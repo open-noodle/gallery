@@ -41,6 +41,25 @@ UPSTREAM_IDENTIFIERS_JSON='[
   "app.immich"
 ]'
 
+# The in-app release announcement is signed by a person, not the product, so the
+# brand swap above cannot fix it: upstream signs it "Your friend, Alex" and a
+# rename only ever produces "Your friend, Alex" again. 55 of the 89 locales define
+# the key, and Weblate translators transliterated the name into their own script
+# ("Твой друг Алекс", "صديقك، أليكس", "당신의 친구, Alex가"), so there is no single
+# token to match — hence the explicit spelling list in config.json, ordered so no
+# entry is a substring of a later one.
+#
+# The fork keeps the name in Latin in every script, matching how it already leaves
+# "Noodle Gallery" in Latin inside Japanese and Arabic strings, and matching the
+# hand-written overrides shipped for de/es/fr/it/nl/pl. Transliterating instead
+# would mean 15 spellings of a real person's name that nobody here can proofread.
+#
+# The 34 locales that never define the key are already correct: svelte-i18n
+# resolves them against the branded en.json.
+AUTHOR_NAME=$(jq -r '.author.name' "$CONFIG")
+AUTHOR_SIGNOFF_KEY=$(jq -r '.author.signoff_key' "$CONFIG")
+UPSTREAM_AUTHOR_NAMES_JSON=$(jq -c '.upstream.author_names' "$CONFIG")
+
 # Mobile
 BUNDLE_ID=$(jq -r '.mobile.bundle_id' "$CONFIG")
 # bundle_id_debug / bundle_id_profile are no longer branded directly — #29077 derives
@@ -90,6 +109,25 @@ fi
 #
 # --- i18n ---
 #
+# Rewrite the release sign-off in one locale file so it names the fork's author.
+#
+# Scoped to the single sign-off key rather than a `walk` over every string: the
+# name appears in no other key in any of the 89 locales, so the narrow scope costs
+# nothing and makes it impossible for a short token like "Alex" to corrupt an
+# unrelated translation. split/join is a LITERAL replace — unlike gsub it cannot
+# reinterpret a name as a regex.
+swap_author_name() { # <locale-file>
+  local tmp
+  tmp=$(mktemp)
+  jq --arg key "$AUTHOR_SIGNOFF_KEY" --arg name "$AUTHOR_NAME" \
+     --argjson upstream "$UPSTREAM_AUTHOR_NAMES_JSON" '
+    def swap: reduce range(0; $upstream | length) as $i (.; split($upstream[$i]) | join($name));
+    if (.[$key] | type) == "string" then .[$key] |= swap else . end
+  ' "$1" > "$tmp"
+  chmod 644 "$tmp"
+  mv "$tmp" "$1"
+}
+
 patch_i18n() {
   echo "--- Patching i18n strings ---"
   local i18n_dir="$REPO_ROOT/i18n"
@@ -105,6 +143,16 @@ patch_i18n() {
     chmod 644 "$tmp"
     mv "$tmp" "$en_target"
     echo "  Merged $(jq '[paths(scalars)] | length' "$en_overrides") override keys into en.json"
+  fi
+
+  # overrides-en.json already carries the branded sign-off, so this is normally a
+  # no-op on en.json. Run it anyway: it keeps the invariant "every locale that
+  # defines the key names the fork's author" true of en too, so an upstream edit
+  # that outruns the override cannot slip through verify-branding.sh's check.
+  # Plain `if`, not `[[ ]] && cmd`: under `set -e` a false test makes the AND-list
+  # return 1 and aborts the whole branding run.
+  if [[ -f "$en_target" ]]; then
+    swap_author_name "$en_target"
   fi
 
   # The non-English locale files (i18n/de.json, fr.json, ...) are upstream
@@ -147,6 +195,12 @@ patch_i18n() {
       mv "$tmp" "$locale_file"
       echo "  Merged $(jq 'length' "$lang_overrides") override keys into ${lang}.json"
     fi
+
+    # 2b. Sign the release announcement with the fork's author. Runs AFTER the
+    #     override merge so a hand-written translation (de/es/fr/it/nl/pl, which
+    #     already say "Pierre") wins and this becomes a no-op there; it is the
+    #     only thing covering the other 47 locales that define the key.
+    swap_author_name "$locale_file"
 
     # 3. Rewrite every remaining upstream-name leak in this locale to the fork
     #    name. `walk` reaches leaves at any depth, so the nested admin.*

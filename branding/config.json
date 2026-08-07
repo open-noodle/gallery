@@ -18,12 +18,36 @@
     "server_id": "1480633426376921239"
   },
 
+  "author": {
+    "_comment": "Signs the in-app release announcement (i18n version_announcement_closing). A person, not the product — upstream signs it 'Your friend, Alex', so the fork signs it with its own author.",
+    "name": "Pierre",
+    "signoff_key": "version_announcement_closing"
+  },
+
   "upstream": {
     "name": "Immich",
     "version": "3.1.0",
     "url": "https://github.com/immich-app/immich",
     "docs_url": "https://docs.immich.app",
-    "discord_url": "https://discord.immich.app"
+    "discord_url": "https://discord.immich.app",
+    "_comment_author_names": "Every spelling Weblate translators gave upstream's author, transliterated per script. patch_i18n swaps these for author.name in the sign-off key. ORDER MATTERS: no entry may be a substring of a later entry, or the shorter one consumes part of the longer ('Alex' would leave 'Pierre가'). test-i18n-branding.sh asserts that invariant.",
+    "author_names": [
+      "Alex가",
+      "Alekss",
+      "Aleks",
+      "Alex",
+      "Ալեքսը",
+      "अ‍ॅलेक्स",
+      "एलेक्स",
+      "ಅಲೆಕ್ಸ್",
+      "അലക്സ്",
+      "அலெக்ச்",
+      "อเล็กซ์",
+      "أليكس",
+      "ایلکس",
+      "אלכס",
+      "Алекс"
+    ]
   },
 
   "mobile": {

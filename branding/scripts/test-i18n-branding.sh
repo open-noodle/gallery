@@ -42,6 +42,14 @@ fi
 source "$SCRIPT_DIR/apply-branding.sh"
 set +e # apply-branding.sh enables `set -e`; a failed grep/jq must not abort the run
 
+# apply-branding.sh keeps the author spellings as JSON (jq consumes them directly);
+# the assertions below need them as a shell array. Read loop, not `mapfile`, which is
+# bash 4+ and macOS still ships bash 3.2.
+UPSTREAM_AUTHOR_NAMES=()
+while IFS= read -r author_spelling; do
+  UPSTREAM_AUTHOR_NAMES+=("$author_spelling")
+done < <(jq -r '.upstream.author_names[]' "$CONFIG")
+
 # Mirror the whole i18n/ tree into a temp REPO_ROOT and patch the mirror.
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
@@ -196,6 +204,89 @@ fi
 echo "English-variant locales carry the fork's English wording (en_GB):"
 eq en_GB "$KEY" "Support Noodle Gallery" 'en_GB buy button is the branded English CTA, not "Buy"'
 eq en_GB version_announcement_closing "Your friend, Pierre" "en_GB release sign-off names the fork author, not upstream's"
+
+# The sign-off names a person, so the brand swap cannot reach it and every scan
+# above is blind to it — the string contains no upstream product name. 55 of the 89
+# locales define the key; hand-written overrides cover 8, and swap_author_name()
+# covers the other 47 by substituting the spellings in .upstream.author_names.
+echo "Release sign-off names the fork's author in every locale that defines it:"
+
+# The substitution list is order-sensitive: replacing a token that is a PREFIX of a
+# later one destroys the later match ("Alex" first would leave "Pierre가" for ko,
+# "Pierres" for lv). Assert the invariant instead of trusting the file's comment.
+order_violations=0
+for i in "${!UPSTREAM_AUTHOR_NAMES[@]}"; do
+  for j in "${!UPSTREAM_AUTHOR_NAMES[@]}"; do
+    [[ $j -le $i ]] && continue
+    if [[ "${UPSTREAM_AUTHOR_NAMES[$j]}" == *"${UPSTREAM_AUTHOR_NAMES[$i]}"* ]]; then
+      echo "  FAIL: config author_names['${UPSTREAM_AUTHOR_NAMES[$i]}'] precedes '${UPSTREAM_AUTHOR_NAMES[$j]}' but is a substring of it — move the longer one first"
+      order_violations=$((order_violations + 1))
+    fi
+  done
+done
+if [[ $order_violations -eq 0 ]]; then
+  echo "  ok:   ${#UPSTREAM_AUTHOR_NAMES[@]} author spellings ordered so none consumes a longer one"
+else
+  fails=$((fails + order_violations))
+fi
+
+# One per substitution class, so a failure says which kind broke.
+eq ru version_announcement_closing "Твой друг Pierre"      'ru sign-off: Cyrillic transliteration swapped, sentence intact'
+eq ko version_announcement_closing "당신의 친구, Pierre"     'ko sign-off: subject particle consumed with the name (Alex가)'
+eq lv version_announcement_closing "Tavs draugs, Pierre"   'lv sign-off: declined Latin form swapped (Alekss)'
+eq th version_announcement_closing "เพื่อนของคุณ Pierre"      'th sign-off: Thai transliteration swapped'
+eq ja version_announcement_closing "あなたの友人、Pierre"     'ja sign-off: bare Latin name in a CJK sentence'
+eq af version_announcement_closing "Jou vriend, Pierre"    'af sign-off: override fixes upstream half-English "Jou friend"'
+# A locale whose override already says Pierre must not be double-substituted.
+eq nl version_announcement_closing "Je vriend, Pierre"     'nl sign-off: hand-written override wins, swap is a no-op'
+
+# Whole-file guarantee, matching verify-branding.sh: assert the OUTCOME, so a future
+# locale arriving with an unlisted transliteration fails here too, not just in CI's
+# verify step. Locales that never define the key inherit branded en and are skipped.
+signoff_gaps=0
+signoff_seen=0
+for locale_file in "$TMP"/i18n/*.json; do
+  lang=$(basename "$locale_file" .json)
+  sign=$(val_at "$lang" version_announcement_closing)
+  [[ -z "$sign" ]] && continue
+  signoff_seen=$((signoff_seen + 1))
+  if ! printf '%s' "$sign" | grep -qF "$AUTHOR_NAME"; then
+    echo "  FAIL: ${lang} sign-off does not name '$AUTHOR_NAME': '$sign' — add its spelling to .upstream.author_names"
+    signoff_gaps=$((signoff_gaps + 1))
+  fi
+done
+if [[ $signoff_gaps -eq 0 ]]; then
+  echo "  ok:   $signoff_seen locales define the sign-off, all name '$AUTHOR_NAME'"
+else
+  fails=$((fails + signoff_gaps))
+fi
+
+# The swap is scoped to the sign-off key precisely so a short token like "Alex"
+# cannot damage an unrelated translation. No real locale exercises that today, so
+# prove it on a fixture: patch a second throwaway tree containing a decoy key.
+echo "The author swap touches only the sign-off key:"
+TMP_SCOPE="$(mktemp -d)"
+trap 'rm -rf "$TMP" "$TMP_SCOPE"' EXIT
+mkdir -p "$TMP_SCOPE/i18n"
+cp "$REPO/i18n/en.json" "$TMP_SCOPE/i18n/en.json"
+jq -n '{
+  "version_announcement_closing": "Din ven, Alex",
+  "album_name_example": "Alex in Paris",
+  "shared_by_user": "Aleks shared an album with you"
+}' > "$TMP_SCOPE/i18n/da.json"
+REPO_ROOT="$TMP_SCOPE" patch_i18n >/dev/null
+scope_got=$(jq -r '.version_announcement_closing' "$TMP_SCOPE/i18n/da.json")
+scope_decoy1=$(jq -r '.album_name_example' "$TMP_SCOPE/i18n/da.json")
+scope_decoy2=$(jq -r '.shared_by_user' "$TMP_SCOPE/i18n/da.json")
+if [[ "$scope_got" != "Din ven, Pierre" ]]; then
+  echo "  FAIL: fixture sign-off = '$scope_got' (expected 'Din ven, Pierre')"
+  fails=$((fails + 1))
+elif [[ "$scope_decoy1" != "Alex in Paris" || "$scope_decoy2" != "Aleks shared an album with you" ]]; then
+  echo "  FAIL: the swap escaped its key — album_name_example = '$scope_decoy1', shared_by_user = '$scope_decoy2'"
+  fails=$((fails + 1))
+else
+  echo "  ok:   sign-off swapped, 'Alex'/'Aleks' in other keys untouched"
+fi
 
 # Structural guard, not a spot check: for EVERY overridden key, branded en_GB must
 # equal branded en unless the difference is a deliberate UK variant listed below.
