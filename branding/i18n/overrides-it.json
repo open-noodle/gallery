@@ -1,0 +1,20 @@
+{
+  "admin": {
+    "notification_email_from_address_description": "Indirizzo email del mittente, ad esempio: \"Noodle Gallery <noreply@example.com>\". Assicurati di usare un indirizzo dal quale sei autorizzato a inviare email."
+  },
+  "buy": "Sostieni Noodle Gallery",
+  "install_app_title": "Installa Noodle Gallery",
+  "my_immich_description": "Copia un link a questa pagina",
+  "my_immich_title": "Link alla pagina",
+  "purchase_activated_subtitle": "Grazie per sostenere Noodle Gallery e il software open source",
+  "purchase_button_buy_immich": "Sostieni Noodle Gallery",
+  "purchase_discord_button": "Entra nel nostro Discord",
+  "purchase_discord_description": "Contattaci su Discord se vuoi scoprire come sostenere il progetto.",
+  "purchase_discord_title": "Vuoi sostenere Noodle Gallery?",
+  "purchase_github_button": "Lascia una stella su GitHub",
+  "purchase_github_description": "Lasciaci una stella su GitHub per aiutare altri a scoprire Noodle Gallery.",
+  "purchase_github_title": "Lasciaci una stella su GitHub",
+  "purchase_license_subtitle": "Sostieni Noodle Gallery per finanziare lo sviluppo continuo del servizio",
+  "purchase_panel_info_2": "Ci impegniamo a non aggiungere paywall. Se vuoi sostenere lo sviluppo continuo di Noodle Gallery, contattaci su Discord.",
+  "version_announcement_closing": "Il tuo amico, Pierre"
+}
