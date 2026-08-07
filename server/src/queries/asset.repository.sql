@@ -933,12 +933,61 @@ from
   inner join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
   inner join "cities" on "asset_exif"."city" = "cities"."city"
 where
-  "ownerId" = $2::uuid
-  and "visibility" = $3
-  and "type" = $4
+  (
+    "asset"."ownerId" = $2::uuid
+    or exists (
+      select
+        1 as "exists"
+      from
+        "shared_space_asset"
+      where
+        "shared_space_asset"."assetId" = "asset"."id"
+        and "shared_space_asset"."spaceId" = any ($3::uuid[])
+    )
+    or exists (
+      select
+        1 as "exists"
+      from
+        "shared_space_library"
+      where
+        "shared_space_library"."libraryId" = "asset"."libraryId"
+        and "shared_space_library"."spaceId" = any ($4::uuid[])
+    )
+    or (
+      exists (
+        select
+          1 as "exists"
+        from
+          "shared_space_album"
+          inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+          inner join "album" on "album"."id" = "shared_space_album"."albumId"
+          and "album"."deletedAt" is null
+        where
+          "album_asset"."assetId" = "asset"."id"
+          and "shared_space_album"."spaceId" = any ($5::uuid[])
+          and "shared_space_album"."showInTimeline" = $6
+      )
+      or exists (
+        select
+          1 as "exists"
+        from
+          "shared_space_album"
+          inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+          and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+          inner join "album" on "album"."id" = "shared_space_album"."albumId"
+          and "album"."deletedAt" is null
+        where
+          "album_space_asset"."assetId" = "asset"."id"
+          and "shared_space_album"."spaceId" = any ($7::uuid[])
+          and "shared_space_album"."showInTimeline" = $8
+      )
+    )
+  )
+  and "visibility" = $9
+  and "type" = $10
   and "deletedAt" is null
 limit
-  $5
+  $11
 
 -- AssetRepository.getRecentlyCreatedAssetIds
 select

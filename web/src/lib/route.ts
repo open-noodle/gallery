@@ -97,7 +97,9 @@ export const Route = {
     `/spaces/${spaceId}/people/${personId}` + asQueryString(params),
 
   // photos
-  photos: (params?: { at?: string }) => '/photos' + asQueryString(params),
+  // `city` is a filter-panel param (SEARCHABLE_PAGE_FILTER_PARAMS) — /photos hydrates its filter
+  // state from the URL, so this lands on the timeline already narrowed to that place (#867).
+  photos: (params?: { at?: string; city?: string }) => '/photos' + asQueryString(params),
   viewAsset: ({ id }: { id: string }) => `/photos/${id}`,
   archive: () => '/archive',
   favorites: () => '/favorites',
