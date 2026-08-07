@@ -1061,14 +1061,63 @@ with recursive
         "asset_exif"
         inner join "asset" on "asset"."id" = "asset_exif"."assetId"
       where
-        "asset"."ownerId" = any ($1::uuid[])
-        and "asset"."visibility" = $2
-        and "asset"."type" = $3
+        (
+          "asset"."ownerId" = any ($1::uuid[])
+          or exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_asset"
+            where
+              "shared_space_asset"."assetId" = "asset"."id"
+              and "shared_space_asset"."spaceId" = any ($2::uuid[])
+          )
+          or exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_library"
+            where
+              "shared_space_library"."libraryId" = "asset"."libraryId"
+              and "shared_space_library"."spaceId" = any ($3::uuid[])
+          )
+          or (
+            exists (
+              select
+                1 as "exists"
+              from
+                "shared_space_album"
+                inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+                inner join "album" on "album"."id" = "shared_space_album"."albumId"
+                and "album"."deletedAt" is null
+              where
+                "album_asset"."assetId" = "asset"."id"
+                and "shared_space_album"."spaceId" = any ($4::uuid[])
+                and "shared_space_album"."showInTimeline" = $5
+            )
+            or exists (
+              select
+                1 as "exists"
+              from
+                "shared_space_album"
+                inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+                and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+                inner join "album" on "album"."id" = "shared_space_album"."albumId"
+                and "album"."deletedAt" is null
+              where
+                "album_space_asset"."assetId" = "asset"."id"
+                and "shared_space_album"."spaceId" = any ($6::uuid[])
+                and "shared_space_album"."showInTimeline" = $7
+            )
+          )
+        )
+        and "asset"."visibility" = $8
+        and "asset"."type" = $9
         and "asset"."deletedAt" is null
       order by
         "city"
       limit
-        $4
+        $10
     )
     union all
     (
@@ -1085,15 +1134,64 @@ with recursive
             "asset_exif"
             inner join "asset" on "asset"."id" = "asset_exif"."assetId"
           where
-            "asset"."ownerId" = any ($5::uuid[])
-            and "asset"."visibility" = $6
-            and "asset"."type" = $7
+            (
+              "asset"."ownerId" = any ($11::uuid[])
+              or exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_asset"
+                where
+                  "shared_space_asset"."assetId" = "asset"."id"
+                  and "shared_space_asset"."spaceId" = any ($12::uuid[])
+              )
+              or exists (
+                select
+                  1 as "exists"
+                from
+                  "shared_space_library"
+                where
+                  "shared_space_library"."libraryId" = "asset"."libraryId"
+                  and "shared_space_library"."spaceId" = any ($13::uuid[])
+              )
+              or (
+                exists (
+                  select
+                    1 as "exists"
+                  from
+                    "shared_space_album"
+                    inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+                    inner join "album" on "album"."id" = "shared_space_album"."albumId"
+                    and "album"."deletedAt" is null
+                  where
+                    "album_asset"."assetId" = "asset"."id"
+                    and "shared_space_album"."spaceId" = any ($14::uuid[])
+                    and "shared_space_album"."showInTimeline" = $15
+                )
+                or exists (
+                  select
+                    1 as "exists"
+                  from
+                    "shared_space_album"
+                    inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+                    and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+                    inner join "album" on "album"."id" = "shared_space_album"."albumId"
+                    and "album"."deletedAt" is null
+                  where
+                    "album_space_asset"."assetId" = "asset"."id"
+                    and "shared_space_album"."spaceId" = any ($16::uuid[])
+                    and "shared_space_album"."showInTimeline" = $17
+                )
+              )
+            )
+            and "asset"."visibility" = $18
+            and "asset"."type" = $19
             and "asset"."deletedAt" is null
             and "asset_exif"."city" > "cte"."city"
           order by
             "city"
           limit
-            $8
+            $20
         ) as "l" on true
     )
   )
