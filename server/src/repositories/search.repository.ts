@@ -1,5 +1,14 @@
 import { Injectable } from '@nestjs/common';
-import { Kysely, OrderByDirection, Selectable, SelectQueryBuilder, ShallowDehydrateObject, sql, SqlBool } from 'kysely';
+import {
+  expressionBuilder,
+  Kysely,
+  OrderByDirection,
+  Selectable,
+  SelectQueryBuilder,
+  ShallowDehydrateObject,
+  sql,
+  SqlBool,
+} from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { columns } from 'src/database';
 import { DummyValue, GenerateSql } from 'src/decorators';
@@ -1004,15 +1013,35 @@ export class SearchRepository {
       .execute();
   }
 
-  @GenerateSql({ params: [[DummyValue.UUID]] })
-  getAssetsByCity(userIds: string[]) {
+  @GenerateSql({ params: [[DummyValue.UUID], [DummyValue.UUID]] })
+  getAssetsByCity(userIds: string[], timelineSpaceIds?: string[]) {
+    // #867: the places page is the "view all" of the Explore strip, so it carries the same scope —
+    // own (and partner) assets, plus anything reachable through a space the viewer kept on their
+    // timeline. Built from a detached expression builder because the recursive `cte` widens the
+    // schema of the builders below past the shared helpers' `ExpressionBuilder<DB, keyof DB>`; the
+    // predicate only ever references `asset.*`, so the emitted SQL is unaffected.
+    const viewerScope = () => {
+      const eb = expressionBuilder<DB, 'asset'>();
+      return eb.or([
+        eb('asset.ownerId', '=', anyUuid(userIds)),
+        ...(timelineSpaceIds?.length
+          ? spaceAssetPathBranches(eb, {
+              correlateAssetId: 'asset.id',
+              correlateLibraryId: 'asset.libraryId',
+              scope: { spaceIds: timelineSpaceIds },
+              requireShowInTimeline: true,
+            })
+          : []),
+      ]);
+    };
+
     return this.db
       .withRecursive('cte', (qb) => {
         const base = qb
           .selectFrom('asset_exif')
           .select(['city', 'assetId'])
           .innerJoin('asset', 'asset.id', 'asset_exif.assetId')
-          .where('asset.ownerId', '=', anyUuid(userIds))
+          .where(viewerScope())
           .where('asset.visibility', '=', AssetVisibility.Timeline)
           .where('asset.type', '=', AssetType.Image)
           .where('asset.deletedAt', 'is', null)
@@ -1028,7 +1057,7 @@ export class SearchRepository {
                 .selectFrom('asset_exif')
                 .select(['city', 'assetId'])
                 .innerJoin('asset', 'asset.id', 'asset_exif.assetId')
-                .where('asset.ownerId', '=', anyUuid(userIds))
+                .where(viewerScope())
                 .where('asset.visibility', '=', AssetVisibility.Timeline)
                 .where('asset.type', '=', AssetType.Image)
                 .where('asset.deletedAt', 'is', null)

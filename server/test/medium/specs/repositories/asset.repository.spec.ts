@@ -2060,4 +2060,93 @@ describe(AssetRepository.name, () => {
       expect(assets.id).toEqual([matchingAsset.id]);
     });
   });
+
+  // #867: the Explore "Places" strip is fed by getAssetIdByCity, which only ever looked at
+  // `asset.ownerId`. A space viewer therefore got no tile for a city that exists only on assets
+  // shared with them, even though the same city showed up in the location filter and the filtered
+  // timeline returned those assets. Each test runs on its own database because the `cities` CTE
+  // and the `maxFields` limit are global — a city left behind by another test in this file would
+  // otherwise compete for the limited slots.
+  describe('getAssetIdByCity — shared-space scope (issue #867)', () => {
+    const exploreOptions = { minAssetsPerField: 1, maxFields: 12 };
+
+    it('surfaces a city that only exists on an asset shared directly into a timeline-enabled space', async () => {
+      const { ctx, sut } = setup(await getKyselyDB());
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: SharedSpaceRole.Viewer });
+
+      const { asset } = await ctx.newAsset({ ownerId: owner.id });
+      await ctx.newExif({ assetId: asset.id, city: 'Reykjavik' });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
+
+      const withSpace = await sut.getAssetIdByCity(member.id, {
+        ...exploreOptions,
+        timelineSpaceIds: [space.id],
+      });
+      expect(withSpace.items).toEqual([{ value: 'Reykjavik', data: asset.id }]);
+
+      // Without the space scope the member is back to their own (empty) library.
+      const ownOnly = await sut.getAssetIdByCity(member.id, exploreOptions);
+      expect(ownOnly.items).toEqual([]);
+    });
+
+    it('surfaces a city from an album linked into the space, and hides it when the link is off-timeline', async () => {
+      const { ctx, sut } = setup(await getKyselyDB());
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: SharedSpaceRole.Viewer });
+
+      const { asset } = await ctx.newAsset({ ownerId: owner.id });
+      await ctx.newExif({ assetId: asset.id, city: 'Reykjavik' });
+      const { result: album } = await ctx.newAlbum({ ownerId: owner.id }, [asset.id]);
+      await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id, showInTimeline: true });
+
+      const shown = await sut.getAssetIdByCity(member.id, { ...exploreOptions, timelineSpaceIds: [space.id] });
+      expect(shown.items).toEqual([{ value: 'Reykjavik', data: asset.id }]);
+
+      // A member who hid this album from their timeline must not get its cities back on Explore.
+      await ctx.database
+        .updateTable('shared_space_album')
+        .set({ showInTimeline: false })
+        .where('spaceId', '=', space.id)
+        .where('albumId', '=', album.id)
+        .execute();
+
+      const hidden = await sut.getAssetIdByCity(member.id, { ...exploreOptions, timelineSpaceIds: [space.id] });
+      expect(hidden.items).toEqual([]);
+    });
+
+    it('does not leak a city from a space the viewer does not belong to', async () => {
+      const { ctx, sut } = setup(await getKyselyDB());
+      const { user: owner } = await ctx.newUser();
+      const { user: outsider } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+
+      const { asset } = await ctx.newAsset({ ownerId: owner.id });
+      await ctx.newExif({ assetId: asset.id, city: 'Reykjavik' });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
+
+      // The outsider resolves no timeline spaces, so the space arm is never armed for them.
+      const result = await sut.getAssetIdByCity(outsider.id, exploreOptions);
+      expect(result.items).toEqual([]);
+    });
+
+    it('excludes hidden and archived space assets from the strip', async () => {
+      const { ctx, sut } = setup(await getKyselyDB());
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: SharedSpaceRole.Viewer });
+
+      const { asset: archived } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Archive });
+      await ctx.newExif({ assetId: archived.id, city: 'Reykjavik' });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: archived.id, addedById: owner.id });
+
+      const result = await sut.getAssetIdByCity(member.id, { ...exploreOptions, timelineSpaceIds: [space.id] });
+      expect(result.items).toEqual([]);
+    });
+  });
 });
