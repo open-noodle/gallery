@@ -108,6 +108,7 @@ describe(SearchService.name, () => {
       const asset = AssetFactory.from()
         .exif({ latitude: 42, longitude: 69, city: 'city', state: 'state', country: 'country' })
         .build();
+      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
       mocks.asset.getAssetIdByCity.mockResolvedValue({
         fieldName: 'exifInfo.city',
         items: [{ value: 'city', data: asset.id }],
@@ -128,6 +129,56 @@ describe(SearchService.name, () => {
       const result = await sut.getExploreData(auth);
 
       expect(result).toEqual(expectedResponse);
+    });
+
+    // #867: the Explore "Places" strip was owner-scoped, so a space member saw no tile for a city
+    // that only exists on assets shared with them. Scope it like every other home surface: own
+    // assets plus the spaces the member kept in their timeline.
+    it('scopes explore cities to the viewer plus their timeline-enabled shared spaces', async () => {
+      const auth = AuthFactory.create();
+      const spaceId = newUuid();
+      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId }]);
+      mocks.asset.getAssetIdByCity.mockResolvedValue({ fieldName: 'exifInfo.city', items: [] });
+      mocks.asset.getRecentlyCreatedAssetIds.mockResolvedValue({ fieldName: 'createdAt', items: [] });
+      mocks.asset.getByIdsWithAllRelationsButStacks.mockResolvedValue([]);
+
+      await sut.getExploreData(auth);
+
+      expect(mocks.sharedSpace.getSpaceIdsForTimeline).toHaveBeenCalledWith(auth.user.id);
+      expect(mocks.asset.getAssetIdByCity).toHaveBeenCalledWith(
+        auth.user.id,
+        expect.objectContaining({ timelineSpaceIds: [spaceId] }),
+      );
+    });
+
+    it('leaves the city scope owner-only when the viewer has no timeline-enabled spaces', async () => {
+      const auth = AuthFactory.create();
+      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
+      mocks.asset.getAssetIdByCity.mockResolvedValue({ fieldName: 'exifInfo.city', items: [] });
+      mocks.asset.getRecentlyCreatedAssetIds.mockResolvedValue({ fieldName: 'createdAt', items: [] });
+      mocks.asset.getByIdsWithAllRelationsButStacks.mockResolvedValue([]);
+
+      await sut.getExploreData(auth);
+
+      expect(mocks.asset.getAssetIdByCity).toHaveBeenCalledWith(auth.user.id, {
+        maxFields: 12,
+        minAssetsPerField: 5,
+        timelineSpaceIds: undefined,
+      });
+    });
+
+    // The "recently added" strip stays owner-scoped on purpose — it answers "what did *I* just
+    // add", and /recently-added itself is an owner surface.
+    it('leaves the recently-added strip owner-scoped', async () => {
+      const auth = AuthFactory.create();
+      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId: newUuid() }]);
+      mocks.asset.getAssetIdByCity.mockResolvedValue({ fieldName: 'exifInfo.city', items: [] });
+      mocks.asset.getRecentlyCreatedAssetIds.mockResolvedValue({ fieldName: 'createdAt', items: [] });
+      mocks.asset.getByIdsWithAllRelationsButStacks.mockResolvedValue([]);
+
+      await sut.getExploreData(auth);
+
+      expect(mocks.asset.getRecentlyCreatedAssetIds).toHaveBeenCalledWith(auth.user.id, 12);
     });
   });
 
@@ -1925,12 +1976,25 @@ describe(SearchService.name, () => {
   describe('getAssetsByCity', () => {
     it('should get assets by city', async () => {
       const asset = AssetFactory.from().build();
+      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
       mocks.search.getAssetsByCity.mockResolvedValue([asset as any]);
 
       const result = await sut.getAssetsByCity(authStub.user1);
 
-      expect(mocks.search.getAssetsByCity).toHaveBeenCalledWith([authStub.user1.user.id]);
+      expect(mocks.search.getAssetsByCity).toHaveBeenCalledWith([authStub.user1.user.id], undefined);
       expect(result).toHaveLength(1);
+    });
+
+    // #867: /places is the "view all" of the same Explore strip, so it gets the same scope.
+    it('scopes the places page to the viewer plus their timeline-enabled shared spaces', async () => {
+      const spaceId = newUuid();
+      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId }]);
+      mocks.search.getAssetsByCity.mockResolvedValue([]);
+
+      await sut.getAssetsByCity(authStub.user1);
+
+      expect(mocks.sharedSpace.getSpaceIdsForTimeline).toHaveBeenCalledWith(authStub.user1.user.id);
+      expect(mocks.search.getAssetsByCity).toHaveBeenCalledWith([authStub.user1.user.id], [spaceId]);
     });
   });
 
