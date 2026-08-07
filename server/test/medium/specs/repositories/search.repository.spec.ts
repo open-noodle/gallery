@@ -1164,4 +1164,67 @@ describe(SearchRepository.name, () => {
       expect(tags.map((tag) => tag.value)).not.toContain('LockedTag');
     });
   });
+
+  // #867: /places ("view all" for the Explore strip) was scoped to own + partner assets only, so a
+  // space member saw none of the cities from the assets shared with them.
+  describe('getAssetsByCity — shared-space scope (issue #867)', () => {
+    it('returns a city that only exists on an asset shared into a timeline-enabled space', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: 'viewer' });
+
+      const { asset } = await ctx.newAsset({ ownerId: owner.id });
+      await ctx.newExif({ assetId: asset.id, city: 'Valparaiso' });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
+
+      const withSpace = await sut.getAssetsByCity([member.id], [space.id]);
+      expect(withSpace.map((item) => item.id)).toContain(asset.id);
+
+      const ownOnly = await sut.getAssetsByCity([member.id]);
+      expect(ownOnly.map((item) => item.id)).not.toContain(asset.id);
+    });
+
+    it('returns a city from an album linked into the space only while the link is on-timeline', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: 'viewer' });
+
+      const { asset } = await ctx.newAsset({ ownerId: owner.id });
+      await ctx.newExif({ assetId: asset.id, city: 'Ushuaia' });
+      const { result: album } = await ctx.newAlbum({ ownerId: owner.id }, [asset.id]);
+      await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id, showInTimeline: true });
+
+      const shown = await sut.getAssetsByCity([member.id], [space.id]);
+      expect(shown.map((item) => item.id)).toContain(asset.id);
+
+      await ctx.database
+        .updateTable('shared_space_album')
+        .set({ showInTimeline: false })
+        .where('spaceId', '=', space.id)
+        .where('albumId', '=', album.id)
+        .execute();
+
+      const hidden = await sut.getAssetsByCity([member.id], [space.id]);
+      expect(hidden.map((item) => item.id)).not.toContain(asset.id);
+    });
+
+    it('does not return archived space assets', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: 'viewer' });
+
+      const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Archive });
+      await ctx.newExif({ assetId: asset.id, city: 'Punta Arenas' });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
+
+      const result = await sut.getAssetsByCity([member.id], [space.id]);
+      expect(result.map((item) => item.id)).not.toContain(asset.id);
+    });
+  });
 });
