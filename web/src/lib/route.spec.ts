@@ -107,6 +107,21 @@ describe('Route', () => {
     });
   });
 
+  describe(Route.photos.name, () => {
+    it('should work', () => {
+      expect(Route.photos()).toBe('/photos');
+    });
+
+    // #867: place tiles now land on the filtered timeline instead of the deprecated /search view.
+    it('should support a city filter', () => {
+      expect(Route.photos({ city: 'Cape Town' })).toBe('/photos?city=Cape%20Town');
+    });
+
+    it('should ignore an empty city', () => {
+      expect(Route.photos({ city: '' })).toBe('/photos');
+    });
+  });
+
   describe('viewSpaceAlbum', () => {
     it('links to an album inside a space', () => {
       expect(Route.viewSpaceAlbum({ spaceId: 'space-1', albumId: 'album-2' })).toBe('/spaces/space-1/albums/album-2');
