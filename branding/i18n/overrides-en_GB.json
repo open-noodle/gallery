@@ -1,0 +1,11 @@
+{
+  "admin": {
+    "notification_email_from_address_description": "Sender email address, for example: \"Noodle Gallery <noreply@example.com>\". Make sure to use an address you're allowed to send emails from."
+  },
+  "buy": "Support Noodle Gallery",
+  "my_immich_description": "Copy a link to this page",
+  "my_immich_title": "Page link",
+  "purchase_button_buy_immich": "Support Noodle Gallery",
+  "purchase_panel_info_2": "We're committed not to add paywalls. If you'd like to support Noodle Gallery's ongoing development, reach out to us on Discord.",
+  "version_announcement_closing": "Your friend, Pierre"
+}
