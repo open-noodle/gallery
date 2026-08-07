@@ -8,6 +8,14 @@ CONFIG="$BRANDING_DIR/config.json"
 
 NAME=$(jq -r '.name' "$CONFIG")
 UPSTREAM_NAME=$(jq -r '.upstream_name' "$CONFIG")
+AUTHOR_NAME=$(jq -r '.author.name' "$CONFIG")
+AUTHOR_SIGNOFF_KEY=$(jq -r '.author.signoff_key' "$CONFIG")
+# read loop rather than `mapfile`, which is bash 4+ — macOS still ships bash 3.2 at
+# /bin/bash, and the rest of this repo's scripts stay runnable there.
+UPSTREAM_AUTHOR_NAMES=()
+while IFS= read -r author_spelling; do
+  UPSTREAM_AUTHOR_NAMES+=("$author_spelling")
+done < <(jq -r '.upstream.author_names[]' "$CONFIG")
 DEEP_LINK_SCHEME=$(jq -r '.mobile.deep_link_scheme' "$CONFIG")
 BUNDLE_ID=$(jq -r '.mobile.bundle_id' "$CONFIG")
 OAUTH_CALLBACK=$(jq -r '.mobile.oauth_callback' "$CONFIG")
@@ -111,6 +119,45 @@ if [[ -f "$overrides_file" && -f "$i18n_file" ]]; then
   done
   if [[ $locale_leaks -eq 0 ]]; then
     echo "  i18n: no '$UPSTREAM_NAME' leaks across rebranded keys in any locale"
+  fi
+
+  # The release sign-off names a PERSON, so none of the brand-name scans above can
+  # see it: "Your friend, Alex" contains no upstream product name and passes every
+  # one of them. patch_i18n's swap covers the spellings listed in config.json, but
+  # upstream gains locales continuously and Weblate translators keep transliterating
+  # the name into new scripts — a Georgian "ალექსი" landing in a future rebase would
+  # be a spelling the list has never seen.
+  #
+  # So assert the OUTCOME rather than the substitution: every locale that defines
+  # the key must name the fork's author. An unrecognised spelling survives the swap
+  # with no "$AUTHOR_NAME" in it and fails here, which turns a silent ship into a red
+  # build. Locales that never define the key are skipped — they inherit branded en.
+  signoff_leaks=0
+  signoff_checked=0
+  for locale_file in "$REPO_ROOT"/i18n/*.json; do
+    [[ -f "$locale_file" ]] || continue
+    lang=$(basename "$locale_file" .json)
+    signoff=$(jq -r --arg k "$AUTHOR_SIGNOFF_KEY" '.[$k] // empty' "$locale_file")
+    [[ -n "$signoff" ]] || continue
+    signoff_checked=$((signoff_checked + 1))
+    if ! printf '%s' "$signoff" | grep -qF "$AUTHOR_NAME"; then
+      echo "  WARN: i18n locale '$lang' sign-off does not name '$AUTHOR_NAME': '$signoff'"
+      echo "        add its spelling of the upstream author to .upstream.author_names in branding/config.json"
+      signoff_leaks=$((signoff_leaks + 1))
+      EXIT_CODE=1
+      continue
+    fi
+    for upstream_author in "${UPSTREAM_AUTHOR_NAMES[@]}"; do
+      if printf '%s' "$signoff" | grep -qF "$upstream_author"; then
+        echo "  WARN: i18n locale '$lang' sign-off still contains '$upstream_author': '$signoff'"
+        signoff_leaks=$((signoff_leaks + 1))
+        EXIT_CODE=1
+        break
+      fi
+    done
+  done
+  if [[ $signoff_leaks -eq 0 ]]; then
+    echo "  i18n: release sign-off names '$AUTHOR_NAME' in all $signoff_checked locales that define it"
   fi
 fi
 
