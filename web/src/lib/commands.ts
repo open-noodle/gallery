@@ -209,8 +209,15 @@ export const getPagesProvider = ($t: MessageFormatter) => {
   return defaultProvider({ name: $t('page'), actions: [...userPages, ...utilityPages, ...adminPages] });
 };
 
+// Upstream builds this on https://my.immich.app, a proxy that redirects a visitor
+// to whichever instance THEY configured there. That cannot work for this fork: a
+// user has configured nothing on that domain, so the copied link drops them on an
+// Immich-branded setup page, and the link they share names immich. Every user here
+// has exactly one instance — the one they are on — so link to it directly. The
+// name and the my_immich_* i18n keys stay as upstream has them to keep the rebase
+// diff to this line. The fragment is deliberately dropped: it is local to the sharer.
 export const getMyImmichLink = () => {
-  return new URL(page.url.pathname + page.url.search, 'https://my.immich.app');
+  return new URL(page.url.pathname + page.url.search, page.url.origin);
 };
 
 export const getSettingsProvider = ($t: MessageFormatter) => {

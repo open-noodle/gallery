@@ -12,6 +12,34 @@ NAME_SHORT=$(jq -r '.name_short' "$CONFIG")
 NAME_SLUG=$(jq -r '.name_slug' "$CONFIG")
 DESCRIPTION=$(jq -r '.description' "$CONFIG")
 UPSTREAM_NAME=$(jq -r '.upstream_name' "$CONFIG")
+UPSTREAM_NAME_LOWER=$(printf '%s' "$UPSTREAM_NAME" | tr '[:upper:]' '[:lower:]')
+
+# Lowercase identifiers that must SURVIVE the rebrand: real hostnames, URL
+# schemes, package scopes and repo slugs that happen to contain the upstream name
+# in lowercase. patch_i18n shields these before rewriting bare lowercase mentions,
+# then restores them. Longest first, so a longer form is shielded whole before a
+# shorter one can consume part of it (docs.immich.app before immich.app).
+#
+# `diles.immich.cloud` is not a typo here — it is one in the Tamil translation of
+# admin.map_implications, and it still points at the upstream brand, so it is
+# shielded rather than silently rebranded into a hostname that never existed.
+#
+# branding/scripts/test-i18n-branding.sh sources this file and asserts that every
+# lowercase mention left after branding is one of these, so a Weblate sync that
+# introduces a new identifier form fails instead of being quietly rewritten.
+UPSTREAM_IDENTIFIERS_JSON='[
+  "tiles.immich.cloud",
+  "diles.immich.cloud",
+  "smtp.immich.app",
+  "docs.immich.app",
+  "buy.immich.app",
+  "get.immich.app",
+  "my.immich.app",
+  "immich.cloud",
+  "immich-app",
+  "immich.app",
+  "app.immich"
+]'
 
 # Mobile
 BUNDLE_ID=$(jq -r '.mobile.bundle_id' "$CONFIG")
@@ -125,10 +153,28 @@ patch_i18n() {
     #    descriptions (issue #672) are covered without enumerating override
     #    paths. split/join is a LITERAL replace — unlike gsub, it cannot
     #    reinterpret the name as a regex or the replacement as a capture ref.
+    #
+    #    Matching the capitalised name alone used to be the whole rule, to spare
+    #    lowercase identifiers (docs.immich.app, app.immich://). But translators
+    #    also lowercase the brand in prose — "Witamy w immich", "Dobrodošli u
+    #    immich" — and those leaked past both this rewrite and every leak scan,
+    #    which grep the capitalised form. So shield the real identifiers first,
+    #    then the lowercase mention can be rewritten with no exception carved out
+    #    for it. Georgian's "immich-ის" rebrands correctly as a result: the case
+    #    suffix is not an identifier, so nothing shields it.
+    #
+    #    Sentinels use private-use code points, which cannot appear in a
+    #    translation, so shielding can never collide with real text.
     tmp=$(mktemp)
-    jq --arg upstream "$UPSTREAM_NAME" --arg name "$NAME" '
-      walk(if type == "string" and contains($upstream)
-           then split($upstream) | join($name)
+    jq --arg upstream "$UPSTREAM_NAME" --arg lower "$UPSTREAM_NAME_LOWER" \
+       --arg name "$NAME" --argjson ids "$UPSTREAM_IDENTIFIERS_JSON" '
+      def shield:   reduce range(0; $ids | length) as $i (.; split($ids[$i]) | join("\ue000\($i)\ue001"));
+      def unshield: reduce range(0; $ids | length) as $i (.; split("\ue000\($i)\ue001") | join($ids[$i]));
+      walk(if type == "string" and (contains($upstream) or contains($lower))
+           then shield
+                | split($upstream) | join($name)
+                | split($lower) | join($name)
+                | unshield
            else . end)
     ' "$locale_file" > "$tmp"
     chmod 644 "$tmp"
