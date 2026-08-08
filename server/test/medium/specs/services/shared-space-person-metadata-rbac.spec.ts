@@ -15,7 +15,6 @@ import { asDateString } from 'src/utils/date';
 import { newMediumService } from 'test/medium.factory';
 import { factory, newEmbedding } from 'test/small.factory';
 import { getKyselyDB } from 'test/utils';
-import { Mocked } from 'vitest';
 
 let defaultDatabase: Kysely<DB>;
 
@@ -35,7 +34,7 @@ const setup = (db?: Kysely<DB>) => {
     ],
     mock: [LoggingRepository, JobRepository],
   });
-  const jobs = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+  const jobs = ctx.getMock(JobRepository);
   jobs.queue.mockResolvedValue();
   jobs.queueAll.mockResolvedValue();
   return { ctx, sut, faceIdentityRepository: ctx.get(FaceIdentityRepository) };
