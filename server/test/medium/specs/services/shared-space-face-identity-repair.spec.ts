@@ -34,7 +34,7 @@ const setup = (db?: Kysely<DB>) => {
     ],
     mock: [LoggingRepository, JobRepository],
   });
-  const jobs = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+  const jobs = ctx.getMock(JobRepository);
   jobs.queue.mockResolvedValue();
   jobs.queueAll.mockResolvedValue();
   jobs.hasInFlightDedupChain.mockResolvedValue(false);
