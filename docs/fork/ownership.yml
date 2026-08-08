@@ -5,7 +5,7 @@ metadata:
   upstream_branch: main
   fork_remote: origin
   fork_branch: main
-  last_verified_fork_head: 88e715507c6a69911bf80f7225faf9c01004ff2a
+  last_verified_fork_head: 64f520e2da0a271dd13d5da5db07c8c295ae3dfd
 
 coverage_ignore:
   - docs/superpowers/**
@@ -288,6 +288,7 @@ features:
       - server/src/schema/migrations-gallery/**
       - server/bin/sync-gallery-migrations.mjs
       - tools/upstream-preflight/**
+      - Template/**
     upstream_extension_paths:
       - .github/workflows/**
       - packages/sdk/src/fetch-client.ts
