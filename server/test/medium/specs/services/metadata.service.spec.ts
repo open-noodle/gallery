@@ -27,7 +27,6 @@ import { clearConfigCache } from 'src/utils/config';
 import { newMediumService } from 'test/medium.factory';
 import { factory } from 'test/small.factory';
 import { getKyselyDB, newRandomImage } from 'test/utils';
-import { Mocked } from 'vitest';
 
 type TimeZoneTest = {
   description: string;
@@ -86,13 +85,11 @@ const setupFaceImport = (db?: Kysely<DB>) => {
   });
 
   ctx.getMock(EventRepository).emit.mockResolvedValue();
-  ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository).queueAll.mockResolvedValue();
-  ctx
-    .getMock<SystemMetadataRepository, Mocked<SystemMetadataRepository>>(SystemMetadataRepository)
-    .get.mockResolvedValue({
-      metadata: { faces: { import: true } },
-      machineLearning: { facialRecognition: { minFaces: 1 } },
-    } as any);
+  ctx.getMock(JobRepository).queueAll.mockResolvedValue();
+  ctx.getMock(SystemMetadataRepository).get.mockResolvedValue({
+    metadata: { faces: { import: true } },
+    machineLearning: { facialRecognition: { minFaces: 1 } },
+  } as any);
   ctx.getMock(StorageRepository).stat.mockResolvedValue({
     size: 123_456,
     mtime: new Date(654_321),
@@ -112,17 +109,15 @@ const setupPersonService = (db?: Kysely<DB>) => {
     mock: [LoggingRepository, SystemMetadataRepository, UserRepository],
   });
 
-  ctx
-    .getMock<SystemMetadataRepository, Mocked<SystemMetadataRepository>>(SystemMetadataRepository)
-    .get.mockResolvedValue({
-      machineLearning: { facialRecognition: { minFaces: 1 } },
-    } as any);
+  ctx.getMock(SystemMetadataRepository).get.mockResolvedValue({
+    machineLearning: { facialRecognition: { minFaces: 1 } },
+  } as any);
 
   // M2: PersonService.getAll now reads the People face threshold from the caller's
   // people.minimumFaces preference (default 3) instead of ML config. Pin it to 1 so these
   // single-face identity tests still surface their people, mirroring the ML minFaces=1 above.
   ctx
-    .getMock<UserRepository, Mocked<UserRepository>>(UserRepository)
+    .getMock(UserRepository)
     .getMetadata.mockResolvedValue([
       { key: UserMetadataKey.Preferences, value: { people: { minimumFaces: 1 } } },
     ] as any);
@@ -139,8 +134,8 @@ const setupFaceIdentityBackfillService = (db?: Kysely<DB>) => {
     mock: [JobRepository, LoggingRepository],
   });
 
-  ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository).queue.mockResolvedValue();
-  ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository).queueAll.mockResolvedValue();
+  ctx.getMock(JobRepository).queue.mockResolvedValue();
+  ctx.getMock(JobRepository).queueAll.mockResolvedValue();
 
   return { sut, ctx };
 };
@@ -154,13 +149,11 @@ const setupSharedSpaceService = (db?: Kysely<DB>) => {
     mock: [JobRepository, LoggingRepository, SystemMetadataRepository],
   });
 
-  ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository).queue.mockResolvedValue();
-  ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository).hasInFlightDedupChain.mockResolvedValue(false);
-  ctx
-    .getMock<SystemMetadataRepository, Mocked<SystemMetadataRepository>>(SystemMetadataRepository)
-    .get.mockResolvedValue({
-      machineLearning: { facialRecognition: { maxDistance: 0.5 } },
-    } as any);
+  ctx.getMock(JobRepository).queue.mockResolvedValue();
+  ctx.getMock(JobRepository).hasInFlightDedupChain.mockResolvedValue(false);
+  ctx.getMock(SystemMetadataRepository).get.mockResolvedValue({
+    machineLearning: { facialRecognition: { maxDistance: 0.5 } },
+  } as any);
 
   return { sut, ctx };
 };
@@ -169,7 +162,7 @@ const drainSharedSpaceFaceJobs = async (
   sharedSpaceService: SharedSpaceService,
   ctx: ReturnType<typeof setupSharedSpaceService>['ctx'],
 ) => {
-  const jobs = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+  const jobs = ctx.getMock(JobRepository);
   let cursor = 0;
 
   while (cursor < jobs.queue.mock.calls.length) {
@@ -525,7 +518,7 @@ describe(MetadataService.name, () => {
           sourceType: SourceType.Exif,
         }),
       ]);
-      expect(sharedSpaceCtx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository).queue).toHaveBeenCalledWith({
+      expect(sharedSpaceCtx.getMock(JobRepository).queue).toHaveBeenCalledWith({
         name: JobName.SharedSpacePersonDedup,
         data: { spaceId: space.id },
       });
@@ -592,7 +585,7 @@ describe(MetadataService.name, () => {
         .execute();
 
       expect(identityLinks).toEqual([{ assetFaceId: assetFace.id, source: 'backfill' }]);
-      expect(backfillCtx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository).queueAll).toHaveBeenCalledWith(
+      expect(backfillCtx.getMock(JobRepository).queueAll).toHaveBeenCalledWith(
         expect.arrayContaining([
           {
             name: JobName.SharedSpaceFaceMatchFromBackfill,
