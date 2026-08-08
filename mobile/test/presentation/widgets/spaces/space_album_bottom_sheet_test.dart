@@ -2,6 +2,8 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/domain/models/setting.model.dart';
+import 'package:immich_mobile/domain/services/setting.service.dart';
 import 'package:immich_mobile/presentation/actions/action.dart';
 import 'package:immich_mobile/presentation/actions/action.widget.dart';
 import 'package:immich_mobile/presentation/actions/download.action.dart';
@@ -9,10 +11,13 @@ import 'package:immich_mobile/presentation/actions/share.action.dart';
 import 'package:immich_mobile/presentation/widgets/action_buttons/remove_from_album_action_button.widget.dart';
 import 'package:immich_mobile/presentation/widgets/spaces/space_album_bottom_sheet.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.state.dart';
+import 'package:immich_mobile/providers/infrastructure/setting.provider.dart';
 import 'package:immich_mobile/providers/timeline/multiselect.provider.dart';
 // easy_localization initializes shared_preferences internally; tests need the mock initializer.
 // ignore: depend_on_referenced_packages
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../../../service.mocks.dart';
 
 // Download and Share both render as ActionMenuItem after upstream's action-model
 // migration, so match on the wrapped action type — byType(ActionMenuItem) alone
@@ -23,11 +28,26 @@ Finder _actionOfType<T extends ActionBuilder>() => find.byWidgetPredicate((w) =>
 // Helper
 // ---------------------------------------------------------------------------
 
+// AssetDebugAction (upstream #30611, carried into this sheet) reads
+// settingsProvider, whose real notifier builds a SettingsService over
+// StoreService — and StoreService needs a Drift-backed init this deliberately
+// lightweight harness does not do. Serve setting defaults directly instead;
+// advancedTroubleshooting defaults to false, which is exactly the state these
+// action-set assertions describe (the troubleshoot entry stays hidden).
+class _DefaultSettingsNotifier extends SettingsNotifier {
+  @override
+  SettingsService build() => SettingsService(storeService: MockStoreService());
+
+  @override
+  T get<T>(Setting<T> setting) => setting.defaultValue;
+}
+
 Widget _wrap(Widget widget, {List<Override> overrides = const []}) {
   return ProviderScope(
     overrides: [
       timelineStateProvider.overrideWith(TimelineStateNotifier.new),
       multiSelectProvider.overrideWith(MultiSelectNotifier.new),
+      settingsProvider.overrideWith(_DefaultSettingsNotifier.new),
       ...overrides,
     ],
     child: EasyLocalization(
