@@ -50,17 +50,17 @@ const setup = (db?: Kysely<DB>) => {
     ],
     mock: [JobRepository, LoggingRepository, SystemMetadataRepository, UserRepository],
   });
-  const metadata = ctx.getMock<SystemMetadataRepository, Mocked<SystemMetadataRepository>>(SystemMetadataRepository);
+  const metadata = ctx.getMock(SystemMetadataRepository);
   metadata.get.mockResolvedValue({ machineLearning: { facialRecognition: { minFaces: 1 } } } as any);
 
   // `PersonService.resolveMinimumFaceCount` (M2) now derives the People face threshold from the
   // per-user `people.minimumFaces` preference (default 3 via `getPreferences`), not the ML config.
   // These RBAC projection tests assert single-face shared people surface, so pin the preference to 1
   // to keep the threshold the tests were written against (matching the mocked ML `minFaces: 1`).
-  const users = ctx.getMock<UserRepository, Mocked<UserRepository>>(UserRepository);
+  const users = ctx.getMock(UserRepository);
   users.getMetadata.mockResolvedValue([{ key: UserMetadataKey.Preferences, value: { people: { minimumFaces: 1 } } }]);
 
-  const jobs = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+  const jobs = ctx.getMock(JobRepository);
   jobs.queue.mockResolvedValue();
   jobs.queueAll.mockResolvedValue();
   jobs.hasInFlightDedupChain.mockResolvedValue(false);
@@ -85,7 +85,7 @@ const setupSharedSpace = (db?: Kysely<DB>) => {
     ],
     mock: [JobRepository, LoggingRepository],
   });
-  const jobs = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+  const jobs = ctx.getMock(JobRepository);
   jobs.queue.mockResolvedValue();
   jobs.queueAll.mockResolvedValue();
   jobs.hasInFlightDedupChain.mockResolvedValue(false);
@@ -141,7 +141,7 @@ const setupSearch = (db?: Kysely<DB>) => {
     ],
     mock: [LoggingRepository, SystemMetadataRepository],
   });
-  const metadata = ctx.getMock<SystemMetadataRepository, Mocked<SystemMetadataRepository>>(SystemMetadataRepository);
+  const metadata = ctx.getMock(SystemMetadataRepository);
   metadata.get.mockResolvedValue({ machineLearning: { facialRecognition: { minFaces: 1 } } } as any);
 
   return { ctx, sut };
@@ -1989,7 +1989,7 @@ describe('People identity RBAC projection', () => {
 
   it('does not re-queue the backfill job after the repair guard refuses a face (no infinite loop)', async () => {
     const { ctx, sut, faceIdentityRepository } = setup();
-    const jobs = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+    const jobs = ctx.getMock(JobRepository);
     const { user } = await ctx.newUser();
     try {
       // Person A: a clean axis-A cluster.
@@ -2542,7 +2542,7 @@ describe('People identity RBAC projection', () => {
   it('identity backfill queues targeted projection jobs and materializes selected-space faces', async () => {
     const { ctx, sut, faceIdentityRepository } = setup();
     const { sut: sharedSpaceService } = setupSharedSpace();
-    const jobs = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+    const jobs = ctx.getMock(JobRepository);
     const { user: owner } = await ctx.newUser();
     const { user: member } = await ctx.newUser();
     try {
@@ -2599,7 +2599,7 @@ describe('People identity RBAC projection', () => {
   it('identity backfill materializes one selected-space assignment per enabled space for the same photo', async () => {
     const { ctx, sut, faceIdentityRepository } = setup();
     const { sut: sharedSpaceService } = setupSharedSpace();
-    const jobs = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+    const jobs = ctx.getMock(JobRepository);
     const { user: owner } = await ctx.newUser();
     try {
       const { person } = await ctx.newPerson({ ownerId: owner.id, identityId: null, name: 'Shared Alice' });
@@ -2655,7 +2655,7 @@ describe('People identity RBAC projection', () => {
   it('delays page-one projection fanout until the final identity backfill page', async () => {
     const { ctx, sut, faceIdentityRepository } = setup();
     const { sut: sharedSpaceService } = setupSharedSpace();
-    const jobs = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+    const jobs = ctx.getMock(JobRepository);
     await ctx.database.deleteFrom('user').execute();
     const { user: owner } = await ctx.newUser();
     try {
@@ -2719,7 +2719,7 @@ describe('People identity RBAC projection', () => {
   it('identity backfill materializes once when an asset is both directly added and linked by library', async () => {
     const { ctx, sut, faceIdentityRepository } = setup();
     const { sut: sharedSpaceService } = setupSharedSpace();
-    const jobs = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+    const jobs = ctx.getMock(JobRepository);
     const { user: owner } = await ctx.newUser();
     try {
       const { library } = await ctx.newLibrary({ ownerId: owner.id });
@@ -2820,7 +2820,7 @@ describe('People identity RBAC projection', () => {
 
   it('identity backfill uses targeted projection for EXIF-imported face evidence', async () => {
     const { ctx, sut, faceIdentityRepository } = setup();
-    const jobs = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+    const jobs = ctx.getMock(JobRepository);
     const { user: owner } = await ctx.newUser();
     try {
       const { space } = await ctx.newSharedSpace({ createdById: owner.id, faceRecognitionEnabled: true });
@@ -2846,13 +2846,11 @@ describe('People identity RBAC projection', () => {
   it('force recognition still rebuilds shared-space projections through full-space jobs', async () => {
     const { ctx, sut, faceIdentityRepository } = setup();
     const { sut: sharedSpaceService, jobs: sharedJobs } = setupSharedSpace();
-    const jobs = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+    const jobs = ctx.getMock(JobRepository);
     jobs.waitForQueueCompletion.mockResolvedValue();
     jobs.empty.mockResolvedValue();
     jobs.getJobCounts.mockResolvedValue({ active: 0, waiting: 0, delayed: 0, paused: 0, failed: 0, completed: 0 });
-    ctx
-      .getMock<SystemMetadataRepository, Mocked<SystemMetadataRepository>>(SystemMetadataRepository)
-      .set.mockResolvedValue();
+    ctx.getMock(SystemMetadataRepository).set.mockResolvedValue();
     await ctx.database.deleteFrom('user').execute();
     const { user: owner } = await ctx.newUser();
     try {
@@ -3670,9 +3668,7 @@ describe('People identity RBAC projection', () => {
     // the viewer-only space. The old "inaccessible attached profiles" hard block no longer exists.
     it('re-points another owner’s person and a space profile the actor cannot repair, since neither is collapsed', async () => {
       const { ctx, sut, faceIdentityRepository } = setup();
-      const metadata = ctx.getMock<SystemMetadataRepository, Mocked<SystemMetadataRepository>>(
-        SystemMetadataRepository,
-      );
+      const metadata = ctx.getMock(SystemMetadataRepository);
       metadata.get.mockResolvedValue({
         server: { mergePeopleAcrossOwners: false },
         machineLearning: { facialRecognition: { minFaces: 1 } },
@@ -3751,12 +3747,10 @@ describe('People identity RBAC projection', () => {
       mergePeopleAcrossOwners?: boolean;
     }) => {
       const { ctx, sut, faceIdentityRepository } = setup();
-      ctx
-        .getMock<SystemMetadataRepository, Mocked<SystemMetadataRepository>>(SystemMetadataRepository)
-        .get.mockResolvedValue({
-          server: { mergePeopleAcrossOwners: options.mergePeopleAcrossOwners ?? true },
-          machineLearning: { facialRecognition: { minFaces: 1 } },
-        } as any);
+      ctx.getMock(SystemMetadataRepository).get.mockResolvedValue({
+        server: { mergePeopleAcrossOwners: options.mergePeopleAcrossOwners ?? true },
+        machineLearning: { facialRecognition: { minFaces: 1 } },
+      } as any);
 
       const { user: actor } = await ctx.newUser();
       const { user: stranger } = await ctx.newUser();
@@ -3867,12 +3861,10 @@ describe('People identity RBAC projection', () => {
     // blocked while the toggle is off (#733 review P1).
     it('blocks the classic person merge when its fan-out would collapse an un-editable space and the toggle is off', async () => {
       const { ctx, sut, faceIdentityRepository } = setup();
-      ctx
-        .getMock<SystemMetadataRepository, Mocked<SystemMetadataRepository>>(SystemMetadataRepository)
-        .get.mockResolvedValue({
-          server: { mergePeopleAcrossOwners: false },
-          machineLearning: { facialRecognition: { minFaces: 1 } },
-        } as any);
+      ctx.getMock(SystemMetadataRepository).get.mockResolvedValue({
+        server: { mergePeopleAcrossOwners: false },
+        machineLearning: { facialRecognition: { minFaces: 1 } },
+      } as any);
 
       const { user: actor } = await ctx.newUser();
       const { user: stranger } = await ctx.newUser();

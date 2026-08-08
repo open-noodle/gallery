@@ -28,7 +28,6 @@ import { UserService } from 'src/services/user.service';
 import { newMediumService } from 'test/medium.factory';
 import { factory, newEmbedding } from 'test/small.factory';
 import { getKyselyDB } from 'test/utils';
-import { Mocked } from 'vitest';
 
 let defaultDatabase: Kysely<DB>;
 
@@ -73,7 +72,7 @@ const setupWithFaceMatch = () => {
     ],
     mock: [EventRepository, LoggingRepository, JobRepository, StorageRepository],
   });
-  const jobs = result.ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+  const jobs = result.ctx.getMock(JobRepository);
   jobs.queue.mockResolvedValue();
   jobs.queueAll.mockResolvedValue();
   jobs.hasInFlightDedupChain.mockResolvedValue(false);
@@ -1644,7 +1643,7 @@ const setupWithUserAdminDelete = () => {
     real: [AlbumRepository, UserRepository, SharedSpaceRepository],
     mock: [EventRepository, JobRepository, LoggingRepository],
   });
-  const jobs = userAdminResult.ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+  const jobs = userAdminResult.ctx.getMock(JobRepository);
   jobs.queue.mockResolvedValue();
 
   // Swap the mocked eventRepository on UserAdminService with the real wired one so that
