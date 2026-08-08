@@ -33,7 +33,6 @@ import { clearConfigCache } from 'src/utils/config';
 import { newMediumService } from 'test/medium.factory';
 import { factory } from 'test/small.factory';
 import { getKyselyDB } from 'test/utils';
-import { Mocked } from 'vitest';
 
 let defaultDatabase: Kysely<DB>;
 
@@ -59,7 +58,7 @@ const setup = (db?: Kysely<DB>) => {
   // mergePerson resolves the cross-owner toggle via getConfig() before opening the merge transaction, so the
   // config plumbing must be present even for a plain own-merge; a bare SystemConfig yields all defaults.
   ctx
-    .getMock<SystemMetadataRepository, Mocked<SystemMetadataRepository>>(SystemMetadataRepository)
+    .getMock(SystemMetadataRepository)
     .get.mockImplementation((key) => (key === SystemMetadataKey.SystemConfig ? ({} as any) : (undefined as any)));
 
   return { sut, ctx };
@@ -83,16 +82,14 @@ const setupFaceDetection = (db?: Kysely<DB>) => {
     mock: [JobRepository, LoggingRepository, MachineLearningRepository, StorageRepository, SystemMetadataRepository],
   });
 
-  ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository).queue.mockResolvedValue();
-  ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository).queueAll.mockResolvedValue();
-  ctx
-    .getMock<SystemMetadataRepository, Mocked<SystemMetadataRepository>>(SystemMetadataRepository)
-    .get.mockImplementation((key) => {
-      if (key === SystemMetadataKey.SystemConfig) {
-        return { machineLearning: { facialRecognition: { enabled: true, minFaces: 1 } } } as any;
-      }
-      return undefined as any;
-    });
+  ctx.getMock(JobRepository).queue.mockResolvedValue();
+  ctx.getMock(JobRepository).queueAll.mockResolvedValue();
+  ctx.getMock(SystemMetadataRepository).get.mockImplementation((key) => {
+    if (key === SystemMetadataKey.SystemConfig) {
+      return { machineLearning: { facialRecognition: { enabled: true, minFaces: 1 } } } as any;
+    }
+    return undefined as any;
+  });
 
   return { sut, ctx };
 };
@@ -185,7 +182,7 @@ const setupFaceRecognition = (db?: Kysely<DB>) => {
     mock: [JobRepository, LoggingRepository, MachineLearningRepository, StorageRepository, SystemMetadataRepository],
   });
 
-  const jobMock = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+  const jobMock = ctx.getMock(JobRepository);
   jobMock.waitForQueueCompletion.mockResolvedValue();
   jobMock.empty.mockResolvedValue();
   jobMock.queue.mockResolvedValue();
@@ -199,18 +196,14 @@ const setupFaceRecognition = (db?: Kysely<DB>) => {
     failed: 0,
   });
 
-  ctx
-    .getMock<SystemMetadataRepository, Mocked<SystemMetadataRepository>>(SystemMetadataRepository)
-    .get.mockImplementation((key) => {
-      if (key === SystemMetadataKey.SystemConfig) {
-        return { machineLearning: { facialRecognition: { enabled: true, minFaces: 1 } } } as any;
-      }
-      return undefined as any;
-    });
+  ctx.getMock(SystemMetadataRepository).get.mockImplementation((key) => {
+    if (key === SystemMetadataKey.SystemConfig) {
+      return { machineLearning: { facialRecognition: { enabled: true, minFaces: 1 } } } as any;
+    }
+    return undefined as any;
+  });
 
-  ctx
-    .getMock<SystemMetadataRepository, Mocked<SystemMetadataRepository>>(SystemMetadataRepository)
-    .set.mockResolvedValue();
+  ctx.getMock(SystemMetadataRepository).set.mockResolvedValue();
 
   return { sut, ctx };
 };
@@ -323,7 +316,7 @@ describe(PersonService.name, () => {
   describe('handleQueueDetectFaces safety', () => {
     it('preserves manual and EXIF roots while force face detection removes stale machine-learning state', async () => {
       const { sut, ctx } = setupFaceDetection();
-      const jobMock = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+      const jobMock = ctx.getMock(JobRepository);
       const { user } = await ctx.newUser();
       const asset = await createAssetReadyForFaceDetection(ctx, user.id);
       await ctx.newJobStatus({ assetId: asset.id });
@@ -459,10 +452,8 @@ describe(PersonService.name, () => {
       const db = await getKyselyDB();
       try {
         const { sut, ctx } = setupFaceRecognition(db);
-        const jobMock = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
-        const systemMetadataMock = ctx.getMock<SystemMetadataRepository, Mocked<SystemMetadataRepository>>(
-          SystemMetadataRepository,
-        );
+        const jobMock = ctx.getMock(JobRepository);
+        const systemMetadataMock = ctx.getMock(SystemMetadataRepository);
         const { user } = await ctx.newUser();
         const asset = await createAssetReadyForFaceDetection(ctx, user.id);
 
@@ -581,7 +572,7 @@ describe(PersonService.name, () => {
       const db = await getKyselyDB();
       try {
         const { sut, ctx } = setupFaceRecognition(db);
-        const jobMock = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+        const jobMock = ctx.getMock(JobRepository);
         const { user } = await ctx.newUser();
         const asset = await createAssetReadyForFaceDetection(ctx, user.id);
         const ml = await createPersonFaceIdentity(ctx, {
@@ -667,9 +658,7 @@ describe(PersonService.name, () => {
   describe('handleDetectFaces face detection safety', () => {
     it('removes stale machine-learning faces without deleting people on non-force no-detected-faces runs', async () => {
       const { sut, ctx } = setupFaceDetection();
-      const machineLearningMock = ctx.getMock<MachineLearningRepository, Mocked<MachineLearningRepository>>(
-        MachineLearningRepository,
-      );
+      const machineLearningMock = ctx.getMock(MachineLearningRepository);
       const { user } = await ctx.newUser();
       const asset = await createAssetReadyForFaceDetection(ctx, user.id);
       const ml = await createPersonFaceIdentity(ctx, {
@@ -727,9 +716,7 @@ describe(PersonService.name, () => {
 
     it('preserves manual and EXIF shared-space projections while removing stale machine-learning face links', async () => {
       const { sut, ctx } = setupFaceDetection();
-      const machineLearningMock = ctx.getMock<MachineLearningRepository, Mocked<MachineLearningRepository>>(
-        MachineLearningRepository,
-      );
+      const machineLearningMock = ctx.getMock(MachineLearningRepository);
       const { user } = await ctx.newUser();
       const asset = await createAssetReadyForFaceDetection(ctx, user.id);
       const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });

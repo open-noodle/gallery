@@ -638,11 +638,15 @@ const newRealRepository = <T extends BaseServiceDeps[number]>(key: T, db: Kysely
     }
 
     case MapRepository: {
+      // MapRepository declares its db as Kysely<MapDB> (MapDB extends DB with the
+      // map-only views). Kysely is invariant in its schema param and MapDB is not
+      // exported, so reference the constructor's own parameter type rather than
+      // widening the shared Kysely<DB> the factory hands every other repository.
       return new key(
         new ConfigRepository(),
         new SystemMetadataRepository(db),
         LoggingRepository.create(),
-        db,
+        db as unknown as ConstructorParameters<typeof MapRepository>[3],
       ) as InstanceType<T>;
     }
 
