@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/constants/enums.dart';
 import 'package:immich_mobile/presentation/actions/action.widget.dart';
+import 'package:immich_mobile/presentation/actions/asset_debug.action.dart';
 import 'package:immich_mobile/presentation/actions/download.action.dart';
 import 'package:immich_mobile/presentation/actions/favorite.action.dart';
 import 'package:immich_mobile/presentation/actions/remove_from_space.action.dart';
@@ -53,6 +54,7 @@ class _SpaceBottomSheetState extends ConsumerState<SpaceBottomSheet> {
       maxChildSize: 0.85,
       shouldCloseOnMinExtent: false,
       actions: [
+        const ActionMenuItem(action: AssetDebugAction(source: ActionSource.timeline)),
         const ActionMenuItem(action: ShareAction(source: ActionSource.timeline)),
         if (multiselect.hasRemote) ...[
           const ActionMenuItem(action: DownloadAction(source: ActionSource.timeline)),
