@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/constants/enums.dart';
 import 'package:immich_mobile/presentation/actions/action.widget.dart';
+import 'package:immich_mobile/presentation/actions/asset_debug.action.dart';
 import 'package:immich_mobile/presentation/actions/download.action.dart';
 import 'package:immich_mobile/presentation/actions/share.action.dart';
 import 'package:immich_mobile/presentation/widgets/action_buttons/remove_from_album_action_button.widget.dart';
@@ -10,6 +11,8 @@ import 'package:immich_mobile/presentation/widgets/bottom_sheet/base_bottom_shee
 /// Reduced multiselect bottom sheet for the Space Album detail page.
 ///
 /// Action set:
+///   - Troubleshoot (self-gating: only renders when the advanced-troubleshooting
+///     setting is on and exactly one asset is selected)
 ///   - Download (always)
 ///   - Share (always)
 ///   - Remove from album (editor only, gated on [canEdit])
@@ -60,6 +63,7 @@ class _SpaceAlbumBottomSheetState extends ConsumerState<SpaceAlbumBottomSheet> {
       maxChildSize: 0.85,
       shouldCloseOnMinExtent: false,
       actions: [
+        const ActionMenuItem(action: AssetDebugAction(source: ActionSource.timeline)),
         const ActionMenuItem(action: ShareAction(source: ActionSource.timeline)),
         const ActionMenuItem(action: DownloadAction(source: ActionSource.timeline)),
         if (widget.canEdit)
