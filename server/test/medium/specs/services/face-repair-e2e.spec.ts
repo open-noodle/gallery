@@ -65,7 +65,7 @@ const setupRepair = (db: Kysely<DB>) => {
     ],
     mock: [LoggingRepository, JobRepository],
   });
-  const jobMock = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+  const jobMock = ctx.getMock(JobRepository);
   jobMock.isActive.mockResolvedValue(false);
   jobMock.queueAll.mockResolvedValue();
   return { sut, ctx, jobMock, faceIdentityRepository: ctx.get(FaceIdentityRepository) };
@@ -88,9 +88,9 @@ const setupPerson = (db: Kysely<DB>) => {
     ],
     mock: [JobRepository, LoggingRepository, SystemMetadataRepository],
   });
-  const metadata = ctx.getMock<SystemMetadataRepository, Mocked<SystemMetadataRepository>>(SystemMetadataRepository);
+  const metadata = ctx.getMock(SystemMetadataRepository);
   metadata.get.mockResolvedValue({ machineLearning: { facialRecognition: { minFaces: 1 } } } as any);
-  const jobs = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+  const jobs = ctx.getMock(JobRepository);
   jobs.queue.mockResolvedValue();
   jobs.queueAll.mockResolvedValue();
   return { sut, ctx };
