@@ -6,6 +6,7 @@
 - **Fork commits synced**: 7 (`1d4a447ecde..64f520e2da0` — #940 #941 #942 #943 #957 #958 #884)
 - **Conflicts resolved**: 1 (`server/test/medium.factory.ts`)
 - **Risk level**: LOW
+- **CI**: 10/10 GREEN first pass on `c70fe642025` (`test.yml` 21/21 jobs, 0 skipped)
 - **Recommendation**: PROCEED
 
 A **BOTH** cycle. It also closed out the previous cycle's loose end: batches 63–64 were rebased on
@@ -247,23 +248,40 @@ Dart OpenAPI SDK, translations, keys, pigeon, `build_runner`, and `drift_dev sch
 ## Remote CI Verification
 
 - **Test branch**: `rebase/upstream-b67`
-- **Commit validated**: `c70fe642025`
+- **Commits validated**: code at `c70fe642025`; the four wave-3 runs landed on `b7a3bf2f30a`, whose
+  delta from `c70fe642025` is **this report file only** (276 lines, docs) — so all ten validated
+  identical code. No SHA skew.
 - **Baseline**: `rebase/upstream-b64` @ `6b15cff86b0` — Test **green**, Static Code Analysis **green**
 
-| Workflow                                  | Status | Notes                                     |
-| ----------------------------------------- | ------ | ----------------------------------------- |
-| `test.yml`                                | TBD    |                                           |
-| `docker.yml`                              | TBD    |                                           |
-| `static_analysis.yml`                     | TBD    |                                           |
-| `gallery-build-mobile.yml`                | TBD    | dispatched with `environment=development` |
-| `gallery-rebase-smoke.yml`                | TBD    |                                           |
-| `gallery-revert-to-immich-validation.yml` | TBD    |                                           |
-| `storage-migration-tests.yml`             | TBD    |                                           |
-| `storage-migration-e2e.yml`               | TBD    |                                           |
-| `gallery-ml-smoke.yml`                    | TBD    |                                           |
-| `gallery-mobile-smoke.yml`                | TBD    |                                           |
+**10 / 10 GREEN, first pass. Zero failed or cancelled jobs across all ten runs.**
 
-Dispatched staggered 4 / 2 / 4 to avoid the GHCR pull rate limit.
+| Workflow                                  | Status | Run         | Notes                                                                               |
+| ----------------------------------------- | ------ | ----------- | ----------------------------------------------------------------------------------- |
+| `test.yml`                                | GREEN  | 31248356837 | **21/21 jobs, 0 skipped**                                                           |
+| `docker.yml`                              | GREEN  | 31248357963 | server/web/cli/ml images build                                                      |
+| `static_analysis.yml`                     | GREEN  | 31248359033 | dart analyze + format + generated-file freshness                                    |
+| `gallery-build-mobile.yml`                | GREEN  | 31248360129 | `environment=development` — Android **and** iOS both built                          |
+| `gallery-rebase-smoke.yml`                | GREEN  | 31248382897 |                                                                                     |
+| `gallery-revert-to-immich-validation.yml` | GREEN  | 31248383704 | read past the coverage grep to `Post-phase drift (0 item(s))` → `validation PASSED` |
+| `storage-migration-tests.yml`             | GREEN  | 31248610519 |                                                                                     |
+| `storage-migration-e2e.yml`               | GREEN  | 31248613436 |                                                                                     |
+| `gallery-ml-smoke.yml`                    | GREEN  | 31248611494 |                                                                                     |
+| `gallery-mobile-smoke.yml`                | GREEN  | 31248612341 |                                                                                     |
+
+Dispatched staggered 4 / 2 / 4 — **no GHCR rate limit fired**.
+
+`test.yml` was inspected job-by-job rather than trusted on the workflow conclusion. The jobs that
+specifically gate this cycle's risks were all green:
+
+- **SQL Schema Checks** — the gate for `server/src/queries/*.sql` cherry-picked from `main` going
+  stale against the rolling branch's newer repositories (#884 touched both).
+- **Test Branding** — the `gallery-branding-check.sh` aggregator, now also covering the new
+  `branding/i18n/overrides-*.json` surface from #957/#958.
+- **Medium Tests (Server)** — the real exercise of the #30612 harness retype propagation.
+- **Unit Test Mobile** — the `AssetDebugAction` propagation and its harness fix.
+- **Lint Web** — the toolchain-drift gate that reddened #826 and #810; clean this cycle despite the
+  sync carrying four web spec files.
+- **OpenAPI Clients** — confirms the committed spec is not stale.
 
 ## Post-Rebase Verification
 
