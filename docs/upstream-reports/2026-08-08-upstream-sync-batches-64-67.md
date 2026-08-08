@@ -216,11 +216,29 @@ consistent. No renumbering was required.
 
 ## Inconsistencies Found
 
-None introduced by this cycle. Two pre-existing items carried forward:
+None introduced by this cycle.
 
-- `branding/scripts/verify-mobile-assets.sh` is still reached by no workflow and no aggregator.
-- The skill's naive "NOT IN CI" branding sweep still yields five false positives because #928 moved
-  invocation behind `gallery-branding-check.sh`; the sweep must grep the aggregator too.
+One item previously carried forward as an open gap was **retired as incorrect** while writing this
+report: `branding/scripts/verify-mobile-assets.sh` was recorded as "reached by no workflow and no
+aggregator". It **is** reached — `verify-branding.sh:461` invokes it, and
+`gallery-branding-check.sh` runs `verify-branding.sh` in `test.yml`'s Test Branding job. So **all
+eight `branding/scripts/*.sh` are wired**. The earlier note stopped one level too shallow in a
+two-level call chain, which is the same mistake as the naive workflow grep it was warning about:
+
+- The naive `grep -rq "$n" .github/workflows/` sweep yields five false positives because #928 moved
+  invocation behind `gallery-branding-check.sh` — but grepping the aggregator alone is still not
+  enough, because `verify-mobile-assets.sh` hangs off `verify-branding.sh`. Follow the whole chain.
+
+### Severity of the new branding-i18n gate (clarified)
+
+`verify-branding.sh` prints its findings as `WARN:` lines, which reads as advisory. It is not: each
+one also sets `EXIT_CODE=1` and the script ends `exit $EXIT_CODE`, run under `set -euo pipefail` by
+the aggregator. An un-overridden i18n key — including the #743 class ("key contains the upstream
+name but has no override in `overrides-en.json`") introduced with the 56 new locale override files —
+therefore **fails CI loudly** rather than slipping through. Corollary worth recording: do not run
+`verify-branding.sh` directly against the source tree, since it verifies _applied_ branding and will
+report dozens of bogus leaks on an unbranded checkout; use `gallery-branding-check.sh`, which copies
+to a temp worktree, applies branding, then verifies.
 
 ## Local CI Verification
 
