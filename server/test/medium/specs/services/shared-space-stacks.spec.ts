@@ -12,7 +12,7 @@ import { SharedSpaceService } from 'src/services/shared-space.service';
 import { newMediumService } from 'test/medium.factory';
 import { factory } from 'test/small.factory';
 import { getKyselyDB } from 'test/utils';
-import { beforeAll, describe, expect, it, Mocked } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 
 let defaultDatabase: Kysely<DB>;
 
@@ -22,7 +22,7 @@ const setup = (db?: Kysely<DB>) => {
     real: [SharedSpaceRepository, AssetRepository, StackRepository, AccessRepository],
     mock: [LoggingRepository, JobRepository],
   });
-  const jobs = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+  const jobs = ctx.getMock(JobRepository);
   jobs.queue.mockResolvedValue();
   jobs.queueAll.mockResolvedValue();
   return {
