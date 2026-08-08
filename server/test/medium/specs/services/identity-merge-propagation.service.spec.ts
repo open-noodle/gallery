@@ -13,7 +13,6 @@ import { asDateString } from 'src/utils/date';
 import { newMediumService } from 'test/medium.factory';
 import { factory } from 'test/small.factory';
 import { getKyselyDB } from 'test/utils';
-import { Mocked } from 'vitest';
 
 let defaultDatabase: Kysely<DB>;
 
@@ -23,14 +22,14 @@ const setup = (db: Kysely<DB> = defaultDatabase) => {
     real: [DatabaseRepository, FaceIdentityRepository, PersonRepository, SharedSpaceRepository],
     mock: [JobRepository, LoggingRepository],
   });
-  const jobRepository = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+  const jobRepository = ctx.getMock(JobRepository);
   jobRepository.queue.mockResolvedValue();
 
   const sut = new IdentityMergePropagationService({
     databaseRepository: ctx.get(DatabaseRepository),
     faceIdentityRepository: ctx.get(FaceIdentityRepository),
     jobRepository,
-    logger: ctx.getMock<LoggingRepository, Mocked<LoggingRepository>>(LoggingRepository),
+    logger: ctx.getMock(LoggingRepository),
     personRepository: ctx.get(PersonRepository),
     sharedSpaceRepository: ctx.get(SharedSpaceRepository),
   });
@@ -310,7 +309,7 @@ describe('IdentityMergePropagationService medium tests', () => {
 
   it('propagates a personal merge across other owners and all affected spaces', async () => {
     const { ctx, sut } = setup();
-    const jobRepository = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+    const jobRepository = ctx.getMock(JobRepository);
     const { user: actor } = await ctx.newUser();
     const { user: otherOwner } = await ctx.newUser();
     const { space: duplicateSpaceA } = await ctx.newSharedSpace({ createdById: actor.id });
@@ -414,7 +413,7 @@ describe('IdentityMergePropagationService medium tests', () => {
 
   it('propagates a space merge across other spaces and personal people for different owners', async () => {
     const { ctx, sut } = setup();
-    const jobRepository = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+    const jobRepository = ctx.getMock(JobRepository);
     const { user: actor } = await ctx.newUser();
     const { user: otherOwner } = await ctx.newUser();
     const { user: singletonOwner } = await ctx.newUser();
@@ -1149,7 +1148,7 @@ describe('IdentityMergePropagationService medium tests', () => {
   // at all), the survivor's faceAssetId is repaired from a reassigned face and a thumbnail job is queued.
   it('repairs the target faceAssetId when the merge invalidates it', async () => {
     const { ctx, sut } = setup();
-    const jobRepository = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+    const jobRepository = ctx.getMock(JobRepository);
     const { user } = await ctx.newUser();
     const targetIdentity = await createIdentity(ctx.database);
     const sourceIdentity = await createIdentity(ctx.database);
