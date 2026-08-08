@@ -12,7 +12,6 @@ import { DB } from 'src/schema';
 import { FaceRepairService, ReattributionCandidate, RepairPlan } from 'src/services/face-repair.service';
 import { newMediumService } from 'test/medium.factory';
 import { getKyselyDB } from 'test/utils';
-import { Mocked } from 'vitest';
 
 let defaultDatabase: Kysely<DB>;
 
@@ -497,7 +496,7 @@ describe('FaceRepairService.executeRepair', () => {
   it('unassigns leaked faces, clears their identity links, and queues FacialRecognition for them', async () => {
     const { sut, ctx } = setupRepair();
     const faceIdentityRepo = ctx.get(FaceIdentityRepository);
-    const jobMock = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+    const jobMock = ctx.getMock(JobRepository);
     const { user } = await ctx.newUser();
 
     // Karina-main: 10 first-axis faces
@@ -664,7 +663,7 @@ describe('FaceRepairService.executeRepair', () => {
   it('rep-face reconcile: faceAssetId is updated when the rep was among the unassigned faces', async () => {
     const { sut, ctx } = setupRepair();
     const faceIdentityRepo = ctx.get(FaceIdentityRepository);
-    const jobMock = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+    const jobMock = ctx.getMock(JobRepository);
     jobMock.queueAll.mockResolvedValue();
     const { user } = await ctx.newUser();
 
@@ -725,7 +724,7 @@ describe('FaceRepairService.executeRepair', () => {
   it('eligibility re-check: face moved to third person before executeRepair is skipped and not queued', async () => {
     const { sut, ctx } = setupRepair();
     const faceIdentityRepo = ctx.get(FaceIdentityRepository);
-    const jobMock = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+    const jobMock = ctx.getMock(JobRepository);
     const { user } = await ctx.newUser();
 
     // Karina-main: 10 first-axis faces
@@ -832,7 +831,7 @@ describe('FaceRepairService.runRepair', () => {
   it('dry-run (default): returns dryRun=true, mutated=false, flaggedFaces>0, mutates nothing, queueAll not called', async () => {
     const { sut, ctx } = setupRunRepair();
     const faceIdentityRepo = ctx.get(FaceIdentityRepository);
-    const jobMock = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+    const jobMock = ctx.getMock(JobRepository);
     jobMock.isActive.mockResolvedValue(false);
     const { user } = await ctx.newUser();
 
@@ -894,7 +893,7 @@ describe('FaceRepairService.runRepair', () => {
   it('execute: dryRun=false with isActive=false → mutated=true, leaked faces nulled, queueAll called', async () => {
     const { sut, ctx } = setupRunRepair();
     const faceIdentityRepo = ctx.get(FaceIdentityRepository);
-    const jobMock = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+    const jobMock = ctx.getMock(JobRepository);
     jobMock.isActive.mockResolvedValue(false);
     jobMock.queueAll.mockResolvedValue();
     const { user } = await ctx.newUser();
@@ -952,7 +951,7 @@ describe('FaceRepairService.runRepair', () => {
   it('concurrency guard: isActive=true + dryRun=false → throws, nothing mutated; dryRun=true with isActive=true → succeeds', async () => {
     const { sut, ctx } = setupRunRepair();
     const faceIdentityRepo = ctx.get(FaceIdentityRepository);
-    const jobMock = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+    const jobMock = ctx.getMock(JobRepository);
     jobMock.isActive.mockResolvedValue(true);
     const { user } = await ctx.newUser();
 
@@ -1012,7 +1011,7 @@ describe('FaceRepairService.runRepair', () => {
   it('scope: runRepair scoped to ownerA mutates only ownerA faces; ownerB faces remain assigned', async () => {
     const { sut, ctx } = setupRunRepair();
     const faceIdentityRepoA = ctx.get(FaceIdentityRepository);
-    const jobMock = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+    const jobMock = ctx.getMock(JobRepository);
     jobMock.isActive.mockResolvedValue(false);
     jobMock.queueAll.mockResolvedValue();
 
@@ -1111,7 +1110,7 @@ describe('FaceRepairService.runRepair', () => {
   it('idempotency: after real runRepair, second dry-run reports flaggedFaces=0', async () => {
     const { sut, ctx } = setupRunRepair();
     const faceIdentityRepo = ctx.get(FaceIdentityRepository);
-    const jobMock = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+    const jobMock = ctx.getMock(JobRepository);
     jobMock.isActive.mockResolvedValue(false);
     jobMock.queueAll.mockResolvedValue();
     const { user } = await ctx.newUser();
@@ -1157,7 +1156,7 @@ describe('FaceRepairService.runRepair', () => {
 
   it('empty owner: runRepair on a fresh user with no faces resolves with flaggedFaces=0, mutated=false, no throw', async () => {
     const { sut, ctx } = setupRunRepair();
-    const jobMock = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+    const jobMock = ctx.getMock(JobRepository);
     jobMock.isActive.mockResolvedValue(false);
     const { user: emptyUser } = await ctx.newUser();
 
