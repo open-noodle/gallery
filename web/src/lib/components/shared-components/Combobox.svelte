@@ -78,6 +78,8 @@
   let selectedIndex: number | undefined = $state();
   let optionRefs: HTMLElement[] = $state([]);
   let input = $state<HTMLInputElement>();
+  let frameStart = $state<HTMLElement>();
+  let frameEnd = $state<HTMLElement>();
   let bounds: DOMRect | undefined = $state();
 
   const inputId = `combobox-${id}`;
@@ -181,45 +183,56 @@
   };
 
   // TODO: move this combobox component into @immich/ui
-  // Bits UI dialogs use `contain: layout` so fixed descendants are positioned in dialog space
-  const getModalBounds = () => {
-    const modalRoot = input?.closest('[data-dialog-content]');
-    if (!modalRoot || !getComputedStyle(modalRoot).contain.includes('layout')) {
-      return;
-    }
-
-    return modalRoot.getBoundingClientRect();
+  /**
+   * The dropdown is `position: fixed`, but "fixed" does not always mean "against the
+   * viewport", so the offsets it is placed at are measured rather than assumed:
+   *
+   * - Bits UI dialogs use `contain: layout`, which positions fixed descendants in dialog space.
+   * - iPadOS Safari resolves fixed positions against the *document* while the on-screen
+   *   keyboard is up, so a dropdown placed at the input's client coordinates lands
+   *   `window.scrollY` too high - off-screen once the keyboard scrolls the page (#959).
+   *
+   * `frameStart` and `frameEnd` are zero-sized probes pinned to the top and bottom of
+   * whatever box this dropdown's `fixed` positions actually resolve against. Wherever
+   * `fixed` behaves like the viewport they read 0 and `window.innerHeight`, leaving the
+   * arithmetic below unchanged.
+   */
+  const getFixedFrame = () => {
+    const start = frameStart?.getBoundingClientRect();
+    const end = frameEnd?.getBoundingClientRect();
+    return {
+      top: start?.top ?? 0,
+      left: start?.left ?? 0,
+      bottom: end?.top ?? window.innerHeight,
+    };
   };
 
-  const calculatePosition = (boundary: DOMRect | undefined) => {
-    const visualViewport = window.visualViewport;
+  /**
+   * The height the user can actually see. The on-screen keyboard shrinks the visual
+   * viewport, and on iPadOS it shrinks `window.innerHeight` along with it.
+   */
+  const getVisibleHeight = () => window.visualViewport?.height || window.innerHeight;
 
+  const calculatePosition = (boundary: DOMRect | undefined) => {
     if (!boundary) {
       return;
     }
 
-    const modalBounds = getModalBounds();
-    const offsetTop = modalBounds?.top || 0;
-    const offsetLeft = modalBounds?.left || 0;
-    const rootHeight = modalBounds?.height || window.innerHeight;
-
-    const top = boundary.top - offsetTop;
-    const bottom = boundary.bottom - offsetTop;
-    const left = boundary.left - offsetLeft;
+    const frame = getFixedFrame();
+    const left = boundary.left - frame.left;
 
     if (dropdownDirection === 'top') {
       return {
-        bottom: `${rootHeight - top}px`,
+        bottom: `${frame.bottom - boundary.top}px`,
         left: `${left}px`,
         width: `${boundary.width}px`,
         maxHeight: maxHeight(boundary.top - dropdownOffset),
       };
     }
 
-    const viewportHeight = visualViewport?.height || window.innerHeight;
-    const availableHeight = viewportHeight - boundary.bottom;
+    const availableHeight = getVisibleHeight() - boundary.bottom;
     return {
-      top: `${bottom}px`,
+      top: `${boundary.bottom - frame.top}px`,
       left: `${left}px`,
       width: `${boundary.width}px`,
       maxHeight: maxHeight(availableHeight - dropdownOffset),
@@ -243,13 +256,18 @@
       return 'bottom';
     }
 
-    const visualHeight = visualViewport?.height || 0;
-    const heightBelow = visualHeight - boundary.bottom;
+    const visibleHeight = getVisibleHeight();
+    const heightBelow = visibleHeight - boundary.bottom;
     const heightAbove = boundary.top;
 
-    const isViewportScaled = visualHeight && Math.floor(visualHeight) !== Math.floor(window.innerHeight);
+    // Pinch-zoom only. While zoomed in, a fixed dropdown flipped above the input lands in
+    // layout space the user is not looking at, so it stays anchored under the input. An
+    // on-screen keyboard also shrinks the visual viewport but leaves `scale` at 1, and it
+    // must still be able to flip - otherwise the dropdown is sized against the strip hidden
+    // behind the keyboard and opens 0px tall (#959).
+    const isViewportZoomed = (visualViewport?.scale || 1) > 1;
 
-    return heightBelow <= bottomBreakpoint && heightAbove > heightBelow && !isViewportScaled ? 'top' : 'bottom';
+    return heightBelow <= bottomBreakpoint && heightAbove > heightBelow && !isViewportZoomed ? 'top' : 'bottom';
   };
 
   const getInputPosition = () => input?.getBoundingClientRect();
@@ -267,7 +285,9 @@
   let dropdownDirection: 'bottom' | 'top' = $derived(getComboboxDirection(bounds, visualViewport));
 </script>
 
-<svelte:window onresize={onPositionChange} />
+<!-- iOS scrolls the document to lift a focused input above the on-screen keyboard, which
+     moves the input out from under an already-open dropdown. -->
+<svelte:window onresize={onPositionChange} onscroll={onPositionChange} />
 {#if !hideLabel}
   <Label class="mb-1 block text-xs font-light text-neutral-500" for={inputId}>{label}</Label>
 {/if}
@@ -378,6 +398,22 @@
       {/if}
     </div>
   </div>
+
+  <!-- Zero-sized probes that measure the box this dropdown's `fixed` offsets resolve
+       against. See getFixedFrame(). Inline styles because these are measurement aids
+       rather than UI, and must stay physically top/left anchored in RTL too. -->
+  <div
+    bind:this={frameStart}
+    data-fixed-frame="start"
+    aria-hidden="true"
+    style="position:fixed;top:0;left:0;width:0;height:0;visibility:hidden;pointer-events:none;"
+  ></div>
+  <div
+    bind:this={frameEnd}
+    data-fixed-frame="end"
+    aria-hidden="true"
+    style="position:fixed;bottom:0;left:0;width:0;height:0;visibility:hidden;pointer-events:none;"
+  ></div>
 
   <ul
     role="listbox"
