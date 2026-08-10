@@ -24,7 +24,7 @@ import '../../widget_tester_extensions.dart';
 
 class MockNetworkRepository extends Mock implements NetworkRepository {}
 
-class MockPermissionRepository extends Mock implements IPermissionRepository {}
+class MockPermissionRepository extends Mock implements DevicePermissionRepository {}
 
 class MockAuthNotifier extends StateNotifier<AuthState> with Mock implements AuthNotifier {
   MockAuthNotifier()
