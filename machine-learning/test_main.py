@@ -1211,7 +1211,7 @@ class TestPetDetection:
             output[0, 4 + class_id, i] = score
         return [output]
 
-    def test_basic_detection(self, cv_image: cv2.Mat, mocker: MockerFixture) -> None:
+    def test_basic_detection(self, cv_image: NDArray[np.uint8], mocker: MockerFixture) -> None:
         mocker.patch.object(PetDetector, "load")
         detector = PetDetector("yolo11n", min_score=0.5, cache_dir="test_cache")
 
@@ -1232,7 +1232,7 @@ class TestPetDetection:
         assert all(isinstance(v, int) for v in detection["boundingBox"].values())
         session.run.assert_called_once()
 
-    def test_filters_non_animal_classes(self, cv_image: cv2.Mat, mocker: MockerFixture) -> None:
+    def test_filters_non_animal_classes(self, cv_image: NDArray[np.uint8], mocker: MockerFixture) -> None:
         mocker.patch.object(PetDetector, "load")
         detector = PetDetector("yolo11n", min_score=0.5, cache_dir="test_cache")
 
@@ -1247,7 +1247,7 @@ class TestPetDetection:
         assert isinstance(results, list)
         assert len(results) == 0
 
-    def test_filters_low_confidence(self, cv_image: cv2.Mat, mocker: MockerFixture) -> None:
+    def test_filters_low_confidence(self, cv_image: NDArray[np.uint8], mocker: MockerFixture) -> None:
         mocker.patch.object(PetDetector, "load")
         detector = PetDetector("yolo11n", min_score=0.7, cache_dir="test_cache")
 
@@ -1270,7 +1270,7 @@ class TestPetDetection:
         detector.configure(minScore=0.3)
         assert detector.min_score == 0.3
 
-    def test_nms_removes_overlapping_boxes(self, cv_image: cv2.Mat, mocker: MockerFixture) -> None:
+    def test_nms_removes_overlapping_boxes(self, cv_image: NDArray[np.uint8], mocker: MockerFixture) -> None:
         mocker.patch.object(PetDetector, "load")
         detector = PetDetector("yolo11n", min_score=0.5, cache_dir="test_cache")
 
