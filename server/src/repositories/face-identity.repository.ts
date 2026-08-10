@@ -11,7 +11,7 @@ import { FaceIdentityFaceSource, FaceIdentityFaceTable } from 'src/schema/tables
 import { FaceIdentityTable } from 'src/schema/tables/face-identity.table';
 import { anyUuid, retryOnDeadlock } from 'src/utils/database';
 import { asDateString, asDateTimeString } from 'src/utils/date';
-import { spaceAlbumAssetExistsSql, spaceVisibleAssetVisibilities } from 'src/utils/shared-space-album-scope';
+import { accessibleTimelineAssetPredicate, spaceVisibleAssetVisibilities } from 'src/utils/shared-space-album-scope';
 
 export type FaceIdentity = Selectable<FaceIdentityTable>;
 export type FaceIdentityFace = Selectable<FaceIdentityFaceTable>;
@@ -894,16 +894,39 @@ export class FaceIdentityRepository {
     };
   }
 
+  /**
+   * Does this viewer belong to any space whose assets appear on their timeline surfaces?
+   *
+   * When they do not, every space arm of {@link accessibleTimelineAssetPredicate} is dead and the
+   * People-page aggregates can run a far cheaper predicate. This is a single indexed lookup, and
+   * it is resolved per request rather than cached so that joining or leaving a space takes effect
+   * on the next page load.
+   */
+  private async hasTimelineSpaces(userId: string): Promise<boolean> {
+    const row = await this.db
+      .selectFrom('shared_space_member')
+      .select('shared_space_member.spaceId')
+      .where('shared_space_member.userId', '=', userId)
+      .where('shared_space_member.showInTimeline', '=', true)
+      .limit(1)
+      .executeTakeFirst();
+    return row !== undefined;
+  }
+
   async getAccessiblePeople(userId: string, options: AccessiblePeopleOptions): Promise<PeopleResponseDto> {
     const page = Math.max(1, options.page);
     const size = Math.max(1, options.size);
     const minimumFaceCount = options.minimumFaceCount ?? 1;
+    // Resolved once and shared by the queries below, so the endpoint pays one indexed lookup
+    // rather than one per query.
+    const hasTimelineSpaces = await this.hasTimelineSpaces(userId);
     const rows = await this.getAccessiblePeopleIdentityPage({
       userId,
       withHidden: options.withHidden,
       limit: size + 1,
       offset: (page - 1) * size,
       minimumFaceCount,
+      hasTimelineSpaces,
     });
     const pageRows = rows.slice(0, size);
     const people = await this.hydrateAccessiblePeople({
@@ -911,8 +934,9 @@ export class FaceIdentityRepository {
       identityIds: pageRows.map((row) => row.identityId),
       withHidden: options.withHidden,
       assetCounts: toAssetCounts(pageRows),
+      hasTimelineSpaces,
     });
-    const counts = await this.getAccessiblePeopleCounts(userId, minimumFaceCount);
+    const counts = await this.getAccessiblePeopleCounts(userId, minimumFaceCount, { hasTimelineSpaces });
 
     return {
       total: Number(counts.total ?? 0),
@@ -928,6 +952,7 @@ export class FaceIdentityRepository {
     options: { minimumFaceCount?: number },
   ): Promise<{ total: number; hidden: number; detectedFaceCount: number }> {
     const minimumFaceCount = options.minimumFaceCount ?? 1;
+    const hasTimelineSpaces = await this.hasTimelineSpaces(userId);
     const result = await sql<AccessiblePeopleStatisticsRow>`
       WITH timeline_spaces AS (
         SELECT "spaceId"
@@ -947,24 +972,7 @@ export class FaceIdentityRepository {
           AND asset."isOffline" = false
           AND asset.visibility IN (${sql.join(peopleAssetVisibilities)})
           AND (
-            asset."ownerId" = ${userId}
-            OR EXISTS (
-              SELECT 1
-              FROM shared_space_asset
-              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_asset."spaceId"
-              WHERE shared_space_asset."assetId" = asset.id
-            )
-            OR EXISTS (
-              SELECT 1
-              FROM shared_space_library
-              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_library."spaceId"
-              WHERE shared_space_library."libraryId" = asset."libraryId"
-            )
-            OR ${spaceAlbumAssetExistsSql({
-              assetIdColumn: sql`asset.id`,
-              spaceScopeJoin: sql`INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_album."spaceId"`,
-              requireShowInTimeline: true,
-            })}
+            ${accessibleTimelineAssetPredicate({ userId, hasTimelineSpaces })}
           )
       ),
       accessible_faces AS (
@@ -1048,6 +1056,7 @@ export class FaceIdentityRepository {
     options: { minimumFaceCount?: number },
   ): Promise<PeopleFaceStatistics> {
     const minimumFaceCount = options.minimumFaceCount ?? 1;
+    const hasTimelineSpaces = await this.hasTimelineSpaces(userId);
     const result = await sql<PeopleFaceStatistics>`
       WITH timeline_spaces AS (
         SELECT "spaceId"
@@ -1067,24 +1076,7 @@ export class FaceIdentityRepository {
           AND asset."isOffline" = false
           AND asset.visibility IN (${sql.join(peopleAssetVisibilities)})
           AND (
-            asset."ownerId" = ${userId}
-            OR EXISTS (
-              SELECT 1
-              FROM shared_space_asset
-              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_asset."spaceId"
-              WHERE shared_space_asset."assetId" = asset.id
-            )
-            OR EXISTS (
-              SELECT 1
-              FROM shared_space_library
-              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_library."spaceId"
-              WHERE shared_space_library."libraryId" = asset."libraryId"
-            )
-            OR ${spaceAlbumAssetExistsSql({
-              assetIdColumn: sql`asset.id`,
-              spaceScopeJoin: sql`INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_album."spaceId"`,
-              requireShowInTimeline: true,
-            })}
+            ${accessibleTimelineAssetPredicate({ userId, hasTimelineSpaces })}
           )
       ),
       accessible_faces AS (
@@ -1188,6 +1180,7 @@ export class FaceIdentityRepository {
 
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
   async getAccessiblePersonStatistics(userId: string, identityId: string): Promise<PersonStatistics> {
+    const hasTimelineSpaces = await this.hasTimelineSpaces(userId);
     const result = await sql<PersonStatistics>`
       WITH timeline_spaces AS (
         SELECT "spaceId"
@@ -1209,24 +1202,7 @@ export class FaceIdentityRepository {
           AND asset."isOffline" = false
           AND asset.visibility = ${AssetVisibility.Timeline}
           AND (
-            asset."ownerId" = ${userId}
-            OR EXISTS (
-              SELECT 1
-              FROM shared_space_asset
-              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_asset."spaceId"
-              WHERE shared_space_asset."assetId" = asset.id
-            )
-            OR EXISTS (
-              SELECT 1
-              FROM shared_space_library
-              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_library."spaceId"
-              WHERE shared_space_library."libraryId" = asset."libraryId"
-            )
-            OR ${spaceAlbumAssetExistsSql({
-              assetIdColumn: sql`asset.id`,
-              spaceScopeJoin: sql`INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_album."spaceId"`,
-              requireShowInTimeline: true,
-            })}
+            ${accessibleTimelineAssetPredicate({ userId, hasTimelineSpaces })}
           )
       )
       SELECT
@@ -1628,7 +1604,12 @@ export class FaceIdentityRepository {
   }
 
   @GenerateSql({
-    params: [{ userId: DummyValue.UUID, withHidden: true, limit: 51, offset: 0, minimumFaceCount: 3 }],
+    // Documented with the shared-space arms present: that is the superset worth reviewing. A
+    // viewer with no timeline-enabled space runs the collapsed predicate instead — see
+    // `accessibleTimelineAssetPredicate`.
+    params: [
+      { userId: DummyValue.UUID, withHidden: true, limit: 51, offset: 0, minimumFaceCount: 3, hasTimelineSpaces: true },
+    ],
   })
   async getAccessiblePeopleIdentityPage(input: {
     userId: string;
@@ -1637,8 +1618,11 @@ export class FaceIdentityRepository {
     offset: number;
     minimumFaceCount: number;
     searchName?: string;
+    /** Resolved by the caller when it runs several of these queries, to avoid repeating the lookup. */
+    hasTimelineSpaces?: boolean;
   }): Promise<AccessiblePeopleIdentityPageRow[]> {
     const searchName = input.searchName ?? '';
+    const hasTimelineSpaces = input.hasTimelineSpaces ?? (await this.hasTimelineSpaces(input.userId));
     const result = await sql<AccessiblePeopleIdentityPageRow>`
       WITH timeline_spaces AS (
         SELECT "spaceId"
@@ -1659,24 +1643,7 @@ export class FaceIdentityRepository {
           AND asset."isOffline" = false
           AND asset.visibility = ${AssetVisibility.Timeline}
           AND (
-            asset."ownerId" = ${input.userId}
-            OR EXISTS (
-              SELECT 1
-              FROM shared_space_asset
-              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_asset."spaceId"
-              WHERE shared_space_asset."assetId" = asset.id
-            )
-            OR EXISTS (
-              SELECT 1
-              FROM shared_space_library
-              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_library."spaceId"
-              WHERE shared_space_library."libraryId" = asset."libraryId"
-            )
-            OR ${spaceAlbumAssetExistsSql({
-              assetIdColumn: sql`asset.id`,
-              spaceScopeJoin: sql`INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_album."spaceId"`,
-              requireShowInTimeline: true,
-            })}
+            ${accessibleTimelineAssetPredicate({ userId: input.userId, hasTimelineSpaces })}
           )
       ),
       accessible_profiles AS (
@@ -1784,7 +1751,9 @@ export class FaceIdentityRepository {
   async getAccessiblePeopleCounts(
     userId: string,
     minimumFaceCount: number,
+    options: { hasTimelineSpaces?: boolean } = {},
   ): Promise<{ total: number; hidden: number }> {
+    const hasTimelineSpaces = options.hasTimelineSpaces ?? (await this.hasTimelineSpaces(userId));
     const result = await sql<AccessiblePeopleCountRow>`
       WITH timeline_spaces AS (
         SELECT "spaceId"
@@ -1805,24 +1774,7 @@ export class FaceIdentityRepository {
           AND asset."isOffline" = false
           AND asset.visibility = ${AssetVisibility.Timeline}
           AND (
-            asset."ownerId" = ${userId}
-            OR EXISTS (
-              SELECT 1
-              FROM shared_space_asset
-              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_asset."spaceId"
-              WHERE shared_space_asset."assetId" = asset.id
-            )
-            OR EXISTS (
-              SELECT 1
-              FROM shared_space_library
-              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_library."spaceId"
-              WHERE shared_space_library."libraryId" = asset."libraryId"
-            )
-            OR ${spaceAlbumAssetExistsSql({
-              assetIdColumn: sql`asset.id`,
-              spaceScopeJoin: sql`INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_album."spaceId"`,
-              requireShowInTimeline: true,
-            })}
+            ${accessibleTimelineAssetPredicate({ userId, hasTimelineSpaces })}
           )
       ),
       identity_counts AS (
@@ -1884,7 +1836,9 @@ export class FaceIdentityRepository {
   }
 
   @GenerateSql({
-    params: [{ userId: DummyValue.UUID, identityIds: [DummyValue.UUID], withHidden: true }],
+    // As above: documents the shared-space form, which is also the uncounted path (the counted
+    // path emits no accessibility predicate at all).
+    params: [{ userId: DummyValue.UUID, identityIds: [DummyValue.UUID], withHidden: true, hasTimelineSpaces: true }],
   })
   async hydrateAccessiblePeople(input: {
     userId: string;
@@ -1907,6 +1861,8 @@ export class FaceIdentityRepository {
      * uncounted path where they fall out of `ranked_profiles`.
      */
     assetCounts?: ReadonlyMap<string, number>;
+    /** Resolved by the caller when it runs several of these queries, to avoid repeating the lookup. */
+    hasTimelineSpaces?: boolean;
   }): Promise<PersonResponseDto[]> {
     const countedIdentities = input.assetCounts
       ? input.identityIds
@@ -1920,6 +1876,12 @@ export class FaceIdentityRepository {
     }
 
     const identityIds = sql`array[${sql.join(requestedIds)}]::uuid[]`;
+
+    // Only the uncounted path emits an accessibility predicate, so skip the lookup entirely on the
+    // hot path rather than paying a round-trip for a value that is never interpolated.
+    const hasTimelineSpaces = countedIdentities
+      ? false
+      : (input.hasTimelineSpaces ?? (await this.hasTimelineSpaces(input.userId)));
 
     // With counts supplied, carry them alongside the ids through a parallel unnest so the whole
     // accessible_faces/asset_counts pair can be dropped from the query.
@@ -1952,24 +1914,7 @@ export class FaceIdentityRepository {
           AND asset."isOffline" = false
           AND asset.visibility = ${AssetVisibility.Timeline}
           AND (
-            asset."ownerId" = ${input.userId}
-            OR EXISTS (
-              SELECT 1
-              FROM shared_space_asset
-              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_asset."spaceId"
-              WHERE shared_space_asset."assetId" = asset.id
-            )
-            OR EXISTS (
-              SELECT 1
-              FROM shared_space_library
-              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_library."spaceId"
-              WHERE shared_space_library."libraryId" = asset."libraryId"
-            )
-            OR ${spaceAlbumAssetExistsSql({
-              assetIdColumn: sql`asset.id`,
-              spaceScopeJoin: sql`INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_album."spaceId"`,
-              requireShowInTimeline: true,
-            })}
+            ${accessibleTimelineAssetPredicate({ userId: input.userId, hasTimelineSpaces })}
           )
       ),
       asset_counts AS (

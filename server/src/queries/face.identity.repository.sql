@@ -98,6 +98,15 @@ LIMIT
 commit
 
 -- FaceIdentityRepository.searchAccessiblePeople
+select
+  "shared_space_member"."spaceId"
+from
+  "shared_space_member"
+where
+  "shared_space_member"."userId" = $1
+  and "shared_space_member"."showInTimeline" = $2
+limit
+  $3
 WITH
   timeline_spaces AS (
     SELECT
@@ -122,56 +131,7 @@ WITH
       AND asset."deletedAt" IS NULL
       AND asset."isOffline" = false
       AND asset.visibility = $2
-      AND (
-        asset."ownerId" = $3
-        OR EXISTS (
-          SELECT
-            1
-          FROM
-            shared_space_asset
-            INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_asset."spaceId"
-          WHERE
-            shared_space_asset."assetId" = asset.id
-        )
-        OR EXISTS (
-          SELECT
-            1
-          FROM
-            shared_space_library
-            INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_library."spaceId"
-          WHERE
-            shared_space_library."libraryId" = asset."libraryId"
-        )
-        OR (
-          EXISTS (
-            SELECT
-              1
-            FROM
-              shared_space_album
-              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_album."spaceId"
-              INNER JOIN album ON album.id = shared_space_album."albumId"
-              AND album."deletedAt" IS NULL
-              INNER JOIN album_asset ON album_asset."albumId" = shared_space_album."albumId"
-            WHERE
-              album_asset."assetId" = asset.id
-              AND "shared_space_album"."showInTimeline" = true
-          )
-          OR EXISTS (
-            SELECT
-              1
-            FROM
-              shared_space_album
-              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_album."spaceId"
-              INNER JOIN album ON album.id = shared_space_album."albumId"
-              AND album."deletedAt" IS NULL
-              INNER JOIN album_space_asset ON album_space_asset."albumId" = shared_space_album."albumId"
-              AND album_space_asset."spaceId" = shared_space_album."spaceId"
-            WHERE
-              album_space_asset."assetId" = asset.id
-              AND "shared_space_album"."showInTimeline" = true
-          )
-        )
-      )
+      AND (asset."ownerId" = $3)
   ),
   accessible_profiles AS (
     SELECT
@@ -318,6 +278,15 @@ OFFSET
   $11
 
 -- FaceIdentityRepository.getAccessiblePersonFilterSuggestions
+select
+  "shared_space_member"."spaceId"
+from
+  "shared_space_member"
+where
+  "shared_space_member"."userId" = $1
+  and "shared_space_member"."showInTimeline" = $2
+limit
+  $3
 WITH
   timeline_spaces AS (
     SELECT
@@ -342,56 +311,7 @@ WITH
       AND asset."deletedAt" IS NULL
       AND asset."isOffline" = false
       AND asset.visibility = $2
-      AND (
-        asset."ownerId" = $3
-        OR EXISTS (
-          SELECT
-            1
-          FROM
-            shared_space_asset
-            INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_asset."spaceId"
-          WHERE
-            shared_space_asset."assetId" = asset.id
-        )
-        OR EXISTS (
-          SELECT
-            1
-          FROM
-            shared_space_library
-            INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_library."spaceId"
-          WHERE
-            shared_space_library."libraryId" = asset."libraryId"
-        )
-        OR (
-          EXISTS (
-            SELECT
-              1
-            FROM
-              shared_space_album
-              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_album."spaceId"
-              INNER JOIN album ON album.id = shared_space_album."albumId"
-              AND album."deletedAt" IS NULL
-              INNER JOIN album_asset ON album_asset."albumId" = shared_space_album."albumId"
-            WHERE
-              album_asset."assetId" = asset.id
-              AND "shared_space_album"."showInTimeline" = true
-          )
-          OR EXISTS (
-            SELECT
-              1
-            FROM
-              shared_space_album
-              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_album."spaceId"
-              INNER JOIN album ON album.id = shared_space_album."albumId"
-              AND album."deletedAt" IS NULL
-              INNER JOIN album_space_asset ON album_space_asset."albumId" = shared_space_album."albumId"
-              AND album_space_asset."spaceId" = shared_space_album."spaceId"
-            WHERE
-              album_space_asset."assetId" = asset.id
-              AND "shared_space_album"."showInTimeline" = true
-          )
-        )
-      )
+      AND (asset."ownerId" = $3)
   ),
   accessible_profiles AS (
     SELECT
@@ -538,6 +458,15 @@ OFFSET
   $11
 
 -- FaceIdentityRepository.getAccessiblePeopleStatistics
+select
+  "shared_space_member"."spaceId"
+from
+  "shared_space_member"
+where
+  "shared_space_member"."userId" = $1
+  and "shared_space_member"."showInTimeline" = $2
+limit
+  $3
 WITH
   timeline_spaces AS (
     SELECT
@@ -561,56 +490,7 @@ WITH
       AND asset."deletedAt" IS NULL
       AND asset."isOffline" = false
       AND asset.visibility IN ($2, $3)
-      AND (
-        asset."ownerId" = $4
-        OR EXISTS (
-          SELECT
-            1
-          FROM
-            shared_space_asset
-            INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_asset."spaceId"
-          WHERE
-            shared_space_asset."assetId" = asset.id
-        )
-        OR EXISTS (
-          SELECT
-            1
-          FROM
-            shared_space_library
-            INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_library."spaceId"
-          WHERE
-            shared_space_library."libraryId" = asset."libraryId"
-        )
-        OR (
-          EXISTS (
-            SELECT
-              1
-            FROM
-              shared_space_album
-              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_album."spaceId"
-              INNER JOIN album ON album.id = shared_space_album."albumId"
-              AND album."deletedAt" IS NULL
-              INNER JOIN album_asset ON album_asset."albumId" = shared_space_album."albumId"
-            WHERE
-              album_asset."assetId" = asset.id
-              AND "shared_space_album"."showInTimeline" = true
-          )
-          OR EXISTS (
-            SELECT
-              1
-            FROM
-              shared_space_album
-              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_album."spaceId"
-              INNER JOIN album ON album.id = shared_space_album."albumId"
-              AND album."deletedAt" IS NULL
-              INNER JOIN album_space_asset ON album_space_asset."albumId" = shared_space_album."albumId"
-              AND album_space_asset."spaceId" = shared_space_album."spaceId"
-            WHERE
-              album_space_asset."assetId" = asset.id
-              AND "shared_space_album"."showInTimeline" = true
-          )
-        )
-      )
+      AND (asset."ownerId" = $4)
   ),
   accessible_faces AS (
     SELECT
@@ -727,6 +607,15 @@ SELECT
   ) AS "detectedFaceCount"
 
 -- FaceIdentityRepository.getAccessiblePeopleFaceStatistics
+select
+  "shared_space_member"."spaceId"
+from
+  "shared_space_member"
+where
+  "shared_space_member"."userId" = $1
+  and "shared_space_member"."showInTimeline" = $2
+limit
+  $3
 WITH
   timeline_spaces AS (
     SELECT
@@ -750,56 +639,7 @@ WITH
       AND asset."deletedAt" IS NULL
       AND asset."isOffline" = false
       AND asset.visibility IN ($2, $3)
-      AND (
-        asset."ownerId" = $4
-        OR EXISTS (
-          SELECT
-            1
-          FROM
-            shared_space_asset
-            INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_asset."spaceId"
-          WHERE
-            shared_space_asset."assetId" = asset.id
-        )
-        OR EXISTS (
-          SELECT
-            1
-          FROM
-            shared_space_library
-            INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_library."spaceId"
-          WHERE
-            shared_space_library."libraryId" = asset."libraryId"
-        )
-        OR (
-          EXISTS (
-            SELECT
-              1
-            FROM
-              shared_space_album
-              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_album."spaceId"
-              INNER JOIN album ON album.id = shared_space_album."albumId"
-              AND album."deletedAt" IS NULL
-              INNER JOIN album_asset ON album_asset."albumId" = shared_space_album."albumId"
-            WHERE
-              album_asset."assetId" = asset.id
-              AND "shared_space_album"."showInTimeline" = true
-          )
-          OR EXISTS (
-            SELECT
-              1
-            FROM
-              shared_space_album
-              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_album."spaceId"
-              INNER JOIN album ON album.id = shared_space_album."albumId"
-              AND album."deletedAt" IS NULL
-              INNER JOIN album_space_asset ON album_space_asset."albumId" = shared_space_album."albumId"
-              AND album_space_asset."spaceId" = shared_space_album."spaceId"
-            WHERE
-              album_space_asset."assetId" = asset.id
-              AND "shared_space_album"."showInTimeline" = true
-          )
-        )
-      )
+      AND (asset."ownerId" = $4)
   ),
   accessible_faces AS (
     SELECT DISTINCT
@@ -945,6 +785,15 @@ FROM
   face_classification
 
 -- FaceIdentityRepository.getAccessiblePersonStatistics
+select
+  "shared_space_member"."spaceId"
+from
+  "shared_space_member"
+where
+  "shared_space_member"."userId" = $1
+  and "shared_space_member"."showInTimeline" = $2
+limit
+  $3
 WITH
   timeline_spaces AS (
     SELECT
@@ -970,56 +819,7 @@ WITH
       AND asset."deletedAt" IS NULL
       AND asset."isOffline" = false
       AND asset.visibility = $3
-      AND (
-        asset."ownerId" = $4
-        OR EXISTS (
-          SELECT
-            1
-          FROM
-            shared_space_asset
-            INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_asset."spaceId"
-          WHERE
-            shared_space_asset."assetId" = asset.id
-        )
-        OR EXISTS (
-          SELECT
-            1
-          FROM
-            shared_space_library
-            INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_library."spaceId"
-          WHERE
-            shared_space_library."libraryId" = asset."libraryId"
-        )
-        OR (
-          EXISTS (
-            SELECT
-              1
-            FROM
-              shared_space_album
-              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_album."spaceId"
-              INNER JOIN album ON album.id = shared_space_album."albumId"
-              AND album."deletedAt" IS NULL
-              INNER JOIN album_asset ON album_asset."albumId" = shared_space_album."albumId"
-            WHERE
-              album_asset."assetId" = asset.id
-              AND "shared_space_album"."showInTimeline" = true
-          )
-          OR EXISTS (
-            SELECT
-              1
-            FROM
-              shared_space_album
-              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_album."spaceId"
-              INNER JOIN album ON album.id = shared_space_album."albumId"
-              AND album."deletedAt" IS NULL
-              INNER JOIN album_space_asset ON album_space_asset."albumId" = shared_space_album."albumId"
-              AND album_space_asset."spaceId" = shared_space_album."spaceId"
-            WHERE
-              album_space_asset."assetId" = asset.id
-              AND "shared_space_album"."showInTimeline" = true
-          )
-        )
-      )
+      AND (asset."ownerId" = $4)
   )
 SELECT
   COUNT(DISTINCT "assetId")::int AS assets,

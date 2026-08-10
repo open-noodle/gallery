@@ -2632,6 +2632,126 @@ describe(FaceIdentityRepository.name, () => {
     });
   });
 
+  // Fix B — the no-timeline-spaces fast path, exercised through the repository rather than through
+  // the predicate helper alone (see accessible-timeline-asset-predicate.medium.spec.ts for the
+  // fragment-level equivalence proof).
+  describe('getAccessiblePeople without any timeline-enabled space', () => {
+    it('returns the viewer own people with correct counts', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { user: stranger } = await ctx.newUser();
+
+      try {
+        const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Solo' });
+        const identity = await sut.ensurePersonIdentity(person.id);
+        for (let index = 0; index < 2; index++) {
+          const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+          const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+          await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
+        }
+
+        // A face belonging to someone else's library must stay invisible on the fast path.
+        const { person: theirs } = await ctx.newPerson({ ownerId: stranger.id, name: 'Theirs' });
+        const strangerIdentity = await sut.ensurePersonIdentity(theirs.id);
+        const { asset: strangerAsset } = await ctx.newAsset({
+          ownerId: stranger.id,
+          visibility: AssetVisibility.Timeline,
+        });
+        const { assetFace: strangerFace } = await ctx.newAssetFace({
+          assetId: strangerAsset.id,
+          personId: theirs.id,
+        });
+        await sut.linkFace({
+          assetFaceId: strangerFace.id,
+          identityId: strangerIdentity.id,
+          source: 'owner-person',
+        });
+
+        const result = await sut.getAccessiblePeople(user.id, {
+          withHidden: false,
+          page: 1,
+          size: 50,
+          minimumFaceCount: 1,
+        });
+
+        expect(result.people.map((candidate) => candidate.name)).toEqual(['Solo']);
+        expect(result.people[0].numberOfAssets).toBe(2);
+        expect(result.total).toBe(1);
+      } finally {
+        await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
+        await ctx.database.deleteFrom('user').where('id', '=', stranger.id).execute();
+      }
+    });
+
+    it('does not surface space people while the membership has showInTimeline off', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+
+      try {
+        const { space } = await createAccessibleSpaceIdentity(ctx, sut, {
+          memberUserId: member.id,
+          ownerUserId: owner.id,
+          showInTimeline: false,
+          embedding: newEmbedding(),
+        });
+        expect(space.id).toBeDefined();
+
+        const result = await sut.getAccessiblePeople(member.id, {
+          withHidden: false,
+          page: 1,
+          size: 50,
+          minimumFaceCount: 1,
+        });
+
+        expect(result.people).toEqual([]);
+        expect(result.total).toBe(0);
+      } finally {
+        await ctx.database.deleteFrom('user').where('id', '=', owner.id).execute();
+        await ctx.database.deleteFrom('user').where('id', '=', member.id).execute();
+      }
+    });
+
+    // The fast path is chosen per request. If the decision were cached anywhere, enabling the
+    // timeline would not take effect and the member would stay blind to the space's people.
+    it('picks the space path up as soon as the membership timeline is switched on', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+
+      try {
+        const { space } = await createAccessibleSpaceIdentity(ctx, sut, {
+          memberUserId: member.id,
+          ownerUserId: owner.id,
+          showInTimeline: false,
+          embedding: newEmbedding(),
+        });
+
+        const before = await sut.getAccessiblePeople(member.id, {
+          withHidden: false,
+          page: 1,
+          size: 50,
+          minimumFaceCount: 1,
+        });
+        expect(before.people).toEqual([]);
+
+        await setMemberTimeline(ctx, { spaceId: space.id, userId: member.id, showInTimeline: true });
+
+        const after = await sut.getAccessiblePeople(member.id, {
+          withHidden: false,
+          page: 1,
+          size: 50,
+          minimumFaceCount: 1,
+        });
+        expect(after.people).toHaveLength(1);
+        expect(after.total).toBe(1);
+      } finally {
+        await ctx.database.deleteFrom('user').where('id', '=', owner.id).execute();
+        await ctx.database.deleteFrom('user').where('id', '=', member.id).execute();
+      }
+    });
+  });
+
   describe('getAccessiblePeopleStatistics', () => {
     it('counts visible and hidden identity profiles and unassigned faces in owned global scope', async () => {
       const { ctx, sut } = setup();
