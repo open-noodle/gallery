@@ -7,16 +7,19 @@
     // Whether any filter is active — shown as a dot on the button.
     active?: boolean;
     onExpand: () => void;
+    // Overridable so a page can keep its own selector; the map's mobile drawer toggle is a
+    // separate control from the desktop header toggle and the two are asserted on separately.
+    testId?: string;
   }
 
-  let { active = false, onExpand }: Props = $props();
+  let { active = false, onExpand, testId = 'filter-toggle-btn' }: Props = $props();
 </script>
 
 <button
   type="button"
   class="relative flex size-9 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-subtle dark:text-gray-400"
   onclick={onExpand}
-  data-testid="filter-toggle-btn"
+  data-testid={testId}
   aria-label={$t('filters')}
   title={$t('filters')}
 >
