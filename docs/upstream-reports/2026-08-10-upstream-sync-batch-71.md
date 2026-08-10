@@ -241,27 +241,47 @@ rather than `mise run`, and the tree stayed clean.
 ## Remote CI Verification
 
 - **Test branch**: `rebase/upstream-batch-71`
-- **Commit validated**: _(filled in after dispatch)_
+- **Commit validated**: `0c666bb04c2`
+- **Result**: **10/10 GREEN**
 
-| Workflow                                  | Status | Notes |
-| ----------------------------------------- | ------ | ----- |
-| `test.yml`                                |        |       |
-| `docker.yml`                              |        |       |
-| `static_analysis.yml`                     |        |       |
-| `gallery-build-mobile.yml`                |        |       |
-| `gallery-rebase-smoke.yml`                |        |       |
-| `storage-migration-tests.yml`             |        |       |
-| `storage-migration-e2e.yml`               |        |       |
-| `gallery-revert-to-immich-validation.yml` |        |       |
-| `gallery-ml-smoke.yml`                    |        |       |
-| `gallery-mobile-smoke.yml`                |        |       |
+| Workflow                                  | Status | Notes                                                          |
+| ----------------------------------------- | ------ | -------------------------------------------------------------- |
+| `test.yml`                                | GREEN  | 21/21 jobs, 0 skipped                                          |
+| `docker.yml`                              | GREEN  | green on re-run of the failed job; see the transient 403 below |
+| `static_analysis.yml`                     | GREEN  | `dart analyze` + `dart format` + generated-file freshness      |
+| `gallery-build-mobile.yml`                | GREEN  | Android **and** iOS both built and signed — neither cancelled  |
+| `gallery-rebase-smoke.yml`                | GREEN  |                                                                |
+| `storage-migration-tests.yml`             | GREEN  |                                                                |
+| `storage-migration-e2e.yml`               | GREEN  |                                                                |
+| `gallery-revert-to-immich-validation.yml` | GREEN  |                                                                |
+| `gallery-ml-smoke.yml`                    | GREEN  |                                                                |
+| `gallery-mobile-smoke.yml`                | GREEN  |                                                                |
 
 Dispatched in staggered waves (4 / 2 / 4) — dispatching all ten at once has twice produced GHCR
-`toomanyrequests` failures during image pulls.
+`toomanyrequests` failures during image pulls. **No rate-limit failures this cycle**, so the
+staggering keeps earning its place.
+
+### Confirmed transient: one GHCR 403 on the openvino ML push
+
+`docker.yml` first came back red on a single job — `Build and Push ML (openvino, -openvino, linux/amd64) / build`
+— with `failed to push ghcr.io/open-noodle/immich-machine-learning: denied: permission_denied ... 403 Forbidden`
+(preceded by a benign `failed to configure registry cache importer ... not found`, just a cache miss
+for a new branch name).
+
+Classified as environmental rather than assumed so, on four independent signals:
+
+1. This cycle's delta under `machine-learning/`, `.github/`, `docker/` and every Dockerfile is **empty**.
+2. The **same job on the same rolling branch** succeeded 11 hours earlier (run `31367786594`, 23 success / 2 skipped).
+3. Decisively — **five other ML variants (cpu ×2 arches, cuda, armnn, rknn) pushed to the same
+   registry with the same token in the same run**. A credentials or permissions misconfiguration
+   cannot fail exactly one matrix leg.
+4. `run rerun --failed` returned openvino's **build _and_ merge** jobs green.
+
+No code change was made for it.
 
 ## Post-Rebase Verification
 
-- Fork commits ahead of upstream: 1129
+- Fork commits ahead of upstream: 1130
 - Commits behind upstream: **0**
 - Fork diff looks clean: YES
 - On `main`: **NO** — newest upstream tag is still `v3.1.0`, so the standing landing rule
