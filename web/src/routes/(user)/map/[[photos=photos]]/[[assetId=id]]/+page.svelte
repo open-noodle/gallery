@@ -36,13 +36,13 @@
     type MapMarkerResponseDto,
     searchSmart,
   } from '@immich/sdk';
-  import { Icon, IconButton, modalManager } from '@immich/ui';
+  import { IconButton, modalManager } from '@immich/ui';
   import SearchAddAllToCollectionModal from '$lib/modals/SearchAddAllToCollectionModal.svelte';
   import type { SearchTerms } from '$lib/services/search.service';
   import { filterStateToSearchTerms } from '$lib/utils/filter-search-terms';
   import { lang } from '$lib/stores/preferences.store';
   import { SvelteMap, SvelteSet } from 'svelte/reactivity';
-  import { mdiArrowLeft, mdiFilterVariant } from '@mdi/js';
+  import { mdiArrowLeft } from '@mdi/js';
   import { onDestroy, onMount } from 'svelte';
   import { t } from 'svelte-i18n';
   import type { PageData } from './$types';
@@ -244,6 +244,16 @@
     });
   }
 
+  // On mobile the panel *is* the drawer, so its collapse control has to dismiss the whole overlay.
+  // Left to collapse itself it shrinks to a 48px icon strip under a full-screen scrim, which reads
+  // as "stuck open" (#964). Feeding it a constant `false` also stops a close from persisting as
+  // "collapsed" into the next open.
+  function onMobileFilterCollapse(collapsed: boolean) {
+    if (collapsed) {
+      showMobileFilters = false;
+    }
+  }
+
   function closeTimelinePanel() {
     isTimelinePanelVisible = false;
     selectedClusterBBox = undefined;
@@ -294,13 +304,14 @@
         />
       {/if}
       {#if isMobile}
-        <button
-          type="button"
-          data-testid="map-mobile-filter-toggle"
-          onclick={() => (showMobileFilters = !showMobileFilters)}
-        >
-          <Icon icon={mdiFilterVariant} size="24" />
-        </button>
+        <!-- The same component the desktop header uses, rather than a hand-rolled button: that
+             duplicate had drifted onto a different icon (mdiFilterVariant vs the mdiTune every
+             other filter affordance uses) and carried no accessible name. -->
+        <FilterToggleButton
+          active={getActiveFilterCount(filters) > 0}
+          onExpand={() => (showMobileFilters = !showMobileFilters)}
+          testId="map-mobile-filter-toggle"
+        />
       {/if}
     {/snippet}
     {#snippet descriptionTrailing()}
@@ -319,6 +330,39 @@
         filters = { ...filters };
       }}
     />
+    {#if isMobile && showMobileFilters}
+      <!-- Portalled to the body, not nested in the map layout: the page header row is a later
+           sibling of the content pane inside <main>, so it paints over everything the pane holds,
+           and the `isolate` below traps any z-index that tries to out-rank it. That is what put
+           "Map" on top of the panel's "Timeline" heading (#964).
+
+           Offsetting the top by the navbar height rather than using `inset-0` keeps the panel's own
+           header - close button and section menu - out of the navbar band, where iOS Safari paints
+           the navbar over it, and leaves the main menu reachable while the drawer is open. -->
+      <Portal target="body">
+        <div
+          class="fixed inset-x-0 top-(--navbar-height) bottom-0 z-30 max-md:top-(--navbar-height-md)"
+          data-testid="map-mobile-filter-overlay"
+        >
+          <button
+            type="button"
+            class="absolute inset-0 bg-black/50"
+            aria-label="Close filters"
+            onclick={() => (showMobileFilters = false)}
+          ></button>
+          <div class="absolute inset-y-0 left-0 w-72 bg-light shadow-xl dark:bg-immich-dark-bg">
+            <FilterPanel
+              bind:filters
+              bind:collapsed={() => false, onMobileFilterCollapse}
+              config={filterConfig}
+              {timeBuckets}
+              storageKey="gallery-filter-visible-sections-map"
+              persistCollapsed={false}
+            />
+          </div>
+        </div>
+      </Portal>
+    {/if}
     <div class="isolate flex size-full">
       {#if !isMobile}
         <FilterPanel
@@ -329,25 +373,6 @@
           {timeBuckets}
           storageKey="gallery-filter-visible-sections-map"
         />
-      {/if}
-      {#if isMobile && showMobileFilters}
-        <div class="fixed inset-0 z-30">
-          <button
-            type="button"
-            class="absolute inset-0 bg-black/50"
-            aria-label="Close filters"
-            onclick={() => (showMobileFilters = false)}
-          ></button>
-          <div class="absolute inset-y-0 left-0 w-72 bg-light shadow-xl dark:bg-immich-dark-bg">
-            <FilterPanel
-              bind:filters
-              config={filterConfig}
-              {timeBuckets}
-              storageKey="gallery-filter-visible-sections-map"
-              persistCollapsed={false}
-            />
-          </div>
-        </div>
       {/if}
       <div class="relative flex min-h-0 min-w-0 flex-1 flex-col sm:flex-row">
         {#if hasActiveFilters}
