@@ -35,13 +35,13 @@
     type MapMarkerResponseDto,
     searchSmart,
   } from '@immich/sdk';
-  import { Icon, IconButton, modalManager } from '@immich/ui';
+  import { IconButton, modalManager } from '@immich/ui';
   import SearchAddAllToCollectionModal from '$lib/modals/SearchAddAllToCollectionModal.svelte';
   import type { SearchTerms } from '$lib/services/search.service';
   import { filterStateToSearchTerms } from '$lib/utils/filter-search-terms';
   import { lang } from '$lib/stores/preferences.store';
   import { SvelteMap, SvelteSet } from 'svelte/reactivity';
-  import { mdiArrowLeft, mdiFilterVariant } from '@mdi/js';
+  import { mdiArrowLeft } from '@mdi/js';
   import { onDestroy, onMount } from 'svelte';
   import { t } from 'svelte-i18n';
   import type { PageData } from './$types';
@@ -303,13 +303,14 @@
         />
       {/if}
       {#if isMobile}
-        <button
-          type="button"
-          data-testid="map-mobile-filter-toggle"
-          onclick={() => (showMobileFilters = !showMobileFilters)}
-        >
-          <Icon icon={mdiFilterVariant} size="24" />
-        </button>
+        <!-- The same component the desktop header uses, rather than a hand-rolled button: that
+             duplicate had drifted onto a different icon (mdiFilterVariant vs the mdiTune every
+             other filter affordance uses) and carried no accessible name. -->
+        <FilterToggleButton
+          active={getActiveFilterCount(filters) > 0}
+          onExpand={() => (showMobileFilters = !showMobileFilters)}
+          testId="map-mobile-filter-toggle"
+        />
       {/if}
     {/snippet}
     {#snippet descriptionTrailing()}

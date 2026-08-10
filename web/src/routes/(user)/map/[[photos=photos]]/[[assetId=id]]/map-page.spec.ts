@@ -1,3 +1,4 @@
+import { mdiTune } from '@mdi/js';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import type { Component } from 'svelte';
@@ -290,6 +291,18 @@ describe('Map page query intersection', () => {
     await waitFor(() => {
       expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '');
     });
+  });
+
+  it('uses the shared filter icon on the mobile toggle (#964)', () => {
+    // Every other filter affordance — the desktop header toggle and the panel's own collapsed
+    // button — is mdiTune. The map's hand-rolled mobile button was the only mdiFilterVariant.
+    Object.defineProperty(globalThis, 'innerWidth', { configurable: true, value: 390 });
+
+    renderPage();
+
+    const toggle = screen.getByTestId('map-mobile-filter-toggle');
+    expect(toggle.querySelector(':scope svg path')).toHaveAttribute('d', mdiTune);
+    expect(toggle).toHaveAccessibleName();
   });
 
   it('keeps the mobile filter overlay clear of the app chrome (#964)', async () => {
