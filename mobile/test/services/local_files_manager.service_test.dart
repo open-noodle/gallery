@@ -18,9 +18,9 @@ void main() {
     );
   });
 
-  group('PermissionRepository.manageMediaPermission', () {
+  group('DevicePermissionRepository.manageMediaPermission', () {
     test('requests manage media settings through the permission API channel', () async {
-      final repository = PermissionRepository(PermissionApi());
+      final repository = DevicePermissionRepository(PermissionApi());
       final calls = <Object?>[];
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockDecodedMessageHandler<Object?>(channel, (
         Object? message,
@@ -37,7 +37,7 @@ void main() {
     });
 
     test('throws when the native permission API handler is missing', () async {
-      final repository = PermissionRepository(PermissionApi());
+      final repository = DevicePermissionRepository(PermissionApi());
 
       await expectLater(
         repository.manageMediaPermission(),
