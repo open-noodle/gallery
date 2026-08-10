@@ -201,6 +201,14 @@ type AccessiblePeopleIdentityPageRow = {
   visibleAssetCount: string | number;
 };
 
+/**
+ * Reshape the page query's rows into the map {@link FaceIdentityRepository.hydrateAccessiblePeople}
+ * takes, so hydrate does not recompute a count the page query already produced. `visibleAssetCount`
+ * arrives as a string when postgres returns the bigint aggregate.
+ */
+const toAssetCounts = (rows: AccessiblePeopleIdentityPageRow[]): ReadonlyMap<string, number> =>
+  new Map(rows.map((row) => [row.identityId, Number(row.visibleAssetCount)]));
+
 type AccessiblePeopleCountRow = {
   total: string | number | null;
   hidden: string | number | null;
@@ -862,6 +870,7 @@ export class FaceIdentityRepository {
       userId,
       identityIds: rows.map((row) => row.identityId),
       withHidden: options.withHidden ?? false,
+      assetCounts: toAssetCounts(rows),
     });
   }
 
@@ -901,6 +910,7 @@ export class FaceIdentityRepository {
       userId,
       identityIds: pageRows.map((row) => row.identityId),
       withHidden: options.withHidden,
+      assetCounts: toAssetCounts(pageRows),
     });
     const counts = await this.getAccessiblePeopleCounts(userId, minimumFaceCount);
 
@@ -1880,24 +1890,55 @@ export class FaceIdentityRepository {
     userId: string;
     identityIds: string[];
     withHidden: boolean;
+    /**
+     * Per-identity `COUNT(DISTINCT assetId)` the caller has already computed, keyed by identity id.
+     *
+     * `getAccessiblePeopleIdentityPage` produces exactly this number (its `visibleAssetCount`) for
+     * every identity it returns, so the two callers that page first — {@link getAccessiblePeople}
+     * and {@link searchAccessiblePeople} — can hand it over instead of making this query rebuild
+     * the `accessible_faces` CTE to recompute the identical value. On a large library that
+     * recomputation dominated `GET /api/people`.
+     *
+     * Supplying it must not change the result. Two invariants make that hold, and both are pinned
+     * by tests: the counts are the same aggregate over the same CTE definition, and an identity
+     * only reaches this method because the page query already established it is accessible — which
+     * is what the dropped `EXISTS (accessible_faces)` guard was re-checking. Identities absent from
+     * the map (or counted zero, which the page query never emits) are dropped, matching the
+     * uncounted path where they fall out of `ranked_profiles`.
+     */
+    assetCounts?: ReadonlyMap<string, number>;
   }): Promise<PersonResponseDto[]> {
-    if (input.identityIds.length === 0) {
+    const countedIdentities = input.assetCounts
+      ? input.identityIds
+          .map((identityId) => [identityId, input.assetCounts?.get(identityId)] as const)
+          .filter((entry): entry is readonly [string, number] => typeof entry[1] === 'number' && entry[1] > 0)
+      : undefined;
+
+    const requestedIds = countedIdentities ? countedIdentities.map(([identityId]) => identityId) : input.identityIds;
+    if (requestedIds.length === 0) {
       return [];
     }
 
-    const identityIds = sql`array[${sql.join(input.identityIds)}]::uuid[]`;
-    const result = await sql<HydratedAccessiblePersonRow>`
-      WITH requested_identities AS (
+    const identityIds = sql`array[${sql.join(requestedIds)}]::uuid[]`;
+
+    // With counts supplied, carry them alongside the ids through a parallel unnest so the whole
+    // accessible_faces/asset_counts pair can be dropped from the query.
+    const requestedIdentities = countedIdentities
+      ? sql`
+        SELECT *
+        FROM unnest(
+          ${identityIds},
+          array[${sql.join(countedIdentities.map(([, numberOfAssets]) => numberOfAssets))}]::bigint[]
+        ) WITH ORDINALITY AS requested("identityId", "numberOfAssets", ord)
+      `
+      : sql`
         SELECT *
         FROM unnest(${identityIds}) WITH ORDINALITY AS requested("identityId", ord)
-      ),
-      timeline_spaces AS (
-        SELECT "spaceId"
-        FROM shared_space_member
-        WHERE "userId" = ${input.userId}
-          AND "showInTimeline" = true
-      ),
-      accessible_faces AS (
+      `;
+
+    const accessibleFacesCte = countedIdentities
+      ? sql``
+      : sql`accessible_faces AS (
         SELECT
           face_identity_face."identityId",
           asset_face."assetId"
@@ -1937,7 +1978,29 @@ export class FaceIdentityRepository {
           COUNT(DISTINCT "assetId") AS "numberOfAssets"
         FROM accessible_faces
         GROUP BY "identityId"
+      ),`;
+
+    // Accessibility was already established by the page query for every identity we were handed,
+    // so the counted path drops the re-check that the accessible_faces CTE existed to answer.
+    const accessibilityFilter = countedIdentities
+      ? sql``
+      : sql`WHERE EXISTS (SELECT 1 FROM accessible_faces WHERE accessible_faces."identityId" = profiles."identityId")`;
+    const numberOfAssetsColumn = countedIdentities
+      ? sql`requested_identities."numberOfAssets"`
+      : sql`asset_counts."numberOfAssets"`;
+    const assetCountsJoin = countedIdentities
+      ? sql``
+      : sql`LEFT JOIN asset_counts ON asset_counts."identityId" = requested_identities."identityId"`;
+
+    const result = await sql<HydratedAccessiblePersonRow>`
+      WITH requested_identities AS (${requestedIdentities}),
+      timeline_spaces AS (
+        SELECT "spaceId"
+        FROM shared_space_member
+        WHERE "userId" = ${input.userId}
+          AND "showInTimeline" = true
       ),
+      ${accessibleFacesCte}
       profiles AS (
         SELECT
           'user-person'::text AS "profileType",
@@ -2034,7 +2097,7 @@ export class FaceIdentityRepository {
               profiles."profileId"
           ) AS birthdate_rn
         FROM profiles
-        WHERE EXISTS (SELECT 1 FROM accessible_faces WHERE accessible_faces."identityId" = profiles."identityId")
+        ${accessibilityFilter}
       )
       SELECT
         primary_profiles."profileType",
@@ -2049,7 +2112,7 @@ export class FaceIdentityRepository {
         primary_profiles."updatedAt",
         primary_profiles.type,
         primary_profiles.species,
-        asset_counts."numberOfAssets"
+        ${numberOfAssetsColumn} AS "numberOfAssets"
       FROM requested_identities
       INNER JOIN ranked_profiles AS primary_profiles
         ON primary_profiles."identityId" = requested_identities."identityId"
@@ -2060,7 +2123,7 @@ export class FaceIdentityRepository {
       INNER JOIN ranked_profiles AS birthdate_profiles
         ON birthdate_profiles."identityId" = requested_identities."identityId"
         AND birthdate_profiles.birthdate_rn = 1
-      LEFT JOIN asset_counts ON asset_counts."identityId" = requested_identities."identityId"
+      ${assetCountsJoin}
       ORDER BY requested_identities.ord
     `.execute(this.db);
 

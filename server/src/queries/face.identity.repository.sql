@@ -1545,7 +1545,7 @@ SELECT
   primary_profiles."updatedAt",
   primary_profiles.type,
   primary_profiles.species,
-  asset_counts."numberOfAssets"
+  asset_counts."numberOfAssets" AS "numberOfAssets"
 FROM
   requested_identities
   INNER JOIN ranked_profiles AS primary_profiles ON primary_profiles."identityId" = requested_identities."identityId"

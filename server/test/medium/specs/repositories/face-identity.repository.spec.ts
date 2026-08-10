@@ -2312,6 +2312,326 @@ describe(FaceIdentityRepository.name, () => {
     }
   });
 
+  // `getAccessiblePeopleIdentityPage` already computes COUNT(DISTINCT assetId) per identity, and
+  // `hydrateAccessiblePeople` used to throw that away and rebuild the whole `accessible_faces` CTE
+  // to compute the identical number a second time — on a large library that recomputation was the
+  // single most expensive part of GET /api/people. Hydrate now accepts those counts. These tests
+  // pin the contract that supplying them changes NOTHING about the result.
+  describe('hydrateAccessiblePeople with precomputed asset counts', () => {
+    it('returns byte-identical rows whether or not counts are supplied', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+
+      try {
+        const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Counted' });
+        const identity = await sut.ensurePersonIdentity(person.id);
+        for (let index = 0; index < 3; index++) {
+          const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+          const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+          await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
+        }
+
+        const pageRows = await sut.getAccessiblePeopleIdentityPage({
+          userId: user.id,
+          withHidden: true,
+          limit: 50,
+          offset: 0,
+          minimumFaceCount: 1,
+        });
+        const counts = new Map(pageRows.map((row) => [row.identityId, Number(row.visibleAssetCount)]));
+
+        const withoutCounts = await sut.hydrateAccessiblePeople({
+          userId: user.id,
+          identityIds: pageRows.map((row) => row.identityId),
+          withHidden: true,
+        });
+        const withCounts = await sut.hydrateAccessiblePeople({
+          userId: user.id,
+          identityIds: pageRows.map((row) => row.identityId),
+          withHidden: true,
+          assetCounts: counts,
+        });
+
+        expect(withoutCounts).toHaveLength(1);
+        expect(withoutCounts[0].numberOfAssets).toBe(3);
+        expect(withCounts).toEqual(withoutCounts);
+      } finally {
+        await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
+      }
+    });
+
+    // The count is COUNT(DISTINCT assetId), not a face count. If the page query and hydrate ever
+    // disagreed on that, every face in the UI would show an inflated photo count.
+    it('counts distinct assets, not faces, when one asset holds several faces of the same identity', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+
+      try {
+        const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Twice' });
+        const identity = await sut.ensurePersonIdentity(person.id);
+        const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+        for (let index = 0; index < 2; index++) {
+          const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+          await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
+        }
+
+        const pageRows = await sut.getAccessiblePeopleIdentityPage({
+          userId: user.id,
+          withHidden: true,
+          limit: 50,
+          offset: 0,
+          minimumFaceCount: 1,
+        });
+        expect(Number(pageRows[0].visibleAssetCount)).toBe(1);
+
+        const withCounts = await sut.hydrateAccessiblePeople({
+          userId: user.id,
+          identityIds: pageRows.map((row) => row.identityId),
+          withHidden: true,
+          assetCounts: new Map(pageRows.map((row) => [row.identityId, Number(row.visibleAssetCount)])),
+        });
+        const withoutCounts = await sut.hydrateAccessiblePeople({
+          userId: user.id,
+          identityIds: pageRows.map((row) => row.identityId),
+          withHidden: true,
+        });
+
+        expect(withCounts[0].numberOfAssets).toBe(1);
+        expect(withCounts).toEqual(withoutCounts);
+      } finally {
+        await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
+      }
+    });
+
+    it('preserves the requested identity ordering', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+
+      try {
+        const identityIds: string[] = [];
+        for (const name of ['Anna', 'Bruno', 'Carla']) {
+          const { person } = await ctx.newPerson({ ownerId: user.id, name });
+          const identity = await sut.ensurePersonIdentity(person.id);
+          const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+          const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+          await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
+          identityIds.push(identity.id);
+        }
+
+        const reversed = identityIds.toReversed();
+        const counts = new Map(reversed.map((identityId) => [identityId, 1]));
+
+        const withCounts = await sut.hydrateAccessiblePeople({
+          userId: user.id,
+          identityIds: reversed,
+          withHidden: true,
+          assetCounts: counts,
+        });
+        const withoutCounts = await sut.hydrateAccessiblePeople({
+          userId: user.id,
+          identityIds: reversed,
+          withHidden: true,
+        });
+
+        expect(withCounts.map((person) => person.name)).toEqual(['Carla', 'Bruno', 'Anna']);
+        expect(withCounts).toEqual(withoutCounts);
+      } finally {
+        await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
+      }
+    });
+
+    // Without counts, an identity whose faces are all inaccessible is dropped by the INNER JOIN on
+    // asset_counts. The precomputed path must drop it too rather than emitting a 0-asset row.
+    it('omits an identity that has no accessible faces, matching the uncounted path', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { user: stranger } = await ctx.newUser();
+
+      try {
+        const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Unreachable' });
+        const identity = await sut.ensurePersonIdentity(person.id);
+        // The only face lives on an asset owned by someone else and never shared.
+        const { asset } = await ctx.newAsset({ ownerId: stranger.id, visibility: AssetVisibility.Timeline });
+        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+        await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
+
+        const withoutCounts = await sut.hydrateAccessiblePeople({
+          userId: user.id,
+          identityIds: [identity.id],
+          withHidden: true,
+        });
+        const withCounts = await sut.hydrateAccessiblePeople({
+          userId: user.id,
+          identityIds: [identity.id],
+          withHidden: true,
+          assetCounts: new Map([[identity.id, 0]]),
+        });
+
+        expect(withoutCounts).toEqual([]);
+        expect(withCounts).toEqual([]);
+      } finally {
+        await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
+        await ctx.database.deleteFrom('user').where('id', '=', stranger.id).execute();
+      }
+    });
+
+    it('drops an identity missing from the supplied counts rather than inventing a row', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+
+      try {
+        const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Present' });
+        const identity = await sut.ensurePersonIdentity(person.id);
+        const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+        await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
+
+        const withCounts = await sut.hydrateAccessiblePeople({
+          userId: user.id,
+          identityIds: [identity.id],
+          withHidden: true,
+          assetCounts: new Map(),
+        });
+
+        expect(withCounts).toEqual([]);
+      } finally {
+        await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
+      }
+    });
+
+    it('returns an empty array for an empty identity list', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+
+      try {
+        await expect(
+          sut.hydrateAccessiblePeople({
+            userId: user.id,
+            identityIds: [],
+            withHidden: true,
+            assetCounts: new Map(),
+          }),
+        ).resolves.toEqual([]);
+      } finally {
+        await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
+      }
+    });
+
+    it('agrees with the uncounted path for a space-visible identity', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+
+      try {
+        const { identity } = await createAccessibleSpaceIdentity(ctx, sut, {
+          memberUserId: member.id,
+          ownerUserId: owner.id,
+          embedding: newEmbedding(),
+        });
+
+        const pageRows = await sut.getAccessiblePeopleIdentityPage({
+          userId: member.id,
+          withHidden: true,
+          limit: 50,
+          offset: 0,
+          minimumFaceCount: 1,
+        });
+        expect(pageRows.map((row) => row.identityId)).toContain(identity.id);
+
+        const withoutCounts = await sut.hydrateAccessiblePeople({
+          userId: member.id,
+          identityIds: pageRows.map((row) => row.identityId),
+          withHidden: true,
+        });
+        const withCounts = await sut.hydrateAccessiblePeople({
+          userId: member.id,
+          identityIds: pageRows.map((row) => row.identityId),
+          withHidden: true,
+          assetCounts: new Map(pageRows.map((row) => [row.identityId, Number(row.visibleAssetCount)])),
+        });
+
+        expect(withCounts).toEqual(withoutCounts);
+        expect(withCounts[0].numberOfAssets).toBe(1);
+      } finally {
+        await ctx.database.deleteFrom('user').where('id', '=', owner.id).execute();
+        await ctx.database.deleteFrom('user').where('id', '=', member.id).execute();
+      }
+    });
+
+    // Seeds BOTH a hidden and a visible identity, so withHidden=false still yields a non-empty
+    // result. With only a hidden person, both paths return [] and the comparison proves nothing.
+    it.each([true, false])('agrees with the uncounted path for withHidden=%s', async (withHidden) => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+
+      try {
+        const seed = async (name: string, isHidden: boolean) => {
+          const { person } = await ctx.newPerson({ ownerId: user.id, name, isHidden });
+          const identity = await sut.ensurePersonIdentity(person.id);
+          const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+          const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+          await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
+          return identity.id;
+        };
+        const hiddenIdentityId = await seed('Shy', true);
+        const visibleIdentityId = await seed('Open', false);
+        const identityIds = [hiddenIdentityId, visibleIdentityId];
+
+        const withoutCounts = await sut.hydrateAccessiblePeople({ userId: user.id, identityIds, withHidden });
+        const withCounts = await sut.hydrateAccessiblePeople({
+          userId: user.id,
+          identityIds,
+          withHidden,
+          assetCounts: new Map(identityIds.map((identityId) => [identityId, 1])),
+        });
+
+        // Guards the comparison itself: an empty-vs-empty result would pass either way.
+        expect(withoutCounts.length).toBe(withHidden ? 2 : 1);
+        expect(withCounts).toEqual(withoutCounts);
+        expect(withCounts.every((person) => person.numberOfAssets === 1)).toBe(true);
+      } finally {
+        await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
+      }
+    });
+
+    // The end-to-end invariant the whole optimisation rests on: the number the page query computes
+    // is the number the endpoint reports.
+    it('makes getAccessiblePeople report exactly the page query visibleAssetCount', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+
+      try {
+        const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Endtoend' });
+        const identity = await sut.ensurePersonIdentity(person.id);
+        for (let index = 0; index < 4; index++) {
+          const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+          const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+          await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
+        }
+
+        const pageRows = await sut.getAccessiblePeopleIdentityPage({
+          userId: user.id,
+          withHidden: false,
+          limit: 50,
+          offset: 0,
+          minimumFaceCount: 1,
+        });
+        const result = await sut.getAccessiblePeople(user.id, {
+          withHidden: false,
+          page: 1,
+          size: 50,
+          minimumFaceCount: 1,
+        });
+
+        const expected = Number(pageRows.find((row) => row.identityId === identity.id)?.visibleAssetCount);
+        expect(expected).toBe(4);
+        expect(result.people.find((candidate) => candidate.id === person.id)?.numberOfAssets).toBe(expected);
+      } finally {
+        await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
+      }
+    });
+  });
+
   describe('getAccessiblePeopleStatistics', () => {
     it('counts visible and hidden identity profiles and unassigned faces in owned global scope', async () => {
       const { ctx, sut } = setup();
