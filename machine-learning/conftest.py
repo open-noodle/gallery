@@ -4,8 +4,10 @@ from types import SimpleNamespace
 from typing import Any, Callable, Iterator
 from unittest import mock
 
+import numpy as np
 import pytest
 from fastapi.testclient import TestClient
+from numpy.typing import NDArray
 from PIL import Image
 
 from immich_ml.config import log
@@ -20,6 +22,13 @@ TEST_ASSETS = Path(__file__).parent.parent / "e2e/test-assets"
 @pytest.fixture(scope="session")
 def asset() -> Callable[[str], bytes]:
     return lambda path: (TEST_ASSETS / path).read_bytes()
+
+
+# Fork-only: upstream dropped this fixture in #30631 along with insightface, but the
+# fork's pet detector still works in cv2 BGR space and its tests feed it a decoded array.
+@pytest.fixture
+def cv_image(pil_image: Image.Image) -> NDArray[np.uint8]:
+    return np.asarray(pil_image)[:, :, ::-1]  # PIL uses RGB while cv2 uses BGR
 
 
 @pytest.fixture
