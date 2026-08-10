@@ -12,6 +12,7 @@
     personNames?: Map<string, string>;
     tagNames?: Map<string, string>;
     onFiltersChange?: (filters: FilterState) => void;
+    collapsed?: boolean;
     [key: string]: unknown;
   }
 
@@ -22,6 +23,7 @@
     personNames,
     tagNames,
     onFiltersChange,
+    collapsed = $bindable(false),
     ...rest
   }: Props = $props();
   let suggestions = $state('');
@@ -101,7 +103,9 @@
   data-suggestions={suggestions}
   data-person-names={JSON.stringify([...(personNames?.entries() ?? [])])}
   data-tag-names={JSON.stringify([...(tagNames?.entries() ?? [])])}
+  data-collapsed={String(collapsed)}
 >
+  <button type="button" data-testid="filter-panel-collapse" onclick={() => (collapsed = true)}>Collapse</button>
   <button type="button" data-testid="select-favorites-filter" onclick={selectFavorites}>Favorites</button>
   <button type="button" data-testid="select-has-no-album-filter" onclick={selectHasNoAlbum}>Has no album</button>
   <button type="button" data-testid="select-has-album-filter" onclick={selectHasAlbum}>Has album</button>
