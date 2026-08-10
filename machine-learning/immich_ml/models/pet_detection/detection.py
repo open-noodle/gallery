@@ -7,7 +7,7 @@ from numpy.typing import NDArray
 
 from immich_ml.config import clean_name
 from immich_ml.models.base import InferenceModel
-from immich_ml.models.transforms import decode_cv2
+from immich_ml.models.transforms import decode_pil, pil_to_cv2
 from immich_ml.schemas import BoundingBox, ModelSession, ModelTask, ModelType, PetDetectionOutput
 
 _HF_ORG = "Deeds67"
@@ -68,8 +68,10 @@ class PetDetector(InferenceModel):
         self._input_name: str = input_name
         return session
 
-    def _predict(self, inputs: NDArray[np.uint8] | bytes) -> PetDetectionOutput:
-        image = decode_cv2(inputs)
+    def _predict(self, inputs: NDArray[np.uint8] | bytes, **model_kwargs: Any) -> PetDetectionOutput:
+        # `min_score` is applied in `_postprocess` and is kept current by `configure`, which
+        # `InferenceModel.predict` calls before forwarding the same kwargs down to `_predict`.
+        image = inputs if isinstance(inputs, np.ndarray) else pil_to_cv2(decode_pil(inputs))
         orig_h, orig_w = image.shape[:2]
 
         blob = self._preprocess(image)
