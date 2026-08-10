@@ -1,3 +1,4 @@
+import { mdiTune } from '@mdi/js';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import type { Component } from 'svelte';
@@ -46,7 +47,7 @@ vi.mock('./MapTimelinePanel.svelte', async () => {
 });
 
 vi.mock('$lib/elements/Portal.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('@test-data/mocks/portal-passthrough.stub.svelte');
   return { default: MockComponent };
 });
 
@@ -290,6 +291,71 @@ describe('Map page query intersection', () => {
     await waitFor(() => {
       expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '');
     });
+  });
+
+  it('uses the shared filter icon on the mobile toggle (#964)', () => {
+    // Every other filter affordance — the desktop header toggle and the panel's own collapsed
+    // button — is mdiTune. The map's hand-rolled mobile button was the only mdiFilterVariant.
+    Object.defineProperty(globalThis, 'innerWidth', { configurable: true, value: 390 });
+
+    renderPage();
+
+    const toggle = screen.getByTestId('map-mobile-filter-toggle');
+    expect(toggle.querySelector(':scope svg path')).toHaveAttribute('d', mdiTune);
+    expect(toggle).toHaveAccessibleName();
+  });
+
+  it('keeps the mobile filter overlay clear of the app chrome (#964)', async () => {
+    // `fixed inset-0` starts the drawer at the top of the viewport, which buries the filter
+    // panel's own header — the close button and the section menu — under the navigation bar.
+    Object.defineProperty(globalThis, 'innerWidth', { configurable: true, value: 390 });
+
+    renderPage();
+    await fireEvent.click(screen.getByTestId('map-mobile-filter-toggle'));
+
+    const overlay = screen.getByTestId('map-mobile-filter-overlay');
+    expect(overlay.className.split(/\s+/)).not.toContain('inset-0');
+    expect(overlay.className).toContain('top-(--navbar-height)');
+  });
+
+  it('renders the mobile filter overlay outside the page stacking context (#964)', async () => {
+    // The map content lives in an `isolate` stacking context, and the page header row paints on
+    // top of it — so a z-index inside that subtree can never lift the drawer above the "Map"
+    // title. It has to be portalled to the body instead.
+    Object.defineProperty(globalThis, 'innerWidth', { configurable: true, value: 390 });
+
+    renderPage();
+    await fireEvent.click(screen.getByTestId('map-mobile-filter-toggle'));
+
+    const overlay = screen.getByTestId('map-mobile-filter-overlay');
+    expect(overlay.closest('[data-testid="portal"]')).toHaveAttribute('data-portal-target', 'body');
+    expect(overlay.closest('.isolate')).toBeNull();
+  });
+
+  it('dismisses the mobile filter overlay when the panel is closed (#964)', async () => {
+    // Collapsing leaves the drawer mounted over a full-screen scrim with nothing but a 48px icon
+    // strip in it — the "stuck open" half of the report. On mobile, closing means closing.
+    Object.defineProperty(globalThis, 'innerWidth', { configurable: true, value: 390 });
+
+    renderPage();
+    await fireEvent.click(screen.getByTestId('map-mobile-filter-toggle'));
+    await fireEvent.click(screen.getByTestId('filter-panel-collapse'));
+
+    expect(screen.queryByTestId('map-mobile-filter-overlay')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('filter-panel-stub')).not.toBeInTheDocument();
+  });
+
+  it('reopens the mobile filter overlay expanded after it was closed from the panel (#964)', async () => {
+    // The drawer owns the collapsed state, so a close must not persist as "collapsed" into the
+    // next open — that would reopen the drawer showing the bare icon strip.
+    Object.defineProperty(globalThis, 'innerWidth', { configurable: true, value: 390 });
+
+    renderPage();
+    await fireEvent.click(screen.getByTestId('map-mobile-filter-toggle'));
+    await fireEvent.click(screen.getByTestId('filter-panel-collapse'));
+    await fireEvent.click(screen.getByTestId('map-mobile-filter-toggle'));
+
+    expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-collapsed', 'false');
   });
 
   it('shows the add-all-to-collection button when the map is filtered with markers', async () => {
