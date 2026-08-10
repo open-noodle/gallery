@@ -202,6 +202,18 @@ type AccessiblePeopleIdentityPageRow = {
 };
 
 /**
+ * What the page query actually returns before the repository tidies it. `identityId` is null only
+ * on the placeholder row a `withTotals` query emits when the requested page is past the end — the
+ * row that still carries the header figures. Kept private so no consumer has to think about it.
+ */
+type AccessiblePeoplePageRawRow = {
+  identityId: string | null;
+  visibleAssetCount: string | number;
+  total?: string | number | null;
+  hidden?: string | number | null;
+};
+
+/**
  * Reshape the page query's rows into the map {@link FaceIdentityRepository.hydrateAccessiblePeople}
  * takes, so hydrate does not recompute a count the page query already produced. `visibleAssetCount`
  * arrives as a string when postgres returns the bigint aggregate.
@@ -920,7 +932,7 @@ export class FaceIdentityRepository {
     // Resolved once and shared by the queries below, so the endpoint pays one indexed lookup
     // rather than one per query.
     const hasTimelineSpaces = await this.hasTimelineSpaces(userId);
-    const rows = await this.getAccessiblePeopleIdentityPage({
+    const { rows, total, hidden } = await this.getAccessiblePeoplePageWithTotals({
       userId,
       withHidden: options.withHidden,
       limit: size + 1,
@@ -928,6 +940,7 @@ export class FaceIdentityRepository {
       minimumFaceCount,
       hasTimelineSpaces,
     });
+
     const pageRows = rows.slice(0, size);
     const people = await this.hydrateAccessiblePeople({
       userId,
@@ -936,11 +949,10 @@ export class FaceIdentityRepository {
       assetCounts: toAssetCounts(pageRows),
       hasTimelineSpaces,
     });
-    const counts = await this.getAccessiblePeopleCounts(userId, minimumFaceCount, { hasTimelineSpaces });
 
     return {
-      total: Number(counts.total ?? 0),
-      hidden: Number(counts.hidden ?? 0),
+      total,
+      hidden,
       hasNextPage: rows.length > size,
       people,
     };
@@ -1618,12 +1630,102 @@ export class FaceIdentityRepository {
     offset: number;
     minimumFaceCount: number;
     searchName?: string;
-    /** Resolved by the caller when it runs several of these queries, to avoid repeating the lookup. */
     hasTimelineSpaces?: boolean;
   }): Promise<AccessiblePeopleIdentityPageRow[]> {
+    const rows = await this.queryAccessiblePeoplePage({ ...input, withTotals: false });
+    return rows.filter((row): row is AccessiblePeopleIdentityPageRow => row.identityId !== null);
+  }
+
+  /**
+   * The page plus the library-wide header figures, from one query. See {@link withTotals} on
+   * {@link queryAccessiblePeoplePage} for why the totals are not simply the page's own numbers.
+   */
+  @GenerateSql({
+    params: [
+      { userId: DummyValue.UUID, withHidden: true, limit: 51, offset: 0, minimumFaceCount: 3, hasTimelineSpaces: true },
+    ],
+  })
+  async getAccessiblePeoplePageWithTotals(input: {
+    userId: string;
+    withHidden: boolean;
+    limit: number;
+    offset: number;
+    minimumFaceCount: number;
+    searchName?: string;
+    hasTimelineSpaces?: boolean;
+  }): Promise<{ rows: AccessiblePeopleIdentityPageRow[]; total: number; hidden: number }> {
+    const raw = await this.queryAccessiblePeoplePage({ ...input, withTotals: true });
+    return {
+      // The header figures ride on every row, including the placeholder row returned when the
+      // requested page is past the end — so read them before discarding it.
+      total: Number(raw[0]?.total ?? 0),
+      hidden: Number(raw[0]?.hidden ?? 0),
+      rows: raw.filter((row): row is AccessiblePeopleIdentityPageRow => row.identityId !== null),
+    };
+  }
+
+  private async queryAccessiblePeoplePage(input: {
+    userId: string;
+    withHidden: boolean;
+    limit: number;
+    offset: number;
+    minimumFaceCount: number;
+    searchName?: string;
+    /** Resolved by the caller when it runs several of these queries, to avoid repeating the lookup. */
+    hasTimelineSpaces?: boolean;
+    /**
+     * Also derive the library-wide total/hidden header figures from the CTEs this query already
+     * builds, instead of a third query that rebuilt them from scratch. Every
+     * returned row carries them; a page past the end returns a single row whose `identityId` is
+     * null and which carries only the totals.
+     */
+    withTotals?: boolean;
+  }): Promise<AccessiblePeoplePageRawRow[]> {
     const searchName = input.searchName ?? '';
     const hasTimelineSpaces = input.hasTimelineSpaces ?? (await this.hasTimelineSpaces(input.userId));
-    const result = await sql<AccessiblePeopleIdentityPageRow>`
+
+    // Fix C — the People header's total/hidden used to come from a third query that rebuilt
+    // `accessible_faces` and `accessible_profiles` from scratch. They are derived here instead,
+    // off the CTEs this query has already materialised.
+    //
+    // They are deliberately NOT the page's own figures: totals are library-wide and ignore
+    // `withHidden` (so they read off `accessible_profiles`, not `eligible_profiles`), and their
+    // "is this identity named" test omits the BTRIM the listing applies. Both asymmetries predate
+    // this change and are pinned by characterisation tests; reproducing them exactly is the point.
+    //
+    // The page is joined onto the totals rather than the other way round, so an empty page (a
+    // request past the last page) still returns the header numbers instead of collapsing to no rows.
+    const totalsCtes = input.withTotals
+      ? sql`,
+      all_identity_counts AS (
+        SELECT
+          accessible_faces."identityId",
+          COUNT(DISTINCT accessible_faces."assetId") AS "visibleAssetCount"
+        FROM accessible_faces
+        GROUP BY accessible_faces."identityId"
+      ),
+      identity_visibility AS (
+        SELECT
+          "identityId",
+          bool_or("isHidden" = false) AS "hasVisibleProfile",
+          bool_or(NULLIF(name, '') IS NOT NULL) AS "hasNamedProfile"
+        FROM accessible_profiles
+        GROUP BY "identityId"
+      ),
+      totals AS (
+        SELECT
+          COUNT(*) AS total,
+          COUNT(*) FILTER (WHERE "hasVisibleProfile" = false) AS hidden
+        FROM identity_visibility
+        INNER JOIN all_identity_counts ON all_identity_counts."identityId" = identity_visibility."identityId"
+        WHERE identity_visibility."hasNamedProfile" = true
+          OR all_identity_counts."visibleAssetCount" >= ${input.minimumFaceCount}
+      )`
+      : sql``;
+    const totalsColumns = input.withTotals ? sql`, totals.total, totals.hidden` : sql``;
+    const totalsFrom = input.withTotals ? sql`FROM totals LEFT JOIN page_rows ON true` : sql`FROM page_rows`;
+
+    const result = await sql<AccessiblePeoplePageRawRow>`
       WITH timeline_spaces AS (
         SELECT "spaceId"
         FROM shared_space_member
@@ -1724,115 +1826,45 @@ export class FaceIdentityRepository {
           bool_or(COALESCE("isFavorite", false)) AS "isFavorite"
         FROM eligible_profiles
         GROUP BY "identityId"
-      )
+      ),
+      page_rows AS (
+        SELECT
+          identity_counts."identityId",
+          identity_counts."visibleAssetCount",
+          ROW_NUMBER() OVER (
+            ORDER BY
+              COALESCE(identity_favorites."isFavorite", false) DESC,
+              NULLIF(BTRIM(best_profiles.name), '') IS NULL,
+              lower(NULLIF(BTRIM(best_profiles.name), '')) ASC NULLS LAST,
+              CASE
+                WHEN NULLIF(BTRIM(best_profiles.name), '') IS NULL THEN identity_counts."visibleAssetCount"
+              END DESC NULLS LAST,
+              identity_counts."identityId"
+          ) AS ord
+        FROM identity_counts
+        INNER JOIN best_profiles ON best_profiles."identityId" = identity_counts."identityId"
+        INNER JOIN identity_favorites ON identity_favorites."identityId" = identity_counts."identityId"
+        WHERE NULLIF(BTRIM(best_profiles.name), '') IS NOT NULL
+          OR identity_counts."visibleAssetCount" >= ${input.minimumFaceCount}
+        ORDER BY
+          COALESCE(identity_favorites."isFavorite", false) DESC,
+          NULLIF(BTRIM(best_profiles.name), '') IS NULL,
+          lower(NULLIF(BTRIM(best_profiles.name), '')) ASC NULLS LAST,
+          CASE
+            WHEN NULLIF(BTRIM(best_profiles.name), '') IS NULL THEN identity_counts."visibleAssetCount"
+          END DESC NULLS LAST,
+          identity_counts."identityId"
+        LIMIT ${input.limit}
+        OFFSET ${input.offset}
+      )${totalsCtes}
       SELECT
-        identity_counts."identityId",
-        identity_counts."visibleAssetCount"
-      FROM identity_counts
-      INNER JOIN best_profiles ON best_profiles."identityId" = identity_counts."identityId"
-      INNER JOIN identity_favorites ON identity_favorites."identityId" = identity_counts."identityId"
-      WHERE NULLIF(BTRIM(best_profiles.name), '') IS NOT NULL
-        OR identity_counts."visibleAssetCount" >= ${input.minimumFaceCount}
-      ORDER BY
-        COALESCE(identity_favorites."isFavorite", false) DESC,
-        NULLIF(BTRIM(best_profiles.name), '') IS NULL,
-        lower(NULLIF(BTRIM(best_profiles.name), '')) ASC NULLS LAST,
-        CASE
-          WHEN NULLIF(BTRIM(best_profiles.name), '') IS NULL THEN identity_counts."visibleAssetCount"
-        END DESC NULLS LAST,
-        identity_counts."identityId"
-      LIMIT ${input.limit}
-      OFFSET ${input.offset}
+        page_rows."identityId",
+        page_rows."visibleAssetCount"${totalsColumns}
+      ${totalsFrom}
+      ORDER BY page_rows.ord
     `.execute(this.db);
 
     return result.rows;
-  }
-
-  async getAccessiblePeopleCounts(
-    userId: string,
-    minimumFaceCount: number,
-    options: { hasTimelineSpaces?: boolean } = {},
-  ): Promise<{ total: number; hidden: number }> {
-    const hasTimelineSpaces = options.hasTimelineSpaces ?? (await this.hasTimelineSpaces(userId));
-    const result = await sql<AccessiblePeopleCountRow>`
-      WITH timeline_spaces AS (
-        SELECT "spaceId"
-        FROM shared_space_member
-        WHERE "userId" = ${userId}
-          AND "showInTimeline" = true
-      ),
-      accessible_faces AS (
-        SELECT
-          face_identity_face."identityId",
-          asset_face."assetId"
-        FROM face_identity_face
-        INNER JOIN asset_face ON asset_face.id = face_identity_face."assetFaceId"
-        INNER JOIN asset ON asset.id = asset_face."assetId"
-        WHERE asset_face."deletedAt" IS NULL
-          AND asset_face."isVisible" = true
-          AND asset."deletedAt" IS NULL
-          AND asset."isOffline" = false
-          AND asset.visibility = ${AssetVisibility.Timeline}
-          AND (
-            ${accessibleTimelineAssetPredicate({ userId, hasTimelineSpaces })}
-          )
-      ),
-      identity_counts AS (
-        SELECT
-          accessible_faces."identityId",
-          COUNT(DISTINCT accessible_faces."assetId") AS "visibleAssetCount"
-        FROM accessible_faces
-        GROUP BY accessible_faces."identityId"
-      ),
-      accessible_profiles AS (
-        SELECT person."identityId", person."isHidden", person.name
-        FROM person
-        WHERE person."ownerId" = ${userId}
-          AND person."identityId" IS NOT NULL
-          AND EXISTS (SELECT 1 FROM accessible_faces WHERE accessible_faces."identityId" = person."identityId")
-        UNION ALL
-        SELECT
-          shared_space_person."identityId",
-          shared_space_person."isHidden",
-          COALESCE(NULLIF(shared_space_person_alias.alias, ''), shared_space_person.name, '') AS name
-        FROM shared_space_person
-        INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_person."spaceId"
-        LEFT JOIN shared_space_person_alias
-          ON shared_space_person_alias."personId" = shared_space_person.id
-          AND shared_space_person_alias."userId" = ${userId}
-        WHERE shared_space_person."identityId" IS NOT NULL
-          AND EXISTS (
-            SELECT 1
-            FROM shared_space_person_face
-            INNER JOIN asset_face AS profile_face
-              ON profile_face.id = shared_space_person_face."assetFaceId"
-            WHERE shared_space_person_face."personId" = shared_space_person.id
-              AND profile_face."deletedAt" IS NULL
-              AND profile_face."isVisible" = true
-          )
-          AND EXISTS (
-            SELECT 1 FROM accessible_faces WHERE accessible_faces."identityId" = shared_space_person."identityId"
-          )
-      ),
-      identity_visibility AS (
-        SELECT
-          "identityId",
-          bool_or("isHidden" = false) AS "hasVisibleProfile",
-          bool_or(NULLIF(name, '') IS NOT NULL) AS "hasNamedProfile"
-        FROM accessible_profiles
-        GROUP BY "identityId"
-      )
-      SELECT
-        COUNT(*) AS total,
-        COUNT(*) FILTER (WHERE "hasVisibleProfile" = false) AS hidden
-      FROM identity_visibility
-      INNER JOIN identity_counts ON identity_counts."identityId" = identity_visibility."identityId"
-      WHERE identity_visibility."hasNamedProfile" = true
-        OR identity_counts."visibleAssetCount" >= ${minimumFaceCount}
-    `.execute(this.db);
-
-    const row = result.rows[0];
-    return { total: Number(row?.total ?? 0), hidden: Number(row?.hidden ?? 0) };
   }
 
   @GenerateSql({

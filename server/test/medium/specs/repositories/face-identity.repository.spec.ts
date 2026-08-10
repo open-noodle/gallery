@@ -35,6 +35,28 @@ beforeAll(async () => {
   defaultDatabase = await getKyselyDB();
 });
 
+// Seeds one owned identity with `assets` distinct timeline photos, for the total/hidden
+// characterisation cases. Declared at module scope: eslint's consistent-function-scoping rejects
+// helpers defined inside a describe block.
+const seedCharacterisationIdentity = async (
+  ctx: ReturnType<typeof setup>['ctx'],
+  sut: FaceIdentityRepository,
+  input: { userId: string; name: string; assets: number; isHidden?: boolean },
+) => {
+  const { person } = await ctx.newPerson({
+    ownerId: input.userId,
+    name: input.name,
+    isHidden: input.isHidden ?? false,
+  });
+  const identity = await sut.ensurePersonIdentity(person.id);
+  for (let index = 0; index < input.assets; index++) {
+    const { asset } = await ctx.newAsset({ ownerId: input.userId, visibility: AssetVisibility.Timeline });
+    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+    await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
+  }
+  return { person, identity };
+};
+
 const newSpacePerson = async (ctx: ReturnType<typeof setup>['ctx'], spaceId: string) => {
   return ctx.database.insertInto('shared_space_person').values({ spaceId }).returningAll().executeTakeFirstOrThrow();
 };
@@ -2745,6 +2767,175 @@ describe(FaceIdentityRepository.name, () => {
         });
         expect(after.people).toHaveLength(1);
         expect(after.total).toBe(1);
+      } finally {
+        await ctx.database.deleteFrom('user').where('id', '=', owner.id).execute();
+        await ctx.database.deleteFrom('user').where('id', '=', member.id).execute();
+      }
+    });
+  });
+
+  // Fix C — characterisation of the total/hidden header numbers BEFORE folding the separate counts
+  // query into the page query. These pin behaviour that is deliberately NOT symmetric with the page
+  // itself, so the fold cannot quietly "tidy" it:
+  //   * total/hidden ignore withHidden entirely — they are library-wide figures, not page figures;
+  //   * eligibility for the totals uses NULLIF(name, '') while the page uses NULLIF(BTRIM(name), ''),
+  //     so a whitespace-only name counts as named for the total but as unnamed for the listing.
+  describe('getAccessiblePeople total/hidden characterisation', () => {
+    it.each([true, false])('reports the same library-wide totals for withHidden=%s', async (withHidden) => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+
+      try {
+        await seedCharacterisationIdentity(ctx, sut, { userId: user.id, name: 'Visible', assets: 1 });
+        await seedCharacterisationIdentity(ctx, sut, { userId: user.id, name: 'Concealed', assets: 1, isHidden: true });
+
+        const result = await sut.getAccessiblePeople(user.id, {
+          withHidden,
+          page: 1,
+          size: 50,
+          minimumFaceCount: 1,
+        });
+
+        // Totals are library-wide and identical either way...
+        expect(result.total).toBe(2);
+        expect(result.hidden).toBe(1);
+        // ...while the listing itself does respect withHidden.
+        expect(result.people).toHaveLength(withHidden ? 2 : 1);
+      } finally {
+        await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
+      }
+    });
+
+    it('counts an unnamed identity only once it reaches minimumFaceCount', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+
+      try {
+        await seedCharacterisationIdentity(ctx, sut, { userId: user.id, name: '', assets: 2 });
+        await seedCharacterisationIdentity(ctx, sut, { userId: user.id, name: '', assets: 3 });
+
+        const result = await sut.getAccessiblePeople(user.id, {
+          withHidden: true,
+          page: 1,
+          size: 50,
+          minimumFaceCount: 3,
+        });
+
+        expect(result.total).toBe(1);
+        expect(result.hidden).toBe(0);
+        expect(result.people).toHaveLength(1);
+      } finally {
+        await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
+      }
+    });
+
+    it('counts a named identity that is below minimumFaceCount', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+
+      try {
+        await seedCharacterisationIdentity(ctx, sut, { userId: user.id, name: 'Named', assets: 1 });
+
+        const result = await sut.getAccessiblePeople(user.id, {
+          withHidden: true,
+          page: 1,
+          size: 50,
+          minimumFaceCount: 5,
+        });
+
+        expect(result.total).toBe(1);
+        expect(result.people).toHaveLength(1);
+      } finally {
+        await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
+      }
+    });
+
+    // Existing asymmetry, pinned deliberately: BTRIM in the listing, none in the totals.
+    it('treats a whitespace-only name as named for the total but unnamed for the listing', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+
+      try {
+        await seedCharacterisationIdentity(ctx, sut, { userId: user.id, name: ' '.repeat(3), assets: 1 });
+
+        const result = await sut.getAccessiblePeople(user.id, {
+          withHidden: true,
+          page: 1,
+          size: 50,
+          minimumFaceCount: 3,
+        });
+
+        expect(result.total).toBe(1);
+        expect(result.people).toHaveLength(0);
+      } finally {
+        await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
+      }
+    });
+
+    // The fold must keep returning totals when the requested page is empty — a CROSS JOIN onto the
+    // page rows would silently produce zeros here.
+    it('still reports totals when the requested page is past the end', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+
+      try {
+        await seedCharacterisationIdentity(ctx, sut, { userId: user.id, name: 'Only', assets: 1 });
+
+        const result = await sut.getAccessiblePeople(user.id, {
+          withHidden: true,
+          page: 5,
+          size: 50,
+          minimumFaceCount: 1,
+        });
+
+        expect(result.people).toEqual([]);
+        expect(result.hasNextPage).toBe(false);
+        expect(result.total).toBe(1);
+        expect(result.hidden).toBe(0);
+      } finally {
+        await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
+      }
+    });
+
+    it('reports zeroes for a library with no people at all', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+
+      try {
+        const result = await sut.getAccessiblePeople(user.id, {
+          withHidden: true,
+          page: 1,
+          size: 50,
+          minimumFaceCount: 1,
+        });
+
+        expect(result).toEqual({ total: 0, hidden: 0, hasNextPage: false, people: [] });
+      } finally {
+        await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
+      }
+    });
+
+    it('counts identities reachable only through a timeline-enabled space', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+
+      try {
+        await createAccessibleSpaceIdentity(ctx, sut, {
+          memberUserId: member.id,
+          ownerUserId: owner.id,
+          embedding: newEmbedding(),
+        });
+
+        const result = await sut.getAccessiblePeople(member.id, {
+          withHidden: true,
+          page: 1,
+          size: 50,
+          minimumFaceCount: 1,
+        });
+
+        expect(result.total).toBe(1);
+        expect(result.people).toHaveLength(1);
       } finally {
         await ctx.database.deleteFrom('user').where('id', '=', owner.id).execute();
         await ctx.database.deleteFrom('user').where('id', '=', member.id).execute();
