@@ -705,16 +705,45 @@ Run: `cd mobile && flutter test test/providers/gallery_nav/gallery_tab_enum_test
 
 Expected: PASS.
 
-- [ ] **Step 5: Confirm the rest of the app still compiles**
+- [ ] **Step 5: Add the Spaces destination case, so the tree still compiles**
 
-Run: `cd mobile && dart analyze --fatal-infos lib/providers/gallery_nav lib/presentation/widgets/gallery_nav lib/presentation/pages/common`
+Widening the enum makes `GalleryNavDestination.forTab`'s `switch` non-exhaustive. That is a **compile error**, not a lint: the method returns a non-nullable `GalleryNavDestination`, so a body that might complete normally fails to build. The case therefore lands in this task rather than Task 9, keeping every commit green.
 
-Expected: clean. Widening an enum does not break the `switch` statements in `gallery_nav_destination.dart` or `gallery_bottom_nav.widget.dart` yet — they are exhaustive over the _old_ values and now miss `spaces`, which the analyzer reports as a non-exhaustive switch. **If it does report that, that is expected**: leave it failing and note it; Tasks 8 and 9 add the missing cases. Do not add a `default:` clause to silence it — that would discard the compiler's exhaustiveness guarantee, which is the main safety net for this whole feature.
+In `mobile/lib/providers/gallery_nav/gallery_nav_destination.dart`, add to the `switch` in `forTab`, between the `albums` and `library` cases:
 
-- [ ] **Step 6: Commit**
+```dart
+      case GalleryTabEnum.spaces:
+        return const GalleryNavDestination._(
+          tab: GalleryTabEnum.spaces,
+          // The existing `spaces` key, already translated everywhere — not a
+          // new `nav_spaces`, which would ship English-only.
+          labelKey: 'spaces',
+          // Same pair the legacy tab shell uses for its own Spaces tab
+          // (tab_shell.page.dart:41-42).
+          idleIcon: Icons.workspaces_outlined,
+          activeIcon: Icons.workspaces,
+          routeBuilder: _spacesRoute,
+        );
+```
+
+and add the top-level builder beside the others at the bottom of the file:
+
+```dart
+SpacesRoute _spacesRoute() => const SpacesRoute();
+```
+
+Do **not** add a `default:` clause anywhere to silence exhaustiveness errors — that guarantee is the main safety net for this whole feature. `_onTabTap`'s `switch` in `gallery_bottom_nav.widget.dart` returns `void`, so it does not error here; Task 8 adds its `spaces` case.
+
+- [ ] **Step 6: Confirm the tree compiles and the nav tests still pass**
+
+Run: `cd mobile && dart analyze --fatal-infos lib/providers/gallery_nav lib/presentation/widgets/gallery_nav lib/presentation/pages/common && flutter test test/providers/gallery_nav`
+
+Expected: analyzer clean, all gallery-nav tests PASS.
+
+- [ ] **Step 7: Commit**
 
 ```bash
-git add mobile/lib/providers/gallery_nav/gallery_tab_enum.dart mobile/test/providers/gallery_nav/gallery_tab_enum_test.dart
+git add mobile/lib/providers/gallery_nav/gallery_tab_enum.dart mobile/lib/providers/gallery_nav/gallery_nav_destination.dart mobile/test/providers/gallery_nav/gallery_tab_enum_test.dart
 git commit -m "refactor(mobile): make nav slot order independent of GalleryTabEnum order"
 ```
 
@@ -1363,7 +1392,7 @@ In `mobile/lib/providers/gallery_nav/gallery_search_action.dart`, replace `Galle
 
 Run: `cd mobile && flutter test test/presentation/widgets/gallery_nav test/providers/gallery_nav`
 
-Expected: PASS. `gallery_nav_destination.dart`'s switch is still missing a `spaces` case — if that blocks compilation, add the case now as specified in Task 9 Step 3 and note it in the commit; otherwise leave it for Task 9.
+Expected: PASS. `gallery_nav_destination.dart` already carries its `spaces` case from Task 5, so the only switch this task completes is `_onTabTap`'s.
 
 - [ ] **Step 9: Commit**
 
@@ -1391,7 +1420,13 @@ git commit -m "feat(mobile): drive the bottom nav from configurable slots"
 
 `SpacesPage`'s app bar is currently `AppBar(title: const Text('Spaces'))` — a hardcoded English literal. That was tolerable for a page reached by an explicit push; this change makes it the default second tab, so it gets localized here.
 
-- [ ] **Step 1: Write the failing test**
+**Read this before starting: two of this task's steps are not red-first, and that is deliberate.**
+
+The destination case itself landed in Task 5, because widening the enum there made `forTab`'s switch non-exhaustive and that is a compile error, not a lint — leaving it for this task would have committed a tree that does not build. So Step 1's test is a **characterization test over code that already exists**, not a red test. Write it anyway: nothing currently pins the label key, the icon pair, or the route builder, and all three are exactly the kind of detail a later edit silently changes.
+
+The title localization has **no test at all**, for a reason worth stating rather than papering over: the `spaces` key's English value is `"Spaces"`, byte-identical to the hardcoded literal it replaces. Any `find.text('Spaces')` assertion passes just as happily before and after — the cannot-fail shape the plan's Global Constraints forbid. The change only has observable effect in non-English locales, and the harness does not switch locales. It is verified by the analyzer and by the existing spaces-page suite continuing to pass. Do not invent a test that appears to cover it.
+
+- [ ] **Step 1: Write the characterization test**
 
 Add to `mobile/test/providers/gallery_nav/gallery_nav_destination_test.dart`:
 
@@ -1407,37 +1442,13 @@ Add to `mobile/test/providers/gallery_nav/gallery_nav_destination_test.dart`:
     });
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [ ] **Step 2: Run it and confirm it passes for the right reason**
 
 Run: `cd mobile && flutter test test/providers/gallery_nav/gallery_nav_destination_test.dart`
 
-Expected: FAIL — either a compile error on the missing `spaces` switch case, or a non-exhaustive-switch analyzer error.
+Expected: PASS. Then prove it is not vacuous: temporarily change the expected `labelKey` to `'nav_spaces'`, re-run, confirm it FAILS, and revert. A characterization test you have not seen fail is decoration.
 
-- [ ] **Step 3: Add the destination case**
-
-In `mobile/lib/providers/gallery_nav/gallery_nav_destination.dart`, add to the `switch` in `forTab`, between the `albums` and `library` cases:
-
-```dart
-      case GalleryTabEnum.spaces:
-        return const GalleryNavDestination._(
-          tab: GalleryTabEnum.spaces,
-          // The existing `spaces` key, already translated everywhere — not a
-          // new `nav_spaces`, which would ship English-only.
-          labelKey: 'spaces',
-          // Same pair the legacy tab shell uses for its own Spaces tab.
-          idleIcon: Icons.workspaces_outlined,
-          activeIcon: Icons.workspaces,
-          routeBuilder: _spacesRoute,
-        );
-```
-
-and add the top-level builder beside the others:
-
-```dart
-SpacesRoute _spacesRoute() => const SpacesRoute();
-```
-
-- [ ] **Step 4: Localize the Spaces page title**
+- [ ] **Step 3: Localize the Spaces page title**
 
 In `mobile/lib/pages/library/spaces/spaces.page.dart`, replace line 157:
 
@@ -1447,16 +1458,16 @@ In `mobile/lib/pages/library/spaces/spaces.page.dart`, replace line 157:
 
 The file already imports `package:immich_mobile/extensions/translate_extensions.dart`; confirm before adding it.
 
-- [ ] **Step 5: Run the destination and spaces-page suites**
+- [ ] **Step 4: Run the destination and spaces-page suites**
 
 Run: `cd mobile && flutter test test/providers/gallery_nav/gallery_nav_destination_test.dart && flutter test test/presentation/widgets/gallery_nav`
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
-git add mobile/lib/providers/gallery_nav/gallery_nav_destination.dart mobile/lib/pages/library/spaces/spaces.page.dart mobile/test/providers/gallery_nav/gallery_nav_destination_test.dart
+git add mobile/lib/pages/library/spaces/spaces.page.dart mobile/test/providers/gallery_nav/gallery_nav_destination_test.dart
 git commit -m "feat(mobile): add the Spaces nav destination and localize the Spaces title"
 ```
 
