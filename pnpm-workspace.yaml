@@ -64,7 +64,7 @@ packageExtensions:
     peerDependencies:
       typescript: '*'
 patchedDependencies:
-  '@immich/ui@0.83.0': patches/@immich__ui@0.83.0.patch
+  '@immich/ui@0.85.0': patches/@immich__ui@0.85.0.patch
 preferWorkspacePackages: true
 shamefullyHoist: false
 verifyDepsBeforeRun: install
