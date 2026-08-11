@@ -104,7 +104,7 @@ it('gives the item-count column header a base width so the longer label does not
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `cd web && pnpm test -- --run src/lib/components/spaces/space-albums-table.spec.ts`
+Run: `cd web && pnpm exec vitest run src/lib/components/spaces/space-albums-table.spec.ts`
 
 Expected: both new tests FAIL. The first reports the received array containing `'items'` and not `'Number of items'`; the second reports `header` is `undefined`. If either passes, stop — the test is not exercising what it claims.
 
@@ -126,7 +126,7 @@ with:
 
 - [ ] **Step 4: Run the whole spec file**
 
-Run: `cd web && pnpm test -- --run src/lib/components/spaces/space-albums-table.spec.ts`
+Run: `cd web && pnpm exec vitest run src/lib/components/spaces/space-albums-table.spec.ts`
 
 Expected: PASS, including the pre-existing `expect(screen.getByText(/5 items/i))` assertion at line 44 — the row still uses `items_count`, and only the header changed.
 
@@ -224,7 +224,7 @@ it('still writes the payload when the DataTransfer has no setDragImage', async (
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `cd web && pnpm test -- --run src/lib/components/spaces/space-album-folder-card.spec.ts`
+Run: `cd web && pnpm exec vitest run src/lib/components/spaces/space-album-folder-card.spec.ts`
 
 Expected: the first two FAIL (`setDragImage` never called; zero chips found). The third PASSES already — it is a regression guard for the guard clause added in Step 3, not a red test. Note that distinction; do not treat its passing as a problem.
 
@@ -299,7 +299,7 @@ In `web/src/lib/components/spaces/space-album-folder-card.svelte`, add `setDragL
 
 - [ ] **Step 5: Run the full spec file**
 
-Run: `cd web && pnpm test -- --run src/lib/components/spaces/space-album-folder-card.spec.ts`
+Run: `cd web && pnpm exec vitest run src/lib/components/spaces/space-album-folder-card.spec.ts`
 
 Expected: PASS, all cases — including the pre-existing dragstart test at line 104, which is the signal that the guard clause works.
 
@@ -1647,7 +1647,7 @@ Expected: no issues. CI treats infos as fatal.
 
 - [ ] **Step 3: Web tests and type checks**
 
-Run: `cd web && pnpm test -- --run && pnpm check:typescript && pnpm check:svelte`
+Run: `cd web && pnpm exec vitest run && pnpm check:typescript && pnpm check:svelte`
 
 Expected: PASS all three.
 
