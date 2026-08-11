@@ -1,9 +1,9 @@
-import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/domain/models/settings_key.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
 
 class PeopleSortButton extends ConsumerWidget {
@@ -27,7 +27,7 @@ class PeopleSortButton extends ConsumerWidget {
         return IconButton(
           key: const Key('people-sort-button'),
           icon: const Icon(Icons.swap_vert),
-          tooltip: 'sort_people_by'.tr(),
+          tooltip: context.t.sort_people_by,
           onPressed: () {
             if (controller.isOpen) {
               controller.close();
@@ -43,8 +43,8 @@ class PeopleSortButton extends ConsumerWidget {
   Widget _menuItem(BuildContext context, WidgetRef ref, PeopleSortBy mode, PeopleSortBy selected) {
     final isSelected = mode == selected;
     final label = switch (mode) {
-      PeopleSortBy.photoCount => 'sort_people_most_photos'.tr(),
-      PeopleSortBy.name => 'name'.tr(),
+      PeopleSortBy.photoCount => context.t.sort_people_most_photos,
+      PeopleSortBy.name => context.t.name,
     };
 
     return MenuItemButton(

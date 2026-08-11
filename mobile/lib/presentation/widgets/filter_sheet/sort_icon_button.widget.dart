@@ -1,7 +1,7 @@
 import 'dart:async';
-import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/models/search/search_filter.model.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 
@@ -16,9 +16,9 @@ class SortIconButton extends ConsumerWidget {
   const SortIconButton({super.key});
 
   static String _label(SearchSortOrder s) => switch (s) {
-    SearchSortOrder.relevance => 'search_sort_relevance'.tr(),
-    SearchSortOrder.newest => 'search_sort_newest'.tr(),
-    SearchSortOrder.oldest => 'search_sort_oldest'.tr(),
+    SearchSortOrder.relevance => StaticTranslations.instance.search_sort_relevance,
+    SearchSortOrder.newest => StaticTranslations.instance.search_sort_newest,
+    SearchSortOrder.oldest => StaticTranslations.instance.search_sort_oldest,
   };
 
   @override
@@ -31,11 +31,11 @@ class SortIconButton extends ConsumerWidget {
 
     return Semantics(
       button: true,
-      label: 'search_sort_title'.tr(),
+      label: context.t.search_sort_title,
       child: IconButton(
         key: const Key('photos-filter-sort-button'),
         icon: const Icon(Icons.swap_vert_rounded),
-        tooltip: 'search_sort_title'.tr(),
+        tooltip: context.t.search_sort_title,
         onPressed: () => _open(context, ref, smart, effective),
       ),
     );
@@ -52,7 +52,7 @@ class SortIconButton extends ConsumerWidget {
             children: [
               Padding(
                 padding: const EdgeInsets.all(16),
-                child: Text('search_sort_title'.tr(), style: Theme.of(ctx).textTheme.titleMedium),
+                child: Text(context.t.search_sort_title, style: Theme.of(ctx).textTheme.titleMedium),
               ),
               RadioGroup<SearchSortOrder>(
                 groupValue: current,
