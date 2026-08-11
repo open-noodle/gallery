@@ -98,6 +98,15 @@ LIMIT
 commit
 
 -- FaceIdentityRepository.searchAccessiblePeople
+select
+  "shared_space_member"."spaceId"
+from
+  "shared_space_member"
+where
+  "shared_space_member"."userId" = $1
+  and "shared_space_member"."showInTimeline" = $2
+limit
+  $3
 WITH
   timeline_spaces AS (
     SELECT
@@ -122,56 +131,7 @@ WITH
       AND asset."deletedAt" IS NULL
       AND asset."isOffline" = false
       AND asset.visibility = $2
-      AND (
-        asset."ownerId" = $3
-        OR EXISTS (
-          SELECT
-            1
-          FROM
-            shared_space_asset
-            INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_asset."spaceId"
-          WHERE
-            shared_space_asset."assetId" = asset.id
-        )
-        OR EXISTS (
-          SELECT
-            1
-          FROM
-            shared_space_library
-            INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_library."spaceId"
-          WHERE
-            shared_space_library."libraryId" = asset."libraryId"
-        )
-        OR (
-          EXISTS (
-            SELECT
-              1
-            FROM
-              shared_space_album
-              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_album."spaceId"
-              INNER JOIN album ON album.id = shared_space_album."albumId"
-              AND album."deletedAt" IS NULL
-              INNER JOIN album_asset ON album_asset."albumId" = shared_space_album."albumId"
-            WHERE
-              album_asset."assetId" = asset.id
-              AND "shared_space_album"."showInTimeline" = true
-          )
-          OR EXISTS (
-            SELECT
-              1
-            FROM
-              shared_space_album
-              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_album."spaceId"
-              INNER JOIN album ON album.id = shared_space_album."albumId"
-              AND album."deletedAt" IS NULL
-              INNER JOIN album_space_asset ON album_space_asset."albumId" = shared_space_album."albumId"
-              AND album_space_asset."spaceId" = shared_space_album."spaceId"
-            WHERE
-              album_space_asset."assetId" = asset.id
-              AND "shared_space_album"."showInTimeline" = true
-          )
-        )
-      )
+      AND (asset."ownerId" = $3)
   ),
   accessible_profiles AS (
     SELECT
@@ -293,31 +253,59 @@ WITH
       eligible_profiles
     GROUP BY
       "identityId"
+  ),
+  page_rows AS (
+    SELECT
+      identity_counts."identityId",
+      identity_counts."visibleAssetCount",
+      ROW_NUMBER() OVER (
+        ORDER BY
+          COALESCE(identity_favorites."isFavorite", false) DESC,
+          NULLIF(BTRIM(best_profiles.name), '') IS NULL,
+          lower(NULLIF(BTRIM(best_profiles.name), '')) ASC NULLS LAST,
+          CASE
+            WHEN NULLIF(BTRIM(best_profiles.name), '') IS NULL THEN identity_counts."visibleAssetCount"
+          END DESC NULLS LAST,
+          identity_counts."identityId"
+      ) AS ord
+    FROM
+      identity_counts
+      INNER JOIN best_profiles ON best_profiles."identityId" = identity_counts."identityId"
+      INNER JOIN identity_favorites ON identity_favorites."identityId" = identity_counts."identityId"
+    WHERE
+      NULLIF(BTRIM(best_profiles.name), '') IS NOT NULL
+      OR identity_counts."visibleAssetCount" >= $9
+    ORDER BY
+      COALESCE(identity_favorites."isFavorite", false) DESC,
+      NULLIF(BTRIM(best_profiles.name), '') IS NULL,
+      lower(NULLIF(BTRIM(best_profiles.name), '')) ASC NULLS LAST,
+      CASE
+        WHEN NULLIF(BTRIM(best_profiles.name), '') IS NULL THEN identity_counts."visibleAssetCount"
+      END DESC NULLS LAST,
+      identity_counts."identityId"
+    LIMIT
+      $10
+    OFFSET
+      $11
   )
 SELECT
-  identity_counts."identityId",
-  identity_counts."visibleAssetCount"
+  page_rows."identityId",
+  page_rows."visibleAssetCount"
 FROM
-  identity_counts
-  INNER JOIN best_profiles ON best_profiles."identityId" = identity_counts."identityId"
-  INNER JOIN identity_favorites ON identity_favorites."identityId" = identity_counts."identityId"
-WHERE
-  NULLIF(BTRIM(best_profiles.name), '') IS NOT NULL
-  OR identity_counts."visibleAssetCount" >= $9
+  page_rows
 ORDER BY
-  COALESCE(identity_favorites."isFavorite", false) DESC,
-  NULLIF(BTRIM(best_profiles.name), '') IS NULL,
-  lower(NULLIF(BTRIM(best_profiles.name), '')) ASC NULLS LAST,
-  CASE
-    WHEN NULLIF(BTRIM(best_profiles.name), '') IS NULL THEN identity_counts."visibleAssetCount"
-  END DESC NULLS LAST,
-  identity_counts."identityId"
-LIMIT
-  $10
-OFFSET
-  $11
+  page_rows.ord
 
 -- FaceIdentityRepository.getAccessiblePersonFilterSuggestions
+select
+  "shared_space_member"."spaceId"
+from
+  "shared_space_member"
+where
+  "shared_space_member"."userId" = $1
+  and "shared_space_member"."showInTimeline" = $2
+limit
+  $3
 WITH
   timeline_spaces AS (
     SELECT
@@ -342,56 +330,7 @@ WITH
       AND asset."deletedAt" IS NULL
       AND asset."isOffline" = false
       AND asset.visibility = $2
-      AND (
-        asset."ownerId" = $3
-        OR EXISTS (
-          SELECT
-            1
-          FROM
-            shared_space_asset
-            INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_asset."spaceId"
-          WHERE
-            shared_space_asset."assetId" = asset.id
-        )
-        OR EXISTS (
-          SELECT
-            1
-          FROM
-            shared_space_library
-            INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_library."spaceId"
-          WHERE
-            shared_space_library."libraryId" = asset."libraryId"
-        )
-        OR (
-          EXISTS (
-            SELECT
-              1
-            FROM
-              shared_space_album
-              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_album."spaceId"
-              INNER JOIN album ON album.id = shared_space_album."albumId"
-              AND album."deletedAt" IS NULL
-              INNER JOIN album_asset ON album_asset."albumId" = shared_space_album."albumId"
-            WHERE
-              album_asset."assetId" = asset.id
-              AND "shared_space_album"."showInTimeline" = true
-          )
-          OR EXISTS (
-            SELECT
-              1
-            FROM
-              shared_space_album
-              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_album."spaceId"
-              INNER JOIN album ON album.id = shared_space_album."albumId"
-              AND album."deletedAt" IS NULL
-              INNER JOIN album_space_asset ON album_space_asset."albumId" = shared_space_album."albumId"
-              AND album_space_asset."spaceId" = shared_space_album."spaceId"
-            WHERE
-              album_space_asset."assetId" = asset.id
-              AND "shared_space_album"."showInTimeline" = true
-          )
-        )
-      )
+      AND (asset."ownerId" = $3)
   ),
   accessible_profiles AS (
     SELECT
@@ -513,31 +452,59 @@ WITH
       eligible_profiles
     GROUP BY
       "identityId"
+  ),
+  page_rows AS (
+    SELECT
+      identity_counts."identityId",
+      identity_counts."visibleAssetCount",
+      ROW_NUMBER() OVER (
+        ORDER BY
+          COALESCE(identity_favorites."isFavorite", false) DESC,
+          NULLIF(BTRIM(best_profiles.name), '') IS NULL,
+          lower(NULLIF(BTRIM(best_profiles.name), '')) ASC NULLS LAST,
+          CASE
+            WHEN NULLIF(BTRIM(best_profiles.name), '') IS NULL THEN identity_counts."visibleAssetCount"
+          END DESC NULLS LAST,
+          identity_counts."identityId"
+      ) AS ord
+    FROM
+      identity_counts
+      INNER JOIN best_profiles ON best_profiles."identityId" = identity_counts."identityId"
+      INNER JOIN identity_favorites ON identity_favorites."identityId" = identity_counts."identityId"
+    WHERE
+      NULLIF(BTRIM(best_profiles.name), '') IS NOT NULL
+      OR identity_counts."visibleAssetCount" >= $9
+    ORDER BY
+      COALESCE(identity_favorites."isFavorite", false) DESC,
+      NULLIF(BTRIM(best_profiles.name), '') IS NULL,
+      lower(NULLIF(BTRIM(best_profiles.name), '')) ASC NULLS LAST,
+      CASE
+        WHEN NULLIF(BTRIM(best_profiles.name), '') IS NULL THEN identity_counts."visibleAssetCount"
+      END DESC NULLS LAST,
+      identity_counts."identityId"
+    LIMIT
+      $10
+    OFFSET
+      $11
   )
 SELECT
-  identity_counts."identityId",
-  identity_counts."visibleAssetCount"
+  page_rows."identityId",
+  page_rows."visibleAssetCount"
 FROM
-  identity_counts
-  INNER JOIN best_profiles ON best_profiles."identityId" = identity_counts."identityId"
-  INNER JOIN identity_favorites ON identity_favorites."identityId" = identity_counts."identityId"
-WHERE
-  NULLIF(BTRIM(best_profiles.name), '') IS NOT NULL
-  OR identity_counts."visibleAssetCount" >= $9
+  page_rows
 ORDER BY
-  COALESCE(identity_favorites."isFavorite", false) DESC,
-  NULLIF(BTRIM(best_profiles.name), '') IS NULL,
-  lower(NULLIF(BTRIM(best_profiles.name), '')) ASC NULLS LAST,
-  CASE
-    WHEN NULLIF(BTRIM(best_profiles.name), '') IS NULL THEN identity_counts."visibleAssetCount"
-  END DESC NULLS LAST,
-  identity_counts."identityId"
-LIMIT
-  $10
-OFFSET
-  $11
+  page_rows.ord
 
 -- FaceIdentityRepository.getAccessiblePeopleStatistics
+select
+  "shared_space_member"."spaceId"
+from
+  "shared_space_member"
+where
+  "shared_space_member"."userId" = $1
+  and "shared_space_member"."showInTimeline" = $2
+limit
+  $3
 WITH
   timeline_spaces AS (
     SELECT
@@ -561,56 +528,7 @@ WITH
       AND asset."deletedAt" IS NULL
       AND asset."isOffline" = false
       AND asset.visibility IN ($2, $3)
-      AND (
-        asset."ownerId" = $4
-        OR EXISTS (
-          SELECT
-            1
-          FROM
-            shared_space_asset
-            INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_asset."spaceId"
-          WHERE
-            shared_space_asset."assetId" = asset.id
-        )
-        OR EXISTS (
-          SELECT
-            1
-          FROM
-            shared_space_library
-            INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_library."spaceId"
-          WHERE
-            shared_space_library."libraryId" = asset."libraryId"
-        )
-        OR (
-          EXISTS (
-            SELECT
-              1
-            FROM
-              shared_space_album
-              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_album."spaceId"
-              INNER JOIN album ON album.id = shared_space_album."albumId"
-              AND album."deletedAt" IS NULL
-              INNER JOIN album_asset ON album_asset."albumId" = shared_space_album."albumId"
-            WHERE
-              album_asset."assetId" = asset.id
-              AND "shared_space_album"."showInTimeline" = true
-          )
-          OR EXISTS (
-            SELECT
-              1
-            FROM
-              shared_space_album
-              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_album."spaceId"
-              INNER JOIN album ON album.id = shared_space_album."albumId"
-              AND album."deletedAt" IS NULL
-              INNER JOIN album_space_asset ON album_space_asset."albumId" = shared_space_album."albumId"
-              AND album_space_asset."spaceId" = shared_space_album."spaceId"
-            WHERE
-              album_space_asset."assetId" = asset.id
-              AND "shared_space_album"."showInTimeline" = true
-          )
-        )
-      )
+      AND (asset."ownerId" = $4)
   ),
   accessible_faces AS (
     SELECT
@@ -727,6 +645,15 @@ SELECT
   ) AS "detectedFaceCount"
 
 -- FaceIdentityRepository.getAccessiblePeopleFaceStatistics
+select
+  "shared_space_member"."spaceId"
+from
+  "shared_space_member"
+where
+  "shared_space_member"."userId" = $1
+  and "shared_space_member"."showInTimeline" = $2
+limit
+  $3
 WITH
   timeline_spaces AS (
     SELECT
@@ -750,56 +677,7 @@ WITH
       AND asset."deletedAt" IS NULL
       AND asset."isOffline" = false
       AND asset.visibility IN ($2, $3)
-      AND (
-        asset."ownerId" = $4
-        OR EXISTS (
-          SELECT
-            1
-          FROM
-            shared_space_asset
-            INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_asset."spaceId"
-          WHERE
-            shared_space_asset."assetId" = asset.id
-        )
-        OR EXISTS (
-          SELECT
-            1
-          FROM
-            shared_space_library
-            INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_library."spaceId"
-          WHERE
-            shared_space_library."libraryId" = asset."libraryId"
-        )
-        OR (
-          EXISTS (
-            SELECT
-              1
-            FROM
-              shared_space_album
-              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_album."spaceId"
-              INNER JOIN album ON album.id = shared_space_album."albumId"
-              AND album."deletedAt" IS NULL
-              INNER JOIN album_asset ON album_asset."albumId" = shared_space_album."albumId"
-            WHERE
-              album_asset."assetId" = asset.id
-              AND "shared_space_album"."showInTimeline" = true
-          )
-          OR EXISTS (
-            SELECT
-              1
-            FROM
-              shared_space_album
-              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_album."spaceId"
-              INNER JOIN album ON album.id = shared_space_album."albumId"
-              AND album."deletedAt" IS NULL
-              INNER JOIN album_space_asset ON album_space_asset."albumId" = shared_space_album."albumId"
-              AND album_space_asset."spaceId" = shared_space_album."spaceId"
-            WHERE
-              album_space_asset."assetId" = asset.id
-              AND "shared_space_album"."showInTimeline" = true
-          )
-        )
-      )
+      AND (asset."ownerId" = $4)
   ),
   accessible_faces AS (
     SELECT DISTINCT
@@ -945,6 +823,15 @@ FROM
   face_classification
 
 -- FaceIdentityRepository.getAccessiblePersonStatistics
+select
+  "shared_space_member"."spaceId"
+from
+  "shared_space_member"
+where
+  "shared_space_member"."userId" = $1
+  and "shared_space_member"."showInTimeline" = $2
+limit
+  $3
 WITH
   timeline_spaces AS (
     SELECT
@@ -970,56 +857,7 @@ WITH
       AND asset."deletedAt" IS NULL
       AND asset."isOffline" = false
       AND asset.visibility = $3
-      AND (
-        asset."ownerId" = $4
-        OR EXISTS (
-          SELECT
-            1
-          FROM
-            shared_space_asset
-            INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_asset."spaceId"
-          WHERE
-            shared_space_asset."assetId" = asset.id
-        )
-        OR EXISTS (
-          SELECT
-            1
-          FROM
-            shared_space_library
-            INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_library."spaceId"
-          WHERE
-            shared_space_library."libraryId" = asset."libraryId"
-        )
-        OR (
-          EXISTS (
-            SELECT
-              1
-            FROM
-              shared_space_album
-              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_album."spaceId"
-              INNER JOIN album ON album.id = shared_space_album."albumId"
-              AND album."deletedAt" IS NULL
-              INNER JOIN album_asset ON album_asset."albumId" = shared_space_album."albumId"
-            WHERE
-              album_asset."assetId" = asset.id
-              AND "shared_space_album"."showInTimeline" = true
-          )
-          OR EXISTS (
-            SELECT
-              1
-            FROM
-              shared_space_album
-              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_album."spaceId"
-              INNER JOIN album ON album.id = shared_space_album."albumId"
-              AND album."deletedAt" IS NULL
-              INNER JOIN album_space_asset ON album_space_asset."albumId" = shared_space_album."albumId"
-              AND album_space_asset."spaceId" = shared_space_album."spaceId"
-            WHERE
-              album_space_asset."assetId" = asset.id
-              AND "shared_space_album"."showInTimeline" = true
-          )
-        )
-      )
+      AND (asset."ownerId" = $4)
   )
 SELECT
   COUNT(DISTINCT "assetId")::int AS assets,
@@ -1275,29 +1113,323 @@ WITH
       eligible_profiles
     GROUP BY
       "identityId"
+  ),
+  page_rows AS (
+    SELECT
+      identity_counts."identityId",
+      identity_counts."visibleAssetCount",
+      ROW_NUMBER() OVER (
+        ORDER BY
+          COALESCE(identity_favorites."isFavorite", false) DESC,
+          NULLIF(BTRIM(best_profiles.name), '') IS NULL,
+          lower(NULLIF(BTRIM(best_profiles.name), '')) ASC NULLS LAST,
+          CASE
+            WHEN NULLIF(BTRIM(best_profiles.name), '') IS NULL THEN identity_counts."visibleAssetCount"
+          END DESC NULLS LAST,
+          identity_counts."identityId"
+      ) AS ord
+    FROM
+      identity_counts
+      INNER JOIN best_profiles ON best_profiles."identityId" = identity_counts."identityId"
+      INNER JOIN identity_favorites ON identity_favorites."identityId" = identity_counts."identityId"
+    WHERE
+      NULLIF(BTRIM(best_profiles.name), '') IS NOT NULL
+      OR identity_counts."visibleAssetCount" >= $9
+    ORDER BY
+      COALESCE(identity_favorites."isFavorite", false) DESC,
+      NULLIF(BTRIM(best_profiles.name), '') IS NULL,
+      lower(NULLIF(BTRIM(best_profiles.name), '')) ASC NULLS LAST,
+      CASE
+        WHEN NULLIF(BTRIM(best_profiles.name), '') IS NULL THEN identity_counts."visibleAssetCount"
+      END DESC NULLS LAST,
+      identity_counts."identityId"
+    LIMIT
+      $10
+    OFFSET
+      $11
   )
 SELECT
-  identity_counts."identityId",
-  identity_counts."visibleAssetCount"
+  page_rows."identityId",
+  page_rows."visibleAssetCount"
 FROM
-  identity_counts
-  INNER JOIN best_profiles ON best_profiles."identityId" = identity_counts."identityId"
-  INNER JOIN identity_favorites ON identity_favorites."identityId" = identity_counts."identityId"
-WHERE
-  NULLIF(BTRIM(best_profiles.name), '') IS NOT NULL
-  OR identity_counts."visibleAssetCount" >= $9
+  page_rows
 ORDER BY
-  COALESCE(identity_favorites."isFavorite", false) DESC,
-  NULLIF(BTRIM(best_profiles.name), '') IS NULL,
-  lower(NULLIF(BTRIM(best_profiles.name), '')) ASC NULLS LAST,
-  CASE
-    WHEN NULLIF(BTRIM(best_profiles.name), '') IS NULL THEN identity_counts."visibleAssetCount"
-  END DESC NULLS LAST,
-  identity_counts."identityId"
-LIMIT
-  $10
-OFFSET
-  $11
+  page_rows.ord
+
+-- FaceIdentityRepository.getAccessiblePeoplePageWithTotals
+WITH
+  timeline_spaces AS (
+    SELECT
+      "spaceId"
+    FROM
+      shared_space_member
+    WHERE
+      "userId" = $1
+      AND "showInTimeline" = true
+  ),
+  accessible_faces AS (
+    SELECT
+      face_identity_face."identityId",
+      asset_face."assetId"
+    FROM
+      face_identity_face
+      INNER JOIN asset_face ON asset_face.id = face_identity_face."assetFaceId"
+      INNER JOIN asset ON asset.id = asset_face."assetId"
+    WHERE
+      asset_face."deletedAt" IS NULL
+      AND asset_face."isVisible" = true
+      AND asset."deletedAt" IS NULL
+      AND asset."isOffline" = false
+      AND asset.visibility = $2
+      AND (
+        asset."ownerId" = $3
+        OR EXISTS (
+          SELECT
+            1
+          FROM
+            shared_space_asset
+            INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_asset."spaceId"
+          WHERE
+            shared_space_asset."assetId" = asset.id
+        )
+        OR EXISTS (
+          SELECT
+            1
+          FROM
+            shared_space_library
+            INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_library."spaceId"
+          WHERE
+            shared_space_library."libraryId" = asset."libraryId"
+        )
+        OR (
+          EXISTS (
+            SELECT
+              1
+            FROM
+              shared_space_album
+              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_album."spaceId"
+              INNER JOIN album ON album.id = shared_space_album."albumId"
+              AND album."deletedAt" IS NULL
+              INNER JOIN album_asset ON album_asset."albumId" = shared_space_album."albumId"
+            WHERE
+              album_asset."assetId" = asset.id
+              AND "shared_space_album"."showInTimeline" = true
+          )
+          OR EXISTS (
+            SELECT
+              1
+            FROM
+              shared_space_album
+              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_album."spaceId"
+              INNER JOIN album ON album.id = shared_space_album."albumId"
+              AND album."deletedAt" IS NULL
+              INNER JOIN album_space_asset ON album_space_asset."albumId" = shared_space_album."albumId"
+              AND album_space_asset."spaceId" = shared_space_album."spaceId"
+            WHERE
+              album_space_asset."assetId" = asset.id
+              AND "shared_space_album"."showInTimeline" = true
+          )
+        )
+      )
+  ),
+  accessible_profiles AS (
+    SELECT
+      person."identityId",
+      person.name,
+      person."isHidden",
+      person."isFavorite",
+      person."updatedAt",
+      person.id AS "profileId",
+      0 AS "profileRank"
+    FROM
+      person
+    WHERE
+      person."ownerId" = $4
+      AND person."identityId" IS NOT NULL
+      AND EXISTS (
+        SELECT
+          1
+        FROM
+          accessible_faces
+        WHERE
+          accessible_faces."identityId" = person."identityId"
+      )
+    UNION ALL
+    SELECT
+      shared_space_person."identityId",
+      COALESCE(
+        NULLIF(shared_space_person_alias.alias, ''),
+        shared_space_person.name,
+        ''
+      ) AS name,
+      shared_space_person."isHidden",
+      NULL::boolean AS "isFavorite",
+      shared_space_person."updatedAt",
+      shared_space_person.id AS "profileId",
+      CASE
+        WHEN NULLIF(shared_space_person_alias.alias, '') IS NULL THEN 2
+        ELSE 1
+      END AS "profileRank"
+    FROM
+      shared_space_person
+      INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_person."spaceId"
+      LEFT JOIN shared_space_person_alias ON shared_space_person_alias."personId" = shared_space_person.id
+      AND shared_space_person_alias."userId" = $5
+    WHERE
+      shared_space_person."identityId" IS NOT NULL
+      AND EXISTS (
+        SELECT
+          1
+        FROM
+          shared_space_person_face
+          INNER JOIN asset_face AS profile_face ON profile_face.id = shared_space_person_face."assetFaceId"
+        WHERE
+          shared_space_person_face."personId" = shared_space_person.id
+          AND profile_face."deletedAt" IS NULL
+          AND profile_face."isVisible" = true
+      )
+      AND EXISTS (
+        SELECT
+          1
+        FROM
+          accessible_faces
+        WHERE
+          accessible_faces."identityId" = shared_space_person."identityId"
+      )
+  ),
+  eligible_profiles AS (
+    SELECT
+      *
+    FROM
+      accessible_profiles
+    WHERE
+      (
+        $6::boolean
+        OR "isHidden" = false
+      )
+      AND (
+        $7 = ''
+        OR name ILIKE $8
+      )
+  ),
+  identity_counts AS (
+    SELECT
+      accessible_faces."identityId",
+      COUNT(DISTINCT accessible_faces."assetId") AS "visibleAssetCount"
+    FROM
+      accessible_faces
+    WHERE
+      EXISTS (
+        SELECT
+          1
+        FROM
+          eligible_profiles
+        WHERE
+          eligible_profiles."identityId" = accessible_faces."identityId"
+      )
+    GROUP BY
+      accessible_faces."identityId"
+  ),
+  best_profiles AS (
+    SELECT DISTINCT
+      ON ("identityId") "identityId",
+      name
+    FROM
+      eligible_profiles
+    ORDER BY
+      "identityId",
+      NULLIF(BTRIM(name), '') IS NULL,
+      "profileRank",
+      lower(NULLIF(BTRIM(name), '')),
+      "updatedAt" DESC,
+      "profileId"
+  ),
+  identity_favorites AS (
+    SELECT
+      "identityId",
+      bool_or(COALESCE("isFavorite", false)) AS "isFavorite"
+    FROM
+      eligible_profiles
+    GROUP BY
+      "identityId"
+  ),
+  page_rows AS (
+    SELECT
+      identity_counts."identityId",
+      identity_counts."visibleAssetCount",
+      ROW_NUMBER() OVER (
+        ORDER BY
+          COALESCE(identity_favorites."isFavorite", false) DESC,
+          NULLIF(BTRIM(best_profiles.name), '') IS NULL,
+          lower(NULLIF(BTRIM(best_profiles.name), '')) ASC NULLS LAST,
+          CASE
+            WHEN NULLIF(BTRIM(best_profiles.name), '') IS NULL THEN identity_counts."visibleAssetCount"
+          END DESC NULLS LAST,
+          identity_counts."identityId"
+      ) AS ord
+    FROM
+      identity_counts
+      INNER JOIN best_profiles ON best_profiles."identityId" = identity_counts."identityId"
+      INNER JOIN identity_favorites ON identity_favorites."identityId" = identity_counts."identityId"
+    WHERE
+      NULLIF(BTRIM(best_profiles.name), '') IS NOT NULL
+      OR identity_counts."visibleAssetCount" >= $9
+    ORDER BY
+      COALESCE(identity_favorites."isFavorite", false) DESC,
+      NULLIF(BTRIM(best_profiles.name), '') IS NULL,
+      lower(NULLIF(BTRIM(best_profiles.name), '')) ASC NULLS LAST,
+      CASE
+        WHEN NULLIF(BTRIM(best_profiles.name), '') IS NULL THEN identity_counts."visibleAssetCount"
+      END DESC NULLS LAST,
+      identity_counts."identityId"
+    LIMIT
+      $10
+    OFFSET
+      $11
+  ),
+  all_identity_counts AS (
+    SELECT
+      accessible_faces."identityId",
+      COUNT(DISTINCT accessible_faces."assetId") AS "visibleAssetCount"
+    FROM
+      accessible_faces
+    GROUP BY
+      accessible_faces."identityId"
+  ),
+  identity_visibility AS (
+    SELECT
+      "identityId",
+      bool_or("isHidden" = false) AS "hasVisibleProfile",
+      bool_or(NULLIF(name, '') IS NOT NULL) AS "hasNamedProfile"
+    FROM
+      accessible_profiles
+    GROUP BY
+      "identityId"
+  ),
+  totals AS (
+    SELECT
+      COUNT(*) AS total,
+      COUNT(*) FILTER (
+        WHERE
+          "hasVisibleProfile" = false
+      ) AS hidden
+    FROM
+      identity_visibility
+      INNER JOIN all_identity_counts ON all_identity_counts."identityId" = identity_visibility."identityId"
+    WHERE
+      identity_visibility."hasNamedProfile" = true
+      OR all_identity_counts."visibleAssetCount" >= $12
+  )
+SELECT
+  page_rows."identityId",
+  page_rows."visibleAssetCount",
+  totals.total,
+  totals.hidden
+FROM
+  totals
+  LEFT JOIN page_rows ON true
+ORDER BY
+  page_rows.ord
 
 -- FaceIdentityRepository.hydrateAccessiblePeople
 WITH
@@ -1545,7 +1677,7 @@ SELECT
   primary_profiles."updatedAt",
   primary_profiles.type,
   primary_profiles.species,
-  asset_counts."numberOfAssets"
+  asset_counts."numberOfAssets" AS "numberOfAssets"
 FROM
   requested_identities
   INNER JOIN ranked_profiles AS primary_profiles ON primary_profiles."identityId" = requested_identities."identityId"
