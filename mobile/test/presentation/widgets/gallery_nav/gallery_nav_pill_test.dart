@@ -94,6 +94,30 @@ void main() {
     expect((underlayRect.width - segmentRect.width).abs(), lessThan(0.5));
   });
 
+  testWidgets('Spaces configuration: the underlay sits under the Spaces segment', (tester) async {
+    // The one test in this file that is NOT pinned to the Albums slots. If
+    // `_measure` ever iterates or gates on a hardcoded slot list again instead
+    // of `widget.slots`, no rect is measured for `spaces`, the length guard
+    // never passes, `_segmentRects` stays empty and the underlay renders at
+    // zero width — silently, with every Albums-pinned test still green.
+    await tester.pumpConsumerWidget(
+      SizedBox(
+        width: 360,
+        child: GalleryNavPill(
+          slots: galleryNavSlots(showSpaces: true),
+          activeTab: GalleryTabEnum.spaces,
+          onTabTap: (_) {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final segmentRect = tester.getRect(find.byKey(const Key('gallery-nav-segment-spaces')));
+    final underlayRect = tester.getRect(find.byKey(const Key('gallery-nav-underlay')));
+    expect(underlayRect.width, greaterThan(0), reason: 'a zero-width underlay means _segmentRects never populated');
+    expect((underlayRect.left - segmentRect.left).abs(), lessThan(0.5));
+    expect((underlayRect.width - segmentRect.width).abs(), lessThan(0.5));
+  });
+
   testWidgets('underlay tracks newly-active segment after tab change (Photos→Albums→Library)', (tester) async {
     // Regression: the rect-diff guard used Map.toString for equality, which
     // collapses to "Instance of 'Rect'" in profile mode — so _segmentRects

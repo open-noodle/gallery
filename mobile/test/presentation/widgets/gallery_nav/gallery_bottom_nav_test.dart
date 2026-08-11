@@ -17,6 +17,7 @@ import 'package:immich_mobile/providers/infrastructure/readonly_mode.provider.da
 import 'package:immich_mobile/providers/infrastructure/remote_album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/filter_sheet.provider.dart';
+import 'package:immich_mobile/providers/shared_space.provider.dart';
 
 import '../../../test_helpers/fake_tabs_router.dart';
 
@@ -494,6 +495,50 @@ void main() {
 
     expect(router.setCalls, [1]);
     expect(albums.refreshCalls, 0, reason: 'the albums tab is not on screen');
+  });
+
+  testWidgets('tapping the Spaces segment refreshes the spaces list', (tester) async {
+    // The Spaces mirror of 'tapping Albums refreshes the existing album
+    // provider'. Without it, dropping the invalidation back to a bare `break;`
+    // leaves the whole nav suite green.
+    final router = FakeTabsRouter();
+    var spacesBuilds = 0;
+    final container = ProviderContainer(
+      overrides: [
+        readonlyModeProvider.overrideWith(() => _FakeReadonly(false)),
+        hapticFeedbackProvider.overrideWith((ref) => _NoOpHaptic(ref)),
+        ..._navOverrides(showSpaces: true),
+        sharedSpacesProvider.overrideWith((ref) async {
+          spacesBuilds++;
+          return const [];
+        }),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    // Listen the way the Spaces page does: invalidating a provider nobody
+    // listens to is a no-op no assertion could observe.
+    final sub = container.listen(sharedSpacesProvider, (_, _) {});
+    addTearDown(sub.close);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          home: MediaQuery(
+            data: _portraitMq,
+            child: Material(child: GalleryBottomNav(tabsRouter: router)),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(spacesBuilds, 1, reason: 'built once for the listener');
+
+    await tester.tap(find.byKey(const Key('gallery-nav-segment-spaces')));
+    await tester.pumpAndSettle();
+
+    expect(spacesBuilds, 2, reason: 'the tap invalidates sharedSpacesProvider, which rebuilds for its listener');
   });
 
   testWidgets('tapping the Albums segment still refreshes albums', (tester) async {
