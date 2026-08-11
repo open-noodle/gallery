@@ -11,6 +11,7 @@ import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 import 'package:mocktail/mocktail.dart';
+import '../../widget_tester_extensions.dart';
 
 class _MockLocalAsset extends Mock implements LocalAsset {}
 
@@ -28,12 +29,14 @@ void main() {
     when(timelineService.dispose).thenAnswer((_) async {});
 
     await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          appConfigProvider.overrideWithValue(const AppConfig(timeline: TimelineConfig(tilesPerRow: 3))),
-          timelineFactoryProvider.overrideWithValue(factory),
-        ],
-        child: MaterialApp(home: CleanupPreviewPage(assets: [asset])),
+      localizedForTest(
+        ProviderScope(
+          overrides: [
+            appConfigProvider.overrideWithValue(const AppConfig(timeline: TimelineConfig(tilesPerRow: 3))),
+            timelineFactoryProvider.overrideWithValue(factory),
+          ],
+          child: MaterialApp(home: CleanupPreviewPage(assets: [asset])),
+        ),
       ),
     );
 

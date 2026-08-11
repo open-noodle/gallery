@@ -1,6 +1,6 @@
-import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/widgets/gallery_nav/animated_nav_icon.widget.dart';
 import 'package:immich_mobile/presentation/widgets/gallery_nav/gallery_nav_segment.widget.dart';
 import 'package:immich_mobile/providers/gallery_nav/gallery_tab_enum.dart';
@@ -13,7 +13,7 @@ void main() {
     await tester.pumpAndSettle();
     final align = tester.widget<Align>(find.byKey(const Key('gallery-nav-segment-icon-slot')));
     expect(align.widthFactor, 0.0, reason: 'idle icon slot has 0 width');
-    expect(find.text('nav_photos'.tr()), findsOneWidget);
+    expect(find.text(StaticTranslations.instance.nav_photos), findsOneWidget);
     expect(find.byType(AnimatedNavIcon), findsOneWidget);
   });
 
@@ -23,7 +23,7 @@ void main() {
     final align = tester.widget<Align>(find.byKey(const Key('gallery-nav-segment-icon-slot')));
     expect(align.widthFactor, 1.0);
     expect(find.byType(AnimatedNavIcon), findsOneWidget);
-    expect(find.text('nav_photos'.tr()), findsOneWidget);
+    expect(find.text(StaticTranslations.instance.nav_photos), findsOneWidget);
   });
 
   testWidgets('active→idle transition: icon-slot collapses after settle', (tester) async {
@@ -64,7 +64,7 @@ void main() {
 
   testWidgets('dark theme: active label is non-null and has w500', (tester) async {
     await tester.pumpConsumerWidgetDark(GalleryNavSegment(tab: GalleryTabEnum.photos, active: true, onTap: () {}));
-    final text = tester.widget<Text>(find.text('nav_photos'.tr()));
+    final text = tester.widget<Text>(find.text(StaticTranslations.instance.nav_photos));
     expect(text.style!.color, isNotNull);
     expect(text.style!.fontWeight, FontWeight.w500);
   });

@@ -1,9 +1,9 @@
 import 'dart:async';
-import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/person.model.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
 import 'package:immich_mobile/providers/photos_filter/people_picker.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
@@ -30,7 +30,7 @@ class RecentPeopleStrip extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.only(left: 4, bottom: 6),
             child: Text(
-              'filter_sheet_picker_recent'.tr(),
+              context.t.filter_sheet_picker_recent,
               style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
           ),

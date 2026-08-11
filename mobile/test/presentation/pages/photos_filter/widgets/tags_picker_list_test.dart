@@ -1,8 +1,8 @@
-import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/tag.model.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/tags_picker_list.widget.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 
@@ -14,7 +14,7 @@ void main() {
   group('TagsPickerList', () {
     testWidgets('shows a MATCHES bucket header', (tester) async {
       await tester.pumpConsumerWidget(TagsPickerList(tags: [_t('t1', 'Food')]));
-      expect(find.text('filter_sheet_picker_tags_matches'.tr().toUpperCase()), findsOneWidget);
+      expect(find.text(StaticTranslations.instance.filter_sheet_picker_tags_matches.toUpperCase()), findsOneWidget);
     });
 
     testWidgets('nested tag row shows leaf title + full-path subtitle', (tester) async {

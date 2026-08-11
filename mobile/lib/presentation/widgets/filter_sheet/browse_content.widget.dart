@@ -1,8 +1,8 @@
 import 'dart:async';
-import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/drag_handle.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/match_count_footer.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/search_bar.widget.dart';
@@ -38,7 +38,7 @@ class BrowseContent extends ConsumerWidget {
                 padding: const EdgeInsets.fromLTRB(20, 0, 12, 8),
                 child: Row(
                   children: [
-                    Text('filter_sheet_title'.tr(), style: theme.textTheme.titleMedium),
+                    Text(context.t.filter_sheet_title, style: theme.textTheme.titleMedium),
                     const Spacer(),
                     if (!isEmpty)
                       TextButton(
@@ -46,7 +46,7 @@ class BrowseContent extends ConsumerWidget {
                           unawaited(HapticFeedback.mediumImpact());
                           ref.read(photosFilterProvider.notifier).reset();
                         },
-                        child: Text('filter_sheet_reset'.tr()),
+                        child: Text(context.t.filter_sheet_reset),
                       ),
                   ],
                 ),
@@ -66,7 +66,7 @@ class BrowseContent extends ConsumerWidget {
                     key: const Key('browse-see-all'),
                     onPressed: () => ref.read(photosFilterSheetProvider.notifier).state = FilterSheetSnap.deep,
                     icon: const Icon(Icons.expand_less_rounded),
-                    label: Text('filter_sheet_browse_see_all'.tr()),
+                    label: Text(context.t.filter_sheet_browse_see_all),
                   ),
                 ),
               ),
