@@ -30,6 +30,7 @@ const makeDataTransfer = () => {
     setData: (type: string, value: string) => store.set(type, value),
     getData: (type: string) => store.get(type) ?? '',
     types: [...store.keys()],
+    setDragImage: vi.fn(),
   } as unknown as DataTransfer;
 };
 
@@ -48,6 +49,17 @@ describe('SpaceAlbumFolderCard', () => {
     // left active by one test would otherwise let a later dragover test "accept" a drop it never
     // actually simulated dragging.
     setActiveDragPayload(null);
+  });
+
+  afterEach(() => {
+    // setDragLabel appends its chip straight to document.body (not inside the rendered
+    // container) and removes it via a real setTimeout(0). Testing-library's own cleanup() only
+    // unmounts the render tree, so a dragstart test that runs with real timers leaves its chip
+    // orphaned for whichever test runs next — sweep it here rather than depending on the
+    // pending timeout winning a race against the next test's assertions.
+    for (const chip of document.querySelectorAll('[data-space-drag-chip]')) {
+      chip.remove();
+    }
   });
 
   it('renders the folder name', () => {
@@ -109,6 +121,59 @@ describe('SpaceAlbumFolderCard', () => {
     await fireEvent.dragEnd(card);
 
     expect(getActiveDragPayload()).toBeNull();
+  });
+
+  it('dragstart replaces the default drag image with a small label chip', async () => {
+    renderWithTooltips(SpaceAlbumFolderCard, defaults);
+    const card = screen.getByTestId('space-album-folder-card');
+    const dataTransfer = makeDataTransfer();
+
+    await fireEvent.dragStart(card, { dataTransfer });
+
+    expect(dataTransfer.setDragImage).toHaveBeenCalledTimes(1);
+    const [chip] = vi.mocked(dataTransfer.setDragImage).mock.calls[0];
+    expect((chip as HTMLElement).textContent).toBe('Trips');
+  });
+
+  it('adds the chip to the document for the snapshot and removes it afterwards', async () => {
+    vi.useFakeTimers();
+    try {
+      renderWithTooltips(SpaceAlbumFolderCard, defaults);
+      const card = screen.getByTestId('space-album-folder-card');
+
+      await fireEvent.dragStart(card, { dataTransfer: makeDataTransfer() });
+      // Present at snapshot time — asserting only the absence below would pass
+      // just as happily against an implementation that never builds a chip.
+      expect(document.querySelectorAll('[data-space-drag-chip]')).toHaveLength(1);
+
+      vi.runAllTimers();
+      expect(document.querySelectorAll('[data-space-drag-chip]')).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('still writes the payload when the DataTransfer has no setDragImage', async () => {
+    renderWithTooltips(SpaceAlbumFolderCard, defaults);
+    const card = screen.getByTestId('space-album-folder-card');
+    const store = new Map<string, string>();
+    const dataTransfer = {
+      setData: (type: string, value: string) => store.set(type, value),
+      getData: (type: string) => store.get(type) ?? '',
+      types: [...store.keys()],
+      // Explicitly undefined, not merely omitted: @testing-library/dom's fireEvent merges a
+      // DataTransfer init object onto `new window.DataTransfer()` by copying only the init
+      // object's OWN property names. happy-dom's real DataTransfer class has a `setDragImage`
+      // *prototype* method (a stub that throws `Not implemented.`), which is inherited and
+      // still `typeof … === 'function'` unless an own property shadows it — an object that
+      // simply omits the key does not reproduce "no setDragImage" through fireEvent here.
+      setDragImage: undefined,
+    } as unknown as DataTransfer;
+
+    await fireEvent.dragStart(card, { dataTransfer });
+
+    expect(readDragPayload(dataTransfer)).toEqual({ kind: 'folder', id: folder.id });
+    expect(getActiveDragPayload()).toEqual({ kind: 'folder', id: folder.id });
   });
 
   describe('as a drop target', () => {

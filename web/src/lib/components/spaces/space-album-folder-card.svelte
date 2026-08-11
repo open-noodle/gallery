@@ -7,6 +7,7 @@
     getActiveDragPayload,
     readDragPayload,
     setActiveDragPayload,
+    setDragLabel,
     writeDragPayload,
     type DragPayload,
   } from '$lib/utils/space-album-folder-dnd';
@@ -73,6 +74,7 @@
     const payload: DragPayload = { kind: 'folder', id: folder.id };
     writeDragPayload(event.dataTransfer, payload);
     setActiveDragPayload(payload);
+    setDragLabel(event.dataTransfer, folder.name);
   }}
   ondragend={() => setActiveDragPayload(null)}
   ondragover={(event) => {

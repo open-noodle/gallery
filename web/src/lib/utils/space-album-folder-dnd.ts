@@ -79,3 +79,50 @@ export const canDrop = (
   }
   return targetFolderId === null || !isDescendant(folders, targetFolderId, folder.id);
 };
+
+/** Marks the transient node so tests and cleanup can find it unambiguously. */
+const DRAG_CHIP_ATTRIBUTE = 'data-space-drag-chip';
+
+/**
+ * Replaces the browser's default drag image — a snapshot of the dragged element, which for a folder
+ * card is a full tile with a four-up collage that covers the drop targets — with a small text chip.
+ *
+ * Three constraints, each a real failure if broken:
+ *  - The chip must be RENDERED. `display: none` yields no drag image at all, so it is placed
+ *    offscreen instead.
+ *  - It must be in the DOM when `setDragImage` runs (the snapshot is taken synchronously) and gone
+ *    afterwards, hence the next-tick removal rather than an immediate one.
+ *  - `setDragImage` must be feature-detected. The unit tests hand-roll a `DataTransfer` with only
+ *    `setData`/`getData`/`types`, and jsdom-family DOMs do not implement it either; without the
+ *    guard, every dragstart test throws.
+ */
+export const setDragLabel = (dataTransfer: DataTransfer, label: string): void => {
+  if (typeof document === 'undefined' || typeof dataTransfer.setDragImage !== 'function') {
+    return;
+  }
+
+  const chip = document.createElement('div');
+  chip.setAttribute(DRAG_CHIP_ATTRIBUTE, '');
+  chip.textContent = label;
+  chip.style.cssText = [
+    'position:absolute',
+    'top:-1000px',
+    'inset-inline-start:0',
+    // A zero-area element is rejected as a drag image by some browsers, so an
+    // empty folder name still has to produce a box.
+    'min-width:2rem',
+    'max-width:16rem',
+    'overflow:hidden',
+    'white-space:nowrap',
+    'text-overflow:ellipsis',
+    'padding:0.25rem 0.5rem',
+    'border-radius:0.375rem',
+    'font-size:0.875rem',
+    'background:#1f2937',
+    'color:#ffffff',
+  ].join(';');
+
+  document.body.append(chip);
+  dataTransfer.setDragImage(chip, 12, 12);
+  setTimeout(() => chip.remove(), 0);
+};
