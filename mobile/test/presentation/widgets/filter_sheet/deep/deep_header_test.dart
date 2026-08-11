@@ -1,7 +1,7 @@
-import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/deep_header.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/filter_section_id.dart';
 import 'package:immich_mobile/providers/photos_filter/filter_sheet.provider.dart';
@@ -28,7 +28,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('deep-header-close')), findsOneWidget);
-      expect(find.text('filter_sheet_title'.tr()), findsOneWidget);
+      expect(find.text(StaticTranslations.instance.filter_sheet_title), findsOneWidget);
       expect(find.byKey(const Key('deep-header-reset')), findsOneWidget);
     });
 
