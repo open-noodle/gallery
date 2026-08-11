@@ -420,6 +420,31 @@ void main() {
     expect(find.byKey(const Key('space-albums-link-action')), findsNothing);
   });
 
+  testWidgets('editor app-bar actions are icon-only with tooltips', (tester) async {
+    await pumpPage(tester, folders: const [], albums: const []);
+
+    for (final entry in const {
+      'space-albums-new-folder-action': 'New folder',
+      'space-albums-new-album-action': 'New album',
+      'space-albums-link-action': 'Link',
+    }.entries) {
+      final button = tester.widget<IconButton>(find.byKey(Key(entry.key)));
+      expect(button.tooltip, entry.value, reason: '${entry.key} must keep its label as a tooltip');
+    }
+
+    // Scoped to the AppBar deliberately: this page also builds TextButtons
+    // inside _FolderNameDialog and the delete confirmation, so a bare
+    // find.byType(TextButton) would pass only because no dialog is open.
+    expect(find.descendant(of: find.byType(AppBar), matching: find.byType(TextButton)), findsNothing);
+  });
+
+  testWidgets('the link action uses the add_link icon', (tester) async {
+    await pumpPage(tester, folders: const [], albums: const []);
+
+    final button = tester.widget<IconButton>(find.byKey(const Key('space-albums-link-action')));
+    expect((button.icon as Icon).icon, Icons.add_link);
+  });
+
   testWidgets('empty + editor: shows empty state', (tester) async {
     await tester.pumpConsumerWidget(
       const SpaceAlbumsPage(spaceId: spaceId, canEdit: true),

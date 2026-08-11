@@ -428,23 +428,25 @@ class SpaceAlbumsPage extends HookConsumerWidget {
         centerTitle: false,
         actions: [
           if (canEdit) ...[
-            TextButton.icon(
+            IconButton(
               key: const Key('space-albums-new-folder-action'),
               onPressed: createFolder,
               icon: const Icon(Icons.create_new_folder_outlined),
-              label: Text('space_album_folder_new'.t(context: context)),
+              tooltip: 'space_album_folder_new'.t(context: context),
             ),
-            TextButton.icon(
+            IconButton(
               key: const Key('space-albums-new-album-action'),
               onPressed: createAlbum,
               icon: const Icon(Icons.photo_album_outlined),
-              label: Text('space_album_new'.t(context: context)),
+              tooltip: 'space_album_new'.t(context: context),
             ),
-            TextButton.icon(
+            IconButton(
               key: const Key('space-albums-link-action'),
               onPressed: () => onLink(folderId),
-              icon: const Icon(Icons.add),
-              label: Text('link'.t(context: context)),
+              // Was Icons.add. Stripped of its label, a bare plus does not say
+              // what it adds; add_link matches web's mdiLinkVariantPlus.
+              icon: const Icon(Icons.add_link),
+              tooltip: 'link'.t(context: context),
             ),
           ],
         ],
