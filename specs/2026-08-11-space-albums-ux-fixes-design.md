@@ -93,29 +93,37 @@ stay green unchanged — that is the regression signal that gating was not distu
 by looking up the `IconButton`'s `tooltip` property, not by pumping a long-press and searching for text: the
 latter is slow and flakes on overlay timing.
 
+The "no `TextButton` in the app bar" assertion must be scoped to the app bar. This page also builds
+`TextButton`s inside `_FolderNameDialog` and the delete-confirmation dialog; a bare `find.byType(TextButton)`
+happens to pass at rest only because no dialog is open, which makes it a coincidence rather than an assertion.
+Scope the finder with `find.descendant(of: find.byType(AppBar), …)`.
+
 ### F2 — Getting into the space albums / folder view
 
-**Current.** `mobile/lib/presentation/widgets/spaces/space_albums_shelf.widget.dart:140-147` wraps only the
-"See all" `Text` in a `GestureDetector`, giving a tap target of roughly 50×16 logical pixels — below the 48dp
-minimum. Worse, `_buildShelf` passes `showSeeAll: albums.isNotEmpty` (line 84), so the affordance disappears
-entirely when the space has no linked albums.
+**Current.** `_HeaderRow.build` in `mobile/lib/presentation/widgets/spaces/space_albums_shelf.widget.dart`
+wraps only the "See all" `Text` in a `GestureDetector`, so the tap target is the text's own bounds — a
+`bodySmall` line, far below the 48dp minimum. Worse, `_buildShelf` passes `showSeeAll: albums.isNotEmpty`, so
+the affordance disappears entirely when the space has no linked albums.
 
 That second part is a functional hole, not a polish item: with zero linked albums, mobile has **no route at
-all** to the space albums page. The shelf's only other control is the Link tile, which links an album that
-already exists. So an editor cannot create an album, and cannot create a folder, from a fresh space on mobile
-— the page holding those actions is unreachable.
+all** to the space albums page. Verified — `SpaceAlbumsRoute` has exactly two push sites in the app,
+`space_detail.page.dart:448` (this callback) and `space_albums.page.dart:592` (the page recursing into a
+subfolder), and the latter is only reachable from the former. The shelf's only other control is the Link tile,
+which links an album that already exists. So an editor cannot create an album, and cannot create a folder,
+from a fresh space on mobile — the page holding those actions is unreachable.
 
 **Change.**
 
-1. The whole header row becomes one tap target: the `Row` at lines 133-148 is wrapped in an `InkWell` with the
+1. The whole header row becomes one tap target: `_HeaderRow`'s `Row` is wrapped in an `InkWell` with the
    existing `onSeeAll` callback, and a `chevron_right` icon follows the "See all" text.
 2. `showSeeAll` becomes unconditional. Case 3 of `_buildShelf` (viewer with no albums) already returns
    `SizedBox.shrink` before this point, so "whenever the shelf renders" is the correct condition — an editor
    with an empty space gets the entry, a viewer with an empty space still sees nothing, which is right because
    there is nothing to browse.
 
-No app-bar icon: `space_detail.page.dart:470-481` already carries four actions plus a kebab, and a fifth would
-squeeze the space title on a phone.
+No app-bar icon: `space_detail.page.dart`'s `SliverAppBar` already carries three `IconButton`s (visibility,
+add-photos for editors, members) plus `SpaceDetailKebab`, and a fifth control would squeeze the space title on
+a phone.
 
 **Scenarios.**
 
@@ -194,10 +202,12 @@ Scenario: a DataTransfer without setDragImage does not break the drag
   Then no exception is thrown
   And the payload is still written
 
-Scenario: the chip does not linger in the document
+Scenario: the chip is added for the snapshot and then removed
   Given a folder card
-  When dragstart fires and the timers are flushed
-  Then document.body contains no drag-chip element
+  When dragstart fires
+  Then a drag-chip element is present in document.body
+  When the pending timers are flushed
+  Then no drag-chip element is present in document.body
 
 Scenario: a viewer cannot start a drag
   Given a folder card with canManage false
@@ -209,6 +219,12 @@ width and truncates. An empty-string name still yields a chip rather than an emp
 which some browsers reject as a drag image. The helper never assumes `document` is available at module scope,
 so it stays importable under SSR.
 
+The cleanup scenario is written present-then-absent deliberately. Asserting only "no chip in the document"
+after the fact is the cannot-fail shape §2 warns about: it passes identically against a correct
+implementation, against one that never creates a chip, and against one where `setDragImage` was never called.
+The test must therefore drive the removal explicitly — `vi.useFakeTimers()` with `vi.runAllTimers()`, or an
+awaited macrotask — rather than hoping the timer has fired by assertion time, which would flake.
+
 ### F4 — "items" list header on web
 
 **Current.** `web/src/lib/components/spaces/space-albums-table.svelte:139-141` derives the header text by
@@ -216,9 +232,16 @@ formatting a plural string with a zero count and stripping the digits back off:
 `$t('items_count', { values: { count: 0 } }).replace(/\d+\s/, '')` → the lowercase, mid-sentence fragment
 "items".
 
-**Change.** Use `$t('sort_items')` — "Number of items" — which is the exact string `/albums` renders for the
-same column at the same widths (`AlbumsTableHeader.svelte:23`). Reusing the existing key means every locale is
+**Change.** Use `$t('sort_items')` — "Number of items" — the same string `/albums` renders for that column
+(`AlbumsTableHeader.svelte:23`, via `sortOptionsMetadata`). Reusing the existing key means every locale is
 already translated; no new i18n key, no untranslated English leaking into other languages.
+
+The two tables' column classes are **not** identical, which matters here. `/albums` gives the item-count
+column a base width (`w-4/12 m:w-2/12 md:w-2/12 …` — the `m:` is an upstream typo, so the base width is what
+actually applies below `md`), whereas the space table's header cell declares no base width at all
+(`sm:w-2/12 md:w-2/12 …`). "Number of items" is four times longer than "items", so on the narrowest
+breakpoint the space header can wrap where it previously did not. The change therefore also adds the matching
+base width to that `<th>`, and the wrap case gets a scenario.
 
 The other three headers keep their current keys. Issue #972 ("Space album table headers are static and
 non-clickable, unlike /albums") wants this whole `<thead>` replaced by the sortable header buttons, and that is
@@ -235,6 +258,10 @@ Scenario: the item-count column header is a proper label
 Scenario: album rows still show their own counts
   Given the space albums table rendered with an album of 5 assets
   Then a cell reading "5 items" is present
+
+Scenario: the header column carries a base width
+  Given the space albums table rendered with one album
+  Then the item-count header cell declares a base width class
 ```
 
 **Edge cases.** The row-level assertion (`space-albums-table.spec.ts:44`, `/5 items/i`) must keep passing — the
@@ -290,6 +317,14 @@ backed by a `NavConfig { bool showSpaces }` wired into `AppConfig` — field, co
 `SettingsKey`, so the compiler refuses to build until the wiring is complete. `appConfigProvider` is
 stream-backed (`settings.provider.dart:7-12`), so a flip re-renders the nav with no restart.
 
+One property of `SettingsRepository.write` shapes how the persistence scenarios below must be written:
+writing a value equal to the default does not store it, it **deletes** the row (`return clear([key])`). With
+the default at `true`, "on" is therefore represented by the _absence_ of a row and "off" by a stored `false`.
+Nothing about the effective config changes — `_build` skips absent keys and `AppConfig.fromEntries` falls back
+to `defaultConfig` — but a test asserting "toggling on stores true" would assert something the repository
+deliberately never does. Persistence scenarios assert the effective `appConfig.read(navShowSpaces)`, not the
+row.
+
 Spaces is the default because it is the surface users reach for most; Albums is one tap away in the Library
 tab either way. The switch is therefore phrased positively and ships **on** — "Show Spaces in the navigation
 bar" — and turning it off restores Albums.
@@ -305,15 +340,11 @@ described below.
 **Scenarios.**
 
 ```gherkin
-Scenario: default is Spaces
-  Given a fresh install with no stored nav preference
-  Then navShowSpaces reads true
+Scenario: an upgrading install with rows for other keys but none for this one gets Spaces
+  Given a settings store carrying other keys and no navShowSpaces row
+  Then appConfig.read(navShowSpaces) is true
   And galleryNavSlots yields [photos, spaces, library]
   And the shell's tab routes are [MainTimeline, Spaces, DriftLibrary]
-
-Scenario: an upgrading user with no stored preference also gets Spaces
-  Given a settings store carrying other keys but no navShowSpaces row
-  Then navShowSpaces reads true
 
 Scenario: turning the setting off restores Albums
   Given navShowSpaces is false
@@ -337,6 +368,23 @@ Scenario: tapping slot 1 with Spaces off still refreshes albums
   When the Albums segment is tapped
   Then the tabs router active index becomes 1
   And remoteAlbumProvider is refreshed
+
+Scenario: the active-tab provider reports the occupant of the slot, not the slot's old name
+  Given navShowSpaces is true
+  When the tabs router active index becomes 1
+  Then galleryTabProvider holds GalleryTabEnum.spaces
+
+Scenario: the pill highlights the correct segment after a flip
+  Given navShowSpaces is true and the active index is 1
+  When navShowSpaces becomes false
+  Then the Albums segment is the active one
+  And no segment rect from the previous configuration is retained
+
+Scenario: a tab with a pushed stack survives a flip
+  Given navShowSpaces is false and slot 1 has a route pushed onto its stack
+  When navShowSpaces becomes true
+  Then no exception is thrown
+  And slot 1 shows the Spaces root rather than the stale pushed route
 
 Scenario: flipping the setting off while standing on slot 1
   Given navShowSpaces is true and the active index is 1
@@ -370,8 +418,9 @@ Scenario: the settings tile round-trips
   Given the preference settings page on a fresh install
   Then the nav tile is shown enabled
   When the tile is toggled off
-  Then navShowSpaces is persisted as false
-  And toggling it back on persists true
+  Then appConfig.read(navShowSpaces) is false
+  When the tile is toggled back on
+  Then appConfig.read(navShowSpaces) is true
 
 Scenario: Albums stays reachable from the Library tab
   Given navShowSpaces is true
@@ -399,9 +448,13 @@ Scenario: Albums stays reachable from the Library tab
   stay exhaustive. The compiler enforces this.
 - **Deep links and pushes to `DriftAlbumsRoute`** are unaffected: it remains declared as a top-level route
   (`router.dart:230`), which is what the Library-tab pushes resolve against.
-- **A stored preference from a future downgrade** — an unknown value in the settings row — must fall back to
-  the default rather than throw. This is the existing `SettingsKey` codec behaviour and gets an assertion in
-  the config test.
+- **A malformed stored value is _not_ handled, and this change does not fix that.** `CachedKeyValueRepository._build`
+  calls `decodeValue` with no guard, so a corrupt row throws while building the whole snapshot — a global
+  failure, not one scoped to this key. Do not write a scenario claiming a fallback that does not exist;
+  hardening that path is shared infrastructure work and out of scope here.
+- **`SpacesPage`'s app-bar title is a hardcoded English `Text('Spaces')`** (`spaces.page.dart:157`). That is
+  tolerable for a page reached by an explicit push; it is not tolerable for the default second tab, which is
+  what this change makes it. Localize it to the existing `spaces` key as part of (b).
 - **Rollback.** The whole feature is inside the `>>> fork-only gallery-bottom-nav` block plus one settings key.
   The rollback note already at `router.dart:147-148` stays accurate.
 
@@ -409,19 +462,20 @@ Scenario: Albums stays reachable from the Library tab
 
 Every file below already exists; each entry is an extension unless marked new.
 
-| File                                                                        | Cases                                                                           |
-| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `mobile/test/presentation/pages/space_albums_page_test.dart`                | F1: icon-only, tooltips, viewer gating, tap still fires                         |
-| `mobile/test/presentation/widgets/spaces/space_albums_shelf_test.dart`      | F2: row tap target, chevron, empty-editor, viewer, null callback                |
-| `mobile/test/presentation/pages/space_detail_top_sliver_test.dart`          | F2: shelf height unchanged                                                      |
-| `web/src/lib/components/spaces/space-album-folder-card.spec.ts`             | F3: drag image, payload, missing API, cleanup, viewer                           |
-| `web/src/lib/components/spaces/space-albums-table.spec.ts`                  | F4: header string, row count untouched                                          |
-| `mobile/test/providers/gallery_nav/gallery_tab_enum_test.dart`              | F5: slot derivation both ways                                                   |
-| `mobile/test/providers/gallery_nav/gallery_nav_destination_test.dart`       | F5: Spaces label, icons, route builder                                          |
-| `mobile/test/presentation/widgets/gallery_nav/gallery_bottom_nav_test.dart` | F5: pill contents, tap side effects, readonly, rail, flip                       |
-| `mobile/test/providers/gallery_nav/gallery_search_action_test.dart`         | F5: search targets slot 0 under both configurations                             |
-| `mobile/test/domain/models/config/app_config_test.dart`                     | F5: read/write round-trip, default true, missing-row and unknown-value fallback |
-| `mobile/test/widgets/settings/nav_setting_test.dart` (new)                  | F5: tile reflects and persists                                                  |
+| File                                                                        | Cases                                                                                           |
+| --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `mobile/test/presentation/pages/space_albums_page_test.dart`                | F1: icon-only, tooltips, viewer gating, tap still fires                                         |
+| `mobile/test/presentation/widgets/spaces/space_albums_shelf_test.dart`      | F2: row tap target, chevron, empty-editor, viewer, null callback                                |
+| `mobile/test/presentation/pages/space_detail_top_sliver_test.dart`          | F2: shelf height unchanged                                                                      |
+| `web/src/lib/components/spaces/space-album-folder-card.spec.ts`             | F3: drag image, payload, missing API, cleanup, viewer                                           |
+| `web/src/lib/components/spaces/space-albums-table.spec.ts`                  | F4: header string, row count untouched                                                          |
+| `mobile/test/providers/gallery_nav/gallery_tab_enum_test.dart`              | F5: slot derivation both ways                                                                   |
+| `mobile/test/providers/gallery_nav/gallery_nav_destination_test.dart`       | F5: Spaces label, icons, route builder                                                          |
+| `mobile/test/presentation/widgets/gallery_nav/gallery_bottom_nav_test.dart` | F5: pill contents, tap side effects, readonly, rail, both flip directions, indicator after flip |
+| `mobile/test/providers/gallery_nav/gallery_search_action_test.dart`         | F5: search targets slot 0 under both configurations                                             |
+| `mobile/test/domain/models/config/app_config_test.dart`                     | F5: read/write round-trip, default true, missing-row fallback                                   |
+| `mobile/test/presentation/pages/gallery_tab_shell_test.dart` (new)          | F5: tab routes per configuration, galleryTabProvider identity, pushed-stack flip                |
+| `mobile/test/widgets/settings/nav_setting_test.dart` (new)                  | F5: tile reflects and round-trips through the effective config                                  |
 
 ## 5. Verification gates
 
@@ -436,10 +490,23 @@ Local, before any push:
 
 ## 6. Sequencing
 
-F1–F4 are independent of each other and of F5; any order works. F5 is sequenced internally: (a) slots →
-(b) destination → (d) setting and config → (c) shell and router wiring. The shell wiring lands last because
-its scenario is the one that depends on everything else being in place, and it is the one carrying real
-uncertainty.
+F1–F4 are independent of each other and of F5; any order works.
+
+F5's order is constrained by a dependency that the earlier draft of this section had backwards: the slots
+_provider_ reads `appConfigProvider`, so the config must exist before the provider can. Splitting (a) in two
+resolves it:
+
+1. **(a1)** the pure `galleryNavSlots({required bool showSpaces})` function plus the widened enum — no
+   settings dependency, testable on its own.
+2. **(d)** `SettingsKey.navShowSpaces`, `NavConfig`, the `AppConfig` wiring, and the settings tile.
+3. **(a2)** `galleryNavSlotsProvider` over `appConfigProvider`, and the call sites moving off `.values` /
+   `.index`.
+4. **(b)** the Spaces destination, including localizing `SpacesPage`'s title.
+5. **(c)** the shell's conditional `routes:` and the router's fourth declared child.
+
+(c) lands last because it depends on everything above and carries the one real unknown. Its precedent is
+reassuring: the legacy `TabShellRoute` already declares `SpacesRoute.page` as a tab child with exactly the
+guards proposed here (`router.dart:142`), and drives it as slot 1 of its own `AutoTabsRouter`.
 
 ## 7. What this does not do
 
