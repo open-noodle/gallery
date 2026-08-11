@@ -2,7 +2,7 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
-import 'package:immich_mobile/extensions/translate_extensions.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter_search.provider.dart';
 import 'package:immich_mobile/providers/sync_status.provider.dart';
@@ -92,13 +92,13 @@ class _FirstRunEmptyState extends State<_FirstRunEmpty> with SingleTickerProvide
       const _PolaroidHero(),
       const SizedBox(height: 28),
       Text(
-        'timeline_empty_title'.t(context: context),
+        context.t.timeline_empty_title,
         textAlign: TextAlign.center,
         style: context.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
       ),
       const SizedBox(height: 10),
       Text(
-        'timeline_empty_subtitle'.t(context: context),
+        context.t.timeline_empty_subtitle,
         textAlign: TextAlign.center,
         style: context.textTheme.bodyMedium?.copyWith(color: context.colorScheme.onSurfaceVariant),
       ),
@@ -106,7 +106,7 @@ class _FirstRunEmptyState extends State<_FirstRunEmpty> with SingleTickerProvide
       FilledButton.icon(
         onPressed: () => context.pushRoute(const DriftBackupRoute()),
         icon: const Icon(Icons.cloud_upload_outlined),
-        label: Text('enable_backup'.t(context: context)),
+        label: Text(context.t.enable_backup),
       ),
     ];
 
@@ -179,20 +179,20 @@ class _FilteredEmpty extends ConsumerWidget {
             ),
             const SizedBox(height: 18),
             Text(
-              'timeline_empty_filtered_title'.t(context: context),
+              context.t.timeline_empty_filtered_title,
               textAlign: TextAlign.center,
               style: context.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 8),
             Text(
-              'timeline_empty_filtered_subtitle'.t(context: context),
+              context.t.timeline_empty_filtered_subtitle,
               textAlign: TextAlign.center,
               style: context.textTheme.bodyMedium?.copyWith(color: context.colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 20),
             TextButton(
               onPressed: () => ref.read(photosFilterProvider.notifier).reset(),
-              child: Text('timeline_empty_clear_filters'.t(context: context)),
+              child: Text(context.t.timeline_empty_clear_filters),
             ),
           ],
         ),
