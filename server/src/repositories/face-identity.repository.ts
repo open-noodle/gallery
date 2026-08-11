@@ -11,7 +11,7 @@ import { FaceIdentityFaceSource, FaceIdentityFaceTable } from 'src/schema/tables
 import { FaceIdentityTable } from 'src/schema/tables/face-identity.table';
 import { anyUuid, retryOnDeadlock } from 'src/utils/database';
 import { asDateString, asDateTimeString } from 'src/utils/date';
-import { spaceAlbumAssetExistsSql, spaceVisibleAssetVisibilities } from 'src/utils/shared-space-album-scope';
+import { accessibleTimelineAssetPredicate, spaceVisibleAssetVisibilities } from 'src/utils/shared-space-album-scope';
 
 export type FaceIdentity = Selectable<FaceIdentityTable>;
 export type FaceIdentityFace = Selectable<FaceIdentityFaceTable>;
@@ -200,6 +200,26 @@ type AccessiblePeopleIdentityPageRow = {
   identityId: string;
   visibleAssetCount: string | number;
 };
+
+/**
+ * What the page query actually returns before the repository tidies it. `identityId` is null only
+ * on the placeholder row a `withTotals` query emits when the requested page is past the end — the
+ * row that still carries the header figures. Kept private so no consumer has to think about it.
+ */
+type AccessiblePeoplePageRawRow = {
+  identityId: string | null;
+  visibleAssetCount: string | number;
+  total?: string | number | null;
+  hidden?: string | number | null;
+};
+
+/**
+ * Reshape the page query's rows into the map {@link FaceIdentityRepository.hydrateAccessiblePeople}
+ * takes, so hydrate does not recompute a count the page query already produced. `visibleAssetCount`
+ * arrives as a string when postgres returns the bigint aggregate.
+ */
+const toAssetCounts = (rows: AccessiblePeopleIdentityPageRow[]): ReadonlyMap<string, number> =>
+  new Map(rows.map((row) => [row.identityId, Number(row.visibleAssetCount)]));
 
 type AccessiblePeopleCountRow = {
   total: string | number | null;
@@ -862,6 +882,7 @@ export class FaceIdentityRepository {
       userId,
       identityIds: rows.map((row) => row.identityId),
       withHidden: options.withHidden ?? false,
+      assetCounts: toAssetCounts(rows),
     });
   }
 
@@ -885,28 +906,53 @@ export class FaceIdentityRepository {
     };
   }
 
+  /**
+   * Does this viewer belong to any space whose assets appear on their timeline surfaces?
+   *
+   * When they do not, every space arm of {@link accessibleTimelineAssetPredicate} is dead and the
+   * People-page aggregates can run a far cheaper predicate. This is a single indexed lookup, and
+   * it is resolved per request rather than cached so that joining or leaving a space takes effect
+   * on the next page load.
+   */
+  private async hasTimelineSpaces(userId: string): Promise<boolean> {
+    const row = await this.db
+      .selectFrom('shared_space_member')
+      .select('shared_space_member.spaceId')
+      .where('shared_space_member.userId', '=', userId)
+      .where('shared_space_member.showInTimeline', '=', true)
+      .limit(1)
+      .executeTakeFirst();
+    return row !== undefined;
+  }
+
   async getAccessiblePeople(userId: string, options: AccessiblePeopleOptions): Promise<PeopleResponseDto> {
     const page = Math.max(1, options.page);
     const size = Math.max(1, options.size);
     const minimumFaceCount = options.minimumFaceCount ?? 1;
-    const rows = await this.getAccessiblePeopleIdentityPage({
+    // Resolved once and shared by the queries below, so the endpoint pays one indexed lookup
+    // rather than one per query.
+    const hasTimelineSpaces = await this.hasTimelineSpaces(userId);
+    const { rows, total, hidden } = await this.getAccessiblePeoplePageWithTotals({
       userId,
       withHidden: options.withHidden,
       limit: size + 1,
       offset: (page - 1) * size,
       minimumFaceCount,
+      hasTimelineSpaces,
     });
+
     const pageRows = rows.slice(0, size);
     const people = await this.hydrateAccessiblePeople({
       userId,
       identityIds: pageRows.map((row) => row.identityId),
       withHidden: options.withHidden,
+      assetCounts: toAssetCounts(pageRows),
+      hasTimelineSpaces,
     });
-    const counts = await this.getAccessiblePeopleCounts(userId, minimumFaceCount);
 
     return {
-      total: Number(counts.total ?? 0),
-      hidden: Number(counts.hidden ?? 0),
+      total,
+      hidden,
       hasNextPage: rows.length > size,
       people,
     };
@@ -918,6 +964,7 @@ export class FaceIdentityRepository {
     options: { minimumFaceCount?: number },
   ): Promise<{ total: number; hidden: number; detectedFaceCount: number }> {
     const minimumFaceCount = options.minimumFaceCount ?? 1;
+    const hasTimelineSpaces = await this.hasTimelineSpaces(userId);
     const result = await sql<AccessiblePeopleStatisticsRow>`
       WITH timeline_spaces AS (
         SELECT "spaceId"
@@ -937,24 +984,7 @@ export class FaceIdentityRepository {
           AND asset."isOffline" = false
           AND asset.visibility IN (${sql.join(peopleAssetVisibilities)})
           AND (
-            asset."ownerId" = ${userId}
-            OR EXISTS (
-              SELECT 1
-              FROM shared_space_asset
-              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_asset."spaceId"
-              WHERE shared_space_asset."assetId" = asset.id
-            )
-            OR EXISTS (
-              SELECT 1
-              FROM shared_space_library
-              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_library."spaceId"
-              WHERE shared_space_library."libraryId" = asset."libraryId"
-            )
-            OR ${spaceAlbumAssetExistsSql({
-              assetIdColumn: sql`asset.id`,
-              spaceScopeJoin: sql`INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_album."spaceId"`,
-              requireShowInTimeline: true,
-            })}
+            ${accessibleTimelineAssetPredicate({ userId, hasTimelineSpaces })}
           )
       ),
       accessible_faces AS (
@@ -1038,6 +1068,7 @@ export class FaceIdentityRepository {
     options: { minimumFaceCount?: number },
   ): Promise<PeopleFaceStatistics> {
     const minimumFaceCount = options.minimumFaceCount ?? 1;
+    const hasTimelineSpaces = await this.hasTimelineSpaces(userId);
     const result = await sql<PeopleFaceStatistics>`
       WITH timeline_spaces AS (
         SELECT "spaceId"
@@ -1057,24 +1088,7 @@ export class FaceIdentityRepository {
           AND asset."isOffline" = false
           AND asset.visibility IN (${sql.join(peopleAssetVisibilities)})
           AND (
-            asset."ownerId" = ${userId}
-            OR EXISTS (
-              SELECT 1
-              FROM shared_space_asset
-              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_asset."spaceId"
-              WHERE shared_space_asset."assetId" = asset.id
-            )
-            OR EXISTS (
-              SELECT 1
-              FROM shared_space_library
-              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_library."spaceId"
-              WHERE shared_space_library."libraryId" = asset."libraryId"
-            )
-            OR ${spaceAlbumAssetExistsSql({
-              assetIdColumn: sql`asset.id`,
-              spaceScopeJoin: sql`INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_album."spaceId"`,
-              requireShowInTimeline: true,
-            })}
+            ${accessibleTimelineAssetPredicate({ userId, hasTimelineSpaces })}
           )
       ),
       accessible_faces AS (
@@ -1178,6 +1192,7 @@ export class FaceIdentityRepository {
 
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
   async getAccessiblePersonStatistics(userId: string, identityId: string): Promise<PersonStatistics> {
+    const hasTimelineSpaces = await this.hasTimelineSpaces(userId);
     const result = await sql<PersonStatistics>`
       WITH timeline_spaces AS (
         SELECT "spaceId"
@@ -1199,24 +1214,7 @@ export class FaceIdentityRepository {
           AND asset."isOffline" = false
           AND asset.visibility = ${AssetVisibility.Timeline}
           AND (
-            asset."ownerId" = ${userId}
-            OR EXISTS (
-              SELECT 1
-              FROM shared_space_asset
-              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_asset."spaceId"
-              WHERE shared_space_asset."assetId" = asset.id
-            )
-            OR EXISTS (
-              SELECT 1
-              FROM shared_space_library
-              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_library."spaceId"
-              WHERE shared_space_library."libraryId" = asset."libraryId"
-            )
-            OR ${spaceAlbumAssetExistsSql({
-              assetIdColumn: sql`asset.id`,
-              spaceScopeJoin: sql`INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_album."spaceId"`,
-              requireShowInTimeline: true,
-            })}
+            ${accessibleTimelineAssetPredicate({ userId, hasTimelineSpaces })}
           )
       )
       SELECT
@@ -1618,7 +1616,12 @@ export class FaceIdentityRepository {
   }
 
   @GenerateSql({
-    params: [{ userId: DummyValue.UUID, withHidden: true, limit: 51, offset: 0, minimumFaceCount: 3 }],
+    // Documented with the shared-space arms present: that is the superset worth reviewing. A
+    // viewer with no timeline-enabled space runs the collapsed predicate instead — see
+    // `accessibleTimelineAssetPredicate`.
+    params: [
+      { userId: DummyValue.UUID, withHidden: true, limit: 51, offset: 0, minimumFaceCount: 3, hasTimelineSpaces: true },
+    ],
   })
   async getAccessiblePeopleIdentityPage(input: {
     userId: string;
@@ -1627,9 +1630,102 @@ export class FaceIdentityRepository {
     offset: number;
     minimumFaceCount: number;
     searchName?: string;
+    hasTimelineSpaces?: boolean;
   }): Promise<AccessiblePeopleIdentityPageRow[]> {
+    const rows = await this.queryAccessiblePeoplePage({ ...input, withTotals: false });
+    return rows.filter((row): row is AccessiblePeopleIdentityPageRow => row.identityId !== null);
+  }
+
+  /**
+   * The page plus the library-wide header figures, from one query. See {@link withTotals} on
+   * {@link queryAccessiblePeoplePage} for why the totals are not simply the page's own numbers.
+   */
+  @GenerateSql({
+    params: [
+      { userId: DummyValue.UUID, withHidden: true, limit: 51, offset: 0, minimumFaceCount: 3, hasTimelineSpaces: true },
+    ],
+  })
+  async getAccessiblePeoplePageWithTotals(input: {
+    userId: string;
+    withHidden: boolean;
+    limit: number;
+    offset: number;
+    minimumFaceCount: number;
+    searchName?: string;
+    hasTimelineSpaces?: boolean;
+  }): Promise<{ rows: AccessiblePeopleIdentityPageRow[]; total: number; hidden: number }> {
+    const raw = await this.queryAccessiblePeoplePage({ ...input, withTotals: true });
+    return {
+      // The header figures ride on every row, including the placeholder row returned when the
+      // requested page is past the end — so read them before discarding it.
+      total: Number(raw[0]?.total ?? 0),
+      hidden: Number(raw[0]?.hidden ?? 0),
+      rows: raw.filter((row): row is AccessiblePeopleIdentityPageRow => row.identityId !== null),
+    };
+  }
+
+  private async queryAccessiblePeoplePage(input: {
+    userId: string;
+    withHidden: boolean;
+    limit: number;
+    offset: number;
+    minimumFaceCount: number;
+    searchName?: string;
+    /** Resolved by the caller when it runs several of these queries, to avoid repeating the lookup. */
+    hasTimelineSpaces?: boolean;
+    /**
+     * Also derive the library-wide total/hidden header figures from the CTEs this query already
+     * builds, instead of a third query that rebuilt them from scratch. Every
+     * returned row carries them; a page past the end returns a single row whose `identityId` is
+     * null and which carries only the totals.
+     */
+    withTotals?: boolean;
+  }): Promise<AccessiblePeoplePageRawRow[]> {
     const searchName = input.searchName ?? '';
-    const result = await sql<AccessiblePeopleIdentityPageRow>`
+    const hasTimelineSpaces = input.hasTimelineSpaces ?? (await this.hasTimelineSpaces(input.userId));
+
+    // Fix C — the People header's total/hidden used to come from a third query that rebuilt
+    // `accessible_faces` and `accessible_profiles` from scratch. They are derived here instead,
+    // off the CTEs this query has already materialised.
+    //
+    // They are deliberately NOT the page's own figures: totals are library-wide and ignore
+    // `withHidden` (so they read off `accessible_profiles`, not `eligible_profiles`), and their
+    // "is this identity named" test omits the BTRIM the listing applies. Both asymmetries predate
+    // this change and are pinned by characterisation tests; reproducing them exactly is the point.
+    //
+    // The page is joined onto the totals rather than the other way round, so an empty page (a
+    // request past the last page) still returns the header numbers instead of collapsing to no rows.
+    const totalsCtes = input.withTotals
+      ? sql`,
+      all_identity_counts AS (
+        SELECT
+          accessible_faces."identityId",
+          COUNT(DISTINCT accessible_faces."assetId") AS "visibleAssetCount"
+        FROM accessible_faces
+        GROUP BY accessible_faces."identityId"
+      ),
+      identity_visibility AS (
+        SELECT
+          "identityId",
+          bool_or("isHidden" = false) AS "hasVisibleProfile",
+          bool_or(NULLIF(name, '') IS NOT NULL) AS "hasNamedProfile"
+        FROM accessible_profiles
+        GROUP BY "identityId"
+      ),
+      totals AS (
+        SELECT
+          COUNT(*) AS total,
+          COUNT(*) FILTER (WHERE "hasVisibleProfile" = false) AS hidden
+        FROM identity_visibility
+        INNER JOIN all_identity_counts ON all_identity_counts."identityId" = identity_visibility."identityId"
+        WHERE identity_visibility."hasNamedProfile" = true
+          OR all_identity_counts."visibleAssetCount" >= ${input.minimumFaceCount}
+      )`
+      : sql``;
+    const totalsColumns = input.withTotals ? sql`, totals.total, totals.hidden` : sql``;
+    const totalsFrom = input.withTotals ? sql`FROM totals LEFT JOIN page_rows ON true` : sql`FROM page_rows`;
+
+    const result = await sql<AccessiblePeoplePageRawRow>`
       WITH timeline_spaces AS (
         SELECT "spaceId"
         FROM shared_space_member
@@ -1649,24 +1745,7 @@ export class FaceIdentityRepository {
           AND asset."isOffline" = false
           AND asset.visibility = ${AssetVisibility.Timeline}
           AND (
-            asset."ownerId" = ${input.userId}
-            OR EXISTS (
-              SELECT 1
-              FROM shared_space_asset
-              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_asset."spaceId"
-              WHERE shared_space_asset."assetId" = asset.id
-            )
-            OR EXISTS (
-              SELECT 1
-              FROM shared_space_library
-              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_library."spaceId"
-              WHERE shared_space_library."libraryId" = asset."libraryId"
-            )
-            OR ${spaceAlbumAssetExistsSql({
-              assetIdColumn: sql`asset.id`,
-              spaceScopeJoin: sql`INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_album."spaceId"`,
-              requireShowInTimeline: true,
-            })}
+            ${accessibleTimelineAssetPredicate({ userId: input.userId, hasTimelineSpaces })}
           )
       ),
       accessible_profiles AS (
@@ -1747,157 +1826,113 @@ export class FaceIdentityRepository {
           bool_or(COALESCE("isFavorite", false)) AS "isFavorite"
         FROM eligible_profiles
         GROUP BY "identityId"
-      )
+      ),
+      page_rows AS (
+        SELECT
+          identity_counts."identityId",
+          identity_counts."visibleAssetCount",
+          ROW_NUMBER() OVER (
+            ORDER BY
+              COALESCE(identity_favorites."isFavorite", false) DESC,
+              NULLIF(BTRIM(best_profiles.name), '') IS NULL,
+              lower(NULLIF(BTRIM(best_profiles.name), '')) ASC NULLS LAST,
+              CASE
+                WHEN NULLIF(BTRIM(best_profiles.name), '') IS NULL THEN identity_counts."visibleAssetCount"
+              END DESC NULLS LAST,
+              identity_counts."identityId"
+          ) AS ord
+        FROM identity_counts
+        INNER JOIN best_profiles ON best_profiles."identityId" = identity_counts."identityId"
+        INNER JOIN identity_favorites ON identity_favorites."identityId" = identity_counts."identityId"
+        WHERE NULLIF(BTRIM(best_profiles.name), '') IS NOT NULL
+          OR identity_counts."visibleAssetCount" >= ${input.minimumFaceCount}
+        ORDER BY
+          COALESCE(identity_favorites."isFavorite", false) DESC,
+          NULLIF(BTRIM(best_profiles.name), '') IS NULL,
+          lower(NULLIF(BTRIM(best_profiles.name), '')) ASC NULLS LAST,
+          CASE
+            WHEN NULLIF(BTRIM(best_profiles.name), '') IS NULL THEN identity_counts."visibleAssetCount"
+          END DESC NULLS LAST,
+          identity_counts."identityId"
+        LIMIT ${input.limit}
+        OFFSET ${input.offset}
+      )${totalsCtes}
       SELECT
-        identity_counts."identityId",
-        identity_counts."visibleAssetCount"
-      FROM identity_counts
-      INNER JOIN best_profiles ON best_profiles."identityId" = identity_counts."identityId"
-      INNER JOIN identity_favorites ON identity_favorites."identityId" = identity_counts."identityId"
-      WHERE NULLIF(BTRIM(best_profiles.name), '') IS NOT NULL
-        OR identity_counts."visibleAssetCount" >= ${input.minimumFaceCount}
-      ORDER BY
-        COALESCE(identity_favorites."isFavorite", false) DESC,
-        NULLIF(BTRIM(best_profiles.name), '') IS NULL,
-        lower(NULLIF(BTRIM(best_profiles.name), '')) ASC NULLS LAST,
-        CASE
-          WHEN NULLIF(BTRIM(best_profiles.name), '') IS NULL THEN identity_counts."visibleAssetCount"
-        END DESC NULLS LAST,
-        identity_counts."identityId"
-      LIMIT ${input.limit}
-      OFFSET ${input.offset}
+        page_rows."identityId",
+        page_rows."visibleAssetCount"${totalsColumns}
+      ${totalsFrom}
+      ORDER BY page_rows.ord
     `.execute(this.db);
 
     return result.rows;
   }
 
-  async getAccessiblePeopleCounts(
-    userId: string,
-    minimumFaceCount: number,
-  ): Promise<{ total: number; hidden: number }> {
-    const result = await sql<AccessiblePeopleCountRow>`
-      WITH timeline_spaces AS (
-        SELECT "spaceId"
-        FROM shared_space_member
-        WHERE "userId" = ${userId}
-          AND "showInTimeline" = true
-      ),
-      accessible_faces AS (
-        SELECT
-          face_identity_face."identityId",
-          asset_face."assetId"
-        FROM face_identity_face
-        INNER JOIN asset_face ON asset_face.id = face_identity_face."assetFaceId"
-        INNER JOIN asset ON asset.id = asset_face."assetId"
-        WHERE asset_face."deletedAt" IS NULL
-          AND asset_face."isVisible" = true
-          AND asset."deletedAt" IS NULL
-          AND asset."isOffline" = false
-          AND asset.visibility = ${AssetVisibility.Timeline}
-          AND (
-            asset."ownerId" = ${userId}
-            OR EXISTS (
-              SELECT 1
-              FROM shared_space_asset
-              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_asset."spaceId"
-              WHERE shared_space_asset."assetId" = asset.id
-            )
-            OR EXISTS (
-              SELECT 1
-              FROM shared_space_library
-              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_library."spaceId"
-              WHERE shared_space_library."libraryId" = asset."libraryId"
-            )
-            OR ${spaceAlbumAssetExistsSql({
-              assetIdColumn: sql`asset.id`,
-              spaceScopeJoin: sql`INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_album."spaceId"`,
-              requireShowInTimeline: true,
-            })}
-          )
-      ),
-      identity_counts AS (
-        SELECT
-          accessible_faces."identityId",
-          COUNT(DISTINCT accessible_faces."assetId") AS "visibleAssetCount"
-        FROM accessible_faces
-        GROUP BY accessible_faces."identityId"
-      ),
-      accessible_profiles AS (
-        SELECT person."identityId", person."isHidden", person.name
-        FROM person
-        WHERE person."ownerId" = ${userId}
-          AND person."identityId" IS NOT NULL
-          AND EXISTS (SELECT 1 FROM accessible_faces WHERE accessible_faces."identityId" = person."identityId")
-        UNION ALL
-        SELECT
-          shared_space_person."identityId",
-          shared_space_person."isHidden",
-          COALESCE(NULLIF(shared_space_person_alias.alias, ''), shared_space_person.name, '') AS name
-        FROM shared_space_person
-        INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_person."spaceId"
-        LEFT JOIN shared_space_person_alias
-          ON shared_space_person_alias."personId" = shared_space_person.id
-          AND shared_space_person_alias."userId" = ${userId}
-        WHERE shared_space_person."identityId" IS NOT NULL
-          AND EXISTS (
-            SELECT 1
-            FROM shared_space_person_face
-            INNER JOIN asset_face AS profile_face
-              ON profile_face.id = shared_space_person_face."assetFaceId"
-            WHERE shared_space_person_face."personId" = shared_space_person.id
-              AND profile_face."deletedAt" IS NULL
-              AND profile_face."isVisible" = true
-          )
-          AND EXISTS (
-            SELECT 1 FROM accessible_faces WHERE accessible_faces."identityId" = shared_space_person."identityId"
-          )
-      ),
-      identity_visibility AS (
-        SELECT
-          "identityId",
-          bool_or("isHidden" = false) AS "hasVisibleProfile",
-          bool_or(NULLIF(name, '') IS NOT NULL) AS "hasNamedProfile"
-        FROM accessible_profiles
-        GROUP BY "identityId"
-      )
-      SELECT
-        COUNT(*) AS total,
-        COUNT(*) FILTER (WHERE "hasVisibleProfile" = false) AS hidden
-      FROM identity_visibility
-      INNER JOIN identity_counts ON identity_counts."identityId" = identity_visibility."identityId"
-      WHERE identity_visibility."hasNamedProfile" = true
-        OR identity_counts."visibleAssetCount" >= ${minimumFaceCount}
-    `.execute(this.db);
-
-    const row = result.rows[0];
-    return { total: Number(row?.total ?? 0), hidden: Number(row?.hidden ?? 0) };
-  }
-
   @GenerateSql({
-    params: [{ userId: DummyValue.UUID, identityIds: [DummyValue.UUID], withHidden: true }],
+    // As above: documents the shared-space form, which is also the uncounted path (the counted
+    // path emits no accessibility predicate at all).
+    params: [{ userId: DummyValue.UUID, identityIds: [DummyValue.UUID], withHidden: true, hasTimelineSpaces: true }],
   })
   async hydrateAccessiblePeople(input: {
     userId: string;
     identityIds: string[];
     withHidden: boolean;
+    /**
+     * Per-identity `COUNT(DISTINCT assetId)` the caller has already computed, keyed by identity id.
+     *
+     * `getAccessiblePeopleIdentityPage` produces exactly this number (its `visibleAssetCount`) for
+     * every identity it returns, so the two callers that page first — {@link getAccessiblePeople}
+     * and {@link searchAccessiblePeople} — can hand it over instead of making this query rebuild
+     * the `accessible_faces` CTE to recompute the identical value. On a large library that
+     * recomputation dominated `GET /api/people`.
+     *
+     * Supplying it must not change the result. Two invariants make that hold, and both are pinned
+     * by tests: the counts are the same aggregate over the same CTE definition, and an identity
+     * only reaches this method because the page query already established it is accessible — which
+     * is what the dropped `EXISTS (accessible_faces)` guard was re-checking. Identities absent from
+     * the map (or counted zero, which the page query never emits) are dropped, matching the
+     * uncounted path where they fall out of `ranked_profiles`.
+     */
+    assetCounts?: ReadonlyMap<string, number>;
+    /** Resolved by the caller when it runs several of these queries, to avoid repeating the lookup. */
+    hasTimelineSpaces?: boolean;
   }): Promise<PersonResponseDto[]> {
-    if (input.identityIds.length === 0) {
+    const countedIdentities = input.assetCounts
+      ? input.identityIds
+          .map((identityId) => [identityId, input.assetCounts?.get(identityId)] as const)
+          .filter((entry): entry is readonly [string, number] => typeof entry[1] === 'number' && entry[1] > 0)
+      : undefined;
+
+    const requestedIds = countedIdentities ? countedIdentities.map(([identityId]) => identityId) : input.identityIds;
+    if (requestedIds.length === 0) {
       return [];
     }
 
-    const identityIds = sql`array[${sql.join(input.identityIds)}]::uuid[]`;
-    const result = await sql<HydratedAccessiblePersonRow>`
-      WITH requested_identities AS (
+    const identityIds = sql`array[${sql.join(requestedIds)}]::uuid[]`;
+
+    // Only the uncounted path emits an accessibility predicate, so skip the lookup entirely on the
+    // hot path rather than paying a round-trip for a value that is never interpolated.
+    const hasTimelineSpaces = countedIdentities
+      ? false
+      : (input.hasTimelineSpaces ?? (await this.hasTimelineSpaces(input.userId)));
+
+    // With counts supplied, carry them alongside the ids through a parallel unnest so the whole
+    // accessible_faces/asset_counts pair can be dropped from the query.
+    const requestedIdentities = countedIdentities
+      ? sql`
+        SELECT *
+        FROM unnest(
+          ${identityIds},
+          array[${sql.join(countedIdentities.map(([, numberOfAssets]) => numberOfAssets))}]::bigint[]
+        ) WITH ORDINALITY AS requested("identityId", "numberOfAssets", ord)
+      `
+      : sql`
         SELECT *
         FROM unnest(${identityIds}) WITH ORDINALITY AS requested("identityId", ord)
-      ),
-      timeline_spaces AS (
-        SELECT "spaceId"
-        FROM shared_space_member
-        WHERE "userId" = ${input.userId}
-          AND "showInTimeline" = true
-      ),
-      accessible_faces AS (
+      `;
+
+    const accessibleFacesCte = countedIdentities
+      ? sql``
+      : sql`accessible_faces AS (
         SELECT
           face_identity_face."identityId",
           asset_face."assetId"
@@ -1911,24 +1946,7 @@ export class FaceIdentityRepository {
           AND asset."isOffline" = false
           AND asset.visibility = ${AssetVisibility.Timeline}
           AND (
-            asset."ownerId" = ${input.userId}
-            OR EXISTS (
-              SELECT 1
-              FROM shared_space_asset
-              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_asset."spaceId"
-              WHERE shared_space_asset."assetId" = asset.id
-            )
-            OR EXISTS (
-              SELECT 1
-              FROM shared_space_library
-              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_library."spaceId"
-              WHERE shared_space_library."libraryId" = asset."libraryId"
-            )
-            OR ${spaceAlbumAssetExistsSql({
-              assetIdColumn: sql`asset.id`,
-              spaceScopeJoin: sql`INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_album."spaceId"`,
-              requireShowInTimeline: true,
-            })}
+            ${accessibleTimelineAssetPredicate({ userId: input.userId, hasTimelineSpaces })}
           )
       ),
       asset_counts AS (
@@ -1937,7 +1955,29 @@ export class FaceIdentityRepository {
           COUNT(DISTINCT "assetId") AS "numberOfAssets"
         FROM accessible_faces
         GROUP BY "identityId"
+      ),`;
+
+    // Accessibility was already established by the page query for every identity we were handed,
+    // so the counted path drops the re-check that the accessible_faces CTE existed to answer.
+    const accessibilityFilter = countedIdentities
+      ? sql``
+      : sql`WHERE EXISTS (SELECT 1 FROM accessible_faces WHERE accessible_faces."identityId" = profiles."identityId")`;
+    const numberOfAssetsColumn = countedIdentities
+      ? sql`requested_identities."numberOfAssets"`
+      : sql`asset_counts."numberOfAssets"`;
+    const assetCountsJoin = countedIdentities
+      ? sql``
+      : sql`LEFT JOIN asset_counts ON asset_counts."identityId" = requested_identities."identityId"`;
+
+    const result = await sql<HydratedAccessiblePersonRow>`
+      WITH requested_identities AS (${requestedIdentities}),
+      timeline_spaces AS (
+        SELECT "spaceId"
+        FROM shared_space_member
+        WHERE "userId" = ${input.userId}
+          AND "showInTimeline" = true
       ),
+      ${accessibleFacesCte}
       profiles AS (
         SELECT
           'user-person'::text AS "profileType",
@@ -2034,7 +2074,7 @@ export class FaceIdentityRepository {
               profiles."profileId"
           ) AS birthdate_rn
         FROM profiles
-        WHERE EXISTS (SELECT 1 FROM accessible_faces WHERE accessible_faces."identityId" = profiles."identityId")
+        ${accessibilityFilter}
       )
       SELECT
         primary_profiles."profileType",
@@ -2049,7 +2089,7 @@ export class FaceIdentityRepository {
         primary_profiles."updatedAt",
         primary_profiles.type,
         primary_profiles.species,
-        asset_counts."numberOfAssets"
+        ${numberOfAssetsColumn} AS "numberOfAssets"
       FROM requested_identities
       INNER JOIN ranked_profiles AS primary_profiles
         ON primary_profiles."identityId" = requested_identities."identityId"
@@ -2060,7 +2100,7 @@ export class FaceIdentityRepository {
       INNER JOIN ranked_profiles AS birthdate_profiles
         ON birthdate_profiles."identityId" = requested_identities."identityId"
         AND birthdate_profiles.birthdate_rn = 1
-      LEFT JOIN asset_counts ON asset_counts."identityId" = requested_identities."identityId"
+      ${assetCountsJoin}
       ORDER BY requested_identities.ord
     `.execute(this.db);
 
