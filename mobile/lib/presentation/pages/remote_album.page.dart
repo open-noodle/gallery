@@ -201,17 +201,13 @@ class _RemoteAlbumPageState extends ConsumerState<RemoteAlbumPage> {
       if (context.mounted) {
         ImmichToast.show(
           context: context,
-          msg: 'album_linked_to_space'.t(context: context, args: {'space': space.name}),
+          msg: context.t.album_linked_to_space(space: space.name),
           toastType: ToastType.success,
         );
       }
     } catch (_) {
       if (context.mounted) {
-        ImmichToast.show(
-          context: context,
-          msg: 'spaces_linked_albums_error_link'.t(context: context),
-          toastType: ToastType.error,
-        );
+        ImmichToast.show(context: context, msg: context.t.spaces_linked_albums_error_link, toastType: ToastType.error);
       }
     }
   }

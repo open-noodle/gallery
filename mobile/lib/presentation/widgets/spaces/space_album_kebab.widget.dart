@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:immich_mobile/extensions/translate_extensions.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 
 /// Space-role-gated kebab menu for the Space Album detail page.
 ///
@@ -54,22 +54,20 @@ class SpaceAlbumKebab extends StatelessWidget {
         PopupMenuItem<_KebabAction>(
           key: const Key('space-album-kebab-add'),
           value: _KebabAction.add,
-          child: Text('add_photos'.t(context: context)),
+          child: Text(context.t.add_photos),
         ),
         PopupMenuItem<_KebabAction>(
           key: const Key('space-album-kebab-toggle'),
           value: _KebabAction.toggle,
           enabled: toggleEnabled,
           child: Text(
-            showInTimeline
-                ? 'spaces_hide_from_timeline'.t(context: context)
-                : 'spaces_linked_albums_show_in_timeline'.t(context: context),
+            showInTimeline ? context.t.spaces_hide_from_timeline : context.t.spaces_linked_albums_show_in_timeline,
           ),
         ),
         PopupMenuItem<_KebabAction>(
           key: const Key('space-album-kebab-unlink'),
           value: _KebabAction.unlink,
-          child: Text('space_album_unlink_from_space'.t(context: context)),
+          child: Text(context.t.space_album_unlink_from_space),
         ),
       ],
     );
