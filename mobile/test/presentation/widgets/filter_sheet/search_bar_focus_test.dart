@@ -15,9 +15,11 @@ void main() {
     container.read(photosFilterSheetProvider.notifier).state = FilterSheetSnap.browse;
 
     await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: const MaterialApp(home: Material(child: FilterSheetSearchBar())),
+      localizedForTest(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: Material(child: FilterSheetSearchBar())),
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -51,9 +53,11 @@ void main() {
     container.read(photosFilterSearchFocusRequestProvider.notifier).state = 1;
 
     await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: const MaterialApp(home: Material(child: FilterSheetSearchBar())),
+      localizedForTest(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: Material(child: FilterSheetSearchBar())),
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -80,15 +84,17 @@ void main() {
     addTearDown(container.dispose);
 
     await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: const MaterialApp(home: Material(child: FilterSheetSearchBar())),
+      localizedForTest(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: Material(child: FilterSheetSearchBar())),
+        ),
       ),
     );
     await tester.pumpAndSettle();
 
     // Unmount the widget while keeping the container alive.
-    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpWidget(localizedForTest(const SizedBox.shrink()));
     await tester.pumpAndSettle();
 
     // Should not throw.
@@ -106,9 +112,11 @@ void main() {
     container.read(photosFilterSearchFocusRequestProvider.notifier).state = 1;
 
     await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: const MaterialApp(home: Material(child: FilterSheetSearchBar())),
+      localizedForTest(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: Material(child: FilterSheetSearchBar())),
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -120,11 +128,13 @@ void main() {
     expect(tester.widget<TextField>(find.byType(TextField)).focusNode!.hasFocus, isFalse);
 
     // Remount a fresh instance (same container = same providers), counter unchanged.
-    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpWidget(localizedForTest(const SizedBox.shrink()));
     await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: const MaterialApp(home: Material(child: FilterSheetSearchBar())),
+      localizedForTest(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: Material(child: FilterSheetSearchBar())),
+        ),
       ),
     );
     await tester.pumpAndSettle();

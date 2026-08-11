@@ -20,10 +20,10 @@ String getMemoryTitle(BuildContext context, Memory memory) {
   final year = memory.data.year;
   if (year != null) {
     final yearsAgo = DateTime.now().year - year;
-    return 'years_ago'.t(context: context, args: {'years': yearsAgo.toString()});
+    return context.t.years_ago(years: yearsAgo);
   }
 
-  return 'memory'.t(context: context);
+  return context.t.memory;
 }
 
 class MemoryLane extends ConsumerWidget {
