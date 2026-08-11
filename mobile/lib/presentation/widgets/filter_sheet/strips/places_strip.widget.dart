@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'package:auto_route/auto_route.dart';
-import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/models/search/search_filter.model.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/strips/strip_scaffold.widget.dart';
 import 'package:immich_mobile/providers/photos_filter/filter_debounce.provider.dart';
@@ -79,7 +79,7 @@ class _MorePlaceTile extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'all'.tr(),
+                  context.t.all,
                   textAlign: TextAlign.center,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
