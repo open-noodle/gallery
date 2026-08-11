@@ -1,9 +1,9 @@
 import 'dart:async';
-import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/collapsible_section.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/filter_section_id.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
@@ -25,19 +25,19 @@ class MediaTypeSection extends ConsumerWidget {
           segments: [
             ButtonSegment(
               value: AssetType.other,
-              label: Text('filter_sheet_deep_media_any'.tr(), key: const Key('media-segment-all')),
+              label: Text(context.t.filter_sheet_deep_media_any, key: const Key('media-segment-all')),
             ),
             ButtonSegment(
               value: AssetType.image,
-              label: Text('filter_sheet_media_photos'.tr(), key: const Key('media-segment-image')),
+              label: Text(context.t.filter_sheet_media_photos, key: const Key('media-segment-image')),
             ),
             ButtonSegment(
               value: AssetType.video,
-              label: Text('filter_sheet_media_videos'.tr(), key: const Key('media-segment-video')),
+              label: Text(context.t.filter_sheet_media_videos, key: const Key('media-segment-video')),
             ),
             ButtonSegment(
               value: AssetType.audio,
-              label: Text('filter_sheet_media_audio'.tr(), key: const Key('media-segment-audio')),
+              label: Text(context.t.filter_sheet_media_audio, key: const Key('media-segment-audio')),
             ),
           ],
           selected: {current},
