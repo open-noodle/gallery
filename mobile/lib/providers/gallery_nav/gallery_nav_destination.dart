@@ -36,6 +36,18 @@ class GalleryNavDestination {
           activeIcon: Icons.photo_album,
           routeBuilder: _albumsRoute,
         );
+      case GalleryTabEnum.spaces:
+        return const GalleryNavDestination._(
+          tab: GalleryTabEnum.spaces,
+          // The existing `spaces` key, already translated everywhere — not a
+          // new `nav_spaces`, which would ship English-only.
+          labelKey: 'spaces',
+          // Same pair the legacy tab shell uses for its own Spaces tab
+          // (tab_shell.page.dart:41-42).
+          idleIcon: Icons.workspaces_outlined,
+          activeIcon: Icons.workspaces,
+          routeBuilder: _spacesRoute,
+        );
       case GalleryTabEnum.library:
         return const GalleryNavDestination._(
           tab: GalleryTabEnum.library,
@@ -51,3 +63,4 @@ class GalleryNavDestination {
 MainTimelineRoute _photosRoute() => const MainTimelineRoute();
 DriftAlbumsRoute _albumsRoute() => const DriftAlbumsRoute();
 DriftLibraryRoute _libraryRoute() => const DriftLibraryRoute();
+SpacesRoute _spacesRoute() => const SpacesRoute();

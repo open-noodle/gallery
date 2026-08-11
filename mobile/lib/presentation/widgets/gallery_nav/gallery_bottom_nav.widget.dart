@@ -112,7 +112,9 @@ class _GalleryBottomNavState extends ConsumerState<GalleryBottomNav> {
                 // pill takes what is left and shrinks its tabs to fit.
                 Flexible(
                   child: GalleryNavPill(
-                    activeTab: GalleryTabEnum.values[widget.tabsRouter.activeIndex],
+                    // Pinned to Albums until the nav setting lands; the provider
+                    // replaces this literal.
+                    activeTab: galleryNavSlots(showSpaces: false)[widget.tabsRouter.activeIndex],
                     disabledTabs: isReadonly ? const {GalleryTabEnum.albums, GalleryTabEnum.library} : const {},
                     onTabTap: _onTabTap,
                   ),
@@ -145,6 +147,12 @@ class _GalleryBottomNavState extends ConsumerState<GalleryBottomNav> {
       case GalleryTabEnum.albums:
         unawaited(ref.read(remoteAlbumProvider.notifier).refresh());
         break;
+      case GalleryTabEnum.spaces:
+        // Exhaustiveness only — Spaces cannot occupy a nav slot until the
+        // setting and slots provider land. The real side effect (invalidating
+        // sharedSpacesProvider, mirroring the albums case above) arrives with
+        // the wiring that makes this reachable.
+        break;
       case GalleryTabEnum.library:
         ref.invalidate(localAlbumProvider);
         ref.invalidate(driftGetAllPeopleProvider);
@@ -162,13 +170,17 @@ class _GalleryBottomNavState extends ConsumerState<GalleryBottomNav> {
       key: const Key('gallery-bottom-nav-rail'),
       selectedIndex: widget.tabsRouter.activeIndex,
       onDestinationSelected: (i) {
-        final tab = GalleryTabEnum.values[i];
+        // Pinned to Albums until the nav setting lands; the provider replaces
+        // this literal.
+        final tab = galleryNavSlots(showSpaces: false)[i];
         if (isReadonly && tab != GalleryTabEnum.photos) return;
         _onTabTap(tab);
       },
       labelType: NavigationRailLabelType.all,
       destinations: [
-        for (final tab in GalleryTabEnum.values)
+        // Pinned to Albums until the nav setting lands; the provider replaces
+        // this literal.
+        for (final tab in galleryNavSlots(showSpaces: false))
           NavigationRailDestination(
             icon: Icon(GalleryNavDestination.forTab(tab).idleIcon),
             selectedIcon: Icon(GalleryNavDestination.forTab(tab).activeIcon),

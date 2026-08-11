@@ -411,6 +411,6 @@ void main() {
     final rail = tester.widget<NavigationRail>(find.byKey(const Key('gallery-bottom-nav-rail')));
     expect(rail.destinations[GalleryTabEnum.photos.index].disabled, isFalse);
     expect(rail.destinations[GalleryTabEnum.albums.index].disabled, isTrue);
-    expect(rail.destinations[GalleryTabEnum.library.index].disabled, isTrue);
+    expect(rail.destinations[galleryNavSlots(showSpaces: false).indexOf(GalleryTabEnum.library)].disabled, isTrue);
   });
 }

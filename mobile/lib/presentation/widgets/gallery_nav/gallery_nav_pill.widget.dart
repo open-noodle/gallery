@@ -34,6 +34,10 @@ class _GalleryNavPillState extends State<GalleryNavPill> {
 
   static const double _edgeInset = 6.0;
 
+  /// Pinned to Albums until the nav setting lands; a later task replaces this
+  /// with the slots the widget is given.
+  List<GalleryTabEnum> get _slots => galleryNavSlots(showSpaces: false);
+
   @override
   void initState() {
     super.initState();
@@ -52,8 +56,8 @@ class _GalleryNavPillState extends State<GalleryNavPill> {
     if (pillBox == null) return;
 
     final rects = <GalleryTabEnum, Rect>{};
-    for (final entry in _keys.entries) {
-      final ctx = entry.value.currentContext;
+    for (final tab in _slots) {
+      final ctx = _keys[tab]?.currentContext;
       if (ctx == null) continue;
       final box = ctx.findRenderObject() as RenderBox?;
       if (box == null) continue;
@@ -61,9 +65,9 @@ class _GalleryNavPillState extends State<GalleryNavPill> {
       // segments sit inside a `FittedBox` that may scale them down (#909), so
       // their raw `size` is the pre-scale size and would leave the underlay
       // wider than the segment it highlights.
-      rects[entry.key] = MatrixUtils.transformRect(box.getTransformTo(pillBox), Offset.zero & box.size);
+      rects[tab] = MatrixUtils.transformRect(box.getTransformTo(pillBox), Offset.zero & box.size);
     }
-    if (rects.length == _keys.length && !_rectsEqual(rects, _segmentRects)) {
+    if (rects.length == _slots.length && !_rectsEqual(rects, _segmentRects)) {
       setState(() => _segmentRects = rects);
     }
   }
@@ -165,7 +169,7 @@ class _GalleryNavPillState extends State<GalleryNavPill> {
                     // spreading them edge-to-edge; the pill sizes to this Row.
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      for (final tab in GalleryTabEnum.values)
+                      for (final tab in _slots)
                         KeyedSubtree(
                           key: _keys[tab],
                           child: Opacity(

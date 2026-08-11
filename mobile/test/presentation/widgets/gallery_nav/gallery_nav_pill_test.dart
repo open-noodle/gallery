@@ -145,7 +145,7 @@ void main() {
     await tester.pumpAndSettle();
 
     final pill = tester.getRect(find.byType(GalleryNavPill));
-    for (final tab in GalleryTabEnum.values) {
+    for (final tab in galleryNavSlots(showSpaces: false)) {
       final segment = tester.getRect(find.byKey(Key('gallery-nav-segment-${tab.name}')));
       expect(segment.left, greaterThanOrEqualTo(pill.left - 0.5), reason: '${tab.name} overflows the pill on the left');
       expect(
@@ -161,12 +161,12 @@ void main() {
     await tester.pumpConsumerWidget(constrained(300, onTap: tapped.add));
     await tester.pumpAndSettle();
 
-    for (final tab in GalleryTabEnum.values) {
+    for (final tab in galleryNavSlots(showSpaces: false)) {
       await tester.tap(find.byKey(Key('gallery-nav-segment-${tab.name}')));
       await tester.pumpAndSettle();
     }
 
-    expect(tapped, GalleryTabEnum.values);
+    expect(tapped, galleryNavSlots(showSpaces: false));
   });
 
   testWidgets('constrained width: underlay still lines up with the active segment (#909)', (tester) async {
