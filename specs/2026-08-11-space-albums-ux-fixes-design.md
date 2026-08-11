@@ -114,8 +114,15 @@ from a fresh space on mobile — the page holding those actions is unreachable.
 
 **Change.**
 
-1. The whole header row becomes one tap target: `_HeaderRow`'s `Row` is wrapped in an `InkWell` with the
-   existing `onSeeAll` callback, and a `chevron_right` icon follows the "See all" text.
+1. The whole header row becomes one tap target: `_HeaderRow`'s `Row` is wrapped in an `InkWell` carrying the
+   existing `onSeeAll` callback.
+
+   No Material chevron is added. `space_albums_see_all` is already `"See all ▸"` — the glyph is in the
+   translated string, and every locale's translation carries it — so an `Icons.chevron_right` beside it would
+   render two chevrons everywhere. Changing the English value to drop the glyph would leave every other locale
+   double-chevroned until re-translated, and a new key would ship English-only. The affordance the report was
+   missing is the tap target, not the arrow.
+
 2. `showSeeAll` becomes unconditional. Case 3 of `_buildShelf` (viewer with no albums) already returns
    `SizedBox.shrink` before this point, so "whenever the shelf renders" is the correct condition — an editor
    with an empty space gets the entry, a viewer with an empty space still sees nothing, which is right because
@@ -133,9 +140,9 @@ Scenario: tapping anywhere on the header row opens the albums page
   When the header row is tapped at the "Albums (2)" title
   Then onSeeAll is called exactly once
 
-Scenario: the chevron affordance is present
-  Given the shelf rendered with two albums
-  Then a chevron_right icon is rendered in the header row
+Scenario: the tap target spans the full header row
+  Given the shelf rendered with two albums in a 400pt-wide viewport
+  Then the header row's InkWell is as wide as the shelf
 
 Scenario: an editor with no albums can still reach the albums page
   Given the shelf rendered with zero albums and canEdit true
@@ -153,11 +160,17 @@ Scenario: a null onSeeAll leaves the row inert
   Then nothing is called and no exception is thrown
 ```
 
-**Edge cases.** `kSpaceAlbumsShelfHeight` (196.0) is consumed by `SpaceTopSliver._topSliverHeight` and must not
-change — the header row keeps its 32px allocation, since a chevron sits inside the existing line box. If the
-row's intrinsic height does grow, the constant and `space_detail_top_sliver_test.dart` move together, and the
-timeline's reserved sliver height is re-verified. The empty-editor case previously rendered the header without
-a "See all"; now it renders with one, so the shelf's own height in that state is unchanged.
+**Edge cases.** `kSpaceAlbumsShelfHeight` (196.0) is consumed by `SpaceTopSliver._topSliverHeight`
+(`space_top_sliver.widget.dart:87,89`) and does not change. The header keeps its 32px allocation: the `InkWell`
+wraps the existing `Row` without adding height.
+
+That caps the target at roughly 32dp tall rather than the 48dp Material minimum — a deliberate trade. Reaching
+48 would mean growing the shelf to 212 and moving `kSpaceAlbumsShelfHeight`, `SpaceTopSliver`, and
+`space_detail_top_sliver_test.dart` in lockstep, for 16 vertical pixels on a target whose width goes from ~50pt
+to the full shelf. The width was the defect; take that now and leave the height contract alone.
+
+`SpaceTopSliver`'s height condition (`(albums.isNotEmpty || canEdit)`) already matches the shelf's own render
+condition, so making "See all" unconditional does not desynchronise the reserved height from what is drawn.
 
 ### F3 — Folder drag image on web
 
