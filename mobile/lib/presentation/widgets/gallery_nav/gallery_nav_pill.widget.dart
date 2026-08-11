@@ -12,7 +12,17 @@ class GalleryNavPill extends StatefulWidget {
   /// readonly mode). Defaults to empty.
   final Set<GalleryTabEnum> disabledTabs;
 
-  const GalleryNavPill({super.key, required this.activeTab, required this.onTabTap, this.disabledTabs = const {}});
+  /// The slots to render, in order — see `galleryNavSlots`. Not
+  /// `GalleryTabEnum.values`: that has four entries for three slots.
+  final List<GalleryTabEnum> slots;
+
+  const GalleryNavPill({
+    super.key,
+    required this.activeTab,
+    required this.onTabTap,
+    required this.slots,
+    this.disabledTabs = const {},
+  });
 
   @override
   State<GalleryNavPill> createState() => _GalleryNavPillState();
@@ -34,10 +44,6 @@ class _GalleryNavPillState extends State<GalleryNavPill> {
 
   static const double _edgeInset = 6.0;
 
-  /// Pinned to Albums until the nav setting lands; a later task replaces this
-  /// with the slots the widget is given.
-  List<GalleryTabEnum> get _slots => galleryNavSlots(showSpaces: false);
-
   @override
   void initState() {
     super.initState();
@@ -55,8 +61,14 @@ class _GalleryNavPillState extends State<GalleryNavPill> {
     final pillBox = _pillKey.currentContext?.findRenderObject() as RenderBox?;
     if (pillBox == null) return;
 
+    // Iterate the RENDERED slots, not every enum value: there are four values
+    // for three slots, so measuring `_keys` and comparing against its length
+    // would gate on a count that can never be reached. Driving off
+    // `widget.slots` also drops any rect measured under a previous
+    // configuration, so a flip cannot leave the underlay on a segment that is
+    // no longer on screen.
     final rects = <GalleryTabEnum, Rect>{};
-    for (final tab in _slots) {
+    for (final tab in widget.slots) {
       final ctx = _keys[tab]?.currentContext;
       if (ctx == null) continue;
       final box = ctx.findRenderObject() as RenderBox?;
@@ -67,7 +79,7 @@ class _GalleryNavPillState extends State<GalleryNavPill> {
       // wider than the segment it highlights.
       rects[tab] = MatrixUtils.transformRect(box.getTransformTo(pillBox), Offset.zero & box.size);
     }
-    if (rects.length == _slots.length && !_rectsEqual(rects, _segmentRects)) {
+    if (rects.length == widget.slots.length && !_rectsEqual(rects, _segmentRects)) {
       setState(() => _segmentRects = rects);
     }
   }
@@ -169,7 +181,7 @@ class _GalleryNavPillState extends State<GalleryNavPill> {
                     // spreading them edge-to-edge; the pill sizes to this Row.
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      for (final tab in _slots)
+                      for (final tab in widget.slots)
                         KeyedSubtree(
                           key: _keys[tab],
                           child: Opacity(

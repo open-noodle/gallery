@@ -1,4 +1,5 @@
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
 
 /// Fork-only tab identity. Distinct from upstream's `TabEnum`
 /// (`home/search/spaces/library`) — the bottom nav redesign keeps the
@@ -25,6 +26,15 @@ List<GalleryTabEnum> galleryNavSlots({required bool showSpaces}) => [
   showSpaces ? GalleryTabEnum.spaces : GalleryTabEnum.albums,
   GalleryTabEnum.library,
 ];
+
+/// The live nav slots, derived from the user's `navShowSpaces` preference.
+///
+/// `autoDispose` is required, not stylistic: `appConfigProvider` is itself
+/// `autoDispose`, and a non-autoDispose provider watching one throws.
+final galleryNavSlotsProvider = Provider.autoDispose<List<GalleryTabEnum>>((ref) {
+  final showSpaces = ref.watch(appConfigProvider.select((config) => config.nav.showSpaces));
+  return galleryNavSlots(showSpaces: showSpaces);
+});
 
 /// The currently-active tab in the Gallery bottom-nav shell.
 /// Synced automatically from `tabsRouter.activeIndex` by a listener registered

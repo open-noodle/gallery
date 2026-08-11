@@ -15,15 +15,20 @@ class _HarnessState extends State<_Harness> {
   GalleryTabEnum active = GalleryTabEnum.photos;
   void switchTo(GalleryTabEnum t) => setState(() => active = t);
   @override
-  Widget build(BuildContext context) => GalleryNavPill(activeTab: active, onTabTap: (t) => setState(() => active = t));
+  Widget build(BuildContext context) =>
+      GalleryNavPill(slots: _slots, activeTab: active, onTabTap: (t) => setState(() => active = t));
 }
+
+/// The pill no longer derives its own slots — its parent passes them. These
+/// tests pin the Albums configuration, which is what their assertions read.
+final _slots = galleryNavSlots(showSpaces: false);
 
 void main() {
   testWidgets('renders 3 segments in canonical order', (tester) async {
     await tester.pumpConsumerWidget(
       SizedBox(
         width: 360,
-        child: GalleryNavPill(activeTab: GalleryTabEnum.photos, onTabTap: (_) {}),
+        child: GalleryNavPill(slots: _slots, activeTab: GalleryTabEnum.photos, onTabTap: (_) {}),
       ),
     );
     await tester.pumpAndSettle();
@@ -37,7 +42,7 @@ void main() {
     await tester.pumpConsumerWidget(
       SizedBox(
         width: 360,
-        child: GalleryNavPill(activeTab: GalleryTabEnum.photos, onTabTap: (t) => tapped = t),
+        child: GalleryNavPill(slots: _slots, activeTab: GalleryTabEnum.photos, onTabTap: (t) => tapped = t),
       ),
     );
     await tester.pumpAndSettle();
@@ -49,7 +54,7 @@ void main() {
     await tester.pumpConsumerWidget(
       SizedBox(
         width: 360,
-        child: GalleryNavPill(activeTab: GalleryTabEnum.albums, onTabTap: (_) {}),
+        child: GalleryNavPill(slots: _slots, activeTab: GalleryTabEnum.albums, onTabTap: (_) {}),
       ),
     );
     await tester.pumpAndSettle();
@@ -62,7 +67,7 @@ void main() {
     await tester.pumpConsumerWidget(
       SizedBox(
         width: 360,
-        child: GalleryNavPill(activeTab: GalleryTabEnum.photos, onTabTap: (_) {}),
+        child: GalleryNavPill(slots: _slots, activeTab: GalleryTabEnum.photos, onTabTap: (_) {}),
       ),
     );
     await tester.pumpAndSettle();
@@ -79,7 +84,7 @@ void main() {
     await tester.pumpConsumerWidget(
       SizedBox(
         width: 360,
-        child: GalleryNavPill(activeTab: GalleryTabEnum.photos, onTabTap: (_) {}),
+        child: GalleryNavPill(slots: _slots, activeTab: GalleryTabEnum.photos, onTabTap: (_) {}),
       ),
     );
     await tester.pumpAndSettle();
@@ -135,7 +140,7 @@ void main() {
     return Center(
       child: SizedBox(
         width: width,
-        child: GalleryNavPill(activeTab: active, onTabTap: onTap ?? (_) {}),
+        child: GalleryNavPill(slots: _slots, activeTab: active, onTabTap: onTap ?? (_) {}),
       ),
     );
   }
@@ -185,6 +190,7 @@ void main() {
       SizedBox(
         width: 360,
         child: GalleryNavPill(
+          slots: _slots,
           activeTab: GalleryTabEnum.photos,
           disabledTabs: const {GalleryTabEnum.albums, GalleryTabEnum.library},
           onTabTap: (t) => tapped = t.index,
@@ -216,7 +222,7 @@ void main() {
     await tester.pumpConsumerWidget(
       SizedBox(
         width: 360,
-        child: GalleryNavPill(activeTab: GalleryTabEnum.photos, onTabTap: (_) {}),
+        child: GalleryNavPill(slots: _slots, activeTab: GalleryTabEnum.photos, onTabTap: (_) {}),
       ),
     );
     await tester.pumpAndSettle();
@@ -231,7 +237,7 @@ void main() {
     await tester.pumpConsumerWidget(
       SizedBox(
         width: 360,
-        child: GalleryNavPill(activeTab: GalleryTabEnum.photos, onTabTap: (_) {}),
+        child: GalleryNavPill(slots: _slots, activeTab: GalleryTabEnum.photos, onTabTap: (_) {}),
       ),
     );
     await tester.pumpAndSettle();

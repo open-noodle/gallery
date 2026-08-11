@@ -2,6 +2,8 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/domain/models/config/app_config.dart';
+import 'package:immich_mobile/domain/models/config/nav_config.dart';
 import 'package:immich_mobile/domain/models/events.model.dart';
 import 'package:immich_mobile/domain/utils/event_stream.dart';
 import 'package:immich_mobile/presentation/widgets/gallery_nav/gallery_bottom_nav.widget.dart';
@@ -13,6 +15,7 @@ import 'package:immich_mobile/providers/haptic_feedback.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/readonly_mode.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/remote_album.provider.dart';
+import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/filter_sheet.provider.dart';
 
 import '../../../test_helpers/fake_tabs_router.dart';
@@ -63,11 +66,28 @@ class _FakeRemoteAlbumNotifier extends RemoteAlbumNotifier {
 /// Tests that need landscape or other viewInsets pass their own `mq`.
 const _portraitMq = MediaQueryData(size: Size(400, 900));
 
+/// Pins the nav configuration for a test. The nav now derives its slots from
+/// `appConfigProvider`, which without an override reaches for the
+/// uninitialized `SettingsRepository.instance` and throws — so every test in
+/// this file needs one. `overrideWithValue` on a directly-constructed
+/// `AppConfig` is the pattern the rest of the repo uses (e.g.
+/// collection_picker_test.dart).
+///
+/// Top-level rather than a local inside `main` so `_wrap` can reuse it;
+/// `no_leading_underscores_for_local_identifiers` only covers locals.
+List<Override> _navOverrides({required bool showSpaces}) => [
+  appConfigProvider.overrideWithValue(AppConfig(nav: NavConfig(showSpaces: showSpaces))),
+];
+
 Widget _wrap(Widget child, {List<Override> overrides = const [], MediaQueryData? mq}) {
   return ProviderScope(
     overrides: [
       readonlyModeProvider.overrideWith(() => _FakeReadonly(false)),
       hapticFeedbackProvider.overrideWith((ref) => _NoOpHaptic(ref)),
+      // Albums in slot 1 by default: the assertions predating the Spaces slot
+      // are written against that configuration. A caller-supplied override
+      // comes later in the list and wins.
+      ..._navOverrides(showSpaces: false),
       ...overrides,
     ],
     child: MaterialApp(
@@ -110,6 +130,7 @@ void main() {
       overrides: [
         readonlyModeProvider.overrideWith(() => _FakeReadonly(false)),
         hapticFeedbackProvider.overrideWith((ref) => _NoOpHaptic(ref)),
+        ..._navOverrides(showSpaces: false),
       ],
     );
     addTearDown(container.dispose);
@@ -202,6 +223,7 @@ void main() {
       overrides: [
         readonlyModeProvider.overrideWith(() => _FakeReadonly(false)),
         hapticFeedbackProvider.overrideWith((ref) => _NoOpHaptic(ref)),
+        ..._navOverrides(showSpaces: false),
       ],
     );
     addTearDown(container.dispose);
@@ -234,6 +256,7 @@ void main() {
       overrides: [
         readonlyModeProvider.overrideWith(() => _FakeReadonly(false)),
         hapticFeedbackProvider.overrideWith((ref) => _NoOpHaptic(ref)),
+        ..._navOverrides(showSpaces: false),
       ],
     );
     addTearDown(container.dispose);
@@ -326,6 +349,7 @@ void main() {
       overrides: [
         readonlyModeProvider.overrideWith(() => _FakeReadonly(false)),
         hapticFeedbackProvider.overrideWith((ref) => _NoOpHaptic(ref)),
+        ..._navOverrides(showSpaces: false),
       ],
     );
     addTearDown(container.dispose);
@@ -433,5 +457,135 @@ void main() {
     expect(rail.destinations[GalleryTabEnum.photos.index].disabled, isFalse);
     expect(rail.destinations[GalleryTabEnum.albums.index].disabled, isTrue);
     expect(rail.destinations[galleryNavSlots(showSpaces: false).indexOf(GalleryTabEnum.library)].disabled, isTrue);
+  });
+
+  testWidgets('with Spaces on, the pill renders a Spaces segment and no Albums segment', (tester) async {
+    final router = FakeTabsRouter();
+    await tester.pumpWidget(_wrap(GalleryBottomNav(tabsRouter: router), overrides: _navOverrides(showSpaces: true)));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('gallery-nav-segment-spaces')), findsOneWidget);
+    expect(find.byKey(const Key('gallery-nav-segment-albums')), findsNothing);
+  });
+
+  testWidgets('with Spaces off, the pill renders an Albums segment and no Spaces segment', (tester) async {
+    final router = FakeTabsRouter();
+    await tester.pumpWidget(_wrap(GalleryBottomNav(tabsRouter: router), overrides: _navOverrides(showSpaces: false)));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('gallery-nav-segment-albums')), findsOneWidget);
+    expect(find.byKey(const Key('gallery-nav-segment-spaces')), findsNothing);
+  });
+
+  testWidgets('tapping the Spaces segment activates slot 1 and does not refresh albums', (tester) async {
+    final router = FakeTabsRouter();
+    final albums = _FakeRemoteAlbumNotifier();
+
+    await tester.pumpWidget(
+      _wrap(
+        GalleryBottomNav(tabsRouter: router),
+        overrides: [..._navOverrides(showSpaces: true), remoteAlbumProvider.overrideWith(() => albums)],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('gallery-nav-segment-spaces')));
+    await tester.pumpAndSettle();
+
+    expect(router.setCalls, [1]);
+    expect(albums.refreshCalls, 0, reason: 'the albums tab is not on screen');
+  });
+
+  testWidgets('tapping the Albums segment still refreshes albums', (tester) async {
+    final router = FakeTabsRouter();
+    final albums = _FakeRemoteAlbumNotifier();
+
+    await tester.pumpWidget(
+      _wrap(
+        GalleryBottomNav(tabsRouter: router),
+        overrides: [..._navOverrides(showSpaces: false), remoteAlbumProvider.overrideWith(() => albums)],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('gallery-nav-segment-albums')));
+    await tester.pumpAndSettle();
+
+    expect(router.setCalls, [1]);
+    expect(albums.refreshCalls, 1);
+  });
+
+  testWidgets('readonly mode disables slot 1 whichever tab occupies it', (tester) async {
+    final router = FakeTabsRouter();
+
+    await tester.pumpWidget(
+      _wrap(
+        GalleryBottomNav(tabsRouter: router),
+        overrides: [..._navOverrides(showSpaces: true), readonlyModeProvider.overrideWith(() => _FakeReadonly(true))],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final pill = tester.widget<GalleryNavPill>(find.byType(GalleryNavPill));
+    expect(pill.disabledTabs, {GalleryTabEnum.spaces, GalleryTabEnum.library});
+  });
+
+  testWidgets('the landscape rail follows the same slots', (tester) async {
+    final router = FakeTabsRouter();
+
+    await tester.pumpWidget(
+      _wrap(
+        GalleryBottomNav(tabsRouter: router),
+        overrides: _navOverrides(showSpaces: true),
+        mq: const MediaQueryData(size: Size(900, 400)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final rail = tester.widget<NavigationRail>(find.byKey(const Key('gallery-bottom-nav-rail')));
+    expect(rail.destinations, hasLength(3));
+    // Raw keys, not translations: this harness has no EasyLocalization above
+    // it, so `tr()` returns the key — same convention as the taps above.
+    expect(find.text('spaces'.tr()), findsOneWidget);
+    expect(find.text('nav_albums'.tr()), findsNothing);
+  });
+
+  testWidgets('the active segment follows the slot occupant after a flip', (tester) async {
+    final router = FakeTabsRouter(initialIndex: 1);
+    final container = ProviderContainer(
+      overrides: [
+        readonlyModeProvider.overrideWith(() => _FakeReadonly(false)),
+        hapticFeedbackProvider.overrideWith((ref) => _NoOpHaptic(ref)),
+        ..._navOverrides(showSpaces: true),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          home: MediaQuery(
+            data: _portraitMq,
+            child: Material(child: GalleryBottomNav(tabsRouter: router)),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    var pill = tester.widget<GalleryNavPill>(find.byType(GalleryNavPill));
+    expect(pill.activeTab, GalleryTabEnum.spaces);
+
+    container.updateOverrides([
+      readonlyModeProvider.overrideWith(() => _FakeReadonly(false)),
+      hapticFeedbackProvider.overrideWith((ref) => _NoOpHaptic(ref)),
+      ..._navOverrides(showSpaces: false),
+    ]);
+    await tester.pumpAndSettle();
+
+    pill = tester.widget<GalleryNavPill>(find.byType(GalleryNavPill));
+    expect(pill.activeTab, GalleryTabEnum.albums, reason: 'slot 1 changed occupant, the index did not');
+    expect(pill.slots, [GalleryTabEnum.photos, GalleryTabEnum.albums, GalleryTabEnum.library]);
   });
 }

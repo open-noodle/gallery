@@ -19,6 +19,7 @@ import 'package:immich_mobile/providers/infrastructure/memory.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/readonly_mode.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/filter_sheet.provider.dart';
+import 'package:immich_mobile/providers/shared_space.provider.dart';
 
 class GalleryBottomNav extends ConsumerStatefulWidget {
   final TabsRouter tabsRouter;
@@ -65,10 +66,11 @@ class _GalleryBottomNavState extends ConsumerState<GalleryBottomNav> {
     final mq = MediaQuery.of(context);
     final keyboardUp = mq.viewInsets.bottom > _keyboardThreshold;
     final isReadonly = ref.watch(readonlyModeProvider);
+    final slots = ref.watch(galleryNavSlotsProvider);
 
     if (isLandscape) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _writeHeight(0));
-      return _landscapeRail(isReadonly);
+      return _landscapeRail(isReadonly, slots);
     }
 
     // Hide the pill while the FilterSheet is visible — it would otherwise
@@ -112,11 +114,12 @@ class _GalleryBottomNavState extends ConsumerState<GalleryBottomNav> {
                 // pill takes what is left and shrinks its tabs to fit.
                 Flexible(
                   child: GalleryNavPill(
-                    // Pinned to Albums until the nav setting lands; the provider
-                    // replaces this literal.
-                    activeTab: galleryNavSlots(showSpaces: false)[widget.tabsRouter.activeIndex],
-                    disabledTabs: isReadonly ? const {GalleryTabEnum.albums, GalleryTabEnum.library} : const {},
-                    onTabTap: _onTabTap,
+                    slots: slots,
+                    activeTab: slots[widget.tabsRouter.activeIndex.clamp(0, slots.length - 1)],
+                    // By slot, not by tab identity: slot 1 is whichever
+                    // collection tab the user configured.
+                    disabledTabs: isReadonly ? {slots[kGalleryCollectionIndex], slots[kGalleryLibraryIndex]} : const {},
+                    onTabTap: (tab) => _onTabTap(tab, slots),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -133,10 +136,10 @@ class _GalleryBottomNavState extends ConsumerState<GalleryBottomNav> {
   /// `_onNavigationSelected` in `tab_shell.page.dart`: side effects fire on
   /// EVERY tap (including re-taps of the same tab) — the shell-level
   /// `tabsRouter.addListener` only fires on index CHANGES.
-  void _onTabTap(GalleryTabEnum tab) {
+  void _onTabTap(GalleryTabEnum tab, List<GalleryTabEnum> slots) {
     final currentIndex = widget.tabsRouter.activeIndex;
 
-    if (tab == GalleryTabEnum.photos && currentIndex == tab.index) {
+    if (tab == GalleryTabEnum.photos && currentIndex == kGalleryPhotosIndex) {
       EventStream.shared.emit(const ScrollToTopEvent());
     }
 
@@ -148,10 +151,7 @@ class _GalleryBottomNavState extends ConsumerState<GalleryBottomNav> {
         unawaited(ref.read(remoteAlbumProvider.notifier).refresh());
         break;
       case GalleryTabEnum.spaces:
-        // Exhaustiveness only — Spaces cannot occupy a nav slot until the
-        // setting and slots provider land. The real side effect (invalidating
-        // sharedSpacesProvider, mirroring the albums case above) arrives with
-        // the wiring that makes this reachable.
+        ref.invalidate(sharedSpacesProvider);
         break;
       case GalleryTabEnum.library:
         ref.invalidate(localAlbumProvider);
@@ -162,27 +162,27 @@ class _GalleryBottomNavState extends ConsumerState<GalleryBottomNav> {
     }
 
     ref.read(hapticFeedbackProvider.notifier).selectionClick();
-    // Pinned to Albums until the nav setting lands; the provider replaces
-    // this literal.
-    widget.tabsRouter.setActiveIndex(galleryNavSlots(showSpaces: false).indexOf(tab));
+    final index = slots.indexOf(tab);
+    // Every tap comes from a segment this same `slots` list rendered, so a miss
+    // means the nav rendered one configuration and resolved taps against
+    // another. Assert rather than clamp: a silent fallback would send the user
+    // to an arbitrary tab and hide the wiring bug.
+    assert(index >= 0, 'tapped $tab is not one of the rendered nav slots $slots');
+    widget.tabsRouter.setActiveIndex(index);
   }
 
-  Widget _landscapeRail(bool isReadonly) {
+  Widget _landscapeRail(bool isReadonly, List<GalleryTabEnum> slots) {
     return NavigationRail(
       key: const Key('gallery-bottom-nav-rail'),
       selectedIndex: widget.tabsRouter.activeIndex,
       onDestinationSelected: (i) {
-        // Pinned to Albums until the nav setting lands; the provider replaces
-        // this literal.
-        final tab = galleryNavSlots(showSpaces: false)[i];
+        final tab = slots[i];
         if (isReadonly && tab != GalleryTabEnum.photos) return;
-        _onTabTap(tab);
+        _onTabTap(tab, slots);
       },
       labelType: NavigationRailLabelType.all,
       destinations: [
-        // Pinned to Albums until the nav setting lands; the provider replaces
-        // this literal.
-        for (final tab in galleryNavSlots(showSpaces: false))
+        for (final tab in slots)
           NavigationRailDestination(
             icon: Icon(GalleryNavDestination.forTab(tab).idleIcon),
             selectedIcon: Icon(GalleryNavDestination.forTab(tab).activeIcon),

@@ -127,6 +127,13 @@ void main() {
     });
   });
 
+  test('search targets slot 0 regardless of the nav configuration', () {
+    for (final showSpaces in [true, false]) {
+      expect(galleryNavSlots(showSpaces: showSpaces).first, GalleryTabEnum.photos);
+      expect(kGalleryPhotosIndex, 0);
+    }
+  });
+
   test('user taps different tab mid-delay: no crash, deferred-open accepted', () {
     fakeAsync((async) {
       final router = FakeTabsRouter(initialIndex: GalleryTabEnum.albums.index);
