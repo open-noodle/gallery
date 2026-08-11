@@ -1,6 +1,7 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 
 /// Shared shell for Browse strips — title + loading skeleton + error + empty.
 ///
@@ -110,7 +111,7 @@ class _Retry extends StatelessWidget {
         child: TextButton.icon(
           onPressed: onRetry,
           icon: const Icon(Icons.refresh_rounded),
-          label: Text('filter_sheet_load_error_retry'.tr()),
+          label: Text(context.t.filter_sheet_load_error_retry),
         ),
       ),
     );
