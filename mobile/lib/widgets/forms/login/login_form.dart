@@ -325,7 +325,7 @@ class LoginForm extends HookConsumerWidget {
 
         ImmichToast.show(
           context: context,
-          msg: "login_form_failed_demo_login".tr(),
+          msg: context.t.login_form_failed_demo_login,
           toastType: ToastType.error,
           gravity: ToastGravity.TOP,
         );

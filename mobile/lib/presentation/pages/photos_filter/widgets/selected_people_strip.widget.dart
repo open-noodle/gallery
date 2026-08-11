@@ -1,7 +1,7 @@
-import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/person.model.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 
 /// Horizontal strip of currently-selected people chips. Hidden (zero-size)
@@ -30,7 +30,7 @@ class SelectedPeopleStrip extends ConsumerWidget {
             child: InputChip(
               label: Text(p.name, overflow: TextOverflow.ellipsis, maxLines: 1),
               deleteIcon: const Icon(Icons.close_rounded, size: 18),
-              deleteButtonTooltipMessage: 'remove_filter'.tr(),
+              deleteButtonTooltipMessage: context.t.remove_filter,
               onDeleted: () => ref.read(photosFilterProvider.notifier).togglePerson(p),
             ),
           );
