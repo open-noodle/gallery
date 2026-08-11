@@ -8,6 +8,7 @@ import {
 import { Insertable, Selectable } from 'kysely';
 import { isAbsolute } from 'node:path';
 import type { JobItem, JobOf } from 'src/types.js';
+import { JOBS_ASSET_PAGINATION_SIZE } from 'src/constants.js';
 import { Chunked, OnJob, OnEvent } from 'src/decorators.js';
 import { BulkIdErrorReason, BulkIdResponseDto, BulkIdsDto } from 'src/dtos/asset-ids.response.dto.js';
 import { AuthDto } from 'src/dtos/auth.dto.js';
