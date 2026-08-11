@@ -154,7 +154,7 @@ class SpacesPage extends HookConsumerWidget {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Spaces')),
+      appBar: AppBar(title: Text('spaces'.t(context: context))),
       body: spacesAsync.when(
         data: (spaces) {
           if (spaces.isEmpty) {
