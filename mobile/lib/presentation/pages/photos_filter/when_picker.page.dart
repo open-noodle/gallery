@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'package:auto_route/auto_route.dart';
-import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/decade_anchor_strip.widget.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/quick_ranges_row.widget.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/when_picker_footer.widget.dart';
@@ -88,15 +88,15 @@ class _WhenPickerPageState extends ConsumerState<WhenPickerPage> {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
-          tooltip: 'back'.tr(),
+          tooltip: context.t.back,
           onPressed: () => Navigator.of(context).maybePop(),
         ),
-        title: Text('filter_sheet_picker_when_title'.tr()),
+        title: Text(context.t.filter_sheet_picker_when_title),
         actions: [
           TextButton(
             key: const Key('when-picker-done'),
             onPressed: () => Navigator.of(context).maybePop(),
-            child: Text('filter_sheet_picker_done'.tr()),
+            child: Text(context.t.filter_sheet_picker_done),
           ),
         ],
       ),
@@ -136,7 +136,7 @@ class _WhenPickerPageState extends ConsumerState<WhenPickerPage> {
               key: const Key('when-picker-retry'),
               onPressed: () => ref.invalidate(timeBucketsProvider(ref.read(photosFilterProvider))),
               icon: const Icon(Icons.refresh_rounded),
-              label: Text('filter_sheet_load_error_retry'.tr()),
+              label: Text(context.t.filter_sheet_load_error_retry),
             ),
           ),
         ),
@@ -185,7 +185,7 @@ class _WhenNoResultsPanel extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            'filter_sheet_picker_no_results'.tr(namedArgs: {'query': query}),
+            context.t.filter_sheet_picker_no_results(query: query),
             textAlign: TextAlign.center,
             style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
           ),
@@ -193,7 +193,7 @@ class _WhenNoResultsPanel extends StatelessWidget {
           TextButton(
             key: const Key('when-picker-clear-search'),
             onPressed: onClear,
-            child: Text('filter_sheet_picker_clear_search'.tr()),
+            child: Text(context.t.filter_sheet_picker_clear_search),
           ),
         ],
       ),

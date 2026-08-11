@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/space_album.model.dart';
-import 'package:immich_mobile/extensions/translate_extensions.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/widgets/spaces/space_album_bottom_sheet.widget.dart';
 import 'package:immich_mobile/presentation/widgets/spaces/space_album_kebab.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
@@ -82,17 +82,13 @@ class _SpaceAlbumDetailPageState extends ConsumerState<SpaceAlbumDetailPage> {
       if (mounted && count > 0) {
         ImmichToast.show(
           context: context,
-          msg: 'space_album_add_photos_success'.t(context: context, args: {'count': count.toString()}),
+          msg: context.t.space_album_add_photos_success(count: count),
           toastType: ToastType.success,
         );
       }
     } catch (_) {
       if (mounted) {
-        ImmichToast.show(
-          context: context,
-          msg: 'space_album_add_photos_failed'.t(context: context),
-          toastType: ToastType.error,
-        );
+        ImmichToast.show(context: context, msg: context.t.space_album_add_photos_failed, toastType: ToastType.error);
       }
     }
   }
@@ -109,9 +105,7 @@ class _SpaceAlbumDetailPageState extends ConsumerState<SpaceAlbumDetailPage> {
       if (mounted) {
         ImmichToast.show(
           context: context,
-          msg: album.showInTimeline
-              ? 'space_album_timeline_hidden'.t(context: context)
-              : 'space_album_timeline_shown'.t(context: context),
+          msg: album.showInTimeline ? context.t.space_album_timeline_hidden : context.t.space_album_timeline_shown,
           toastType: ToastType.success,
         );
       }
@@ -119,7 +113,7 @@ class _SpaceAlbumDetailPageState extends ConsumerState<SpaceAlbumDetailPage> {
       if (mounted) {
         ImmichToast.show(
           context: context,
-          msg: 'space_album_timeline_update_failed'.t(context: context),
+          msg: context.t.space_album_timeline_update_failed,
           toastType: ToastType.error,
         );
       }
@@ -130,17 +124,14 @@ class _SpaceAlbumDetailPageState extends ConsumerState<SpaceAlbumDetailPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('space_album_unlink_title'.t(context: ctx)),
-        content: Text('space_album_unlink_confirmation'.t(context: ctx)),
+        title: Text(ctx.t.space_album_unlink_from_space),
+        content: Text(ctx.t.space_album_unlink_confirmation),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text('cancel'.t(context: ctx)),
-          ),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(ctx.t.cancel)),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             style: TextButton.styleFrom(foregroundColor: Theme.of(ctx).colorScheme.error),
-            child: Text('space_album_unlink_action'.t(context: ctx)),
+            child: Text(ctx.t.space_album_unlink_action),
           ),
         ],
       ),
@@ -151,18 +142,14 @@ class _SpaceAlbumDetailPageState extends ConsumerState<SpaceAlbumDetailPage> {
     try {
       await ref.read(spaceAlbumActionsProvider).unlink(widget.spaceId, widget.albumId);
       if (mounted) {
-        ImmichToast.show(
-          context: context,
-          msg: 'space_album_unlinked_success'.t(context: context),
-          toastType: ToastType.success,
-        );
+        ImmichToast.show(context: context, msg: context.t.space_album_unlinked_success, toastType: ToastType.success);
         await context.maybePop();
       }
     } catch (_) {
       if (mounted) {
         ImmichToast.show(
           context: context,
-          msg: 'spaces_linked_albums_error_unlink'.t(context: context),
+          msg: context.t.spaces_linked_albums_error_unlink,
           toastType: ToastType.error,
         );
       }
@@ -257,8 +244,8 @@ class SpaceAlbumAppBar extends StatelessWidget {
                 if (showSubtitle)
                   Text(
                     [
-                      'space_album_photo_count'.t(context: context, args: {'count': album!.assetCount.toString()}),
-                      'space_album_in_space'.t(context: context, args: {'space': spaceName!}),
+                      context.t.space_album_photo_count(count: album!.assetCount),
+                      context.t.space_album_in_space(space: spaceName!),
                     ].join(' · '),
                     style: Theme.of(context).textTheme.bodySmall,
                   ),

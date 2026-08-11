@@ -1,6 +1,6 @@
-import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/widgets/gallery_nav/gallery_nav_pill.widget.dart';
 import 'package:immich_mobile/providers/gallery_nav/gallery_tab_enum.dart';
 
@@ -27,9 +27,9 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('nav_photos'.tr()), findsOneWidget);
-    expect(find.text('nav_albums'.tr()), findsOneWidget);
-    expect(find.text('nav_library'.tr()), findsOneWidget);
+    expect(find.text(StaticTranslations.instance.nav_photos), findsOneWidget);
+    expect(find.text(StaticTranslations.instance.nav_albums), findsOneWidget);
+    expect(find.text(StaticTranslations.instance.nav_library), findsOneWidget);
   });
 
   testWidgets('tap on a segment invokes onTabTap with its enum', (tester) async {
@@ -41,7 +41,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('nav_albums'.tr()));
+    await tester.tap(find.text(StaticTranslations.instance.nav_albums));
     expect(tapped, GalleryTabEnum.albums);
   });
 
@@ -203,11 +203,11 @@ void main() {
     );
     expect(photosOpacity.opacity, 1.0);
 
-    await tester.tap(find.text('nav_albums'.tr()));
+    await tester.tap(find.text(StaticTranslations.instance.nav_albums));
     await tester.pumpAndSettle();
     expect(tapped, -1, reason: 'disabled segment should not invoke onTabTap');
 
-    await tester.tap(find.text('nav_photos'.tr()));
+    await tester.tap(find.text(StaticTranslations.instance.nav_photos));
     await tester.pumpAndSettle();
     expect(tapped, GalleryTabEnum.photos.index);
   });

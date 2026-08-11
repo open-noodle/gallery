@@ -1,7 +1,7 @@
-import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/camera_picker.page.dart';
 import 'package:immich_mobile/providers/photos_filter/camera_model_suggestions.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/camera_picker.provider.dart';
@@ -23,7 +23,7 @@ void main() {
       await tester.pumpConsumerWidget(const CameraPickerPage(), overrides: _overrideMakes([]));
       await tester.pumpAndSettle();
       expect(find.byIcon(Icons.arrow_back_rounded), findsOneWidget);
-      expect(find.text('filter_sheet_picker_camera_title'.tr()), findsOneWidget);
+      expect(find.text(StaticTranslations.instance.filter_sheet_picker_camera_title), findsOneWidget);
       expect(find.byKey(const Key('camera-picker-done')), findsOneWidget);
     });
 

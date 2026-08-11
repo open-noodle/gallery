@@ -153,7 +153,7 @@ class _PersonName extends ConsumerWidget {
       return GestureDetector(
         onTap: () => showNameEditModal(context, person),
         child: Text(
-          'add_a_name'.tr(),
+          context.t.add_a_name,
           style: context.textTheme.titleSmall?.copyWith(
             fontWeight: FontWeight.w500,
             color: context.colorScheme.primary,
