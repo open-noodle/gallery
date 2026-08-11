@@ -1,11 +1,11 @@
 import 'package:auto_route/auto_route.dart';
-import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/user.model.dart';
 import 'package:immich_mobile/extensions/asyncvalue_extensions.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/providers/infrastructure/user.provider.dart';
 import 'package:immich_mobile/providers/shared_space.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
@@ -74,7 +74,7 @@ class SpaceMemberSelectionPage extends HookConsumerWidget {
           TextButton(
             onPressed: selectedUsers.value.isEmpty ? null : addSelectedMembers,
             child: Text(
-              'add'.tr(),
+              context.t.add,
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
@@ -114,7 +114,7 @@ class SpaceMemberSelectionPage extends HookConsumerWidget {
               Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Text(
-                  'suggestions'.tr(),
+                  context.t.suggestions,
                   style: const TextStyle(fontSize: 14, color: Colors.grey, fontWeight: FontWeight.bold),
                 ),
               ),

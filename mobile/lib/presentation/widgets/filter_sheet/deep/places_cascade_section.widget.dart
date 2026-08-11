@@ -3,6 +3,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/models/search/search_filter.model.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/deep_section_scaffold.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/filter_section_id.dart';
@@ -184,7 +185,7 @@ class _CityCascade extends ConsumerWidget {
           error: (_, __) => TextButton.icon(
             onPressed: () => ref.invalidate(citySuggestionsProvider(country)),
             icon: const Icon(Icons.refresh_rounded),
-            label: Text('filter_sheet_load_error_retry'.tr()),
+            label: Text(context.t.filter_sheet_load_error_retry),
           ),
         ),
       ],

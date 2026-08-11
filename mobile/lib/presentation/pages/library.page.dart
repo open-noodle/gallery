@@ -227,7 +227,7 @@ class _SpacesCollectionCard extends ConsumerWidget {
               Padding(
                 padding: const EdgeInsets.all(8.0),
                 child: Text(
-                  'spaces'.t(context: context),
+                  context.t.spaces,
                   style: context.textTheme.titleSmall?.copyWith(
                     color: context.colorScheme.onSurface,
                     fontWeight: FontWeight.w500,
@@ -581,7 +581,7 @@ class _AlbumsCollectionCard extends ConsumerWidget {
               Padding(
                 padding: const EdgeInsets.all(8.0),
                 child: Text(
-                  'albums'.t(context: context),
+                  context.t.albums,
                   style: context.textTheme.titleSmall?.copyWith(
                     color: context.colorScheme.onSurface,
                     fontWeight: FontWeight.w500,
@@ -609,7 +609,7 @@ class _QuickAccessButtonList extends ConsumerWidget {
     final items = [
       _QuickAccessItem(
         leading: const Icon(Icons.workspaces_outlined, size: 26),
-        title: 'spaces'.t(context: context),
+        title: context.t.spaces,
         onTap: () => context.pushRoute(const SpacesRoute()),
       ),
       _QuickAccessItem(
@@ -629,7 +629,7 @@ class _QuickAccessButtonList extends ConsumerWidget {
       ),
       _QuickAccessItem(
         leading: const Icon(Icons.photo_album_outlined, size: 26),
-        title: 'albums'.t(context: context),
+        title: context.t.albums,
         onTap: () => context.pushRoute(const DriftAlbumsRoute()),
       ),
       for (final partner in partners)

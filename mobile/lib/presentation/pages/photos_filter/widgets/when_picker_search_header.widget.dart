@@ -1,5 +1,5 @@
-import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 
 /// Sticky header for the WhenPickerPage: a search TextField only (no count
 /// label — total picker height is smaller than people picker). Pinned via
@@ -50,13 +50,13 @@ class _WhenPickerSearchHeaderDelegate extends SliverPersistentHeaderDelegate {
           textInputAction: TextInputAction.search,
           decoration: InputDecoration(
             isDense: true,
-            hintText: 'filter_sheet_picker_search_when_hint'.tr(),
+            hintText: context.t.filter_sheet_picker_search_when_hint,
             prefixIcon: const Icon(Icons.search_rounded, size: 20),
             suffixIcon: hasText
                 ? IconButton(
                     key: const Key('when-picker-search-clear-x'),
                     icon: const Icon(Icons.close_rounded, size: 18),
-                    tooltip: 'filter_sheet_picker_clear_search'.tr(),
+                    tooltip: context.t.filter_sheet_picker_clear_search,
                     onPressed: () {
                       controller.clear();
                       onChanged('');

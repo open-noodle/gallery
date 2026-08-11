@@ -1,8 +1,8 @@
 import 'package:auto_route/auto_route.dart';
-import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/person.model.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/person_picker_list.widget.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/person_picker_search_header.widget.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/recent_people_strip.widget.dart';
@@ -52,15 +52,15 @@ class _PersonPickerPageState extends ConsumerState<PersonPickerPage> {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
-          tooltip: 'back'.tr(),
+          tooltip: context.t.back,
           onPressed: () => Navigator.of(context).maybePop(),
         ),
-        title: Text('filter_sheet_picker_people_title'.tr()),
+        title: Text(context.t.filter_sheet_picker_people_title),
         actions: [
           TextButton(
             key: const Key('person-picker-done'),
             onPressed: () => Navigator.of(context).maybePop(),
-            child: Text('filter_sheet_picker_done'.tr()),
+            child: Text(context.t.filter_sheet_picker_done),
           ),
         ],
       ),
@@ -90,7 +90,7 @@ class _PersonPickerPageState extends ConsumerState<PersonPickerPage> {
               key: const Key('person-picker-retry'),
               onPressed: () => ref.invalidate(driftGetAllPeopleWithSharedSpacesProvider),
               icon: const Icon(Icons.refresh_rounded),
-              label: Text('filter_sheet_load_error_retry'.tr()),
+              label: Text(context.t.filter_sheet_load_error_retry),
             ),
           ),
         ),
@@ -131,7 +131,7 @@ class _NoResultsPanel extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            'filter_sheet_picker_no_results'.tr(namedArgs: {'query': query}),
+            context.t.filter_sheet_picker_no_results(query: query),
             textAlign: TextAlign.center,
             style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
           ),
@@ -139,7 +139,7 @@ class _NoResultsPanel extends StatelessWidget {
           TextButton(
             key: const Key('person-picker-clear-search'),
             onPressed: onClear,
-            child: Text('filter_sheet_picker_clear_search'.tr()),
+            child: Text(context.t.filter_sheet_picker_clear_search),
           ),
         ],
       ),

@@ -13,6 +13,7 @@ import 'package:immich_mobile/domain/models/space_album.model.dart';
 import 'package:immich_mobile/presentation/widgets/spaces/space_top_sliver.widget.dart';
 import 'package:immich_mobile/providers/infrastructure/space_album.provider.dart';
 import 'package:immich_mobile/providers/sync_status.provider.dart';
+import '../../widget_tester_extensions.dart';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -65,14 +66,14 @@ class _FakeSyncStatusNotifier extends SyncStatusNotifier {
 
 void main() {
   testWidgets('editor + 1 album: shelf is present inside the top sliver', (tester) async {
-    await tester.pumpWidget(_wrap(spaceId: 'space-1', canEdit: true, albums: [_album('a1')]));
+    await tester.pumpWidget(localizedForTest(_wrap(spaceId: 'space-1', canEdit: true, albums: [_album('a1')])));
     await tester.pump(); // stream emit
 
     expect(find.byKey(const Key('space-albums-shelf')), findsOneWidget);
   });
 
   testWidgets('viewer + 0 albums: shelf is absent from the top sliver', (tester) async {
-    await tester.pumpWidget(_wrap(spaceId: 'space-1', canEdit: false, albums: []));
+    await tester.pumpWidget(localizedForTest(_wrap(spaceId: 'space-1', canEdit: false, albums: [])));
     await tester.pump();
 
     expect(find.byKey(const Key('space-albums-shelf')), findsNothing);
@@ -81,7 +82,7 @@ void main() {
   });
 
   testWidgets('editor + 0 albums: slim shelf with link tile still renders', (tester) async {
-    await tester.pumpWidget(_wrap(spaceId: 'space-1', canEdit: true, albums: []));
+    await tester.pumpWidget(localizedForTest(_wrap(spaceId: 'space-1', canEdit: true, albums: [])));
     await tester.pump();
 
     expect(find.byKey(const Key('space-albums-shelf')), findsOneWidget);

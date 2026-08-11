@@ -1,7 +1,7 @@
-import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/tags_section.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/filter_section_id.dart';
 import 'package:immich_mobile/providers/photos_filter/collapsed_sections.provider.dart';
@@ -137,7 +137,7 @@ void main() {
 
       // DeepSectionScaffold renders the title as .tr().toUpperCase(); the
       // localized pump resolves it, so assert on the same value.
-      expect(find.text('filter_sheet_deep_tags_section'.tr().toUpperCase()), findsOneWidget);
+      expect(find.text(StaticTranslations.instance.filter_sheet_deep_tags_section.toUpperCase()), findsOneWidget);
     });
 
     // Slice 5 / final review: cap the preview Wrap to 10 chips + a body "Search N tags →" row.

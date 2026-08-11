@@ -1,7 +1,7 @@
-import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/models/search/search_filter.model.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/sort_icon_button.widget.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
@@ -35,7 +35,7 @@ void main() {
       await tester.tap(find.byKey(const Key('photos-filter-sort-button')));
       await tester.pumpAndSettle();
 
-      expect(find.text('search_sort_title'.tr()), findsOneWidget);
+      expect(find.text(StaticTranslations.instance.search_sort_title), findsOneWidget);
       // 'beach' is a semantic (context) search → relevance is on offer.
       expect(find.byKey(Key('sort-option-${SearchSortOrder.relevance.name}')), findsOneWidget);
 

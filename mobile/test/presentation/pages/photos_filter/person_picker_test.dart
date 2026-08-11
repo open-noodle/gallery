@@ -8,6 +8,7 @@ import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/person_picker.page.dart';
@@ -46,7 +47,7 @@ void main() {
     testWidgets('renders AppBar with back icon, title key, and Done button', (tester) async {
       await tester.pumpConsumerWidget(const PersonPickerPage());
       expect(find.byIcon(Icons.arrow_back_rounded), findsOneWidget);
-      expect(find.text('filter_sheet_picker_people_title'.tr()), findsOneWidget);
+      expect(find.text(StaticTranslations.instance.filter_sheet_picker_people_title), findsOneWidget);
       expect(find.byKey(const Key('person-picker-done')), findsOneWidget);
     });
 

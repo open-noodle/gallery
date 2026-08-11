@@ -34,6 +34,7 @@ import 'package:mocktail/mocktail.dart';
 
 import '../../../mock_http_override.dart';
 import '../../../test_utils.dart';
+import '../../../widget_tester_extensions.dart';
 
 class _MockSearch extends Mock implements SearchService {}
 
@@ -129,9 +130,11 @@ void main() {
     // testWidgets' pending-timer check, which runs before tearDowns.
 
     await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: const MaterialApp(home: MainTimelinePage()),
+      localizedForTest(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: MainTimelinePage()),
+        ),
       ),
     );
     await tester.pump();
@@ -158,7 +161,7 @@ void main() {
     // Tear the tree down inside the test so the route ProviderScope's autoDispose
     // scheduler timer (the search lives in TimelineRouteScope now) fires here rather
     // than outliving the widget tree. Advance fake time so the 0-duration timer runs.
-    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpWidget(localizedForTest(const SizedBox.shrink()));
     await tester.pump(const Duration(seconds: 1));
     // Dispose the container so provider timers — incl. the memory provider's
     // midnight-refresh Timer (upstream #28983) — are cancelled before the
@@ -177,9 +180,11 @@ void main() {
     addTearDown(container.dispose);
 
     await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: const MaterialApp(home: MainTimelinePage()),
+      localizedForTest(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: MainTimelinePage()),
+        ),
       ),
     );
     for (var c = 0; c < 3; c++) {
