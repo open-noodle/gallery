@@ -152,6 +152,11 @@ class AppRouter extends RootStackRouter {
       children: [
         AutoRoute(page: MainTimelineRoute.page, guards: [_authGuard, _duplicateGuard]),
         AutoRoute(page: DriftAlbumsRoute.page, guards: [_authGuard, _duplicateGuard]),
+        // Declared but not always a tab: the `routes:` list in
+        // GalleryTabShellPage picks three of these four per the user's
+        // navShowSpaces preference. DriftAlbumsRoute stays declared even when
+        // Spaces occupies slot 1 — the Library tab pushes it directly.
+        AutoRoute(page: SpacesRoute.page, guards: [_authGuard, _duplicateGuard]),
         AutoRoute(page: DriftLibraryRoute.page, guards: [_authGuard, _duplicateGuard]),
       ],
     ),
