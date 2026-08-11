@@ -110,7 +110,7 @@ class RemoteAlbumOption extends StatelessWidget {
     if (onLinkToSpace != null) {
       menuChildren.add(
         BaseActionButton(
-          label: 'link_album_to_space'.t(context: context),
+          label: context.t.link_album_to_space,
           iconData: Icons.add_link,
           onPressed: onLinkToSpace,
           menuItem: true,

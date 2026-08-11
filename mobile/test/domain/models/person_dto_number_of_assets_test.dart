@@ -27,17 +27,16 @@ void main() {
       expect(base, isNot(equals(different)));
     });
 
-    test('fromMap(toMap()) round-trips a non-null value', () {
-      final roundTripped = PersonDto.fromMap(base.toMap());
-      expect(roundTripped.numberOfAssets, 5);
-      expect(roundTripped, base);
-    });
+    // The two `fromMap(toMap())` round-trip tests that used to live here are gone:
+    // upstream #30452 converted PersonDto to freezed and dropped toMap/fromMap/
+    // toJson/fromJson, which had no production callers (SearchFilter does not
+    // serialize `people`). The field's real contract — carried by copyWith and
+    // included in equality — is covered by the three tests above, both of which
+    // freezed now generates.
 
-    test('fromMap(toMap()) round-trips a null value', () {
+    test('defaults to null when not provided', () {
       const nullCount = PersonDto(id: 'b', name: 'Bob', isHidden: false, thumbnailPath: '');
-      final roundTripped = PersonDto.fromMap(nullCount.toMap());
-      expect(roundTripped.numberOfAssets, isNull);
-      expect(roundTripped, nullCount);
+      expect(nullCount.numberOfAssets, isNull);
     });
   });
 }

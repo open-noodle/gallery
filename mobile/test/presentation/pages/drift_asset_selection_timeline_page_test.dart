@@ -27,6 +27,7 @@ import 'package:immich_mobile/services/server_info.service.dart';
 import 'package:mocktail/mocktail.dart';
 
 import '../../test_utils.dart';
+import '../../widget_tester_extensions.dart';
 
 class _MockTimelineFactory extends Mock implements TimelineFactory {}
 
@@ -127,16 +128,18 @@ void main() {
     addTearDown(timelineService.dispose);
 
     await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          currentUserProvider.overrideWith((ref) => _StubCurrentUserNotifier(userService, user)),
-          readonlyModeProvider.overrideWith(() => _StubReadOnlyModeNotifier()),
-          appConfigProvider.overrideWithValue(const AppConfig(timeline: TimelineConfig(tilesPerRow: 3))),
-          timelineFactoryProvider.overrideWithValue(factory),
-          castProvider.overrideWith((ref) => _StubCastNotifier()),
-          serverInfoServiceProvider.overrideWithValue(serverInfoService),
-        ],
-        child: const MaterialApp(home: DriftAssetSelectionTimelinePage()),
+      localizedForTest(
+        ProviderScope(
+          overrides: [
+            currentUserProvider.overrideWith((ref) => _StubCurrentUserNotifier(userService, user)),
+            readonlyModeProvider.overrideWith(() => _StubReadOnlyModeNotifier()),
+            appConfigProvider.overrideWithValue(const AppConfig(timeline: TimelineConfig(tilesPerRow: 3))),
+            timelineFactoryProvider.overrideWithValue(factory),
+            castProvider.overrideWith((ref) => _StubCastNotifier()),
+            serverInfoServiceProvider.overrideWithValue(serverInfoService),
+          ],
+          child: const MaterialApp(home: DriftAssetSelectionTimelinePage()),
+        ),
       ),
     );
 

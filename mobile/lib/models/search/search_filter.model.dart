@@ -147,7 +147,7 @@ abstract class SearchFilter with _$SearchFilter {
     location: SearchLocationFilter(),
     camera: SearchCameraFilter(),
     date: SearchDateFilter(),
-    display: SearchDisplayFilters(isFavorite: false, isArchive: false, isNotInAlbum: false),
+    display: const SearchDisplayFilters(isFavorite: false, isArchive: false, isNotInAlbum: false),
     rating: SearchRatingFilter(),
     mediaType: AssetType.other,
   );

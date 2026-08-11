@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
-import 'package:immich_mobile/extensions/translate_extensions.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/providers/shared_space.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:immich_mobile/utils/space_permissions.dart';
@@ -46,14 +46,14 @@ class SpaceLinkPickerSheet extends ConsumerWidget {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-              child: Text('link_album_to_space'.t(context: context), style: context.textTheme.titleMedium),
+              child: Text(context.t.link_album_to_space, style: context.textTheme.titleMedium),
             ),
             Flexible(
               child: spacesAsync.when(
                 data: (spaces) {
                   final writable = spaces.where((s) => spaceIsWritable(s, currentUserId)).toList();
                   if (writable.isEmpty) {
-                    return _CenteredMessage(text: 'spaces_no_writable_spaces'.t(context: context));
+                    return _CenteredMessage(text: context.t.spaces_no_writable_spaces);
                   }
                   return ListView.builder(
                     shrinkWrap: true,
@@ -73,7 +73,7 @@ class SpaceLinkPickerSheet extends ConsumerWidget {
                   padding: EdgeInsets.symmetric(vertical: 32),
                   child: Center(child: CircularProgressIndicator()),
                 ),
-                error: (_, _) => _CenteredMessage(text: 'failed_to_load_spaces'.t(context: context)),
+                error: (_, _) => _CenteredMessage(text: context.t.failed_to_load_spaces),
               ),
             ),
           ],

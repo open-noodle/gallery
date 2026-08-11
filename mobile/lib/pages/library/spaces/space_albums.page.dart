@@ -6,7 +6,7 @@ import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/settings_key.dart';
 import 'package:immich_mobile/domain/models/space_album.model.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
-import 'package:immich_mobile/extensions/translate_extensions.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/pages/library/spaces/collection_sort.dart';
 import 'package:immich_mobile/presentation/widgets/images/thumbnail.widget.dart';
 import 'package:immich_mobile/providers/infrastructure/asset.provider.dart';
@@ -79,7 +79,7 @@ class SpaceAlbumsPage extends HookConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('space_albums_page_title'.t(context: context)),
+        title: Text(context.t.space_albums_page_title),
         centerTitle: false,
         actions: [
           if (canEdit)
@@ -87,15 +87,13 @@ class SpaceAlbumsPage extends HookConsumerWidget {
               key: const Key('space-albums-link-action'),
               onPressed: onLink,
               icon: const Icon(Icons.add),
-              label: Text('link'.t(context: context)),
+              label: Text(context.t.link),
             ),
         ],
       ),
       body: albumsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(
-          child: Text('space_albums_load_failed'.t(context: context, args: {'error': error.toString()})),
-        ),
+        error: (error, _) => Center(child: Text(context.t.space_albums_load_failed(error: error.toString()))),
         data: (albums) {
           if (albums.isEmpty) {
             return _EmptyState(key: const Key('space-albums-empty'), canEdit: canEdit, onLink: onLink);
@@ -178,7 +176,7 @@ class _SearchAndSortBar extends StatelessWidget {
         children: [
           SearchField(
             key: const Key('space-albums-search-field'),
-            hintText: 'space_albums_search_hint'.t(context: context),
+            hintText: context.t.space_albums_search_hint,
             controller: controller,
             prefixIcon: const Icon(Icons.search_rounded),
             suffixIcon: hasQuery
@@ -195,11 +193,8 @@ class _SearchAndSortBar extends StatelessWidget {
             children: [
               Text(
                 query.isEmpty
-                    ? 'space_albums_result_count'.t(context: context, args: {'count': resultCount.toString()})
-                    : 'space_albums_search_result_count'.t(
-                        context: context,
-                        args: {'count': resultCount.toString(), 'total': totalCount.toString(), 'query': query},
-                      ),
+                    ? context.t.space_albums_result_count(count: resultCount)
+                    : context.t.space_albums_search_result_count(count: resultCount, total: totalCount, query: query),
                 key: const Key('space-albums-result-count'),
                 style: context.textTheme.bodySmall?.copyWith(color: context.colorScheme.onSurfaceVariant),
               ),
@@ -358,12 +353,12 @@ class _AlbumCard extends ConsumerWidget {
                     Row(
                       children: [
                         Text(
-                          'space_album_photo_count'.t(context: context, args: {'count': album.assetCount.toString()}),
+                          context.t.space_album_photo_count(count: album.assetCount),
                           style: context.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                         ),
                         if (isOffTimeline)
                           Text(
-                            '· ${'space_albums_hidden'.t(context: context)}',
+                            '· ${context.t.space_albums_hidden}',
                             style: context.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                           ),
                       ],
@@ -392,14 +387,11 @@ class _AlbumCard extends ConsumerWidget {
                         value: _CardAction.toggle,
                         child: Text(
                           album.showInTimeline
-                              ? 'spaces_hide_from_timeline'.t(context: ctx)
-                              : 'spaces_linked_albums_show_in_timeline'.t(context: ctx),
+                              ? ctx.t.spaces_hide_from_timeline
+                              : ctx.t.spaces_linked_albums_show_in_timeline,
                         ),
                       ),
-                      PopupMenuItem(
-                        value: _CardAction.unlink,
-                        child: Text('space_album_unlink_from_space'.t(context: ctx)),
-                      ),
+                      PopupMenuItem(value: _CardAction.unlink, child: Text(ctx.t.space_album_unlink_from_space)),
                     ],
                   ),
                 ),
@@ -436,7 +428,7 @@ class _EmptyState extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            'space_albums_empty'.t(context: context),
+            context.t.space_albums_empty,
             style: context.textTheme.titleMedium?.copyWith(color: context.colorScheme.onSurfaceVariant),
           ),
           if (canEdit) ...[
@@ -444,7 +436,7 @@ class _EmptyState extends StatelessWidget {
             FilledButton.icon(
               onPressed: onLink,
               icon: const Icon(Icons.add),
-              label: Text('space_albums_empty_editor_cta'.t(context: context)),
+              label: Text(context.t.space_albums_empty_editor_cta),
             ),
           ],
         ],
@@ -471,7 +463,7 @@ class _NoMatch extends StatelessWidget {
           Icon(Icons.search_off_rounded, size: 64, color: context.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
           const SizedBox(height: 16),
           Text(
-            'space_albums_no_match'.t(context: context, args: {'query': query}),
+            context.t.space_albums_no_match(query: query),
             textAlign: TextAlign.center,
             style: context.textTheme.titleMedium?.copyWith(color: context.colorScheme.onSurfaceVariant),
           ),

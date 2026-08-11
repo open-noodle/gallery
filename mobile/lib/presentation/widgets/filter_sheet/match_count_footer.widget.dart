@@ -1,6 +1,6 @@
-import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/match_count_label.widget.dart';
 import 'package:immich_mobile/providers/photos_filter/filter_sheet.provider.dart';
 
@@ -20,7 +20,7 @@ class MatchCountFooter extends ConsumerWidget {
             const Expanded(child: MatchCountLabel()),
             FilledButton.tonal(
               onPressed: () => ref.read(photosFilterSheetProvider.notifier).state = FilterSheetSnap.hidden,
-              child: Text('filter_sheet_done'.tr()),
+              child: Text(context.t.filter_sheet_done),
             ),
           ],
         ),
