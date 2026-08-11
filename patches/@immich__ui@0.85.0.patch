@@ -12,10 +12,10 @@ index 495db52198b1d133949fe11eb1bda0c030a9107d..ae0a81e9682149b79ee97af087f6fd81
      </p>
    </a>
 diff --git a/dist/services/command-palette-manager.svelte.js b/dist/services/command-palette-manager.svelte.js
-index 3d78f92fdb82e7bdd04a12a57c189c3de8a84ea4..59edf03451f4b1618e56485ec5989cbe32d7aaa1 100644
+index 064b6fa525cb3756d8dbd85c2d4338117037b38b..b68a350dc216282bf5a54e5432e0e07d8c59e3c6 100644
 --- a/dist/services/command-palette-manager.svelte.js
 +++ b/dist/services/command-palette-manager.svelte.js
-@@ -38,11 +38,13 @@ class CommandPaletteManager {
+@@ -103,11 +103,13 @@ class CommandPaletteManager {
          }
          this.#isEnabled = true;
          if (globalThis.window && document.body) {
