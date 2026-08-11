@@ -162,7 +162,9 @@ class _GalleryBottomNavState extends ConsumerState<GalleryBottomNav> {
     }
 
     ref.read(hapticFeedbackProvider.notifier).selectionClick();
-    widget.tabsRouter.setActiveIndex(tab.index);
+    // Pinned to Albums until the nav setting lands; the provider replaces
+    // this literal.
+    widget.tabsRouter.setActiveIndex(galleryNavSlots(showSpaces: false).indexOf(tab));
   }
 
   Widget _landscapeRail(bool isReadonly) {

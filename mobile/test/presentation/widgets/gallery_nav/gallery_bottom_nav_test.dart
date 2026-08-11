@@ -380,6 +380,27 @@ void main() {
     expect(router.setCalls, contains(GalleryTabEnum.albums.index));
   });
 
+  testWidgets('tapping Library calls setActiveIndex with the slot index, not GalleryTabEnum.index', (tester) async {
+    // Regression: GalleryTabEnum.library.index is 3 (declaration order), but
+    // the shell only registers 3 routes (slots 0-2). Albums-only coverage
+    // above can't catch this — GalleryTabEnum.albums.index (1) still
+    // coincides with its slot. Library is the one tab whose enum index and
+    // slot index now diverge.
+    final router = FakeTabsRouter(initialIndex: GalleryTabEnum.photos.index);
+    await tester.pumpWidget(
+      _wrap(
+        GalleryBottomNav(tabsRouter: router),
+        overrides: [remoteAlbumProvider.overrideWith(_FakeRemoteAlbumNotifier.new)],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('nav_library'.tr()));
+    await tester.pumpAndSettle();
+
+    expect(router.setCalls, [2]);
+  });
+
   testWidgets('tapping Albums refreshes the existing album provider', (tester) async {
     final router = FakeTabsRouter(initialIndex: GalleryTabEnum.photos.index);
     final remoteAlbumNotifier = _FakeRemoteAlbumNotifier();

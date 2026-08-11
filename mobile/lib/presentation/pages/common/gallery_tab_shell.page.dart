@@ -28,7 +28,9 @@ class _GalleryTabShellPageState extends ConsumerState<GalleryTabShellPage> {
     final i = router.activeIndex;
     if (i == _lastIndex) return;
     _lastIndex = i;
-    ref.read(galleryTabProvider.notifier).state = GalleryTabEnum.values[i];
+    // Pinned to Albums until the nav setting lands; the provider replaces
+    // this literal.
+    ref.read(galleryTabProvider.notifier).state = galleryNavSlots(showSpaces: false)[i];
   }
 
   @override
