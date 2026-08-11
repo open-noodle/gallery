@@ -1,9 +1,9 @@
-import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/events.model.dart';
 import 'package:immich_mobile/domain/utils/event_stream.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/widgets/gallery_nav/gallery_bottom_nav.widget.dart';
 import 'package:immich_mobile/presentation/widgets/gallery_nav/gallery_nav_pill.widget.dart';
 import 'package:immich_mobile/presentation/widgets/gallery_nav/gallery_search_blob.widget.dart';
@@ -16,6 +16,7 @@ import 'package:immich_mobile/providers/infrastructure/remote_album.provider.dar
 import 'package:immich_mobile/providers/photos_filter/filter_sheet.provider.dart';
 
 import '../../../test_helpers/fake_tabs_router.dart';
+import '../../../widget_tester_extensions.dart';
 
 /// ReadOnlyModeNotifier replacement that short-circuits the build-time read of
 /// appSettingsServiceProvider.
@@ -82,7 +83,7 @@ Widget _wrap(Widget child, {List<Override> overrides = const [], MediaQueryData?
 void main() {
   testWidgets('portrait: pill + blob both rendered', (tester) async {
     final router = FakeTabsRouter();
-    await tester.pumpWidget(_wrap(GalleryBottomNav(tabsRouter: router)));
+    await tester.pumpWidget(localizedForTest(_wrap(GalleryBottomNav(tabsRouter: router))));
     await tester.pumpAndSettle();
     expect(find.byType(GalleryNavPill), findsOneWidget);
     expect(find.byType(GallerySearchBlob), findsOneWidget);
@@ -90,7 +91,7 @@ void main() {
 
   testWidgets('multi-select event hides nav (opacity→0)', (tester) async {
     final router = FakeTabsRouter();
-    await tester.pumpWidget(_wrap(GalleryBottomNav(tabsRouter: router)));
+    await tester.pumpWidget(localizedForTest(_wrap(GalleryBottomNav(tabsRouter: router))));
     await tester.pumpAndSettle();
 
     EventStream.shared.emit(const MultiSelectToggleEvent(true));
@@ -115,12 +116,14 @@ void main() {
     addTearDown(container.dispose);
 
     await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: MaterialApp(
-          home: MediaQuery(
-            data: _portraitMq,
-            child: Material(child: GalleryBottomNav(tabsRouter: router)),
+      localizedForTest(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            home: MediaQuery(
+              data: _portraitMq,
+              child: Material(child: GalleryBottomNav(tabsRouter: router)),
+            ),
           ),
         ),
       ),
@@ -142,9 +145,11 @@ void main() {
     final router = FakeTabsRouter();
 
     await tester.pumpWidget(
-      _wrap(
-        GalleryBottomNav(tabsRouter: router),
-        mq: const MediaQueryData(size: Size(400, 900), viewInsets: EdgeInsets.only(bottom: 79)),
+      localizedForTest(
+        _wrap(
+          GalleryBottomNav(tabsRouter: router),
+          mq: const MediaQueryData(size: Size(400, 900), viewInsets: EdgeInsets.only(bottom: 79)),
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -152,9 +157,11 @@ void main() {
     expect(opacity.opacity, 1, reason: 'at 79pt, still shown');
 
     await tester.pumpWidget(
-      _wrap(
-        GalleryBottomNav(tabsRouter: router),
-        mq: const MediaQueryData(size: Size(400, 900), viewInsets: EdgeInsets.only(bottom: 81)),
+      localizedForTest(
+        _wrap(
+          GalleryBottomNav(tabsRouter: router),
+          mq: const MediaQueryData(size: Size(400, 900), viewInsets: EdgeInsets.only(bottom: 81)),
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -165,9 +172,11 @@ void main() {
   testWidgets('landscape: NavigationRail with 3 destinations + trailing search', (tester) async {
     final router = FakeTabsRouter();
     await tester.pumpWidget(
-      _wrap(
-        GalleryBottomNav(tabsRouter: router),
-        mq: const MediaQueryData(size: Size(900, 400)),
+      localizedForTest(
+        _wrap(
+          GalleryBottomNav(tabsRouter: router),
+          mq: const MediaQueryData(size: Size(900, 400)),
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -181,9 +190,11 @@ void main() {
   testWidgets('readonly: blob disabled, pill dims Albums+Library, Photos enabled', (tester) async {
     final router = FakeTabsRouter();
     await tester.pumpWidget(
-      _wrap(
-        GalleryBottomNav(tabsRouter: router),
-        overrides: [readonlyModeProvider.overrideWith(() => _FakeReadonly(true))],
+      localizedForTest(
+        _wrap(
+          GalleryBottomNav(tabsRouter: router),
+          overrides: [readonlyModeProvider.overrideWith(() => _FakeReadonly(true))],
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -207,12 +218,14 @@ void main() {
     addTearDown(container.dispose);
 
     await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: MaterialApp(
-          home: MediaQuery(
-            data: _portraitMq,
-            child: Material(child: GalleryBottomNav(tabsRouter: router)),
+      localizedForTest(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            home: MediaQuery(
+              data: _portraitMq,
+              child: Material(child: GalleryBottomNav(tabsRouter: router)),
+            ),
           ),
         ),
       ),
@@ -239,16 +252,18 @@ void main() {
     addTearDown(container.dispose);
 
     await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: MaterialApp(
-          home: MediaQuery(
-            data: const MediaQueryData(
-              size: Size(430, 932),
-              padding: EdgeInsets.only(bottom: 34),
-              textScaler: TextScaler.linear(0.45),
+      localizedForTest(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            home: MediaQuery(
+              data: const MediaQueryData(
+                size: Size(430, 932),
+                padding: EdgeInsets.only(bottom: 34),
+                textScaler: TextScaler.linear(0.45),
+              ),
+              child: Scaffold(bottomNavigationBar: GalleryBottomNav(tabsRouter: router)),
             ),
-            child: Scaffold(bottomNavigationBar: GalleryBottomNav(tabsRouter: router)),
           ),
         ),
       ),
@@ -269,9 +284,11 @@ void main() {
 
     final router = FakeTabsRouter();
     await tester.pumpWidget(
-      _wrap(
-        GalleryBottomNav(tabsRouter: router),
-        mq: const MediaQueryData(size: Size(360, 800)),
+      localizedForTest(
+        _wrap(
+          GalleryBottomNav(tabsRouter: router),
+          mq: const MediaQueryData(size: Size(360, 800)),
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -294,10 +311,12 @@ void main() {
 
     final router = FakeTabsRouter();
     await tester.pumpWidget(
-      _wrap(
-        GalleryBottomNav(tabsRouter: router),
-        // Portrait MediaQuery so the pill branch is exercised, not the rail.
-        mq: const MediaQueryData(size: Size(1024, 1400)),
+      localizedForTest(
+        _wrap(
+          GalleryBottomNav(tabsRouter: router),
+          // Portrait MediaQuery so the pill branch is exercised, not the rail.
+          mq: const MediaQueryData(size: Size(1024, 1400)),
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -331,12 +350,14 @@ void main() {
     addTearDown(container.dispose);
 
     await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: MaterialApp(
-          home: MediaQuery(
-            data: const MediaQueryData(size: Size(360, 800)),
-            child: Material(child: GalleryBottomNav(tabsRouter: router)),
+      localizedForTest(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            home: MediaQuery(
+              data: const MediaQueryData(size: Size(360, 800)),
+              child: Material(child: GalleryBottomNav(tabsRouter: router)),
+            ),
           ),
         ),
       ),
@@ -355,10 +376,10 @@ void main() {
     final sub = EventStream.shared.listen<ScrollToTopEvent>((_) => scrollEvents++);
     addTearDown(sub.cancel);
 
-    await tester.pumpWidget(_wrap(GalleryBottomNav(tabsRouter: router)));
+    await tester.pumpWidget(localizedForTest(_wrap(GalleryBottomNav(tabsRouter: router))));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('nav_photos'.tr()));
+    await tester.tap(find.text(StaticTranslations.instance.nav_photos));
     await tester.pumpAndSettle();
 
     expect(scrollEvents, 1);
@@ -367,14 +388,16 @@ void main() {
   testWidgets('tapping a different tab calls tabsRouter.setActiveIndex', (tester) async {
     final router = FakeTabsRouter(initialIndex: GalleryTabEnum.photos.index);
     await tester.pumpWidget(
-      _wrap(
-        GalleryBottomNav(tabsRouter: router),
-        overrides: [remoteAlbumProvider.overrideWith(_FakeRemoteAlbumNotifier.new)],
+      localizedForTest(
+        _wrap(
+          GalleryBottomNav(tabsRouter: router),
+          overrides: [remoteAlbumProvider.overrideWith(_FakeRemoteAlbumNotifier.new)],
+        ),
       ),
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('nav_albums'.tr()));
+    await tester.tap(find.text(StaticTranslations.instance.nav_albums));
     await tester.pumpAndSettle();
 
     expect(router.setCalls, contains(GalleryTabEnum.albums.index));
@@ -384,14 +407,16 @@ void main() {
     final router = FakeTabsRouter(initialIndex: GalleryTabEnum.photos.index);
     final remoteAlbumNotifier = _FakeRemoteAlbumNotifier();
     await tester.pumpWidget(
-      _wrap(
-        GalleryBottomNav(tabsRouter: router),
-        overrides: [remoteAlbumProvider.overrideWith(() => remoteAlbumNotifier)],
+      localizedForTest(
+        _wrap(
+          GalleryBottomNav(tabsRouter: router),
+          overrides: [remoteAlbumProvider.overrideWith(() => remoteAlbumNotifier)],
+        ),
       ),
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('nav_albums'.tr()));
+    await tester.tap(find.text(StaticTranslations.instance.nav_albums));
     await tester.pumpAndSettle();
 
     expect(remoteAlbumNotifier.refreshCalls, 1);
@@ -400,10 +425,12 @@ void main() {
   testWidgets('readonly landscape rail: Photos destination enabled, others disabled', (tester) async {
     final router = FakeTabsRouter();
     await tester.pumpWidget(
-      _wrap(
-        GalleryBottomNav(tabsRouter: router),
-        overrides: [readonlyModeProvider.overrideWith(() => _FakeReadonly(true))],
-        mq: const MediaQueryData(size: Size(900, 400)),
+      localizedForTest(
+        _wrap(
+          GalleryBottomNav(tabsRouter: router),
+          overrides: [readonlyModeProvider.overrideWith(() => _FakeReadonly(true))],
+          mq: const MediaQueryData(size: Size(900, 400)),
+        ),
       ),
     );
     await tester.pumpAndSettle();

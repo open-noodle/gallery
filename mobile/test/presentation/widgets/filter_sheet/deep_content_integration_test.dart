@@ -8,6 +8,7 @@ import 'package:immich_mobile/providers/photos_filter/filter_sheet.provider.dart
 import 'package:immich_mobile/providers/photos_filter/hidden_sections.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/temporal_utils.dart';
 import 'package:immich_mobile/providers/photos_filter/time_buckets.provider.dart';
+import '../../../widget_tester_extensions.dart';
 
 class _FakePrefs implements FilterSectionPrefs {
   final Set<FilterSectionId> collapsed;
@@ -75,7 +76,7 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(800, 600));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    await tester.pumpWidget(_buildHarness(controller: controller));
+    await tester.pumpWidget(localizedForTest(_buildHarness(controller: controller)));
     await tester.pumpAndSettle();
 
     // Scroll DeepContent to ~300pt.
@@ -105,7 +106,7 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(800, 2400));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    await tester.pumpWidget(_buildHarness(controller: controller));
+    await tester.pumpWidget(localizedForTest(_buildHarness(controller: controller)));
     await tester.pumpAndSettle();
 
     // Expand 2024. The viewport is tall enough that the When section is
