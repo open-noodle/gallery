@@ -342,6 +342,28 @@ blocks, drop the auth-only ones. Each result was cross-checked against upstream'
 | `make sql`                             | SKIPPED | no upstream repository change; `server/src/queries/` clean        |
 | ML gate                                | SKIPPED | `machine-learning/` delta empty                                   |
 
+## Remote CI Verification
+
+- **Test branch**: `rebase/upstream-b83`
+- **Commit validated**: `51182c387de` — **all 10 runs on the same headSha, no skew**
+- **Result**: **10/10 GREEN, first pass** (staggered 4/2/4 dispatch; zero GHCR rate limits)
+
+| Workflow                                  | Status | Notes                                                                                                                                              |
+| ----------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `test.yml`                                | GREEN  | **21/21 jobs, 0 skipped**                                                                                                                          |
+| `docker.yml`                              | GREEN  | ML matrix = cpu/cuda/openvino/armnn/rknn — **no rocm, no `mirror` job**. `Re-Tag ML`/`Re-Tag Server` skipped (release-gated, expected on dispatch) |
+| `static_analysis.yml`                     | GREEN  | dart analyze + format + generated-file freshness                                                                                                   |
+| `gallery-build-mobile.yml`                | GREEN  | iOS + Android                                                                                                                                      |
+| `gallery-rebase-smoke.yml`                | GREEN  |                                                                                                                                                    |
+| `storage-migration-tests.yml`             | GREEN  |                                                                                                                                                    |
+| `storage-migration-e2e.yml`               | GREEN  |                                                                                                                                                    |
+| `gallery-revert-to-immich-validation.yml` | GREEN  | read past the coverage grep: pre-phase drift 0, **post-phase drift 0**, "revert-to-immich validation PASSED"                                       |
+| `gallery-ml-smoke.yml`                    | GREEN  |                                                                                                                                                    |
+| `gallery-mobile-smoke.yml`                | GREEN  |                                                                                                                                                    |
+
+- **Failures fixed**: none — first pass
+- **Confirmed flakes**: none
+
 ## Drift during the cycle
 
 Both remotes moved while the rebase ran — re-checked immediately before finishing, per the
