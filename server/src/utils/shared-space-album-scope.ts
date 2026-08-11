@@ -366,6 +366,54 @@ export interface SpaceAlbumAssetSqlOptions {
  * this precedence-safe for every consumer that interpolates it into a larger `OR ${...}` / negates
  * it via `NOT (...)`.
  */
+/**
+ * "Can this viewer see `asset` on a timeline surface?" — the predicate the People-page aggregates
+ * correlate per face row. A viewer reaches an asset by owning it, or through one of three space
+ * paths: a directly-added asset, a linked library, or a linked album.
+ *
+ * **Every space arm joins the `timeline_spaces` CTE**, so a viewer who belongs to no
+ * timeline-enabled space cannot satisfy any of them, and the predicate is exactly
+ * `asset."ownerId" = <viewer>`. Postgres cannot deduce that at plan time — it evaluates the whole
+ * OR per candidate row, which on a large single-user library meant hundreds of thousands of index
+ * probes into `asset` that removed nothing. Passing `hasTimelineSpaces: false` emits the collapsed
+ * form instead.
+ *
+ * The caller is responsible for establishing `hasTimelineSpaces` (a `shared_space_member` lookup
+ * on `userId` + `showInTimeline`), and for defining the `timeline_spaces` CTE this correlates
+ * against when it is true.
+ *
+ * If a future space path is added here that is NOT gated on `timeline_spaces`, the collapsed form
+ * becomes wrong — `accessible-timeline-asset-predicate.medium.spec.ts` compares the two forms'
+ * result sets and will fail.
+ */
+export function accessibleTimelineAssetPredicate(options: {
+  userId: string;
+  hasTimelineSpaces: boolean;
+}): RawBuilder<SqlBool> {
+  if (!options.hasTimelineSpaces) {
+    return sql<SqlBool>`asset."ownerId" = ${options.userId}`;
+  }
+
+  return sql<SqlBool>`asset."ownerId" = ${options.userId}
+            OR EXISTS (
+              SELECT 1
+              FROM shared_space_asset
+              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_asset."spaceId"
+              WHERE shared_space_asset."assetId" = asset.id
+            )
+            OR EXISTS (
+              SELECT 1
+              FROM shared_space_library
+              INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_library."spaceId"
+              WHERE shared_space_library."libraryId" = asset."libraryId"
+            )
+            OR ${spaceAlbumAssetExistsSql({
+              assetIdColumn: sql`asset.id`,
+              spaceScopeJoin: sql`INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_album."spaceId"`,
+              requireShowInTimeline: true,
+            })}`;
+}
+
 export function spaceAlbumAssetExistsSql(options: SpaceAlbumAssetSqlOptions): RawBuilder<SqlBool> {
   const albumJoin =
     (options.requireAlbumNotDeleted ?? true)
