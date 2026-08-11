@@ -17,7 +17,7 @@ SearchFilter _base() => SearchFilter(
   location: SearchLocationFilter(),
   camera: SearchCameraFilter(),
   date: SearchDateFilter(),
-  display: SearchDisplayFilters(isFavorite: false, isArchive: false, isNotInAlbum: false),
+  display: const SearchDisplayFilters(isFavorite: false, isArchive: false, isNotInAlbum: false),
   rating: SearchRatingFilter(),
   mediaType: AssetType.other,
 );
@@ -223,7 +223,7 @@ void main() {
 
     test('favourites / archived / notInAlbum / untagged emit toggle chips', () {
       final f = _base()
-        ..display = SearchDisplayFilters(isFavorite: true, isArchive: true, isNotInAlbum: true, isUntagged: true);
+        ..display = const SearchDisplayFilters(isFavorite: true, isArchive: true, isNotInAlbum: true, isUntagged: true);
       final ids = activeChipsFromFilter(f).map((c) => c.id.runtimeType).toSet();
       expect(ids, containsAll([FavouriteChipId, ArchiveChipId, NotInAlbumChipId, UntaggedChipId]));
     });
@@ -237,7 +237,7 @@ void main() {
         ..date = SearchDateFilter(takenAfter: DateTime(2024, 4, 1))
         ..rating = SearchRatingFilter(rating: const Option.some(4))
         ..mediaType = AssetType.image
-        ..display = SearchDisplayFilters(isFavorite: true, isArchive: true, isNotInAlbum: true, isUntagged: true)
+        ..display = const SearchDisplayFilters(isFavorite: true, isArchive: true, isNotInAlbum: true, isUntagged: true)
         ..context = 'paris';
       final chips = activeChipsFromFilter(f);
       final visuals = chips.map((c) => c.visual).toList();

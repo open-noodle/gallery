@@ -1,7 +1,7 @@
 import 'dart:ui' as ui;
 
-import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 
 class GallerySearchBlob extends StatefulWidget {
   final bool enabled;
@@ -26,7 +26,7 @@ class _GallerySearchBlobState extends State<GallerySearchBlob> {
       container: true,
       button: true,
       enabled: widget.enabled,
-      label: 'nav_search_photos_hint'.tr(),
+      label: context.t.nav_search_photos_hint,
       child: Opacity(
         opacity: widget.enabled ? 1.0 : 0.3,
         child: IgnorePointer(

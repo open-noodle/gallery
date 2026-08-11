@@ -7,6 +7,7 @@ import 'package:immich_mobile/domain/models/settings_key.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
@@ -41,18 +42,18 @@ void main() {
     await tester.pumpConsumerWidget(const GroupSettings());
     await tester.pumpAndSettle();
 
-    expect(find.text('asset_list_layout_settings_group_by_month_day'.tr()), findsOneWidget);
-    expect(find.text('month'.tr()), findsOneWidget);
-    expect(find.text('year'.tr()), findsNothing);
+    expect(find.text(StaticTranslations.instance.asset_list_layout_settings_group_by_month_day), findsOneWidget);
+    expect(find.text(StaticTranslations.instance.month), findsOneWidget);
+    expect(find.text(StaticTranslations.instance.year), findsNothing);
     expect(find.text('asset_list_layout_settings_group_automatically'.tr()), findsNothing);
-    expect(find.text('none'.tr()), findsNothing);
+    expect(find.text(StaticTranslations.instance.none), findsNothing);
   });
 
   testWidgets('selecting month persists selected grouping', (tester) async {
     await tester.pumpConsumerWidget(const GroupSettings());
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('month'.tr()));
+    await tester.tap(find.text(StaticTranslations.instance.month));
     await tester.pumpAndSettle();
 
     expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.month);
@@ -64,7 +65,7 @@ void main() {
     await tester.pumpConsumerWidget(const GroupSettings());
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('asset_list_layout_settings_group_by_month_day'.tr()));
+    await tester.tap(find.text(StaticTranslations.instance.asset_list_layout_settings_group_by_month_day));
     await tester.pumpAndSettle();
 
     expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.day);

@@ -1,6 +1,7 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 
 const _monthKeys = <String>[
@@ -61,7 +62,7 @@ class WhenPickerFooter extends ConsumerWidget {
                 child: FilledButton(
                   key: const Key('when-picker-footer-done'),
                   onPressed: () => Navigator.of(context).maybePop(),
-                  child: Text('filter_sheet_picker_done'.tr(), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  child: Text(context.t.filter_sheet_picker_done, maxLines: 1, overflow: TextOverflow.ellipsis),
                 ),
               ),
             ],
@@ -75,7 +76,7 @@ class WhenPickerFooter extends ConsumerWidget {
   /// `Text.data` assertions. Note that in unit tests `.tr()` returns the
   /// i18n key verbatim (no bundles loaded), so assertions target keys.
   static String _formatLabel(DateTime? start, DateTime? end) {
-    if (start == null || end == null) return 'filter_sheet_picker_all_time'.tr();
+    if (start == null || end == null) return StaticTranslations.instance.filter_sheet_picker_all_time;
 
     final startMonth = _monthKeys[start.month - 1].tr();
     final endMonth = _monthKeys[end.month - 1].tr();

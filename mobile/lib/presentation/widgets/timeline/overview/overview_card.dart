@@ -4,6 +4,7 @@ import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/domain/models/timeline_grouping.model.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/widgets/images/thumbnail.widget.dart';
 
 const double kTimelineOverviewCardHeight = 144.0;
@@ -45,7 +46,7 @@ class TimelineOverviewCard extends StatelessWidget {
 
   String _countLabel() {
     final count = bucket.assetCount;
-    final translated = 'timeline_overview_photo_count'.tr(namedArgs: {'count': count.toString()});
+    final translated = StaticTranslations.instance.timeline_overview_photo_count(count: count);
     if (translated != 'timeline_overview_photo_count' && !translated.contains('plural')) {
       return translated;
     }
@@ -77,8 +78,10 @@ class TimelineOverviewCard extends StatelessWidget {
 
   String _cardSemanticsLabel(BuildContext context, String countLabel, String actionLabel) {
     final period = _semanticsPeriod(context);
-    final translated = 'timeline_overview_card_semantics'.tr(
-      namedArgs: {'period': period, 'countLabel': countLabel, 'action': actionLabel},
+    final translated = context.t.timeline_overview_card_semantics(
+      period: period,
+      countLabel: countLabel,
+      action: actionLabel,
     );
     if (translated != 'timeline_overview_card_semantics' && !translated.contains('{period}')) {
       return translated;

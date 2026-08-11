@@ -1,8 +1,8 @@
 import 'dart:async';
 
-import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/providers/photos_filter/filter_sheet.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/search_focus.provider.dart';
@@ -99,14 +99,14 @@ class _FilterSheetSearchBarState extends ConsumerState<FilterSheetSearchBar> {
       focusNode: _focusNode,
       decoration: InputDecoration(
         isDense: true,
-        hintText: 'filter_sheet_search_hint'.tr(),
+        hintText: context.t.filter_sheet_search_hint,
         prefixIcon: const Icon(Icons.search_rounded, size: 20),
         suffixIcon: hasText
             ? IconButton(
                 key: const Key('filter-sheet-search-clear'),
                 icon: const Icon(Icons.close_rounded, size: 18),
                 onPressed: _clear,
-                tooltip: 'remove_filter'.tr(),
+                tooltip: context.t.remove_filter,
               )
             : null,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),

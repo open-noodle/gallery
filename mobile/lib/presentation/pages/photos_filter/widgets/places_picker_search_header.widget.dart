@@ -1,5 +1,5 @@
-import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 
 /// Sticky header for the PlacesPickerPage: a search TextField only. Pinned via
 /// SliverPersistentHeader so it stays visible while the body beneath scrolls.
@@ -50,13 +50,13 @@ class _PlacesPickerSearchHeaderDelegate extends SliverPersistentHeaderDelegate {
           textInputAction: TextInputAction.search,
           decoration: InputDecoration(
             isDense: true,
-            hintText: 'filter_sheet_picker_search_places_hint'.tr(),
+            hintText: context.t.filter_sheet_picker_search_places_hint,
             prefixIcon: const Icon(Icons.search_rounded, size: 20),
             suffixIcon: hasText
                 ? IconButton(
                     key: const Key('places-picker-search-clear-x'),
                     icon: const Icon(Icons.close_rounded, size: 18),
-                    tooltip: 'filter_sheet_picker_clear_search'.tr(),
+                    tooltip: context.t.filter_sheet_picker_clear_search,
                     onPressed: () {
                       controller.clear();
                       onChanged('');
