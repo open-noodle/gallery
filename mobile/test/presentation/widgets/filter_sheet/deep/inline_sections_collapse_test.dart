@@ -6,6 +6,7 @@ import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/rating_star
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/toggles_section.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/filter_section_id.dart';
 import 'package:immich_mobile/providers/photos_filter/collapsed_sections.provider.dart';
+import '../../../../widget_tester_extensions.dart';
 
 class _FakePrefs implements FilterSectionPrefs {
   Set<FilterSectionId> stored;
@@ -16,11 +17,13 @@ class _FakePrefs implements FilterSectionPrefs {
   Future<void> saveCollapsed(Set<FilterSectionId> ids) async => stored = ids;
 }
 
-Widget _host(Widget child) => ProviderScope(
-  overrides: [filterSectionPrefsProvider.overrideWithValue(_FakePrefs({}))],
-  child: MaterialApp(
-    localizationsDelegates: const [DefaultMaterialLocalizations.delegate, DefaultWidgetsLocalizations.delegate],
-    home: Scaffold(body: ListView(children: [child])),
+Widget _host(Widget child) => localizedForTest(
+  ProviderScope(
+    overrides: [filterSectionPrefsProvider.overrideWithValue(_FakePrefs({}))],
+    child: MaterialApp(
+      localizationsDelegates: const [DefaultMaterialLocalizations.delegate, DefaultWidgetsLocalizations.delegate],
+      home: Scaffold(body: ListView(children: [child])),
+    ),
   ),
 );
 

@@ -1,9 +1,9 @@
 import 'dart:async';
-import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/tag.model.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 
 /// Windowed flat list of [tags] under a single "MATCHES" bucket header —
@@ -40,7 +40,7 @@ class _MatchesHeader extends StatelessWidget {
       key: const Key('tags-picker-matches-header'),
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 6),
       child: Text(
-        'filter_sheet_picker_tags_matches'.tr().toUpperCase(),
+        context.t.filter_sheet_picker_tags_matches.toUpperCase(),
         style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.w600),
       ),
     );

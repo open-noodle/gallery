@@ -1,6 +1,6 @@
-import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/widgets/gallery_nav/gallery_search_blob.widget.dart';
 
 import '../../../widget_tester_extensions.dart';
@@ -32,7 +32,7 @@ void main() {
   testWidgets('semantics label resolves from nav.search_photos_hint', (tester) async {
     await tester.pumpConsumerWidget(GallerySearchBlob(enabled: true, onTap: () {}));
     final semantics = tester.getSemantics(find.byType(GallerySearchBlob));
-    expect(semantics.label, 'nav_search_photos_hint'.tr());
+    expect(semantics.label, StaticTranslations.instance.nav_search_photos_hint);
   });
 
   testWidgets('tap target ≥ 44×44 pt', (tester) async {

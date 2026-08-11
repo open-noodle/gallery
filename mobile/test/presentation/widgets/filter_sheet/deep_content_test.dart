@@ -146,11 +146,13 @@ void main() {
       expect(scope.read(photosFilterProvider).people, hasLength(1));
 
       await tester.pumpWidget(
-        UncontrolledProviderScope(
-          container: scope,
-          child: MaterialApp(
-            debugShowCheckedModeBanner: false,
-            home: Material(child: DeepContent(scrollController: controller1)),
+        localizedForTest(
+          UncontrolledProviderScope(
+            container: scope,
+            child: MaterialApp(
+              debugShowCheckedModeBanner: false,
+              home: Material(child: DeepContent(scrollController: controller1)),
+            ),
           ),
         ),
       );
@@ -158,9 +160,11 @@ void main() {
 
       // Simulate unmount (picker push covers DeepContent).
       await tester.pumpWidget(
-        UncontrolledProviderScope(
-          container: scope,
-          child: const MaterialApp(debugShowCheckedModeBanner: false, home: Material(child: SizedBox.shrink())),
+        localizedForTest(
+          UncontrolledProviderScope(
+            container: scope,
+            child: const MaterialApp(debugShowCheckedModeBanner: false, home: Material(child: SizedBox.shrink())),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -169,11 +173,13 @@ void main() {
       final controller2 = ScrollController();
       addTearDown(controller2.dispose);
       await tester.pumpWidget(
-        UncontrolledProviderScope(
-          container: scope,
-          child: MaterialApp(
-            debugShowCheckedModeBanner: false,
-            home: Material(child: DeepContent(scrollController: controller2)),
+        localizedForTest(
+          UncontrolledProviderScope(
+            container: scope,
+            child: MaterialApp(
+              debugShowCheckedModeBanner: false,
+              home: Material(child: DeepContent(scrollController: controller2)),
+            ),
           ),
         ),
       );

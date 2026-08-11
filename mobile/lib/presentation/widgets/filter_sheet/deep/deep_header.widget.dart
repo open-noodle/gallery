@@ -1,8 +1,8 @@
 import 'dart:async';
-import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/manage_sections_sheet.widget.dart';
 import 'package:immich_mobile/providers/photos_filter/filter_sheet.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
@@ -22,13 +22,13 @@ class DeepHeader extends ConsumerWidget {
           IconButton(
             key: const Key('deep-header-close'),
             icon: const Icon(Icons.close_rounded),
-            tooltip: 'close'.tr(),
+            tooltip: context.t.close,
             // Close = dismiss the sheet entirely (hidden), matching Done / system-back /
             // drag-to-dismiss. Progressive collapse (deep → browse) is the scrim-tap / drag.
             onPressed: () => ref.read(photosFilterSheetProvider.notifier).state = FilterSheetSnap.hidden,
           ),
           Expanded(
-            child: Text('filter_sheet_title'.tr(), style: theme.textTheme.titleMedium, textAlign: TextAlign.center),
+            child: Text(context.t.filter_sheet_title, style: theme.textTheme.titleMedium, textAlign: TextAlign.center),
           ),
           Row(
             mainAxisSize: MainAxisSize.min,
@@ -36,7 +36,7 @@ class DeepHeader extends ConsumerWidget {
               IconButton(
                 key: const Key('deep-header-manage'),
                 icon: const Icon(Icons.settings_rounded),
-                tooltip: 'filter_sheet_deep_manage_sections'.tr(),
+                tooltip: context.t.filter_sheet_deep_manage_sections,
                 onPressed: () {
                   unawaited(HapticFeedback.selectionClick());
                   unawaited(showManageSectionsSheet(context));
@@ -49,7 +49,7 @@ class DeepHeader extends ConsumerWidget {
                     unawaited(HapticFeedback.mediumImpact());
                     ref.read(photosFilterProvider.notifier).reset();
                   },
-                  child: Text('filter_sheet_reset'.tr()),
+                  child: Text(context.t.filter_sheet_reset),
                 ),
             ],
           ),

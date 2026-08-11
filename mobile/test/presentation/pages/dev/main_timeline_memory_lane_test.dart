@@ -35,6 +35,7 @@ import 'package:mocktail/mocktail.dart';
 
 import '../../../mock_http_override.dart';
 import '../../../test_utils.dart';
+import '../../../widget_tester_extensions.dart';
 
 class _MockSearch extends Mock implements SearchService {}
 
@@ -134,9 +135,11 @@ void main() {
     final container = _makeContainer(search: search, db: db);
 
     await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: const MaterialApp(home: MainTimelinePage()),
+      localizedForTest(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: MainTimelinePage()),
+        ),
       ),
     );
     for (var i = 0; i < 10; i++) {
@@ -156,7 +159,7 @@ void main() {
     }
     expect(find.byType(DriftMemoryLane), findsOneWidget, reason: 'clearing the search restores the strip');
 
-    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpWidget(localizedForTest(const SizedBox.shrink()));
     await tester.pump(const Duration(seconds: 1));
     container.dispose();
   });

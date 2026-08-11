@@ -1,8 +1,8 @@
 import 'dart:async';
-import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/active_filter_chip.widget.dart';
 import 'package:immich_mobile/providers/photos_filter/active_chips.dart';
 import 'package:immich_mobile/providers/photos_filter/filter_debounce.provider.dart';
@@ -77,7 +77,7 @@ class _ClearAllChip extends StatelessWidget {
     final theme = Theme.of(context);
     return Semantics(
       button: true,
-      label: 'clear_all'.tr(),
+      label: context.t.clear_all,
       child: Material(
         key: const Key('photos-filter-subheader-clear-all'),
         color: theme.colorScheme.primary.withValues(alpha: theme.brightness == Brightness.dark ? 0.16 : 0.22),
@@ -92,7 +92,10 @@ class _ClearAllChip extends StatelessWidget {
               children: [
                 Icon(Icons.close_rounded, size: 16, color: theme.colorScheme.primary),
                 const SizedBox(width: 4),
-                Text('clear_all'.tr(), style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.primary)),
+                Text(
+                  context.t.clear_all,
+                  style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.primary),
+                ),
               ],
             ),
           ),

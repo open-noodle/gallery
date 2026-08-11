@@ -4,7 +4,7 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
-import 'package:immich_mobile/extensions/translate_extensions.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/widgets/bottom_sheet/space_bottom_sheet.widget.dart';
 import 'package:immich_mobile/presentation/widgets/spaces/space_detail_kebab.widget.dart';
 import 'package:immich_mobile/presentation/widgets/spaces/space_edit_sheet.widget.dart';
@@ -171,17 +171,14 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('spaces_delete'.t(context: ctx)),
-        content: Text('spaces_delete_confirmation'.t(context: ctx, args: {'name': _space?.name ?? ''})),
+        title: Text(ctx.t.spaces_delete),
+        content: Text(ctx.t.spaces_delete_confirmation(name: _space?.name ?? '')),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text('cancel'.t(context: ctx)),
-          ),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(ctx.t.cancel)),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             style: TextButton.styleFrom(foregroundColor: Theme.of(ctx).colorScheme.error),
-            child: Text('delete'.t(context: ctx)),
+            child: Text(ctx.t.delete),
           ),
         ],
       ),
@@ -288,17 +285,13 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
       if (mounted) {
         ImmichToast.show(
           context: context,
-          msg: 'space_album_linked_success'.t(context: context, args: {'count': ids.length.toString()}),
+          msg: context.t.space_album_linked_success(count: ids.length),
           toastType: ToastType.success,
         );
       }
     } catch (_) {
       if (mounted) {
-        ImmichToast.show(
-          context: context,
-          msg: 'spaces_linked_albums_error_link'.t(context: context),
-          toastType: ToastType.error,
-        );
+        ImmichToast.show(context: context, msg: context.t.spaces_linked_albums_error_link, toastType: ToastType.error);
       }
     }
   }
@@ -314,9 +307,7 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
       if (mounted) {
         ImmichToast.show(
           context: context,
-          msg: album.showInTimeline
-              ? 'space_album_timeline_hidden'.t(context: context)
-              : 'space_album_timeline_shown'.t(context: context),
+          msg: album.showInTimeline ? context.t.space_album_timeline_hidden : context.t.space_album_timeline_shown,
           toastType: ToastType.success,
         );
       }
@@ -324,7 +315,7 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
       if (mounted) {
         ImmichToast.show(
           context: context,
-          msg: 'space_album_timeline_update_failed'.t(context: context),
+          msg: context.t.space_album_timeline_update_failed,
           toastType: ToastType.error,
         );
       }
@@ -336,17 +327,14 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('space_album_unlink_title'.t(context: ctx)),
-        content: Text('space_album_unlink_confirmation'.t(context: ctx)),
+        title: Text(ctx.t.space_album_unlink_from_space),
+        content: Text(ctx.t.space_album_unlink_confirmation),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text('cancel'.t(context: ctx)),
-          ),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(ctx.t.cancel)),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             style: TextButton.styleFrom(foregroundColor: Theme.of(ctx).colorScheme.error),
-            child: Text('space_album_unlink_action'.t(context: ctx)),
+            child: Text(ctx.t.space_album_unlink_action),
           ),
         ],
       ),
@@ -357,17 +345,13 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
     try {
       await ref.read(spaceAlbumActionsProvider).unlink(widget.spaceId, albumId);
       if (mounted) {
-        ImmichToast.show(
-          context: context,
-          msg: 'space_album_unlinked_success'.t(context: context),
-          toastType: ToastType.success,
-        );
+        ImmichToast.show(context: context, msg: context.t.space_album_unlinked_success, toastType: ToastType.success);
       }
     } catch (_) {
       if (mounted) {
         ImmichToast.show(
           context: context,
-          msg: 'spaces_linked_albums_error_unlink'.t(context: context),
+          msg: context.t.spaces_linked_albums_error_unlink,
           toastType: ToastType.error,
         );
       }

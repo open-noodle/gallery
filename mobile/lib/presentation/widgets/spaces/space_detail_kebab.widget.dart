@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:immich_mobile/extensions/translate_extensions.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 
 /// Role-gated overflow menu for the space detail page.
 ///
@@ -37,13 +37,13 @@ class SpaceDetailKebab extends StatelessWidget {
         PopupMenuItem<_KebabAction>(
           key: const Key('space-detail-kebab-edit'),
           value: _KebabAction.edit,
-          child: Text('spaces_edit'.t(context: context)),
+          child: Text(context.t.spaces_edit),
         ),
         if (canDelete)
           PopupMenuItem<_KebabAction>(
             key: const Key('space-detail-kebab-delete'),
             value: _KebabAction.delete,
-            child: Text('spaces_delete'.t(context: context)),
+            child: Text(context.t.spaces_delete),
           ),
       ],
     );

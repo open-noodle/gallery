@@ -3,17 +3,20 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/domain/models/memory.model.dart';
 import 'package:immich_mobile/presentation/pages/drift_memory.page.dart' as drift_page;
 import 'package:immich_mobile/presentation/widgets/memory/memory_lane.widget.dart' as memory_lane;
+import '../../widget_tester_extensions.dart';
 
 void main() {
   testWidgets('prefers server title and falls back gracefully when year is absent', (tester) async {
     late BuildContext context;
     await tester.pumpWidget(
-      MaterialApp(
-        home: Builder(
-          builder: (ctx) {
-            context = ctx;
-            return const SizedBox.shrink();
-          },
+      localizedForTest(
+        MaterialApp(
+          home: Builder(
+            builder: (ctx) {
+              context = ctx;
+              return const SizedBox.shrink();
+            },
+          ),
         ),
       ),
     );
