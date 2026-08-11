@@ -7,6 +7,7 @@ import 'package:immich_mobile/domain/models/config/cleanup_config.dart';
 import 'package:immich_mobile/domain/models/config/feature_message_config.dart';
 import 'package:immich_mobile/domain/models/config/image_config.dart';
 import 'package:immich_mobile/domain/models/config/map_config.dart';
+import 'package:immich_mobile/domain/models/config/nav_config.dart';
 import 'package:immich_mobile/domain/models/config/network_config.dart';
 import 'package:immich_mobile/domain/models/config/people_config.dart';
 import 'package:immich_mobile/domain/models/config/share_config.dart';
@@ -39,6 +40,7 @@ class AppConfig {
   final PeopleConfig people;
   final SpaceAlbumsConfig spaceAlbums;
   final SpacesConfig spaces;
+  final NavConfig nav;
   final BackupConfig backup;
   final NetworkConfig network;
   final ShareConfig share;
@@ -57,6 +59,7 @@ class AppConfig {
     this.people = const .new(),
     this.spaceAlbums = const .new(),
     this.spaces = const .new(),
+    this.nav = const .new(),
     this.backup = const .new(),
     this.network = const .new(),
     this.share = const .new(),
@@ -76,6 +79,7 @@ class AppConfig {
     PeopleConfig? people,
     SpaceAlbumsConfig? spaceAlbums,
     SpacesConfig? spaces,
+    NavConfig? nav,
     BackupConfig? backup,
     NetworkConfig? network,
     ShareConfig? share,
@@ -93,6 +97,7 @@ class AppConfig {
     people: people ?? this.people,
     spaceAlbums: spaceAlbums ?? this.spaceAlbums,
     spaces: spaces ?? this.spaces,
+    nav: nav ?? this.nav,
     backup: backup ?? this.backup,
     network: network ?? this.network,
     share: share ?? this.share,
@@ -115,6 +120,7 @@ class AppConfig {
           other.people == people &&
           other.spaceAlbums == spaceAlbums &&
           other.spaces == spaces &&
+          other.nav == nav &&
           other.backup == backup &&
           other.network == network &&
           other.share == share &&
@@ -134,6 +140,7 @@ class AppConfig {
     people,
     spaceAlbums,
     spaces,
+    nav,
     backup,
     network,
     share,
@@ -142,7 +149,7 @@ class AppConfig {
 
   @override
   String toString() =>
-      'AppConfig(logLevel: $logLevel, theme: $theme, cleanup: $cleanup, map: $map, timeline: $timeline, image: $image, viewer: $viewer, slideshow: $slideshow, album: $album, people: $people, spaceAlbums: $spaceAlbums, spaces: $spaces, backup: $backup, network: $network, share: $share, featureMessage: $featureMessage)';
+      'AppConfig(logLevel: $logLevel, theme: $theme, cleanup: $cleanup, map: $map, timeline: $timeline, image: $image, viewer: $viewer, slideshow: $slideshow, album: $album, people: $people, spaceAlbums: $spaceAlbums, spaces: $spaces, nav: $nav, backup: $backup, network: $network, share: $share, featureMessage: $featureMessage)';
 
   T read<T>(SettingsKey<T> key) =>
       (switch (key) {
@@ -170,6 +177,7 @@ class AppConfig {
             .spaceAlbumsIsReverse => spaceAlbums.isReverse,
             .spacesSortMode => spaces.sortMode,
             .spacesIsReverse => spaces.isReverse,
+            .navShowSpaces => nav.showSpaces,
             .backupEnabled => backup.enabled,
             .backupUseCellularForVideos => backup.useCellularForVideos,
             .backupUseCellularForPhotos => backup.useCellularForPhotos,
@@ -231,6 +239,7 @@ class AppConfig {
       .spaceAlbumsIsReverse => copyWith(spaceAlbums: spaceAlbums.copyWith(isReverse: value as bool)),
       .spacesSortMode => copyWith(spaces: spaces.copyWith(sortMode: value as SpaceSortMode)),
       .spacesIsReverse => copyWith(spaces: spaces.copyWith(isReverse: value as bool)),
+      .navShowSpaces => copyWith(nav: nav.copyWith(showSpaces: value as bool)),
       .backupEnabled => copyWith(backup: backup.copyWith(enabled: value as bool)),
       .backupUseCellularForVideos => copyWith(backup: backup.copyWith(useCellularForVideos: value as bool)),
       .backupUseCellularForPhotos => copyWith(backup: backup.copyWith(useCellularForPhotos: value as bool)),
