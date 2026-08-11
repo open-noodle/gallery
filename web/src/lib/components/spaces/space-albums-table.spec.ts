@@ -117,4 +117,26 @@ describe('SpaceAlbumsTable', () => {
       );
     });
   });
+
+  it('labels the item-count column with a proper header, not a stripped plural', () => {
+    render(SpaceAlbumsTable, { spaceId: 's-1', albums: [a1], canManage: false });
+
+    const headerTexts = screen.getAllByRole('columnheader').map((header) => header.textContent?.trim());
+
+    expect(headerTexts).toContain('Number of items');
+    // The bug rendered the bare fragment; assert on the exact string so a
+    // substring match cannot pass against it.
+    expect(headerTexts).not.toContain('items');
+  });
+
+  it('gives the item-count column header a base width so the longer label does not wrap', () => {
+    render(SpaceAlbumsTable, { spaceId: 's-1', albums: [a1], canManage: false });
+
+    const header = screen
+      .getAllByRole('columnheader')
+      .find((candidate) => candidate.textContent?.trim() === 'Number of items');
+
+    expect(header).toBeDefined();
+    expect(header?.className).toContain('w-4/12');
+  });
 });
