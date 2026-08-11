@@ -1,7 +1,7 @@
-import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/when_picker_footer.widget.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 
@@ -18,7 +18,7 @@ void main() {
     testWidgets('label shows all-time key when no selection', (tester) async {
       await tester.pumpConsumerWidget(const WhenPickerFooter());
       final labelWidget = tester.widget<Text>(find.byKey(const Key('when-picker-footer-label')));
-      expect(labelWidget.data, 'filter_sheet_picker_all_time'.tr());
+      expect(labelWidget.data, StaticTranslations.instance.filter_sheet_picker_all_time);
     });
 
     testWidgets('label shows "MONTH YEAR" for single-month selection', (tester) async {
@@ -29,7 +29,7 @@ void main() {
           .setDateRange(start: DateTime(2024, 11, 1), end: DateTime(2024, 11, 30, 23, 59, 59));
       await tester.pumpAndSettle();
       final labelWidget = tester.widget<Text>(find.byKey(const Key('when-picker-footer-label')));
-      expect(labelWidget.data, contains('filter_sheet_deep_when_month_nov'.tr()));
+      expect(labelWidget.data, contains(StaticTranslations.instance.filter_sheet_deep_when_month_nov));
       expect(labelWidget.data, contains('2024'));
     });
 
@@ -41,8 +41,8 @@ void main() {
           .setDateRange(start: DateTime(2024, 1, 1), end: DateTime(2024, 3, 31));
       await tester.pumpAndSettle();
       final labelWidget = tester.widget<Text>(find.byKey(const Key('when-picker-footer-label')));
-      expect(labelWidget.data, contains('filter_sheet_deep_when_month_jan'.tr()));
-      expect(labelWidget.data, contains('filter_sheet_deep_when_month_mar'.tr()));
+      expect(labelWidget.data, contains(StaticTranslations.instance.filter_sheet_deep_when_month_jan));
+      expect(labelWidget.data, contains(StaticTranslations.instance.filter_sheet_deep_when_month_mar));
       expect(labelWidget.data, contains('2024'));
       expect(labelWidget.data, contains('–'));
     });

@@ -1,6 +1,5 @@
 import 'package:drift/drift.dart' as drift;
 import 'package:drift/native.dart';
-import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/domain/models/person.model.dart';
@@ -8,6 +7,7 @@ import 'package:immich_mobile/domain/models/settings_key.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
@@ -128,7 +128,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('add_a_name'.tr()), findsOneWidget);
+      expect(find.text(StaticTranslations.instance.add_a_name), findsOneWidget);
     });
 
     testWidgets('hides the add-a-name affordance for a viewer-only space person', (tester) async {
@@ -143,7 +143,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('add_a_name'.tr()), findsNothing);
+      expect(find.text(StaticTranslations.instance.add_a_name), findsNothing);
     });
 
     testWidgets('still renders a viewer-only space person\'s name read-only', (tester) async {

@@ -1,6 +1,5 @@
 import 'package:drift/drift.dart' as drift;
 import 'package:drift/native.dart';
-import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -8,6 +7,7 @@ import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/people_section.widget.dart';
@@ -55,7 +55,7 @@ void main() {
 
       // DeepSectionScaffold renders the title as .tr().toUpperCase(); the
       // localized pump resolves it, so assert on the same value.
-      expect(find.text('filter_sheet_deep_people_section'.tr().toUpperCase()), findsOneWidget);
+      expect(find.text(StaticTranslations.instance.filter_sheet_deep_people_section.toUpperCase()), findsOneWidget);
       expect(find.text('Emma'), findsOneWidget);
       expect(find.text('Lars'), findsOneWidget);
       expect(find.byKey(const Key('people-section-search-more')), findsOneWidget);
