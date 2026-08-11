@@ -89,16 +89,26 @@ describe('Face identity query shape', () => {
 
   it('does not run vector similarity for people, filters, or identity-token asset paths', () => {
     const sqlText = collectIdentityQueryText();
+    // Each slice is delimited by method names. A rename that stops one matching used to yield ''
+    // silently, which would make every `not.toContain` below pass while checking nothing — so a
+    // miss is a hard failure instead.
+    const slice = (pattern: RegExp): string => {
+      const matched = pattern.exec(sqlText)?.[0];
+      if (!matched) {
+        throw new Error(`query-shape slice matched nothing: ${pattern} — did a method get renamed?`);
+      }
+      return matched;
+    };
     const identityOnlyText = [
-      /async getAccessiblePeopleIdentityPage[\s\S]*?async getAccessiblePeopleCounts/.exec(sqlText)?.[0] ?? '',
-      /async getAccessiblePeopleStatistics[\s\S]*?async getAccessiblePeopleIdentityPage/.exec(sqlText)?.[0] ?? '',
-      /async getAccessiblePeopleFaceStatistics[\s\S]*?async getAccessiblePersonByProfileId/.exec(sqlText)?.[0] ?? '',
-      /async getAccessiblePersonStatistics[\s\S]*?async getAccessibleProfileIdentityId/.exec(sqlText)?.[0] ?? '',
-      /async hydrateAccessiblePeople[\s\S]*?private mapAccessiblePerson/.exec(sqlText)?.[0] ?? '',
-      /async getAccessiblePersonFilterSuggestions[\s\S]*?async getAccessiblePeople/.exec(sqlText)?.[0] ?? '',
-      /async searchAccessiblePeople[\s\S]*?async getAccessiblePersonFilterSuggestions/.exec(sqlText)?.[0] ?? '',
-      /private async getFilteredIdentityPeople[\s\S]*?private async getFilteredRatings/.exec(sqlText)?.[0] ?? '',
-      /identity-filter-suggestions[\s\S]*?async getFilterSuggestions/.exec(sqlText)?.[0] ?? '',
+      slice(/private async queryAccessiblePeoplePage[\s\S]*?async hydrateAccessiblePeople/),
+      slice(/async getAccessiblePeopleStatistics[\s\S]*?async getAccessiblePeopleIdentityPage/),
+      slice(/async getAccessiblePeopleFaceStatistics[\s\S]*?async getAccessiblePersonByProfileId/),
+      slice(/async getAccessiblePersonStatistics[\s\S]*?async getAccessibleProfileIdentityId/),
+      slice(/async hydrateAccessiblePeople[\s\S]*?private mapAccessiblePerson/),
+      slice(/async getAccessiblePersonFilterSuggestions[\s\S]*?async getAccessiblePeople/),
+      slice(/async searchAccessiblePeople[\s\S]*?async getAccessiblePersonFilterSuggestions/),
+      slice(/private async getFilteredIdentityPeople[\s\S]*?private async getFilteredRatings/),
+      slice(/identity-filter-suggestions[\s\S]*?async getFilterSuggestions/),
     ].join('\n');
 
     expect(identityOnlyText).toContain('face_identity_face');
@@ -124,7 +134,7 @@ describe('Face identity query shape', () => {
 
   it('keeps pagination in the identity page query instead of hydrating all identities first', () => {
     const sqlText = collectIdentityQueryText();
-    const identityPageQuery = /async getAccessiblePeopleIdentityPage[\s\S]*?async getAccessiblePeopleCounts/.exec(
+    const identityPageQuery = /private async queryAccessiblePeoplePage[\s\S]*?async hydrateAccessiblePeople/.exec(
       sqlText,
     )?.[0];
 
