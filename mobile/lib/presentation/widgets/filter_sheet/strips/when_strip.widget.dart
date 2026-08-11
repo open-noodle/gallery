@@ -4,6 +4,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 
 Future<void> _openPicker(BuildContext context, WidgetRef ref) async {
@@ -51,7 +52,7 @@ class WhenStrip extends ConsumerWidget {
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
           child: Text(
-            'filter_sheet_when'.tr().toUpperCase(),
+            context.t.filter_sheet_when.toUpperCase(),
             style: theme.textTheme.labelSmall?.copyWith(letterSpacing: 2, color: theme.colorScheme.outline),
           ),
         ),
@@ -148,7 +149,7 @@ class _CustomPill extends ConsumerWidget {
         },
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          child: Text('filter_sheet_when_custom'.tr(), style: theme.textTheme.labelLarge),
+          child: Text(context.t.filter_sheet_when_custom, style: theme.textTheme.labelLarge),
         ),
       ),
     );
