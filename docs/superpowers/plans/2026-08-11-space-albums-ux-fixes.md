@@ -732,7 +732,20 @@ and add the top-level builder beside the others at the bottom of the file:
 SpacesRoute _spacesRoute() => const SpacesRoute();
 ```
 
-Do **not** add a `default:` clause anywhere to silence exhaustiveness errors — that guarantee is the main safety net for this whole feature. `_onTabTap`'s `switch` in `gallery_bottom_nav.widget.dart` returns `void`, so it does not error here; Task 8 adds its `spaces` case.
+Do **not** add a `default:` clause anywhere to silence exhaustiveness errors — that guarantee is the main safety net for this whole feature.
+
+`_onTabTap`'s `switch` in `gallery_bottom_nav.widget.dart` **also errors**, and needs a case here too. An earlier draft of this plan claimed a `void` switch statement was exempt from exhaustiveness; that is false on Dart 3.12.2 (Flutter 3.44.8), which reports `Error: The type 'GalleryTabEnum' is not exhaustively matched by the switch cases since it doesn't match 'GalleryTabEnum.spaces'` from the frontend compiler — so `flutter test` cannot even compile the file. Add a placeholder case, not a `default:`:
+
+```dart
+      case GalleryTabEnum.spaces:
+        // Exhaustiveness only — Spaces cannot occupy a nav slot until the
+        // setting and slots provider land. The real side effect (invalidating
+        // sharedSpacesProvider, mirroring the albums case above) arrives with
+        // the wiring that makes this reachable.
+        break;
+```
+
+Task 8 replaces this switch body wholesale.
 
 - [ ] **Step 6: Confirm the tree compiles and the nav tests still pass**
 
