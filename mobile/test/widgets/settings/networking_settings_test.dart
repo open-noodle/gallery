@@ -1,6 +1,5 @@
 import 'package:drift/drift.dart' as drift;
 import 'package:drift/native.dart';
-import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -8,6 +7,7 @@ import 'package:immich_mobile/domain/models/settings_key.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
@@ -105,18 +105,18 @@ void main() {
     await pumpNetworkingSettings(tester, authNotifier: authNotifier, networkService: networkService);
     await tester.pumpAndSettle();
 
-    expect(find.text('location_permission'.tr()), findsOneWidget);
-    expect(find.text('cancel'.tr()), findsOneWidget);
-    expect(find.text('grant_permission'.tr()), findsOneWidget);
+    expect(find.text(StaticTranslations.instance.location_permission), findsOneWidget);
+    expect(find.text(StaticTranslations.instance.cancel), findsOneWidget);
+    expect(find.text(StaticTranslations.instance.grant_permission), findsOneWidget);
 
-    await tester.tap(find.text('cancel'.tr()));
+    await tester.tap(find.text(StaticTranslations.instance.cancel));
     await tester.pumpAndSettle();
 
-    expect(find.text('location_permission'.tr()), findsNothing);
+    expect(find.text(StaticTranslations.instance.location_permission), findsNothing);
     verifyNever(() => permissionRepository.requestLocationWhenInUsePermission());
     verifyNever(() => permissionRepository.requestLocationAlwaysPermission());
     verifyNever(() => permissionRepository.openSettings());
-    expect(find.text('background_location_permission'.tr()), findsNothing);
+    expect(find.text(StaticTranslations.instance.background_location_permission), findsNothing);
   });
 
   testWidgets('background location disclosure can be declined without opening settings', (tester) async {
@@ -127,14 +127,14 @@ void main() {
     await pumpNetworkingSettings(tester, authNotifier: authNotifier, networkService: networkService);
     await tester.pumpAndSettle();
 
-    expect(find.text('background_location_permission'.tr()), findsOneWidget);
-    expect(find.text('cancel'.tr()), findsOneWidget);
-    expect(find.text('grant_permission'.tr()), findsOneWidget);
+    expect(find.text(StaticTranslations.instance.background_location_permission), findsOneWidget);
+    expect(find.text(StaticTranslations.instance.cancel), findsOneWidget);
+    expect(find.text(StaticTranslations.instance.grant_permission), findsOneWidget);
 
-    await tester.tap(find.text('cancel'.tr()));
+    await tester.tap(find.text(StaticTranslations.instance.cancel));
     await tester.pumpAndSettle();
 
-    expect(find.text('background_location_permission'.tr()), findsNothing);
+    expect(find.text(StaticTranslations.instance.background_location_permission), findsNothing);
     verifyNever(() => permissionRepository.requestLocationAlwaysPermission());
     verifyNever(() => permissionRepository.openSettings());
   });
@@ -149,9 +149,9 @@ void main() {
     await pumpNetworkingSettings(tester, authNotifier: authNotifier, networkService: networkService);
     await tester.pumpAndSettle();
 
-    expect(find.text('background_location_permission'.tr()), findsOneWidget);
+    expect(find.text(StaticTranslations.instance.background_location_permission), findsOneWidget);
 
-    await tester.tap(find.text('grant_permission'.tr()));
+    await tester.tap(find.text(StaticTranslations.instance.grant_permission));
     await pumpDisclosureAction(tester);
 
     verify(() => permissionRepository.requestLocationAlwaysPermission()).called(1);
@@ -165,14 +165,14 @@ void main() {
     await pumpNetworkingSettings(tester, authNotifier: authNotifier, networkService: networkService);
     await tester.pumpAndSettle();
 
-    expect(find.text('location_permission'.tr()), findsOneWidget);
+    expect(find.text(StaticTranslations.instance.location_permission), findsOneWidget);
 
-    await tester.tap(find.text('grant_permission'.tr()));
+    await tester.tap(find.text(StaticTranslations.instance.grant_permission));
     await pumpDisclosureAction(tester);
 
-    expect(find.text('background_location_permission'.tr()), findsOneWidget);
+    expect(find.text(StaticTranslations.instance.background_location_permission), findsOneWidget);
 
-    await tester.tap(find.text('grant_permission'.tr()));
+    await tester.tap(find.text(StaticTranslations.instance.grant_permission));
     await pumpDisclosureAction(tester);
 
     expect(Store.get(StoreKey.autoEndpointLocationDisclosureAccepted), isTrue);
@@ -188,14 +188,14 @@ void main() {
     await pumpNetworkingSettings(tester, authNotifier: authNotifier, networkService: networkService);
     await tester.pumpAndSettle();
 
-    expect(find.text('location_permission'.tr()), findsOneWidget);
+    expect(find.text(StaticTranslations.instance.location_permission), findsOneWidget);
 
-    await tester.tap(find.text('cancel'.tr()));
+    await tester.tap(find.text(StaticTranslations.instance.cancel));
     await tester.pumpAndSettle();
 
-    expect(find.text('location_permission'.tr()), findsNothing);
+    expect(find.text(StaticTranslations.instance.location_permission), findsNothing);
 
-    await tester.tap(find.text('use_current_connection'.tr()));
+    await tester.tap(find.text(StaticTranslations.instance.use_current_connection));
     await tester.pumpAndSettle();
 
     verifyNever(() => networkRepository.getWifiName());

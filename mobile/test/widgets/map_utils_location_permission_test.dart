@@ -5,6 +5,7 @@ import 'package:immich_mobile/presentation/widgets/map/map_utils.dart' as presen
 import 'package:immich_mobile/utils/map_utils.dart' as legacy_map;
 
 import '../test_utils.dart';
+import '../widget_tester_extensions.dart';
 
 typedef LocationChecker =
     Future<(Position?, LocationPermission?)> Function({required BuildContext context, bool silent});
@@ -29,12 +30,14 @@ void main() {
 
       late BuildContext context;
       await tester.pumpWidget(
-        MaterialApp(
-          home: Builder(
-            builder: (builderContext) {
-              context = builderContext;
-              return const SizedBox();
-            },
+        localizedForTest(
+          MaterialApp(
+            home: Builder(
+              builder: (builderContext) {
+                context = builderContext;
+                return const SizedBox();
+              },
+            ),
           ),
         ),
       );
@@ -65,12 +68,14 @@ void main() {
 
       late BuildContext context;
       await tester.pumpWidget(
-        MaterialApp(
-          home: Builder(
-            builder: (builderContext) {
-              context = builderContext;
-              return const SizedBox();
-            },
+        localizedForTest(
+          MaterialApp(
+            home: Builder(
+              builder: (builderContext) {
+                context = builderContext;
+                return const SizedBox();
+              },
+            ),
           ),
         ),
       );
@@ -105,12 +110,14 @@ void main() {
 
       late BuildContext context;
       await tester.pumpWidget(
-        MaterialApp(
-          home: Builder(
-            builder: (builderContext) {
-              context = builderContext;
-              return const SizedBox();
-            },
+        localizedForTest(
+          MaterialApp(
+            home: Builder(
+              builder: (builderContext) {
+                context = builderContext;
+                return const SizedBox();
+              },
+            ),
           ),
         ),
       );

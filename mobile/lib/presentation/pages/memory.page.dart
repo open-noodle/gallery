@@ -27,10 +27,10 @@ String getMemoryTitle(BuildContext context, DriftMemory memory) {
   final year = memory.data.year;
   if (year != null) {
     final yearsAgo = DateTime.now().year - year;
-    return 'years_ago'.t(context: context, args: {'years': yearsAgo.toString()});
+    return context.t.years_ago(years: yearsAgo);
   }
 
-  return 'memory'.t(context: context);
+  return context.t.memory;
 }
 
 /// Expects the current asset to be set via [assetViewerProvider] before navigating to this page
