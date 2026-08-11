@@ -1,6 +1,6 @@
-import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/providers/infrastructure/tag.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 
@@ -28,14 +28,14 @@ class SelectedTagsStrip extends ConsumerWidget {
         separatorBuilder: (_, _) => const SizedBox(width: 8),
         itemBuilder: (context, i) {
           final id = tagIds[i];
-          final label = tagsById[id] ?? 'filter_sheet_tag_fallback'.tr();
+          final label = tagsById[id] ?? context.t.filter_sheet_tag_fallback;
           return ConstrainedBox(
             key: Key('selected-tag-chip-$id'),
             constraints: const BoxConstraints(maxWidth: 220),
             child: InputChip(
               label: Text(label, overflow: TextOverflow.ellipsis, maxLines: 1),
               deleteIcon: const Icon(Icons.close_rounded, size: 18),
-              deleteButtonTooltipMessage: 'remove_filter'.tr(),
+              deleteButtonTooltipMessage: context.t.remove_filter,
               onDeleted: () => ref.read(photosFilterProvider.notifier).toggleTag(id),
             ),
           );

@@ -1,6 +1,7 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/providers/photos_filter/filter_count.provider.dart';
 
 /// Live-region label for the current match count.
@@ -15,8 +16,8 @@ class MatchCountLabel extends ConsumerWidget {
     final count = ref.watch(photosFilterCountProvider);
     final label = count.when(
       data: _formatPlural,
-      loading: () => 'filter_sheet_match_count_loading'.tr(),
-      error: (_, _) => 'filter_sheet_match_count_loading'.tr(),
+      loading: () => context.t.filter_sheet_match_count_loading,
+      error: (_, _) => context.t.filter_sheet_match_count_loading,
     );
     return Semantics(
       liveRegion: true,
@@ -37,7 +38,7 @@ class MatchCountLabel extends ConsumerWidget {
     // key returns the variant Map; `.plural()` hits Localization._locale which
     // is a late field that isn't set without an EasyLocalization ancestor
     // (e.g. in unit tests). Looking up the nested `.zero` leaf sidesteps both.
-    if (count == 0) return 'filter_sheet_match_count_photos.zero'.tr();
+    if (count == 0) return StaticTranslations.instance.filter_sheet_match_count_photos.zero;
     final formatted = NumberFormat.decimalPattern(Intl.getCurrentLocale()).format(count);
     return 'filter_sheet_match_count_photos'.plural(count, args: [formatted]);
   }

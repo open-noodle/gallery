@@ -4,7 +4,7 @@ import 'package:immich_mobile/constants/collection.dart';
 import 'package:immich_mobile/domain/models/collection_target.dart';
 import 'package:immich_mobile/domain/models/space_album.model.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
-import 'package:immich_mobile/extensions/translate_extensions.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/providers/infrastructure/space_album.provider.dart';
 import 'package:immich_mobile/providers/shared_space.provider.dart';
 import 'package:immich_mobile/providers/timeline/multiselect.provider.dart';
@@ -95,14 +95,11 @@ class _SpaceCollectionSectionState extends ConsumerState<SpaceCollectionSection>
 
     final String? notice;
     if (selectionHasNonOwned(selection, userId)) {
-      notice = 'spaces_hidden_non_owned_selection'.t(context: context);
+      notice = context.t.spaces_hidden_non_owned_selection;
     } else if (selectionHasLocked(selection)) {
-      notice = 'spaces_hidden_non_owned_selection'.t(context: context);
+      notice = context.t.spaces_hidden_non_owned_selection;
     } else if (selectionExceedsSpaceCap(selection)) {
-      notice = 'spaces_hidden_too_many_assets'.t(
-        context: context,
-        args: {'count': kMaxSpaceAssetsPerRequest.toString()},
-      );
+      notice = context.t.spaces_hidden_too_many_assets(count: kMaxSpaceAssetsPerRequest);
     } else {
       notice = null;
     }
@@ -114,7 +111,7 @@ class _SpaceCollectionSectionState extends ConsumerState<SpaceCollectionSection>
         Padding(
           key: const Key('space-collection-header'),
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: Text('spaces'.t(context: context), style: context.textTheme.labelLarge),
+          child: Text(context.t.spaces, style: context.textTheme.labelLarge),
         ),
         if (notice != null)
           Padding(
@@ -172,7 +169,7 @@ class _SpaceCollectionSectionState extends ConsumerState<SpaceCollectionSection>
         key: Key('space-pool-child-${space.id}'),
         contentPadding: const EdgeInsets.only(left: 48, right: 16),
         leading: const Icon(Icons.workspaces_outline),
-        title: Text('add_to_space'.t(context: context)),
+        title: Text(context.t.add_to_space),
         enabled: !widget.isBusy,
         onTap: widget.isBusy ? null : () => _emit(SpacePoolTarget(space)),
       ),
@@ -180,7 +177,7 @@ class _SpaceCollectionSectionState extends ConsumerState<SpaceCollectionSection>
         Padding(
           key: Key('space-albums-empty-${space.id}'),
           padding: const EdgeInsets.only(left: 48, right: 16, bottom: 8),
-          child: Text('no_albums_in_space_yet'.t(context: context), style: context.textTheme.bodySmall),
+          child: Text(context.t.no_albums_in_space_yet, style: context.textTheme.bodySmall),
         )
       else
         for (final album in albums)

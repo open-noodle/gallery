@@ -1,13 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/search_result.model.dart';
 import 'package:immich_mobile/domain/services/search.service.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/models/search/search_filter.model.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_empty_state.widget.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
@@ -91,7 +91,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('timeline_empty_title'.tr()), findsOneWidget);
+    expect(find.text(StaticTranslations.instance.timeline_empty_title), findsOneWidget);
     expect(find.byType(FilledButton), findsOneWidget);
     expect(find.byType(ImmichLoadingIndicator), findsNothing);
   });
@@ -145,13 +145,13 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('timeline_empty_filtered_title'.tr()), findsOneWidget);
-    expect(find.text('timeline_empty_clear_filters'.tr()), findsOneWidget);
+    expect(find.text(StaticTranslations.instance.timeline_empty_filtered_title), findsOneWidget);
+    expect(find.text(StaticTranslations.instance.timeline_empty_clear_filters), findsOneWidget);
 
-    await tester.tap(find.text('timeline_empty_clear_filters'.tr()));
+    await tester.tap(find.text(StaticTranslations.instance.timeline_empty_clear_filters));
     await tester.pump();
 
-    expect(find.text('timeline_empty_filtered_title'.tr()), findsNothing);
+    expect(find.text(StaticTranslations.instance.timeline_empty_filtered_title), findsNothing);
     expect(find.byType(ImmichLoadingIndicator), findsOneWidget);
   });
 }

@@ -1,8 +1,8 @@
 import 'dart:async';
-import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
 import 'package:immich_mobile/providers/photos_filter/active_chips.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
@@ -37,7 +37,7 @@ class ActiveFilterChip extends ConsumerWidget {
 
     return Semantics(
       button: true,
-      label: spec.semanticsLabel ?? '${spec.label}, ${'remove_filter'.tr()}',
+      label: spec.semanticsLabel ?? '${spec.label}, ${context.t.remove_filter}',
       onTap: removeChip,
       child: ExcludeSemantics(
         child: Material(

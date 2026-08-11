@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
-import 'package:immich_mobile/extensions/translate_extensions.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/repositories/shared_space_api.repository.dart';
 import 'package:immich_mobile/widgets/common/immich_toast.dart';
 import 'package:immich_mobile/widgets/spaces/space_collage.dart';
@@ -91,11 +91,7 @@ class _SpaceEditSheetState extends ConsumerState<SpaceEditSheet> {
       // disabled forever would be a real (if latent) bug on any caller that doesn't
       // immediately tear the sheet down.
       setState(() => _isSaving = false);
-      ImmichToast.show(
-        context: context,
-        msg: 'spaces_edit_success'.t(context: context),
-        toastType: ToastType.success,
-      );
+      ImmichToast.show(context: context, msg: context.t.spaces_edit_success, toastType: ToastType.success);
       widget.onClose(true);
     } catch (_) {
       if (!mounted) return;
@@ -105,11 +101,7 @@ class _SpaceEditSheetState extends ConsumerState<SpaceEditSheet> {
       // 3s fluttertoast Timer outside the frame scheduler, so any widget test that
       // reaches this path must pump past it (see the test's `settleToast` helper) or
       // teardown reports a pending timer.
-      ImmichToast.show(
-        context: context,
-        msg: 'errors.unable_to_update_space'.t(context: context),
-        toastType: ToastType.error,
-      );
+      ImmichToast.show(context: context, msg: context.t.errors.unable_to_update_space, toastType: ToastType.error);
     }
   }
 
@@ -123,7 +115,7 @@ class _SpaceEditSheetState extends ConsumerState<SpaceEditSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('spaces_edit'.t(context: context), style: context.textTheme.titleMedium),
+              Text(context.t.spaces_edit, style: context.textTheme.titleMedium),
               const SizedBox(height: 16),
               TextField(
                 key: const Key('space-edit-name'),
@@ -136,7 +128,7 @@ class _SpaceEditSheetState extends ConsumerState<SpaceEditSheet> {
                 // framework's own tap-to-position gesture move the caret away from wherever
                 // the user last left it -- select-once only.
                 enableInteractiveSelection: false,
-                decoration: InputDecoration(labelText: 'name'.t(context: context)),
+                decoration: InputDecoration(labelText: context.t.name),
                 onChanged: (_) => setState(() {}),
               ),
               const SizedBox(height: 8),
@@ -146,10 +138,10 @@ class _SpaceEditSheetState extends ConsumerState<SpaceEditSheet> {
                 maxLength: 500,
                 maxLines: 3,
                 minLines: 1,
-                decoration: InputDecoration(labelText: 'description'.t(context: context)),
+                decoration: InputDecoration(labelText: context.t.description),
               ),
               const SizedBox(height: 8),
-              Text('color'.t(context: context), style: context.textTheme.labelLarge),
+              Text(context.t.color, style: context.textTheme.labelLarge),
               const SizedBox(height: 8),
               Wrap(spacing: 8, runSpacing: 8, children: [for (final color in UserAvatarColor.values) _swatch(color)]),
               const SizedBox(height: 16),
@@ -159,13 +151,13 @@ class _SpaceEditSheetState extends ConsumerState<SpaceEditSheet> {
                   TextButton(
                     key: const Key('space-edit-cancel'),
                     onPressed: _isSaving ? null : () => widget.onClose(null),
-                    child: Text('cancel'.t(context: context)),
+                    child: Text(context.t.cancel),
                   ),
                   const SizedBox(width: 8),
                   FilledButton(
                     key: const Key('space-edit-save'),
                     onPressed: _canSave ? _save : null,
-                    child: Text('save'.t(context: context)),
+                    child: Text(context.t.save),
                   ),
                 ],
               ),
