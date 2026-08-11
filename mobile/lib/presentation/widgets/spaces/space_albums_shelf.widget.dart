@@ -93,7 +93,7 @@ class SpaceAlbumsShelf extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header row: "Albums (N)  See all ▸"
-          _HeaderRow(count: albums.length, showSeeAll: albums.isNotEmpty, onSeeAll: onSeeAll),
+          _HeaderRow(count: albums.length, onSeeAll: onSeeAll),
           const SizedBox(height: 8),
           // Horizontal scroll of tiles
           Expanded(
@@ -133,31 +133,39 @@ class SpaceAlbumsShelf extends ConsumerWidget {
 // ---------------------------------------------------------------------------
 
 class _HeaderRow extends StatelessWidget {
-  const _HeaderRow({required this.count, required this.showSeeAll, this.onSeeAll});
+  const _HeaderRow({required this.count, this.onSeeAll});
   final int count;
-  final bool showSeeAll;
   final VoidCallback? onSeeAll;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            'space_albums_shelf_title'.t(context: context, args: {'count': count}),
-            style: context.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-          ),
-          if (showSeeAll)
-            GestureDetector(
-              onTap: onSeeAll,
-              child: Text(
-                'space_albums_see_all'.t(context: context),
-                style: context.textTheme.bodySmall?.copyWith(color: context.colorScheme.primary),
-              ),
+    // The whole row, not just the "See all" text: the old target was the text's
+    // own bounds. The InkWell adds no height, so kSpaceAlbumsShelfHeight and
+    // SpaceTopSliver's reserved height are untouched.
+    return InkWell(
+      key: const Key('space-albums-shelf-see-all'),
+      onTap: onSeeAll,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'space_albums_shelf_title'.t(context: context, args: {'count': count}),
+              style: context.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
             ),
-        ],
+            // Deliberately unconditional. Gating this on `albums.isNotEmpty`
+            // left a space with no linked albums with NO route to the albums
+            // page at all — and that page is the only place an editor can
+            // create an album or a folder. The viewer-with-no-albums case is
+            // already handled one level up, where _buildShelf returns
+            // SizedBox.shrink before this widget is built.
+            Text(
+              'space_albums_see_all'.t(context: context),
+              style: context.textTheme.bodySmall?.copyWith(color: context.colorScheme.primary),
+            ),
+          ],
+        ),
       ),
     );
   }
