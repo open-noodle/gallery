@@ -3,6 +3,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/filter_section_id.dart';
 import 'package:immich_mobile/providers/photos_filter/hidden_sections.provider.dart';
 
@@ -28,7 +29,7 @@ class ManageSectionsSheet extends ConsumerWidget {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
-              child: Text('filter_sheet_deep_manage_sections'.tr(), style: theme.textTheme.titleMedium),
+              child: Text(context.t.filter_sheet_deep_manage_sections, style: theme.textTheme.titleMedium),
             ),
             for (final section in FilterSectionId.values)
               SwitchListTile.adaptive(

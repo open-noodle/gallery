@@ -47,7 +47,7 @@ class NetworkingSettings extends HookConsumerWidget {
               title: Text(context.t.location_permission),
               content: Text(context.t.location_permission_content),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(dialogContext), child: Text("cancel".tr())),
+                TextButton(onPressed: () => Navigator.pop(dialogContext), child: Text(context.t.cancel)),
                 TextButton(
                   onPressed: () async {
                     final isGrant = hasLocationInUse
@@ -60,7 +60,7 @@ class NetworkingSettings extends HookConsumerWidget {
 
                     Navigator.pop(dialogContext, isGrant);
                   },
-                  child: Text("grant_permission".tr()),
+                  child: Text(context.t.grant_permission),
                 ),
               ],
             );
@@ -85,10 +85,10 @@ class NetworkingSettings extends HookConsumerWidget {
           context: context,
           builder: (dialogContext) {
             return AlertDialog(
-              title: Text("background_location_permission".tr()),
-              content: Text("background_location_permission_content".tr()),
+              title: Text(context.t.background_location_permission),
+              content: Text(context.t.background_location_permission_content),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(dialogContext), child: Text("cancel".tr())),
+                TextButton(onPressed: () => Navigator.pop(dialogContext), child: Text(context.t.cancel)),
                 TextButton(
                   onPressed: () async {
                     final isGrant = hasLocationAlways

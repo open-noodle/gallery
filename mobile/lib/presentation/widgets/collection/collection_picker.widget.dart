@@ -1,10 +1,11 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/constants/enums.dart';
 import 'package:immich_mobile/domain/models/album/album.model.dart';
 import 'package:immich_mobile/domain/models/collection_target.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
-import 'package:immich_mobile/extensions/translate_extensions.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/widgets/album/album_selector.widget.dart';
 import 'package:immich_mobile/presentation/widgets/collection/space_collection_section.widget.dart';
 import 'package:immich_mobile/providers/infrastructure/action.provider.dart';
@@ -48,8 +49,8 @@ class _CollectionPickerState extends ConsumerState<CollectionPicker> {
     ImmichToast.show(
       context: context,
       msg: result.count == 0
-          ? 'add_to_album_bottom_sheet_already_exists'.t(context: context, args: {'album': album.name})
-          : 'add_to_album_bottom_sheet_added'.t(context: context, args: {'album': album.name}),
+          ? context.t.add_to_album_bottom_sheet_already_exists(album: album.name)
+          : context.t.add_to_album_bottom_sheet_added(album: album.name),
     );
   }
 
@@ -84,18 +85,14 @@ class _CollectionPickerState extends ConsumerState<CollectionPicker> {
     if (successMessage != null) {
       ImmichToast.show(
         context: context,
-        msg: successMessage.t(context: context, args: {'count': result.count.toString()}),
+        msg: successMessage.tr(namedArgs: {'count': result.count.toString()}),
         toastType: ToastType.success,
       );
     }
   }
 
   void _toastError() {
-    ImmichToast.show(
-      context: context,
-      msg: 'scaffold_body_error_occurred'.t(context: context),
-      toastType: ToastType.error,
-    );
+    ImmichToast.show(context: context, msg: context.t.scaffold_body_error_occurred, toastType: ToastType.error);
   }
 
   @override
@@ -106,7 +103,7 @@ class _CollectionPickerState extends ConsumerState<CollectionPicker> {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
           sliver: SliverToBoxAdapter(
             child: Text(
-              'add_to_album_or_space'.t(context: context),
+              context.t.add_to_album_or_space,
               key: const Key('collection-picker-header'),
               style: context.textTheme.titleSmall,
             ),
@@ -116,7 +113,7 @@ class _CollectionPickerState extends ConsumerState<CollectionPicker> {
           onAlbumSelected: _addToAlbum,
           onKeyboardExpanded: widget.onKeyboardExpanded,
           onSearchChanged: (query) => setState(() => _searchQuery = query),
-          searchHint: 'search_albums_and_spaces'.t(context: context),
+          searchHint: context.t.search_albums_and_spaces,
         ),
         SliverToBoxAdapter(
           child: SpaceCollectionSection(

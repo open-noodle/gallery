@@ -116,17 +116,14 @@ class AlbumOptionsPage extends HookConsumerWidget {
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: Text("unlink_album_from_space".t(context: ctx, args: {'space': spaceName})),
-          content: Text("unlink_album_from_space_confirmation".t(context: ctx, args: {'space': spaceName})),
+          title: Text(ctx.t.unlink_album_from_space(space: spaceName)),
+          content: Text(ctx.t.unlink_album_from_space_confirmation(space: spaceName)),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text("cancel".t(context: ctx)),
-            ),
+            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(ctx.t.cancel)),
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(true),
               style: TextButton.styleFrom(foregroundColor: Theme.of(ctx).colorScheme.error),
-              child: Text("spaces_linked_albums_unlink".t(context: ctx)),
+              child: Text(ctx.t.spaces_linked_albums_unlink),
             ),
           ],
         ),
@@ -145,7 +142,7 @@ class AlbumOptionsPage extends HookConsumerWidget {
         if (context.mounted) {
           ImmichToast.show(
             context: context,
-            msg: "spaces_linked_albums_error_unlink".t(context: context),
+            msg: context.t.spaces_linked_albums_error_unlink,
             toastType: ToastType.error,
           );
         }
@@ -163,7 +160,7 @@ class AlbumOptionsPage extends HookConsumerWidget {
           return Column(
             key: const Key('album-linked-spaces-section'),
             children: [
-              buildSectionTitle("linked_spaces".t(context: context)),
+              buildSectionTitle(context.t.linked_spaces),
               ListView.builder(
                 primary: false,
                 shrinkWrap: true,
@@ -177,7 +174,7 @@ class AlbumOptionsPage extends HookConsumerWidget {
                     subtitle: link.showInTimeline
                         ? null
                         : Text(
-                            "space_albums_hidden_from_timeline".t(context: context),
+                            context.t.space_albums_hidden_from_timeline,
                             key: Key('album-space-link-hidden-badge-${link.spaceId}'),
                             style: TextStyle(color: context.colorScheme.onSurfaceSecondary),
                           ),

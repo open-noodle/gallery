@@ -103,7 +103,9 @@ class PhotosFilterNotifier extends Notifier<SearchFilter> {
       case Dimension.mediaType:
         setMediaType(null);
       case Dimension.display:
-        state = state.copyWith(display: SearchDisplayFilters(isFavorite: false, isArchive: false, isNotInAlbum: false));
+        state = state.copyWith(
+          display: const SearchDisplayFilters(isFavorite: false, isArchive: false, isNotInAlbum: false),
+        );
       case Dimension.text:
         setText('');
     }

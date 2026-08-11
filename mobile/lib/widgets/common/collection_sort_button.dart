@@ -1,6 +1,7 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
-import 'package:immich_mobile/extensions/translate_extensions.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 
 /// A single option offered by a [CollectionSortButton]: a sort mode paired
 /// with the i18n key used to render its label.
@@ -62,10 +63,7 @@ class CollectionSortButton<T> extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'sort_by_label'.t(
-                  context: context,
-                  args: {'label': currentOption.label.t(context: context)},
-                ),
+                context.t.sort_by_label(label: currentOption.label.tr()),
                 style: context.textTheme.labelLarge?.copyWith(color: context.colorScheme.onSurface.withAlpha(225)),
               ),
             ],
@@ -92,7 +90,7 @@ class CollectionSortButton<T> extends StatelessWidget {
         ),
       ),
       child: Text(
-        option.label.t(context: context),
+        option.label.tr(),
         style: context.textTheme.labelLarge?.copyWith(
           color: isSelected ? context.colorScheme.onPrimary : context.colorScheme.onSurface.withAlpha(185),
         ),

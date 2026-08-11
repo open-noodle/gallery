@@ -1,8 +1,8 @@
 import 'dart:async';
-import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/collapsible_section.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/filter_section_id.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
@@ -28,7 +28,7 @@ class TogglesSection extends ConsumerWidget {
             SwitchListTile.adaptive(
               key: const Key('toggle-favourites'),
               contentPadding: EdgeInsets.zero,
-              title: Text('filter_sheet_favourites'.tr()),
+              title: Text(context.t.filter_sheet_favourites),
               value: display.isFavorite,
               onChanged: (v) {
                 unawaited(HapticFeedback.selectionClick());
@@ -38,7 +38,7 @@ class TogglesSection extends ConsumerWidget {
             SwitchListTile.adaptive(
               key: const Key('toggle-archived'),
               contentPadding: EdgeInsets.zero,
-              title: Text('filter_sheet_archived'.tr()),
+              title: Text(context.t.filter_sheet_archived),
               value: display.isArchive,
               onChanged: (v) {
                 unawaited(HapticFeedback.selectionClick());
@@ -48,7 +48,7 @@ class TogglesSection extends ConsumerWidget {
             SwitchListTile.adaptive(
               key: const Key('toggle-not-in-album'),
               contentPadding: EdgeInsets.zero,
-              title: Text('filter_sheet_not_in_album'.tr()),
+              title: Text(context.t.filter_sheet_not_in_album),
               value: display.isNotInAlbum,
               onChanged: (v) {
                 unawaited(HapticFeedback.selectionClick());
@@ -58,7 +58,7 @@ class TogglesSection extends ConsumerWidget {
             SwitchListTile.adaptive(
               key: const Key('toggle-untagged'),
               contentPadding: EdgeInsets.zero,
-              title: Text('untagged'.tr()),
+              title: Text(context.t.untagged),
               value: display.isUntagged,
               onChanged: (v) {
                 unawaited(HapticFeedback.selectionClick());

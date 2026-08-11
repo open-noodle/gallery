@@ -1,8 +1,8 @@
-import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/tag.model.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/tags_picker.page.dart';
 import 'package:immich_mobile/providers/infrastructure/tag.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
@@ -45,7 +45,7 @@ void main() {
     testWidgets('renders AppBar with back icon, title key, and Done button', (tester) async {
       await tester.pumpConsumerWidget(const TagsPickerPage(), overrides: _overrides({}));
       expect(find.byIcon(Icons.arrow_back_rounded), findsOneWidget);
-      expect(find.text('filter_sheet_picker_tags_title'.tr()), findsOneWidget);
+      expect(find.text(StaticTranslations.instance.filter_sheet_picker_tags_title), findsOneWidget);
       expect(find.byKey(const Key('tags-picker-done')), findsOneWidget);
     });
 

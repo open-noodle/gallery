@@ -1,6 +1,5 @@
 import 'package:drift/drift.dart' as drift;
 import 'package:drift/native.dart';
-import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -10,6 +9,7 @@ import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/domain/models/timeline_grouping.model.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
@@ -184,7 +184,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.descendant(of: find.byType(GroupSettings), matching: find.text('month'.tr())));
+      await tester.tap(
+        find.descendant(of: find.byType(GroupSettings), matching: find.text(StaticTranslations.instance.month)),
+      );
       await tester.pumpAndSettle();
 
       expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.month);

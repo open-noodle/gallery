@@ -4,7 +4,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/settings_key.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
-import 'package:immich_mobile/extensions/translate_extensions.dart';
+import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/pages/library/spaces/collection_sort.dart';
 import 'package:immich_mobile/presentation/widgets/spaces/space_edit_sheet.widget.dart';
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
@@ -88,17 +88,14 @@ class SpacesPage extends HookConsumerWidget {
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: Text('spaces_delete'.t(context: ctx)),
-          content: Text('spaces_delete_confirmation'.t(context: ctx, args: {'name': space.name})),
+          title: Text(ctx.t.spaces_delete),
+          content: Text(ctx.t.spaces_delete_confirmation(name: space.name)),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text('cancel'.t(context: ctx)),
-            ),
+            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(ctx.t.cancel)),
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(true),
               style: TextButton.styleFrom(foregroundColor: Theme.of(ctx).colorScheme.error),
-              child: Text('delete'.t(context: ctx)),
+              child: Text(ctx.t.delete),
             ),
           ],
         ),
@@ -130,7 +127,7 @@ class SpacesPage extends HookConsumerWidget {
               ListTile(
                 key: const Key('space-card-action-edit'),
                 leading: const Icon(Icons.edit_outlined),
-                title: Text('spaces_edit'.t(context: sheetContext)),
+                title: Text(sheetContext.t.spaces_edit),
                 onTap: () async {
                   Navigator.of(sheetContext).pop();
                   final saved = await SpaceEditSheet.show(context, space);
@@ -141,7 +138,7 @@ class SpacesPage extends HookConsumerWidget {
                 ListTile(
                   key: const Key('space-card-action-delete'),
                   leading: const Icon(Icons.delete_outline),
-                  title: Text('spaces_delete'.t(context: sheetContext)),
+                  title: Text(sheetContext.t.spaces_delete),
                   onTap: () async {
                     Navigator.of(sheetContext).pop();
                     await confirmAndDeleteSpace(space);
@@ -294,7 +291,7 @@ class _SearchAndSortBar extends StatelessWidget {
         children: [
           SearchField(
             key: const Key('spaces-search-field'),
-            hintText: 'spaces_search_hint'.t(context: context),
+            hintText: context.t.spaces_search_hint,
             controller: controller,
             prefixIcon: const Icon(Icons.search_rounded),
             suffixIcon: hasQuery
@@ -311,11 +308,8 @@ class _SearchAndSortBar extends StatelessWidget {
             children: [
               Text(
                 query.isEmpty
-                    ? 'spaces_result_count'.t(context: context, args: {'count': resultCount.toString()})
-                    : 'spaces_page_search_result_count'.t(
-                        context: context,
-                        args: {'count': resultCount.toString(), 'total': totalCount.toString(), 'query': query},
-                      ),
+                    ? context.t.spaces_result_count(count: resultCount)
+                    : context.t.spaces_page_search_result_count(count: resultCount, total: totalCount, query: query),
                 key: const Key('spaces-result-count'),
                 style: context.textTheme.bodySmall?.copyWith(color: context.colorScheme.onSurfaceVariant),
               ),
@@ -351,7 +345,7 @@ class _NoMatch extends StatelessWidget {
           Icon(Icons.search_off_rounded, size: 64, color: context.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
           const SizedBox(height: 16),
           Text(
-            'spaces_no_match'.t(context: context, args: {'query': query}),
+            context.t.spaces_no_match(query: query),
             textAlign: TextAlign.center,
             style: context.textTheme.titleMedium?.copyWith(color: context.colorScheme.onSurfaceVariant),
           ),
