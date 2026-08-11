@@ -14,7 +14,7 @@ Source spec: `docs/superpowers/specs/2026-08-11-space-albums-ux-fixes-design.md`
 
 - **Flutter version:** read the pin from `mobile/mise.toml` (currently `"aqua:flutter/flutter" = "3.44.8"`). If a local `mise install` shim self-reports a different patch, invoke the binary directly from `~/.local/share/mise/installs/aqua-flutter-flutter/<version>/flutter/bin/{flutter,dart}`.
 - **Mobile test prerequisites**, once per session, from `mobile/`: `flutter pub get`, then `dart run easy_localization:generate -S ../i18n && dart run bin/generate_keys.dart`. The `lib/generated/*.g.dart` files are gitignored, so any new i18n key is invisible to tests until this is re-run.
-- **`dart analyze --fatal-infos` must pass.** `withOpacity` is banned; use `withValues(alpha:)`.
+- **`dart analyze --fatal-infos` must pass.** `withOpacity` is banned; use `withValues(alpha:)`. `mobile/analysis_options.yaml` also enables `require_trailing_commas`, `prefer_const_constructors`, `always_use_package_imports` and `unawaited_futures`, and `flutter_lints` brings `no_leading_underscores_for_local_identifiers` — so no `_`-prefixed local variables or local functions, even in tests. Run `dart format` before committing; it settles the trailing commas.
 - **`dart analyze` is not a substitute for `flutter test`.** Enum-exhaustiveness and generated-code breaks only surface when the test compiles.
 - **TDD is mandatory.** Every task writes the test first and runs it to observe a real failure. A test that passes before the implementation exists is a defective test, not a completed step.
 - **No new i18n keys except the three in Task 7.** F1 reuses the strings already on its buttons, F4 reuses `sort_items`, and the nav label reuses `spaces`.
@@ -358,7 +358,7 @@ Add to `mobile/test/presentation/pages/space_albums_page_test.dart`, using the f
   });
 ```
 
-If `pumpPage`'s signature requires `canEdit`, pass whatever value it already uses for its editor cases; read lines 177-210 of the test file before writing.
+`pumpPage`'s signature is `pumpPage(WidgetTester tester, {required List<SpaceAlbumFolder> folders, required List<SpaceAlbum> albums, String? folderId, bool canEdit = true, List<Override> overrides = const []})` — `canEdit` already defaults to `true`, so the calls above need no extra arguments.
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
@@ -1012,17 +1012,21 @@ git commit -m "feat(mobile): add a Preferences switch for Spaces in the navigati
 
 - [ ] **Step 1: Write the failing tests**
 
-Add to `mobile/test/presentation/widgets/gallery_nav/gallery_bottom_nav_test.dart`. Override `appConfigProvider` with a fixed `AppConfig` to control the setting:
+Add to `mobile/test/presentation/widgets/gallery_nav/gallery_bottom_nav_test.dart`, importing `package:immich_mobile/domain/models/config/app_config.dart`, `package:immich_mobile/domain/models/config/nav_config.dart` and `package:immich_mobile/providers/infrastructure/settings.provider.dart`. Override `appConfigProvider` with a fixed `AppConfig` to control the setting:
 
 ```dart
-  List<Override> _navOverrides({required bool showSpaces}) => [
-    appConfigProvider.overrideWithValue(const AppConfig().write(SettingsKey.navShowSpaces, showSpaces)),
+  // No leading underscore: `no_leading_underscores_for_local_identifiers` is on
+  // via flutter_lints, and `dart analyze --fatal-infos` is a gate.
+  // `overrideWithValue` with a directly-constructed AppConfig is the pattern
+  // every other test in this repo uses (e.g. collection_picker_test.dart:89).
+  List<Override> navOverrides({required bool showSpaces}) => [
+    appConfigProvider.overrideWithValue(AppConfig(nav: NavConfig(showSpaces: showSpaces))),
   ];
 
   testWidgets('with Spaces on, the pill renders a Spaces segment and no Albums segment', (tester) async {
     final router = FakeTabsRouter();
     await tester.pumpWidget(
-      _wrap(GalleryBottomNav(tabsRouter: router), overrides: _navOverrides(showSpaces: true)),
+      _wrap(GalleryBottomNav(tabsRouter: router), overrides: navOverrides(showSpaces: true)),
     );
     await tester.pumpAndSettle();
 
@@ -1033,7 +1037,7 @@ Add to `mobile/test/presentation/widgets/gallery_nav/gallery_bottom_nav_test.dar
   testWidgets('with Spaces off, the pill renders an Albums segment and no Spaces segment', (tester) async {
     final router = FakeTabsRouter();
     await tester.pumpWidget(
-      _wrap(GalleryBottomNav(tabsRouter: router), overrides: _navOverrides(showSpaces: false)),
+      _wrap(GalleryBottomNav(tabsRouter: router), overrides: navOverrides(showSpaces: false)),
     );
     await tester.pumpAndSettle();
 
@@ -1049,7 +1053,7 @@ Add to `mobile/test/presentation/widgets/gallery_nav/gallery_bottom_nav_test.dar
       _wrap(
         GalleryBottomNav(tabsRouter: router),
         overrides: [
-          ..._navOverrides(showSpaces: true),
+          ...navOverrides(showSpaces: true),
           remoteAlbumProvider.overrideWith(() => albums),
         ],
       ),
@@ -1071,7 +1075,7 @@ Add to `mobile/test/presentation/widgets/gallery_nav/gallery_bottom_nav_test.dar
       _wrap(
         GalleryBottomNav(tabsRouter: router),
         overrides: [
-          ..._navOverrides(showSpaces: false),
+          ...navOverrides(showSpaces: false),
           remoteAlbumProvider.overrideWith(() => albums),
         ],
       ),
@@ -1092,7 +1096,7 @@ Add to `mobile/test/presentation/widgets/gallery_nav/gallery_bottom_nav_test.dar
       _wrap(
         GalleryBottomNav(tabsRouter: router),
         overrides: [
-          ..._navOverrides(showSpaces: true),
+          ...navOverrides(showSpaces: true),
           readonlyModeProvider.overrideWith(() => _FakeReadonly(true)),
         ],
       ),
@@ -1109,7 +1113,7 @@ Add to `mobile/test/presentation/widgets/gallery_nav/gallery_bottom_nav_test.dar
     await tester.pumpWidget(
       _wrap(
         GalleryBottomNav(tabsRouter: router),
-        overrides: _navOverrides(showSpaces: true),
+        overrides: navOverrides(showSpaces: true),
         mq: const MediaQueryData(size: Size(900, 400)),
       ),
     );
@@ -1127,7 +1131,7 @@ Add to `mobile/test/presentation/widgets/gallery_nav/gallery_bottom_nav_test.dar
       overrides: [
         readonlyModeProvider.overrideWith(() => _FakeReadonly(false)),
         hapticFeedbackProvider.overrideWith((ref) => _NoOpHaptic(ref)),
-        ..._navOverrides(showSpaces: true),
+        ...navOverrides(showSpaces: true),
       ],
     );
     addTearDown(container.dispose);
@@ -1151,7 +1155,7 @@ Add to `mobile/test/presentation/widgets/gallery_nav/gallery_bottom_nav_test.dar
     container.updateOverrides([
       readonlyModeProvider.overrideWith(() => _FakeReadonly(false)),
       hapticFeedbackProvider.overrideWith((ref) => _NoOpHaptic(ref)),
-      appConfigProvider.overrideWithValue(const AppConfig().write(SettingsKey.navShowSpaces, false)),
+      appConfigProvider.overrideWithValue(const AppConfig(nav: NavConfig(showSpaces: false))),
     ]);
     await tester.pumpAndSettle();
 
@@ -1215,7 +1219,7 @@ In `mobile/lib/presentation/widgets/gallery_nav/gallery_nav_pill.widget.dart`:
   });
 ```
 
-2. Leave the `_keys` field initializer (lines 29-31) exactly as it is:
+2. **Fix `_measure`, or the indicator silently dies.** Leave the `_keys` field initializer (lines 29-31) as it is — it is keyed by tab, not by position, and cannot read `widget.slots` from a field initializer anyway:
 
 ```dart
   final Map<GalleryTabEnum, GlobalKey> _keys = {
@@ -1223,10 +1227,32 @@ In `mobile/lib/presentation/widgets/gallery_nav/gallery_nav_pill.widget.dart`:
   };
 ```
 
-It is keyed by tab rather than by position, it cannot read `widget.slots` from a field initializer anyway, and `_measure` already skips entries with no `currentContext` — so the tab that is not currently rendered simply never gets a rect. What it does not do is _discard_ a rect measured under the previous configuration, which is how a flip can leave the indicator sitting on a segment that is no longer on screen. Add that eviction to `_measure`, immediately before it writes `_segmentRects`:
+But `_measure` currently walks `_keys.entries` and then gates the write on `rects.length == _keys.length`. Widening the enum makes `_keys.length` 4 while only 3 segments are ever rendered, so `rects.length` is 3, the guard is **never** satisfied, `_segmentRects` stays empty forever and the animated underlay never appears. Nothing would fail loudly — the pill would just lose its indicator.
+
+Replace the body of `_measure` from `final rects = ...` down to the closing `}` of the `if` with:
 
 ```dart
-    rects.removeWhere((tab, _) => !widget.slots.contains(tab));
+    // Iterate the RENDERED slots, not every enum value: there are four values
+    // for three slots, so measuring `_keys` and comparing against its length
+    // would gate on a count that can never be reached. Driving off
+    // `widget.slots` also drops any rect measured under a previous
+    // configuration, so a flip cannot leave the underlay on a segment that is
+    // no longer on screen.
+    final rects = <GalleryTabEnum, Rect>{};
+    for (final tab in widget.slots) {
+      final ctx = _keys[tab]?.currentContext;
+      if (ctx == null) continue;
+      final box = ctx.findRenderObject() as RenderBox?;
+      if (box == null) continue;
+      // Project through the full transform rather than diffing origins: the
+      // segments sit inside a `FittedBox` that may scale them down (#909), so
+      // their raw `size` is the pre-scale size and would leave the underlay
+      // wider than the segment it highlights.
+      rects[tab] = MatrixUtils.transformRect(box.getTransformTo(pillBox), Offset.zero & box.size);
+    }
+    if (rects.length == widget.slots.length && !_rectsEqual(rects, _segmentRects)) {
+      setState(() => _segmentRects = rects);
+    }
 ```
 
 3. Replace the render loop at line 168:
@@ -1451,7 +1477,10 @@ git commit -m "feat(mobile): add the Spaces nav destination and localize the Spa
 
 **Background and the one real unknown.** `AutoTabsRouter.routes` is currently a `const` list. It becomes conditional, which means the list's identity at slot 1 changes while the widget stays mounted. Whether auto_route 11.1.0 re-resolves in place is the open question this task settles — the flip tests below are written first precisely so it surfaces before the production change is committed to.
 
-Precedent is reassuring: the legacy `TabShellRoute` already declares `SpacesRoute.page` as a tab child with exactly these guards (`router.dart:142`) and drives it as slot 1 of its own `AutoTabsRouter` (`tab_shell.page.dart:73`).
+Two pieces of precedent make this narrower than it looks:
+
+- The legacy `TabShellRoute` already declares `SpacesRoute.page` as a tab child with exactly these guards (`router.dart:142`) and drives it as slot 1 of its own `AutoTabsRouter` (`tab_shell.page.dart:73`). Spaces working as a tab root is settled; only the _mutation_ of the list is new.
+- Declaring the same page both as a shell child and top-level is already the norm here, not a novelty: `DriftAlbumsRoute` (child `:153`, top-level `:230`) and `DriftLibraryRoute` (child `:154`, top-level `:224`) both do it, and `SpacesRoute` is already top-level at `:167` — which is what `drift_library.page.dart:171,557` resolves against today. Adding the shell child is additive; it does not change how those pushes resolve.
 
 **If the flip test cannot be made to pass**, fall back to resetting the active index to 0 when the setting changes — a visible but safe degradation — and record that in the spec's F5 edge-case list before implementing it. Do not paper over it with a `key:` that force-rebuilds the whole shell; that discards every tab's stack on an unrelated setting change.
 
@@ -1514,20 +1543,24 @@ Create `mobile/test/presentation/pages/gallery_tab_shell_test.dart`. Pump `Galle
     expect(find.byType(SpacesPage), findsOneWidget);
   });
 
-  testWidgets('a route pushed onto slot 1 does not survive the flip as a stale page', (tester) async {
+  testWidgets('a flip that happens while a pushed page covers the shell lands correctly on pop', (tester) async {
     final container = await pumpShell(tester, showSpaces: false);
     await activateIndex(tester, 1);
-    await pushOntoActiveTab(tester, const DriftCreateAlbumRoute());
+    expect(find.byType(DriftAlbumsPage), findsOneWidget);
 
+    await pushRoute(tester, const DriftCreateAlbumRoute());
     await setShowSpaces(tester, container, true);
+    await popRoute(tester);
 
     expect(tester.takeException(), isNull);
-    expect(find.byType(DriftCreateAlbumPage), findsNothing);
+    expect(activeIndex(tester), 1);
     expect(find.byType(SpacesPage), findsOneWidget);
   });
 ```
 
-Write `pumpShell`, `currentTabRoutes`, `activateIndex`, `activeIndex`, `setShowSpaces` and `pushOntoActiveTab` as helpers in this file. `setShowSpaces` must go through `container.updateOverrides` on `appConfigProvider` followed by `await tester.pumpAndSettle()`. Both space and album pages hit network/Drift providers on build — override `sharedSpacesProvider` and `remoteAlbumProvider` with fixed empty values so the test exercises routing, not data loading.
+Write `pumpShell`, `currentTabRoutes`, `activateIndex`, `activeIndex`, `setShowSpaces`, `pushRoute` and `popRoute` as helpers in this file. `setShowSpaces` must go through `container.updateOverrides` on `appConfigProvider` followed by `await tester.pumpAndSettle()`. Both space and album pages hit network/Drift providers on build — override `sharedSpacesProvider` and `remoteAlbumProvider` with fixed empty values so the test exercises routing, not data loading.
+
+**Why the last test pushes over the shell rather than "onto slot 1".** Each tab child is declared as a leaf `AutoRoute` with no `children:` (`router.dart:151-155`), so a tab has no stack of its own — `context.pushRoute` walks up and resolves against the top-level declarations (`DriftCreateAlbumRoute.page` is at `router.dart:231`), producing a page that covers the entire shell, nav bar included. There is therefore no such thing as a stale page buried inside slot 1, and a test asserting one would be asserting a state the router cannot reach. What _can_ happen is a flip landing while the shell is covered, which is what this test drives.
 
 - [ ] **Step 2: Run the tests to verify they fail**
 

@@ -393,11 +393,14 @@ Scenario: the pill highlights the correct segment after a flip
   Then the Albums segment is the active one
   And no segment rect from the previous configuration is retained
 
-Scenario: a tab with a pushed stack survives a flip
-  Given navShowSpaces is false and slot 1 has a route pushed onto its stack
+Scenario: a flip while a pushed page covers the shell lands correctly on pop
+  Given navShowSpaces is false and the active index is 1
+  And a route has been pushed that covers the shell
   When navShowSpaces becomes true
+  And the pushed route is popped
   Then no exception is thrown
-  And slot 1 shows the Spaces root rather than the stale pushed route
+  And the active index is still 1
+  And slot 1 shows the Spaces page
 
 Scenario: flipping the setting off while standing on slot 1
   Given navShowSpaces is true and the active index is 1
@@ -454,9 +457,12 @@ Scenario: Albums stays reachable from the Library tab
   is the guard, and it is a red-first test — if `AutoTabsRouter` cannot re-resolve in place, this surfaces
   before any production code is committed to. Fallback if it cannot: reset the active index to 0 on flip,
   which is a visible but safe degradation, and would then get its own scenario.
-- **`GalleryNavPill._keys`** is built from `GalleryTabEnum.values` and gains a `spaces` entry that is only
-  measured when rendered — `_measure` skips entries with no `currentContext`. Keys must move to `slots` so a
-  stale segment rect from the previous configuration cannot survive a flip.
+- **`GalleryNavPill._measure` breaks silently on a widened enum.** It gates its write on
+  `rects.length == _keys.length`, and `_keys` is built from `GalleryTabEnum.values`. Four values against three
+  rendered segments means that equality can never hold, `_segmentRects` stays empty, and the animated
+  indicator simply never appears — with nothing failing loudly. `_measure` must iterate the rendered slots and
+  compare against `widget.slots.length`, which also drops any rect measured under the previous configuration
+  so a flip cannot strand the underlay on an off-screen segment.
 - **`galleryTabProvider`** holds a `GalleryTabEnum`; with the enum widened, any consumer switching on it must
   stay exhaustive. The compiler enforces this.
 - **Deep links and pushes to `DriftAlbumsRoute`** are unaffected: it remains declared as a top-level route
