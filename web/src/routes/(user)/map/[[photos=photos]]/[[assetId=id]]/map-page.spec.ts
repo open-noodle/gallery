@@ -1,20 +1,17 @@
 import { mdiTune } from '@mdi/js';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
-import type { Component } from 'svelte';
+import { tick, type Component } from 'svelte';
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import TestWrapper from '$lib/components/TestWrapper.svelte';
 import { timeToLoadTheMap } from '$lib/constants';
 import { SEARCH_FILTER_DEBOUNCE_MS } from '$lib/utils/space-search';
+import { reactivePageMock as mockPage } from '@test-data/mocks/reactive-page.mock.svelte';
 import MapPage from './+page.svelte';
 
-const { gotoMock, mockPage, mockAssetViewerManager } = vi.hoisted(() => ({
+const { featureFlagsMock, gotoMock, mockAssetViewerManager } = vi.hoisted(() => ({
+  featureFlagsMock: { value: { map: true } as Record<string, unknown> },
   gotoMock: vi.fn().mockResolvedValue(undefined),
-  mockPage: {
-    url: new URL('https://gallery.test/map'),
-    route: { id: '/(user)/map/[[photos=photos]]/[[assetId=id]]' },
-    params: {},
-  },
   mockAssetViewerManager: {
     isViewing: false,
     asset: undefined,
@@ -24,7 +21,14 @@ const { gotoMock, mockPage, mockAssetViewerManager } = vi.hoisted(() => ({
 }));
 
 vi.mock('$app/navigation', () => ({ goto: gotoMock }));
-vi.mock('$app/state', () => ({ page: mockPage }));
+// The mock module and the spec import the SAME singleton, so assigning mockPage.url in a test is
+// what the page's $effect sees. A plain vi.hoisted object registers no signal for a Svelte 5
+// `$effect` reading `page.url.search` (I5) — this reactive mock is the faithful stand-in for the
+// real `page` from $app/state.
+vi.mock('$app/state', async () => {
+  const { reactivePageMock } = await import('@test-data/mocks/reactive-page.mock.svelte');
+  return { page: reactivePageMock };
+});
 
 vi.mock('$lib/components/layouts/UserPageLayout.svelte', async () => {
   const { default: MockComponent } = await import('$lib/components/spaces/mock-user-page-layout.test-wrapper.svelte');
@@ -61,7 +65,7 @@ vi.mock('$lib/managers/asset-viewer-manager.svelte', () => ({
 }));
 
 vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({
-  featureFlagsManager: { value: { map: true } },
+  featureFlagsManager: featureFlagsMock,
 }));
 
 vi.mock('$lib/utils/navigation', () => ({ navigate: () => Promise.resolve() }));
@@ -93,14 +97,27 @@ describe('Map page query intersection', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.resetAllMocks();
-    gotoMock.mockResolvedValue(undefined);
-    mockPage.url = new URL('https://gallery.test/map');
+    // A goto() actually moves page.url, which re-runs the page's URL $effect. If the effect's
+    // lastHandled token guard is ever broken, this turns goto -> $effect -> goto into a real loop
+    // and the test times out — the correct, loud failure.
+    gotoMock.mockImplementation((href: string) => {
+      mockPage.url = new URL(href, 'https://gallery.test');
+      return Promise.resolve();
+    });
+    mockPage.reset('https://gallery.test/map', {
+      routeId: '/(user)/map/[[photos=photos]]/[[assetId=id]]',
+    });
     sdkMock.getTimeBuckets.mockResolvedValue([]);
     sdkMock.getFilteredMapMarkers.mockResolvedValue([]);
     sdkMock.searchSmart.mockResolvedValue({
       assets: { items: [], nextPage: null },
       albums: { items: [], nextPage: null },
     } as never);
+    // This whole describe block pins the pre-existing intersection loop, which only ever runs
+    // when machineLearning.clip.maxDistance is configured in (0, 2) — a cutoff-limited
+    // smart-search result set (#767c) — arrange onto that instance explicitly rather than
+    // relying on an ambient default.
+    featureFlagsMock.value = { ...featureFlagsMock.value, map: true, smartSearchHasCutoff: true };
   });
 
   afterEach(() => {
@@ -371,5 +388,424 @@ describe('Map page query intersection', () => {
     await flushMapLoad();
 
     expect(await screen.findByTestId('add-all-to-collection')).toBeInTheDocument();
+  });
+});
+
+describe('Map page filters are URL-backed', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.resetAllMocks();
+    // Stand in for SvelteKit: a goto() actually changes page.url, which re-runs the page's URL
+    // $effect. If the effect's lastHandled token guard is ever broken, this turns goto -> $effect ->
+    // goto into a real loop and the test times out — which is the correct, loud failure.
+    gotoMock.mockImplementation((href: string) => {
+      mockPage.url = new URL(href, 'https://gallery.test');
+      return Promise.resolve();
+    });
+    mockPage.reset('https://gallery.test/map', {
+      routeId: '/(user)/map/[[photos=photos]]/[[assetId=id]]',
+    });
+    sdkMock.getTimeBuckets.mockResolvedValue([]);
+    sdkMock.getFilteredMapMarkers.mockResolvedValue([]);
+    // None of this describe's tests exercise the q/searchSmart intersection — reset explicitly
+    // rather than depend on whatever the previous describe block left behind.
+    featureFlagsMock.value = { map: true };
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('hydrates the filters from the URL into the marker query', async () => {
+    mockPage.url = new URL('https://gallery.test/map?spaceId=space-1&make=Apple&rating=4&lens=RF24-70mm');
+
+    renderPage();
+    await flushQueryDebounce();
+
+    await waitFor(() =>
+      expect(sdkMock.getFilteredMapMarkers).toHaveBeenCalledWith(
+        expect.objectContaining({ spaceId: 'space-1', make: 'Apple', rating: 4, lensModel: 'RF24-70mm' }),
+      ),
+    );
+    expect(screen.getByTestId('active-filters-bar')).toBeInTheDocument();
+  });
+
+  // NB: the panel stub's `filter-panel-set-year` is deliberately NOT used here. It sets only the
+  // transient selectedYear, which encodeFilterParams does not emit — so the rebuilt URL would be
+  // identical, the no-op guard would fire, and goto would never be called. Use a stub button that
+  // sets a URL-ENCODED filter: `filter-panel-set-country` (bindable-filter-panel.stub.svelte:112-122,
+  // sets country: 'Germany' -> `country=Germany`).
+  it('writes a filter change back to the URL, preserving spaceId, q and the viewport hash', async () => {
+    mockPage.url = new URL('https://gallery.test/map?spaceId=space-1&q=ski#12/48.85/2.35');
+
+    renderPage();
+    await fireEvent.click(screen.getByTestId('filter-panel-set-country'));
+
+    await waitFor(() => expect(gotoMock).toHaveBeenCalled());
+    const [target] = gotoMock.mock.calls.at(-1) as [string];
+    expect(target).toContain('/map?');
+    expect(target).toContain('spaceId=space-1');
+    expect(target).toContain('q=ski');
+    expect(target).toContain('country=Germany');
+    expect(target).toContain('#12/48.85/2.35');
+  });
+
+  // The transient-only case, from the other side: a year is not a URL param, so the rebuilt URL is
+  // unchanged and the guard must swallow the write rather than churn history. (The full year +
+  // URL-filter round trip is pinned below, now that this suite has a reactive page mock too — I5.)
+  it('writes a year-only filter change to the URL, keeping the space scope', async () => {
+    mockPage.url = new URL('https://gallery.test/map?spaceId=space-1');
+
+    renderPage();
+    await fireEvent.click(screen.getByTestId('filter-panel-set-year'));
+
+    await waitFor(() => expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '2015'));
+    await waitFor(() => expect(gotoMock).toHaveBeenCalled());
+    const [target] = gotoMock.mock.calls.at(-1) as [string];
+    expect(target).toContain('year=2015');
+    expect(target).toContain('spaceId=space-1');
+  });
+
+  // The NIT decision, client side: a space and an album are two different scopes and the server
+  // rejects their combination with a 400. Drop the album at hydrate so a hand-typed URL degrades to
+  // a plain space map instead of an error.
+  it('drops a stray albumId when the map is scoped to a space', async () => {
+    mockPage.url = new URL('https://gallery.test/map?spaceId=space-1&albumId=album-9&make=Apple');
+
+    renderPage();
+    await flushQueryDebounce();
+
+    await waitFor(() => expect(sdkMock.getFilteredMapMarkers).toHaveBeenCalled());
+    const [options] = sdkMock.getFilteredMapMarkers.mock.calls.at(-1) as [Record<string, unknown>];
+    expect(options).toMatchObject({ spaceId: 'space-1', make: 'Apple' });
+    expect(options.albumId).toBeUndefined();
+  });
+
+  // …but WITHOUT a space, an albumId IS a legitimate map scope (that is what the server-side album
+  // access fix in Step 1 is for).
+  it('keeps an albumId scope on the global map', async () => {
+    mockPage.url = new URL('https://gallery.test/map?albumId=album-9');
+
+    renderPage();
+    await flushQueryDebounce();
+
+    await waitFor(() =>
+      expect(sdkMock.getFilteredMapMarkers).toHaveBeenCalledWith(expect.objectContaining({ albumId: 'album-9' })),
+    );
+  });
+
+  // Slice 6 — this suite renders the REAL ActiveFiltersBar, so it is where the album chip's label is
+  // pinned end to end: a pasted/reloaded `?albumId=` link has no session-cached name and no
+  // suggestions feeder, so without by-id resolution the chip degrades to a raw UUID — the headline
+  // failure mode of a shareable filter URL.
+  it('names the album chip by id instead of showing the raw album id', async () => {
+    sdkMock.getAlbumInfo.mockResolvedValue({ id: 'album-9', albumName: 'Iceland 2026' } as never);
+    mockPage.url = new URL('https://gallery.test/map?albumId=album-9');
+
+    renderPage();
+    await flushQueryDebounce();
+
+    await waitFor(() => {
+      expect(sdkMock.getAlbumInfo).toHaveBeenCalledWith({ id: 'album-9' });
+      expect(screen.getByTestId('active-filters-bar')).toHaveTextContent('Iceland 2026');
+    });
+    expect(screen.getByTestId('active-filters-bar')).not.toHaveTextContent('album-9');
+  });
+
+  // The real ✕, clicked on the real chip, inside a space scope (the spec's BDD: "and likewise when I
+  // click it inside a Space") — the lens filter must leave the URL, and the space scope must stay.
+  it('clears a lens chip from the URL when its ✕ is clicked in a space-scoped map', async () => {
+    mockPage.url = new URL('https://gallery.test/map?spaceId=space-1&lens=RF24-70mm');
+
+    renderPage();
+    await flushQueryDebounce();
+
+    const chips = await screen.findAllByTestId('active-chip');
+    const lensChip = chips.find((chip) => chip.textContent?.includes('RF24-70mm'));
+    expect(lensChip).toBeDefined();
+    await fireEvent.click(lensChip!.querySelector('[data-testid="chip-close"]')!);
+
+    await waitFor(() => expect(gotoMock).toHaveBeenCalled());
+    const [target] = gotoMock.mock.calls.at(-1) as [string];
+    expect(target).not.toContain('lens=');
+    expect(target).toContain('spaceId=space-1');
+  });
+
+  // Finding 1 (#767 fresh instance): clearing the temporal chip INSIDE the timeline panel used to
+  // only mutate the bound `filters` — the page never wrote the URL back, so from/to survived a
+  // reload/Back/shared link. MapTimelinePanel must be wired with onFiltersChange={syncMapFilterUrl}
+  // exactly like FilterPanel is (see the wiring above), so this proves the PAGE side of the fix.
+  it('writes the URL when the temporal filter is cleared from inside the timeline panel', async () => {
+    mockPage.url = new URL('https://gallery.test/map?from=2024-01-01&to=2024-06-30');
+    sdkMock.getFilteredMapMarkers.mockResolvedValue([{ id: 'asset-1', lat: 1, lon: 2 } as never]);
+
+    renderPage();
+    await flushQueryDebounce();
+    await flushMapLoad();
+    await fireEvent.click(screen.getByTestId('map-cluster-asset-1'));
+    await fireEvent.click(screen.getByTestId('map-panel-clear-temporal-filter'));
+
+    await waitFor(() => expect(gotoMock).toHaveBeenCalled());
+    const [target] = gotoMock.mock.calls.at(-1) as [string];
+    expect(target).not.toContain('from=');
+    expect(target).not.toContain('to=');
+  });
+
+  // Task 10: the cluster panel's asset scope was captured ONCE from the markers at click time and
+  // fed to the panel as a client-side `assetFilter` EXCLUSION set, which no filter change ever
+  // recomputed. So the panel could only shrink: adding a filter left it answering from the old set,
+  // and clearing one — from the left panel or from inside the panel itself — could never surface the
+  // assets that had just started matching. It is derived from the CURRENT markers now, so it tracks
+  // the filters in both directions.
+  it('narrows the cluster selection when a filter change drops markers', async () => {
+    sdkMock.getFilteredMapMarkers.mockResolvedValue([
+      { id: 'asset-1', lat: 1, lon: 1 },
+      { id: 'asset-2', lat: 3, lon: 3 },
+      { id: 'asset-3', lat: 5, lon: 5 },
+    ] as never);
+
+    renderPage();
+    await flushQueryDebounce();
+    await flushMapLoad();
+    await fireEvent.click(screen.getByTestId('map-cluster-asset-1'));
+
+    expect(screen.getByTestId('map-timeline-panel-stub')).toHaveAttribute(
+      'data-selected-cluster-ids',
+      'asset-1,asset-2,asset-3',
+    );
+
+    // A rating/country/… chip drops two of the three pins.
+    sdkMock.getFilteredMapMarkers.mockResolvedValue([{ id: 'asset-1', lat: 1, lon: 1 }] as never);
+    await fireEvent.click(screen.getByTestId('filter-panel-set-country'));
+    await flushQueryDebounce();
+
+    await waitFor(() =>
+      expect(screen.getByTestId('map-timeline-panel-stub')).toHaveAttribute('data-selected-cluster-ids', 'asset-1'),
+    );
+  });
+
+  // The direction that was outright impossible before: WIDENING.
+  it('widens the cluster selection when a filter is cleared and new markers match', async () => {
+    sdkMock.getFilteredMapMarkers.mockResolvedValue([{ id: 'asset-1', lat: 1, lon: 1 }] as never);
+    mockPage.url = new URL('https://gallery.test/map?country=Germany');
+
+    renderPage();
+    await flushQueryDebounce();
+    await flushMapLoad();
+    await fireEvent.click(screen.getByTestId('map-cluster-asset-1'));
+
+    expect(screen.getByTestId('map-timeline-panel-stub')).toHaveAttribute('data-selected-cluster-ids', 'asset-1');
+
+    // Clearing the country brings two more assets — inside the same cluster's bbox — back into the
+    // markers. They must reach the panel; the click-time snapshot could never let them in.
+    sdkMock.getFilteredMapMarkers.mockResolvedValue([
+      { id: 'asset-1', lat: 1, lon: 1 },
+      { id: 'asset-2', lat: 1, lon: 1 },
+      { id: 'asset-3', lat: 1, lon: 1 },
+    ] as never);
+    await fireEvent.click(screen.getByTestId('filter-panel-clear-location'));
+    await flushQueryDebounce();
+
+    await waitFor(() =>
+      expect(screen.getByTestId('map-timeline-panel-stub')).toHaveAttribute(
+        'data-selected-cluster-ids',
+        'asset-1,asset-2,asset-3',
+      ),
+    );
+  });
+
+  // Back/forward: SvelteKit swaps page.url without remounting the page component. The $effect must
+  // notice and re-hydrate — this is the same code path a reload and a shared URL take. Only provable
+  // now that this suite's page mock is reactive (I5) — the old plain vi.hoisted object registered no
+  // signal for a Svelte 5 $effect reading page.url.search, so reassigning it here would have been a
+  // no-op the effect never saw.
+  it('re-hydrates when the URL changes underneath the page (back/forward)', async () => {
+    mockPage.url = new URL('https://gallery.test/map?make=Apple&rating=4');
+    renderPage();
+    await flushQueryDebounce();
+
+    await waitFor(() =>
+      expect(sdkMock.getFilteredMapMarkers).toHaveBeenCalledWith(expect.objectContaining({ make: 'Apple', rating: 4 })),
+    );
+
+    // The browser Back button: no remount, just a new URL.
+    mockPage.url = new URL('https://gallery.test/map?make=Apple');
+    await flushQueryDebounce();
+
+    await waitFor(() => {
+      const [options] = sdkMock.getFilteredMapMarkers.mock.calls.at(-1) as [Record<string, unknown>];
+      expect(options).toMatchObject({ make: 'Apple' });
+      expect(options.rating).toBeUndefined();
+    });
+  });
+
+  // C2's regression test. TimelineAssetViewer.handleClose -> replaceScrollTarget writes `?at=` onto
+  // /map when an asset closes over a filtered map. The year is URL-backed (D2), so it survives on
+  // its own — and `?at=` must still not read as a filter change, or the map re-runs its marker fetch
+  // for an identical FilterState on every viewer close.
+  it('keeps the year when the asset viewer closes (?at= is not a filter change)', async () => {
+    renderPage();
+    await fireEvent.click(screen.getByTestId('filter-panel-set-year'));
+
+    await waitFor(() => expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '2015'));
+
+    // Simulate the asset viewer closing: replaceScrollTarget appends `at` to the CURRENT url, which
+    // now carries year=2015 (the page wrote it). This is a raw property set (not a fireEvent), so
+    // nothing implicitly flushes the pending $effect the way fireEvent does — tick() forces that
+    // flush. A plain waitFor here would be vacuous under fake timers: its own first synchronous
+    // check runs BEFORE the effect flushes and sees the still-2015 value, so it would pass whether
+    // or not the bug is present (compare I3).
+    const withAt = new URL(mockPage.url);
+    withAt.searchParams.set('at', 'asset-1');
+    mockPage.url = withAt;
+    await tick();
+
+    expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '2015');
+  });
+
+  // I4's regression test. Clicking the search chip's X calls clearCommittedQuery, which goto()s a
+  // URL without `q` — that re-runs the re-hydrate effect and rebuilds `filters` from the URL alone
+  // unless the transient year is carried over the same way syncMapFilterUrl does it. Reviewer-proven
+  // repro: year 2015 -> "" after clicking the chip's X.
+  it('keeps a transient year when the committed q chip is cleared', async () => {
+    mockPage.url = new URL('https://gallery.test/map?q=beach');
+    renderPage();
+    await fireEvent.click(screen.getByTestId('filter-panel-set-year'));
+
+    await waitFor(() => expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '2015'));
+
+    // fireEvent flushes pending effects itself (unlike a raw page.url mutation — see the tick() note
+    // above), so the state right after this settles is the real post-effect state, not a stale one.
+    await fireEvent.click(screen.getByTestId('search-chip-close'));
+
+    expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '2015');
+  });
+
+  // D2 (was the transient-year carry-over test). A picked year is IN the URL codec now: it writes,
+  // and survives a second URL-writing filter change on its own. The map's viewport hash (which lives
+  // outside the FilterState codec entirely) survives the same write.
+  it('writes a picked year to the URL and keeps it across a second filter change, preserving the viewport hash', async () => {
+    mockPage.url = new URL('https://gallery.test/map#12/48.85/2.35');
+    renderPage();
+    await fireEvent.click(screen.getByTestId('filter-panel-set-year'));
+
+    await waitFor(() => expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '2015'));
+    // A year IS in the URL codec, so picking one writes.
+    await waitFor(() => expect(gotoMock).toHaveBeenCalled());
+    const [yearTarget] = gotoMock.mock.calls.at(-1) as [string];
+    expect(yearTarget).toContain('year=2015');
+    expect(yearTarget).toContain('#12/48.85/2.35');
+
+    await fireEvent.click(screen.getByTestId('filter-panel-set-country'));
+
+    await waitFor(() => {
+      const [target] = gotoMock.mock.calls.at(-1) as [string];
+      expect(target).toContain('country=Germany');
+      expect(target).toContain('year=2015');
+      expect(target).toContain('#12/48.85/2.35');
+    });
+
+    await waitFor(() => expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '2015'));
+  });
+
+  // D2 — a shared map link carries the year.
+  it('hydrates a shared ?year= link into the picker, the chip and the marker query', async () => {
+    mockPage.url = new URL('https://gallery.test/map?year=2023&month=6');
+
+    renderPage();
+    await flushQueryDebounce();
+
+    expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '2023');
+    expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-month', '6');
+    expect(screen.getByTestId('active-filters-bar')).toHaveTextContent('2023');
+    await waitFor(() =>
+      expect(sdkMock.getFilteredMapMarkers).toHaveBeenCalledWith(
+        expect.objectContaining({
+          takenAfter: '2023-06-01T00:00:00.000Z',
+          takenBefore: '2023-07-01T00:00:00.000Z',
+        }),
+      ),
+    );
+  });
+});
+
+describe('Map page smart-search honesty (#767c)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.resetAllMocks();
+    gotoMock.mockResolvedValue(undefined);
+    mockPage.url = new URL('https://gallery.test/map');
+    sdkMock.getTimeBuckets.mockResolvedValue([]);
+    sdkMock.getFilteredMapMarkers.mockResolvedValue([]);
+    // Default instance: clip.maxDistance = 0 ⇒ smart search cannot narrow anything.
+    featureFlagsMock.value = { ...featureFlagsMock.value, map: true, smartSearchHasCutoff: false };
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('applies every structured filter and says the smart-search term is not applied', async () => {
+    mockPage.url = new URL('https://gallery.test/map?q=ski&make=Apple&rating=4');
+    sdkMock.getFilteredMapMarkers.mockResolvedValue([{ id: 'asset-1', lat: 1, lon: 2 } as never]);
+
+    renderPage();
+    await flushQueryDebounce();
+
+    await waitFor(() => {
+      // the structured half of the filter IS honoured…
+      expect(sdkMock.getFilteredMapMarkers).toHaveBeenCalledWith(expect.objectContaining({ make: 'Apple', rating: 4 }));
+      // …the smart-search half is not, and the map says so instead of pretending
+      expect(screen.getByTestId('map-smart-search-notice')).toBeInTheDocument();
+    });
+
+    // The loop that pages the entire library and narrows nothing never runs here (R2).
+    expect(sdkMock.searchSmart).not.toHaveBeenCalled();
+    // The markers matching the structured filters are still shown — not a silent full library, and
+    // not a silently empty map either.
+    expect(screen.getByTestId('map-stub')).toHaveAttribute('data-marker-ids', 'asset-1');
+  });
+
+  it('intersects and shows NO notice when the instance has a smart-search cutoff', async () => {
+    // The regression guard for the configured instance: this is the test that fails if someone
+    // "simplifies" the gate away by deleting the loop.
+    featureFlagsMock.value = { ...featureFlagsMock.value, smartSearchHasCutoff: true };
+    mockPage.url = new URL('https://gallery.test/map?q=ski');
+    sdkMock.getFilteredMapMarkers.mockResolvedValue([
+      { id: 'asset-1', lat: 1, lon: 2 } as never,
+      { id: 'asset-2', lat: 3, lon: 4 } as never,
+    ]);
+    sdkMock.searchSmart.mockResolvedValue({
+      assets: { items: [{ id: 'asset-2' }], nextPage: null },
+    } as never);
+
+    renderPage();
+    await flushQueryDebounce();
+
+    await waitFor(() => expect(sdkMock.searchSmart).toHaveBeenCalled());
+    // Narrowed to the semantic match…
+    await waitFor(() => expect(screen.getByTestId('map-stub')).toHaveAttribute('data-marker-ids', 'asset-2'));
+    // …and no notice, because the term genuinely WAS applied.
+    expect(screen.queryByTestId('map-smart-search-notice')).not.toBeInTheDocument();
+  });
+
+  it('shows no notice when there is no smart-search term', async () => {
+    mockPage.url = new URL('https://gallery.test/map?make=Apple');
+    sdkMock.getFilteredMapMarkers.mockResolvedValue([{ id: 'asset-1', lat: 1, lon: 2 } as never]);
+
+    renderPage();
+    await flushQueryDebounce();
+
+    await waitFor(() => expect(sdkMock.getFilteredMapMarkers).toHaveBeenCalled());
+    expect(screen.queryByTestId('map-smart-search-notice')).not.toBeInTheDocument();
+  });
+
+  it('shows no notice for a whitespace-only q', async () => {
+    mockPage.url = new URL('https://gallery.test/map?q=%20%20');
+
+    renderPage();
+    await flushQueryDebounce();
+
+    expect(screen.queryByTestId('map-smart-search-notice')).not.toBeInTheDocument();
   });
 });

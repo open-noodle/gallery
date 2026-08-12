@@ -1,5 +1,5 @@
 import { createZodDto } from 'nestjs-zod';
-import { isoDatetimeToDate, stringToBool } from 'src/validation';
+import { boundedTextFilter, isoDatetimeToDate, stringToBool } from 'src/validation';
 import z from 'zod';
 
 export enum MapMediaType {
@@ -37,14 +37,22 @@ const FilteredMapMarkerSchema = z
     isFavorite: stringToBool.optional().describe('Filter by favorite status'),
     isNotInAlbum: stringToBool.optional().describe('Filter assets not in any album'),
     isInAlbum: stringToBool.optional().describe('Filter assets in at least one album'),
+    originalFileName: boundedTextFilter()
+      .optional()
+      .describe('Filter by original filename (substring, case/accent-insensitive)'),
+    description: boundedTextFilter()
+      .optional()
+      .describe('Filter by asset description (substring, case/accent-insensitive)'),
+    ocr: boundedTextFilter().optional().describe('Filter by OCR text content (substring, case/accent-insensitive)'),
     city: z.string().optional().describe('Filter by city'),
     country: z.string().optional().describe('Filter by country'),
-    // The Map filter panel renders the same "Text" section as every other surface (#802), so
-    // markers accept the same three predicates the map timeline (TimeBucketDto) already does.
-    // searchAssetBuilder already implements all three.
-    description: z.string().optional().describe('Filter by description text'),
-    originalFileName: z.string().optional().describe('Filter by original file name'),
-    ocr: z.string().optional().describe('Filter by text recognised in the image'),
+    lensModel: z.string().optional().describe('Camera lens model'),
+    state: z.string().optional().describe('Filter by state/province'),
+    ownerId: z
+      .uuidv4()
+      .optional()
+      .describe('Filter by asset owner (contributor). Narrows within the current scope; never widens it.'),
+    albumId: z.uuidv4().optional().describe('Filter by album'),
     withSharedSpaces: stringToBool.optional().describe('Include shared space assets'),
   })
   .meta({ id: 'FilteredMapMarkerDto' });
