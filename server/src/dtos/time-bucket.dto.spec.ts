@@ -145,5 +145,47 @@ describe('TimeBucketDto', () => {
       expect(result.data?.description).toBeUndefined();
       expect(result.data?.ocr).toBeUndefined();
     });
+
+    // Bounded server-side to mirror the web clamp (TEXT_FILTER_MAX_CODE_POINTS = 200), counting CODE
+    // POINTS not UTF-16 units, so a direct API caller cannot push a multi-kilobyte ILIKE pattern in.
+    it.each(['originalFileName', 'description', 'ocr'] as const)('accepts %s at exactly 200 code points', (field) => {
+      expect(TimeBucketDto.schema.safeParse({ [field]: 'a'.repeat(200) }).success).toBe(true);
+    });
+
+    it.each(['originalFileName', 'description', 'ocr'] as const)('rejects %s longer than 200 code points', (field) => {
+      expect(TimeBucketDto.schema.safeParse({ [field]: 'a'.repeat(201) }).success).toBe(false);
+    });
+
+    it('bounds by code points, so 200 astral characters (400 UTF-16 units) still pass', () => {
+      expect(TimeBucketDto.schema.safeParse({ description: '😀'.repeat(200) }).success).toBe(true);
+      expect(TimeBucketDto.schema.safeParse({ description: '😀'.repeat(201) }).success).toBe(false);
+    });
+  });
+
+  describe('ownerId, lensModel, state query params', () => {
+    const uuid = '7e57d004-2b97-4e7a-b45f-5387367791cd';
+
+    it('accepts a valid ownerId', () => {
+      const result = TimeBucketDto.schema.safeParse({ ownerId: uuid });
+      expect(result.success).toBe(true);
+      expect(result.data?.ownerId).toBe(uuid);
+    });
+
+    it('rejects a non-uuid ownerId (a scoped token or arbitrary string must not reach SQL)', () => {
+      expect(TimeBucketDto.schema.safeParse({ ownerId: 'not-a-uuid' }).success).toBe(false);
+      expect(TimeBucketDto.schema.safeParse({ ownerId: `space-person:${uuid}` }).success).toBe(false);
+    });
+
+    it('accepts lensModel and state, and leaves them undefined when omitted', () => {
+      const present = TimeBucketDto.schema.safeParse({ lensModel: 'RF24-70mm', state: 'Bavaria' });
+      expect(present.success).toBe(true);
+      expect(present.data?.lensModel).toBe('RF24-70mm');
+      expect(present.data?.state).toBe('Bavaria');
+
+      const absent = TimeBucketDto.schema.safeParse({});
+      expect(absent.data?.ownerId).toBeUndefined();
+      expect(absent.data?.lensModel).toBeUndefined();
+      expect(absent.data?.state).toBeUndefined();
+    });
   });
 });
