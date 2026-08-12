@@ -262,8 +262,12 @@ describe('space-album scope guard: every library scoping arm has album coverage'
 //     predicate (map / memory / view use the tighter Timeline-only gate).
 //   - *_SYNC_COLUMNS: the query streams a LINK table (libraryId/albumId/spaceId
 //     metadata) not asset rows; asset visibility lives in the asset-stream classes.
+//   - reviewableAssetVisibility: the face-review engines' gate (src/utils/face-review.ts). It is
+//     defined as `eb(column, 'in', spaceVisibleAssetVisibilities)` — the same set, under a name that
+//     says why the face-review surfaces need it (no Locked-folder crop reaches a reviewer, because
+//     neither the suggestion queue nor the cleanup console re-authenticates).
 const VIS_GATE_MARKER =
-  /spaceVisibilityGate|spaceVisibleAssetVisibilities|visibleSpaceAssetVisibilities|peopleAssetVisibilities|visibilityFilter|AssetVisibility\.(Timeline|Archive)|SHARED_SPACE_LIBRARY_SYNC_COLUMNS|SHARED_SPACE_ALBUM_SYNC_COLUMNS/;
+  /spaceVisibilityGate|spaceVisibleAssetVisibilities|visibleSpaceAssetVisibilities|reviewableAssetVisibility|peopleAssetVisibilities|visibilityFilter|AssetVisibility\.(Timeline|Archive)|SHARED_SPACE_LIBRARY_SYNC_COLUMNS|SHARED_SPACE_ALBUM_SYNC_COLUMNS/;
 
 // Lines that reference a space marker but are NOT an asset-read scoping arm.
 const VIS_BENIGN_LINE = [
