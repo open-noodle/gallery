@@ -1,7 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { AuthDto } from 'src/dtos/auth.dto';
 import { PluginManifestDto } from 'src/dtos/plugin-manifest.dto';
+import { GalleryWorkflowHostService } from 'src/services/gallery-workflow-host.service';
 import { describe, expect, it } from 'vitest';
+import { newTestService } from 'test/utils';
 
 const manifestPath = join(process.cwd(), '..', 'packages/plugin-gallery/manifest.json');
 const readManifest = () => JSON.parse(readFileSync(manifestPath, { encoding: 'utf8' }));
@@ -22,5 +25,20 @@ describe('gallery plugin manifest', () => {
         .methods.map((method: { name: string }) => method.name)
         .sort(),
     ).toEqual(['addToSpace', 'addToSpaceAlbum']);
+  });
+});
+
+const auth = { user: { id: 'user-1' } } as AuthDto;
+
+describe(GalleryWorkflowHostService.name, () => {
+  const setup = () => newTestService(GalleryWorkflowHostService);
+
+  // U2 — a stale externally-installed plugin must degrade, not explode.
+  it('resolves ok:false for an unknown method instead of rejecting', async () => {
+    const { sut } = setup();
+    await expect(sut.dispatch(auth, 'noSuchMethod', {})).resolves.toEqual({
+      ok: false,
+      reason: 'unknown-method',
+    });
   });
 });
