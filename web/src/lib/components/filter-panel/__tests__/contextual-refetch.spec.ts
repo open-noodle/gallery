@@ -469,6 +469,140 @@ describe('Contextual re-fetch on temporal change', () => {
     });
   });
 
+  it('should pass the state, lens and contributor narrowings to the dependent providers', async () => {
+    const cities = vi.fn().mockResolvedValue(['Munich']);
+    const cameraModels = vi.fn().mockResolvedValue(['Canon EOS R6']);
+    const config = createConfig({ cities, cameraModels });
+
+    // A state and a lens can only ARRIVE pinned — from a contextual filter clicked in the asset
+    // viewer, typed search or a link — so the scenario is "the panel opens with them already set",
+    // not "the user clicks them". (Clicking a country would replace the whole location group and
+    // clear the state, which is why the city list must not be narrowed by it.)
+    render(FilterPanel, {
+      props: {
+        config,
+        timeBuckets,
+        filters: {
+          personIds: [],
+          tagIds: [],
+          mediaType: 'all',
+          sortOrder: 'desc',
+          country: 'Germany',
+          state: 'Bavaria',
+          make: 'Canon',
+          model: 'Canon EOS R6',
+          lensModel: 'RF24-105mm F4 L IS USM',
+          ownerId: 'owner-1',
+        },
+      },
+    });
+
+    await vi.advanceTimersByTimeAsync(250);
+
+    await waitFor(() => {
+      // The location group is self-excluded, so the pinned state is NOT sent to the city list …
+      expect(cities).toHaveBeenLastCalledWith('Germany', {
+        make: 'Canon',
+        model: 'Canon EOS R6',
+        lensModel: 'RF24-105mm F4 L IS USM',
+        ownerId: 'owner-1',
+      });
+      // … but it does narrow the camera-model list, alongside the lens and the contributor.
+      expect(cameraModels).toHaveBeenLastCalledWith('Canon', {
+        country: 'Germany',
+        state: 'Bavaria',
+        lensModel: 'RF24-105mm F4 L IS USM',
+        ownerId: 'owner-1',
+      });
+    });
+  });
+
+  it('should send the state, lens and contributor narrowings to the unified suggestions provider', async () => {
+    const narrowed: FilterSuggestionsResponse = {
+      ...defaultSuggestions,
+      people: [{ id: 'p1', name: 'Alice' }],
+      tags: [{ id: 't1', name: 'Vacation' }],
+    };
+    const suggestionsProvider = vi.fn().mockResolvedValue(narrowed);
+    const config: FilterPanelConfig = {
+      sections: ['people', 'tags'],
+      suggestionsProvider,
+    };
+
+    render(FilterPanel, {
+      props: {
+        config,
+        timeBuckets,
+        filters: {
+          personIds: [],
+          tagIds: [],
+          mediaType: 'all',
+          sortOrder: 'desc',
+          state: 'Bavaria',
+          lensModel: 'RF24-105mm F4 L IS USM',
+          ownerId: 'owner-1',
+        },
+      },
+    });
+
+    await vi.advanceTimersByTimeAsync(0);
+
+    await waitFor(() => {
+      // The provider reads the state this effect reconstructs, so an untracked field is an unsent
+      // one — these three have to survive the round trip for the lists to narrow at all.
+      expect(suggestionsProvider).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          state: 'Bavaria',
+          lensModel: 'RF24-105mm F4 L IS USM',
+          ownerId: 'owner-1',
+        }),
+      );
+      // …and the narrowed lists it returns are what the panel renders.
+      expect(screen.getByTestId('people-item-p1')).toBeTruthy();
+      expect(screen.queryByTestId('people-item-p2')).toBeNull();
+      expect(screen.getByTestId('tags-item-t1')).toBeTruthy();
+      expect(screen.queryByTestId('tags-item-t2')).toBeNull();
+    });
+  });
+
+  it('should keep the empty-section disable gate off for a state, lens or contributor filter only', async () => {
+    // #858 §3.3 decision 3: the count/disable gate answers "has a cross-section filter narrowed the
+    // panel?" and must keep today's behaviour. A section with an empty list renders "(0)" and is
+    // disabled only when that gate is on; these three arrive from a contextual filter or a link, so
+    // turning it on for them would be a separate UX change.
+    const suggestionsProvider = vi.fn().mockResolvedValue({
+      ...defaultSuggestions,
+      people: [],
+      tags: [],
+    });
+    const config: FilterPanelConfig = { sections: ['people', 'tags'], suggestionsProvider };
+
+    render(FilterPanel, {
+      props: {
+        config,
+        timeBuckets,
+        filters: {
+          personIds: [],
+          tagIds: [],
+          mediaType: 'all',
+          sortOrder: 'desc',
+          state: 'Bavaria',
+          lensModel: 'RF24-105mm F4 L IS USM',
+          ownerId: 'owner-1',
+        },
+      },
+    });
+
+    await vi.advanceTimersByTimeAsync(0);
+    await waitFor(() => expect(suggestionsProvider).toHaveBeenCalled());
+
+    for (const section of ['people', 'tags']) {
+      const button = screen.getByTestId(`filter-section-${section}`).querySelector('button')!;
+      expect(button.textContent).not.toContain('(0)');
+      expect(button.hasAttribute('disabled')).toBe(false);
+    }
+  });
+
   it('should keep rating and media controls stable after custom date changes', async () => {
     const secondSuggestions: FilterSuggestionsResponse = {
       ...defaultSuggestions,
