@@ -114,7 +114,6 @@ features:
       - web/src/lib/components/import/**
       - web/src/lib/managers/import-manager.svelte.ts
       - web/src/lib/utils/google-takeout-*.ts
-      - web/src/lib/gallery/storage-usage.ts
       - web/src/routes/admin/system-settings/StorageUsageSettings.svelte
       - scripts/revert-to-immich.sql
       - .github/workflows/storage-migration*.yml
@@ -125,18 +124,11 @@ features:
       - server/src/services/metadata.service.ts
       - server/src/services/auth.service.ts
       - server/src/services/user.service.ts
-      - server/src/services/server.service.ts
-      - server/src/services/asset-media.service.ts
       - server/src/services/integrity.service.ts
       - server/src/services/index.ts
       - server/src/repositories/user.repository.ts
       - server/src/repositories/asset.repository.ts
       - server/src/repositories/storage.repository.ts
-      - server/src/schema/tables/user.table.ts
-      - server/src/database.ts
-      - server/src/dtos/user.dto.ts
-      - server/src/dtos/server.dto.ts
-      - web/src/lib/components/shared-components/side-bar/StorageSpace.svelte
       - web/src/routes/admin/system-settings/+page.svelte
       - server/Dockerfile
       - e2e/docker-compose.yml
@@ -152,7 +144,6 @@ features:
       migration_globs:
         - server/src/schema/migrations-gallery/*Storage*.ts
         - server/src/schema/migrations-gallery/*DuplicateChecksum*.ts
-        - server/src/schema/migrations-gallery/*PhysicalUsage*.ts
     required_checks: [storage-migration-tests, storage-migration-e2e]
 
   search-map-and-ui:
