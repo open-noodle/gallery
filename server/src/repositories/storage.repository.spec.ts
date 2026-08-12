@@ -1,5 +1,5 @@
 import mockfs from 'mock-fs';
-import { mkdir, rm, writeFile } from 'node:fs/promises';
+import fs, { mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
@@ -193,6 +193,7 @@ describe(StorageRepository.name, () => {
 
   afterEach(() => {
     mockfs.restore();
+    vi.restoreAllMocks();
   });
 
   describe('crawl', () => {
@@ -231,6 +232,39 @@ describe(StorageRepository.name, () => {
       mockfs({});
 
       await expect(sut.getFolderSize('/data/upload/missing')).resolves.toBe(0);
+    });
+
+    it('skips files rejected by the filter', async () => {
+      mockfs.restore();
+      const testDir = join(tmpdir(), `immich-storage-filter-${Date.now()}`);
+      try {
+        await mkdir(join(testDir, 'aa'), { recursive: true });
+        await writeFile(join(testDir, 'aa/keep.jpg'), 'one');
+        await writeFile(join(testDir, 'aa/skip.jpg'), 'two!!');
+
+        await expect(sut.getFolderSize(testDir, (filename) => filename !== 'skip.jpg')).resolves.toBe(3);
+      } finally {
+        await rm(testDir, { recursive: true, force: true });
+      }
+    });
+
+    it('ignores files deleted between listing and stat', async () => {
+      // Regression for the nightly scan walking a live tree that delete jobs write to: a file
+      // can vanish between `opendir` and `stat`. Uses a real temp dir (not mock-fs) because
+      // mock-fs does not intercept `fs.promises.opendir`'s async iterator, so a mock-fs-only
+      // version of this test would never reach the `stat` call it's meant to exercise.
+      mockfs.restore();
+      const testDir = join(tmpdir(), `immich-storage-enoent-${Date.now()}`);
+      try {
+        await mkdir(join(testDir, 'aa'), { recursive: true });
+        await writeFile(join(testDir, 'aa/one.webp'), 'one');
+        const error = Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+        vi.spyOn(fs, 'stat').mockRejectedValueOnce(error as never);
+
+        await expect(sut.getFolderSize(testDir)).resolves.toBe(0);
+      } finally {
+        await rm(testDir, { recursive: true, force: true });
+      }
     });
   });
 
