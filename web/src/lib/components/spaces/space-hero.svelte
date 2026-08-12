@@ -156,7 +156,7 @@
           {space.description}
         </p>
       {/if}
-      {#if assetCount != null}
+      {#if assetCount !== undefined}
         <span
           class="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/20 px-2.5 py-1 text-xs font-medium backdrop-blur-sm"
           data-testid="hero-photo-count"
