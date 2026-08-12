@@ -1,5 +1,6 @@
 <script lang="ts">
   import UserAvatar from '$lib/components/shared-components/UserAvatar.svelte';
+  import { authManager } from '$lib/managers/auth-manager.svelte';
   import { Route } from '$lib/route';
   import { getAdminFaceThumbnailUrl } from '$lib/utils/people-utils';
   import { getPeopleThumbnailPath, type UserAdminResponseDto } from '@immich/sdk';
@@ -14,6 +15,8 @@
   // cluster can be dropped without opening it. Row internals port from the deleted FaceCleanupTable.
   type Props = { people: FaceCleanupPerson[]; users: UserAdminResponseDto[]; onDismiss: (personId: string) => void };
   const { people, users, onDismiss }: Props = $props();
+
+  const isReadOnlyDemo = $derived(authManager.isReadOnlyDemo);
 
   const usersById = $derived(new Map(users.map((u) => [u.id, u])));
   let query = $state('');
@@ -228,16 +231,18 @@
           >
             <Icon icon={mdiChevronRight} size="18" />
           </span>
-          <button
-            type="button"
-            class="pointer-events-none absolute top-1/2 right-3 z-10 flex size-8 -translate-y-1/2 items-center justify-center rounded-lg text-gray-400 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 hover:bg-gray-100 hover:text-gray-600 focus:pointer-events-auto focus:opacity-100 dark:hover:bg-gray-700 dark:hover:text-gray-200"
-            aria-label={$t('admin.face_cleanup_dismiss')}
-            title={$t('admin.face_cleanup_dismiss')}
-            onclick={() => handleDismiss(person)}
-            data-testid={`review-dismiss-${person.personId}`}
-          >
-            <Icon icon={mdiClose} size="16" />
-          </button>
+          {#if !isReadOnlyDemo}
+            <button
+              type="button"
+              class="pointer-events-none absolute top-1/2 right-3 z-10 flex size-8 -translate-y-1/2 items-center justify-center rounded-lg text-gray-400 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 hover:bg-gray-100 hover:text-gray-600 focus:pointer-events-auto focus:opacity-100 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+              aria-label={$t('admin.face_cleanup_dismiss')}
+              title={$t('admin.face_cleanup_dismiss')}
+              onclick={() => handleDismiss(person)}
+              data-testid={`review-dismiss-${person.personId}`}
+            >
+              <Icon icon={mdiClose} size="16" />
+            </button>
+          {/if}
         </div>
       {/each}
       {#if visible.length === 0}
