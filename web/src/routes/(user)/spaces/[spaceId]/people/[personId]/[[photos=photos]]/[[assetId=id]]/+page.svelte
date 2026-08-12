@@ -15,6 +15,8 @@
   import type { TimelineAsset, TimelineGrouping, TimelineTemporalAnchor } from '$lib/managers/timeline-manager/types';
   import { timeBeforeShowLoadingSpinner } from '$lib/constants';
   import PersonEditBirthDateModal from '$lib/modals/PersonEditBirthDateModal.svelte';
+  import PersonSuggestionBanner from '$lib/components/faces-page/person-suggestion-banner.svelte';
+  import PersonSuggestionReviewModal from '$lib/modals/PersonSuggestionReviewModal.svelte';
   import RepresentativeFacePickerModal from '$lib/modals/RepresentativeFacePickerModal.svelte';
   import { Route } from '$lib/route';
   import { createUrl, getPeopleThumbnailUrl } from '$lib/utils';
@@ -30,8 +32,12 @@
   import { getTimelineBucketZoomTarget, type ActivatableTimelineBucket } from '$lib/utils/timeline-zoom-navigation';
   import { getTimelineTopVisibleAnchor } from '$lib/managers/timeline-manager/timeline-anchor';
   import {
+    confirmSpacePersonFaceSuggestion,
     detachScopedPerson,
+    dismissSpacePersonFaceSuggestion,
     getSpacePersonFaces,
+    getSpacePersonFaceSuggestions,
+    ignoreSpacePersonFaceSuggestion,
     getSpacePeople,
     mergeSpacePeople,
     RepresentativeFaceSource,
@@ -41,6 +47,7 @@
     updateSpacePersonRepresentativeFace,
     updateSpacePerson,
     type PersonFaceResponseDto,
+    type PersonFaceSuggestionResponseDto,
     type PersonResponseDto,
     type PersonStatisticsResponseDto,
     type ScopedPersonProfileRefDto,
@@ -115,9 +122,15 @@
     currentMember?.role === SharedSpaceRole.Owner || currentMember?.role === SharedSpaceRole.Editor,
   );
   const getSpacePersonRoute = (personId: string) => Route.viewSpacePerson(space.id, personId, previousRouteParams);
+  let thumbnailRefresh = $state<string | null>(null);
   const thumbnailUrl = $derived(
-    createUrl(`/shared-spaces/${space.id}/people/${person.id}/thumbnail`, { updatedAt: person.updatedAt }),
+    createUrl(`/shared-spaces/${space.id}/people/${person.id}/thumbnail`, {
+      updatedAt: thumbnailRefresh ?? person.updatedAt,
+    }),
   );
+  const suggestionPerson = $derived({ id: person.id, name: person.name } as PersonResponseDto);
+  let suggestionTotal = $state(0);
+  let suggestionPreviews = $state<PersonFaceSuggestionResponseDto[]>([]);
 
   const setPerson = (updatedPerson: SharedSpacePersonResponseDto) => {
     personOverride = updatedPerson;
@@ -485,6 +498,52 @@
     }
   }
 
+  async function loadSuggestionSummary(spaceId = space.id, personId = person.id) {
+    try {
+      const response = await getSpacePersonFaceSuggestions({ id: spaceId, personId, page: 1, size: 5 });
+      if (spaceId !== space.id || personId !== person.id) {
+        return;
+      }
+      suggestionTotal = response.total;
+      suggestionPreviews = response.items;
+    } catch {
+      if (spaceId !== space.id || personId !== person.id) {
+        return;
+      }
+      suggestionTotal = 0;
+      suggestionPreviews = [];
+    }
+  }
+
+  // F24/S11b: these endpoints answer 200 with `{ acted }` — the signal is in the body because
+  // `oazapfts.ok()` discards the status code for every 2xx. They pass straight through to the modal.
+
+  async function openSuggestionReview() {
+    const currentSpaceId = space.id;
+    const currentPersonId = person.id;
+    const currentPerson = suggestionPerson;
+    const currentThumbnailUrl = thumbnailUrl;
+
+    const result = await modalManager.show(PersonSuggestionReviewModal, {
+      person: currentPerson,
+      referenceThumbnailUrl: currentThumbnailUrl,
+      loadPage: ({ page, size }: { page: number; size: number }) =>
+        getSpacePersonFaceSuggestions({ id: currentSpaceId, personId: currentPersonId, page, size }),
+      confirm: (assetFaceId: string) =>
+        confirmSpacePersonFaceSuggestion({ id: currentSpaceId, personId: currentPersonId, assetFaceId }),
+      dismiss: (assetFaceId: string) =>
+        dismissSpacePersonFaceSuggestion({ id: currentSpaceId, personId: currentPersonId, assetFaceId }),
+      ignore: (assetFaceId: string) =>
+        ignoreSpacePersonFaceSuggestion({ id: currentSpaceId, personId: currentPersonId, assetFaceId }),
+    });
+
+    await loadSuggestionSummary(currentSpaceId, currentPersonId);
+    if (result && result.confirmed > 0) {
+      thumbnailRefresh = Date.now().toString();
+      await invalidateAll();
+    }
+  }
+
   async function handleHidePerson() {
     try {
       await updateSpacePerson({
@@ -553,6 +612,15 @@
     }
 
     return items;
+  });
+
+  $effect(() => {
+    const currentSpaceId = space.id;
+    const currentPersonId = person.id;
+    thumbnailRefresh = null;
+    suggestionTotal = 0;
+    suggestionPreviews = [];
+    void loadSuggestionSummary(currentSpaceId, currentPersonId);
   });
 </script>
 
@@ -715,6 +783,22 @@
             </div>
           {/if}
         </div>
+
+        {#if isEditor}
+          <!-- Defence in depth, not the primary gate: the server already returns an empty page (`total: 0`)
+               to members below editor (loadSuggestionSummary above), which is what actually keeps this
+               hidden from viewers today. This client-side check exists so that a future relaxation of that
+               read gate ("let viewers see what is pending") does not also silently expose the review
+               action — it must be relaxed here explicitly, not by accident. -->
+          <PersonSuggestionBanner
+            person={suggestionPerson}
+            snoozeId={person.id}
+            total={suggestionTotal}
+            previews={suggestionPreviews}
+            referenceThumbnailUrl={thumbnailUrl}
+            onReview={openSuggestionReview}
+          />
+        {/if}
 
         {#snippet empty()}
           <div class="mx-auto max-w-md py-16 text-center">

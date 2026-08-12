@@ -83,8 +83,8 @@ export type FaceRepairRequestDto = {
 export type FaceRepairResponseDto = {
     dryRun: boolean;
     executed?: {
-        requeued: number;
-        unassigned: number;
+        moved: number;
+        skipped: number;
     };
     mutated: boolean;
     report: {
@@ -113,6 +113,95 @@ export type FaceRepairResponseDto = {
             toRepair: number;
         };
     };
+};
+export type FaceRepairApplyRequestDto = {
+    approvedPersonIds?: string[];
+    excludeFaceIds?: string[];
+    manualMove?: {
+        destinationPersonId: string;
+        entireCluster?: boolean;
+        faceIds?: string[];
+        personId: string;
+    };
+};
+export type FaceRepairApplyResponseDto = {
+    moved: number;
+    skipped: number;
+};
+export type FaceRepairDeclineRemoveRequestDto = {
+    faces?: {
+        assetFaceId: string;
+        suspectedOwnerId: string;
+    }[];
+    ids?: string[];
+};
+export type FaceRepairDeclineRemovedDto = {
+    removed: number;
+};
+export type FaceRepairDeclineListDto = {
+    declines: {
+        assetFaceId: string | null;
+        createdAt: string;
+        id: string;
+        personId: string | null;
+        personName: string | null;
+        personThumbnailFaceId: string | null;
+        suspectedOwnerId: string | null;
+        suspectedOwnerName: string | null;
+        suspectedOwnerThumbnailFaceId: string | null;
+        "type": string;
+    }[];
+};
+export type FaceRepairDeclineRequestDto = {
+    faces?: {
+        assetFaceId: string;
+        suspectedOwnerId: string;
+    }[];
+    persons?: {
+        personId: string;
+        suspectedOwnerIds: string[];
+    }[];
+};
+export type FaceRepairDeclineCreatedDto = {
+    created: number;
+};
+export type FaceRepairScanTriggerRequestDto = {
+    params?: {
+        largeClusterThreshold?: number;
+        maxAttributionDistance?: number;
+        maxDistance?: number;
+        maxFlaggedFraction?: number;
+        minFaces?: number;
+        voteMargin?: number;
+        voteWindow?: number;
+    };
+};
+export type FaceRepairScanTriggerResponseDto = {
+    scanId: string;
+};
+export type FaceRepairScanDefaultsDto = {
+    maxDistance: number;
+    maxFlaggedFraction: number;
+    minFaces: number;
+};
+export type FaceRepairPersonFacesDto = {
+    flaggedFaces: {
+        assetFaceId: string;
+        suspectedOwnerId: string;
+    }[];
+    personId: string;
+};
+export type FaceRepairClusterFacesRequestDto = {
+    excludeFaceIds?: string[];
+    page: number;
+    size: number;
+};
+export type FaceRepairClusterFacesResponseDto = {
+    faces: {
+        assetFaceId: string;
+    }[];
+    hasMore: boolean;
+    total: number;
 };
 export type SetMaintenanceModeDto = {
     action: MaintenanceAction;
@@ -1651,8 +1740,6 @@ export type PeopleFaceStatisticsResponseDto = {
     unassignedFaceCount: number;
 };
 export type MergeScopedPeopleDto = {
-    /** Acknowledgement that this merge will modify people/faces owned by other users. Required to commit a cross-owner merge. */
-    confirmCrossOwner?: boolean;
     /** Source scoped profiles */
     sources: ScopedPersonProfileRefDto[];
     /** Target scoped profile */
@@ -1881,8 +1968,6 @@ export type MetadataSearchDto = {
     isEncoded?: boolean;
     /** Filter by favorite status */
     isFavorite?: boolean;
-    /** Filter assets in at least one album */
-    isInAlbum?: boolean;
     /** Filter by motion photo status */
     isMotion?: boolean;
     /** Filter assets not in any album */
@@ -2010,8 +2095,6 @@ export type RandomSearchDto = {
     isEncoded?: boolean;
     /** Filter by favorite status */
     isFavorite?: boolean;
-    /** Filter assets in at least one album */
-    isInAlbum?: boolean;
     /** Filter by motion photo status */
     isMotion?: boolean;
     /** Filter assets not in any album */
@@ -2082,8 +2165,6 @@ export type SmartSearchDto = {
     isEncoded?: boolean;
     /** Filter by favorite status */
     isFavorite?: boolean;
-    /** Filter assets in at least one album */
-    isInAlbum?: boolean;
     /** Filter by motion photo status */
     isMotion?: boolean;
     /** Filter assets not in any album */
@@ -2152,8 +2233,6 @@ export type SmartSearchFacetsDto = {
     country?: string | null;
     /** Filter by favorite status */
     isFavorite?: boolean;
-    /** Filter assets in at least one album */
-    isInAlbum?: boolean;
     /** Filter assets not in any album */
     isNotInAlbum?: boolean;
     /** Search language code */
@@ -2245,8 +2324,6 @@ export type StatisticsSearchDto = {
     isEncoded?: boolean;
     /** Filter by favorite status */
     isFavorite?: boolean;
-    /** Filter assets in at least one album */
-    isInAlbum?: boolean;
     /** Filter by motion photo status */
     isMotion?: boolean;
     /** Filter assets not in any album */
@@ -3223,8 +3300,6 @@ export type SystemConfigServerDto = {
     externalDomain: string;
     /** Login page message */
     loginPageMessage: string;
-    /** Allow merging people/faces across different owners and external libraries */
-    mergePeopleAcrossOwners: boolean;
     /** Public users */
     publicUsers: boolean;
 };
@@ -4100,6 +4175,55 @@ export declare function runFaceRepair({ faceRepairRequestDto }: {
     faceRepairRequestDto: FaceRepairRequestDto;
 }, opts?: Oazapfts.RequestOpts): Promise<FaceRepairResponseDto>;
 /**
+ * Apply face re-attribution for approved persons
+ */
+export declare function applyFaceRepair({ faceRepairApplyRequestDto }: {
+    faceRepairApplyRequestDto: FaceRepairApplyRequestDto;
+}, opts?: Oazapfts.RequestOpts): Promise<FaceRepairApplyResponseDto>;
+/**
+ * Remove face-repair declines
+ */
+export declare function removeFaceRepairDeclines({ faceRepairDeclineRemoveRequestDto }: {
+    faceRepairDeclineRemoveRequestDto: FaceRepairDeclineRemoveRequestDto;
+}, opts?: Oazapfts.RequestOpts): Promise<FaceRepairDeclineRemovedDto>;
+/**
+ * List face-repair declines
+ */
+export declare function getFaceRepairDeclines(opts?: Oazapfts.RequestOpts): Promise<FaceRepairDeclineListDto>;
+/**
+ * Decline flagged faces / dismiss flagged persons
+ */
+export declare function declineFaceRepair({ faceRepairDeclineRequestDto }: {
+    faceRepairDeclineRequestDto: FaceRepairDeclineRequestDto;
+}, opts?: Oazapfts.RequestOpts): Promise<FaceRepairDeclineCreatedDto>;
+/**
+ * Trigger a face-repair scan
+ */
+export declare function triggerScan({ faceRepairScanTriggerRequestDto }: {
+    faceRepairScanTriggerRequestDto: FaceRepairScanTriggerRequestDto;
+}, opts?: Oazapfts.RequestOpts): Promise<FaceRepairScanTriggerResponseDto>;
+/**
+ * Get effective face-repair scan defaults
+ */
+export declare function getFaceRepairScanDefaults(opts?: Oazapfts.RequestOpts): Promise<FaceRepairScanDefaultsDto>;
+/**
+ * Get the latest face-repair scan
+ */
+export declare function getLatestScan(opts?: Oazapfts.RequestOpts): Promise<object>;
+/**
+ * Get a person's flagged faces for review
+ */
+export declare function getFaceRepairPersonFaces({ personId }: {
+    personId: string;
+}, opts?: Oazapfts.RequestOpts): Promise<FaceRepairPersonFacesDto>;
+/**
+ * List a person's cluster faces (paginated, excluding the supplied flagged ids)
+ */
+export declare function getFaceRepairClusterFaces({ personId, faceRepairClusterFacesRequestDto }: {
+    personId: string;
+    faceRepairClusterFacesRequestDto: FaceRepairClusterFacesRequestDto;
+}, opts?: Oazapfts.RequestOpts): Promise<FaceRepairClusterFacesResponseDto>;
+/**
  * Set maintenance mode
  */
 export declare function setMaintenanceMode({ setMaintenanceModeDto }: {
@@ -4621,11 +4745,10 @@ export declare function reassignFacesById({ id, faceDto }: {
 /**
  * Get filtered map markers
  */
-export declare function getFilteredMapMarkers({ city, country, isFavorite, isInAlbum, isNotInAlbum, make, model, personIds, rating, spaceId, tagIds, takenAfter, takenBefore, $type, withSharedSpaces }: {
+export declare function getFilteredMapMarkers({ city, country, isFavorite, isNotInAlbum, make, model, personIds, rating, spaceId, tagIds, takenAfter, takenBefore, $type, withSharedSpaces }: {
     city?: string;
     country?: string;
     isFavorite?: boolean;
-    isInAlbum?: boolean;
     isNotInAlbum?: boolean;
     make?: string;
     model?: string;
@@ -5072,7 +5195,7 @@ export declare function getExploreData(opts?: Oazapfts.RequestOpts): Promise<Sea
 /**
  * Search large assets
  */
-export declare function searchLargeAssets({ albumIds, city, country, createdAfter, createdBefore, isEncoded, isFavorite, isInAlbum, isMotion, isNotInAlbum, isOffline, lensModel, libraryId, make, minFileSize, model, ocr, personIds, rating, size, spaceId, spacePersonIds, state, tagIds, takenAfter, takenBefore, trashedAfter, trashedBefore, $type, updatedAfter, updatedBefore, visibility, withDeleted, withExif, withSharedSpaces }: {
+export declare function searchLargeAssets({ albumIds, city, country, createdAfter, createdBefore, isEncoded, isFavorite, isMotion, isNotInAlbum, isOffline, lensModel, libraryId, make, minFileSize, model, ocr, personIds, rating, size, spaceId, spacePersonIds, state, tagIds, takenAfter, takenBefore, trashedAfter, trashedBefore, $type, updatedAfter, updatedBefore, visibility, withDeleted, withExif, withSharedSpaces }: {
     albumIds?: string[];
     city?: string | null;
     country?: string | null;
@@ -5080,7 +5203,6 @@ export declare function searchLargeAssets({ albumIds, city, country, createdAfte
     createdBefore?: string;
     isEncoded?: boolean;
     isFavorite?: boolean;
-    isInAlbum?: boolean;
     isMotion?: boolean;
     isNotInAlbum?: boolean;
     isOffline?: boolean;
@@ -5156,12 +5278,11 @@ export declare function searchAssetStatistics({ statisticsSearchDto }: {
 /**
  * Retrieve search suggestions
  */
-export declare function getSearchSuggestions({ albumId, country, includeNull, isFavorite, isInAlbum, isNotInAlbum, lensModel, make, model, personIds, rating, spaceId, state, tagIds, takenAfter, takenBefore, $type, withSharedSpaces }: {
+export declare function getSearchSuggestions({ albumId, country, includeNull, isFavorite, isNotInAlbum, lensModel, make, model, personIds, rating, spaceId, state, tagIds, takenAfter, takenBefore, $type, withSharedSpaces }: {
     albumId?: string;
     country?: string;
     includeNull?: boolean;
     isFavorite?: boolean;
-    isInAlbum?: boolean;
     isNotInAlbum?: boolean;
     lensModel?: string;
     make?: string;
@@ -5179,12 +5300,11 @@ export declare function getSearchSuggestions({ albumId, country, includeNull, is
 /**
  * Retrieve dynamic filter suggestions
  */
-export declare function getFilterSuggestions({ albumId, city, country, isFavorite, isInAlbum, isNotInAlbum, make, mediaType, model, personIds, rating, spaceId, tagIds, takenAfter, takenBefore, withSharedSpaces }: {
+export declare function getFilterSuggestions({ albumId, city, country, isFavorite, isNotInAlbum, make, mediaType, model, personIds, rating, spaceId, tagIds, takenAfter, takenBefore, withSharedSpaces }: {
     albumId?: string;
     city?: string;
     country?: string;
     isFavorite?: boolean;
-    isInAlbum?: boolean;
     isNotInAlbum?: boolean;
     make?: string;
     mediaType?: AssetTypeEnum;
@@ -5813,14 +5933,13 @@ export declare function tagAssets({ id, bulkIdsDto }: {
 /**
  * Get time bucket
  */
-export declare function getTimeBucket({ albumId, bbox, bucketSize, city, country, isFavorite, isInAlbum, isNotInAlbum, isTrashed, key, make, model, order, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, tagId, tagIds, takenAfter, takenBefore, timeBucket, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
+export declare function getTimeBucket({ albumId, bbox, bucketSize, city, country, isFavorite, isNotInAlbum, isTrashed, key, make, model, order, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, tagId, tagIds, takenAfter, takenBefore, timeBucket, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
     albumId?: string;
     bbox?: string;
     bucketSize?: TimeBucketSize;
     city?: string;
     country?: string;
     isFavorite?: boolean;
-    isInAlbum?: boolean;
     isNotInAlbum?: boolean;
     isTrashed?: boolean;
     key?: string;
@@ -5850,14 +5969,13 @@ export declare function getTimeBucket({ albumId, bbox, bucketSize, city, country
 /**
  * Get time bucket covers
  */
-export declare function getTimeBucketCovers({ albumId, bbox, bucketSize, city, country, isFavorite, isInAlbum, isNotInAlbum, isTrashed, key, make, model, order, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, tagId, tagIds, takenAfter, takenBefore, timeBuckets, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
+export declare function getTimeBucketCovers({ albumId, bbox, bucketSize, city, country, isFavorite, isNotInAlbum, isTrashed, key, make, model, order, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, tagId, tagIds, takenAfter, takenBefore, timeBuckets, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
     albumId?: string;
     bbox?: string;
     bucketSize?: TimeBucketSize;
     city?: string;
     country?: string;
     isFavorite?: boolean;
-    isInAlbum?: boolean;
     isNotInAlbum?: boolean;
     isTrashed?: boolean;
     key?: string;
@@ -5887,14 +6005,13 @@ export declare function getTimeBucketCovers({ albumId, bbox, bucketSize, city, c
 /**
  * Get time buckets
  */
-export declare function getTimeBuckets({ albumId, bbox, bucketSize, city, country, isFavorite, isInAlbum, isNotInAlbum, isTrashed, key, make, model, order, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, tagId, tagIds, takenAfter, takenBefore, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
+export declare function getTimeBuckets({ albumId, bbox, bucketSize, city, country, isFavorite, isNotInAlbum, isTrashed, key, make, model, order, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, tagId, tagIds, takenAfter, takenBefore, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }: {
     albumId?: string;
     bbox?: string;
     bucketSize?: TimeBucketSize;
     city?: string;
     country?: string;
     isFavorite?: boolean;
-    isInAlbum?: boolean;
     isNotInAlbum?: boolean;
     isTrashed?: boolean;
     key?: string;
@@ -6485,6 +6602,7 @@ export declare enum JobName {
     FacialRecognition = "FacialRecognition",
     FaceIdentityBackfill = "FaceIdentityBackfill",
     FaceIdentityMaintenanceAfterRecognition = "FaceIdentityMaintenanceAfterRecognition",
+    FaceRepairScan = "FaceRepairScan",
     FileDelete = "FileDelete",
     FileMigrationQueueAll = "FileMigrationQueueAll",
     LibraryDeleteCheck = "LibraryDeleteCheck",
