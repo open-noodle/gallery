@@ -92,7 +92,9 @@ import { join } from 'node:path';
 import { PluginManifestDto } from 'src/dtos/plugin-manifest.dto';
 import { describe, expect, it } from 'vitest';
 
-const manifestPath = join(import.meta.dirname, '../../../packages/plugin-gallery/manifest.json');
+// `import.meta` is not legal here — the server package builds to CommonJS and `tsc --noEmit`
+// rejects it (TS1470), even though vitest tolerates it. Server vitest runs with cwd = server/.
+const manifestPath = join(process.cwd(), '..', 'packages/plugin-gallery/manifest.json');
 const readManifest = () => JSON.parse(readFileSync(manifestPath, { encoding: 'utf8' }));
 
 describe('gallery plugin manifest', () => {
