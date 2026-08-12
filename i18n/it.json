@@ -3473,6 +3473,7 @@
   "workflow_json_help": "Edita la configurazione della sequenza in formato JSON. I cambiamenti verranno sincronizzati con il costruttore visuale.",
   "workflow_name": "Nome della sequenza",
   "workflow_navigation_prompt": "Sei sicuro di voler uscire senza salvare i cambiamenti?",
+  "workflow_space_unavailable": "Space non disponibile",
   "workflow_summary": "Sommario della sequenza",
   "workflow_templates": "Modelli di sequenze",
   "workflow_update_success": "Sequenza aggiornata con successo",

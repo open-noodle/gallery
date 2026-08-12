@@ -3476,6 +3476,7 @@
   "workflow_json_help": "Edit the workflow configuration in JSON format. Changes will sync to the visual builder.",
   "workflow_name": "Workflow name",
   "workflow_navigation_prompt": "Are you sure you want to leave without saving your changes?",
+  "workflow_space_unavailable": "Space unavailable",
   "workflow_summary": "Workflow summary",
   "workflow_templates": "Workflow templates",
   "workflow_update_success": "Workflow updated successfully",
