@@ -235,7 +235,10 @@ describe(UserAdminService.name, () => {
 
       await sut.update(authStub.admin, userStub.user1.id, { quotaSizeInBytes: 1024 });
 
-      expect((mocks.user as any).setUsage).toHaveBeenCalledWith(userStub.user1.id, 0);
+      expect(mocks.user.syncUsage).toHaveBeenCalledWith(userStub.user1.id);
+      // The toggle defaults to off, so the expensive physical walk must not run.
+      expect(mocks.storage.getFolderSize).not.toHaveBeenCalled();
+      expect((mocks.user as any).setUsage).not.toHaveBeenCalled();
     });
 
     it('should not sync usage when quota size does not change', async () => {
@@ -246,6 +249,7 @@ describe(UserAdminService.name, () => {
 
       await sut.update(authStub.admin, user.id, { quotaSizeInBytes: 1024 });
 
+      expect(mocks.user.syncUsage).not.toHaveBeenCalled();
       expect((mocks.user as any).setUsage).not.toHaveBeenCalled();
     });
 
