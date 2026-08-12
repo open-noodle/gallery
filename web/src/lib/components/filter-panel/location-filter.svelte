@@ -10,14 +10,38 @@
     countries: string[];
     selectedCity?: string;
     selectedCountry?: string;
+    /**
+     * A state/province/region narrowing, which this panel can DISPLAY and CLEAR but not browse:
+     * there is no state list to pick from, so the only way one arrives is a contextual filter
+     * clicked in the asset viewer, typed search, or a shared link.
+     *
+     * It still has to be honoured here, because city / state / country are ONE filter and one chip
+     * (`getActiveFilterCount` counts them once): without this the state was invisible in the panel,
+     * unremovable from it, and silently AND-ed onto the next country or city clicked — which nearly
+     * always returns nothing.
+     */
+    selectedState?: string;
     context?: FilterContext;
     onCityFetch: (country: string, context?: FilterContext) => Promise<string[]>;
-    onSelectionChange: (country?: string, city?: string) => void;
+    /**
+     * `state` is the LAST parameter, and omitting it clears the state — every country/city click
+     * replaces the whole location group, so those call sites pass two arguments and get that for
+     * free.
+     */
+    onSelectionChange: (country?: string, city?: string, state?: string) => void;
     emptyText?: string;
   }
 
-  let { countries, selectedCity, selectedCountry, context, onCityFetch, onSelectionChange, emptyText }: Props =
-    $props();
+  let {
+    countries,
+    selectedCity,
+    selectedCountry,
+    selectedState,
+    context,
+    onCityFetch,
+    onSelectionChange,
+    emptyText,
+  }: Props = $props();
 
   let searchQuery = $state('');
   let showAll = $state(false);
@@ -84,11 +108,30 @@
     });
   });
 
-  let visibleCountries = $derived(
-    searchQuery.trim() || showAll ? filteredCountries : filteredCountries.slice(0, COUNTRY_SHOW_COUNT),
-  );
+  /**
+   * The truncated head of the country list, with the SELECTED country hoisted into it.
+   *
+   * Everything below a country — its cities, and the state row — renders inside that country's
+   * block, so a selected country that falls outside the first ten takes the whole selection off
+   * screen with it. Same reasoning (and same hoist) as the selected tag and the selected person.
+   */
+  let visibleCountries = $derived.by(() => {
+    if (searchQuery.trim() || showAll) {
+      return filteredCountries;
+    }
 
-  let remainingCount = $derived(Math.max(0, filteredCountries.length - COUNTRY_SHOW_COUNT));
+    const head = filteredCountries.slice(0, COUNTRY_SHOW_COUNT);
+    if (!selectedCountry || head.includes(selectedCountry) || !filteredCountries.includes(selectedCountry)) {
+      return head;
+    }
+
+    return [selectedCountry, ...filteredCountries.filter((country) => country !== selectedCountry)].slice(
+      0,
+      COUNTRY_SHOW_COUNT,
+    );
+  });
+
+  let remainingCount = $derived(Math.max(0, filteredCountries.length - visibleCountries.length));
 
   let expandedCountry = $state<string | undefined>(undefined);
   let cities = $state<string[]>([]);
@@ -96,8 +139,10 @@
   // Orphaned country: selected but not in current results
   let orphanedCountry = $derived(selectedCountry && !countries.includes(selectedCountry) ? selectedCountry : undefined);
 
+  // Reveal the level the selection lives on. A state counts: its row renders inside the country's
+  // expanded block, so a collapsed country would hide it exactly like it hid a selected city.
   $effect(() => {
-    if (!(selectedCountry && selectedCity) || expandedCountry === selectedCountry) {
+    if (!(selectedCountry && (selectedCity || selectedState)) || expandedCountry === selectedCountry) {
       return;
     }
 
@@ -266,6 +311,8 @@
     }
   }
 
+  // Both selection handlers below pass two arguments, which drops any state: see the
+  // `onSelectionChange` prop docs — a new country or city REPLACES the location group.
   function handleCityClick(city: string, country: string) {
     if (selectedCity === city && !selectedCountry) {
       // City-only filters can come from typed search syntax. Clicking the selected
@@ -281,8 +328,34 @@
   }
 </script>
 
+<!--
+  The active state/province. Always ticked and always the deepest selection — this panel has no state
+  list to browse, so the row exists to SHOW the filter and to take it off again. Clicking it keeps
+  the country, matching what clicking a selected city does.
+-->
+{#snippet stateRow(state: string, country: string | undefined)}
+  <button
+    type="button"
+    class="-mx-2 flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium hover:bg-subtle {country
+      ? 'ml-5 w-[calc(100%-1.25rem+1rem)]'
+      : 'w-[calc(100%+1rem)]'}"
+    onclick={() => onSelectionChange(country, undefined, undefined)}
+    aria-pressed="true"
+    data-testid="location-state-{state}"
+  >
+    <div
+      class="flex size-4 shrink-0 items-center justify-center rounded-full border-2 border-immich-primary bg-immich-primary dark:border-immich-dark-primary dark:bg-immich-dark-primary"
+    >
+      <div class="size-1.5 rounded-full bg-white dark:bg-black"></div>
+    </div>
+    <span class="flex-1 truncate text-left">{state}</span>
+  </button>
+{/snippet}
+
 <div data-testid="location-filter">
-  {#if countries.length === 0 && !orphanedCountry}
+  <!-- `selectedState` counts as something to render: an active filter must never be reachable only
+       through the chip, or it cannot be removed from here. -->
+  {#if countries.length === 0 && !orphanedCountry && !selectedState}
     <p class="text-sm text-gray-400 dark:text-gray-500" data-testid="location-empty">
       {emptyText ?? $t('filter_no_locations_found')}
     </p>
@@ -306,7 +379,7 @@
 
     <!-- Orphaned country (selected but no longer in suggestions) -->
     {#if orphanedCountry}
-      {@const isCountrySelected = true}
+      {@const isCountryTicked = !selectedCity && !selectedState}
       <button
         type="button"
         class="-mx-2 flex w-[calc(100%+1rem)] items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium opacity-50 hover:bg-subtle"
@@ -315,17 +388,24 @@
         data-testid="location-country-{orphanedCountry}"
       >
         <div
-          class="flex size-4 shrink-0 items-center justify-center rounded-full border-2 {isCountrySelected &&
-          !selectedCity
+          class="flex size-4 shrink-0 items-center justify-center rounded-full border-2 {isCountryTicked
             ? 'border-immich-primary bg-immich-primary dark:border-immich-dark-primary dark:bg-immich-dark-primary'
             : 'border-gray-300 dark:border-gray-600'}"
         >
-          {#if isCountrySelected && !selectedCity}
+          {#if isCountryTicked}
             <div class="size-1.5 rounded-full bg-white dark:bg-black"></div>
           {/if}
         </div>
         <span class="flex-1 truncate text-left">{orphanedCountry}</span>
       </button>
+      {#if selectedState}
+        {@render stateRow(selectedState, orphanedCountry)}
+      {/if}
+    {/if}
+
+    <!-- A state with no country at all (only reachable by URL) has no country block to sit in. -->
+    {#if selectedState && !selectedCountry}
+      {@render stateRow(selectedState, undefined)}
     {/if}
 
     {#if selectedCity && !selectedCountry && !cityOnlySelectionHasVisibleRow}
@@ -355,6 +435,10 @@
     {#each visibleCountries as country (country)}
       {@const isCountrySelected = selectedCountry === country}
       {@const visibleCities = getVisibleCities(country)}
+      <!-- The dot marks the DEEPEST narrowing, so a selected state takes it off the country exactly
+           as a selected city does — a ticked country beside a ticked state would read as "the whole
+           country", which is not what is being filtered. -->
+      {@const isCountryTicked = isCountrySelected && !selectedCity && !selectedState}
       <!-- Country row -->
       <button
         type="button"
@@ -366,12 +450,11 @@
       >
         <!-- Radio indicator -->
         <div
-          class="flex size-4 shrink-0 items-center justify-center rounded-full border-2 {isCountrySelected &&
-          !selectedCity
+          class="flex size-4 shrink-0 items-center justify-center rounded-full border-2 {isCountryTicked
             ? 'border-immich-primary bg-immich-primary dark:border-immich-dark-primary dark:bg-immich-dark-primary'
             : 'border-gray-300 dark:border-gray-600'}"
         >
-          {#if isCountrySelected && !selectedCity}
+          {#if isCountryTicked}
             <div class="size-1.5 rounded-full bg-white dark:bg-black"></div>
           {/if}
         </div>
@@ -379,6 +462,10 @@
         <!-- Label -->
         <span class="flex-1 truncate text-left">{country}</span>
       </button>
+
+      {#if selectedState && isCountrySelected}
+        {@render stateRow(selectedState, country)}
+      {/if}
 
       <!-- Cities (indented when country is expanded) -->
       {#if (expandedCountry === country || (normalizedSearchQuery && visibleCities.length > 0)) && !loadingCitiesByCountry[country]}

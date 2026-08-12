@@ -82,7 +82,66 @@ describe('ActiveFiltersBar', () => {
     expect(chips[0].textContent).not.toContain(',');
   });
 
-  it('should render chip for rating as "3+" (star shown as a leading icon)', () => {
+  it('should render chip for state alone (folds into the location chip)', () => {
+    const filters = createFilterState();
+    filters.state = 'Bavaria';
+
+    const { getAllByTestId } = render(ActiveFiltersBar, {
+      props: {
+        filters,
+        onRemoveFilter: () => {},
+        onClearAll: () => {},
+      },
+    });
+
+    const chips = getAllByTestId('active-chip');
+    expect(chips).toHaveLength(1);
+    expect(chips[0].textContent).toContain('Bavaria');
+  });
+
+  it('should render one location chip containing city, state and country together', () => {
+    const filters = createFilterState();
+    filters.city = 'Munich';
+    filters.state = 'Bavaria';
+    filters.country = 'Germany';
+
+    const { getAllByTestId } = render(ActiveFiltersBar, {
+      props: {
+        filters,
+        onRemoveFilter: () => {},
+        onClearAll: () => {},
+      },
+    });
+
+    const chips = getAllByTestId('active-chip');
+    expect(chips).toHaveLength(1);
+    expect(chips[0].textContent).toContain('Munich');
+    expect(chips[0].textContent).toContain('Bavaria');
+    expect(chips[0].textContent).toContain('Germany');
+  });
+
+  it('should remove city, state and country together on location chip close', async () => {
+    let removedType: string | undefined;
+    const filters = createFilterState();
+    filters.city = 'Munich';
+    filters.state = 'Bavaria';
+    filters.country = 'Germany';
+
+    const { getByTestId } = render(ActiveFiltersBar, {
+      props: {
+        filters,
+        onRemoveFilter: (type: string) => {
+          removedType = type;
+        },
+        onClearAll: () => {},
+      },
+    });
+
+    await fireEvent.click(getByTestId('chip-close'));
+    expect(removedType).toBe('location');
+  });
+
+  it('should render chip for rating as "≥ 3 stars" (star shown as a leading icon)', () => {
     const filters = createFilterState();
     filters.rating = 3;
 
@@ -96,7 +155,137 @@ describe('ActiveFiltersBar', () => {
 
     const chips = getAllByTestId('active-chip');
     expect(chips).toHaveLength(1);
-    expect(chips[0].textContent).toContain('3+');
+    expect(chips[0].textContent).toContain('≥ 3 stars');
+    expect(chips[0].textContent).not.toContain('3+');
+  });
+
+  it('should render chip for a rating of 1 as "≥ 1 star" (singular)', () => {
+    const filters = createFilterState();
+    filters.rating = 1;
+
+    const { getAllByTestId } = render(ActiveFiltersBar, {
+      props: {
+        filters,
+        onRemoveFilter: () => {},
+        onClearAll: () => {},
+      },
+    });
+
+    const chips = getAllByTestId('active-chip');
+    expect(chips).toHaveLength(1);
+    expect(chips[0].textContent).toContain('≥ 1 star');
+    expect(chips[0].textContent).not.toContain('1 stars');
+  });
+
+  it('should render chip for lens filter, removable as type "lens"', async () => {
+    let removedType: string | undefined;
+    const filters = createFilterState();
+    filters.lensModel = 'RF24-70mm F2.8';
+
+    const { getAllByTestId, getByTestId } = render(ActiveFiltersBar, {
+      props: {
+        filters,
+        onRemoveFilter: (type: string) => {
+          removedType = type;
+        },
+        onClearAll: () => {},
+      },
+    });
+
+    const chips = getAllByTestId('active-chip');
+    expect(chips).toHaveLength(1);
+    expect(chips[0].textContent).toContain('RF24-70mm F2.8');
+
+    await fireEvent.click(getByTestId('chip-close'));
+    expect(removedType).toBe('lens');
+  });
+
+  it('should render chip for album filter with resolved name, removable as type "album"', async () => {
+    let removedType: string | undefined;
+    let removedId: string | undefined;
+    const filters = createFilterState();
+    filters.albumId = 'album-1';
+
+    const { getAllByTestId, getByTestId } = render(ActiveFiltersBar, {
+      props: {
+        filters,
+        albumNames: new Map([['album-1', 'Summer Trip']]),
+        onRemoveFilter: (type: string, id?: string) => {
+          removedType = type;
+          removedId = id;
+        },
+        onClearAll: () => {},
+      },
+    });
+
+    const chips = getAllByTestId('active-chip');
+    expect(chips).toHaveLength(1);
+    expect(chips[0].textContent).toContain('Summer Trip');
+
+    await fireEvent.click(getByTestId('chip-close'));
+    expect(removedType).toBe('album');
+    expect(removedId).toBe('album-1');
+  });
+
+  it('should fall back to the raw id for an album chip with no name resolved', () => {
+    const filters = createFilterState();
+    filters.albumId = 'album-2';
+
+    const { getAllByTestId } = render(ActiveFiltersBar, {
+      props: {
+        filters,
+        onRemoveFilter: () => {},
+        onClearAll: () => {},
+      },
+    });
+
+    const chips = getAllByTestId('active-chip');
+    expect(chips).toHaveLength(1);
+    expect(chips[0].textContent).toContain('album-2');
+  });
+
+  it('should render chip for owner filter with resolved name, removable as type "owner"', async () => {
+    let removedType: string | undefined;
+    let removedId: string | undefined;
+    const filters = createFilterState();
+    filters.ownerId = 'user-1';
+
+    const { getAllByTestId, getByTestId } = render(ActiveFiltersBar, {
+      props: {
+        filters,
+        ownerNames: new Map([['user-1', 'Jamie Rivera']]),
+        onRemoveFilter: (type: string, id?: string) => {
+          removedType = type;
+          removedId = id;
+        },
+        onClearAll: () => {},
+      },
+    });
+
+    const chips = getAllByTestId('active-chip');
+    expect(chips).toHaveLength(1);
+    expect(chips[0].textContent).toContain('Jamie Rivera');
+
+    await fireEvent.click(getByTestId('chip-close'));
+    expect(removedType).toBe('owner');
+    expect(removedId).toBe('user-1');
+  });
+
+  it('should fall back to the raw id for an owner chip with no name resolved', () => {
+    const filters = createFilterState();
+    filters.ownerId = 'user-2';
+
+    const { getAllByTestId } = render(ActiveFiltersBar, {
+      props: {
+        filters,
+        onRemoveFilter: () => {},
+        onClearAll: () => {},
+      },
+    });
+
+    const chips = getAllByTestId('active-chip');
+    expect(chips).toHaveLength(1);
+    expect(chips[0].textContent).toContain('user-2');
   });
 
   it('should render chip for media type as "Photos only"', () => {
@@ -235,10 +424,10 @@ describe('ActiveFiltersBar', () => {
     expect(removedType).toBe('albums');
   });
 
-  it('should not render a favorites chip for isFavorite false', () => {
+  it('should render a chip for isFavorite === false too (counted but previously never chipped)', () => {
     const filters = { ...createFilterState(), isFavorite: false };
 
-    const { queryAllByTestId } = render(ActiveFiltersBar, {
+    const { getAllByTestId } = render(ActiveFiltersBar, {
       props: {
         filters,
         onRemoveFilter: () => {},
@@ -246,7 +435,27 @@ describe('ActiveFiltersBar', () => {
       },
     });
 
-    expect(queryAllByTestId('active-chip')).toHaveLength(0);
+    const chips = getAllByTestId('active-chip');
+    expect(chips).toHaveLength(1);
+    expect(chips[0].textContent).toContain('Not favorite');
+  });
+
+  it('should remove the isFavorite === false filter on chip close', async () => {
+    let removedType: string | undefined;
+    const filters = { ...createFilterState(), isFavorite: false };
+
+    const { getByTestId } = render(ActiveFiltersBar, {
+      props: {
+        filters,
+        onRemoveFilter: (type: string) => {
+          removedType = type;
+        },
+        onClearAll: () => {},
+      },
+    });
+
+    await fireEvent.click(getByTestId('chip-close'));
+    expect(removedType).toBe('favorites');
   });
 
   it('should not render a has-no-album chip for false', () => {
@@ -385,6 +594,25 @@ describe('ActiveFiltersBar', () => {
     const chips = getAllByTestId('active-chip');
     expect(chips).toHaveLength(1);
     expect(chips[0].textContent).toContain('Canon EOS R5');
+  });
+
+  it('should render a camera chip for a model-only value (no make)', () => {
+    const filters = createFilterState();
+    filters.model = 'iPhone 17 Pro Max';
+
+    // make is absent, but ?model= is applied by every surface, so the bar MUST surface a
+    // removable chip (label = the model) rather than hiding the filter entirely.
+    const { getAllByTestId } = render(ActiveFiltersBar, {
+      props: {
+        filters,
+        onRemoveFilter: () => {},
+        onClearAll: () => {},
+      },
+    });
+
+    const chips = getAllByTestId('active-chip');
+    expect(chips).toHaveLength(1);
+    expect(chips[0].textContent).toContain('iPhone 17 Pro Max');
   });
 
   it('should render tag chips with names', () => {

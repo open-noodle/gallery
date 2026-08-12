@@ -20,9 +20,12 @@ export function buildMapFilterConfig(spaceId?: string): FilterPanelConfig {
     const response = await getFilterSuggestions({
       personIds: filters.personIds.length > 0 ? filters.personIds : undefined,
       country: filters.country,
+      state: filters.state,
       city: filters.city,
       make: filters.make,
       model: filters.model,
+      lensModel: filters.lensModel,
+      ownerId: filters.ownerId,
       tagIds: filters.tagIds.length > 0 ? filters.tagIds : undefined,
       rating: filters.rating,
       mediaType:

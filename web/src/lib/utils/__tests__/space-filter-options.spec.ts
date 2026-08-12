@@ -131,6 +131,23 @@ describe('buildSpaceTimelineOptions', () => {
     expect(options).not.toHaveProperty('originalFileName');
     expect(options).not.toHaveProperty('ocr');
   });
+
+  it('forwards the new filter dimensions to the space timeline query', () => {
+    const filters = {
+      ...createFilterState(),
+      lensModel: 'RF24-70mm F2.8 L IS USM',
+      state: 'State of Berlin',
+      albumId: 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',
+      ownerId: 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb',
+    };
+
+    expect(buildSpaceTimelineOptions('space-1', filters)).toMatchObject({
+      lensModel: 'RF24-70mm F2.8 L IS USM',
+      state: 'State of Berlin',
+      albumId: 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',
+      ownerId: 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb',
+    });
+  });
 });
 
 describe('handleSpaceRemoveFilter', () => {
@@ -216,5 +233,11 @@ describe('handleSpaceRemoveFilter', () => {
 
     expect(handleSpaceRemoveFilter(filters, 'albums').isInAlbum).toBeUndefined();
     expect(handleSpaceRemoveFilter(filters, 'isInAlbum').isInAlbum).toBeUndefined();
+  });
+
+  it('clears lensModel for the lens chip (delegates to the shared handleRemoveFilter)', () => {
+    const filters = { ...createFilterState(), lensModel: 'RF24-70mm F2.8 L IS USM' };
+    const result = handleSpaceRemoveFilter(filters, 'lens');
+    expect(result.lensModel).toBeUndefined();
   });
 });

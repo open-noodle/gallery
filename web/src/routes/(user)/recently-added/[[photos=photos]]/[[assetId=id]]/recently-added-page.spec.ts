@@ -23,6 +23,9 @@ const { mockPage, mockAssetMultiSelectManager, mockAuthManager, mockRegisterSear
       isAllUserOwned: true,
     },
     mockAuthManager: {
+      // The timeline / picker queries send `userId` as the view's owner gate (D3), so the page
+      // reads authManager.user.id.
+      user: { id: 'cccccccc-cccc-4ccc-cccc-cccccccccccc' },
       preferences: { tags: { enabled: false } },
     },
     mockRegisterSearchablePageFilters: vi.fn(() => vi.fn()),
@@ -252,7 +255,10 @@ describe('Recently Added page filters', () => {
     renderPage();
 
     await waitFor(() => {
-      expect(buildRecentlyAddedTimelineOptions).toHaveBeenCalledWith(expect.objectContaining({ rating: 5 }));
+      expect(buildRecentlyAddedTimelineOptions).toHaveBeenCalledWith(
+        expect.objectContaining({ rating: 5 }),
+        expect.any(String),
+      );
       expect(screen.getByTestId('timeline-options')).toHaveTextContent('"rating":5');
     });
   });
