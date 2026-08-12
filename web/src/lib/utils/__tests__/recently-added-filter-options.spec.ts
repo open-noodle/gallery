@@ -8,6 +8,8 @@ import {
   shouldShowRecentlyAddedCount,
 } from '$lib/utils/recently-added-filter-options';
 
+const MY_USER_ID = 'cccccccc-cccc-4ccc-cccc-cccccccccccc';
+
 describe('shouldShowRecentlyAddedCount', () => {
   it('hides the count while loading or for an empty account', () => {
     // No buckets loaded yet (assetCount is transiently 0) and no filters: showing
@@ -38,7 +40,8 @@ describe('buildRecentlyAddedTimelineOptions', () => {
   it('returns the own+partner added-date shape by default', () => {
     // Exact shape on purpose: if buildPhotosTimelineOptions ever grows a new shared-scope key,
     // this fails rather than silently leaking it into Recently Added.
-    expect(buildRecentlyAddedTimelineOptions(createFilterState())).toEqual({
+    expect(buildRecentlyAddedTimelineOptions(createFilterState(), MY_USER_ID)).toEqual({
+      userId: MY_USER_ID,
       visibility: AssetVisibility.Timeline,
       withStacked: true,
       withPartners: true,
@@ -48,15 +51,15 @@ describe('buildRecentlyAddedTimelineOptions', () => {
   });
 
   it('never sends withSharedSpaces under a metadata filter', () => {
-    const options = buildRecentlyAddedTimelineOptions({ ...createFilterState(), country: 'Germany' });
+    const options = buildRecentlyAddedTimelineOptions({ ...createFilterState(), country: 'Germany' }, MY_USER_ID);
     expect(options).not.toHaveProperty('withSharedSpaces');
     expect(options.country).toBe('Germany');
   });
 
   it('never sends withSharedSpaces under a favorites filter', () => {
-    expect(buildRecentlyAddedTimelineOptions({ ...createFilterState(), isFavorite: true })).not.toHaveProperty(
-      'withSharedSpaces',
-    );
+    expect(
+      buildRecentlyAddedTimelineOptions({ ...createFilterState(), isFavorite: true }, MY_USER_ID),
+    ).not.toHaveProperty('withSharedSpaces');
   });
 
   it('keeps orderBy CreatedAt under every filter combination', () => {
@@ -67,50 +70,57 @@ describe('buildRecentlyAddedTimelineOptions', () => {
       { ...createFilterState(), sortOrder: 'asc' as const },
     ];
     for (const filters of cases) {
-      expect(buildRecentlyAddedTimelineOptions(filters).orderBy).toBe(AssetOrderBy.CreatedAt);
+      expect(buildRecentlyAddedTimelineOptions(filters, MY_USER_ID).orderBy).toBe(AssetOrderBy.CreatedAt);
     }
   });
 
   it('keeps partner assets for a non-favorite filter', () => {
-    expect(buildRecentlyAddedTimelineOptions({ ...createFilterState(), rating: 4 }).withPartners).toBe(true);
+    expect(buildRecentlyAddedTimelineOptions({ ...createFilterState(), rating: 4 }, MY_USER_ID).withPartners).toBe(
+      true,
+    );
   });
 
   it('drops partner assets under a favorites filter (favorites are personal)', () => {
-    expect(buildRecentlyAddedTimelineOptions({ ...createFilterState(), isFavorite: true })).not.toHaveProperty(
-      'withPartners',
-    );
+    expect(
+      buildRecentlyAddedTimelineOptions({ ...createFilterState(), isFavorite: true }, MY_USER_ID),
+    ).not.toHaveProperty('withPartners');
   });
 
   it('maps sortOrder to order without touching orderBy', () => {
-    expect(buildRecentlyAddedTimelineOptions({ ...createFilterState(), sortOrder: 'asc' }).order).toBe(AssetOrder.Asc);
-    expect(buildRecentlyAddedTimelineOptions({ ...createFilterState(), sortOrder: 'desc' }).order).toBe(
+    expect(buildRecentlyAddedTimelineOptions({ ...createFilterState(), sortOrder: 'asc' }, MY_USER_ID).order).toBe(
+      AssetOrder.Asc,
+    );
+    expect(buildRecentlyAddedTimelineOptions({ ...createFilterState(), sortOrder: 'desc' }, MY_USER_ID).order).toBe(
       AssetOrder.Desc,
     );
-    expect(buildRecentlyAddedTimelineOptions({ ...createFilterState(), sortOrder: 'relevance' }).order).toBe(
-      AssetOrder.Desc,
-    );
+    expect(
+      buildRecentlyAddedTimelineOptions({ ...createFilterState(), sortOrder: 'relevance' }, MY_USER_ID).order,
+    ).toBe(AssetOrder.Desc);
   });
 
   it('degrades a relevance sort to newest-added-first in browse mode', () => {
     // A `?q=` in the URL resolves sortOrder to 'relevance'. Browse mode has no relevance ranking,
     // so it must fall back to the view's natural default rather than producing an invalid order.
-    const options = buildRecentlyAddedTimelineOptions({ ...createFilterState(), sortOrder: 'relevance' });
+    const options = buildRecentlyAddedTimelineOptions({ ...createFilterState(), sortOrder: 'relevance' }, MY_USER_ID);
 
     expect(options.order).toBe(AssetOrder.Desc);
     expect(options.orderBy).toBe(AssetOrderBy.CreatedAt);
   });
 
   it('passes metadata predicates through', () => {
-    const options = buildRecentlyAddedTimelineOptions({
-      ...createFilterState(),
-      personIds: ['person:p1'],
-      city: 'Berlin',
-      country: 'Germany',
-      make: 'Sony',
-      model: 'A7',
-      tagIds: ['tag-1'],
-      rating: 5,
-    });
+    const options = buildRecentlyAddedTimelineOptions(
+      {
+        ...createFilterState(),
+        personIds: ['person:p1'],
+        city: 'Berlin',
+        country: 'Germany',
+        make: 'Sony',
+        model: 'A7',
+        tagIds: ['tag-1'],
+        rating: 5,
+      },
+      MY_USER_ID,
+    );
 
     expect(options).toMatchObject({
       personIds: ['person:p1'],
@@ -124,87 +134,108 @@ describe('buildRecentlyAddedTimelineOptions', () => {
   });
 
   it('maps mediaType to $type and omits it for "all"', () => {
-    expect(buildRecentlyAddedTimelineOptions({ ...createFilterState(), mediaType: 'image' }).$type).toBe(
+    expect(buildRecentlyAddedTimelineOptions({ ...createFilterState(), mediaType: 'image' }, MY_USER_ID).$type).toBe(
       AssetTypeEnum.Image,
     );
-    expect(buildRecentlyAddedTimelineOptions({ ...createFilterState(), mediaType: 'video' }).$type).toBe(
+    expect(buildRecentlyAddedTimelineOptions({ ...createFilterState(), mediaType: 'video' }, MY_USER_ID).$type).toBe(
       AssetTypeEnum.Video,
     );
-    expect(buildRecentlyAddedTimelineOptions({ ...createFilterState(), mediaType: 'all' })).not.toHaveProperty('$type');
+    expect(
+      buildRecentlyAddedTimelineOptions({ ...createFilterState(), mediaType: 'all' }, MY_USER_ID),
+    ).not.toHaveProperty('$type');
   });
 
   it('trims text predicates and omits them when blank', () => {
-    const set = buildRecentlyAddedTimelineOptions({
-      ...createFilterState(),
-      description: '  sunset  ',
-      originalFileName: '  IMG_1.jpg  ',
-      ocr: '  invoice  ',
-    });
+    const set = buildRecentlyAddedTimelineOptions(
+      {
+        ...createFilterState(),
+        description: '  sunset  ',
+        originalFileName: '  IMG_1.jpg  ',
+        ocr: '  invoice  ',
+      },
+      MY_USER_ID,
+    );
     expect(set).toMatchObject({ description: 'sunset', originalFileName: 'IMG_1.jpg', ocr: 'invoice' });
 
-    const blank = buildRecentlyAddedTimelineOptions({
-      ...createFilterState(),
-      description: ' '.repeat(3),
-      originalFileName: ' '.repeat(3),
-      ocr: ' '.repeat(3),
-    });
+    const blank = buildRecentlyAddedTimelineOptions(
+      {
+        ...createFilterState(),
+        description: ' '.repeat(3),
+        originalFileName: ' '.repeat(3),
+        ocr: ' '.repeat(3),
+      },
+      MY_USER_ID,
+    );
     expect(blank).not.toHaveProperty('description');
     expect(blank).not.toHaveProperty('originalFileName');
     expect(blank).not.toHaveProperty('ocr');
   });
 
   it('passes album membership flags only when true', () => {
-    expect(buildRecentlyAddedTimelineOptions({ ...createFilterState(), isNotInAlbum: true }).isNotInAlbum).toBe(true);
-    expect(buildRecentlyAddedTimelineOptions({ ...createFilterState(), isInAlbum: true }).isInAlbum).toBe(true);
-    expect(buildRecentlyAddedTimelineOptions({ ...createFilterState(), isNotInAlbum: false })).not.toHaveProperty(
-      'isNotInAlbum',
+    expect(
+      buildRecentlyAddedTimelineOptions({ ...createFilterState(), isNotInAlbum: true }, MY_USER_ID).isNotInAlbum,
+    ).toBe(true);
+    expect(buildRecentlyAddedTimelineOptions({ ...createFilterState(), isInAlbum: true }, MY_USER_ID).isInAlbum).toBe(
+      true,
     );
-    expect(buildRecentlyAddedTimelineOptions({ ...createFilterState(), isInAlbum: false })).not.toHaveProperty(
-      'isInAlbum',
-    );
+    expect(
+      buildRecentlyAddedTimelineOptions({ ...createFilterState(), isNotInAlbum: false }, MY_USER_ID),
+    ).not.toHaveProperty('isNotInAlbum');
+    expect(
+      buildRecentlyAddedTimelineOptions({ ...createFilterState(), isInAlbum: false }, MY_USER_ID),
+    ).not.toHaveProperty('isInAlbum');
   });
 
   it('derives takenAfter/takenBefore from the timeline date filter', () => {
     // Documented semantic: the date filter filters *taken* date while day-groups reflect *added*
     // date. Intentional — no created-at range predicate exists (that would be backend work).
-    const year = buildRecentlyAddedTimelineOptions({ ...createFilterState(), selectedYear: 2024 });
+    const year = buildRecentlyAddedTimelineOptions({ ...createFilterState(), selectedYear: 2024 }, MY_USER_ID);
     expect(year.takenAfter).toBe('2024-01-01T00:00:00.000Z');
     expect(year.takenBefore).toBe('2025-01-01T00:00:00.000Z');
 
-    const yearMonth = buildRecentlyAddedTimelineOptions({
-      ...createFilterState(),
-      selectedYear: 2024,
-      selectedMonth: 3,
-    });
+    const yearMonth = buildRecentlyAddedTimelineOptions(
+      {
+        ...createFilterState(),
+        selectedYear: 2024,
+        selectedMonth: 3,
+      },
+      MY_USER_ID,
+    );
     expect(yearMonth.takenAfter).toBe('2024-03-01T00:00:00.000Z');
     expect(yearMonth.takenBefore).toBe('2024-04-01T00:00:00.000Z');
 
-    const custom = buildRecentlyAddedTimelineOptions({
-      ...createFilterState(),
-      dateAfter: '2024-01-01',
-      dateBefore: '2024-12-31',
-    });
+    const custom = buildRecentlyAddedTimelineOptions(
+      {
+        ...createFilterState(),
+        dateAfter: '2024-01-01',
+        dateBefore: '2024-12-31',
+      },
+      MY_USER_ID,
+    );
     expect(custom.takenAfter).toBe('2024-01-01T00:00:00.000Z');
     expect(custom.takenBefore).toBe('2025-01-01T00:00:00.000Z');
 
-    const fromOnly = buildRecentlyAddedTimelineOptions({ ...createFilterState(), dateAfter: '2024-01-01' });
+    const fromOnly = buildRecentlyAddedTimelineOptions({ ...createFilterState(), dateAfter: '2024-01-01' }, MY_USER_ID);
     expect(fromOnly.takenAfter).toBe('2024-01-01T00:00:00.000Z');
     expect(fromOnly).not.toHaveProperty('takenBefore');
 
-    const toOnly = buildRecentlyAddedTimelineOptions({ ...createFilterState(), dateBefore: '2024-12-31' });
+    const toOnly = buildRecentlyAddedTimelineOptions({ ...createFilterState(), dateBefore: '2024-12-31' }, MY_USER_ID);
     expect(toOnly.takenBefore).toBe('2025-01-01T00:00:00.000Z');
     expect(toOnly).not.toHaveProperty('takenAfter');
   });
 
   it('holds both invariants under a multi-filter combination', () => {
-    const options = buildRecentlyAddedTimelineOptions({
-      ...createFilterState(),
-      personIds: ['person:p1'],
-      country: 'Germany',
-      tagIds: ['tag-1'],
-      mediaType: 'video',
-      sortOrder: 'asc',
-    });
+    const options = buildRecentlyAddedTimelineOptions(
+      {
+        ...createFilterState(),
+        personIds: ['person:p1'],
+        country: 'Germany',
+        tagIds: ['tag-1'],
+        mediaType: 'video',
+        sortOrder: 'asc',
+      },
+      MY_USER_ID,
+    );
 
     expect(options.orderBy).toBe(AssetOrderBy.CreatedAt);
     expect(options).not.toHaveProperty('withSharedSpaces');
@@ -218,13 +249,14 @@ describe('buildRecentlyAddedPickerBucketOptions', () => {
     // clicking a year emits takenAfter/takenBefore against localDateTime. A library imported in
     // 2026 therefore showed a single "2026" chip that matched zero assets. The grid and the
     // predicate must read the same column, and takenAt is the one the predicate uses.
-    expect(buildRecentlyAddedPickerBucketOptions(createFilterState()).orderBy).toBe(AssetOrderBy.TakenAt);
+    expect(buildRecentlyAddedPickerBucketOptions(createFilterState(), MY_USER_ID).orderBy).toBe(AssetOrderBy.TakenAt);
   });
 
   it('keeps the own+partner scope of the view it describes', () => {
     // Same invariant as the timeline: a facet grid must never count shared-space assets the
     // timeline below it will not show.
-    expect(buildRecentlyAddedPickerBucketOptions(createFilterState())).toEqual({
+    expect(buildRecentlyAddedPickerBucketOptions(createFilterState(), MY_USER_ID)).toEqual({
+      userId: MY_USER_ID,
       visibility: AssetVisibility.Timeline,
       withStacked: true,
       withPartners: true,
@@ -240,7 +272,7 @@ describe('buildRecentlyAddedPickerBucketOptions', () => {
       { ...createFilterState(), personIds: ['person:p1'] },
     ];
     for (const filters of cases) {
-      expect(buildRecentlyAddedPickerBucketOptions(filters)).not.toHaveProperty('withSharedSpaces');
+      expect(buildRecentlyAddedPickerBucketOptions(filters, MY_USER_ID)).not.toHaveProperty('withSharedSpaces');
     }
   });
 
@@ -253,7 +285,7 @@ describe('buildRecentlyAddedPickerBucketOptions', () => {
       { ...createFilterState(), selectedYear: 2024 },
     ];
     for (const filters of cases) {
-      expect(buildRecentlyAddedPickerBucketOptions(filters).orderBy).toBe(AssetOrderBy.TakenAt);
+      expect(buildRecentlyAddedPickerBucketOptions(filters, MY_USER_ID).orderBy).toBe(AssetOrderBy.TakenAt);
     }
   });
 
@@ -261,14 +293,17 @@ describe('buildRecentlyAddedPickerBucketOptions', () => {
     // The counts on each year chip must describe the set the timeline is showing, so every
     // non-temporal predicate carries over.
     expect(
-      buildRecentlyAddedPickerBucketOptions({
-        ...createFilterState(),
-        personIds: ['person:p1'],
-        country: 'Germany',
-        tagIds: ['tag-1'],
-        rating: 5,
-        mediaType: 'video',
-      }),
+      buildRecentlyAddedPickerBucketOptions(
+        {
+          ...createFilterState(),
+          personIds: ['person:p1'],
+          country: 'Germany',
+          tagIds: ['tag-1'],
+          rating: 5,
+          mediaType: 'video',
+        },
+        MY_USER_ID,
+      ),
     ).toMatchObject({
       personIds: ['person:p1'],
       country: 'Germany',
@@ -345,6 +380,39 @@ describe('buildRecentlyAddedSuggestionRequest', () => {
     });
     expect(custom.takenAfter).toBe('2024-01-01T00:00:00.000Z');
     expect(custom.takenBefore).toBe('2025-01-01T00:00:00.000Z');
+  });
+
+  it('narrows the suggestion lists by state, lens and contributor', () => {
+    const request = buildRecentlyAddedSuggestionRequest({
+      ...createFilterState(),
+      state: 'Bavaria',
+      lensModel: 'RF24-105mm F4 L IS USM',
+      ownerId: 'owner-1',
+    });
+
+    expect(request).toMatchObject({
+      state: 'Bavaria',
+      lensModel: 'RF24-105mm F4 L IS USM',
+      ownerId: 'owner-1',
+    });
+  });
+
+  it('never sends the album filter or the free-text filters to the suggestion endpoint', () => {
+    // `albumId` is a SCOPE on this endpoint (it widens ownership to album participants and is
+    // mutually exclusive with spaceId / withSharedSpaces), and the three free-text filters are
+    // unindexable ILIKE / trigram predicates typed per keystroke — neither belongs on a facet list.
+    const request = buildRecentlyAddedSuggestionRequest({
+      ...createFilterState(),
+      albumId: '11111111-1111-4111-8111-111111111111',
+      description: 'birthday cake',
+      originalFileName: 'IMG_1234.jpg',
+      ocr: 'happy birthday',
+    });
+
+    expect(request).not.toHaveProperty('albumId');
+    expect(request).not.toHaveProperty('description');
+    expect(request).not.toHaveProperty('originalFileName');
+    expect(request).not.toHaveProperty('ocr');
   });
 
   it('passes album membership flags only when true', () => {

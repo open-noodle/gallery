@@ -1,6 +1,8 @@
 <script lang="ts">
   import { page } from '$app/state';
-  import { QueryParameter } from '$lib/constants';
+  import { createFilterState } from '$lib/components/filter-panel/filter-panel';
+  import { Route } from '$lib/route';
+  import { getSearchablePageFilterState, getSearchablePageState } from '$lib/utils/searchable-page-search';
   import { t } from 'svelte-i18n';
 
   interface Props {
@@ -38,6 +40,19 @@
   // Photos owns the index + the optional `/photos[/assetId]` segment.
   const photosActive = $derived(path === base || path.startsWith(`${base}/photos`));
 
+  // #767a: this tab used to be a hard-coded `/map?spaceId=<id>`, which silently dropped every
+  // active filter and the search term on the way to the map. The Photos tab URL-backs both, so
+  // rebuild the link from the live URL while that tab is the one being viewed.
+  const mapHref = $derived(
+    photosActive
+      ? Route.map({
+          spaceId,
+          query: getSearchablePageState(page.url).query,
+          filters: { ...createFilterState(), ...getSearchablePageFilterState(page.url) },
+        })
+      : Route.map({ spaceId }),
+  );
+
   const tabs = $derived<Tab[]>(
     (
       [
@@ -70,7 +85,7 @@
         {
           key: 'map',
           label: $t('map'),
-          href: `/map?${QueryParameter.SPACE_ID}=${spaceId}`,
+          href: mapHref,
           external: true,
           active: false,
         },

@@ -6,7 +6,6 @@ import {
   getSearchablePageBasePath,
   getSearchablePageFilterState,
   getSearchablePageState,
-  preserveTransientTemporalFilters,
 } from '$lib/utils/searchable-page-search';
 
 describe('searchable page URL state', () => {
@@ -86,11 +85,14 @@ describe('typed filter URL state', () => {
     expect(buildSearchablePageUrl(url, '', 'desc', filters)).toBe('/photos?sort=desc');
   });
 
-  it('does not serialize transient year and month selections into URL params', () => {
+  // D2 — the year/month is IN the codec, so it serializes like any other filter.
+  it('serializes the selected year and month into URL params', () => {
     const url = new URL('https://gallery.test/photos?view=timeline');
     const filters = { ...createFilterState(), personIds: ['person-1'], selectedYear: 2015, selectedMonth: 8 };
 
-    expect(buildSearchablePageUrl(url, '', 'desc', filters)).toBe('/photos?view=timeline&sort=desc&people=person-1');
+    expect(buildSearchablePageUrl(url, '', 'desc', filters)).toBe(
+      '/photos?view=timeline&sort=desc&people=person-1&year=2015&month=8',
+    );
   });
 
   it('serializes typed filters into space URLs', () => {
@@ -132,20 +134,24 @@ describe('typed filter URL state', () => {
     expect(getSearchablePageFilterState(url)).toEqual({});
   });
 
-  it('preserves transient selected year and month while hydrating URL-backed filters', () => {
-    const urlFilters = getSearchablePageFilterState(new URL('https://gallery.test/photos?city=Berlin'));
+  // D2 — the selected year/month is URL-backed, not transient. There is no carry-over slot to
+  // smuggle it across the page's own goto(): it hydrates from the URL like every other filter.
+  it('hydrates the selected year and month from the URL', () => {
+    const urlFilters = getSearchablePageFilterState(
+      new URL('https://gallery.test/photos?city=Berlin&year=2023&month=6'),
+    );
 
-    expect(preserveTransientTemporalFilters(urlFilters, { selectedYear: 2023, selectedMonth: 6 })).toEqual({
+    expect(urlFilters).toEqual({
       city: 'Berlin',
       selectedYear: 2023,
       selectedMonth: 6,
     });
   });
 
-  it('does not preserve transient year selection over an explicit custom date range', () => {
-    const urlFilters = getSearchablePageFilterState(new URL('https://gallery.test/photos?from=2024-01-01'));
+  it('does not hydrate a year alongside an explicit custom date range (from/to wins)', () => {
+    const urlFilters = getSearchablePageFilterState(new URL('https://gallery.test/photos?from=2024-01-01&year=2023'));
 
-    expect(preserveTransientTemporalFilters(urlFilters, { selectedYear: 2023, selectedMonth: 6 })).toEqual({
+    expect(urlFilters).toEqual({
       dateAfter: '2024-01-01',
     });
   });
