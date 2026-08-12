@@ -1,6 +1,8 @@
 import {
   RepresentativeFaceSource,
   SharedSpaceRole,
+  type PersonFaceSuggestionPageResponseDto,
+  type PersonFaceSuggestionResponseDto,
   type PersonStatisticsResponseDto,
   type SharedSpaceMemberResponseDto,
   type SharedSpacePersonResponseDto,
@@ -147,6 +149,21 @@ function makePerson(overrides: Partial<SharedSpacePersonResponseDto> = {}): Shar
     spaceId: 'space-1',
     ...overrides,
   } as SharedSpacePersonResponseDto;
+}
+
+function makeSuggestion(overrides: Partial<PersonFaceSuggestionResponseDto> = {}): PersonFaceSuggestionResponseDto {
+  return {
+    assetFaceId: 'face-1',
+    assetId: 'asset-1',
+    distance: 0.62,
+    imageWidth: 100,
+    imageHeight: 100,
+    boundingBoxX1: 10,
+    boundingBoxX2: 40,
+    boundingBoxY1: 10,
+    boundingBoxY2: 40,
+    ...overrides,
+  };
 }
 
 function renderPage({
@@ -849,5 +866,305 @@ describe('Spaces person detail page', () => {
     });
     expect(gotoMock).toHaveBeenCalledWith('/spaces/space-2/people/space-person-candidate', { replaceState: true });
     expect(invalidateAllMock).not.toHaveBeenCalled();
+  });
+
+  describe('face suggestions', () => {
+    beforeEach(() => {
+      localStorage.clear();
+      sdkMock.getSpacePersonFaceSuggestions.mockResolvedValue({ total: 0, items: [] });
+      sdkMock.confirmSpacePersonFaceSuggestion.mockResolvedValue(undefined as never);
+      sdkMock.dismissSpacePersonFaceSuggestion.mockResolvedValue(undefined as never);
+      sdkMock.ignoreSpacePersonFaceSuggestion.mockResolvedValue(undefined as never);
+    });
+
+    it('renders the reused banner for editors and uses the space-person thumbnail URL', async () => {
+      sdkMock.getSpacePersonFaceSuggestions.mockResolvedValue({
+        total: 2,
+        items: [makeSuggestion()],
+      });
+
+      renderPage();
+
+      await screen.findByTestId('person-suggestion-banner');
+      expect(sdkMock.getSpacePersonFaceSuggestions).toHaveBeenCalledWith({
+        id: 'space-1',
+        personId: 'person-1',
+        page: 1,
+        size: 5,
+      });
+      const src = screen.getByTestId('suggestion-banner-reference').getAttribute('src') ?? '';
+      expect(src).toContain('/shared-spaces/space-1/people/person-1/thumbnail');
+      expect(src).not.toContain('/api/people/person-1/thumbnail');
+    });
+
+    it('relies on the server read-gate for viewers and hides when the API returns zero', async () => {
+      sdkMock.getSpacePersonFaceSuggestions.mockResolvedValue({ total: 0, items: [] });
+
+      renderPage({ members: [makeMember({ role: SharedSpaceRole.Viewer })] });
+
+      await waitFor(() => {
+        expect(sdkMock.getSpacePersonFaceSuggestions).toHaveBeenCalledWith({
+          id: 'space-1',
+          personId: 'person-1',
+          page: 1,
+          size: 5,
+        });
+      });
+      expect(screen.queryByTestId('person-suggestion-banner')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('suggestion-review-btn')).not.toBeInTheDocument();
+    });
+
+    // S12.1: client-side defence in depth. The server already returns `{ total: 0 }` to viewers (covered
+    // above), but that is enforced only by the read endpoint — a future relaxation of that read gate ("let
+    // viewers see what is pending") must not silently expose the review action too. This test uses the SAME
+    // non-zero suggestion data for both halves, differing only in role, so it cannot pass on `total: 0` alone
+    // (the vacuous shape a previous slice removed).
+    it('gates the banner on isEditor: a viewer with pending suggestions renders none, an editor with the same data does', async () => {
+      const suggestions = { total: 3, items: [makeSuggestion()] };
+      sdkMock.getSpacePersonFaceSuggestions.mockResolvedValue(suggestions);
+
+      const viewerRender = renderPage({ members: [makeMember({ role: SharedSpaceRole.Viewer })] });
+      await waitFor(() => expect(sdkMock.getSpacePersonFaceSuggestions).toHaveBeenCalled());
+      expect(screen.queryByTestId('person-suggestion-banner')).not.toBeInTheDocument();
+      viewerRender.unmount();
+
+      renderPage({ members: [makeMember({ role: SharedSpaceRole.Editor })] });
+      await screen.findByTestId('person-suggestion-banner');
+    });
+
+    it('hides the banner if the shared-space suggestion summary request fails', async () => {
+      sdkMock.getSpacePersonFaceSuggestions.mockRejectedValue(new Error('not a member'));
+
+      renderPage();
+
+      await waitFor(() => {
+        expect(sdkMock.getSpacePersonFaceSuggestions).toHaveBeenCalledWith({
+          id: 'space-1',
+          personId: 'person-1',
+          page: 1,
+          size: 5,
+        });
+      });
+      expect(screen.queryByTestId('person-suggestion-banner')).not.toBeInTheDocument();
+    });
+
+    it('opens the review modal with shared-space SDK actions and refreshes after a confirm', async () => {
+      const firstSuggestion = makeSuggestion({ assetFaceId: 'face-1' });
+      let closeModal!: (value: { confirmed: number }) => void;
+      sdkMock.getSpacePersonFaceSuggestions
+        .mockResolvedValueOnce({ total: 1, items: [firstSuggestion] })
+        .mockResolvedValueOnce({ total: 1, items: [firstSuggestion] })
+        .mockResolvedValueOnce({ total: 0, items: [] });
+      vi.mocked(modalManager.show).mockReturnValue(
+        new Promise((resolve) => {
+          closeModal = resolve;
+        }) as never,
+      );
+
+      renderPage();
+
+      await userEvent.click(await screen.findByTestId('suggestion-review-btn'));
+
+      const modalProps = vi.mocked(modalManager.show).mock.calls[0][1] as unknown as {
+        referenceThumbnailUrl: string;
+        loadPage: (request: { page: number; size: number }) => Promise<PersonFaceSuggestionPageResponseDto>;
+        confirm: (assetFaceId: string) => Promise<void>;
+        dismiss: (assetFaceId: string) => Promise<void>;
+        ignore: (assetFaceId: string) => Promise<void>;
+      };
+
+      expect(modalProps.referenceThumbnailUrl).toContain('/shared-spaces/space-1/people/person-1/thumbnail');
+
+      await modalProps.loadPage({ page: 2, size: 50 });
+      expect(sdkMock.getSpacePersonFaceSuggestions).toHaveBeenLastCalledWith({
+        id: 'space-1',
+        personId: 'person-1',
+        page: 2,
+        size: 50,
+      });
+
+      await modalProps.confirm('face-1');
+      expect(sdkMock.confirmSpacePersonFaceSuggestion).toHaveBeenCalledWith({
+        id: 'space-1',
+        personId: 'person-1',
+        assetFaceId: 'face-1',
+      });
+
+      await modalProps.dismiss('face-2');
+      expect(sdkMock.dismissSpacePersonFaceSuggestion).toHaveBeenCalledWith({
+        id: 'space-1',
+        personId: 'person-1',
+        assetFaceId: 'face-2',
+      });
+
+      await modalProps.ignore('face-3');
+      expect(sdkMock.ignoreSpacePersonFaceSuggestion).toHaveBeenCalledWith({
+        id: 'space-1',
+        personId: 'person-1',
+        assetFaceId: 'face-3',
+      });
+
+      closeModal({ confirmed: 1 });
+
+      await waitFor(() => expect(invalidateAllMock).toHaveBeenCalled());
+      await waitFor(() => {
+        expect(sdkMock.getSpacePersonFaceSuggestions).toHaveBeenLastCalledWith({
+          id: 'space-1',
+          personId: 'person-1',
+          page: 1,
+          size: 5,
+        });
+      });
+    });
+
+    it('keeps modal actions scoped to the person the review was opened for after route navigation', async () => {
+      let closeModal!: (value: { confirmed: number }) => void;
+      sdkMock.getSpacePersonFaceSuggestions
+        .mockResolvedValueOnce({ total: 1, items: [makeSuggestion({ assetFaceId: 'face-1' })] })
+        .mockResolvedValueOnce({ total: 2, items: [makeSuggestion({ assetFaceId: 'face-2' })] })
+        .mockResolvedValueOnce({ total: 0, items: [] });
+      vi.mocked(modalManager.show).mockReturnValue(
+        new Promise((resolve) => {
+          closeModal = resolve;
+        }) as never,
+      );
+
+      const secondPerson = makePerson({
+        id: 'person-2',
+        name: 'Bob',
+        updatedAt: '2026-01-03T00:00:00.000Z',
+      });
+      const view = renderPage();
+
+      await userEvent.click(await screen.findByTestId('suggestion-review-btn'));
+
+      const modalProps = vi.mocked(modalManager.show).mock.calls[0][1] as unknown as {
+        loadPage: (request: { page: number; size: number }) => Promise<PersonFaceSuggestionPageResponseDto>;
+        confirm: (assetFaceId: string) => Promise<void>;
+        dismiss: (assetFaceId: string) => Promise<void>;
+        ignore: (assetFaceId: string) => Promise<void>;
+      };
+
+      await view.rerender({
+        component: SpacePersonDetailPage,
+        componentProps: {
+          data: {
+            space: makeSpace(),
+            members: [makeMember()],
+            person: secondPerson,
+            statistics: { assets: secondPerson.assetCount, faces: secondPerson.faceCount },
+            action: null,
+            previousRoute: null,
+            meta: { title: 'Bob - Test Space' },
+          },
+        },
+      });
+
+      await waitFor(() => {
+        expect(sdkMock.getSpacePersonFaceSuggestions).toHaveBeenLastCalledWith({
+          id: 'space-1',
+          personId: 'person-2',
+          page: 1,
+          size: 5,
+        });
+      });
+
+      await modalProps.loadPage({ page: 2, size: 50 });
+      await modalProps.confirm('face-1');
+      await modalProps.dismiss('face-2');
+      await modalProps.ignore('face-3');
+
+      expect(sdkMock.getSpacePersonFaceSuggestions).toHaveBeenLastCalledWith({
+        id: 'space-1',
+        personId: 'person-1',
+        page: 2,
+        size: 50,
+      });
+      expect(sdkMock.confirmSpacePersonFaceSuggestion).toHaveBeenCalledWith({
+        id: 'space-1',
+        personId: 'person-1',
+        assetFaceId: 'face-1',
+      });
+      expect(sdkMock.dismissSpacePersonFaceSuggestion).toHaveBeenCalledWith({
+        id: 'space-1',
+        personId: 'person-1',
+        assetFaceId: 'face-2',
+      });
+      expect(sdkMock.ignoreSpacePersonFaceSuggestion).toHaveBeenCalledWith({
+        id: 'space-1',
+        personId: 'person-1',
+        assetFaceId: 'face-3',
+      });
+
+      closeModal({ confirmed: 1 });
+
+      await waitFor(() => expect(invalidateAllMock).toHaveBeenCalled());
+      await waitFor(() => {
+        expect(sdkMock.getSpacePersonFaceSuggestions).toHaveBeenLastCalledWith({
+          id: 'space-1',
+          personId: 'person-1',
+          page: 1,
+          size: 5,
+        });
+      });
+    });
+
+    it('keys Not now snooze by the space person id', async () => {
+      sdkMock.getSpacePersonFaceSuggestions.mockResolvedValue({
+        total: 2,
+        items: [makeSuggestion()],
+      });
+
+      const firstRender = renderPage({ person: makePerson({ id: 'person-1', name: 'Alice' }) });
+      await screen.findByTestId('person-suggestion-banner');
+      await userEvent.click(screen.getByTestId('suggestion-snooze-btn'));
+      expect(screen.queryByTestId('person-suggestion-banner')).not.toBeInTheDocument();
+      firstRender.unmount();
+
+      renderPage({ person: makePerson({ id: 'person-2', name: 'Alice in another space cluster' }) });
+
+      await screen.findByTestId('person-suggestion-banner');
+    });
+
+    it('reloads suggestions when navigating to another space person in the same route component', async () => {
+      sdkMock.getSpacePersonFaceSuggestions
+        .mockResolvedValueOnce({ total: 2, items: [makeSuggestion({ assetFaceId: 'face-1' })] })
+        .mockResolvedValueOnce({ total: 0, items: [] });
+      const firstPerson = makePerson({ id: 'person-1', name: 'Alice' });
+      const secondPerson = makePerson({
+        id: 'person-2',
+        name: 'Bob',
+        updatedAt: '2026-01-03T00:00:00.000Z',
+      });
+
+      const view = renderPage({ person: firstPerson });
+
+      await screen.findByTestId('person-suggestion-banner');
+
+      await view.rerender({
+        component: SpacePersonDetailPage,
+        componentProps: {
+          data: {
+            space: makeSpace(),
+            members: [makeMember()],
+            person: secondPerson,
+            statistics: { assets: secondPerson.assetCount, faces: secondPerson.faceCount },
+            action: null,
+            previousRoute: null,
+            meta: { title: 'Bob - Test Space' },
+          },
+        },
+      });
+
+      await waitFor(() => {
+        expect(sdkMock.getSpacePersonFaceSuggestions).toHaveBeenLastCalledWith({
+          id: 'space-1',
+          personId: 'person-2',
+          page: 1,
+          size: 5,
+        });
+      });
+      await waitFor(() => expect(screen.queryByTestId('person-suggestion-banner')).not.toBeInTheDocument());
+    });
   });
 });

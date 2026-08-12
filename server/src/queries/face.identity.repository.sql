@@ -1729,10 +1729,41 @@ values
 on conflict ("assetFaceId") do update
 set
   "identityId" = $5,
-  "source" = $6,
+  "source" = CASE
+    WHEN "face_identity_face"."source" = 'manual' THEN 'manual'
+    ELSE $6
+  END,
   "confidence" = $7
 returning
   *
+
+-- FaceIdentityRepository.getManualLinkedFaceIds
+select
+  "assetFaceId"
+from
+  "face_identity_face"
+where
+  "assetFaceId" in ($1)
+  and "source" = $2
+
+-- FaceIdentityRepository.getPersonVerdictTokens
+select
+  "id",
+  "identityId"
+from
+  "person"
+where
+  "id" in ($1)
+
+-- FaceIdentityRepository.demoteManualFaceLinks
+update "face_identity_face"
+set
+  "source" = $1
+where
+  "assetFaceId" in ($2)
+  and "source" = $3
+returning
+  "assetFaceId"
 
 -- FaceIdentityRepository.replaceFaceIdentity
 insert into
@@ -1747,7 +1778,10 @@ values
 on conflict ("assetFaceId") do update
 set
   "identityId" = $5,
-  "source" = $6,
+  "source" = CASE
+    WHEN "face_identity_face"."source" = 'manual' THEN 'manual'
+    ELSE $6
+  END,
   "confidence" = $7
 returning
   *
@@ -1781,7 +1815,10 @@ where
 on conflict ("assetFaceId") do update
 set
   "identityId" = $7,
-  "source" = $8,
+  "source" = CASE
+    WHEN "face_identity_face"."source" = 'manual' THEN 'manual'
+    ELSE $8
+  END,
   "confidence" = $9
 
 -- FaceIdentityRepository.updateRepresentativeFace
@@ -1802,7 +1839,10 @@ values
 on conflict ("assetFaceId") do update
 set
   "identityId" = $5,
-  "source" = $6,
+  "source" = CASE
+    WHEN "face_identity_face"."source" = 'manual' THEN 'manual'
+    ELSE $6
+  END,
   "confidence" = $7
 returning
   *
