@@ -120,6 +120,7 @@ DROP TABLE IF EXISTS "shared_space_person" CASCADE;
 DROP TABLE IF EXISTS "shared_space_face_match_backfill_target" CASCADE;
 DROP TABLE IF EXISTS "shared_space_library_asset_audit" CASCADE;
 DROP TABLE IF EXISTS "shared_space_album_asset_audit" CASCADE;
+DROP TABLE IF EXISTS "face_person_verdict" CASCADE;
 DROP TABLE IF EXISTS "shared_space_asset_audit" CASCADE;
 DROP TABLE IF EXISTS "shared_space_member_audit" CASCADE;
 DROP TABLE IF EXISTS "shared_space_audit" CASCADE;
@@ -132,6 +133,10 @@ DROP TABLE IF EXISTS "shared_space_member" CASCADE;
 DROP TABLE IF EXISTS "shared_space" CASCADE;
 
 -- Face identities
+DROP TABLE IF EXISTS "face_repair_scan_flagged_face" CASCADE;
+DROP TABLE IF EXISTS "face_repair_decline" CASCADE;
+DROP TABLE IF EXISTS "face_repair_lock" CASCADE;
+DROP TABLE IF EXISTS "face_repair_scan" CASCADE;
 DROP TABLE IF EXISTS "face_identity_face" CASCADE;
 DROP TABLE IF EXISTS "face_identity" CASCADE;
 
@@ -237,6 +242,11 @@ DELETE FROM "migration_overrides"
    'index_asset_face_personId_idx',
    'index_face_identity_representativeFaceId_idx',
    'index_person_identityId_idx',
+   'index_face_person_verdict_personId_assetFaceId_uq',
+   'index_face_person_verdict_spacePersonId_assetFaceId_uq',
+   'index_face_person_verdict_spacePersonId_status_distance_idx',
+   'index_face_person_verdict_identityId_assetFaceId_idx',
+   'index_face_repair_scan_in_flight_uq',
    'index_person_ownerId_identityId_key',
    'index_shared_space_person_identityId_spaceId_idx',
    'index_shared_space_person_space_name_idx',
@@ -247,6 +257,7 @@ DELETE FROM "migration_overrides"
    'trigger_face_identity_updatedAt',
    'trigger_library_after_insert',
    'trigger_library_user_delete_after_audit',
+   'trigger_face_person_verdict_updatedAt',
    'trigger_shared_space_face_match_backfill_target_updatedAt',
    'trigger_shared_space_asset_delete_audit',
    'trigger_shared_space_asset_updatedAt',
@@ -423,16 +434,37 @@ DELETE FROM "kysely_migrations"
    '1779200000000-AddSharedSpaceAlbumDeleteSideTriggers',
    '1779300000000-FixUserHasAlbumPathSoftDeleted',
    '1779309791424-SharedSpaceAlbumAssetAuditTable',
+   '1780000000000-AddFaceRepairScan',
+   '1781000000000-AddFaceRepairDecline',
    '1781181889688-SharedSpaceLibraryAssetAuditTable',
+   '1781500000000-AddFaceRepairScanFlaggedFace',
    '1782000000000-AddAssetExifDescriptionTrigramIndex',
    '1782050000000-AddAlbumSoftDeleteSharedSpaceAlbumTrigger',
    '1782100000000-FixSharedSpaceAlbumGrantRelinkCreateId',
    '1782300000000-AddSharedSpaceAlbumAuditSyncIndexes',
    '1783000000000-AddAlbumSpaceAssetTable',
+   '1783050000000-AddFaceRepairScanInFlightIndex',
    '1783100000000-AddAlbumSpaceAssetSyncAndAudit',
    '1783628194057-DisablePostgresJit',
    '1783700000000-FixSharedSpaceMemberJoinGrantCreateId',
+   '1784000000000-FixFaceRepairScanInFlightIndexOverride',
    '1784800000000-RepairSharedSpaceAlbumGrantDrift',
+   '1785000000000-AddFaceRepairLock',
+   '1786000000000-FaceRepairLockPersonNullable',
+   '1787000000000-AddFacePersonVerdict',
+   '1788000000000-ReconcileFacePersonVerdictConstraints',
+   '1789000000000-AddFacePersonVerdictStatusCreatedAtIdIndex',
+   '1790000000000-FixFaceRepairScanInFlightIndex',
+
+   -- Pre-rename names for two migrations that were renumbered off timestamp collisions
+   -- ("renumber AddFaceRepairScanFlaggedFace off the #722 collision",
+   -- "renumber AddFaceRepairScanInFlightIndex off the #752 collision"). The current names are
+   -- already in the list above (1781500000000 / 1783050000000); an RC/staging database that ran
+   -- this branch before either renumbering fix recorded the OLD name below instead, which has no
+   -- matching file on disk in this tree, and without an exact-name DELETE entry that database
+   -- trips "corrupted migrations: previously executed migration ... is missing" on boot.
+   '1782000000000-AddFaceRepairScanFlaggedFace',
+   '1783000000000-AddFaceRepairScanInFlightIndex',
 
    -- Build-time compatibility alias (server/bin/sync-gallery-migrations.mjs).
    -- Gallery's postbuild records ChangeDurationToInteger under BOTH its current
@@ -485,7 +517,16 @@ BEGIN
       OR "name" LIKE '%AddSpacePersonRepresentativeFaceSource%'
       OR "name" LIKE '%SortSpacePeopleByNameIndex%'
       OR "name" LIKE '%ReconcileFaceIdentityIndexOverrides%'
-      OR "name" LIKE '%TrimSpacePersonNameIndex%';
+      OR "name" LIKE '%TrimSpacePersonNameIndex%'
+      OR "name" LIKE '%AddPersonFaceSuggestion%'
+      OR "name" LIKE '%AddSpacePersonFaceSuggestion%'
+      OR "name" LIKE '%AddFaceSuggestionIntentStatuses%'
+      OR "name" LIKE '%AddFacePersonVerdict%'
+      OR "name" LIKE '%AddFaceRepairScan%'
+      OR "name" LIKE '%AddFaceRepairDecline%'
+      OR "name" LIKE '%AddFaceRepairLock%'
+      OR "name" LIKE '%AddFaceRepairScanFlaggedFace%'
+      OR "name" LIKE '%AddFaceRepairScanInFlightIndex%';
   IF fork_rows_left > 0 THEN
     RAISE EXCEPTION 'revert-to-immich: % Gallery row(s) still present in kysely_migrations after cleanup — aborting.', fork_rows_left;
   END IF;
@@ -509,7 +550,9 @@ BEGIN
        'face_identity_face', 'face_identity',
        'shared_space', 'user_group_member', 'user_group',
        'classification_prompt_embedding', 'classification_category',
-       'storage_migration_log', 'asset_duplicate_checksum'
+       'storage_migration_log', 'asset_duplicate_checksum',
+       'face_person_verdict', 'face_repair_scan', 'face_repair_decline',
+       'face_repair_scan_flagged_face', 'face_repair_lock'
      );
   IF fork_tables_left > 0 THEN
     RAISE EXCEPTION 'revert-to-immich: % Gallery table(s) still present after cleanup — aborting.', fork_tables_left;

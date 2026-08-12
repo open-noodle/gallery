@@ -61,6 +61,7 @@ import { StorageMigrationService } from 'src/services/storage-migration.service.
 import { UserGroupService } from 'src/services/user-group.service.js';
 import { ClassificationService } from 'src/services/classification.service.js';
 import { FaceRepairService } from 'src/services/face-repair.service.js';
+import { FaceSuggestionService } from 'src/services/face-suggestion.service.js';
 
 export const services = [
   ApiKeyService,
@@ -80,6 +81,7 @@ export const services = [
   DownloadService,
   DuplicateService,
   FaceRepairService,
+  FaceSuggestionService,
   FutoBackupsService,
   IntegrityService,
   HlsService,
