@@ -165,6 +165,61 @@ describe('FilteredMapMarkerDto', () => {
 
       expect(result.success).toBe(false);
     });
+
+    // The three free-text ILIKE filters are bounded server-side to mirror the web clamp
+    // (TEXT_FILTER_MAX_CODE_POINTS = 200), so a direct API caller cannot push a multi-kilobyte
+    // pattern into the query. The bound counts CODE POINTS, not UTF-16 units.
+    it.each(['description', 'originalFileName', 'ocr'])('accepts %s at exactly 200 code points', (field) => {
+      const result = parse({ [field]: 'a'.repeat(200) });
+      expect(result.success).toBe(true);
+    });
+
+    it.each(['description', 'originalFileName', 'ocr'])('rejects %s longer than 200 code points', (field) => {
+      const result = parse({ [field]: 'a'.repeat(201) });
+      expect(result.success).toBe(false);
+    });
+
+    it('bounds by code points, so 200 astral characters (400 UTF-16 units) still pass', () => {
+      // A value the web already clamped to 200 code points must never be rejected by the server.
+      expect(parse({ description: '😀'.repeat(200) }).success).toBe(true);
+      expect(parse({ description: '😀'.repeat(201) }).success).toBe(false);
+    });
+  });
+
+  // The new contributor/album/lens/state facets this feature wired onto the map endpoint. Their
+  // presence + type rules had no DTO-level test — only indirect e2e coverage.
+  describe('ownerId, albumId, lensModel, state', () => {
+    const uuid = '7e57d004-2b97-4e7a-b45f-5387367791cd';
+
+    it('accepts a valid ownerId and albumId', () => {
+      const result = parse({ ownerId: uuid, albumId: uuid });
+      expect(result.success).toBe(true);
+      expect(result.data?.ownerId).toBe(uuid);
+      expect(result.data?.albumId).toBe(uuid);
+    });
+
+    it('rejects a non-uuid ownerId (a scoped token or arbitrary string must not reach SQL)', () => {
+      expect(parse({ ownerId: 'not-a-uuid' }).success).toBe(false);
+      expect(parse({ ownerId: `space-person:${uuid}` }).success).toBe(false);
+    });
+
+    it('rejects a non-uuid albumId', () => {
+      expect(parse({ albumId: 'not-a-uuid' }).success).toBe(false);
+    });
+
+    it('accepts lensModel and state strings, and leaves all four undefined when absent', () => {
+      const present = parse({ lensModel: 'RF24-70mm', state: 'Bavaria' });
+      expect(present.success).toBe(true);
+      expect(present.data?.lensModel).toBe('RF24-70mm');
+      expect(present.data?.state).toBe('Bavaria');
+
+      const absent = parse({});
+      expect(absent.success).toBe(true);
+      expect(absent.data?.ownerId).toBeUndefined();
+      expect(absent.data?.albumId).toBeUndefined();
+      expect(absent.data?.lensModel).toBeUndefined();
+      expect(absent.data?.state).toBeUndefined();
+    });
   });
 
   it('should accept all three text filters together alongside the existing filters', () => {

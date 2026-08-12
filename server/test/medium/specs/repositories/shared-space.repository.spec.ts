@@ -98,6 +98,21 @@ const createIdentityBackedFace = async (
   return { asset, assetFace, identityId, person };
 };
 
+// Every map marker needs GPS: getFilteredMapMarkers inner-joins asset_exif and requires lat/lon.
+const newGeotaggedAsset = async (
+  ctx: ReturnType<typeof setup>['ctx'],
+  dto: { ownerId: string; visibility?: AssetVisibility; deletedAt?: Date; originalFileName?: string },
+) => {
+  const { asset } = await ctx.newAsset({
+    ownerId: dto.ownerId,
+    visibility: dto.visibility ?? AssetVisibility.Timeline,
+    deletedAt: dto.deletedAt,
+    originalFileName: dto.originalFileName ?? 'marker.jpg',
+  });
+  await ctx.newExif({ assetId: asset.id, latitude: 48.86, longitude: 2.35 });
+  return asset;
+};
+
 const createSpaceIdentityPerson = async (
   sut: SharedSpaceRepository,
   input: { spaceId: string; identityId: string; representativeFaceId: string; name?: string; isHidden?: boolean },
@@ -4821,5 +4836,128 @@ describe('getPersonAssetIds — visibility scoping', () => {
 
     const after = await sut.getPersonAssetIds(spacePerson.id);
     expect(after.map((r) => r.assetId)).not.toContain(asset.id);
+  });
+
+  describe('getFilteredMapMarkers', () => {
+    // D4: the album map matches the album GRID, which uses withDefaultVisibility
+    // (Archive | Timeline). An archived, geotagged album asset must therefore be pinned —
+    // and NOTHING else may be widened in with it.
+    describe("visibility parity with the album grid ('timeline-or-archive')", () => {
+      it('pins Timeline and Archive album assets and excludes Hidden, Locked and Trashed ones', async () => {
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+
+        const timeline = await newGeotaggedAsset(ctx, { ownerId: user.id, visibility: AssetVisibility.Timeline });
+        const archived = await newGeotaggedAsset(ctx, { ownerId: user.id, visibility: AssetVisibility.Archive });
+        const hidden = await newGeotaggedAsset(ctx, { ownerId: user.id, visibility: AssetVisibility.Hidden });
+        const locked = await newGeotaggedAsset(ctx, { ownerId: user.id, visibility: AssetVisibility.Locked });
+        const trashed = await newGeotaggedAsset(ctx, { ownerId: user.id, deletedAt: new Date() });
+
+        const { album } = await ctx.newAlbum({ ownerId: user.id }, [
+          timeline.id,
+          archived.id,
+          hidden.id,
+          locked.id,
+          trashed.id,
+        ]);
+
+        // The album-boundary shape used by shared-space.service.ts getFilteredMapMarkers:
+        // album ACCESS is the scope (no userIds), visibility matches the grid.
+        const markers = await sut.getFilteredMapMarkers({
+          albumIds: [album.id],
+          albumAccessIsBoundary: true,
+          visibility: 'timeline-or-archive',
+        });
+
+        const ids = markers.map(({ id }) => id);
+        expect(ids).toContain(timeline.id);
+        expect(ids).toContain(archived.id);
+        expect(ids).not.toContain(hidden.id);
+        expect(ids).not.toContain(locked.id);
+        expect(ids).not.toContain(trashed.id);
+      });
+
+      it('keeps a concrete Timeline visibility exact (the non-album map branch is unchanged)', async () => {
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+
+        const timeline = await newGeotaggedAsset(ctx, { ownerId: user.id, visibility: AssetVisibility.Timeline });
+        const archived = await newGeotaggedAsset(ctx, { ownerId: user.id, visibility: AssetVisibility.Archive });
+
+        const markers = await sut.getFilteredMapMarkers({
+          userIds: [user.id],
+          visibility: AssetVisibility.Timeline,
+        });
+
+        const ids = markers.map(({ id }) => id);
+        expect(ids).toContain(timeline.id);
+        expect(ids).not.toContain(archived.id);
+      });
+    });
+
+    // ILIKE wildcard escaping: `_` and `%` in a user-supplied filter must match literally,
+    // exactly as they do on the time-bucket/timeline path (asset.repository.ts).
+    describe('text filters treat ILIKE wildcards literally', () => {
+      it('does not let `_` in an originalFileName filter act as a single-char wildcard', async () => {
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+
+        const underscore = await newGeotaggedAsset(ctx, { ownerId: user.id, originalFileName: 'IMG_0001.jpg' });
+        const dash = await newGeotaggedAsset(ctx, { ownerId: user.id, originalFileName: 'IMG-0001.jpg' });
+
+        const markers = await sut.getFilteredMapMarkers({
+          userIds: [user.id],
+          visibility: AssetVisibility.Timeline,
+          originalFileName: 'IMG_0001',
+        });
+
+        const ids = markers.map(({ id }) => id);
+        expect(ids).toContain(underscore.id);
+        expect(ids).not.toContain(dash.id);
+      });
+
+      it('treats `%` in a filter value as a literal instead of matching everything', async () => {
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+
+        const percent = await newGeotaggedAsset(ctx, { ownerId: user.id, originalFileName: 'battery-100%.jpg' });
+        const plain = await newGeotaggedAsset(ctx, { ownerId: user.id, originalFileName: 'battery-full.jpg' });
+
+        const markers = await sut.getFilteredMapMarkers({
+          userIds: [user.id],
+          visibility: AssetVisibility.Timeline,
+          originalFileName: '%',
+        });
+
+        const ids = markers.map(({ id }) => id);
+        expect(ids).toContain(percent.id);
+        expect(ids).not.toContain(plain.id);
+      });
+
+      it('does not let `_` in a description filter act as a single-char wildcard', async () => {
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+
+        const { asset: underscore } = await ctx.newAsset({ ownerId: user.id });
+        await ctx.newExif({
+          assetId: underscore.id,
+          latitude: 48.86,
+          longitude: 2.35,
+          description: 'trip_2024',
+        });
+        const { asset: dash } = await ctx.newAsset({ ownerId: user.id });
+        await ctx.newExif({ assetId: dash.id, latitude: 48.86, longitude: 2.35, description: 'trip-2024' });
+
+        const markers = await sut.getFilteredMapMarkers({
+          userIds: [user.id],
+          visibility: AssetVisibility.Timeline,
+          description: 'trip_2024',
+        });
+
+        const ids = markers.map(({ id }) => id);
+        expect(ids).toContain(underscore.id);
+        expect(ids).not.toContain(dash.id);
+      });
+    });
   });
 });

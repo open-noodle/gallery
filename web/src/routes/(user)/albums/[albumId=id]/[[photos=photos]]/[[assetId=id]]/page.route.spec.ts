@@ -12,12 +12,29 @@ import { albumFactory } from '@test-data/factories/album-factory';
 import { timelineAssetFactory } from '@test-data/factories/asset-factory';
 import { preferencesFactory } from '@test-data/factories/preferences-factory';
 import { userAdminFactory } from '@test-data/factories/user-factory';
+import { reactivePageMock as mockPage } from '@test-data/mocks/reactive-page.mock.svelte';
 import AlbumPage from './+page.svelte';
 
-const { registerAlbumContextMock, registerSelectionContextMock } = vi.hoisted(() => ({
-  registerAlbumContextMock: vi.fn(),
-  registerSelectionContextMock: vi.fn(),
+const { registerAlbumContextMock, registerSelectionContextMock, gotoMock, mockFeatureFlagsManager } = vi.hoisted(
+  () => ({
+    registerAlbumContextMock: vi.fn(),
+    registerSelectionContextMock: vi.fn(),
+    gotoMock: vi.fn(),
+    mockFeatureFlagsManager: { init: vi.fn(), loadFeatureFlags: vi.fn(), value: { map: false } },
+  }),
+);
+
+vi.mock('$app/navigation', () => ({
+  goto: gotoMock,
+  invalidate: vi.fn().mockResolvedValue(undefined),
+  onNavigate: vi.fn(),
 }));
+// The mock module and the spec import the SAME singleton, so assigning mockPage.url in a test is
+// what the page's $effect sees.
+vi.mock('$app/state', async () => {
+  const { reactivePageMock } = await import('@test-data/mocks/reactive-page.mock.svelte');
+  return { page: reactivePageMock };
+});
 
 vi.mock('$lib/components/timeline/Timeline.svelte', async () => {
   const { default: MockTimeline } = await import('./mock-timeline.test-wrapper.svelte');
@@ -30,11 +47,7 @@ vi.mock('$lib/managers/command-context-manager.svelte', () => ({
 }));
 
 vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({
-  featureFlagsManager: {
-    init: vi.fn(),
-    loadFeatureFlags: vi.fn(),
-    value: { map: false },
-  } as never,
+  featureFlagsManager: mockFeatureFlagsManager as never,
 }));
 
 vi.mock('$lib/utils/navigation', async (importOriginal) => {
@@ -42,7 +55,12 @@ vi.mock('$lib/utils/navigation', async (importOriginal) => {
   return {
     ...actual,
     isAlbumsRoute: () => true,
-    navigate: vi.fn().mockResolvedValue(undefined),
+    // Spy that DELEGATES to the real implementation (not a no-op stub): the picker open/close
+    // handlers below call navigate({ assetGridRouteSearchParams: { at } }), which routes into the
+    // real replaceScrollTarget/goto machinery against mockPage + gotoMock above. A no-op stub would
+    // hide the exact bug this suite regression-tests (album.e2e-spec.ts:150 — closing the add-photos
+    // picker silently drops the album's own filter query).
+    navigate: vi.fn(actual.navigate),
   };
 });
 
@@ -111,8 +129,20 @@ function renderPage(album = albumFactory.build({ assetCount: 2 })) {
 describe('album detail filter panel route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Stand in for SvelteKit: a goto() actually changes page.url, which re-runs the page's URL
+    // $effect. If the effect's lastHandled token guard is ever broken, this turns goto -> $effect ->
+    // goto into a real loop and the test times out — which is the correct, loud failure.
+    gotoMock.mockImplementation((href: string) => {
+      mockPage.url = new URL(href, 'https://gallery.test');
+      return Promise.resolve();
+    });
+    mockPage.reset('https://gallery.test/albums/album-1', {
+      routeId: '/(user)/albums/[albumId=id]/[[photos=photos]]/[[assetId=id]]',
+      params: { albumId: 'album-1' },
+    });
     assetMultiSelectManager.clear();
     Element.prototype.animate = getAnimateMock();
+    mockFeatureFlagsManager.value.map = false;
   });
 
   afterAll(() => {
@@ -401,6 +431,15 @@ describe('album detail filter panel route', () => {
     await user.click(screen.getByTestId('people-item-person-view'));
     expect(screen.getByTestId('active-chip')).toHaveTextContent('First Album Person');
 
+    // A real navigation to another album always moves page.url/page.params in lockstep with
+    // data.album (the URL change is what drives the new load in the first place). Move them here
+    // too, so this proves filters reset because the new album's URL carries none of its own —
+    // not merely because a mock forgot to move.
+    mockPage.reset('https://gallery.test/albums/album-2', {
+      routeId: '/(user)/albums/[albumId=id]/[[photos=photos]]/[[assetId=id]]',
+      params: { albumId: 'album-2' },
+    });
+
     await view.rerender({
       component: AlbumPage,
       componentProps: {
@@ -451,5 +490,237 @@ describe('album detail filter panel route', () => {
 
     await screen.findByTestId('timeline-options');
     expect(screen.queryByTestId('add-all-to-collection')).not.toBeInTheDocument();
+  });
+
+  // Slice 6 — the owner chip on an album is named from the album users the page already holds, so
+  // it costs no request. (There is no album chip here: E9 drops `?albumId=` at hydrate.)
+  it('names the owner chip from the album users in scope, without a request', async () => {
+    const album = albumFactory.build({ id: 'album-1', assetCount: 2 });
+    const owner = album.albumUsers[0].user;
+    mockPage.url = new URL(`https://gallery.test/albums/album-1?owner=${owner.id}`);
+
+    renderPage(album);
+
+    await waitFor(() => expect(screen.getByTestId('active-filters-bar')).toHaveTextContent(owner.name));
+    expect(screen.getByTestId('active-filters-bar')).not.toHaveTextContent(owner.id);
+    expect(sdkMock.getUser).not.toHaveBeenCalled();
+  });
+
+  // Nested (not a sibling describe) so it shares this outer describe's beforeEach — the mockPage
+  // reset and gotoMock re-arm above are what make the round-trip tests below load-bearing.
+  describe('album detail filters are URL-backed', () => {
+    const album1 = () => albumFactory.build({ id: 'album-1', assetCount: 2 });
+
+    it('hydrates the album timeline filters from the URL', async () => {
+      mockPage.url = new URL('https://gallery.test/albums/album-1?make=Apple&rating=4&lens=RF24-70mm');
+      renderPage(album1());
+
+      const options = await screen.findByTestId('timeline-options');
+      await waitFor(() => {
+        expect(options.textContent).toContain('"make":"Apple"');
+        expect(options.textContent).toContain('"rating":4');
+        expect(options.textContent).toContain('"lensModel":"RF24-70mm"');
+      });
+      expect(screen.getByTestId('active-filters-bar')).toBeInTheDocument();
+    });
+
+    it('writes a filter chosen in the panel back to the URL', async () => {
+      renderPage(album1());
+      const user = userEvent.setup();
+
+      await waitFor(() => expect(screen.getByTestId('people-item-person-view')).toBeInTheDocument());
+      await user.click(screen.getByTestId('people-item-person-view'));
+
+      await waitFor(() =>
+        expect(gotoMock).toHaveBeenCalledWith('/albums/album-1?people=person-view', {
+          replaceState: true,
+          keepFocus: true,
+          noScroll: true,
+        }),
+      );
+    });
+
+    it('writes chip removal back to the URL', async () => {
+      mockPage.url = new URL('https://gallery.test/albums/album-1?make=Apple');
+      renderPage(album1());
+      const user = userEvent.setup();
+
+      await user.click(await screen.findByRole('button', { name: 'filter_remove_chip' }));
+
+      await waitFor(() =>
+        expect(gotoMock).toHaveBeenCalledWith('/albums/album-1', {
+          replaceState: true,
+          keepFocus: true,
+          noScroll: true,
+        }),
+      );
+    });
+
+    // Back/forward: SvelteKit swaps page.url without remounting the page component. The $effect must
+    // notice and re-hydrate — this is the same code path a reload and a shared URL take.
+    it('re-hydrates when the URL changes underneath it (back/forward)', async () => {
+      mockPage.url = new URL('https://gallery.test/albums/album-1?make=Apple&rating=4');
+      renderPage(album1());
+
+      await waitFor(() => expect(screen.getByTestId('timeline-options').textContent).toContain('"rating":4'));
+
+      // The browser Back button: no remount, just a new URL.
+      mockPage.url = new URL('https://gallery.test/albums/album-1?make=Apple');
+
+      await waitFor(() => {
+        const options = screen.getByTestId('timeline-options');
+        expect(options.textContent).toContain('"make":"Apple"');
+        expect(options.textContent).not.toContain('"rating"');
+      });
+    });
+
+    // D2 (was THE transient-year carry-over test). selectedYear is IN the URL codec now: picking a year
+    // writes `?year=2024`, so it survives the page's own goto() round trip on its own — no
+    // carry-over slot smuggling it across. Picking a year and THEN a second filter must keep both.
+    it('writes a picked year to the URL and keeps it across a second filter change', async () => {
+      renderPage(album1());
+      const user = userEvent.setup();
+
+      await user.click(await screen.findByTestId('year-btn-2024'));
+      await waitFor(() =>
+        expect(screen.getByTestId('timeline-options').textContent).toContain('"takenAfter":"2024-01-01T00:00:00.000Z"'),
+      );
+      // A year IS in the URL codec, so picking one writes.
+      await waitFor(() => expect(gotoMock).toHaveBeenCalled());
+      const [yearTarget] = gotoMock.mock.calls.at(-1) as [string];
+      expect(yearTarget).toContain('year=2024');
+
+      await user.click(await screen.findByTestId('people-item-person-view'));
+
+      await waitFor(() => {
+        const [target] = gotoMock.mock.calls.at(-1) as [string];
+        expect(target).toContain('people=person-view');
+        expect(target).toContain('year=2024');
+      });
+      await waitFor(() => {
+        const options = screen.getByTestId('timeline-options').textContent ?? '';
+        expect(options).toContain('"personIds":["person-view"]');
+        // survived the round trip
+        expect(options).toContain('"takenAfter":"2024-01-01T00:00:00.000Z"');
+        expect(options).toContain('"takenBefore":"2025-01-01T00:00:00.000Z"');
+      });
+      expect(screen.getByTestId('active-filters-bar')).toHaveTextContent('2024');
+    });
+
+    // D2 — a shared album link carries the year.
+    it('hydrates a shared ?year= link into the picker, the chip and the timeline query', async () => {
+      mockPage.url = new URL('https://gallery.test/albums/album-1?year=2023');
+      renderPage(album1());
+
+      await waitFor(() => {
+        const options = screen.getByTestId('timeline-options').textContent ?? '';
+        expect(options).toContain('"takenAfter":"2023-01-01T00:00:00.000Z"');
+        expect(options).toContain('"takenBefore":"2024-01-01T00:00:00.000Z"');
+      });
+      expect(screen.getByTestId('active-filters-bar')).toHaveTextContent('2023');
+    });
+
+    // replaceScrollTarget (navigation.ts) writes `?at=<assetId>` into the URL when the asset viewer
+    // closes. The year is URL-backed (D2), so it survives on its own — and `?at=` must still not
+    // read as a filter change, or the page rebuilds an identical FilterState (and with it the
+    // timeline options object) on every viewer close.
+    it('keeps the year when the asset viewer closes (?at= is not a filter change)', async () => {
+      renderPage(album1());
+      const user = userEvent.setup();
+
+      await user.click(await screen.findByTestId('year-btn-2024'));
+      await waitFor(() =>
+        expect(screen.getByTestId('timeline-options').textContent).toContain('"takenAfter":"2024-01-01T00:00:00.000Z"'),
+      );
+
+      // Simulate the asset viewer closing: replaceScrollTarget appends `at` to the CURRENT url,
+      // which now carries year=2024 (the page wrote it, and gotoMock landed page.url on it).
+      const withAt = new URL(mockPage.url);
+      withAt.searchParams.set('at', 'asset-1');
+      mockPage.url = withAt;
+
+      await waitFor(() => {
+        const options = screen.getByTestId('timeline-options').textContent ?? '';
+        expect(options).toContain('"takenAfter":"2024-01-01T00:00:00.000Z"');
+        expect(options).toContain('"takenBefore":"2025-01-01T00:00:00.000Z"');
+      });
+      expect(screen.getByTestId('active-filters-bar')).toHaveTextContent('2024');
+    });
+
+    // E9 — the route already scopes the query to this album, and the server's albumId is a SCALAR
+    // driving one inner join, so a second album cannot be AND-ed. A stray param must be IGNORED,
+    // not merely redundant.
+    it('E9: ignores a stray albumId param and keeps its own album scope', async () => {
+      mockPage.url = new URL('https://gallery.test/albums/album-1?albumId=album-2&make=Apple');
+      renderPage(album1());
+
+      const options = await screen.findByTestId('timeline-options');
+      await waitFor(() => expect(options.textContent).toContain('"make":"Apple"'));
+      expect(options.textContent).toContain('"albumId":"album-1"');
+      expect(options.textContent).not.toContain('album-2');
+    });
+
+    // The picker filters the asset PICKER, not the album timeline. They must never reach the URL.
+    it('does not write picker filters to the URL', async () => {
+      renderPage(album1());
+      const user = userEvent.setup();
+
+      await fireEvent.click(screen.getByLabelText('add_photos'));
+      await waitFor(() => expect(screen.getByTestId('people-item-person-picker')).toBeInTheDocument());
+      gotoMock.mockClear();
+      await user.click(screen.getByTestId('people-item-person-picker'));
+
+      expect(screen.getByTestId('active-chip')).toHaveTextContent('Picker Person');
+      expect(gotoMock).not.toHaveBeenCalled();
+    });
+
+    // Regression test for e2e/src/specs/web/album.e2e-spec.ts:150 ("reuses album filters for select
+    // cover but keeps a separate picker state for add assets"). Both opening AND closing the
+    // add-photos picker call navigate({ assetGridRouteSearchParams: { at } }) with no real `at` —
+    // replaceScrollTarget must preserve the album's `?tags=…` query through that round trip, or the
+    // URL-backed $effect re-hydrates albumFilters from a filter-less URL and the chip vanishes.
+    it('keeps the album tag filter across opening and closing the add-photos picker', async () => {
+      renderPage(album1());
+      const user = userEvent.setup();
+
+      await waitFor(() => expect(screen.getByTestId('tags-item-tag-view')).toBeInTheDocument());
+      await user.click(screen.getByTestId('tags-item-tag-view'));
+      expect(screen.getByTestId('active-chip')).toHaveTextContent('First Album Tag');
+
+      await fireEvent.click(screen.getByLabelText('add_photos'));
+      // The picker shows its OWN (empty) filter state, not the album's — this is expected, not the bug.
+      expect(screen.queryByTestId('active-chip')).not.toBeInTheDocument();
+
+      await fireEvent.click(screen.getByLabelText('Close'));
+      expect(screen.getByTestId('active-chip')).toHaveTextContent('First Album Tag');
+    });
+
+    // Finding (#767c): the grid and the map of one album must agree on what a shared/bookmarked
+    // filter URL means. The map already forwards description/filename/ocr/isInAlbum/isNotInAlbum
+    // (buildAlbumMapMarkerOptions); the timeline query must forward them too, or a URL like this
+    // renders a "1 filter" chip over the ENTIRE unfiltered album.
+    it('hydrates the album description filter from the URL and forwards it to the timeline query', async () => {
+      mockPage.url = new URL('https://gallery.test/albums/album-1?description=beach');
+      renderPage(album1());
+
+      const options = await screen.findByTestId('timeline-options');
+      await waitFor(() => expect(options.textContent).toContain('"description":"beach"'));
+      expect(screen.getByTestId('active-filters-bar')).toBeInTheDocument();
+    });
+
+    it('passes the album filters to the album map', async () => {
+      mockFeatureFlagsManager.value.map = true;
+      sdkMock.getFilteredMapMarkers.mockResolvedValue([]);
+      mockPage.url = new URL('https://gallery.test/albums/album-1?make=Apple');
+
+      renderPage(albumFactory.build({ id: 'album-1', assetCount: 2 }));
+
+      await waitFor(() =>
+        expect(sdkMock.getFilteredMapMarkers).toHaveBeenCalledWith(
+          expect.objectContaining({ albumId: 'album-1', make: 'Apple' }),
+          expect.anything(),
+        ),
+      );
+    });
   });
 });

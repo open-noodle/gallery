@@ -27,9 +27,13 @@ export function shouldShowRecentlyAddedCount(count: number, hasActiveFilters: bo
  * day-groups reflect added date. That mismatch is intentional — e.g. old photos just imported.
  * The filter panel's year/month grid must therefore be built from
  * `buildRecentlyAddedPickerBucketOptions`, NOT from these buckets.
+ *
+ * `userId` is required and always sent for the same reason `/photos` sends it (D3): it is this
+ * view's owner gate, so an `albumId` chip NARROWS my own recently-added assets instead of
+ * redefining the scope to "everything in that album".
  */
-export function buildRecentlyAddedTimelineOptions(filters: FilterState): Record<string, unknown> {
-  const { withSharedSpaces: _, ...base } = buildPhotosTimelineOptions(filters);
+export function buildRecentlyAddedTimelineOptions(filters: FilterState, userId: string): Record<string, unknown> {
+  const { withSharedSpaces: _, ...base } = buildPhotosTimelineOptions(filters, userId);
   return { ...base, orderBy: AssetOrderBy.CreatedAt };
 }
 
@@ -45,8 +49,8 @@ export function buildRecentlyAddedTimelineOptions(filters: FilterState): Record<
  * This is also what query mode already does — smart-search facets bucket on takenAt — so browse
  * and query mode now agree.
  */
-export function buildRecentlyAddedPickerBucketOptions(filters: FilterState): Record<string, unknown> {
-  const { withSharedSpaces: _, ...base } = buildPhotosTimelineOptions(filters);
+export function buildRecentlyAddedPickerBucketOptions(filters: FilterState, userId: string): Record<string, unknown> {
+  const { withSharedSpaces: _, ...base } = buildPhotosTimelineOptions(filters, userId);
   return { ...base, orderBy: AssetOrderBy.TakenAt };
 }
 
@@ -60,9 +64,12 @@ export function buildRecentlyAddedSuggestionRequest(filters: FilterState) {
   return {
     personIds: filters.personIds.length > 0 ? filters.personIds : undefined,
     country: filters.country,
+    state: filters.state,
     city: filters.city,
     make: filters.make,
     model: filters.model,
+    lensModel: filters.lensModel,
+    ownerId: filters.ownerId,
     tagIds: filters.tagIds.length > 0 ? filters.tagIds : undefined,
     rating: filters.rating,
     isFavorite: filters.isFavorite,
