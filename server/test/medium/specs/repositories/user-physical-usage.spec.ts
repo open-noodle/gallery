@@ -55,10 +55,22 @@ describe('UserRepository.syncUsage', () => {
     const { asset: external } = await ctx.newAsset({ ownerId: user.id, libraryId: library.id });
     await ctx.newExif({ assetId: external.id, fileSizeInByte: 9_000_000 });
 
+    // A second owner: the subquery correlates on asset.ownerId = user.id, and with only one user in
+    // the table a broken correlation would still produce 1000.
+    const { user: other } = await ctx.newUser();
+    const { asset: otherOwned } = await ctx.newAsset({ ownerId: other.id });
+    await ctx.newExif({ assetId: otherOwned.id, fileSizeInByte: 77 });
+
     await sut.syncUsage(user.id);
+    await sut.syncUsage(other.id);
 
     const after = await getUsage(user.id);
     expect(after.quotaUsageInBytes).toBe(1000);
+    // The quota sync must not touch the fork-owned physical column.
+    expect(after.physicalUsageInBytes).toBe(0);
+
+    const otherAfter = await getUsage(other.id);
+    expect(otherAfter.quotaUsageInBytes).toBe(77);
   });
 });
 
@@ -82,5 +94,7 @@ describe('UserRepository.updateUsage', () => {
 
     const after = await getUsage(user.id);
     expect(after.physicalUsageInBytes).toBe(0);
+    // Deliberate asymmetry: the quota column keeps upstream's exact unclamped arithmetic.
+    expect(after.quotaUsageInBytes).toBe(-500);
   });
 });
