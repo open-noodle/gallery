@@ -22,6 +22,10 @@ class ServerConfigManager {
     return this.#value;
   }
 
+  get valueOrUndefined() {
+    return this.#value;
+  }
+
   async loadServerConfig() {
     this.#value = await getServerConfig();
   }
