@@ -8,6 +8,7 @@ import {
   AssetVisibility,
   SharedSpaceActivityType,
   SharedSpaceRole,
+  SourceType,
   VectorIndex,
 } from 'src/enum';
 import { probes } from 'src/repositories/database.repository';
@@ -23,8 +24,10 @@ import { SharedSpacePersonFaceTable } from 'src/schema/tables/shared-space-perso
 import { SharedSpacePersonTable } from 'src/schema/tables/shared-space-person.table';
 import { SharedSpaceTable } from 'src/schema/tables/shared-space.table';
 import { anyUuid, retryOnDeadlock, searchAssetBuilderLegacy } from 'src/utils/database';
+import { retargetVerdictSpacePersonId } from 'src/utils/face-verdict-merge';
 import {
   spaceAlbumAssetExists,
+  spaceAssetPathBranches,
   spaceContributedAssetExists,
   spaceVisibilityGate,
   spaceVisibleAssetVisibilities,
@@ -2611,7 +2614,11 @@ export class SharedSpaceRepository {
     await this.db.deleteFrom('shared_space_person').where('id', '=', id).execute();
   }
 
-  async addPersonFaces(values: Insertable<SharedSpacePersonFaceTable>[], options?: { skipRecount?: boolean }) {
+  async addPersonFaces(
+    values: Insertable<SharedSpacePersonFaceTable>[],
+    options?: { skipRecount?: boolean },
+    db: Kysely<DB> | Transaction<DB> = this.db,
+  ) {
     if (values.length === 0) {
       return [];
     }
@@ -2622,28 +2629,35 @@ export class SharedSpaceRepository {
     // parents in id order first so this agrees with every other writer, and re-drive if it still loses.
     const parentIds = [...new Set(values.map(({ personId }) => personId))].toSorted();
 
-    const result = await retryOnDeadlock(() =>
-      this.db.transaction().execute(async (trx) => {
-        await trx
-          .selectFrom('shared_space_person')
-          .select('id')
-          .where('id', 'in', parentIds)
-          .orderBy('id')
-          .forUpdate()
-          .execute();
+    const insert = async (runner: Kysely<DB> | Transaction<DB>) => {
+      await runner
+        .selectFrom('shared_space_person')
+        .select('id')
+        .where('id', 'in', parentIds)
+        .orderBy('id')
+        .forUpdate()
+        .execute();
 
-        return trx
-          .insertInto('shared_space_person_face')
-          .values(values)
-          .onConflict((oc) => oc.doNothing())
-          .returningAll()
-          .execute();
-      }),
-    );
+      return runner
+        .insertInto('shared_space_person_face')
+        .values(values)
+        .onConflict((oc) => oc.doNothing())
+        .returningAll()
+        .execute();
+    };
+
+    // Slice 5 (F10): a caller inside its own transaction (the space-confirm transaction) passes that handle
+    // here and must never trigger a second `this.db` acquisition mid-transaction (issue #595) — run directly
+    // on it instead of opening a nested retry-wrapped transaction. The deadlock retry only makes sense for
+    // the standalone (non-transactional) caller: a caller-supplied transaction that deadlocks aborts as a
+    // whole and must be re-driven by ITS caller, not retried in place here.
+    const result = db.isTransaction
+      ? await insert(db)
+      : await retryOnDeadlock(() => this.db.transaction().execute(insert));
 
     if (!options?.skipRecount && result.length > 0) {
       const personIds = [...new Set(result.map((r) => r.personId))];
-      await this.recountPersons(personIds);
+      await this.recountPersons(personIds, db);
     }
 
     return result;
@@ -2685,6 +2699,15 @@ export class SharedSpaceRepository {
           }),
         ]),
       )
+      .execute();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID] })
+  getFaceIdsForPerson(personId: string): Promise<Array<{ assetFaceId: string }>> {
+    return this.db
+      .selectFrom('shared_space_person_face')
+      .select('assetFaceId')
+      .where('personId', '=', personId)
       .execute();
   }
 
@@ -2740,6 +2763,10 @@ export class SharedSpaceRepository {
     }
 
     await db.deleteFrom('shared_space_person_alias').where('personId', '=', input.sourcePersonId).execute();
+
+    // D1: move this space-person's verdicts to the survivor before deleting the source row.
+    await retargetVerdictSpacePersonId(db, input.sourcePersonId, input.targetPersonId);
+
     const [deleteResult] = await db.deleteFrom('shared_space_person').where('id', '=', input.sourcePersonId).execute();
     if (Number(deleteResult.numDeletedRows ?? 0) === 0) {
       throw new Error('Space person profile not found');
@@ -3506,6 +3533,85 @@ export class SharedSpaceRepository {
       .where('asset_face.deletedAt', 'is', null)
       .where('asset_face.isVisible', '=', true)
       .execute();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID, 20] })
+  getSpacePersonAssignedFaceEmbeddings(spacePersonId: string, limit: number) {
+    return this.db
+      .selectFrom('shared_space_person_face')
+      .innerJoin('face_search', 'face_search.faceId', 'shared_space_person_face.assetFaceId')
+      .innerJoin('asset_face', 'asset_face.id', 'shared_space_person_face.assetFaceId')
+      .select('face_search.embedding')
+      .where('shared_space_person_face.personId', '=', spacePersonId)
+      .where('asset_face.deletedAt', 'is', null)
+      .where('asset_face.isVisible', 'is', true)
+      .orderBy('shared_space_person_face.assetFaceId', 'asc')
+      .limit(limit)
+      .execute();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID, [DummyValue.UUID]] })
+  getAssignedFaceIdsForSpace(spaceId: string, assetFaceIds: string[]) {
+    return this.db
+      .selectFrom('shared_space_person_face')
+      .innerJoin('shared_space_person', 'shared_space_person.id', 'shared_space_person_face.personId')
+      .select('shared_space_person_face.assetFaceId')
+      .where('shared_space_person.spaceId', '=', spaceId)
+      .where('shared_space_person_face.assetFaceId', '=', anyUuid(assetFaceIds))
+      .execute();
+  }
+
+  getScannableSpacePeopleWithUnassignedFaces() {
+    return this.db
+      .selectFrom('shared_space_person')
+      .innerJoin('shared_space', 'shared_space.id', 'shared_space_person.spaceId')
+      .select(['shared_space_person.id', 'shared_space_person.spaceId'])
+      .where(sql`BTRIM("shared_space_person"."name")`, '<>', '')
+      .where('shared_space_person.isHidden', 'is', false)
+      .where('shared_space_person.type', '=', 'person')
+      .where('shared_space.faceRecognitionEnabled', 'is', true)
+      .where((eb) =>
+        eb.exists(
+          eb
+            .selectFrom('asset_face')
+            .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+            .innerJoin('face_search', 'face_search.faceId', 'asset_face.id')
+            .select('asset_face.id')
+            .where('asset.deletedAt', 'is', null)
+            .where('asset_face.personId', 'is', null)
+            .where('asset_face.deletedAt', 'is', null)
+            .where('asset_face.isVisible', 'is', true)
+            .where('asset_face.sourceType', '=', SourceType.MachineLearning)
+            .where((eb) => spaceVisibilityGate(eb))
+            .where((eb) =>
+              eb.not(
+                eb.exists(
+                  eb
+                    .selectFrom('shared_space_person_face')
+                    .innerJoin('shared_space_person as assigned_person', (join) =>
+                      join
+                        .onRef('assigned_person.id', '=', 'shared_space_person_face.personId')
+                        .onRef('assigned_person.spaceId', '=', 'shared_space_person.spaceId'),
+                    )
+                    .select('shared_space_person_face.assetFaceId')
+                    .whereRef('shared_space_person_face.assetFaceId', '=', 'asset_face.id'),
+                ),
+              ),
+            )
+            // All THREE space access paths (direct / linked library / linked album +
+            // cross-owner contributions) via the canonical helper.
+            .where((eb) =>
+              eb.or(
+                spaceAssetPathBranches(eb, {
+                  correlateAssetId: 'asset.id',
+                  correlateLibraryId: 'asset.libraryId',
+                  scope: { spaceIdRef: 'shared_space_person.spaceId' },
+                }),
+              ),
+            ),
+        ),
+      )
+      .stream();
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })
