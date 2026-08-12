@@ -56,6 +56,24 @@ describe('SpaceTabs', () => {
     expect(map).not.toHaveAttribute('aria-current');
   });
 
+  // #767a — the Map tab used to be a hard-coded `/map?spaceId=<id>`, so every active filter and
+  // the search term were dropped on the way to the map. The Photos tab URL-backs both.
+  it('carries the space filters and the search query to the map', () => {
+    mockPage.url = new URL('https://gallery.test/spaces/s1/photos?q=ski&make=Apple&people=space-person%3Ap1');
+    render(SpaceTabs, base);
+    const href = screen.getByTestId('space-tab-map').getAttribute('href') ?? '';
+    expect(href).toContain('spaceId=s1');
+    expect(href).toContain('q=ski');
+    expect(href).toContain('make=Apple');
+    expect(href).toContain('people=space-person%3Ap1');
+  });
+
+  it('does not carry another tab’s query params to the map', () => {
+    mockPage.url = new URL('https://gallery.test/spaces/s1/albums?make=Apple');
+    render(SpaceTabs, base);
+    expect(screen.getByTestId('space-tab-map')).toHaveAttribute('href', '/map?spaceId=s1');
+  });
+
   it('renders an Activity tab linking to the activity route', () => {
     render(SpaceTabs, base);
     const activity = screen.getByTestId('space-tab-activity');
