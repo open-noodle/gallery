@@ -91,6 +91,13 @@ const makeFinishedScan = () => ({
   createdAt: new Date().toISOString(),
 });
 
+const makeFailedScan = () => ({
+  ...makeFinishedScan(),
+  status: 'failed' as const,
+  totals: null,
+  error: 'boom',
+});
+
 const makePageData = () => ({ users: [], meta: { title: 'Guided cleanup' } });
 
 const renderScanPage = async () => {
@@ -102,7 +109,7 @@ const renderScanPage = async () => {
 
 describe('face-cleanup scan page — read-only demo', () => {
   beforeEach(() => {
-    mockAuthManager.isReadOnlyDemo = false; // web vitest does not clear mocks between tests
+    mockAuthManager.isReadOnlyDemo = false; // clearMocks resets spies only — this plain object needs its own reset
     vi.mocked(getLatestScan).mockResolvedValue(makeFinishedScan() as unknown as object);
   });
 
@@ -125,11 +132,48 @@ describe('face-cleanup scan page — read-only demo', () => {
     );
 
     expect(screen.queryByText('admin.face_cleanup_rescan')).not.toBeInTheDocument();
-    expect(screen.queryByText('admin.face_cleanup_mode_run_first_scan')).not.toBeInTheDocument();
     expect(screen.queryByText('admin.face_cleanup_advanced')).not.toBeInTheDocument();
   });
 
-  it('renders the read-only notice in demo mode only', async () => {
+  // The empty ("never scanned") state's own primary CTA. Latent on the live demo, which has a completed
+  // seeded scan — but it goes live the moment one does not, so it is gated and covered like the rest. The
+  // fixture returns null from getLatestScan to reach that branch at all; asserting its absence against the
+  // completed-scan fixture used above could never fail.
+  it('shows the first-scan CTA to a real admin when nothing has been scanned', async () => {
+    vi.mocked(getLatestScan).mockResolvedValue(null as unknown as object);
+    render(Page, { props: { data: makePageData() } });
+
+    await waitFor(() => expect(screen.getByTestId('first-scan-cta')).toBeInTheDocument());
+  });
+
+  it('hides the first-scan CTA in read-only demo mode', async () => {
+    vi.mocked(getLatestScan).mockResolvedValue(null as unknown as object);
+    mockAuthManager.isReadOnlyDemo = true;
+    render(Page, { props: { data: makePageData() } });
+
+    // Wait on the empty state that HOSTS the CTA, so a page that never reached that branch fails loudly
+    // rather than passing on an absence it was always going to have.
+    await waitFor(() => expect(screen.getByText('admin.face_cleanup_empty_no_scan')).toBeInTheDocument());
+    expect(screen.queryByTestId('first-scan-cta')).not.toBeInTheDocument();
+  });
+
+  it('shows the retry-scan button to a real admin when the last scan failed', async () => {
+    vi.mocked(getLatestScan).mockResolvedValue(makeFailedScan() as unknown as object);
+    render(Page, { props: { data: makePageData() } });
+
+    await waitFor(() => expect(screen.getByTestId('retry-scan-btn')).toBeInTheDocument());
+  });
+
+  it('hides the retry-scan button in read-only demo mode', async () => {
+    vi.mocked(getLatestScan).mockResolvedValue(makeFailedScan() as unknown as object);
+    mockAuthManager.isReadOnlyDemo = true;
+    render(Page, { props: { data: makePageData() } });
+
+    await waitFor(() => expect(screen.getByText('admin.face_cleanup_scan_failed')).toBeInTheDocument());
+    expect(screen.queryByTestId('retry-scan-btn')).not.toBeInTheDocument();
+  });
+
+  it('omits the read-only notice for a real admin', async () => {
     await renderScanPage();
     expect(screen.queryByTestId('read-only-demo-notice')).not.toBeInTheDocument();
   });
