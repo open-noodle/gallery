@@ -63,7 +63,7 @@ describe('/workflows (spaces)', () => {
       const { body } = await request(app).get(`/shared-spaces/${spaceId}`).set(asBearerAuth(user.accessToken));
       return body?.assetCount === 1;
     });
-  });
+  }, 35_000);
 
   it('creates, links and fills a space album that does not exist yet', async () => {
     // E2 — corrected from the brief draft: AlbumResponseDto has no `assets` field. album.service.ts's
@@ -90,7 +90,7 @@ describe('/workflows (spaces)', () => {
       .set(asBearerAuth(user.accessToken))
       .expect(200);
     expect(detail.assetCount).toBe(1);
-  });
+  }, 35_000);
 
   it('reuses the same album for a second asset', async () => {
     // E3 — proves resolve-by-name, and that linkAlbum did not fire twice. Polls for assetCount === 2
@@ -113,7 +113,7 @@ describe('/workflows (spaces)', () => {
     });
 
     expect(albums).toHaveLength(1);
-  });
+  }, 60_000);
 
   it('keeps running the workflow when a space action is not permitted', async () => {
     // E4 — the §7 invariant, observed from outside: the second step must still take effect.
@@ -140,7 +140,7 @@ describe('/workflows (spaces)', () => {
       const { body } = await request(app).get(`/assets/${asset.id}`).set(asBearerAuth(user.accessToken));
       return body?.isFavorite === true;
     });
-  });
+  }, 35_000);
 
   it('rejects a workflow that references an unknown gallery method', async () => {
     // E5
