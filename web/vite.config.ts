@@ -142,5 +142,6 @@ export default defineConfig({
         inline: ['@futo-org/backups-orchestrator-ui', '@material-symbols/svg-400'],
       },
     },
+    clearMocks: true,
   },
 } as UserConfig);

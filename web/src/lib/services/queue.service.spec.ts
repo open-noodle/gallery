@@ -9,6 +9,14 @@ describe('queue service', () => {
     expect(getQueueJobTypeLabel(JobName.FacialRecognition)).toBe('Facial recognition');
   });
 
+  it('labels face suggestion maintenance jobs by scope', () => {
+    expect(getQueueJobTypeLabel(JobName.FaceSuggestionMaintenance)).toBe('Face suggestion maintenance');
+    expect(getQueueJobTypeLabel(JobName.PersonSuggestionScanQueueAll)).toBe('Personal face suggestion scan');
+    expect(getQueueJobTypeLabel(JobName.PersonSuggestionScan)).toBe('Personal face suggestion scan');
+    expect(getQueueJobTypeLabel(JobName.SpacePersonSuggestionScanQueueAll)).toBe('Shared-space face suggestion scan');
+    expect(getQueueJobTypeLabel(JobName.SpacePersonSuggestionScan)).toBe('Shared-space face suggestion scan');
+  });
+
   it('formats sampled job type counts as capped values above the sampling limit', () => {
     const formatNumber = (count: number) => count.toLocaleString('de-DE');
 

@@ -11,6 +11,8 @@ import { FaceIdentityFaceSource, FaceIdentityFaceTable } from 'src/schema/tables
 import { FaceIdentityTable } from 'src/schema/tables/face-identity.table';
 import { anyUuid, retryOnDeadlock } from 'src/utils/database';
 import { asDateString, asDateTimeString } from 'src/utils/date';
+import { targetTokens } from 'src/utils/face-repair';
+import { rekeyVerdictIdentity } from 'src/utils/face-verdict-merge';
 import { accessibleTimelineAssetPredicate, spaceVisibleAssetVisibilities } from 'src/utils/shared-space-album-scope';
 
 export type FaceIdentity = Selectable<FaceIdentityTable>;
@@ -27,6 +29,10 @@ export type LinkPersonFacesInput = {
   personId: string;
   identityId: string;
   source: FaceIdentityFaceSource;
+  // Slice 4 / R1: when the incoming source is the human people-merge's literal 'manual', a preserve-manual
+  // CASE would degenerate to `ELSE 'manual'` and fabricate placements on faces a human never touched. Set
+  // this to omit `source` from the update entirely so each face's true prior source is left untouched.
+  preserveSource?: boolean;
 };
 
 export type BackfillResult = {
@@ -245,6 +251,18 @@ type HydratedAccessiblePersonRow = {
   species: string | null;
   numberOfAssets: string | number | null;
 };
+
+// Slice 4 (D4): keep a human placement (source='manual') intact while relabeling everything else to the
+// incoming source. Mirrors the CASE realignFacesToPersonIdentity has used since Slice 1.
+//
+// Only use this where `incoming` is a genuinely non-'manual' value at the call site (an automatic merge's
+// 'shared-space-evidence', a recognition-race 'owner-person', a backfill sweep's 'backfill'). Where the
+// incoming source is ITSELF the literal 'manual' (the human people-merge path), this degenerates to
+// `ELSE 'manual'` — identical to the bug it exists to prevent. That path must omit `source` from the write
+// entirely instead (see linkPersonFaces's `preserveSource` and mergeIdentitiesAfterProfileResolution).
+function preserveManualSource(incoming: FaceIdentityFaceSource) {
+  return sql<FaceIdentityFaceSource>`CASE WHEN "face_identity_face"."source" = 'manual' THEN 'manual' ELSE ${incoming} END`;
+}
 
 @Injectable()
 export class FaceIdentityRepository {
@@ -1341,9 +1359,18 @@ export class FaceIdentityRepository {
 
       const faceIds = await this.getScopedProfileFaceIds(profileRef, trx);
       if (faceIds.length > 0) {
+        // Re-key the faces onto the fresh identity and touch NOTHING else. `source` is deliberately absent:
+        // separating a profile is a statement about grouping ("this profile is not the same human as the ones
+        // it was grouped with"), not a per-face attestation, and `source='manual'` means precisely the latter
+        // — both engines read it, owner-agnostically, as "a human confirmed this face" and exclude it from the
+        // cleanup console and from suggestions forever (see isSettledForOwner in utils/face-repair.ts and the
+        // manual-link anti-join in face-person-verdict.repository.ts). Stamping it here buried every ML
+        // mistake in exactly the contaminated cluster a user separates BECAUSE it is contaminated, with no UI
+        // to undo it — the same over-claim the R1 people-merge decision reversed. The identityId rewrite is
+        // what makes the separation stick; the source label plays no part in it.
         await trx
           .updateTable('face_identity_face')
-          .set({ identityId: identity.id, source: 'manual' })
+          .set({ identityId: identity.id })
           .where('assetFaceId', 'in', faceIds)
           .execute();
 
@@ -2308,11 +2335,99 @@ export class FaceIdentityRepository {
     return this.replaceFaceIdentity(input);
   }
 
+  // The positive verdict read, scoped to a bounded set of faces. `source='manual'` is the durable record
+  // that a human placed a face on a person — written by every human reassignment, keyed by identity so it
+  // survives merges, and replaced (never accumulated) by the next human reassignment. Both face engines
+  // exclude these faces from their queues.
+  // H6: face-verdict.service.ts calls this for every flagged face in a scan. minFaces is admin-settable, so
+  // a full-library scan can pass every flagged face in the instance — chunked at 1000, matching every
+  // sibling bulk face path in this file (replaceFaceIdentities, demoteManualFaceLinks): one id is one bind
+  // parameter, so an unchunked IN-list breaks at Postgres's 65 535-parameter ceiling.
+  @GenerateSql({ params: [[DummyValue.UUID]] })
+  async getManualLinkedFaceIds(assetFaceIds: string[]): Promise<Set<string>> {
+    const linked = new Set<string>();
+    if (assetFaceIds.length === 0) {
+      return linked;
+    }
+    for (let index = 0; index < assetFaceIds.length; index += 1000) {
+      const rows = await this.db
+        .selectFrom('face_identity_face')
+        .select('assetFaceId')
+        .where('assetFaceId', 'in', assetFaceIds.slice(index, index + 1000))
+        .where('source', '=', 'manual')
+        .execute();
+      for (const row of rows) {
+        linked.add(row.assetFaceId);
+      }
+    }
+    return linked;
+  }
+
+  // personId -> the verdict tokens that person answers to. A negative verdict recorded against the person's
+  // IDENTITY has to match a suspicion aimed at the person itself, which is what the identity token provides;
+  // the person token remains so verdicts written before the person had an identity keep matching.
+  //
+  // H6: chunked at 1000 for the same reason as getManualLinkedFaceIds above — face-verdict.service.ts calls
+  // this for every suspected owner in a scan, and minFaces is admin-settable.
+  @GenerateSql({ params: [[DummyValue.UUID]] })
+  async getPersonVerdictTokens(personIds: string[]): Promise<Map<string, string[]>> {
+    const map = new Map<string, string[]>();
+    if (personIds.length === 0) {
+      return map;
+    }
+    for (let index = 0; index < personIds.length; index += 1000) {
+      const rows = await this.db
+        .selectFrom('person')
+        .select(['id', 'identityId'])
+        .where('id', 'in', personIds.slice(index, index + 1000))
+        .execute();
+      for (const row of rows) {
+        map.set(row.id, targetTokens({ personId: row.id, identityId: row.identityId }));
+      }
+    }
+    return map;
+  }
+
+  // Un-confirm: downgrade a human placement back to a machine one so future scans may flag the face again.
+  // The identity link itself is untouched — only the claim that a human put the face there.
+  //
+  // F20: chunked at 1000, matching the idiom every other bulk face path in this file uses
+  // (replaceFaceIdentities). The unconfirm DTO's assetFaceIds is capped at MAX_RESOLVE_FACES (25 000), so
+  // an unchunked IN-list here was reachable in principle even under that cap, and any direct (non-HTTP)
+  // caller is not bounded by the DTO at all — one id is one bind parameter.
+  @GenerateSql({ params: [[DummyValue.UUID]] })
+  async demoteManualFaceLinks(assetFaceIds: string[]): Promise<number> {
+    if (assetFaceIds.length === 0) {
+      return 0;
+    }
+    let demoted = 0;
+    for (let index = 0; index < assetFaceIds.length; index += 1000) {
+      const chunk = assetFaceIds.slice(index, index + 1000);
+      const rows = await this.db
+        .updateTable('face_identity_face')
+        .set({ source: 'ml' })
+        .where('assetFaceId', 'in', chunk)
+        .where('source', '=', 'manual')
+        .returning('assetFaceId')
+        .execute();
+      demoted += rows.length;
+    }
+    return demoted;
+  }
+
+  // F22: this method previously had no SQL doc coverage of its own — its @GenerateSql decorator had been
+  // left stranded on getManualLinkedFaceIds (a stacked-decorator leftover from when that method's
+  // signature line was inserted between linkFace and this one), overwriting that method's own array-shaped
+  // decorator in the committed doc (GenerateSql is SetMetadata: overwrite, not merge; decorators apply
+  // bottom-up, so the closer one wins first and the farther one overwrites it last).
   @GenerateSql({
     params: [{ assetFaceId: DummyValue.UUID, identityId: DummyValue.UUID, source: 'manual' }],
   })
-  async replaceFaceIdentity(input: LinkFaceInput): Promise<FaceIdentityFace> {
-    return this.db
+  async replaceFaceIdentity(
+    input: LinkFaceInput,
+    db: Kysely<DB> | Transaction<DB> = this.db,
+  ): Promise<FaceIdentityFace> {
+    return db
       .insertInto('face_identity_face')
       .values({
         assetFaceId: input.assetFaceId,
@@ -2323,12 +2438,79 @@ export class FaceIdentityRepository {
       .onConflict((oc) =>
         oc.column('assetFaceId').doUpdateSet({
           identityId: input.identityId,
-          source: input.source,
+          // D4b: a recognition-race replace (source='owner-person') must not downgrade an existing manual
+          // placement. `linkFace` delegates here too, so this also protects that caller.
+          source: preserveManualSource(input.source),
           confidence: input.confidence ?? null,
         }),
       )
       .returningAll()
       .executeTakeFirstOrThrow();
+  }
+
+  /**
+   * Returns the asset-face ids actually written. With `requirePersonId` set, only faces still assigned to
+   * that person are written (H5): the caller's eligibility read happens outside the transaction, so a
+   * concurrent reassign would otherwise leave the face on one person while this re-points its identity to
+   * another — the torn state `reattributeFaces` and `detachFaces` both guard against at write time, and
+   * which a later FaceIdentityBackfill resolves in the wrong direction.
+   */
+  async replaceFaceIdentities(
+    input: {
+      assetFaceIds: string[];
+      identityId: string;
+      source: FaceIdentityFaceSource;
+      confidence?: number | null;
+      requirePersonId?: string;
+    },
+    db: Kysely<DB> | Transaction<DB> = this.db,
+  ): Promise<string[]> {
+    if (input.assetFaceIds.length === 0) {
+      return [];
+    }
+    // F13: de-duplicate before chunking, mirroring markRejectedMany's guard. A client repeating an id
+    // (e.g. a duplicate in the cleanup console's `lock` bucket) would otherwise land twice in the same
+    // chunk's INSERT, and Postgres refuses an ON CONFLICT DO UPDATE that touches the same row twice in
+    // one statement ("cannot affect row a second time", 21000).
+    const assetFaceIds = [...new Set(input.assetFaceIds)];
+    const written: string[] = [];
+    for (let index = 0; index < assetFaceIds.length; index += 1000) {
+      let chunk = assetFaceIds.slice(index, index + 1000);
+      if (input.requirePersonId) {
+        // Re-check inside the caller's transaction, exactly as reattributeFaces/detachFaces do. Scoped per
+        // chunk so the guard runs against the same snapshot as the write it protects.
+        const stillOnPerson = await db
+          .selectFrom('asset_face')
+          .select('id')
+          .where('id', 'in', chunk)
+          .where('personId', '=', input.requirePersonId)
+          .execute();
+        chunk = stillOnPerson.map((row) => row.id);
+        if (chunk.length === 0) {
+          continue;
+        }
+      }
+      await db
+        .insertInto('face_identity_face')
+        .values(
+          chunk.map((assetFaceId) => ({
+            assetFaceId,
+            identityId: input.identityId,
+            source: input.source,
+            confidence: input.confidence ?? null,
+          })),
+        )
+        .onConflict((oc) =>
+          oc.column('assetFaceId').doUpdateSet({
+            identityId: input.identityId,
+            source: input.source,
+            confidence: input.confidence ?? null,
+          }),
+        )
+        .execute();
+      written.push(...chunk);
+    }
+    return written;
   }
 
   @GenerateSql({ params: [{ personId: DummyValue.UUID, identityId: DummyValue.UUID, source: 'manual' }] })
@@ -2359,11 +2541,15 @@ export class FaceIdentityRepository {
           ),
       )
       .onConflict((oc) =>
-        oc.column('assetFaceId').doUpdateSet({
-          identityId: input.identityId,
-          source: input.source,
-          confidence: null,
-        }),
+        oc.column('assetFaceId').doUpdateSet(
+          input.preserveSource
+            ? // D4d/R1: the human people-merge caller — omit `source` entirely so Postgres leaves each
+              // face's true prior source untouched (a CASE here would degenerate to `ELSE 'manual'`, see
+              // preserveManualSource's doc comment).
+              { identityId: input.identityId, confidence: null }
+            : // D4c: the backfill caller — preserve an existing manual placement, relabel everything else.
+              { identityId: input.identityId, source: preserveManualSource(input.source), confidence: null },
+        ),
       )
       .execute();
   }
@@ -2466,7 +2652,11 @@ export class FaceIdentityRepository {
         await this.linkFace({ assetFaceId: face.id, identityId: identity.id, source: 'backfill' });
       }
 
-      affectedSpaceAssets.push(...(await this.repairPersonalIdentityAssignments(person)));
+      const currentPerson = { ...person, identityId: identity.id };
+      affectedSpaceAssets.push(
+        ...(await this.repairPersonalIdentityAssignments(currentPerson)),
+        ...(await this.repairRemainingPersonalIdentityFaceLinks(currentPerson)),
+      );
     }
 
     return {
@@ -2527,6 +2717,23 @@ export class FaceIdentityRepository {
     }
 
     return this.addPendingSharedSpaceFaceMatchBackfillTargetsForAssetFaces([...affectedAssetFaceIds]);
+  }
+
+  private async repairRemainingPersonalIdentityFaceLinks(
+    person: PersonalBackfillRow,
+  ): Promise<SharedSpaceFaceMatchBackfillTarget[]> {
+    if (!person.identityId) {
+      return [];
+    }
+
+    const assetFaceIds = await this.getPersonalBackfillAssetFaceIdsForMismatch(person.id, person.identityId);
+    if (assetFaceIds.length === 0) {
+      return [];
+    }
+
+    const affectedSpaceAssets = await this.addPendingSharedSpaceFaceMatchBackfillTargetsForAssetFaces(assetFaceIds);
+    await this.linkPersonFaces({ personId: person.id, identityId: person.identityId, source: 'backfill' });
+    return affectedSpaceAssets;
   }
 
   private getPersonalBackfillIdentityGroups(person: PersonalBackfillRow): Promise<PersonalBackfillIdentityGroup[]> {
@@ -2629,9 +2836,34 @@ export class FaceIdentityRepository {
     const identity = await this.ensurePersonIdentity(personId);
     await this.db
       .updateTable('face_identity_face')
-      .set({ identityId: identity.id, source: 'backfill' })
+      .set({
+        identityId: identity.id,
+        // Realigning WHICH human a face is linked to is this method's job; erasing the fact that a HUMAN
+        // placed it is not. `source='manual'` is the durable record that a person confirmed a face — it is
+        // what both the Face Cleanup scan and the face-suggestion scan use to exclude a face from ever being
+        // re-proposed. A blanket `source: 'backfill'` here silently downgraded that record whenever a link
+        // drifted from its person's identity (most commonly right after a people merge), re-exposing
+        // human-confirmed faces to both queues. Preserve 'manual'; realign everything else as before.
+        source: preserveManualSource('backfill'),
+      })
       .where('assetFaceId', 'in', assetFaceIds)
       .execute();
+  }
+
+  private async getPersonalBackfillAssetFaceIdsForMismatch(personId: string, identityId: string): Promise<string[]> {
+    const rows = await this.db
+      .selectFrom('asset_face')
+      .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+      .innerJoin('face_identity_face', 'face_identity_face.assetFaceId', 'asset_face.id')
+      .select('asset_face.id')
+      .where('asset_face.personId', '=', personId)
+      .where('face_identity_face.identityId', '!=', identityId)
+      .where('asset_face.deletedAt', 'is', null)
+      .where('asset_face.isVisible', '=', true)
+      .where('asset.deletedAt', 'is', null)
+      .execute();
+
+    return rows.map((row) => row.id);
   }
 
   private getPersonByIdentity(ownerId: string, identityId: string, excludePersonId?: string) {
@@ -3018,9 +3250,11 @@ export class FaceIdentityRepository {
         }
       }
 
+      // D4a: an automatic merge's incoming source (e.g. 'shared-space-evidence') must not downgrade a
+      // manual placement that rode along with the merged-away identity.
       await trx
         .updateTable('face_identity_face')
-        .set({ identityId: input.targetIdentityId, source: input.source })
+        .set({ identityId: input.targetIdentityId, source: preserveManualSource(input.source) })
         .where('identityId', 'in', mergeableSourceIdentityIds)
         .execute();
 
@@ -3055,6 +3289,10 @@ export class FaceIdentityRepository {
           ),
         )
         .execute();
+
+      // D1: move any verdict rows off the merged-away identities onto the survivor before those
+      // identities are deleted (identityId FK is SET NULL, but we re-key so identity-first reads keep working).
+      await rekeyVerdictIdentity(trx, mergeableSourceIdentityIds, input.targetIdentityId);
 
       const deletable = await trx
         .selectFrom('face_identity')
@@ -3117,9 +3355,15 @@ export class FaceIdentityRepository {
       throw new Error('Cannot merge face identities with unresolved profile conflicts');
     }
 
+    // D4d/R1 (signed off): re-point identity but PRESERVE each face's prior source. `source` is
+    // intentionally OMITTED from this write, not written via a preserve-manual CASE — the human
+    // people-merge caller's incoming source is always the literal 'manual', so `CASE ... ELSE
+    // input.source` would degenerate to `ELSE 'manual'`, fabricating placements on faces a human never
+    // touched (identical to the bug this fixes). Omitting the key leaves each row's existing source column
+    // untouched. `input.source` is still used above for the cross-type merge gate.
     await db
       .updateTable('face_identity_face')
-      .set({ identityId: input.targetIdentityId, source: input.source })
+      .set({ identityId: input.targetIdentityId })
       .where('identityId', 'in', sourceIdentityIds)
       .execute();
 
@@ -3151,6 +3395,9 @@ export class FaceIdentityRepository {
       .where('identityId', '=', input.targetIdentityId)
       .where('type', '!=', targetIdentity.type)
       .execute();
+
+    // D1: same re-key as mergeIdentities, on the production person-merge path.
+    await rekeyVerdictIdentity(db, sourceIdentityIds, input.targetIdentityId);
 
     const deletable = await db
       .selectFrom('face_identity')
