@@ -1,3 +1,4 @@
+import { StorageUsageService } from 'src/gallery/storage-usage.service';
 import { ActivityService } from 'src/services/activity.service';
 import { AlbumService } from 'src/services/album.service';
 import { ApiKeyService } from 'src/services/api-key.service';
@@ -109,6 +110,8 @@ export const services = [
   StorageMigrationService,
   StorageService,
   StorageTemplateService,
+  // Gallery-fork: resyncs the derivative-inclusive usage column when the toggle is enabled.
+  StorageUsageService,
   SyncService,
   SystemConfigService,
   SystemMetadataService,

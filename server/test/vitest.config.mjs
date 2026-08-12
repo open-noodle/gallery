@@ -14,7 +14,7 @@ export default defineConfig({
     include: ['src/**/*.spec.ts'],
     coverage: {
       provider: 'v8',
-      include: ['src/cores/**', 'src/services/**', 'src/utils/**', 'src/sql-tools/**'],
+      include: ['src/cores/**', 'src/gallery/**', 'src/services/**', 'src/utils/**', 'src/sql-tools/**'],
       exclude: [
         'src/services/*.spec.ts',
         'src/services/api.service.ts',
