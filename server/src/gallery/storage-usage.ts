@@ -8,6 +8,8 @@ const UUID_PATTERN = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/
  * caller can recover the id and check it against the owner's external asset ids.
  *
  * Returns null for files that are not keyed on an asset id (HLS segments, Android motion sidecars).
+ * Note: person thumbnails also match the <uuid>. pattern and ARE returned; the caller filters by
+ * membership in the owner's external-asset-id set, so person ids are naturally excluded.
  */
 export const getDerivativeAssetId = (filename: string): string | null => {
   const candidate = filename.slice(0, UUID_LENGTH);
@@ -16,7 +18,7 @@ export const getDerivativeAssetId = (filename: string): string | null => {
   }
 
   const separator = filename[UUID_LENGTH];
-  if (separator !== undefined && separator !== '_' && separator !== '.' && separator !== '-') {
+  if (separator !== undefined && separator !== '_' && separator !== '.') {
     return null;
   }
 

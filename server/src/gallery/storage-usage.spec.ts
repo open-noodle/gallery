@@ -32,4 +32,9 @@ describe('getDerivativeAssetId', () => {
   it('should return null when the uuid is not followed by a known separator', () => {
     expect(getDerivativeAssetId(`${id}extra.webp`)).toBeNull();
   });
+
+  it('should return null for an Android motion sidecar', () => {
+    // StorageCore.getAndroidMotionPath creates ${uuid}-MP.mp4 where uuid is fresh, not the asset id
+    expect(getDerivativeAssetId(`${id}-MP.mp4`)).toBeNull();
+  });
 });
