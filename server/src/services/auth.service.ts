@@ -72,6 +72,21 @@ const DEMO_ADMIN_PREVIEW_READ_ROUTES = [
   /^\/api\/admin\/integrity\/summary$/,
   /^\/api\/admin\/integrity\/report$/,
   /^\/api\/admin\/database-backups$/,
+  // Face Repair console (demo read-only preview). Anchored like every entry above. The write half of
+  // `admin/face-repair` (scan, resolve, decline, unconfirm, cluster-faces, resolutions/remove, and the
+  // POST twin of owner/:id/people) is unreachable here regardless: the preview branch below requires
+  // `metadata.method === 'GET'` before these regexes are tested, and DemoInterceptor refuses it again.
+  // `faces/:assetFaceId/thumbnail` is a file-serving route and is opened deliberately — unlike the
+  // maintenance sub-routes it returns a face crop of a photo already public on the demo instance, and
+  // without it the console renders as empty grey tiles.
+  /^\/api\/admin\/face-repair\/scan\/latest$/,
+  /^\/api\/admin\/face-repair\/scan\/defaults$/,
+  /^\/api\/admin\/face-repair\/scan\/person\/[^/]+$/,
+  /^\/api\/admin\/face-repair\/person\/[^/]+$/,
+  /^\/api\/admin\/face-repair\/decline$/,
+  /^\/api\/admin\/face-repair\/resolutions$/,
+  /^\/api\/admin\/face-repair\/owner\/[^/]+\/people$/,
+  /^\/api\/admin\/face-repair\/faces\/[^/]+\/thumbnail$/,
 ];
 
 const normalizeDemoAdminPreviewUri = (uri: string) => (uri.startsWith('/api/') ? uri : `/api${uri}`);
