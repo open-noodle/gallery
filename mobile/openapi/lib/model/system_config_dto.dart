@@ -33,6 +33,7 @@ class SystemConfigDto {
     required this.reverseGeocoding,
     required this.server,
     required this.storageTemplate,
+    required this.storageUsage,
     required this.templates,
     required this.theme,
     required this.trash,
@@ -79,6 +80,8 @@ class SystemConfigDto {
 
   SystemConfigStorageTemplateDto storageTemplate;
 
+  SystemConfigStorageUsageDto storageUsage;
+
   SystemConfigTemplatesDto templates;
 
   SystemConfigThemeDto theme;
@@ -109,6 +112,7 @@ class SystemConfigDto {
     other.reverseGeocoding == reverseGeocoding &&
     other.server == server &&
     other.storageTemplate == storageTemplate &&
+    other.storageUsage == storageUsage &&
     other.templates == templates &&
     other.theme == theme &&
     other.trash == trash &&
@@ -137,13 +141,14 @@ class SystemConfigDto {
     (reverseGeocoding.hashCode) +
     (server.hashCode) +
     (storageTemplate.hashCode) +
+    (storageUsage.hashCode) +
     (templates.hashCode) +
     (theme.hashCode) +
     (trash.hashCode) +
     (user.hashCode);
 
   @override
-  String toString() => 'SystemConfigDto[backup=$backup, classification=$classification, ffmpeg=$ffmpeg, image=$image, integrityChecks=$integrityChecks, job=$job, library_=$library_, logging=$logging, machineLearning=$machineLearning, map=$map, memories=$memories, metadata=$metadata, newVersionCheck=$newVersionCheck, nightlyTasks=$nightlyTasks, notifications=$notifications, oauth=$oauth, passwordLogin=$passwordLogin, reverseGeocoding=$reverseGeocoding, server=$server, storageTemplate=$storageTemplate, templates=$templates, theme=$theme, trash=$trash, user=$user]';
+  String toString() => 'SystemConfigDto[backup=$backup, classification=$classification, ffmpeg=$ffmpeg, image=$image, integrityChecks=$integrityChecks, job=$job, library_=$library_, logging=$logging, machineLearning=$machineLearning, map=$map, memories=$memories, metadata=$metadata, newVersionCheck=$newVersionCheck, nightlyTasks=$nightlyTasks, notifications=$notifications, oauth=$oauth, passwordLogin=$passwordLogin, reverseGeocoding=$reverseGeocoding, server=$server, storageTemplate=$storageTemplate, storageUsage=$storageUsage, templates=$templates, theme=$theme, trash=$trash, user=$user]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -167,6 +172,7 @@ class SystemConfigDto {
       json[r'reverseGeocoding'] = this.reverseGeocoding;
       json[r'server'] = this.server;
       json[r'storageTemplate'] = this.storageTemplate;
+      json[r'storageUsage'] = this.storageUsage;
       json[r'templates'] = this.templates;
       json[r'theme'] = this.theme;
       json[r'trash'] = this.trash;
@@ -203,6 +209,7 @@ class SystemConfigDto {
         reverseGeocoding: SystemConfigReverseGeocodingDto.fromJson(json[r'reverseGeocoding'])!,
         server: SystemConfigServerDto.fromJson(json[r'server'])!,
         storageTemplate: SystemConfigStorageTemplateDto.fromJson(json[r'storageTemplate'])!,
+        storageUsage: SystemConfigStorageUsageDto.fromJson(json[r'storageUsage'])!,
         templates: SystemConfigTemplatesDto.fromJson(json[r'templates'])!,
         theme: SystemConfigThemeDto.fromJson(json[r'theme'])!,
         trash: SystemConfigTrashDto.fromJson(json[r'trash'])!,
@@ -274,6 +281,7 @@ class SystemConfigDto {
     'reverseGeocoding',
     'server',
     'storageTemplate',
+    'storageUsage',
     'templates',
     'theme',
     'trash',

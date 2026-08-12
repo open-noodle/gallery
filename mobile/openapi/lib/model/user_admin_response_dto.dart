@@ -22,6 +22,7 @@ class UserAdminResponseDto {
     required this.license,
     required this.name,
     required this.oauthId,
+    required this.physicalUsageInBytes,
     required this.profileChangedAt,
     required this.profileImagePath,
     required this.quotaSizeInBytes,
@@ -56,6 +57,12 @@ class UserAdminResponseDto {
 
   /// OAuth ID
   String oauthId;
+
+  /// Physical storage usage in bytes, including derivatives
+  ///
+  /// Minimum value: 0
+  /// Maximum value: 9007199254740991
+  int? physicalUsageInBytes;
 
   /// Profile change date
   DateTime profileChangedAt;
@@ -97,6 +104,7 @@ class UserAdminResponseDto {
     other.license == license &&
     other.name == name &&
     other.oauthId == oauthId &&
+    other.physicalUsageInBytes == physicalUsageInBytes &&
     other.profileChangedAt == profileChangedAt &&
     other.profileImagePath == profileImagePath &&
     other.quotaSizeInBytes == quotaSizeInBytes &&
@@ -118,6 +126,7 @@ class UserAdminResponseDto {
     (license == null ? 0 : license!.hashCode) +
     (name.hashCode) +
     (oauthId.hashCode) +
+    (physicalUsageInBytes == null ? 0 : physicalUsageInBytes!.hashCode) +
     (profileChangedAt.hashCode) +
     (profileImagePath.hashCode) +
     (quotaSizeInBytes == null ? 0 : quotaSizeInBytes!.hashCode) +
@@ -128,7 +137,7 @@ class UserAdminResponseDto {
     (updatedAt.hashCode);
 
   @override
-  String toString() => 'UserAdminResponseDto[avatarColor=$avatarColor, createdAt=$createdAt, deletedAt=$deletedAt, email=$email, id=$id, isAdmin=$isAdmin, license=$license, name=$name, oauthId=$oauthId, profileChangedAt=$profileChangedAt, profileImagePath=$profileImagePath, quotaSizeInBytes=$quotaSizeInBytes, quotaUsageInBytes=$quotaUsageInBytes, shouldChangePassword=$shouldChangePassword, status=$status, storageLabel=$storageLabel, updatedAt=$updatedAt]';
+  String toString() => 'UserAdminResponseDto[avatarColor=$avatarColor, createdAt=$createdAt, deletedAt=$deletedAt, email=$email, id=$id, isAdmin=$isAdmin, license=$license, name=$name, oauthId=$oauthId, physicalUsageInBytes=$physicalUsageInBytes, profileChangedAt=$profileChangedAt, profileImagePath=$profileImagePath, quotaSizeInBytes=$quotaSizeInBytes, quotaUsageInBytes=$quotaUsageInBytes, shouldChangePassword=$shouldChangePassword, status=$status, storageLabel=$storageLabel, updatedAt=$updatedAt]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -153,6 +162,11 @@ class UserAdminResponseDto {
     }
       json[r'name'] = this.name;
       json[r'oauthId'] = this.oauthId;
+    if (this.physicalUsageInBytes != null) {
+      json[r'physicalUsageInBytes'] = this.physicalUsageInBytes;
+    } else {
+      json[r'physicalUsageInBytes'] = null;
+    }
       json[r'profileChangedAt'] = this.profileChangedAt.toUtc().toIso8601String();
       json[r'profileImagePath'] = this.profileImagePath;
     if (this.quotaSizeInBytes != null) {
@@ -196,6 +210,7 @@ class UserAdminResponseDto {
         license: UserLicense.fromJson(json[r'license']),
         name: mapValueOfType<String>(json, r'name')!,
         oauthId: mapValueOfType<String>(json, r'oauthId')!,
+        physicalUsageInBytes: mapValueOfType<int>(json, r'physicalUsageInBytes'),
         profileChangedAt: mapDateTime(json, r'profileChangedAt', r'')!,
         profileImagePath: mapValueOfType<String>(json, r'profileImagePath')!,
         quotaSizeInBytes: mapValueOfType<int>(json, r'quotaSizeInBytes'),
@@ -260,6 +275,7 @@ class UserAdminResponseDto {
     'license',
     'name',
     'oauthId',
+    'physicalUsageInBytes',
     'profileChangedAt',
     'profileImagePath',
     'quotaSizeInBytes',

@@ -24,6 +24,7 @@ class ServerConfigDto {
     required this.minFaces,
     required this.oauthButtonText,
     required this.publicUsers,
+    required this.storageUsageIncludesDerivatives,
     required this.trashDays,
     required this.userDeleteDelay,
   });
@@ -64,6 +65,9 @@ class ServerConfigDto {
   /// Whether public user registration is enabled
   bool publicUsers;
 
+  /// Whether displayed storage usage includes thumbnails and transcoded videos
+  bool storageUsageIncludesDerivatives;
+
   /// Number of days before trashed assets are permanently deleted
   ///
   /// Minimum value: -9007199254740991
@@ -89,6 +93,7 @@ class ServerConfigDto {
     other.minFaces == minFaces &&
     other.oauthButtonText == oauthButtonText &&
     other.publicUsers == publicUsers &&
+    other.storageUsageIncludesDerivatives == storageUsageIncludesDerivatives &&
     other.trashDays == trashDays &&
     other.userDeleteDelay == userDeleteDelay;
 
@@ -106,11 +111,12 @@ class ServerConfigDto {
     (minFaces.hashCode) +
     (oauthButtonText.hashCode) +
     (publicUsers.hashCode) +
+    (storageUsageIncludesDerivatives.hashCode) +
     (trashDays.hashCode) +
     (userDeleteDelay.hashCode);
 
   @override
-  String toString() => 'ServerConfigDto[availableMemoryTypes=$availableMemoryTypes, externalDomain=$externalDomain, isInitialized=$isInitialized, isOnboarded=$isOnboarded, loginPageMessage=$loginPageMessage, maintenanceMode=$maintenanceMode, mapDarkStyleUrl=$mapDarkStyleUrl, mapLightStyleUrl=$mapLightStyleUrl, minFaces=$minFaces, oauthButtonText=$oauthButtonText, publicUsers=$publicUsers, trashDays=$trashDays, userDeleteDelay=$userDeleteDelay]';
+  String toString() => 'ServerConfigDto[availableMemoryTypes=$availableMemoryTypes, externalDomain=$externalDomain, isInitialized=$isInitialized, isOnboarded=$isOnboarded, loginPageMessage=$loginPageMessage, maintenanceMode=$maintenanceMode, mapDarkStyleUrl=$mapDarkStyleUrl, mapLightStyleUrl=$mapLightStyleUrl, minFaces=$minFaces, oauthButtonText=$oauthButtonText, publicUsers=$publicUsers, storageUsageIncludesDerivatives=$storageUsageIncludesDerivatives, trashDays=$trashDays, userDeleteDelay=$userDeleteDelay]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -125,6 +131,7 @@ class ServerConfigDto {
       json[r'minFaces'] = this.minFaces;
       json[r'oauthButtonText'] = this.oauthButtonText;
       json[r'publicUsers'] = this.publicUsers;
+      json[r'storageUsageIncludesDerivatives'] = this.storageUsageIncludesDerivatives;
       json[r'trashDays'] = this.trashDays;
       json[r'userDeleteDelay'] = this.userDeleteDelay;
     return json;
@@ -152,6 +159,7 @@ class ServerConfigDto {
         minFaces: mapValueOfType<int>(json, r'minFaces')!,
         oauthButtonText: mapValueOfType<String>(json, r'oauthButtonText')!,
         publicUsers: mapValueOfType<bool>(json, r'publicUsers')!,
+        storageUsageIncludesDerivatives: mapValueOfType<bool>(json, r'storageUsageIncludesDerivatives')!,
         trashDays: mapValueOfType<int>(json, r'trashDays')!,
         userDeleteDelay: mapValueOfType<int>(json, r'userDeleteDelay')!,
       );
@@ -212,6 +220,7 @@ class ServerConfigDto {
     'minFaces',
     'oauthButtonText',
     'publicUsers',
+    'storageUsageIncludesDerivatives',
     'trashDays',
     'userDeleteDelay',
   };

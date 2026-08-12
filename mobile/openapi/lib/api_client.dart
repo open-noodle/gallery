@@ -1035,6 +1035,8 @@ class ApiClient {
           return SystemConfigSmtpTransportDto.fromJson(value);
         case 'SystemConfigStorageTemplateDto':
           return SystemConfigStorageTemplateDto.fromJson(value);
+        case 'SystemConfigStorageUsageDto':
+          return SystemConfigStorageUsageDto.fromJson(value);
         case 'SystemConfigTemplateEmailsDto':
           return SystemConfigTemplateEmailsDto.fromJson(value);
         case 'SystemConfigTemplateStorageOptionDto':

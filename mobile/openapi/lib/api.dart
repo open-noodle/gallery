@@ -500,6 +500,7 @@ part 'model/system_config_server_dto.dart';
 part 'model/system_config_smtp_dto.dart';
 part 'model/system_config_smtp_transport_dto.dart';
 part 'model/system_config_storage_template_dto.dart';
+part 'model/system_config_storage_usage_dto.dart';
 part 'model/system_config_template_emails_dto.dart';
 part 'model/system_config_template_storage_option_dto.dart';
 part 'model/system_config_templates_dto.dart';
