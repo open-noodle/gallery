@@ -244,6 +244,9 @@ The default configuration looks like this:
     "hashVerificationEnabled": true,
     "template": "{{y}}/{{y}}-{{MM}}-{{dd}}/{{filename}}"
   },
+  "storageUsage": {
+    "includeDerivatives": false
+  },
   "templates": {
     "email": {
       "albumInviteTemplate": "",
@@ -347,6 +350,12 @@ The per-type switches do not control whether the nightly task runs. To disable a
 The older `memories.birthday` and `memories.recentTrips` booleans are deprecated but still honored as aliases for `types["birthday"]` and `types["recent_trip"]`. An explicit `types` entry takes precedence over the matching legacy field.
 
 See the [Memories docs](/features/memories) for details about how retention and generated-memory types work.
+:::
+
+:::info Storage Usage
+`storageUsage.includeDerivatives` controls whether server-generated files — thumbnails and transcoded videos — count toward a user's storage usage. It defaults to `false`, matching upstream Immich, where only original files are counted. Turning it on changes both the figure shown to users and what their storage quota is enforced against, so the two can never disagree; it also reduces how much original media a user can upload within the same quota.
+
+Storage usage is cached per user rather than computed on every request, so the figure has to be recalculated after you change this setting. On a config file install there is no "save settings" moment to trigger that, so the server recalculates it at startup whenever the flag is on — after editing the config file, restart the server and the figure will be correct once the recalculation finishes. From then on it is kept up to date by the nightly `nightlyTasks.syncQuotaUsage` task. If you set `syncQuotaUsage` to `false`, the figure is only refreshed on the next restart.
 :::
 
 ### Step 2 - Specify the file location

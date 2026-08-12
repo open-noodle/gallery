@@ -210,6 +210,9 @@ const updatedConfig = Object.freeze<SystemConfig>({
     hashVerificationEnabled: true,
     template: '{{y}}/{{y}}-{{MM}}-{{dd}}/{{filename}}',
   },
+  storageUsage: {
+    includeDerivatives: false,
+  },
   image: {
     thumbnail: {
       size: 250,
@@ -436,6 +439,15 @@ describe(SystemConfigService.name, () => {
       await expect(sut.getAdminConfig()).resolves.toMatchObject({
         ffmpeg: expect.objectContaining({ threads: 42 }),
       });
+    });
+
+    it('should accept storageUsage from a config file', async () => {
+      mocks.config.getEnv.mockReturnValue(mockEnvData({ configFile: 'immich-config.json' }));
+      mocks.systemMetadata.readFile.mockResolvedValue(JSON.stringify({ storageUsage: { includeDerivatives: true } }));
+
+      const config = await sut.getConfig({ withCache: false });
+
+      expect(config.storageUsage.includeDerivatives).toBe(true);
     });
 
     it('should default generated memory settings', async () => {
@@ -900,6 +912,14 @@ describe(SystemConfigService.name, () => {
       mocks.systemMetadata.get.mockResolvedValue({ theme: { customCss: 'body { color: red; }' } });
 
       await expect(sut.getCustomCss()).resolves.toEqual('body { color: red; }');
+    });
+  });
+
+  describe('storageUsage defaults', () => {
+    it('should default the derivative toggle to off (upstream behavior)', async () => {
+      const config = await sut.getConfig({ withCache: false });
+
+      expect(config.storageUsage.includeDerivatives).toBe(false);
     });
   });
 });
