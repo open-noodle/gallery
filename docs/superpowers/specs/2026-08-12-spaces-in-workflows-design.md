@@ -1,14 +1,14 @@
 # Spaces in Workflows — Design
 
 **Date:** 2026-08-12
-**Status:** Approved design, not yet implemented
+**Status:** Implemented. Seam figures in §1 and §5.1 are measured from the implemented branch, not estimated.
 **Scope:** Add shared-space actions to upstream's workflows feature, with a fork/upstream boundary that does not grow as more fork features are added.
 
 ## 1. Summary
 
 Upstream Immich ships a workflow engine driven by WASM plugins. Gallery's shared spaces are invisible to it: a workflow can add an uploaded asset to an album, but not to a space or to a space album.
 
-This design adds two action steps — **Add to space** and **Add to space album** — via a fork-owned plugin and a single generic host-function seam. The permanent cost to upstream-owned files is **6 files, ~19 lines**, and that cost is **flat**: every future fork action or filter adds zero upstream lines.
+This design adds two action steps — **Add to space** and **Add to space album** — via a fork-owned plugin and a single generic host-function seam. The permanent cost to upstream-owned files is **7 files, +23/−3 lines** (measured on the implemented branch), and that cost is **flat**: every future fork action or filter adds zero upstream lines.
 
 ## 2. How upstream's workflow engine works
 
@@ -83,16 +83,21 @@ AssetCreate / AssetMetadataExtraction
 
 ### 5.1 The permanent seam in upstream-owned files
 
-| File                                                | Lines | Change                                                                                                                            |
-| --------------------------------------------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `server/src/services/workflow-execution.service.ts` | ~5    | `gallery` in `functions` and `stubs`; one `BaseService.create`; one `importFolder(resourcePaths.galleryPlugin)` in `onPluginSync` |
-| `server/src/repositories/config.repository.ts`      | 2     | `resourcePaths.galleryPlugin` — type line plus value line                                                                         |
-| `server/Dockerfile`                                 | ~4    | Build and copy inside the **existing** `plugins` stage                                                                            |
-| `docker/docker-compose.dev.yml`                     | 1     | Bind-mount, mirroring line 76                                                                                                     |
-| `web/src/lib/types.ts`                              | 1     | `uiHint.type` union gains `'SpaceId'`                                                                                             |
-| `web/src/lib/components/SchemaConfiguration.svelte` | ~6    | One branch beside the existing `AlbumId` branch at line 81                                                                        |
+Measured on the implemented branch (`git diff --stat <merge-base>..HEAD` over these paths): **7 files, 23 insertions, 3 deletions.**
+
+| File                                                 | Lines | Change                                                                                                                              |
+| ---------------------------------------------------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `server/src/services/workflow-execution.service.ts`  | +10   | `gallery` in `functions` and `stubs`; one `BaseService.create`; one `importFolder(resourcePaths.galleryPlugin)` in `onPluginSync`   |
+| `server/Dockerfile`                                  | +5/−2 | Build and copy inside the **existing** `plugins` stage; the two deletions are existing pnpm invocations gaining one more `--filter` |
+| `web/src/lib/components/SchemaConfiguration.svelte`  | +3    | One import and one branch beside the existing `AlbumId` branch                                                                      |
+| `server/src/repositories/config.repository.ts`       | +2    | `resourcePaths.galleryPlugin` — type line plus value line                                                                           |
+| `server/test/repositories/config.repository.mock.ts` | +1    | The mock's full-object `EnvData` literal needs the new required field, or `tsc` fails                                               |
+| `docker/docker-compose.dev.yml`                      | +1    | Bind-mount, mirroring the `plugin-core` one                                                                                         |
+| `web/src/lib/types.ts`                               | +1/−1 | `uiHint.type` union gains `'SpaceId'`                                                                                               |
 
 Every one of these is registered in `docs/fork/ownership.yml` under `upstream_extension_paths`.
+
+**The seventh file was discovered during implementation, not designed in.** Making `galleryPlugin` a required field on `resourcePaths` breaks `config.repository.mock.ts`'s full-object literal. The alternative — declaring it optional — would push a non-null assertion or a runtime guard into `workflow-execution.service.ts`, the one file this design most wants to keep small, to describe an invariant that never actually holds (`getEnv()` always sets it). One mechanical line in a test mock is the cheaper trade, and it is the same edit upstream would make when adding a resource path.
 
 `server/src/services/index.ts` is deliberately **not** on this list. The dispatcher is built with `BaseService.create` and never injected, and it declares no `@OnEvent` or `@OnJob`, so Nest never needs to know it exists — which removes the two lines every other fork service costs.
 

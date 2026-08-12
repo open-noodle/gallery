@@ -2026,4 +2026,4 @@ Before opening a PR, confirm each of these by running the command and reading th
 - [ ] `cd web && pnpm check:typescript && pnpm check:svelte && pnpm lint` clean
 - [ ] `npx prettier --check i18n/*.json` clean, and all ten locales carry `workflow_space_unavailable`
 - [ ] `make fork-ownership-coverage-check` green
-- [ ] `git diff origin/main --stat` touches **exactly six** upstream-owned files: `config.repository.ts`, `workflow-execution.service.ts`, `docker-compose.dev.yml`, `types.ts`, `SchemaConfiguration.svelte`, `Dockerfile`
+- [ ] `git diff --stat $(git merge-base origin/main HEAD)..HEAD` touches **exactly seven** upstream-owned files, +23/−3 in total: `workflow-execution.service.ts` (+10), `Dockerfile` (+5/−2), `SchemaConfiguration.svelte` (+3), `config.repository.ts` (+2), `config.repository.mock.ts` (+1), `docker-compose.dev.yml` (+1), `types.ts` (+1/−1). Diff against the **merge base**, not `origin/main` directly — main advances during a long branch and diffing against its tip shows unrelated upstream work as if it were yours.
