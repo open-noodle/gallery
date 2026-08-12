@@ -59,6 +59,9 @@ import { StorageMigrationRepository } from 'src/repositories/storage-migration.r
 import { UserGroupRepository } from 'src/repositories/user-group.repository.js';
 import { ClassificationRepository } from 'src/repositories/classification.repository.js';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository.js';
+import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository.js';
+import { FaceRepairDeclineRepository } from 'src/repositories/face-repair-decline.repository.js';
+import { FaceRepairScanRepository } from 'src/repositories/face-repair-scan.repository.js';
 import { FaceRepairRepository } from 'src/repositories/face-repair.repository.js';
 
 export const repositories = [
@@ -83,7 +86,10 @@ export const repositories = [
   EmailRepository,
   EventRepository,
   FaceIdentityRepository,
+  FacePersonVerdictRepository,
+  FaceRepairDeclineRepository,
   FaceRepairRepository,
+  FaceRepairScanRepository,
   IntegrityRepository,
   JobRepository,
   LibraryRepository,

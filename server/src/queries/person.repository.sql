@@ -226,6 +226,29 @@ where
   "asset_face"."id" = $2
   and "asset_face"."deletedAt" is null
 
+-- PersonRepository.getFaceByIdIncludingTombstoned
+select
+  "asset_face".*,
+  (
+    select
+      to_json(obj)
+    from
+      (
+        select
+          "person".*
+        from
+          "person"
+        where
+          "person"."id" = "asset_face"."personId"
+      ) as obj
+  ) as "person"
+from
+  "asset_face"
+  inner join "asset" on "asset"."id" = "asset_face"."assetId"
+where
+  "asset_face"."id" = $1
+  and "asset"."visibility" in ($2, $3)
+
 -- PersonRepository.getRepresentativeFaces
 select
   "asset_face".*,
@@ -777,6 +800,21 @@ where
   "asset_face"."assetId" in ($2)
   and "asset_face"."personGroupId" in ($3)
   and "asset_face"."deletedAt" is null
+
+-- PersonRepository.getAssignedFaceEmbeddings
+select
+  "face_search"."embedding"
+from
+  "asset_face"
+  inner join "face_search" on "face_search"."faceId" = "asset_face"."id"
+where
+  "asset_face"."personId" = $1
+  and "asset_face"."deletedAt" is null
+  and "asset_face"."isVisible" is true
+order by
+  "asset_face"."id" asc
+limit
+  $2
 
 -- PersonRepository.getRandomFace
 select

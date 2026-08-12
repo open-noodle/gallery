@@ -438,3 +438,52 @@ describe('clamp', () => {
     expect(clamp(1, 3, 3)).toBe(3);
   });
 });
+
+const build = (overrides: {
+  ml?: boolean;
+  fr?: boolean;
+  suggestions?: boolean;
+  maxDistance?: number;
+  suggestionMaxDistance?: number;
+}) => ({
+  ...defaults.machineLearning,
+  enabled: overrides.ml ?? true,
+  facialRecognition: {
+    ...defaults.machineLearning.facialRecognition,
+    enabled: overrides.fr ?? true,
+    maxDistance: overrides.maxDistance ?? 0.5,
+    suggestions: {
+      enabled: overrides.suggestions ?? true,
+      maxDistance: overrides.suggestionMaxDistance ?? 0.7,
+    },
+  },
+});
+
+describe('isFaceSuggestionEnabled', () => {
+  it('is true when machine learning, facial recognition and suggestions are all on with a valid band', () => {
+    expect(isFaceSuggestionEnabled(build({}))).toBe(true);
+  });
+
+  // Suggestions never call the machine learning service — they are a vector query over embeddings
+  // that already exist — so turning the ML master switch off (a supported way to reclaim resources
+  // once a library is scanned) must leave them working.
+  it('is true when the machine learning master switch is off but facial recognition is on', () => {
+    expect(isFaceSuggestionEnabled(build({ ml: false }))).toBe(true);
+  });
+
+  it('is false when facial recognition is disabled', () => {
+    expect(isFaceSuggestionEnabled(build({ fr: false }))).toBe(false);
+  });
+
+  it('is false when suggestions are disabled, even with a valid band', () => {
+    expect(isFaceSuggestionEnabled(build({ suggestions: false }))).toBe(false);
+  });
+
+  it('is false when the band is inverted', () => {
+    expect(isFaceSuggestionEnabled(build({ maxDistance: 0.5, suggestionMaxDistance: 0.5 }))).toBe(false);
+  });
+
+  it('is false when the suggestion distance is below the recognition distance', () => {
+    expect(isFaceSuggestionEnabled(build({ maxDistance: 0.5, suggestionMaxDistance: 0.4 }))).toBe(false);
+  });
+});
