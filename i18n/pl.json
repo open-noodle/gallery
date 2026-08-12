@@ -740,7 +740,7 @@
     "storage_usage_include_derivatives_display_setting": "Uwzględnij pliki z pamięci podręcznej w wyświetlanym wykorzystaniu magazynu",
     "storage_usage_include_derivatives_display_setting_description": "Zlicz miniatury i transkodowane filmy w wykorzystaniu magazynu widocznym dla użytkowników. Domyślnie wyłączone, tak jak w źródłowym Immich, gdzie liczą się tylko pliki oryginalne.",
     "storage_usage_include_derivatives_quota_setting": "Uwzględnij pliki z pamięci podręcznej w naliczaniu kontyngentu magazynu",
-    "storage_usage_include_derivatives_quota_setting_description": "Zlicz miniatury i transkodowane filmy w kontyngencie magazynu każdego użytkownika. Włączenie tej opcji zmniejsza ilość oryginalnych multimediów, które użytkownik może przesłać w ramach tego samego kontyngentu.",
+    "storage_usage_include_derivatives_quota_setting_description": "Zlicz miniatury i transkodowane filmy w kontyngencie magazynu każdego użytkownika. Włączenie tej opcji zmniejsza ilość oryginalnych multimediów, które użytkownik może przesłać w ramach tego samego kontyngentu. Powoduje to również zmianę wartości pokazywanej użytkownikom, dzięki czemu nigdy nie widzą innej liczby niż ta, która jest egzekwowana.",
     "storage_usage_settings": "Wykorzystanie magazynu",
     "storage_usage_settings_description": "Wybierz, czy pliki wygenerowane przez serwer liczą się do wykorzystania magazynu przez użytkowników",
     "system_settings": "Ustawienia Systemowe",

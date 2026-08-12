@@ -740,7 +740,7 @@
     "storage_usage_include_derivatives_display_setting": "Include cached files in displayed usage",
     "storage_usage_include_derivatives_display_setting_description": "Count thumbnails and transcoded videos in the storage usage shown to users. Off by default, matching upstream Immich, where only original files are counted.",
     "storage_usage_include_derivatives_quota_setting": "Include cached files in quota enforcement",
-    "storage_usage_include_derivatives_quota_setting_description": "Count thumbnails and transcoded videos against each user's storage quota. Enabling this reduces how much original media a user can upload within the same quota.",
+    "storage_usage_include_derivatives_quota_setting_description": "Count thumbnails and transcoded videos against each user's storage quota. Enabling this reduces how much original media a user can upload within the same quota. It also switches the figure shown to users, so they never see a number that differs from the one enforced.",
     "storage_usage_settings": "Storage usage",
     "storage_usage_settings_description": "Choose whether server-generated files count toward user storage usage",
     "system_settings": "System Settings",

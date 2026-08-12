@@ -740,7 +740,7 @@
     "storage_usage_include_derivatives_display_setting": "Gecachte bestanden meetellen in het weergegeven gebruik",
     "storage_usage_include_derivatives_display_setting_description": "Telt thumbnails en getranscodeerde video's mee in het opslaggebruik dat aan gebruikers wordt getoond. Standaard uitgeschakeld, zoals in upstream Immich, waar alleen originele bestanden worden geteld.",
     "storage_usage_include_derivatives_quota_setting": "Gecachte bestanden meetellen in de opslaglimiet",
-    "storage_usage_include_derivatives_quota_setting_description": "Telt thumbnails en getranscodeerde video's mee in de opslaglimiet van elke gebruiker. Door dit in te schakelen vermindert de hoeveelheid originele media die een gebruiker binnen dezelfde limiet kan uploaden.",
+    "storage_usage_include_derivatives_quota_setting_description": "Telt thumbnails en getranscodeerde video's mee in de opslaglimiet van elke gebruiker. Door dit in te schakelen vermindert de hoeveelheid originele media die een gebruiker binnen dezelfde limiet kan uploaden. Hierdoor verandert ook het aan gebruikers getoonde getal, zodat zij nooit een ander getal zien dan het getal dat wordt afgedwongen.",
     "storage_usage_settings": "Opslaggebruik",
     "storage_usage_settings_description": "Kies of door de server gegenereerde bestanden meetellen voor het opslaggebruik van gebruikers",
     "system_settings": "Systeeminstellingen",

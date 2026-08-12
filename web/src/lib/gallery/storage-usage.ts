@@ -12,7 +12,8 @@ type StorageSpaceInput = {
  *
  * A user with no quota sees whole-server disk figures — upstream behaviour, deliberately kept.
  * A user with a quota sees their own usage, reading either the upstream originals-only column or
- * the fork's physical column depending on the server-wide display toggle.
+ * the fork's physical column depending on storageUsageIncludesDerivatives — which the server sets
+ * whenever either storageUsage toggle is on, so the number shown always matches the one enforced.
  */
 export const getStorageSpace = ({ user, authenticated, serverInfo, serverConfig }: StorageSpaceInput) => {
   const hasQuota = user.quotaSizeInBytes !== null;

@@ -740,7 +740,7 @@
     "storage_usage_include_derivatives_display_setting": "Includi i file in cache nell'utilizzo visualizzato",
     "storage_usage_include_derivatives_display_setting_description": "Conteggia le miniature e i video transcodificati nell'utilizzo di archiviazione mostrato agli utenti. Disattivato per impostazione predefinita, come nell'Immich originale, dove vengono conteggiati solo i file originali.",
     "storage_usage_include_derivatives_quota_setting": "Includi i file in cache nell'applicazione della quota",
-    "storage_usage_include_derivatives_quota_setting_description": "Conteggia le miniature e i video transcodificati nella quota di spazio di ogni utente. Attivando questa opzione si riduce la quantità di contenuti originali che un utente può caricare con la stessa quota.",
+    "storage_usage_include_derivatives_quota_setting_description": "Conteggia le miniature e i video transcodificati nella quota di spazio di ogni utente. Attivando questa opzione si riduce la quantità di contenuti originali che un utente può caricare con la stessa quota. Cambia anche il valore mostrato agli utenti, così non vedono mai un numero diverso da quello applicato.",
     "storage_usage_settings": "Utilizzo dello spazio di archiviazione",
     "storage_usage_settings_description": "Scegli se i file generati dal server contano ai fini dell'utilizzo di archiviazione degli utenti",
     "system_settings": "Impostazioni di sistema",

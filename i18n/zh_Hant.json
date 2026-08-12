@@ -740,7 +740,7 @@
     "storage_usage_include_derivatives_display_setting": "在顯示的使用量中納入快取檔案",
     "storage_usage_include_derivatives_display_setting_description": "將縮圖與轉碼影片計入顯示給使用者的儲存使用量。預設關閉，與上游 Immich 一致，僅計算原始檔案。",
     "storage_usage_include_derivatives_quota_setting": "在配額計算中納入快取檔案",
-    "storage_usage_include_derivatives_quota_setting_description": "將縮圖與轉碼影片計入每位使用者的儲存配額。啟用後，使用者在相同配額下可上傳的原始媒體數量會減少。",
+    "storage_usage_include_derivatives_quota_setting_description": "將縮圖與轉碼影片計入每位使用者的儲存配額。啟用後，使用者在相同配額下可上傳的原始媒體數量會減少，同時顯示給使用者的使用量也會隨之切換，使其始終與實際套用的數值一致。",
     "storage_usage_settings": "儲存使用量",
     "storage_usage_settings_description": "選擇伺服器產生的檔案是否計入使用者的儲存使用量",
     "system_settings": "系統設定",

@@ -740,7 +740,7 @@
     "storage_usage_include_derivatives_display_setting": "Zwischengespeicherte Dateien in der angezeigten Nutzung einbeziehen",
     "storage_usage_include_derivatives_display_setting_description": "Miniaturansichten und transkodierte Videos in die den Nutzern angezeigte Speichernutzung einrechnen. Standardmäßig deaktiviert, wie im Upstream-Immich, wo nur Originaldateien gezählt werden.",
     "storage_usage_include_derivatives_quota_setting": "Zwischengespeicherte Dateien in der Kontingentberechnung einbeziehen",
-    "storage_usage_include_derivatives_quota_setting_description": "Miniaturansichten und transkodierte Videos auf das Speicherkontingent jedes Nutzers anrechnen. Bei Aktivierung sinkt die Menge an Originalmedien, die ein Nutzer im selben Kontingent hochladen kann.",
+    "storage_usage_include_derivatives_quota_setting_description": "Miniaturansichten und transkodierte Videos auf das Speicherkontingent jedes Nutzers anrechnen. Bei Aktivierung sinkt die Menge an Originalmedien, die ein Nutzer im selben Kontingent hochladen kann. Außerdem wird dadurch die den Nutzern angezeigte Angabe umgestellt, sodass sie nie eine andere Zahl sehen als die, die durchgesetzt wird.",
     "storage_usage_settings": "Speichernutzung",
     "storage_usage_settings_description": "Festlegen, ob vom Server generierte Dateien zur Speichernutzung der Nutzer zählen",
     "system_settings": "Systemeinstellungen",

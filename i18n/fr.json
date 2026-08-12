@@ -740,7 +740,7 @@
     "storage_usage_include_derivatives_display_setting": "Inclure les fichiers en cache dans l'utilisation affichée",
     "storage_usage_include_derivatives_display_setting_description": "Comptabiliser les miniatures et les vidéos transcodées dans l'utilisation du stockage affichée aux utilisateurs. Désactivé par défaut, comme dans Immich en amont, où seuls les fichiers originaux sont comptabilisés.",
     "storage_usage_include_derivatives_quota_setting": "Inclure les fichiers en cache dans l'application du quota",
-    "storage_usage_include_derivatives_quota_setting_description": "Comptabiliser les miniatures et les vidéos transcodées dans le quota de stockage de chaque utilisateur. Activer cette option réduit la quantité de médias originaux qu'un utilisateur peut envoyer avec le même quota.",
+    "storage_usage_include_derivatives_quota_setting_description": "Comptabiliser les miniatures et les vidéos transcodées dans le quota de stockage de chaque utilisateur. Activer cette option réduit la quantité de médias originaux qu'un utilisateur peut envoyer avec le même quota. Cela bascule également le chiffre affiché aux utilisateurs, afin qu'ils ne voient jamais une valeur différente de celle qui est appliquée.",
     "storage_usage_settings": "Utilisation du stockage",
     "storage_usage_settings_description": "Choisir si les fichiers générés par le serveur comptent dans l'utilisation du stockage des utilisateurs",
     "system_settings": "Paramètres du système",
