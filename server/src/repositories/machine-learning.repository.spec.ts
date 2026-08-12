@@ -38,7 +38,14 @@ describe(MachineLearningRepository.name, () => {
     availabilityChecks: { enabled: false, timeout: 2000, interval: 30_000 },
     clip: { enabled: true, modelName: 'ViT-B-32__openai', maxDistance: 0 },
     duplicateDetection: { enabled: true, maxDistance: 0.01 },
-    facialRecognition: { enabled: true, modelName: 'buffalo_l', minScore: 0.7, maxDistance: 0.5, minFaces: 1 },
+    facialRecognition: {
+      enabled: true,
+      modelName: 'buffalo_l',
+      minScore: 0.7,
+      maxDistance: 0.5,
+      minFaces: 1,
+      suggestions: { enabled: false, maxDistance: 0.7 },
+    },
     ocr: {
       enabled: false,
       modelName: 'default-ocr',

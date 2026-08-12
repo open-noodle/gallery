@@ -34,12 +34,17 @@ beforeEach(() => {
   updateSpaceDetailsMock.mockResolvedValue(true);
 });
 
+// bits-ui's body-scroll-lock schedules `resetBodyStyle` on a 24ms `window.setTimeout` when a modal unmounts
+// (`body-scroll-lock.svelte.js`, the same-tick destroy/create guard). That callback touches `document.body`, so
+// a still-pending timer at environment teardown throws an UNHANDLED `ReferenceError: document is not defined`
+// and fails the job even with every test green.
+//
+// Unmounting EXPLICITLY is the load-bearing part: @testing-library/svelte registers its auto-cleanup afterEach
+// at import time, so it runs AFTER this hook — a bare sleep would wait BEFORE the unmount that schedules the
+// timer and drain nothing. cleanup() forces the unmount first, then we outwait the 24ms.
 afterEach(async () => {
   cleanup();
-  // bits-ui's body-scroll-lock resets body styles on a 24ms timer after the last dialog
-  // unmounts (bits-ui#1639). Wait it out so it fires while `document` still exists —
-  // otherwise it lands after environment teardown as an unhandled ReferenceError.
-  await new Promise((resolve) => setTimeout(resolve, 30));
+  await new Promise((r) => setTimeout(r, 50));
 });
 
 describe('SpaceEditModal', () => {

@@ -20,18 +20,21 @@ import { AssetRepository } from 'src/repositories/asset.repository';
 import { ConfigRepository } from 'src/repositories/config.repository';
 import { DatabaseRepository } from 'src/repositories/database.repository';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository';
+import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository';
 import { JobRepository } from 'src/repositories/job.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { MachineLearningRepository } from 'src/repositories/machine-learning.repository';
 import { PersonRepository } from 'src/repositories/person.repository';
+import { SearchRepository } from 'src/repositories/search.repository';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
 import { StorageRepository } from 'src/repositories/storage.repository';
 import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository';
 import { DB } from 'src/schema';
+import { FaceSuggestionService } from 'src/services/face-suggestion.service';
 import { PersonService } from 'src/services/person.service';
 import { clearConfigCache } from 'src/utils/config';
 import { newMediumService } from 'test/medium.factory';
-import { factory } from 'test/small.factory';
+import { factory, newEmbedding } from 'test/small.factory';
 import { getKyselyDB } from 'test/utils';
 
 let defaultDatabase: Kysely<DB>;
@@ -46,6 +49,7 @@ const setup = (db?: Kysely<DB>) => {
       AssetJobRepository,
       ConfigRepository,
       FaceIdentityRepository,
+      FacePersonVerdictRepository,
       DatabaseRepository,
       PersonRepository,
       AssetRepository,
@@ -76,6 +80,9 @@ const setupFaceDetection = (db?: Kysely<DB>) => {
       ConfigRepository,
       DatabaseRepository,
       FaceIdentityRepository,
+      // handleQueueRecognizeFaces collects orphaned verdicts (Slice 8), so this setup needs the repository
+      // too — without it the service field is undefined and the call throws at runtime.
+      FacePersonVerdictRepository,
       PersonRepository,
       SharedSpaceRepository,
     ],
@@ -121,6 +128,31 @@ const seedPersonWithRepresentativeFace = async (
   const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
   await ctx.get(PersonRepository).update({ id: person.id, faceAssetId: faceId });
   return { asset, person };
+};
+
+// Slice 1 (S1.14 pin): a setup with SearchRepository real, so handleRecognizeFaces's KNN passes run
+// against a real DB rather than a mock.
+const setupRecognition = (db?: Kysely<DB>) => {
+  clearConfigCache();
+  const { sut, ctx } = newMediumService(PersonService, {
+    database: db || defaultDatabase,
+    real: [
+      AccessRepository,
+      ConfigRepository,
+      DatabaseRepository,
+      FaceIdentityRepository,
+      PersonRepository,
+      SearchRepository,
+      SharedSpaceRepository,
+    ],
+    mock: [JobRepository, LoggingRepository, SystemMetadataRepository],
+  });
+  const metadata = ctx.getMock<SystemMetadataRepository, Mocked<SystemMetadataRepository>>(SystemMetadataRepository);
+  metadata.get.mockResolvedValue({ machineLearning: { facialRecognition: { minFaces: 1 } } } as any);
+  const jobs = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+  jobs.queue.mockResolvedValue();
+  jobs.queueAll.mockResolvedValue();
+  return { sut, ctx };
 };
 
 /**
@@ -176,6 +208,8 @@ const setupFaceRecognition = (db?: Kysely<DB>) => {
       ConfigRepository,
       DatabaseRepository,
       FaceIdentityRepository,
+      // handleQueueRecognizeFaces collects orphaned verdicts (Slice 8) — see setupFaceDetection above.
+      FacePersonVerdictRepository,
       PersonRepository,
       SharedSpaceRepository,
     ],
@@ -537,10 +571,15 @@ describe(PersonService.name, () => {
         await expect(getSpacePeople(ctx, [enabledSpace.id, disabledSpace.id])).resolves.toEqual([]);
 
         const queuedJobs = jobMock.queueAll.mock.calls.flatMap(([jobs]) => jobs);
+        // The PeopleBackfill wait is a separate, time-bounded call: a suggestion sweep can outlive a
+        // forced recognition run, and the unbounded poll used to park that job indefinitely.
         expect(jobMock.waitForQueueCompletion).toHaveBeenCalledWith(
           QueueName.ThumbnailGeneration,
           QueueName.FaceDetection,
+        );
+        expect(jobMock.waitForQueueCompletion).toHaveBeenCalledWith(
           QueueName.PeopleBackfill,
+          expect.objectContaining({ timeoutMs: expect.any(Number) }),
         );
         expect(jobMock.empty).toHaveBeenCalledWith(QueueName.FacialRecognition, true);
         expect(jobMock.queueAll).toHaveBeenCalledWith([
@@ -2131,6 +2170,130 @@ describe(PersonService.name, () => {
       const auth = factory.auth({ user: { id: viewer.id }, session: { hasElevatedPermission: true } });
 
       await expect(sut.getThumbnail(auth, person.id)).rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
+
+  // D14/Slice 9: confirm's claim -> reassign -> resolveAssignedFace -> identity-relink chain must be one
+  // atomic unit. Before this slice each write autocommitted separately, so a crash/failure between the
+  // reassign and the relink left the face pointed at the new person WITHOUT a manual identity link (a torn
+  // write) and the claimed pending row gone for good — the exact defect class executeRepair's per-route
+  // transaction (A1) already closes for the cleanup engine.
+  describe('confirmFaceSuggestion (atomicity)', () => {
+    // Slice 3 (S3.9) added an isFaceSuggestionEnabled short-circuit ahead of the transaction, so this test's
+    // config must enable suggestions with a valid band — plain setup() defaults leave suggestions disabled,
+    // which would resolve confirmFaceSuggestion before it ever reaches the write chain under test.
+    const enabled = {
+      machineLearning: {
+        enabled: true,
+        facialRecognition: {
+          enabled: true,
+          maxDistance: 0.5,
+          minFaces: 3,
+          suggestions: { enabled: true, maxDistance: 0.8 },
+        },
+      },
+    };
+
+    it('rolls back the reassign when the identity relink fails (no torn write)', async () => {
+      const { ctx } = setup();
+      // Slice 13: confirmFaceSuggestion moved to FaceSuggestionService. Sharing `ctx`'s exact dependency
+      // instances means the spy below (on the real faceIdentityRepo) is observed by this sut exactly the
+      // same as it would have been on PersonService before the move.
+      const faceSuggestion = ctx.getService(FaceSuggestionService);
+      ctx
+        .getMock<SystemMetadataRepository, Mocked<SystemMetadataRepository>>(SystemMetadataRepository)
+        .get.mockResolvedValue(enabled as any);
+      const faceIdentityRepo = ctx.get(FaceIdentityRepository);
+      const verdictRepo = ctx.get(FacePersonVerdictRepository);
+      const { user } = await ctx.newUser();
+      const auth = factory.auth({ user });
+
+      // P is the suggested target. A real suggestion sits on an UNASSIGNED face — confirm's job is to make
+      // the assignment, not to steal the face from someone else.
+      const { person: p } = await ctx.newPerson({ ownerId: user.id, name: 'P' });
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      const { assetFace: face } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      // distance 0.6 sits strictly inside the open eligibility band (0.5, 0.8] — a valid, claimable row.
+      await verdictRepo.upsertPending([{ personId: p.id, assetFaceId: face.id, distance: 0.6 }]);
+
+      // Positive control: the seeded row really is pending before the confirm call touches anything.
+      const seeded = await ctx.database
+        .selectFrom('face_person_verdict')
+        .select(['status'])
+        .where('personId', '=', p.id)
+        .where('assetFaceId', '=', face.id)
+        .executeTakeFirstOrThrow();
+      expect(seeded.status).toBe('pending');
+
+      // The LAST write in the chain fails.
+      vi.spyOn(faceIdentityRepo, 'replaceFaceIdentity').mockRejectedValueOnce(new Error('relink failed'));
+
+      await expect(faceSuggestion.confirmFaceSuggestion(auth, p.id, face.id)).rejects.toThrow('relink failed');
+
+      // The reassign must have rolled back — the face is still unassigned.
+      const reloadedFace = await ctx.database
+        .selectFrom('asset_face')
+        .select('personId')
+        .where('id', '=', face.id)
+        .executeTakeFirstOrThrow();
+      expect(reloadedFace.personId).toBeNull();
+
+      // No manual identity link was left dangling on the face.
+      const identityLink = await ctx.database
+        .selectFrom('face_identity_face')
+        .select('assetFaceId')
+        .where('assetFaceId', '=', face.id)
+        .executeTakeFirst();
+      expect(identityLink).toBeUndefined();
+
+      // The claim must have rolled back too — the row is still pending (claim-then-work contract, R4).
+      const verdict = await ctx.database
+        .selectFrom('face_person_verdict')
+        .select(['status'])
+        .where('personId', '=', p.id)
+        .where('assetFaceId', '=', face.id)
+        .executeTakeFirst();
+      expect(verdict?.status).toBe('pending');
+    });
+  });
+
+  // Slice 1 (§4 decision): facial recognition is deliberately OUT of scope for the Locked/Hidden exclusion —
+  // it keeps clustering Locked-folder faces into the owner's own people exactly as before this slice. S1.14
+  // pins that: a Locked-asset anchor face must still be usable as a recognition neighbor.
+  describe('handleRecognizeFaces visibility scoping (Slice 1, S1.14 pin)', () => {
+    it('S1.14: a locked-asset anchor face still gets a timeline query face assigned to its person', async () => {
+      const { sut, ctx } = setupRecognition();
+      const { user } = await ctx.newUser();
+      const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Anchor' });
+
+      const embedding = newEmbedding();
+
+      // The anchor: an already-assigned ML face on a LOCKED asset.
+      const { asset: anchorAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Locked });
+      const { assetFace: anchorFace } = await ctx.newAssetFace({
+        assetId: anchorAsset.id,
+        personId: person.id,
+        sourceType: SourceType.MachineLearning,
+      });
+      await ctx.database.insertInto('face_search').values({ faceId: anchorFace.id, embedding }).execute();
+
+      // The query face: unassigned, on a Timeline asset, with the SAME embedding (distance 0 — guaranteed match).
+      const { asset: queryAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+      const { assetFace: queryFace } = await ctx.newAssetFace({
+        assetId: queryAsset.id,
+        personId: null,
+        sourceType: SourceType.MachineLearning,
+      });
+      await ctx.database.insertInto('face_search').values({ faceId: queryFace.id, embedding }).execute();
+
+      await sut.handleRecognizeFaces({ id: queryFace.id, deferred: false });
+
+      const row = await ctx.database
+        .selectFrom('asset_face')
+        .select('personId')
+        .where('id', '=', queryFace.id)
+        .executeTakeFirstOrThrow();
+      expect(row.personId).toBe(person.id);
     });
   });
 });

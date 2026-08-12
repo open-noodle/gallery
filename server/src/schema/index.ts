@@ -56,6 +56,10 @@ import { ClusterGroupRequestTable } from 'src/schema/tables/cluster-group-reques
 import { ClusterGroupTable } from 'src/schema/tables/cluster-group.table';
 import { FaceIdentityFaceTable } from 'src/schema/tables/face-identity-face.table';
 import { FaceIdentityTable } from 'src/schema/tables/face-identity.table';
+import { FacePersonVerdictTable } from 'src/schema/tables/face-person-verdict.table';
+import { FaceRepairDeclineTable } from 'src/schema/tables/face-repair-decline.table';
+import { FaceRepairScanFlaggedFaceTable } from 'src/schema/tables/face-repair-scan-flagged-face.table';
+import { FaceRepairScanTable } from 'src/schema/tables/face-repair-scan.table';
 import { FaceSearchTable } from 'src/schema/tables/face-search.table';
 import { GeodataPlacesTable } from 'src/schema/tables/geodata-places.table';
 import { IntegrityReportTable } from 'src/schema/tables/integrity-report.table';
@@ -158,6 +162,9 @@ export class ImmichDatabase {
     ClusterGroupRequestTable,
     FaceIdentityTable,
     FaceIdentityFaceTable,
+    FaceRepairDeclineTable,
+    FaceRepairScanFlaggedFaceTable,
+    FaceRepairScanTable,
     FaceSearchTable,
     GeodataPlacesTable,
     IntegrityReportTable,
@@ -179,6 +186,7 @@ export class ImmichDatabase {
     PersonAuditTable,
     PersonGroupTable,
     PersonGroupAuditTable,
+    FacePersonVerdictTable,
     SessionTable,
     SharedLinkAssetTable,
     SharedLinkTable,
@@ -296,6 +304,9 @@ export interface DB {
   face_search: FaceSearchTable;
   face_identity: FaceIdentityTable;
   face_identity_face: FaceIdentityFaceTable;
+  face_repair_decline: FaceRepairDeclineTable;
+  face_repair_scan_flagged_face: FaceRepairScanFlaggedFaceTable;
+  face_repair_scan: FaceRepairScanTable;
 
   geodata_places: GeodataPlacesTable;
 
@@ -326,9 +337,9 @@ export interface DB {
   person_audit: PersonAuditTable;
   person_group: PersonGroupTable;
   person_group_audit: PersonGroupAuditTable;
-
   cluster_group: ClusterGroupTable;
   cluster_group_request: ClusterGroupRequestTable;
+  face_person_verdict: FacePersonVerdictTable;
 
   session: SessionTable;
   session_sync_checkpoint: SessionSyncCheckpointTable;

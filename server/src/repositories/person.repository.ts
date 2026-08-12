@@ -11,6 +11,9 @@ import { FaceSearchTable } from 'src/schema/tables/face-search.table';
 import { PersonGroupTable } from 'src/schema/tables/person-group.table';
 import { PersonTable } from 'src/schema/tables/person.table';
 import { asUuid, dummy, inSharedAlbum, removeUndefinedKeys, withFilePath } from 'src/utils/database';
+import { retargetDeclinePersonId } from 'src/utils/face-decline-merge';
+import { reviewableAssetVisibility } from 'src/utils/face-review';
+import { retargetVerdictPersonId } from 'src/utils/face-verdict-merge';
 import { paginationHelper, PaginationOptions } from 'src/utils/pagination';
 import {
   spaceAssetPathBranches,
@@ -107,6 +110,15 @@ export interface GetAllFacesOptions {
   assetId?: string;
   sourceType?: SourceType;
   clusterGroupId?: string;
+  /**
+   * Slice 5 (F9): recognition must never re-claim a face a human has already placed. Space-person
+   * confirms never write `asset_face.personId` (space people are a projection over personal people),
+   * so the `personId: null` filter alone does not exclude a confirmed-but-still-unassigned face — the
+   * durable record is the `face_identity_face` row with `source='manual'` instead. When set, excludes
+   * any face carrying one. Default off, so the force-recognition branch (which has already wiped every
+   * `face_identity_face` row via `unassignFaces` before this runs) and every other caller are unchanged.
+   */
+  excludeManuallyPlaced?: boolean;
 }
 
 export interface RepresentativeFaceListOptions {
@@ -225,6 +237,21 @@ export class PersonRepository {
       .set({ personId: input.targetPersonId })
       .where('personId', '=', input.sourcePersonId)
       .execute();
+
+    // Human placements live in `face_identity_face.source='manual'` (identity-keyed); negative/keep-here
+    // verdicts live in `face_person_verdict`. Both are re-pointed to the survivor at merge time: the
+    // identityId re-key runs in mergeIdentitiesAfterProfileResolution, and the personId re-target runs
+    // just below (survivor-wins). The identityId FK is ON DELETE SET NULL as a safety net.
+
+    // D1: move this person's verdicts to the survivor before deleting the source person (personId FK is
+    // SET NULL — a bare delete would orphan them). Survivor-wins on the (personId, assetFaceId) collision.
+    await retargetVerdictPersonId(db, input.sourcePersonId, input.targetPersonId);
+
+    // H10: face_repair_decline.personId is ON DELETE CASCADE (unlike the verdict FK above), so the source
+    // person's cluster mute must be moved onto the survivor before deletion too, or it is silently
+    // destroyed and the cluster resurfaces on the next scan.
+    await retargetDeclinePersonId(db, input.sourcePersonId, input.targetPersonId);
+
     const targetNeedsFeatureFaceRepair =
       !target.faceAssetId || !(await this.isFeatureFaceValid(input.targetPersonId, target.faceAssetId, db));
     const [deleteResult] = await db.deleteFrom('person').where('id', '=', input.sourcePersonId).execute();
@@ -281,6 +308,16 @@ export class PersonRepository {
 
   @GenerateSql({ params: [{ sourceType: SourceType.MachineLearning, clusterGroupId: DummyValue.UUID }] })
   async unassignFaces({ sourceType, clusterGroupId }: UnassignFacesOptions): Promise<void> {
+    // "Reset all people" bulk-nulls personId across the whole library. It must also clear the human-placement
+    // record (face_identity_face.source='manual'); otherwise every previously-confirmed face keeps a stale
+    // manual link with no person behind it, and both face engines would treat those unassigned faces as
+    // settled forever — permanently excluding them from recognition and suggestions after a reset.
+    await this.db
+      .deleteFrom('face_identity_face')
+      .where('assetFaceId', 'in', (eb) =>
+        eb.selectFrom('asset_face').select('id').where('asset_face.sourceType', '=', sourceType),
+      )
+      .execute();
     await this.db
       .updateTable('asset_face')
       .set({ personGroupId: null })
@@ -384,6 +421,19 @@ export class PersonRepository {
           .innerJoin('asset', 'asset.id', 'asset_face.assetId')
           .innerJoin('user', 'user.id', 'asset.ownerId')
           .where('user.clusterGroupId', '=', options.clusterGroupId!),
+      )
+      .$if(!!options.excludeManuallyPlaced, (qb) =>
+        qb.where((eb) =>
+          eb.not(
+            eb.exists(
+              eb
+                .selectFrom('face_identity_face')
+                .select('face_identity_face.assetFaceId')
+                .whereRef('face_identity_face.assetFaceId', '=', 'asset_face.id')
+                .where('face_identity_face.source', '=', 'manual'),
+            ),
+          ),
+        ),
       )
       .where('asset_face.deletedAt', 'is', null)
       .where('asset_face.isVisible', 'is', true)
@@ -545,6 +595,25 @@ export class PersonRepository {
       .executeTakeFirstOrThrow();
   }
 
+  // Admin face-thumbnail read: no person join, and INCLUDES tombstoned faces (the "not a face"
+  // action sets deletedAt but keeps boundingBox/dims, and resolutions history must still render).
+  // Slice 1 (F1): excludes faces on a non-reviewable (Locked/Hidden) asset — the Locked folder requires
+  // the owner's elevated re-authentication, which this admin route never performs. A Locked-asset face id
+  // makes this throw, which the sole caller (face-repair.service.ts getAdminFaceThumbnail) already turns
+  // into a 404, so the asset's existence is never disclosed. The tombstone inclusion above is unaffected —
+  // deliberate and still tested.
+  @GenerateSql({ params: [DummyValue.UUID] })
+  getFaceByIdIncludingTombstoned(id: string) {
+    return this.db
+      .selectFrom('asset_face')
+      .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+      .selectAll('asset_face')
+      .select(withPerson)
+      .where('asset_face.id', '=', id)
+      .where((eb) => reviewableAssetVisibility(eb))
+      .executeTakeFirstOrThrow();
+  }
+
   @GenerateSql({ params: [{ personId: DummyValue.UUID, take: 50, skip: 0 }] })
   getRepresentativeFaces(options: RepresentativeFaceListOptions) {
     return this.db
@@ -695,8 +764,12 @@ export class PersonRepository {
   }
 
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
-  async reassignFace(assetFaceId: string, newPersonGroupId: string): Promise<number> {
-    const result = await this.db
+  async reassignFace(
+    assetFaceId: string,
+    newPersonGroupId: string,
+    db: Kysely<DB> | Transaction<DB> = this.db,
+  ): Promise<number> {
+    const result = await db
       .updateTable('asset_face')
       .set({ personGroupId: newPersonGroupId })
       .where('asset_face.id', '=', assetFaceId)
@@ -1185,6 +1258,75 @@ export class PersonRepository {
       .where('asset_face.personGroupId', 'in', personGroupIds)
       .where('asset_face.deletedAt', 'is', null)
       .execute();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID, 20] })
+  getAssignedFaceEmbeddings(personId: string, limit: number) {
+    return this.db
+      .selectFrom('asset_face')
+      .innerJoin('face_search', 'face_search.faceId', 'asset_face.id')
+      .select('face_search.embedding')
+      .where('asset_face.personId', '=', personId)
+      .where('asset_face.deletedAt', 'is', null)
+      .where('asset_face.isVisible', 'is', true)
+      .orderBy('asset_face.id', 'asc')
+      .limit(limit)
+      .execute();
+  }
+
+  /**
+   * Slice 9 (F17): a person is only "scannable" — worth queueing `PersonSuggestionScan` for — when
+   * BOTH cheap `EXISTS` checks below hold. Neither is the KNN the scan job itself performs, so
+   * together they cannot tell whether any candidate actually falls within the configured distance
+   * band for this specific person — that would need a per-person embedding search, which this
+   * pre-check deliberately avoids (`handlePersonSuggestionScan` still does that work). A person who
+   * passes both checks but whose real candidates all sit outside the band still gets a job that
+   * finds nothing and returns early; that residual waste is not what this narrows.
+   *
+   * What it does remove: the previous predicate only correlated on `asset.ownerId = person.ownerId`,
+   * so a single unassigned face anywhere in the owner's library queued a scan for every named,
+   * visible, non-pet person that owner has — regardless of whether that person has ever been seen
+   * in a photo. That is fixed by requiring the person to have at least one of their own assigned,
+   * live, visible faces with an embedding (the exact precondition `getAssignedFaceEmbeddings` needs
+   * before `handlePersonSuggestionScan` will do any work — a person with none is always Skipped
+   * immediately, so queueing them can never do anything). The owner-side `EXISTS` keeps the
+   * ownership correlation but is narrowed to `reviewableAssetVisibility` (Slice 1) so a Locked or
+   * Hidden stray face no longer counts as a candidate the scan would never actually search against.
+   */
+  getScannablePeopleWithUnassignedFaces() {
+    return this.db
+      .selectFrom('person')
+      .select(['person.id', 'person.ownerId'])
+      .where('person.name', '!=', '')
+      .where('person.isHidden', '=', false)
+      .where('person.type', '=', 'person')
+      .where((eb) =>
+        eb.exists(
+          eb
+            .selectFrom('asset_face')
+            .innerJoin('face_search', 'face_search.faceId', 'asset_face.id')
+            .select('asset_face.id')
+            .whereRef('asset_face.personId', '=', 'person.id')
+            .where('asset_face.deletedAt', 'is', null)
+            .where('asset_face.isVisible', 'is', true),
+        ),
+      )
+      .where((eb) =>
+        eb.exists(
+          eb
+            .selectFrom('asset_face')
+            .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+            .select('asset_face.id')
+            .whereRef('asset.ownerId', '=', 'person.ownerId')
+            .where('asset.deletedAt', 'is', null)
+            .where('asset_face.personId', 'is', null)
+            .where('asset_face.deletedAt', 'is', null)
+            .where('asset_face.isVisible', 'is', true)
+            .where('asset_face.sourceType', '=', SourceType.MachineLearning)
+            .where((eb2) => reviewableAssetVisibility(eb2)),
+        ),
+      )
+      .stream();
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })

@@ -36,6 +36,37 @@ class PersonalMergeDb {
   deleteFrom(table: string) {
     return new PersonalMergeDeleteBuilder(this, table);
   }
+
+  // `mergePersonProfile` re-points `face_repair_decline` via an insert-select + onConflict-doNothing (Face
+  // Cleanup temporal-consistency hardening, Slice 1). These personal-merge fixtures never seed declines and
+  // don't assert on them, so — like the generic (non-person/asset_face) branches of the update/delete
+  // builders above — this is a no-op stub that only needs to satisfy the chained call shape without throwing.
+  insertInto(table: string) {
+    return new PersonalMergeInsertBuilder(this, table);
+  }
+}
+
+class PersonalMergeInsertBuilder {
+  constructor(
+    private db: PersonalMergeDb,
+    private table: string,
+  ) {}
+
+  columns() {
+    return this;
+  }
+
+  expression() {
+    return this;
+  }
+
+  onConflict() {
+    return this;
+  }
+
+  execute() {
+    return [];
+  }
 }
 
 class PersonalMergeSelectBuilder {
@@ -109,6 +140,19 @@ class PersonalMergeUpdateBuilder {
   where(column: string, _operator: string, value: string) {
     this.whereColumn = column;
     this.whereValue = value;
+    return this;
+  }
+
+  // `retargetVerdictPersonId`'s survivor-promotion step is an aliased `updateTable(...).from(...)`
+  // correlated update over `face_person_verdict`. These personal-merge fixtures never seed verdicts and
+  // don't assert on them, so — like the generic branches of `execute()` below — these only need to
+  // satisfy the chained call shape without throwing. Real coverage for that statement lives in
+  // `test/medium/specs/services/face-verdict.merge-durability.spec.ts`, against a real database.
+  from(_table: string) {
+    return this;
+  }
+
+  whereRef(_left: string, _operator: string, _right: string) {
     return this;
   }
 
@@ -291,6 +335,16 @@ class SharedSpaceMergeUpdateBuilder {
   where(column: string, _operator: string, value: string) {
     this.whereColumn = column;
     this.whereValue = value;
+    return this;
+  }
+
+  // Chainable no-ops for `retargetVerdictSpacePersonId`'s aliased correlated update — see the twin
+  // comment on PersonalMergeUpdateBuilder above.
+  from(_table: string) {
+    return this;
+  }
+
+  whereRef(_left: string, _operator: string, _right: string) {
     return this;
   }
 
@@ -1819,8 +1873,11 @@ describe('IdentityMergePropagationService', () => {
         { actorUserId: 'owner-1' },
       );
 
+      // Slice 4 / R1: preserveSource:true so the call PRESERVES each rode-along face's prior source
+      // instead of fabricating a 'manual' placement (see face-identity.repository.ts's preserveManualSource
+      // doc comment for why this must be omission, not a CASE, on the human people-merge path).
       expect(mocks.faceIdentity.linkPersonFaces).toHaveBeenCalledWith(
-        { personId: 'person-x', identityId: 'identity-x', source: 'manual' },
+        { personId: 'person-x', identityId: 'identity-x', source: 'manual', preserveSource: true },
         expect.anything(),
       );
       expect(mocks.faceIdentity.linkPersonFaces.mock.invocationCallOrder[0]).toBeLessThan(

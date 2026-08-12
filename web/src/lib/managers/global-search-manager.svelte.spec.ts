@@ -3374,6 +3374,7 @@ describe('tagsDisabled persists across close/reopen', () => {
     vi.mocked(getAllTags).mockResolvedValue([{ id: 't1', name: 'beach', color: null }] as unknown as Awaited<
       ReturnType<typeof getAllTags>
     >);
+    vi.mocked(getAllTags).mockClear();
     m.setQuery('tag');
     await vi.advanceTimersByTimeAsync(200);
     expect(m.sections.tags).toEqual({ status: 'error', message: 'tag_cache_too_large' });
