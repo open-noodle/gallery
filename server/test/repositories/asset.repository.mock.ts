@@ -65,5 +65,6 @@ export const newAssetRepositoryMock = (): Mocked<RepositoryInterface<AssetReposi
     getForMetadataExtractionTags: vitest.fn(),
     getForFaces: vitest.fn(),
     getForUpdateTags: vitest.fn(),
+    getExternalAssetIds: vitest.fn().mockResolvedValue(new Set<string>()),
   };
 };
