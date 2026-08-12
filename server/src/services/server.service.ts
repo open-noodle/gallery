@@ -176,11 +176,6 @@ export class ServerService extends BaseService {
       maintenanceMode: false,
       minFaces: config.machineLearning.facialRecognition.minFaces,
       availableMemoryTypes: MEMORY_TYPE_KEYS.filter((key) => getAdminAvailableMemoryTypeKeys(config.memories).has(key)),
-      // Gallery-fork: what a user is shown must never contradict what is enforced against them,
-      // so enabling derivative accounting for quota implies showing that same number. Otherwise
-      // display=false + quota=true reads "10 GB of 20 GB" right up to a rejected upload.
-      storageUsageIncludesDerivatives:
-        config.storageUsage.includeDerivativesInDisplay || config.storageUsage.includeDerivativesInQuota,
     };
   }
 

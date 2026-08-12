@@ -246,8 +246,7 @@ export type SystemConfig = {
   };
   // Gallery-fork: opt-in accounting for server-generated files (thumbnails, transcodes).
   storageUsage: {
-    includeDerivativesInDisplay: boolean;
-    includeDerivativesInQuota: boolean;
+    includeDerivatives: boolean;
   };
   user: {
     deleteDelay: number;
@@ -507,11 +506,10 @@ export const defaults = Object.freeze<SystemConfig>({
     enabled: true,
     categories: [],
   },
-  // Gallery-fork: both default false, so out of the box storage usage matches upstream Immich
+  // Gallery-fork: defaults to false, so out of the box storage usage matches upstream Immich
   // and counts original files only.
   storageUsage: {
-    includeDerivativesInDisplay: false,
-    includeDerivativesInQuota: false,
+    includeDerivatives: false,
   },
   user: {
     deleteDelay: 7,

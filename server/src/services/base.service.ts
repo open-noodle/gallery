@@ -621,20 +621,22 @@ export class BaseService {
   }
 
   // Gallery-fork: upstream calls userRepository.syncUsage() directly from its two call sites
-  // (user.service.ts handleUserSyncUsage and user-admin.service.ts). The fork keeps that behaviour
-  // as-is and layers the optional physical-usage pass on top; all of its logic lives in
-  // src/gallery/storage-usage.ts.
+  // (user.service.ts handleUserSyncUsage and user-admin.service.ts). The fork routes both through
+  // here so a single admin toggle can decide what quotaUsageInBytes means: upstream's originals-only
+  // sum, or a physical walk that also counts thumbnails and transcodes. Either way the column holds
+  // the figure the admin asked for, so display and quota enforcement need no knowledge of the
+  // setting. The walk's own logic lives in src/gallery/storage-usage.ts.
   protected async syncUsage(id?: string): Promise<void> {
-    await this.userRepository.syncUsage(id);
-
-    // The walk is expensive — hundreds of thousands of stat calls on a large install. With both
-    // toggles off nothing reads the column, so skip it and keep the nightly job as cheap as
-    // upstream's.
+    // The walk is expensive — hundreds of thousands of stat calls on a large install — so the
+    // default path stays exactly as cheap as upstream's single statement.
     const { storageUsage } = await this.getConfig({ withCache: false });
-    if (!storageUsage.includeDerivativesInDisplay && !storageUsage.includeDerivativesInQuota) {
+    if (!storageUsage.includeDerivatives) {
+      await this.userRepository.syncUsage(id);
       return;
     }
 
+    // Deliberately either/or: running upstream's statement here too would immediately overwrite
+    // the physical figure with the originals-only one.
     // lazy import to avoid circular dependency (StorageService extends BaseService)
     const { StorageService } = await import('./storage.service.js');
     const s3 = StorageService.getS3Backend();
@@ -649,7 +651,7 @@ export class BaseService {
         storageRepository: this.storageRepository,
         s3,
       });
-      await this.userRepository.setPhysicalUsage(user.id, usage);
+      await this.userRepository.setUsage(user.id, usage);
     }
   }
 

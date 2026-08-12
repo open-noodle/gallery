@@ -126,12 +126,6 @@ const ServerConfigSchema = z
     maintenanceMode: z.boolean().describe('Whether maintenance mode is active'),
     minFaces: z.int().describe('People min faces server default'),
     availableMemoryTypes: z.array(z.string()).describe('Globally-available memory type keys'),
-    // Gallery-fork: tells clients (the web sidebar, the admin user page) which usage number to
-    // show. Derived from both storageUsage toggles, not just the display one — see
-    // ServerService.getSystemConfig.
-    storageUsageIncludesDerivatives: z
-      .boolean()
-      .describe('Whether displayed storage usage includes thumbnails and transcoded videos'),
   })
   .meta({ id: 'ServerConfigDto' });
 

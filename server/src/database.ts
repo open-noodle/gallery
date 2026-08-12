@@ -25,8 +25,6 @@ export type AuthUser = {
   name: string;
   email: string;
   quotaUsageInBytes: number;
-  // Gallery-fork: physical (derivative-inclusive) storage usage.
-  physicalUsageInBytes: number;
   quotaSizeInBytes: number | null;
 };
 
@@ -145,8 +143,6 @@ export type UserAdmin = User & {
   oauthId: string;
   quotaSizeInBytes: number | null;
   quotaUsageInBytes: number;
-  // Gallery-fork: physical (derivative-inclusive) storage usage.
-  physicalUsageInBytes: number;
   status: UserStatus;
   metadata: UserMetadataItem[];
 };
@@ -496,16 +492,7 @@ export const columns = {
     'asset_file.isProgressive',
     'asset_file.isTransparent',
   ],
-  authUser: [
-    'user.id',
-    'user.name',
-    'user.email',
-    'user.isAdmin',
-    'user.quotaUsageInBytes',
-    // Gallery-fork: quota enforcement reads this off the auth user when opted in.
-    'user.physicalUsageInBytes',
-    'user.quotaSizeInBytes',
-  ],
+  authUser: ['user.id', 'user.name', 'user.email', 'user.isAdmin', 'user.quotaUsageInBytes', 'user.quotaSizeInBytes'],
   authApiKey: ['api_key.id', 'api_key.permissions'],
   authSession: ['session.id', 'session.updatedAt', 'session.pinExpiresAt', 'session.appVersion'],
   user: userColumns,
@@ -523,8 +510,6 @@ export const columns = {
     'storageLabel',
     'quotaSizeInBytes',
     'quotaUsageInBytes',
-    // Gallery-fork: exposed as UserAdminResponseDto.physicalUsageInBytes.
-    'physicalUsageInBytes',
   ],
   tag: ['tag.id', 'tag.value', 'tag.createdAt', 'tag.updatedAt', 'tag.color', 'tag.parentId'],
   apiKey: ['id', 'name', 'userId', 'createdAt', 'updatedAt', 'permissions'],

@@ -375,16 +375,6 @@ where
 update "user"
 set
   "quotaUsageInBytes" = "quotaUsageInBytes" + $1,
-  "physicalUsageInBytes" = greatest(0, "physicalUsageInBytes" + $2),
-  "updatedAt" = $3
-where
-  "id" = $4::uuid
-  and "user"."deletedAt" is null
-
--- UserRepository.setPhysicalUsage
-update "user"
-set
-  "physicalUsageInBytes" = $1,
   "updatedAt" = $2
 where
   "id" = $3::uuid
@@ -407,3 +397,12 @@ set
 where
   "user"."deletedAt" is null
   and "user"."id" = $2::uuid
+
+-- UserRepository.setUsage
+update "user"
+set
+  "quotaUsageInBytes" = $1,
+  "updatedAt" = $2
+where
+  "id" = $3::uuid
+  and "user"."deletedAt" is null

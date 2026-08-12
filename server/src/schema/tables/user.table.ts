@@ -74,11 +74,6 @@ export class UserTable {
   @Column({ type: 'bigint', default: 0 })
   quotaUsageInBytes!: Generated<ColumnType<number>>;
 
-  // Gallery-fork: originals + thumbnails + transcodes, as measured on disk/S3. Maintained only
-  // while a storageUsage toggle is enabled; quotaUsageInBytes above stays upstream-exact.
-  @Column({ type: 'bigint', default: 0 })
-  physicalUsageInBytes!: Generated<ColumnType<number>>;
-
   @Column({ type: 'character varying', default: UserStatus.Active })
   status!: Generated<UserStatus>;
 

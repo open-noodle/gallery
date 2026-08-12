@@ -454,10 +454,7 @@ const SystemConfigTrashSchema = z
 // Gallery-fork: opt-in accounting for server-generated files (thumbnails, transcodes).
 const SystemConfigStorageUsageSchema = z
   .object({
-    includeDerivativesInDisplay: configBool.describe(
-      'Include thumbnails and transcoded videos in the displayed storage usage',
-    ),
-    includeDerivativesInQuota: configBool.describe('Include thumbnails and transcoded videos in quota enforcement'),
+    includeDerivatives: configBool.describe('Include thumbnails and transcoded videos in storage usage'),
   })
   .meta({ id: 'SystemConfigStorageUsageDto' });
 
