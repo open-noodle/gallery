@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { authManager } from '$lib/managers/auth-manager.svelte';
   import { getAdminFaceThumbnailUrl } from '$lib/utils/people-utils';
   import {
     createFaceRepairOwnerPerson,
@@ -40,6 +41,11 @@
   };
 
   const { ownerId, faceCount, suggestedPersonId = null, showLock = true, onClose }: Props = $props();
+
+  // Creating a person is a POST (`owner/:ownerId/people`), refused for the public demo's read-only user.
+  // Only the CREATE affordance is gated — search and row selection stay fully usable, since neither writes
+  // anything. Gated on `isReadOnlyDemo`, never `canPreviewAdmin`, so real admins keep the row.
+  const isReadOnlyDemo = $derived(authManager.isReadOnlyDemo);
 
   let query = $state('');
   let people = $state<OwnerPerson[]>([]);
@@ -203,7 +209,7 @@
           </button>
         {/each}
 
-        {#if trimmedQuery}
+        {#if trimmedQuery && !isReadOnlyDemo}
           <button
             type="button"
             class="flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left font-bold text-primary hover:bg-gray-100 dark:hover:bg-gray-800"
