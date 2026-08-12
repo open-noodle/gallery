@@ -13,6 +13,12 @@ const AddToSpaceArgs = z.object({
   spaceIds: z.array(z.uuidv4()),
 });
 
+const AddToSpaceAlbumArgs = z.object({
+  assetId: z.uuidv4(),
+  spaceId: z.uuidv4(),
+  albumName: z.string().trim().min(1),
+});
+
 type GalleryHandler = (auth: AuthDto, args: unknown) => Promise<GalleryDispatchResult>;
 
 /** Returned by `runGuarded` when an expected, user-fixable failure was swallowed. */
@@ -65,6 +71,7 @@ export class GalleryWorkflowHostService extends BaseService {
 
   private readonly handlers: Record<string, GalleryHandler> = {
     addToSpace: (auth, args) => this.handleAddToSpace(auth, args),
+    addToSpaceAlbum: (auth, args) => this.handleAddToSpaceAlbum(auth, args),
   };
 
   get methodNames(): string[] {
@@ -102,5 +109,45 @@ export class GalleryWorkflowHostService extends BaseService {
     }
 
     return skipped ? { ok: false, reason: 'no-access' } : { ok: true };
+  }
+
+  private async handleAddToSpaceAlbum(auth: AuthDto, args: unknown): Promise<GalleryDispatchResult> {
+    const parsed = AddToSpaceAlbumArgs.safeParse(args);
+    if (!parsed.success) {
+      this.logger.warn(`addToSpaceAlbum: invalid config — ${parsed.error.message}`);
+      return { ok: false, reason: 'invalid-config' };
+    }
+
+    const { assetId, spaceId, albumName } = parsed.data;
+    const { album } = this.collaborators();
+
+    const outcome = await this.runGuarded(`addToSpaceAlbum(${spaceId})`, async () => {
+      const albumId = await this.resolveSpaceAlbum(auth, spaceId, albumName);
+      await album.addAssets(auth, albumId, { ids: [assetId] });
+    });
+
+    return outcome === SKIPPED ? { ok: false, reason: 'no-access' } : { ok: true };
+  }
+
+  /** Finds the named album among a space's linked albums, creating and linking it when absent. */
+  private async resolveSpaceAlbum(auth: AuthDto, spaceId: string, albumName: string): Promise<string> {
+    const { sharedSpace, album } = this.collaborators();
+    const target = albumName.toLowerCase();
+
+    const linkedAlbums = await sharedSpace.getLinkedAlbums(auth, spaceId);
+    const matches = linkedAlbums
+      .filter((candidate) => candidate.albumName.trim().toLowerCase() === target)
+      // Oldest wins, tie-broken on id, so repeated runs converge on one album rather than fan out.
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
+
+    const existing = matches[0];
+    if (existing) {
+      return existing.id;
+    }
+
+    const created = await album.create(auth, { albumName });
+    await sharedSpace.linkAlbum(auth, spaceId, created.id);
+
+    return created.id;
   }
 }

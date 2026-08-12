@@ -29,6 +29,20 @@ describe('gallery plugin manifest', () => {
   });
 });
 
+describe('manifest / handler parity', () => {
+  // U1 — the dispatcher is string-keyed across the WASM boundary, so a renamed handler would
+  // otherwise break only at runtime. Introduced here, in the task that makes it pass, so no commit
+  // in this plan ever leaves the suite red.
+  it('has a handler for every manifest method and no extras', () => {
+    const { sut } = newTestService(GalleryWorkflowHostService);
+    expect(sut.methodNames.sort()).toEqual(
+      readManifest()
+        .methods.map((method: { name: string }) => method.name)
+        .sort(),
+    );
+  });
+});
+
 const auth = { user: { id: 'user-1' } } as AuthDto;
 
 const setup = () => newTestService(GalleryWorkflowHostService);
@@ -128,6 +142,11 @@ const setupTestable = () => {
 
 const run = (sut: TestableService, config: unknown) => sut.dispatch(auth, 'addToSpace', config);
 
+// Hoisted per unicorn/consistent-function-scoping — neither closes over anything from a describe
+// block, so both must live at module scope rather than be redeclared inside it.
+const linked = (id: string, albumName: string, createdAt: string) => ({ id, albumName, createdAt });
+const runAlbum = (sut: TestableService, config: unknown) => sut.dispatch(auth, 'addToSpaceAlbum', config);
+
 describe('addToSpace', () => {
   it('adds the asset once per space', async () => {
     // U6
@@ -212,5 +231,136 @@ describe('addToSpace', () => {
     const otherAuth = { user: { id: 'someone-else' } } as AuthDto;
     await sut.dispatch(otherAuth, 'addToSpace', { assetId: ASSET, spaceIds: [SPACE_A] });
     expect(doubles.sharedSpace.addAssets).toHaveBeenCalledWith(otherAuth, SPACE_A, { assetIds: [ASSET] });
+  });
+});
+
+describe('addToSpaceAlbum', () => {
+  const ALBUM_OLD = '00000000-0000-4000-8000-0000000000e1';
+  const ALBUM_NEW = '00000000-0000-4000-8000-0000000000e2';
+  const config = { assetId: ASSET, spaceId: SPACE_A, albumName: 'Holidays 2026' };
+
+  it('uses an existing album without creating or linking', async () => {
+    // U15 / U20 — linkAlbum enqueues grant reconcile + face sync; firing it per asset floods the queue
+    const { sut, doubles } = setupTestable();
+    doubles.sharedSpace.getLinkedAlbums.mockResolvedValue([linked(ALBUM_OLD, 'Holidays 2026', '2026-01-01T00:00:00Z')]);
+    await expect(runAlbum(sut, config)).resolves.toEqual({ ok: true });
+    expect(doubles.album.create).not.toHaveBeenCalled();
+    expect(doubles.sharedSpace.linkAlbum).not.toHaveBeenCalled();
+    expect(doubles.album.addAssets).toHaveBeenCalledWith(auth, ALBUM_OLD, { ids: [ASSET] });
+  });
+
+  it('matches album names ignoring case and surrounding whitespace', async () => {
+    // U16
+    const { sut, doubles } = setupTestable();
+    doubles.sharedSpace.getLinkedAlbums.mockResolvedValue([linked(ALBUM_OLD, 'holidays 2026', '2026-01-01T00:00:00Z')]);
+    await runAlbum(sut, { ...config, albumName: '  Holidays 2026  ' });
+    expect(doubles.album.create).not.toHaveBeenCalled();
+    expect(doubles.album.addAssets).toHaveBeenCalledWith(auth, ALBUM_OLD, { ids: [ASSET] });
+  });
+
+  it('picks the oldest album when names collide', async () => {
+    // U17
+    const { sut, doubles } = setupTestable();
+    doubles.sharedSpace.getLinkedAlbums.mockResolvedValue([
+      linked(ALBUM_NEW, 'Holidays 2026', '2026-06-01T00:00:00Z'),
+      linked(ALBUM_OLD, 'Holidays 2026', '2026-01-01T00:00:00Z'),
+    ]);
+    await runAlbum(sut, config);
+    expect(doubles.album.addAssets).toHaveBeenCalledWith(auth, ALBUM_OLD, { ids: [ASSET] });
+  });
+
+  it('breaks a createdAt tie on album id, deterministically', async () => {
+    // U18
+    const { sut, doubles } = setupTestable();
+    doubles.sharedSpace.getLinkedAlbums.mockResolvedValue([
+      linked(ALBUM_NEW, 'Holidays 2026', '2026-01-01T00:00:00Z'),
+      linked(ALBUM_OLD, 'Holidays 2026', '2026-01-01T00:00:00Z'),
+    ]);
+    await runAlbum(sut, config);
+    expect(doubles.album.addAssets).toHaveBeenCalledWith(auth, ALBUM_OLD, { ids: [ASSET] });
+  });
+
+  it('creates, links, then adds — in that order', async () => {
+    // U19
+    const { sut, doubles } = setupTestable();
+    const order: string[] = [];
+    doubles.sharedSpace.getLinkedAlbums.mockResolvedValue([]);
+    doubles.album.create.mockImplementation(() => {
+      order.push('create');
+      return Promise.resolve({ id: ALBUM_NEW });
+    });
+    doubles.sharedSpace.linkAlbum.mockImplementation(() => {
+      order.push('link');
+      return Promise.resolve();
+    });
+    doubles.album.addAssets.mockImplementation(() => {
+      order.push('add');
+      return Promise.resolve([]);
+    });
+
+    await expect(runAlbum(sut, config)).resolves.toEqual({ ok: true });
+    expect(order).toEqual(['create', 'link', 'add']);
+    expect(doubles.album.create).toHaveBeenCalledWith(auth, { albumName: 'Holidays 2026' });
+    expect(doubles.sharedSpace.linkAlbum).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a blank album name without creating anything', async () => {
+    // U21
+    const { sut, doubles } = setupTestable();
+    await expect(runAlbum(sut, { ...config, albumName: ' '.repeat(3) })).resolves.toEqual({
+      ok: false,
+      reason: 'invalid-config',
+    });
+    expect(doubles.album.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects a missing space id', async () => {
+    // U22
+    const { sut } = setupTestable();
+    await expect(runAlbum(sut, { assetId: ASSET, albumName: 'Holidays 2026' })).resolves.toEqual({
+      ok: false,
+      reason: 'invalid-config',
+    });
+  });
+
+  it('succeeds when the asset is already in the album', async () => {
+    // U25
+    const { sut, doubles } = setupTestable();
+    doubles.sharedSpace.getLinkedAlbums.mockResolvedValue([linked(ALBUM_OLD, 'Holidays 2026', '2026-01-01T00:00:00Z')]);
+    doubles.album.addAssets.mockResolvedValue([{ id: ASSET, success: false, error: 'duplicate' }]);
+    await expect(runAlbum(sut, config)).resolves.toEqual({ ok: true });
+  });
+
+  it('reports ok:false when the album cannot be added to', async () => {
+    // U24
+    const { sut, doubles } = setupTestable();
+    doubles.sharedSpace.getLinkedAlbums.mockResolvedValue([linked(ALBUM_OLD, 'Holidays 2026', '2026-01-01T00:00:00Z')]);
+    doubles.album.addAssets.mockRejectedValue(new BadRequestException('no rights'));
+    await expect(runAlbum(sut, config)).resolves.toMatchObject({ ok: false });
+  });
+
+  it('does not create or link when the space albums cannot be read', async () => {
+    // U30
+    const { sut, doubles } = setupTestable();
+    doubles.sharedSpace.getLinkedAlbums.mockRejectedValue(new ForbiddenException('not a member'));
+    await expect(runAlbum(sut, config)).resolves.toMatchObject({ ok: false });
+    expect(doubles.album.create).not.toHaveBeenCalled();
+    expect(doubles.sharedSpace.linkAlbum).not.toHaveBeenCalled();
+  });
+
+  it('creates no second album when the job is retried', async () => {
+    // U27 — BullMQ retries re-run every step of the workflow
+    const { sut, doubles } = setupTestable();
+    doubles.sharedSpace.getLinkedAlbums
+      .mockResolvedValueOnce([])
+      .mockResolvedValue([linked(ALBUM_NEW, 'Holidays 2026', '2026-01-01T00:00:00Z')]);
+    doubles.album.create.mockResolvedValue({ id: ALBUM_NEW });
+
+    await runAlbum(sut, config);
+    await runAlbum(sut, config);
+
+    expect(doubles.album.create).toHaveBeenCalledTimes(1);
+    expect(doubles.sharedSpace.linkAlbum).toHaveBeenCalledTimes(1);
+    expect(doubles.album.addAssets).toHaveBeenCalledTimes(2);
   });
 });
