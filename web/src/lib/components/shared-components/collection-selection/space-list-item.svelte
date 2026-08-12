@@ -99,13 +99,13 @@
     <span class="flex h-full flex-col items-start justify-center overflow-hidden">
       <span class="w-full shrink truncate">{nameParts[0]}<b>{nameParts[1]}</b>{nameParts[2]}</span>
       <span class="flex gap-2 text-sm" data-testid="space-row-details">
-        {#if space.assetCount != null}
+        {#if space.assetCount !== undefined}
           <span>{$t('items_count', { values: { count: space.assetCount } })}</span>
         {/if}
-        {#if space.assetCount != null && space.memberCount != null}
+        {#if space.assetCount !== undefined && space.memberCount !== undefined}
           <span>&middot;</span>
         {/if}
-        {#if space.memberCount != null}
+        {#if space.memberCount !== undefined}
           <span>{space.memberCount} {$t('members')}</span>
         {/if}
       </span>
