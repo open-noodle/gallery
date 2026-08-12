@@ -8,7 +8,7 @@
 
 Upstream Immich ships a workflow engine driven by WASM plugins. Gallery's shared spaces are invisible to it: a workflow can add an uploaded asset to an album, but not to a space or to a space album.
 
-This design adds two action steps — **Add to space** and **Add to space album** — via a fork-owned plugin and a single generic host-function seam. The permanent cost to upstream-owned files is **7 files, ~21 lines**, and that cost is **flat**: every future fork action or filter adds zero upstream lines.
+This design adds two action steps — **Add to space** and **Add to space album** — via a fork-owned plugin and a single generic host-function seam. The permanent cost to upstream-owned files is **6 files, ~19 lines**, and that cost is **flat**: every future fork action or filter adds zero upstream lines.
 
 ## 2. How upstream's workflow engine works
 
@@ -87,13 +87,14 @@ AssetCreate / AssetMetadataExtraction
 | --------------------------------------------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------- |
 | `server/src/services/workflow-execution.service.ts` | ~5    | `gallery` in `functions` and `stubs`; one `BaseService.create`; one `importFolder(resourcePaths.galleryPlugin)` in `onPluginSync` |
 | `server/src/repositories/config.repository.ts`      | 2     | `resourcePaths.galleryPlugin` — type line plus value line                                                                         |
-| `server/src/services/index.ts`                      | 2     | Register the fork service — the same two lines every fork service already has                                                     |
 | `server/Dockerfile`                                 | ~4    | Build and copy inside the **existing** `plugins` stage                                                                            |
 | `docker/docker-compose.dev.yml`                     | 1     | Bind-mount, mirroring line 76                                                                                                     |
 | `web/src/lib/types.ts`                              | 1     | `uiHint.type` union gains `'SpaceId'`                                                                                             |
 | `web/src/lib/components/SchemaConfiguration.svelte` | ~6    | One branch beside the existing `AlbumId` branch at line 81                                                                        |
 
 Every one of these is registered in `docs/fork/ownership.yml` under `upstream_extension_paths`.
+
+`server/src/services/index.ts` is deliberately **not** on this list. The dispatcher is built with `BaseService.create` and never injected, and it declares no `@OnEvent` or `@OnJob`, so Nest never needs to know it exists — which removes the two lines every other fork service costs.
 
 ### 5.2 Fork-owned files
 
@@ -253,7 +254,9 @@ Handler:
   <SchemaSpacePicker {label} {description} array={schema.array} bind:spaceIds={getUiHintValue, setUiHintValue} />
 ```
 
-`SchemaSpacePicker.svelte` mirrors `SchemaAlbumPicker.svelte` exactly, reusing the fork's existing `SpacePickerModal` (which resolves `onClose(space?: SharedSpaceResponseDto)` — a **single** space, so array mode appends one per invocation) and `space-card.svelte` for the chosen-space chip.
+`SchemaSpacePicker.svelte` mirrors `SchemaAlbumPicker.svelte` exactly, reusing the fork's existing `SpacePickerModal` — which resolves `onClose(space?: SharedSpaceResponseDto)`, a **single** space, so array mode appends one per invocation. Space names come from `getAllSpaces()`.
+
+The chosen-space chip is a plain name plus a remove button. It must **not** reuse `space-card.svelte`: that component is a full card with a collage, member avatars, a pin menu and a route link, none of which belong in a config form.
 
 **i18n:** the picker's own label and empty-state strings are new keys and must land in all ten locales in the same commit (`en` plus `de`, `fr`, `it`, `nl`, `pl`, `es`, `ru`, `zh_Hans`, `zh_Hant`), alphabetically placed, followed by `npx prettier --write i18n/*.json`.
 
@@ -396,4 +399,4 @@ Test-first throughout: each step below names the tests that must be **red before
 6. **Dockerfile plugins-stage rows.** Confirm a production image boots and imports **both** plugins — a missing plugin folder only produces a warning, so check the log line, not just a healthy container.
 7. **`workflow-spaces.e2e-spec.ts` — E1–E5**, written last because they need the whole stack, and polling their own assertions rather than trusting `waitForQueueFinish`.
 8. Register every new and modified path in `docs/fork/ownership.yml`.
-9. Gates: `make check-server`, `make check-web`, `make lint-all`, server and web unit suites, the e2e suite, and `npx prettier --write i18n/*.json` plus prettier over `docs/`.
+9. Gates — **the `make` targets CLAUDE.md documents do not exist in this repo**; use the per-package scripts: `cd server && pnpm check && pnpm lint && pnpm test --run <path>`, `cd web && pnpm check:typescript && pnpm check:svelte && pnpm lint && pnpm test --run <path>`, the e2e suite, `make fork-ownership-coverage-check`, and `npx prettier --write i18n/*.json` plus prettier over `docs/`. Note `pnpm test -- --run <path>` (with `--`) silently runs the **entire** suite — a false green.
