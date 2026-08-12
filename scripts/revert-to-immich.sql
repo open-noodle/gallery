@@ -197,6 +197,7 @@ DROP INDEX IF EXISTS "asset_face_personId_idx";
 DROP INDEX IF EXISTS "person_ownerId_identityId_key";
 DROP INDEX IF EXISTS "person_identityId_idx";
 ALTER TABLE "person"            DROP COLUMN IF EXISTS "identityId";
+ALTER TABLE "user"              DROP COLUMN IF EXISTS "physicalUsageInBytes";
 
 -- -----------------------------------------------------------------------------
 -- 5. Strip Gallery's merged 'classification' key out of system_metadata's
@@ -411,6 +412,7 @@ DELETE FROM "kysely_migrations"
    '1784000000000-FixFaceRepairScanInFlightIndexOverride',
    '1784800000000-RepairSharedSpaceAlbumGrantDrift',
    '1785000000000-AddFaceRepairLock',
+   '1785000000000-AddPhysicalUsageInBytes',
    '1786000000000-FaceRepairLockPersonNullable',
    '1787000000000-AddFacePersonVerdict',
    '1788000000000-ReconcileFacePersonVerdictConstraints',
