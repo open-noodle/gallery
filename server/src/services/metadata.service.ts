@@ -1183,7 +1183,7 @@ export class MetadataService extends BaseService {
       // OffsetTimeOriginal, unlike iOS). Recover the original offset from the
       // upload-supplied fileCreatedAt instant so the timestamp is not shifted
       // into UTC on sync. Issue #607.
-      if (timeZone == null) {
+      if (timeZone === null) {
         const derived = deriveTimeZoneFromUploadedInstant(dateTimeOriginal, asset.fileCreatedAt);
         if (derived) {
           timeZone = derived;
