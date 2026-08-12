@@ -64,13 +64,59 @@ describe('filterStateToSearchTerms', () => {
     expect(terms).toEqual({});
   });
 
+  it('maps lensModel and state to search terms', () => {
+    const terms = filterStateToSearchTerms({
+      ...createFilterState(),
+      lensModel: 'RF24-70mm F2.8 L IS USM',
+      state: 'State of Berlin',
+    });
+
+    expect(terms).toEqual(
+      expect.objectContaining({
+        lensModel: 'RF24-70mm F2.8 L IS USM',
+        state: 'State of Berlin',
+      }),
+    );
+  });
+
+  // MetadataSearchDto's albumIds field is plural/array, so a single albumId filter must be wrapped.
+  // Dropping this would make "add all filtered results to a collection" collect every album's assets
+  // instead of just the one the user is viewing (live over-collection bug).
+  it('maps albumId to albumIds on the search terms', () => {
+    const terms = filterStateToSearchTerms({
+      ...createFilterState(),
+      albumId: 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',
+    });
+
+    expect(terms).toEqual(
+      expect.objectContaining({
+        albumIds: ['aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa'],
+      }),
+    );
+  });
+
+  // MetadataSearchDto now has an ownerId field (server-side fix landed alongside this test), so the
+  // owner/contributor filter must be forwarded like every other narrowing filter. Dropping it would
+  // make "add all filtered results to a collection" collect every owner's assets instead of just the
+  // filtered owner's (live over-collection bug).
+  it('maps ownerId to the search terms', () => {
+    const terms = filterStateToSearchTerms({ ...createFilterState(), ownerId: 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb' });
+
+    expect(terms).toEqual(expect.objectContaining({ ownerId: 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb' }));
+  });
+
+  // Assert the exact ISO instants, as the album/map page tests do. `toBeTruthy()` was vacuous:
+  // swapping takenAfter/takenBefore in buildFilterContext (filter-panel.ts) — an INVERTED date
+  // range, which matches nothing — left it green, because both fields are non-empty either way.
+  // dateBefore is an INCLUSIVE calendar day, so it maps to the EXCLUSIVE start of the next one.
   it('maps a custom date range to takenAfter / takenBefore', () => {
     const terms = filterStateToSearchTerms({
       ...createFilterState(),
       dateAfter: '2024-01-01',
       dateBefore: '2024-12-31',
     });
-    expect(terms.takenAfter).toBeTruthy();
-    expect(terms.takenBefore).toBeTruthy();
+
+    expect(terms.takenAfter).toBe('2024-01-01T00:00:00.000Z');
+    expect(terms.takenBefore).toBe('2025-01-01T00:00:00.000Z');
   });
 });

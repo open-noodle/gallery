@@ -13,7 +13,7 @@ import {
   SearchOrderField,
   SearchOrderFieldSchema,
 } from 'src/enum';
-import { IsNotSiblingOf, isoDatetimeToDate, nonEmptyPartial, stringToBool } from 'src/validation';
+import { boundedTextFilter, IsNotSiblingOf, isoDatetimeToDate, nonEmptyPartial, stringToBool } from 'src/validation';
 import z from 'zod';
 
 const ADDED_V3_2 = new HistoryBuilder().added('v3.2.0').getExtensions();
@@ -52,6 +52,10 @@ const BaseSearchSchema = z.object({
   make: z.string().nullable().optional().describe('Filter by camera make').meta(DEPRECATED_FLAT_FIELD),
   model: z.string().nullable().optional().describe('Filter by camera model').meta(DEPRECATED_FLAT_FIELD),
   lensModel: z.string().nullable().optional().describe('Filter by lens model').meta(DEPRECATED_FLAT_FIELD),
+  ownerId: z
+    .uuidv4()
+    .optional()
+    .describe('Filter by asset owner (contributor). Narrows within the current scope; never widens it.'),
   isNotInAlbum: z.boolean().optional().describe('Filter assets not in any album').meta(DEPRECATED_FLAT_FIELD),
   isInAlbum: z.boolean().optional().describe('Filter assets in at least one album'),
   personIds: z.array(ScopedPersonTokenSchema).optional().describe('Filter by person IDs').meta(DEPRECATED_FLAT_FIELD),
@@ -73,7 +77,7 @@ const BaseSearchSchema = z.object({
         .getExtensions(),
       deprecated: true,
     }),
-  ocr: z.string().optional().describe('Filter by OCR text content').meta(DEPRECATED_FLAT_FIELD),
+  ocr: boundedTextFilter().optional().describe('Filter by OCR text content').meta(DEPRECATED_FLAT_FIELD),
   // Fork field: no V3 `filter` equivalent exists, so it is NOT marked DEPRECATED_FLAT_FIELD —
   // that meta advertises a structured replacement, and there is none for shared spaces.
   spaceId: z.uuidv4().optional().describe('Shared space ID to filter by'),
@@ -151,6 +155,10 @@ const SearchSuggestionRequestBaseSchema = z.object({
   make: z.string().optional().describe('Filter by camera make'),
   model: z.string().optional().describe('Filter by camera model'),
   lensModel: z.string().optional().describe('Filter by lens model'),
+  // Contributor filter, not an ownership scope: it narrows within whatever scope the request
+  // already resolved (see FilterSuggestionFilterOptions.ownerId). Without a field here the
+  // ZodValidationPipe would silently strip it and the suggestion lists would not narrow.
+  ownerId: z.uuidv4().optional().describe('Filter by asset owner (contributor)'),
   mediaType: AssetTypeSchema.optional().describe('Filter by asset type'),
   takenAfter: isoDatetimeToDate.optional().describe('Filter suggestions by taken date (after)'),
   takenBefore: isoDatetimeToDate.optional().describe('Filter suggestions by taken date (before)'),
@@ -237,9 +245,13 @@ const FilterSuggestionsRequestBaseSchema = z.object({
     .optional()
     .describe('Filter by person IDs'),
   country: z.string().optional().describe('Filter by country'),
+  state: z.string().optional().describe('Filter by state/province'),
   city: z.string().optional().describe('Filter by city'),
   make: z.string().optional().describe('Filter by camera make'),
   model: z.string().optional().describe('Filter by camera model'),
+  lensModel: z.string().optional().describe('Filter by lens model'),
+  // See SearchSuggestionRequestBaseSchema.ownerId — a narrowing contributor filter, never a scope.
+  ownerId: z.uuidv4().optional().describe('Filter by asset owner (contributor)'),
   tagIds: z
     .preprocess((v) => (v === undefined ? undefined : Array.isArray(v) ? v : [v]), z.array(z.uuidv4()))
     .optional()
@@ -600,9 +612,15 @@ const RandomSearchSchema = withShapeExclusivity(RandomSearchBaseSchema).meta({ i
 const MetadataSearchSchema = withShapeExclusivity(
   RandomSearchBaseSchema.extend({
     id: z.uuidv4().optional().describe('Filter by asset ID').meta(DEPRECATED_FLAT_FIELD),
-    description: z.string().trim().optional().describe('Filter by description text').meta(DEPRECATED_FLAT_FIELD),
+    description: boundedTextFilter(z.string().trim())
+      .optional()
+      .describe('Filter by description text')
+      .meta(DEPRECATED_FLAT_FIELD),
     checksum: z.string().optional().describe('Filter by file checksum').meta(DEPRECATED_FLAT_FIELD),
-    originalFileName: z.string().trim().optional().describe('Filter by original file name').meta(DEPRECATED_FLAT_FIELD),
+    originalFileName: boundedTextFilter(z.string().trim())
+      .optional()
+      .describe('Filter by original file name')
+      .meta(DEPRECATED_FLAT_FIELD),
     originalPath: z.string().optional().describe('Filter by original file path').meta(DEPRECATED_FLAT_FIELD),
     previewPath: z.string().optional().describe('Filter by preview file path').meta(DEPRECATED_FLAT_FIELD),
     thumbnailPath: z.string().optional().describe('Filter by thumbnail file path').meta(DEPRECATED_FLAT_FIELD),
@@ -616,7 +634,10 @@ const MetadataSearchSchema = withShapeExclusivity(
 
 const StatisticsSearchSchema = withShapeExclusivity(
   BaseSearchSchema.extend({
-    description: z.string().trim().optional().describe('Filter by description text').meta(DEPRECATED_FLAT_FIELD),
+    description: boundedTextFilter(z.string().trim())
+      .optional()
+      .describe('Filter by description text')
+      .meta(DEPRECATED_FLAT_FIELD),
     filter: filterField,
   }),
 ).meta({ id: 'StatisticsSearchDto' });
