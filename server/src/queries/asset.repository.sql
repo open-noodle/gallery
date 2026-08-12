@@ -1217,3 +1217,12 @@ from
   "asset"
 where
   "asset"."id" = $1
+
+-- AssetRepository.getExternalAssetIds
+select
+  "asset"."id"
+from
+  "asset"
+where
+  "asset"."ownerId" = $1::uuid
+  and "asset"."libraryId" is not null
