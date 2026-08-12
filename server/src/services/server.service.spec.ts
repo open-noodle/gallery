@@ -139,6 +139,7 @@ describe(ServerService.name, () => {
     it('should respond the server features', async () => {
       await expect(sut.getFeatures()).resolves.toEqual({
         smartSearch: true,
+        smartSearchHasCutoff: false,
         duplicateDetection: true,
         facialRecognition: true,
         importFaces: false,
@@ -606,6 +607,30 @@ describe(ServerService.name, () => {
       const result = await sut.getFeatures();
 
       expect(result.trash).toBe(false);
+    });
+
+    it('reports a smart-search cutoff when clip.maxDistance is an active threshold', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({
+        machineLearning: { enabled: true, clip: { enabled: true, maxDistance: 1.2 } },
+      });
+
+      await expect(sut.getFeatures()).resolves.toMatchObject({ smartSearchHasCutoff: true });
+    });
+
+    it('reports no smart-search cutoff on the default maxDistance of 0', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({
+        machineLearning: { enabled: true, clip: { enabled: true, maxDistance: 0 } },
+      });
+
+      await expect(sut.getFeatures()).resolves.toMatchObject({ smartSearchHasCutoff: false });
+    });
+
+    it('reports no smart-search cutoff when machine learning is disabled entirely', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({
+        machineLearning: { enabled: false, clip: { enabled: true, maxDistance: 1.2 } },
+      });
+
+      await expect(sut.getFeatures()).resolves.toMatchObject({ smartSearchHasCutoff: false });
     });
   });
 

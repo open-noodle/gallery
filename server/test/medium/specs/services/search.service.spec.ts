@@ -1,6 +1,7 @@
 import { Kysely } from 'kysely';
+import { AuthDto } from 'src/dtos/auth.dto';
 import { FilterSuggestionsResponseDto, SearchSuggestionType } from 'src/dtos/search.dto';
-import { AlbumUserRole, AssetOrder, AssetVisibility, SearchOrderField } from 'src/enum';
+import { AlbumUserRole, AssetOrder, AssetVisibility, SearchOrderField, SharedSpaceRole } from 'src/enum';
 import { AccessRepository } from 'src/repositories/access.repository';
 import { AssetRepository } from 'src/repositories/asset.repository';
 import { DatabaseRepository } from 'src/repositories/database.repository';
@@ -15,6 +16,7 @@ import { DB } from 'src/schema';
 import { SearchService } from 'src/services/search.service';
 import { upsertTags } from 'src/utils/tag';
 import { newMediumService } from 'test/medium.factory';
+import { createTwoOwnerSpace } from 'test/medium/fixtures/two-owner-space';
 import { factory } from 'test/small.factory';
 import { getKyselyDB } from 'test/utils';
 
@@ -157,6 +159,16 @@ const seedSpaceAssetWithFacets = async (
   const { person } = await ctx.newPerson({ ownerId, name: `${marker}-Person` });
   await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
   return asset;
+};
+
+/** Asset ids returned by searchMetadata for the given filter. */
+const searchIds = async (
+  sut: ReturnType<typeof setup>['sut'],
+  auth: AuthDto,
+  dto: Parameters<SearchService['searchMetadata']>[1],
+) => {
+  const response = await sut.searchMetadata(auth, dto);
+  return response.assets.items.map((asset) => asset.id);
 };
 
 beforeAll(async () => {
@@ -1323,6 +1335,34 @@ describe(SearchService.name, () => {
       expect(result.cameraMakes).toContain('Sony');
       expect(result.people.map((p) => p.name)).toContain('Ada');
     });
+
+    it('E19: camera suggestions in a Space include cameras from assets the viewer does not own', async () => {
+      const { sut, ctx } = setup();
+      const { user: anna } = await ctx.newUser();
+      const { user: ben } = await ctx.newUser();
+      const { user: viewer } = await ctx.newUser();
+
+      const { space } = await ctx.newSharedSpace({ createdById: anna.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: anna.id, role: SharedSpaceRole.Owner });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: ben.id, role: SharedSpaceRole.Editor });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: viewer.id, role: SharedSpaceRole.Viewer });
+
+      for (const [ownerId, make] of [
+        [anna.id, 'Apple'],
+        [ben.id, 'Canon'],
+      ] as const) {
+        const { asset } = await ctx.newAsset({ ownerId });
+        await ctx.newExif({ assetId: asset.id, make, timeZone: 'UTC' });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: ownerId });
+      }
+
+      const auth = factory.auth({ user: { id: viewer.id } });
+      const result = await sut.getFilterSuggestions(auth, { spaceId: space.id });
+
+      // applySuggestionScope's spaceId branch (search.repository.ts:1257-1274) carries NO ownerId
+      // predicate. If someone reintroduces one, the viewer sees an empty dropdown — issue #655.
+      expect(result.cameraMakes).toEqual(expect.arrayContaining(['Apple', 'Canon']));
+    });
   });
 
   describe('getFilterSuggestions album permission boundaries', () => {
@@ -1790,6 +1830,146 @@ describe(SearchService.name, () => {
       const result = await sut.searchMetadata(auth, { spaceId: space.id });
 
       expect(result.assets.items.find((a) => a.id === albumAsset.id)).toBeUndefined();
+    });
+  });
+
+  /**
+   * The `ownerId` (contributor) filter on the SEARCH/MAP query builder.
+   *
+   * `ownerId` lives on BaseSearchSchema (search.dto.ts), so metadata/random/smart/statistics all
+   * inherit it, and `GET /gallery/map/markers` forwards it too — five endpoints whose ONLY
+   * implementation of the filter is a single clause in searchAssetBuilder (database.ts):
+   *
+   *     .$if(options.ownerId !== undefined, (qb) => qb.where('asset.ownerId', '=', asUuid(options.ownerId!)))
+   *
+   * That is a DIFFERENT builder from the timeline's withTimeBucketAssetFilters (asset.repository.ts),
+   * whose equivalent contract is pinned by E20/E21/E21b/E21c in timeline.service.spec.ts. Until these
+   * tests existed, the whole 4,799-test unit suite stayed green with the clause above mutated to
+   * `.$if(false, …)`, and the only guards against merging ownerId into the `userIds` SCOPING
+   * predicate — a cross-owner widening leak — were service-level MOCK assertions, which a
+   * repository-level change bypasses entirely.
+   *
+   * Two mutations must break something here:
+   *   1. drop the AND  → a stranger's ownerId returns the caller's whole visible scope, not [].
+   *   2. anyUuid([...userIds, ownerId]) → the stranger's OWN assets come back. A real leak.
+   * Every assertion below is paired with a NON-EMPTY BASELINE, or "returns []" would prove nothing.
+   */
+  describe('contextual filters — ownerId (searchAssetBuilder)', () => {
+    it('narrows a Space search to one contributor', async () => {
+      const { sut, ctx } = setup();
+      const { space, anna, viewer, annaAsset, benAsset } = await createTwoOwnerSpace(ctx);
+      const auth = factory.auth({ user: { id: viewer.id } });
+
+      // Baseline: unfiltered, the viewer sees BOTH contributors. Without this the assertion below
+      // would pass vacuously on any bug that empties the result.
+      const unfiltered = await searchIds(sut, auth, { spaceId: space.id });
+      expect(unfiltered).toEqual(expect.arrayContaining([annaAsset.id, benAsset.id]));
+
+      const ids = await searchIds(sut, auth, { spaceId: space.id, ownerId: anna.id });
+
+      expect(ids).toEqual([annaAsset.id]);
+      expect(ids).not.toContain(benAsset.id);
+    });
+
+    it('E20 twin: ownerId of a non-member returns EMPTY inside a Space (narrows, never widens)', async () => {
+      const { sut, ctx } = setup();
+      const { space, viewer, annaAsset, benAsset } = await createTwoOwnerSpace(ctx);
+      const { user: carol } = await ctx.newUser(); // not a member of the space
+      const auth = factory.auth({ user: { id: viewer.id } });
+
+      const unfiltered = await searchIds(sut, auth, { spaceId: space.id });
+      expect(unfiltered).toEqual(expect.arrayContaining([annaAsset.id, benAsset.id]));
+
+      const ids = await searchIds(sut, auth, { spaceId: space.id, ownerId: carol.id });
+
+      expect(ids).toEqual([]);
+    });
+
+    it('ownerId does NOT widen a Space search: an owner asset outside the space stays out', async () => {
+      const { sut, ctx } = setup();
+      const { space, anna, viewer, annaAsset } = await createTwoOwnerSpace(ctx);
+      const auth = factory.auth({ user: { id: viewer.id } });
+
+      // Anna also owns an asset OUTSIDE the space. Filtering the space by owner=anna must not pull
+      // it in — the filter narrows within the scope, it never re-opens the scope.
+      const { asset: outsideAsset } = await ctx.newAsset({ ownerId: anna.id });
+
+      const ids = await searchIds(sut, auth, { spaceId: space.id, ownerId: anna.id });
+
+      expect(ids).toEqual([annaAsset.id]);
+      expect(ids).not.toContain(outsideAsset.id);
+    });
+
+    it('E21 twin: ownerId of a stranger on the personal search returns EMPTY (no leak)', async () => {
+      const { sut, ctx } = setup();
+      const { user: me } = await ctx.newUser();
+      const { user: carol } = await ctx.newUser();
+
+      // I MUST own an asset. Without this the assertion is vacuous: an empty library returns []
+      // whether or not the filter is applied at all, so the test would pass on the RED run.
+      const { asset: myAsset } = await ctx.newAsset({ ownerId: me.id });
+
+      // Carol is a stranger — no space, no album, no partnership. Her asset must never surface.
+      const { asset: carolAsset } = await ctx.newAsset({ ownerId: carol.id });
+
+      const auth = factory.auth({ user: { id: me.id } });
+
+      // Baseline: my search is NOT empty, and does not already contain Carol's asset.
+      const unfiltered = await searchIds(sut, auth, {});
+      expect(unfiltered).toContain(myAsset.id);
+      expect(unfiltered).not.toContain(carolAsset.id);
+
+      // userIds is scoped to [me] (+ timeline partners), so the query is
+      // (ownerId = ANY[me]) AND (ownerId = carol) = empty. THIS is the test that goes red if
+      // ownerId is ever merged into the userIds scoping predicate — the leak direction.
+      const ids = await searchIds(sut, auth, { ownerId: carol.id });
+
+      expect(ids).toEqual([]);
+      expect(ids).not.toContain(carolAsset.id);
+    });
+
+    /**
+     * THE OTHER WIDENING VECTOR. The userIds clause that ANDs on the personal path
+     * (`!!options.userIds && !options.spaceId && !options.timelineSpaceIds`) is switched OFF once
+     * `withSharedSpaces` populates timelineSpaceIds — a different OR-group takes over. An
+     * implementer who merged ownerId into userIds inside THAT group would still pass every test
+     * above. These two are the E21b/E21c twins for the search path. Do not delete them.
+     */
+    it('E21b twin: ownerId of a stranger under withSharedSpaces returns EMPTY (the real leak vector)', async () => {
+      const { sut, ctx } = setup();
+      const { viewer, annaAsset, benAsset } = await createTwoOwnerSpace(ctx);
+      const { user: carol } = await ctx.newUser();
+
+      // Carol is a stranger with an asset, outside every space the viewer can see.
+      const { asset: carolAsset } = await ctx.newAsset({ ownerId: carol.id });
+
+      const auth = factory.auth({ user: { id: viewer.id } });
+
+      // Baseline: withSharedSpaces DOES return the space assets for this viewer (who owns nothing),
+      // and does NOT already contain Carol's. So an empty result below is the filter, not a broken
+      // query.
+      const unfiltered = await searchIds(sut, auth, { withSharedSpaces: true });
+      expect(unfiltered).toEqual(expect.arrayContaining([annaAsset.id, benAsset.id]));
+      expect(unfiltered).not.toContain(carolAsset.id);
+
+      const ids = await searchIds(sut, auth, { withSharedSpaces: true, ownerId: carol.id });
+
+      expect(ids).toEqual([]);
+      expect(ids).not.toContain(carolAsset.id);
+    });
+
+    it('E21c twin: ownerId under withSharedSpaces narrows to that member, not to everything', async () => {
+      const { sut, ctx } = setup();
+      const { anna, viewer, annaAsset, benAsset } = await createTwoOwnerSpace(ctx);
+      const auth = factory.auth({ user: { id: viewer.id } });
+
+      const unfiltered = await searchIds(sut, auth, { withSharedSpaces: true });
+      expect(unfiltered).toEqual(expect.arrayContaining([annaAsset.id, benAsset.id]));
+
+      const ids = await searchIds(sut, auth, { withSharedSpaces: true, ownerId: anna.id });
+
+      expect(ids).toContain(annaAsset.id);
+      expect(ids).not.toContain(benAsset.id);
     });
   });
 });

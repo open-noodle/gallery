@@ -47,6 +47,12 @@ export interface SearchAssetIdOptions {
 export interface SearchUserIdOptions {
   libraryId?: string | null;
   userIds?: string[];
+  /**
+   * Contributor filter: a plain AND on asset.ownerId. Deliberately separate from `userIds`, which
+   * is the owner SCOPING predicate (database.ts:677/687/770). Merging a contributor filter into
+   * userIds would widen the result set instead of narrowing it.
+   */
+  ownerId?: string;
 }
 
 export type SearchIdOptions = SearchAssetIdOptions & SearchUserIdOptions;
@@ -132,6 +138,14 @@ export interface SearchTagOptions {
 
 export interface SearchAlbumOptions {
   albumIds?: string[];
+  /**
+   * Opts an `albumIds` query OUT of `albumSharedSpaceScope` (database.ts:608), for a caller whose
+   * album ACCESS check (e.g. Permission.AlbumRead) is already the access boundary — matching the
+   * album grid and the pre-fork `GET /albums/{id}/map-markers` endpoint (issue #656). Defaults to
+   * false/absent, which preserves the existing shared-space re-gate for album-scoped
+   * SearchService queries (database.ts:600-607) — do not flip this default.
+   */
+  albumAccessIsBoundary?: boolean;
 }
 
 export interface SearchSpaceOptions {
@@ -162,8 +176,19 @@ type BaseAssetSearchOptions = SearchDateOptions &
   SearchOcrOptions &
   SearchSpaceOptions;
 
+/**
+ * Visibility modes `searchAssetBuilder` (src/utils/database.ts) understands:
+ * - a concrete `AssetVisibility` — exactly that state
+ * - `'not-locked'` — everything except Locked; note this STILL admits Hidden
+ * - `'timeline-or-archive'` — Archive | Timeline, what the timeline and the album grid show
+ *   (`withDefaultVisibility`). Used only by the album-boundary map query (shared-space.service.ts),
+ *   which must match the grid it is reached from.
+ * - `undefined` — no visibility clause at all (admits Hidden and Locked)
+ */
+export type AssetSearchVisibility = AssetVisibility | 'not-locked' | 'timeline-or-archive';
+
 export type AssetSearchOptions = Omit<BaseAssetSearchOptions, 'visibility'> &
-  SearchRelationOptions & { visibility?: AssetVisibility | 'not-locked' };
+  SearchRelationOptions & { visibility?: AssetSearchVisibility };
 
 export type AssetSearchBuilderOptions = Omit<AssetSearchOptions, 'orderDirection'>;
 
@@ -271,9 +296,24 @@ interface FilterSuggestionFilterOptions {
   identityIds?: string[];
   forceEmptyResult?: boolean;
   country?: string;
+  /**
+   * State/province. A first-class facet key (not just an outer `getCities` predicate) so that an
+   * active state narrows *every* suggestion list — people, tags, camera makes, ratings, media types
+   * — the way `country` / `city` already do. The location group members that a list must NOT be
+   * narrowed by are excluded per call site via `without(...)`, never here.
+   */
+  state?: string;
   city?: string;
   make?: string;
   model?: string;
+  /** Lens model. Same reasoning as `state`, for the camera group. */
+  lensModel?: string;
+  /**
+   * Contributor filter: a plain `AND asset.ownerId = X` applied *inside* whatever scope
+   * `applySuggestionScope` resolved, so it can only ever shrink the suggestion set. It is NOT an
+   * ownership scope — see `SearchUserIdOptions.ownerId` for the same distinction on the search path.
+   */
+  ownerId?: string;
   tagIds?: string[];
   rating?: number;
   mediaType?: AssetType;
@@ -282,25 +322,15 @@ interface FilterSuggestionFilterOptions {
   isInAlbum?: boolean;
 }
 
-export interface GetStatesOptions extends SuggestionScopeOptions, FilterSuggestionFilterOptions {
-  state?: string;
-}
+export interface GetStatesOptions extends SuggestionScopeOptions, FilterSuggestionFilterOptions {}
 
-export interface GetCitiesOptions extends SuggestionScopeOptions, FilterSuggestionFilterOptions {
-  state?: string;
-}
+export interface GetCitiesOptions extends SuggestionScopeOptions, FilterSuggestionFilterOptions {}
 
-export interface GetCameraModelsOptions extends SuggestionScopeOptions, FilterSuggestionFilterOptions {
-  lensModel?: string;
-}
+export interface GetCameraModelsOptions extends SuggestionScopeOptions, FilterSuggestionFilterOptions {}
 
-export interface GetCameraMakesOptions extends SuggestionScopeOptions, FilterSuggestionFilterOptions {
-  lensModel?: string;
-}
+export interface GetCameraMakesOptions extends SuggestionScopeOptions, FilterSuggestionFilterOptions {}
 
-export interface GetCameraLensModelsOptions extends SuggestionScopeOptions, FilterSuggestionFilterOptions {
-  lensModel?: string;
-}
+export interface GetCameraLensModelsOptions extends SuggestionScopeOptions, FilterSuggestionFilterOptions {}
 
 export interface FilterSuggestionsOptions extends SuggestionScopeOptions, FilterSuggestionFilterOptions {}
 
@@ -1173,7 +1203,10 @@ export class SearchRepository {
   async getCountries(userIds: string[], options: FilterSuggestionsOptions = {}): Promise<string[]> {
     // #858: mirror getFilterSuggestions' own getFilteredCountries — `city` is excluded alongside
     // `country`, because a selected city implies its country and would collapse this list to one row.
-    const filteredIds = this.buildFilteredAssetIds(userIds, without(options, 'country', 'city'));
+    // `state` is excluded for exactly that reason too (a state implies its country), and because the
+    // whole location group is replaced by one click in the panel: country / state / city are ONE
+    // filter (`handleLocationChange`), so the top level of it must never be narrowed by its children.
+    const filteredIds = this.buildFilteredAssetIds(userIds, without(options, 'country', 'state', 'city'));
     const res = await this.db
       .selectFrom('asset_exif')
       .select('country')
@@ -1190,8 +1223,9 @@ export class SearchRepository {
   @GenerateSql({ params: [[DummyValue.UUID], DummyValue.STRING] })
   async getStates(userIds: string[], options: GetStatesOptions): Promise<string[]> {
     // `country` stays applied (it is the drill-down parent); `city` is excluded for the same reason
-    // as in getCountries. `state` is not a FilterSuggestionFilterOptions key, so it never self-narrows.
-    const filteredIds = this.buildFilteredAssetIds(userIds, without(options, 'city'));
+    // as in getCountries. `state` is now a FilterSuggestionFilterOptions key, so it has to be
+    // excluded explicitly or a selected state would collapse this list to that one row.
+    const filteredIds = this.buildFilteredAssetIds(userIds, without(options, 'state', 'city'));
     const res = await this.db
       .selectFrom('asset_exif')
       .select('state')
@@ -1207,6 +1241,8 @@ export class SearchRepository {
 
   @GenerateSql({ params: [[DummyValue.UUID], DummyValue.STRING, DummyValue.STRING] })
   async getCities(userIds: string[], options: GetCitiesOptions): Promise<string[]> {
+    // `state` stays applied (it is the drill-down parent, like `country`) — but now from inside
+    // buildFilteredAssetIds, which replaces the old outer $if clause. Same shape, same behaviour.
     const filteredIds = this.buildFilteredAssetIds(userIds, without(options, 'city'));
     const res = await this.db
       .selectFrom('asset_exif')
@@ -1215,7 +1251,6 @@ export class SearchRepository {
       .where('assetId', 'in', filteredIds)
       .where('city', 'is not', null)
       .where('city', '!=', '')
-      .$if(!!options.state, (qb) => qb.where('state', '=', options.state!))
       .orderBy('city')
       .execute();
 
@@ -1224,6 +1259,9 @@ export class SearchRepository {
 
   @GenerateSql({ params: [[DummyValue.UUID], DummyValue.STRING, DummyValue.STRING] })
   async getCameraMakes(userIds: string[], options: GetCameraMakesOptions): Promise<string[]> {
+    // `lensModel` stays applied — moved inside buildFilteredAssetIds, replacing the outer $if.
+    // A lens is an independent filter here: unlike the location group, `handleCameraChange` does
+    // not clear it when a make or model is clicked, so narrowing by it is honest.
     const filteredIds = this.buildFilteredAssetIds(userIds, without(options, 'make'));
     const res = await this.db
       .selectFrom('asset_exif')
@@ -1232,7 +1270,6 @@ export class SearchRepository {
       .where('assetId', 'in', filteredIds)
       .where('make', 'is not', null)
       .where('make', '!=', '')
-      .$if(!!options.lensModel, (qb) => qb.where('lensModel', '=', options.lensModel!))
       .orderBy('make')
       .execute();
 
@@ -1243,6 +1280,7 @@ export class SearchRepository {
   async getCameraModels(userIds: string[], options: GetCameraModelsOptions): Promise<string[]> {
     // #858: every other active filter must narrow the model list, exactly like getCities. Only the
     // model itself is excluded — a selected model must not collapse its own list to one row.
+    // `lensModel` stays applied, moved inside buildFilteredAssetIds (see getCameraMakes).
     const filteredIds = this.buildFilteredAssetIds(userIds, without(options, 'model'));
     const res = await this.db
       .selectFrom('asset_exif')
@@ -1251,7 +1289,6 @@ export class SearchRepository {
       .where('assetId', 'in', filteredIds)
       .where('model', 'is not', null)
       .where('model', '!=', '')
-      .$if(!!options.lensModel, (qb) => qb.where('lensModel', '=', options.lensModel!))
       .orderBy('model')
       .execute();
 
@@ -1260,9 +1297,10 @@ export class SearchRepository {
 
   @GenerateSql({ params: [[DummyValue.UUID], DummyValue.STRING] })
   async getCameraLensModels(userIds: string[], options: GetCameraLensModelsOptions): Promise<string[]> {
-    // `lensModel` is not a member of `FilterSuggestionFilterOptions`, so nothing to exclude — `make`
-    // and `model` are applied inside buildFilteredAssetIds, replacing the old outer $if clauses.
-    const filteredIds = this.buildFilteredAssetIds(userIds, options);
+    // `lensModel` is now a member of `FilterSuggestionFilterOptions`, so it has to be excluded here
+    // or a selected lens would collapse its own list to one row. `make` and `model` stay applied,
+    // inside buildFilteredAssetIds, replacing the old outer $if clauses.
+    const filteredIds = this.buildFilteredAssetIds(userIds, without(options, 'lensModel'));
     const res = await this.db
       .selectFrom('asset_exif')
       .select('lensModel')
@@ -1414,7 +1452,12 @@ export class SearchRepository {
   })
   async getFilterSuggestions(userIds: string[], options: FilterSuggestionsOptions): Promise<FilterSuggestionsResult> {
     const [countries, cameraMakes, tags, peopleResult, ratings, mediaTypes] = await Promise.all([
-      this.getFilteredCountries(userIds, without(options, 'country', 'city')),
+      // `state` joins `country` / `city` in the location group's self-exclusion: it implies its
+      // country, so leaving it applied would collapse the country selector to a single row —
+      // exactly the reason `city` is excluded here. Every other list keeps `state` applied.
+      this.getFilteredCountries(userIds, without(options, 'country', 'state', 'city')),
+      // `lensModel` deliberately stays applied, matching the standalone getCameraMakes endpoint:
+      // clicking a make does not clear the lens chip, so the make list may honestly narrow by it.
       this.getFilteredCameraMakes(userIds, without(options, 'make', 'model')),
       this.getFilteredTags(userIds, without(options, 'tagIds')),
       this.getFilteredPeople(userIds, without(options, 'personIds', 'identityIds')),
@@ -1544,7 +1587,15 @@ export class SearchRepository {
   }
 
   private buildFilteredAssetIds(userIds: string[], options: FilterSuggestionsOptions) {
-    const needsExifJoin = !!(options.country || options.city || options.make || options.model || options.rating);
+    const needsExifJoin = !!(
+      options.country ||
+      options.state ||
+      options.city ||
+      options.make ||
+      options.model ||
+      options.lensModel ||
+      options.rating
+    );
     const visibility = options.visibility;
 
     return this.applySuggestionScope(
@@ -1577,11 +1628,14 @@ export class SearchRepository {
         qb
           .innerJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
           .$if(!!options.country, (qb) => qb.where('asset_exif.country', '=', options.country!))
+          .$if(!!options.state, (qb) => qb.where('asset_exif.state', '=', options.state!))
           .$if(!!options.city, (qb) => qb.where('asset_exif.city', '=', options.city!))
           .$if(!!options.make, (qb) => qb.where('asset_exif.make', '=', options.make!))
           .$if(!!options.model, (qb) => qb.where('asset_exif.model', '=', options.model!))
+          .$if(!!options.lensModel, (qb) => qb.where('asset_exif.lensModel', '=', options.lensModel!))
           .$if(!!options.rating, (qb) => qb.where('asset_exif.rating', '>=', options.rating!)),
       )
+      .$if(options.ownerId !== undefined, (qb) => qb.where('asset.ownerId', '=', asUuid(options.ownerId!)))
       .$if(!!options.personIds?.length && !!options.spaceId, (qb) => hasSpacePeople(qb, options.personIds!))
       .$if(!!options.personIds?.length && !options.spaceId, (qb) => hasPeople(qb, options.personIds!))
       .$if(!!options.identityIds?.length, (qb) =>
