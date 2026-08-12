@@ -2027,4 +2027,19 @@ export class AssetRepository {
 
     return rows.filter(({ assetId }) => existingAssetIds.has(assetId));
   }
+
+  // Gallery-fork: derivative files are stored by ownerId with no library dimension, so the
+  // physical-usage walk needs the owner's external asset ids to exclude their thumbnails and
+  // transcodes — upstream excludes external assets from quota entirely.
+  @GenerateSql({ params: [DummyValue.UUID] })
+  async getExternalAssetIds(ownerId: string): Promise<Set<string>> {
+    const rows = await this.db
+      .selectFrom('asset')
+      .select('asset.id')
+      .where('asset.ownerId', '=', asUuid(ownerId))
+      .where('asset.libraryId', 'is not', null)
+      .execute();
+
+    return new Set(rows.map((row) => row.id));
+  }
 }
