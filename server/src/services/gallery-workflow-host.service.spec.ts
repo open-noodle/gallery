@@ -364,3 +364,45 @@ describe('addToSpaceAlbum', () => {
     expect(doubles.album.addAssets).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('addToSpaceAlbum compensation', () => {
+  const ALBUM_NEW = '00000000-0000-4000-8000-0000000000e2';
+  const ALBUM_OLD = '00000000-0000-4000-8000-0000000000e1';
+  // Reuses the module-scope `runAlbum(sut, config)` helper — a `run(sut)` closing over a local
+  // `config` would need its own module-scope declaration and collide with the existing `run` /
+  // `runAlbum` names (unicorn/consistent-function-scoping forbids the closure form inside a describe).
+  const config = { assetId: ASSET, spaceId: SPACE_A, albumName: 'Holidays 2026' };
+
+  it('deletes the album it just created when linking is denied', async () => {
+    // U23
+    const { sut, doubles } = setupTestable();
+    doubles.sharedSpace.getLinkedAlbums.mockResolvedValue([]);
+    doubles.album.create.mockResolvedValue({ id: ALBUM_NEW });
+    doubles.sharedSpace.linkAlbum.mockRejectedValue(new BadRequestException('cannot link'));
+
+    await expect(runAlbum(sut, config)).resolves.toMatchObject({ ok: false });
+    expect(doubles.album.delete).toHaveBeenCalledWith(auth, ALBUM_NEW);
+    expect(doubles.album.addAssets).not.toHaveBeenCalled();
+  });
+
+  it('never deletes a pre-existing album', async () => {
+    // U28
+    const { sut, doubles } = setupTestable();
+    doubles.sharedSpace.getLinkedAlbums.mockResolvedValue([linked(ALBUM_OLD, 'Holidays 2026', '2026-01-01T00:00:00Z')]);
+    doubles.album.addAssets.mockRejectedValue(new BadRequestException('no rights'));
+
+    await expect(runAlbum(sut, config)).resolves.toMatchObject({ ok: false });
+    expect(doubles.album.delete).not.toHaveBeenCalled();
+  });
+
+  it('still resolves ok:false when the compensating delete itself fails', async () => {
+    // U29 — otherwise §7 is breached and the rest of the workflow dies
+    const { sut, doubles } = setupTestable();
+    doubles.sharedSpace.getLinkedAlbums.mockResolvedValue([]);
+    doubles.album.create.mockResolvedValue({ id: ALBUM_NEW });
+    doubles.sharedSpace.linkAlbum.mockRejectedValue(new BadRequestException('cannot link'));
+    doubles.album.delete.mockRejectedValue(new Error('delete blew up'));
+
+    await expect(runAlbum(sut, config)).resolves.toMatchObject({ ok: false });
+  });
+});

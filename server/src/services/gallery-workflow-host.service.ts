@@ -146,8 +146,28 @@ export class GalleryWorkflowHostService extends BaseService {
     }
 
     const created = await album.create(auth, { albumName });
-    await sharedSpace.linkAlbum(auth, spaceId, created.id);
+
+    try {
+      await sharedSpace.linkAlbum(auth, spaceId, created.id);
+    } catch (error) {
+      // Compensate: this invocation created the album, so this invocation removes it. A
+      // pre-existing album is never touched here, because this branch only runs after a create.
+      await this.discardAlbum(auth, created.id);
+      throw error;
+    }
 
     return created.id;
+  }
+
+  /**
+   * Best-effort cleanup of an album this invocation created. Swallows every failure: a throw here
+   * would escape `runGuarded`'s HttpException filter and abandon the remaining workflow steps.
+   */
+  private async discardAlbum(auth: AuthDto, albumId: string): Promise<void> {
+    try {
+      await this.collaborators().album.delete(auth, albumId);
+    } catch (error) {
+      this.logger.error(`addToSpaceAlbum: failed to clean up orphan album ${albumId}`, error);
+    }
   }
 }
