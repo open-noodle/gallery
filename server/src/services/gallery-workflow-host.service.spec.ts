@@ -3,8 +3,8 @@ import { join } from 'node:path';
 import { AuthDto } from 'src/dtos/auth.dto';
 import { PluginManifestDto } from 'src/dtos/plugin-manifest.dto';
 import { GalleryWorkflowHostService } from 'src/services/gallery-workflow-host.service';
-import { describe, expect, it } from 'vitest';
 import { newTestService } from 'test/utils';
+import { describe, expect, it } from 'vitest';
 
 const manifestPath = join(process.cwd(), '..', 'packages/plugin-gallery/manifest.json');
 const readManifest = () => JSON.parse(readFileSync(manifestPath, { encoding: 'utf8' }));
@@ -37,6 +37,24 @@ describe(GalleryWorkflowHostService.name, () => {
   it('resolves ok:false for an unknown method instead of rejecting', async () => {
     const { sut } = setup();
     await expect(sut.dispatch(auth, 'noSuchMethod', {})).resolves.toEqual({
+      ok: false,
+      reason: 'unknown-method',
+    });
+  });
+
+  // Regression: prototype-chain collision — handlers inherits Object.prototype,
+  // so handlers['constructor'], handlers['__proto__'], etc. are truthy and bypass the guard.
+  it('does not call prototype chain properties as handlers', async () => {
+    const { sut } = setup();
+    await expect(sut.dispatch(auth, '__proto__', {})).resolves.toEqual({
+      ok: false,
+      reason: 'unknown-method',
+    });
+  });
+
+  it('does not call constructor as a handler', async () => {
+    const { sut } = setup();
+    await expect(sut.dispatch(auth, 'constructor', {})).resolves.toEqual({
       ok: false,
       reason: 'unknown-method',
     });

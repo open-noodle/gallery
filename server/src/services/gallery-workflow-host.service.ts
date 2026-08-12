@@ -23,7 +23,7 @@ export class GalleryWorkflowHostService extends BaseService {
    * observe collaborator calls at all. Specs subclass and override it. Memoised so a step does not
    * rebuild both services on every dispatch.
    */
-  protected collaborators() {
+  protected collaborators(): { sharedSpace: SharedSpaceService; album: AlbumService } {
     this.services ??= {
       sharedSpace: BaseService.create(SharedSpaceService, this),
       album: BaseService.create(AlbumService, this),
@@ -39,12 +39,12 @@ export class GalleryWorkflowHostService extends BaseService {
   }
 
   async dispatch(auth: AuthDto, method: string, args: unknown): Promise<GalleryDispatchResult> {
-    const handler = this.handlers[method];
-    if (!handler) {
+    if (!Object.hasOwn(this.handlers, method)) {
       this.logger.warn(`Unknown gallery workflow method: ${method}`);
       return { ok: false, reason: 'unknown-method' };
     }
 
+    const handler = this.handlers[method];
     return handler(auth, args);
   }
 }
