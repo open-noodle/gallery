@@ -379,18 +379,22 @@ jobs:
       - name: Use CocoaPods for Flutter plugins (disable SwiftPM)
         run: flutter config --no-enable-swift-package-manager
 
-      - name: Install Flutter dependencies
-        run: mise //mobile:install:ci
-
-      - name: Perform codegen
-        run: mise //mobile:codegen
-
+      # Must precede `mise //mobile:install:ci`: upstream #30722 made the
+      # `install` task depend on a new `install:ios` task that runs
+      # `cd ios && pod install` on macOS, so CocoaPods now runs inside the
+      # dependency install rather than only in the explicit step below.
       - name: Setup Ruby
         uses: ruby/setup-ruby@c515ec17f69368147deb311832da000dd229d338 # v1.297.0
         with:
           ruby-version: '3.3'
           bundler-cache: true
           working-directory: ./mobile/ios
+
+      - name: Install Flutter dependencies
+        run: mise //mobile:install:ci
+
+      - name: Perform codegen
+        run: mise //mobile:codegen
 
       - name: Install CocoaPods dependencies
         working-directory: ./mobile/ios
