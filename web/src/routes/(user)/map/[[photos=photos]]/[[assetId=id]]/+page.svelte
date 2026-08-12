@@ -25,7 +25,10 @@
   import { Route } from '$lib/route';
   import { handlePromiseError } from '$lib/utils';
   import { delay } from '$lib/utils/asset-utils';
+  import { clusterMarkerIdsInBBox } from '$lib/utils/map-cluster-selection';
   import { buildMapFilterConfig } from '$lib/utils/map-filter-config';
+  import { buildFilterStateUrl, isFilterStateUrlUnchanged, withoutAtParam } from '$lib/utils/filter-target';
+  import { decodeFilterParams } from '$lib/utils/filter-url';
   import { navigate } from '$lib/utils/navigation';
   import { mapSettings } from '$lib/stores/preferences.store';
   import { buildSmartSearchParams, SEARCH_FILTER_DEBOUNCE_MS } from '$lib/utils/space-search';
@@ -39,11 +42,12 @@
   import { IconButton, modalManager } from '@immich/ui';
   import SearchAddAllToCollectionModal from '$lib/modals/SearchAddAllToCollectionModal.svelte';
   import type { SearchTerms } from '$lib/services/search.service';
+  import { resolveFilterNames } from '$lib/utils/filter-name-resolution';
   import { filterStateToSearchTerms } from '$lib/utils/filter-search-terms';
   import { lang } from '$lib/stores/preferences.store';
   import { SvelteMap, SvelteSet } from 'svelte/reactivity';
   import { mdiArrowLeft } from '@mdi/js';
-  import { onDestroy, onMount } from 'svelte';
+  import { onDestroy, onMount, untrack } from 'svelte';
   import { t } from 'svelte-i18n';
   import type { PageData } from './$types';
   import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
@@ -57,7 +61,6 @@
   const spaceId = $derived(page.url.searchParams.get(QueryParameter.SPACE_ID) || undefined);
   const committedQuery = $derived(page.url.searchParams.get('q') ?? '');
 
-  let selectedClusterIds = $state.raw(new Set<string>());
   let selectedClusterBBox = $state.raw<SelectionBBox>();
   let isTimelinePanelVisible = $state(false);
   let showMobileFilters = $state(false);
@@ -79,12 +82,41 @@
     return () => window.removeEventListener('resize', checkMobile);
   });
 
+  // #767(b): this used to be an always-empty createFilterState(), so every filter active on the
+  // surface you came from was dropped the moment you reached the map. The URL is the source of
+  // truth now.
+  //
+  // Unlike the album page, the map KEEPS an albumId filter — /map?albumId=X is a legitimate scope
+  // (that is what the server-side album-access fix in this slice exists for) — EXCEPT when the map is
+  // already scoped to a space. Space ∩ album is unsatisfiable (the space scope demands the asset be
+  // in the space; albumSharedSpaceScope, run with no timelineSpaceIds under a spaceId query, demands
+  // it be in no space at all) and the server 400s it. Dropping it here means a hand-typed
+  // /map?spaceId=S&albumId=A degrades to the space map instead of erroring.
+  const hydrateMapFilters = (url: URL): FilterState => {
+    const decoded = decodeFilterParams(url);
+    const urlSpaceId = url.searchParams.get(QueryParameter.SPACE_ID) || undefined;
+    return { ...createFilterState(), ...decoded, albumId: urlSpaceId ? undefined : decoded.albumId };
+  };
+
   // Filter state
-  let filters = $state<FilterState>(createFilterState());
+  let filters = $state<FilterState>(hydrateMapFilters(page.url));
+  // Token guard for the URL $effect below, at-stripped like the album page — see withoutAtParam's
+  // docs: replaceScrollTarget writes `?at=<assetId>` onto /map when the timeline panel's asset
+  // viewer closes, and that is not a filter change. Re-hydrating on it is pure churn — the
+  // FilterState it would rebuild is identical, since every filter is URL-backed — and it would
+  // needlessly re-create `filters`, re-running the debounced marker/bucket fetch below.
+  let lastHandledFilterSearch = $state(withoutAtParam(page.url.search));
   let mapMarkers = $state<MapMarkerResponseDto[]>([]);
   let timeBuckets = $state<Array<{ timeBucket: string; count: number }>>([]);
   let personNames = new SvelteMap<string, string>();
   let tagNames = new SvelteMap<string, string>();
+  // /map?albumId=… and ?ownerId=… survive a reload and travel in a shared link, and nothing on this
+  // page knows their names — resolve them by id, once, so the chip is a name and not a UUID.
+  let albumNames = new SvelteMap<string, string>();
+  let ownerNames = new SvelteMap<string, string>();
+  $effect(() => {
+    void resolveFilterNames(filters, { albumNames, ownerNames });
+  });
 
   const filterConfig = $derived.by(() => {
     const base = buildMapFilterConfig(spaceId);
@@ -109,6 +141,9 @@
   // float over the map's own controls (mobile keeps its separate drawer toggle).
   let filterCollapsed = $state(loadFilterCollapsed());
   const noResults = $derived(mapMarkers.length === 0 && hasActiveFilters);
+  const hasUnappliedSmartSearch = $derived(
+    committedQuery.trim().length > 0 && !featureFlagsManager.value.smartSearchHasCutoff,
+  );
 
   const handleAddAllToCollection = () => {
     const query = committedQuery.trim();
@@ -137,6 +172,13 @@
   const timeBucketOptions = $derived.by(() => buildMapTimeBucketOptions(filters, spaceId));
   const mapMarkerOptions = $derived.by(() => buildMapMarkerOptions(filters, spaceId));
 
+  // The cluster panel's asset scope, RECOMPUTED from the current markers on every refetch — i.e. on
+  // every filter change (Task 10). It used to be the leaf ids captured once at click time, which
+  // made the panel a one-way street: it could narrow, but a filter cleared from inside it could
+  // never surface the assets that had just started matching, and its header count never moved off
+  // the click-time number. See map-cluster-selection.ts.
+  const selectedClusterIds = $derived(clusterMarkerIdsInBBox(mapMarkers, selectedClusterBBox));
+
   // Fetch time buckets for the temporal picker
   $effect(() => {
     void getTimeBuckets(timeBucketOptions).then((buckets) => {
@@ -154,6 +196,11 @@
     const options = mapMarkerOptions;
     const currentSpaceId = spaceId;
     const query = committedQuery.trim();
+    // Admin-only config: only the server can tell us whether machineLearning.clip.maxDistance is
+    // configured in (0, 2), which is what makes searchSmart return a cutoff-limited result set.
+    // Only then can the intersection loop below actually narrow anything — with no cutoff the
+    // ranked result set isn't narrowed, and the loop would otherwise page it to exhaustion.
+    const canApplySmartSearch = featureFlagsManager.value.smartSearchHasCutoff;
 
     clearTimeout(fetchTimeout);
     queryAbortController?.abort();
@@ -169,7 +216,7 @@
             return;
           }
 
-          if (!query) {
+          if (!query || !canApplySmartSearch) {
             mapMarkers = markers;
             return;
           }
@@ -234,10 +281,40 @@
     };
   });
 
+  function syncMapFilterUrl(nextFilters: FilterState) {
+    const nextUrl = buildFilterStateUrl(page.url, nextFilters);
+    // NOT a string compare — buildFilterStateUrl re-appends the filter params last, so a URL like
+    // /map?make=Apple&spaceId=s1 rebuilds re-ordered. See filter-target.ts.
+    if (isFilterStateUrlUnchanged(page.url, nextUrl)) {
+      return;
+    }
+    void goto(nextUrl, { replaceState: true, keepFocus: true, noScroll: true });
+  }
+
+  $effect(() => {
+    const nextFilterSearch = withoutAtParam(page.url.search);
+    if (nextFilterSearch === lastHandledFilterSearch) {
+      return;
+    }
+
+    untrack(() => {
+      // Every filter — including the temporal picker's year/month — round-trips through the URL, so
+      // rebuilding FilterState from the URL alone is lossless.
+      filters = {
+        ...createFilterState(),
+        ...hydrateMapFilters(page.url),
+      };
+      lastHandledFilterSearch = nextFilterSearch;
+    });
+  });
+
   function clearCommittedQuery() {
     const url = new URL(page.url);
     url.searchParams.delete('q');
-    void goto(`${url.pathname}${url.search}${url.hash}`, {
+    const nextUrl = `${url.pathname}${url.search}${url.hash}`;
+    // Only `q` is dropped. The re-hydrate effect above then rebuilds `filters` from the remaining
+    // URL, which still carries every active filter — including the picked year/month.
+    void goto(nextUrl, {
       replaceState: true,
       keepFocus: true,
       noScroll: true,
@@ -257,7 +334,6 @@
   function closeTimelinePanel() {
     isTimelinePanelVisible = false;
     selectedClusterBBox = undefined;
-    selectedClusterIds = new Set();
   }
 
   onDestroy(() => {
@@ -273,8 +349,11 @@
     closeTimelinePanel();
   }
 
-  function onClusterSelect(assetIds: string[], bbox: SelectionBBox) {
-    selectedClusterIds = new Set(assetIds);
+  // The clicked cluster's leaf ids are deliberately NOT stored: they are a snapshot of the markers as
+  // they stood under the filters at click time, and any filter change re-fetches the markers. The
+  // bbox — the tight bounding box of those leaves — is the cluster's durable identity, and
+  // `selectedClusterIds` above is re-derived from the current markers inside it.
+  function onClusterSelect(_: string[], bbox: SelectionBBox) {
     selectedClusterBBox = bbox;
     isTimelinePanelVisible = true;
     assetViewerManager.showAssetViewer(false);
@@ -358,6 +437,7 @@
               {timeBuckets}
               storageKey="gallery-filter-visible-sections-map"
               persistCollapsed={false}
+              onFiltersChange={syncMapFilterUrl}
             />
           </div>
         </div>
@@ -372,6 +452,7 @@
           config={filterConfig}
           {timeBuckets}
           storageKey="gallery-filter-visible-sections-map"
+          onFiltersChange={syncMapFilterUrl}
         />
       {/if}
       <div class="relative flex min-h-0 min-w-0 flex-1 flex-col sm:flex-row">
@@ -384,14 +465,29 @@
               onClearSearch={clearCommittedQuery}
               {personNames}
               {tagNames}
+              {albumNames}
+              {ownerNames}
               onRemoveFilter={(type, id) => {
                 filters = handlePhotosRemoveFilter(filters, type, id);
+                syncMapFilterUrl(filters);
               }}
               onClearAll={() => {
                 filters = clearFilters(filters);
+                syncMapFilterUrl(filters);
               }}
               onAddAllToCollection={handleAddAllToCollection}
             />
+          </div>
+        {/if}
+        {#if hasUnappliedSmartSearch}
+          <div
+            class="pointer-events-none absolute inset-x-0 top-0 z-10 mt-12 flex justify-center px-4"
+            data-testid="map-smart-search-notice"
+            role="status"
+          >
+            <p class="pointer-events-auto rounded-lg bg-warning/90 px-4 py-2 text-sm text-dark shadow-sm">
+              {$t('map_smart_search_not_applied')}
+            </p>
           </div>
         {/if}
         <div
@@ -436,10 +532,10 @@
             <MapTimelinePanel
               bbox={selectedClusterBBox}
               {selectedClusterIds}
-              assetCount={selectedClusterIds.size}
               onClose={closeTimelinePanel}
               {spaceId}
               bind:filters
+              onFiltersChange={syncMapFilterUrl}
             />
           </div>
         {/if}

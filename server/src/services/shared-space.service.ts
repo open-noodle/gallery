@@ -1050,12 +1050,62 @@ export class SharedSpaceService extends BaseService {
   }
 
   async getFilteredMapMarkers(auth: AuthDto, dto: FilteredMapMarkerDto): Promise<MapMarkerResponseDto[]> {
+    // A space and an album are two different, mutually-exclusive scopes for this endpoint — the
+    // space scope requires shared_space_asset membership in that specific space, while the album
+    // scope (see below) is bounded by album access alone. Combining them isn't a query this endpoint
+    // supports; reject loudly with a 400 rather than guess at an intersection. (Mirrors
+    // search.service.ts:122-124.)
+    if (dto.spaceId && dto.albumId) {
+      throw new BadRequestException('Cannot use both spaceId and albumId');
+    }
+
     if (dto.spaceId) {
       await this.requireAccess({ auth, permission: Permission.SharedSpaceRead, ids: [dto.spaceId] });
     }
 
+    // An album query is scoped by album ACCESS, never by asset owner (see userIds below).
+    if (dto.albumId) {
+      await this.requireAccess({ auth, permission: Permission.AlbumRead, ids: [dto.albumId] });
+    }
+
+    // timelineSpaceIds has TWO independent consumers, and they do NOT want it under the same
+    // conditions. Conflating them has now produced the same silently-empty map twice (00a7fd6bac,
+    // and again below), so they are computed as two separate predicates.
+    //
+    // CONSUMER 1 — the space-scope WIDENING (searchAssetBuilder, database.ts:688). It only applies
+    // to the plain (non-album, non-space) query, where it widens the result to shared-space assets
+    // in the caller's timeline. It is skipped for a favorites query: `isFavorite` is the asset
+    // OWNER'S flag, so widening would pin other members' favourites on the caller's favourites map
+    // (timeline.service.ts:158-168 refuses the same combination outright rather than answer it).
+    //
+    // The album map matches the album grid on SCOPE: album ACCESS (AlbumRead, checked above) IS the
+    // boundary for an album query — same as the album grid (asset.repository.ts
+    // withTimeBucketAssetFilters, a plain album_asset join with no space scoping) and the pre-fork
+    // GET /albums/{id}/map-markers endpoint (map.repository.ts). Re-gating an album query by the
+    // caller's shared-space timeline visibility on top of that hid pins the grid shows — whenever a
+    // shared album asset also lived in a space the caller wasn't a member of, or had simply toggled
+    // out of their timeline (#656). (It matches the grid on VISIBILITY too — see the `visibility`
+    // option below.) On the album path timelineSpaceIds is therefore inert for the gate (albumAccessIsBoundary
+    // skips albumSharedSpaceScope, and with userIds unset the widening arm cannot fire either).
+    const spaceScopeWidensToTimelineSpaces = !dto.spaceId && dto.withSharedSpaces === true && dto.isFavorite !== true;
+
+    // CONSUMER 2 — scoped person-token resolution. resolveScopedMapPersonFilters forwards
+    // timelineSpaceIds to faceIdentityRepository.resolveScopedPersonTokens to resolve
+    // `space-person:<id>` tokens: face-identity.repository.ts's spaceMatchesScope requires
+    // timelineSpaceIds.size > 0 whenever withSharedSpaces is truthy, or it treats the token as
+    // inaccessible -> hasInaccessibleToken -> forceEmptyResult -> ZERO pins. This consumer is
+    // conditioned on neither albumId nor isFavorite — a caller can combine
+    // ?withSharedSpaces=true&isFavorite=true&personIds=space-person:<id> (the /photos favourite chip
+    // and person chip are one-click co-reachable, and its map icon carries both), just as they can
+    // combine ?albumId=&withSharedSpaces=true&personIds=space-person:<id>. Narrowing this predicate
+    // to the widening one starves it and silently empties the map for a legitimate space member —
+    // that was the albumId bug fixed in 00a7fd6bac, and the isFavorite bug fixed here. So do NOT
+    // re-fold this back into the condition above.
+    const hasScopedPersonTokens = !dto.spaceId && !!dto.personIds?.some((token) => token.includes(':'));
+    const personScopeNeedsTimelineSpaceIds = dto.withSharedSpaces === true && hasScopedPersonTokens;
+
     let timelineSpaceIds: string[] | undefined;
-    if (!dto.spaceId && dto.withSharedSpaces && dto.isFavorite !== true) {
+    if (spaceScopeWidensToTimelineSpaces || personScopeNeedsTimelineSpaceIds) {
       const spaceRows = await this.sharedSpaceRepository.getSpaceIdsForTimeline(auth.user.id);
       if (spaceRows.length > 0) {
         timelineSpaceIds = spaceRows.map((row) => row.spaceId);
@@ -1071,9 +1121,17 @@ export class SharedSpaceService extends BaseService {
     });
 
     const markers = await this.sharedSpaceRepository.getFilteredMapMarkers({
-      userIds: dto.spaceId ? undefined : [auth.user.id],
+      // Album ACCESS is the scope (checked above), never asset ownership: leaving userIds set would
+      // hide the album owner's pins from a viewer of a shared album — the issue #656 bug class, which
+      // album.service.ts:112-123 calls out by name. albumAccessIsBoundary opts the album branch out of
+      // albumSharedSpaceScope's shared-space re-gate (database.ts:713): album membership is already the
+      // boundary here, matching the grid and the old map endpoint — see the comment above.
+      userIds: dto.spaceId || dto.albumId ? undefined : [auth.user.id],
       spaceId: dto.spaceId,
-      timelineSpaceIds,
+      albumAccessIsBoundary: !!dto.albumId,
+      // Consumer 1 only (see above): a favorites query resolved timelineSpaceIds purely to make its
+      // space-person tokens resolvable, and must NOT be widened by it — the query stays owner-scoped.
+      timelineSpaceIds: spaceScopeWidensToTimelineSpaces ? timelineSpaceIds : undefined,
       personIds: scopedPersonFilters.personIds,
       spacePersonIds: scopedPersonFilters.spacePersonIds,
       identityIds: scopedPersonFilters.identityIds,
@@ -1096,9 +1154,25 @@ export class SharedSpaceService extends BaseService {
       isInAlbum: dto.isInAlbum,
       city: dto.city,
       country: dto.country,
-      visibility: AssetVisibility.Timeline,
-      personMatchAny: true,
-      tagMatchAny: true,
+      lensModel: dto.lensModel,
+      state: dto.state,
+      ownerId: dto.ownerId,
+      albumIds: dto.albumId ? [dto.albumId] : undefined,
+      // D4: an album query matches the album GRID, which shows Archive | Timeline
+      // (withDefaultVisibility, database.ts) — an archived, geotagged album asset appeared in the
+      // grid with no pin on the map. The accepted caveat is that another member's archived asset in
+      // the album now gets a pin, exactly as the grid already shows it. The widening is EXACTLY one
+      // visibility state: Hidden and Locked stay out (the mode is a two-value IN, not the absence of
+      // a clause, which would admit both), and Trashed stays out via the deletedAt predicate.
+      // Every other branch (plain map, space map) is unchanged: Timeline only.
+      visibility: dto.albumId ? 'timeline-or-archive' : AssetVisibility.Timeline,
+      // D1: personMatchAny/tagMatchAny are deliberately NOT set. This was the only caller in the
+      // server that asked searchAssetBuilder for OR matching (database.ts:721,724) — every timeline
+      // path ANDs. The map is reached from a surface whose chips it carries verbatim (/photos' map
+      // icon forwards ?people=alice,bob), so ORing them showed ~double the pins for identical chips,
+      // made the cluster panel (which ANDs) contradict its own pin count, and made "Add all N to…"
+      // advertise the OR count while collecting the AND set. The repository still supports OR for
+      // callers that want it; the map simply stops asking.
     });
 
     return markers.map((marker) => ({
