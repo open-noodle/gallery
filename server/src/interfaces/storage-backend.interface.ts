@@ -52,7 +52,7 @@ export interface StorageBackend {
   deletePrefix(prefix: string): Promise<void>;
 
   /** Return the total size in bytes for all objects/files under the given key prefix. */
-  getPrefixUsage(prefix: string): Promise<number>;
+  getPrefixUsage(prefix: string, shouldCount?: (filename: string) => boolean): Promise<number>;
 
   /** Determine how to serve this file to a client */
   getServeStrategy(key: string, options: ServeOptions): Promise<ServeStrategy>;

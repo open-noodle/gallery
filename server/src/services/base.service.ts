@@ -76,7 +76,8 @@ import { FaceVerdictService } from 'src/services/face-verdict.service.js';
 import { IdentityMergePropagationService } from 'src/services/identity-merge-propagation.service.js';
 import { AccessRequest, checkAccess, requireAccess } from 'src/utils/access.js';
 import { getConfig, updateConfig } from 'src/utils/config.js';
-import { AssetFileType, CacheControl, ImageFormat, StorageFolder } from 'src/enum.js';
+import { AssetFileType, CacheControl, ImageFormat } from 'src/enum.js';
+import { computePhysicalUsage } from 'src/gallery/storage-usage.js';
 import { RangeNotSatisfiableError, ServeStrategy } from 'src/interfaces/storage-backend.interface.js';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { StorageMigrationRepository } from 'src/repositories/storage-migration.repository.js';
@@ -638,46 +639,39 @@ export class BaseService {
     return Number.isFinite(rounded) && rounded > 0 ? rounded : fallback;
   }
 
+  // Gallery-fork: upstream calls userRepository.syncUsage() directly from its two call sites
+  // (user.service.ts handleUserSyncUsage and user-admin.service.ts). The fork routes both through
+  // here so a single admin toggle can decide what quotaUsageInBytes means: upstream's originals-only
+  // sum, or a physical walk that also counts thumbnails and transcodes. Either way the column holds
+  // the figure the admin asked for, so display and quota enforcement need no knowledge of the
+  // setting. The walk's own logic lives in src/gallery/storage-usage.ts.
   protected async syncUsage(id?: string): Promise<void> {
+    // The walk is expensive — hundreds of thousands of stat calls on a large install — so the
+    // default path stays exactly as cheap as upstream's single statement.
+    const { storageUsage } = await this.getConfig({ withCache: false });
+    if (!storageUsage.includeDerivatives) {
+      await this.userRepository.syncUsage(id);
+      return;
+    }
+
+    // Deliberately either/or: running upstream's statement here too would immediately overwrite
+    // the physical figure with the originals-only one.
+    // lazy import to avoid circular dependency (StorageService extends BaseService)
+    const { StorageService } = await import('./storage.service.js');
+    const s3 = StorageService.getS3Backend();
     const users = id
       ? [await this.userRepository.get(id, { withDeleted: false })].filter((user): user is UserAdmin => !!user)
       : await this.userRepository.getList({ withDeleted: false });
 
     for (const user of users) {
-      await this.userRepository.setUsage(user.id, await this.getPhysicalUsage(user));
+      const usage = await computePhysicalUsage({
+        user,
+        assetRepository: this.assetRepository,
+        storageRepository: this.storageRepository,
+        s3,
+      });
+      await this.userRepository.setUsage(user.id, usage);
     }
-  }
-
-  private async getPhysicalUsage(user: Pick<UserAdmin, 'id' | 'storageLabel'>): Promise<number> {
-    let total = await this.getDiskUsage(user);
-
-    // lazy import to avoid circular dependency (StorageService extends BaseService)
-    const { StorageService } = await import('./storage.service.js');
-    const s3 = StorageService.getS3Backend();
-    if (s3) {
-      const prefixes = [
-        StorageFolder.Upload,
-        StorageFolder.Profile,
-        StorageFolder.Thumbnails,
-        StorageFolder.EncodedVideo,
-      ].map((folder) => `${folder}/${user.id}/`);
-      const usage = await Promise.all(prefixes.map((prefix) => s3.getPrefixUsage(prefix)));
-      total += usage.reduce((total, value) => total + value, 0);
-    }
-
-    return total;
-  }
-
-  private async getDiskUsage(user: Pick<UserAdmin, 'id' | 'storageLabel'>): Promise<number> {
-    const folders = [
-      StorageCore.getLibraryFolder(user),
-      StorageCore.getFolderLocation(StorageFolder.Upload, user.id),
-      StorageCore.getFolderLocation(StorageFolder.Profile, user.id),
-      StorageCore.getFolderLocation(StorageFolder.Thumbnails, user.id),
-      StorageCore.getFolderLocation(StorageFolder.EncodedVideo, user.id),
-    ];
-    const usage = await Promise.all(folders.map((folder) => this.storageRepository.getFolderSize(folder)));
-    return usage.reduce((total, value) => total + value, 0);
   }
 
   async createUser(dto: Omit<Insertable<UserTable>, 'clusterGroupId'> & { email: string }): Promise<UserAdmin> {
