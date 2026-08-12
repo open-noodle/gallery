@@ -35,21 +35,22 @@ pnpm --filter @immich/plugin-sdk build
 
 **Created (all fork-owned):**
 
-| Path                                                        | Responsibility                                                                |
-| ----------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `packages/plugin-gallery/manifest.json`                     | Method declarations — the source of truth for method names and config schemas |
-| `packages/plugin-gallery/package.json`                      | Build scripts, mirroring `plugin-core`                                        |
-| `packages/plugin-gallery/tsconfig.json`                     | Compiler config, mirroring `plugin-core`                                      |
-| `packages/plugin-gallery/esbuild.js`                        | Bundles `src/index.ts` to CJS for QuickJS                                     |
-| `packages/plugin-gallery/bin/prepare-build.mjs`             | Generates `dist/index.d.ts` declaring the `gallery` host import               |
-| `packages/plugin-gallery/src/contract.ts`                   | Method-argument types shared by shim and host declaration                     |
-| `packages/plugin-gallery/src/host.ts`                       | The `gallery` host-function caller                                            |
-| `packages/plugin-gallery/src/index.ts`                      | Two shims — no branching, no logic                                            |
-| `server/src/services/gallery-workflow-host.service.ts`      | Dispatcher + every fork handler                                               |
-| `server/src/services/gallery-workflow-host.service.spec.ts` | Unit tests U0–U30                                                             |
-| `web/src/lib/components/SchemaSpacePicker.svelte`           | Space picker for the step config form                                         |
-| `web/src/lib/components/SchemaSpacePicker.spec.ts`          | Web tests W1–W7                                                               |
-| `e2e/src/specs/server/api/workflow-spaces.e2e-spec.ts`      | End-to-end guard E1–E5                                                        |
+| Path                                                           | Responsibility                                                                |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `packages/plugin-gallery/manifest.json`                        | Method declarations — the source of truth for method names and config schemas |
+| `packages/plugin-gallery/package.json`                         | Build scripts, mirroring `plugin-core`                                        |
+| `packages/plugin-gallery/tsconfig.json`                        | Compiler config, mirroring `plugin-core`                                      |
+| `packages/plugin-gallery/esbuild.js`                           | Bundles `src/index.ts` to CJS for QuickJS                                     |
+| `packages/plugin-gallery/bin/prepare-build.mjs`                | Generates `dist/index.d.ts` declaring the `gallery` host import               |
+| `packages/plugin-gallery/src/contract.ts`                      | Method-argument types shared by shim and host declaration                     |
+| `packages/plugin-gallery/src/host.ts`                          | The `gallery` host-function caller                                            |
+| `packages/plugin-gallery/src/index.ts`                         | Two shims — no branching, no logic                                            |
+| `server/src/services/gallery-workflow-host.service.ts`         | Dispatcher + every fork handler                                               |
+| `server/src/services/gallery-workflow-host.service.spec.ts`    | Unit tests U0–U30                                                             |
+| `web/src/lib/components/SchemaSpacePicker.svelte`              | Space picker for the step config form                                         |
+| `web/src/lib/components/SchemaSpacePicker.test-wrapper.svelte` | Owns `$state` so tests can assert the bindable prop propagating upward        |
+| `web/src/lib/components/SchemaSpacePicker.spec.ts`             | Web tests W1–W7                                                               |
+| `e2e/src/specs/server/api/workflow-spaces.e2e-spec.ts`         | End-to-end guard E1–E5                                                        |
 
 **Modified (upstream-owned — the entire permanent seam):**
 
@@ -301,17 +302,6 @@ const auth = { user: { id: 'user-1' } } as AuthDto;
 describe(GalleryWorkflowHostService.name, () => {
   const setup = () => newTestService(GalleryWorkflowHostService);
 
-  // U1 — the dispatcher is string-keyed across the WASM boundary, so a renamed handler
-  // would otherwise break only at runtime.
-  it('has a handler for every manifest method and no extras', () => {
-    const { sut } = setup();
-    expect(sut.methodNames.sort()).toEqual(
-      readManifest()
-        .methods.map((method: { name: string }) => method.name)
-        .sort(),
-    );
-  });
-
   // U2 — a stale externally-installed plugin must degrade, not explode.
   it('resolves ok:false for an unknown method instead of rejecting', async () => {
     const { sut } = setup();
@@ -388,22 +378,19 @@ export class GalleryWorkflowHostService extends BaseService {
 }
 ```
 
-- [ ] **Step 4: Run tests to verify U2 passes and U1 still fails**
+- [ ] **Step 4: Run tests to verify they pass**
 
 ```bash
 cd server && pnpm test --run src/services/gallery-workflow-host.service.spec.ts
 ```
 
-Expected: U2 PASS; U1 FAIL with `[] !== ['addToSpace','addToSpaceAlbum']`. This is correct — the handlers arrive in Tasks 4 and 5. Leave U1 red and note it in the commit message.
+Expected: PASS — U0 and U2. **Every commit in this plan leaves the suite green**; U1 (manifest/handler parity) is deliberately introduced in Task 5, the task where both handlers exist to make it pass, rather than sitting red across three commits and reddening CI if anything is pushed mid-plan.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add server/src/services/gallery-workflow-host.service.ts server/src/services/gallery-workflow-host.service.spec.ts
-git commit -m "feat(spaces): add the gallery workflow dispatcher skeleton
-
-U1 (manifest/handler parity) stays red until the two handlers land in the
-following tasks."
+git commit -m "feat(spaces): add the gallery workflow dispatcher skeleton"
 ```
 
 ---
@@ -422,10 +409,17 @@ following tasks."
 
 - [ ] **Step 1: Write the failing tests**
 
-Append inside the `describe(GalleryWorkflowHostService.name, ...)` block:
+Add the import to the **top** of the file, alongside the existing imports, and the class and `describe`
+block at **module scope** — not nested inside the existing `describe`. Imports are only legal at module
+scope, and a class declared inside a `describe` trips lint, which runs with `--max-warnings 0`.
 
 ```ts
+// ↓ goes with the other imports at the top of the file
 import { BadRequestException, ForbiddenException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+```
+
+```ts
+// ↓ module scope, after the existing describe blocks
 
 // A stand-in handler so the invariant is tested once, not per-handler.
 class ProbeService extends GalleryWorkflowHostService {
@@ -677,16 +671,10 @@ describe('addToSpace', () => {
     // never source an identity from anywhere else, or the space access checks mean nothing.
     const { sut, doubles } = setupTestable();
     const otherAuth = { user: { id: 'someone-else' } } as AuthDto;
-    await run2(sut, otherAuth, { assetId: ASSET, spaceIds: [SPACE_A] });
+    await sut.dispatch(otherAuth, 'addToSpace', { assetId: ASSET, spaceIds: [SPACE_A] });
     expect(doubles.sharedSpace.addAssets).toHaveBeenCalledWith(otherAuth, SPACE_A, { assetIds: [ASSET] });
   });
 });
-```
-
-Add the second runner beside `run`:
-
-```ts
-const run2 = (sut: TestableService, as: AuthDto, config: unknown) => sut.dispatch(as, 'addToSpace', config);
 ```
 
 ````
@@ -703,10 +691,11 @@ Expected: FAIL on U7, U8, U9, U13 (the placeholder handler only ever touches `sp
 
 - [ ] **Step 3: Replace the placeholder handler**
 
-Add the schema near the top of `gallery-workflow-host.service.ts`:
+Add the schema near the top of `gallery-workflow-host.service.ts`. Note the default import — that is
+the form every DTO in this codebase uses.
 
 ```ts
-import { z } from 'zod';
+import z from 'zod';
 
 const AddToSpaceArgs = z.object({
   assetId: z.uuidv4(),
@@ -773,6 +762,20 @@ git commit -m "feat(spaces): add the addToSpace workflow action"
 - [ ] **Step 1: Write the failing tests**
 
 ```ts
+// U1 — the dispatcher is string-keyed across the WASM boundary, so a renamed handler would
+// otherwise break only at runtime. Introduced here, in the task that makes it pass, so no commit
+// in this plan ever leaves the suite red.
+describe('manifest / handler parity', () => {
+  it('has a handler for every manifest method and no extras', () => {
+    const { sut } = newTestService(GalleryWorkflowHostService);
+    expect(sut.methodNames.sort()).toEqual(
+      readManifest()
+        .methods.map((method: { name: string }) => method.name)
+        .sort(),
+    );
+  });
+});
+
 describe('addToSpaceAlbum', () => {
   const ALBUM_OLD = '00000000-0000-4000-8000-0000000000e1';
   const ALBUM_NEW = '00000000-0000-4000-8000-0000000000e2';
@@ -1423,6 +1426,7 @@ git commit -m "feat(spaces): expose a generic gallery host function to workflow 
 **Files:**
 
 - Create: `web/src/lib/components/SchemaSpacePicker.svelte`
+- Create: `web/src/lib/components/SchemaSpacePicker.test-wrapper.svelte`
 - Create: `web/src/lib/components/SchemaSpacePicker.spec.ts`
 - Modify: `web/src/lib/types.ts:103`
 - Modify: `web/src/lib/components/SchemaConfiguration.svelte:81`
@@ -1437,79 +1441,118 @@ git commit -m "feat(spaces): expose a generic gallery host function to workflow 
 
 - [ ] **Step 1: Write the failing tests**
 
+A `$bindable` prop is **not** readable off the render result in Svelte 5 runes mode. This repo's
+established pattern is a `.test-wrapper.svelte` that owns the `$state` and renders it into a
+`data-testid`, which the spec asserts with `toHaveTextContent` — see
+`web/src/lib/components/spaces/space-albums-controls.test-wrapper.svelte`.
+
+Create `web/src/lib/components/SchemaSpacePicker.test-wrapper.svelte`:
+
+```svelte
+<script lang="ts">
+  import SchemaSpacePicker from './SchemaSpacePicker.svelte';
+
+  type Props = { array?: boolean; initial?: string[] };
+  let { array = false, initial = [] }: Props = $props();
+
+  let spaceIds = $state(initial);
+</script>
+
+<!-- Expose the wrapper's own state so tests can assert upward propagation. -->
+<span data-testid="wrapper-space-ids">{spaceIds.join(',')}</span>
+<SchemaSpacePicker label="Spaces" {array} bind:spaceIds />
+```
+
 Create `web/src/lib/components/SchemaSpacePicker.spec.ts`:
 
 ```ts
-import SchemaSpacePicker from '$lib/components/SchemaSpacePicker.svelte';
+import SchemaSpacePickerWrapper from '$lib/components/SchemaSpacePicker.test-wrapper.svelte';
+import { getAllSpaces } from '@immich/sdk';
 import { modalManager } from '@immich/ui';
 import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+// Module mocks, matching the pattern used across this suite. `vi.spyOn` on these is not the
+// convention here, and an unmocked @immich/sdk would attempt a real fetch under happy-dom.
+vi.mock('@immich/sdk', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@immich/sdk')>()),
+  getAllSpaces: vi.fn(),
+}));
+
+vi.mock('@immich/ui', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@immich/ui')>()),
+  modalManager: { show: vi.fn() },
+}));
+
 const space = (id: string, name: string) => ({ id, name }) as never;
+const boundValue = () => screen.getByTestId('wrapper-space-ids');
 
 describe('SchemaSpacePicker', () => {
   beforeEach(() => {
-    vi.restoreAllMocks();
+    // This suite does not clear mocks between tests, so reset explicitly.
+    vi.mocked(modalManager.show).mockReset();
+    vi.mocked(getAllSpaces)
+      .mockReset()
+      .mockResolvedValue([space('space-1', 'Family')]);
   });
 
-  const renderPicker = (props: Partial<{ array: boolean; spaceIds: string[] }> = {}) => {
-    const spaceIds = props.spaceIds ?? [];
-    const result = render(SchemaSpacePicker, { label: 'Spaces', array: props.array ?? false, spaceIds });
-    return result;
-  };
+  const renderPicker = (props: { array?: boolean; initial?: string[] } = {}) =>
+    render(SchemaSpacePickerWrapper, { array: props.array ?? false, initial: props.initial ?? [] });
 
   it('renders a choose button and no chip when nothing is selected', async () => {
     // W1
     renderPicker();
     expect(await screen.findByRole('button', { name: 'Choose' })).toBeInTheDocument();
     expect(screen.queryByTestId('space-chip')).toBeNull();
+    expect(boundValue()).toHaveTextContent('');
   });
 
-  it('stores the chosen space id', async () => {
+  it('stores the chosen space id and shows its name', async () => {
     // W2
-    vi.spyOn(modalManager, 'show').mockResolvedValue(space('space-1', 'Family'));
-    const { component } = renderPicker();
+    vi.mocked(modalManager.show).mockResolvedValue(space('space-2', 'Friends'));
+    renderPicker();
     await userEvent.click(await screen.findByRole('button', { name: 'Choose' }));
-    expect(await screen.findByText('Family')).toBeInTheDocument();
-    expect(component.spaceIds).toEqual(['space-1']);
+    expect(await screen.findByText('Friends')).toBeInTheDocument();
+    expect(boundValue()).toHaveTextContent('space-2');
   });
 
   it('appends in array mode', async () => {
     // W3
-    vi.spyOn(modalManager, 'show').mockResolvedValue(space('space-2', 'Friends'));
-    const { component } = renderPicker({ array: true, spaceIds: ['space-1'] });
+    vi.mocked(modalManager.show).mockResolvedValue(space('space-2', 'Friends'));
+    renderPicker({ array: true, initial: ['space-1'] });
     await userEvent.click(await screen.findByRole('button', { name: 'Choose' }));
-    expect(component.spaceIds).toEqual(['space-1', 'space-2']);
+    expect(boundValue()).toHaveTextContent('space-1,space-2');
   });
 
   it('replaces in single mode', async () => {
     // W4
-    vi.spyOn(modalManager, 'show').mockResolvedValue(space('space-2', 'Friends'));
-    const { component } = renderPicker({ array: false, spaceIds: ['space-1'] });
+    vi.mocked(modalManager.show).mockResolvedValue(space('space-2', 'Friends'));
+    renderPicker({ array: false, initial: ['space-1'] });
     await userEvent.click(await screen.findByRole('button', { name: 'Choose' }));
-    expect(component.spaceIds).toEqual(['space-2']);
+    expect(boundValue()).toHaveTextContent('space-2');
   });
 
   it('leaves the value untouched when the modal is dismissed', async () => {
     // W5
-    vi.spyOn(modalManager, 'show').mockResolvedValue(undefined);
-    const { component } = renderPicker({ spaceIds: ['space-1'] });
+    vi.mocked(modalManager.show).mockResolvedValue(undefined as never);
+    renderPicker({ initial: ['space-1'] });
     await userEvent.click(await screen.findByRole('button', { name: 'Choose' }));
-    expect(component.spaceIds).toEqual(['space-1']);
+    expect(boundValue()).toHaveTextContent('space-1');
   });
 
   it('removes a selected space', async () => {
     // W6
-    const { component } = renderPicker({ array: true, spaceIds: ['space-1'] });
+    renderPicker({ array: true, initial: ['space-1'] });
     await userEvent.click(await screen.findByRole('button', { name: 'Remove' }));
-    expect(component.spaceIds).toEqual([]);
+    expect(boundValue()).toHaveTextContent('');
   });
 
   it('renders a removable placeholder for a space that no longer resolves', async () => {
     // W7 — a workflow outlives the spaces it points at; an unhandled throw here would take down
     // the whole step editor, including the field the user needs in order to fix it.
-    renderPicker({ array: true, spaceIds: ['deleted-space'] });
+    vi.mocked(getAllSpaces).mockResolvedValue([]);
+    renderPicker({ array: true, initial: ['deleted-space'] });
     expect(await screen.findByText('Space unavailable')).toBeInTheDocument();
     expect(await screen.findByRole('button', { name: 'Remove' })).toBeInTheDocument();
   });
@@ -1585,6 +1628,12 @@ Create `web/src/lib/components/SchemaSpacePicker.svelte`:
       return;
     }
 
+    // Merge the picked space into local state so its name renders immediately. Without this the
+    // chip would fall back to the "unavailable" placeholder until the next getAllSpaces() resolve.
+    if (!spaces.some((known) => known.id === space.id)) {
+      spaces = [...spaces, space];
+    }
+
     spaceIds = array ? [...spaceIds, space.id] : [space.id];
   };
 
@@ -1653,7 +1702,7 @@ Expected: all clean.
 - [ ] **Step 8: Commit**
 
 ```bash
-git add web/src/lib/components/SchemaSpacePicker.svelte web/src/lib/components/SchemaSpacePicker.spec.ts web/src/lib/types.ts web/src/lib/components/SchemaConfiguration.svelte i18n/
+git add web/src/lib/components/SchemaSpacePicker.svelte web/src/lib/components/SchemaSpacePicker.test-wrapper.svelte web/src/lib/components/SchemaSpacePicker.spec.ts web/src/lib/types.ts web/src/lib/components/SchemaConfiguration.svelte i18n/
 git commit -m "feat(spaces): add a space picker to the workflow step config form"
 ```
 
@@ -1910,6 +1959,7 @@ Under the shared-spaces feature in `docs/fork/ownership.yml`, add to `owned_path
 - server/src/services/gallery-workflow-host.service.ts
 - server/src/services/gallery-workflow-host.service.spec.ts
 - web/src/lib/components/SchemaSpacePicker.svelte
+- web/src/lib/components/SchemaSpacePicker.test-wrapper.svelte
 - web/src/lib/components/SchemaSpacePicker.spec.ts
 - e2e/src/specs/server/api/workflow-spaces.e2e-spec.ts
 ```

@@ -98,16 +98,16 @@ Every one of these is registered in `docs/fork/ownership.yml` under `upstream_ex
 
 ### 5.2 Fork-owned files
 
-| Path                                                              | Purpose                                                                                                    |
-| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `packages/plugin-gallery/manifest.json`                           | Method declarations — source of truth for method names and config schemas. `templates: []` this cut (D12). |
-| `packages/plugin-gallery/src/index.ts`                            | Two shims, each one `functions.gallery(...)` call, no branching (§10.4)                                    |
-| `packages/plugin-gallery/src/host.ts`                             | `declare module 'extism:host'` augmentation and the `gallery` caller                                       |
-| `packages/plugin-gallery/{package.json,tsconfig.json,esbuild.js}` | Build config, copied from `plugin-core`'s shape                                                            |
-| `server/src/services/gallery-workflow-host.service.ts`            | The dispatcher and every current and future fork handler                                                   |
-| `server/src/services/gallery-workflow-host.service.spec.ts`       | Unit tests — manifest validity (U0), manifest/handler parity (U1), the rest of §10.1                       |
-| `web/src/lib/components/SchemaSpacePicker.svelte` + `.spec.ts`    | Space picker for the config form                                                                           |
-| `e2e/src/specs/server/api/workflow-spaces.e2e-spec.ts`            | End-to-end guard (see §10.3)                                                                               |
+| Path                                                                                    | Purpose                                                                                                                                                                 |
+| --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/plugin-gallery/manifest.json`                                                 | Method declarations — source of truth for method names and config schemas. `templates: []` this cut (D12).                                                              |
+| `packages/plugin-gallery/src/index.ts`                                                  | Two shims, each one `functions.gallery(...)` call, no branching (§10.4)                                                                                                 |
+| `packages/plugin-gallery/src/host.ts`                                                   | `declare module 'extism:host'` augmentation and the `gallery` caller                                                                                                    |
+| `packages/plugin-gallery/{package.json,tsconfig.json,esbuild.js}`                       | Build config, copied from `plugin-core`'s shape                                                                                                                         |
+| `server/src/services/gallery-workflow-host.service.ts`                                  | The dispatcher and every current and future fork handler                                                                                                                |
+| `server/src/services/gallery-workflow-host.service.spec.ts`                             | Unit tests — manifest validity (U0), manifest/handler parity (U1), the rest of §10.1                                                                                    |
+| `web/src/lib/components/SchemaSpacePicker.svelte` + `.spec.ts` + `.test-wrapper.svelte` | Space picker for the config form. The wrapper owns `$state` so tests can observe the bindable prop — a `$bindable` is not readable off the render result in runes mode. |
+| `e2e/src/specs/server/api/workflow-spaces.e2e-spec.ts`                                  | End-to-end guard (see §10.3)                                                                                                                                            |
 
 ### 5.3 Naming
 
@@ -334,6 +334,8 @@ U0 exists because manifest failure is **silent**: `importFolder` catches everyth
 | W7  | **Given** a configured space id that no longer resolves (the space was deleted after the workflow was saved), **then** the form renders a removable placeholder instead of crashing, and the rest of the step's fields stay editable |
 
 W7 matters because a workflow outlives the spaces it points at, and `SchemaConfiguration` renders every property of the step in one form — an unhandled throw in the space chip would take the whole step editor down, including the field the user needs in order to fix it.
+
+These assert through a `.test-wrapper.svelte` that owns the `$state` and renders it into a `data-testid`, following `space-albums-controls.test-wrapper.svelte`. Reading a `$bindable` off the render result does not work in Svelte 5 runes mode. `@immich/ui` and `@immich/sdk` are module-mocked, per the convention in this suite — an unmocked `getAllSpaces()` would attempt a real fetch under happy-dom, and would also make W2 fail while W7 passed for the wrong reason.
 
 Assertions must be failable — assert on rendered text and the bound value, never `queryBy…` alone, and re-set mocks per test (this suite does not clear mocks between tests).
 
