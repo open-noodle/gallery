@@ -61,6 +61,79 @@ describe('buildAlbumTimelineOptions', () => {
       }),
     );
   });
+
+  it('forwards lensModel, state and ownerId to the album timeline query', () => {
+    const filters = {
+      ...createFilterState(),
+      lensModel: 'RF24-70mm F2.8 L IS USM',
+      state: 'State of Berlin',
+      ownerId: 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb',
+    };
+
+    expect(buildAlbumTimelineOptions('album-1', AssetOrder.Desc, filters)).toEqual(
+      expect.objectContaining({
+        lensModel: 'RF24-70mm F2.8 L IS USM',
+        state: 'State of Berlin',
+        ownerId: 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb',
+      }),
+    );
+  });
+
+  // The album page's route ALREADY scopes the query to its album, and the server's albumId is a
+  // scalar driving one inner join — a second album cannot be AND-ed. So an albumId FILTER is
+  // meaningless here and must not overwrite the route's album scope.
+  it('ignores an albumId filter and keeps the route album', () => {
+    const filters = { ...createFilterState(), albumId: 'some-other-album' };
+
+    const options = buildAlbumTimelineOptions('route-album-id', AssetOrder.Desc, filters);
+
+    expect(options.albumId).toBe('route-album-id');
+  });
+
+  // Finding (#767c): hydrateAlbumFilters hydrates description/originalFileName/ocr/isInAlbum/
+  // isNotInAlbum straight from the URL, getActiveFilterCount counts them, and ActiveFiltersBar
+  // renders a removable chip for each — but until now the album TIMELINE query never forwarded
+  // them, so `/albums/{id}?description=beach` showed a "1 filter" chip over the entire unfiltered
+  // album. The same album's map (buildAlbumMapMarkerOptions) already forwards these.
+  it('forwards trimmed description/filename/ocr text filters to the album timeline query', () => {
+    const filters = {
+      ...createFilterState(),
+      description: '  beach  ',
+      originalFileName: 'IMG_001',
+      ocr: 'invoice',
+    };
+
+    const options = buildAlbumTimelineOptions('album-1', AssetOrder.Desc, filters);
+
+    expect(options).toEqual(
+      expect.objectContaining({ description: 'beach', originalFileName: 'IMG_001', ocr: 'invoice' }),
+    );
+  });
+
+  it('omits blank description/filename/ocr text filters from the album timeline query', () => {
+    const filters = { ...createFilterState(), description: ' '.repeat(3), originalFileName: '', ocr: undefined };
+
+    const options = buildAlbumTimelineOptions('album-1', AssetOrder.Desc, filters);
+
+    expect(options).not.toHaveProperty('description');
+    expect(options).not.toHaveProperty('originalFileName');
+    expect(options).not.toHaveProperty('ocr');
+  });
+
+  it('forwards isInAlbum/isNotInAlbum to the album timeline query only when true', () => {
+    expect(buildAlbumTimelineOptions('album-1', AssetOrder.Desc, { ...createFilterState(), isInAlbum: true })).toEqual(
+      expect.objectContaining({ isInAlbum: true }),
+    );
+    expect(
+      buildAlbumTimelineOptions('album-1', AssetOrder.Desc, { ...createFilterState(), isNotInAlbum: true }),
+    ).toEqual(expect.objectContaining({ isNotInAlbum: true }));
+    expect(
+      buildAlbumTimelineOptions('album-1', AssetOrder.Desc, { ...createFilterState(), isInAlbum: false }),
+    ).not.toHaveProperty('isInAlbum');
+    expect(
+      buildAlbumTimelineOptions('album-1', AssetOrder.Desc, { ...createFilterState(), isNotInAlbum: false }),
+    ).not.toHaveProperty('isNotInAlbum');
+  });
 });
 
 describe('buildAlbumAssetPickerOptions', () => {
@@ -104,6 +177,29 @@ describe('buildAlbumAssetPickerOptions', () => {
       }),
     );
     expect(options).not.toHaveProperty('withPartners');
+  });
+
+  // Pinned per the #767c Step-3 decision: buildAlbumAssetPickerOptions deliberately does NOT
+  // forward lensModel/state/ownerId (unlike buildAlbumTimelineOptions). This is safe only because
+  // the picker's sections (album-filter-config.ts) has no control that can ever set these three on
+  // its component-local, non-URL-hydrated FilterState. Both configs share ONE `sections` const, so
+  // if a future change adds a control that sets one of these fields, this test fails — forcing a
+  // conscious choice to forward the field here too, instead of silently reintroducing the same
+  // "chip says one thing, query does another" bug fixed above for description/originalFileName/
+  // ocr/isInAlbum/isNotInAlbum.
+  it('pins the intentional omission of lensModel/state/ownerId from the asset picker query', () => {
+    const filters = {
+      ...createFilterState(),
+      lensModel: 'RF24-70mm F2.8 L IS USM',
+      state: 'State of Berlin',
+      ownerId: 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb',
+    };
+
+    const options = buildAlbumAssetPickerOptions('album-1', filters);
+
+    expect(options).not.toHaveProperty('lensModel');
+    expect(options).not.toHaveProperty('state');
+    expect(options).not.toHaveProperty('ownerId');
   });
 });
 

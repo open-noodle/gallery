@@ -2,7 +2,7 @@ import { AssetOrder, AssetTypeEnum, AssetVisibility, type FilterSuggestionsPerso
 import type { FilterState } from '$lib/components/filter-panel/filter-panel';
 import { applyTextFilters, buildFilterContext } from '$lib/components/filter-panel/filter-panel';
 import { createUrl } from '$lib/utils';
-import { clearTimelineTemporalFilter } from '$lib/utils/timeline-temporal-filters';
+import { handleRemoveFilter } from '$lib/utils/filter-remove';
 
 export type PhotosPersonFilterReference = {
   id: string;
@@ -14,9 +14,25 @@ export type PhotosPersonFilterReference = {
   };
 };
 
-export function buildPhotosTimelineOptions(filters: FilterState): Record<string, unknown> {
+/**
+ * The `/photos` timeline query.
+ *
+ * `userId` is REQUIRED and always sent — it is the personal timeline's owner gate, and it is what
+ * makes every other chip a NARROWING of my own timeline rather than a redefinition of its scope.
+ *
+ * The server only defaults `userId` to the caller when neither `albumId` nor `spaceId` is present
+ * (`timeline.service.ts` `timeBucketChecks`); under an `albumId` it deliberately leaves the owner
+ * scope unset, because for the ALBUM page album ACCESS *is* the scope — a viewer of a shared album
+ * must see the owner's assets (medium test E22). `/photos` is the opposite surface, so it has to
+ * state its scope itself: without `userId`, an album chip would collapse the personal timeline to
+ * "everything in that album", and `?albumId=A&ownerId=<co-member>` would list a co-member's assets
+ * — and the Favorites chip the album OWNER's favourites (`isFavorite` is the owner's flag) — on MY
+ * timeline. The server query already ANDs the two gates; it just has to be told about both.
+ */
+export function buildPhotosTimelineOptions(filters: FilterState, userId: string): Record<string, unknown> {
   const includeSharedTimelineAssets = filters.isFavorite === undefined;
   const base: Record<string, unknown> = {
+    userId,
     visibility: AssetVisibility.Timeline,
     withStacked: true,
     ...(includeSharedTimelineAssets && { withPartners: true, withSharedSpaces: true }),
@@ -36,6 +52,18 @@ export function buildPhotosTimelineOptions(filters: FilterState): Record<string,
   }
   if (filters.model) {
     base.model = filters.model;
+  }
+  if (filters.lensModel) {
+    base.lensModel = filters.lensModel;
+  }
+  if (filters.state) {
+    base.state = filters.state;
+  }
+  if (filters.ownerId) {
+    base.ownerId = filters.ownerId;
+  }
+  if (filters.albumId) {
+    base.albumId = filters.albumId;
   }
   applyTextFilters(base, filters);
   if (filters.tagIds.length > 0) {
@@ -105,53 +133,5 @@ export function getPhotosPersonFilterId(person: PhotosPersonFilterReference): st
 }
 
 export function handlePhotosRemoveFilter(filters: FilterState, type: string, id?: string): FilterState {
-  switch (type) {
-    case 'person': {
-      return { ...filters, personIds: filters.personIds.filter((p) => p !== id) };
-    }
-    case 'location': {
-      return { ...filters, city: undefined, country: undefined };
-    }
-    case 'camera': {
-      return { ...filters, make: undefined, model: undefined };
-    }
-    case 'tag': {
-      return { ...filters, tagIds: filters.tagIds.filter((t) => t !== id) };
-    }
-    case 'rating': {
-      return { ...filters, rating: undefined };
-    }
-    case 'media':
-    case 'mediaType': {
-      return { ...filters, mediaType: 'all' };
-    }
-    case 'favorites':
-    case 'isFavorite': {
-      return { ...filters, isFavorite: undefined };
-    }
-    case 'albums': {
-      return { ...filters, isNotInAlbum: undefined, isInAlbum: undefined };
-    }
-    case 'isNotInAlbum': {
-      return { ...filters, isNotInAlbum: undefined };
-    }
-    case 'isInAlbum': {
-      return { ...filters, isInAlbum: undefined };
-    }
-    case 'timeline': {
-      return clearTimelineTemporalFilter(filters);
-    }
-    case 'description': {
-      return { ...filters, description: undefined };
-    }
-    case 'filename': {
-      return { ...filters, originalFileName: undefined };
-    }
-    case 'ocr': {
-      return { ...filters, ocr: undefined };
-    }
-    default: {
-      return filters;
-    }
-  }
+  return handleRemoveFilter(filters, type, id);
 }

@@ -16,6 +16,7 @@ import {
   UsageByUserDto,
 } from 'src/dtos/server.dto';
 import { StorageFolder, SyncRequestType, SystemMetadataKey } from 'src/enum';
+import { isActiveDistanceThreshold } from 'src/repositories/search.repository';
 import { UserStatsQueryResponse } from 'src/repositories/user.repository';
 import { BaseService } from 'src/services/base.service';
 import { getAdminAvailableMemoryTypeKeys, MEMORY_TYPE_KEYS } from 'src/services/memory-rules/memory-type.metadata';
@@ -125,6 +126,8 @@ export class ServerService extends BaseService {
 
     return {
       smartSearch: isSmartSearchEnabled(machineLearning),
+      smartSearchHasCutoff:
+        isSmartSearchEnabled(machineLearning) && isActiveDistanceThreshold(machineLearning.clip.maxDistance),
       facialRecognition: isFacialRecognitionEnabled(machineLearning),
       duplicateDetection: isDuplicateDetectionEnabled(machineLearning),
       map: map.enabled,
