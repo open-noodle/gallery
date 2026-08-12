@@ -1,5 +1,7 @@
 <script lang="ts">
   import AdminPageLayout from '$lib/components/layouts/AdminPageLayout.svelte';
+  import ReadOnlyDemoNotice from '$lib/components/admin/ReadOnlyDemoNotice.svelte';
+  import { authManager } from '$lib/managers/auth-manager.svelte';
   import { Route } from '$lib/route';
   import { createScanTriageModel, type ScanTriageModel } from './scan-triage.svelte';
   import ConfidentLane from './ConfidentLane.svelte';
@@ -65,6 +67,8 @@
 
   type Props = { data: PageData };
   const { data }: Props = $props();
+
+  const isReadOnlyDemo = $derived(authManager.isReadOnlyDemo);
 
   let scan = $state<FaceCleanupScan | null>(null);
   let loading = $state(true);
@@ -370,6 +374,7 @@
 
 <AdminPageLayout breadcrumbs={faceCleanupBreadcrumbs($t, guidedCrumb($t))}>
   <div class="mx-auto max-w-screen-xl p-6">
+    <ReadOnlyDemoNotice />
     <!-- Header -->
     <div class="mb-6 flex flex-wrap items-start justify-between gap-6">
       <div>
@@ -392,35 +397,37 @@
           <Button color="secondary" variant="ghost" size="small" href={Route.faceCleanupResolutions()}>
             {$t('admin.face_cleanup_view_resolutions')}
           </Button>
-          <div class="mx-0.5 h-5 w-px bg-gray-200 dark:bg-gray-700" aria-hidden="true"></div>
-          <!-- Before the first scan the tuning knobs are recessed to `ghost`: the defaults are what run one
-               wants, and an admin who has never seen a scan's output has no basis for changing maxDistance or
-               minFaces. Recessed rather than hidden, so it stays reachable for anyone who does know. -->
-          <Button
-            color="secondary"
-            variant={scan ? 'outline' : 'ghost'}
-            size="small"
-            disabled={scanning || (!!scan && isActive(scan.status))}
-            onclick={handleAdvanced}
-            class="gap-2"
-          >
-            <Icon icon={mdiTune} size="16" />
-            {$t('admin.face_cleanup_advanced')}
-          </Button>
-          <!-- `scan === null` is "this instance has never scanned" (loading and loadError are handled as
-               separate branches below), so the action must not call itself "Re-scan" or wear a refresh icon —
-               there is nothing to repeat. It reuses the chooser's own `face_cleanup_mode_run_first_scan`, so
-               the button an admin was just told to click is named the same on both pages. -->
-          <Button
-            color="primary"
-            size="small"
-            disabled={scanning || (!!scan && isActive(scan.status))}
-            onclick={handleRescan}
-            class="gap-2"
-          >
-            <Icon icon={scan ? mdiRefresh : mdiRadar} size="16" />
-            {scan ? $t('admin.face_cleanup_rescan') : $t('admin.face_cleanup_mode_run_first_scan')}
-          </Button>
+          {#if !isReadOnlyDemo}
+            <div class="mx-0.5 h-5 w-px bg-gray-200 dark:bg-gray-700" aria-hidden="true"></div>
+            <!-- Before the first scan the tuning knobs are recessed to `ghost`: the defaults are what run one
+                 wants, and an admin who has never seen a scan's output has no basis for changing maxDistance or
+                 minFaces. Recessed rather than hidden, so it stays reachable for anyone who does know. -->
+            <Button
+              color="secondary"
+              variant={scan ? 'outline' : 'ghost'}
+              size="small"
+              disabled={scanning || (!!scan && isActive(scan.status))}
+              onclick={handleAdvanced}
+              class="gap-2"
+            >
+              <Icon icon={mdiTune} size="16" />
+              {$t('admin.face_cleanup_advanced')}
+            </Button>
+            <!-- `scan === null` is "this instance has never scanned" (loading and loadError are handled as
+                 separate branches below), so the action must not call itself "Re-scan" or wear a refresh icon —
+                 there is nothing to repeat. It reuses the chooser's own `face_cleanup_mode_run_first_scan`, so
+                 the button an admin was just told to click is named the same on both pages. -->
+            <Button
+              color="primary"
+              size="small"
+              disabled={scanning || (!!scan && isActive(scan.status))}
+              onclick={handleRescan}
+              class="gap-2"
+            >
+              <Icon icon={scan ? mdiRefresh : mdiRadar} size="16" />
+              {scan ? $t('admin.face_cleanup_rescan') : $t('admin.face_cleanup_mode_run_first_scan')}
+            </Button>
+          {/if}
         </div>
       </div>
     </div>
