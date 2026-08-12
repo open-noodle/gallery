@@ -1,0 +1,638 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Review · Jula Kulz · Face cleanup</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --primary: #4250af;
+        --primary-600: #39459a;
+        --primary-tint: #eef0fb;
+        --primary-tint-2: #e2e6f7;
+        --success: #2fa84f;
+        --success-tint: #e8f6ec;
+        --warning: #e0a106;
+        --warning-tint: #fdf3e0;
+        --danger: #dc3a3a;
+        --danger-tint: #fcecec;
+        --bg: #fff;
+        --canvas: #f4f5f8;
+        --subtle: #f6f6f8;
+        --fg: #191b22;
+        --muted: #6b7180;
+        --muted-2: #9aa0ad;
+        --line: #e7e8ee;
+        --line-2: #dadce4;
+        --font: 'GoogleSans', 'Google Sans', 'Product Sans', 'Roboto', system-ui, sans-serif;
+        --mono: 'GoogleSansCode', 'Roboto Mono', monospace;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+      }
+      body {
+        background: var(--canvas);
+        color: var(--fg);
+        font-family: var(--font);
+        font-size: 14px;
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+      }
+      .mono {
+        font-family: var(--mono);
+        font-variant-numeric: tabular-nums;
+      }
+      .num {
+        font-variant-numeric: tabular-nums;
+      }
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+      .shell {
+        display: grid;
+        grid-template-columns: 248px 1fr;
+        min-height: 100vh;
+      }
+      .side {
+        background: var(--bg);
+        border-right: 1px solid var(--line);
+        padding: 18px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .side .logo {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 6px 10px 16px;
+        font-weight: 700;
+        font-size: 18px;
+      }
+      .side .logo .mark {
+        width: 30px;
+        height: 30px;
+        border-radius: 9px;
+        background: var(--primary);
+        display: grid;
+        place-items: center;
+        color: #fff;
+      }
+      .side .sec {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--muted-2);
+        padding: 14px 12px 6px;
+      }
+      .nav {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 14px;
+        border-radius: 999px;
+        color: var(--muted);
+        font-weight: 500;
+        font-size: 14px;
+      }
+      .nav.active {
+        background: var(--primary-tint);
+        color: var(--primary);
+        font-weight: 600;
+      }
+
+      .main {
+        padding: 22px 34px 130px;
+        max-width: 1180px;
+      }
+      .back {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        color: var(--muted);
+        font-weight: 600;
+        font-size: 13px;
+        text-decoration: none;
+        margin-bottom: 14px;
+      }
+      .titlerow {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        margin-bottom: 18px;
+      }
+      .titlerow .face {
+        width: 58px;
+        height: 58px;
+        border-radius: 15px;
+        object-fit: cover;
+      }
+      .titlerow h1 {
+        font-size: 24px;
+      }
+      .titlerow .meta {
+        color: var(--muted);
+        font-size: 13px;
+        margin-top: 2px;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .card {
+        background: var(--bg);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+      }
+
+      .explain {
+        padding: 16px 18px;
+        display: flex;
+        gap: 13px;
+        align-items: flex-start;
+        margin-bottom: 18px;
+      }
+      .explain .ic {
+        width: 34px;
+        height: 34px;
+        border-radius: 10px;
+        background: var(--warning-tint);
+        color: var(--warning);
+        display: grid;
+        place-items: center;
+        flex: none;
+      }
+      .explain h3 {
+        font-size: 15px;
+        margin-bottom: 3px;
+      }
+      .explain p {
+        margin: 0;
+        color: var(--muted);
+        max-width: 80ch;
+      }
+      .explain b {
+        color: var(--fg);
+      }
+
+      /* the decision: keep vs move reference */
+      .decide {
+        display: grid;
+        grid-template-columns: 1fr 56px 1fr;
+        gap: 0;
+        align-items: stretch;
+        margin-bottom: 20px;
+      }
+      .ref {
+        padding: 16px 18px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+      .ref .face {
+        width: 60px;
+        height: 60px;
+        border-radius: 14px;
+        object-fit: cover;
+        flex: none;
+      }
+      .ref .lab {
+        font-size: 11.5px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      .ref .nm {
+        font-size: 17px;
+        font-weight: 600;
+        margin-top: 2px;
+      }
+      .ref .ct {
+        font-size: 12.5px;
+        color: var(--muted);
+        margin-top: 1px;
+      }
+      .ref.keep {
+        border-right: none;
+        border-radius: 18px 0 0 18px;
+      }
+      .ref.keep .lab {
+        color: var(--success);
+      }
+      .ref.keep .face {
+        box-shadow:
+          0 0 0 3px var(--success-tint),
+          0 0 0 4px var(--success);
+      }
+      .ref.move {
+        border-left: none;
+        border-radius: 0 18px 18px 0;
+        justify-content: flex-end;
+        text-align: right;
+      }
+      .ref.move .lab {
+        color: var(--primary);
+      }
+      .ref.move .face {
+        box-shadow:
+          0 0 0 3px var(--primary-tint),
+          0 0 0 4px var(--primary);
+      }
+      .splitter {
+        display: grid;
+        place-items: center;
+        background: var(--bg);
+        border-top: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+        color: var(--muted-2);
+        position: relative;
+      }
+      .splitter svg {
+        background: var(--bg);
+        padding: 4px;
+        border: 1px solid var(--line);
+        border-radius: 50%;
+      }
+
+      /* toolbar over the grid */
+      .gridhdr {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 18px;
+        border-bottom: 1px solid var(--line);
+        flex-wrap: wrap;
+      }
+      .gridhdr h3 {
+        font-size: 15px;
+      }
+      .gridhdr h3 .q {
+        color: var(--muted);
+        font-weight: 400;
+        font-size: 13.5px;
+        margin-left: 8px;
+      }
+      .seg {
+        display: flex;
+        gap: 2px;
+        background: var(--subtle);
+        border: 1px solid var(--line);
+        padding: 3px;
+        border-radius: 11px;
+      }
+      .seg .opt {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--muted);
+        padding: 6px 12px;
+        border-radius: 8px;
+        cursor: pointer;
+      }
+      .seg .opt.active {
+        background: var(--bg);
+        color: var(--fg);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+      }
+      .gridhdr .spacer {
+        flex: 1;
+      }
+      .hint {
+        font-size: 12.5px;
+        color: var(--muted);
+      }
+      .hint b {
+        color: var(--fg);
+      }
+
+      .facegrid {
+        padding: 16px 18px;
+        display: grid;
+        grid-template-columns: repeat(8, 1fr);
+        gap: 10px;
+      }
+      .tile {
+        position: relative;
+        border-radius: 11px;
+        overflow: hidden;
+        cursor: pointer;
+        aspect-ratio: 1;
+        background: var(--subtle);
+        border: 2px solid transparent;
+        transition: 0.12s;
+      }
+      .tile img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
+      .tile .check {
+        position: absolute;
+        top: 6px;
+        left: 6px;
+        width: 20px;
+        height: 20px;
+        border-radius: 6px;
+        background: var(--primary);
+        border: 2px solid #fff;
+        display: grid;
+        place-items: center;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+      }
+      .tile .check svg {
+        width: 11px;
+        height: 11px;
+        color: #fff;
+      }
+      .tile .dest {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+        color: #fff;
+        font-size: 10px;
+        font-weight: 600;
+        padding: 10px 7px 4px;
+        display: flex;
+        align-items: center;
+        gap: 3px;
+      }
+      .tile.off {
+        opacity: 0.55;
+        filter: grayscale(0.5);
+      }
+      .tile.off .check {
+        background: var(--bg);
+        border-color: var(--line-2);
+      }
+      .tile.off .dest {
+        display: none;
+      }
+      .tile.off:after {
+        content: 'Stays with Jula';
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: var(--success);
+        color: #fff;
+        font-size: 9.5px;
+        font-weight: 700;
+        text-align: center;
+        padding: 3px;
+      }
+      .facegrid .more {
+        grid-column: 1/-1;
+        text-align: center;
+        color: var(--muted);
+        font-size: 13px;
+        padding: 8px;
+      }
+      .facegrid .more a {
+        color: var(--primary);
+        font-weight: 600;
+        text-decoration: none;
+      }
+
+      /* sticky action bar */
+      .actionbar {
+        position: fixed;
+        left: 248px;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.92);
+        backdrop-filter: blur(8px);
+        border-top: 1px solid var(--line);
+        padding: 14px 34px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        z-index: 20;
+      }
+      .actionbar .sum {
+        font-size: 14px;
+      }
+      .actionbar .sum b {
+        font-weight: 600;
+      }
+      .actionbar .sub {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .actionbar .spacer {
+        flex: 1;
+      }
+      .btn {
+        font-family: inherit;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        border-radius: 14px;
+        padding: 11px 20px;
+        border: 1px solid var(--line-2);
+        background: var(--bg);
+        color: var(--fg);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .btn:hover {
+        background: var(--subtle);
+      }
+      .btn.primary {
+        background: var(--primary);
+        border-color: var(--primary);
+        color: #fff;
+      }
+      .btn.primary:hover {
+        background: var(--primary-600);
+      }
+      @media (max-width: 1100px) {
+        .shell {
+          grid-template-columns: 1fr;
+        }
+        .side {
+          display: none;
+        }
+        .actionbar {
+          left: 0;
+        }
+        .facegrid {
+          grid-template-columns: repeat(5, 1fr);
+        }
+        .decide {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="side">
+        <div class="logo">
+          <span class="mark"
+            ><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="3" />
+              <circle cx="9" cy="9" r="2" />
+              <path d="m21 15-4.5-4.5L7 20" /></svg
+          ></span>
+          Gallery
+        </div>
+        <div class="sec">Administration</div>
+        <div class="nav">Users</div>
+        <div class="nav">Libraries</div>
+        <div class="nav">Jobs</div>
+        <div class="nav">Settings</div>
+        <div class="nav active">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <circle cx="12" cy="11" r="3" />
+            <path d="M5.5 20a7 7 0 0 1 13 0" />
+          </svg>
+          Face cleanup
+        </div>
+      </aside>
+
+      <main class="main">
+        <a class="back" href="#"
+          ><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
+          Face cleanup</a
+        >
+
+        <div class="titlerow">
+          <img class="face" src="https://i.pravatar.cc/120?img=5" alt="" />
+          <div>
+            <h1>Reviewing: Jula Kulz</h1>
+            <div class="meta">
+              <span>owned by Hagen</span><span>·</span><span>2,738 faces</span><span>·</span
+              ><span class="mono">ab714816</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card explain">
+          <div class="ic">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <path d="M12 9v4M12 17h.01" />
+              <path d="M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
+            </svg>
+          </div>
+          <div>
+            <h3>This cluster is mixed — it contains two different people</h3>
+            <p>
+              <b>1,956 of Jula’s 2,738 faces actually match Armin Falkner</b> (a separate person whose own cluster is
+              intact). They were misattributed during the 25 May event. Approving moves those 1,956 faces back to Armin.
+              <b>Jula keeps her 782 real faces, name and thumbnail.</b>
+            </p>
+          </div>
+        </div>
+
+        <div class="card decide">
+          <div class="ref keep">
+            <img class="face" src="https://i.pravatar.cc/120?img=5" alt="" />
+            <div>
+              <div class="lab">✓ Stays — this is Jula</div>
+              <div class="nm">Jula Kulz</div>
+              <div class="ct">782 faces remain</div>
+            </div>
+          </div>
+          <div class="splitter">
+            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path d="M5 12h14M13 6l6 6-6 6" />
+            </svg>
+          </div>
+          <div class="ref move">
+            <div>
+              <div class="lab">Moves to →</div>
+              <div class="nm">Armin Falkner</div>
+              <div class="ct">receives 1,956 faces · clean cluster of 3,104</div>
+            </div>
+            <img class="face" src="https://i.pravatar.cc/120?img=42" alt="" />
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="gridhdr">
+            <h3>
+              Faces leaving Jula
+              <span class="q">— do these look like Armin, not Jula? Uncheck any that <i>are</i> Jula.</span>
+            </h3>
+            <div class="spacer"></div>
+            <div class="seg">
+              <div class="opt active">Leaving (1,956)</div>
+              <div class="opt">Staying (782)</div>
+            </div>
+          </div>
+          <div class="facegrid" id="grid"></div>
+        </div>
+      </main>
+    </div>
+
+    <div class="actionbar">
+      <div>
+        <div class="sum"><b id="count">1,955</b> faces will move to <b>Armin Falkner</b></div>
+        <div class="sub" id="sub">1 face you kept on Jula · she’ll have 783 faces after</div>
+      </div>
+      <div class="spacer"></div>
+      <button class="btn">Cancel</button>
+      <button class="btn primary">
+        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+          <path d="M5 12h14M13 6l6 6-6 6" />
+        </svg>
+        Move <span id="btncount">1,955</span> faces to Armin
+      </button>
+    </div>
+
+    <script>
+      const grid = document.getElementById('grid');
+      // 47 flagged tiles; tile index 19 pre-deselected to show a caught false-positive
+      let html = '';
+      for (let i = 0; i < 47; i++) {
+        const off = i === 19;
+        const seed = off ? 5 : ((42 + i) % 70) + 1; // the "off" tile looks like Jula (seed 5)
+        html += `<div class="tile ${off ? 'off' : ''}" data-i="${i}" onclick="toggle(this)">
+      <img src="https://i.pravatar.cc/120?img=${seed}" alt="">
+      <div class="check">${off ? '' : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg>'}</div>
+      <div class="dest">→ Armin</div>
+    </div>`;
+      }
+      html += `<div class="more">Showing 47 of 1,956 · <a href="#">load more</a></div>`;
+      grid.innerHTML = html;
+      function toggle(el) {
+        el.classList.toggle('off');
+        const on = el.classList.contains('off');
+        el.querySelector('.check').innerHTML = on
+          ? ''
+          : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg>';
+        recount();
+      }
+      function recount() {
+        const off = document.querySelectorAll('.tile.off').length;
+        const moving = 1956 - off;
+        document.getElementById('count').textContent = moving.toLocaleString();
+        document.getElementById('btncount').textContent = moving.toLocaleString();
+        document.getElementById('sub').textContent =
+          `${off} face${off === 1 ? '' : 's'} you kept on Jula · she’ll have ${(782 + off).toLocaleString()} faces after`;
+      }
+      recount();
+    </script>
+  </body>
+</html>

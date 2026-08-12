@@ -4,6 +4,8 @@ import { AccessRepository } from 'src/repositories/access.repository';
 import { ConfigRepository } from 'src/repositories/config.repository';
 import { DatabaseRepository } from 'src/repositories/database.repository';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository';
+import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository';
+import { FaceRepairDeclineRepository } from 'src/repositories/face-repair-decline.repository';
 import { FaceRepairRepository } from 'src/repositories/face-repair.repository';
 import { JobRepository } from 'src/repositories/job.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
@@ -57,10 +59,13 @@ const setupRepair = (db: Kysely<DB>) => {
     database: db,
     real: [
       FaceRepairRepository,
+      FaceRepairDeclineRepository,
+      FacePersonVerdictRepository,
       SearchRepository,
       PersonRepository,
       FaceIdentityRepository,
       ConfigRepository,
+      DatabaseRepository,
       SystemMetadataRepository,
     ],
     mock: [LoggingRepository, JobRepository],
@@ -143,7 +148,7 @@ beforeAll(async () => {
 // ── Task 1: end-to-end re-home + no-loop ────────────────────────────────────────────────────────
 
 describe('face re-attribution repair: end-to-end re-home', () => {
-  it('leaked faces re-home to their true owner after runRepair + handleRecognizeFaces, names preserved, no backfill loop', async () => {
+  it('leaked faces re-home directly to their true owner; a later recognition pass does not boomerang them; names preserved; no backfill loop', async () => {
     const { sut: faceRepair, ctx, jobMock, faceIdentityRepository } = setupRepair(e2eDatabase);
     const { sut: personService } = setupPerson(e2eDatabase);
     const { user } = await ctx.newUser();
@@ -200,24 +205,33 @@ describe('face re-attribution repair: end-to-end re-home', () => {
     // Run repair (real execution).
     const result = await faceRepair.runRepair({ ownerId: user.id, ...repairParams });
     expect(result.mutated).toBe(true);
-    expect(result.executed!.unassigned).toBe(3);
+    expect(result.executed!.moved).toBe(3);
 
-    // Collect the queued face ids from the mock.
-    const queuedIds = collectQueuedFaceIds(jobMock);
-    expect(queuedIds.toSorted()).toEqual(leakedFaceIds.toSorted());
+    // The move is direct — no FacialRecognition jobs are queued (the old re-queue route is exactly what
+    // re-clustered unassigned faces back to the wrong person on contaminated clusters).
+    expect(collectQueuedFaceIds(jobMock)).toHaveLength(0);
 
-    // Drive handleRecognizeFaces for each queued id.
-    for (const id of queuedIds) {
-      await personService.handleRecognizeFaces({ id, deferred: false });
-    }
-
-    // Assert: each leaked face re-homed to Karina.
+    // Assert: each leaked face is already re-homed to Karina.
     const reassignedRows = await ctx.database
       .selectFrom('asset_face')
       .select(['id', 'personId'])
       .where('id', 'in', leakedFaceIds)
       .execute();
     for (const row of reassignedRows) {
+      expect(row.personId).toBe(karina.id);
+    }
+
+    // Durability / boomerang regression: a subsequent recognition pass over the moved faces must leave them
+    // on Karina (recognition is a no-op for an already-assigned face).
+    for (const id of leakedFaceIds) {
+      await personService.handleRecognizeFaces({ id, deferred: false });
+    }
+    const afterRecognition = await ctx.database
+      .selectFrom('asset_face')
+      .select(['id', 'personId'])
+      .where('id', 'in', leakedFaceIds)
+      .execute();
+    for (const row of afterRecognition) {
       expect(row.personId).toBe(karina.id);
     }
 
@@ -248,7 +262,6 @@ describe('face re-attribution repair: end-to-end re-home', () => {
 describe('face re-attribution repair: multi-owner contamination split', () => {
   it('leaked faces split to their correct true owners (Karina-leaks→Karina, Bob-leaks→Bob)', async () => {
     const { sut: faceRepair, ctx, jobMock, faceIdentityRepository } = setupRepair(e2eDatabase);
-    const { sut: personService } = setupPerson(e2eDatabase);
     const { user } = await ctx.newUser();
 
     // Karina: 10 first-axis faces.
@@ -323,14 +336,10 @@ describe('face re-attribution repair: multi-owner contamination split', () => {
     // Run repair.
     const result = await faceRepair.runRepair({ ownerId: user.id, ...repairParams });
     expect(result.mutated).toBe(true);
-    expect(result.executed!.unassigned).toBe(4);
+    expect(result.executed!.moved).toBe(4);
 
-    // Drive handleRecognizeFaces for each queued id.
-    const queuedIds = collectQueuedFaceIds(jobMock);
-    expect(queuedIds).toHaveLength(4);
-    for (const id of queuedIds) {
-      await personService.handleRecognizeFaces({ id, deferred: false });
-    }
+    // Direct move — no recognition re-queue; each face went straight to its own suspected owner.
+    expect(collectQueuedFaceIds(jobMock)).toHaveLength(0);
 
     // Assert: Karina-leaks re-homed to Karina.
     const karinaLeakRows = await ctx.database
@@ -361,9 +370,8 @@ describe('face re-attribution repair: multi-owner contamination split', () => {
 // ── Task 3: re-home at production minFaces:3 + sub-minFaces stays blank ─────────────────────────
 
 describe('face re-attribution repair: minFaces:3 + sub-minFaces stays unassigned', () => {
-  it('leaked face with ≥3 Karina neighbors re-homes; lone face with <3 neighbors stays NULL; no backfill loop', async () => {
+  it('leaked face with ≥3 Karina neighbors re-homes to Karina; lone sub-minFaces face is never flagged; no backfill loop', async () => {
     const { sut: faceRepair, ctx, jobMock, faceIdentityRepository } = setupRepair(e2eDatabase);
-    const { sut: personService } = setupPerson(e2eDatabase);
     const { user } = await ctx.newUser();
 
     // Karina: 10 first-axis faces — the reference cluster.
@@ -447,15 +455,11 @@ describe('face re-attribution repair: minFaces:3 + sub-minFaces stays unassigned
       maxFlaggedFraction: 0.5,
     });
     expect(result.mutated).toBe(true);
-    // The 3 leaked faces should be in toRepair; the lone Bob face is sub-minFaces and not in toRepair
-    expect(result.executed!.unassigned).toBe(3);
+    // The 3 leaked faces should be in toRepair; the lone Bob face is sub-minFaces and not in toRepair.
+    expect(result.executed!.moved).toBe(3);
 
-    // Drive handleRecognizeFaces for queued ids.
-    const queuedIds = collectQueuedFaceIds(jobMock);
-    expect(queuedIds.toSorted()).toEqual(leakedFaceIds.toSorted());
-    for (const id of queuedIds) {
-      await personService.handleRecognizeFaces({ id, deferred: false });
-    }
+    // Direct move — no recognition re-queue.
+    expect(collectQueuedFaceIds(jobMock)).toHaveLength(0);
 
     // Assert: leaked faces re-homed to Karina.
     const reassignedRows = await ctx.database

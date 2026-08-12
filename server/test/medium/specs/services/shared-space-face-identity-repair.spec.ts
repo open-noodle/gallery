@@ -1,8 +1,10 @@
 import { Kysely } from 'kysely';
-import { AssetVisibility, JobName, JobStatus, SharedSpaceRole, SourceType } from 'src/enum';
+import { AssetVisibility, JobName, JobStatus, QueueName, SharedSpaceRole, SourceType } from 'src/enum';
 import { AssetRepository } from 'src/repositories/asset.repository';
 import { ConfigRepository } from 'src/repositories/config.repository';
+import { DatabaseRepository } from 'src/repositories/database.repository';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository';
+import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository';
 import { JobRepository } from 'src/repositories/job.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { PersonRepository } from 'src/repositories/person.repository';
@@ -28,8 +30,10 @@ const setup = (db?: Kysely<DB>) => {
       FaceIdentityRepository,
       PersonRepository,
       ConfigRepository,
+      DatabaseRepository,
       SystemMetadataRepository,
       SearchRepository,
+      FacePersonVerdictRepository,
       StackRepository,
     ],
     mock: [LoggingRepository, JobRepository],
@@ -187,6 +191,49 @@ const createLegacyPetFace = async (
 };
 
 describe('SharedSpaceService linked-library face identity repair', () => {
+  it('resolves pending suggestions for faces moved by mergeSpacePeople', async () => {
+    const { ctx, sut } = setup();
+    const { user } = await ctx.newUser();
+    const auth = factory.auth({ user });
+    const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
+    const { asset } = await ctx.newAsset({ ownerId: user.id });
+    await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
+    const { assetFace: targetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+    const { assetFace: sourceFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+    const target = await ctx.database
+      .insertInto('shared_space_person')
+      .values({ spaceId: space.id, name: 'Target', representativeFaceId: targetFace.id })
+      .returningAll()
+      .executeTakeFirstOrThrow();
+    const source = await ctx.database
+      .insertInto('shared_space_person')
+      .values({ spaceId: space.id, name: 'Source', representativeFaceId: sourceFace.id })
+      .returningAll()
+      .executeTakeFirstOrThrow();
+    await ctx.database
+      .insertInto('shared_space_person_face')
+      .values([
+        { personId: target.id, assetFaceId: targetFace.id },
+        { personId: source.id, assetFaceId: sourceFace.id },
+      ])
+      .execute();
+    await ctx.database
+      .insertInto('face_person_verdict')
+      .values({ spacePersonId: target.id, assetFaceId: sourceFace.id, distance: 0.7 })
+      .execute();
+
+    await sut.mergeSpacePeople(auth, space.id, target.id, { ids: [source.id] });
+
+    const rows = await ctx.database
+      .selectFrom('face_person_verdict')
+      .selectAll()
+      .where('assetFaceId', '=', sourceFace.id)
+      .where('status', '=', 'pending')
+      .execute();
+    expect(rows).toEqual([]);
+  });
+
   it('full-space rematch assigns every EXIF identity face in linked libraries without embeddings', async () => {
     const { ctx, sut, faceIdentityRepository, sharedSpaceRepository, jobs } = setup();
     const { user } = await ctx.newUser();
@@ -844,7 +891,14 @@ describe('SharedSpaceService linked-library face identity repair', () => {
 
     await firstBoot.sut.onBootstrap();
 
-    expect(firstBoot.jobs.removeFailedJobsByJobIdPrefix).toHaveBeenCalledTimes(2);
+    // Three sweeps on a first boot: the shared-space cleanup covers PeopleBackfill and FacialRecognition
+    // (2), and H8 added an independent person-suggestion-scan cleanup on PeopleBackfill (1). The latter
+    // needs its own state key precisely because this one is already marked done on every booted instance.
+    expect(firstBoot.jobs.removeFailedJobsByJobIdPrefix).toHaveBeenCalledTimes(3);
+    expect(firstBoot.jobs.removeFailedJobsByJobIdPrefix).toHaveBeenCalledWith(QueueName.PeopleBackfill, [
+      'person-suggestion-scan/',
+      'space-person-suggestion-scan/',
+    ]);
     expect(firstBoot.jobs.queue).toHaveBeenCalledWith({ name: JobName.FaceIdentityBackfill, data: {} });
 
     const secondBoot = setup();

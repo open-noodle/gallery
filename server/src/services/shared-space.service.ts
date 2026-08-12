@@ -10,6 +10,8 @@ import {
   PeopleFaceStatisticsResponseDto,
   PersonFacePageQueryDto,
   PersonFacePageResponseDto,
+  PersonFaceSuggestionPageQueryDto,
+  PersonFaceSuggestionPageResponseDto,
   PersonStatisticsResponseDto,
 } from 'src/dtos/person.dto';
 import {
@@ -72,6 +74,7 @@ import { asDateString, asDateTimeString } from 'src/utils/date';
 import { ImmichMediaResponse } from 'src/utils/file';
 import { createCrossOwnerMergeAuthorizer } from 'src/utils/merge-policy';
 import { mimeTypes } from 'src/utils/mime-types';
+import { isFaceSuggestionEnabled } from 'src/utils/misc';
 
 const ROLE_HIERARCHY: Record<SharedSpaceRole, number> = {
   [SharedSpaceRole.Viewer]: 0,
@@ -109,6 +112,13 @@ type SharedSpaceIdentityReconciliationClaim = ReconciliationClaim & {
   spacePersonId: string;
   targetIdentityId: string;
   sourceIdentityId: string;
+};
+
+type SpacePersonSuggestionScanCandidate = Pick<SharedSpacePerson, 'id' | 'spaceId' | 'name' | 'isHidden' | 'type'>;
+
+type SpacePersonMetadataInheritanceResult = {
+  didInherit: boolean;
+  suggestionScanCandidate?: SpacePersonSuggestionScanCandidate;
 };
 
 @Injectable()
@@ -1258,6 +1268,175 @@ export class SharedSpaceService extends BaseService {
     };
   }
 
+  async getSpacePersonFaceSuggestions(
+    auth: AuthDto,
+    spaceId: string,
+    personId: string,
+    dto: PersonFaceSuggestionPageQueryDto,
+  ): Promise<PersonFaceSuggestionPageResponseDto> {
+    const member = await this.requireMembership(auth, spaceId);
+    if (ROLE_HIERARCHY[member.role as SharedSpaceRole] < ROLE_HIERARCHY[SharedSpaceRole.Editor]) {
+      return { total: 0, items: [] };
+    }
+
+    await this.requireSpacePersonInSpace(spaceId, personId);
+
+    if (!(await this.areSpacePersonSuggestionsEnabled({ withCache: true }))) {
+      return { total: 0, items: [] };
+    }
+
+    const distanceConfig = await this.getFaceSuggestionDistanceConfig();
+    const result = await this.facePersonVerdictRepository.getPendingForSpacePerson(spaceId, personId, {
+      ...distanceConfig,
+      page: dto.page,
+      size: dto.size,
+    });
+
+    return {
+      total: result.total,
+      items: result.items.map((item) => ({
+        assetFaceId: item.assetFaceId,
+        assetId: item.assetId,
+        distance: item.distance,
+        imageWidth: item.imageWidth,
+        imageHeight: item.imageHeight,
+        boundingBoxX1: item.boundingBoxX1,
+        boundingBoxX2: item.boundingBoxX2,
+        boundingBoxY1: item.boundingBoxY1,
+        boundingBoxY2: item.boundingBoxY2,
+        fileCreatedAt: item.fileCreatedAt?.toISOString(),
+      })),
+    };
+  }
+
+  // S11 (F24): the return value is the acted/no-op signal the controller maps to 200/204 — mirrors the
+  // personal confirmFaceSuggestion twin.
+  async confirmSpacePersonFaceSuggestion(
+    auth: AuthDto,
+    spaceId: string,
+    personId: string,
+    assetFaceId: string,
+  ): Promise<boolean> {
+    await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
+    const person = await this.requireSpacePersonInSpace(spaceId, personId);
+
+    if (!(await this.areSpacePersonSuggestionsEnabled({ withCache: true }))) {
+      return false;
+    }
+
+    const distanceConfig = await this.getFaceSuggestionDistanceConfig();
+    const isPending = await this.facePersonVerdictRepository.hasPendingForSpacePerson(
+      spaceId,
+      person.id,
+      assetFaceId,
+      distanceConfig,
+    );
+    if (!isPending) {
+      return false;
+    }
+
+    // Slice 5 (F10): the four writes below used to be autocommit — a crash between replaceFaceIdentity and
+    // addPersonFaces left a 'manual'-linked face attached to nobody, excluded from every suggestion read and
+    // every cleanup scan, with no repair path (processSpaceFaceMatch early-returns on `!face.personId`). One
+    // transaction makes the whole confirm all-or-nothing, mirroring the personal confirm path. Every call
+    // below threads `trx` — never `this.db` inside this callback (issue #595).
+    const claimed = await this.databaseRepository.transaction(async (trx) => {
+      const identity = await this.faceIdentityRepository.ensureSpacePersonIdentity(person.id, trx);
+      // Claim the queue row first so a double-submit resolves exactly once. No 'confirmed' status is written:
+      // the durable positive verdict is the manual identity link set immediately below.
+      // Slice 3 (F5): pass the SAME band `hasPendingForSpacePerson` just checked, so the claim itself is gated
+      // by the identical eligibility — not just the read that preceded it.
+      const claimed = await this.facePersonVerdictRepository.claimPendingForSpacePerson(
+        person.id,
+        assetFaceId,
+        distanceConfig,
+        trx,
+      );
+      if (claimed === 0) {
+        return claimed;
+      }
+
+      await this.faceIdentityRepository.replaceFaceIdentity(
+        { assetFaceId, identityId: identity.id, source: 'manual' },
+        trx,
+      );
+      await this.facePersonVerdictRepository.resolveAssignedFace(assetFaceId, trx);
+      // Slice 8 (F15): the editor just stated a fact ("this face IS this space person") that contradicts
+      // any durable rejected/ignored row for this SAME target. As with the personal confirm,
+      // claimPendingForSpacePerson's own eligibility gate already refuses the claim whenever such a row
+      // exists (identical spacePersonId/identityId match), so this call is defense-in-depth rather than
+      // something a fresh confirm can currently observe deleting a row. Scoped to this space person only.
+      await this.facePersonVerdictRepository.clearNegativeForTarget(
+        { spacePersonId: person.id, identityId: identity.id },
+        [assetFaceId],
+        trx,
+      );
+      // D3: write the space projection so getAssignedFaceIdsForSpace excludes this face from the same space's
+      // next scan, for every space person — not just this one. addPersonFaces is onConflict().doNothing(), so
+      // this is idempotent if a concurrent face-match backfill already wrote the same row.
+      await this.sharedSpaceRepository.addPersonFaces([{ personId: person.id, assetFaceId }], undefined, trx);
+      return claimed;
+    });
+    return claimed > 0;
+  }
+
+  // D9/D2: reachability (RBAC — is this face's asset in the space at all), not pendingness, gates a space
+  // reject/ignore; then the upsert runs unconditionally, same as the personal path. This matches the personal
+  // path's semantics (a reject/ignore on a drained-but-otherwise-valid target still records) while still
+  // refusing a face whose asset has genuinely left the space. Carries the target's identity + acting user,
+  // same as a cleanup verdict, so the negative-verdict row answers "not this person" everywhere the identity
+  // is checked and records who made the call.
+  // S11 (F24): returns whether a row was actually written — the acted/no-op signal the controller maps to
+  // 200/204, mirroring the personal reject/ignore twins.
+  private async resolveSpacePersonFaceSuggestion(
+    auth: AuthDto,
+    spaceId: string,
+    personId: string,
+    assetFaceId: string,
+    action: 'rejected' | 'ignored',
+  ): Promise<boolean> {
+    await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
+    const person = await this.requireSpacePersonInSpace(spaceId, personId);
+    const reachable = await this.facePersonVerdictRepository.isFaceReachableInSpace(spaceId, assetFaceId);
+    if (!reachable) {
+      return false;
+    }
+
+    const identity = await this.faceIdentityRepository.ensureSpacePersonIdentity(person.id);
+    const opts = { identityId: identity.id, source: 'suggestion' as const, actorId: auth.user.id };
+    const affected = await (action === 'rejected'
+      ? this.facePersonVerdictRepository.markRejectedForSpacePerson(person.id, assetFaceId, opts)
+      : this.facePersonVerdictRepository.markIgnoredForSpacePerson(person.id, assetFaceId, opts));
+    return affected > 0;
+  }
+
+  async rejectSpacePersonFaceSuggestion(
+    auth: AuthDto,
+    spaceId: string,
+    personId: string,
+    assetFaceId: string,
+  ): Promise<boolean> {
+    return this.resolveSpacePersonFaceSuggestion(auth, spaceId, personId, assetFaceId, 'rejected');
+  }
+
+  async ignoreSpacePersonFaceSuggestion(
+    auth: AuthDto,
+    spaceId: string,
+    personId: string,
+    assetFaceId: string,
+  ): Promise<boolean> {
+    return this.resolveSpacePersonFaceSuggestion(auth, spaceId, personId, assetFaceId, 'ignored');
+  }
+
+  async dismissSpacePersonFaceSuggestion(
+    auth: AuthDto,
+    spaceId: string,
+    personId: string,
+    assetFaceId: string,
+  ): Promise<boolean> {
+    return this.rejectSpacePersonFaceSuggestion(auth, spaceId, personId, assetFaceId);
+  }
+
   async updateSpacePersonRepresentativeFace(
     auth: AuthDto,
     spaceId: string,
@@ -1493,6 +1672,22 @@ export class SharedSpaceService extends BaseService {
       await this.queueSpacePersonMetadataBackfill(person.identityId);
     }
 
+    if (dto.name !== undefined) {
+      const candidate = {
+        id: personId,
+        spaceId,
+        name: dto.name,
+        isHidden: dto.isHidden ?? person.isHidden,
+        type: person.type,
+      };
+      if (this.isNamedVisibleSpacePerson(candidate) && dto.name.trim() !== person.name.trim()) {
+        const suggestionsEnabled = await this.areSpacePersonSuggestionsEnabled({ withCache: false });
+        if (suggestionsEnabled && (await this.isSpaceFaceRecognitionEnabled(spaceId))) {
+          await this.jobRepository.queue({ name: JobName.SpacePersonSuggestionScan, data: { id: personId } });
+        }
+      }
+    }
+
     const alias = await this.sharedSpaceRepository.getAlias(personId, auth.user.id);
 
     const enriched = await this.sharedSpaceRepository.getPersonById(personId);
@@ -1554,24 +1749,30 @@ export class SharedSpaceService extends BaseService {
 
     let inherited = 0;
     let skipped = 0;
+    const suggestionScanCandidates: SpacePersonSuggestionScanCandidate[] = [];
     for (const person of people) {
       if (!person.identityId) {
         skipped++;
         continue;
       }
       const assetAdderIds = await this.sharedSpaceRepository.getSpacePersonAssetAdderIds(person.spaceId, person.id);
-      const didInherit = await this.inheritSpacePersonMetadata(
+      const inheritance = await this.inheritSpacePersonMetadata(
         person.spaceId,
         person.id,
         person.identityId,
         assetAdderIds,
       );
-      if (didInherit) {
+      if (inheritance.didInherit) {
         inherited++;
+        if (inheritance.suggestionScanCandidate) {
+          suggestionScanCandidates.push(inheritance.suggestionScanCandidate);
+        }
       } else {
         skipped++;
       }
     }
+
+    await this.queueSpacePersonSuggestionScans(suggestionScanCandidates);
 
     return {
       processed: people.length,
@@ -1614,6 +1815,16 @@ export class SharedSpaceService extends BaseService {
   // (removals are idempotent), and only a non-zero cleanup kicks identity maintenance.
   @OnEvent({ name: 'AppBootstrap', workers: [ImmichWorker.Microservices] })
   async onBootstrap(): Promise<void> {
+    // Two independent one-time sweeps, each gated by its OWN state key. They must not share a gate: an
+    // instance that already ran the shared-space sweep below has SharedSpaceFaceJobCleanupState.cleanedAt
+    // set forever, so folding the H8 prefixes into that gate would make the H8 sweep a permanent no-op on
+    // every instance that boots after this fix — exactly the instances carrying the stuck jobIds it exists
+    // to clear.
+    await this.cleanupBlockedSharedSpaceFaceJobs();
+    await this.cleanupBlockedPersonSuggestionScanJobs();
+  }
+
+  private async cleanupBlockedSharedSpaceFaceJobs(): Promise<void> {
     const state = await this.systemMetadataRepository.get(SystemMetadataKey.SharedSpaceFaceJobCleanupState);
     if (state?.cleanedAt) {
       return;
@@ -1632,6 +1843,31 @@ export class SharedSpaceService extends BaseService {
     }
 
     await this.systemMetadataRepository.set(SystemMetadataKey.SharedSpaceFaceJobCleanupState, {
+      cleanedAt: new Date().toISOString(),
+    });
+  }
+
+  // H8: one-time recovery for PersonSuggestionScan/SpacePersonSuggestionScan jobs that failed before
+  // job.repository.ts set removeOnFail on those two job options. Those failures permanently occupy their
+  // stable per-person dedup jobId — BullMQ silently ignores any later add() with the same id, so that
+  // person's suggestion queue never refills, with no log and no admin-visible symptom. removeOnFail now
+  // protects every NEW failure; this sweep clears the ones that got stuck before that fix shipped. Both
+  // job types run only on QueueName.PeopleBackfill (person.service.ts), so there is no FacialRecognition
+  // arm to sweep here, unlike cleanupBlockedSharedSpaceFaceJobs above.
+  private async cleanupBlockedPersonSuggestionScanJobs(): Promise<void> {
+    const state = await this.systemMetadataRepository.get(SystemMetadataKey.PersonSuggestionScanJobCleanupState);
+    if (state?.cleanedAt) {
+      return;
+    }
+
+    const prefixes = ['person-suggestion-scan/', 'space-person-suggestion-scan/'];
+    const removed = await this.jobRepository.removeFailedJobsByJobIdPrefix(QueueName.PeopleBackfill, prefixes);
+
+    if (removed > 0) {
+      this.logger.log(`Removed ${removed} failed person-suggestion-scan job(s) that were blocking their dedup jobIds`);
+    }
+
+    await this.systemMetadataRepository.set(SystemMetadataKey.PersonSuggestionScanJobCleanupState, {
       cleanedAt: new Date().toISOString(),
     });
   }
@@ -1723,6 +1959,12 @@ export class SharedSpaceService extends BaseService {
     });
   }
 
+  private async resolveMovedSpacePersonFaces(faceIds: Array<{ assetFaceId: string }>): Promise<void> {
+    for (const { assetFaceId } of faceIds) {
+      await this.facePersonVerdictRepository.resolveAssignedFace(assetFaceId);
+    }
+  }
+
   async mergeSpacePeople(
     auth: AuthDto,
     spaceId: string,
@@ -1761,6 +2003,13 @@ export class SharedSpaceService extends BaseService {
     // holds the instance-wide advisory lock, and reading config there would query a second pool connection a
     // saturated pool cannot grant, deadlocking every merge (#595). The authorizer gets an already-resolved value.
     const { server } = await this.getConfig({ withCache: false });
+    // Capture the source people's face ids before the merge so any pending suggestions for
+    // those faces can be resolved once the merge reassigns them to the target person.
+    const movedFaceIds: Array<{ assetFaceId: string }> = [];
+    for (const source of sources) {
+      movedFaceIds.push(...(await this.sharedSpaceRepository.getFaceIdsForPerson(source.id)));
+    }
+
     await this.identityMergePropagationService.mergeSpacePeople(
       auth,
       spaceId,
@@ -1768,6 +2017,8 @@ export class SharedSpaceService extends BaseService {
       dto.ids,
       createCrossOwnerMergeAuthorizer(() => Promise.resolve(server), dto),
     );
+
+    await this.resolveMovedSpacePersonFaces(movedFaceIds);
     await this.sharedSpaceRepository.logActivity({
       spaceId,
       userId: auth.user.id,
@@ -2408,7 +2659,9 @@ export class SharedSpaceService extends BaseService {
       );
 
       // Reassign faces and migrate aliases
+      const movedFaceIds = await this.sharedSpaceRepository.getFaceIdsForPerson(source.id);
       await this.sharedSpaceRepository.reassignPersonFacesSafe(source.id, target.id);
+      await this.resolveMovedSpacePersonFaces(movedFaceIds);
       await this.sharedSpaceRepository.migrateAliases(source.id, target.id);
 
       const candidateIdentityIds = [target.identityId, source.identityId].filter(
@@ -2784,21 +3037,6 @@ export class SharedSpaceService extends BaseService {
     return [...affectedPersonIds];
   }
 
-  private async findOrCreateSpacePersonForFace(input: {
-    spaceId: string;
-    faceId: string;
-    personId: string;
-    identityId: string;
-    type: string;
-  }): Promise<SpacePersonMatchResult> {
-    const spacePerson = await this.findOrCreateCompatibleSpacePersonForIdentity(input);
-    if (!spacePerson) {
-      throw new Error(`Identity ${input.identityId} is already attached to a different space person type`);
-    }
-
-    return spacePerson;
-  }
-
   private async findOrCreateCompatibleSpacePersonForIdentity(input: {
     spaceId: string;
     faceId: string;
@@ -2978,10 +3216,10 @@ export class SharedSpaceService extends BaseService {
     spacePersonId: string,
     identityId: string,
     assetAdderIdOrIds?: string | string[] | null,
-  ): Promise<boolean> {
+  ): Promise<SpacePersonMetadataInheritanceResult> {
     const person = await this.sharedSpaceRepository.getPersonById(spacePersonId);
     if (!person || person.spaceId !== spaceId) {
-      return false;
+      return { didInherit: false };
     }
     const assetAdderIds = Array.isArray(assetAdderIdOrIds)
       ? assetAdderIdOrIds
@@ -3057,9 +3295,69 @@ export class SharedSpaceService extends BaseService {
 
     if (Object.keys(updates).length > 0) {
       await this.sharedSpaceRepository.updatePerson(spacePersonId, updates);
-      return true;
+      const nextName = updates.name ?? person.name;
+      const nameChanged = typeof updates.name === 'string' && updates.name.trim() !== person.name.trim();
+      return {
+        didInherit: true,
+        ...(nameChanged &&
+          this.isNamedVisibleSpacePerson({ ...person, name: nextName }) && {
+            suggestionScanCandidate: { ...person, name: nextName },
+          }),
+      };
     }
-    return false;
+    return { didInherit: false };
+  }
+
+  private isNamedVisibleSpacePerson(person: Pick<SharedSpacePerson, 'name' | 'isHidden' | 'type'>): boolean {
+    return person.name.trim().length > 0 && !person.isHidden && person.type === 'person';
+  }
+
+  private async areSpacePersonSuggestionsEnabled({ withCache }: { withCache: boolean }): Promise<boolean> {
+    const { machineLearning } = await this.getConfig({ withCache });
+    return isFaceSuggestionEnabled(machineLearning);
+  }
+
+  private async isSpaceFaceRecognitionEnabled(spaceId: string, cache = new Map<string, boolean>()): Promise<boolean> {
+    const cached = cache.get(spaceId);
+    if (cached !== undefined) {
+      return cached;
+    }
+
+    const space = await this.sharedSpaceRepository.getById(spaceId);
+    const enabled = !!space?.faceRecognitionEnabled;
+    cache.set(spaceId, enabled);
+    return enabled;
+  }
+
+  private async queueSpacePersonSuggestionScans(candidates: SpacePersonSuggestionScanCandidate[]): Promise<void> {
+    if (candidates.length === 0) {
+      return;
+    }
+
+    const suggestionsEnabled = await this.areSpacePersonSuggestionsEnabled({ withCache: false });
+    if (!suggestionsEnabled) {
+      return;
+    }
+
+    const queuedIds = new Set<string>();
+    const spaceEnabledCache = new Map<string, boolean>();
+    const jobs: Array<{ name: JobName.SpacePersonSuggestionScan; data: { id: string } }> = [];
+    for (const candidate of candidates) {
+      if (queuedIds.has(candidate.id) || !this.isNamedVisibleSpacePerson(candidate)) {
+        continue;
+      }
+
+      if (!(await this.isSpaceFaceRecognitionEnabled(candidate.spaceId, spaceEnabledCache))) {
+        continue;
+      }
+
+      queuedIds.add(candidate.id);
+      jobs.push({ name: JobName.SpacePersonSuggestionScan, data: { id: candidate.id } });
+    }
+
+    if (jobs.length > 0) {
+      await this.jobRepository.queueAll(jobs);
+    }
   }
 
   private selectMetadataCandidate<
@@ -3118,6 +3416,22 @@ export class SharedSpaceService extends BaseService {
       throw new ForbiddenException('Insufficient role');
     }
     return member;
+  }
+
+  private async requireSpacePersonInSpace(spaceId: string, personId: string): Promise<SharedSpacePerson> {
+    const person = await this.sharedSpaceRepository.getPersonById(personId);
+    if (!person || person.spaceId !== spaceId) {
+      throw new BadRequestException('Person not found');
+    }
+    return person;
+  }
+
+  private async getFaceSuggestionDistanceConfig() {
+    const { machineLearning } = await this.getConfig({ withCache: false });
+    return {
+      maxDistance: machineLearning.facialRecognition.maxDistance,
+      suggestionMaxDistance: machineLearning.facialRecognition.suggestions.maxDistance,
+    };
   }
 
   private mapMember(member: {

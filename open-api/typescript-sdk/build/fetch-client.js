@@ -123,6 +123,88 @@ export function runFaceRepair({ faceRepairRequestDto }, opts) {
     })));
 }
 /**
+ * Apply face re-attribution for approved persons
+ */
+export function applyFaceRepair({ faceRepairApplyRequestDto }, opts) {
+    return oazapfts.ok(oazapfts.fetchJson("/admin/face-repair/apply", oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: faceRepairApplyRequestDto
+    })));
+}
+/**
+ * Remove face-repair declines
+ */
+export function removeFaceRepairDeclines({ faceRepairDeclineRemoveRequestDto }, opts) {
+    return oazapfts.ok(oazapfts.fetchJson("/admin/face-repair/decline", oazapfts.json({
+        ...opts,
+        method: "DELETE",
+        body: faceRepairDeclineRemoveRequestDto
+    })));
+}
+/**
+ * List face-repair declines
+ */
+export function getFaceRepairDeclines(opts) {
+    return oazapfts.ok(oazapfts.fetchJson("/admin/face-repair/decline", {
+        ...opts
+    }));
+}
+/**
+ * Decline flagged faces / dismiss flagged persons
+ */
+export function declineFaceRepair({ faceRepairDeclineRequestDto }, opts) {
+    return oazapfts.ok(oazapfts.fetchJson("/admin/face-repair/decline", oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: faceRepairDeclineRequestDto
+    })));
+}
+/**
+ * Trigger a face-repair scan
+ */
+export function triggerScan({ faceRepairScanTriggerRequestDto }, opts) {
+    return oazapfts.ok(oazapfts.fetchJson("/admin/face-repair/scan", oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: faceRepairScanTriggerRequestDto
+    })));
+}
+/**
+ * Get effective face-repair scan defaults
+ */
+export function getFaceRepairScanDefaults(opts) {
+    return oazapfts.ok(oazapfts.fetchJson("/admin/face-repair/scan/defaults", {
+        ...opts
+    }));
+}
+/**
+ * Get the latest face-repair scan
+ */
+export function getLatestScan(opts) {
+    return oazapfts.ok(oazapfts.fetchJson("/admin/face-repair/scan/latest", {
+        ...opts
+    }));
+}
+/**
+ * Get a person's flagged faces for review
+ */
+export function getFaceRepairPersonFaces({ personId }, opts) {
+    return oazapfts.ok(oazapfts.fetchJson(`/admin/face-repair/scan/person/${encodeURIComponent(personId)}`, {
+        ...opts
+    }));
+}
+/**
+ * List a person's cluster faces (paginated, excluding the supplied flagged ids)
+ */
+export function getFaceRepairClusterFaces({ personId, faceRepairClusterFacesRequestDto }, opts) {
+    return oazapfts.ok(oazapfts.fetchJson(`/admin/face-repair/scan/person/${encodeURIComponent(personId)}/cluster-faces`, oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: faceRepairClusterFacesRequestDto
+    })));
+}
+/**
  * Set maintenance mode
  */
 export function setMaintenanceMode({ setMaintenanceModeDto }, opts) {
@@ -931,12 +1013,11 @@ export function reassignFacesById({ id, faceDto }, opts) {
 /**
  * Get filtered map markers
  */
-export function getFilteredMapMarkers({ city, country, isFavorite, isInAlbum, isNotInAlbum, make, model, personIds, rating, spaceId, tagIds, takenAfter, takenBefore, $type, withSharedSpaces }, opts) {
+export function getFilteredMapMarkers({ city, country, isFavorite, isNotInAlbum, make, model, personIds, rating, spaceId, tagIds, takenAfter, takenBefore, $type, withSharedSpaces }, opts) {
     return oazapfts.ok(oazapfts.fetchJson(`/gallery/map/markers${QS.query(QS.explode({
         city,
         country,
         isFavorite,
-        isInAlbum,
         isNotInAlbum,
         make,
         model,
@@ -1607,7 +1688,7 @@ export function getExploreData(opts) {
 /**
  * Search large assets
  */
-export function searchLargeAssets({ albumIds, city, country, createdAfter, createdBefore, isEncoded, isFavorite, isInAlbum, isMotion, isNotInAlbum, isOffline, lensModel, libraryId, make, minFileSize, model, ocr, personIds, rating, size, spaceId, spacePersonIds, state, tagIds, takenAfter, takenBefore, trashedAfter, trashedBefore, $type, updatedAfter, updatedBefore, visibility, withDeleted, withExif, withSharedSpaces }, opts) {
+export function searchLargeAssets({ albumIds, city, country, createdAfter, createdBefore, isEncoded, isFavorite, isMotion, isNotInAlbum, isOffline, lensModel, libraryId, make, minFileSize, model, ocr, personIds, rating, size, spaceId, spacePersonIds, state, tagIds, takenAfter, takenBefore, trashedAfter, trashedBefore, $type, updatedAfter, updatedBefore, visibility, withDeleted, withExif, withSharedSpaces }, opts) {
     return oazapfts.ok(oazapfts.fetchJson(`/search/large-assets${QS.query(QS.explode({
         albumIds,
         city,
@@ -1616,7 +1697,6 @@ export function searchLargeAssets({ albumIds, city, country, createdAfter, creat
         createdBefore,
         isEncoded,
         isFavorite,
-        isInAlbum,
         isMotion,
         isNotInAlbum,
         isOffline,
@@ -1724,13 +1804,12 @@ export function searchAssetStatistics({ statisticsSearchDto }, opts) {
 /**
  * Retrieve search suggestions
  */
-export function getSearchSuggestions({ albumId, country, includeNull, isFavorite, isInAlbum, isNotInAlbum, lensModel, make, model, personIds, rating, spaceId, state, tagIds, takenAfter, takenBefore, $type, withSharedSpaces }, opts) {
+export function getSearchSuggestions({ albumId, country, includeNull, isFavorite, isNotInAlbum, lensModel, make, model, personIds, rating, spaceId, state, tagIds, takenAfter, takenBefore, $type, withSharedSpaces }, opts) {
     return oazapfts.ok(oazapfts.fetchJson(`/search/suggestions${QS.query(QS.explode({
         albumId,
         country,
         includeNull,
         isFavorite,
-        isInAlbum,
         isNotInAlbum,
         lensModel,
         make,
@@ -1751,13 +1830,12 @@ export function getSearchSuggestions({ albumId, country, includeNull, isFavorite
 /**
  * Retrieve dynamic filter suggestions
  */
-export function getFilterSuggestions({ albumId, city, country, isFavorite, isInAlbum, isNotInAlbum, make, mediaType, model, personIds, rating, spaceId, tagIds, takenAfter, takenBefore, withSharedSpaces }, opts) {
+export function getFilterSuggestions({ albumId, city, country, isFavorite, isNotInAlbum, make, mediaType, model, personIds, rating, spaceId, tagIds, takenAfter, takenBefore, withSharedSpaces }, opts) {
     return oazapfts.ok(oazapfts.fetchJson(`/search/suggestions/filters${QS.query(QS.explode({
         albumId,
         city,
         country,
         isFavorite,
-        isInAlbum,
         isNotInAlbum,
         make,
         mediaType,
@@ -2707,7 +2785,7 @@ export function tagAssets({ id, bulkIdsDto }, opts) {
 /**
  * Get time bucket
  */
-export function getTimeBucket({ albumId, bbox, bucketSize, city, country, isFavorite, isInAlbum, isNotInAlbum, isTrashed, key, make, model, order, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, tagId, tagIds, takenAfter, takenBefore, timeBucket, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }, opts) {
+export function getTimeBucket({ albumId, bbox, bucketSize, city, country, isFavorite, isNotInAlbum, isTrashed, key, make, model, order, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, tagId, tagIds, takenAfter, takenBefore, timeBucket, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }, opts) {
     return oazapfts.ok(oazapfts.fetchJson(`/timeline/bucket${QS.query(QS.explode({
         albumId,
         bbox,
@@ -2715,7 +2793,6 @@ export function getTimeBucket({ albumId, bbox, bucketSize, city, country, isFavo
         city,
         country,
         isFavorite,
-        isInAlbum,
         isNotInAlbum,
         isTrashed,
         key,
@@ -2748,7 +2825,7 @@ export function getTimeBucket({ albumId, bbox, bucketSize, city, country, isFavo
 /**
  * Get time bucket covers
  */
-export function getTimeBucketCovers({ albumId, bbox, bucketSize, city, country, isFavorite, isInAlbum, isNotInAlbum, isTrashed, key, make, model, order, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, tagId, tagIds, takenAfter, takenBefore, timeBuckets, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }, opts) {
+export function getTimeBucketCovers({ albumId, bbox, bucketSize, city, country, isFavorite, isNotInAlbum, isTrashed, key, make, model, order, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, tagId, tagIds, takenAfter, takenBefore, timeBuckets, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }, opts) {
     return oazapfts.ok(oazapfts.fetchJson(`/timeline/bucket-covers${QS.query(QS.explode({
         albumId,
         bbox,
@@ -2756,7 +2833,6 @@ export function getTimeBucketCovers({ albumId, bbox, bucketSize, city, country, 
         city,
         country,
         isFavorite,
-        isInAlbum,
         isNotInAlbum,
         isTrashed,
         key,
@@ -2789,7 +2865,7 @@ export function getTimeBucketCovers({ albumId, bbox, bucketSize, city, country, 
 /**
  * Get time buckets
  */
-export function getTimeBuckets({ albumId, bbox, bucketSize, city, country, isFavorite, isInAlbum, isNotInAlbum, isTrashed, key, make, model, order, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, tagId, tagIds, takenAfter, takenBefore, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }, opts) {
+export function getTimeBuckets({ albumId, bbox, bucketSize, city, country, isFavorite, isNotInAlbum, isTrashed, key, make, model, order, personId, personIds, rating, slug, spaceId, spacePersonId, spacePersonIds, tagId, tagIds, takenAfter, takenBefore, $type, userId, visibility, withCoordinates, withPartners, withSharedSpaces, withStacked }, opts) {
     return oazapfts.ok(oazapfts.fetchJson(`/timeline/buckets${QS.query(QS.explode({
         albumId,
         bbox,
@@ -2797,7 +2873,6 @@ export function getTimeBuckets({ albumId, bbox, bucketSize, city, country, isFav
         city,
         country,
         isFavorite,
-        isInAlbum,
         isNotInAlbum,
         isTrashed,
         key,
@@ -3543,6 +3618,7 @@ export var JobName;
     JobName["FacialRecognition"] = "FacialRecognition";
     JobName["FaceIdentityBackfill"] = "FaceIdentityBackfill";
     JobName["FaceIdentityMaintenanceAfterRecognition"] = "FaceIdentityMaintenanceAfterRecognition";
+    JobName["FaceRepairScan"] = "FaceRepairScan";
     JobName["FileDelete"] = "FileDelete";
     JobName["FileMigrationQueueAll"] = "FileMigrationQueueAll";
     JobName["LibraryDeleteCheck"] = "LibraryDeleteCheck";
