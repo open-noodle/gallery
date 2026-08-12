@@ -31,9 +31,9 @@ describe('gallery plugin manifest', () => {
 
 const auth = { user: { id: 'user-1' } } as AuthDto;
 
-describe(GalleryWorkflowHostService.name, () => {
-  const setup = () => newTestService(GalleryWorkflowHostService);
+const setup = () => newTestService(GalleryWorkflowHostService);
 
+describe(GalleryWorkflowHostService.name, () => {
   // U2 — a stale externally-installed plugin must degrade, not explode.
   it('resolves ok:false for an unknown method instead of rejecting', async () => {
     const { sut } = setup();
@@ -73,13 +73,13 @@ class ProbeService extends GalleryWorkflowHostService {
   }
 }
 
-describe('never-throws invariant', () => {
-  const probe = (error: unknown) => {
-    const { sut } = newTestService(ProbeService);
-    sut.error = error;
-    return sut;
-  };
+const probe = (error: unknown) => {
+  const { sut } = newTestService(ProbeService);
+  sut.error = error;
+  return sut;
+};
 
+describe('never-throws invariant', () => {
   const args = { assetId: '00000000-0000-4000-8000-000000000001', spaceIds: ['00000000-0000-4000-8000-000000000002'] };
 
   // U3 / U4 — every expected rejection resolves ok:false. If any of these threw, upstream's
@@ -126,9 +126,9 @@ const setupTestable = () => {
   return { sut, doubles: sut.doubles };
 };
 
-describe('addToSpace', () => {
-  const run = (sut: TestableService, config: unknown) => sut.dispatch(auth, 'addToSpace', config);
+const run = (sut: TestableService, config: unknown) => sut.dispatch(auth, 'addToSpace', config);
 
+describe('addToSpace', () => {
   it('adds the asset once per space', async () => {
     // U6
     const { sut, doubles } = setupTestable();
