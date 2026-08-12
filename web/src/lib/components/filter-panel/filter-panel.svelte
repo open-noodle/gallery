@@ -76,9 +76,18 @@
 
   // The count gate answers "has a *cross-section* filter narrowed the panel?". It drives the
   // empty-section disable in filter-section.svelte, not a request, so the location/camera/media
-  // dimensions added for #858 stay out of it — see the #858 design doc §3.3.
-  let filterContext = $derived(buildFilterContext(filters, ['country', 'city', 'make', 'model', 'mediaType']));
-  let locationFilterContext = $derived(buildFilterContext(filters, ['country', 'city']));
+  // dimensions added for #858 stay out of it — see the #858 design doc §3.3. `state` / `lensModel` /
+  // `ownerId` join them for the same reason: they only ever arrive from a contextual filter, typed
+  // search or a link, and turning the disable behaviour on for those arrivals is a separate UX call.
+  let filterContext = $derived(
+    buildFilterContext(filters, ['country', 'state', 'city', 'make', 'model', 'lensModel', 'ownerId', 'mediaType']),
+  );
+  // country / state / city are ONE filter — `handleLocationChange` replaces all three on any click —
+  // so the whole group is self-excluded here and the drill-down parent is passed explicitly instead.
+  // A city list narrowed by a state that the very next click clears would be a lie.
+  let locationFilterContext = $derived(buildFilterContext(filters, ['country', 'state', 'city']));
+  // `lensModel` is NOT excluded: `handleCameraChange` leaves the lens chip alone, so it stays an
+  // independent active filter and the model list may honestly narrow by it.
   let cameraFilterContext = $derived(buildFilterContext(filters, ['make', 'model']));
 
   // Unified suggestions re-fetch: replaces mount effects + temporal re-fetch when suggestionsProvider is set
@@ -95,8 +104,14 @@
       personIds: filters.personIds,
       city: filters.city,
       country: filters.country,
+      // Tracked so clearing a state re-fetches: the suggestion lists describe the filtered set, and
+      // dropping a state widens it. Same for the lens and the contributor narrowing — and the
+      // provider reads this reconstructed state, so an untracked field is also an unsent one.
+      state: filters.state,
       make: filters.make,
       model: filters.model,
+      lensModel: filters.lensModel,
+      ownerId: filters.ownerId,
       tagIds: filters.tagIds,
       rating: filters.rating,
       mediaType: filters.mediaType,
@@ -560,8 +575,11 @@
     updateFilters({ ...filters, personIds: ids });
   }
 
-  function handleLocationChange(country?: string, city?: string) {
-    updateFilters({ ...filters, country, city });
+  // city / state / country are ONE filter and one chip, so a change to any of them REPLACES the
+  // group. `state` defaulting to undefined is what makes a country or city click drop a stale state
+  // rather than silently AND-ing an invisible predicate onto the new selection.
+  function handleLocationChange(country?: string, city?: string, state?: string) {
+    updateFilters({ ...filters, country, city, state });
   }
 
   function handleCameraChange(make?: string, model?: string) {
@@ -610,7 +628,10 @@
         return filters.personIds.length > 0;
       }
       case 'location': {
-        return !!filters.city || !!filters.country;
+        // `state` counts: it is part of the same one-filter group, and without it a state-only
+        // filter left the section looking untouched from the outside too (no dot on the collapsed
+        // panel, none on the hidden-section toggle).
+        return !!filters.city || !!filters.country || !!filters.state;
       }
       case 'camera': {
         return !!filters.make;
@@ -764,6 +785,7 @@
                     {countries}
                     selectedCity={filters.city}
                     selectedCountry={filters.country}
+                    selectedState={filters.state}
                     context={locationFilterContext}
                     onCityFetch={async (country, ctx) => {
                       if (providers.cities) {
