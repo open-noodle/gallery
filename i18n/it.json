@@ -737,7 +737,7 @@
     "storage_template_settings_description": "Gestisci la struttura delle cartelle e il nome degli asset caricati",
     "storage_template_user_label": "<code>{label}</code> è l'etichetta di archiviazione dell'utente",
     "storage_usage_include_derivatives_display_setting": "Includi i file in cache nell'utilizzo visualizzato",
-    "storage_usage_include_derivatives_display_setting_description": "Conteggia le miniature e i video transcodificati nello spazio di archiviazione mostrato agli utenti. Disattivato per impostazione predefinita, come nell'Immich originale, dove vengono conteggiati solo i file originali.",
+    "storage_usage_include_derivatives_display_setting_description": "Conteggia le miniature e i video transcodificati nell'utilizzo di archiviazione mostrato agli utenti. Disattivato per impostazione predefinita, come nell'Immich originale, dove vengono conteggiati solo i file originali.",
     "storage_usage_include_derivatives_quota_setting": "Includi i file in cache nell'applicazione della quota",
     "storage_usage_include_derivatives_quota_setting_description": "Conteggia le miniature e i video transcodificati nella quota di spazio di ogni utente. Attivando questa opzione si riduce la quantità di contenuti originali che un utente può caricare con la stessa quota.",
     "storage_usage_settings": "Utilizzo dello spazio di archiviazione",
