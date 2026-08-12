@@ -1,6 +1,6 @@
 import { AssetOrder, AssetTypeEnum } from '@immich/sdk';
 import { applyTextFilters, buildFilterContext, type FilterState } from '$lib/components/filter-panel/filter-panel';
-import { clearTimelineTemporalFilter } from '$lib/utils/timeline-temporal-filters';
+import { handleRemoveFilter } from '$lib/utils/filter-remove';
 
 export function buildSpaceTimelineOptions(spaceId: string, filters: FilterState): Record<string, unknown> {
   const base: Record<string, unknown> = { spaceId, withStacked: true };
@@ -19,6 +19,18 @@ export function buildSpaceTimelineOptions(spaceId: string, filters: FilterState)
   }
   if (filters.model) {
     base.model = filters.model;
+  }
+  if (filters.lensModel) {
+    base.lensModel = filters.lensModel;
+  }
+  if (filters.state) {
+    base.state = filters.state;
+  }
+  if (filters.ownerId) {
+    base.ownerId = filters.ownerId;
+  }
+  if (filters.albumId) {
+    base.albumId = filters.albumId;
   }
   applyTextFilters(base, filters);
   if (filters.tagIds.length > 0) {
@@ -53,53 +65,5 @@ export function buildSpaceTimelineOptions(spaceId: string, filters: FilterState)
 }
 
 export function handleSpaceRemoveFilter(filters: FilterState, type: string, id?: string): FilterState {
-  switch (type) {
-    case 'person': {
-      return { ...filters, personIds: filters.personIds.filter((p) => p !== id) };
-    }
-    case 'location': {
-      return { ...filters, city: undefined, country: undefined };
-    }
-    case 'camera': {
-      return { ...filters, make: undefined, model: undefined };
-    }
-    case 'tag': {
-      return { ...filters, tagIds: filters.tagIds.filter((t) => t !== id) };
-    }
-    case 'rating': {
-      return { ...filters, rating: undefined };
-    }
-    case 'media':
-    case 'mediaType': {
-      return { ...filters, mediaType: 'all' };
-    }
-    case 'favorites':
-    case 'isFavorite': {
-      return { ...filters, isFavorite: undefined };
-    }
-    case 'albums': {
-      return { ...filters, isNotInAlbum: undefined, isInAlbum: undefined };
-    }
-    case 'isNotInAlbum': {
-      return { ...filters, isNotInAlbum: undefined };
-    }
-    case 'isInAlbum': {
-      return { ...filters, isInAlbum: undefined };
-    }
-    case 'timeline': {
-      return clearTimelineTemporalFilter(filters);
-    }
-    case 'description': {
-      return { ...filters, description: undefined };
-    }
-    case 'filename': {
-      return { ...filters, originalFileName: undefined };
-    }
-    case 'ocr': {
-      return { ...filters, ocr: undefined };
-    }
-    default: {
-      return filters;
-    }
-  }
+  return handleRemoveFilter(filters, type, id);
 }

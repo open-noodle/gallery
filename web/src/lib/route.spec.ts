@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createFilterState } from '$lib/components/filter-panel/filter-panel';
 import { OpenQueryParam } from '$lib/constants';
 import { Route } from '$lib/route';
 
@@ -129,6 +130,47 @@ describe('Route', () => {
 
     it('links to a space albums tab', () => {
       expect(Route.viewSpaceAlbums({ id: 'space-1' })).toBe('/spaces/space-1/albums');
+    });
+  });
+
+  describe(Route.map.name, () => {
+    it('emits a bare /map with no arguments', () => {
+      expect(Route.map()).toBe('/map');
+    });
+
+    it('emits only the viewport hash when given a point', () => {
+      expect(Route.map({ zoom: 12, lat: 52.52, lng: 13.4 })).toBe('/map#12/52.52/13.4');
+    });
+
+    // E11 — query AND hash together. The map keeps its viewport in the hash and its scope/filters in
+    // the query; before this, Route.map could only emit the hash.
+    it('E11: emits query params and the viewport hash together', () => {
+      const url = Route.map({
+        zoom: 12,
+        lat: 52.52,
+        lng: 13.4,
+        spaceId: 'space-1',
+        query: 'ski',
+        filters: { ...createFilterState(), make: 'Apple', rating: 4 },
+      });
+
+      expect(url).toBe('/map?spaceId=space-1&q=ski&make=Apple&rating=4#12/52.52/13.4');
+    });
+
+    // E10 — a pin dropped from inside a Space carries the space AND the active filters.
+    it('E10: carries spaceId and filters without a point', () => {
+      const url = Route.map({
+        spaceId: 'space-1',
+        filters: { ...createFilterState(), personIds: ['space-person:p1'] },
+      });
+
+      expect(url).toBe('/map?spaceId=space-1&people=space-person%3Ap1');
+    });
+
+    it('omits an empty query and an empty filter state', () => {
+      expect(Route.map({ spaceId: 'space-1', query: ' '.repeat(3), filters: createFilterState() })).toBe(
+        '/map?spaceId=space-1',
+      );
     });
   });
 });

@@ -102,6 +102,23 @@ describe('FilterState utilities', () => {
     expect(getActiveFilterCount(state)).toBe(1);
   });
 
+  it('should count a model-only camera filter (no make) as one active filter', () => {
+    const state = createFilterState();
+    state.model = 'iPhone 17 Pro Max';
+    // A model-only camera value (some EXIF has a model but no make) is still applied by
+    // every surface as ?model=; if it is not counted the badge shows "0 filters" and
+    // Clear-all hides, leaving an invisible, unremovable filter.
+    expect(getActiveFilterCount(state)).toBe(1);
+  });
+
+  it('should count make and model together as a single camera filter', () => {
+    const state = createFilterState();
+    state.make = 'Canon';
+    state.model = 'EOS R5';
+    // make+model are ONE dimension — they must never double-count.
+    expect(getActiveFilterCount(state)).toBe(1);
+  });
+
   it('should clear filters but preserve sortOrder', () => {
     const state = createFilterState();
     state.personIds = ['p1'];
@@ -195,6 +212,38 @@ describe('FilterState utilities', () => {
     expect(cleared.description).toBeUndefined();
     expect(cleared.originalFileName).toBeUndefined();
     expect(cleared.ocr).toBeUndefined();
+  });
+
+  it('counts each new dimension as one active filter', () => {
+    const filters = { ...createFilterState(), lensModel: 'RF24-70mm', albumId: 'a1', ownerId: 'u1' };
+
+    expect(getActiveFilterCount(filters)).toBe(3);
+  });
+
+  it('counts city, state and country together as a single location filter', () => {
+    const location = { ...createFilterState(), city: 'Berlin', state: 'State of Berlin', country: 'Germany' };
+    expect(getActiveFilterCount(location)).toBe(1);
+
+    // …and a state without a city is still just one location filter, not two
+    const noCity = { ...createFilterState(), state: 'Hamburg', country: 'Germany' };
+    expect(getActiveFilterCount(noCity)).toBe(1);
+  });
+
+  it('clearFilters clears the four new dimensions', () => {
+    const filters = {
+      ...createFilterState(),
+      lensModel: 'RF24-70mm',
+      state: 'Hamburg',
+      albumId: 'a1',
+      ownerId: 'u1',
+    };
+
+    expect(clearFilters(filters)).toMatchObject({
+      lensModel: undefined,
+      state: undefined,
+      albumId: undefined,
+      ownerId: undefined,
+    });
   });
 });
 
@@ -428,6 +477,75 @@ describe('buildFilterContext', () => {
       mediaType: AssetTypeEnum.Image,
       tagIds: ['t1'],
     });
+  });
+
+  it('should include the state, lens and contributor narrowings', () => {
+    const state = {
+      ...createFilterState(),
+      state: 'Bavaria',
+      lensModel: 'RF24-105mm F4 L IS USM',
+      ownerId: 'u1',
+    };
+
+    expect(buildFilterContext(state)).toEqual({
+      state: 'Bavaria',
+      lensModel: 'RF24-105mm F4 L IS USM',
+      ownerId: 'u1',
+    });
+  });
+
+  it('should exclude the whole location group for the location context but keep the lens and contributor', () => {
+    const state = {
+      ...createFilterState(),
+      country: 'Germany',
+      state: 'Bavaria',
+      city: 'Munich',
+      lensModel: 'RF24-105mm F4 L IS USM',
+      ownerId: 'u1',
+    };
+
+    // country / state / city are one filter that any location click replaces wholesale, so a city
+    // list must not be narrowed by the state the click is about to clear.
+    expect(buildFilterContext(state, ['country', 'state', 'city'])).toEqual({
+      lensModel: 'RF24-105mm F4 L IS USM',
+      ownerId: 'u1',
+    });
+  });
+
+  it('should keep the lens, state and contributor for the camera context', () => {
+    const state = {
+      ...createFilterState(),
+      make: 'Canon',
+      model: 'Canon EOS R6',
+      lensModel: 'RF24-105mm F4 L IS USM',
+      state: 'Bavaria',
+      ownerId: 'u1',
+    };
+
+    // Unlike the location group, a make/model click leaves the lens chip in place, so the model
+    // list may narrow by it.
+    expect(buildFilterContext(state, ['make', 'model'])).toEqual({
+      lensModel: 'RF24-105mm F4 L IS USM',
+      state: 'Bavaria',
+      ownerId: 'u1',
+    });
+  });
+
+  it('should never carry the album filter or the free-text filters into a suggestion request', () => {
+    const state = {
+      ...createFilterState(),
+      albumId: 'a1',
+      description: 'birthday cake',
+      originalFileName: 'IMG_1234.jpg',
+      ocr: 'happy birthday',
+      rating: 4,
+    };
+
+    // `albumId` on the suggestion endpoints is a SCOPE that widens ownership to album participants
+    // and is mutually exclusive with spaceId / withSharedSpaces — spreading it would 400 the
+    // request. The three free-text filters are unindexable ILIKE / trigram predicates typed
+    // per keystroke, not facet values. Exact match so adding either one here has to be deliberate.
+    expect(buildFilterContext(state)).toEqual({ rating: 4 });
   });
 
   it('should return undefined when only mediaType is all and nothing else is set', () => {

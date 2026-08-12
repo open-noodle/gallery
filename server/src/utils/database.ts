@@ -163,6 +163,20 @@ export function withDefaultVisibility<O>(qb: SelectQueryBuilder<DB, 'asset', O>)
   return qb.where('asset.visibility', 'in', [sql.lit(AssetVisibility.Archive), sql.lit(AssetVisibility.Timeline)]);
 }
 
+/**
+ * Escape ILIKE wildcards so user-supplied filter text matches literally — e.g. a filename search for
+ * "IMG_2024" must not treat "_" as a single-char wildcard, and "%" must not match everything. Pairs
+ * with an `ESCAPE '\'` clause on the ILIKE. Backslash is escaped first so it does not double-escape
+ * the wildcard escapes added afterwards. Used by both text-filter paths (the time-bucket queries in
+ * asset.repository.ts and searchAssetBuilderLegacy below), which must agree: the map and the timeline
+ * read the same filter chips.
+ */
+export const escapeLikePattern = (value: string): string =>
+  value
+    .replaceAll('\\', String.raw`\\`)
+    .replaceAll('%', String.raw`\%`)
+    .replaceAll('_', String.raw`\_`);
+
 const selectExifInfo = (eb: AssetExpressionBuilder) =>
   eb.fn
     .toJson(eb.table('asset_exif'))
@@ -804,193 +818,236 @@ const joinDeduplicationPlugin = new DeduplicateJoinsPlugin();
 export function searchAssetBuilderLegacy(kysely: Kysely<DB>, options: AssetSearchBuilderOptions) {
   options.withDeleted ||= !!(options.trashedAfter || options.trashedBefore || options.isOffline);
 
-  return kysely
-    .withPlugin(joinDeduplicationPlugin)
-    .selectFrom('asset')
-    .$if(!!options.visibility, (qb) =>
-      options.visibility === 'not-locked'
-        ? qb.where('asset.visibility', '!=', AssetVisibility.Locked)
-        : qb.where('asset.visibility', '=', options.visibility!),
-    )
-    .$if(!!options.forceEmptyResult, (qb) => qb.where(sql<SqlBool>`false`))
-    .$if(!!options.albumIds && options.albumIds.length > 0, (qb) =>
-      inAlbums(qb, options.albumIds!, options.timelineSpaceIds),
-    )
-    .$if(!!options.spaceId && !options.timelineSpaceIds, (qb) =>
-      qb.where((eb) =>
-        eb.and([
-          eb.or(
-            spaceAssetPathBranches(eb, {
-              correlateAssetId: 'asset.id',
-              correlateLibraryId: 'asset.libraryId',
-              scope: { spaceId: options.spaceId! },
-              requireShowInTimeline: true,
-            }),
-          ),
-          // Fork RBAC (M3/Slice 10): elevation only unlocks the CALLER'S OWN locked/archived
-          // folder. The caller's own (and partner) rows follow the resolved visibility applied
-          // above; every OTHER space member's row is constrained to Archive+Timeline (matching the
-          // browse / timeline gate) — Hidden and Locked are never surfaced for other members.
-          eb.or([
-            ...(options.userIds ? [eb('asset.ownerId', '=', anyUuid(options.userIds))] : []),
-            // Fork RBAC (H-1): the other-members branch must ALSO exclude trashed assets, mirroring
-            // albumSharedSpaceScope. Without this, a member (incl. a read-only Viewer) can pull another
-            // member's trashed asset by flipping withDeleted — directly or implicitly via
-            // trashedAfter/trashedBefore/isOffline (see :676) — because the terminal deletedAt filter
-            // (:850) is caller-skippable. The ownerId branch stays unfiltered so a caller keeps
-            // own/partner trash search.
-            eb.and([spaceVisibilityGate(eb), eb('asset.deletedAt', 'is', null)]),
-          ]),
-        ]),
-      ),
-    )
-    .$if(!!options.timelineSpaceIds && !!options.userIds, (qb) =>
-      qb.where((eb) =>
-        eb.or([
-          // Caller's own (and partner) rows follow the resolved visibility applied above.
-          eb('asset.ownerId', '=', anyUuid(options.userIds!)),
-          // Other space members' rows are Archive+Timeline (Slice 10 aligns search with browse;
-          // elevation is per-owner, Hidden/Locked never surface for other members).
+  // Contributor filter (options.ownerId, applied below): a standalone AND on asset.ownerId.
+  // Deliberately NOT merged into the options.userIds clauses elsewhere in this chain, which are the
+  // owner SCOPING predicate — merging a contributor filter into userIds would widen the result set
+  // instead of narrowing it.
+  return (
+    kysely
+      .withPlugin(joinDeduplicationPlugin)
+      .selectFrom('asset')
+      // Visibility modes (AssetSearchBuilderOptions.visibility):
+      //   - a concrete AssetVisibility  -> exactly that state
+      //   - 'not-locked'                -> everything except Locked (STILL admits Hidden)
+      //   - 'timeline-or-archive'       -> Archive | Timeline, i.e. what the timeline and the album
+      //                                    GRID show (withDefaultVisibility, above). Hidden, Locked
+      //                                    and Trashed stay out. Added for the album map (D4), which
+      //                                    must match the grid it is reached from; no other caller
+      //                                    uses it.
+      //   - undefined                   -> no clause at all (admits Hidden AND Locked)
+      .$if(!!options.visibility, (qb) => {
+        switch (options.visibility) {
+          case 'not-locked': {
+            return qb.where('asset.visibility', '!=', AssetVisibility.Locked);
+          }
+          case 'timeline-or-archive': {
+            return withDefaultVisibility(qb);
+          }
+          default: {
+            return qb.where('asset.visibility', '=', options.visibility!);
+          }
+        }
+      })
+      .$if(!!options.forceEmptyResult, (qb) => qb.where(sql<SqlBool>`false`))
+      .$if(!!options.albumIds && options.albumIds.length > 0, (qb) =>
+        inAlbums(qb, options.albumIds!, options.timelineSpaceIds),
+      )
+      .$if(!!options.spaceId && !options.timelineSpaceIds, (qb) =>
+        qb.where((eb) =>
           eb.and([
-            spaceVisibilityGate(eb),
-            // Fork RBAC (H-1): not-trashed on the other-members branch too (the ownerId branch above is
-            // left unfiltered). Mirrors the spaceId arm and albumSharedSpaceScope; never rely on the
-            // caller-skippable terminal deletedAt filter (:850).
-            eb('asset.deletedAt', 'is', null),
             eb.or(
               spaceAssetPathBranches(eb, {
                 correlateAssetId: 'asset.id',
                 correlateLibraryId: 'asset.libraryId',
-                scope: { spaceIds: options.timelineSpaceIds! },
+                scope: { spaceId: options.spaceId! },
                 requireShowInTimeline: true,
               }),
             ),
+            // Fork RBAC (M3/Slice 10): elevation only unlocks the CALLER'S OWN locked/archived
+            // folder. The caller's own (and partner) rows follow the resolved visibility applied
+            // above; every OTHER space member's row is constrained to Archive+Timeline (matching the
+            // browse / timeline gate) — Hidden and Locked are never surfaced for other members.
+            eb.or([
+              ...(options.userIds ? [eb('asset.ownerId', '=', anyUuid(options.userIds))] : []),
+              // Fork RBAC (H-1): the other-members branch must ALSO exclude trashed assets, mirroring
+              // albumSharedSpaceScope. Without this, a member (incl. a read-only Viewer) can pull another
+              // member's trashed asset by flipping withDeleted — directly or implicitly via
+              // trashedAfter/trashedBefore/isOffline (see :676) — because the terminal deletedAt filter
+              // (:850) is caller-skippable. The ownerId branch stays unfiltered so a caller keeps
+              // own/partner trash search.
+              eb.and([spaceVisibilityGate(eb), eb('asset.deletedAt', 'is', null)]),
+            ]),
           ]),
-        ]),
-      ),
-    )
-    .$if(!!options.albumIds?.length && !options.userIds, (qb) => albumSharedSpaceScope(qb, options.timelineSpaceIds))
-    .$if(!!(options.personIds?.length || options.identityIds?.length || options.spacePersonIds?.length), (qb) =>
-      options.personMatchAny ? hasAnyPeople(qb, options) : hasAllPeople(qb, options),
-    )
-    .$if(!!options.tagIds && options.tagIds.length > 0, (qb) =>
-      options.tagMatchAny ? withAnyTagId(qb, options.tagIds!) : hasTags(qb, options.tagIds!),
-    )
-    .$if(options.tagIds === null, (qb) =>
-      qb.where((eb) => eb.not(eb.exists((eb) => eb.selectFrom('tag_asset').whereRef('assetId', '=', 'asset.id')))),
-    )
-    .$if(!!options.createdBefore, (qb) => qb.where('asset.createdAt', '<=', options.createdBefore!))
-    .$if(!!options.createdAfter, (qb) => qb.where('asset.createdAt', '>=', options.createdAfter!))
-    .$if(!!options.updatedBefore, (qb) => qb.where('asset.updatedAt', '<=', options.updatedBefore!))
-    .$if(!!options.updatedAfter, (qb) => qb.where('asset.updatedAt', '>=', options.updatedAfter!))
-    .$if(!!options.trashedBefore, (qb) => qb.where('asset.deletedAt', '<=', options.trashedBefore!))
-    .$if(!!options.trashedAfter, (qb) => qb.where('asset.deletedAt', '>=', options.trashedAfter!))
-    .$if(!!options.takenBefore, (qb) => qb.where('asset.fileCreatedAt', '<=', options.takenBefore!))
-    .$if(!!options.takenAfter, (qb) => qb.where('asset.fileCreatedAt', '>=', options.takenAfter!))
-    .$if(options.city !== undefined, (qb) =>
-      qb
-        .innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId')
-        .where('asset_exif.city', options.city === null ? 'is' : '=', options.city!),
-    )
-    .$if(options.state !== undefined, (qb) =>
-      qb
-        .innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId')
-        .where('asset_exif.state', options.state === null ? 'is' : '=', options.state!),
-    )
-    .$if(options.country !== undefined, (qb) =>
-      qb
-        .innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId')
-        .where('asset_exif.country', options.country === null ? 'is' : '=', options.country!),
-    )
-    .$if(options.make !== undefined, (qb) =>
-      qb
-        .innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId')
-        .where('asset_exif.make', options.make === null ? 'is' : '=', options.make!),
-    )
-    .$if(options.model !== undefined, (qb) =>
-      qb
-        .innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId')
-        .where('asset_exif.model', options.model === null ? 'is' : '=', options.model!),
-    )
-    .$if(options.lensModel !== undefined, (qb) =>
-      qb
-        .innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId')
-        .where('asset_exif.lensModel', options.lensModel === null ? 'is' : '=', options.lensModel!),
-    )
-    .$if(options.rating !== undefined, (qb) =>
-      qb
-        .innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId')
-        .where(
-          'asset_exif.rating',
-          options.rating === null ? 'is' : options.ratingIsMinimum ? '>=' : '=',
-          options.rating!,
         ),
-    )
-    .$if(!!options.checksum, (qb) => qb.where('asset.checksum', '=', options.checksum!))
-    .$if(!!options.id, (qb) => qb.where('asset.id', '=', asUuid(options.id!)))
-    .$if(!!options.libraryId, (qb) => qb.where('asset.libraryId', '=', asUuid(options.libraryId!)))
-    .$if(!!options.userIds && !options.spaceId && !options.timelineSpaceIds, (qb) =>
-      qb.where('asset.ownerId', '=', anyUuid(options.userIds!)),
-    )
-    .$if(!!options.encodedVideoPath, (qb) =>
-      qb
-        .innerJoin('asset_file', (join) =>
-          join
-            .onRef('asset.id', '=', 'asset_file.assetId')
-            .on('asset_file.type', '=', AssetFileType.EncodedVideo)
-            .on('asset_file.isEdited', '=', false),
-        )
-        .where('asset_file.path', '=', options.encodedVideoPath!),
-    )
-    .$if(!!options.originalPath, (qb) =>
-      qb.where(sql`f_unaccent(asset."originalPath")`, 'ilike', sql`'%' || f_unaccent(${options.originalPath}) || '%'`),
-    )
-    .$if(!!options.originalFileName, (qb) =>
-      qb.where(
-        sql`f_unaccent(asset."originalFileName")`,
-        'ilike',
-        sql`'%' || f_unaccent(${options.originalFileName}) || '%'`,
-      ),
-    )
-    .$if(!!options.description, (qb) =>
-      qb
-        .innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId')
-        .where(sql`f_unaccent(asset_exif.description)`, 'ilike', sql`'%' || f_unaccent(${options.description}) || '%'`),
-    )
-    .$if(!!options.ocr, (qb) =>
-      qb
-        .innerJoin('ocr_search', 'asset.id', 'ocr_search.assetId')
-        .where(() => sql`f_unaccent(ocr_search.text) %>> f_unaccent(${tokenizeForSearch(options.ocr!).join(' ')})`),
-    )
-    .$if(!!options.type, (qb) => qb.where('asset.type', '=', options.type!))
-    .$if(options.isFavorite !== undefined, (qb) => qb.where('asset.isFavorite', '=', options.isFavorite!))
-    .$if(options.isOffline !== undefined, (qb) => qb.where('asset.isOffline', '=', options.isOffline!))
-    .$if(options.isEncoded !== undefined, (qb) =>
-      qb.where((eb) => {
-        const exists = eb.exists((eb) =>
-          eb
-            .selectFrom('asset_file')
-            .whereRef('assetId', '=', 'asset.id')
-            .where('type', '=', AssetFileType.EncodedVideo),
-        );
-        return options.isEncoded ? exists : eb.not(exists);
-      }),
-    )
-    .$if(options.isMotion !== undefined, (qb) =>
-      qb.where('asset.livePhotoVideoId', options.isMotion ? 'is not' : 'is', null),
-    )
-    .$if(!!options.isNotInAlbum && (!options.albumIds || options.albumIds.length === 0), (qb) =>
-      qb.where((eb) => eb.not(eb.exists((eb) => eb.selectFrom('album_asset').whereRef('assetId', '=', 'asset.id')))),
-    )
-    .$if(!!options.isInAlbum && (!options.albumIds || options.albumIds.length === 0), (qb) =>
-      qb.where((eb) => eb.exists((eb) => eb.selectFrom('album_asset').whereRef('assetId', '=', 'asset.id'))),
-    )
-    .$if(options.withStacked === false, (qb) => qb.where('asset.stackId', 'is', null))
-    .$if(!!options.withExif, withExifInner)
-    .$if(!!(options.withFaces || options.withPeople), (qb) =>
+      )
+      .$if(!!options.timelineSpaceIds && !!options.userIds, (qb) =>
+        qb.where((eb) =>
+          eb.or([
+            // Caller's own (and partner) rows follow the resolved visibility applied above.
+            eb('asset.ownerId', '=', anyUuid(options.userIds!)),
+            // Other space members' rows are Archive+Timeline (Slice 10 aligns search with browse;
+            // elevation is per-owner, Hidden/Locked never surface for other members).
+            eb.and([
+              spaceVisibilityGate(eb),
+              // Fork RBAC (H-1): not-trashed on the other-members branch too (the ownerId branch above is
+              // left unfiltered). Mirrors the spaceId arm and albumSharedSpaceScope; never rely on the
+              // caller-skippable terminal deletedAt filter (:850).
+              eb('asset.deletedAt', 'is', null),
+              eb.or(
+                spaceAssetPathBranches(eb, {
+                  correlateAssetId: 'asset.id',
+                  correlateLibraryId: 'asset.libraryId',
+                  scope: { spaceIds: options.timelineSpaceIds! },
+                  requireShowInTimeline: true,
+                }),
+              ),
+            ]),
+          ]),
+        ),
+      )
+      // albumAccessIsBoundary opts an album query OUT of this re-gate for a caller whose album ACCESS
+      // check is already the boundary (see the option's doc comment in search.repository.ts, and the
+      // call site in shared-space.service.ts getFilteredMapMarkers — issue #656).
+      .$if(!!options.albumIds?.length && !options.userIds && !options.albumAccessIsBoundary, (qb) =>
+        albumSharedSpaceScope(qb, options.timelineSpaceIds),
+      )
+      .$if(!!(options.personIds?.length || options.identityIds?.length || options.spacePersonIds?.length), (qb) =>
+        options.personMatchAny ? hasAnyPeople(qb, options) : hasAllPeople(qb, options),
+      )
+      .$if(!!options.tagIds && options.tagIds.length > 0, (qb) =>
+        options.tagMatchAny ? withAnyTagId(qb, options.tagIds!) : hasTags(qb, options.tagIds!),
+      )
+      .$if(options.tagIds === null, (qb) =>
+        qb.where((eb) => eb.not(eb.exists((eb) => eb.selectFrom('tag_asset').whereRef('assetId', '=', 'asset.id')))),
+      )
+      .$if(!!options.createdBefore, (qb) => qb.where('asset.createdAt', '<=', options.createdBefore!))
+      .$if(!!options.createdAfter, (qb) => qb.where('asset.createdAt', '>=', options.createdAfter!))
+      .$if(!!options.updatedBefore, (qb) => qb.where('asset.updatedAt', '<=', options.updatedBefore!))
+      .$if(!!options.updatedAfter, (qb) => qb.where('asset.updatedAt', '>=', options.updatedAfter!))
+      .$if(!!options.trashedBefore, (qb) => qb.where('asset.deletedAt', '<=', options.trashedBefore!))
+      .$if(!!options.trashedAfter, (qb) => qb.where('asset.deletedAt', '>=', options.trashedAfter!))
+      .$if(!!options.takenBefore, (qb) => qb.where('asset.fileCreatedAt', '<=', options.takenBefore!))
+      .$if(!!options.takenAfter, (qb) => qb.where('asset.fileCreatedAt', '>=', options.takenAfter!))
+      .$if(options.city !== undefined, (qb) =>
+        qb
+          .innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId')
+          .where('asset_exif.city', options.city === null ? 'is' : '=', options.city!),
+      )
+      .$if(options.state !== undefined, (qb) =>
+        qb
+          .innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId')
+          .where('asset_exif.state', options.state === null ? 'is' : '=', options.state!),
+      )
+      .$if(options.country !== undefined, (qb) =>
+        qb
+          .innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId')
+          .where('asset_exif.country', options.country === null ? 'is' : '=', options.country!),
+      )
+      .$if(options.make !== undefined, (qb) =>
+        qb
+          .innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId')
+          .where('asset_exif.make', options.make === null ? 'is' : '=', options.make!),
+      )
+      .$if(options.model !== undefined, (qb) =>
+        qb
+          .innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId')
+          .where('asset_exif.model', options.model === null ? 'is' : '=', options.model!),
+      )
+      .$if(options.lensModel !== undefined, (qb) =>
+        qb
+          .innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId')
+          .where('asset_exif.lensModel', options.lensModel === null ? 'is' : '=', options.lensModel!),
+      )
+      .$if(options.ownerId !== undefined, (qb) => qb.where('asset.ownerId', '=', asUuid(options.ownerId!)))
+      .$if(options.rating !== undefined, (qb) =>
+        qb
+          .innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId')
+          .where(
+            'asset_exif.rating',
+            options.rating === null ? 'is' : options.ratingIsMinimum ? '>=' : '=',
+            options.rating!,
+          ),
+      )
+      .$if(!!options.checksum, (qb) => qb.where('asset.checksum', '=', options.checksum!))
+      .$if(!!options.id, (qb) => qb.where('asset.id', '=', asUuid(options.id!)))
+      .$if(!!options.libraryId, (qb) => qb.where('asset.libraryId', '=', asUuid(options.libraryId!)))
+      .$if(!!options.userIds && !options.spaceId && !options.timelineSpaceIds, (qb) =>
+        qb.where('asset.ownerId', '=', anyUuid(options.userIds!)),
+      )
+      .$if(!!options.encodedVideoPath, (qb) =>
+        qb
+          .innerJoin('asset_file', (join) =>
+            join
+              .onRef('asset.id', '=', 'asset_file.assetId')
+              .on('asset_file.type', '=', AssetFileType.EncodedVideo)
+              .on('asset_file.isEdited', '=', false),
+          )
+          .where('asset_file.path', '=', options.encodedVideoPath!),
+      )
+      // The three ILIKE text filters escape their wildcards (escapeLikePattern + `escape '\'`), so a
+      // filter of `IMG_0001` matches `_` literally rather than as a single-char wildcard and a `%`
+      // matches a literal percent sign. This mirrors the time-bucket path (asset.repository.ts): the
+      // map and the timeline are driven by the same filter chips and must agree on what they match.
+      // Escaping does not cost the trigram index. OCR (below) is unaffected — it uses the `%>>`
+      // trigram operator, not ILIKE.
+      .$if(!!options.originalPath, (qb) =>
+        qb.where(
+          sql`f_unaccent(asset."originalPath")`,
+          'ilike',
+          sql`'%' || f_unaccent(${escapeLikePattern(options.originalPath!)}) || '%' escape '\\'`,
+        ),
+      )
+      .$if(!!options.originalFileName, (qb) =>
+        qb.where(
+          sql`f_unaccent(asset."originalFileName")`,
+          'ilike',
+          sql`'%' || f_unaccent(${escapeLikePattern(options.originalFileName!)}) || '%' escape '\\'`,
+        ),
+      )
+      .$if(!!options.description, (qb) =>
+        qb
+          .innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId')
+          .where(
+            sql`f_unaccent(asset_exif.description)`,
+            'ilike',
+            sql`'%' || f_unaccent(${escapeLikePattern(options.description!)}) || '%' escape '\\'`,
+          ),
+      )
+      .$if(!!options.ocr, (qb) =>
+        qb
+          .innerJoin('ocr_search', 'asset.id', 'ocr_search.assetId')
+          .where(() => sql`f_unaccent(ocr_search.text) %>> f_unaccent(${tokenizeForSearch(options.ocr!).join(' ')})`),
+      )
+      .$if(!!options.type, (qb) => qb.where('asset.type', '=', options.type!))
+      .$if(options.isFavorite !== undefined, (qb) => qb.where('asset.isFavorite', '=', options.isFavorite!))
+      .$if(options.isOffline !== undefined, (qb) => qb.where('asset.isOffline', '=', options.isOffline!))
+      .$if(options.isEncoded !== undefined, (qb) =>
+        qb.where((eb) => {
+          const exists = eb.exists((eb) =>
+            eb
+              .selectFrom('asset_file')
+              .whereRef('assetId', '=', 'asset.id')
+              .where('type', '=', AssetFileType.EncodedVideo),
+          );
+          return options.isEncoded ? exists : eb.not(exists);
+        }),
+      )
+      .$if(options.isMotion !== undefined, (qb) =>
+        qb.where('asset.livePhotoVideoId', options.isMotion ? 'is not' : 'is', null),
+      )
+      .$if(!!options.isNotInAlbum && (!options.albumIds || options.albumIds.length === 0), (qb) =>
+        qb.where((eb) => eb.not(eb.exists((eb) => eb.selectFrom('album_asset').whereRef('assetId', '=', 'asset.id')))),
+      )
+      .$if(!!options.isInAlbum && (!options.albumIds || options.albumIds.length === 0), (qb) =>
+        qb.where((eb) => eb.exists((eb) => eb.selectFrom('album_asset').whereRef('assetId', '=', 'asset.id'))),
+      )
+      .$if(options.withStacked === false, (qb) => qb.where('asset.stackId', 'is', null))
+      .$if(!!options.withExif, withExifInner)
+      .$if(!!(options.withFaces || options.withPeople), (qb) =>
       qb.select(withFacesAndPeople({ viewingUserId: options.viewingUserId! })),
     )
-    .$if(!options.withDeleted, (qb) => qb.where('asset.deletedAt', 'is', null));
+      .$if(!options.withDeleted, (qb) => qb.where('asset.deletedAt', 'is', null))
+  );
 }
 
 type AssetExpressionBuilder = ExpressionBuilder<DB, 'asset' | 'asset_exif'>;

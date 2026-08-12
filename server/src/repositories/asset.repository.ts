@@ -39,6 +39,7 @@ import { AssetTable } from 'src/schema/tables/asset.table';
 import {
   anyUuid,
   asUuid,
+  escapeLikePattern,
   hasFaceIdentities,
   hasPeople,
   hasSpacePeople,
@@ -110,6 +111,12 @@ interface AssetBuilderOptions {
   forceEmptyResult?: boolean;
   tagIds?: string[];
   userIds?: string[];
+  /**
+   * Contributor filter: a plain AND on asset.ownerId. Deliberately separate from `userIds`,
+   * which expresses timeline COMPOSITION and is OR-ed with `timelineSpaceIds` below. Routing a
+   * contributor filter through `userIds` would WIDEN results inside a Space instead of narrowing.
+   */
+  ownerId?: string;
   timelineSpaceIds?: string[];
   withStacked?: boolean;
   withPartners?: boolean;
@@ -124,6 +131,8 @@ interface AssetBuilderOptions {
   country?: string;
   make?: string;
   model?: string;
+  lensModel?: string;
+  state?: string;
   originalFileName?: string;
   description?: string;
   ocr?: string;
@@ -262,16 +271,6 @@ const addBucketInterval = (bucketStart: string, bucketSize: TimeBucketSize): str
   }
 };
 
-// Escape ILIKE wildcards so user-supplied filter text matches literally — e.g. a filename
-// search for "IMG_2024" must not treat "_" as a single-char wildcard, and "%" must not match
-// everything. Pairs with an `ESCAPE '\'` clause on the ILIKE. Backslash is escaped first so it
-// does not double-escape the wildcard escapes added afterwards.
-const escapeLikePattern = (value: string): string =>
-  value
-    .replaceAll('\\', String.raw`\\`)
-    .replaceAll('%', String.raw`\%`)
-    .replaceAll('_', String.raw`\_`);
-
 export function withTimeBucketAssetFilters<O>(
   qb: SelectQueryBuilder<DB, 'asset', O>,
   options: TimeBucketOptions,
@@ -288,8 +287,10 @@ export function withTimeBucketAssetFilters<O>(
       !!options.bbox ||
         !!options.city ||
         !!options.country ||
+        !!options.state ||
         !!options.make ||
         !!options.model ||
+        !!options.lensModel ||
         !!options.description ||
         options.rating !== undefined,
       (qb) => {
@@ -317,6 +318,12 @@ export function withTimeBucketAssetFilters<O>(
         if (options.model) {
           q = q.where('asset_exif.model', '=', options.model) as any;
         }
+        if (options.lensModel) {
+          q = q.where('asset_exif.lensModel', '=', options.lensModel) as any;
+        }
+        if (options.state) {
+          q = q.where('asset_exif.state', '=', options.state) as any;
+        }
         if (options.rating !== undefined) {
           q = q.where('asset_exif.rating', '>=', options.rating) as any;
         }
@@ -333,6 +340,7 @@ export function withTimeBucketAssetFilters<O>(
     )
     .$if(options.visibility === undefined, withDefaultVisibility)
     .$if(!!options.visibility, (qb) => qb.where('asset.visibility', '=', options.visibility!))
+    .$if(!!options.ownerId, (qb) => qb.where('asset.ownerId', '=', asUuid(options.ownerId!)))
     .$if(!!options.albumId, (qb) =>
       qb
         // Fork RBAC (Slice 1 / security-3 defense-in-depth): an explicit visibility=HIDDEN/LOCKED

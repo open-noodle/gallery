@@ -50,10 +50,32 @@
     searchQuery.trim() ? tags.filter((t) => t.name.toLowerCase().includes(searchQuery.trim().toLowerCase())) : tags,
   );
 
-  // When searching, show all results (no truncation); otherwise respect INITIAL_SHOW_COUNT
-  let visibleTags = $derived(searchQuery.trim() || showAll ? filteredTags : filteredTags.slice(0, INITIAL_SHOW_COUNT));
+  /**
+   * When searching, show all results (no truncation); otherwise respect INITIAL_SHOW_COUNT — but
+   * never truncate away a tag that is actually SELECTED.
+   *
+   * A library with thousands of tags will essentially never have the active one in the first ten, so
+   * a tag filter applied from anywhere other than this list (a contextual filter clicked in the
+   * asset viewer, a shared link, typed search) left the panel looking as though nothing was
+   * selected. Selected tags are hoisted rather than scrolled to: it needs no measurement, survives a
+   * re-fetch, and puts them alongside the orphaned tags already pinned above instead of splitting
+   * the selection across two places.
+   */
+  let visibleTags = $derived.by(() => {
+    if (searchQuery.trim() || showAll) {
+      return filteredTags;
+    }
 
-  let remainingCount = $derived(Math.max(0, filteredTags.length - INITIAL_SHOW_COUNT));
+    const selected = filteredTags.filter((tag) => selectedIds.includes(tag.id));
+    if (selected.length === 0) {
+      return filteredTags.slice(0, INITIAL_SHOW_COUNT);
+    }
+
+    const rest = filteredTags.filter((tag) => !selectedIds.includes(tag.id));
+    return [...selected, ...rest].slice(0, Math.max(INITIAL_SHOW_COUNT, selected.length));
+  });
+
+  let remainingCount = $derived(Math.max(0, filteredTags.length - visibleTags.length));
 
   function toggleTag(id: string) {
     const isSelected = selectedIds.includes(id);
