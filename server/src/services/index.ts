@@ -106,6 +106,7 @@ export const services = [
   StorageMigrationService,
   StorageService,
   StorageTemplateService,
+  // Gallery-fork: resyncs the derivative-inclusive usage column when the toggles are enabled.
   StorageUsageService,
   SyncService,
   SystemConfigService,

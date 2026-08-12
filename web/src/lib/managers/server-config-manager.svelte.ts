@@ -22,6 +22,8 @@ class ServerConfigManager {
     return this.#value;
   }
 
+  // Gallery-fork: the storage meters render before the root layout's init() has resolved, and a
+  // missing config there just means "fall back to upstream behaviour" rather than a hard error.
   get valueOrUndefined() {
     return this.#value;
   }

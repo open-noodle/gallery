@@ -21,8 +21,8 @@ const setup = () => {
   return { ctx, sut: ctx.get(UserRepository) };
 };
 
-// physicalUsageInBytes is not part of the userAdmin projection yet, so read both usage columns
-// straight off the row rather than through UserRepository.get.
+// These assertions are about what updateUsage writes, so read both usage columns straight off the
+// row rather than through UserRepository.get — no projection between the write and the check.
 const getUsage = (userId: string) =>
   db
     .selectFrom('user')

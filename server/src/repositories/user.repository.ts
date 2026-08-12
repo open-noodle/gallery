@@ -302,6 +302,9 @@ export class UserRepository {
       .updateTable('user')
       .set({
         quotaUsageInBytes: sql`"quotaUsageInBytes" + ${delta}`,
+        // Gallery-fork: keep the physical column moving with the same delta, so the
+        // derivative-inclusive figure stays live between full walks. Clamped at zero because
+        // it is only ever seeded by a walk, and deletes can otherwise drive it negative.
         physicalUsageInBytes: sql`greatest(0, "physicalUsageInBytes" + ${delta})`,
         updatedAt: new Date(),
       })

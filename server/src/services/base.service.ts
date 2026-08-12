@@ -620,9 +620,10 @@ export class BaseService {
     return Number.isFinite(rounded) && rounded > 0 ? rounded : fallback;
   }
 
-  // Gallery-fork: upstream calls userRepository.syncUsage() directly from the two call sites
-  // below this method. The fork keeps that behaviour as-is and layers the optional physical-usage
-  // pass on top; all of its logic lives in src/gallery/storage-usage.ts.
+  // Gallery-fork: upstream calls userRepository.syncUsage() directly from its two call sites
+  // (user.service.ts handleUserSyncUsage and user-admin.service.ts). The fork keeps that behaviour
+  // as-is and layers the optional physical-usage pass on top; all of its logic lives in
+  // src/gallery/storage-usage.ts.
   protected async syncUsage(id?: string): Promise<void> {
     await this.userRepository.syncUsage(id);
 
@@ -634,6 +635,7 @@ export class BaseService {
       return;
     }
 
+    // lazy import to avoid circular dependency (StorageService extends BaseService)
     const { StorageService } = await import('./storage.service.js');
     const s3 = StorageService.getS3Backend();
     const users = id

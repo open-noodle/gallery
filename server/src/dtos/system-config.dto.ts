@@ -451,6 +451,7 @@ const SystemConfigTrashSchema = z
   })
   .meta({ id: 'SystemConfigTrashDto' });
 
+// Gallery-fork: opt-in accounting for server-generated files (thumbnails, transcodes).
 const SystemConfigStorageUsageSchema = z
   .object({
     includeDerivativesInDisplay: configBool.describe(
@@ -481,6 +482,7 @@ export const SystemConfigSchema = z
     reverseGeocoding: SystemConfigReverseGeocodingSchema,
     metadata: SystemConfigMetadataSchema,
     storageTemplate: SystemConfigStorageTemplateSchema,
+    // Gallery-fork: see SystemConfigStorageUsageSchema above.
     storageUsage: SystemConfigStorageUsageSchema,
     job: SystemConfigJobSchema,
     image: SystemConfigImageSchema,

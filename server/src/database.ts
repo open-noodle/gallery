@@ -25,6 +25,7 @@ export type AuthUser = {
   name: string;
   email: string;
   quotaUsageInBytes: number;
+  // Gallery-fork: physical (derivative-inclusive) storage usage.
   physicalUsageInBytes: number;
   quotaSizeInBytes: number | null;
 };
@@ -501,6 +502,7 @@ export const columns = {
     'user.email',
     'user.isAdmin',
     'user.quotaUsageInBytes',
+    // Gallery-fork: quota enforcement reads this off the auth user when opted in.
     'user.physicalUsageInBytes',
     'user.quotaSizeInBytes',
   ],
@@ -521,6 +523,7 @@ export const columns = {
     'storageLabel',
     'quotaSizeInBytes',
     'quotaUsageInBytes',
+    // Gallery-fork: exposed as UserAdminResponseDto.physicalUsageInBytes.
     'physicalUsageInBytes',
   ],
   tag: ['tag.id', 'tag.value', 'tag.createdAt', 'tag.updatedAt', 'tag.color', 'tag.parentId'],

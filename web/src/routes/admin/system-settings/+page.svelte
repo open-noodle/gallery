@@ -181,6 +181,7 @@
       key: 'storage-template',
       icon: mdiFolderOutline,
     },
+    // Gallery-fork: opt-ins for counting server-generated files toward storage usage.
     {
       component: StorageUsageSettings,
       title: $t('admin.storage_usage_settings'),
