@@ -230,4 +230,35 @@ describe('buildAlbumAssetPickerFilterConfig', () => {
 
     expect(getFilterSuggestions).toHaveBeenCalledWith(expect.objectContaining({ isFavorite: true }));
   });
+
+  it('narrows album suggestions by state, lens and contributor', async () => {
+    const config = buildAlbumDetailFilterConfig('album-1');
+    await config.suggestionsProvider!({
+      ...createFilterState(),
+      state: 'Bavaria',
+      lensModel: 'RF24-105mm F4 L IS USM',
+      ownerId: 'owner-1',
+    });
+
+    expect(getFilterSuggestions).toHaveBeenCalledWith(
+      expect.objectContaining({
+        albumId: 'album-1',
+        state: 'Bavaria',
+        lensModel: 'RF24-105mm F4 L IS USM',
+        ownerId: 'owner-1',
+      }),
+    );
+  });
+
+  it('never lets a panel album filter clobber the album scope of a suggestion request', async () => {
+    // On the album detail surface `albumId` in the request IS the scope; the panel's own album
+    // filter must not be spread on top of it (the albums section is not even rendered here).
+    const config = buildAlbumDetailFilterConfig('album-1');
+    await config.suggestionsProvider!({
+      ...createFilterState(),
+      albumId: '11111111-1111-4111-8111-111111111111',
+    });
+
+    expect(getFilterSuggestions).toHaveBeenCalledWith(expect.objectContaining({ albumId: 'album-1' }));
+  });
 });

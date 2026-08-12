@@ -1,6 +1,6 @@
 // server/src/repositories/search.repository.spec.ts
 import { DummyDriver, Kysely, PostgresAdapter, PostgresIntrospector, PostgresQueryCompiler } from 'kysely';
-import { AssetOrder } from 'src/enum';
+import { AssetOrder, AssetVisibility } from 'src/enum';
 import { SearchRepository } from 'src/repositories/search.repository';
 import type { DB } from 'src/schema';
 import { searchAssetBuilderLegacy } from 'src/utils/database';
@@ -25,13 +25,24 @@ const buildQueries = (
   options: Record<string, unknown>,
 ) => (sut as any).buildSearchSmartQueries(offlineKysely(), pagination, options);
 
-const buildAssetSearchSql = (options: Record<string, unknown>) =>
+const compileAssetSearch = (options: Record<string, unknown>) =>
   searchAssetBuilderLegacy(offlineKysely(), options as any)
     .selectAll('asset')
-    .compile().sql;
+    .compile();
+
+const buildAssetSearchSql = (options: Record<string, unknown>) => compileAssetSearch(options).sql;
 
 const compileFilteredAssetIds = (sut: SearchRepository, options: Record<string, unknown>) =>
   (sut as any).buildFilteredAssetIds(['00000000-0000-0000-0000-000000000000'], options).compile().sql;
+
+// A fresh repository whose private buildFilteredAssetIds is spied on rather than mocked, so the
+// suggestion queries still compile and run against the DummyDriver (empty rows) — what is asserted
+// is the *options* each list narrows by. Fresh per test so no spy state leaks between them.
+const spyOnFilteredAssetIds = () => {
+  const repository = new SearchRepository(offlineKysely());
+  const spy = vi.spyOn(repository as any, 'buildFilteredAssetIds');
+  return { repository, options: () => spy.mock.calls.map((call) => call[1] as Record<string, unknown>) };
+};
 
 const compileFilteredPeopleQuery = (sut: SearchRepository, options: Record<string, unknown>) =>
   (sut as any)
@@ -391,6 +402,42 @@ describe(SearchRepository.name, () => {
       expect(sql).not.toMatch(/"asset_exif"\."rating"\s*=\s*\$\d+/i);
     });
 
+    it('narrows facet assets by an active state', () => {
+      const sql = compileFilteredAssetIds(sut, { state: 'Bavaria' });
+
+      expect(sql).toContain('"asset_exif"');
+      expect(sql).toMatch(/"asset_exif"\."state"\s*=\s*\$\d+/i);
+    });
+
+    it('narrows facet assets by an active lens model', () => {
+      const sql = compileFilteredAssetIds(sut, { lensModel: 'RF24-105mm F4 L IS USM' });
+
+      expect(sql).toContain('"asset_exif"');
+      expect(sql).toMatch(/"asset_exif"\."lensModel"\s*=\s*\$\d+/i);
+    });
+
+    it('ANDs the contributor filter with the owner scope instead of replacing it', () => {
+      const sql = compileFilteredAssetIds(sut, { ownerId: '00000000-0000-4000-8000-000000000009' });
+
+      // The scope predicate resolved by applySuggestionScope must survive …
+      expect(sql).toMatch(/"asset"\."ownerId"\s*=\s*any\s*\(\$\d+::uuid\[\]\)/i);
+      // … and the contributor filter is a second, single-value predicate on top of it. A merged
+      // implementation (ownerId folded into userIds) would widen the set — design §4.4.
+      expect(sql).toMatch(/"asset"\."ownerId"\s*=\s*\$\d+::uuid/i);
+    });
+
+    // Guards the committed server/src/queries/*.sql: every predicate added for state / lensModel /
+    // ownerId is $if-guarded, so the @GenerateSql dummy params (which set none of them) still
+    // compile to exactly the same SQL and `mise //:sql` stays a no-op.
+    it('adds no exif join or contributor predicate when none of the new dimensions is set', () => {
+      const sql = compileFilteredAssetIds(sut, {});
+
+      expect(sql).not.toContain('"asset_exif"');
+      expect(sql).not.toMatch(/"state"/i);
+      expect(sql).not.toMatch(/"lensModel"/i);
+      expect(sql).not.toMatch(/"asset"\."ownerId"\s*=\s*\$\d+::uuid/i);
+    });
+
     it('orders global people suggestions by favorite first, then name', () => {
       const sql = compileFilteredPeopleQuery(sut, {});
 
@@ -490,6 +537,111 @@ describe(SearchRepository.name, () => {
     });
   });
 
+  // Which options each suggestion list excludes from its own asset-id subquery.
+  describe('suggestion self-exclusion', () => {
+    const userId = '00000000-0000-0000-0000-000000000000';
+    const allDimensions = {
+      country: 'Germany',
+      state: 'Bavaria',
+      city: 'Munich',
+      make: 'Canon',
+      model: 'Canon EOS R6',
+      lensModel: 'RF24-105mm F4 L IS USM',
+      ownerId: '00000000-0000-4000-8000-000000000009',
+    };
+
+    it('excludes the whole location group when listing countries, keeping camera and contributor', async () => {
+      const { repository, options } = spyOnFilteredAssetIds();
+
+      await repository.getCountries([userId], { ...allDimensions });
+
+      expect(options()).toEqual([
+        expect.objectContaining({
+          country: undefined,
+          state: undefined,
+          city: undefined,
+          make: 'Canon',
+          lensModel: 'RF24-105mm F4 L IS USM',
+          ownerId: '00000000-0000-4000-8000-000000000009',
+        }),
+      ]);
+    });
+
+    it('excludes state and city when listing states, keeping the country parent', async () => {
+      const { repository, options } = spyOnFilteredAssetIds();
+
+      await repository.getStates([userId], { ...allDimensions });
+
+      expect(options()).toEqual([
+        expect.objectContaining({
+          state: undefined,
+          city: undefined,
+          country: 'Germany',
+          lensModel: 'RF24-105mm F4 L IS USM',
+        }),
+      ]);
+    });
+
+    it('keeps the state parent applied when listing cities', async () => {
+      const { repository, options } = spyOnFilteredAssetIds();
+
+      await repository.getCities([userId], { ...allDimensions });
+
+      expect(options()).toEqual([expect.objectContaining({ city: undefined, state: 'Bavaria', country: 'Germany' })]);
+    });
+
+    it('keeps the lens applied when listing camera makes and models', async () => {
+      const makes = spyOnFilteredAssetIds();
+      const models = spyOnFilteredAssetIds();
+
+      await makes.repository.getCameraMakes([userId], { ...allDimensions });
+      await models.repository.getCameraModels([userId], { ...allDimensions });
+
+      expect(makes.options()).toEqual([
+        expect.objectContaining({ make: undefined, lensModel: 'RF24-105mm F4 L IS USM' }),
+      ]);
+      expect(models.options()).toEqual([
+        expect.objectContaining({ model: undefined, make: 'Canon', lensModel: 'RF24-105mm F4 L IS USM' }),
+      ]);
+    });
+
+    it('excludes only the lens itself when listing lens models', async () => {
+      const { repository, options } = spyOnFilteredAssetIds();
+
+      await repository.getCameraLensModels([userId], { ...allDimensions });
+
+      expect(options()).toEqual([
+        expect.objectContaining({
+          lensModel: undefined,
+          make: 'Canon',
+          model: 'Canon EOS R6',
+          state: 'Bavaria',
+          ownerId: '00000000-0000-4000-8000-000000000009',
+        }),
+      ]);
+    });
+
+    it('narrows every unified suggestion list by state, lens and contributor except the country list', async () => {
+      const { repository, options } = spyOnFilteredAssetIds();
+
+      await repository.getFilterSuggestions([userId], { ...allDimensions });
+
+      // countries, cameraMakes, tags, people, ratings, mediaTypes — in construction order.
+      const [countries, ...rest] = options();
+      expect(rest).toHaveLength(5);
+
+      expect(countries.state).toBeUndefined();
+      expect(countries.lensModel).toBe('RF24-105mm F4 L IS USM');
+      expect(countries.ownerId).toBe('00000000-0000-4000-8000-000000000009');
+
+      for (const list of rest) {
+        expect(list.state).toBe('Bavaria');
+        expect(list.lensModel).toBe('RF24-105mm F4 L IS USM');
+        expect(list.ownerId).toBe('00000000-0000-4000-8000-000000000009');
+      }
+    });
+  });
+
   describe('album-scoped suggestions', () => {
     // Album facets cover assets the user may legitimately see in the album: those
     // contributed by an album participant (owner or shared user), owned by the user, or
@@ -567,6 +719,32 @@ describe(SearchRepository.name, () => {
     });
   });
 
+  describe('searchAssetBuilder album shared-space scope (albumAccessIsBoundary)', () => {
+    // Default OFF is load-bearing: SearchService's album-scoped search (search.service.ts:142-153)
+    // relies on searchAssetBuilder re-gating album results by shared-space timeline visibility
+    // (albumSharedSpaceScope, database.ts:600-607) whenever albumAccessIsBoundary is absent. If a
+    // future change ever flips this default, album-scoped search would leak a shared-space asset's
+    // content to a caller who lost (or never had) space access — guard against that regression here.
+    it('applies albumSharedSpaceScope by default for an album-scoped query (search re-gate stays intact)', () => {
+      const sql = buildAssetSearchSql({ albumIds: ['11111111-1111-1111-1111-111111111111'] });
+
+      expect(sql).toContain('"shared_space_asset"');
+      expect(sql).toContain('"shared_space_library"');
+    });
+
+    // The opt-out (shared-space.service.ts getFilteredMapMarkers, issue #656): album ACCESS is
+    // already the boundary for the album map, so it must not re-gate by shared-space visibility.
+    it('skips albumSharedSpaceScope when albumAccessIsBoundary is set', () => {
+      const sql = buildAssetSearchSql({
+        albumIds: ['11111111-1111-1111-1111-111111111111'],
+        albumAccessIsBoundary: true,
+      });
+
+      expect(sql).not.toContain('"shared_space_asset"');
+      expect(sql).not.toContain('"shared_space_library"');
+    });
+  });
+
   describe('searchAssetBuilder rating semantics', () => {
     it('keeps non-smart rating filters as exact match', () => {
       const sql = buildAssetSearchSql({ rating: 2 });
@@ -632,6 +810,84 @@ describe(SearchRepository.name, () => {
       expect(sql).toContain('"has_face_identities"');
       expect(sql).toContain('"shared_space_person_face"');
       expect(sql).not.toMatch(/\bor\b/i);
+    });
+  });
+
+  describe('searchAssetBuilder visibility modes', () => {
+    // D4: the album map matches the album GRID, which uses withDefaultVisibility
+    // (Archive | Timeline — database.ts). Neither pre-existing mode expresses that:
+    // `undefined` skips the clause entirely (admitting Hidden AND Locked) and
+    // 'not-locked' still admits Hidden. Hence the explicit 'timeline-or-archive' mode,
+    // used only by the album-boundary map query (shared-space.service.ts).
+    it('timeline-or-archive admits exactly Archive and Timeline', () => {
+      const sql = buildAssetSearchSql({ visibility: 'timeline-or-archive' });
+
+      expect(sql).toMatch(/"asset"\."visibility" in \('archive', 'timeline'\)/i);
+      expect(sql).not.toContain(`'${AssetVisibility.Hidden}'`);
+      expect(sql).not.toContain(`'${AssetVisibility.Locked}'`);
+    });
+
+    it('keeps a concrete visibility as an exact match', () => {
+      const { sql, parameters } = compileAssetSearch({ visibility: AssetVisibility.Timeline });
+
+      expect(sql).toMatch(/"asset"\."visibility" = \$\d+/i);
+      expect(parameters).toContain(AssetVisibility.Timeline);
+      expect(sql).not.toMatch(/"asset"\."visibility" in \(/i);
+    });
+
+    it('keeps not-locked as an inequality (it still admits Hidden — why the new mode exists)', () => {
+      const { sql, parameters } = compileAssetSearch({ visibility: 'not-locked' });
+
+      expect(sql).toMatch(/"asset"\."visibility" != \$\d+/i);
+      expect(parameters).toContain(AssetVisibility.Locked);
+    });
+
+    it('applies no visibility clause when visibility is undefined', () => {
+      const sql = buildAssetSearchSql({});
+
+      expect(sql).not.toContain('"asset"."visibility"');
+    });
+  });
+
+  describe('searchAssetBuilder ILIKE wildcard escaping', () => {
+    // The map and metadata search route text filters through ILIKE. Without escaping, a
+    // filename filter of `IMG_0001` treats `_` as a single-char wildcard (matching
+    // `IMG-0001` too) while the time-bucket/timeline path — which DOES escape
+    // (asset.repository.ts) — treats it literally. Same divergence for `%`.
+    const ESCAPE_CLAUSE = String.raw`escape '\'`;
+
+    it('escapes wildcards in the originalFileName filter and pairs them with an ESCAPE clause', () => {
+      const { sql, parameters } = compileAssetSearch({ originalFileName: 'IMG_0001' });
+
+      expect(sql).toContain(ESCAPE_CLAUSE);
+      expect(parameters).toContain(String.raw`IMG\_0001`);
+    });
+
+    it('escapes wildcards in the description filter', () => {
+      const { sql, parameters } = compileAssetSearch({ description: '100% sun_set' });
+
+      expect(sql).toContain(ESCAPE_CLAUSE);
+      expect(parameters).toContain(String.raw`100\% sun\_set`);
+    });
+
+    it('escapes wildcards in the originalPath filter', () => {
+      const { sql, parameters } = compileAssetSearch({ originalPath: 'upload/IMG_0001' });
+
+      expect(sql).toContain(ESCAPE_CLAUSE);
+      expect(parameters).toContain(String.raw`upload/IMG\_0001`);
+    });
+
+    it('escapes a literal backslash before the wildcards it introduces', () => {
+      const { parameters } = compileAssetSearch({ originalFileName: String.raw`back\slash_1` });
+
+      expect(parameters).toContain(String.raw`back\\slash\_1`);
+    });
+
+    it('leaves OCR alone — it uses the trigram operator, not ILIKE', () => {
+      const { sql } = compileAssetSearch({ ocr: 'IMG_0001' });
+
+      expect(sql).toContain('%>>');
+      expect(sql).not.toContain(ESCAPE_CLAUSE);
     });
   });
 });
