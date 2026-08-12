@@ -5,6 +5,7 @@
   import { Route } from '#lib/route.ts';
   import { manualReviewOwnerId } from '#lib/stores/face-cleanup-manual-review.store.ts';
   import { getAdminFaceThumbnailUrl } from '#lib/utils/people-utils.ts';
+  import ReadOnlyDemoNotice from '#lib/components/admin/ReadOnlyDemoNotice.svelte';
   import { getFaceRepairOwnerPeople, type FaceRepairOwnerPeopleResponseDto } from '@immich/sdk';
   import { Button, Icon } from '@immich/ui';
   import { mdiAccountCircleOutline, mdiMagnify } from '@mdi/js';
@@ -179,6 +180,7 @@
 
 <AdminPageLayout breadcrumbs={faceCleanupBreadcrumbs($t, manualCrumb($t))}>
   <div class="mx-auto max-w-screen-xl p-6">
+    <ReadOnlyDemoNotice />
     <div class="mb-6">
       <h1 class="text-2xl font-semibold tracking-tight">{$t('admin.face_cleanup_mode_browse_people')}</h1>
       <p class="mt-2 max-w-2xl text-sm text-gray-500 dark:text-gray-400">{$t('admin.face_cleanup_mode_manual_sub')}</p>

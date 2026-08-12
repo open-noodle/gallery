@@ -1,6 +1,7 @@
 <script lang="ts">
   import AdminPageLayout from '#lib/components/layouts/AdminPageLayout.svelte';
   import { Route } from '#lib/route.ts';
+  import ReadOnlyDemoNotice from '#lib/components/admin/ReadOnlyDemoNotice.svelte';
   import { Button, Icon } from '@immich/ui';
   import { mdiAccountSearch, mdiArrowRight, mdiRadar, mdiSwapHorizontal } from '@mdi/js';
   import { t } from 'svelte-i18n';
@@ -92,6 +93,7 @@
 
 <AdminPageLayout breadcrumbs={faceCleanupBreadcrumbs($t)}>
   <div class="mx-auto max-w-screen-xl p-6 sm:p-8">
+    <ReadOnlyDemoNotice />
     <!-- Header. The last-scan chip stays on the right; the explainer below is unconditional (design §3.4) —
          it used to be gated on `firstVisit`, which hid it from every visit after the first scan. -->
     <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
