@@ -31973,10 +31973,6 @@
             "description": "Whether public user registration is enabled",
             "type": "boolean"
           },
-          "storageUsageIncludesDerivatives": {
-            "description": "Whether displayed storage usage includes thumbnails and transcoded videos",
-            "type": "boolean"
-          },
           "trashDays": {
             "description": "Number of days before trashed assets are permanently deleted",
             "maximum": 9007199254740991,
@@ -32002,7 +31998,6 @@
           "minFaces",
           "oauthButtonText",
           "publicUsers",
-          "storageUsageIncludesDerivatives",
           "trashDays",
           "userDeleteDelay"
         ],
@@ -37741,18 +37736,13 @@
       },
       "SystemConfigStorageUsageDto": {
         "properties": {
-          "includeDerivativesInDisplay": {
-            "description": "Include thumbnails and transcoded videos in the displayed storage usage",
-            "type": "boolean"
-          },
-          "includeDerivativesInQuota": {
-            "description": "Include thumbnails and transcoded videos in quota enforcement",
+          "includeDerivatives": {
+            "description": "Include thumbnails and transcoded videos in storage usage",
             "type": "boolean"
           }
         },
         "required": [
-          "includeDerivativesInDisplay",
-          "includeDerivativesInQuota"
+          "includeDerivatives"
         ],
         "type": "object"
       },
@@ -38735,13 +38725,6 @@
             "description": "OAuth ID",
             "type": "string"
           },
-          "physicalUsageInBytes": {
-            "description": "Physical storage usage in bytes, including derivatives",
-            "maximum": 9007199254740991,
-            "minimum": 0,
-            "nullable": true,
-            "type": "integer"
-          },
           "profileChangedAt": {
             "description": "Profile change date",
             "format": "date-time",
@@ -38795,7 +38778,6 @@
           "license",
           "name",
           "oauthId",
-          "physicalUsageInBytes",
           "profileChangedAt",
           "profileImagePath",
           "quotaSizeInBytes",

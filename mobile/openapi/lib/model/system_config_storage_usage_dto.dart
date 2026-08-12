@@ -13,34 +13,27 @@ part of openapi.api;
 class SystemConfigStorageUsageDto {
   /// Returns a new [SystemConfigStorageUsageDto] instance.
   SystemConfigStorageUsageDto({
-    required this.includeDerivativesInDisplay,
-    required this.includeDerivativesInQuota,
+    required this.includeDerivatives,
   });
 
-  /// Include thumbnails and transcoded videos in the displayed storage usage
-  bool includeDerivativesInDisplay;
-
-  /// Include thumbnails and transcoded videos in quota enforcement
-  bool includeDerivativesInQuota;
+  /// Include thumbnails and transcoded videos in storage usage
+  bool includeDerivatives;
 
   @override
   bool operator ==(Object other) => identical(this, other) || other is SystemConfigStorageUsageDto &&
-    other.includeDerivativesInDisplay == includeDerivativesInDisplay &&
-    other.includeDerivativesInQuota == includeDerivativesInQuota;
+    other.includeDerivatives == includeDerivatives;
 
   @override
   int get hashCode =>
     // ignore: unnecessary_parenthesis
-    (includeDerivativesInDisplay.hashCode) +
-    (includeDerivativesInQuota.hashCode);
+    (includeDerivatives.hashCode);
 
   @override
-  String toString() => 'SystemConfigStorageUsageDto[includeDerivativesInDisplay=$includeDerivativesInDisplay, includeDerivativesInQuota=$includeDerivativesInQuota]';
+  String toString() => 'SystemConfigStorageUsageDto[includeDerivatives=$includeDerivatives]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-      json[r'includeDerivativesInDisplay'] = this.includeDerivativesInDisplay;
-      json[r'includeDerivativesInQuota'] = this.includeDerivativesInQuota;
+      json[r'includeDerivatives'] = this.includeDerivatives;
     return json;
   }
 
@@ -53,8 +46,7 @@ class SystemConfigStorageUsageDto {
       final json = value.cast<String, dynamic>();
 
       return SystemConfigStorageUsageDto(
-        includeDerivativesInDisplay: mapValueOfType<bool>(json, r'includeDerivativesInDisplay')!,
-        includeDerivativesInQuota: mapValueOfType<bool>(json, r'includeDerivativesInQuota')!,
+        includeDerivatives: mapValueOfType<bool>(json, r'includeDerivatives')!,
       );
     }
     return null;
@@ -102,8 +94,7 @@ class SystemConfigStorageUsageDto {
 
   /// The list of required keys that must be present in a JSON.
   static const requiredKeys = <String>{
-    'includeDerivativesInDisplay',
-    'includeDerivativesInQuota',
+    'includeDerivatives',
   };
 }
 
