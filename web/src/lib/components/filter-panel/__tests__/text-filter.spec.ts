@@ -1,6 +1,8 @@
+import '@testing-library/jest-dom';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import TextFilter from '$lib/components/filter-panel/text-filter.svelte';
+import { TEXT_FILTER_PARAM_MAX_LENGTH } from '$lib/utils/filter-url';
 
 describe('TextFilter', () => {
   beforeEach(() => {
@@ -53,6 +55,17 @@ describe('TextFilter', () => {
     await rerender({ description: undefined, onChange: vi.fn() });
 
     expect((screen.getByTestId('text-filter-description') as HTMLInputElement).value).toBe('');
+  });
+
+  // E13: the URL codec clamps all three free-text filters to 200 characters, so the inputs must not
+  // invite a longer value — a pasted 10KB description/filename/OCR string would be silently
+  // truncated on the way into the URL (and reverse proxies commonly cap headers at ~8KB).
+  it('bounds all three inputs to the URL codec length', () => {
+    render(TextFilter, { props: { onChange: vi.fn() } });
+
+    for (const testId of ['text-filter-description', 'text-filter-filename', 'text-filter-ocr']) {
+      expect(screen.getByTestId(testId)).toHaveAttribute('maxlength', String(TEXT_FILTER_PARAM_MAX_LENGTH));
+    }
   });
 
   it('keeps the three inputs independent', async () => {

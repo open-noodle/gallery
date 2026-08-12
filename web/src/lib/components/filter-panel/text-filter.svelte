@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { TEXT_FILTER_PARAM_MAX_LENGTH } from '$lib/utils/filter-url';
   import { untrack } from 'svelte';
   import { t } from 'svelte-i18n';
 
@@ -78,6 +79,7 @@
     <input
       type="text"
       class="immich-form-input h-8 w-full rounded-lg px-2 text-sm"
+      maxlength={TEXT_FILTER_PARAM_MAX_LENGTH}
       bind:value={descriptionValue}
       oninput={scheduleEmit}
       data-testid="text-filter-description"
@@ -88,6 +90,7 @@
     <input
       type="text"
       class="immich-form-input h-8 w-full rounded-lg px-2 text-sm"
+      maxlength={TEXT_FILTER_PARAM_MAX_LENGTH}
       bind:value={filenameValue}
       oninput={scheduleEmit}
       data-testid="text-filter-filename"
@@ -98,6 +101,7 @@
     <input
       type="text"
       class="immich-form-input h-8 w-full rounded-lg px-2 text-sm"
+      maxlength={TEXT_FILTER_PARAM_MAX_LENGTH}
       bind:value={ocrValue}
       oninput={scheduleEmit}
       data-testid="text-filter-ocr"
