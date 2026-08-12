@@ -3707,6 +3707,10 @@ export type SystemConfigStorageTemplateDto = {
     /** Template */
     template: string;
 };
+export type SystemConfigStorageUsageDto = {
+    /** Include thumbnails and transcoded videos in storage usage */
+    includeDerivatives: boolean;
+};
 export type SystemConfigTemplateEmailsDto = {
     /** Album invite template */
     albumInviteTemplate: string;
@@ -3753,6 +3757,7 @@ export type SystemConfigDto = {
     reverseGeocoding: SystemConfigReverseGeocodingDto;
     server: SystemConfigServerDto;
     storageTemplate: SystemConfigStorageTemplateDto;
+    storageUsage: SystemConfigStorageUsageDto;
     templates: SystemConfigTemplatesDto;
     theme: SystemConfigThemeDto;
     trash: SystemConfigTrashDto;

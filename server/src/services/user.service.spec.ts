@@ -964,8 +964,10 @@ describe(UserService.name, () => {
           .mockResolvedValueOnce(400),
       };
       (StorageService as any).s3Backend = s3Backend;
+      mocks.systemMetadata.get.mockResolvedValue({ storageUsage: { includeDerivatives: true } });
       (mocks.user as any).setUsage = vi.fn().mockResolvedValue(void 0);
       mocks.user.getList.mockResolvedValue([user]);
+      mocks.asset.getExternalAssetIds.mockResolvedValue(new Set<string>());
       mocks.storage.getFolderSize
         .mockResolvedValueOnce(10)
         .mockResolvedValueOnce(20)
@@ -979,22 +981,24 @@ describe(UserService.name, () => {
         ['/data/library/storage-label'],
         ['/data/upload/user-id'],
         ['/data/profile/user-id'],
-        ['/data/thumbs/user-id'],
-        ['/data/encoded-video/user-id'],
+        ['/data/thumbs/user-id', expect.any(Function)],
+        ['/data/encoded-video/user-id', expect.any(Function)],
       ]);
       expect(s3Backend.getPrefixUsage.mock.calls).toEqual([
         ['upload/user-id/'],
         ['profile/user-id/'],
-        ['thumbs/user-id/'],
-        ['encoded-video/user-id/'],
+        ['thumbs/user-id/', expect.any(Function)],
+        ['encoded-video/user-id/', expect.any(Function)],
       ]);
       expect((mocks.user as any).setUsage).toHaveBeenCalledWith(user.id, 1150);
     });
 
     it('should sync disk usage from all managed user folders', async () => {
       const user = factory.userAdmin({ id: 'user-id', storageLabel: 'storage-label' });
+      mocks.systemMetadata.get.mockResolvedValue({ storageUsage: { includeDerivatives: true } });
       (mocks.user as any).setUsage = vi.fn().mockResolvedValue(void 0);
       mocks.user.getList.mockResolvedValue([user]);
+      mocks.asset.getExternalAssetIds.mockResolvedValue(new Set<string>());
       mocks.storage.getFolderSize
         .mockResolvedValueOnce(100)
         .mockResolvedValueOnce(200)
@@ -1008,8 +1012,8 @@ describe(UserService.name, () => {
         ['/data/library/storage-label'],
         ['/data/upload/user-id'],
         ['/data/profile/user-id'],
-        ['/data/thumbs/user-id'],
-        ['/data/encoded-video/user-id'],
+        ['/data/thumbs/user-id', expect.any(Function)],
+        ['/data/encoded-video/user-id', expect.any(Function)],
       ]);
       expect((mocks.user as any).setUsage).toHaveBeenCalledWith(user.id, 1500);
     });
@@ -1021,6 +1025,54 @@ describe(UserService.name, () => {
       const result = await sut.handleUserSyncUsage();
 
       expect(result).toBe(JobStatus.Success);
+    });
+
+    it('should write the walked figure into quota usage and skip the originals-only statement', async () => {
+      const user = factory.userAdmin({ id: 'user-id', storageLabel: 'storage-label' });
+      mocks.systemMetadata.get.mockResolvedValue({ storageUsage: { includeDerivatives: true } });
+      (mocks.user as any).setUsage = vi.fn().mockResolvedValue(void 0);
+      mocks.user.getList.mockResolvedValue([user]);
+      mocks.asset.getExternalAssetIds.mockResolvedValue(new Set<string>());
+      mocks.storage.getFolderSize.mockResolvedValue(100);
+
+      await expect(sut.handleUserSyncUsage()).resolves.toBe(JobStatus.Success);
+
+      expect((mocks.user as any).setUsage).toHaveBeenCalledWith(user.id, 500);
+      // Both write quotaUsageInBytes, so running upstream's statement as well would overwrite the
+      // walked figure with the originals-only one.
+      expect(mocks.user.syncUsage).not.toHaveBeenCalled();
+    });
+
+    it('should skip the physical walk entirely when the toggle is off', async () => {
+      const user = factory.userAdmin({ id: 'user-id', storageLabel: 'storage-label' });
+      mocks.systemMetadata.get.mockResolvedValue({ storageUsage: { includeDerivatives: false } });
+      (mocks.user as any).setUsage = vi.fn().mockResolvedValue(void 0);
+      mocks.user.getList.mockResolvedValue([user]);
+
+      await expect(sut.handleUserSyncUsage()).resolves.toBe(JobStatus.Success);
+
+      // the nightly job syncs every user, so the repository is called without an id filter
+      expect(mocks.user.syncUsage).toHaveBeenCalledWith(undefined);
+      expect(mocks.storage.getFolderSize).not.toHaveBeenCalled();
+      expect((mocks.user as any).setUsage).not.toHaveBeenCalled();
+    });
+
+    it('should exclude derivatives belonging to external library assets', async () => {
+      const externalId = '0f9b1e2c-4a5d-4c8e-9f10-2b3c4d5e6f70';
+      const user = factory.userAdmin({ id: 'user-id', storageLabel: 'storage-label' });
+      mocks.systemMetadata.get.mockResolvedValue({ storageUsage: { includeDerivatives: true } });
+      (mocks.user as any).setUsage = vi.fn().mockResolvedValue(void 0);
+      mocks.user.getList.mockResolvedValue([user]);
+      mocks.asset.getExternalAssetIds.mockResolvedValue(new Set([externalId]));
+      mocks.storage.getFolderSize.mockResolvedValue(0);
+
+      await sut.handleUserSyncUsage();
+
+      const thumbsCall = mocks.storage.getFolderSize.mock.calls.find(([folder]) => folder.includes('thumbs'))!;
+      const shouldCount = thumbsCall[1] as (filename: string) => boolean;
+      expect(shouldCount(`${externalId}_preview.webp`)).toBe(false);
+      expect(shouldCount('0f9b1e2c-4a5d-4c8e-9f10-2b3c4d5e6f71_preview.webp')).toBe(true);
+      expect(shouldCount('segment-00001.ts')).toBe(true);
     });
   });
 

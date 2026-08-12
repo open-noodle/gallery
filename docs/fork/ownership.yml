@@ -102,25 +102,34 @@ features:
       - image-editing
       - checksum-tombstone
       - switch-back-to-immich
+      - storage-usage-accounting
     risk: high
     domains: [server, web, database, ci, e2e]
     owned_paths:
       - server/src/services/storage-migration.service.ts
       - server/src/controllers/storage-migration.controller.ts
       - server/src/backends/s3-storage.backend.ts
+      - server/src/gallery/storage-usage*.ts
       - web/src/routes/admin/storage-migration/**
       - web/src/lib/components/import/**
       - web/src/lib/managers/import-manager.svelte.ts
       - web/src/lib/utils/google-takeout-*.ts
+      - web/src/routes/admin/system-settings/StorageUsageSettings.svelte
       - scripts/revert-to-immich.sql
       - .github/workflows/storage-migration*.yml
       - .github/workflows/gallery-revert-to-immich-validation.yml
     upstream_extension_paths:
+      - server/src/services/base.service.ts
       - server/src/services/media.service.ts
       - server/src/services/metadata.service.ts
       - server/src/services/auth.service.ts
       - server/src/services/user.service.ts
       - server/src/services/integrity.service.ts
+      - server/src/services/index.ts
+      - server/src/repositories/user.repository.ts
+      - server/src/repositories/asset.repository.ts
+      - server/src/repositories/storage.repository.ts
+      - web/src/routes/admin/system-settings/+page.svelte
       - server/Dockerfile
       - e2e/docker-compose.yml
     expected_symbols:
