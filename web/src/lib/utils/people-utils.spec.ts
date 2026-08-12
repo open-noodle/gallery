@@ -6,6 +6,7 @@ import type { Size } from '$lib/utils/container-utils';
 import {
   appendUniqueById,
   getBoundingBox,
+  getFaceCropTransform,
   sortPeople,
   sortPeopleForManagement,
   zoomImageToBase64,
@@ -282,6 +283,45 @@ describe('getBoundingBox', () => {
 
     expect(boxes).toHaveLength(2);
     expect(boxes[0].left).toBeLessThan(boxes[1].left);
+  });
+});
+
+describe('getFaceCropTransform', () => {
+  it('centres a half-size box: scales 200% and positions at 50%/50%', () => {
+    const t = getFaceCropTransform({
+      imageWidth: 10_000,
+      imageHeight: 6000,
+      boundingBoxX1: 2500,
+      boundingBoxX2: 7500,
+      boundingBoxY1: 1500,
+      boundingBoxY2: 4500,
+    });
+    expect(t).toEqual({ backgroundSize: '200% 200%', backgroundPosition: '50% 50%' });
+  });
+
+  it('top-left full-width-tall box maps to 0% position', () => {
+    const t = getFaceCropTransform({
+      imageWidth: 1000,
+      imageHeight: 1000,
+      boundingBoxX1: 0,
+      boundingBoxX2: 250,
+      boundingBoxY1: 0,
+      boundingBoxY2: 250,
+    });
+    expect(t).toEqual({ backgroundSize: '400% 400%', backgroundPosition: '0% 0%' });
+  });
+
+  it('degenerate (zero-area / full-frame) box falls back to cover/center', () => {
+    expect(
+      getFaceCropTransform({
+        imageWidth: 100,
+        imageHeight: 100,
+        boundingBoxX1: 0,
+        boundingBoxX2: 0,
+        boundingBoxY1: 0,
+        boundingBoxY2: 0,
+      }),
+    ).toEqual({ backgroundSize: 'cover', backgroundPosition: 'center' });
   });
 });
 

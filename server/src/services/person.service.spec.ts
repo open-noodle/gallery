@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, ForbiddenException, NotFoundExc
 import { Reflector } from '@nestjs/core';
 import { writeFile } from 'node:fs/promises';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend';
+import { SystemConfig } from 'src/config';
 import { BulkIdErrorReason } from 'src/dtos/asset-ids.response.dto';
 import { mapFaces, mapPerson } from 'src/dtos/person.dto';
 import { QueueStatisticsDto } from 'src/dtos/queue.dto';
@@ -81,6 +82,31 @@ const planWith = (overrides: {
   ...overrides,
 });
 
+const configValidateTestConfig = (enabled: boolean, maxDistance: number, suggestionMaxDistance: number) =>
+  ({
+    machineLearning: {
+      facialRecognition: { maxDistance, suggestions: { enabled, maxDistance: suggestionMaxDistance } },
+    },
+  }) as SystemConfig;
+
+const onConfigUpdateTestConfig = (
+  suggestionsEnabled: boolean,
+  machineLearningEnabled: boolean = true,
+  facialRecognitionEnabled: boolean = true,
+  recognitionMaxDistance: number = 0.5,
+  suggestionsMaxDistance: number = 0.7,
+) =>
+  ({
+    machineLearning: {
+      enabled: machineLearningEnabled,
+      facialRecognition: {
+        enabled: facialRecognitionEnabled,
+        maxDistance: recognitionMaxDistance,
+        suggestions: { enabled: suggestionsEnabled, maxDistance: suggestionsMaxDistance },
+      },
+    },
+  }) as SystemConfig;
+
 describe(PersonService.name, () => {
   let sut: PersonService;
   let mocks: ServiceMocks;
@@ -122,6 +148,11 @@ describe(PersonService.name, () => {
     mocks.sharedSpace.getSpaceIdsWithFaceRecognitionEnabled.mockResolvedValue([]);
     // Default: no stored preferences → getPreferences() falls back to minimumFaces = 3.
     mocks.user.getMetadata.mockResolvedValue([]);
+    mocks.sharedSpace.getAssignedFaceIdsForSpace.mockResolvedValue([]);
+    // Default: no face has been manually linked or negatively verdicted — the suggestion-scan handlers'
+    // write-time exclusion (D3) becomes a no-op unless an individual test configures otherwise.
+    mocks.faceIdentity.getManualLinkedFaceIds.mockResolvedValue(new Set());
+    mocks.facePersonVerdict.getNegativeVerdictTokens.mockResolvedValue(new Map());
   });
 
   const expectNoFaceDetectionMutation = () => {
@@ -186,12 +217,30 @@ describe(PersonService.name, () => {
     return identityMergePropagation;
   };
 
+  // `mocks.systemMetadata.get` is one mock shared by every key, so a bare `mockResolvedValue` would answer the
+  // one-shot suggestion-sweep marker AND the system config with the same object. These two helpers key on the
+  // metadata key so a test can pin one without disturbing the other.
+  const useSuggestionSweepAlreadyRun = (config?: unknown) =>
+    mocks.systemMetadata.get.mockImplementation(
+      (key: SystemMetadataKey) =>
+        Promise.resolve(
+          key === SystemMetadataKey.FaceSuggestionDefaultOnState ? { sweptAt: '2026-08-01T00:00:00.000Z' } : config,
+        ) as any,
+    );
+
+  const useSuggestionSweepPending = (config?: unknown) =>
+    mocks.systemMetadata.get.mockImplementation(
+      (key: SystemMetadataKey) =>
+        Promise.resolve(key === SystemMetadataKey.FaceSuggestionDefaultOnState ? undefined : config) as any,
+    );
+
   it('should be defined', () => {
     expect(sut).toBeDefined();
   });
 
   describe('onBootstrap', () => {
     it('should queue identity backfill when existing people or faces need identity links', async () => {
+      useSuggestionSweepAlreadyRun();
       (mocks.faceIdentity as any).hasBackfillWork.mockResolvedValue(true);
       mocks.job.searchJobs.mockResolvedValue([]);
 
@@ -219,6 +268,7 @@ describe(PersonService.name, () => {
     });
 
     it('should skip identity backfill when no identity work remains', async () => {
+      useSuggestionSweepAlreadyRun();
       (mocks.faceIdentity as any).hasBackfillWork.mockResolvedValue(false);
 
       await sut.onBootstrap();
@@ -229,6 +279,7 @@ describe(PersonService.name, () => {
     });
 
     it('should not queue a new identity backfill root while another backfill page is pending', async () => {
+      useSuggestionSweepAlreadyRun();
       (mocks.faceIdentity as any).hasBackfillWork.mockResolvedValue(true);
       mocks.job.searchJobs.mockResolvedValue([
         {
@@ -245,6 +296,7 @@ describe(PersonService.name, () => {
     });
 
     it('should not queue a new identity backfill root while the root backfill is active', async () => {
+      useSuggestionSweepAlreadyRun();
       (mocks.faceIdentity as any).hasBackfillWork.mockResolvedValue(true);
       mocks.job.searchJobs.mockResolvedValue([
         {
@@ -267,6 +319,79 @@ describe(PersonService.name, () => {
       });
       expect(mocks.job.searchJobs.mock.calls[0][1]?.status).toHaveLength(4);
       expect(mocks.job.queue).not.toHaveBeenCalled();
+    });
+
+    // Face suggestions ship enabled by default. An instance that upgrades into that default never emits a
+    // ConfigUpdate, and FaceSuggestionMaintenance has no cron, so without this one-shot sweep the toggle
+    // would read "on" over a permanently empty queue.
+    describe('one-shot face suggestion sweep', () => {
+      it('should queue face suggestion maintenance once when the marker is absent and the feature is on', async () => {
+        useSuggestionSweepPending();
+        (mocks.faceIdentity as any).hasBackfillWork.mockResolvedValue(false);
+
+        await sut.onBootstrap();
+
+        expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.FaceSuggestionMaintenance, data: {} });
+      });
+
+      it('should not queue face suggestion maintenance when the marker is already burnt', async () => {
+        useSuggestionSweepAlreadyRun();
+        (mocks.faceIdentity as any).hasBackfillWork.mockResolvedValue(false);
+
+        await sut.onBootstrap();
+
+        expect(mocks.job.queue).not.toHaveBeenCalledWith({ name: JobName.FaceSuggestionMaintenance, data: {} });
+        expect(mocks.systemMetadata.set).not.toHaveBeenCalledWith(
+          SystemMetadataKey.FaceSuggestionDefaultOnState,
+          expect.anything(),
+        );
+      });
+
+      // The marker records "a sweep has actually run", so only a sweep may write it. Burning it here instead
+      // rested on the assumption that a later opt-in always re-triggers via onConfigUpdate's false -> true
+      // transition — which cannot happen under IMMICH_CONFIG_FILE, where updateSystemConfig throws outright
+      // (system-config.service.ts) and a YAML edit + restart emits only ConfigInit. Such an admin would get a
+      // toggle reading "on" over a queue that is never filled.
+      it('should leave the marker unburnt when the feature resolves off, so a later boot re-checks', async () => {
+        useSuggestionSweepPending(onConfigUpdateTestConfig(false));
+        (mocks.faceIdentity as any).hasBackfillWork.mockResolvedValue(false);
+
+        await sut.onBootstrap();
+
+        expect(mocks.job.queue).not.toHaveBeenCalledWith({ name: JobName.FaceSuggestionMaintenance, data: {} });
+        expect(mocks.systemMetadata.set).not.toHaveBeenCalledWith(
+          SystemMetadataKey.FaceSuggestionDefaultOnState,
+          expect.anything(),
+        );
+      });
+
+      // Queueing is not sweeping. FaceSuggestionMaintenance runs with attempts:1 and removeOnFail:true
+      // (job.repository.ts), so a marker written here would survive a job that failed and vanished — the
+      // sweep would be recorded as done having never run, with no retry. Only the handler's success path
+      // may write it (see job.service.spec.ts).
+      it('should not burn the marker at queue time, leaving that to the sweep itself', async () => {
+        useSuggestionSweepPending();
+        (mocks.faceIdentity as any).hasBackfillWork.mockResolvedValue(false);
+
+        await sut.onBootstrap();
+
+        expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.FaceSuggestionMaintenance, data: {} });
+        expect(mocks.systemMetadata.set).not.toHaveBeenCalledWith(
+          SystemMetadataKey.FaceSuggestionDefaultOnState,
+          expect.anything(),
+        );
+      });
+
+      it('should still queue the identity backfill it shares the hook with', async () => {
+        useSuggestionSweepPending();
+        (mocks.faceIdentity as any).hasBackfillWork.mockResolvedValue(true);
+        mocks.job.searchJobs.mockResolvedValue([]);
+
+        await sut.onBootstrap();
+
+        expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.FaceSuggestionMaintenance, data: {} });
+        expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.FaceIdentityBackfill, data: {} });
+      });
     });
   });
 
@@ -1378,6 +1503,120 @@ describe(PersonService.name, () => {
       expect(mocks.person.update).not.toHaveBeenCalled();
       expect(mocks.access.person.checkOwnerAccess).toHaveBeenCalledWith(auth.user.id, new Set([person.personGroupId]));
     });
+
+    describe('suggestion on-name trigger', () => {
+      const enabled = {
+        machineLearning: {
+          enabled: true,
+          facialRecognition: {
+            enabled: true,
+            maxDistance: 0.5,
+            minFaces: 3,
+            suggestions: { enabled: true, maxDistance: 0.8 },
+          },
+        },
+      };
+
+      it('enqueues a scan when an unnamed cluster is named (edge 5)', async () => {
+        mocks.systemMetadata.get.mockResolvedValue(enabled);
+        const auth = AuthFactory.create();
+        const prior = PersonFactory.create({ name: '', isHidden: false });
+        mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([prior.id]));
+        mocks.person.getById.mockResolvedValue(prior);
+        mocks.person.update.mockResolvedValue({ ...prior, name: 'Alice' });
+
+        await sut.update(auth, prior.id, { name: 'Alice' });
+
+        expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.PersonSuggestionScan, data: { id: prior.id } });
+      });
+
+      it('enqueues a scan on rename of an already-named person (edge 6)', async () => {
+        mocks.systemMetadata.get.mockResolvedValue(enabled);
+        const auth = AuthFactory.create();
+        const prior = PersonFactory.create({ name: 'Alice', isHidden: false });
+        mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([prior.id]));
+        mocks.person.getById.mockResolvedValue(prior);
+        mocks.person.update.mockResolvedValue({ ...prior, name: 'Bob' });
+
+        await sut.update(auth, prior.id, { name: 'Bob' });
+
+        expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.PersonSuggestionScan, data: { id: prior.id } });
+      });
+
+      it('does NOT enqueue on a color/favorite/birthDate edit (name unchanged) (edge 7)', async () => {
+        mocks.systemMetadata.get.mockResolvedValue(enabled);
+        const auth = AuthFactory.create();
+        const prior = PersonFactory.create({ name: 'Alice', isHidden: false });
+        mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([prior.id]));
+        mocks.person.getById.mockResolvedValue(prior);
+        mocks.person.update.mockResolvedValue({ ...prior }); // name unchanged
+
+        await sut.update(auth, prior.id, { isFavorite: true });
+
+        expect(mocks.job.queue).not.toHaveBeenCalledWith({
+          name: JobName.PersonSuggestionScan,
+          data: { id: prior.id },
+        });
+      });
+
+      it('does NOT enqueue when name is cleared (edge 7)', async () => {
+        mocks.systemMetadata.get.mockResolvedValue(enabled);
+        const auth = AuthFactory.create();
+        const prior = PersonFactory.create({ name: 'Alice', isHidden: false });
+        mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([prior.id]));
+        mocks.person.getById.mockResolvedValue(prior);
+        mocks.person.update.mockResolvedValue({ ...prior, name: '' });
+
+        await sut.update(auth, prior.id, { name: '' });
+
+        expect(mocks.job.queue).not.toHaveBeenCalledWith({
+          name: JobName.PersonSuggestionScan,
+          data: { id: prior.id },
+        });
+      });
+
+      it('does NOT enqueue when a person becomes hidden (edge 7)', async () => {
+        mocks.systemMetadata.get.mockResolvedValue(enabled);
+        const auth = AuthFactory.create();
+        const prior = PersonFactory.create({ name: 'Alice', isHidden: false });
+        mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([prior.id]));
+        mocks.person.getById.mockResolvedValue(prior);
+        mocks.person.update.mockResolvedValue({ ...prior, isHidden: true }); // name unchanged
+
+        await sut.update(auth, prior.id, { isHidden: true });
+
+        expect(mocks.job.queue).not.toHaveBeenCalledWith({
+          name: JobName.PersonSuggestionScan,
+          data: { id: prior.id },
+        });
+      });
+
+      it('does NOT enqueue when the feature is disabled', async () => {
+        mocks.systemMetadata.get.mockResolvedValue({
+          machineLearning: {
+            enabled: true,
+            facialRecognition: {
+              enabled: true,
+              maxDistance: 0.5,
+              minFaces: 3,
+              suggestions: { enabled: false, maxDistance: 0.7 },
+            },
+          },
+        });
+        const auth = AuthFactory.create();
+        const prior = PersonFactory.create({ name: '', isHidden: false });
+        mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([prior.id]));
+        mocks.person.getById.mockResolvedValue(prior);
+        mocks.person.update.mockResolvedValue({ ...prior, name: 'Alice' });
+
+        await sut.update(auth, prior.id, { name: 'Alice' });
+
+        expect(mocks.job.queue).not.toHaveBeenCalledWith({
+          name: JobName.PersonSuggestionScan,
+          data: { id: prior.id },
+        });
+      });
+    });
   });
 
   describe('updateAll', () => {
@@ -1455,6 +1694,12 @@ describe(PersonService.name, () => {
         identityId: 'identity-1',
         source: 'manual',
       });
+      // S11 (slice 11d): the owner just stated a fact that contradicts any durable rejected/ignored row for
+      // this same target — clear it, scoped to this person's identity only.
+      expect(mocks.facePersonVerdict.clearNegativeForTarget).toHaveBeenCalledWith(
+        { personId: person.id, identityId: 'identity-1' },
+        [face.id],
+      );
     });
   });
 
@@ -1815,6 +2060,11 @@ describe(PersonService.name, () => {
         identityId: 'identity-1',
         source: 'manual',
       });
+      // S11 (slice 11d): same clearing as reassignFaces — scoped to this person's identity only.
+      expect(mocks.facePersonVerdict.clearNegativeForTarget).toHaveBeenCalledWith(
+        { personId: person.id, identityId: 'identity-1' },
+        [face.id],
+      );
     });
 
     it('should fail if user has not the correct permissions on the asset', async () => {
@@ -2068,6 +2318,7 @@ describe(PersonService.name, () => {
       expect(mocks.person.getAllFaces).toHaveBeenCalledWith({
         personGroupId: null,
         sourceType: SourceType.MachineLearning,
+        excludeManuallyPlaced: true,
       });
       expect(mocks.job.queueAll).toHaveBeenCalledWith([
         {
@@ -2115,7 +2366,7 @@ describe(PersonService.name, () => {
       expect(mocks.person.vacuum).toHaveBeenCalledWith({ reindexVectors: false });
     });
 
-    it('force recognition waits for thumbnail, face detection, and people backfill before draining and clearing identities', async () => {
+    it('force recognition waits for thumbnail, face detection, and (separately, boundedly) people backfill before draining and clearing identities', async () => {
       const face = AssetFaceFactory.create();
       mocks.job.getJobCounts.mockResolvedValue(recognitionCounts());
       mocks.person.getAllFaces.mockReturnValue(makeStream([face]));
@@ -2126,14 +2377,19 @@ describe(PersonService.name, () => {
 
       await expect(sut.handleQueueRecognizeFaces({ force: true })).resolves.toBe(JobStatus.Success);
 
+      // S9 (F19): PeopleBackfill is waited on in its OWN call, with a bounded timeout, so a hung
+      // sweep there can never delay ThumbnailGeneration/FaceDetection's own (unbounded) wait.
       expect(mocks.job.waitForQueueCompletion).toHaveBeenCalledWith(
         QueueName.ThumbnailGeneration,
         QueueName.FaceDetection,
-        QueueName.PeopleBackfill,
       );
-      expect(mocks.job.waitForQueueCompletion.mock.invocationCallOrder[0]).toBeLessThan(
-        mocks.job.empty.mock.invocationCallOrder[0],
-      );
+      expect(mocks.job.waitForQueueCompletion).toHaveBeenCalledWith(QueueName.PeopleBackfill, {
+        timeoutMs: expect.any(Number),
+      });
+      expect(mocks.job.waitForQueueCompletion).toHaveBeenCalledTimes(2);
+
+      const lastWaitCallOrder = mocks.job.waitForQueueCompletion.mock.invocationCallOrder.at(-1)!;
+      expect(lastWaitCallOrder).toBeLessThan(mocks.job.empty.mock.invocationCallOrder[0]);
       expect(mocks.job.empty.mock.invocationCallOrder[0]).toBeLessThan(
         mocks.person.unassignFaces.mock.invocationCallOrder[0],
       );
@@ -2145,6 +2401,74 @@ describe(PersonService.name, () => {
       );
       expect(mocks.job.empty.mock.invocationCallOrder[0]).toBeLessThan(
         mocks.sharedSpace.deleteAllPersons.mock.invocationCallOrder[0],
+      );
+    });
+
+    it('S9.9: passes a bounded timeout on the forced PeopleBackfill wait, as its own call', async () => {
+      mocks.job.getJobCounts.mockResolvedValue({
+        active: 1,
+        waiting: 0,
+        paused: 0,
+        completed: 0,
+        failed: 0,
+        delayed: 0,
+      });
+      mocks.person.getAll.mockReturnValue(makeStream());
+      mocks.person.getAllFaces.mockReturnValue(makeStream([]));
+      mocks.person.getAllWithoutFaces.mockResolvedValue([]);
+      mocks.sharedSpace.deleteAllPersonFaces.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.deleteAllPersons.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.getSpaceIdsWithFaceRecognitionEnabled.mockResolvedValue([]);
+
+      await expect(sut.handleQueueRecognizeFaces({ force: true })).resolves.toBe(JobStatus.Success);
+
+      expect(mocks.job.waitForQueueCompletion).toHaveBeenCalledWith(
+        QueueName.PeopleBackfill,
+        expect.objectContaining({ timeoutMs: expect.any(Number) }),
+      );
+      const [, options] = mocks.job.waitForQueueCompletion.mock.calls.find(
+        (call) => call[0] === QueueName.PeopleBackfill,
+      )!;
+      expect((options as { timeoutMs: number }).timeoutMs).toBeGreaterThan(0);
+    });
+
+    it('S9.10 (pin): the non-forced path never waits on PeopleBackfill at all', async () => {
+      mocks.job.getJobCounts.mockResolvedValue(recognitionCounts({ waiting: 87_000 }));
+      mocks.person.getAllFaces.mockReturnValue(makeStream([AssetFaceFactory.create()]));
+
+      await expect(sut.handleQueueRecognizeFaces({ force: false })).resolves.toBe(JobStatus.Skipped);
+
+      for (const call of mocks.job.waitForQueueCompletion.mock.calls) {
+        expect(call).not.toContain(QueueName.PeopleBackfill);
+      }
+      expect(mocks.job.waitForQueueCompletion).toHaveBeenCalledTimes(1);
+      expect(mocks.job.waitForQueueCompletion).toHaveBeenCalledWith(
+        QueueName.ThumbnailGeneration,
+        QueueName.FaceDetection,
+      );
+
+      // positive control, same test body: the forced path DOES wait on PeopleBackfill
+      mocks.job.waitForQueueCompletion.mockClear();
+      mocks.job.getJobCounts.mockResolvedValue({
+        active: 1,
+        waiting: 0,
+        paused: 0,
+        completed: 0,
+        failed: 0,
+        delayed: 0,
+      });
+      mocks.person.getAll.mockReturnValue(makeStream());
+      mocks.person.getAllFaces.mockReturnValue(makeStream([]));
+      mocks.person.getAllWithoutFaces.mockResolvedValue([]);
+      mocks.sharedSpace.deleteAllPersonFaces.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.deleteAllPersons.mockResolvedValue(void 0 as any);
+      mocks.sharedSpace.getSpaceIdsWithFaceRecognitionEnabled.mockResolvedValue([]);
+
+      await expect(sut.handleQueueRecognizeFaces({ force: true })).resolves.toBe(JobStatus.Success);
+
+      expect(mocks.job.waitForQueueCompletion).toHaveBeenCalledWith(
+        QueueName.PeopleBackfill,
+        expect.objectContaining({ timeoutMs: expect.any(Number) }),
       );
     });
 
@@ -2344,6 +2668,7 @@ describe(PersonService.name, () => {
       expect(mocks.person.getAllFaces).toHaveBeenCalledWith({
         personGroupId: null,
         sourceType: SourceType.MachineLearning,
+        excludeManuallyPlaced: true,
       });
       expect(mocks.job.queueAll).toHaveBeenCalledWith([
         {
@@ -3727,6 +4052,19 @@ describe(PersonService.name, () => {
     });
 
     it('queues one metadata backfill when identity work completes without targeted face-match work', async () => {
+      // Suggestions pinned off so the count below stays about the metadata backfill: the shipped default is
+      // on, and the two tests below own the enabled/disabled suggestion-chaining behaviour.
+      mocks.systemMetadata.get.mockResolvedValue({
+        machineLearning: {
+          enabled: true,
+          facialRecognition: {
+            enabled: true,
+            maxDistance: 0.5,
+            minFaces: 3,
+            suggestions: { enabled: false, maxDistance: 0.7 },
+          },
+        },
+      });
       mocks.faceIdentity.backfillPersonalIdentities.mockResolvedValue({ processed: 0 });
       mocks.faceIdentity.backfillSpacePersonIdentities.mockResolvedValue({ processed: 0, conflictCount: 0 });
       (mocks.faceIdentity as any).getBackfillWork.mockResolvedValue({
@@ -3743,6 +4081,104 @@ describe(PersonService.name, () => {
         name: JobName.SharedSpacePersonMetadataBackfill,
         data: {},
       });
+    });
+
+    it('chains PersonSuggestionScanQueueAll when backfill completes and the feature is enabled (edge 19)', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({
+        machineLearning: {
+          enabled: true,
+          facialRecognition: {
+            enabled: true,
+            maxDistance: 0.5,
+            minFaces: 3,
+            suggestions: { enabled: true, maxDistance: 0.8 },
+          },
+        },
+      });
+      mocks.faceIdentity.backfillPersonalIdentities.mockResolvedValue({ processed: 0 });
+      mocks.faceIdentity.backfillSpacePersonIdentities.mockResolvedValue({ processed: 0, conflictCount: 0 });
+      (mocks.faceIdentity as any).getBackfillWork.mockResolvedValue({
+        hasPersonalIdentityWork: false,
+        hasSpacePersonIdentityWork: false,
+        hasSharedSpaceProjectionWork: false,
+      });
+
+      await expect(sut.handleFaceIdentityBackfill({ stage: 'person' })).resolves.toBe(JobStatus.Success);
+
+      expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.PersonSuggestionScanQueueAll, data: {} });
+    });
+
+    it('chains SpacePersonSuggestionScanQueueAll when backfill completes and the feature is enabled', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({
+        machineLearning: {
+          enabled: true,
+          facialRecognition: {
+            enabled: true,
+            maxDistance: 0.5,
+            minFaces: 3,
+            suggestions: { enabled: true, maxDistance: 0.8 },
+          },
+        },
+      });
+      mocks.faceIdentity.backfillPersonalIdentities.mockResolvedValue({ processed: 0 });
+      mocks.faceIdentity.backfillSpacePersonIdentities.mockResolvedValue({ processed: 0, conflictCount: 0 });
+      (mocks.faceIdentity as any).getBackfillWork.mockResolvedValue({
+        hasPersonalIdentityWork: false,
+        hasSpacePersonIdentityWork: false,
+        hasSharedSpaceProjectionWork: false,
+      });
+
+      await expect(sut.handleFaceIdentityBackfill({ stage: 'person' })).resolves.toBe(JobStatus.Success);
+
+      expect(mocks.job.queue).toHaveBeenNthCalledWith(2, { name: JobName.PersonSuggestionScanQueueAll, data: {} });
+      expect(mocks.job.queue).toHaveBeenNthCalledWith(3, { name: JobName.SpacePersonSuggestionScanQueueAll, data: {} });
+    });
+
+    it('does NOT chain PersonSuggestionScanQueueAll when the feature is disabled', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({
+        machineLearning: {
+          enabled: true,
+          facialRecognition: {
+            enabled: true,
+            maxDistance: 0.5,
+            minFaces: 3,
+            suggestions: { enabled: false, maxDistance: 0.7 },
+          },
+        },
+      });
+      mocks.faceIdentity.backfillPersonalIdentities.mockResolvedValue({ processed: 0 });
+      mocks.faceIdentity.backfillSpacePersonIdentities.mockResolvedValue({ processed: 0, conflictCount: 0 });
+      (mocks.faceIdentity as any).getBackfillWork.mockResolvedValue({
+        hasPersonalIdentityWork: false,
+        hasSpacePersonIdentityWork: false,
+        hasSharedSpaceProjectionWork: false,
+      });
+
+      await expect(sut.handleFaceIdentityBackfill({ stage: 'person' })).resolves.toBe(JobStatus.Success);
+
+      expect(mocks.job.queue).not.toHaveBeenCalledWith({ name: JobName.PersonSuggestionScanQueueAll, data: {} });
+      expect(mocks.job.queue).not.toHaveBeenCalledWith({ name: JobName.SpacePersonSuggestionScanQueueAll, data: {} });
+    });
+
+    it('does NOT chain PersonSuggestionScanQueueAll while cursor pages remain (edge 19 — strictly after)', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({
+        machineLearning: {
+          enabled: true,
+          facialRecognition: {
+            enabled: true,
+            maxDistance: 0.5,
+            minFaces: 3,
+            suggestions: { enabled: true, maxDistance: 0.8 },
+          },
+        },
+      });
+      mocks.faceIdentity.backfillPersonalIdentities.mockResolvedValue({ processed: 1000, nextCursor: 'c' });
+      mocks.faceIdentity.backfillSpacePersonIdentities.mockResolvedValue({ processed: 0, conflictCount: 0 });
+
+      await expect(sut.handleFaceIdentityBackfill({ stage: 'person' })).resolves.toBe(JobStatus.Success);
+
+      expect(mocks.job.queue).not.toHaveBeenCalledWith({ name: JobName.PersonSuggestionScanQueueAll, data: {} });
+      expect(mocks.job.queue).not.toHaveBeenCalledWith({ name: JobName.SpacePersonSuggestionScanQueueAll, data: {} });
     });
 
     it('does not write an empty trailing batch for exactly one full chunk', async () => {
@@ -3864,6 +4300,8 @@ describe(PersonService.name, () => {
         name: JobName.SharedSpacePersonMetadataBackfill,
         data: {},
       });
+      expect(mocks.job.queue).not.toHaveBeenCalledWith({ name: JobName.PersonSuggestionScanQueueAll, data: {} });
+      expect(mocks.job.queue).not.toHaveBeenCalledWith({ name: JobName.SpacePersonSuggestionScanQueueAll, data: {} });
     });
 
     it('does not queue full shared-space rebuilds when identity backfill is retriggered during face recognition work', async () => {
@@ -4826,6 +5264,35 @@ describe(PersonService.name, () => {
       expect(mocks.sharedSpace.getSpaceIdsForAsset).toHaveBeenCalledWith(noPerson1.assetId);
       expect(mocks.job.queue).not.toHaveBeenCalledWith(expect.objectContaining({ name: JobName.SharedSpaceFaceMatch }));
     });
+
+    it('does not enqueue any PersonSuggestionScan from the recognition path (zero-regression)', async () => {
+      const asset = AssetFactory.create();
+      const person = PersonFactory.create();
+      const [noPerson1, primaryFace] = [
+        AssetFaceFactory.create({ assetId: asset.id }),
+        AssetFaceFactory.from().person().build(),
+      ];
+
+      const faces = [
+        { ...noPerson1, distance: 0 },
+        { ...primaryFace, distance: 0.2 },
+      ] as FaceSearchResult[];
+
+      mocks.systemMetadata.get.mockResolvedValue({ machineLearning: { facialRecognition: { minFaces: 1 } } });
+      mocks.search.searchFaces.mockResolvedValue(faces);
+      mocks.person.getFaceForFacialRecognitionJob.mockResolvedValue(getForFacialRecognitionJob(noPerson1, asset));
+      mocks.person.create.mockResolvedValue(person);
+      mocks.sharedSpace.getSpaceIdsForAsset.mockResolvedValue([]);
+
+      await sut.handleRecognizeFaces({ id: noPerson1.id });
+
+      // The recognition path must never enqueue suggestion jobs — suggestions are generated
+      // only by the dedicated PersonSuggestionScan job chain, not inline in recognition.
+      expect(mocks.job.queue).not.toHaveBeenCalledWith(expect.objectContaining({ name: JobName.PersonSuggestionScan }));
+      expect(mocks.job.queue).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: JobName.PersonSuggestionScanQueueAll }),
+      );
+    });
   });
 
   describe('mergePerson', () => {
@@ -5593,6 +6060,26 @@ describe(PersonService.name, () => {
     });
   });
 
+  describe('reassignFaces', () => {
+    it('resolves pending suggestions for the face when bulk-reassigned (edge 11, manual branch)', async () => {
+      const face = AssetFaceFactory.create();
+      const auth = AuthFactory.create();
+      const person = PersonFactory.create();
+
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.id]));
+      mocks.person.getById.mockResolvedValue(person);
+      mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set([face.id]));
+      mocks.person.getFacesByIds.mockResolvedValue([getForAssetFace(face)]);
+      mocks.person.reassignFace.mockResolvedValue(1);
+
+      await sut.reassignFaces(auth, person.id, {
+        data: [{ personId: person.id, assetId: face.assetId }],
+      });
+
+      expect(mocks.facePersonVerdict.resolveAssignedFace).toHaveBeenCalledWith(face.id);
+    });
+  });
+
   describe('reassignFacesById', () => {
     it('should trigger new feature photo for person with null faceAssetId', async () => {
       const face = AssetFaceFactory.create();
@@ -5630,6 +6117,20 @@ describe(PersonService.name, () => {
       await sut.reassignFacesById(AuthFactory.create(), newPerson.id, { id: face.id });
 
       expect(mocks.person.getRandomFace).toHaveBeenCalledWith(face.person!.id);
+    });
+
+    it('resolves pending suggestions for the face when it is reassigned by id (edge 11, manual branch)', async () => {
+      const face = AssetFaceFactory.create();
+      const person = PersonFactory.create();
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.id]));
+      mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set([face.id]));
+      mocks.person.getFaceById.mockResolvedValue(getForAssetFace(face));
+      mocks.person.reassignFace.mockResolvedValue(1);
+      mocks.person.getById.mockResolvedValue(person);
+
+      await sut.reassignFacesById(AuthFactory.create(), person.id, { id: face.id });
+
+      expect(mocks.facePersonVerdict.resolveAssignedFace).toHaveBeenCalledWith(face.id);
     });
   });
 
@@ -5812,6 +6313,7 @@ describe(PersonService.name, () => {
       expect(mocks.person.getAllFaces).toHaveBeenCalledWith({
         personId: null,
         sourceType: SourceType.MachineLearning,
+        excludeManuallyPlaced: true,
       });
       expect(mocks.job.queueAll).toHaveBeenCalledWith([
         { name: JobName.FacialRecognition, data: { id: face.id, deferred: false } },
@@ -6015,6 +6517,111 @@ describe(PersonService.name, () => {
 
     it('should map a null person when the face has none', () => {
       expect(mapFaces(getForAssetFace(AssetFaceFactory.from().build()), AuthFactory.create()).person).toBeNull();
+    });
+  });
+
+  describe('onConfigValidate', () => {
+    it('rejects an enabled band at or below the recognition distance', () => {
+      expect(() =>
+        sut.onConfigValidate({
+          newConfig: configValidateTestConfig(true, 0.5, 0.5),
+          oldConfig: configValidateTestConfig(false, 0.5, 0.7),
+        }),
+      ).toThrow(/must be greater than the maximum recognition distance/);
+    });
+
+    it('accepts an enabled band above the recognition distance', () => {
+      expect(() =>
+        sut.onConfigValidate({
+          newConfig: configValidateTestConfig(true, 0.5, 0.7),
+          oldConfig: configValidateTestConfig(false, 0.5, 0.7),
+        }),
+      ).not.toThrow();
+    });
+
+    it('ignores the band when suggestions are disabled', () => {
+      expect(() =>
+        sut.onConfigValidate({
+          newConfig: configValidateTestConfig(false, 0.5, 0.3),
+          oldConfig: configValidateTestConfig(false, 0.5, 0.7),
+        }),
+      ).not.toThrow();
+    });
+  });
+
+  describe('onConfigUpdate', () => {
+    it('queues the maintenance scan on the false to true transition', async () => {
+      await sut.onConfigUpdate({
+        newConfig: onConfigUpdateTestConfig(true),
+        oldConfig: onConfigUpdateTestConfig(false),
+      });
+
+      expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.FaceSuggestionMaintenance, data: {} });
+    });
+
+    it('does not queue when it was already enabled', async () => {
+      await sut.onConfigUpdate({
+        newConfig: onConfigUpdateTestConfig(true),
+        oldConfig: onConfigUpdateTestConfig(true),
+      });
+
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+    });
+
+    it('does not queue when the feature is switched off', async () => {
+      await sut.onConfigUpdate({
+        newConfig: onConfigUpdateTestConfig(false),
+        oldConfig: onConfigUpdateTestConfig(true),
+      });
+
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+    });
+
+    it('does not queue when suggestions are untouched', async () => {
+      await sut.onConfigUpdate({
+        newConfig: onConfigUpdateTestConfig(false),
+        oldConfig: onConfigUpdateTestConfig(false),
+      });
+
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+    });
+
+    it('does not queue when band widens while already enabled', async () => {
+      await sut.onConfigUpdate({
+        newConfig: onConfigUpdateTestConfig(true, true, true, 0.5, 0.9),
+        oldConfig: onConfigUpdateTestConfig(true, true, true, 0.5, 0.7),
+      });
+
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+    });
+
+    // Suggestions never call the machine learning service, so the ML master switch does not gate
+    // them — flipping them on while it is off is a real transition and must queue the scan.
+    it('queues when suggestions.enabled flips true while the machine learning master switch is off', async () => {
+      await sut.onConfigUpdate({
+        newConfig: onConfigUpdateTestConfig(true, false, true, 0.5, 0.7),
+        oldConfig: onConfigUpdateTestConfig(false, false, true, 0.5, 0.7),
+      });
+
+      expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.FaceSuggestionMaintenance, data: {} });
+    });
+
+    it('does not queue when suggestions.enabled flips true while facial recognition is disabled', async () => {
+      await sut.onConfigUpdate({
+        newConfig: onConfigUpdateTestConfig(true, true, false, 0.5, 0.7),
+        oldConfig: onConfigUpdateTestConfig(false, true, false, 0.5, 0.7),
+      });
+
+      expect(mocks.job.queue).not.toHaveBeenCalled();
+    });
+
+    it('queues when band becomes valid from invalid transition', async () => {
+      await sut.onConfigUpdate({
+        newConfig: onConfigUpdateTestConfig(true, true, true, 0.5, 0.7),
+        oldConfig: onConfigUpdateTestConfig(true, true, true, 0.5, 0.4),
+      });
+
+      expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.FaceSuggestionMaintenance, data: {} });
     });
   });
 });

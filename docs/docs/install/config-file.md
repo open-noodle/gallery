@@ -149,7 +149,11 @@ The default configuration looks like this:
       "maxDistance": 0.5,
       "minFaces": 3,
       "minScore": 0.7,
-      "modelName": "buffalo_l"
+      "modelName": "buffalo_l",
+      "suggestions": {
+        "enabled": true,
+        "maxDistance": 0.7
+      }
     },
     "ocr": {
       "enabled": true,

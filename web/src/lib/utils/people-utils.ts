@@ -2,7 +2,7 @@ import { AssetTypeEnum } from '@immich/sdk';
 import type { Faces } from '$lib/managers/asset-viewer-manager.svelte';
 import { PeopleSortBy } from '$lib/stores/preferences.store';
 import { createUrl, getAssetMediaUrl } from '$lib/utils';
-import { mapNormalizedRectToContent, type Rect, type Size } from '$lib/utils/container-utils';
+import { mapNormalizedRectToContent, type ContentMetrics, type Rect, type Size } from '$lib/utils/container-utils';
 
 export type BoundingBox = Rect & { id: string };
 export type SortablePerson = {
@@ -105,7 +105,12 @@ export const getPersonFaceThumbnailUrl = (personId: string, faceId: string, upda
 export const getSpacePersonFaceThumbnailUrl = (spaceId: string, personId: string, faceId: string, updatedAt?: string) =>
   createUrl(`/shared-spaces/${spaceId}/people/${personId}/faces/${faceId}/thumbnail`, { updatedAt });
 
-export const getBoundingBox = (faces: Faces[], imageSize: Size): BoundingBox[] => {
+// Admin cleanup + resolutions surfaces render clusters the admin does not own — the person-scoped
+// thumbnail routes above 404/403 for those. Face-keyed, admin-gated, no person join required.
+export const getAdminFaceThumbnailUrl = (assetFaceId: string, updatedAt?: string) =>
+  createUrl(`/admin/face-repair/faces/${assetFaceId}/thumbnail`, { updatedAt });
+
+export const getBoundingBox = (faces: Faces[], imageSize: Size | ContentMetrics): BoundingBox[] => {
   const boxes: BoundingBox[] = [];
 
   for (const face of faces) {
@@ -119,6 +124,45 @@ export const getBoundingBox = (faces: Faces[], imageSize: Size): BoundingBox[] =
   }
 
   return boxes;
+};
+
+export type FaceBox = {
+  imageWidth: number;
+  imageHeight: number;
+  boundingBoxX1: number;
+  boundingBoxX2: number;
+  boundingBoxY1: number;
+  boundingBoxY2: number;
+};
+
+export type FaceCropTransform = { backgroundSize: string; backgroundPosition: string };
+
+/**
+ * CSS background size/position that reveals exactly the face sub-rectangle of an image
+ * inside a square container. Non-uniform scale is intentional for compact preview crops;
+ * the review modal shows the undistorted full photo separately.
+ */
+export const getFaceCropTransform = (face: FaceBox): FaceCropTransform => {
+  const bw = (face.boundingBoxX2 - face.boundingBoxX1) / face.imageWidth;
+  const bh = (face.boundingBoxY2 - face.boundingBoxY1) / face.imageHeight;
+
+  // Number.isFinite rather than `bw <= 0`: imageWidth/imageHeight can be 0, and 0/0 is NaN. `!(NaN > 0)` is
+  // true but `NaN <= 0` is false, so the obvious rewrite the linter suggests would silently drop the NaN
+  // guard and let a garbage transform through. This form also catches ±Infinity explicitly, which the old
+  // code only caught incidentally via the `>= 1` bound.
+  if (!Number.isFinite(bw) || !Number.isFinite(bh) || bw <= 0 || bh <= 0 || bw >= 1 || bh >= 1) {
+    return { backgroundSize: 'cover', backgroundPosition: 'center' };
+  }
+
+  const nx1 = face.boundingBoxX1 / face.imageWidth;
+  const ny1 = face.boundingBoxY1 / face.imageHeight;
+  const posX = (nx1 / (1 - bw)) * 100;
+  const posY = (ny1 / (1 - bh)) * 100;
+
+  return {
+    backgroundSize: `${100 / bw}% ${100 / bh}%`,
+    backgroundPosition: `${posX}% ${posY}%`,
+  };
 };
 
 export const zoomImageToBase64 = async (

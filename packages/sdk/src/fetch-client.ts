@@ -88,8 +88,8 @@ export type FaceRepairRequestDto = {
 export type FaceRepairResponseDto = {
     dryRun: boolean;
     executed?: {
-        requeued: number;
-        unassigned: number;
+        moved: number;
+        skipped: number;
     };
     mutated: boolean;
     report: {
@@ -118,6 +118,156 @@ export type FaceRepairResponseDto = {
             toRepair: number;
         };
     };
+};
+export type FaceRepairDeclineRemoveRequestDto = {
+    faces?: {
+        assetFaceId: string;
+        suspectedOwnerId: string;
+    }[];
+    ids?: string[];
+};
+export type FaceRepairDeclineRemovedDto = {
+    removed: number;
+};
+export type FaceRepairDeclineListDto = {
+    declines: {
+        assetFaceId: string | null;
+        createdAt: string;
+        id: string;
+        personId: string | null;
+        personName: string | null;
+        personThumbnailFaceId: string | null;
+        suspectedOwnerId: string | null;
+        suspectedOwnerName: string | null;
+        suspectedOwnerThumbnailFaceId: string | null;
+        "type": string;
+    }[];
+};
+export type FaceRepairDeclineRequestDto = {
+    faces?: {
+        assetFaceId: string;
+        suspectedOwnerId: string;
+    }[];
+    persons?: {
+        personId: string;
+        suspectedOwnerIds: string[];
+    }[];
+};
+export type FaceRepairDeclineCreatedDto = {
+    created: number;
+};
+export type FaceRepairOwnerPeopleResponseDto = {
+    hasMore: boolean;
+    people: {
+        faceCount: number;
+        id: string;
+        name: string;
+        thumbnailFaceId: string | null;
+    }[];
+    total: number;
+};
+export type FaceRepairOwnerPersonCreateRequestDto = {
+    name: string;
+};
+export type FaceRepairOwnerPersonCreatedResponseDto = {
+    id: string;
+};
+export type FaceRepairPersonMetadataResponseDto = {
+    faceCount: number;
+    id: string;
+    name: string;
+    ownerId: string;
+    thumbnailFaceId: string | null;
+};
+export type FaceRepairResolutionsListDto = {
+    resolutions: {
+        actorId: string | null;
+        actorName: string | null;
+        assetFaceId: string;
+        createdAt: string;
+        id: string;
+        personId: string | null;
+        personName: string | null;
+        personThumbnailFaceId: string | null;
+        source: string;
+        spaceName: string | null;
+        spacePersonId: string | null;
+        spacePersonName: string | null;
+        spacePersonThumbnailFaceId: string | null;
+        status: string;
+    }[];
+    total: number;
+};
+export type FaceRepairResolutionsRemoveRequestDto = {
+    clusterMuteIds?: string[];
+    verdictIds?: string[];
+};
+export type FaceRepairResolutionsRemovedDto = {
+    removed: number;
+};
+export type FaceRepairResolveRequestDto = {
+    detach?: string[];
+    entireCluster?: {
+        destinationPersonId: string;
+    };
+    lock?: string[];
+    moveToPerson?: {
+        destinationPersonId: string;
+        faceIds: string[];
+        lock?: boolean;
+    }[];
+    personId: string;
+    stay?: string[];
+    "unknown"?: string[];
+};
+export type FaceRepairResolveResponseDto = {
+    declined: number;
+    detached: number;
+    locked: number;
+    moved: number;
+    skipped: number;
+    "unknown": number;
+};
+export type FaceRepairScanTriggerRequestDto = {
+    params?: {
+        largeClusterThreshold?: number;
+        maxAttributionDistance?: number;
+        maxDistance?: number;
+        maxFlaggedFraction?: number;
+        minFaces?: number;
+        voteMargin?: number;
+        voteWindow?: number;
+    };
+};
+export type FaceRepairScanTriggerResponseDto = {
+    scanId: string;
+};
+export type FaceRepairScanDefaultsDto = {
+    maxDistance: number;
+    maxFlaggedFraction: number;
+    minFaces: number;
+};
+export type FaceRepairPersonFacesDto = {
+    flaggedFaces: {
+        assetFaceId: string;
+        suspectedOwnerId: string;
+    }[];
+    personId: string;
+};
+export type FaceRepairClusterFacesRequestDto = {
+    excludeFaceIds?: string[];
+    page: number;
+    size: number;
+};
+export type FaceRepairClusterFacesResponseDto = {
+    faces: {
+        assetFaceId: string;
+    }[];
+    hasMore: boolean;
+    total: number;
+};
+export type FaceRepairUnconfirmRequestDto = {
+    assetFaceIds: string[];
 };
 export type IntegrityReportResponseDto = {
     items: {
@@ -1684,6 +1834,37 @@ export type PersonUpdateDto = {
     isHidden?: boolean;
     /** Person name */
     name?: string;
+};
+export type PersonFaceSuggestionResponseDto = {
+    /** Unassigned asset face ID */
+    assetFaceId: string;
+    /** Asset ID containing the candidate face */
+    assetId: string;
+    /** Bounding box X1 coordinate */
+    boundingBoxX1: number;
+    /** Bounding box X2 coordinate */
+    boundingBoxX2: number;
+    /** Bounding box Y1 coordinate */
+    boundingBoxY1: number;
+    /** Bounding box Y2 coordinate */
+    boundingBoxY2: number;
+    /** Embedding distance to the person */
+    distance: number;
+    /** Asset creation date */
+    fileCreatedAt?: string;
+    /** Image height in pixels */
+    imageHeight: number;
+    /** Image width in pixels */
+    imageWidth: number;
+};
+export type PersonFaceSuggestionPageResponseDto = {
+    items: PersonFaceSuggestionResponseDto[];
+    /** Total in-band pending suggestions for this person */
+    total: number;
+};
+export type FaceSuggestionActionResponseDto = {
+    /** Whether the call changed anything. False when the suggestion was already resolved. */
+    acted: boolean;
 };
 export type PersonFaceResponseDto = {
     /** Asset ID containing the face */
@@ -3330,6 +3511,12 @@ export type DuplicateDetectionConfig = {
     /** Maximum distance threshold for duplicate detection */
     maxDistance: number;
 };
+export type FaceSuggestionConfig = {
+    /** Whether face suggestions are enabled */
+    enabled: boolean;
+    /** Maximum embedding distance for a face to be surfaced as a suggestion on a named person */
+    maxDistance: number;
+};
 export type FacialRecognitionConfig = {
     /** Whether the task is enabled */
     enabled: boolean;
@@ -3341,6 +3528,7 @@ export type FacialRecognitionConfig = {
     minScore: number;
     /** Name of the model to use */
     modelName: string;
+    suggestions: FaceSuggestionConfig;
 };
 export type OcrConfig = {
     /** Whether the task is enabled */
@@ -4581,6 +4769,235 @@ export function runFaceRepair({ faceRepairRequestDto }: {
         ...opts,
         method: "POST",
         body: faceRepairRequestDto
+    })));
+}
+/**
+ * Remove face-repair declines
+ */
+export function removeFaceRepairDeclines({ faceRepairDeclineRemoveRequestDto }: {
+    faceRepairDeclineRemoveRequestDto: FaceRepairDeclineRemoveRequestDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: FaceRepairDeclineRemovedDto;
+    }>("/admin/face-repair/decline", oazapfts.json({
+        ...opts,
+        method: "DELETE",
+        body: faceRepairDeclineRemoveRequestDto
+    })));
+}
+/**
+ * List face-repair declines
+ */
+export function getFaceRepairDeclines(opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: FaceRepairDeclineListDto;
+    }>("/admin/face-repair/decline", {
+        ...opts
+    }));
+}
+/**
+ * Decline flagged faces / dismiss flagged persons
+ */
+export function declineFaceRepair({ faceRepairDeclineRequestDto }: {
+    faceRepairDeclineRequestDto: FaceRepairDeclineRequestDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 201;
+        data: FaceRepairDeclineCreatedDto;
+    }>("/admin/face-repair/decline", oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: faceRepairDeclineRequestDto
+    })));
+}
+/**
+ * Get an admin face-repair face thumbnail
+ */
+export function getFaceRepairFaceThumbnail({ assetFaceId }: {
+    assetFaceId: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchBlob<{
+        status: 200;
+        data: Blob;
+    }>(`/admin/face-repair/faces/${encodeURIComponent(assetFaceId)}/thumbnail`, {
+        ...opts
+    }));
+}
+/**
+ * Search an owner's people for the move-to-chosen-person picker
+ */
+export function getFaceRepairOwnerPeople({ ownerId, page, query }: {
+    ownerId: string;
+    page?: number;
+    query?: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: FaceRepairOwnerPeopleResponseDto;
+    }>(`/admin/face-repair/owner/${encodeURIComponent(ownerId)}/people${QS.query(QS.explode({
+        page,
+        query
+    }))}`, {
+        ...opts
+    }));
+}
+/**
+ * Create a person under an owner for the move-to-chosen-person picker
+ */
+export function createFaceRepairOwnerPerson({ ownerId, faceRepairOwnerPersonCreateRequestDto }: {
+    ownerId: string;
+    faceRepairOwnerPersonCreateRequestDto: FaceRepairOwnerPersonCreateRequestDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 201;
+        data: FaceRepairOwnerPersonCreatedResponseDto;
+    }>(`/admin/face-repair/owner/${encodeURIComponent(ownerId)}/people`, oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: faceRepairOwnerPersonCreateRequestDto
+    })));
+}
+/**
+ * Get a person for manual review
+ */
+export function getFaceRepairPersonMetadata({ personId }: {
+    personId: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: FaceRepairPersonMetadataResponseDto;
+    }>(`/admin/face-repair/person/${encodeURIComponent(personId)}`, {
+        ...opts
+    }));
+}
+/**
+ * List face-repair resolutions (negative verdicts from both engines)
+ */
+export function getFaceRepairResolutions({ page, size }: {
+    page?: number;
+    size?: number;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: FaceRepairResolutionsListDto;
+    }>(`/admin/face-repair/resolutions${QS.query(QS.explode({
+        page,
+        size
+    }))}`, {
+        ...opts
+    }));
+}
+/**
+ * Remove face-repair resolutions (undo)
+ */
+export function removeFaceRepairResolutions({ faceRepairResolutionsRemoveRequestDto }: {
+    faceRepairResolutionsRemoveRequestDto: FaceRepairResolutionsRemoveRequestDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 201;
+        data: FaceRepairResolutionsRemovedDto;
+    }>("/admin/face-repair/resolutions/remove", oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: faceRepairResolutionsRemoveRequestDto
+    })));
+}
+/**
+ * Resolve reviewed faces
+ */
+export function resolveFaces({ faceRepairResolveRequestDto }: {
+    faceRepairResolveRequestDto: FaceRepairResolveRequestDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 201;
+        data: FaceRepairResolveResponseDto;
+    }>("/admin/face-repair/resolve", oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: faceRepairResolveRequestDto
+    })));
+}
+/**
+ * Trigger a face-repair scan
+ */
+export function triggerScan({ faceRepairScanTriggerRequestDto }: {
+    faceRepairScanTriggerRequestDto: FaceRepairScanTriggerRequestDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 201;
+        data: FaceRepairScanTriggerResponseDto;
+    }>("/admin/face-repair/scan", oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: faceRepairScanTriggerRequestDto
+    })));
+}
+/**
+ * Get effective face-repair scan defaults
+ */
+export function getFaceRepairScanDefaults(opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: FaceRepairScanDefaultsDto;
+    }>("/admin/face-repair/scan/defaults", {
+        ...opts
+    }));
+}
+/**
+ * Get the latest face-repair scan
+ */
+export function getLatestScan(opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: object;
+    }>("/admin/face-repair/scan/latest", {
+        ...opts
+    }));
+}
+/**
+ * Get a person's flagged faces for review
+ */
+export function getFaceRepairPersonFaces({ personId }: {
+    personId: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: FaceRepairPersonFacesDto;
+    }>(`/admin/face-repair/scan/person/${encodeURIComponent(personId)}`, {
+        ...opts
+    }));
+}
+/**
+ * List a person's cluster faces (paginated, excluding the supplied flagged ids)
+ */
+export function getFaceRepairClusterFaces({ personId, faceRepairClusterFacesRequestDto }: {
+    personId: string;
+    faceRepairClusterFacesRequestDto: FaceRepairClusterFacesRequestDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 201;
+        data: FaceRepairClusterFacesResponseDto;
+    }>(`/admin/face-repair/scan/person/${encodeURIComponent(personId)}/cluster-faces`, oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: faceRepairClusterFacesRequestDto
+    })));
+}
+/**
+ * Un-confirm human-placed faces so a re-scan may flag them again
+ */
+export function unconfirmFaceRepairFaces({ faceRepairUnconfirmRequestDto }: {
+    faceRepairUnconfirmRequestDto: FaceRepairUnconfirmRequestDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 201;
+        data: FaceRepairResolutionsRemovedDto;
+    }>("/admin/face-repair/unconfirm", oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: faceRepairUnconfirmRequestDto
     })));
 }
 /**
@@ -6800,6 +7217,84 @@ export function updatePerson({ id, personUpdateDto }: {
     })));
 }
 /**
+ * Get face suggestions for a person
+ */
+export function getPersonFaceSuggestions({ id, page, size }: {
+    id: string;
+    page?: number;
+    size?: number;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: PersonFaceSuggestionPageResponseDto;
+    }>(`/people/${encodeURIComponent(id)}/face-suggestions${QS.query(QS.explode({
+        page,
+        size
+    }))}`, {
+        ...opts
+    }));
+}
+/**
+ * Confirm a face suggestion
+ */
+export function confirmPersonFaceSuggestion({ assetFaceId, id }: {
+    assetFaceId: string;
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: FaceSuggestionActionResponseDto;
+    }>(`/people/${encodeURIComponent(id)}/face-suggestions/${encodeURIComponent(assetFaceId)}/confirm`, {
+        ...opts,
+        method: "POST"
+    }));
+}
+/**
+ * Dismiss a face suggestion
+ */
+export function dismissPersonFaceSuggestion({ assetFaceId, id }: {
+    assetFaceId: string;
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: FaceSuggestionActionResponseDto;
+    }>(`/people/${encodeURIComponent(id)}/face-suggestions/${encodeURIComponent(assetFaceId)}/dismiss`, {
+        ...opts,
+        method: "POST"
+    }));
+}
+/**
+ * Ignore a face suggestion
+ */
+export function ignorePersonFaceSuggestion({ assetFaceId, id }: {
+    assetFaceId: string;
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: FaceSuggestionActionResponseDto;
+    }>(`/people/${encodeURIComponent(id)}/face-suggestions/${encodeURIComponent(assetFaceId)}/ignore`, {
+        ...opts,
+        method: "POST"
+    }));
+}
+/**
+ * Reject a face suggestion
+ */
+export function rejectPersonFaceSuggestion({ assetFaceId, id }: {
+    assetFaceId: string;
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: FaceSuggestionActionResponseDto;
+    }>(`/people/${encodeURIComponent(id)}/face-suggestions/${encodeURIComponent(assetFaceId)}/reject`, {
+        ...opts,
+        method: "POST"
+    }));
+}
+/**
  * Get person faces
  */
 export function getPersonFaces({ id, page, size }: {
@@ -8288,6 +8783,89 @@ export function getSpacePersonAssets({ id, personId }: {
         data: string[];
     }>(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}/assets`, {
         ...opts
+    }));
+}
+/**
+ * Get face suggestions for a person in a shared space
+ */
+export function getSpacePersonFaceSuggestions({ id, page, personId, size }: {
+    id: string;
+    page?: number;
+    personId: string;
+    size?: number;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: PersonFaceSuggestionPageResponseDto;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}/face-suggestions${QS.query(QS.explode({
+        page,
+        size
+    }))}`, {
+        ...opts
+    }));
+}
+/**
+ * Confirm a face suggestion for a person in a shared space
+ */
+export function confirmSpacePersonFaceSuggestion({ assetFaceId, id, personId }: {
+    assetFaceId: string;
+    id: string;
+    personId: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: FaceSuggestionActionResponseDto;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}/face-suggestions/${encodeURIComponent(assetFaceId)}/confirm`, {
+        ...opts,
+        method: "POST"
+    }));
+}
+/**
+ * Dismiss a face suggestion for a person in a shared space
+ */
+export function dismissSpacePersonFaceSuggestion({ assetFaceId, id, personId }: {
+    assetFaceId: string;
+    id: string;
+    personId: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: FaceSuggestionActionResponseDto;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}/face-suggestions/${encodeURIComponent(assetFaceId)}/dismiss`, {
+        ...opts,
+        method: "POST"
+    }));
+}
+/**
+ * Ignore a face suggestion for a person in a shared space
+ */
+export function ignoreSpacePersonFaceSuggestion({ assetFaceId, id, personId }: {
+    assetFaceId: string;
+    id: string;
+    personId: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: FaceSuggestionActionResponseDto;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}/face-suggestions/${encodeURIComponent(assetFaceId)}/ignore`, {
+        ...opts,
+        method: "POST"
+    }));
+}
+/**
+ * Reject a face suggestion for a person in a shared space
+ */
+export function rejectSpacePersonFaceSuggestion({ assetFaceId, id, personId }: {
+    assetFaceId: string;
+    id: string;
+    personId: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: FaceSuggestionActionResponseDto;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}/face-suggestions/${encodeURIComponent(assetFaceId)}/reject`, {
+        ...opts,
+        method: "POST"
     }));
 }
 /**
@@ -9867,6 +10445,7 @@ export enum ManualJobName {
     IntegrityUntrackedFilesDeleteAll = "integrity-untracked-files-delete-all",
     IntegrityChecksumMismatchDeleteAll = "integrity-checksum-mismatch-delete-all",
     FaceIdentityBackfill = "face-identity-backfill",
+    FaceSuggestionMaintenance = "face-suggestion-maintenance",
     SharedSpacePersonMetadataBackfill = "shared-space-person-metadata-backfill"
 }
 export enum QueueName {
@@ -9948,6 +10527,12 @@ export enum JobName {
     FacialRecognition = "FacialRecognition",
     FaceIdentityBackfill = "FaceIdentityBackfill",
     FaceIdentityMaintenanceAfterRecognition = "FaceIdentityMaintenanceAfterRecognition",
+    FaceRepairScan = "FaceRepairScan",
+    FaceSuggestionMaintenance = "FaceSuggestionMaintenance",
+    PersonSuggestionScanQueueAll = "PersonSuggestionScanQueueAll",
+    PersonSuggestionScan = "PersonSuggestionScan",
+    SpacePersonSuggestionScanQueueAll = "SpacePersonSuggestionScanQueueAll",
+    SpacePersonSuggestionScan = "SpacePersonSuggestionScan",
     FileDelete = "FileDelete",
     FileMigrationQueueAll = "FileMigrationQueueAll",
     LibraryDeleteCheck = "LibraryDeleteCheck",
