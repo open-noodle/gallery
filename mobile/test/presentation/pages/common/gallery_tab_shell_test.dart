@@ -114,9 +114,18 @@ List<String> currentTabRoutes(WidgetTester tester) =>
 
 int activeIndex(WidgetTester tester) => _tabsRouter(tester).activeIndex;
 
-/// The route whose page the shell is actually showing — `currentTabRoutes`
-/// alone would pass even if the [IndexedStack] were displaying a different
-/// slot.
+/// The route the shell's [TabsRouter] considers active. Router state only: it
+/// reads the controller, never the rendered widget, so it could not by itself
+/// catch an [IndexedStack] displaying a different slot.
+///
+/// What actually pins the pixels is the paired `find.byKey(Key('tab-<name>'))`
+/// assertion at each call site. That finder is meaningful — not merely
+/// "somewhere in the stack" — because a changed `routes:` list gives
+/// `AutoTabsRouter` a new `tabsHash`, which makes `_IndexedStackBuilder`
+/// clear `_initializedPagesTracker` and re-run `_setup()`; with `lazyLoad`
+/// (default true) that marks ONLY the active index as initialized, so every
+/// other slot renders a `SizedBox.shrink()` placeholder. After a flip, the tab
+/// stub the finder locates is necessarily the one on screen.
 String activeTabRoute(WidgetTester tester) => currentTabRoutes(tester)[activeIndex(tester)];
 
 Future<void> activateIndex(WidgetTester tester, int index) async {

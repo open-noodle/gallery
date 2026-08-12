@@ -91,6 +91,15 @@ class _GalleryTabShellPageState extends ConsumerState<GalleryTabShellPage> {
     return AutoTabsRouter(
       // Built from the same destinations the nav renders, so a slot's tab
       // route and its nav segment can never disagree about what it holds.
+      //
+      // This list is rebuilt every build, and auto_route's
+      // `_AutoTabsRouterIndexedStack.didUpdateWidget` calls `replaceAll` on it
+      // unless a `ListEquality` says it is unchanged. It only ever compares
+      // equal because `PageRouteInfo.operator ==` is value-based over
+      // name/fragment/args and every route here is argument-free. Hand a tab
+      // route freshly-constructed arguments on each build (a new object, a new
+      // list, a closure) and equality fails every frame, which tears down and
+      // rebuilds the entire tab stack every frame.
       routes: [for (final tab in slots) GalleryNavDestination.forTab(tab).routeBuilder()],
       duration: const Duration(milliseconds: 600),
       transitionBuilder: (_, child, animation) => FadeTransition(opacity: animation, child: child),

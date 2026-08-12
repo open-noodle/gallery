@@ -29,8 +29,11 @@ List<GalleryTabEnum> galleryNavSlots({required bool showSpaces}) => [
 
 /// The live nav slots, derived from the user's `navShowSpaces` preference.
 ///
-/// `autoDispose` is required, not stylistic: `appConfigProvider` is itself
-/// `autoDispose`, and a non-autoDispose provider watching one throws.
+/// `autoDispose` for lifecycle symmetry with `appConfigProvider`, which this
+/// watches and which is itself `autoDispose`: without it this provider would
+/// outlive its only dependency and keep it alive for the process lifetime.
+/// Nothing enforces it — riverpod 2.6.1 lets a non-autoDispose provider watch an
+/// autoDispose one without throwing.
 final galleryNavSlotsProvider = Provider.autoDispose<List<GalleryTabEnum>>((ref) {
   final showSpaces = ref.watch(appConfigProvider.select((config) => config.nav.showSpaces));
   return galleryNavSlots(showSpaces: showSpaces);

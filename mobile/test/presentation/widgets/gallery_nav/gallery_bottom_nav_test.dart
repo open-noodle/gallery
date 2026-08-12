@@ -455,9 +455,14 @@ void main() {
     await tester.pumpAndSettle();
 
     final rail = tester.widget<NavigationRail>(find.byKey(const Key('gallery-bottom-nav-rail')));
-    expect(rail.destinations[GalleryTabEnum.photos.index].disabled, isFalse);
-    expect(rail.destinations[GalleryTabEnum.albums.index].disabled, isTrue);
-    expect(rail.destinations[galleryNavSlots(showSpaces: false).indexOf(GalleryTabEnum.library)].disabled, isTrue);
+    // `destinations` is indexed by SLOT, so every lookup here resolves through
+    // the slot list — `GalleryTabEnum.index` happens to coincide for Photos and
+    // Albums, but never for Library, and would silently stop coinciding for the
+    // others if the enum's declaration order changed.
+    final slots = galleryNavSlots(showSpaces: false);
+    expect(rail.destinations[slots.indexOf(GalleryTabEnum.photos)].disabled, isFalse);
+    expect(rail.destinations[slots.indexOf(GalleryTabEnum.albums)].disabled, isTrue);
+    expect(rail.destinations[slots.indexOf(GalleryTabEnum.library)].disabled, isTrue);
   });
 
   testWidgets('with Spaces on, the pill renders a Spaces segment and no Albums segment', (tester) async {

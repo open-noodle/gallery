@@ -10,6 +10,7 @@ import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/widgets/settings/preference_settings/nav_setting.dart';
+import 'package:immich_mobile/widgets/settings/preference_settings/preference_setting.dart';
 
 import '../../test_utils.dart';
 import '../../widget_tester_extensions.dart';
@@ -57,5 +58,15 @@ void main() {
     // clears the row when the value equals the default, so "true" is persisted
     // as the absence of a row.
     expect(readConfig().read(SettingsKey.navShowSpaces), true);
+  });
+
+  // Everything above pumps [NavSetting] directly, so none of it would notice
+  // the tile being dropped from the Preferences page — which is the only place
+  // a user can reach it, and the only way back to Albums in the nav.
+  testWidgets('the Preferences settings page lists the nav setting', (tester) async {
+    await tester.pumpConsumerWidget(const PreferenceSetting());
+
+    expect(find.byType(NavSetting), findsOneWidget);
+    expect(find.byKey(const Key('nav-show-spaces-switch')), findsOneWidget);
   });
 }

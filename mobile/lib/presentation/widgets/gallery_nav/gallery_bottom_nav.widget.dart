@@ -115,6 +115,11 @@ class _GalleryBottomNavState extends ConsumerState<GalleryBottomNav> {
                 Flexible(
                   child: GalleryNavPill(
                     slots: slots,
+                    // The clamp cannot fire in a settled tree: the shell builds
+                    // its `routes:` from this same `galleryNavSlotsProvider`, so
+                    // `routes.length == slots.length` and every router index is
+                    // a valid slot index. It only covers the one frame between a
+                    // slots change and auto_route rebuilding the tab stack.
                     activeTab: slots[widget.tabsRouter.activeIndex.clamp(0, slots.length - 1)],
                     // By slot, not by tab identity: slot 1 is whichever
                     // collection tab the user configured.
