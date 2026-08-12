@@ -43,6 +43,7 @@ import {
   SystemMetadataKey,
   VectorIndex,
 } from 'src/enum';
+import { ArgOf } from 'src/repositories/event.repository';
 import type {
   AccessibleIdentityFaceMatch,
   SharedSpaceFaceMatchBackfillTarget,
@@ -64,13 +65,22 @@ import { asDateTimeString } from 'src/utils/date';
 import { ImmichMediaResponse } from 'src/utils/file';
 import { createCrossOwnerMergeAuthorizer } from 'src/utils/merge-policy';
 import { mimeTypes } from 'src/utils/mime-types';
-import { batched, findOrFail, isFacialRecognitionEnabled } from 'src/utils/misc';
+import { batched, findOrFail, isFaceSuggestionEnabled, isFacialRecognitionEnabled } from 'src/utils/misc';
 import { applyResolvedIdentityMetadata } from 'src/utils/person-identity';
 import { getPreferences } from 'src/utils/preferences';
 import { Point, transformPoints } from 'src/utils/transform';
 
 const personKey = ({ ownerId, personGroupId }: PersonId) => `${ownerId}/${personGroupId}`;
 const FACE_IDENTITY_BACKFILL_CHUNK_SIZE = 1000;
+
+/**
+ * S9 (F19): upper bound on how long a forced `handleQueueRecognizeFaces` run waits for the
+ * concurrency-1 PeopleBackfill queue before giving up and proceeding anyway. PeopleBackfill also
+ * carries the person/space-person suggestion-scan sweep (F17/F18), which can legitimately take a
+ * while on a large library — generous enough not to abandon a real drain in progress, bounded so a
+ * forced recognition run is never wedged indefinitely behind it.
+ */
+const PEOPLE_BACKFILL_WAIT_TIMEOUT_MS = 10 * 60 * 1000;
 
 /**
  * Upper bound on full re-scan passes one backfill chain may take when getBackfillWork() keeps
@@ -94,6 +104,8 @@ export class PersonService extends BaseService {
 
   @OnEvent({ name: 'AppBootstrap', workers: [ImmichWorker.Microservices] })
   async onBootstrap(): Promise<void> {
+    await this.queueInitialFaceSuggestionSweep();
+
     if (!(await this.faceIdentityRepository.hasBackfillWork())) {
       return;
     }
@@ -106,6 +118,66 @@ export class PersonService extends BaseService {
     }
 
     await this.jobRepository.queue({ name: JobName.FaceIdentityBackfill, data: {} });
+  }
+
+  /**
+   * Face suggestions ship enabled (`config.ts` defaults). An instance that upgrades *into* that default
+   * never emits a `ConfigUpdate`, so `onConfigUpdate`'s false -> true transition — the thing that normally
+   * starts the work — cannot fire for it. `FaceSuggestionMaintenance` has no cron either, so without this
+   * the settings page would report the feature on while the queue stayed empty until someone renamed a
+   * person or ran the job by hand: the same "the feature seems to be missing" report the opt-in toggle was
+   * introduced to fix, in a new shape.
+   *
+   * Runs at most once per instance, guarded by a system-metadata marker (same pattern as
+   * SharedSpaceService.onBootstrap). This method only ever QUEUES; the marker is written by the sweep
+   * itself, in `JobService.handleFaceSuggestionMaintenance`'s success path. Two failure modes make that
+   * split load-bearing, and burning the marker here reintroduces both:
+   *
+   *   - feature off at this boot. The old code burnt the marker anyway, reasoning that a later opt-in is
+   *     served by `onConfigUpdate`'s false -> true transition. That is untrue under IMMICH_CONFIG_FILE:
+   *     `updateSystemConfig` throws outright for file-mode instances, and a YAML edit + restart emits only
+   *     `ConfigInit`. Such an admin would get a toggle reading "on" over a queue nothing ever fills. The
+   *     cost of leaving it unset is one config read per boot.
+   *   - the sweep fails. `FaceSuggestionMaintenance` runs with `attempts: 1` and `removeOnFail: true`
+   *     (job.repository.ts), so a marker written at queue time would outlive a job that failed and
+   *     vanished — recorded as swept, never actually run, never retried.
+   *
+   * A fresh install still burns it on the first boot, against an empty library, which costs nothing: the
+   * sweep finds no named people, and `handleFaceIdentityBackfill`'s completion path keeps the queue current
+   * from then on.
+   */
+  private async queueInitialFaceSuggestionSweep(): Promise<void> {
+    const state = await this.systemMetadataRepository.get(SystemMetadataKey.FaceSuggestionDefaultOnState);
+    if (state?.sweptAt) {
+      return;
+    }
+
+    const { machineLearning } = await this.getConfig({ withCache: false });
+    if (!isFaceSuggestionEnabled(machineLearning)) {
+      return;
+    }
+
+    this.logger.log('Face suggestions are enabled and have never been swept; queueing face suggestion maintenance');
+    await this.jobRepository.queue({ name: JobName.FaceSuggestionMaintenance, data: {} });
+  }
+
+  @OnEvent({ name: 'ConfigValidate' })
+  onConfigValidate({ newConfig }: ArgOf<'ConfigValidate'>) {
+    const { maxDistance, suggestions } = newConfig.machineLearning.facialRecognition;
+    if (suggestions.enabled && suggestions.maxDistance <= maxDistance) {
+      throw new Error(
+        `Face suggestion max distance (${suggestions.maxDistance}) must be greater than the maximum recognition distance (${maxDistance}), otherwise no faces can ever be suggested.`,
+      );
+    }
+  }
+
+  @OnEvent({ name: 'ConfigUpdate', workers: [ImmichWorker.Microservices], server: true })
+  async onConfigUpdate({ oldConfig, newConfig }: ArgOf<'ConfigUpdate'>) {
+    // Transition-only: re-saving settings must not re-queue a library-wide sweep. Widening the band
+    // while already enabled is picked up by running the maintenance job manually.
+    if (!isFaceSuggestionEnabled(oldConfig.machineLearning) && isFaceSuggestionEnabled(newConfig.machineLearning)) {
+      await this.jobRepository.queue({ name: JobName.FaceSuggestionMaintenance, data: {} });
+    }
   }
 
   /**
@@ -252,7 +324,12 @@ export class PersonService extends BaseService {
         }
 
         await this.personRepository.reassignFace(face.id, person.personGroupId);
-        await this.replaceFaceIdentity(person.personGroupId, face.id, 'manual');
+        await this.facePersonVerdictRepository.resolveAssignedFace(face.id);
+        const identityId = await this.replaceFaceIdentity(person.personGroupId, face.id, 'manual');
+        // Slice 8 (F15): the owner just stated a fact ("this face IS this person") that contradicts any
+        // durable rejected/ignored row for this SAME target — the newer human decision wins. Scoped to
+        // `personId` only: a negative recorded against a DIFFERENT person for this face must survive.
+        await this.facePersonVerdictRepository.clearNegativeForTarget({ personId: person.personGroupId, identityId }, [face.id]);
       }
 
       result.push(mapPerson(person));
@@ -270,7 +347,11 @@ export class PersonService extends BaseService {
     const person = await this.findOrFail(auth, personGroupId);
 
     await this.personRepository.reassignFace(face.id, person.personGroupId);
-    await this.replaceFaceIdentity(person.personGroupId, face.id, 'manual');
+    await this.facePersonVerdictRepository.resolveAssignedFace(face.id);
+    const identityId = await this.replaceFaceIdentity(person.personGroupId, face.id, 'manual');
+    // Slice 8 (F15): same clearing as reassignFaces above — scoped to `personId`, so a negative recorded
+    // against a DIFFERENT person for this face survives.
+    await this.facePersonVerdictRepository.clearNegativeForTarget({ personId: person.personGroupId, identityId }, [face.id]);
     if (person.faceAssetId === null) {
       await this.createNewFeaturePhoto([person]);
     }
@@ -541,6 +622,7 @@ export class PersonService extends BaseService {
 
   async update(auth: AuthDto, personGroupId: string, dto: PersonUpdateDto): Promise<PersonResponseDto> {
     await this.requireAccess({ auth, permission: Permission.PersonUpdate, ids: [personGroupId] });
+    const prior = await this.personRepository.getByGroupIdOnly(personGroupId);
 
     const { ownerId } = await this.findOrFail(auth, personGroupId);
     const { name, birthDate, isHidden, featureFaceAssetId: assetId, isFavorite, color } = dto;
@@ -576,6 +658,13 @@ export class PersonService extends BaseService {
         name: JobName.SharedSpacePersonMetadataBackfill,
         data: { identityId: person.identityId },
       });
+    }
+
+    const { machineLearning } = await this.getConfig({ withCache: true });
+    const featureEnabled = isFaceSuggestionEnabled(machineLearning);
+    const nowScannable = person.name !== '' && !person.isHidden && person.type === 'person';
+    if (featureEnabled && nowScannable && prior && prior.name !== person.name) {
+      await this.jobRepository.queue({ name: JobName.PersonSuggestionScan, data: { id } });
     }
 
     return mapPerson(person);
@@ -652,6 +741,9 @@ export class PersonService extends BaseService {
     continuationCount,
   }: JobOf<JobName.FaceIdentityBackfill>): Promise<JobStatus> {
     const affectedSpaceAssets: SharedSpaceFaceMatchBackfillTarget[] = [];
+    this.logger.debug(
+      `FaceIdentityBackfill peopleBackfill start stage=${stage} cursor=${cursor ?? 'none'} continuation=${continuationId ?? 'none'}`,
+    );
 
     if (stage === 'person') {
       const result = await this.faceIdentityRepository.backfillPersonalIdentities({
@@ -659,8 +751,12 @@ export class PersonService extends BaseService {
         limit: FACE_IDENTITY_BACKFILL_CHUNK_SIZE,
       });
       affectedSpaceAssets.push(...this.getAffectedSpaceAssets(result));
+      this.logger.debug(
+        `FaceIdentityBackfill peopleBackfill personal page processed=${result.processed} nextCursor=${result.nextCursor ?? 'none'} affectedSpaceAssets=${affectedSpaceAssets.length}`,
+      );
 
       if (result.nextCursor) {
+        this.logger.debug(`FaceIdentityBackfill peopleBackfill queue next stage=person cursor=${result.nextCursor}`);
         await this.jobRepository.queue({
           name: JobName.FaceIdentityBackfill,
           data: { stage: 'person', cursor: result.nextCursor, continuationCount },
@@ -674,12 +770,18 @@ export class PersonService extends BaseService {
       limit: FACE_IDENTITY_BACKFILL_CHUNK_SIZE,
     });
     affectedSpaceAssets.push(...this.getAffectedSpaceAssets(result));
+    this.logger.debug(
+      `FaceIdentityBackfill peopleBackfill space-person page processed=${result.processed} nextCursor=${result.nextCursor ?? 'none'} conflicts=${result.conflictCount} affectedSpaceAssets=${affectedSpaceAssets.length}`,
+    );
 
     if (result.conflictCount > 0) {
       this.logger.warn(`Face identity backfill left ${result.conflictCount} space people unresolved`);
     }
 
     if (result.nextCursor) {
+      this.logger.debug(
+        `FaceIdentityBackfill peopleBackfill queue next stage=space-person cursor=${result.nextCursor}`,
+      );
       await this.jobRepository.queue({
         name: JobName.FaceIdentityBackfill,
         data: { stage: 'space-person', cursor: result.nextCursor, continuationCount },
@@ -688,6 +790,9 @@ export class PersonService extends BaseService {
     }
 
     const work = await this.faceIdentityRepository.getBackfillWork();
+    this.logger.debug(
+      `FaceIdentityBackfill peopleBackfill remaining work personal=${work.hasPersonalIdentityWork} spacePerson=${work.hasSpacePersonIdentityWork} projection=${work.hasSharedSpaceProjectionWork}`,
+    );
 
     if (work.hasPersonalIdentityWork || work.hasSpacePersonIdentityWork) {
       const passCount = continuationCount ?? 0;
@@ -697,10 +802,12 @@ export class PersonService extends BaseService {
         );
         return JobStatus.Success;
       }
+      const nextContinuationId = this.getNextFaceIdentityBackfillContinuationId(continuationId);
+      this.logger.debug(`FaceIdentityBackfill peopleBackfill queue continuation=${nextContinuationId}`);
       await this.jobRepository.queue({
         name: JobName.FaceIdentityBackfill,
         data: {
-          continuationId: this.getNextFaceIdentityBackfillContinuationId(continuationId),
+          continuationId: nextContinuationId,
           continuationCount: passCount + 1,
         },
       });
@@ -708,9 +815,13 @@ export class PersonService extends BaseService {
     }
 
     const pendingTargets = await this.faceIdentityRepository.getPendingSharedSpaceFaceMatchBackfillTargets();
+    this.logger.debug(
+      `FaceIdentityBackfill peopleBackfill finalizing pendingTargets=${pendingTargets.length} affectedSpaceAssets=${affectedSpaceAssets.length}`,
+    );
 
     if (work.hasSharedSpaceProjectionWork) {
       const projectionTargets = await this.faceIdentityRepository.getSharedSpaceFaceMatchBackfillTargets();
+      this.logger.debug(`FaceIdentityBackfill peopleBackfill projectionTargets=${projectionTargets.length}`);
       if (projectionTargets.length === 0) {
         this.logger.warn('Face identity projection backfill work was reported but no targets were found');
       }
@@ -718,9 +829,17 @@ export class PersonService extends BaseService {
     }
 
     const queuedTargets = await this.queueSharedSpaceFaceMatchTargets([...pendingTargets, ...affectedSpaceAssets]);
+    this.logger.debug(`FaceIdentityBackfill peopleBackfill queued face-match targets=${queuedTargets.length}`);
     await this.faceIdentityRepository.deletePendingSharedSpaceFaceMatchBackfillTargets(pendingTargets);
     if (queuedTargets.length === 0) {
       await this.queueSpacePersonMetadataBackfill();
+      this.logger.debug('FaceIdentityBackfill peopleBackfill complete; queuedSpacePersonMetadataBackfill=true');
+
+      const { machineLearning } = await this.getConfig({ withCache: true });
+      if (isFaceSuggestionEnabled(machineLearning)) {
+        await this.jobRepository.queue({ name: JobName.PersonSuggestionScanQueueAll, data: {} });
+        await this.jobRepository.queue({ name: JobName.SpacePersonSuggestionScanQueueAll, data: {} });
+      }
     }
 
     return JobStatus.Success;
@@ -934,11 +1053,17 @@ export class PersonService extends BaseService {
       }
     }
 
-    await this.jobRepository.waitForQueueCompletion(
-      QueueName.ThumbnailGeneration,
-      QueueName.FaceDetection,
-      ...(force ? [QueueName.PeopleBackfill] : []),
-    );
+    await this.jobRepository.waitForQueueCompletion(QueueName.ThumbnailGeneration, QueueName.FaceDetection);
+
+    if (force) {
+      // S9 (F19): a separate, bounded wait — PersonSuggestionScanQueueAll/SpacePersonSuggestionScanQueueAll
+      // (F17/F18) can keep the concurrency-1 PeopleBackfill queue busy indefinitely, and this forced
+      // recognition run must proceed rather than park forever behind that sweep. Bounding only this call
+      // leaves the ThumbnailGeneration/FaceDetection wait above (and every other call site) unbounded.
+      await this.jobRepository.waitForQueueCompletion(QueueName.PeopleBackfill, {
+        timeoutMs: PEOPLE_BACKFILL_WAIT_TIMEOUT_MS,
+      });
+    }
 
     if (force) {
       await this.jobRepository.empty(QueueName.FacialRecognition, true);
@@ -960,6 +1085,13 @@ export class PersonService extends BaseService {
       await this.sharedSpaceRepository.deleteAllPersonFaces();
       await this.sharedSpaceRepository.deleteAllPersons();
       await this.faceIdentityRepository.deleteUnreferencedIdentities();
+      // Slice 8 (F16): the reaper for face_person_verdict rows deleteUnreferencedIdentities is what nulls a
+      // row's LAST remaining key (personId/spacePersonId are already NULL by this point, via the person and
+      // space-person wipes above) — a row is only fully orphaned once this line has run, so the reaper must
+      // run strictly after it, not from inside handlePersonCleanup a few lines up (which runs BEFORE the
+      // space-person wipe and before this identity GC — see the ordering test in
+      // face-review-cross-flow.spec.ts for the discriminating case).
+      await this.facePersonVerdictRepository.deleteOrphanedVerdicts();
     } else if (hasPendingRecognitionWork) {
       this.logger.debug(
         `Skipping facial recognition queueing because recognition work is already pending ` +
@@ -972,10 +1104,18 @@ export class PersonService extends BaseService {
 
     const lastRun = new Date().toISOString();
 
+    // Slice 5 (F9): excludeManuallyPlaced only applies on the non-forced branch. The forced branch already
+    // wiped every face_identity_face row via unassignFaces above, so there is nothing left to preserve —
+    // passing it there would be meaningless.
     const faces = this.personRepository.getAllFaces(
       force
         ? { clusterGroupId, sourceType: SourceType.MachineLearning }
-        : { personGroupId: null, clusterGroupId, sourceType: SourceType.MachineLearning },
+        : {
+            personGroupId: null,
+            clusterGroupId,
+            sourceType: SourceType.MachineLearning,
+            excludeManuallyPlaced: true,
+          },
     );
     for await (const batch of batched(faces)) {
       await this.jobRepository.queueAll(
