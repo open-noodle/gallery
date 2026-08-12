@@ -16,6 +16,7 @@
   import NotificationSettings from './NotificationSettings.svelte';
   import ServerSettings from './ServerSettings.svelte';
   import StorageTemplateSettings from './StorageTemplateSettings.svelte';
+  import StorageUsageSettings from './StorageUsageSettings.svelte';
   import ThemeSettings from './ThemeSettings.svelte';
   import TrashSettings from './TrashSettings.svelte';
   import UserSettings from './UserSettings.svelte';
@@ -31,6 +32,7 @@
     mdiBackupRestore,
     mdiBellOutline,
     mdiBookshelf,
+    mdiChartPie,
     mdiClockOutline,
     mdiDatabaseOutline,
     mdiFileCheckOutline,
@@ -178,6 +180,13 @@
       subtitle: $t('admin.storage_template_settings_description'),
       key: 'storage-template',
       icon: mdiFolderOutline,
+    },
+    {
+      component: StorageUsageSettings,
+      title: $t('admin.storage_usage_settings'),
+      subtitle: $t('admin.storage_usage_settings_description'),
+      key: 'storage-usage',
+      icon: mdiChartPie,
     },
     {
       component: ThemeSettings,
