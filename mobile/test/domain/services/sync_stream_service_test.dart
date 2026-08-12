@@ -56,6 +56,7 @@ ServerFeaturesDto makeServerFeatures({Optional<List<String>?> syncRequestTypes =
       search: true,
       sidecar: true,
       smartSearch: false,
+      smartSearchHasCutoff: false,
       trash: true,
       syncRequestTypes: syncRequestTypes,
     );

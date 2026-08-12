@@ -133,6 +133,9 @@ const ServerConfigSchema = z
 const ServerFeaturesSchema = z
   .object({
     smartSearch: z.boolean().describe('Whether smart search is enabled'),
+    smartSearchHasCutoff: z
+      .boolean()
+      .describe('Whether smart search has an active relevance cutoff (clip.maxDistance)'),
     duplicateDetection: z.boolean().describe('Whether duplicate detection is enabled'),
     configFile: z.boolean().describe('Whether config file is available'),
     facialRecognition: z.boolean().describe('Whether facial recognition is enabled'),
