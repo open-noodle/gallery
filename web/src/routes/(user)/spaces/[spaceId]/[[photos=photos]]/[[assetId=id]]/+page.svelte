@@ -40,8 +40,6 @@
     buildSearchablePageUrl,
     getSearchablePageFilterState,
     getSearchablePageState,
-    preserveTransientTemporalFilters,
-    type SearchablePageTransientTemporalState,
   } from '$lib/utils/searchable-page-search';
   import { consumeTypedSearchNamesInto } from '$lib/utils/typed-search/typed-search-name-cache';
   import {
@@ -52,6 +50,7 @@
   import { buildSpaceTimelineOptions, handleSpaceRemoveFilter } from '$lib/utils/space-filter-options';
   import SearchAddAllToCollectionModal from '$lib/modals/SearchAddAllToCollectionModal.svelte';
   import type { SearchTerms } from '$lib/services/search.service';
+  import { resolveFilterNames } from '$lib/utils/filter-name-resolution';
   import { filterStateToSearchTerms } from '$lib/utils/filter-search-terms';
   import {
     type ActivatableTimelineBucket,
@@ -113,6 +112,8 @@
     };
     personNames.clear();
     tagNames.clear();
+    albumNames.clear();
+    ownerNames.clear();
     consumeTypedSearchNamesInto(page.url.pathname + page.url.search, personNames, tagNames);
     isLoading = false;
     smartFacetInFlight?.controller.abort();
@@ -157,7 +158,18 @@
   let temporalAnchor = $state<TimelineTemporalAnchor | undefined>();
   let personNames = new SvelteMap<string, string>();
   let tagNames = new SvelteMap<string, string>();
+  let albumNames = new SvelteMap<string, string>();
+  let ownerNames = new SvelteMap<string, string>();
   consumeTypedSearchNamesInto(page.url.pathname + page.url.search, personNames, tagNames);
+  // An owner chip inside a Space is always a member, and the members are already in scope — seed
+  // the map from them so resolveFilterNames never issues a request for it. Only an `albumId` chip
+  // (no local source) falls through to a by-id fetch.
+  $effect(() => {
+    for (const member of members) {
+      ownerNames.set(member.userId, member.name);
+    }
+    void resolveFilterNames(filters, { albumNames, ownerNames });
+  });
   $effect(() => globalSearchManager.registerSearchablePageFilters(() => filters));
   let smartFacets = $state<SmartSearchFacetsResponseDto>();
   let smartFacetKey = $state('');
@@ -186,9 +198,12 @@
     const response = await getFilterSuggestions({
       personIds: nextFilters.personIds.length > 0 ? nextFilters.personIds : undefined,
       country: nextFilters.country,
+      state: nextFilters.state,
       city: nextFilters.city,
       make: nextFilters.make,
       model: nextFilters.model,
+      lensModel: nextFilters.lensModel,
+      ownerId: nextFilters.ownerId,
       tagIds: nextFilters.tagIds.length > 0 ? nextFilters.tagIds : undefined,
       rating: nextFilters.rating,
       mediaType:
@@ -626,9 +641,6 @@
 
   let committedSearchQuery = $state(initialSearchState.query);
   let lastHandledSearchState = $state(`${initialSearchState.query}:${initialSearchState.sortOrder}:${page.url.search}`);
-  let pendingFilterUrlSync = $state<
-    { url: string; transientTemporal?: SearchablePageTransientTemporalState } | undefined
-  >();
   let isLoading = $state(false);
   const showSearchResults = $derived(committedSearchQuery.trim().length > 0);
   // Loaded smart search results. The timeline (and its TimelineManager) is unmounted while
@@ -675,13 +687,6 @@
     if (!nextUrl || nextUrl === page.url.pathname + page.url.search) {
       return;
     }
-    pendingFilterUrlSync = {
-      url: nextUrl,
-      transientTemporal: {
-        selectedYear: nextFilters.selectedYear,
-        selectedMonth: nextFilters.selectedMonth,
-      },
-    };
     void goto(nextUrl, {
       replaceState: true,
       keepFocus: true,
@@ -735,26 +740,23 @@
   $effect(() => {
     const nextSearchState = getSearchablePageState(page.url);
     const nextToken = `${nextSearchState.query}:${nextSearchState.sortOrder}:${page.url.search}`;
-    const currentUrl = page.url.pathname + page.url.search;
     if (nextToken === lastHandledSearchState) {
       return;
     }
 
     const queryChanged = nextSearchState.query !== committedSearchQuery;
     untrack(() => {
+      // Every filter — including the temporal picker's year/month — round-trips through the URL, so
+      // rebuilding FilterState from the URL alone is lossless. Any URL change (back/forward, a
+      // shared link, or the `?at=` write from closing the asset viewer) re-hydrates the same state.
       const filterState = getSearchablePageFilterState(page.url);
-      const transientTemporal =
-        pendingFilterUrlSync?.url === currentUrl ? pendingFilterUrlSync.transientTemporal : undefined;
       committedSearchQuery = nextSearchState.query;
       isLoading = false;
       filters = {
         ...createFilterState(),
-        ...preserveTransientTemporalFilters(filterState, transientTemporal),
+        ...filterState,
         sortOrder: nextSearchState.sortOrder,
       };
-      if (pendingFilterUrlSync?.url === currentUrl) {
-        pendingFilterUrlSync = undefined;
-      }
       consumeTypedSearchNamesInto(page.url.pathname + page.url.search, personNames, tagNames);
       if (queryChanged) {
         smartFacetInFlight?.controller.abort();
@@ -845,6 +847,8 @@
         resultCount={showSearchResults ? smartFacetTotal : totalAssetCount}
         {personNames}
         {tagNames}
+        {albumNames}
+        {ownerNames}
         onRemoveFilter={handleRemoveFilter}
         onClearAll={handleClearAllFilters}
         searchQuery={committedSearchQuery}

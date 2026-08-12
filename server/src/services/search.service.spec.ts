@@ -1684,6 +1684,22 @@ describe(SearchService.name, () => {
         }),
       );
     });
+
+    // ownerId is a narrowing contributor filter (searchAssetBuilder applies it as a standalone AND
+    // on asset.ownerId). It must reach the repository as its own field and must NOT be merged into
+    // userIds, which is the owner SCOPING predicate — merging it there would widen the result set
+    // (a data leak) instead of narrowing it.
+    it('passes ownerId through to the search repository as its own field, not merged into userIds', async () => {
+      const ownerId = newUuid();
+      mocks.search.searchMetadata.mockResolvedValue({ hasNextPage: false, items: [] });
+
+      await sut.searchMetadata(authStub.user1, { ownerId });
+
+      expect(mocks.search.searchMetadata).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ ownerId, userIds: [authStub.user1.user.id] }),
+      );
+    });
   });
 
   describe('searchStatistics', () => {

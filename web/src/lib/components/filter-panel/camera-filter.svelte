@@ -21,6 +21,19 @@
   // Orphaned make: selected but not in current results
   let orphanedMake = $derived(selectedMake && !makes.includes(selectedMake) ? selectedMake : undefined);
 
+  /**
+   * A make+model filter can arrive already selected — from a contextual filter clicked in the asset
+   * viewer, from a shared link, or from a reload. The model level is lazily fetched and was only ever
+   * expanded by a CLICK, so the panel showed a lone (unfilled) "Canon" row while the chip read
+   * "Canon Canon EOS R6": no model row existed to tick. Reveal the level the selection lives on, the
+   * same way location-filter reveals the city under its selected country.
+   */
+  $effect(() => {
+    if (selectedMake && selectedModel && expandedMake !== selectedMake) {
+      expandedMake = selectedMake;
+    }
+  });
+
   $effect(() => {
     if (expandedMake) {
       const _context = context;
@@ -28,16 +41,31 @@
       void onModelFetch(expandedMake, _context).then((result) => {
         models = result;
         loadingModels = false;
-
-        // Cascade child auto-clear: if selected model is not in new results, clear it
-        if (selectedModel && result.length > 0 && !result.includes(selectedModel)) {
-          onSelectionChange(expandedMake!, undefined);
-        }
       });
     } else {
       models = [];
     }
   });
+
+  /**
+   * The fetched models, with the selected one guaranteed present.
+   *
+   * The model list is narrowed (by make, and on /photos under a search query by the smart-search
+   * facets), so a model that is legitimately being filtered by can be absent from it. Since the
+   * effect above now fetches on MOUNT rather than only on a click, dropping the selection there
+   * would silently widen a shared `?make=…&model=…` link the moment it loads. Every other level of
+   * this panel keeps an unlisted selection visible instead — `orphanedMake` here, orphaned
+   * people/tags, the pinned city in location-filter — so the model does too, dimmed to say "not in
+   * these results" and still clickable to remove.
+   */
+  let visibleModels = $derived(
+    selectedModel && selectedMake === expandedMake && !models.includes(selectedModel)
+      ? [...models, selectedModel]
+      : models,
+  );
+  let orphanedModel = $derived(
+    selectedModel && selectedMake === expandedMake && !models.includes(selectedModel) ? selectedModel : undefined,
+  );
 
   function handleMakeClick(make: string) {
     if (selectedMake === make && !selectedModel) {
@@ -115,13 +143,14 @@
 
       <!-- Models (indented when make is expanded) -->
       {#if expandedMake === make && !loadingModels}
-        {#each models as model (model)}
+        {#each visibleModels as model (model)}
           {@const isModelSelected = selectedModel === model && selectedMake === make}
           <button
             type="button"
-            class="-mx-2 ml-5 flex w-[calc(100%-1.25rem+1rem)] items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-subtle {isModelSelected
-              ? 'font-medium'
-              : 'text-gray-500 dark:text-gray-300'}"
+            class="-mx-2 ml-5 flex w-[calc(100%-1.25rem+1rem)] items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-subtle {orphanedModel ===
+            model
+              ? 'opacity-50'
+              : ''} {isModelSelected ? 'font-medium' : 'text-gray-500 dark:text-gray-300'}"
             onclick={() => handleModelClick(model, make)}
             data-testid="camera-model-{model}"
           >

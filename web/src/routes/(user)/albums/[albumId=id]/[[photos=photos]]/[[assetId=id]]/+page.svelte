@@ -1,6 +1,6 @@
 <script lang="ts">
   import { goto, invalidate, onNavigate } from '$app/navigation';
-  import { navigating } from '$app/state';
+  import { navigating, page } from '$app/state';
   import { scrollMemoryClearer } from '$lib/actions/scroll-memory';
   import AlbumMap from '$lib/components/album-page/AlbumMap.svelte';
   import AlbumSharedSpaceLinks from '$lib/components/album-page/AlbumSharedSpaceLinks.svelte';
@@ -65,7 +65,10 @@
   import { buildAlbumAssetPickerFilterConfig, buildAlbumDetailFilterConfig } from '$lib/utils/album-filter-config';
   import { buildAlbumAssetPickerOptions, buildAlbumTimelineOptions } from '$lib/utils/album-filter-options';
   import SearchAddAllToCollectionModal from '$lib/modals/SearchAddAllToCollectionModal.svelte';
+  import { resolveFilterNames } from '$lib/utils/filter-name-resolution';
   import { filterStateToSearchTerms } from '$lib/utils/filter-search-terms';
+  import { buildFilterStateUrl, isFilterStateUrlUnchanged, withoutAtParam } from '$lib/utils/filter-target';
+  import { decodeFilterParams } from '$lib/utils/filter-url';
   import { lang } from '$lib/stores/preferences.store';
   import { handleError } from '$lib/utils/handle-error';
   import { isAlbumsRoute, navigate, type AssetGridRouteSearchParams } from '$lib/utils/navigation';
@@ -101,7 +104,7 @@
     mdiPlus,
     mdiPresentationPlay,
   } from '@mdi/js';
-  import { onDestroy } from 'svelte';
+  import { onDestroy, untrack } from 'svelte';
   import { t } from 'svelte-i18n';
   import { fly } from 'svelte/transition';
   import { SvelteMap } from 'svelte/reactivity';
@@ -117,14 +120,46 @@
   let { slideshowState, slideshowNavigation } = slideshowStore;
   let oldAt: AssetGridRouteSearchParams | null | undefined = $state();
   let album = $state(data.album);
-  let albumFilters = $state(createFilterState());
+  /**
+   * E9 — the route already scopes the timeline to this album, and the server's `albumId` is a
+   * SCALAR driving one inner join, so album ∩ album is impossible. A stray `?albumId=` must be
+   * IGNORED: dropping it here keeps it out of the active-filter count, out of the chip bar, and
+   * out of the next URL write. buildAlbumTimelineOptions already refuses to forward it.
+   */
+  const hydrateAlbumFilters = (url: URL): FilterState => ({
+    ...createFilterState(),
+    ...decodeFilterParams(url),
+    albumId: undefined,
+  });
+
+  let albumFilters = $state<FilterState>(hydrateAlbumFilters(page.url));
+  // Token guard for the URL $effect below. Copied in spirit from photos/…/+page.svelte: without it,
+  // our own goto() re-runs the effect, which re-runs goto(), forever. It is at-stripped because
+  // closing the asset viewer writes `?at=<assetId>` (replaceScrollTarget), which is not a filter
+  // change: re-hydrating on it is pure churn — the FilterState it would rebuild is identical, since
+  // every filter is URL-backed. Rebuilding it anyway would needlessly re-create `filters` and, with
+  // it, the timeline options object.
+  let lastHandledFilterSearch = $state(withoutAtParam(page.url.search));
   let pickerFilters = $state(createFilterState());
   let timelineGrouping = $state<TimelineGrouping>('day');
   let temporalAnchor = $state<TimelineTemporalAnchor | undefined>();
   let albumPersonNames = new SvelteMap<string, string>();
   let albumTagNames = new SvelteMap<string, string>();
+  let albumOwnerNames = new SvelteMap<string, string>();
+  // Never populated: E9 drops `?albumId=` at hydrate, so an album chip can never appear on this
+  // page. It exists only to satisfy resolveFilterNames' map pair.
+  let albumAlbumNames = new SvelteMap<string, string>();
   let pickerPersonNames = new SvelteMap<string, string>();
   let pickerTagNames = new SvelteMap<string, string>();
+  // An `?ownerId=` chip on an album is (all but always) one of the album's users, and they are
+  // already in scope — seed from them so no request is made. resolveFilterNames only falls through
+  // to a by-id fetch for an owner who is not an album user (a space contributor, say).
+  $effect(() => {
+    for (const { user } of album.albumUsers) {
+      albumOwnerNames.set(user.id, user.name);
+    }
+    void resolveFilterNames(albumFilters, { albumNames: albumAlbumNames, ownerNames: albumOwnerNames });
+  });
   let viewMode: AlbumPageViewMode = $state(AlbumPageViewMode.VIEW);
   let timelineManager = $state<TimelineManager>() as TimelineManager;
   let showAlbumUsers = $derived(timelineManager?.showAssetOwners ?? false);
@@ -271,7 +306,8 @@
     }
 
     album = data.album;
-    albumFilters = createFilterState();
+    albumFilters = hydrateAlbumFilters(page.url);
+    lastHandledFilterSearch = withoutAtParam(page.url.search);
     pickerFilters = createFilterState();
     albumPersonNames.clear();
     albumTagNames.clear();
@@ -283,6 +319,23 @@
     timelineGrouping = 'day';
     temporalAnchor = undefined;
     oldAt = null;
+  });
+
+  $effect(() => {
+    const nextFilterSearch = withoutAtParam(page.url.search);
+    if (nextFilterSearch === lastHandledFilterSearch) {
+      return;
+    }
+
+    untrack(() => {
+      // Every filter — including the temporal picker's year/month — round-trips through the URL, so
+      // rebuilding FilterState from the URL alone is lossless.
+      albumFilters = {
+        ...createFilterState(),
+        ...hydrateAlbumFilters(page.url),
+      };
+      lastHandledFilterSearch = nextFilterSearch;
+    });
   });
 
   const containsEditors = $derived(album?.shared && album.albumUsers.some(({ role }) => role === AlbumUserRole.Editor));
@@ -428,9 +481,20 @@
     temporalAnchor = result.anchor;
   }
 
+  function syncAlbumFilterUrl(nextFilters: FilterState) {
+    const nextUrl = buildFilterStateUrl(page.url, nextFilters);
+    // NOT a string compare: buildFilterStateUrl re-appends the filter params last, so an unchanged
+    // state on `?make=Apple&at=…`-style URLs can come back re-ordered. See filter-target.ts.
+    if (isFilterStateUrlUnchanged(page.url, nextUrl)) {
+      return;
+    }
+    void goto(nextUrl, { replaceState: true, keepFocus: true, noScroll: true });
+  }
+
   function clearAlbumTemporalFilter() {
     albumFilters = clearTimelineTemporalFilter(albumFilters);
     temporalAnchor = undefined;
+    syncAlbumFilterUrl(albumFilters);
   }
 
   const onSharedLinkCreate = async () => {
@@ -539,6 +603,7 @@
                   {timeBuckets}
                   storageKey="gallery-filter-visible-sections-album-detail"
                   hidden={isTimelineEmpty}
+                  onFiltersChange={syncAlbumFilterUrl}
                 />
               {/key}
             {/if}
@@ -567,16 +632,19 @@
                 resultCount={totalAssetCount}
                 personNames={albumPersonNames}
                 tagNames={albumTagNames}
+                ownerNames={albumOwnerNames}
                 onRemoveFilter={(type, id) => {
                   if (type === 'timeline') {
                     clearAlbumTemporalFilter();
                   } else {
                     albumFilters = handlePhotosRemoveFilter(albumFilters, type, id);
+                    syncAlbumFilterUrl(albumFilters);
                   }
                 }}
                 onClearAll={() => {
                   albumFilters = clearFilters(albumFilters);
                   temporalAnchor = undefined;
+                  syncAlbumFilterUrl(albumFilters);
                 }}
                 onAddAllToCollection={handleAddAllToCollection}
               />
@@ -613,6 +681,7 @@
                   } else {
                     albumFilters = clearFilters(albumFilters);
                     temporalAnchor = undefined;
+                    syncAlbumFilterUrl(albumFilters);
                   }
                 }}
               >
@@ -818,7 +887,7 @@
             <ActionButton action={Share} />
 
             {#if featureFlagsManager.value.map}
-              <AlbumMap {album} />
+              <AlbumMap {album} filters={albumFilters} />
             {/if}
 
             {#if album.assetCount > 0}
