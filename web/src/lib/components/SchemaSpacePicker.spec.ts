@@ -73,7 +73,7 @@ describe('SchemaSpacePicker', () => {
     vi.mocked(modalManager.show).mockResolvedValue(space('space-2', 'Friends'));
     renderPicker({ array: false, initial: ['space-1'] });
     await userEvent.click(await screen.findByRole('button', { name: 'Choose' }));
-    expect(boundValue()).toHaveTextContent('space-2');
+    expect(boundValue()).toHaveTextContent(/^space-2$/);
   });
 
   it('leaves the value untouched when the modal is dismissed', async () => {
