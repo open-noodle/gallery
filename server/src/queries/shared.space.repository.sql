@@ -1912,6 +1912,14 @@ where
     )
   )
 
+-- SharedSpaceRepository.getFaceIdsForPerson
+select
+  "assetFaceId"
+from
+  "shared_space_person_face"
+where
+  "personId" = $1
+
 -- SharedSpaceRepository.reassignPersonFacesSafe
 delete from "shared_space_person_face"
 where
@@ -2535,6 +2543,32 @@ where
   "shared_space_person"."spaceId" = $1
   and "asset_face"."deletedAt" is null
   and "asset_face"."isVisible" = $2
+
+-- SharedSpaceRepository.getSpacePersonAssignedFaceEmbeddings
+select
+  "face_search"."embedding"
+from
+  "shared_space_person_face"
+  inner join "face_search" on "face_search"."faceId" = "shared_space_person_face"."assetFaceId"
+  inner join "asset_face" on "asset_face"."id" = "shared_space_person_face"."assetFaceId"
+where
+  "shared_space_person_face"."personId" = $1
+  and "asset_face"."deletedAt" is null
+  and "asset_face"."isVisible" is true
+order by
+  "shared_space_person_face"."assetFaceId" asc
+limit
+  $2
+
+-- SharedSpaceRepository.getAssignedFaceIdsForSpace
+select
+  "shared_space_person_face"."assetFaceId"
+from
+  "shared_space_person_face"
+  inner join "shared_space_person" on "shared_space_person"."id" = "shared_space_person_face"."personId"
+where
+  "shared_space_person"."spaceId" = $1
+  and "shared_space_person_face"."assetFaceId" = any ($2::uuid[])
 
 -- SharedSpaceRepository.getAssetFacesForMatching
 select

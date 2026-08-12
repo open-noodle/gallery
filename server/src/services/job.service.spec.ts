@@ -1,5 +1,16 @@
 import { BadRequestException } from '@nestjs/common';
-import { AssetType, AssetVisibility, ImmichWorker, JobName, JobStatus, ManualJobName, QueueName } from 'src/enum';
+import { Reflector } from '@nestjs/core';
+import {
+  AssetType,
+  AssetVisibility,
+  ImmichWorker,
+  JobName,
+  JobStatus,
+  ManualJobName,
+  MetadataKey,
+  QueueName,
+  SystemMetadataKey,
+} from 'src/enum';
 import { JobService } from 'src/services/job.service';
 import { JobItem } from 'src/types';
 import { AssetFactory } from 'test/factories/asset.factory';
@@ -75,11 +86,93 @@ describe(JobService.name, () => {
       expect(mocks.job.queueAll).not.toHaveBeenCalled();
     });
 
+    it('should queue a FaceSuggestionMaintenance job', async () => {
+      await sut.create({ name: ManualJobName.FaceSuggestionMaintenance });
+
+      expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.FaceSuggestionMaintenance, data: {} });
+    });
+
     it('should throw BadRequestException for an invalid job name', async () => {
       await expect(sut.create({ name: 'invalid-job' as ManualJobName })).rejects.toThrow(BadRequestException);
 
       expect(mocks.job.queue).not.toHaveBeenCalled();
       expect(mocks.job.queueAll).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('handleFaceSuggestionMaintenance', () => {
+    it('should run on the people backfill queue', () => {
+      const config = new Reflector().get(MetadataKey.JobConfig, sut.handleFaceSuggestionMaintenance);
+
+      expect(config).toEqual(expect.objectContaining({ queue: QueueName.PeopleBackfill }));
+    });
+
+    it('should queue personal and shared-space suggestion fanout jobs when suggestions are enabled', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({
+        machineLearning: {
+          enabled: true,
+          facialRecognition: {
+            enabled: true,
+            maxDistance: 0.5,
+            minFaces: 3,
+            suggestions: { enabled: true, maxDistance: 0.8 },
+          },
+        },
+      });
+
+      await expect(sut.handleFaceSuggestionMaintenance()).resolves.toBe(JobStatus.Success);
+
+      expect(mocks.job.queueAll).toHaveBeenCalledWith([
+        { name: JobName.PersonSuggestionScanQueueAll, data: {} },
+        { name: JobName.SpacePersonSuggestionScanQueueAll, data: {} },
+      ]);
+    });
+
+    // PersonService.onBootstrap runs this once per instance and skips it forever after the marker is set, so
+    // the marker must mean "a sweep ran", not "a sweep was queued". Writing it here is what makes a failed
+    // sweep (attempts:1, removeOnFail:true) retry on the next boot instead of being silently recorded as done.
+    it('should record the one-shot sweep marker once the fanout has been queued', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({
+        machineLearning: {
+          enabled: true,
+          facialRecognition: {
+            enabled: true,
+            maxDistance: 0.5,
+            minFaces: 3,
+            suggestions: { enabled: true, maxDistance: 0.8 },
+          },
+        },
+      });
+
+      await expect(sut.handleFaceSuggestionMaintenance()).resolves.toBe(JobStatus.Success);
+
+      expect(mocks.systemMetadata.set).toHaveBeenCalledWith(SystemMetadataKey.FaceSuggestionDefaultOnState, {
+        sweptAt: expect.any(String),
+      });
+    });
+
+    it('should skip without queueing child fanout jobs when suggestions are disabled', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({
+        machineLearning: {
+          enabled: true,
+          facialRecognition: {
+            enabled: true,
+            maxDistance: 0.5,
+            minFaces: 3,
+            suggestions: { enabled: false, maxDistance: 0.8 },
+          },
+        },
+      });
+
+      await expect(sut.handleFaceSuggestionMaintenance()).resolves.toBe(JobStatus.Skipped);
+
+      expect(mocks.job.queueAll).not.toHaveBeenCalled();
+      // A skipped run swept nothing, so it must not claim the one-shot slot — otherwise an admin who ran the
+      // job by hand while the feature was off would consume the boot sweep they never got.
+      expect(mocks.systemMetadata.set).not.toHaveBeenCalledWith(
+        SystemMetadataKey.FaceSuggestionDefaultOnState,
+        expect.anything(),
+      );
     });
   });
 
