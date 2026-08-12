@@ -88,7 +88,11 @@ describe('rail-storage', () => {
 
   it('uses server disk figures when unauthenticated even if a quota exists', () => {
     mocks.authManager.authenticated = false;
-    mocks.authManager.user = { quotaSizeInBytes: 20_000_000_000, quotaUsageInBytes: 5_000_000_000, physicalUsageInBytes: 0 };
+    mocks.authManager.user = {
+      quotaSizeInBytes: 20_000_000_000,
+      quotaUsageInBytes: 5_000_000_000,
+      physicalUsageInBytes: 0,
+    };
 
     render(RailStorage);
 
@@ -135,10 +139,10 @@ describe('rail-storage parity with StorageSpace', () => {
   });
 
   it.each`
-    scenario                         | quotaSize         | quotaUsed        | physicalUsed      | diskSize          | diskUse           | includesDerivatives
-    ${'quota set'}                   | ${20_000_000_000} | ${5_000_000_000} | ${5_000_000_000}  | ${50_000_000_000} | ${12_000_000_000} | ${false}
-    ${'no quota, server disk'}       | ${null}           | ${0}             | ${0}              | ${50_000_000_000} | ${12_000_000_000} | ${false}
-    ${'server includes derivatives'} | ${20_000_000_000} | ${5_000_000_000} | ${9_000_000_000}  | ${50_000_000_000} | ${12_000_000_000} | ${true}
+    scenario                         | quotaSize         | quotaUsed        | physicalUsed     | diskSize          | diskUse           | includesDerivatives
+    ${'quota set'}                   | ${20_000_000_000} | ${5_000_000_000} | ${5_000_000_000} | ${50_000_000_000} | ${12_000_000_000} | ${false}
+    ${'no quota, server disk'}       | ${null}           | ${0}             | ${0}             | ${50_000_000_000} | ${12_000_000_000} | ${false}
+    ${'server includes derivatives'} | ${20_000_000_000} | ${5_000_000_000} | ${9_000_000_000} | ${50_000_000_000} | ${12_000_000_000} | ${true}
   `(
     'reports identical bytes to StorageSpace for $scenario',
     ({ quotaSize, quotaUsed, physicalUsed, diskSize, diskUse, includesDerivatives }) => {
