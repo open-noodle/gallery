@@ -7,7 +7,11 @@ import { getByteUnitString } from '$lib/utils/byte-units';
 const mocks = vi.hoisted(() => ({
   authManager: {
     authenticated: true,
-    user: { quotaSizeInBytes: null as number | null, quotaUsageInBytes: 0, physicalUsageInBytes: 0 },
+    user: {
+      quotaSizeInBytes: null as number | null,
+      quotaUsageInBytes: 0,
+      physicalUsageInBytes: 0 as number | null,
+    },
   },
   userInteraction: {
     serverInfo: { diskSizeRaw: 0, diskUseRaw: 0 } as { diskSizeRaw: number; diskUseRaw: number } | undefined,
@@ -116,6 +120,15 @@ describe('rail-storage', () => {
     expect(bytes()).toEqual({ used: 300, available: 1000 });
   });
 
+  it('treats a null physical usage as zero when the server includes derivatives', () => {
+    mocks.serverConfigManager.valueOrUndefined = { storageUsageIncludesDerivatives: true };
+    mocks.authManager.user = { quotaSizeInBytes: 1000, quotaUsageInBytes: 100, physicalUsageInBytes: null };
+
+    render(RailStorage);
+
+    expect(bytes()).toEqual({ used: 0, available: 1000 });
+  });
+
   it('still shows server disk usage when the user has no quota, regardless of the toggle', () => {
     mocks.serverConfigManager.valueOrUndefined = { storageUsageIncludesDerivatives: true };
     mocks.authManager.user = { quotaSizeInBytes: null, quotaUsageInBytes: 100, physicalUsageInBytes: 300 };
@@ -127,11 +140,11 @@ describe('rail-storage', () => {
   });
 });
 
-// Compensating control for duplicating StorageSpace's used/available derivation into
-// rail-storage.svelte: render both components against the same store state and assert they
-// report identical bytes. If an upstream change to StorageSpace's quota-vs-disk logic ever
-// diverges from rail-storage's frozen copy, this fails - even though the byte-derivation
-// table above (which only exercises rail-storage's own code) would keep passing.
+// Both components call the same shared getStorageSpace, so there is no duplicated derivation
+// left to drift - what this guards is wiring, not logic. serverConfig is an optional parameter
+// of that function, so a component that dropped `serverConfig: serverConfigManager.valueOrUndefined`
+// from its call site would still type-check, and would silently fall back to the toggle-off
+// default. Rendering both against the same state and asserting identical bytes catches that.
 describe('rail-storage parity with StorageSpace', () => {
   beforeEach(() => {
     mocks.authManager.authenticated = true;
