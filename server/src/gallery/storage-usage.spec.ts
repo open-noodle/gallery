@@ -15,8 +15,10 @@ describe('getDerivativeAssetId', () => {
     expect(getDerivativeAssetId(`${id}.mp4`)).toBe(id);
   });
 
-  it('should extract the asset id from an uppercase filename', () => {
-    expect(getDerivativeAssetId(`${id.toUpperCase()}.mp4`)).toBe(id.toUpperCase());
+  it('should lowercase the extracted id from an uppercase filename', () => {
+    // getExternalAssetIds compares against Postgres-lowercased uuids, so the extraction
+    // must normalise casing rather than preserve the filename's own casing.
+    expect(getDerivativeAssetId(`${id.toUpperCase()}.mp4`)).toBe(id);
   });
 
   it('should return null for a filename that is not asset derived', () => {

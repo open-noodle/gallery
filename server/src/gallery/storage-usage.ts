@@ -29,7 +29,11 @@ export const getDerivativeAssetId = (filename: string): string | null => {
     return null;
   }
 
-  return candidate;
+  // Normalise to lowercase: Postgres always returns uuid columns lowercased, so
+  // getExternalAssetIds' set membership check would silently miss an uppercase-cased
+  // extraction. Filenames are built from asset.id (already lowercase) so this never
+  // fires today, but keep it — do not go back to preserving the source casing.
+  return candidate.toLowerCase();
 };
 
 type PhysicalUsageDeps = {
