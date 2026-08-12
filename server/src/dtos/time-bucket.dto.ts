@@ -8,7 +8,7 @@ import {
   TimeBucketSize,
   TimeBucketSizeSchema,
 } from 'src/enum';
-import { stringToBool } from 'src/validation';
+import { boundedTextFilter, stringToBool } from 'src/validation';
 import z from 'zod';
 
 const UUID_PATTERN = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}';
@@ -62,12 +62,21 @@ const TimeBucketQueryBaseSchema = z
     country: z.string().optional().describe('Filter by country name'),
     make: z.string().optional().describe('Filter by camera make'),
     model: z.string().optional().describe('Filter by camera model'),
-    originalFileName: z
-      .string()
+    lensModel: z.string().optional().describe('Filter by camera lens model'),
+    state: z.string().optional().describe('Filter by state/province name'),
+    ownerId: z
+      .uuidv4()
+      .optional()
+      .describe(
+        'Filter by asset owner (contributor). Narrows within the current scope and never widens it. This is NOT the same as userId, which selects whose timeline is being composed.',
+      ),
+    originalFileName: boundedTextFilter()
       .optional()
       .describe('Filter by original filename (substring, case/accent-insensitive)'),
-    description: z.string().optional().describe('Filter by asset description (substring, case/accent-insensitive)'),
-    ocr: z.string().optional().describe('Filter by OCR text content (substring, case/accent-insensitive)'),
+    description: boundedTextFilter()
+      .optional()
+      .describe('Filter by asset description (substring, case/accent-insensitive)'),
+    ocr: boundedTextFilter().optional().describe('Filter by OCR text content (substring, case/accent-insensitive)'),
     rating: z.coerce.number().int().min(1).max(5).optional().describe('Minimum star rating (>=)'),
     type: AssetTypeSchema.optional().describe('Filter by asset type (IMAGE or VIDEO)'),
     takenAfter: z.string().optional().describe('Only include assets taken on or after this date (ISO 8601)'),

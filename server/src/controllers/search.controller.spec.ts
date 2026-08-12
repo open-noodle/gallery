@@ -441,6 +441,38 @@ describe(SearchController.name, () => {
         );
       });
 
+      // The filter panel spreads its whole FilterContext into this request. An undeclared param is
+      // stripped by the validation pipe with a 200, so the only way to notice is to assert on what
+      // the service actually receives.
+      it('forwards the state, lens and contributor narrowings to the service', async () => {
+        const ownerId = '44444444-4444-4444-8444-444444444444';
+        ctx.authenticate.mockResolvedValue({});
+        service.getSearchSuggestions.mockResolvedValue(['Canon EOS R5']);
+
+        const { status } = await request(ctx.getHttpServer()).get('/search/suggestions').query({
+          type: 'camera-model',
+          make: 'Canon',
+          state: 'Bavaria',
+          lensModel: 'RF24-105mm F4 L IS USM',
+          ownerId,
+        });
+
+        expect(status).toBe(200);
+        expect(service.getSearchSuggestions).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ state: 'Bavaria', lensModel: 'RF24-105mm F4 L IS USM', ownerId }),
+        );
+      });
+
+      it('rejects a non-uuid contributor narrowing', async () => {
+        const { status, body } = await request(ctx.getHttpServer())
+          .get('/search/suggestions')
+          .query({ type: 'camera-model', ownerId: 'not-a-uuid' });
+
+        expect(status).toBe(400);
+        expect(body).toEqual(errorDto.validationError([{ path: ['ownerId'], message: 'Invalid UUID' }]));
+      });
+
       it('rejects an invalid mediaType (#858)', async () => {
         const { status, body } = await request(ctx.getHttpServer()).get('/search/suggestions').query({
           type: 'camera-model',
@@ -551,6 +583,39 @@ describe(SearchController.name, () => {
           expect.anything(),
           expect.objectContaining({ withSharedSpaces: true, personIds: [`space-person:${personId}`] }),
         );
+      });
+
+      it('forwards the state, lens and contributor narrowings to the service', async () => {
+        const ownerId = '44444444-4444-4444-8444-444444444444';
+        ctx.authenticate.mockResolvedValue({});
+        service.getFilterSuggestions.mockResolvedValue({
+          countries: [],
+          cameraMakes: [],
+          tags: [],
+          people: [],
+          ratings: [],
+          mediaTypes: [],
+          hasUnnamedPeople: false,
+        });
+
+        const { status } = await request(ctx.getHttpServer())
+          .get('/search/suggestions/filters')
+          .query({ state: 'Bavaria', lensModel: 'RF24-105mm F4 L IS USM', ownerId });
+
+        expect(status).toBe(200);
+        expect(service.getFilterSuggestions).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ state: 'Bavaria', lensModel: 'RF24-105mm F4 L IS USM', ownerId }),
+        );
+      });
+
+      it('rejects a non-uuid contributor narrowing', async () => {
+        const { status, body } = await request(ctx.getHttpServer())
+          .get('/search/suggestions/filters')
+          .query({ ownerId: 'not-a-uuid' });
+
+        expect(status).toBe(400);
+        expect(body).toEqual(errorDto.validationError([{ path: ['ownerId'], message: 'Invalid UUID' }]));
       });
 
       it('rejects malformed scoped person tokens for filter suggestions', async () => {

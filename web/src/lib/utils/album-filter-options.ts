@@ -53,9 +53,32 @@ export function buildAlbumTimelineOptions(
   order: AssetOrder,
   filters: FilterState,
 ): Record<string, unknown> {
-  return applyCommonFilterFields({ albumId, order }, filters);
+  const base = applyCommonFilterFields({ albumId, order }, filters);
+
+  // The route already scopes the query to `albumId`; the server's albumId is a scalar driving one
+  // inner join, so a second album cannot be AND-ed. A stray albumId filter is therefore never
+  // forwarded here — it must not hijack the route's own album scope.
+  if (filters.lensModel) {
+    base.lensModel = filters.lensModel;
+  }
+  if (filters.state) {
+    base.state = filters.state;
+  }
+  if (filters.ownerId) {
+    base.ownerId = filters.ownerId;
+  }
+
+  return base;
 }
 
+// Intentionally does NOT forward lensModel/state/ownerId, unlike its buildAlbumTimelineOptions
+// sibling above. This is safe today only because the picker's FilterState is component-local
+// (never URL-hydrated) and the shared `sections` const in album-filter-config.ts has no control
+// that can ever set these three fields on it — so they can never actually be present here. If
+// `sections` (shared by BOTH the album-detail and picker filter configs) ever grows a control that
+// sets one of these three, this omission becomes the same "filter honesty" lie #767c fixed for
+// description/originalFileName/ocr/isInAlbum/isNotInAlbum above: forward the field here too, in
+// the same change that adds the control. See album-filter-options.spec.ts for the pinning test.
 export function buildAlbumAssetPickerOptions(albumId: string, filters: FilterState): Record<string, unknown> {
   return applyCommonFilterFields(
     {
