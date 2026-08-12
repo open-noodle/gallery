@@ -54,8 +54,8 @@ export class DiskStorageBackend implements StorageBackend {
     await rm(this.resolvePath(prefix), { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   }
 
-  async getPrefixUsage(prefix: string): Promise<number> {
-    return this.getFolderSize(this.resolvePath(prefix));
+  async getPrefixUsage(prefix: string, shouldCount?: (filename: string) => boolean): Promise<number> {
+    return this.getFolderSize(this.resolvePath(prefix), shouldCount);
   }
 
   getServeStrategy(key: string, _options: ServeOptions): Promise<ServeStrategy> {
@@ -73,7 +73,7 @@ export class DiskStorageBackend implements StorageBackend {
     return Promise.resolve(this.resolvePath(key));
   }
 
-  private async getFolderSize(folder: string): Promise<number> {
+  private async getFolderSize(folder: string, shouldCount?: (filename: string) => boolean): Promise<number> {
     let total = 0;
     let dir;
     try {
@@ -88,10 +88,18 @@ export class DiskStorageBackend implements StorageBackend {
     for await (const entry of dir) {
       const entryPath = join(folder, entry.name);
       if (entry.isDirectory()) {
-        total += await this.getFolderSize(entryPath);
-      } else if (entry.isFile()) {
-        const entryStat = await stat(entryPath);
-        total += entryStat.size;
+        total += await this.getFolderSize(entryPath, shouldCount);
+      } else if (entry.isFile() && (!shouldCount || shouldCount(entry.name))) {
+        try {
+          const entryStat = await stat(entryPath);
+          total += entryStat.size;
+        } catch (error: any) {
+          // The nightly scan walks a live tree that delete jobs are writing to; a file that
+          // disappears mid-walk must not abort the whole user's sync.
+          if (error.code !== 'ENOENT') {
+            throw error;
+          }
+        }
       }
     }
 
