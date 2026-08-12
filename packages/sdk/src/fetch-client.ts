@@ -412,6 +412,8 @@ export type UserAdminResponseDto = {
     name: string;
     /** OAuth ID */
     oauthId: string;
+    /** Physical storage usage in bytes, including derivatives */
+    physicalUsageInBytes: number | null;
     /** Profile change date */
     profileChangedAt: string;
     /** Profile image path */
@@ -2586,6 +2588,8 @@ export type ServerConfigDto = {
     oauthButtonText: string;
     /** Whether public user registration is enabled */
     publicUsers: boolean;
+    /** Whether displayed storage usage includes thumbnails and transcoded videos */
+    storageUsageIncludesDerivatives: boolean;
     /** Number of days before trashed assets are permanently deleted */
     trashDays: number;
     /** Delay in days before deleted users are permanently removed */
@@ -3533,6 +3537,12 @@ export type SystemConfigStorageTemplateDto = {
     /** Template */
     template: string;
 };
+export type SystemConfigStorageUsageDto = {
+    /** Include thumbnails and transcoded videos in the displayed storage usage */
+    includeDerivativesInDisplay: boolean;
+    /** Include thumbnails and transcoded videos in quota enforcement */
+    includeDerivativesInQuota: boolean;
+};
 export type SystemConfigTemplateEmailsDto = {
     /** Album invite template */
     albumInviteTemplate: string;
@@ -3579,6 +3589,7 @@ export type SystemConfigDto = {
     reverseGeocoding: SystemConfigReverseGeocodingDto;
     server: SystemConfigServerDto;
     storageTemplate: SystemConfigStorageTemplateDto;
+    storageUsage: SystemConfigStorageUsageDto;
     templates: SystemConfigTemplatesDto;
     theme: SystemConfigThemeDto;
     trash: SystemConfigTrashDto;

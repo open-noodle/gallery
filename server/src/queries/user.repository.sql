@@ -375,16 +375,35 @@ where
 update "user"
 set
   "quotaUsageInBytes" = "quotaUsageInBytes" + $1,
+  "physicalUsageInBytes" = greatest(0, "physicalUsageInBytes" + $2),
+  "updatedAt" = $3
+where
+  "id" = $4::uuid
+  and "user"."deletedAt" is null
+
+-- UserRepository.setPhysicalUsage
+update "user"
+set
+  "physicalUsageInBytes" = $1,
   "updatedAt" = $2
 where
   "id" = $3::uuid
   and "user"."deletedAt" is null
 
--- UserRepository.setUsage
+-- UserRepository.syncUsage
 update "user"
 set
-  "quotaUsageInBytes" = $1,
-  "updatedAt" = $2
+  "quotaUsageInBytes" = (
+    select
+      coalesce(sum("asset_exif"."fileSizeInByte"), 0) as "usage"
+    from
+      "asset"
+      left join "asset_exif" on "asset_exif"."assetId" = "asset"."id"
+    where
+      "asset"."libraryId" is null
+      and "asset"."ownerId" = "user"."id"
+  ),
+  "updatedAt" = $1
 where
-  "id" = $3::uuid
-  and "user"."deletedAt" is null
+  "user"."deletedAt" is null
+  and "user"."id" = $2::uuid

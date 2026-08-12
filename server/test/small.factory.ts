@@ -208,6 +208,7 @@ const userAdminFactory = (user: Partial<UserAdmin> = {}) => {
     oauthId = '',
     quotaSizeInBytes = null,
     quotaUsageInBytes = 0,
+    physicalUsageInBytes = 0,
     status = UserStatus.Active,
     metadata = [],
   } = user;
@@ -227,6 +228,7 @@ const userAdminFactory = (user: Partial<UserAdmin> = {}) => {
     oauthId,
     quotaSizeInBytes,
     quotaUsageInBytes,
+    physicalUsageInBytes,
     status,
     metadata,
   };

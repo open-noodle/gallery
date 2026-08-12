@@ -144,6 +144,8 @@ export type UserAdmin = User & {
   oauthId: string;
   quotaSizeInBytes: number | null;
   quotaUsageInBytes: number;
+  // Gallery-fork: physical (derivative-inclusive) storage usage.
+  physicalUsageInBytes: number;
   status: UserStatus;
   metadata: UserMetadataItem[];
 };
@@ -519,6 +521,7 @@ export const columns = {
     'storageLabel',
     'quotaSizeInBytes',
     'quotaUsageInBytes',
+    'physicalUsageInBytes',
   ],
   tag: ['tag.id', 'tag.value', 'tag.createdAt', 'tag.updatedAt', 'tag.color', 'tag.parentId'],
   apiKey: ['id', 'name', 'userId', 'createdAt', 'updatedAt', 'permissions'],

@@ -125,6 +125,8 @@ const UserAdminResponseSchema = UserResponseSchema.extend({
   oauthId: z.string().describe('OAuth ID'),
   quotaSizeInBytes: z.int().min(0).nullable().describe('Storage quota in bytes'),
   quotaUsageInBytes: z.int().min(0).nullable().describe('Storage usage in bytes'),
+  // Gallery-fork: physical (derivative-inclusive) storage usage, independent of the display/quota toggles above.
+  physicalUsageInBytes: z.int().min(0).nullable().describe('Physical storage usage in bytes, including derivatives'),
   status: UserStatusSchema,
   license: UserLicenseSchema.nullable(),
 }).meta({ id: 'UserAdminResponseDto' });
@@ -148,6 +150,8 @@ export function mapUserAdmin(entity: UserAdmin): UserAdminResponseDto {
     oauthId: entity.oauthId,
     quotaSizeInBytes: entity.quotaSizeInBytes,
     quotaUsageInBytes: entity.quotaUsageInBytes,
+    // Gallery-fork: physical (derivative-inclusive) storage usage.
+    physicalUsageInBytes: entity.physicalUsageInBytes,
     status: entity.status,
     license: license ? { ...license, activatedAt: new Date(license.activatedAt) } : null,
   };

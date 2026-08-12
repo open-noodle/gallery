@@ -176,6 +176,8 @@ export class ServerService extends BaseService {
       maintenanceMode: false,
       minFaces: config.machineLearning.facialRecognition.minFaces,
       availableMemoryTypes: MEMORY_TYPE_KEYS.filter((key) => getAdminAvailableMemoryTypeKeys(config.memories).has(key)),
+      // Gallery-fork: display-only toggle; the quota-enforcement toggle stays server-side.
+      storageUsageIncludesDerivatives: config.storageUsage.includeDerivativesInDisplay,
     };
   }
 
