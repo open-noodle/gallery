@@ -3,50 +3,26 @@ import { enhancedImages } from '@sveltejs/enhanced-img';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 import tailwindcss from '@tailwindcss/vite';
-import { playwright } from '@vitest/browser-playwright';
+import { svelteTesting } from '@testing-library/svelte/vite';
 import dotenv from 'dotenv';
-import { defaultTreeAdapter, parse, parseFragment, type DefaultTreeAdapterMap } from 'parse5';
+import { defaultTreeAdapter, parse, type DefaultTreeAdapterMap } from 'parse5';
 import { visualizer } from 'rollup-plugin-visualizer';
 import { defineConfig, type Plugin, type ProxyOptions, type UserConfig } from 'vite';
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { stripVTControlCharacters } from 'node:util';
 
 const buildDir = 'build';
 const inlineTags = ['script', 'style'];
-const shadowTemplatePackages = ['media-chrome', 'custom-media-element'];
-const shadowTemplateModulePattern = new RegExp(`/node_modules/(${shadowTemplatePackages.join('|')})/dist/`);
-const shadowTemplateModules = new Set<string>();
-const pinInputStyle = '';
-
-type ShadowTemplateElement = { getTemplateHTML: (attributes: Record<string, string>) => string };
-
-const isShadowTemplateElement = (value: unknown): value is ShadowTemplateElement =>
-  typeof value === 'function' && 'getTemplateHTML' in value && typeof value.getTemplateHTML === 'function';
 
 const cspManifest = (): Plugin => ({
   name: 'immich:csp-manifest',
   apply: 'build',
-  generateBundle(_, bundle) {
-    for (const chunk of Object.values(bundle)) {
-      for (const id of chunk.type === 'chunk' ? chunk.moduleIds : []) {
-        if (shadowTemplateModulePattern.test(id)) {
-          shadowTemplateModules.add(id);
-        }
-      }
-    }
-  },
   buildApp: {
     order: 'post',
     async handler() {
       const indexHtml = path.join(buildDir, 'index.html');
-      const hashes: Record<string, Set<string>> = Object.fromEntries(
-        inlineTags.map((tag) => [`${tag}-src`, new Set()]),
-      );
-      const addHash = (tag: string, content: string) =>
-        hashes[`${tag}-src`].add(`'sha256-${createHash('sha256').update(content).digest('base64')}'`);
+      const hashes: Record<string, string[]> = Object.fromEntries(inlineTags.map((tag) => [`${tag}-src`, []]));
 
       const walk = (node: DefaultTreeAdapterMap['node']) => {
         if (
@@ -56,7 +32,7 @@ const cspManifest = (): Plugin => ({
         ) {
           const [child] = node.childNodes;
           const content = child && defaultTreeAdapter.isTextNode(child) ? child.value : '';
-          addHash(node.tagName, content);
+          hashes[`${node.tagName}-src`].push(`'sha256-${createHash('sha256').update(content).digest('base64')}'`);
         }
 
         if ('childNodes' in node) {
@@ -67,41 +43,11 @@ const cspManifest = (): Plugin => ({
       };
 
       walk(parse(readFileSync(indexHtml, 'utf8')));
-      addHash('style', pinInputStyle);
 
-      for (const id of shadowTemplateModules) {
-        for (const value of Object.values(await import(pathToFileURL(id).href))) {
-          if (isShadowTemplateElement(value)) {
-            walk(parseFragment(value.getTemplateHTML({})));
-          }
-        }
-      }
-
-      const manifest = JSON.stringify(hashes, (_, value) => (value instanceof Set ? [...value] : value), 2);
-      writeFileSync(path.join(buildDir, '.csp.json'), manifest + '\n');
+      writeFileSync(path.join(buildDir, '.csp.json'), JSON.stringify(hashes, undefined, 2) + '\n');
     },
   },
 });
-
-const notFoundGetLine = /^404 (GET|HEAD) /;
-
-const testing = (): Plugin => ({
-  name: 'immich:test',
-  apply: () => !!process.env.VITEST,
-  configureServer: (server) => {
-    const { logger } = server.config;
-    const error = logger.error.bind(logger);
-    logger.error = (message, options) => {
-      if (isUnmockedMediaOrDownload(message)) {
-        return;
-      }
-
-      error(message, options);
-    };
-  },
-});
-
-const isUnmockedMediaOrDownload = (message: string) => notFoundGetLine.test(stripVTControlCharacters(message));
 
 const upstream = {
   target: process.env.IMMICH_SERVER_URL || 'http://immich-server:2283/',
@@ -134,7 +80,7 @@ export default defineConfig({
   // '@immich/ui': path.resolve(import.meta.dirname, '../../ui/packages/ui'),
   server: {
     // connect to a remote backend during web-only development
-    proxy: process.env.VITEST ? {} : proxy,
+    proxy,
     allowedHosts: true,
   },
   preview: {
@@ -167,7 +113,6 @@ export default defineConfig({
       },
     }),
     cspManifest(),
-    testing(),
 
     process.env.BUILD_STATS === 'true'
       ? visualizer({
@@ -175,12 +120,17 @@ export default defineConfig({
           filename: 'stats.html',
         })
       : undefined,
+    svelteTesting(),
   ],
   optimizeDeps: {
     entries: ['src/**/*.{svelte,ts,html}'],
   },
   test: {
+    name: 'web:unit',
+    include: ['src/**/*.{test,spec}.{js,ts}'],
     globals: true,
+    environment: 'happy-dom',
+    setupFiles: ['./test/unit/setup.ts'],
     sequence: {
       hooks: 'list',
     },
@@ -192,14 +142,6 @@ export default defineConfig({
         inline: ['@futo-org/backups-orchestrator-ui', '@material-symbols/svg-400'],
       },
     },
-    name: 'web:unit',
-    include: ['src/**/*.{test,spec}.{js,ts}'],
-    setupFiles: ['./test/unit/setup.ts'],
-    browser: {
-      enabled: true,
-      headless: true,
-      provider: playwright({ contextOptions: { timezoneId: 'UTC', locale: 'en-US' } }),
-      instances: [{ browser: 'chromium' }],
-    },
+    clearMocks: true,
   },
 } as UserConfig);

@@ -1,7 +1,14 @@
 import {
-  decideReattribution,
+  ClassifyContext,
+  ClassifyPersonInput,
   ReattributionNeighbor,
   ReattributionTally,
+  applyVerdictFilters,
+  classifyFlaggedPerson,
+  decideReattribution,
+  findOverlappingIds,
+  findUnresolvableIds,
+  isSubset,
   tallyReattribution,
 } from 'src/utils/face-repair';
 
@@ -142,5 +149,284 @@ describe('tallyReattribution', () => {
     // 'A' < 'B' lexically — A must win regardless of input order
     expect(t1.topOtherPersonId).toBe('A');
     expect(t2.topOtherPersonId).toBe('A');
+  });
+});
+
+const ctx = (over: Partial<ClassifyContext> = {}): ClassifyContext => ({
+  reviewOnlyPersonIds: new Set<string>(),
+  largeClusterThreshold: 50,
+  ...over,
+});
+
+const person = (over: Partial<ClassifyPersonInput> = {}): ClassifyPersonInput => ({
+  personId: 'person-1',
+  personName: null,
+  faceCount: 10,
+  suspectedOwnerIds: ['owner-1'],
+  ...over,
+});
+
+describe('classifyFlaggedPerson', () => {
+  it('confident: unnamed, small, single clean owner', () => {
+    expect(classifyFlaggedPerson(person(), ctx())).toEqual({ recommendation: 'confident', reviewReasons: [] });
+  });
+
+  it('review-first: named person (even with one clean owner)', () => {
+    expect(classifyFlaggedPerson(person({ personName: 'Jula' }), ctx())).toEqual({
+      recommendation: 'review-first',
+      reviewReasons: ['named'],
+    });
+  });
+
+  it('treats empty / whitespace name as unnamed', () => {
+    expect(classifyFlaggedPerson(person({ personName: '' }), ctx()).reviewReasons).toEqual([]);
+    expect(classifyFlaggedPerson(person({ personName: ' '.repeat(3) }), ctx()).reviewReasons).toEqual([]);
+  });
+
+  it('large-cluster boundary: 50 is confident, 51 is review-first', () => {
+    expect(classifyFlaggedPerson(person({ faceCount: 50 }), ctx()).recommendation).toBe('confident');
+    expect(classifyFlaggedPerson(person({ faceCount: 51 }), ctx())).toEqual({
+      recommendation: 'review-first',
+      reviewReasons: ['large-cluster'],
+    });
+  });
+
+  it('uses the ctx largeClusterThreshold, not a hard-coded 50', () => {
+    const c = ctx({ largeClusterThreshold: 10 });
+    expect(classifyFlaggedPerson(person({ faceCount: 10 }), c).recommendation).toBe('confident');
+    expect(classifyFlaggedPerson(person({ faceCount: 11 }), c).reviewReasons).toEqual(['large-cluster']);
+  });
+
+  it('review-first: more than one distinct suspected owner', () => {
+    expect(classifyFlaggedPerson(person({ suspectedOwnerIds: ['owner-1', 'owner-2'] }), ctx()).reviewReasons).toEqual([
+      'multiple-owners',
+    ]);
+  });
+
+  it('does NOT flag multiple-owners when the same owner repeats', () => {
+    expect(
+      classifyFlaggedPerson(person({ suspectedOwnerIds: ['owner-1', 'owner-1', 'owner-1'] }), ctx()).reviewReasons,
+    ).toEqual([]);
+  });
+
+  it('review-first: suspected owner is itself in reviewOnlyPersonIds (bad-target)', () => {
+    const c = ctx({ reviewOnlyPersonIds: new Set(['owner-1']) });
+    expect(classifyFlaggedPerson(person(), c).reviewReasons).toEqual(['bad-target']);
+  });
+
+  it('review-first: the person itself is over-cap (own id in reviewOnlyPersonIds)', () => {
+    const c = ctx({ reviewOnlyPersonIds: new Set(['person-1']) });
+    expect(classifyFlaggedPerson(person(), c)).toEqual({
+      recommendation: 'review-first',
+      reviewReasons: ['over-cap'],
+    });
+  });
+
+  it('over-cap: a fully-contaminated unnamed small cluster is never confident', () => {
+    // 100% flagged toward ONE clean owner used to classify confident (auto-selected) — approving it would
+    // empty the cluster. The person's own over-cap status must force review-first.
+    const c = ctx({ reviewOnlyPersonIds: new Set(['person-1']) });
+    const result = classifyFlaggedPerson(person({ personName: null, faceCount: 8 }), c);
+    expect(result.recommendation).toBe('review-first');
+    expect(result.reviewReasons).toContain('over-cap');
+  });
+
+  it('accumulates reasons in deterministic order (named + large + multi + bad-target)', () => {
+    const c = ctx({ reviewOnlyPersonIds: new Set(['person-1', 'owner-2']) });
+    const result = classifyFlaggedPerson(
+      person({ personName: 'Jula', faceCount: 99, suspectedOwnerIds: ['owner-1', 'owner-2'] }),
+      c,
+    );
+    expect(result).toEqual({
+      recommendation: 'review-first',
+      reviewReasons: ['over-cap', 'named', 'large-cluster', 'multiple-owners', 'bad-target'],
+    });
+  });
+});
+
+const f = (assetFaceId: string, currentPersonId: string, suspectedOwnerId: string) => ({
+  assetFaceId,
+  currentPersonId,
+  suspectedOwnerId,
+});
+
+describe('isSubset', () => {
+  it('true when every element is present', () => {
+    expect(isSubset(new Set(['a']), new Set(['a', 'b']))).toBe(true);
+  });
+  it('false when an element is missing', () => {
+    expect(isSubset(new Set(['a', 'c']), new Set(['a', 'b']))).toBe(false);
+  });
+});
+
+describe('applyVerdictFilters', () => {
+  it('drops a face declined toward its current suspected owner', () => {
+    const flagged = new Map([['P', [f('face1', 'P', 'Q'), f('face2', 'P', 'Q')]]]);
+    applyVerdictFilters(flagged, {
+      negativeFaceTargets: new Map([['face1', new Set(['person:Q'])]]),
+      mutedPersons: new Map(),
+    });
+    expect(flagged.get('P')!.map((x) => x.assetFaceId)).toEqual(['face2']);
+  });
+
+  it('keeps a declined face if a DIFFERENT owner is now suspected (evidence changed)', () => {
+    const flagged = new Map([['P', [f('face1', 'P', 'R')]]]);
+    applyVerdictFilters(flagged, {
+      negativeFaceTargets: new Map([['face1', new Set(['person:Q'])]]),
+      mutedPersons: new Map(),
+    });
+    expect(flagged.get('P')!.map((x) => x.assetFaceId)).toEqual(['face1']);
+  });
+
+  it('drops a whole dismissed person when its suspected set is a subset of the fingerprint', () => {
+    const flagged = new Map([['P', [f('face1', 'P', 'Q'), f('face2', 'P', 'Q')]]]);
+    applyVerdictFilters(flagged, {
+      negativeFaceTargets: new Map(),
+      mutedPersons: new Map([['P', new Set(['Q', 'R'])]]),
+    });
+    expect(flagged.get('P')).toEqual([]);
+  });
+
+  it('re-surfaces a dismissed person when a NEW suspected owner appears', () => {
+    const flagged = new Map([['P', [f('face1', 'P', 'Q'), f('face2', 'P', 'S')]]]);
+    applyVerdictFilters(flagged, {
+      negativeFaceTargets: new Map(),
+      mutedPersons: new Map([['P', new Set(['Q'])]]),
+    });
+    expect(flagged.get('P')!.map((x) => x.assetFaceId)).toEqual(['face1', 'face2']);
+  });
+
+  it('applies face-level before person-level (a re-flagged new-owner face keeps the person)', () => {
+    const flagged = new Map([['P', [f('face1', 'P', 'Q'), f('face2', 'P', 'S')]]]);
+    applyVerdictFilters(flagged, {
+      negativeFaceTargets: new Map([['face1', new Set(['person:Q'])]]),
+      mutedPersons: new Map([['P', new Set(['Q'])]]),
+    });
+    // face1 dropped (declined); face2 toward NEW owner S keeps the person on the board
+    expect(flagged.get('P')!.map((x) => x.assetFaceId)).toEqual(['face2']);
+  });
+
+  // U1 (Slice 3): a locked face is dropped for EVERY suspected owner — owner-agnostic, independent of the
+  // decline map — unlike a decline, which only mutes one specific (face, suspectedOwner) pairing.
+  it('drops a locked face regardless of its suspected owner, whether or not it is also declined', () => {
+    const flagged = new Map([['P', [f('face1', 'P', 'Q'), f('face1', 'P', 'R'), f('face2', 'P', 'Q')]]]);
+    applyVerdictFilters(flagged, {
+      negativeFaceTargets: new Map(),
+      mutedPersons: new Map(),
+      manualLinkedFaceIds: new Set(['face1']),
+    });
+    expect(flagged.get('P')!.map((x) => x.assetFaceId)).toEqual(['face2']);
+  });
+
+  // U1 (temporal-consistency hardening design, Slice 4, E12): a regression lock proving the scoped-load
+  // change (Step 2 scopes buildRepairPlan's getDeclineMaps read to the flagged set) cannot change what gets
+  // dropped — applyVerdictFilters itself is agnostic to how its maps were populated, so feeding it a full
+  // (unscoped) DeclineMaps or one pre-filtered down to only the flagged set's own ids must produce identical
+  // results, as long as the scope actually covers every id the flagged set touches.
+  it('produces identical drops whether fed full (unscoped) maps or maps scoped to the flagged set', () => {
+    const buildFlagged = () =>
+      new Map([
+        ['P', [f('face1', 'P', 'Q'), f('face2', 'P', 'Q'), f('face3', 'P', 'R')]],
+        ['S', [f('face4', 'S', 'T')]],
+      ]);
+
+    // The FULL (unscoped) table contents: face1/face2/S are relevant to the flagged set above; face5/face6/X
+    // are entirely OUTSIDE it — the kind of unrelated row an unscoped read pulls in that a scoped read, built
+    // from the flagged set's own face/person ids, would never fetch.
+    const fullMaps = {
+      negativeFaceTargets: new Map([
+        ['face1', new Set(['person:Q'])],
+        ['face5', new Set(['person:Z'])],
+      ]),
+      mutedPersons: new Map([
+        ['S', new Set(['T'])],
+        ['X', new Set(['Z'])],
+      ]),
+      manualLinkedFaceIds: new Set(['face2', 'face6']),
+    };
+
+    // A scoped read only ever returns rows for the flagged assetFaceIds/personIds — simulate that by
+    // filtering fullMaps down to exactly the flagged set's own ids, mirroring what a real scoped
+    // buildVerdictMaps({ assetFaceIds, personIds, suspectedOwnerIds }) call returns.
+    const flaggedFaceIds = new Set(['face1', 'face2', 'face3', 'face4']);
+    const flaggedPersonIds = new Set(['P', 'S']);
+    const scopedMaps = {
+      negativeFaceTargets: new Map([...fullMaps.negativeFaceTargets].filter(([faceId]) => flaggedFaceIds.has(faceId))),
+      mutedPersons: new Map([...fullMaps.mutedPersons].filter(([personId]) => flaggedPersonIds.has(personId))),
+      manualLinkedFaceIds: fullMaps.manualLinkedFaceIds.intersection(flaggedFaceIds),
+    };
+
+    const withFull = buildFlagged();
+    applyVerdictFilters(withFull, fullMaps);
+
+    const withScoped = buildFlagged();
+    applyVerdictFilters(withScoped, scopedMaps);
+
+    const asPlainObject = (m: Map<string, { assetFaceId: string }[]>) =>
+      Object.fromEntries([...m].map(([id, faces]) => [id, faces.map((x) => x.assetFaceId)]));
+    expect(asPlainObject(withScoped)).toEqual(asPlainObject(withFull));
+
+    // Sanity: something was actually dropped by both — not a vacuous no-op comparison.
+    expect(withFull.get('P')!.map((x) => x.assetFaceId)).toEqual(['face3']);
+    expect(withScoped.get('P')!.map((x) => x.assetFaceId)).toEqual(['face3']);
+    expect(withFull.get('S')).toEqual([]);
+    expect(withScoped.get('S')).toEqual([]);
+  });
+});
+
+describe('findOverlappingIds', () => {
+  it('returns [] when every bucket is disjoint', () => {
+    expect(findOverlappingIds([['a', 'b'], ['c'], [], ['d']])).toEqual([]);
+  });
+
+  it('flags an id present in two different buckets (E7)', () => {
+    expect(
+      findOverlappingIds([
+        ['a', 'b'],
+        ['b', 'c'],
+      ]),
+    ).toEqual(['b']);
+  });
+
+  it('flags an id present in three buckets only once', () => {
+    expect(findOverlappingIds([['a'], ['a'], ['a']])).toEqual(['a']);
+  });
+
+  it('does not flag a duplicate id within the SAME bucket', () => {
+    expect(findOverlappingIds([['a', 'a'], ['b']])).toEqual([]);
+  });
+
+  // F14: resolveFaces used to flatten every moveToPerson group's faceIds into ONE bucket before calling this,
+  // which made a face routed to two different destinations invisible to the check below (both occurrences
+  // collapsed into the same bucket's within-bucket de-duplication). The fix is entirely at the CALLER — pass
+  // one bucket per move group — so this function needed no change; this test documents that it already
+  // supports that shape as long as the caller stops flattening.
+  it('flags a face present in two different moveToPerson groups, each passed as its own bucket (F14)', () => {
+    const groupToQ = ['face-1', 'face-2'];
+    const groupToR = ['face-1', 'face-3'];
+    expect(findOverlappingIds([groupToQ, groupToR, [], [], []])).toEqual(['face-1']);
+  });
+
+  // Positive control for the above: a face that only ever appears in ONE move group must NOT be flagged,
+  // proving the detection is genuinely about cross-group membership and not, say, "any face in a multi-group
+  // request".
+  it('does not flag a face that appears in only one of several moveToPerson groups', () => {
+    const groupToQ = ['face-1', 'face-2'];
+    const groupToR = ['face-3'];
+    expect(findOverlappingIds([groupToQ, groupToR, [], [], []])).toEqual([]);
+  });
+});
+
+describe('findUnresolvableIds', () => {
+  it('returns [] when every id is in the resolvable set', () => {
+    expect(findUnresolvableIds(['a', 'b'], new Set(['a', 'b', 'c']))).toEqual([]);
+  });
+
+  it('returns ids not present in the resolvable set (E15)', () => {
+    expect(findUnresolvableIds(['a', 'x', 'b', 'y'], new Set(['a', 'b']))).toEqual(['x', 'y']);
+  });
+
+  it('returns [] for an empty input', () => {
+    expect(findUnresolvableIds([], new Set(['a']))).toEqual([]);
   });
 });
