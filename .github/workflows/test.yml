@@ -38,6 +38,7 @@ jobs:
               - 'mise.toml'
               - 'packages/plugin-core/**'
               - 'packages/plugin-sdk/**'
+              - 'packages/plugin-gallery/**'
             cli:
               - 'packages/cli/**'
               - 'packages/sdk/**'
@@ -47,6 +48,7 @@ jobs:
               - 'e2e/**'
               - 'pnpm-lock.yaml'
               - 'mise.toml'
+              - 'packages/plugin-gallery/**'
             mobile:
               - 'mobile/**'
               - 'mise.toml'
