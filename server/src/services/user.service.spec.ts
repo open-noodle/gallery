@@ -964,10 +964,8 @@ describe(UserService.name, () => {
           .mockResolvedValueOnce(400),
       };
       (StorageService as any).s3Backend = s3Backend;
-      mocks.systemMetadata.get.mockResolvedValue({
-        storageUsage: { includeDerivativesInDisplay: true, includeDerivativesInQuota: false },
-      });
-      (mocks.user as any).setPhysicalUsage = vi.fn().mockResolvedValue(void 0);
+      mocks.systemMetadata.get.mockResolvedValue({ storageUsage: { includeDerivatives: true } });
+      (mocks.user as any).setUsage = vi.fn().mockResolvedValue(void 0);
       mocks.user.getList.mockResolvedValue([user]);
       mocks.asset.getExternalAssetIds.mockResolvedValue(new Set<string>());
       mocks.storage.getFolderSize
@@ -992,15 +990,13 @@ describe(UserService.name, () => {
         ['thumbs/user-id/', expect.any(Function)],
         ['encoded-video/user-id/', expect.any(Function)],
       ]);
-      expect((mocks.user as any).setPhysicalUsage).toHaveBeenCalledWith(user.id, 1150);
+      expect((mocks.user as any).setUsage).toHaveBeenCalledWith(user.id, 1150);
     });
 
     it('should sync disk usage from all managed user folders', async () => {
       const user = factory.userAdmin({ id: 'user-id', storageLabel: 'storage-label' });
-      mocks.systemMetadata.get.mockResolvedValue({
-        storageUsage: { includeDerivativesInDisplay: true, includeDerivativesInQuota: false },
-      });
-      (mocks.user as any).setPhysicalUsage = vi.fn().mockResolvedValue(void 0);
+      mocks.systemMetadata.get.mockResolvedValue({ storageUsage: { includeDerivatives: true } });
+      (mocks.user as any).setUsage = vi.fn().mockResolvedValue(void 0);
       mocks.user.getList.mockResolvedValue([user]);
       mocks.asset.getExternalAssetIds.mockResolvedValue(new Set<string>());
       mocks.storage.getFolderSize
@@ -1019,11 +1015,11 @@ describe(UserService.name, () => {
         ['/data/thumbs/user-id', expect.any(Function)],
         ['/data/encoded-video/user-id', expect.any(Function)],
       ]);
-      expect((mocks.user as any).setPhysicalUsage).toHaveBeenCalledWith(user.id, 1500);
+      expect((mocks.user as any).setUsage).toHaveBeenCalledWith(user.id, 1500);
     });
 
     it('should return JobStatus.Success', async () => {
-      (mocks.user as any).setPhysicalUsage = vi.fn().mockResolvedValue(void 0);
+      (mocks.user as any).setUsage = vi.fn().mockResolvedValue(void 0);
       mocks.user.getList.mockResolvedValue([]);
 
       const result = await sut.handleUserSyncUsage();
@@ -1031,29 +1027,26 @@ describe(UserService.name, () => {
       expect(result).toBe(JobStatus.Success);
     });
 
-    it('should reset quota usage from the database, not from disk', async () => {
+    it('should write the walked figure into quota usage and skip the originals-only statement', async () => {
       const user = factory.userAdmin({ id: 'user-id', storageLabel: 'storage-label' });
-      mocks.systemMetadata.get.mockResolvedValue({
-        storageUsage: { includeDerivativesInDisplay: true, includeDerivativesInQuota: false },
-      });
-      (mocks.user as any).setPhysicalUsage = vi.fn().mockResolvedValue(void 0);
+      mocks.systemMetadata.get.mockResolvedValue({ storageUsage: { includeDerivatives: true } });
+      (mocks.user as any).setUsage = vi.fn().mockResolvedValue(void 0);
       mocks.user.getList.mockResolvedValue([user]);
       mocks.asset.getExternalAssetIds.mockResolvedValue(new Set<string>());
       mocks.storage.getFolderSize.mockResolvedValue(100);
 
       await expect(sut.handleUserSyncUsage()).resolves.toBe(JobStatus.Success);
 
-      // the nightly job syncs every user, so the repository is called without an id filter
-      expect(mocks.user.syncUsage).toHaveBeenCalledWith(undefined);
-      expect((mocks.user as any).setPhysicalUsage).toHaveBeenCalledWith(user.id, 500);
+      expect((mocks.user as any).setUsage).toHaveBeenCalledWith(user.id, 500);
+      // Both write quotaUsageInBytes, so running upstream's statement as well would overwrite the
+      // walked figure with the originals-only one.
+      expect(mocks.user.syncUsage).not.toHaveBeenCalled();
     });
 
-    it('should skip the physical walk entirely when neither toggle is enabled', async () => {
+    it('should skip the physical walk entirely when the toggle is off', async () => {
       const user = factory.userAdmin({ id: 'user-id', storageLabel: 'storage-label' });
-      mocks.systemMetadata.get.mockResolvedValue({
-        storageUsage: { includeDerivativesInDisplay: false, includeDerivativesInQuota: false },
-      });
-      (mocks.user as any).setPhysicalUsage = vi.fn().mockResolvedValue(void 0);
+      mocks.systemMetadata.get.mockResolvedValue({ storageUsage: { includeDerivatives: false } });
+      (mocks.user as any).setUsage = vi.fn().mockResolvedValue(void 0);
       mocks.user.getList.mockResolvedValue([user]);
 
       await expect(sut.handleUserSyncUsage()).resolves.toBe(JobStatus.Success);
@@ -1061,16 +1054,14 @@ describe(UserService.name, () => {
       // the nightly job syncs every user, so the repository is called without an id filter
       expect(mocks.user.syncUsage).toHaveBeenCalledWith(undefined);
       expect(mocks.storage.getFolderSize).not.toHaveBeenCalled();
-      expect((mocks.user as any).setPhysicalUsage).not.toHaveBeenCalled();
+      expect((mocks.user as any).setUsage).not.toHaveBeenCalled();
     });
 
     it('should exclude derivatives belonging to external library assets', async () => {
       const externalId = '0f9b1e2c-4a5d-4c8e-9f10-2b3c4d5e6f70';
       const user = factory.userAdmin({ id: 'user-id', storageLabel: 'storage-label' });
-      mocks.systemMetadata.get.mockResolvedValue({
-        storageUsage: { includeDerivativesInDisplay: true, includeDerivativesInQuota: false },
-      });
-      (mocks.user as any).setPhysicalUsage = vi.fn().mockResolvedValue(void 0);
+      mocks.systemMetadata.get.mockResolvedValue({ storageUsage: { includeDerivatives: true } });
+      (mocks.user as any).setUsage = vi.fn().mockResolvedValue(void 0);
       mocks.user.getList.mockResolvedValue([user]);
       mocks.asset.getExternalAssetIds.mockResolvedValue(new Set([externalId]));
       mocks.storage.getFolderSize.mockResolvedValue(0);

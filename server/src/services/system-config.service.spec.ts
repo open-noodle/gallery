@@ -209,8 +209,7 @@ const updatedConfig = Object.freeze<SystemConfig>({
     template: '{{y}}/{{y}}-{{MM}}-{{dd}}/{{filename}}',
   },
   storageUsage: {
-    includeDerivativesInDisplay: false,
-    includeDerivativesInQuota: false,
+    includeDerivatives: false,
   },
   image: {
     thumbnail: {
@@ -443,13 +442,12 @@ describe(SystemConfigService.name, () => {
     it('should accept storageUsage from a config file', async () => {
       mocks.config.getEnv.mockReturnValue(mockEnvData({ configFile: 'immich-config.json' }));
       mocks.systemMetadata.readFile.mockResolvedValue(
-        JSON.stringify({ storageUsage: { includeDerivativesInDisplay: true, includeDerivativesInQuota: true } }),
+        JSON.stringify({ storageUsage: { includeDerivatives: true } }),
       );
 
       const config = await sut.getConfig({ withCache: false });
 
-      expect(config.storageUsage.includeDerivativesInDisplay).toBe(true);
-      expect(config.storageUsage.includeDerivativesInQuota).toBe(true);
+      expect(config.storageUsage.includeDerivatives).toBe(true);
     });
 
     it('should default generated memory settings', async () => {
@@ -918,11 +916,10 @@ describe(SystemConfigService.name, () => {
   });
 
   describe('storageUsage defaults', () => {
-    it('should default both derivative toggles to off (upstream behavior)', async () => {
+    it('should default the derivative toggle to off (upstream behavior)', async () => {
       const config = await sut.getConfig({ withCache: false });
 
-      expect(config.storageUsage.includeDerivativesInDisplay).toBe(false);
-      expect(config.storageUsage.includeDerivativesInQuota).toBe(false);
+      expect(config.storageUsage.includeDerivatives).toBe(false);
     });
   });
 });

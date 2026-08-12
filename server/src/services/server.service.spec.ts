@@ -196,7 +196,6 @@ describe(ServerService.name, () => {
         maintenanceMode: false,
         minFaces: 3,
         availableMemoryTypes: ['on_this_day', 'birthday', 'recent_trip'],
-        storageUsageIncludesDerivatives: false,
       });
       expect(mocks.systemMetadata.get).toHaveBeenCalled();
     });
@@ -649,26 +648,6 @@ describe(ServerService.name, () => {
       const result = await sut.getSystemConfig();
 
       expect(result.isInitialized).toBe(true);
-    });
-
-    it('should report whether displayed usage includes derivatives', async () => {
-      clearConfigCache();
-      mocks.systemMetadata.get.mockResolvedValue({
-        storageUsage: { includeDerivativesInDisplay: true, includeDerivativesInQuota: false },
-      });
-
-      await expect(sut.getSystemConfig()).resolves.toMatchObject({ storageUsageIncludesDerivatives: true });
-    });
-
-    it('should report derivatives as included when only quota enforcement opts in', async () => {
-      clearConfigCache();
-      mocks.systemMetadata.get.mockResolvedValue({
-        storageUsage: { includeDerivativesInDisplay: false, includeDerivativesInQuota: true },
-      });
-
-      // Displaying the originals-only figure while enforcing the physical one is the
-      // "misleading number" this branch exists to remove, so quota implies display.
-      await expect(sut.getSystemConfig()).resolves.toMatchObject({ storageUsageIncludesDerivatives: true });
     });
   });
 

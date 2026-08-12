@@ -1,4 +1,4 @@
-import { Kysely, sql } from 'kysely';
+import { Kysely } from 'kysely';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { UserRepository } from 'src/repositories/user.repository';
 import { DB } from 'src/schema';
@@ -21,28 +21,10 @@ const setup = () => {
   return { ctx, sut: ctx.get(UserRepository) };
 };
 
-// These assertions are about what updateUsage writes, so read both usage columns straight off the
-// row rather than through UserRepository.get — no projection between the write and the check.
+// These assertions are about what the repository writes, so read the column straight off the row
+// rather than through UserRepository.get — no projection between the write and the check.
 const getUsage = (userId: string) =>
-  db
-    .selectFrom('user')
-    .select(['quotaUsageInBytes', 'physicalUsageInBytes'])
-    .where('id', '=', userId)
-    .executeTakeFirstOrThrow();
-
-describe('physicalUsageInBytes column', () => {
-  it('exists after migrations and defaults to zero', async () => {
-    const result = await sql<{
-      column_default: string | null;
-      is_nullable: string;
-    }>`SELECT column_default, is_nullable FROM information_schema.columns
-       WHERE table_name = 'user' AND column_name = 'physicalUsageInBytes'`.execute(db);
-
-    expect(result.rows).toHaveLength(1);
-    expect(result.rows[0].is_nullable).toBe('NO');
-    expect(result.rows[0].column_default).toBe('0');
-  });
-});
+  db.selectFrom('user').select(['quotaUsageInBytes']).where('id', '=', userId).executeTakeFirstOrThrow();
 
 describe('UserRepository.syncUsage', () => {
   it('sums originals and ignores external library assets', async () => {
@@ -64,37 +46,43 @@ describe('UserRepository.syncUsage', () => {
     await sut.syncUsage(user.id);
     await sut.syncUsage(other.id);
 
-    const after = await getUsage(user.id);
-    expect(after.quotaUsageInBytes).toBe(1000);
-    // The quota sync must not touch the fork-owned physical column.
-    expect(after.physicalUsageInBytes).toBe(0);
-
-    const otherAfter = await getUsage(other.id);
-    expect(otherAfter.quotaUsageInBytes).toBe(77);
+    await expect(getUsage(user.id)).resolves.toEqual({ quotaUsageInBytes: 1000 });
+    await expect(getUsage(other.id)).resolves.toEqual({ quotaUsageInBytes: 77 });
   });
 });
 
 describe('UserRepository.updateUsage', () => {
-  it('moves both the quota and the physical column', async () => {
+  it('applies the delta to the quota column', async () => {
     const { ctx, sut } = setup();
     const { user } = await ctx.newUser();
 
     await sut.updateUsage(user.id, 500);
 
-    const after = await getUsage(user.id);
-    expect(after.quotaUsageInBytes).toBe(500);
-    expect(after.physicalUsageInBytes).toBe(500);
+    await expect(getUsage(user.id)).resolves.toEqual({ quotaUsageInBytes: 500 });
   });
 
-  it('clamps the physical column at zero', async () => {
+  it('keeps upstream unclamped arithmetic for a negative delta', async () => {
     const { ctx, sut } = setup();
     const { user } = await ctx.newUser();
 
     await sut.updateUsage(user.id, -500);
 
-    const after = await getUsage(user.id);
-    expect(after.physicalUsageInBytes).toBe(0);
-    // Deliberate asymmetry: the quota column keeps upstream's exact unclamped arithmetic.
-    expect(after.quotaUsageInBytes).toBe(-500);
+    await expect(getUsage(user.id)).resolves.toEqual({ quotaUsageInBytes: -500 });
+  });
+});
+
+describe('UserRepository.setUsage', () => {
+  it('overwrites the same column syncUsage fills', async () => {
+    const { ctx, sut } = setup();
+    const { user } = await ctx.newUser();
+    const { asset } = await ctx.newAsset({ ownerId: user.id });
+    await ctx.newExif({ assetId: asset.id, fileSizeInByte: 1000 });
+
+    await sut.syncUsage(user.id);
+    // The derivative-inclusive walk writes here, so display and quota enforcement read whichever
+    // figure the admin's toggle selected without knowing which one produced it.
+    await sut.setUsage(user.id, 4321);
+
+    await expect(getUsage(user.id)).resolves.toEqual({ quotaUsageInBytes: 4321 });
   });
 });
