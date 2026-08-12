@@ -98,6 +98,7 @@ export interface EnvData {
       indexHtml: string;
     };
     corePlugin: string;
+    galleryPlugin: string;
   };
 
   redis: RedisOptions;
@@ -361,6 +362,7 @@ const getEnv = (): EnvData => {
         indexHtml: join(folders.web, 'index.html'),
       },
       corePlugin: join(buildFolder, 'plugins', 'immich-plugin-core'),
+      galleryPlugin: join(buildFolder, 'plugins', 'gallery-core'),
     },
 
     setup: {
