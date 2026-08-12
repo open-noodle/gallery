@@ -16,11 +16,17 @@
   let spaces = $state<SharedSpaceResponseDto[]>([]);
 
   $effect(() => {
-    void getAllSpaces()
-      .then((result) => (spaces = result))
-      // A workflow outlives the spaces it points at. Failing to resolve names must never take the
-      // step editor down — unresolved ids fall back to a removable placeholder.
-      .catch(() => (spaces = []));
+    const load = async () => {
+      try {
+        spaces = await getAllSpaces();
+      } catch {
+        // A workflow outlives the spaces it points at. Failing to resolve names must never take the
+        // step editor down — unresolved ids fall back to a removable placeholder.
+        spaces = [];
+      }
+    };
+
+    void load();
   });
 
   const nameFor = (id: string) => spaces.find((space) => space.id === id)?.name;

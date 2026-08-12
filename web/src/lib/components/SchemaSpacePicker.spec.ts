@@ -1,10 +1,10 @@
-import SchemaSpacePickerWrapper from '$lib/components/SchemaSpacePicker.test-wrapper.svelte';
 import { getAllSpaces } from '@immich/sdk';
 import { modalManager } from '@immich/ui';
 import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { init, register, waitLocale } from 'svelte-i18n';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import SchemaSpacePickerWrapper from '$lib/components/SchemaSpacePicker.test-wrapper.svelte';
 
 // Module mocks, matching the pattern used across this suite. `vi.spyOn` on these is not the
 // convention here, and an unmocked @immich/sdk would attempt a real fetch under happy-dom.
