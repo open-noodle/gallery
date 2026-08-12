@@ -19,6 +19,50 @@ type SmartSearchParamsArgs = {
   language?: string;
 };
 
+/**
+ * How query mode (smart search) treats each filter-panel dimension.
+ *
+ * - `sent` — forwarded to `SmartSearchDto`, possibly under a different name
+ *   (`albumId` → `albumIds`, `mediaType` → `type`, `sortOrder` → `order`).
+ * - `derived` — not sent directly; folded into another param by `buildFilterContext`
+ *   (the date fields all collapse into `takenAfter` / `takenBefore`).
+ * - `unsupported` — `SmartSearchDto` has no such field, so the chip cannot apply in query
+ *   mode. Browse mode (`MetadataSearchDto`) does support these; see `filter-search-terms.ts`.
+ *
+ * `satisfies Record<keyof FilterState, …>` is the point of this map: adding a dimension to
+ * `FilterState` without classifying it here fails `tsc`. Without that, a new filter silently
+ * fails to reach smart search while its chip still renders as active — which is exactly how
+ * `state`, `lensModel`, `ownerId`, `ocr` and `albumId` came to be dropped.
+ */
+export const QUERY_MODE_FILTER_HANDLING = {
+  personIds: 'sent',
+  city: 'sent',
+  country: 'sent',
+  make: 'sent',
+  model: 'sent',
+  lensModel: 'sent',
+  state: 'sent',
+  albumId: 'sent',
+  ownerId: 'sent',
+  ocr: 'sent',
+  tagIds: 'sent',
+  rating: 'sent',
+  mediaType: 'sent',
+  isFavorite: 'sent',
+  isNotInAlbum: 'sent',
+  isInAlbum: 'sent',
+  sortOrder: 'sent',
+  // SmartSearchDto exposes neither field. Both are unindexed leading-wildcard `ilike` scans that
+  // upstream only put on MetadataSearchDto; adding them to smart search is a perf decision, not
+  // plumbing. Until then a description / filename chip does not narrow query-mode results.
+  description: 'unsupported',
+  originalFileName: 'unsupported',
+  dateAfter: 'derived',
+  dateBefore: 'derived',
+  selectedYear: 'derived',
+  selectedMonth: 'derived',
+} satisfies Record<keyof FilterState, 'sent' | 'derived' | 'unsupported'>;
+
 export function buildSmartSearchParams(args: SmartSearchParamsArgs): SmartSearchDto {
   const { query, filters, spaceId, withSharedSpaces, language } = args;
   const params: SmartSearchDto = { query };
@@ -51,6 +95,25 @@ export function buildSmartSearchParams(args: SmartSearchParamsArgs): SmartSearch
   }
   if (filters.model) {
     params.model = filters.model;
+  }
+  if (filters.state) {
+    params.state = filters.state;
+  }
+  if (filters.lensModel) {
+    params.lensModel = filters.lensModel;
+  }
+  if (filters.ownerId) {
+    params.ownerId = filters.ownerId;
+  }
+  if (filters.ocr?.trim()) {
+    params.ocr = filters.ocr.trim();
+  }
+  if (filters.albumId) {
+    // SmartSearchDto's albumIds is plural; wrap the single contextual filter value, matching
+    // filterStateToSearchTerms. Unlike the suggestion endpoints — where albumId is a *scope* and
+    // carries IsNotSiblingOf guards against spaceId / withSharedSpaces — here albumIds is a plain
+    // filter with no sibling guard, so it composes safely with either scope.
+    params.albumIds = [filters.albumId];
   }
   if (filters.tagIds.length > 0) {
     params.tagIds = filters.tagIds;

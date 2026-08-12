@@ -1,6 +1,7 @@
 import { AssetTypeEnum, AssetVisibility } from '@immich/sdk';
 import { createFilterState } from '$lib/components/filter-panel/filter-panel';
 import {
+  buildAlbumMapMarkerOptions,
   buildMapMarkerOptions,
   buildMapTimeBucketOptions,
   buildMapTimelineOptions,
@@ -41,6 +42,33 @@ describe('buildMapMarkerOptions', () => {
 
     expect(buildMapMarkerOptions(filters)).not.toHaveProperty('isInAlbum');
   });
+
+  // The map-markers DTO now exposes albumId (server forwards it as albumIds: [albumId] to
+  // searchAssetBuilder's inAlbums()), so it must be forwarded here too — otherwise the map's pins
+  // would ignore the album filter that the map's own timeline picker honours (a fresh instance of #767).
+  it('forwards lensModel/state/ownerId/albumId', () => {
+    const options = buildMapMarkerOptions(
+      { ...createFilterState(), lensModel: 'RF24', state: 'Hamburg', ownerId: 'u1', albumId: 'a1' },
+      undefined,
+    );
+
+    expect(options).toMatchObject({ lensModel: 'RF24', state: 'Hamburg', ownerId: 'u1', albumId: 'a1' });
+  });
+
+  // Finding 2 (#767 fresh instance): a Space filtered by description/filename/OCR carries those
+  // filters to the map via encodeFilterParams — the map hydrates them, counts them, and shows a
+  // chip for each — but the marker query silently dropped all three, so the map showed EVERY pin
+  // in the space while claiming the filter was active. Forward them for real.
+  it('forwards description/filename/ocr filters carried from a space', () => {
+    const options = buildMapMarkerOptions({
+      ...createFilterState(),
+      description: 'sunset',
+      originalFileName: 'IMG_1234',
+      ocr: 'stop sign',
+    });
+
+    expect(options).toMatchObject({ description: 'sunset', originalFileName: 'IMG_1234', ocr: 'stop sign' });
+  });
 });
 
 describe('buildMapTimeBucketOptions', () => {
@@ -53,7 +81,6 @@ describe('buildMapTimeBucketOptions', () => {
       tagIds: ['tag-1'],
       rating: 4,
       mediaType: 'video' as const,
-      isFavorite: true,
       isNotInAlbum: true,
       selectedYear: 2015,
       selectedMonth: 3,
@@ -67,12 +94,35 @@ describe('buildMapTimeBucketOptions', () => {
       model: 'EOS R6',
       tagIds: ['tag-1'],
       rating: 4,
-      isFavorite: true,
       isNotInAlbum: true,
       $type: AssetTypeEnum.Video,
       takenAfter: '2015-03-01T00:00:00.000Z',
       takenBefore: '2015-04-01T00:00:00.000Z',
     });
+  });
+
+  // The favourites chip 400s the map's temporal picker: timeline.service.ts (timeBucketChecks)
+  // REJECTS withSharedSpaces together with isFavorite — "a favourite is the asset owner's flag" —
+  // so sending both errored getTimeBuckets and the cluster panel while the markers answered fine.
+  // Mirror buildPhotosTimelineOptions: it drops withPartners/withSharedSpaces for a favourites
+  // query, which also matches what the marker endpoint does (it does NOT widen a favourites query
+  // to shared spaces either), so the two surfaces still agree.
+  it('drops withSharedSpaces for a favourites time-bucket query (the server 400s the combination)', () => {
+    const options = buildMapTimeBucketOptions({ ...createFilterState(), isFavorite: true });
+
+    expect(options).toMatchObject({ visibility: AssetVisibility.Timeline, isFavorite: true });
+    expect(options).not.toHaveProperty('withSharedSpaces');
+  });
+
+  it('drops withSharedSpaces for an explicitly non-favourite time-bucket query too', () => {
+    const options = buildMapTimeBucketOptions({ ...createFilterState(), isFavorite: false });
+
+    expect(options).toMatchObject({ isFavorite: false });
+    expect(options).not.toHaveProperty('withSharedSpaces');
+  });
+
+  it('keeps withSharedSpaces when the favourites chip is off', () => {
+    expect(buildMapTimeBucketOptions(createFilterState())).toMatchObject({ withSharedSpaces: true });
   });
 
   it('uses the current space instead of global timeline visibility when spaceId is present', () => {
@@ -119,6 +169,40 @@ describe('buildMapTimeBucketOptions', () => {
     expect(buildMapTimeBucketOptions(filters)).toEqual(
       expect.objectContaining({ takenBefore: '2025-01-01T00:00:00.000Z' }),
     );
+  });
+
+  it('forwards the new filter dimensions to the map time bucket query', () => {
+    const filters = {
+      ...createFilterState(),
+      lensModel: 'RF24-70mm F2.8 L IS USM',
+      state: 'State of Berlin',
+      albumId: 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',
+      ownerId: 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb',
+    };
+
+    expect(buildMapTimeBucketOptions(filters)).toMatchObject({
+      lensModel: 'RF24-70mm F2.8 L IS USM',
+      state: 'State of Berlin',
+      albumId: 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',
+      ownerId: 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb',
+    });
+  });
+
+  // Finding 2: the temporal picker's time buckets must agree with the marker pins — both read the
+  // same active filters, so a Space's description/filename/OCR filter must narrow both alike.
+  it('forwards description/filename/ocr filters to the map time bucket query', () => {
+    const filters = {
+      ...createFilterState(),
+      description: 'sunset',
+      originalFileName: 'IMG_1234',
+      ocr: 'stop sign',
+    };
+
+    expect(buildMapTimeBucketOptions(filters)).toMatchObject({
+      description: 'sunset',
+      originalFileName: 'IMG_1234',
+      ocr: 'stop sign',
+    });
   });
 });
 
@@ -168,54 +252,51 @@ describe('buildMapTimelineOptions', () => {
     });
   });
 
-  it('omits partners when favorites filter is selected for global map cluster timelines', () => {
-    const filters = {
-      ...createFilterState(),
-      isFavorite: true,
-    };
-    const selectedClusterIds = new Set(['asset-1']);
+  // Task 11 Step 2: the cluster panel's asset scope must be EXACTLY the marker query's scope. The
+  // marker endpoint (FilteredMapMarkerDto) has no partner scope at all — it is owner-scoped plus the
+  // caller's timeline-enabled spaces — so a partner asset can never be a pin, and the panel asking
+  // for withPartners could only ever list an asset the map has no pin for. Today that is masked by
+  // the client-side assetFilter (the panel is constrained to ids taken from the markers); it
+  // surfaces the moment that constraint is relaxed. Same for onlyFavorites, which the markers also
+  // ignore — as a settings-derived narrowing it made the panel show FEWER assets than the cluster's
+  // own pin count. The legacy $mapSettings asset-scope toggles feed the legacy /map/markers endpoint
+  // only; the filter panel is the single source of truth for this map's scope.
+  it('never asks the cluster timeline for partner assets (the markers have no partner scope, so a partner asset has no pin)', () => {
+    const options = buildMapTimelineOptions(createFilterState(), '1,2,3,4', new Set(['asset-1']));
 
-    const options = buildMapTimelineOptions(filters, '1,2,3,4', selectedClusterIds, undefined, {
-      withPartners: true,
-    });
-
-    expect(options).toEqual(
-      expect.objectContaining({
-        isFavorite: true,
-      }),
-    );
     expect(options).not.toHaveProperty('withPartners');
   });
 
-  it('omits partners when map favorites setting is enabled for global map cluster timelines', () => {
-    const selectedClusterIds = new Set(['asset-1']);
+  it('does not narrow the cluster timeline to favourites unless the FILTERS say so (the markers do not)', () => {
+    const options = buildMapTimelineOptions(createFilterState(), '1,2,3,4', new Set(['asset-1']));
 
-    const options = buildMapTimelineOptions(createFilterState(), '1,2,3,4', selectedClusterIds, undefined, {
-      onlyFavorites: true,
-      withPartners: true,
-    });
-
-    expect(options).toEqual(
-      expect.objectContaining({
-        isFavorite: true,
-      }),
-    );
-    expect(options).not.toHaveProperty('withPartners');
-  });
-
-  it('keeps partners when global map cluster timelines are not narrowed to favorites', () => {
-    const selectedClusterIds = new Set(['asset-1']);
-
-    const options = buildMapTimelineOptions(createFilterState(), '1,2,3,4', selectedClusterIds, undefined, {
-      withPartners: true,
-    });
-
-    expect(options).toEqual(
-      expect.objectContaining({
-        withPartners: true,
-      }),
-    );
     expect(options).not.toHaveProperty('isFavorite');
+  });
+
+  it('forwards the favourites FILTER to the cluster timeline (the markers honour it too)', () => {
+    const options = buildMapTimelineOptions(
+      { ...createFilterState(), isFavorite: true },
+      '1,2,3,4',
+      new Set(['asset-1']),
+    );
+
+    expect(options).toEqual(expect.objectContaining({ isFavorite: true }));
+    expect(options).not.toHaveProperty('withPartners');
+  });
+
+  // Same 400 as the temporal picker above: the cluster panel is a timeline query, so it must not
+  // send withSharedSpaces beside isFavorite.
+  it('drops withSharedSpaces for a favourites cluster timeline (the server 400s the combination)', () => {
+    const options = buildMapTimelineOptions({ ...createFilterState(), isFavorite: true }, '1,2,3,4', new Set(['a1']));
+
+    expect(options).toMatchObject({ visibility: AssetVisibility.Timeline, isFavorite: true });
+    expect(options).not.toHaveProperty('withSharedSpaces');
+  });
+
+  it('keeps withSharedSpaces on the cluster timeline when the favourites chip is off', () => {
+    expect(buildMapTimelineOptions(createFilterState(), '1,2,3,4', new Set(['a1']))).toMatchObject({
+      withSharedSpaces: true,
+    });
   });
 });
 
@@ -382,6 +463,46 @@ describe('text filters (#802)', () => {
       expect(options).not.toHaveProperty('description');
       expect(options).not.toHaveProperty('originalFileName');
       expect(options).not.toHaveProperty('ocr');
+    });
+  });
+});
+
+describe('buildAlbumMapMarkerOptions', () => {
+  it('scopes to the album and forwards the active filters', () => {
+    const options = buildAlbumMapMarkerOptions('album-1', {
+      ...createFilterState(),
+      make: 'Apple',
+      rating: 4,
+      lensModel: 'RF24-70mm',
+    });
+
+    expect(options).toMatchObject({ albumId: 'album-1', make: 'Apple', rating: 4, lensModel: 'RF24-70mm' });
+  });
+
+  it('sends the album scope alone — no spaceId, no withSharedSpaces, no owner scope', () => {
+    // The server derives everything else from albumId: it checks AlbumRead, leaves userIds unset,
+    // and computes timelineSpaceIds itself so albumSharedSpaceScope can keep unreachable space
+    // assets out (R4). The client must NOT try to help by adding withSharedSpaces — that flag also
+    // widens person-token resolution scope in SharedSpaceService.getFilteredMapMarkers
+    // (server/src/services/shared-space.service.ts), which is not what an album query wants.
+    expect(buildAlbumMapMarkerOptions('album-1', createFilterState())).toEqual({ albumId: 'album-1' });
+  });
+
+  // Finding 2: description/filename/OCR must narrow the album map the same way they narrow the
+  // album grid — this is also what AlbumMap's marker-options refetch key now keys on.
+  it('forwards description/filename/ocr filters', () => {
+    const options = buildAlbumMapMarkerOptions('album-1', {
+      ...createFilterState(),
+      description: 'sunset',
+      originalFileName: 'IMG_1234',
+      ocr: 'stop sign',
+    });
+
+    expect(options).toMatchObject({
+      albumId: 'album-1',
+      description: 'sunset',
+      originalFileName: 'IMG_1234',
+      ocr: 'stop sign',
     });
   });
 });

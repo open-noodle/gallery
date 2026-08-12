@@ -116,6 +116,42 @@ describe('buildMapFilterConfig', () => {
       expect(getFilterSuggestions).toHaveBeenCalledWith(expect.not.objectContaining({ isInAlbum: expect.anything() }));
     });
 
+    it('should narrow the map suggestions by state, lens and contributor', async () => {
+      const config = buildMapFilterConfig();
+      await config.suggestionsProvider!({
+        ...emptyFilters,
+        state: 'Bavaria',
+        lensModel: 'RF24-105mm F4 L IS USM',
+        ownerId: 'owner-1',
+      });
+
+      expect(getFilterSuggestions).toHaveBeenCalledWith(
+        expect.objectContaining({
+          state: 'Bavaria',
+          lensModel: 'RF24-105mm F4 L IS USM',
+          ownerId: 'owner-1',
+        }),
+      );
+    });
+
+    it('should never send the album filter or the free-text filters to the suggestion endpoint', async () => {
+      // `albumId` there is a SCOPE, mutually exclusive with the `withSharedSpaces` this surface
+      // sends: forwarding it would 400 the request rather than narrow anything.
+      const config = buildMapFilterConfig();
+      await config.suggestionsProvider!({
+        ...emptyFilters,
+        albumId: '11111111-1111-4111-8111-111111111111',
+        description: 'cake',
+        originalFileName: 'IMG_1.jpg',
+        ocr: 'happy',
+      });
+
+      expect(getFilterSuggestions).toHaveBeenCalledWith(expect.not.objectContaining({ albumId: expect.anything() }));
+      for (const key of ['description', 'originalFileName', 'ocr']) {
+        expect(vi.mocked(getFilterSuggestions).mock.lastCall![0]).not.toHaveProperty(key);
+      }
+    });
+
     it('should map people with thumbnail URLs', async () => {
       vi.mocked(getFilterSuggestions).mockResolvedValueOnce({
         countries: [],

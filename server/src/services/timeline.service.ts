@@ -156,11 +156,27 @@ export class TimelineService extends BaseService {
       throw new BadRequestException('Trashed assets are not available when browsing a shared space or album');
     }
 
+    // Each scope that is REQUESTED is checked — never `else if`. Both predicates go into the query
+    // when both are present (an AND), so gating on only the first one let a caller with access to
+    // album A learn which of A's assets belong to a space S they are not a member of: a membership
+    // oracle (no asset leaks — every returned asset is in an album they may read — but the space
+    // boundary was still answering questions for them). The filtered map endpoint refuses the
+    // combination outright (shared-space.service.ts getFilteredMapMarkers); the timeline answers it,
+    // so it must enforce the boundary it is querying.
     if (dto.albumId) {
       await this.requireAccess({ auth, permission: Permission.AlbumRead, ids: [dto.albumId] });
-    } else if (dto.spaceId) {
+    }
+
+    if (dto.spaceId) {
       await this.requireAccess({ auth, permission: Permission.SharedSpaceRead, ids: [dto.spaceId] });
-    } else {
+    }
+
+    // Only the un-scoped timeline defaults to "my assets". Under an album (or a space) the CALLER
+    // states the owner scope: the album page sends none, because album ACCESS is its whole scope and
+    // a viewer must see the owner's assets (medium E22); /photos sends `userId`, because it is my
+    // personal timeline and the album chip must NARROW it, not redefine it (D3 — see
+    // web/src/lib/utils/photos-filter-options.ts). Defaulting userId here would break the former.
+    if (!dto.albumId && !dto.spaceId) {
       dto.userId ||= auth.user.id;
     }
 

@@ -56,8 +56,6 @@
     buildSearchablePageUrl,
     getSearchablePageFilterState,
     getSearchablePageState,
-    preserveTransientTemporalFilters,
-    type SearchablePageTransientTemporalState,
   } from '$lib/utils/searchable-page-search';
   import {
     buildSmartSearchFacetKey,
@@ -114,9 +112,6 @@
   let temporalAnchor = $state<TimelineTemporalAnchor | undefined>();
   let committedQuery = $state(initialSearchState.query);
   let lastHandledSearchState = $state(`${initialSearchState.query}:${initialSearchState.sortOrder}:${page.url.search}`);
-  let pendingFilterUrlSync = $state<
-    { url: string; transientTemporal?: SearchablePageTransientTemporalState } | undefined
-  >();
   let isLoading = $state(false);
   const showSearchResults = $derived(committedQuery.trim().length > 0);
   // Loaded smart search results. The timeline (and its TimelineManager) is unmounted while
@@ -124,7 +119,10 @@
   let searchResults = $state<AssetResponseDto[]>([]);
   // Bumped to force a re-run of the search (undo-delete restores the removed assets).
   let searchReloadToken = $state(0);
-  const options = $derived({ ...buildRecentlyAddedTimelineOptions(filters), grouping: timelineGrouping });
+  const options = $derived({
+    ...buildRecentlyAddedTimelineOptions(filters, authManager.user.id),
+    grouping: timelineGrouping,
+  });
   $effect(() => {
     filtersBeforePanelChange = filters;
   });
@@ -150,7 +148,7 @@
   // Browse mode fetches its own bucket set; query mode keeps the smart-search facets, which already
   // bucket on takenAt.
   let pickerBuckets = $state<Array<{ timeBucket: string; count: number }>>([]);
-  const pickerBucketOptions = $derived(buildRecentlyAddedPickerBucketOptions(filters));
+  const pickerBucketOptions = $derived(buildRecentlyAddedPickerBucketOptions(filters, authManager.user.id));
 
   $effect(() => {
     // Read the derived options up front so every filter change is tracked as a dependency.
@@ -387,13 +385,6 @@
     if (!nextUrl || nextUrl === page.url.pathname + page.url.search) {
       return;
     }
-    pendingFilterUrlSync = {
-      url: nextUrl,
-      transientTemporal: {
-        selectedYear: nextFilters.selectedYear,
-        selectedMonth: nextFilters.selectedMonth,
-      },
-    };
     void goto(nextUrl, { replaceState: true, keepFocus: true, noScroll: true });
   }
 
@@ -452,7 +443,6 @@
   $effect(() => {
     const nextSearchState = getSearchablePageState(page.url);
     const nextToken = `${nextSearchState.query}:${nextSearchState.sortOrder}:${page.url.search}`;
-    const currentUrl = page.url.pathname + page.url.search;
 
     if (nextToken === lastHandledSearchState) {
       return;
@@ -460,19 +450,17 @@
 
     const queryChanged = nextSearchState.query !== committedQuery;
     untrack(() => {
+      // Every filter — including the temporal picker's year/month — round-trips through the URL, so
+      // rebuilding FilterState from the URL alone is lossless. Any URL change (back/forward, a
+      // shared link, or the `?at=` write from closing the asset viewer) re-hydrates the same state.
       const filterState = getSearchablePageFilterState(page.url);
-      const transientTemporal =
-        pendingFilterUrlSync?.url === currentUrl ? pendingFilterUrlSync.transientTemporal : undefined;
       committedQuery = nextSearchState.query;
       isLoading = false;
       filters = {
         ...createFilterState(),
-        ...preserveTransientTemporalFilters(filterState, transientTemporal),
+        ...filterState,
         sortOrder: nextSearchState.sortOrder,
       };
-      if (pendingFilterUrlSync?.url === currentUrl) {
-        pendingFilterUrlSync = undefined;
-      }
       consumeTypedSearchNamesInto(page.url.pathname + page.url.search, personNames, tagNames);
       if (queryChanged) {
         smartFacetInFlight?.controller.abort();

@@ -46,11 +46,24 @@
     searchQuery.trim() ? people.filter((p) => p.name.toLowerCase().includes(searchQuery.trim().toLowerCase())) : people,
   );
 
-  let visiblePeople = $derived(
-    searchQuery.trim() || showAll ? filteredPeople : filteredPeople.slice(0, INITIAL_SHOW_COUNT),
-  );
+  // Selected people are hoisted out of the truncated head for the same reason tags-filter hoists
+  // selected tags: with the head only five rows long, a person filter applied from anywhere but this
+  // list (a contextual filter clicked in the viewer, a shared link, typed search) was invisible here.
+  let visiblePeople = $derived.by(() => {
+    if (searchQuery.trim() || showAll) {
+      return filteredPeople;
+    }
 
-  let remainingCount = $derived(filteredPeople.length - INITIAL_SHOW_COUNT);
+    const selected = filteredPeople.filter((person) => selectedIds.includes(person.id));
+    if (selected.length === 0) {
+      return filteredPeople.slice(0, INITIAL_SHOW_COUNT);
+    }
+
+    const rest = filteredPeople.filter((person) => !selectedIds.includes(person.id));
+    return [...selected, ...rest].slice(0, Math.max(INITIAL_SHOW_COUNT, selected.length));
+  });
+
+  let remainingCount = $derived(filteredPeople.length - visiblePeople.length);
 
   function getInitial(name: string): string {
     return name.charAt(0).toUpperCase();

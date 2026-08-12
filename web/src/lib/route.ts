@@ -1,6 +1,8 @@
 import { getBaseUrl, IntegrityReport, QueueName, type MetadataSearchDto, type SmartSearchDto } from '@immich/sdk';
 import { omitBy } from 'lodash-es';
-import { OpenQueryParam, type SharedLinkTab } from '$lib/constants';
+import type { FilterState } from '$lib/components/filter-panel/filter-panel';
+import { OpenQueryParam, QueryParameter, type SharedLinkTab } from '$lib/constants';
+import { encodeFilterParams } from '$lib/utils/filter-url';
 
 const asQueueSlug = (name: QueueName) => {
   return name.replaceAll(/[A-Z]/g, (m) => '-' + m.toLowerCase());
@@ -76,8 +78,38 @@ export const Route = {
   maintenanceMode: (params?: { continue?: string }) => '/maintenance' + asQueryString(params),
 
   // map
-  map: (point?: { zoom: number; lat: number; lng: number }) =>
-    '/map' + (point ? `#${point.zoom}/${point.lat}/${point.lng}` : ''),
+  //
+  // Emits `/map?<scope+filters>#<zoom>/<lat>/<lng>` (E11). The map keeps its VIEWPORT in the hash
+  // (`<Map hash>` on the map page) and its SCOPE + FILTERS in the query, so both halves have to be
+  // buildable from one call — a map link that drops the caller's filters is bug #767.
+  map: (params?: {
+    zoom?: number;
+    lat?: number;
+    lng?: number;
+    spaceId?: string;
+    query?: string;
+    filters?: FilterState;
+  }) => {
+    const search = new URLSearchParams();
+    if (params?.spaceId) {
+      search.set(QueryParameter.SPACE_ID, params.spaceId);
+    }
+    const query = params?.query?.trim();
+    if (query) {
+      search.set('q', query);
+    }
+    if (params?.filters) {
+      encodeFilterParams(search, params.filters);
+    }
+
+    const point =
+      params?.zoom !== undefined && params?.lat !== undefined && params?.lng !== undefined
+        ? `#${params.zoom}/${params.lat}/${params.lng}`
+        : '';
+
+    const searchString = search.toString();
+    return '/map' + (searchString ? `?${searchString}` : '') + point;
+  },
 
   // memories
   memories: (params?: { isSaved?: boolean }) => '/memories' + asQueryString(params),

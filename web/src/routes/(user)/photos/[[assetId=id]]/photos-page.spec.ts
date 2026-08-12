@@ -1,7 +1,7 @@
 import { AssetTypeEnum } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
-import type { Component } from 'svelte';
+import { tick, type Component } from 'svelte';
 import { goto } from '$app/navigation';
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import TestWrapper from '$lib/components/TestWrapper.svelte';
@@ -9,10 +9,10 @@ import type { FilterState } from '$lib/components/filter-panel/filter-panel';
 import { lang } from '$lib/stores/preferences.store';
 import { buildPhotosTimelineOptions } from '$lib/utils/photos-filter-options';
 import { storeTypedSearchNames } from '$lib/utils/typed-search/typed-search-name-cache';
+import { reactivePageMock as mockPage } from '@test-data/mocks/reactive-page.mock.svelte';
 import PhotosPage from './+page.svelte';
 
 const {
-  mockPage,
   mockAssetMultiSelectManager,
   mockAuthManager,
   mockMemoryManager,
@@ -20,11 +20,6 @@ const {
   mockRegisterSearchablePageFilters,
   readableFn,
 } = vi.hoisted(() => ({
-  mockPage: {
-    url: new URL('https://gallery.test/photos?q=nature'),
-    route: { id: '/(user)/photos/[[assetId=id]]' },
-    params: {},
-  },
   mockAssetMultiSelectManager: {
     selectionActive: false,
     assets: [],
@@ -33,6 +28,7 @@ const {
   },
   mockAuthManager: {
     preferences: { memories: { enabled: false } },
+    user: { id: 'cccccccc-cccc-4ccc-cccc-cccccccccccc' },
   },
   mockMemoryManager: {
     memories: [] as unknown[],
@@ -53,7 +49,15 @@ const {
 }));
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn().mockResolvedValue(undefined) }));
-vi.mock('$app/state', () => ({ page: mockPage }));
+// The mock module and the spec import the SAME singleton, so assigning mockPage.url in a test is
+// what the page's $effect sees. A plain vi.hoisted object registers no signal for a Svelte 5
+// `$effect` reading `page.url.search` — without this reactive stand-in, a test that changes the URL
+// after render (back/forward, or the `?at=` write from closing the asset viewer) would assert
+// against a page that never re-hydrated, and would pass whether or not the bug is present.
+vi.mock('$app/state', async () => {
+  const { reactivePageMock } = await import('@test-data/mocks/reactive-page.mock.svelte');
+  return { page: reactivePageMock };
+});
 
 vi.mock('$lib/components/layouts/UserPageLayout.svelte', async () => {
   const { default: MockComponent } = await import('$lib/components/spaces/mock-user-page-layout.test-wrapper.svelte');
@@ -215,7 +219,9 @@ vi.mock('$lib/utils/photos-filter-options', async (importOriginal) => {
   const actual = await importOriginal<typeof import('$lib/utils/photos-filter-options')>();
   return {
     ...actual,
-    buildPhotosTimelineOptions: vi.fn(() => ({})),
+    // Spied, NOT stubbed: `<Timeline options>` must carry the REAL derived query (takenAfter/…), or
+    // the `not.toHaveTextContent('"takenAfter"')` assertions below would pass vacuously.
+    buildPhotosTimelineOptions: vi.fn(actual.buildPhotosTimelineOptions),
   };
 });
 
@@ -227,6 +233,9 @@ vi.mock('$lib/utils/timeline-util', () => ({
   toTimelineAsset: vi.fn((asset) => asset),
 }));
 
+/** Must match mockAuthManager.user.id — the signed-in user whose personal timeline /photos is. */
+const MY_USER_ID = 'cccccccc-cccc-4ccc-cccc-cccccccccccc';
+
 function renderPage() {
   return render(TestWrapper as Component<{ component: typeof PhotosPage; componentProps: Record<string, never> }>, {
     component: PhotosPage,
@@ -237,7 +246,7 @@ function renderPage() {
 describe('Photos page search URL state', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    mockPage.url = new URL('https://gallery.test/photos?q=nature');
+    mockPage.reset('https://gallery.test/photos?q=nature', { routeId: '/(user)/photos/[[assetId=id]]' });
     lang.set('de');
     mockAssetMultiSelectManager.selectionActive = false;
     mockAssetMultiSelectManager.assets = [];
@@ -365,7 +374,10 @@ describe('Photos page search URL state', () => {
     renderPage();
 
     await waitFor(() => {
-      expect(buildPhotosTimelineOptions).toHaveBeenCalledWith(expect.objectContaining({ isNotInAlbum: true }));
+      expect(buildPhotosTimelineOptions).toHaveBeenCalledWith(
+        expect.objectContaining({ isNotInAlbum: true }),
+        MY_USER_ID,
+      );
     });
   });
 
@@ -377,8 +389,33 @@ describe('Photos page search URL state', () => {
     await waitFor(() => {
       expect(buildPhotosTimelineOptions).toHaveBeenCalledWith(
         expect.objectContaining({ description: 'beach', originalFileName: 'IMG', ocr: 'invoice' }),
+        MY_USER_ID,
       );
     });
+  });
+
+  it('D3: an album chip on /photos still carries the owner gate (userId) into the timeline query', async () => {
+    // /photos is MY timeline. The server leaves `userId` undefined under an `albumId` — that branch
+    // belongs to the ALBUM page, where album ACCESS is the scope (medium E22). If /photos sends the
+    // album chip without stating its own owner scope, `?albumId=A&owner=<co-member>` lists that
+    // co-member's assets, and the Favorites chip the album OWNER's favourites, on my personal
+    // timeline. The two gates AND in the query — the page just has to send both.
+    mockPage.url = new URL(
+      'https://gallery.test/photos?albumId=aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa&owner=bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb',
+    );
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(buildPhotosTimelineOptions).toHaveBeenCalledWith(
+        expect.objectContaining({
+          albumId: 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',
+          ownerId: 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb',
+        }),
+        MY_USER_ID,
+      );
+    });
+    expect(screen.getByTestId('timeline-options')).toHaveTextContent(`"userId":"${MY_USER_ID}"`);
   });
 
   it('passes has-album into photos timeline options when hydrated from the URL', async () => {
@@ -387,7 +424,7 @@ describe('Photos page search URL state', () => {
     renderPage();
 
     await waitFor(() => {
-      expect(buildPhotosTimelineOptions).toHaveBeenCalledWith(expect.objectContaining({ isInAlbum: true }));
+      expect(buildPhotosTimelineOptions).toHaveBeenCalledWith(expect.objectContaining({ isInAlbum: true }), MY_USER_ID);
     });
   });
 
@@ -432,7 +469,10 @@ describe('Photos page search URL state', () => {
     await fireEvent.click(screen.getByTestId('select-favorites-filter'));
 
     await waitFor(() => {
-      expect(buildPhotosTimelineOptions).toHaveBeenCalledWith(expect.objectContaining({ isFavorite: true }));
+      expect(buildPhotosTimelineOptions).toHaveBeenCalledWith(
+        expect.objectContaining({ isFavorite: true }),
+        MY_USER_ID,
+      );
     });
   });
 
@@ -552,6 +592,44 @@ describe('Photos page search URL state', () => {
         JSON.stringify([{ timeBucket: '2024-01-01', count: 12 }]),
       );
     });
+  });
+
+  // End-to-end for the narrowing path: URL → FilterState → suggestion request. A state, lens or
+  // contributor filter only ever ARRIVES this way (contextual filter, typed search or a link), so a
+  // panel that did not forward it would show suggestion lists describing the whole library.
+  it('narrows the photos suggestion lists by the state, lens and contributor from the URL', async () => {
+    const ownerId = '44444444-4444-4444-8444-444444444444';
+    mockPage.url = new URL(
+      `https://gallery.test/photos?state=Bavaria&lens=RF24-105mm%20F4%20L%20IS%20USM&owner=${ownerId}`,
+    );
+
+    renderPage();
+
+    await vi.waitFor(() =>
+      expect(sdkMock.getFilterSuggestions).toHaveBeenCalledWith(
+        expect.objectContaining({
+          state: 'Bavaria',
+          lensModel: 'RF24-105mm F4 L IS USM',
+          ownerId,
+          withSharedSpaces: true,
+        }),
+      ),
+    );
+  });
+
+  it('never sends the album filter or the free-text filters to the photos suggestion endpoint', async () => {
+    // `albumId` there is a SCOPE the server rejects alongside `withSharedSpaces` (a 400 that would
+    // empty every list), and the free-text filters are ILIKE / trigram predicates, not facets.
+    const albumId = '11111111-1111-4111-8111-111111111111';
+    mockPage.url = new URL(`https://gallery.test/photos?albumId=${albumId}&description=cake&filename=IMG_1.jpg&ocr=hi`);
+
+    renderPage();
+
+    await vi.waitFor(() => expect(sdkMock.getFilterSuggestions).toHaveBeenCalled());
+    const request = sdkMock.getFilterSuggestions.mock.calls[0][0];
+    for (const key of ['albumId', 'description', 'originalFileName', 'ocr']) {
+      expect(request).not.toHaveProperty(key);
+    }
   });
 
   it('does not fetch smart facets when the committed query is empty', async () => {
@@ -713,6 +791,7 @@ describe('Photos page search URL state', () => {
         dateAfter: undefined,
         dateBefore: undefined,
       }),
+      MY_USER_ID,
     );
     expect(goto).not.toHaveBeenCalled();
   });
@@ -741,6 +820,7 @@ describe('Photos page search URL state', () => {
         dateAfter: undefined,
         dateBefore: undefined,
       }),
+      MY_USER_ID,
     );
     expect(goto).not.toHaveBeenCalled();
   });
@@ -759,7 +839,7 @@ describe('Photos page search URL state', () => {
     expect(goto).not.toHaveBeenCalled();
   });
 
-  it('keeps explicit photos temporal filters transient across URL sync for non-time filter changes', async () => {
+  it('keeps explicit photos temporal filters across URL sync for non-time filter changes', async () => {
     mockPage.url = new URL('https://gallery.test/photos');
 
     renderPage();
@@ -783,8 +863,10 @@ describe('Photos page search URL state', () => {
         selectedYear: 2015,
         selectedMonth: undefined,
       }),
+      MY_USER_ID,
     );
-    expect(goto).toHaveBeenLastCalledWith('/photos?country=Germany', {
+    // D2 — the year rides along in the URL now, rather than in a carry-over slot beside it.
+    expect(goto).toHaveBeenLastCalledWith('/photos?country=Germany&year=2015', {
       replaceState: true,
       keepFocus: true,
       noScroll: true,
@@ -817,6 +899,7 @@ describe('Photos page search URL state', () => {
         selectedYear: undefined,
         selectedMonth: undefined,
       }),
+      MY_USER_ID,
     );
     expect(goto).toHaveBeenLastCalledWith('/photos?people=person-1&from=2024-01-01&to=2024-12-31', {
       replaceState: true,
@@ -845,6 +928,7 @@ describe('Photos page search URL state', () => {
         selectedYear: undefined,
         selectedMonth: undefined,
       }),
+      MY_USER_ID,
     );
   });
 
@@ -870,6 +954,7 @@ describe('Photos page search URL state', () => {
         selectedYear: undefined,
         selectedMonth: undefined,
       }),
+      MY_USER_ID,
     );
     expect(goto).not.toHaveBeenCalled();
   });
@@ -1018,5 +1103,124 @@ describe('Photos page search URL state', () => {
     const strip = container.querySelector('a[href*="/memory"]')!.closest('section')!;
     expect([...strip.classList]).toContain('mt-0');
     expect([...strip.classList]).not.toContain('mt-3');
+  });
+
+  // D2 — the picked year/month is IN the URL codec. It used to be transient, which meant a shared
+  // link silently dropped it (recipient sees the whole library, no chip) and every URL-backed page
+  // needed a carry-over slot to smuggle it across its own goto().
+  describe('D2: the temporal filter is URL-backed', () => {
+    it('hydrates a shared ?year= link into the picker, the chip and the timeline query', async () => {
+      mockPage.url = new URL('https://gallery.test/photos?year=2023');
+
+      renderPage();
+
+      await waitFor(() => {
+        expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '2023');
+        expect(screen.getByTestId('active-filters-bar-stub')).toHaveAttribute('data-selected-year', '2023');
+        const options = screen.getByTestId('timeline-options').textContent ?? '';
+        expect(options).toContain('"takenAfter":"2023-01-01T00:00:00.000Z"');
+        expect(options).toContain('"takenBefore":"2024-01-01T00:00:00.000Z"');
+      });
+    });
+
+    it('hydrates a shared ?year=&month= link', async () => {
+      mockPage.url = new URL('https://gallery.test/photos?year=2023&month=6');
+
+      renderPage();
+
+      await waitFor(() => {
+        expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '2023');
+        expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-month', '6');
+        const options = screen.getByTestId('timeline-options').textContent ?? '';
+        expect(options).toContain('"takenAfter":"2023-06-01T00:00:00.000Z"');
+        expect(options).toContain('"takenBefore":"2023-07-01T00:00:00.000Z"');
+      });
+    });
+
+    it('writes the picked year to the URL', async () => {
+      mockPage.url = new URL('https://gallery.test/photos');
+
+      renderPage();
+      await fireEvent.click(await screen.findByTestId('filter-panel-set-year'));
+
+      await waitFor(() => expect(goto).toHaveBeenCalled());
+      const [target] = vi.mocked(goto).mock.calls.at(-1) as [string];
+      expect(target).toContain('year=2015');
+    });
+
+    // The bug D2 retires. Closing the asset viewer calls replaceScrollTarget, which writes
+    // `?at=<assetId>` — a URL change the page MUST re-hydrate from. Before D2 the year lived only in
+    // a carry-over slot keyed on the exact URL the page itself last wrote, so the `?at=` URL missed
+    // it and the timeline silently widened back to "all time".
+    it('keeps a picked year when the asset viewer closes and writes ?at=', async () => {
+      mockPage.url = new URL('https://gallery.test/photos');
+
+      renderPage();
+      await fireEvent.click(await screen.findByTestId('filter-panel-set-year'));
+
+      // goto() is mocked, so land page.url on the page's own write the way SvelteKit would.
+      await waitFor(() => expect(goto).toHaveBeenCalled());
+      const [target] = vi.mocked(goto).mock.calls.at(-1) as [string];
+      mockPage.url = new URL(target, 'https://gallery.test');
+      await waitFor(() =>
+        expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '2015'),
+      );
+
+      // Closing the asset viewer: replaceScrollTarget appends `at` to the CURRENT url. This is a raw
+      // property set (not a fireEvent), so nothing implicitly flushes the pending $effect — tick()
+      // forces that flush. A plain waitFor here would be vacuous: its own first synchronous check
+      // runs BEFORE the effect flushes and sees the still-2015 value, so it would pass whether or
+      // not the bug is present.
+      const withAt = new URL(mockPage.url);
+      withAt.searchParams.set('at', 'asset-1');
+      mockPage.url = withAt;
+      await tick();
+
+      expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-selected-year', '2015');
+      expect(screen.getByTestId('timeline-options').textContent).toContain('"takenAfter":"2015-01-01T00:00:00.000Z"');
+    });
+  });
+
+  // Slice 6 — a pasted/reloaded `/photos?albumId=<uuid>` has no session-cached name and no
+  // suggestions feeder to name the album from, so the chip label comes from a by-id lookup. The bar
+  // stub labels exactly like the real one (`albumNames.get(id) ?? id`), so a page that failed to
+  // pass or fill the map would show the UUID here.
+  describe('Slice 6: album / owner chip names', () => {
+    const ALBUM_ID = 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa';
+    const OWNER_ID = 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb';
+
+    it('labels the album chip with the album NAME, not the raw id', async () => {
+      sdkMock.getAlbumInfo.mockResolvedValue({ id: ALBUM_ID, albumName: 'Iceland 2026' } as never);
+      mockPage.url = new URL(`https://gallery.test/photos?albumId=${ALBUM_ID}`);
+
+      renderPage();
+
+      await waitFor(() => {
+        expect(sdkMock.getAlbumInfo).toHaveBeenCalledWith({ id: ALBUM_ID });
+        expect(screen.getByTestId('active-filters-bar-stub')).toHaveAttribute('data-album-label', 'Iceland 2026');
+      });
+    });
+
+    it('labels the owner chip with the user NAME, resolved by id', async () => {
+      sdkMock.getUser.mockResolvedValue({ id: OWNER_ID, name: 'Ada Lovelace' } as never);
+      mockPage.url = new URL(`https://gallery.test/photos?owner=${OWNER_ID}`);
+
+      renderPage();
+
+      await waitFor(() => {
+        expect(sdkMock.getUser).toHaveBeenCalledWith({ id: OWNER_ID });
+        expect(screen.getByTestId('active-filters-bar-stub')).toHaveAttribute('data-owner-label', 'Ada Lovelace');
+      });
+    });
+
+    it('keeps the id as the label — and the page alive — when the lookup fails', async () => {
+      sdkMock.getAlbumInfo.mockRejectedValue(new Error('403'));
+      mockPage.url = new URL(`https://gallery.test/photos?albumId=${ALBUM_ID}`);
+
+      renderPage();
+
+      await waitFor(() => expect(sdkMock.getAlbumInfo).toHaveBeenCalled());
+      expect(screen.getByTestId('active-filters-bar-stub')).toHaveAttribute('data-album-label', ALBUM_ID);
+    });
   });
 });

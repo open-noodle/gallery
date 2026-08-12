@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { page } from '$app/state';
   import ImageThumbnail from '$lib/components/assets/thumbnail/ImageThumbnail.svelte';
   import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
   import { authManager } from '$lib/managers/auth-manager.svelte';
@@ -6,10 +7,15 @@
   import { faceManager } from '$lib/stores/face.svelte';
   import { locale } from '$lib/stores/preferences.store';
   import { createUrl, getAssetUrls, getPeopleThumbnailUrl } from '$lib/utils';
+  import {
+    buildContextualFilterUrl,
+    buildPersonFilterPatch,
+    rememberContextualPersonName,
+  } from '$lib/utils/filter-target';
   import { zoomImageToBase64 } from '$lib/utils/people-utils';
   import { type AssetResponseDto } from '@immich/sdk';
   import { IconButton, Text } from '@immich/ui';
-  import { mdiEye, mdiEyeOff, mdiPencil, mdiPlus } from '@mdi/js';
+  import { mdiEye, mdiEyeOff, mdiOpenInNew, mdiPencil, mdiPlus } from '@mdi/js';
   import { DateTime } from 'luxon';
   import { t } from 'svelte-i18n';
 
@@ -17,10 +23,15 @@
     asset: AssetResponseDto;
     isOwner: boolean;
     previousRoute: string;
+    /**
+     * R4/E2 — false on a shared link. (People are already shared-link-suppressed by the section gate
+     * below; this is belt-and-braces, and keeps the row's gate identical to every other row's.)
+     */
+    canFilter?: boolean;
     spaceId?: string;
   };
 
-  const { asset, isOwner, previousRoute, spaceId }: Props = $props();
+  const { asset, isOwner, previousRoute, canFilter = false, spaceId }: Props = $props();
 
   type AssetPerson = NonNullable<AssetResponseDto['people']>[number];
 
@@ -41,11 +52,39 @@
 
   // A non-owner has no access to the owner-scoped person page, so their name is rendered as plain
   // text rather than a link into a 404.
-  const getPersonHref = (person: AssetPerson) => {
+  const getPersonPageHref = (person: AssetPerson) => {
     if (spaceId && person.spacePersonId) {
       return Route.viewSpacePerson(spaceId, person.spacePersonId);
     }
     return isOwner ? Route.viewPerson(person, { previousRoute }) : undefined;
+  };
+
+  /**
+   * R8 — the person patch is TARGET-DEPENDENT, and getting it wrong 400s the Space timeline. All of
+   * that lives in buildPersonFilterPatch; null means "there is nothing honest to filter by here", so
+   * the chip falls back to being the person-page link it is today.
+   */
+  const getPersonFilterHref = (person: AssetPerson) => {
+    if (!canFilter) {
+      return undefined;
+    }
+
+    const patch = buildPersonFilterPatch(page.url, person);
+    return patch ? buildContextualFilterUrl(page.url, patch) : undefined;
+  };
+
+  /**
+   * The destination's chip and filter panel resolve a person id to a name through the
+   * filter-suggestions response, which is a round-trip late and does not always carry THIS token
+   * (see rememberContextualPersonName). Bank the name we already have on the way out, so the chip
+   * never renders a raw id.
+   */
+  const rememberPersonName = (person: AssetPerson, href: string) => {
+    const patch = buildPersonFilterPatch(page.url, person);
+    const personId = patch?.personIds?.[0];
+    if (personId) {
+      rememberContextualPersonName(href, personId, person.name);
+    }
   };
   const visiblePeople = $derived(
     people
@@ -128,16 +167,53 @@
         {@const personFaces = faceManager.facesByPersonId.get(person.id) ?? []}
         {@const isHighlighted = personFaces.some((f) => assetViewerManager.highlightedFaces.some((b) => b.id === f.id))}
         {@const fallbackThumbnailUrl = getPersonFallbackThumbnailUrl(person)}
-        <a
-          class="group outline-none"
-          href={getPersonHref(person)}
-          onfocus={() => assetViewerManager.setHighlightedFaces(personFaces)}
-          onblur={() => assetViewerManager.clearHighlightedFaces()}
-          onpointerenter={() => assetViewerManager.setHighlightedFaces(personFaces)}
-          onpointerleave={() => assetViewerManager.clearHighlightedFaces()}
-        >
-          {#if personFaces[0]}
-            {#await zoomImageToBase64(personFaces[0], asset.id, asset.type, assetViewerManager.imgRef)}
+        {@const filterHref = getPersonFilterHref(person)}
+        {@const personPageHref = getPersonPageHref(person)}
+        <!--
+        R6 — the chip IS the <a>, and it carries the four face-highlight handlers that drive the face
+        overlay. The ↗ person-page link cannot nest inside it (a link inside a link), so it is a
+        SIBLING overlay control on a relative wrapper. When there is no honest filter to offer
+        (buildPersonFilterPatch → null, e.g. a Space person with no spacePersonId, or a shared link),
+        the chip stays the person-page link it is today and no ↗ renders.
+      -->
+        <div class="relative">
+          <a
+            class="group block outline-none"
+            href={filterHref ?? personPageHref}
+            aria-label={filterHref ? `${$t('filter_by_person')}: ${person.name}` : undefined}
+            onclick={filterHref ? () => rememberPersonName(person, filterHref) : undefined}
+            onfocus={() => assetViewerManager.setHighlightedFaces(personFaces)}
+            onblur={() => assetViewerManager.clearHighlightedFaces()}
+            onpointerenter={() => assetViewerManager.setHighlightedFaces(personFaces)}
+            onpointerleave={() => assetViewerManager.clearHighlightedFaces()}
+          >
+            {#if personFaces[0]}
+              {#await zoomImageToBase64(personFaces[0], asset.id, asset.type, assetViewerManager.imgRef)}
+                <ImageThumbnail
+                  curve
+                  shadow
+                  url={fallbackThumbnailUrl}
+                  altText={person.name}
+                  title={person.name}
+                  widthStyle="100%"
+                  hidden={person.isHidden}
+                  highlighted={isHighlighted}
+                  class="outline-offset-2 outline-immich-primary group-focus-visible:outline-2 dark:outline-immich-dark-primary"
+                />
+              {:then faceThumbnailUrl}
+                <ImageThumbnail
+                  curve
+                  shadow
+                  url={faceThumbnailUrl ?? fallbackThumbnailUrl}
+                  altText={person.name}
+                  title={person.name}
+                  widthStyle="100%"
+                  hidden={person.isHidden}
+                  highlighted={isHighlighted}
+                  class="outline-offset-2 outline-immich-primary group-focus-visible:outline-2 dark:outline-immich-dark-primary"
+                />
+              {/await}
+            {:else}
               <ImageThumbnail
                 curve
                 shadow
@@ -149,39 +225,28 @@
                 highlighted={isHighlighted}
                 class="outline-offset-2 outline-immich-primary group-focus-visible:outline-2 dark:outline-immich-dark-primary"
               />
-            {:then faceThumbnailUrl}
-              <ImageThumbnail
-                curve
-                shadow
-                url={faceThumbnailUrl ?? fallbackThumbnailUrl}
-                altText={person.name}
-                title={person.name}
-                widthStyle="100%"
-                hidden={person.isHidden}
-                highlighted={isHighlighted}
-                class="outline-offset-2 outline-immich-primary group-focus-visible:outline-2 dark:outline-immich-dark-primary"
+            {/if}
+            <p class="mt-1 truncate font-medium" title={person.name}>{person.name}</p>
+            {#if person.birthDate && person.formattedAge}
+              <p class="font-light {visiblePeople.length > 6 ? 'text-xs' : ''}" title={person.formattedBirthDate!}>
+                {person.formattedAge}
+              </p>
+            {/if}
+          </a>
+          {#if filterHref && personPageHref}
+            <div class="absolute top-1 right-1 rounded-full bg-light/80">
+              <IconButton
+                href={personPageHref}
+                icon={mdiOpenInNew}
+                aria-label="{$t('view_person')}: {person.name}"
+                size="small"
+                shape="round"
+                color="secondary"
+                variant="ghost"
               />
-            {/await}
-          {:else}
-            <ImageThumbnail
-              curve
-              shadow
-              url={fallbackThumbnailUrl}
-              altText={person.name}
-              title={person.name}
-              widthStyle="100%"
-              hidden={person.isHidden}
-              highlighted={isHighlighted}
-              class="outline-offset-2 outline-immich-primary group-focus-visible:outline-2 dark:outline-immich-dark-primary"
-            />
+            </div>
           {/if}
-          <p class="mt-1 truncate font-medium" title={person.name}>{person.name}</p>
-          {#if person.birthDate && person.formattedAge}
-            <p class="font-light {visiblePeople.length > 6 ? 'text-xs' : ''}" title={person.formattedBirthDate!}>
-              {person.formattedAge}
-            </p>
-          {/if}
-        </a>
+        </div>
       {/each}
     </div>
   </section>
