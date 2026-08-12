@@ -8,7 +8,9 @@
 
 Upstream Immich ships a workflow engine driven by WASM plugins. Gallery's shared spaces are invisible to it: a workflow can add an uploaded asset to an album, but not to a space or to a space album.
 
-This design adds two action steps — **Add to space** and **Add to space album** — via a fork-owned plugin and a single generic host-function seam. The permanent cost to upstream-owned files is **7 files, +23/−3 lines** (measured on the implemented branch), and that cost is **flat**: every future fork action or filter adds zero upstream lines.
+This design adds two action steps — **Add to space** and **Add to space album** — via a fork-owned plugin and a single generic host-function seam. The cost to upstream-owned files is **9 files, +27/−5 lines** (measured on the implemented branch).
+
+That number is a **one-time cost of introducing a new package**, not a per-feature cost. Four of the nine files exist purely to build and ship `packages/plugin-gallery` (`Dockerfile`, `docker-compose.dev.yml`, `mise.toml`, `test.yml`'s path filters) and one is a test mock. The claim the design actually rests on is narrower and still holds: **every future fork action or filter adds zero upstream lines**, because they are new methods in a package that is already built, shipped and routed through the one generic `gallery(method, args)` dispatcher.
 
 ## 2. How upstream's workflow engine works
 
@@ -83,7 +85,9 @@ AssetCreate / AssetMetadataExtraction
 
 ### 5.1 The permanent seam in upstream-owned files
 
-Measured on the implemented branch (`git diff --stat <merge-base>..HEAD` over these paths): **7 files, 23 insertions, 3 deletions.**
+Measured on the implemented branch (`git diff --stat <merge-base>..HEAD` over these paths): **9 files, 27 insertions, 5 deletions.**
+
+Two of the nine were discovered only during implementation, and both are recorded below rather than quietly folded in: `config.repository.mock.ts` (a required field breaks its full-object literal) and `mise.toml` (without it the dev bind-mount points at a folder with no wasm, and the feature is silently absent in every dev stack — `importFolder` only warns).
 
 | File                                                 | Lines | Change                                                                                                                              |
 | ---------------------------------------------------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------- |
@@ -94,8 +98,10 @@ Measured on the implemented branch (`git diff --stat <merge-base>..HEAD` over th
 | `server/test/repositories/config.repository.mock.ts` | +1    | The mock's full-object `EnvData` literal needs the new required field, or `tsc` fails                                               |
 | `docker/docker-compose.dev.yml`                      | +1    | Bind-mount, mirroring the `plugin-core` one                                                                                         |
 | `web/src/lib/types.ts`                               | +1/−1 | `uiHint.type` union gains `'SpaceId'`                                                                                               |
+| `mise.toml`                                          | +2/−2 | `[tasks.plugins]` builds the new package, so `mise dev`'s bind-mount has a wasm to serve                                            |
+| `.github/workflows/test.yml`                         | +2    | `packages/plugin-gallery/**` in the server and e2e path filters, so a manifest-only change still runs the drift guards              |
 
-Every one of these is registered in `docs/fork/ownership.yml` under `upstream_extension_paths`.
+Every one of these is registered in `docs/fork/ownership.yml` — the last two were already declared as fork-extended infrastructure, so they needed no new entry.
 
 **The seventh file was discovered during implementation, not designed in.** Making `galleryPlugin` a required field on `resourcePaths` breaks `config.repository.mock.ts`'s full-object literal. The alternative — declaring it optional — would push a non-null assertion or a runtime guard into `workflow-execution.service.ts`, the one file this design most wants to keep small, to describe an invariant that never actually holds (`getEnv()` always sets it). One mechanical line in a test mock is the cheaper trade, and it is the same edit upstream would make when adding a resource path.
 

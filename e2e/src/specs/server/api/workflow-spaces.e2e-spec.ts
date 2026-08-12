@@ -113,7 +113,10 @@ describe('/workflows (spaces)', () => {
     });
 
     expect(albums).toHaveLength(1);
-  }, 60_000);
+    // 70s, not 60s: this test runs TWO sequential 30s-bounded polls, so 60s exactly equals the
+    // worst-case polling time and leaves nothing for the two uploads and the setup requests, which
+    // happen outside the polls. The single-poll tests above use the same bound-plus-margin shape.
+  }, 70_000);
 
   it('keeps running the workflow when a space action is not permitted', async () => {
     // E4 — the §7 invariant, observed from outside: the second step must still take effect.
