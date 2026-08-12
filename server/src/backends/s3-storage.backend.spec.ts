@@ -646,5 +646,17 @@ describe('S3StorageBackend', () => {
 
       await expect(backend.getPrefixUsage('profile/ghost/')).resolves.toBe(0);
     });
+
+    it('skips objects rejected by the filter', async () => {
+      mockSend.mockResolvedValueOnce({
+        Contents: [
+          { Key: 'thumbs/user-a/aa/bb/keep.webp', Size: 10 },
+          { Key: 'thumbs/user-a/aa/bb/skip.webp', Size: 20 },
+        ],
+        IsTruncated: false,
+      });
+
+      await expect(backend.getPrefixUsage('thumbs/user-a/', (filename) => filename !== 'skip.webp')).resolves.toBe(10);
+    });
   });
 });

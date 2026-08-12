@@ -2299,4 +2299,24 @@ describe(AssetRepository.name, () => {
       expect(counts[0] + counts[1]).toBe(assets.length);
     }, 60_000);
   });
+
+  describe('getExternalAssetIds', () => {
+    it('returns only assets belonging to an external library', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { library } = await ctx.newLibrary({ ownerId: user.id });
+      const { asset: external } = await ctx.newAsset({ ownerId: user.id, libraryId: library.id });
+      await ctx.newAsset({ ownerId: user.id });
+
+      await expect(sut.getExternalAssetIds(user.id)).resolves.toEqual(new Set([external.id]));
+    });
+
+    it('returns an empty set for a user with no external library', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      await ctx.newAsset({ ownerId: user.id });
+
+      await expect(sut.getExternalAssetIds(user.id)).resolves.toEqual(new Set());
+    });
+  });
 });

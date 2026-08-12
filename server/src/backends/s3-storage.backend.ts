@@ -175,7 +175,7 @@ export class S3StorageBackend implements StorageBackend {
     } while (continuationToken);
   }
 
-  async getPrefixUsage(prefix: string): Promise<number> {
+  async getPrefixUsage(prefix: string, shouldCount?: (filename: string) => boolean): Promise<number> {
     let total = 0;
     let continuationToken: string | undefined;
     do {
@@ -183,6 +183,10 @@ export class S3StorageBackend implements StorageBackend {
         new ListObjectsV2Command({ Bucket: this.bucket, Prefix: prefix, ContinuationToken: continuationToken }),
       );
       for (const object of page.Contents ?? []) {
+        const filename = (object.Key ?? '').split('/').pop() ?? '';
+        if (shouldCount && !shouldCount(filename)) {
+          continue;
+        }
         total += object.Size ?? 0;
       }
       continuationToken = page.IsTruncated ? page.NextContinuationToken : undefined;
