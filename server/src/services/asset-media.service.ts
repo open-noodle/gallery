@@ -151,7 +151,7 @@ export class AssetMediaService extends BaseService {
         ids: [auth.user.id],
       });
 
-      this.requireQuota(auth, file.size);
+      await this.requireQuota(auth, file.size);
 
       if (dto.livePhotoVideoId) {
         await onBeforeLink(
@@ -454,8 +454,17 @@ export class AssetMediaService extends BaseService {
     return asset;
   }
 
-  private requireQuota(auth: AuthDto, size: number) {
-    if (auth.user.quotaSizeInBytes !== null && auth.user.quotaSizeInBytes < auth.user.quotaUsageInBytes + size) {
+  private async requireQuota(auth: AuthDto, size: number) {
+    if (auth.user.quotaSizeInBytes === null) {
+      return;
+    }
+
+    // Gallery-fork: enforce against physical usage when the admin has opted in; upstream always
+    // enforces against quotaUsageInBytes, which is what the default branch below preserves.
+    const { storageUsage } = await this.getConfig({ withCache: true });
+    const used = storageUsage.includeDerivativesInQuota ? auth.user.physicalUsageInBytes : auth.user.quotaUsageInBytes;
+
+    if (auth.user.quotaSizeInBytes < used + size) {
       throw new BadRequestException('Quota has been exceeded!');
     }
   }

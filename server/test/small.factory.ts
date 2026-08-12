@@ -117,10 +117,11 @@ const authUserFactory = (authUser: Partial<AuthUser> = {}) => {
     name = 'Test User',
     email = 'test@immich.cloud',
     quotaUsageInBytes = 0,
+    physicalUsageInBytes = 0,
     quotaSizeInBytes = null,
   } = authUser;
 
-  return { id, isAdmin, name, email, quotaUsageInBytes, quotaSizeInBytes };
+  return { id, isAdmin, name, email, quotaUsageInBytes, physicalUsageInBytes, quotaSizeInBytes };
 };
 
 const partnerFactory = ({

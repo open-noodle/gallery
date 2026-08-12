@@ -12,6 +12,7 @@ const makeAuth = (userId?: string): AuthDto => ({
     name: 'test',
     email: 'test@test.com',
     quotaUsageInBytes: 0,
+    physicalUsageInBytes: 0,
     quotaSizeInBytes: null,
   },
 });
@@ -25,6 +26,7 @@ describe('requireElevatedPermission', () => {
         name: 'test',
         email: 'test@test.com',
         quotaUsageInBytes: 0,
+        physicalUsageInBytes: 0,
         quotaSizeInBytes: null,
       },
       session: { id: newUuid(), hasElevatedPermission: false },
@@ -42,6 +44,7 @@ describe('requireElevatedPermission', () => {
         name: 'test',
         email: 'test@test.com',
         quotaUsageInBytes: 0,
+        physicalUsageInBytes: 0,
         quotaSizeInBytes: null,
       },
     };
@@ -57,6 +60,7 @@ describe('requireElevatedPermission', () => {
         name: 'test',
         email: 'test@test.com',
         quotaUsageInBytes: 0,
+        physicalUsageInBytes: 0,
         quotaSizeInBytes: null,
       },
       session: { id: newUuid(), hasElevatedPermission: true },
@@ -78,6 +82,7 @@ describe('checkOtherAccess SharedSpaceRead', () => {
         name: 'test',
         email: 'test@test.com',
         quotaUsageInBytes: 0,
+        physicalUsageInBytes: 0,
         quotaSizeInBytes: null,
       },
     };
@@ -105,6 +110,7 @@ describe('checkOtherAccess SharedSpaceRead', () => {
         name: 'test',
         email: 'test@test.com',
         quotaUsageInBytes: 0,
+        physicalUsageInBytes: 0,
         quotaSizeInBytes: null,
       },
     };
@@ -501,6 +507,7 @@ describe('checkOtherAccess default case', () => {
         name: 'test',
         email: 'test@test.com',
         quotaUsageInBytes: 0,
+        physicalUsageInBytes: 0,
         quotaSizeInBytes: null,
       },
     };

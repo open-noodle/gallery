@@ -354,6 +354,50 @@ describe(AssetMediaService.name, () => {
       );
     });
 
+    describe('quota enforcement column selection', () => {
+      it('should enforce quota against physical usage when the toggle is enabled', async () => {
+        mocks.systemMetadata.get.mockResolvedValue({
+          storageUsage: { includeDerivativesInDisplay: false, includeDerivativesInQuota: true },
+        });
+        const auth = {
+          ...authStub.admin,
+          user: { ...authStub.admin.user, quotaSizeInBytes: 100, quotaUsageInBytes: 1, physicalUsageInBytes: 99 },
+        };
+        const file = {
+          uuid: 'random-uuid',
+          originalPath: 'fake_path/asset_1.jpeg',
+          mimeType: 'image/jpeg',
+          checksum: Buffer.from('file hash', 'utf8'),
+          originalName: 'asset_1.jpeg',
+          size: 2,
+        };
+
+        await expect(sut.uploadAsset(auth, createDto, file)).rejects.toThrow('Quota has been exceeded!');
+      });
+
+      it('should enforce quota against originals by default', async () => {
+        mocks.systemMetadata.get.mockResolvedValue({
+          storageUsage: { includeDerivativesInDisplay: false, includeDerivativesInQuota: false },
+        });
+        const auth = {
+          ...authStub.admin,
+          user: { ...authStub.admin.user, quotaSizeInBytes: 100, quotaUsageInBytes: 1, physicalUsageInBytes: 99 },
+        };
+        const file = {
+          uuid: 'random-uuid',
+          originalPath: 'fake_path/asset_1.jpeg',
+          mimeType: 'image/jpeg',
+          checksum: Buffer.from('file hash', 'utf8'),
+          originalName: 'asset_1.jpeg',
+          size: 2,
+        };
+
+        mocks.asset.create.mockResolvedValue(assetEntity);
+
+        await expect(sut.uploadAsset(auth, createDto, file)).resolves.toBeDefined();
+      });
+    });
+
     it('should handle a file upload', async () => {
       const file = {
         uuid: 'random-uuid',

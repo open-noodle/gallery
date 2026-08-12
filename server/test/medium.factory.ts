@@ -857,6 +857,7 @@ const userInsert = (user: Partial<Insertable<UserTable>> = {}) => {
     avatarColor: null,
     quotaSizeInBytes: null,
     quotaUsageInBytes: 0,
+    physicalUsageInBytes: 0,
   };
 
   return { ...defaults, ...user, id };

@@ -25,6 +25,7 @@ export type AuthUser = {
   name: string;
   email: string;
   quotaUsageInBytes: number;
+  physicalUsageInBytes: number;
   quotaSizeInBytes: number | null;
 };
 
@@ -492,7 +493,15 @@ export const columns = {
     'asset_file.isProgressive',
     'asset_file.isTransparent',
   ],
-  authUser: ['user.id', 'user.name', 'user.email', 'user.isAdmin', 'user.quotaUsageInBytes', 'user.quotaSizeInBytes'],
+  authUser: [
+    'user.id',
+    'user.name',
+    'user.email',
+    'user.isAdmin',
+    'user.quotaUsageInBytes',
+    'user.physicalUsageInBytes',
+    'user.quotaSizeInBytes',
+  ],
   authApiKey: ['api_key.id', 'api_key.permissions'],
   authSession: ['session.id', 'session.updatedAt', 'session.pinExpiresAt', 'session.appVersion'],
   user: userColumns,
