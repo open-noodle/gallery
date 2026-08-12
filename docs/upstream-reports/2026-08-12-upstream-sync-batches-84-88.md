@@ -4,7 +4,7 @@
 
 - **Upstream commits pulled**: 5 (`00d10dab639..610bcfa6d09`, batches 84–88)
 - **Fork commits synced**: 0 — `origin/main` never moved during the cycle
-- **Conflicts resolved**: 6 across 4 rebase steps
+- **Conflicts resolved**: 7 conflicted files across 6 rebase steps
 - **Risk level**: MEDIUM
 - **Recommendation**: PROCEED
 - **Branch**: `rebase/upstream-rolling-v3.1.1`, level with `upstream/main` (0 behind)
@@ -250,7 +250,43 @@ No Drift change in this batch. `mobile/` delta is a single file, `mobile/mise.to
 
 ## Remote CI Verification
 
-Filled in after the dispatch round.
+- **Test branch**: `rebase/upstream-b88`
+- **Commit validated**: `e80a648b8a8` — every run reports the same `headSha`, so there is no SHA skew
+- **Result**: **10 / 10 GREEN, first pass.** Dispatched staggered 4 / 2 / 4; no GHCR rate limits.
+
+| Workflow                                  | Status | Notes                                                                                                |
+| ----------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------- |
+| `test.yml`                                | GREEN  | **21 / 21 jobs, 0 skipped** — inspected job-by-job, not on the workflow conclusion                   |
+| `docker.yml`                              | GREEN  |                                                                                                      |
+| `static_analysis.yml`                     | GREEN  |                                                                                                      |
+| `gallery-build-mobile.yml`                | GREEN  | **Both legs**: Build and sign Android ✓, Build and sign iOS ✓                                        |
+| `gallery-rebase-smoke.yml`                | GREEN  |                                                                                                      |
+| `gallery-revert-to-immich-validation.yml` | GREEN  | Read past the coverage grep to `Post-phase drift (0 item(s))` → `revert-to-immich validation PASSED` |
+| `storage-migration-tests.yml`             | GREEN  |                                                                                                      |
+| `storage-migration-e2e.yml`               | GREEN  |                                                                                                      |
+| `gallery-ml-smoke.yml`                    | GREEN  |                                                                                                      |
+| `gallery-mobile-smoke.yml`                | GREEN  |                                                                                                      |
+
+Two results are worth calling out because they are the evidence for this cycle's two riskiest items:
+
+- **`Medium Tests (Server)` passed.** This is the only gate that exercises upstream's new
+  `album_user_delete` row trigger against the fork's shared-space album triggers on a real database —
+  it could not be run locally (no Docker daemon), so it was the named residual exposure of the
+  HIGH-risk change. `SQL Schema Checks` and `Test Branding` also passed.
+- **The iOS/Android build empirically validated the CocoaPods reorder.** On the Linux Android runner
+  `//mobile:install:ios` ran and short-circuited through its `uname != Darwin` guard; on the macOS iOS
+  runner `Setup Ruby` executed _before_ `Install Flutter dependencies`, so `pod install` inside the
+  mise task had the bundler-pinned Ruby. Without the reorder that step would have run first, with the
+  runner's ambient Ruby.
+- **`gallery-revert-to-immich-validation` proved the `IF EXISTS` guards are load-bearing**, not
+  defensive padding: the log shows
+  `NOTICE: trigger "album_user_delete" for relation "album_user" does not exist, skipping` and
+  `NOTICE: function album_user_delete() does not exist, skipping` — the script runs against the tagged
+  `:main` image where those objects were never created, so an unguarded `DROP` would have aborted it.
+
+### Failures fixed / confirmed flakes
+
+None. No re-runs were needed.
 
 ## Post-Rebase Verification
 
