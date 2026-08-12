@@ -1,5 +1,7 @@
 <script lang="ts">
+  import ReadOnlyDemoNotice from '$lib/components/admin/ReadOnlyDemoNotice.svelte';
   import AdminPageLayout from '$lib/components/layouts/AdminPageLayout.svelte';
+  import { authManager } from '$lib/managers/auth-manager.svelte';
   import { Route } from '$lib/route';
   import { getAdminFaceThumbnailUrl } from '$lib/utils/people-utils';
   import { getFaceRepairResolutions, getPeopleThumbnailPath, removeFaceRepairResolutions } from '@immich/sdk';
@@ -48,6 +50,8 @@
   let loadingMore = $state(false);
   let loadError = $state(false);
   let sourceFilter = $state<SourceFilter>('all');
+
+  const isReadOnlyDemo = $derived(authManager.isReadOnlyDemo);
 
   const hasMore = $derived(resolutions.length < total);
 
@@ -153,6 +157,7 @@
 
 <AdminPageLayout breadcrumbs={faceCleanupBreadcrumbs($t, { title: $t('admin.face_cleanup_resolutions_title') })}>
   <div class="mx-auto max-w-screen-xl p-6">
+    <ReadOnlyDemoNotice />
     <!-- Header -->
     <div class="mb-6 flex flex-wrap items-start justify-between gap-3">
       <div class="min-w-0">
@@ -325,9 +330,11 @@
             {/if}
 
             <!-- Undo button -->
-            <Button color="secondary" size="small" data-testid="undo-button" onclick={() => handleUndo(item)}>
-              {$t('admin.face_cleanup_resolutions_undo')}
-            </Button>
+            {#if !isReadOnlyDemo}
+              <Button color="secondary" size="small" data-testid="undo-button" onclick={() => handleUndo(item)}>
+                {$t('admin.face_cleanup_resolutions_undo')}
+              </Button>
+            {/if}
           </div>
         {/each}
       </div>
