@@ -11,6 +11,25 @@ const derivativesEnabled = (config: SystemConfig) =>
 @Injectable()
 export class StorageUsageService extends BaseService {
   /**
+   * Config-file installs never emit ConfigUpdate — SystemConfigService.updateSystemConfig rejects
+   * outright while IMMICH_CONFIG_FILE is set — so the toggles can only ever go off -> on across a
+   * restart, and the handler below would never see the transition. Resync at boot instead, which is
+   * the only signal those installs give us. Repeated on every restart while a toggle is on: that is
+   * the cost of having no persisted previous config to diff against, and it is bounded by how often
+   * the server restarts, which is far less than the nightly job that keeps the column fresh anyway.
+   *
+   * Pinned to the Microservices worker for the same reason as onConfigUpdate: UserSyncUsage has no
+   * jobId, so an unpinned handler would enqueue one full walk per worker.
+   */
+  @OnEvent({ name: 'ConfigInit', workers: [ImmichWorker.Microservices] })
+  async onConfigInit({ newConfig }: ArgOf<'ConfigInit'>) {
+    const { configFile } = this.configRepository.getEnv();
+    if (configFile && derivativesEnabled(newConfig)) {
+      await this.jobRepository.queue({ name: JobName.UserSyncUsage });
+    }
+  }
+
+  /**
    * The physical-usage column is only maintained while at least one toggle is on, so switching one
    * on would otherwise show a stale or zero figure until the next nightly sync. Queue a resync on
    * the off -> on transition only; flipping the second toggle on, or turning one off, needs nothing.

@@ -350,7 +350,9 @@ See the [Memories docs](/features/memories) for details about how retention and 
 :::
 
 :::info Storage Usage
-`storageUsage` controls whether server-generated files — thumbnails and transcoded videos — count toward a user's storage usage. Both flags default to `false`, matching upstream Immich, where only original files are counted. `includeDerivativesInDisplay` changes the figure shown to users; `includeDerivativesInQuota` changes what their storage quota is enforced against. Enabling the quota flag reduces how much original media a user can upload within the same quota.
+`storageUsage` controls whether server-generated files — thumbnails and transcoded videos — count toward a user's storage usage. Both flags default to `false`, matching upstream Immich, where only original files are counted. `includeDerivativesInDisplay` changes the figure shown to users; `includeDerivativesInQuota` changes what their storage quota is enforced against. Enabling the quota flag reduces how much original media a user can upload within the same quota. Enabling the quota flag also switches the displayed figure over, so users are never shown a number that differs from the one their uploads are checked against.
+
+The figure that includes server-generated files is cached per user rather than computed on every request, so it has to be populated before it is accurate. On a config file install there is no "save settings" moment to trigger that, so the server recalculates it at startup whenever either flag is on — after editing the config file, restart the server and the figure will be correct once the recalculation finishes. From then on it is kept up to date by the nightly `nightlyTasks.syncQuotaUsage` task. If you set `syncQuotaUsage` to `false`, the figure is only refreshed on the next restart.
 :::
 
 ### Step 2 - Specify the file location
