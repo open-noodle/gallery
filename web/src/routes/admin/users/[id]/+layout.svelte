@@ -9,6 +9,7 @@
   import FeatureSetting from './FeatureSetting.svelte';
   import { Route } from '$lib/route';
   import { getUserAdminActions } from '$lib/services/user-admin.service';
+  import { serverConfigManager } from '$lib/managers/server-config-manager.svelte';
   import { locale } from '$lib/stores/preferences.store';
   import { createDateFormatter, findLocale } from '$lib/utils';
   import { getBytesWithUnit } from '$lib/utils/byte-units';
@@ -55,7 +56,15 @@
   const { children, data }: Props = $props();
 
   const { user, userPreferences, userStatistics, userSessions } = $derived(data);
-  const usedBytes = $derived(user.quotaUsageInBytes ?? 0);
+  // Gallery-fork: read the same column the user's own sidebar meter reads, so an admin
+  // investigating a rejected upload sees the figure quota enforcement actually used. The
+  // server ORs the display and quota toggles into this flag, so it is true whenever
+  // derivatives count towards either. Written inline rather than through the shared
+  // getStorageSpace helper: that helper falls back to whole-server disk figures for a
+  // user with no quota, which is sidebar-only behaviour — this page renders "unlimited"
+  // instead and still needs the user's own bytes for the storage stat card above.
+  const includeDerivatives = $derived(serverConfigManager.valueOrUndefined?.storageUsageIncludesDerivatives ?? false);
+  const usedBytes = $derived((includeDerivatives ? user.physicalUsageInBytes : user.quotaUsageInBytes) ?? 0);
   const availableBytes = $derived(user.quotaSizeInBytes ?? 0);
   const TiB = 1024 ** 4;
   const [statsUsage, statsUsageUnit] = $derived(getBytesWithUnit(usedBytes, usedBytes > TiB ? 2 : 0));

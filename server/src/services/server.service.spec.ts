@@ -659,6 +659,17 @@ describe(ServerService.name, () => {
 
       await expect(sut.getSystemConfig()).resolves.toMatchObject({ storageUsageIncludesDerivatives: true });
     });
+
+    it('should report derivatives as included when only quota enforcement opts in', async () => {
+      clearConfigCache();
+      mocks.systemMetadata.get.mockResolvedValue({
+        storageUsage: { includeDerivativesInDisplay: false, includeDerivativesInQuota: true },
+      });
+
+      // Displaying the originals-only figure while enforcing the physical one is the
+      // "misleading number" this branch exists to remove, so quota implies display.
+      await expect(sut.getSystemConfig()).resolves.toMatchObject({ storageUsageIncludesDerivatives: true });
+    });
   });
 
   describe('getStats', () => {
