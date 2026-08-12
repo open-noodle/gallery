@@ -110,6 +110,15 @@ export const isPetDetectionEnabled = (machineLearning: SystemConfig['machineLear
   isMachineLearningEnabled(machineLearning) && machineLearning.petDetection.enabled;
 export const isFacialRecognitionEnabled = (machineLearning: SystemConfig['machineLearning']) =>
   isMachineLearningEnabled(machineLearning) && machineLearning.facialRecognition.enabled;
+// Deliberately gated on `facialRecognition.enabled` rather than `isFacialRecognitionEnabled`: face
+// suggestions are a pure vector query over embeddings that already exist and never call the machine
+// learning service, so the ML master switch must not disable them. Turning that switch off to reclaim
+// resources after a library is scanned is a supported configuration (the e2e stack runs that way),
+// and it previously left suggestions working.
+export const isFaceSuggestionEnabled = (machineLearning: SystemConfig['machineLearning']) =>
+  machineLearning.facialRecognition.enabled &&
+  machineLearning.facialRecognition.suggestions.enabled &&
+  machineLearning.facialRecognition.suggestions.maxDistance > machineLearning.facialRecognition.maxDistance;
 export const isDuplicateDetectionEnabled = (machineLearning: SystemConfig['machineLearning']) =>
   isSmartSearchEnabled(machineLearning) && machineLearning.duplicateDetection.enabled;
 export const isFaceImportEnabled = (metadata: SystemConfig['metadata']) => metadata.faces.import;

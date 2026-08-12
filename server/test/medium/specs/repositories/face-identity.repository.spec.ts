@@ -1,4 +1,5 @@
 import { Kysely } from 'kysely';
+import { randomUUID } from 'node:crypto';
 import { AssetVisibility, SharedSpaceRole } from 'src/enum';
 import {
   FaceIdentityRepository,
@@ -530,6 +531,48 @@ describe(FaceIdentityRepository.name, () => {
       });
     } finally {
       await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
+    }
+  });
+
+  it('repairs stale personal face identity links when the assigned person has no identity yet', async () => {
+    const { ctx, sut } = setup();
+    const { user } = await ctx.newUser();
+    let staleIdentityId: string | undefined;
+
+    try {
+      const staleIdentity = await ctx.database
+        .insertInto('face_identity')
+        .values({ type: 'person' })
+        .returningAll()
+        .executeTakeFirstOrThrow();
+      staleIdentityId = staleIdentity.id;
+
+      const { person } = await ctx.newPerson({ ownerId: user.id, identityId: null });
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+      await sut.linkFace({ assetFaceId: assetFace.id, identityId: staleIdentity.id, source: 'backfill' });
+
+      await expect(sut.getBackfillWork()).resolves.toMatchObject({ hasPersonalIdentityWork: true });
+
+      await sut.backfillPersonalIdentities({ limit: 100 });
+
+      const [updatedPerson, updatedFaceLink] = await Promise.all([
+        ctx.database.selectFrom('person').select(['identityId']).where('id', '=', person.id).executeTakeFirstOrThrow(),
+        ctx.database
+          .selectFrom('face_identity_face')
+          .select(['identityId'])
+          .where('assetFaceId', '=', assetFace.id)
+          .executeTakeFirstOrThrow(),
+      ]);
+
+      expect(updatedPerson.identityId).toEqual(expect.any(String));
+      expect(updatedFaceLink.identityId).toBe(updatedPerson.identityId);
+      await expect(sut.getBackfillWork()).resolves.toMatchObject({ hasPersonalIdentityWork: false });
+    } finally {
+      await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
+      if (staleIdentityId) {
+        await ctx.database.deleteFrom('face_identity').where('id', '=', staleIdentityId).execute();
+      }
     }
   });
 
@@ -1367,7 +1410,7 @@ describe(FaceIdentityRepository.name, () => {
     }
   });
 
-  it('does not move mismatched personal faces to a target person owned by another user', async () => {
+  it('keeps mismatched personal faces assigned to the source person when the target profile is owned by another user', async () => {
     const { ctx, sut } = setup(await getKyselyDB());
     const { user: sourceOwner } = await ctx.newUser();
     const { user: targetOwner } = await ctx.newUser();
@@ -4696,6 +4739,76 @@ describe(FaceIdentityRepository.name, () => {
       );
     });
 
+    // Separating a profile is a statement about GROUPING — "this profile is not the same human as the ones it
+    // was grouped with". It says nothing about whether each individual face inside it is correctly placed. So
+    // the detach must not relabel those faces as human placements: `source='manual'` is read by BOTH engines
+    // as "a human attested to this face", owner-agnostically (face-repair.ts isSettledForOwner /
+    // face-person-verdict.repository.ts applyPendingEligibility) — permanently excluding them from the cleanup
+    // console and from suggestions. Stamping it here would hide every ML mistake in exactly the contaminated
+    // cluster a user separates BECAUSE it is contaminated, with no UI to undo it. Same shape as the R1 people
+    // -merge decision: a person-level action is not a per-face attestation.
+    it('preserves each backing face source when detaching, so machine placements stay scannable', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: user.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
+      const { person: personalPerson } = await ctx.newPerson({ ownerId: user.id, name: 'Alice' });
+      const originalIdentity = await sut.ensurePersonIdentity(personalPerson.id);
+
+      // Two faces behind ONE space profile, reaching it by different routes: one placed by the machine, one
+      // genuinely placed by a human. The detach must leave both labels exactly as it found them.
+      const { asset: evidenceAsset } = await ctx.newAsset({ ownerId: user.id });
+      const { assetFace: evidenceFace } = await ctx.newAssetFace({ assetId: evidenceAsset.id });
+      const { asset: placedAsset } = await ctx.newAsset({ ownerId: user.id });
+      const { assetFace: placedFace } = await ctx.newAssetFace({ assetId: placedAsset.id });
+
+      const spacePerson = await ctx.database
+        .insertInto('shared_space_person')
+        .values({
+          spaceId: space.id,
+          identityId: originalIdentity.id,
+          name: 'Alice in Space',
+          representativeFaceId: evidenceFace.id,
+          type: 'person',
+        })
+        .returningAll()
+        .executeTakeFirstOrThrow();
+      await linkSpaceFace(ctx, spacePerson.id, evidenceFace.id);
+      await linkSpaceFace(ctx, spacePerson.id, placedFace.id);
+      await sut.linkFace({
+        assetFaceId: evidenceFace.id,
+        identityId: originalIdentity.id,
+        source: 'shared-space-evidence',
+      });
+      await sut.linkFace({ assetFaceId: placedFace.id, identityId: originalIdentity.id, source: 'manual' });
+
+      const newIdentityId = await sut.detachScopedProfile({
+        type: 'space-person',
+        id: spacePerson.id,
+        spaceId: space.id,
+      });
+
+      const links = await ctx.database
+        .selectFrom('face_identity_face')
+        .select(['assetFaceId', 'identityId', 'source'])
+        .where('assetFaceId', 'in', [evidenceFace.id, placedFace.id])
+        .execute();
+
+      const evidenceLink = links.find((link) => link.assetFaceId === evidenceFace.id);
+      const placedLink = links.find((link) => link.assetFaceId === placedFace.id);
+
+      // The machine placement keeps its true origin — still visible to both scan engines.
+      expect(evidenceLink?.source).toBe('shared-space-evidence');
+      // Positive control: a face a human really did place keeps 'manual'. Without this, dropping the write
+      // entirely (rather than dropping only the relabel) would pass the assertion above just as well.
+      expect(placedLink?.source).toBe('manual');
+      // The separation itself still holds: both faces moved to the fresh identity, which is what makes the
+      // detach stick — not the source stamp.
+      expect(newIdentityId).not.toBe(originalIdentity.id);
+      expect(evidenceLink?.identityId).toBe(newIdentityId);
+      expect(placedLink?.identityId).toBe(newIdentityId);
+    });
+
     it('rejects detach when selected space-person faces also back non-repairable personal profiles', async () => {
       const { ctx, sut } = setup();
       const { user: actor } = await ctx.newUser();
@@ -5194,6 +5307,246 @@ describe(FaceIdentityRepository.name, () => {
       } finally {
         await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
       }
+    });
+  });
+
+  // S7.8 (F13): the cleanup console's `lock` bucket passes assetFaceIds straight through from the request —
+  // a client repeating an id (double-click, retry) must not make this call 500. Postgres refuses an
+  // ON CONFLICT DO UPDATE that would touch the same row twice in one statement ("cannot affect row a second
+  // time", 21000) unless the duplicate is removed before chunking.
+  describe('replaceFaceIdentities', () => {
+    it('deduplicates repeated assetFaceIds before chunking, writing exactly one row per distinct id', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { person } = await ctx.newPerson({ ownerId: user.id });
+      const identity = await sut.ensurePersonIdentity(person.id);
+      const { asset: assetA } = await ctx.newAsset({ ownerId: user.id });
+      const { assetFace: faceA } = await ctx.newAssetFace({ assetId: assetA.id, personId: person.id });
+      const { asset: assetB } = await ctx.newAsset({ ownerId: user.id });
+      const { assetFace: faceB } = await ctx.newAssetFace({ assetId: assetB.id, personId: person.id });
+
+      // Repeating faceA's id must not raise Postgres 21000.
+      await sut.replaceFaceIdentities({
+        assetFaceIds: [faceA.id, faceA.id, faceB.id],
+        identityId: identity.id,
+        source: 'manual',
+      });
+
+      const rows = await ctx.database
+        .selectFrom('face_identity_face')
+        .select('assetFaceId')
+        .where('assetFaceId', 'in', [faceA.id, faceB.id])
+        .execute();
+      // Positive control built in: faceB is a genuinely DIFFERENT id in the same call and must still get its
+      // own row — proving the fix only merges the DUPLICATE, not the whole batch.
+      expect(rows.map((r) => r.assetFaceId).sort()).toEqual([faceA.id, faceB.id].sort());
+    });
+
+    // H5: getEligibleFaceIdsForPerson (the lock bucket's eligibility read) runs OUTSIDE the caller's
+    // transaction and calls itself "advisory only". Without a write-time re-check here, a concurrent
+    // reassign landing between that read and this write leaves asset_face.personId pointing at the new
+    // person while this call still re-points the OLD person's identity onto the face — the same torn
+    // state reattributeFaces/detachFaces already guard against at write time.
+    it('excludes and does not write a face that moved off the required person between read and write', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { person: personP } = await ctx.newPerson({ ownerId: user.id });
+      const { person: personQ } = await ctx.newPerson({ ownerId: user.id });
+      const identityP = await sut.ensurePersonIdentity(personP.id);
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      // GIVEN: an eligibility read taken before this call (e.g. getEligibleFaceIdsForPerson) observed this
+      // face on personP — the face is created on P to model that stale snapshot.
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: personP.id });
+      // GIVEN: a concurrent reassignment lands between that read and this write, moving the face onto
+      // personQ before replaceFaceIdentities runs — the exact race the requirePersonId guard exists to catch.
+      await ctx.database
+        .updateTable('asset_face')
+        .set({ personId: personQ.id })
+        .where('id', '=', assetFace.id)
+        .execute();
+
+      // WHEN: the stale plan is written with requirePersonId still pinned to the person the read saw.
+      const written = await sut.replaceFaceIdentities({
+        assetFaceIds: [assetFace.id],
+        identityId: identityP.id,
+        source: 'manual',
+        requirePersonId: personP.id,
+      });
+
+      // THEN: the raced face is neither returned nor linked to P's identity.
+      expect(written).toEqual([]);
+      const rows = await ctx.database
+        .selectFrom('face_identity_face')
+        .select('assetFaceId')
+        .where('assetFaceId', '=', assetFace.id)
+        .execute();
+      expect(rows).toEqual([]);
+    });
+
+    // Positive control for the race test above: same call shape, but no concurrent reassignment occurs, so
+    // the write must still go through — proves the guard filters on a genuine mismatch, not on
+    // requirePersonId being set at all.
+    it('writes normally when the face is still on the required person', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { person } = await ctx.newPerson({ ownerId: user.id });
+      const identity = await sut.ensurePersonIdentity(person.id);
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      // GIVEN: the face is still on `person` — no race occurred.
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+
+      // WHEN
+      const written = await sut.replaceFaceIdentities({
+        assetFaceIds: [assetFace.id],
+        identityId: identity.id,
+        source: 'manual',
+        requirePersonId: person.id,
+      });
+
+      // THEN
+      expect(written).toEqual([assetFace.id]);
+      const row = await ctx.database
+        .selectFrom('face_identity_face')
+        .select(['assetFaceId', 'identityId', 'source'])
+        .where('assetFaceId', '=', assetFace.id)
+        .executeTakeFirstOrThrow();
+      expect(row).toEqual({ assetFaceId: assetFace.id, identityId: identity.id, source: 'manual' });
+    });
+
+    // The move path (executeRepair) calls replaceFaceIdentities WITHOUT requirePersonId, because
+    // reattributeFaces has already re-pointed asset_face.personId onto the destination person inside the
+    // SAME transaction by the time this runs — there is nothing stale left to re-check. Omitting the guard
+    // must keep writing unconditionally, or the move path itself would silently stop relinking identities.
+    it('writes unconditionally when requirePersonId is omitted, even for a face already reassigned elsewhere', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { person: originalPerson } = await ctx.newPerson({ ownerId: user.id });
+      const { person: destinationPerson } = await ctx.newPerson({ ownerId: user.id });
+      const destinationIdentity = await sut.ensurePersonIdentity(destinationPerson.id);
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: originalPerson.id });
+      // GIVEN: mirrors the move path — the face's personId has already moved to the destination by the
+      // time replaceFaceIdentities runs.
+      await ctx.database
+        .updateTable('asset_face')
+        .set({ personId: destinationPerson.id })
+        .where('id', '=', assetFace.id)
+        .execute();
+
+      // WHEN: requirePersonId is omitted, exactly as the move path calls it.
+      const written = await sut.replaceFaceIdentities({
+        assetFaceIds: [assetFace.id],
+        identityId: destinationIdentity.id,
+        source: 'manual',
+      });
+
+      // THEN: the write happens regardless of asset_face.personId — no eligibility re-check runs.
+      expect(written).toEqual([assetFace.id]);
+      const row = await ctx.database
+        .selectFrom('face_identity_face')
+        .select('identityId')
+        .where('assetFaceId', '=', assetFace.id)
+        .executeTakeFirstOrThrow();
+      expect(row.identityId).toBe(destinationIdentity.id);
+    });
+
+    it('returns [] for an empty assetFaceIds input without touching the database', async () => {
+      const { sut } = setup();
+
+      const written = await sut.replaceFaceIdentities({
+        assetFaceIds: [],
+        identityId: randomUUID(),
+        source: 'manual',
+      });
+
+      expect(written).toEqual([]);
+    });
+  });
+
+  // S10.3 (F20): the unconfirm DTO's assetFaceIds now goes up to MAX_RESOLVE_FACES (25 000), so this write
+  // path must chunk its IN-list rather than send one unchunked statement. The filler below is far larger
+  // than Postgres's 65 535 bind-parameter ceiling (unrelated, non-existent ids — a NOT/IN's bind count is a
+  // function of list length, not of whether rows match) so the test proves the chunking is real: it would
+  // fail with a bind-parameter error today, before chunking.
+  describe('demoteManualFaceLinks (F20)', () => {
+    it('demotes only the requested manual links, chunked, without a bind-parameter error on a huge request', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { person } = await ctx.newPerson({ ownerId: user.id });
+      const identity = await sut.ensurePersonIdentity(person.id);
+
+      const { asset: assetA } = await ctx.newAsset({ ownerId: user.id });
+      const { assetFace: manualFaceA } = await ctx.newAssetFace({ assetId: assetA.id, personId: person.id });
+      await sut.linkFace({ assetFaceId: manualFaceA.id, identityId: identity.id, source: 'manual' });
+
+      const { asset: assetB } = await ctx.newAsset({ ownerId: user.id });
+      const { assetFace: manualFaceB } = await ctx.newAssetFace({ assetId: assetB.id, personId: person.id });
+      await sut.linkFace({ assetFaceId: manualFaceB.id, identityId: identity.id, source: 'manual' });
+
+      // Positive control: a manual link that is NOT in the request — must stay 'manual'.
+      const { asset: assetC } = await ctx.newAsset({ ownerId: user.id });
+      const { assetFace: untouchedManualFace } = await ctx.newAssetFace({ assetId: assetC.id, personId: person.id });
+      await sut.linkFace({ assetFaceId: untouchedManualFace.id, identityId: identity.id, source: 'manual' });
+
+      const filler = Array.from({ length: 70_000 }, () => randomUUID());
+      const demoted = await sut.demoteManualFaceLinks([manualFaceA.id, manualFaceB.id, ...filler]);
+
+      expect(demoted).toBe(2);
+      const rows = await ctx.database
+        .selectFrom('face_identity_face')
+        .select(['assetFaceId', 'source'])
+        .where('assetFaceId', 'in', [manualFaceA.id, manualFaceB.id, untouchedManualFace.id])
+        .execute();
+      const sourceOf = Object.fromEntries(rows.map((r) => [r.assetFaceId, r.source]));
+      expect(sourceOf[manualFaceA.id]).toBe('ml');
+      expect(sourceOf[manualFaceB.id]).toBe('ml');
+      expect(sourceOf[untouchedManualFace.id]).toBe('manual'); // positive control: untouched
+    });
+  });
+
+  // H6: face-verdict.service.ts calls this for every flagged face in a scan, unchunked. minFaces is
+  // admin-settable, so a full-library scan can pass every flagged face in the instance — far larger than
+  // Postgres's 65 535 bind-parameter ceiling (one id is one bind parameter). Mirrors the
+  // demoteManualFaceLinks (F20) test above.
+  describe('getManualLinkedFaceIds (H6)', () => {
+    it('finds a manually-linked face among an id list far larger than the bind-parameter ceiling', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { person } = await ctx.newPerson({ ownerId: user.id });
+      const identity = await sut.ensurePersonIdentity(person.id);
+      const { asset: manualAsset } = await ctx.newAsset({ ownerId: user.id });
+      const { assetFace: manualFace } = await ctx.newAssetFace({ assetId: manualAsset.id, personId: person.id });
+      await sut.linkFace({ assetFaceId: manualFace.id, identityId: identity.id, source: 'manual' });
+
+      const { asset: mlAsset } = await ctx.newAsset({ ownerId: user.id });
+      const { assetFace: mlFace } = await ctx.newAssetFace({ assetId: mlAsset.id, personId: person.id });
+      await sut.linkFace({ assetFaceId: mlFace.id, identityId: identity.id, source: 'ml' });
+
+      const filler = Array.from({ length: 70_000 }, () => randomUUID());
+      const linked = await sut.getManualLinkedFaceIds([manualFace.id, mlFace.id, ...filler]);
+
+      expect(linked.has(manualFace.id)).toBe(true);
+      expect(linked.has(mlFace.id)).toBe(false); // positive control: an ml-sourced link is not "manual"
+    });
+  });
+
+  // H6: face-verdict.service.ts calls this for every owner among a scan's suspected owners, unchunked.
+  // Same bind-parameter ceiling concern as getManualLinkedFaceIds above.
+  describe('getPersonVerdictTokens (H6)', () => {
+    it('resolves tokens for a person among a personId list far larger than the bind-parameter ceiling', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { person } = await ctx.newPerson({ ownerId: user.id });
+      const identity = await sut.ensurePersonIdentity(person.id);
+      // Positive control: a person with no identity yet must still resolve to its bare person token,
+      // proving the chunk isn't merely returning the FIRST id it sees.
+      const { person: personWithoutIdentity } = await ctx.newPerson({ ownerId: user.id });
+
+      const filler = Array.from({ length: 70_000 }, () => randomUUID());
+      const tokens = await sut.getPersonVerdictTokens([person.id, personWithoutIdentity.id, ...filler]);
+
+      expect(tokens.get(person.id)).toEqual([`identity:${identity.id}`, `person:${person.id}`]);
+      expect(tokens.get(personWithoutIdentity.id)).toEqual([`person:${personWithoutIdentity.id}`]);
     });
   });
 });
