@@ -1615,11 +1615,19 @@ Create `web/src/lib/components/SchemaSpacePicker.svelte`:
   let spaces = $state<SharedSpaceResponseDto[]>([]);
 
   $effect(() => {
-    void getAllSpaces()
-      .then((result) => (spaces = result))
-      // A workflow outlives the spaces it points at. Failing to resolve names must never take the
-      // step editor down — unresolved ids fall back to a removable placeholder.
-      .catch(() => (spaces = []));
+    // Use async/await, not a .then().catch() chain: the `tscompat` ESLint plugin crashes on those
+    // member expressions (convertToMDNName), which fails `pnpm lint` in CI.
+    const load = async () => {
+      try {
+        spaces = await getAllSpaces();
+      } catch {
+        // A workflow outlives the spaces it points at. Failing to resolve names must never take the
+        // step editor down — unresolved ids fall back to a removable placeholder.
+        spaces = [];
+      }
+    };
+
+    void load();
   });
 
   const nameFor = (id: string) => spaces.find((space) => space.id === id)?.name;
@@ -1660,9 +1668,10 @@ Create `web/src/lib/components/SchemaSpacePicker.svelte`:
       </div>
     {/each}
 
-    {#if array || spaceIds.length === 0}
-      <Button size="small" shape="round" color="secondary" onclick={() => onChoose()}>{$t('choose')}</Button>
-    {/if}
+    <!-- Always shown, even in single mode with a value already picked: clicking Choose again
+         replaces it. Gating this on `array || spaceIds.length === 0` makes W4 and W5 unreachable,
+         because in single mode there would be no way to open the picker to replace a selection. -->
+    <Button size="small" shape="round" color="secondary" onclick={() => onChoose()}>{$t('choose')}</Button>
   </div>
 </div>
 ```
