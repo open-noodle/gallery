@@ -663,6 +663,14 @@ describe(AuthService.name, () => {
       '/api/admin/integrity/summary',
       '/api/admin/integrity/report',
       '/api/admin/database-backups',
+      '/api/admin/face-repair/scan/latest',
+      '/api/admin/face-repair/scan/defaults',
+      '/api/admin/face-repair/scan/person/person-id',
+      '/api/admin/face-repair/person/person-id',
+      '/api/admin/face-repair/decline',
+      '/api/admin/face-repair/resolutions',
+      '/api/admin/face-repair/owner/owner-id/people',
+      '/api/admin/face-repair/faces/asset-face-id/thumbnail',
     ])('allows the configured demo user to read allowlisted admin route %s in demo mode', async (uri) => {
       setDemoMode(true);
       mockSessionFor(demoUser);
@@ -691,6 +699,34 @@ describe(AuthService.name, () => {
       mockSessionFor(demoUser);
 
       await expect(authenticateAdmin('GET', uri)).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    // The face-repair allowlist is read-only by construction: the preview branch requires
+    // metadata.method === 'GET' before the regex is consulted. These are the same paths as the
+    // allowlisted reads above, and they must still be refused when the method mutates.
+    it.each([
+      ['POST', '/api/admin/face-repair/scan'],
+      ['POST', '/api/admin/face-repair/resolve'],
+      ['POST', '/api/admin/face-repair/decline'],
+      ['DELETE', '/api/admin/face-repair/decline'],
+      ['POST', '/api/admin/face-repair/unconfirm'],
+      ['POST', '/api/admin/face-repair/resolutions/remove'],
+      ['POST', '/api/admin/face-repair/owner/owner-id/people'],
+      ['POST', '/api/admin/face-repair/scan/person/person-id/cluster-faces'],
+    ])('blocks the demo user from %s %s', async (method, uri) => {
+      setDemoMode(true);
+      mockSessionFor(demoUser);
+
+      await expect(authenticateAdmin(method, uri)).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('blocks the demo user from an unanchored face-repair path', async () => {
+      setDemoMode(true);
+      mockSessionFor(demoUser);
+
+      await expect(authenticateAdmin('GET', '/api/admin/face-repair/resolutions/export')).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
     });
 
     it('blocks demo user mutating admin requests before route handlers can run', async () => {
