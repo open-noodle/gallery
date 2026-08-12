@@ -33,6 +33,9 @@ import { DuplicateRepository } from 'src/repositories/duplicate.repository';
 import { EmailRepository } from 'src/repositories/email.repository';
 import { EventRepository } from 'src/repositories/event.repository';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository';
+import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository';
+import { FaceRepairDeclineRepository } from 'src/repositories/face-repair-decline.repository';
+import { FaceRepairScanRepository } from 'src/repositories/face-repair-scan.repository';
 import { FaceRepairRepository } from 'src/repositories/face-repair.repository';
 import { IntegrityRepository } from 'src/repositories/integrity.repository';
 import { JobRepository } from 'src/repositories/job.repository';
@@ -74,6 +77,7 @@ import { ViewRepository } from 'src/repositories/view-repository';
 import { WebsocketRepository } from 'src/repositories/websocket.repository';
 import { WorkflowRepository } from 'src/repositories/workflow.repository';
 import { UserTable } from 'src/schema/tables/user.table';
+import { FaceVerdictService } from 'src/services/face-verdict.service';
 import { IdentityMergePropagationService } from 'src/services/identity-merge-propagation.service';
 import { ClassConstructor, GenerateThumbnailOptions, ImageDimensions } from 'src/types';
 import { AccessRequest, checkAccess, requireAccess } from 'src/utils/access';
@@ -118,6 +122,9 @@ export const BASE_SERVICE_DEPENDENCIES = [
   EventRepository,
   FaceIdentityRepository,
   FaceRepairRepository,
+  FaceRepairScanRepository,
+  FaceRepairDeclineRepository,
+  FacePersonVerdictRepository,
   IntegrityRepository,
   JobRepository,
   LibraryRepository,
@@ -162,6 +169,7 @@ export const BASE_SERVICE_DEPENDENCIES = [
 export class BaseService {
   protected storageCore: StorageCore;
   protected identityMergePropagationService: IdentityMergePropagationService;
+  protected faceVerdictService: FaceVerdictService;
 
   constructor(
     protected logger: LoggingRepository,
@@ -187,6 +195,9 @@ export class BaseService {
     protected eventRepository: EventRepository,
     protected faceIdentityRepository: FaceIdentityRepository,
     protected faceRepairRepository: FaceRepairRepository,
+    protected faceRepairScanRepository: FaceRepairScanRepository,
+    protected faceRepairDeclineRepository: FaceRepairDeclineRepository,
+    protected facePersonVerdictRepository: FacePersonVerdictRepository,
     protected integrityRepository: IntegrityRepository,
     protected jobRepository: JobRepository,
     protected libraryRepository: LibraryRepository,
@@ -245,6 +256,12 @@ export class BaseService {
       personRepository,
       sharedSpaceRepository,
     });
+    this.faceVerdictService = new FaceVerdictService({
+      faceIdentityRepository,
+      facePersonVerdictRepository,
+      faceRepairDeclineRepository,
+      logger: this.logger,
+    });
   }
 
   static create<T extends ClassConstructor<typeof BaseService>>(Service: T, ctx: BaseService) {
@@ -272,6 +289,9 @@ export class BaseService {
       ctx.eventRepository,
       ctx.faceIdentityRepository,
       ctx.faceRepairRepository,
+      ctx.faceRepairScanRepository,
+      ctx.faceRepairDeclineRepository,
+      ctx.facePersonVerdictRepository,
       ctx.integrityRepository,
       ctx.jobRepository,
       ctx.libraryRepository,
@@ -526,7 +546,10 @@ export class BaseService {
     return new ImmichStreamResponse({
       stream,
       contentType: 'image/jpeg',
-      cacheControl: CacheControl.PrivateWithoutCache,
+      // A face crop is immutable for a given faceId (the bounding box and source preview don't change), so let
+      // the browser cache it (B5). Without this the review grid re-fetched — and the server re-decoded, cropped
+      // and re-encoded — every visible tile on every visit.
+      cacheControl: CacheControl.PrivateWithCache,
     });
   }
 

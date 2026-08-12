@@ -83,6 +83,17 @@ export const getQueueJobTypeLabel = (name: JobName) => {
     case JobName.FaceIdentityBackfill: {
       return 'Face identity backfill';
     }
+    case JobName.FaceSuggestionMaintenance: {
+      return 'Face suggestion maintenance';
+    }
+    case JobName.PersonSuggestionScan:
+    case JobName.PersonSuggestionScanQueueAll: {
+      return 'Personal face suggestion scan';
+    }
+    case JobName.SpacePersonSuggestionScan:
+    case JobName.SpacePersonSuggestionScanQueueAll: {
+      return 'Shared-space face suggestion scan';
+    }
     default: {
       return name.replaceAll(/([a-z])([A-Z])/g, '$1 $2');
     }

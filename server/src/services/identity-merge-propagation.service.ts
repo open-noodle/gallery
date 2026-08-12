@@ -326,8 +326,12 @@ export class IdentityMergePropagationService {
         targetNeedsFeatureFaceRepair ||= sourceMergeNeedsFeatureFaceRepair;
       }
 
+      // Slice 4 / R1 (signed off): preserve each rode-along face's prior source — do not fabricate a
+      // 'manual' placement on faces the target person didn't already have manually linked. See
+      // preserveManualSource's doc comment in face-identity.repository.ts for why this must be omission,
+      // not a CASE, on this path (input.source here is always the literal 'manual').
       await this.deps.faceIdentityRepository.linkPersonFaces(
-        { personId: step.targetPersonId, identityId: plan.targetIdentityId, source: 'manual' },
+        { personId: step.targetPersonId, identityId: plan.targetIdentityId, source: 'manual', preserveSource: true },
         db,
       );
 

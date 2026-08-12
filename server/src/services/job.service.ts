@@ -1,12 +1,22 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { OnEvent } from 'src/decorators';
+import { OnEvent, OnJob } from 'src/decorators';
 import { mapAsset } from 'src/dtos/asset-response.dto';
 import { JobCreateDto } from 'src/dtos/job.dto';
-import { AssetType, AssetVisibility, IntegrityReport, JobName, JobStatus, ManualJobName } from 'src/enum';
+import {
+  AssetType,
+  AssetVisibility,
+  IntegrityReport,
+  JobName,
+  JobStatus,
+  ManualJobName,
+  QueueName,
+  SystemMetadataKey,
+} from 'src/enum';
 import { ArgsOf } from 'src/repositories/event.repository';
 import { BaseService } from 'src/services/base.service';
 import { JobItem } from 'src/types';
 import { hexOrBufferToBase64 } from 'src/utils/bytes';
+import { isFaceSuggestionEnabled } from 'src/utils/misc';
 
 const asJobItem = (dto: JobCreateDto): JobItem => {
   switch (dto.name) {
@@ -74,6 +84,10 @@ const asJobItem = (dto: JobCreateDto): JobItem => {
       return { name: JobName.FaceIdentityBackfill, data: {} };
     }
 
+    case ManualJobName.FaceSuggestionMaintenance: {
+      return { name: JobName.FaceSuggestionMaintenance, data: {} };
+    }
+
     case ManualJobName.SharedSpacePersonMetadataBackfill: {
       return { name: JobName.SharedSpacePersonMetadataBackfill, data: {} };
     }
@@ -88,6 +102,30 @@ const asJobItem = (dto: JobCreateDto): JobItem => {
 export class JobService extends BaseService {
   async create(dto: JobCreateDto): Promise<void> {
     await this.jobRepository.queue(asJobItem(dto));
+  }
+
+  @OnJob({ name: JobName.FaceSuggestionMaintenance, queue: QueueName.PeopleBackfill })
+  async handleFaceSuggestionMaintenance(): Promise<JobStatus> {
+    const { machineLearning } = await this.getConfig({ withCache: false });
+    if (!isFaceSuggestionEnabled(machineLearning)) {
+      return JobStatus.Skipped;
+    }
+
+    await this.jobRepository.queueAll([
+      { name: JobName.PersonSuggestionScanQueueAll, data: {} },
+      { name: JobName.SpacePersonSuggestionScanQueueAll, data: {} },
+    ]);
+
+    // The one-shot boot sweep's marker (PersonService.queueInitialFaceSuggestionSweep) is written HERE, not
+    // where the job is queued, so it records "a sweep ran" rather than "a sweep was queued". This job is
+    // attempts:1 / removeOnFail:true, so a marker burnt at queue time would survive a run that failed and
+    // vanished. Only the success path may claim the slot — the `Skipped` return above deliberately does not,
+    // so an admin running this by hand while the feature is off doesn't consume the boot sweep. Setting it
+    // on a manual run once the feature IS on is correct and intentional: a full sweep genuinely happened.
+    await this.systemMetadataRepository.set(SystemMetadataKey.FaceSuggestionDefaultOnState, {
+      sweptAt: new Date().toISOString(),
+    });
+    return JobStatus.Success;
   }
 
   @OnEvent({ name: 'JobRun' })
