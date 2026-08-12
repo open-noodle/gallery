@@ -20,6 +20,11 @@ type JobMapItem = {
   label: string;
 };
 
+export interface WaitForQueueCompletionOptions {
+  /** S9 (F19): give up waiting after this many milliseconds instead of polling forever. */
+  timeoutMs?: number;
+}
+
 const WORKER_WATCH_INTERVAL_MS = 30_000;
 
 const FORCE_FACIAL_RECOGNITION_QUEUE_ALL_JOB_ID = `${JobName.FacialRecognitionQueueAll}/force`;
@@ -298,6 +303,26 @@ export class JobRepository {
   }
 
   /**
+   * Slice 14 (fork isolation): `getJobCounts` is a pure delegate upstream — every read-only caller
+   * (the admin queue poll in queue.service.ts, media.service.ts, person.service.ts's recognition-queue
+   * checks, storage-migration.service.ts, and this repository's own getTelemetryMetrics) expects a read
+   * that never mutates Redis. `removeDanglingActiveJobs` used to run unconditionally inside
+   * `getJobCounts`, so those upstream call paths silently wrote to Redis on every poll.
+   *
+   * This variant carries that repair. `waitForQueueCompletion` is the one caller that genuinely needs
+   * it: it blocks in a loop deciding whether a queue (including the fork's PeopleBackfill, where the
+   * dangling-active-entry bug this repair fixes was originally found — see the "fix(server): clean
+   * dangling active queue entries" commit) has actually drained, and a dangling active entry with no
+   * backing job hash would otherwise read as perpetually "still active." A blocking wait loop paying for
+   * an extra bounded Redis scan per poll is a reasonable trade against a passive per-request read paying
+   * the same cost for no benefit.
+   */
+  async getJobCountsWithRepair(name: QueueName): Promise<JobCounts> {
+    await this.removeDanglingActiveJobs(name);
+    return this.getJobCounts(name);
+  }
+
+  /**
    * True when a dedup chain is already running for the space — a pass-scoped follow-up
    * (`space-dedup-<spaceId>-pass-<n>`, n >= 2) is queued, active, delayed, or paused on the
    * FacialRecognition queue. The initial dedup trigger uses the bare `space-dedup-<spaceId>` id,
@@ -384,6 +409,47 @@ export class JobRepository {
     return (this.handlers[name] as JobMapItem).queueName;
   }
 
+  private async removeDanglingActiveJobs(name: QueueName): Promise<void> {
+    const queue = this.getQueue(name);
+    const client = await queue.client;
+    const activeKey = queue.toKey('active');
+    const activeJobIds = [...new Set(await client.lrange(activeKey, 0, -1))];
+    if (activeJobIds.length === 0) {
+      return;
+    }
+
+    // bullmq >=5.80 narrowed `IRedisClient` to just the commands bullmq itself issues; EXISTS, LREM
+    // and SREM are not among them. The concrete client is ioredis, so cast to reach them — the same
+    // approach removeOrphanedActiveJobs above takes for LREM.
+    const redis = client as unknown as Pick<Redis, 'exists' | 'lrem' | 'srem'>;
+
+    const removedIds: string[] = [];
+    let removedCount = 0;
+    for (const jobId of activeJobIds) {
+      const jobKey = queue.toKey(jobId);
+      const lockKey = `${jobKey}:lock`;
+      const [jobExists, lockExists] = await Promise.all([redis.exists(jobKey), redis.exists(lockKey)]);
+      if (jobExists > 0 || lockExists > 0) {
+        continue;
+      }
+
+      const removed = await redis.lrem(activeKey, 0, jobId);
+      if (removed > 0) {
+        removedCount += removed;
+        removedIds.push(jobId);
+        await redis.srem(queue.toKey('stalled'), jobId);
+      }
+    }
+
+    if (removedCount > 0) {
+      const sampleIds = removedIds.slice(0, 5).join(', ');
+      const suffix = removedIds.length > 5 ? `${sampleIds}, ...` : sampleIds;
+      this.logger.warn(
+        `Removed ${removedCount} dangling active job id${removedCount === 1 ? '' : 's'} from ${name}: ${suffix}`,
+      );
+    }
+  }
+
   async queueAll(items: JobItem[]): Promise<void> {
     if (items.length === 0) {
       return;
@@ -432,11 +498,29 @@ export class JobRepository {
     return this.queueAll([item]);
   }
 
-  async waitForQueueCompletion(...queues: QueueName[]): Promise<void> {
+  /**
+   * S9 (F19): the trailing-options form keeps every existing call site's variadic syntax
+   * (`waitForQueueCompletion(a, b, c)`) byte-identical — only a caller that explicitly appends a
+   * trailing options object opts into the bounded wait. Without `timeoutMs` this is the original
+   * unbounded `while (pending.length > 0)` poll; with it, a forced recognition run that gives up
+   * waiting still proceeds instead of parking indefinitely while F17/F18's suggestion sweep keeps
+   * the PeopleBackfill queue busy.
+   */
+  async waitForQueueCompletion(
+    ...args: [...queues: QueueName[]] | [...queues: QueueName[], options: WaitForQueueCompletionOptions]
+  ): Promise<void> {
+    const maybeOptions = args.at(-1);
+    const hasOptions = typeof maybeOptions === 'object' && maybeOptions !== null;
+    const { timeoutMs } = hasOptions ? (maybeOptions as WaitForQueueCompletionOptions) : {};
+    const queues = (hasOptions ? args.slice(0, -1) : args) as QueueName[];
+
     const getPending = async () => {
       const results = await Promise.all(
         queues.map(async (name) => {
-          const [counts, paused] = await Promise.all([this.getJobCounts(name), this.isPaused(name)]);
+          // Slice 14: the repairing variant. This loop decides whether a queue has actually drained, and
+          // a dangling active entry with no backing job hash (the bug getJobCountsWithRepair fixes) would
+          // otherwise read as perpetually "still active" — see the comment on getJobCountsWithRepair.
+          const [counts, paused] = await Promise.all([this.getJobCountsWithRepair(name), this.isPaused(name)]);
           const pending = counts.active + counts.waiting + counts.delayed + counts.paused;
           return { counts, name, paused, pending };
         }),
@@ -445,9 +529,18 @@ export class JobRepository {
       return results.filter(({ pending }) => pending > 0);
     };
 
+    const deadline = timeoutMs === undefined ? undefined : Date.now() + timeoutMs;
     let pending = await getPending();
 
     while (pending.length > 0) {
+      if (deadline !== undefined && Date.now() >= deadline) {
+        const names = pending.map(({ name }) => name).join(', ');
+        this.logger.warn(
+          `Gave up waiting for ${names} queue(s) to finish after ${timeoutMs}ms; proceeding without waiting`,
+        );
+        return;
+      }
+
       const blocked = pending[0];
       const message =
         `Waiting for ${blocked.name} queue to finish ` +
@@ -466,8 +559,12 @@ export class JobRepository {
   }
 
   async searchJobs(name: QueueName, dto: QueueJobSearchDto): Promise<QueueJobResponseDto[]> {
+    if (!dto.status || dto.status.includes(QueueJobStatus.Active)) {
+      await this.removeDanglingActiveJobs(name);
+    }
+
     const jobs = await this.getQueue(name).getJobs(dto.status ?? Object.values(QueueJobStatus), 0, 1000);
-    return jobs.map((job) => {
+    return jobs.filter(Boolean).map((job) => {
       const { id, name, timestamp, data } = job;
       return { id, name: name as JobName, timestamp, data };
     });
@@ -506,6 +603,29 @@ export class JobRepository {
           return { delay: data.delay, removeOnFail: true };
         }
         return { jobId: 'face-identity-maintenance-after-recognition', removeOnFail: true };
+      }
+      case JobName.FaceSuggestionMaintenance: {
+        return { jobId: 'face-suggestion-maintenance', removeOnComplete: true, removeOnFail: true };
+      }
+      case JobName.PersonSuggestionScanQueueAll: {
+        return { jobId: 'person-suggestion-scan/all', removeOnComplete: true, removeOnFail: true };
+      }
+      case JobName.SpacePersonSuggestionScanQueueAll: {
+        return { jobId: 'space-person-suggestion-scan/all', removeOnComplete: true, removeOnFail: true };
+      }
+      case JobName.PersonSuggestionScan: {
+        // S9.8: a per-id jobId so a re-entrant QueueAll sweep (F18 — FaceIdentityBackfill re-queues
+        // both QueueAll jobs on every drain) coalesces onto the in-flight job for the same person
+        // instead of stacking a duplicate on the concurrency-1 PeopleBackfill queue.
+        //
+        // H8: removeOnFail, unlike before — without it a failed run permanently occupies this stable
+        // dedup jobId (see removeFailedJobsByJobIdPrefix's doc comment above) and every later add() for
+        // that person is silently dropped, so their suggestion queue never refills.
+        return { jobId: `person-suggestion-scan/${item.data.id}`, removeOnComplete: true, removeOnFail: true };
+      }
+      case JobName.SpacePersonSuggestionScan: {
+        // H8: see PersonSuggestionScan above — same stuck-dedup-jobId hazard, same fix.
+        return { jobId: `space-person-suggestion-scan/${item.data.id}`, removeOnComplete: true, removeOnFail: true };
       }
       case JobName.VersionCheck: {
         return { deduplication: { id: JobName.VersionCheck } };
@@ -593,6 +713,11 @@ export class JobRepository {
           return { jobId: `shared-space-person-metadata-backfill/${scope}/${data.cursor}`, removeOnFail: true };
         }
         return { jobId: `shared-space-person-metadata-backfill/${scope}`, removeOnFail: true };
+      }
+      case JobName.FaceRepairScan: {
+        // Fixed jobId so BullMQ dedupes concurrent scan enqueues into one (single-flight, complementing the DB
+        // partial unique index). removeOnComplete/Fail frees the id once the scan finishes so the next can run.
+        return { jobId: JobName.FaceRepairScan, removeOnComplete: true, removeOnFail: true };
       }
       default: {
         return null;

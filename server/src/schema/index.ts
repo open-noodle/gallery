@@ -57,6 +57,10 @@ import { ClusterGroupRequestTable } from 'src/schema/tables/cluster-group-reques
 import { ClusterGroupTable } from 'src/schema/tables/cluster-group.table.js';
 import { FaceIdentityFaceTable } from 'src/schema/tables/face-identity-face.table.js';
 import { FaceIdentityTable } from 'src/schema/tables/face-identity.table.js';
+import { FacePersonVerdictTable } from 'src/schema/tables/face-person-verdict.table.js';
+import { FaceRepairDeclineTable } from 'src/schema/tables/face-repair-decline.table.js';
+import { FaceRepairScanFlaggedFaceTable } from 'src/schema/tables/face-repair-scan-flagged-face.table.js';
+import { FaceRepairScanTable } from 'src/schema/tables/face-repair-scan.table.js';
 import { FaceSearchTable } from 'src/schema/tables/face-search.table.js';
 import { GeodataPlacesTable } from 'src/schema/tables/geodata-places.table.js';
 import { IntegrityReportTable } from 'src/schema/tables/integrity-report.table.js';
@@ -160,6 +164,9 @@ export class ImmichDatabase {
     ClusterGroupRequestTable,
     FaceIdentityTable,
     FaceIdentityFaceTable,
+    FaceRepairDeclineTable,
+    FaceRepairScanFlaggedFaceTable,
+    FaceRepairScanTable,
     FaceSearchTable,
     GeodataPlacesTable,
     IntegrityReportTable,
@@ -182,6 +189,7 @@ export class ImmichDatabase {
     PersonUserTable,
     PersonGroupTable,
     PersonGroupAuditTable,
+    FacePersonVerdictTable,
     SessionTable,
     SharedLinkAssetTable,
     SharedLinkTable,
@@ -305,6 +313,9 @@ export interface DB {
   face_search: FaceSearchTable;
   face_identity: FaceIdentityTable;
   face_identity_face: FaceIdentityFaceTable;
+  face_repair_decline: FaceRepairDeclineTable;
+  face_repair_scan_flagged_face: FaceRepairScanFlaggedFaceTable;
+  face_repair_scan: FaceRepairScanTable;
 
   geodata_places: GeodataPlacesTable;
 
@@ -336,9 +347,9 @@ export interface DB {
   person_user: PersonUserTable;
   person_group: PersonGroupTable;
   person_group_audit: PersonGroupAuditTable;
-
   cluster_group: ClusterGroupTable;
   cluster_group_request: ClusterGroupRequestTable;
+  face_person_verdict: FacePersonVerdictTable;
 
   session: SessionTable;
   session_sync_checkpoint: SessionSyncCheckpointTable;

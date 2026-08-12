@@ -41,6 +41,7 @@
       value: ManualJobName.IntegrityChecksumMismatchRefresh,
     },
     { title: $t('admin.face_identity_backfill_job'), value: ManualJobName.FaceIdentityBackfill },
+    { title: $t('admin.face_suggestion_maintenance_job'), value: ManualJobName.FaceSuggestionMaintenance },
     {
       title: $t('admin.space_person_metadata_backfill_job'),
       value: ManualJobName.SharedSpacePersonMetadataBackfill,

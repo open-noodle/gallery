@@ -1,0 +1,1307 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Face cleanup · Gallery Administration</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ---- Immich / Gallery design tokens (from web/src/app.css + @immich/ui) ---- */
+      :root {
+        --primary: #4250af; /* immich-ui-primary-500 */
+        --primary-600: #39459a;
+        --primary-tint: #eef0fb; /* primary/10-ish */
+        --primary-tint-2: #e2e6f7;
+        --success: #2fa84f;
+        --success-tint: #e8f6ec;
+        --warning: #e0a106; /* immich-ui-warning-500 */
+        --warning-tint: #fdf3e0;
+        --danger: #dc3a3a; /* immich-ui-danger-500 */
+        --danger-tint: #fcecec;
+        --bg: #ffffff; /* immich-bg */
+        --canvas: #f4f5f8; /* page canvas behind cards */
+        --subtle: #f6f6f8; /* immich-ui-gray (light surface) */
+        --fg: #191b22; /* near-black text */
+        --muted: #6b7180; /* secondary text */
+        --muted-2: #9aa0ad;
+        --line: #e7e8ee; /* ring / borders */
+        --line-2: #dadce4;
+        --font: 'GoogleSans', 'Google Sans', 'Product Sans', 'Roboto', 'Noto Sans', system-ui, sans-serif;
+        --mono: 'GoogleSansCode', 'Roboto Mono', monospace;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+      }
+      body {
+        background: var(--canvas);
+        color: var(--fg);
+        font-family: var(--font);
+        font-size: 14px;
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+      }
+      .mono {
+        font-family: var(--mono);
+        font-variant-numeric: tabular-nums;
+      }
+      .num {
+        font-variant-numeric: tabular-nums;
+      }
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+
+      .shell {
+        display: grid;
+        grid-template-columns: 248px 1fr;
+        min-height: 100vh;
+      }
+
+      /* ---- sidebar (immich admin rail) ---- */
+      .side {
+        background: var(--bg);
+        border-right: 1px solid var(--line);
+        padding: 18px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        position: sticky;
+        top: 0;
+        height: 100vh;
+      }
+      .side .logo {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 6px 10px 16px;
+        font-weight: 700;
+        font-size: 18px;
+      }
+      .side .logo .mark {
+        width: 30px;
+        height: 30px;
+        border-radius: 9px;
+        background: var(--primary);
+        display: grid;
+        place-items: center;
+        color: #fff;
+      }
+      .side .sec {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--muted-2);
+        padding: 14px 12px 6px;
+      }
+      .nav {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 14px;
+        border-radius: 999px;
+        color: var(--muted);
+        font-weight: 500;
+        cursor: pointer;
+        font-size: 14px;
+      }
+      .nav:hover {
+        background: var(--subtle);
+        color: var(--fg);
+      }
+      .nav.active {
+        background: var(--primary-tint);
+        color: var(--primary);
+        font-weight: 600;
+      }
+      .nav svg {
+        flex: none;
+      }
+      .side .grow {
+        flex: 1;
+      }
+      .side .me {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+      }
+      .side .me img {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+      }
+
+      /* ---- main ---- */
+      .main {
+        padding: 26px 34px 80px;
+        max-width: 1280px;
+      }
+      .head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 24px;
+      }
+      .head h1 {
+        font-size: 26px;
+      }
+      .head p {
+        margin: 7px 0 0;
+        color: var(--muted);
+        max-width: 64ch;
+      }
+      .head .right {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex: none;
+      }
+      .head .last {
+        text-align: right;
+        font-size: 12px;
+        color: var(--muted-2);
+      }
+      .head .last b {
+        display: block;
+        color: var(--muted);
+        font-weight: 600;
+        font-size: 13px;
+      }
+
+      .btn {
+        font-family: inherit;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        border-radius: 14px;
+        padding: 10px 18px;
+        border: 1px solid var(--line-2);
+        background: var(--bg);
+        color: var(--fg);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition: 0.14s;
+      }
+      .btn:hover {
+        background: var(--subtle);
+      }
+      .btn.primary {
+        background: var(--primary);
+        border-color: var(--primary);
+        color: #fff;
+      }
+      .btn.primary:hover {
+        background: var(--primary-600);
+      }
+      .btn.sm {
+        padding: 7px 13px;
+        font-size: 13px;
+        border-radius: 11px;
+      }
+      .btn:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      .btn.ghost {
+        border-color: transparent;
+        background: transparent;
+        color: var(--muted);
+      }
+      .btn.ghost:hover {
+        background: var(--subtle);
+        color: var(--fg);
+      }
+
+      /* ---- stat cards ---- */
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 14px;
+        margin: 24px 0 20px;
+      }
+      .card {
+        background: var(--bg);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+      }
+      .stat {
+        padding: 16px 17px;
+      }
+      .stat .k {
+        font-size: 12px;
+        color: var(--muted);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 500;
+      }
+      .stat .v {
+        font-size: 27px;
+        font-weight: 600;
+        margin-top: 8px;
+        letter-spacing: -0.02em;
+      }
+      .stat .sub {
+        font-size: 12px;
+        color: var(--muted-2);
+        margin-top: 1px;
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+      }
+      .dot.pri {
+        background: var(--primary);
+      }
+      .dot.warn {
+        background: var(--warning);
+      }
+      .dot.ok {
+        background: var(--success);
+      }
+      .dot.bad {
+        background: var(--danger);
+      }
+      .dot.mut {
+        background: var(--muted-2);
+      }
+
+      /* ---- toolbar ---- */
+      .toolbar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+      }
+      .seg {
+        display: flex;
+        gap: 2px;
+        background: var(--subtle);
+        border: 1px solid var(--line);
+        padding: 3px;
+        border-radius: 13px;
+      }
+      .seg .opt {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--muted);
+        padding: 7px 13px;
+        border-radius: 10px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+      }
+      .seg .opt.active {
+        background: var(--bg);
+        color: var(--fg);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+      }
+      .seg .opt .c {
+        font-size: 11px;
+        color: var(--muted-2);
+      }
+      .search {
+        flex: 1;
+        min-width: 170px;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        background: var(--bg);
+        border: 1px solid var(--line);
+        border-radius: 13px;
+        padding: 10px 14px;
+        color: var(--muted-2);
+      }
+      .search input {
+        all: unset;
+        flex: 1;
+        color: var(--fg);
+        font-size: 14px;
+      }
+      select.sort {
+        appearance: none;
+        background: var(--bg);
+        border: 1px solid var(--line);
+        color: var(--muted);
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 600;
+        padding: 10px 32px 10px 14px;
+        border-radius: 13px;
+        cursor: pointer;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%236b7180' stroke-width='2'><path d='M3 4.5 6 7.5 9 4.5'/></svg>");
+        background-repeat: no-repeat;
+        background-position: right 12px center;
+      }
+
+      /* ---- selection bar ---- */
+      .selbar {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        background: var(--primary-tint);
+        border: 1px solid var(--primary-tint-2);
+        border-radius: 16px;
+        padding: 12px 16px;
+        margin-bottom: 18px;
+      }
+      .selbar .sc {
+        font-weight: 700;
+        font-size: 15px;
+        color: var(--primary-600);
+      }
+      .selbar .note {
+        color: var(--muted);
+        font-size: 12.5px;
+      }
+      .selbar .spacer {
+        flex: 1;
+      }
+
+      /* ---- table ---- */
+      .tablecard {
+        overflow: hidden;
+      }
+      .grouphdr {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 13px 18px;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+      }
+      .grouphdr.warn {
+        background: var(--warning-tint);
+        color: #9a6f04;
+      }
+      .grouphdr.ok {
+        background: var(--subtle);
+        color: var(--muted);
+      }
+      .grouphdr .sub {
+        font-weight: 500;
+        text-transform: none;
+        letter-spacing: 0;
+        color: var(--muted-2);
+        font-size: 12px;
+      }
+      .thead {
+        display: grid;
+        grid-template-columns: 42px 2.3fr 1.2fr 1.5fr 1.6fr 130px 96px;
+        gap: 14px;
+        padding: 9px 18px;
+        font-size: 11.5px;
+        font-weight: 600;
+        color: var(--muted-2);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        border-bottom: 1px solid var(--line);
+      }
+      .trow {
+        display: grid;
+        grid-template-columns: 42px 2.3fr 1.2fr 1.5fr 1.6fr 130px 96px;
+        gap: 14px;
+        align-items: center;
+        padding: 13px 18px;
+        border-bottom: 1px solid var(--line);
+        transition: 0.12s;
+        animation: rise 0.4s both;
+      }
+      .trow:last-child {
+        border-bottom: none;
+      }
+      .trow:hover {
+        background: var(--subtle);
+      }
+      .trow.sel {
+        background: var(--primary-tint);
+      }
+      @keyframes rise {
+        from {
+          opacity: 0;
+          transform: translateY(5px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+
+      .cb {
+        appearance: none;
+        width: 19px;
+        height: 19px;
+        border-radius: 6px;
+        border: 1.7px solid var(--line-2);
+        background: var(--bg);
+        cursor: pointer;
+        position: relative;
+        transition: 0.12s;
+      }
+      .cb:checked {
+        background: var(--primary);
+        border-color: var(--primary);
+      }
+      .cb:checked:after {
+        content: '';
+        position: absolute;
+        left: 6px;
+        top: 2.5px;
+        width: 4px;
+        height: 8px;
+        border: solid #fff;
+        border-width: 0 2.2px 2.2px 0;
+        transform: rotate(43deg);
+      }
+      .cb:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+
+      .person {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+      }
+      .face {
+        width: 40px;
+        height: 40px;
+        border-radius: 11px;
+        object-fit: cover;
+        background: var(--subtle);
+        flex: none;
+      }
+      .av {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        object-fit: cover;
+        background: var(--subtle);
+        flex: none;
+      }
+      .pname {
+        font-weight: 600;
+        font-size: 14.5px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .pname.un {
+        font-weight: 500;
+        color: var(--muted);
+        font-style: italic;
+      }
+      .pmeta {
+        font-size: 12px;
+        color: var(--muted-2);
+        margin-top: 1px;
+      }
+      .owner {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        color: var(--muted);
+        font-size: 13.5px;
+        min-width: 0;
+      }
+
+      .flag {
+        min-width: 0;
+      }
+      .flag .top {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin-bottom: 5px;
+      }
+      .flag .pct {
+        font-weight: 700;
+        font-size: 15px;
+      }
+      .flag .frac {
+        font-size: 11.5px;
+        color: var(--muted-2);
+      }
+      .meter {
+        height: 7px;
+        border-radius: 99px;
+        background: var(--subtle);
+        overflow: hidden;
+        border: 1px solid var(--line);
+      }
+      .meter span {
+        display: block;
+        height: 100%;
+        border-radius: 99px;
+        background: var(--warning);
+      }
+      .meter.bad span {
+        background: var(--danger);
+      }
+
+      .suspect {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+      }
+      .suspect .arrow {
+        color: var(--muted-2);
+        flex: none;
+      }
+      .suspect .nm {
+        font-weight: 600;
+        font-size: 13.5px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .suspect .cnt {
+        font-size: 11.5px;
+        color: var(--success);
+      }
+      .suspect .cnt.bad {
+        color: var(--danger);
+      }
+
+      .chip {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        padding: 4px 10px;
+        border-radius: 8px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        white-space: nowrap;
+      }
+      .chip.ok {
+        color: var(--primary-600);
+        background: var(--primary-tint);
+      }
+      .chip.warn {
+        color: #9a6f04;
+        background: var(--warning-tint);
+      }
+      .reasons {
+        margin-top: 6px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+      }
+      .reason {
+        font-size: 10.5px;
+        color: var(--muted);
+        background: var(--subtle);
+        border: 1px solid var(--line);
+        padding: 2px 7px;
+        border-radius: 6px;
+        white-space: nowrap;
+      }
+      .reason.bad {
+        color: var(--danger);
+        background: var(--danger-tint);
+        border-color: transparent;
+      }
+      .rowact {
+        display: flex;
+        justify-content: flex-end;
+      }
+
+      .footnote {
+        margin-top: 18px;
+        color: var(--muted);
+        font-size: 12.5px;
+        max-width: 92ch;
+      }
+      .footnote b {
+        color: var(--fg);
+      }
+
+      /* ---- review modal ---- */
+      .scrim {
+        position: fixed;
+        inset: 0;
+        background: rgba(20, 22, 30, 0.45);
+        backdrop-filter: blur(2px);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 60;
+        padding: 28px;
+      }
+      .scrim.open {
+        display: flex;
+      }
+      .modal {
+        width: min(960px, 100%);
+        max-height: 92vh;
+        background: var(--bg);
+        border-radius: 26px;
+        box-shadow: 0 30px 80px -24px rgba(20, 22, 40, 0.5);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        animation: pop 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
+      }
+      @keyframes pop {
+        from {
+          opacity: 0;
+          transform: translateY(10px) scale(0.98);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+      .mh {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 20px 24px 16px;
+      }
+      .mh .face {
+        width: 52px;
+        height: 52px;
+        border-radius: 14px;
+      }
+      .mh h2 {
+        font-size: 20px;
+      }
+      .mh .meta {
+        color: var(--muted);
+        font-size: 13px;
+        margin-top: 2px;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .mh .x {
+        margin-left: auto;
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        border: 1px solid var(--line);
+        background: var(--bg);
+        color: var(--muted);
+        cursor: pointer;
+        font-size: 17px;
+      }
+      .mh .x:hover {
+        background: var(--subtle);
+      }
+      .verdict {
+        margin: 0 24px;
+        background: var(--warning-tint);
+        border: 1px solid #f1dca6;
+        border-radius: 14px;
+        padding: 13px 15px;
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        color: #7a5803;
+      }
+      .verdict svg {
+        flex: none;
+        color: var(--warning);
+        margin-top: 1px;
+      }
+      .verdict b {
+        color: #5f4502;
+      }
+      .compare {
+        padding: 18px 24px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        overflow: auto;
+      }
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 14px;
+      }
+      .panel.bad {
+        border-color: #f3cccc;
+        background: #fef8f8;
+      }
+      .panel.good {
+        border-color: #cfe9d6;
+        background: #f8fcf9;
+      }
+      .panel h3 {
+        font-size: 13.5px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .panel .tk {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+      }
+      .panel.bad .tk {
+        background: var(--danger);
+      }
+      .panel.good .tk {
+        background: var(--success);
+      }
+      .panel .sub {
+        font-size: 12px;
+        color: var(--muted);
+        margin: 3px 0 12px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 7px;
+      }
+      .grid img {
+        width: 100%;
+        aspect-ratio: 1;
+        object-fit: cover;
+        border-radius: 9px;
+        background: var(--subtle);
+      }
+      .more {
+        grid-column: span 5;
+        text-align: center;
+        color: var(--muted-2);
+        font-size: 12px;
+        padding-top: 5px;
+      }
+      .mf {
+        border-top: 1px solid var(--line);
+        padding: 16px 24px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+      .mf .keep {
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .mf .keep b {
+        color: var(--fg);
+      }
+      .mf .spacer {
+        flex: 1;
+      }
+      @media (max-width: 1100px) {
+        .shell {
+          grid-template-columns: 1fr;
+        }
+        .side {
+          display: none;
+        }
+        .stats {
+          grid-template-columns: repeat(2, 1fr);
+        }
+        .compare {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <!-- SIDEBAR -->
+      <aside class="side">
+        <div class="logo">
+          <span class="mark"
+            ><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="3" />
+              <circle cx="9" cy="9" r="2" />
+              <path d="m21 15-4.5-4.5L7 20" /></svg
+          ></span>
+          Gallery
+        </div>
+        <div class="sec">Administration</div>
+        <div class="nav">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M16 21v-2a4 4 0 0 0-8 0v2" />
+            <circle cx="12" cy="7" r="4" />
+          </svg>
+          Users
+        </div>
+        <div class="nav">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M3 7h18M3 12h18M3 17h18" />
+          </svg>
+          Libraries
+        </div>
+        <div class="nav">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M10 2 4 6v6c0 5 3 8 6 10 3-2 6-5 6-10V6Z" />
+          </svg>
+          Jobs
+        </div>
+        <div class="nav">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="3" />
+            <path
+              d="M19 12a7 7 0 0 0-.1-1l2-1.6-2-3.4-2.3 1a7 7 0 0 0-1.7-1L16.5 2h-4l-.4 2.4a7 7 0 0 0-1.7 1l-2.3-1-2 3.4 2 1.6a7 7 0 0 0 0 2l-2 1.6 2 3.4 2.3-1a7 7 0 0 0 1.7 1l.4 2.4h4l.4-2.4a7 7 0 0 0 1.7-1l2.3 1 2-3.4-2-1.6c.1-.3.1-.7.1-1Z"
+            />
+          </svg>
+          Settings
+        </div>
+        <div class="nav active">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <circle cx="12" cy="11" r="3" />
+            <path d="M5.5 20a7 7 0 0 1 13 0" />
+            <path d="M12 2v2M3.5 6 5 7M20.5 6 19 7" />
+          </svg>
+          Face cleanup
+        </div>
+        <div class="grow"></div>
+        <div class="me">
+          <img src="https://i.pravatar.cc/48?img=12" alt="" />
+          <div>
+            <div style="font-weight: 600; color: var(--fg); font-size: 13px">Hagen</div>
+            <div style="font-size: 11px">Administrator</div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- MAIN -->
+      <main class="main">
+        <div class="head">
+          <div>
+            <h1>Face cleanup</h1>
+            <p>
+              Review people whose clusters were contaminated by the misattribution event and re-home the impostor faces
+              to their true owners. Real faces, names and thumbnails are preserved — nothing is emptied.
+            </p>
+          </div>
+          <div class="right">
+            <div class="last">Last scan<b>3 Jun 2026, 14:20</b></div>
+            <button class="btn primary">
+              <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                <path d="M21 12a9 9 0 1 1-3-6.7L21 7" />
+                <path d="M21 3v4h-4" />
+              </svg>
+              Re-scan
+            </button>
+          </div>
+        </div>
+
+        <div class="stats">
+          <div class="card stat">
+            <div class="k"><span class="dot mut"></span>Eligible faces</div>
+            <div class="v num">450,200</div>
+            <div class="sub">machine-recognised</div>
+          </div>
+          <div class="card stat">
+            <div class="k"><span class="dot warn"></span>Flagged</div>
+            <div class="v num">13,267</div>
+            <div class="sub">across 632 people</div>
+          </div>
+          <div class="card stat">
+            <div class="k"><span class="dot ok"></span>Auto-repaired</div>
+            <div class="v num">2,760</div>
+            <div class="sub">re-homed earlier ✓</div>
+          </div>
+          <div class="card stat">
+            <div class="k"><span class="dot pri"></span>Needs decision</div>
+            <div class="v num">10,486</div>
+            <div class="sub">627 people · this page</div>
+          </div>
+          <div class="card stat">
+            <div class="k"><span class="dot bad"></span>Unattributable</div>
+            <div class="v num">173</div>
+            <div class="sub">no clean owner — left as-is</div>
+          </div>
+        </div>
+
+        <div class="toolbar">
+          <div class="seg">
+            <div class="opt active">All <span class="c">627</span></div>
+            <div class="opt">Review first <span class="c">29</span></div>
+            <div class="opt">Confident <span class="c">598</span></div>
+            <div class="opt">Named <span class="c">5</span></div>
+          </div>
+          <label class="search"
+            ><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <circle cx="11" cy="11" r="7" />
+              <path d="m20 20-3.2-3.2" /></svg
+            ><input placeholder="Search people or suspected owner…"
+          /></label>
+          <select class="sort">
+            <option>Sort: Faces (high → low)</option>
+            <option>Sort: Flagged %</option>
+          </select>
+        </div>
+
+        <div class="selbar">
+          <span class="sc" id="selcount">598 selected</span>
+          <span class="note">confident clusters pre-selected · review-first excluded until you open them</span>
+          <span class="spacer"></span>
+          <button class="btn ghost sm" onclick="clearSel()">Clear</button>
+          <button class="btn primary" id="applybtn">Re-attribute selected →</button>
+        </div>
+
+        <div class="card tablecard">
+          <div class="grouphdr warn">
+            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <path d="M12 9v4M12 17h.01" />
+              <path d="M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
+            </svg>
+            Review these first
+            <span class="sub">named, large, or routing into another flagged cluster — open before approving</span>
+          </div>
+          <div class="thead">
+            <div></div>
+            <div>Person</div>
+            <div>Owner</div>
+            <div>Flagged</div>
+            <div>Suspected owner</div>
+            <div>Status</div>
+            <div></div>
+          </div>
+          <div id="reviewRows"></div>
+
+          <div class="grouphdr ok">
+            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
+              <path d="M20 6 9 17l-5-5" />
+            </svg>
+            Confident — auto-selected <span class="sub">single clean owner · unnamed · safe to bulk-approve</span>
+          </div>
+          <div id="confRows"></div>
+        </div>
+
+        <div class="footnote">
+          Applying re-attribution unassigns only the <b>flagged</b> faces from each selected person and re-queues facial
+          recognition, which routes them to their true owner’s intact cluster. The person keeps every unflagged (real)
+          face, its name and its thumbnail. <b>Unattributable</b> faces (no confident owner) are intentionally left
+          assigned.
+        </div>
+      </main>
+    </div>
+
+    <!-- REVIEW MODAL -->
+    <div class="scrim" id="scrim" onclick="if (event.target === this) closeModal();">
+      <div class="modal" role="dialog" aria-label="Review person">
+        <div class="mh">
+          <img class="face" id="m_face" alt="" />
+          <div>
+            <h2 id="m_name">Jula Kulz</h2>
+            <div class="meta" id="m_meta">
+              <span>owned by Hagen</span><span>·</span><span>2,738 faces</span><span>·</span
+              ><span class="mono">ab714816</span>
+            </div>
+          </div>
+          <button class="x" onclick="closeModal()">✕</button>
+        </div>
+        <div class="verdict">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path d="M12 9v4M12 17h.01" />
+            <path d="M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
+          </svg>
+          <div id="m_verdict">
+            <b>77.7% of this cluster (1,956 faces) resembles Armin Falkner.</b> Confirm the two columns look like
+            different people, then re-attribute.
+          </div>
+        </div>
+        <div class="compare">
+          <div class="panel bad">
+            <h3>
+              <span class="tk"></span> Flagged as not Jula
+              <span class="mono" style="color: var(--muted-2); font-weight: 400">1,956</span>
+            </h3>
+            <div class="sub">these are unassigned &amp; re-homed by recognition</div>
+            <div class="grid" id="grid_bad"></div>
+          </div>
+          <div class="panel good">
+            <h3><span class="tk"></span> Suspected owner · Armin Falkner</h3>
+            <div class="sub">clean cluster · 3,104 faces · receives the re-homed faces</div>
+            <div class="grid" id="grid_good"></div>
+          </div>
+        </div>
+        <div class="mf">
+          <div class="keep">Jula keeps <b>782</b> real faces · name &amp; thumbnail preserved</div>
+          <div class="spacer"></div>
+          <button class="btn" onclick="closeModal()">Skip for now</button>
+          <button class="btn primary" id="m_apply">Re-attribute 1,956 faces</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const F = (seed, n = 15) =>
+        Array.from({ length: n }, (_, i) => `https://i.pravatar.cc/120?img=${((seed + i) % 70) + 1}`);
+      const av = (s) => `https://i.pravatar.cc/64?img=${(s % 70) + 1}`;
+
+      const review = [
+        {
+          id: '8b003b39',
+          name: 'Person A',
+          owner: 'Hagen',
+          faces: 5885,
+          pct: 67.7,
+          flag: '3,875',
+          keep: '2,010',
+          sus: 'Angelinde Falkner',
+          susCount: '3,873',
+          seed: 11,
+          susSeed: 31,
+          reasons: ['named'],
+          bad: false,
+        },
+        {
+          id: 'ab714816',
+          name: 'Jula Kulz',
+          owner: 'Hagen',
+          faces: 2738,
+          pct: 77.7,
+          flag: '1,956',
+          keep: '782',
+          sus: 'Armin Falkner',
+          susCount: '1,956',
+          seed: 5,
+          susSeed: 42,
+          reasons: ['named'],
+          bad: false,
+        },
+        {
+          id: 'f0ef121e',
+          name: 'Alexia Varga Arrieta',
+          owner: 'Hagen',
+          faces: 783,
+          pct: 64.7,
+          flag: '376',
+          keep: '407',
+          sus: 'Marco Varga',
+          susCount: '376',
+          seed: 9,
+          susSeed: 51,
+          reasons: ['named'],
+          bad: false,
+        },
+        {
+          id: '7c41aa02',
+          name: null,
+          owner: 'Lena',
+          faces: 604,
+          pct: 71.2,
+          flag: '430',
+          keep: '174',
+          sus: 'Unnamed #2231',
+          susCount: '430',
+          seed: 22,
+          susSeed: 48,
+          reasons: ['large cluster · 604 faces'],
+          bad: false,
+        },
+        {
+          id: 'b8c93f70',
+          name: null,
+          owner: 'Hagen',
+          faces: 224,
+          pct: 58.9,
+          flag: '132',
+          keep: '92',
+          sus: 'Sven Radner',
+          susCount: '132',
+          seed: 14,
+          susSeed: 60,
+          reasons: ['bad target — owner also flagged'],
+          bad: true,
+        },
+      ];
+      const conf = [
+        {
+          id: 'a1f2',
+          name: null,
+          owner: 'Hagen',
+          faces: 187,
+          pct: 61.5,
+          flag: '115',
+          keep: '72',
+          sus: 'Angelinde Falkner',
+          susCount: '115',
+          seed: 18,
+          susSeed: 31,
+        },
+        {
+          id: 'c7d1',
+          name: null,
+          owner: 'Lena',
+          faces: 115,
+          pct: 69.6,
+          flag: '80',
+          keep: '35',
+          sus: 'Armin Falkner',
+          susCount: '80',
+          seed: 25,
+          susSeed: 42,
+        },
+        {
+          id: 'e3b9',
+          name: null,
+          owner: 'Hagen',
+          faces: 90,
+          pct: 73.3,
+          flag: '66',
+          keep: '24',
+          sus: 'Marco Varga',
+          susCount: '66',
+          seed: 33,
+          susSeed: 51,
+        },
+        {
+          id: '9a04',
+          name: null,
+          owner: 'Mara',
+          faces: 72,
+          pct: 65.3,
+          flag: '47',
+          keep: '25',
+          sus: 'Tomas Hale',
+          susCount: '47',
+          seed: 7,
+          susSeed: 19,
+        },
+        {
+          id: '4f8c',
+          name: null,
+          owner: 'Hagen',
+          faces: 58,
+          pct: 79.3,
+          flag: '46',
+          keep: '12',
+          sus: 'Angelinde Falkner',
+          susCount: '46',
+          seed: 40,
+          susSeed: 31,
+        },
+        {
+          id: '2db6',
+          name: null,
+          owner: 'Lena',
+          faces: 55,
+          pct: 60.0,
+          flag: '33',
+          keep: '22',
+          sus: 'Nadia Ulrich',
+          susCount: '33',
+          seed: 3,
+          susSeed: 27,
+        },
+      ];
+
+      let selected = new Set(conf.map((c) => c.id));
+      const opened = new Set();
+      const all = [...review, ...conf];
+
+      function row(p, kind) {
+        const sel = selected.has(p.id);
+        const disabled = kind === 'warn' && !opened.has(p.id) ? 'disabled' : '';
+        const name = p.name ? `<div class="pname">${p.name}</div>` : `<div class="pname un">Unnamed cluster</div>`;
+        const reasons = (p.reasons || []).map((r) => `<span class="reason ${p.bad ? 'bad' : ''}">${r}</span>`).join('');
+        const chip =
+          kind === 'warn' ? `<span class="chip warn">Review first</span>` : `<span class="chip ok">Confident</span>`;
+        return `<div class="trow ${sel ? 'sel' : ''}" data-id="${p.id}">
+      <input class="cb" type="checkbox" ${sel ? 'checked' : ''} ${disabled} onchange="toggle('${p.id}',this)">
+      <div class="person"><img class="face" src="${F(p.seed, 1)[0]}" alt="">
+        <div style="min-width:0">${name}<div class="pmeta"><span class="mono">${p.id}</span> · ${p.faces.toLocaleString()} faces</div></div></div>
+      <div class="owner"><img class="av" src="${av(p.seed + 2)}" alt="">${p.owner}</div>
+      <div class="flag"><div class="top"><span class="pct">${p.pct}%</span><span class="frac">${p.flag}/${p.faces.toLocaleString()}</span></div>
+        <div class="meter ${p.bad ? 'bad' : ''}"><span style="width:${p.pct}%"></span></div></div>
+      <div class="suspect"><span class="arrow"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+        <img class="av" src="${av(p.susSeed)}" alt=""><div style="min-width:0"><div class="nm">${p.sus}</div><div class="cnt ${p.bad ? 'bad' : ''}">${p.bad ? '⚠ also flagged' : p.susCount + ' faces'}</div></div></div>
+      <div>${chip}<div class="reasons">${reasons}</div></div>
+      <div class="rowact"><button class="btn sm" onclick="openModal('${p.id}')">Review</button></div>
+    </div>`;
+      }
+      document.getElementById('reviewRows').innerHTML = review.map((p) => row(p, 'warn')).join('');
+      document.getElementById('confRows').innerHTML = conf.map((p) => row(p, 'ok')).join('');
+      document.querySelectorAll('.trow').forEach((r, i) => (r.style.animationDelay = i * 28 + 'ms'));
+
+      function refresh() {
+        document.getElementById('selcount').textContent = selected.size + ' selected';
+        const b = document.getElementById('applybtn');
+        b.textContent = 'Re-attribute selected (' + selected.size + ') →';
+        b.disabled = selected.size === 0;
+        document.querySelectorAll('.trow').forEach((r) => r.classList.toggle('sel', selected.has(r.dataset.id)));
+      }
+      function toggle(id, el) {
+        el.checked ? selected.add(id) : selected.delete(id);
+        refresh();
+      }
+      function clearSel() {
+        selected.clear();
+        document.querySelectorAll('.cb').forEach((c) => (c.checked = false));
+        refresh();
+      }
+
+      function openModal(id) {
+        const p = all.find((x) => x.id === id);
+        if (!p) return;
+        opened.add(id);
+        document.getElementById('m_face').src = F(p.seed, 1)[0];
+        document.getElementById('m_name').textContent = p.name || 'Unnamed cluster';
+        document.getElementById('m_meta').innerHTML =
+          `<span>owned by ${p.owner}</span><span>·</span><span>${p.faces.toLocaleString()} faces</span><span>·</span><span class="mono">${p.id}</span>`;
+        document.getElementById('m_verdict').innerHTML =
+          `<b>${p.pct}% of this cluster (${p.flag} faces) resembles ${p.sus}.</b> Confirm the two columns look like different people, then re-attribute.`;
+        document.querySelector('.panel.bad h3').innerHTML =
+          `<span class="tk"></span> Flagged as not ${(p.name || 'this person').split(' ')[0]} <span class="mono" style="color:var(--muted-2);font-weight:400">${p.flag}</span>`;
+        document.querySelector('.panel.good h3').innerHTML = `<span class="tk"></span> Suspected owner · ${p.sus}`;
+        document.getElementById('grid_bad').innerHTML =
+          F(p.seed, 15)
+            .map((s) => `<img src="${s}" alt="">`)
+            .join('') + `<div class="more">+ ${p.flag} flagged</div>`;
+        document.getElementById('grid_good').innerHTML =
+          F(p.susSeed, 15)
+            .map((s) => `<img src="${s}" alt="">`)
+            .join('') + `<div class="more">true owner</div>`;
+        document.querySelector('.mf .keep').innerHTML =
+          `${p.name || 'This person'} keeps <b>${p.keep}</b> real faces · name &amp; thumbnail preserved`;
+        const ap = document.getElementById('m_apply');
+        ap.textContent = `Re-attribute ${p.flag} faces`;
+        ap.setAttribute('onclick', `applyModal('${p.id}')`);
+        document.getElementById('scrim').classList.add('open');
+      }
+      function closeModal() {
+        document.getElementById('scrim').classList.remove('open');
+      }
+      function applyModal(id) {
+        selected.add(id);
+        const cb = document.querySelector(`.trow[data-id="${id}"] .cb`);
+        if (cb) {
+          cb.disabled = false;
+          cb.checked = true;
+        }
+        refresh();
+        closeModal();
+      }
+
+      refresh();
+      if (location.hash === '#review') openModal('ab714816');
+    </script>
+  </body>
+</html>
