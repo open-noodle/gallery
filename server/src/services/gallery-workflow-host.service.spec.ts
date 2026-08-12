@@ -1,3 +1,4 @@
+import { BadRequestException, ForbiddenException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { AuthDto } from 'src/dtos/auth.dto';
@@ -58,5 +59,42 @@ describe(GalleryWorkflowHostService.name, () => {
       ok: false,
       reason: 'unknown-method',
     });
+  });
+});
+
+// A stand-in handler so the invariant is tested once, not per-handler.
+class ProbeService extends GalleryWorkflowHostService {
+  error: unknown;
+  protected override collaborators() {
+    return {
+      sharedSpace: { addAssets: () => Promise.reject(this.error) },
+      album: {},
+    } as never;
+  }
+}
+
+describe('never-throws invariant', () => {
+  const probe = (error: unknown) => {
+    const { sut } = newTestService(ProbeService);
+    sut.error = error;
+    return sut;
+  };
+
+  const args = { assetId: '00000000-0000-4000-8000-000000000001', spaceIds: ['00000000-0000-4000-8000-000000000002'] };
+
+  // U3 / U4 — every expected rejection resolves ok:false. If any of these threw, upstream's
+  // execute() would catch it and abandon all remaining steps (spec §7).
+  it.each([
+    ['BadRequestException', new BadRequestException('nope')],
+    ['ForbiddenException', new ForbiddenException('nope')],
+    ['NotFoundException', new NotFoundException('nope')],
+    ['UnauthorizedException', new UnauthorizedException('nope')],
+  ])('resolves ok:false for %s', async (_name, error) => {
+    await expect(probe(error).dispatch(auth, 'addToSpace', args)).resolves.toMatchObject({ ok: false });
+  });
+
+  // U5 — a genuine bug must still fail the run loudly.
+  it('propagates an unexpected error', async () => {
+    await expect(probe(new TypeError('boom')).dispatch(auth, 'addToSpace', args)).rejects.toThrow('boom');
   });
 });
