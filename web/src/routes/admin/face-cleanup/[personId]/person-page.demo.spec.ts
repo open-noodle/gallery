@@ -141,7 +141,7 @@ const renderPersonPage = async () => {
 
 describe('face-cleanup person page — read-only demo', () => {
   beforeEach(() => {
-    mockAuthManager.isReadOnlyDemo = false; // web vitest does not clear mocks between tests
+    mockAuthManager.isReadOnlyDemo = false; // clearMocks resets spies only — this plain object needs its own reset
     vi.mocked(getLatestScan).mockResolvedValue(makeCompletedScan() as unknown as object);
     vi.mocked(getFaceRepairPersonFaces).mockResolvedValue({
       personId: PERSON_ID,
@@ -165,5 +165,57 @@ describe('face-cleanup person page — read-only demo', () => {
     await renderPersonPage();
 
     expect(screen.queryByTestId('apply-btn')).toBeNull();
+  });
+
+  it('shows Move entire cluster to a real admin', async () => {
+    await renderPersonPage();
+
+    expect(screen.queryByTestId('move-entire-btn')).not.toBeNull();
+  });
+
+  it('hides Move entire cluster in read-only demo mode', async () => {
+    mockAuthManager.isReadOnlyDemo = true;
+    await renderPersonPage();
+
+    // `rest-section` hosts the button and renders in BOTH branches, so a page that never got that far
+    // fails here rather than passing on an absence it was always going to have.
+    expect(screen.getByTestId('rest-section')).toBeInTheDocument();
+    expect(screen.queryByTestId('move-entire-btn')).toBeNull();
+  });
+
+  // The rest-of-cluster load is a POST the demo user is refused. Firing it would flip restLoadError and
+  // paint a red banner over a page whose whole purpose here is to be a working read-only exhibit.
+  it('loads the rest of the cluster for a real admin', async () => {
+    await renderPersonPage();
+
+    await waitFor(() => expect(getFaceRepairClusterFaces).toHaveBeenCalled());
+    expect(screen.queryByTestId('rest-load-error')).toBeNull();
+  });
+
+  it('skips the blocked cluster-faces POST in read-only demo mode, with no error banner', async () => {
+    mockAuthManager.isReadOnlyDemo = true;
+    // Would set restLoadError if the call were ever made — proving the assertion below is about the call
+    // NOT happening, not about a call that happened to succeed.
+    vi.mocked(getFaceRepairClusterFaces).mockRejectedValue(new Error('403'));
+    await renderPersonPage();
+
+    // The flagged grid still rendered, i.e. the page is genuinely usable rather than blank.
+    expect(screen.getByTestId('flagged-grid')).toBeInTheDocument();
+    expect(getFaceRepairClusterFaces).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('rest-load-error')).toBeNull();
+    expect(screen.queryByTestId('rest-load-error-retry')).toBeNull();
+  });
+
+  it('renders the read-only notice in demo mode', async () => {
+    mockAuthManager.isReadOnlyDemo = true;
+    await renderPersonPage();
+
+    expect(screen.queryByTestId('read-only-demo-notice')).not.toBeNull();
+  });
+
+  it('omits the read-only notice for a real admin', async () => {
+    await renderPersonPage();
+
+    expect(screen.queryByTestId('read-only-demo-notice')).toBeNull();
   });
 });

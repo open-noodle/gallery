@@ -459,20 +459,24 @@
           {$t('admin.face_cleanup_empty_no_scan_sub')}
         </p>
         <!-- The copy used to say "Click Re-scan", pointing at a small button in the opposite corner. The
-             instruction and the action are now the same object, so first run has one obvious thing to do. -->
-        <div class="mt-6 flex justify-center">
-          <Button
-            color="primary"
-            size="medium"
-            disabled={scanning}
-            onclick={handleRescan}
-            class="gap-2"
-            data-testid="first-scan-cta"
-          >
-            <Icon icon={mdiRadar} size="18" />
-            {$t('admin.face_cleanup_mode_run_first_scan')}
-          </Button>
-        </div>
+             instruction and the action are now the same object, so first run has one obvious thing to do.
+             Hidden from the read-only demo user: it calls triggerScan (POST), exactly like the header's
+             Re-scan button already gated above. -->
+        {#if !isReadOnlyDemo}
+          <div class="mt-6 flex justify-center">
+            <Button
+              color="primary"
+              size="medium"
+              disabled={scanning}
+              onclick={handleRescan}
+              class="gap-2"
+              data-testid="first-scan-cta"
+            >
+              <Icon icon={mdiRadar} size="18" />
+              {$t('admin.face_cleanup_mode_run_first_scan')}
+            </Button>
+          </div>
+        {/if}
       </div>
 
       <!-- Scan running / pending: show progress -->
@@ -506,11 +510,14 @@
         {#if scan.error}
           <p class="mt-1 font-mono text-xs text-red-500">{scan.error}</p>
         {/if}
-        <div class="mt-3">
-          <Button color="secondary" onclick={handleRescan} disabled={scanning}>
-            {$t('admin.face_cleanup_retry_scan')}
-          </Button>
-        </div>
+        <!-- Also triggerScan (POST) — gated for the same reason as the first-scan CTA above. -->
+        {#if !isReadOnlyDemo}
+          <div class="mt-3">
+            <Button color="secondary" onclick={handleRescan} disabled={scanning} data-testid="retry-scan-btn">
+              {$t('admin.face_cleanup_retry_scan')}
+            </Button>
+          </div>
+        {/if}
       </div>
 
       <!-- Scan completed -->
