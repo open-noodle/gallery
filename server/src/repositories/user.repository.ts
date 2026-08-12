@@ -306,6 +306,30 @@ export class UserRepository {
       .execute();
   }
 
+  @GenerateSql({ params: [DummyValue.UUID] })
+  async syncUsage(id?: string) {
+    const query = this.db
+      .updateTable('user')
+      .set({
+        quotaUsageInBytes: (eb) =>
+          eb
+            .selectFrom('asset')
+            .leftJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
+            .select((eb) => eb.fn.coalesce(eb.fn.sum<number>('asset_exif.fileSizeInByte'), eb.lit(0)).as('usage'))
+            .where('asset.libraryId', 'is', null)
+            .where('asset.ownerId', '=', eb.ref('user.id')),
+        updatedAt: new Date(),
+      })
+      .where('user.deletedAt', 'is', null)
+      .$if(id !== undefined, (eb) => eb.where('user.id', '=', asUuid(id!)));
+
+    await query.execute();
+  }
+
+  // Gallery-fork: writes an already-computed figure into the same column syncUsage above fills,
+  // so nothing downstream has to know which of the two produced it. Used when the admin has opted
+  // into counting server-generated files, where the number comes from a disk/S3 walk rather than
+  // from summing exif file sizes.
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.NUMBER] })
   async setUsage(id: string, usage: number): Promise<void> {
     await this.db
