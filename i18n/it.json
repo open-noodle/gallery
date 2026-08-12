@@ -736,6 +736,7 @@
     "storage_template_settings": "Modello di archiviazione",
     "storage_template_settings_description": "Gestisci la struttura delle cartelle e il nome degli asset caricati",
     "storage_template_user_label": "<code>{label}</code> è l'etichetta di archiviazione dell'utente",
+    "storage_usage_derivatives_refresh_hint": "L'utilizzo comprensivo dei file in cache viene ricalcolato una volta quando attivi per la prima volta una di queste opzioni, poi mantenuto aggiornato dall'attività notturna Sincronizza quota di utilizzo. Se quell'attività notturna è disattivata, il valore smette di cambiare.",
     "storage_usage_include_derivatives_display_setting": "Includi i file in cache nell'utilizzo visualizzato",
     "storage_usage_include_derivatives_display_setting_description": "Conteggia le miniature e i video transcodificati nell'utilizzo di archiviazione mostrato agli utenti. Disattivato per impostazione predefinita, come nell'Immich originale, dove vengono conteggiati solo i file originali.",
     "storage_usage_include_derivatives_quota_setting": "Includi i file in cache nell'applicazione della quota",

@@ -736,6 +736,7 @@
     "storage_template_settings": "存储模板",
     "storage_template_settings_description": "管理存放已上传照片/视频的文件夹结构和文件名",
     "storage_template_user_label": "该用户的「存储标签」为<code>{label}</code>",
+    "storage_usage_derivatives_refresh_hint": "首次启用其中任一开关时，会重新计算一次包含缓存文件的使用量，之后由每日任务「同步配额使用情况」保持更新。若该每日任务已禁用，该数值将不再变化。",
     "storage_usage_include_derivatives_display_setting": "在显示的使用量中包含缓存文件",
     "storage_usage_include_derivatives_display_setting_description": "将缩略图和转码视频计入向用户显示的存储使用量。默认关闭，与上游 Immich 一致，仅统计原始文件。",
     "storage_usage_include_derivatives_quota_setting": "在配额计算中包含缓存文件",

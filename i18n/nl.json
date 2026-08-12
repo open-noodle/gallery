@@ -736,6 +736,7 @@
     "storage_template_settings": "Opslagtemplate",
     "storage_template_settings_description": "Beheer de mapstructuur en bestandsnaam van geüploade bestanden",
     "storage_template_user_label": "<code>{label}</code> is het opslaglabel van de gebruiker",
+    "storage_usage_derivatives_refresh_hint": "Het gebruik inclusief gecachte bestanden wordt één keer opnieuw berekend zodra je een van deze opties inschakelt en daarna bijgehouden door de nachtelijke taak Synchroniseer opslaglimieten. Als die nachtelijke taak is uitgeschakeld, verandert het getal niet meer.",
     "storage_usage_include_derivatives_display_setting": "Gecachte bestanden meetellen in het weergegeven gebruik",
     "storage_usage_include_derivatives_display_setting_description": "Telt thumbnails en getranscodeerde video's mee in het opslaggebruik dat aan gebruikers wordt getoond. Standaard uitgeschakeld, zoals in upstream Immich, waar alleen originele bestanden worden geteld.",
     "storage_usage_include_derivatives_quota_setting": "Gecachte bestanden meetellen in de opslaglimiet",

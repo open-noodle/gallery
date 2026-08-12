@@ -736,6 +736,7 @@
     "storage_template_settings": "Speichervorlage",
     "storage_template_settings_description": "Die Ordnerstruktur und den Dateinamen der hochgeladenen Datei verwalten",
     "storage_template_user_label": "<code>{label}</code> is die Speicherpfadbezeichnung des Benutzers",
+    "storage_usage_derivatives_refresh_hint": "Die Nutzung einschließlich zwischengespeicherter Dateien wird einmal neu berechnet, sobald du eine dieser Optionen aktivierst, und danach von der nächtlichen Aufgabe „Kontingentnutzung synchronisieren“ aktuell gehalten. Ist diese nächtliche Aufgabe deaktiviert, ändert sich der Wert nicht mehr.",
     "storage_usage_include_derivatives_display_setting": "Zwischengespeicherte Dateien in der angezeigten Nutzung einbeziehen",
     "storage_usage_include_derivatives_display_setting_description": "Miniaturansichten und transkodierte Videos in die den Nutzern angezeigte Speichernutzung einrechnen. Standardmäßig deaktiviert, wie im Upstream-Immich, wo nur Originaldateien gezählt werden.",
     "storage_usage_include_derivatives_quota_setting": "Zwischengespeicherte Dateien in der Kontingentberechnung einbeziehen",

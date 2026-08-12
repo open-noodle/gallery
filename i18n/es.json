@@ -736,6 +736,7 @@
     "storage_template_settings": "Plantilla de almacenamiento",
     "storage_template_settings_description": "Administrar la estructura de carpetas y el nombre de archivo del recurso subido",
     "storage_template_user_label": "<code>{label}</code> es la etiqueta de almacenamiento del usuario",
+    "storage_usage_derivatives_refresh_hint": "El uso incluyendo los archivos en caché se recalcula una vez cuando activas por primera vez una de estas opciones y después se mantiene actualizado mediante la tarea nocturna «Uso de la cuota de sincronización». Si esa tarea nocturna está desactivada, la cifra deja de cambiar.",
     "storage_usage_include_derivatives_display_setting": "Incluir archivos en caché en el uso mostrado",
     "storage_usage_include_derivatives_display_setting_description": "Contabilizar las miniaturas y los vídeos transcodificados en el uso de almacenamiento mostrado a los usuarios. Desactivado de forma predeterminada, como en Immich original, donde solo se contabilizan los archivos originales.",
     "storage_usage_include_derivatives_quota_setting": "Incluir archivos en caché en la aplicación de la cuota",

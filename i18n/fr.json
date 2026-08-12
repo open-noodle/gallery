@@ -736,6 +736,7 @@
     "storage_template_settings": "Modèle de stockage",
     "storage_template_settings_description": "Gérer la structure des dossiers et le nom des fichiers du média envoyé",
     "storage_template_user_label": "<code>{label}</code> est l'étiquette de stockage de l'utilisateur",
+    "storage_usage_derivatives_refresh_hint": "L'utilisation incluant les fichiers en cache est recalculée une fois lorsque vous activez l'une de ces options, puis tenue à jour par la tâche de nuit « Synchroniser les quota d'usage ». Si cette tâche de nuit est désactivée, la valeur cesse d'évoluer.",
     "storage_usage_include_derivatives_display_setting": "Inclure les fichiers en cache dans l'utilisation affichée",
     "storage_usage_include_derivatives_display_setting_description": "Comptabiliser les miniatures et les vidéos transcodées dans l'utilisation du stockage affichée aux utilisateurs. Désactivé par défaut, comme dans Immich en amont, où seuls les fichiers originaux sont comptabilisés.",
     "storage_usage_include_derivatives_quota_setting": "Inclure les fichiers en cache dans l'application du quota",

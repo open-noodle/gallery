@@ -3,6 +3,8 @@
   import SettingSwitch from '$lib/components/shared-components/settings/SettingSwitch.svelte';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import { systemConfigManager } from '$lib/managers/system-config-manager.svelte';
+  import { Icon } from '@immich/ui';
+  import { mdiHelpCircleOutline } from '@mdi/js';
   import { t } from 'svelte-i18n';
   import { fade } from 'svelte/transition';
 
@@ -26,6 +28,11 @@
           bind:checked={configToEdit.storageUsage.includeDerivativesInQuota}
           {disabled}
         />
+
+        <p class="text-sm dark:text-immich-dark-fg">
+          <Icon icon={mdiHelpCircleOutline} class="inline" size="15" />
+          {$t('admin.storage_usage_derivatives_refresh_hint')}
+        </p>
       </div>
 
       <SettingButtonsRow bind:configToEdit keys={['storageUsage']} {disabled} />
