@@ -1,6 +1,6 @@
 import { ModuleRef } from '@nestjs/core';
 import { setTimeout } from 'node:timers/promises';
-import { JobName, QueueName } from 'src/enum';
+import { JobName, QueueJobStatus, QueueName } from 'src/enum';
 import { ConfigRepository } from 'src/repositories/config.repository';
 import { EventRepository } from 'src/repositories/event.repository';
 import { buildWorkerOptions, JobRepository } from 'src/repositories/job.repository';
@@ -24,15 +24,23 @@ const emptyCounts = (): JobCounts => ({
 });
 
 const setup = (counts: JobCounts[] = []) => {
+  const client = {
+    exists: vi.fn().mockResolvedValue(0),
+    lrange: vi.fn().mockResolvedValue([]),
+    lrem: vi.fn().mockResolvedValue(0),
+    srem: vi.fn().mockResolvedValue(0),
+  };
   const queue = {
     add: vi.fn().mockResolvedValue({}),
     addBulk: vi.fn().mockResolvedValue([]),
     clean: vi.fn().mockResolvedValue([]),
+    client: Promise.resolve(client),
     drain: vi.fn().mockResolvedValue(void 0),
     getJob: vi.fn().mockResolvedValue(void 0),
     getJobCounts: vi.fn().mockResolvedValue(emptyCounts()),
     getJobs: vi.fn().mockResolvedValue([]),
     isPaused: vi.fn().mockResolvedValue(false),
+    toKey: vi.fn((key: string) => `queue:${key}`),
   };
 
   for (const value of counts) {
@@ -49,7 +57,7 @@ const setup = (counts: JobCounts[] = []) => {
 
   const sut = new JobRepository(moduleRef, {} as ConfigRepository, {} as EventRepository, logger);
 
-  return { sut, queue, logger };
+  return { sut, queue, client, logger };
 };
 
 const stubActiveList = (queue: ReturnType<typeof setup>['queue'], activeIds: string[]) => {
@@ -242,6 +250,39 @@ describe(JobRepository.name, () => {
     );
   });
 
+  it('S9.9 supplementary (job.repository): gives up waiting after the configured timeout and logs a warning naming the queue', async () => {
+    const { sut, queue, logger } = setup();
+    // never drains — always reports a waiting job
+    queue.getJobCounts.mockResolvedValue({ ...emptyCounts(), waiting: 1 });
+
+    // a short injected timeout (not a production-length interval) — setTimeout is mocked to resolve
+    // instantly (see the file-level `vi.mock('node:timers/promises', ...)` above), so the loop spins
+    // until this many real milliseconds have actually elapsed, not 20 real seconds.
+    await sut.waitForQueueCompletion(QueueName.PeopleBackfill, { timeoutMs: 20 });
+
+    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining(QueueName.PeopleBackfill));
+    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('20ms'));
+
+    // positive control, same test body: a queue that drains before the timeout does not warn at all
+    vi.mocked(logger.warn).mockClear();
+    queue.getJobCounts.mockReset();
+    queue.getJobCounts.mockResolvedValueOnce({ ...emptyCounts(), waiting: 1 }).mockResolvedValueOnce(emptyCounts());
+
+    await sut.waitForQueueCompletion(QueueName.PeopleBackfill, { timeoutMs: 20 });
+
+    expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  it('S9.9 supplementary (pin): waitForQueueCompletion without a timeout option behaves exactly as before (no deadline check)', async () => {
+    const { sut, queue } = setup([{ ...emptyCounts(), waiting: 1 }, emptyCounts()]);
+
+    await sut.waitForQueueCompletion(QueueName.PeopleBackfill);
+
+    // control: still resolves once the queue drains, and polls exactly once via the normal path
+    expect(queue.getJobCounts).toHaveBeenCalledTimes(2);
+    expect(setTimeoutMock).toHaveBeenCalledTimes(1);
+  });
+
   it('drains delayed jobs when requested', async () => {
     const { sut, queue } = setup();
 
@@ -265,6 +306,64 @@ describe(JobRepository.name, () => {
 
     expect(queue.drain).toHaveBeenCalledWith(true);
     expect(queue.clean).not.toHaveBeenCalled();
+  });
+
+  // Slice 14 (fork isolation): getJobCounts is upstream's pure delegate — every read-only caller (the
+  // admin queue poll, media.service.ts, person.service.ts's recognition-queue checks,
+  // storage-migration.service.ts, and this repository's own getTelemetryMetrics) must never see a read
+  // mutate Redis. The dangling-active repair moved to getJobCountsWithRepair, whose only caller is
+  // waitForQueueCompletion.
+  it('getJobCounts performs no Redis writes, even with a dangling active entry present', async () => {
+    const { sut, client, queue } = setup([emptyCounts()]);
+    client.lrange.mockResolvedValue(['face-identity-backfill/space-person/orphan']);
+    client.lrem.mockResolvedValue(1);
+
+    await sut.getJobCounts(QueueName.PeopleBackfill);
+
+    expect(client.lrange).not.toHaveBeenCalled();
+    expect(client.exists).not.toHaveBeenCalled();
+    expect(client.lrem).not.toHaveBeenCalled();
+    expect(client.srem).not.toHaveBeenCalled();
+    expect(queue.getJobCounts).toHaveBeenCalledWith('active', 'completed', 'failed', 'delayed', 'waiting', 'paused');
+  });
+
+  it('getJobCountsWithRepair removes active queue ids whose job hash and lock are both gone before counting jobs', async () => {
+    const { sut, client, queue, logger } = setup([emptyCounts()]);
+    client.lrange.mockResolvedValue(['face-identity-backfill/space-person/orphan']);
+    client.lrem.mockResolvedValue(1);
+
+    await sut.getJobCountsWithRepair(QueueName.PeopleBackfill);
+
+    expect(client.lrange).toHaveBeenCalledWith('queue:active', 0, -1);
+    expect(client.exists).toHaveBeenCalledWith('queue:face-identity-backfill/space-person/orphan');
+    expect(client.exists).toHaveBeenCalledWith('queue:face-identity-backfill/space-person/orphan:lock');
+    expect(client.lrem).toHaveBeenCalledWith('queue:active', 0, 'face-identity-backfill/space-person/orphan');
+    expect(client.srem).toHaveBeenCalledWith('queue:stalled', 'face-identity-backfill/space-person/orphan');
+    expect(queue.getJobCounts).toHaveBeenCalledWith('active', 'completed', 'failed', 'delayed', 'waiting', 'paused');
+    expect(logger.warn).toHaveBeenCalledWith(
+      'Removed 1 dangling active job id from peopleBackfill: face-identity-backfill/space-person/orphan',
+    );
+  });
+
+  it('removes dangling active ids and ignores missing job hashes when searching jobs', async () => {
+    const { sut, client, queue } = setup();
+    client.lrange.mockResolvedValue(['face-identity-backfill/space-person/orphan']);
+    client.lrem.mockResolvedValue(1);
+    queue.getJobs.mockResolvedValue([
+      undefined,
+      { id: 'face-identity-backfill/root', name: JobName.FaceIdentityBackfill, timestamp: 123, data: {} },
+    ]);
+
+    await expect(
+      sut.searchJobs(QueueName.PeopleBackfill, {
+        status: [QueueJobStatus.Active, QueueJobStatus.Waiting],
+      }),
+    ).resolves.toEqual([
+      { id: 'face-identity-backfill/root', name: JobName.FaceIdentityBackfill, timestamp: 123, data: {} },
+    ]);
+
+    expect(client.lrem).toHaveBeenCalledWith('queue:active', 0, 'face-identity-backfill/space-person/orphan');
+    expect(queue.getJobs).toHaveBeenCalledWith([QueueJobStatus.Active, QueueJobStatus.Waiting], 0, 1000);
   });
 
   it('returns queue counts and oldest job ages', async () => {
@@ -496,6 +595,121 @@ describe(JobRepository.name, () => {
       JobName.SharedSpaceFaceMatchAll,
       { spaceId: 'space-1' },
       { jobId: 'shared-space-face-match-all/space-1', removeOnComplete: true, removeOnFail: true },
+    );
+  });
+
+  it('uses stable job ids for global face suggestion maintenance and queue-all fanout jobs', async () => {
+    const { sut, queue } = setup();
+    setHandlers(sut, [
+      JobName.FaceSuggestionMaintenance,
+      JobName.PersonSuggestionScanQueueAll,
+      JobName.SpacePersonSuggestionScanQueueAll,
+    ]);
+
+    await sut.queueAll([
+      { name: JobName.FaceSuggestionMaintenance, data: {} },
+      { name: JobName.FaceSuggestionMaintenance, data: {} },
+      { name: JobName.PersonSuggestionScanQueueAll, data: {} },
+      { name: JobName.PersonSuggestionScanQueueAll, data: {} },
+      { name: JobName.SpacePersonSuggestionScanQueueAll, data: {} },
+      { name: JobName.SpacePersonSuggestionScanQueueAll, data: {} },
+    ]);
+
+    expect(queue.addBulk).not.toHaveBeenCalled();
+    expect(queue.add).toHaveBeenCalledWith(
+      JobName.FaceSuggestionMaintenance,
+      {},
+      {
+        jobId: 'face-suggestion-maintenance',
+        removeOnComplete: true,
+        removeOnFail: true,
+      },
+    );
+    expect(queue.add).toHaveBeenCalledWith(
+      JobName.PersonSuggestionScanQueueAll,
+      {},
+      {
+        jobId: 'person-suggestion-scan/all',
+        removeOnComplete: true,
+        removeOnFail: true,
+      },
+    );
+    expect(queue.add).toHaveBeenCalledWith(
+      JobName.SpacePersonSuggestionScanQueueAll,
+      {},
+      {
+        jobId: 'space-person-suggestion-scan/all',
+        removeOnComplete: true,
+        removeOnFail: true,
+      },
+    );
+  });
+
+  it('S9.8: coalesces per-person suggestion-scan jobs onto a stable per-id jobId', async () => {
+    const { sut, queue } = setup();
+    setHandlers(sut, [JobName.PersonSuggestionScan, JobName.SpacePersonSuggestionScan]);
+
+    await sut.queueAll([
+      { name: JobName.PersonSuggestionScan, data: { id: 'person-1' } },
+      { name: JobName.PersonSuggestionScan, data: { id: 'person-1' } }, // same id → same jobId (coalesces)
+      { name: JobName.PersonSuggestionScan, data: { id: 'person-2' } }, // different id → different jobId
+      { name: JobName.SpacePersonSuggestionScan, data: { id: 'space-person-1' } },
+      { name: JobName.SpacePersonSuggestionScan, data: { id: 'space-person-1' } },
+      { name: JobName.SpacePersonSuggestionScan, data: { id: 'space-person-2' } },
+    ]);
+
+    expect(queue.addBulk).not.toHaveBeenCalled();
+    expect(queue.add).toHaveBeenCalledWith(
+      JobName.PersonSuggestionScan,
+      { id: 'person-1' },
+      { jobId: 'person-suggestion-scan/person-1', removeOnComplete: true, removeOnFail: true },
+    );
+    expect(queue.add).toHaveBeenCalledWith(
+      JobName.PersonSuggestionScan,
+      { id: 'person-2' },
+      { jobId: 'person-suggestion-scan/person-2', removeOnComplete: true, removeOnFail: true },
+    );
+    expect(queue.add).toHaveBeenCalledWith(
+      JobName.SpacePersonSuggestionScan,
+      { id: 'space-person-1' },
+      { jobId: 'space-person-suggestion-scan/space-person-1', removeOnComplete: true, removeOnFail: true },
+    );
+    expect(queue.add).toHaveBeenCalledWith(
+      JobName.SpacePersonSuggestionScan,
+      { id: 'space-person-2' },
+      { jobId: 'space-person-suggestion-scan/space-person-2', removeOnComplete: true, removeOnFail: true },
+    );
+
+    const personJobIds = queue.add.mock.calls
+      .filter((call) => call[0] === JobName.PersonSuggestionScan)
+      .map((call) => (call[2] as { jobId?: string })?.jobId);
+    // two calls for person-1 produced the identical jobId (the coalescing contract); person-2's differs
+    expect(personJobIds.filter((jobId) => jobId === 'person-suggestion-scan/person-1')).toHaveLength(2);
+    expect(new Set(personJobIds).size).toBe(2);
+  });
+
+  // H8: PersonSuggestionScan and SpacePersonSuggestionScan set removeOnComplete but not removeOnFail, unlike
+  // every sibling job option in this switch. A job that fails while removeOnFail is unset permanently
+  // occupies its stable dedup jobId (see removeFailedJobsByJobIdPrefix's doc comment above) — BullMQ
+  // silently ignores every later add() with the same id, so that person's suggestion queue never refills,
+  // with no log and no admin-visible symptom.
+  //
+  // GIVEN a per-person suggestion scan is enqueued
+  // WHEN BullMQ receives it
+  // THEN it must carry removeOnFail, or a single failure occupies the stable dedup jobId forever.
+  it.each([
+    [JobName.PersonSuggestionScan, 'person-suggestion-scan/person-1'],
+    [JobName.SpacePersonSuggestionScan, 'space-person-suggestion-scan/person-1'],
+  ])('%s is enqueued with removeOnFail', async (name, expectedJobId) => {
+    const { sut, queue } = setup();
+    setHandlers(sut, [name]);
+
+    await sut.queue({ name, data: { id: 'person-1' } } as never);
+
+    expect(queue.add).toHaveBeenCalledWith(
+      name,
+      { id: 'person-1' },
+      expect.objectContaining({ jobId: expectedJobId, removeOnFail: true }),
     );
   });
 

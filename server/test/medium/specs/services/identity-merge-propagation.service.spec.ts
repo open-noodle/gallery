@@ -7,6 +7,7 @@ import { LoggingRepository } from 'src/repositories/logging.repository';
 import { PersonRepository } from 'src/repositories/person.repository';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
 import { DB } from 'src/schema';
+import { FaceIdentityFaceSource } from 'src/schema/tables/face-identity-face.table';
 import { BaseService } from 'src/services/base.service';
 import { IdentityMergePropagationService, MergeAuthorizer } from 'src/services/identity-merge-propagation.service';
 import { asDateString } from 'src/utils/date';
@@ -98,13 +99,13 @@ const createSpacePerson = async (
 
 const createIdentityLinkedFace = async (
   ctx: ReturnType<typeof setup>['ctx'],
-  input: { ownerId: string; identityId: string; personId?: string | null },
+  input: { ownerId: string; identityId: string; personId?: string | null; source?: FaceIdentityFaceSource },
 ) => {
   const { asset } = await ctx.newAsset({ ownerId: input.ownerId });
   const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: input.personId ?? null });
   await ctx.database
     .insertInto('face_identity_face')
-    .values({ assetFaceId: assetFace.id, identityId: input.identityId, source: 'manual' })
+    .values({ assetFaceId: assetFace.id, identityId: input.identityId, source: input.source ?? 'manual' })
     .execute();
   return assetFace;
 };
@@ -305,6 +306,63 @@ describe('IdentityMergePropagationService medium tests', () => {
       .where('assetFaceId', '=', orphanedSourceFace.id)
       .executeTakeFirstOrThrow();
     expect(faceLink).toEqual({ assetFaceId: orphanedSourceFace.id, identityId: targetIdentity.id, source: 'manual' });
+  });
+
+  // Slice 4 / R1 (signed off): a human people-merge re-points identity but must PRESERVE each rode-along
+  // face's prior source — never fabricate 'manual' placements on faces a human never touched. This is the
+  // "omit source from the write" mechanism (mergeIdentitiesAfterProfileResolution's repo write, and
+  // linkPersonFaces's preserveSource branch for the target person's own re-affirmed faces) — NOT the
+  // preserve-manual CASE used at the automatic-merge/replace/backfill sites in
+  // face-identity.manual-durability.spec.ts. A `CASE ... ELSE input.source` here would degenerate to
+  // `ELSE 'manual'` (input.source is always the literal 'manual' on this path) and silently reproduce the bug.
+  it("preserves each rode-along face's prior source on a people merge (Slice 4 / R1)", async () => {
+    const { ctx, sut } = setup();
+    const { user } = await ctx.newUser();
+    const targetIdentity = await createIdentity(ctx.database);
+    const sourceIdentity = await createIdentity(ctx.database);
+    const target = await createPersonProfile(ctx, { ownerId: user.id, identityId: targetIdentity.id, name: 'Target' });
+    const source = await createPersonProfile(ctx, { ownerId: user.id, identityId: sourceIdentity.id, name: 'Source' });
+
+    // Assigned to the source person: moved onto target by mergePersonProfile, then re-keyed by the
+    // linkPersonFaces(preserveSource: true) call — exercises the SERVICE-level fix.
+    const mlFace = await createIdentityLinkedFace(ctx, {
+      ownerId: user.id,
+      identityId: sourceIdentity.id,
+      personId: source.id,
+      source: 'ml',
+    });
+    const manualFace = await createIdentityLinkedFace(ctx, {
+      ownerId: user.id,
+      identityId: sourceIdentity.id,
+      personId: source.id,
+      source: 'manual',
+    });
+    // Not assigned to any person (identity-only evidence): only reachable via
+    // mergeIdentitiesAfterProfileResolution's blanket identityId update — exercises the REPO-level fix.
+    const ownerPersonFace = await createIdentityLinkedFace(ctx, {
+      ownerId: user.id,
+      identityId: sourceIdentity.id,
+      personId: null,
+      source: 'owner-person',
+    });
+
+    await sut.mergePersonalPeople(factory.auth({ user }), target.id, [source.id]);
+
+    const faceLinks = await ctx.database
+      .selectFrom('face_identity_face')
+      .select(['assetFaceId', 'identityId', 'source'])
+      .where('assetFaceId', 'in', [mlFace.id, manualFace.id, ownerPersonFace.id])
+      .execute();
+    const bySource = new Map(faceLinks.map((row) => [row.assetFaceId, row]));
+
+    // Every face is re-keyed onto the surviving identity...
+    expect(bySource.get(mlFace.id)?.identityId).toBe(targetIdentity.id);
+    expect(bySource.get(manualFace.id)?.identityId).toBe(targetIdentity.id);
+    expect(bySource.get(ownerPersonFace.id)?.identityId).toBe(targetIdentity.id);
+    // ...but the merge does NOT fabricate 'manual' placements: each face's prior source survives untouched.
+    expect(bySource.get(mlFace.id)?.source).toBe('ml');
+    expect(bySource.get(manualFace.id)?.source).toBe('manual');
+    expect(bySource.get(ownerPersonFace.id)?.source).toBe('owner-person');
   });
 
   it('propagates a personal merge across other owners and all affected spaces', async () => {

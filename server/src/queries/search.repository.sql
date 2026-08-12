@@ -989,7 +989,7 @@ order by
   "type"
 commit
 
--- SearchRepository.searchFaces
+-- SearchRepository.searchFaces (owner)
 begin
 set
   local vchordrq.probes = 1
@@ -1013,6 +1013,7 @@ with
           "user"."clusterGroupId" = $2
       )
       and "asset"."deletedAt" is null
+      and "asset_face"."deletedAt" is null
     order by
       "distance"
     limit
@@ -1025,6 +1026,119 @@ from
 where
   "cte"."distance" <= $4
 rollback
+
+-- SearchRepository.searchFaces (space)
+begin
+set
+  local vchordrq.probes = 1
+with
+  "cte" as (
+    select
+      "asset_face"."id",
+      "asset_face"."personId",
+      face_search.embedding <=> $1 as "distance"
+    from
+      "asset_face"
+      inner join "asset" on "asset"."id" = "asset_face"."assetId"
+      inner join "face_search" on "face_search"."faceId" = "asset_face"."id"
+      left join "person" on "person"."id" = "asset_face"."personId"
+    where
+      (
+        exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_asset"
+          where
+            "shared_space_asset"."assetId" = "asset"."id"
+            and "shared_space_asset"."spaceId" = $2::uuid
+        )
+        or exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_library"
+          where
+            "shared_space_library"."libraryId" = "asset"."libraryId"
+            and "shared_space_library"."spaceId" = $3::uuid
+        )
+        or (
+          exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+              inner join "album" on "album"."id" = "shared_space_album"."albumId"
+              and "album"."deletedAt" is null
+            where
+              "album_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = $4::uuid
+          )
+          or exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+              and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+              inner join "album" on "album"."id" = "shared_space_album"."albumId"
+              and "album"."deletedAt" is null
+            where
+              "album_space_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = $5::uuid
+          )
+        )
+      )
+      and "asset"."visibility" in ($6, $7)
+      and "asset"."deletedAt" is null
+      and "asset_face"."deletedAt" is null
+      and "asset_face"."personId" is null
+    order by
+      "distance"
+    limit
+      $8
+  )
+select
+  *
+from
+  "cte"
+where
+  "cte"."distance" <= $9
+commit
+
+-- SearchRepository.searchFaces (owner-visibility)
+begin
+set
+  local vchordrq.probes = 1
+with
+  "cte" as (
+    select
+      "asset_face"."id",
+      "asset_face"."personId",
+      face_search.embedding <=> $1 as "distance"
+    from
+      "asset_face"
+      inner join "asset" on "asset"."id" = "asset_face"."assetId"
+      inner join "face_search" on "face_search"."faceId" = "asset_face"."id"
+      left join "person" on "person"."id" = "asset_face"."personId"
+    where
+      "asset"."ownerId" = any ($2::uuid[])
+      and "asset"."deletedAt" is null
+      and "asset"."visibility" in ($3, $4)
+      and "asset_face"."deletedAt" is null
+    order by
+      "distance"
+    limit
+      $5
+  )
+select
+  *
+from
+  "cte"
+where
+  "cte"."distance" <= $6
+commit
 
 -- SearchRepository.searchPlaces
 select
