@@ -17,15 +17,9 @@
     <form autocomplete="off" class="mx-4 mt-4" onsubmit={(event) => event.preventDefault()}>
       <div class="ms-4 mt-4 flex flex-col gap-4">
         <SettingSwitch
-          title={$t('admin.storage_usage_include_derivatives_display_setting')}
-          subtitle={$t('admin.storage_usage_include_derivatives_display_setting_description')}
-          bind:checked={configToEdit.storageUsage.includeDerivativesInDisplay}
-          {disabled}
-        />
-        <SettingSwitch
-          title={$t('admin.storage_usage_include_derivatives_quota_setting')}
-          subtitle={$t('admin.storage_usage_include_derivatives_quota_setting_description')}
-          bind:checked={configToEdit.storageUsage.includeDerivativesInQuota}
+          title={$t('admin.storage_usage_include_derivatives_setting')}
+          subtitle={$t('admin.storage_usage_include_derivatives_setting_description')}
+          bind:checked={configToEdit.storageUsage.includeDerivatives}
           {disabled}
         />
 

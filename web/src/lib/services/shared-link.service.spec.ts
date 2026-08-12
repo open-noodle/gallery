@@ -5,7 +5,6 @@ import { sharedLinkFactory } from '@test-data/factories/shared-link-factory';
 vi.mock(import('$lib/managers/server-config-manager.svelte'), () => ({
   serverConfigManager: {
     value: { externalDomain: 'http://localhost:2283' } as ServerConfigDto,
-    valueOrUndefined: { externalDomain: 'http://localhost:2283' } as ServerConfigDto,
     init: vi.fn(),
     loadServerConfig: vi.fn(),
   },

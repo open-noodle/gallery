@@ -158,7 +158,6 @@ describe('/server', () => {
         mapLightStyleUrl: 'https://tiles.openfreemap.org/styles/positron',
         minFaces: 3,
         availableMemoryTypes: ['on_this_day', 'birthday', 'recent_trip'],
-        storageUsageIncludesDerivatives: false,
       });
     });
   });

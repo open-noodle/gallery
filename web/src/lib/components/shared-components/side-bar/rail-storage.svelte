@@ -1,7 +1,5 @@
 <script lang="ts">
-  import { getStorageSpace } from '$lib/gallery/storage-usage';
   import { authManager } from '$lib/managers/auth-manager.svelte';
-  import { serverConfigManager } from '$lib/managers/server-config-manager.svelte';
   import { locale } from '$lib/stores/preferences.store';
   import { userInteraction } from '$lib/stores/user.svelte';
   import { requestServerInfo } from '$lib/utils/auth';
@@ -11,17 +9,20 @@
   import { onMount } from 'svelte';
   import { t } from 'svelte-i18n';
 
-  // Gallery-fork: derivation shared with StorageSpace.svelte, see $lib/gallery/storage-usage.
-  let space = $derived(
-    getStorageSpace({
-      user: authManager.user,
-      authenticated: authManager.authenticated,
-      serverInfo: userInteraction.serverInfo,
-      serverConfig: serverConfigManager.valueOrUndefined,
-    }),
+  // Duplicated from StorageSpace.svelte because giving that upstream component a
+  // `compact` prop would add a fifth upstream file. The derivation is mirrored line for
+  // line, and rail-storage.spec.ts pins it against a table of expected byte values.
+  let hasQuota = $derived(authManager.user.quotaSizeInBytes !== null);
+  let availableBytes = $derived(
+    (hasQuota && authManager.authenticated
+      ? authManager.user.quotaSizeInBytes
+      : userInteraction.serverInfo?.diskSizeRaw) || 0,
   );
-  let availableBytes = $derived(space.availableBytes);
-  let usedBytes = $derived(space.usedBytes);
+  let usedBytes = $derived(
+    (hasQuota && authManager.authenticated
+      ? authManager.user.quotaUsageInBytes
+      : userInteraction.serverInfo?.diskUseRaw) || 0,
+  );
 
   onMount(async () => {
     if (userInteraction.serverInfo && authManager.authenticated) {
