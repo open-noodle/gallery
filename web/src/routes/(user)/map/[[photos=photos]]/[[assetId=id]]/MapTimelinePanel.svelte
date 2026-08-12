@@ -25,7 +25,6 @@
   import type { TimelineGrouping, TimelineTemporalAnchor } from '$lib/managers/timeline-manager/types';
   import { getAssetBulkActions } from '$lib/services/asset.service';
   import { createFilterState, type FilterState } from '$lib/components/filter-panel/filter-panel';
-  import { mapSettings } from '$lib/stores/preferences.store';
   import { clearTimelineTemporalFilter } from '$lib/utils/timeline-temporal-filters';
   import {
     updateStackedAssetInTimeline,
@@ -44,22 +43,29 @@
   interface Props {
     bbox: SelectionBBox;
     selectedClusterIds: Set<string>;
-    assetCount: number;
     onClose: () => void;
     spaceId?: string;
     filters?: FilterState;
+    onFiltersChange?: (filters: FilterState) => void;
   }
 
   let {
     bbox,
     selectedClusterIds,
-    assetCount,
     onClose,
     spaceId,
     filters = $bindable(createFilterState()),
+    onFiltersChange,
   }: Props = $props();
 
   let timelineManager = $state<TimelineManager>() as TimelineManager;
+
+  // The panel's OWN count, not the cluster selection's size (Task 10). The header used to be fed
+  // `selectedClusterIds.size` from the page — a click-time snapshot that no filter change ever
+  // recomputed, so it kept claiming "50 assets" over the five pins a rating filter had left. This
+  // is the count of what the panel actually lists: the server's bucket counts until a month loads,
+  // and the loaded assets (client-side `assetFilter` exclusions already applied) after.
+  const assetCount = $derived(timelineManager?.assetCount ?? 0);
   let timelineGrouping = $state<TimelineGrouping>('day');
   let temporalAnchor = $state<TimelineTemporalAnchor | undefined>();
   let selectedAssets = $derived(assetMultiSelectManager.assets);
@@ -116,18 +122,21 @@
   const clearTemporalFilter = () => {
     filters = clearTimelineTemporalFilter(filters);
     temporalAnchor = undefined;
+    // #767 fresh instance: this used to only mutate the bound `filters`, leaving the map page's
+    // URL-backed from/to params in place — a reload, Back, or shared link brought the "cleared"
+    // filter right back. Mirror the page's other mutation sites (FilterPanel's onFiltersChange).
+    onFiltersChange?.(filters);
   };
 
   const timelineBoundingBox = $derived(
     `${floor(bbox.west, 6)},${floor(bbox.south, 6)},${ceil(bbox.east, 6)},${ceil(bbox.north, 6)}`,
   );
 
+  // No $mapSettings here: the cluster panel is scoped by the active filters and nothing else, so it
+  // returns exactly the assets behind the pins. See buildMapTimelineOptions.
   const timelineOptions = $derived.by(() => {
     return {
-      ...buildMapTimelineOptions(filters, timelineBoundingBox, selectedClusterIds, spaceId, {
-        onlyFavorites: $mapSettings.onlyFavorites,
-        withPartners: $mapSettings.withPartners,
-      }),
+      ...buildMapTimelineOptions(filters, timelineBoundingBox, selectedClusterIds, spaceId),
       grouping: timelineGrouping,
     };
   });
@@ -142,7 +151,11 @@
   <div class="flex items-center justify-between border-b border-gray-200 pe-1 pb-1 dark:border-immich-dark-gray">
     <div class="flex items-center gap-2">
       <Icon icon={mdiImageMultiple} size="20" />
-      <p class="text-sm font-medium text-immich-fg dark:text-immich-dark-fg">
+      <p
+        class="text-sm font-medium text-immich-fg dark:text-immich-dark-fg"
+        data-testid="map-panel-asset-count"
+        data-asset-count={assetCount}
+      >
         {$t('assets_count', { values: { count: assetCount } })}
       </p>
     </div>

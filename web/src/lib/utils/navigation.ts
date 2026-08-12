@@ -3,6 +3,7 @@ import { page } from '$app/state';
 import type { RouteId } from '$app/types';
 import { assetCacheManager } from '$lib/managers/AssetCacheManager.svelte';
 import { Route } from '$lib/route';
+import { withoutAtParam } from '$lib/utils/filter-target';
 
 export type AssetGridRouteSearchParams = {
   at: string | null | undefined;
@@ -66,8 +67,12 @@ function replaceScrollTarget(url: string, searchParams?: AssetGridRouteSearchPar
 
   const { at: assetId } = searchParams || { at: null };
 
+  // No new scroll target: this call is just closing the asset viewer/picker, not navigating
+  // elsewhere. Only the one-shot `at` param should be dropped — the surrounding page's own query
+  // (filters, sort, q, …) must survive, or a URL-backed filter surface's re-hydrate effect reads
+  // the query change as "filters cleared" (gallery#album.e2e-spec.ts:150).
   if (!assetId) {
-    return parsed.pathname;
+    return parsed.pathname + withoutAtParam(page.url.search);
   }
 
   const params = new URLSearchParams(page.url.search);
