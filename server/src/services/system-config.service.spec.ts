@@ -208,6 +208,10 @@ const updatedConfig = Object.freeze<SystemConfig>({
     hashVerificationEnabled: true,
     template: '{{y}}/{{y}}-{{MM}}-{{dd}}/{{filename}}',
   },
+  storageUsage: {
+    includeDerivativesInDisplay: false,
+    includeDerivativesInQuota: false,
+  },
   image: {
     thumbnail: {
       size: 250,
@@ -898,6 +902,15 @@ describe(SystemConfigService.name, () => {
       mocks.systemMetadata.get.mockResolvedValue({ theme: { customCss: 'body { color: red; }' } });
 
       await expect(sut.getCustomCss()).resolves.toEqual('body { color: red; }');
+    });
+  });
+
+  describe('storageUsage defaults', () => {
+    it('should default both derivative toggles to off (upstream behavior)', async () => {
+      const config = await sut.getConfig({ withCache: false });
+
+      expect(config.storageUsage.includeDerivativesInDisplay).toBe(false);
+      expect(config.storageUsage.includeDerivativesInQuota).toBe(false);
     });
   });
 });

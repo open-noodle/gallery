@@ -244,6 +244,11 @@ export type SystemConfig = {
       faceExclusion: ClassificationFaceExclusion;
     }>;
   };
+  // Gallery-fork: opt-in accounting for server-generated files (thumbnails, transcodes).
+  storageUsage: {
+    includeDerivativesInDisplay: boolean;
+    includeDerivativesInQuota: boolean;
+  };
   user: {
     deleteDelay: number;
   };
@@ -501,6 +506,10 @@ export const defaults = Object.freeze<SystemConfig>({
   classification: {
     enabled: true,
     categories: [],
+  },
+  storageUsage: {
+    includeDerivativesInDisplay: false,
+    includeDerivativesInQuota: false,
   },
   user: {
     deleteDelay: 7,

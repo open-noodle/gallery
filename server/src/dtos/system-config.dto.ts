@@ -451,6 +451,15 @@ const SystemConfigTrashSchema = z
   })
   .meta({ id: 'SystemConfigTrashDto' });
 
+const SystemConfigStorageUsageSchema = z
+  .object({
+    includeDerivativesInDisplay: configBool.describe(
+      'Include thumbnails and transcoded videos in the displayed storage usage',
+    ),
+    includeDerivativesInQuota: configBool.describe('Include thumbnails and transcoded videos in quota enforcement'),
+  })
+  .meta({ id: 'SystemConfigStorageUsageDto' });
+
 const SystemConfigUserSchema = z
   .object({
     deleteDelay: z.int().min(1).describe('Delete delay'),
@@ -472,6 +481,7 @@ export const SystemConfigSchema = z
     reverseGeocoding: SystemConfigReverseGeocodingSchema,
     metadata: SystemConfigMetadataSchema,
     storageTemplate: SystemConfigStorageTemplateSchema,
+    storageUsage: SystemConfigStorageUsageSchema,
     job: SystemConfigJobSchema,
     image: SystemConfigImageSchema,
     trash: SystemConfigTrashSchema,
