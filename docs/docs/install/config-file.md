@@ -240,6 +240,10 @@ The default configuration looks like this:
     "hashVerificationEnabled": true,
     "template": "{{y}}/{{y}}-{{MM}}-{{dd}}/{{filename}}"
   },
+  "storageUsage": {
+    "includeDerivativesInDisplay": false,
+    "includeDerivativesInQuota": false
+  },
   "templates": {
     "email": {
       "albumInviteTemplate": "",
@@ -343,6 +347,10 @@ The per-type switches do not control whether the nightly task runs. To disable a
 The older `memories.birthday` and `memories.recentTrips` booleans are deprecated but still honored as aliases for `types["birthday"]` and `types["recent_trip"]`. An explicit `types` entry takes precedence over the matching legacy field.
 
 See the [Memories docs](/features/memories) for details about how retention and generated-memory types work.
+:::
+
+:::info Storage Usage
+`storageUsage` controls whether server-generated files — thumbnails and transcoded videos — count toward a user's storage usage. Both flags default to `false`, matching upstream Immich, where only original files are counted. `includeDerivativesInDisplay` changes the figure shown to users; `includeDerivativesInQuota` changes what their storage quota is enforced against. Enabling the quota flag reduces how much original media a user can upload within the same quota.
 :::
 
 ### Step 2 - Specify the file location

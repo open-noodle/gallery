@@ -440,6 +440,18 @@ describe(SystemConfigService.name, () => {
       });
     });
 
+    it('should accept storageUsage from a config file', async () => {
+      mocks.config.getEnv.mockReturnValue(mockEnvData({ configFile: 'immich-config.json' }));
+      mocks.systemMetadata.readFile.mockResolvedValue(
+        JSON.stringify({ storageUsage: { includeDerivativesInDisplay: true, includeDerivativesInQuota: true } }),
+      );
+
+      const config = await sut.getConfig({ withCache: false });
+
+      expect(config.storageUsage.includeDerivativesInDisplay).toBe(true);
+      expect(config.storageUsage.includeDerivativesInQuota).toBe(true);
+    });
+
     it('should default generated memory settings', async () => {
       mocks.systemMetadata.get.mockResolvedValue({});
 
