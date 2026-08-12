@@ -135,6 +135,7 @@ const updatedConfig = Object.freeze<SystemConfig>({
       minScore: 0.7,
       maxDistance: 0.5,
       minFaces: 3,
+      suggestions: { enabled: true, maxDistance: 0.7 },
     },
     ocr: {
       enabled: true,

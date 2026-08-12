@@ -161,6 +161,14 @@ export const Route = {
   workflows: () => '/workflows',
   viewWorkflow: ({ id }: { id: string }) => `/workflows/${id}`,
 
+  // face cleanup
+  faceCleanup: () => '/admin/face-cleanup',
+  faceCleanupScan: () => '/admin/face-cleanup/scan',
+  faceCleanupPeople: () => '/admin/face-cleanup/people',
+  viewFaceCleanupPerson: ({ id }: { id: string }) => `/admin/face-cleanup/${id}`,
+  viewFaceCleanupManualPerson: ({ id }: { id: string }) => `/admin/face-cleanup/people/${id}`,
+  faceCleanupResolutions: () => '/admin/face-cleanup/resolutions',
+
   // queues
   queues: () => '/admin/queues',
   viewQueue: ({ name }: { name: QueueName }) => `/admin/queues/${asQueueSlug(name)}`,
