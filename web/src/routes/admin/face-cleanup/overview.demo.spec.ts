@@ -45,7 +45,7 @@ const renderOverview = async () => {
 
 describe('face-cleanup overview page — read-only demo', () => {
   beforeEach(() => {
-    mockAuthManager.isReadOnlyDemo = false; // web vitest does not clear mocks between tests
+    mockAuthManager.isReadOnlyDemo = false; // clearMocks resets spies only — this plain object needs its own reset
   });
 
   it('renders the read-only notice on the overview in demo mode', async () => {

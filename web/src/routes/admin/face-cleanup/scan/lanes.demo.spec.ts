@@ -74,7 +74,7 @@ const reviewPerson = (): FaceCleanupPerson => ({
 
 describe('face-cleanup triage lanes — read-only demo', () => {
   beforeEach(() => {
-    mockAuthManager.isReadOnlyDemo = false; // web vitest does not clear mocks between tests
+    mockAuthManager.isReadOnlyDemo = false; // clearMocks resets spies only — this plain object needs its own reset
   });
 
   it('ConfidentLane shows the approve action to a real admin', () => {
