@@ -36,7 +36,7 @@ This repository is rebased onto upstream Immich continuously, and `make fork-own
 | ------------------------------------------------------------------------------- | -------------------------------------------------------------- |
 | `server/src/gallery/storage-usage.ts`                                           | **New.** All physical-usage logic: filename parsing + the walk |
 | `server/src/gallery/storage-usage.service.ts`                                   | **New.** Queues a resync when a toggle is switched on          |
-| `server/src/schema/migrations-gallery/1785000000000-AddPhysicalUsageInBytes.ts` | **New.** Column + data backfill + quota reset                  |
+| `server/src/schema/migrations-gallery/1791000000000-AddPhysicalUsageInBytes.ts` | **New.** Column + data backfill + quota reset                  |
 | `web/src/lib/gallery/storage-usage.ts`                                          | **New.** The sidebar's used/available derivation               |
 | `web/src/routes/admin/system-settings/StorageUsageSettings.svelte`              | **New.** Admin panel section                                   |
 | `server/src/backends/*-storage.backend.ts`, `interfaces/storage-backend.ts`     | Fork-created (S3 support). `getPrefixUsage` gains a filter     |
@@ -166,7 +166,7 @@ git commit -m "feat(server): add storageUsage config group for derivative accoun
 **Files:**
 
 - Modify: `server/src/schema/tables/user.table.ts:75`
-- Create: `server/src/schema/migrations-gallery/1785000000000-AddPhysicalUsageInBytes.ts`
+- Create: `server/src/schema/migrations-gallery/1791000000000-AddPhysicalUsageInBytes.ts`
 
 **Interfaces:**
 
@@ -187,7 +187,7 @@ In `server/src/schema/tables/user.table.ts`, immediately after the `quotaUsageIn
 
 - [ ] **Step 2: Write the migration**
 
-Create `server/src/schema/migrations-gallery/1785000000000-AddPhysicalUsageInBytes.ts`:
+Create `server/src/schema/migrations-gallery/1791000000000-AddPhysicalUsageInBytes.ts`:
 
 ```ts
 import { Kysely, sql } from 'kysely';
@@ -221,7 +221,9 @@ export async function down(db: Kysely<any>): Promise<void> {
 - [ ] **Step 3: Verify the timestamp does not collide**
 
 Run: `ls server/src/schema/migrations-gallery/ | sort | tail -5`
-Expected: no existing file starts with `1785000000000`. The highest existing timestamp should be lower (`1784800000000` at time of writing). If `1785000000000` is taken, bump to the next free round number and rename the file and this plan's references.
+Expected: no existing file starts with `1791000000000`, and the highest existing timestamp is lower (`1790000000000-FixFaceRepairScanInFlightIndex`). If the number is taken, bump to the next free round number and rename the file and this plan's references.
+
+This migration was originally written as `1785000000000-AddPhysicalUsageInBytes` and renumbered to `1791000000000` when the branch was rebased onto #834, which landed `1785000000000-AddFaceRepairLock` on the same timestamp prefix. Nothing had deployed the migration under its old name, so the rename is a plain rename — no pre-rename alias entry is needed in `scripts/revert-to-immich.sql`.
 
 - [ ] **Step 4: Write a medium test proving the migration is picked up**
 
@@ -270,7 +272,7 @@ Expected: no errors.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add server/src/schema/tables/user.table.ts server/src/schema/migrations-gallery/1785000000000-AddPhysicalUsageInBytes.ts server/test/medium/specs/repositories/user-physical-usage.spec.ts
+git add server/src/schema/tables/user.table.ts server/src/schema/migrations-gallery/1791000000000-AddPhysicalUsageInBytes.ts server/test/medium/specs/repositories/user-physical-usage.spec.ts
 git commit -m "feat(server): add physicalUsageInBytes column and reset quota to upstream semantics"
 ```
 

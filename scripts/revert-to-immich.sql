@@ -412,12 +412,12 @@ DELETE FROM "kysely_migrations"
    '1784000000000-FixFaceRepairScanInFlightIndexOverride',
    '1784800000000-RepairSharedSpaceAlbumGrantDrift',
    '1785000000000-AddFaceRepairLock',
-   '1785000000000-AddPhysicalUsageInBytes',
    '1786000000000-FaceRepairLockPersonNullable',
    '1787000000000-AddFacePersonVerdict',
    '1788000000000-ReconcileFacePersonVerdictConstraints',
    '1789000000000-AddFacePersonVerdictStatusCreatedAtIdIndex',
    '1790000000000-FixFaceRepairScanInFlightIndex',
+   '1791000000000-AddPhysicalUsageInBytes',
 
    -- Pre-rename names for two migrations that were renumbered off timestamp collisions
    -- ("renumber AddFaceRepairScanFlaggedFace off the #722 collision",
