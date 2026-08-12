@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { authManager } from '$lib/managers/auth-manager.svelte';
   import { getAdminFaceThumbnailUrl } from '$lib/utils/people-utils';
   import { Icon } from '@immich/ui';
   import { mdiArrowRight, mdiCheckCircle, mdiChevronDown, mdiClose } from '@mdi/js';
@@ -8,6 +9,8 @@
 
   type Props = { model: ScanTriageModel; applying: boolean; onApprove: () => void };
   const { model, applying, onApprove }: Props = $props();
+
+  const isReadOnlyDemo = $derived(authManager.isReadOnlyDemo);
 
   let expanded = $state(false);
   const excludedCount = $derived(model.confident.length - model.approvedCount);
@@ -49,22 +52,24 @@
             class={expanded ? 'rotate-180 transition-transform' : 'transition-transform'}
           />
         </button>
-        <button
-          type="button"
-          class="inline-flex items-center gap-2 rounded-full bg-green-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-green-700 disabled:opacity-40"
-          disabled={applying || model.approvedCount === 0}
-          onclick={onApprove}
-          data-testid="confident-approve"
-        >
-          <!-- approvedCount is a plain-text node, not inside $t(): the sibling face-cleanup specs mock
-               svelte-i18n as a key-passthrough that drops {values}, so an assertable count must render as
-               its own text node. The label stays a static key. -->
-          {excludedCount === 0
-            ? $t('admin.face_cleanup_confident_approve_all')
-            : $t('admin.face_cleanup_confident_approve')}
-          {model.approvedCount}
-          <Icon icon={mdiArrowRight} size="17" />
-        </button>
+        {#if !isReadOnlyDemo}
+          <button
+            type="button"
+            class="inline-flex items-center gap-2 rounded-full bg-green-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-green-700 disabled:opacity-40"
+            disabled={applying || model.approvedCount === 0}
+            onclick={onApprove}
+            data-testid="confident-approve"
+          >
+            <!-- approvedCount is a plain-text node, not inside $t(): the sibling face-cleanup specs mock
+                 svelte-i18n as a key-passthrough that drops {values}, so an assertable count must render as
+                 its own text node. The label stays a static key. -->
+            {excludedCount === 0
+              ? $t('admin.face_cleanup_confident_approve_all')
+              : $t('admin.face_cleanup_confident_approve')}
+            {model.approvedCount}
+            <Icon icon={mdiArrowRight} size="17" />
+          </button>
+        {/if}
       </div>
     </div>
 
