@@ -441,9 +441,7 @@ describe(SystemConfigService.name, () => {
 
     it('should accept storageUsage from a config file', async () => {
       mocks.config.getEnv.mockReturnValue(mockEnvData({ configFile: 'immich-config.json' }));
-      mocks.systemMetadata.readFile.mockResolvedValue(
-        JSON.stringify({ storageUsage: { includeDerivatives: true } }),
-      );
+      mocks.systemMetadata.readFile.mockResolvedValue(JSON.stringify({ storageUsage: { includeDerivatives: true } }));
 
       const config = await sut.getConfig({ withCache: false });
 
