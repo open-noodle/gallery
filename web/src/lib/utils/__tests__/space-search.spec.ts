@@ -6,6 +6,7 @@ import {
   buildSmartSearchFacetsParams,
   buildSmartSearchParams,
   mapSmartSearchFacetsToFilterSuggestions,
+  QUERY_MODE_FILTER_HANDLING,
   SEARCH_FILTER_DEBOUNCE_MS,
 } from '$lib/utils/space-search';
 
@@ -263,6 +264,99 @@ describe('buildSmartSearchParams', () => {
       expect(result.make).toBeUndefined();
       expect(result.model).toBeUndefined();
     });
+  });
+
+  // #767: these five were silently dropped — the chip rendered as active while the server never
+  // received it, so query-mode results ignored the filter with no way for the user to tell.
+  describe('the dimensions that used to be dropped in query mode', () => {
+    it('forwards state, lensModel, ownerId and ocr', () => {
+      const result = buildSmartSearchParams({
+        query: 'beach',
+        filters: {
+          ...baseFilters,
+          state: 'Bavaria',
+          lensModel: 'RF 24-70mm',
+          ownerId: 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',
+          ocr: '  invoice  ',
+        },
+      });
+
+      expect(result.state).toBe('Bavaria');
+      expect(result.lensModel).toBe('RF 24-70mm');
+      expect(result.ownerId).toBe('aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa');
+      // trimmed, matching filterStateToSearchTerms
+      expect(result.ocr).toBe('invoice');
+    });
+
+    it('wraps a single albumId into the plural albumIds field', () => {
+      const result = buildSmartSearchParams({
+        query: 'beach',
+        filters: { ...baseFilters, albumId: 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb' },
+      });
+
+      expect(result.albumIds).toEqual(['bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb']);
+    });
+
+    it('composes albumIds with a spaceId scope', () => {
+      // Unlike the suggestion endpoints, SmartSearchSchema has no IsNotSiblingOf guard between
+      // albumIds and spaceId / withSharedSpaces, so sending both must not be avoided here.
+      const result = buildSmartSearchParams({
+        query: 'beach',
+        filters: { ...baseFilters, albumId: 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb' },
+        spaceId: 'space-1',
+      });
+
+      expect(result.spaceId).toBe('space-1');
+      expect(result.albumIds).toEqual(['bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb']);
+    });
+
+    it('omits all five when unset, and omits a whitespace-only ocr', () => {
+      const result = buildSmartSearchParams({
+        query: 'beach',
+        filters: { ...baseFilters, ocr: ' '.repeat(3) },
+      });
+
+      expect(result.state).toBeUndefined();
+      expect(result.lensModel).toBeUndefined();
+      expect(result.ownerId).toBeUndefined();
+      expect(result.ocr).toBeUndefined();
+      expect(result.albumIds).toBeUndefined();
+    });
+
+    it('does not send description or originalFileName, which SmartSearchDto cannot express', () => {
+      const result = buildSmartSearchParams({
+        query: 'beach',
+        filters: { ...baseFilters, description: 'birthday', originalFileName: 'IMG_1234.jpg' },
+      });
+
+      // Documents a real limitation rather than asserting desired behaviour: browse mode applies
+      // both (MetadataSearchDto), query mode cannot. QUERY_MODE_FILTER_HANDLING marks them
+      // 'unsupported'. If SmartSearchDto ever gains them, this test should flip.
+      expect(result).not.toHaveProperty('description');
+      expect(result).not.toHaveProperty('originalFileName');
+    });
+  });
+});
+
+describe('QUERY_MODE_FILTER_HANDLING', () => {
+  // The compile-time `satisfies Record<keyof FilterState, …>` is the real guard — adding a
+  // dimension to FilterState without classifying it fails tsc (verified: TS2741). These runtime
+  // assertions pin the classifications a reader is most likely to get wrong.
+  it('classifies the previously-dropped dimensions as sent', () => {
+    expect(QUERY_MODE_FILTER_HANDLING.state).toBe('sent');
+    expect(QUERY_MODE_FILTER_HANDLING.lensModel).toBe('sent');
+    expect(QUERY_MODE_FILTER_HANDLING.ownerId).toBe('sent');
+    expect(QUERY_MODE_FILTER_HANDLING.ocr).toBe('sent');
+    expect(QUERY_MODE_FILTER_HANDLING.albumId).toBe('sent');
+  });
+
+  it('records the two SmartSearchDto gaps and the derived date fields', () => {
+    expect(QUERY_MODE_FILTER_HANDLING.description).toBe('unsupported');
+    expect(QUERY_MODE_FILTER_HANDLING.originalFileName).toBe('unsupported');
+    expect(QUERY_MODE_FILTER_HANDLING.dateAfter).toBe('derived');
+    expect(QUERY_MODE_FILTER_HANDLING.dateBefore).toBe('derived');
+    expect(QUERY_MODE_FILTER_HANDLING.selectedYear).toBe('derived');
+    expect(QUERY_MODE_FILTER_HANDLING.selectedMonth).toBe('derived');
   });
 });
 

@@ -23,7 +23,8 @@
   }
 
   function loadCitySuggestions() {
-    void config?.providers?.cities?.('Germany', buildFilterContext(filters, ['country', 'city']));
+    // Same exclusion list as filter-panel.svelte's locationFilterContext — the whole location group.
+    void config?.providers?.cities?.('Germany', buildFilterContext(filters, ['country', 'state', 'city']));
   }
 
   function loadCameraModelSuggestions() {
