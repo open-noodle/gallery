@@ -5,7 +5,7 @@ import { AuthDto } from 'src/dtos/auth.dto';
 import { PluginManifestDto } from 'src/dtos/plugin-manifest.dto';
 import { GalleryWorkflowHostService } from 'src/services/gallery-workflow-host.service';
 import { newTestService } from 'test/utils';
-import { describe, expect, it } from 'vitest';
+import { type Mock, describe, expect, it, vi } from 'vitest';
 
 const manifestPath = join(process.cwd(), '..', 'packages/plugin-gallery/manifest.json');
 const readManifest = () => JSON.parse(readFileSync(manifestPath, { encoding: 'utf8' }));
@@ -96,5 +96,121 @@ describe('never-throws invariant', () => {
   // U5 — a genuine bug must still fail the run loudly.
   it('propagates an unexpected error', async () => {
     await expect(probe(new TypeError('boom')).dispatch(auth, 'addToSpace', args)).rejects.toThrow('boom');
+  });
+});
+
+const ASSET = '00000000-0000-4000-8000-0000000000aa';
+const SPACE_A = '00000000-0000-4000-8000-00000000000a';
+const SPACE_B = '00000000-0000-4000-8000-00000000000b';
+const SPACE_C = '00000000-0000-4000-8000-00000000000c';
+
+type Doubles = {
+  sharedSpace: { addAssets: Mock; getLinkedAlbums: Mock; linkAlbum: Mock };
+  album: { create: Mock; addAssets: Mock; delete: Mock };
+};
+
+const makeDoubles = (): Doubles => ({
+  sharedSpace: { addAssets: vi.fn(), getLinkedAlbums: vi.fn(), linkAlbum: vi.fn() },
+  album: { create: vi.fn(), addAssets: vi.fn(), delete: vi.fn() },
+});
+
+class TestableService extends GalleryWorkflowHostService {
+  doubles = makeDoubles();
+  protected override collaborators() {
+    return this.doubles as never;
+  }
+}
+
+const setupTestable = () => {
+  const { sut } = newTestService(TestableService);
+  return { sut, doubles: sut.doubles };
+};
+
+describe('addToSpace', () => {
+  const run = (sut: TestableService, config: unknown) => sut.dispatch(auth, 'addToSpace', config);
+
+  it('adds the asset once per space', async () => {
+    // U6
+    const { sut, doubles } = setupTestable();
+    await expect(run(sut, { assetId: ASSET, spaceIds: [SPACE_A, SPACE_B] })).resolves.toEqual({ ok: true });
+    expect(doubles.sharedSpace.addAssets.mock.calls).toEqual([
+      [auth, SPACE_A, { assetIds: [ASSET] }],
+      [auth, SPACE_B, { assetIds: [ASSET] }],
+    ]);
+  });
+
+  it('de-duplicates repeated space ids', async () => {
+    // U7
+    const { sut, doubles } = setupTestable();
+    await run(sut, { assetId: ASSET, spaceIds: [SPACE_A, SPACE_A] });
+    expect(doubles.sharedSpace.addAssets).toHaveBeenCalledTimes(1);
+  });
+
+  it('does nothing for an empty space list', async () => {
+    // U8
+    const { sut, doubles } = setupTestable();
+    await expect(run(sut, { assetId: ASSET, spaceIds: [] })).resolves.toEqual({ ok: true });
+    expect(doubles.sharedSpace.addAssets).not.toHaveBeenCalled();
+  });
+
+  it('rejects malformed config without calling the service', async () => {
+    // U9
+    const { sut, doubles } = setupTestable();
+    await expect(run(sut, { assetId: ASSET, spaceIds: 'not-an-array' })).resolves.toEqual({
+      ok: false,
+      reason: 'invalid-config',
+    });
+    expect(doubles.sharedSpace.addAssets).not.toHaveBeenCalled();
+  });
+
+  it('reports ok:false when the owner may not contribute', async () => {
+    // U10 — the reason label is deliberately not asserted (spec D11)
+    const { sut, doubles } = setupTestable();
+    doubles.sharedSpace.addAssets.mockRejectedValue(new BadRequestException('not a member'));
+    await expect(run(sut, { assetId: ASSET, spaceIds: [SPACE_A] })).resolves.toMatchObject({ ok: false });
+  });
+
+  it('reports ok:false when the space is gone', async () => {
+    // U11
+    const { sut, doubles } = setupTestable();
+    doubles.sharedSpace.addAssets.mockRejectedValue(new NotFoundException('gone'));
+    await expect(run(sut, { assetId: ASSET, spaceIds: [SPACE_A] })).resolves.toMatchObject({ ok: false });
+  });
+
+  it('succeeds when the asset is already in the space', async () => {
+    // U12 — addAssets is idempotent server-side
+    const { sut, doubles } = setupTestable();
+    doubles.sharedSpace.addAssets.mockResolvedValue(undefined);
+    await expect(run(sut, { assetId: ASSET, spaceIds: [SPACE_A] })).resolves.toEqual({ ok: true });
+  });
+
+  it('still attempts later spaces after one is denied', async () => {
+    // U13 — per-space isolation
+    const { sut, doubles } = setupTestable();
+    doubles.sharedSpace.addAssets
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new ForbiddenException('no'))
+      .mockResolvedValueOnce(undefined);
+    await expect(run(sut, { assetId: ASSET, spaceIds: [SPACE_A, SPACE_B, SPACE_C] })).resolves.toMatchObject({
+      ok: false,
+    });
+    expect(doubles.sharedSpace.addAssets.mock.calls.map(([, spaceId]) => spaceId)).toEqual([SPACE_A, SPACE_B, SPACE_C]);
+  });
+
+  it('never returns asset changes', async () => {
+    // U14 — a `changes` key would make execute() re-read the asset after every step
+    const { sut } = setupTestable();
+    const result = await run(sut, { assetId: ASSET, spaceIds: [SPACE_A] });
+    expect(result).not.toHaveProperty('changes');
+  });
+
+  it('passes the auth it was given straight through to the service', async () => {
+    // U26 — the token is minted for the ASSET OWNER, not the workflow owner
+    // (workflow-execution.service.ts:158-197). The dispatcher must forward it untouched and must
+    // never source an identity from anywhere else, or the space access checks mean nothing.
+    const { sut, doubles } = setupTestable();
+    const otherAuth = { user: { id: 'someone-else' } } as AuthDto;
+    await sut.dispatch(otherAuth, 'addToSpace', { assetId: ASSET, spaceIds: [SPACE_A] });
+    expect(doubles.sharedSpace.addAssets).toHaveBeenCalledWith(otherAuth, SPACE_A, { assetIds: [ASSET] });
   });
 });

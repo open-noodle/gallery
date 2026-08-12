@@ -3,9 +3,15 @@ import { AuthDto } from 'src/dtos/auth.dto';
 import { AlbumService } from 'src/services/album.service';
 import { BaseService } from 'src/services/base.service';
 import { SharedSpaceService } from 'src/services/shared-space.service';
+import z from 'zod';
 
 export type GallerySkipReason = 'invalid-config' | 'no-access' | 'not-found' | 'unknown-method';
 export type GalleryDispatchResult = { ok: true } | { ok: false; reason: GallerySkipReason };
+
+const AddToSpaceArgs = z.object({
+  assetId: z.uuidv4(),
+  spaceIds: z.array(z.uuidv4()),
+});
 
 type GalleryHandler = (auth: AuthDto, args: unknown) => Promise<GalleryDispatchResult>;
 
@@ -76,13 +82,25 @@ export class GalleryWorkflowHostService extends BaseService {
   }
 
   private async handleAddToSpace(auth: AuthDto, args: unknown): Promise<GalleryDispatchResult> {
-    const { spaceIds, assetId } = args as { spaceIds: string[]; assetId: string };
+    const parsed = AddToSpaceArgs.safeParse(args);
+    if (!parsed.success) {
+      this.logger.warn(`addToSpace: invalid config — ${parsed.error.message}`);
+      return { ok: false, reason: 'invalid-config' };
+    }
+
+    const { assetId, spaceIds } = parsed.data;
     const { sharedSpace } = this.collaborators();
+    let skipped = false;
 
-    const result = await this.runGuarded('addToSpace', () =>
-      sharedSpace.addAssets(auth, spaceIds[0], { assetIds: [assetId] }),
-    );
+    // Per-space isolation: one denied space must not stop the others (spec §7).
+    for (const spaceId of new Set(spaceIds)) {
+      const result = await this.runGuarded(`addToSpace(${spaceId})`, () =>
+        sharedSpace.addAssets(auth, spaceId, { assetIds: [assetId] }),
+      );
 
-    return result === SKIPPED ? { ok: false, reason: 'no-access' } : { ok: true };
+      skipped ||= result === SKIPPED;
+    }
+
+    return skipped ? { ok: false, reason: 'no-access' } : { ok: true };
   }
 }
