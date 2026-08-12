@@ -354,6 +354,24 @@ UPDATE "user" SET "password" = '' WHERE "password" IS NULL;
 ALTER TABLE "user" ALTER COLUMN "password" SET DEFAULT '';
 ALTER TABLE "user" ALTER COLUMN "password" SET NOT NULL;
 
+-- 1786385711807-AlbumOwnerDeleteTrigger (upstream #30692) added an AFTER DELETE
+-- row trigger on album_user that deletes an album once its last 'owner'-role
+-- album_user row is gone, plus the function it calls and two migration_overrides
+-- rows registering both. The tagged release ships none of them, so its
+-- schema-check reports the function, the trigger and both override rows as extra.
+-- Guarded with IF EXISTS because this script also runs against a tagged-release DB
+-- where they were never created; album_user itself exists in both schemas.
+--
+-- The migration's leading `DELETE FROM "album" WHERE NOT EXISTS (... 'owner')` is
+-- a one-way data cleanup and cannot be undone here. It only removes albums that
+-- already had no owner, which Gallery's single album-creation path (album.repository
+-- createWithAssets, which inserts the owner album_user row in the same CTE) does
+-- not produce.
+DROP TRIGGER IF EXISTS "album_user_delete" ON "album_user";
+DROP FUNCTION IF EXISTS album_user_delete();
+DELETE FROM "migration_overrides"
+ WHERE "name" IN ('function_album_user_delete', 'trigger_album_user_delete');
+
 -- -----------------------------------------------------------------------------
 -- 8. Delete Gallery + post-v<branding upstream.version> upstream migration rows
 --    from kysely_migrations.
@@ -433,7 +451,8 @@ DELETE FROM "kysely_migrations"
    '1784647658615-AddOAuthBearerTokenToSession',
    '1784836013770-MinFacePreferenceMigration',
    '1784986754473-ConvertUserPasswordEmptyStringToNull',
-   '1784986754474-AlbumDescriptionNullable'
+   '1784986754474-AlbumDescriptionNullable',
+   '1786385711807-AlbumOwnerDeleteTrigger'
  );
 
 -- -----------------------------------------------------------------------------
