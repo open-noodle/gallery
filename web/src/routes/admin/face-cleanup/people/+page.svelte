@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ReadOnlyDemoNotice from '$lib/components/admin/ReadOnlyDemoNotice.svelte';
   import AdminPageLayout from '$lib/components/layouts/AdminPageLayout.svelte';
   import InfiniteScrollSentinel from '$lib/components/shared-components/infinite-scroll-sentinel.svelte';
   import { authManager } from '$lib/managers/auth-manager.svelte';
@@ -179,6 +180,7 @@
 
 <AdminPageLayout breadcrumbs={faceCleanupBreadcrumbs($t, manualCrumb($t))}>
   <div class="mx-auto max-w-screen-xl p-6">
+    <ReadOnlyDemoNotice />
     <div class="mb-6">
       <h1 class="text-2xl font-semibold tracking-tight">{$t('admin.face_cleanup_mode_browse_people')}</h1>
       <p class="mt-2 max-w-2xl text-sm text-gray-500 dark:text-gray-400">{$t('admin.face_cleanup_mode_manual_sub')}</p>
