@@ -1,3 +1,4 @@
+import { StorageUsageService } from 'src/gallery/storage-usage.service';
 import { ActivityService } from 'src/services/activity.service';
 import { AlbumService } from 'src/services/album.service';
 import { ApiKeyService } from 'src/services/api-key.service';
@@ -105,6 +106,7 @@ export const services = [
   StorageMigrationService,
   StorageService,
   StorageTemplateService,
+  StorageUsageService,
   SyncService,
   SystemConfigService,
   SystemMetadataService,

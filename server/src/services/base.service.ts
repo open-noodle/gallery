@@ -10,7 +10,8 @@ import { FACE_THUMBNAIL_SIZE, SALT_ROUNDS } from 'src/constants';
 import { StorageCore } from 'src/cores/storage.core';
 import { AssetFace, UserAdmin } from 'src/database';
 import { AssetEditAction, type CropParameters } from 'src/dtos/editing.dto';
-import { AssetFileType, CacheControl, ImageFormat, StorageFolder } from 'src/enum';
+import { AssetFileType, CacheControl, ImageFormat } from 'src/enum';
+import { computePhysicalUsage } from 'src/gallery/storage-usage';
 import { RangeNotSatisfiableError, ServeStrategy } from 'src/interfaces/storage-backend.interface';
 import { AccessRepository } from 'src/repositories/access.repository';
 import { ActivityRepository } from 'src/repositories/activity.repository';
@@ -619,46 +620,35 @@ export class BaseService {
     return Number.isFinite(rounded) && rounded > 0 ? rounded : fallback;
   }
 
+  // Gallery-fork: upstream calls userRepository.syncUsage() directly from the two call sites
+  // below this method. The fork keeps that behaviour as-is and layers the optional physical-usage
+  // pass on top; all of its logic lives in src/gallery/storage-usage.ts.
   protected async syncUsage(id?: string): Promise<void> {
+    await this.userRepository.syncUsage(id);
+
+    // The walk is expensive — hundreds of thousands of stat calls on a large install. With both
+    // toggles off nothing reads the column, so skip it and keep the nightly job as cheap as
+    // upstream's.
+    const { storageUsage } = await this.getConfig({ withCache: false });
+    if (!storageUsage.includeDerivativesInDisplay && !storageUsage.includeDerivativesInQuota) {
+      return;
+    }
+
+    const { StorageService } = await import('./storage.service.js');
+    const s3 = StorageService.getS3Backend();
     const users = id
       ? [await this.userRepository.get(id, { withDeleted: false })].filter((user): user is UserAdmin => !!user)
       : await this.userRepository.getList({ withDeleted: false });
 
     for (const user of users) {
-      await this.userRepository.setUsage(user.id, await this.getPhysicalUsage(user));
+      const usage = await computePhysicalUsage({
+        user,
+        assetRepository: this.assetRepository,
+        storageRepository: this.storageRepository,
+        s3,
+      });
+      await this.userRepository.setPhysicalUsage(user.id, usage);
     }
-  }
-
-  private async getPhysicalUsage(user: Pick<UserAdmin, 'id' | 'storageLabel'>): Promise<number> {
-    let total = await this.getDiskUsage(user);
-
-    // lazy import to avoid circular dependency (StorageService extends BaseService)
-    const { StorageService } = await import('./storage.service.js');
-    const s3 = StorageService.getS3Backend();
-    if (s3) {
-      const prefixes = [
-        StorageFolder.Upload,
-        StorageFolder.Profile,
-        StorageFolder.Thumbnails,
-        StorageFolder.EncodedVideo,
-      ].map((folder) => `${folder}/${user.id}/`);
-      const usage = await Promise.all(prefixes.map((prefix) => s3.getPrefixUsage(prefix)));
-      total += usage.reduce((total, value) => total + value, 0);
-    }
-
-    return total;
-  }
-
-  private async getDiskUsage(user: Pick<UserAdmin, 'id' | 'storageLabel'>): Promise<number> {
-    const folders = [
-      StorageCore.getLibraryFolder(user),
-      StorageCore.getFolderLocation(StorageFolder.Upload, user.id),
-      StorageCore.getFolderLocation(StorageFolder.Profile, user.id),
-      StorageCore.getFolderLocation(StorageFolder.Thumbnails, user.id),
-      StorageCore.getFolderLocation(StorageFolder.EncodedVideo, user.id),
-    ];
-    const usage = await Promise.all(folders.map((folder) => this.storageRepository.getFolderSize(folder)));
-    return usage.reduce((total, value) => total + value, 0);
   }
 
   async createUser(dto: Insertable<UserTable> & { email: string }): Promise<UserAdmin> {
