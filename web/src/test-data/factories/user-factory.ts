@@ -24,6 +24,7 @@ export const userAdminFactory = Sync.makeFactory<UserAdminResponseDto>({
   oauthId: '',
   quotaUsageInBytes: 0,
   quotaSizeInBytes: 1000,
+  physicalUsageInBytes: 0,
   shouldChangePassword: false,
   status: UserStatus.Active,
   storageLabel: null,
