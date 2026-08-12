@@ -1549,6 +1549,74 @@ git commit -m "feat(web): add admin settings for derivative storage accounting"
 
 ---
 
+### Task 12: Document and pin config-file support
+
+**Files:**
+
+- Modify: `docs/docs/install/config-file.md`
+- Test: `server/src/services/system-config.service.spec.ts`
+
+**Interfaces:**
+
+- Consumes: `SystemConfig['storageUsage']` (Task 1).
+
+Both toggles are already settable from `IMMICH_CONFIG_FILE` with no additional code: `buildConfig` (`server/src/utils/config.ts:76-95`) loads the file and deep-merges it over `defaults`, then rejects any key not present in `defaults`. Task 1 added `storageUsage` to `defaults` and to `SystemConfigSchema`, which is exactly what makes the key both settable and valid. This task documents that surface and pins it with a test, so a future refactor cannot silently make the key unknown again.
+
+- [ ] **Step 1: Write the failing test**
+
+In `server/src/services/system-config.service.spec.ts`, alongside the existing config-file tests (there are already cases using `mockEnvData({ configFile: 'immich-config.json' })` around `:416-425` — follow their arrangement exactly, including how they stub the file read):
+
+```ts
+it('should accept storageUsage from a config file', async () => {
+  mocks.config.getEnv.mockReturnValue(mockEnvData({ configFile: 'immich-config.json' }));
+  mocks.systemMetadata.readFile.mockResolvedValue(
+    JSON.stringify({ storageUsage: { includeDerivativesInDisplay: true, includeDerivativesInQuota: true } }),
+  );
+
+  const config = await sut.getConfig({ withCache: false });
+
+  expect(config.storageUsage.includeDerivativesInDisplay).toBe(true);
+  expect(config.storageUsage.includeDerivativesInQuota).toBe(true);
+});
+```
+
+Match the mock names to whatever the neighbouring config-file tests actually use — `mocks.systemMetadata.readFile` is the expected one given `loadFromFile` calls `metadataRepo.readFile`, but verify against the existing tests rather than assuming.
+
+- [ ] **Step 2: Run test to verify it passes immediately**
+
+Run: `cd server && pnpm vitest --config test/vitest.config.mjs run src/services/system-config.service.spec.ts -t 'config file'`
+
+**This test is expected to PASS without any production change** — it is a characterization test pinning behaviour Task 1 already delivered, not TDD for new code. If it FAILS, that is a real finding: it means the key is not reaching the merged config, and you should report it rather than changing the test to match. Note the difference from the other tasks in this plan and do not force a red phase.
+
+- [ ] **Step 3: Document the option**
+
+In `docs/docs/install/config-file.md`, the example JSON block lists every top-level config key in alphabetical order. Add `storageUsage` immediately after the `storageTemplate` block (which starts at `:234`), matching the file's two-space indentation and key ordering:
+
+```json
+  "storageUsage": {
+    "includeDerivativesInDisplay": false,
+    "includeDerivativesInQuota": false
+  },
+```
+
+Then add a short prose note after the JSON block, in the style of the existing `nightlyTasks.generateMemories` note at `:337`, explaining what the two flags do and that both default to `false` so usage matches upstream Immich:
+
+> `storageUsage` controls whether server-generated files — thumbnails and transcoded videos — count toward a user's storage usage. Both flags default to `false`, matching upstream Immich, where only original files are counted. `includeDerivativesInDisplay` changes the figure shown to users; `includeDerivativesInQuota` changes what their storage quota is enforced against. Enabling the quota flag reduces how much original media a user can upload within the same quota.
+
+- [ ] **Step 4: Verify docs formatting**
+
+Run: `npx prettier --check docs/docs/install/config-file.md`
+Expected: clean. CI Docs Build is strict; run `--write` if it reports a diff.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add docs/docs/install/config-file.md server/src/services/system-config.service.spec.ts
+git commit -m "docs: document storageUsage config file options"
+```
+
+---
+
 ### Task 11: Declare the change in the fork ownership manifest
 
 **Files:**
