@@ -166,13 +166,13 @@
     {/if}
 
     <span class="flex gap-2 text-sm dark:text-immich-dark-fg" data-testid="space-details">
-      {#if space.assetCount != null}
+      {#if space.assetCount !== undefined}
         <p>{space.assetCount} {$t('photos')}</p>
       {/if}
-      {#if space.assetCount != null && space.memberCount != null}
+      {#if space.assetCount !== undefined && space.memberCount !== undefined}
         <p>&middot;</p>
       {/if}
-      {#if space.memberCount != null}
+      {#if space.memberCount !== undefined}
         <p>{space.memberCount} {$t('members')}</p>
       {/if}
     </span>
