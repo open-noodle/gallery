@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { PluginManifestDto } from 'src/dtos/plugin-manifest.dto';
 import { describe, expect, it } from 'vitest';
 
-const manifestPath = join(import.meta.dirname, '../../../packages/plugin-gallery/manifest.json');
+const manifestPath = join(process.cwd(), '..', 'packages/plugin-gallery/manifest.json');
 const readManifest = () => JSON.parse(readFileSync(manifestPath, { encoding: 'utf8' }));
 
 describe('gallery plugin manifest', () => {
