@@ -14,6 +14,7 @@
   import { Button, ConfirmModal, Icon, modalManager, toastManager } from '@immich/ui';
   import { mdiArrowLeft, mdiArrowRight, mdiCheckBold, mdiClose, mdiInformationOutline } from '@mdi/js';
   import { goto } from '$app/navigation';
+  import { authManager } from '$lib/managers/auth-manager.svelte';
   import { onMount } from 'svelte';
   import { SvelteSet } from 'svelte/reactivity';
   import { t, type Translations } from 'svelte-i18n';
@@ -69,6 +70,7 @@
   const { data }: Props = $props();
 
   const personId = $derived(data.personId);
+  const isReadOnlyDemo = $derived(authManager.isReadOnlyDemo);
 
   // State
   let flaggedFaces = $state<FlaggedFace[]>([]);
@@ -990,14 +992,16 @@
         {/snippet}
 
         {#snippet apply()}
-          <Button color="primary" disabled={applying || restBlocked} onclick={handleApply} data-testid="apply-btn">
-            <Icon icon={mdiArrowRight} size="16" />
-            {restSelected.size > 0
-              ? $t('admin.face_cleanup_review_apply_label_added', {
-                  values: { count: vm.total, added: restSelected.size },
-                })
-              : $t('admin.face_cleanup_review_apply_label', { values: { count: vm.total } })}
-          </Button>
+          {#if !isReadOnlyDemo}
+            <Button color="primary" disabled={applying || restBlocked} onclick={handleApply} data-testid="apply-btn">
+              <Icon icon={mdiArrowRight} size="16" />
+              {restSelected.size > 0
+                ? $t('admin.face_cleanup_review_apply_label_added', {
+                    values: { count: vm.total, added: restSelected.size },
+                  })
+                : $t('admin.face_cleanup_review_apply_label', { values: { count: vm.total } })}
+            </Button>
+          {/if}
         {/snippet}
       </FaceReviewDock>
     {/if}
