@@ -1,5 +1,6 @@
 <script lang="ts">
   import AdminPageLayout from '$lib/components/layouts/AdminPageLayout.svelte';
+  import ReadOnlyDemoNotice from '$lib/components/admin/ReadOnlyDemoNotice.svelte';
   import { Route } from '$lib/route';
   import { getAdminFaceThumbnailUrl } from '$lib/utils/people-utils';
   import {
@@ -223,7 +224,12 @@
         scanPerson = scan.persons.find((p) => p.personId === personId) ?? null;
       }
 
-      if (flaggedFaces.length > 0) {
+      // The rest-of-cluster load is a POST (`scan/person/:id/cluster-faces`), which the public demo's
+      // read-only user is refused. Firing it there sets restLoadError and paints a red banner with a Retry
+      // that fails identically — on a seeded demo scan with flagged faces that is guaranteed, not
+      // hypothetical. Skip it and degrade quietly, the same shape as admin/storage-migration/+page.svelte's
+      // onMount early return.
+      if (flaggedFaces.length > 0 && !isReadOnlyDemo) {
         void loadRestPage();
       }
     } catch (error) {
@@ -563,6 +569,9 @@
 
 <AdminPageLayout breadcrumbs={faceCleanupBreadcrumbs($t, guidedCrumb($t), { title: personName })}>
   <div class="mx-auto max-w-screen-xl p-6">
+    <!-- Self-gating: renders nothing unless the viewer is the read-only demo user. This page is exactly
+         where a vanishing primary CTA (Apply, Move entire cluster) most needs explaining. -->
+    <ReadOnlyDemoNotice />
     <!-- Back link -->
     <a
       href={Route.faceCleanupScan()}
@@ -827,15 +836,19 @@
           >
             {$t('admin.face_cleanup_review_select_all')}
           </button>
-          <Button
-            color="secondary"
-            size="small"
-            disabled={!canMoveEntireCluster}
-            onclick={handleMoveEntireCluster}
-            data-testid="move-entire-btn"
-          >
-            {$t('admin.face_cleanup_review_move_entire')}
-          </Button>
+          {#if !isReadOnlyDemo}
+            <!-- Mutating (resolveFaces with entireCluster). Hidden — not merely disabled — for the public
+                 demo's read-only user, same as Apply in the dock below. -->
+            <Button
+              color="secondary"
+              size="small"
+              disabled={!canMoveEntireCluster}
+              onclick={handleMoveEntireCluster}
+              data-testid="move-entire-btn"
+            >
+              {$t('admin.face_cleanup_review_move_entire')}
+            </Button>
+          {/if}
         </div>
 
         {#if restLoadError}

@@ -1,7 +1,9 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import AdminPageLayout from '$lib/components/layouts/AdminPageLayout.svelte';
+  import ReadOnlyDemoNotice from '$lib/components/admin/ReadOnlyDemoNotice.svelte';
   import InfiniteScrollSentinel from '$lib/components/shared-components/infinite-scroll-sentinel.svelte';
+  import { authManager } from '$lib/managers/auth-manager.svelte';
   import { Route } from '$lib/route';
   import { handleError } from '$lib/utils/handle-error';
   import { getAdminFaceThumbnailUrl } from '$lib/utils/people-utils';
@@ -10,6 +12,7 @@
     getFaceRepairPersonMetadata,
     getPeopleThumbnailPath,
     resolveFaces,
+    type FaceRepairClusterFacesResponseDto,
     type FaceRepairPersonMetadataResponseDto,
     type FaceRepairResolveRequestDto,
   } from '@immich/sdk';
@@ -63,7 +66,18 @@
   // resolves the same way a normal client-side navigation does (design §6.4, plan item 4).
   const personId = data.personId;
 
+  // The public demo signs visitors in as a NON-admin "demo user" who may read the admin consoles but never
+  // write. Mutating controls are hidden from that viewer only — never from a real admin, which is why this
+  // reads `isReadOnlyDemo` and not `canPreviewAdmin`.
+  const isReadOnlyDemo = $derived(authManager.isReadOnlyDemo);
+
   const PAGE_SIZE = 48;
+
+  // `getFaceRepairClusterFaces` is a POST, so the read-only demo user is refused it. Standing in for the
+  // call with an empty page keeps the (GET) metadata leg of the Promise.all below alive: without this the
+  // rejection took metadata down with it and the whole page rendered as an error banner whose Retry 403s
+  // again. Same "skip the blocked fetch" shape as admin/storage-migration/+page.svelte's onMount.
+  const EMPTY_CLUSTER_PAGE: FaceRepairClusterFacesResponseDto = { faces: [], total: 0, hasMore: false };
 
   // Created exactly ONCE, here, and never reassigned. This is what makes appendFaces safe: a `$derived` that
   // rebuilds the model from a growing faces array would wipe every staged mark and the current selection on
@@ -153,10 +167,13 @@
     try {
       const [metadataResult, facesResult] = await Promise.all([
         getFaceRepairPersonMetadata({ personId }),
-        getFaceRepairClusterFaces({
-          personId,
-          faceRepairClusterFacesRequestDto: { excludeFaceIds: [], page: 0, size: PAGE_SIZE },
-        }),
+        // See EMPTY_CLUSTER_PAGE: the faces leg is a POST the read-only demo user cannot make.
+        isReadOnlyDemo
+          ? Promise.resolve(EMPTY_CLUSTER_PAGE)
+          : getFaceRepairClusterFaces({
+              personId,
+              faceRepairClusterFacesRequestDto: { excludeFaceIds: [], page: 0, size: PAGE_SIZE },
+            }),
       ]);
       metadata = metadataResult;
       // clear() before appendFaces, because appending is idempotent by assetFaceId: merging page 0 back into a
@@ -430,6 +447,8 @@
 
 <AdminPageLayout breadcrumbs={faceCleanupBreadcrumbs($t, manualCrumb($t), { title: personName })}>
   <div class="mx-auto max-w-screen-xl p-6">
+    <!-- Self-gating: renders nothing unless the viewer is the read-only demo user. -->
+    <ReadOnlyDemoNotice />
     <!-- Back link -->
     <a
       href={Route.faceCleanupPeople()}
@@ -553,16 +572,19 @@
           </button>
           <span class="h-4 w-px bg-gray-200 dark:bg-gray-700"></span>
           <!-- Move entire cluster… (slice 10): NOT a selection action — available regardless of
-               vm.selectedCount, since it is the tool for the faces selection can never reach. -->
-          <Button
-            color="secondary"
-            size="small"
-            disabled={applying}
-            onclick={handleMoveEntireCluster}
-            data-testid="manual-review-move-entire-btn"
-          >
-            {$t('admin.face_cleanup_review_move_entire')}
-          </Button>
+               vm.selectedCount, since it is the tool for the faces selection can never reach. Hidden from
+               the read-only demo user: it ends in a resolveFaces POST. -->
+          {#if !isReadOnlyDemo}
+            <Button
+              color="secondary"
+              size="small"
+              disabled={applying}
+              onclick={handleMoveEntireCluster}
+              data-testid="manual-review-move-entire-btn"
+            >
+              {$t('admin.face_cleanup_review_move_entire')}
+            </Button>
+          {/if}
           <!-- Plain button, not <IconButton>: @immich/ui wraps any titled button in a Tooltip, which needs a
                TooltipProvider from the app root — absent when this page is rendered in isolation (same
                convention as guided's banner-help/bulk-help). -->
@@ -693,16 +715,19 @@
 
         {#snippet apply()}
           <!-- Apply is disabled while everything is `keep`: buildResolveRequest() returns null, and an
-               all-keep POST would be an empty resolve the server 400s. -->
-          <Button
-            color="primary"
-            disabled={applying || !vm.hasStagedWork}
-            onclick={handleApply}
-            data-testid="manual-review-apply-btn"
-          >
-            <Icon icon={mdiArrowRight} size="16" />
-            {$t('admin.face_cleanup_review_apply_label', { values: { count: stagedCount } })}
-          </Button>
+               all-keep POST would be an empty resolve the server 400s. Hidden outright from the read-only
+               demo user, matching the guided page's Apply. -->
+          {#if !isReadOnlyDemo}
+            <Button
+              color="primary"
+              disabled={applying || !vm.hasStagedWork}
+              onclick={handleApply}
+              data-testid="manual-review-apply-btn"
+            >
+              <Icon icon={mdiArrowRight} size="16" />
+              {$t('admin.face_cleanup_review_apply_label', { values: { count: stagedCount } })}
+            </Button>
+          {/if}
         {/snippet}
       </FaceReviewDock>
     {/if}

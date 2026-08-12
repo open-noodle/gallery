@@ -99,7 +99,7 @@ const renderPeoplePage = async () => {
 
 describe('face-cleanup people page — read-only demo', () => {
   beforeEach(() => {
-    mockAuthManager.isReadOnlyDemo = false; // web vitest does not clear mocks between tests
+    mockAuthManager.isReadOnlyDemo = false; // clearMocks resets spies only — this plain object needs its own reset
     manualReviewOwnerId.reset();
     vi.mocked(getFaceRepairOwnerPeople).mockResolvedValue({ people: [], total: 0, hasMore: false });
   });

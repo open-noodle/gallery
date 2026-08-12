@@ -76,9 +76,14 @@ const DEMO_ADMIN_PREVIEW_READ_ROUTES = [
   // `admin/face-repair` (scan, resolve, decline, unconfirm, cluster-faces, resolutions/remove, and the
   // POST twin of owner/:id/people) is unreachable here regardless: the preview branch below requires
   // `metadata.method === 'GET'` before these regexes are tested, and DemoInterceptor refuses it again.
-  // `faces/:assetFaceId/thumbnail` is a file-serving route and is opened deliberately — unlike the
-  // maintenance sub-routes it returns a face crop of a photo already public on the demo instance, and
-  // without it the console renders as empty grey tiles.
+  // `faces/:assetFaceId/thumbnail` is a file-serving route and is opened deliberately — without it the
+  // console renders as empty grey tiles. Note what does and does not make that safe: the route itself
+  // applies NO owner scope and no `deletedAt` filter (getFaceByIdIncludingTombstoned →
+  // src/utils/face-review.ts filters only `asset.visibility IN (archive, timeline)`), and the face ids are
+  // enumerable from `scan/latest` and `owner/:ownerId/people`. It is safe because of the DATASET, not the
+  // route: the demo instance holds nothing but seeded public content, with no archived and no trashed
+  // assets (its only non-timeline assets are `hidden`, which that filter already excludes). Re-check this
+  // exception before serving anything private from a demo instance.
   /^\/api\/admin\/face-repair\/scan\/latest$/,
   /^\/api\/admin\/face-repair\/scan\/defaults$/,
   /^\/api\/admin\/face-repair\/scan\/person\/[^/]+$/,
