@@ -10,7 +10,7 @@ import 'package:immich_mobile/utils/people.utils.dart';
 
 /// How a grid decides whether a person's name is editable.
 ///
-/// This is NOT a plain `bool Function(DriftPerson)`. The global People page's answer is
+/// This is NOT a plain `bool Function(Person)`. The global People page's answer is
 /// reactive — it watches [driftSpaceEditableProvider], which resolves optimistically to true
 /// and rebuilds to false once a viewer's role arrives. A predicate evaluated outside a
 /// Consumer would be computed once and leave viewers holding rename affordances that fail
@@ -33,19 +33,18 @@ class FixedEditability extends PeopleEditPolicy {
 
 /// The face grid shared by the global People page and the space People page.
 ///
-/// Hidden people are filtered out here as a defence in depth — both callers already request
-/// `withHidden: false` server-side.
+/// Hidden people never reach here: the unified [Person] no longer carries `isHidden`, and every
+/// source already excludes them (both callers request `withHidden: false` server-side, and the
+/// local Drift query filters `isHidden` in SQL).
 class PeopleGrid extends StatelessWidget {
   const PeopleGrid({super.key, required this.people, required this.editPolicy, required this.onPersonTap});
 
-  final List<DriftPerson> people;
+  final List<Person> people;
   final PeopleEditPolicy editPolicy;
-  final void Function(DriftPerson person) onPersonTap;
+  final void Function(Person person) onPersonTap;
 
   @override
   Widget build(BuildContext context) {
-    final visible = people.where((person) => !person.isHidden).toList();
-
     return LayoutBuilder(
       builder: (context, constraints) {
         final isTablet = constraints.maxWidth > 600;
@@ -58,9 +57,9 @@ class PeopleGrid extends StatelessWidget {
             mainAxisSpacing: isPortrait && isTablet ? 36 : 0,
           ),
           padding: const EdgeInsets.symmetric(vertical: 32),
-          itemCount: visible.length,
+          itemCount: people.length,
           itemBuilder: (context, index) {
-            final person = visible[index];
+            final person = people[index];
 
             return Column(
               key: ValueKey(person.id),
@@ -102,7 +101,7 @@ class PeopleGrid extends StatelessWidget {
 class _PersonName extends ConsumerWidget {
   const _PersonName({required this.person, required this.editPolicy});
 
-  final DriftPerson person;
+  final Person person;
   final PeopleEditPolicy editPolicy;
 
   @override

@@ -18,16 +18,7 @@ import 'package:immich_mobile/providers/photos_filter/people_picker.provider.dar
 
 import '../../../widget_tester_extensions.dart';
 
-DriftPerson _d(String id, String name) => DriftPerson(
-  id: id,
-  createdAt: DateTime(2024, 1, 1),
-  updatedAt: DateTime(2024, 1, 1),
-  ownerId: 'owner',
-  name: name,
-  isFavorite: false,
-  isHidden: false,
-  color: null,
-);
+Person _d(String id, String name) => Person(id: id, updatedAt: DateTime(2024, 1, 1), name: name);
 
 void main() {
   // Rendering a populated list needs a Store-backed server endpoint (via

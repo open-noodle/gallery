@@ -22,7 +22,7 @@ void main() {
   late MockSharedSpaceApiRepository mockSharedSpace;
 
   Person person(String id, {String? spaceId}) =>
-      Person(id: id, name: 'Alice', updatedAt: DateTime(2020), spaceId: spaceId);
+      Person(id: id, updatedAt: DateTime(2020), name: 'Alice', spaceId: spaceId);
 
   setUpAll(() {
     registerFallbackValue(PeopleSortBy.photoCount);
