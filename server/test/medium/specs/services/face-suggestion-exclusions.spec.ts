@@ -20,7 +20,6 @@ import { clearConfigCache } from 'src/utils/config';
 import { MediumTestContext, newMediumService } from 'test/medium.factory';
 import { factory } from 'test/small.factory';
 import { getKyselyDB } from 'test/utils';
-import { Mocked } from 'vitest';
 
 // D3 (docs/superpowers/plans/2026-07-23-face-verdict-remediation-slice-3.md): the suggestion engine must
 // consult the SAME shared verdict layer the Face Cleanup engine writes to. This suite drives the REAL
@@ -78,10 +77,8 @@ const setupPerson = () => {
     ],
     mock: [JobRepository, LoggingRepository, SystemMetadataRepository],
   });
-  ctx
-    .getMock<SystemMetadataRepository, Mocked<SystemMetadataRepository>>(SystemMetadataRepository)
-    .get.mockResolvedValue(CONFIG as any);
-  const jobs = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+  ctx.getMock(SystemMetadataRepository).get.mockResolvedValue(CONFIG as any);
+  const jobs = ctx.getMock(JobRepository);
   jobs.queue.mockResolvedValue();
   jobs.queueAll.mockResolvedValue();
   // Slice 13: the suggestion-scan handlers and the confirm/reject/ignore/dismiss endpoints moved to
