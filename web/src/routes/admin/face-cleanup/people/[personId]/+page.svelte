@@ -12,7 +12,6 @@
     getFaceRepairPersonMetadata,
     getPeopleThumbnailPath,
     resolveFaces,
-    type FaceRepairClusterFacesResponseDto,
     type FaceRepairPersonMetadataResponseDto,
     type FaceRepairResolveRequestDto,
   } from '@immich/sdk';
@@ -73,11 +72,11 @@
 
   const PAGE_SIZE = 48;
 
-  // `getFaceRepairClusterFaces` is a POST, so the read-only demo user is refused it. Standing in for the
-  // call with an empty page keeps the (GET) metadata leg of the Promise.all below alive: without this the
-  // rejection took metadata down with it and the whole page rendered as an error banner whose Retry 403s
-  // again. Same "skip the blocked fetch" shape as admin/storage-migration/+page.svelte's onMount.
-  const EMPTY_CLUSTER_PAGE: FaceRepairClusterFacesResponseDto = { faces: [], total: 0, hasMore: false };
+  // The faces leg is a POST, which a demo instance refuses by default — so this used to be stubbed out with
+  // an empty page for the read-only demo user, which made the page report an empty cluster for every person.
+  // Listing a cluster is a READ (it is only a POST because of the exclude-list body), so the route is now
+  // allowed for the demo user server-side: see server/src/utils/demo-preview.ts. The demo user therefore
+  // loads exactly what a real admin does, and only the WRITE controls below stay hidden.
 
   // Created exactly ONCE, here, and never reassigned. This is what makes appendFaces safe: a `$derived` that
   // rebuilds the model from a growing faces array would wipe every staged mark and the current selection on
@@ -167,13 +166,10 @@
     try {
       const [metadataResult, facesResult] = await Promise.all([
         getFaceRepairPersonMetadata({ personId }),
-        // See EMPTY_CLUSTER_PAGE: the faces leg is a POST the read-only demo user cannot make.
-        isReadOnlyDemo
-          ? Promise.resolve(EMPTY_CLUSTER_PAGE)
-          : getFaceRepairClusterFaces({
-              personId,
-              faceRepairClusterFacesRequestDto: { excludeFaceIds: [], page: 0, size: PAGE_SIZE },
-            }),
+        getFaceRepairClusterFaces({
+          personId,
+          faceRepairClusterFacesRequestDto: { excludeFaceIds: [], page: 0, size: PAGE_SIZE },
+        }),
       ]);
       metadata = metadataResult;
       // clear() before appendFaces, because appending is idempotent by assetFaceId: merging page 0 back into a

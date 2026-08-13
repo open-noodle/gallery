@@ -15,18 +15,18 @@ import Page from './+page.svelte';
 // auth-manager.svelte mock exposing isReadOnlyDemo via a getter, plus the AdminPageLayout stub — the one
 // stub that renders the `footer` snippet this page's dock lives in). Three things are covered:
 //
-//   1. The mount's cluster-faces leg is a POST. Its 403 used to reject the whole `Promise.all`, taking the
-//      metadata GET down with it, so the demo saw nothing but an error banner whose Retry 403s again. It is
-//      skipped under isReadOnlyDemo, so the page renders what the metadata alone supports.
+//   1. The demo visitor loads the SAME face grid a real admin does. The mount's cluster-faces leg is a POST,
+//      which a demo instance normally refuses — so the page used to stub it out with an empty page and told
+//      every visitor the person had no faces in their cluster. That route is a read, and is now allowed for
+//      the demo user by server/src/utils/demo-preview.ts. This is the regression test for that.
 //   2. Both mutating CTAs (Move entire cluster, Apply) are hidden — never merely disabled.
 //   3. The read-only notice explains the vanished CTAs.
 //
-// WHY THE CTA TESTS FLIP THE FLAG AFTER MOUNT: because of (1), a demo visitor loads zero faces, so the grid
-// and the dock that HOST those two buttons never render at all — asserting their absence straight after a
-// demo-mode mount would pass with the gates deleted. The flag is therefore flipped once the grid is on
-// screen, which isolates each assertion to the gate itself. That is why the mock is the rune-backed
-// readOnlyDemoAuthMock rather than the plain hoisted object the sibling specs use: a plain object registers
-// no signal and the flip would be invisible to `$derived`.
+// Because of (1) the grid and the dock that HOST those two buttons now render for a demo visitor, so the CTA
+// tests mount straight into demo mode and still assert against a populated page — each assertion isolates the
+// gate itself rather than a page that never rendered. Every such test also asserts on a sibling element from
+// the same block (the grid, the tally) so a vanished container cannot make an absence assertion pass
+// vacuously.
 //
 // Every assertion keys off data-testid: $t() renders raw keys in this repo's web specs, never English prose.
 
@@ -126,12 +126,13 @@ const renderManualPage = async () => {
   return result;
 };
 
-// Mounts as a real admin so the faces actually load, waits for the grid, THEN switches the viewer to the
-// read-only demo user. See the flag-flip note at the top of this file.
-const renderThenSwitchToDemo = async () => {
+// Mounts AS the read-only demo user and waits for the face grid — which a demo visitor now gets, since the
+// cluster-faces POST is an allowed read. Every CTA test below starts here, so each one asserts against the
+// same populated page a real demo visitor sees.
+const renderAsDemoUser = async () => {
+  readOnlyDemoAuthMock.isReadOnlyDemo = true;
   await renderManualPage();
   await waitFor(() => expect(screen.getByTestId('manual-review-grid')).toBeInTheDocument());
-  readOnlyDemoAuthMock.isReadOnlyDemo = true;
 };
 
 describe('face-cleanup manual review page — read-only demo', () => {
@@ -149,19 +150,19 @@ describe('face-cleanup manual review page — read-only demo', () => {
     expect(screen.queryByTestId('manual-review-load-error')).toBeNull();
   });
 
-  it('skips the blocked cluster-faces POST in read-only demo mode, with no error banner', async () => {
-    readOnlyDemoAuthMock.isReadOnlyDemo = true;
-    // Rejecting is what the demo user's 403 actually does. Were the call still made, the whole Promise.all
-    // would reject and the load-error banner asserted against below would appear — so this is a test about
-    // the call NOT being made, not about a call that happened to succeed.
-    vi.mocked(getFaceRepairClusterFaces).mockRejectedValue(new Error('403'));
-    await renderManualPage();
+  // THE REGRESSION TEST. The demo visitor must load the cluster, not an empty stub: while this POST was
+  // refused, the page rendered "this person has no faces in their cluster" for every person on the demo.
+  // Asserts the grid is populated AND that the empty state is absent — the empty state is the exact symptom,
+  // so a fix that loaded nothing would still be caught here.
+  it('loads the cluster faces in read-only demo mode, with no empty state and no error banner', async () => {
+    await renderAsDemoUser();
 
-    expect(getFaceRepairClusterFaces).not.toHaveBeenCalled();
+    expect(getFaceRepairClusterFaces).toHaveBeenCalled();
+    expect(screen.getAllByTestId('face-tile').length).toBeGreaterThan(0);
+    expect(screen.queryByTestId('manual-review-empty')).toBeNull();
     expect(screen.queryByTestId('manual-review-load-error')).toBeNull();
     expect(screen.queryByTestId('manual-review-load-error-retry')).toBeNull();
-    // The metadata leg survived: the person's name and owner still render, i.e. the page is a working
-    // read-only exhibit rather than a red banner.
+    // The metadata leg still renders alongside it, so the header and the grid agree on the same person.
     expect(screen.getByTestId('manual-review-heading')).toHaveTextContent('Jula');
     expect(screen.getByTestId('manual-review-owner')).toHaveTextContent(OWNER_ID);
   });
@@ -173,9 +174,9 @@ describe('face-cleanup manual review page — read-only demo', () => {
   });
 
   it('hides Move entire cluster in read-only demo mode', async () => {
-    await renderThenSwitchToDemo();
+    await renderAsDemoUser();
 
-    await waitFor(() => expect(screen.queryByTestId('manual-review-move-entire-btn')).toBeNull());
+    expect(screen.queryByTestId('manual-review-move-entire-btn')).toBeNull();
     // The grid that HOSTS the button is still on screen, so its absence is the gate and not a vanished page.
     expect(screen.getByTestId('manual-review-grid')).toBeInTheDocument();
   });
@@ -187,9 +188,9 @@ describe('face-cleanup manual review page — read-only demo', () => {
   });
 
   it('hides Apply in read-only demo mode', async () => {
-    await renderThenSwitchToDemo();
+    await renderAsDemoUser();
 
-    await waitFor(() => expect(screen.queryByTestId('manual-review-apply-btn')).toBeNull());
+    expect(screen.queryByTestId('manual-review-apply-btn')).toBeNull();
     // `manual-review-tally` is rendered by the SAME footer snippet as Apply, unconditionally in both
     // branches — its presence proves the dock is still mounted, so a dropped footer cannot make the
     // assertion above pass vacuously.

@@ -2,6 +2,7 @@ import { CallHandler, ExecutionContext, ForbiddenException, Injectable, NestInte
 import { Observable } from 'rxjs';
 import { AuthRequest } from 'src/middleware/auth.guard';
 import { ConfigRepository } from 'src/repositories/config.repository';
+import { isDemoReadOnlyPostRoute } from 'src/utils/demo-preview';
 
 const SAFE_POST_PREFIXES = ['/api/auth/', '/api/search/', '/api/download/'];
 
@@ -30,6 +31,13 @@ export class DemoInterceptor implements NestInterceptor {
     }
 
     if (method === 'POST' && SAFE_POST_PREFIXES.some((prefix) => request.path.startsWith(prefix))) {
+      return next.handle();
+    }
+
+    // Exact-path, POST-only: the handful of routes that read but cannot be GETs. Unlike SAFE_POST_PREFIXES
+    // above this is anchored, so nothing below the route rides in with it. Admin-route access is still
+    // decided separately by AuthService's demo preview branch, which consults the same list.
+    if (method === 'POST' && isDemoReadOnlyPostRoute(request.path)) {
       return next.handle();
     }
 
