@@ -43,7 +43,7 @@ String getPersonThumbnailUrl(final String personId, {final String? spaceId, fina
       : getSpacePersonThumbnailUrl(spaceId, personId, updatedAt: updatedAt);
 }
 
-/// Thumbnail URL for a photos-filter [PersonDto] whose id is the tokenized filter id
+/// Thumbnail URL for a photos-filter [FilterPerson] whose id is the tokenized filter id
 /// (`person:<uuid>` / `space-person:<uuid>`) the picker/recent/chip surfaces store, with the
 /// Space scope carried separately in [spaceId]. De-tokenizes to the raw profile id, then routes a
 /// Space person (non-null [spaceId]) to the membership-gated space endpoint and everyone else to

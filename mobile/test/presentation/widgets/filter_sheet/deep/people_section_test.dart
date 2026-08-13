@@ -3,13 +3,13 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
+import 'package:immich_mobile/models/photos_filter/filter_person.model.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/people_section.widget.dart';
 import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
 import 'package:immich_mobile/providers/photos_filter/filter_suggestions.provider.dart';
@@ -185,9 +185,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       final container = ProviderScope.containerOf(tester.element(find.byType(PeopleSectionDeep)));
-      container
-          .read(photosFilterProvider.notifier)
-          .togglePerson(const PersonDto(id: 'p1', name: 'Emma', isHidden: false, thumbnailPath: ''));
+      container.read(photosFilterProvider.notifier).togglePerson(const FilterPerson(id: 'p1', name: 'Emma'));
       await tester.pumpAndSettle();
 
       final ring = tester.widget<AnimatedContainer>(find.byKey(const Key('people-tile-ring-p1')));
@@ -236,9 +234,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final container = ProviderScope.containerOf(tester.element(find.byType(PeopleSectionDeep)));
-      container
-          .read(photosFilterProvider.notifier)
-          .togglePerson(const PersonDto(id: 'p7', name: 'P7', isHidden: false, thumbnailPath: ''));
+      container.read(photosFilterProvider.notifier).togglePerson(const FilterPerson(id: 'p7', name: 'P7'));
       await tester.pumpAndSettle();
 
       // Pinned beyond the cap because it's selected.

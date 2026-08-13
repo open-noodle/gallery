@@ -11,6 +11,7 @@ import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
+import 'package:immich_mobile/models/photos_filter/filter_person.model.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/person_picker.page.dart';
 import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/people_picker.provider.dart';
@@ -112,9 +113,9 @@ void main() {
         overrides: [
           peoplePickerFilteredProvider.overrideWith(
             (ref) async => const [
-              PersonDto(id: 'a', name: 'Alice', isHidden: false, thumbnailPath: ''),
-              PersonDto(id: 'b', name: 'Bob', isHidden: false, thumbnailPath: ''),
-              PersonDto(id: 'c', name: 'Carol', isHidden: false, thumbnailPath: ''),
+              FilterPerson(id: 'a', name: 'Alice'),
+              FilterPerson(id: 'b', name: 'Bob'),
+              FilterPerson(id: 'c', name: 'Carol'),
             ],
           ),
         ],
