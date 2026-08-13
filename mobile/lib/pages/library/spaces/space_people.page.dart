@@ -78,6 +78,10 @@ class _SpacePeoplePageState extends ConsumerState<SpacePeoplePage> {
           error: (error, _) {
             dPrint(() => 'Error loading space people: $error');
             return _ErrorState(
+              // Deliberately NOT ref.invalidateServerPeopleLists() (see people.provider.dart):
+              // that would also refetch driftGetAllPeopleWithSharedSpacesProvider, which this
+              // page never watches. This retry stays scoped to the one family member that
+              // actually errored — this space's people, keyed by (spaceId, sortBy).
               onRetry: () => ref.invalidate(driftSpacePeopleProvider((spaceId: widget.spaceId, sortBy: sortBy))),
             );
           },
