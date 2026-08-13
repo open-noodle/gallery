@@ -131,7 +131,10 @@ class MediumRepositoryContext {
     String? stackId,
     String? thumbHash,
     String? libraryId,
-    DateTime? localDateTime,
+    // Defaults to createdAt.toLocal() (the pre-existing behaviour). Pass
+    // Value(null) explicitly to simulate an asset synced with no
+    // localDateTime — remote_asset.localDateTime is nullable (S13).
+    Value<DateTime?> localDateTime = const Value.absent(),
   }) async {
     id ??= TestUtils.uuid();
     createdAt ??= TestUtils.date();
@@ -156,8 +159,7 @@ class MediumRepositoryContext {
             isEdited: .new(isEdited ?? false),
             livePhotoVideoId: .new(livePhotoVideoId),
             stackId: .new(stackId),
-            localDateTime: .new(date),
-            groupDate: .new(timelineGroupDate(date)),
+            localDateTime: localDateTime.present ? localDateTime : Value(createdAt.toLocal()),
             thumbHash: .new(TestUtils.uuid(thumbHash)),
             libraryId: .new(TestUtils.uuid(libraryId)),
           ),
@@ -512,6 +514,7 @@ class MediumRepositoryContext {
   Future<SharedSpaceAlbumEntityData> newSharedSpaceAlbum({
     String? id,
     String? name,
+    String? description,
     String? thumbnailAssetId,
     bool? isActivityEnabled,
     int? order,
@@ -525,6 +528,9 @@ class MediumRepositoryContext {
           SharedSpaceAlbumEntityCompanion(
             id: .new(id),
             name: .new(name ?? 'space_album_$id'),
+            // Left NULL by default — the column is nullable and a SyncAlbumV2
+            // with no description stores NULL, so that is the realistic default.
+            description: .new(description),
             thumbnailAssetId: .new(thumbnailAssetId),
             isActivityEnabled: .new(isActivityEnabled ?? true),
             order: .new(order ?? 0),
