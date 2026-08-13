@@ -1,7 +1,6 @@
 <script lang="ts">
-  import { AlbumSortBy, AlbumViewMode, SortOrder } from '$lib/stores/preferences.store';
+  import { AlbumViewMode, SortOrder } from '$lib/stores/preferences.store';
   import { SpaceAlbumGroupBy, spaceAlbumViewSettings } from '$lib/stores/space-album-view-settings.store';
-  import { type AlbumSortOptionMetadata, findSortOptionMetadata, sortOptionsMetadata } from '$lib/utils/album-utils';
   import {
     collapseAllSpaceAlbumGroups,
     expandAllSpaceAlbumGroups,
@@ -10,6 +9,13 @@
     spaceGroupOptionsMetadata,
     type SpaceAlbumGroupOptionMetadata,
   } from '$lib/utils/space-album-grouping';
+  import {
+    type SpaceAlbumSortByValue,
+    type SpaceAlbumSortOptionMetadata,
+    SpaceAlbumSortBy,
+    findSpaceAlbumSortOptionMetadata,
+    spaceAlbumSortOptionsMetadata,
+  } from '$lib/utils/space-album-sort';
   import { Button, Icon, Text } from '@immich/ui';
   import {
     mdiArrowDownThin,
@@ -42,7 +48,7 @@
     return ordering === SortOrder.Asc ? SortOrder.Desc : SortOrder.Asc;
   };
 
-  const handleChangeSortBy = ({ id, defaultOrder }: AlbumSortOptionMetadata) => {
+  const handleChangeSortBy = ({ id, defaultOrder }: SpaceAlbumSortOptionMetadata) => {
     if ($spaceAlbumViewSettings.sortBy === id) {
       $spaceAlbumViewSettings.sortOrder = flipOrdering($spaceAlbumViewSettings.sortOrder);
     } else {
@@ -77,19 +83,28 @@
     }
   }
 
-  let selectedSortOption = $derived(findSortOptionMetadata($spaceAlbumViewSettings.sortBy));
+  let selectedSortOption = $derived(findSpaceAlbumSortOptionMetadata($spaceAlbumViewSettings.sortBy));
   let sortIcon = $derived($spaceAlbumViewSettings.sortOrder === SortOrder.Desc ? mdiArrowDownThin : mdiArrowUpThin);
 
-  let selectedGroupOption = $derived(findSpaceGroupOptionMetadata($spaceAlbumViewSettings.groupBy));
+  // Resolve the *effective* grouping, not the raw stored one. A stored groupBy
+  // survives a sort change that disables it — the menu greys the option out and
+  // the list falls back to flat, so a trigger reading the stored value would
+  // claim "Group by year" over an ungrouped list (#974). Upstream's
+  // AlbumsControls has the same defect; fixing it there would dirty a file we
+  // keep byte-clean for rebases, so the fork only fixes its own copy.
+  let selectedGroupOption = $derived(
+    findSpaceGroupOptionMetadata(getSelectedSpaceAlbumGroupOption($spaceAlbumViewSettings)),
+  );
   let isGrouped = $derived(getSelectedSpaceAlbumGroupOption($spaceAlbumViewSettings) !== SpaceAlbumGroupBy.None);
 
-  let albumSortByNames: Record<AlbumSortBy, string> = $derived({
-    [AlbumSortBy.Title]: $t('sort_title'),
-    [AlbumSortBy.ItemCount]: $t('sort_items'),
-    [AlbumSortBy.DateModified]: $t('sort_modified'),
-    [AlbumSortBy.DateCreated]: $t('sort_created'),
-    [AlbumSortBy.MostRecentPhoto]: $t('sort_recent'),
-    [AlbumSortBy.OldestPhoto]: $t('sort_oldest'),
+  let albumSortByNames: Record<SpaceAlbumSortByValue, string> = $derived({
+    [SpaceAlbumSortBy.Title]: $t('sort_title'),
+    [SpaceAlbumSortBy.ItemCount]: $t('sort_items'),
+    [SpaceAlbumSortBy.DateModified]: $t('sort_modified'),
+    [SpaceAlbumSortBy.DateCreated]: $t('sort_created'),
+    [SpaceAlbumSortBy.MostRecentPhoto]: $t('sort_recent'),
+    [SpaceAlbumSortBy.OldestPhoto]: $t('sort_oldest'),
+    [SpaceAlbumSortBy.RecentlyLinked]: $t('sort_recently_linked'),
   });
 
   let spaceGroupByNames: Record<SpaceAlbumGroupBy, string> = $derived({
@@ -124,7 +139,7 @@
         onclick={() => (showSortMenu = !showSortMenu)}
       >
         <Icon icon={sortIcon} size="18" />
-        <span class="hidden sm:inline">{albumSortByNames[selectedSortOption.id as AlbumSortBy]}</span>
+        <span class="hidden sm:inline">{albumSortByNames[selectedSortOption.id]}</span>
         <Icon icon={mdiChevronDown} size="14" />
       </button>
 
@@ -133,7 +148,7 @@
           class="absolute top-full right-0 z-10 mt-1 min-w-[180px] rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-900"
           data-testid="space-albums-sort-menu"
         >
-          {#each sortOptionsMetadata as option (option.id)}
+          {#each spaceAlbumSortOptionsMetadata as option (option.id)}
             <button
               type="button"
               class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800"
@@ -141,7 +156,7 @@
               onclick={() => handleChangeSortBy(option)}
               data-testid="space-albums-sort-option-{option.id}"
             >
-              {albumSortByNames[option.id as AlbumSortBy]}
+              {albumSortByNames[option.id]}
             </button>
           {/each}
         </div>
