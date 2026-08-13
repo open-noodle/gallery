@@ -29,10 +29,7 @@ final driftSpaceEditableProvider = FutureProvider.family<bool, String>((ref, spa
   return repository.isSpaceEditor(spaceId, userId);
 });
 
-final peopleAssetProvider = FutureProvider.family<List<Person>, ({String id, String ownerId})>((
-  ref,
-  key,
-) async {
+final peopleAssetProvider = FutureProvider.family<List<Person>, ({String id, String ownerId})>((ref, key) async {
   final service = ref.watch(peopleServiceProvider);
   final currentUserId = ref.watch(currentUserProvider.select((user) => user?.id));
   return service.getAssetPeople(key.id, ownedByCurrentUser: key.ownerId == currentUserId);
@@ -46,10 +43,10 @@ final getAllPeopleProvider = StreamProvider.family<List<Person>, PeopleSortBy>((
 
 /// People for the global People page AND the photos-filter People picker (see
 /// `peoplePickerAllProvider`) — the viewer's own people plus people on Space-shared assets,
-/// matching the web People page / picker. Kept distinct from [driftGetAllPeopleProvider] so
+/// matching the web People page / picker. Kept distinct from [getAllPeopleProvider] so
 /// the remaining owner-scoped, local-first surface (the library people card) stays local.
 /// See issue #727.
-final driftGetAllPeopleWithSharedSpacesProvider = FutureProvider.family<List<DriftPerson>, PeopleSortBy>((
+final driftGetAllPeopleWithSharedSpacesProvider = FutureProvider.family<List<Person>, PeopleSortBy>((
   ref,
   sortBy,
 ) async {
@@ -76,7 +73,7 @@ final driftGetAllPeopleWithSharedSpacesProvider = FutureProvider.family<List<Dri
 /// restarting the app. `autoDispose` tears the provider down when [SpacePeoplePage] is popped
 /// (its only consumer), so re-opening the page always issues a fresh fetch.
 final driftSpacePeopleProvider = FutureProvider.autoDispose
-    .family<List<DriftPerson>, ({String spaceId, PeopleSortBy sortBy})>((ref, key) async {
+    .family<List<Person>, ({String spaceId, PeopleSortBy sortBy})>((ref, key) async {
       final repository = ref.watch(sharedSpaceApiRepositoryProvider);
       return repository.getSpacePeople(key.spaceId, sortBy: key.sortBy);
     });

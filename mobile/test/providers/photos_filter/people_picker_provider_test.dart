@@ -5,15 +5,10 @@ import 'package:immich_mobile/models/photos_filter/filter_person.model.dart';
 import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/people_picker.provider.dart';
 
-DriftPerson _d(String id, String name, {bool isHidden = false, int? numberOfAssets, String? spaceId}) => DriftPerson(
+Person _d(String id, String name, {int? numberOfAssets, String? spaceId}) => Person(
   id: id,
-  createdAt: DateTime(2024, 1, 1),
   updatedAt: DateTime(2024, 1, 1),
-  ownerId: 'owner',
   name: name,
-  isFavorite: false,
-  isHidden: isHidden,
-  color: null,
   numberOfAssets: numberOfAssets,
   spaceId: spaceId,
 );
@@ -21,9 +16,9 @@ DriftPerson _d(String id, String name, {bool isHidden = false, int? numberOfAsse
 FilterPerson _p(String id, String name) => FilterPerson(id: id, name: name);
 
 // peoplePickerAllProvider sources driftGetAllPeopleWithSharedSpacesProvider (not the
-// owner-scoped-only driftGetAllPeopleProvider) so the picker includes shared-space people,
+// owner-scoped-only getAllPeopleProvider) so the picker includes shared-space people,
 // mirroring the web People picker. See slice 3 plan.
-ProviderContainer _containerWith(List<DriftPerson> people) {
+ProviderContainer _containerWith(List<Person> people) {
   return ProviderContainer(
     overrides: [driftGetAllPeopleWithSharedSpacesProvider.overrideWith((ref, sortBy) async => people)],
   );
@@ -65,7 +60,7 @@ void main() {
       expect(result.map((p) => p.id), ['person:a']);
     });
 
-    test('maps DriftPerson to FilterPerson', () async {
+    test('maps Person to FilterPerson', () async {
       final c = _containerWith([_d('a', 'Alice')]);
       addTearDown(c.dispose);
       final result = await c.read(peoplePickerAllProvider.future);
@@ -87,8 +82,8 @@ void main() {
     });
 
     // Slice 3: the picker row's photo count reads straight off the already-fetched
-    // DriftPerson — no extra network call.
-    test('carries numberOfAssets from the source DriftPerson', () async {
+    // Person — no extra network call.
+    test('carries numberOfAssets from the source Person', () async {
       final c = _containerWith([
         _d('a', 'Alice', numberOfAssets: 1204),
         _d('b', 'Bob', numberOfAssets: 0),
@@ -215,12 +210,19 @@ void main() {
     // is the sole source recentPeopleProvider reads from.
 
     test('a stale updatedAt is not "recent"', () async {
-      // Pins the Recent-strip cutoff. (DriftPerson.updatedAt is still non-nullable in
-      // Phase 1; Task 14 extends this with a true updatedAt:null person once the
-      // unified model makes it constructible.)
+      // Pins the Recent-strip cutoff.
       final c = _containerWith([
         _d('p1', 'Alice'), // helper's fixed 2024 date — stale
       ]);
+      addTearDown(c.dispose);
+      expect(await c.read(recentPeopleProvider.future), isEmpty);
+    });
+
+    test('a person with no updatedAt at all is not "recent"', () async {
+      // The unified Person makes updatedAt genuinely nullable (the old model's epoch-0
+      // sentinel is gone), so this input is now constructible and the provider's
+      // `p.updatedAt ?? DateTime(1970)` fallback is what keeps it out of the strip.
+      final c = _containerWith([_d('p1', 'Alice').copyWith(updatedAt: null)]);
       addTearDown(c.dispose);
       expect(await c.read(recentPeopleProvider.future), isEmpty);
     });
