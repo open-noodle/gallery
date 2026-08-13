@@ -21,9 +21,7 @@ void main() {
 
   setUp(() {
     mockRepository = MockSharedSpaceApiRepository();
-    container = ProviderContainer(
-      overrides: [sharedSpaceApiRepositoryProvider.overrideWithValue(mockRepository)],
-    );
+    container = ProviderContainer(overrides: [sharedSpaceApiRepositoryProvider.overrideWithValue(mockRepository)]);
     addTearDown(container.dispose);
   });
 
@@ -41,23 +39,17 @@ void main() {
   });
 
   test('re-fetches when the sort mode changes because it is part of the family key', () async {
-    when(
-      () => mockRepository.getSpacePeople(any(), sortBy: any(named: 'sortBy')),
-    ).thenAnswer((_) async => [_p('sp1')]);
+    when(() => mockRepository.getSpacePeople(any(), sortBy: any(named: 'sortBy'))).thenAnswer((_) async => [_p('sp1')]);
 
     await container.read(driftSpacePeopleProvider((spaceId: 'space-1', sortBy: PeopleSortBy.name)).future);
-    await container.read(
-      driftSpacePeopleProvider((spaceId: 'space-1', sortBy: PeopleSortBy.photoCount)).future,
-    );
+    await container.read(driftSpacePeopleProvider((spaceId: 'space-1', sortBy: PeopleSortBy.photoCount)).future);
 
     verify(() => mockRepository.getSpacePeople('space-1', sortBy: PeopleSortBy.name)).called(1);
     verify(() => mockRepository.getSpacePeople('space-1', sortBy: PeopleSortBy.photoCount)).called(1);
   });
 
   test('surfaces the failure instead of falling back to the owner-scoped local list', () async {
-    when(
-      () => mockRepository.getSpacePeople(any(), sortBy: any(named: 'sortBy')),
-    ).thenThrow(Exception('offline'));
+    when(() => mockRepository.getSpacePeople(any(), sortBy: any(named: 'sortBy'))).thenThrow(Exception('offline'));
 
     // A local fallback would list people who are NOT in this space, which is wrong rather
     // than merely stale — so the error must reach the UI.
