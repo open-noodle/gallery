@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
-import 'package:immich_mobile/domain/models/person.model.dart';
+import 'package:immich_mobile/models/photos_filter/filter_person.model.dart';
 import 'package:immich_mobile/utils/option.dart';
 
 part 'search_filter.model.freezed.dart';
@@ -132,7 +132,7 @@ abstract class SearchFilter with _$SearchFilter {
     String? language,
     String? assetId,
     List<String>? tagIds,
-    required Set<Person> people,
+    required Set<FilterPerson> people,
     required SearchLocationFilter location,
     required SearchCameraFilter camera,
     required SearchDateFilter date,
