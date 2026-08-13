@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/constants/collection.dart';
+import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/collection_target.dart';
-import 'package:immich_mobile/domain/models/space_album.model.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/providers/infrastructure/space_album.provider.dart';
@@ -27,12 +27,20 @@ class SpaceCollectionSection extends ConsumerStatefulWidget {
     this.excludeSpaceId,
     this.isBusy = false,
     this.searchQuery = '',
+    this.assets,
   });
 
   final void Function(CollectionTarget target) onTargetSelected;
 
   /// Set on a space's own surface so it is not offered as a destination for its own assets.
   final String? excludeSpaceId;
+
+  /// The assets the picker is about to file, for the ownership / cap notices.
+  ///
+  /// Defaults to the timeline multiselect. The asset viewer has no multiselect, so it passes
+  /// its one asset — falling back to the empty selection there would read as "nothing
+  /// non-owned" and offer space targets for a photo that can never reach one.
+  final Iterable<BaseAsset>? assets;
 
   /// Disables every row while an add is in flight.
   final bool isBusy;
@@ -73,7 +81,8 @@ class _SpaceCollectionSectionState extends ConsumerState<SpaceCollectionSection>
   Widget build(BuildContext context) {
     final spacesAsync = ref.watch(sharedSpacesProvider);
     final userId = ref.watch(currentUserProvider.select((user) => user?.id));
-    final selection = ref.watch(multiSelectProvider.select((state) => state.selectedAssets));
+    final multiSelection = ref.watch(multiSelectProvider.select((state) => state.selectedAssets));
+    final selection = widget.assets ?? multiSelection;
 
     final spaces = spacesAsync.valueOrNull;
     // Offline or still loading: the album half of the picker still works, so stay out of
@@ -162,7 +171,10 @@ class _SpaceCollectionSectionState extends ConsumerState<SpaceCollectionSection>
 
   List<Widget> _childrenFor(SharedSpaceResponseDto space) {
     final albumsAsync = ref.watch(spaceAlbumsProvider(space.id));
-    final albums = albumsAsync.valueOrNull ?? const <SpaceAlbum>[];
+    // `null` means the watch has not produced a value yet, which is NOT the same as "this space
+    // has no albums" — conflating them flashed "no albums yet" on every expand. Web draws the
+    // same distinction (`expandedSpaceAlbums === undefined`).
+    final albums = albumsAsync.valueOrNull;
 
     return [
       ListTile(
@@ -173,7 +185,9 @@ class _SpaceCollectionSectionState extends ConsumerState<SpaceCollectionSection>
         enabled: !widget.isBusy,
         onTap: widget.isBusy ? null : () => _emit(SpacePoolTarget(space)),
       ),
-      if (albums.isEmpty)
+      if (albums == null)
+        const SizedBox.shrink() // still loading — say nothing rather than something wrong
+      else if (albums.isEmpty)
         Padding(
           key: Key('space-albums-empty-${space.id}'),
           padding: const EdgeInsets.only(left: 48, right: 16, bottom: 8),
