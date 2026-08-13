@@ -7,6 +7,7 @@ import 'package:immich_mobile/presentation/actions/download.action.dart';
 import 'package:immich_mobile/presentation/actions/share.action.dart';
 import 'package:immich_mobile/presentation/widgets/action_buttons/remove_from_album_action_button.widget.dart';
 import 'package:immich_mobile/presentation/widgets/bottom_sheet/base_bottom_sheet.widget.dart';
+import 'package:immich_mobile/presentation/widgets/collection/collection_picker.widget.dart';
 
 /// Reduced multiselect bottom sheet for the Space Album detail page.
 ///
@@ -20,6 +21,9 @@ import 'package:immich_mobile/presentation/widgets/bottom_sheet/base_bottom_shee
 /// Excluded actions compared to [RemoteAlbumBottomSheet]:
 ///   Favorite / Archive / Trash / Lock / Set-cover / Share-link / Stack /
 ///   Unstack / Edit-date-time / Edit-location / Delete-local
+///
+/// The sheet also mounts the shared [CollectionPicker] (#965 follow-up), with no
+/// `excludeSpaceId` — the current space is a legitimate target from inside one of its own albums.
 ///
 /// Role-gating is on [canEdit] (space role), not album ownership (D3).
 ///
@@ -56,6 +60,11 @@ class _SpaceAlbumBottomSheetState extends ConsumerState<SpaceAlbumBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
+    Future<void> onKeyboardExpand() {
+      // 0.85 is this sheet's maxChildSize.
+      return sheetController.animateTo(0.85, duration: const Duration(milliseconds: 200), curve: Curves.easeInOut);
+    }
+
     return BaseBottomSheet(
       controller: sheetController,
       initialChildSize: 0.18,
@@ -73,6 +82,9 @@ class _SpaceAlbumBottomSheetState extends ConsumerState<SpaceAlbumBottomSheet> {
             onComplete: widget.onRemoved,
           ),
       ],
+      // The same picker every other multi-select surface offers. No excludeSpaceId: this sheet has
+      // no spaceId, and the current space is a legitimate target from inside one of its albums.
+      slivers: [CollectionPicker(onKeyboardExpanded: onKeyboardExpand)],
     );
   }
 }
