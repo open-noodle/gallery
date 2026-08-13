@@ -4,7 +4,7 @@ import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/models/photos_filter/filter_person.model.dart';
 import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
 
-/// DriftPerson -> FilterPerson for the photos filter.
+/// Person -> FilterPerson for the photos filter.
 ///
 /// [FilterPerson.id] carries the **tokenized filter id** (`space-person:<id>` for a shared-space
 /// person, else `person:<id>`) — the exact value the server emits as `PersonResponseDto.filterId`.
@@ -17,7 +17,7 @@ import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
 /// space thumbnail endpoint via getFilterPersonThumbnailUrl (the owner endpoint 404s a
 /// space-person id). numberOfAssets carries straight through (no extra network call) so the
 /// picker row can render a photo count.
-FilterPerson _toFilterPerson(DriftPerson p) => FilterPerson(
+FilterPerson _toFilterPerson(Person p) => FilterPerson(
   id: p.spaceId == null ? 'person:${p.id}' : 'space-person:${p.id}',
   name: p.name,
   birthDate: p.birthDate,

@@ -28,17 +28,8 @@ class _StubCurrentUserNotifier extends CurrentUserProvider {
   }
 }
 
-DriftPerson _person(String id, String name, {String? spaceId}) => DriftPerson(
-  id: id,
-  createdAt: DateTime(2024, 1, 1),
-  updatedAt: DateTime(2024, 1, 1),
-  ownerId: 'admin',
-  name: name,
-  isFavorite: false,
-  isHidden: false,
-  color: null,
-  spaceId: spaceId,
-);
+Person _person(String id, String name, {String? spaceId}) =>
+    Person(id: id, updatedAt: DateTime(2024, 1, 1), name: name, spaceId: spaceId);
 
 void main() {
   late Drift db;
@@ -76,7 +67,7 @@ void main() {
     return provider is RemoteImageProvider ? provider.url : null;
   }
 
-  Future<void> pumpStrip(WidgetTester tester, DriftPerson person) async {
+  Future<void> pumpStrip(WidgetTester tester, Person person) async {
     final asset = TestUtils.createRemoteAsset(id: 'asset-1', ownerId: 'admin');
     await tester.pumpConsumerWidget(
       PeopleDetails(asset: asset),
