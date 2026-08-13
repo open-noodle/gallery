@@ -9,8 +9,10 @@ import {
   toggleSpaceAlbumGroupCollapsing,
   collapseAllSpaceAlbumGroups,
   expandAllSpaceAlbumGroups,
+  spaceGroupOptionsMetadata,
   type SpaceAlbumGroupingCtx,
 } from '$lib/utils/space-album-grouping';
+import { SpaceAlbumSortBy } from '$lib/utils/space-album-sort';
 
 const CTX: SpaceAlbumGroupingCtx = {
   ungrouped: 'Albums',
@@ -59,6 +61,9 @@ it('Year buckets by endDate, unknown-year last', () => {
     A({ id: 'y2020', endDate: '2020-06-01T00:00:00Z' }),
     A({ id: 'y2024', endDate: '2024-06-01T00:00:00Z' }),
   ];
+  // Year's isDisabled() reads the store directly, so the store (not just the
+  // locally-built settings object below) must carry a Year-compatible sortBy.
+  spaceAlbumViewSettings.update((s) => ({ ...s, sortBy: AlbumSortBy.MostRecentPhoto }));
   const g = buildSpaceAlbumGroups(
     albums,
     {
@@ -74,6 +79,9 @@ it('Year buckets by endDate, unknown-year last', () => {
 
 it('Year uses startDate under Oldest-photo sort', () => {
   const albums = [A({ id: 's', startDate: '2019-01-01T00:00:00Z', endDate: '2025-01-01T00:00:00Z' })];
+  // Year's isDisabled() reads the store directly, so the store (not just the
+  // locally-built settings object below) must carry a Year-compatible sortBy.
+  spaceAlbumViewSettings.update((s) => ({ ...s, sortBy: AlbumSortBy.OldestPhoto }));
   const g = buildSpaceAlbumGroups(
     albums,
     { ...get(spaceAlbumViewSettings), groupBy: SpaceAlbumGroupBy.Year, sortBy: AlbumSortBy.OldestPhoto },
@@ -131,4 +139,54 @@ it('collapse mutators write only the space store, keyed by groupBy', () => {
   expect(get(spaceAlbumViewSettings).collapsedGroups.Year.sort()).toEqual(['2020', '2024']);
   expandAllSpaceAlbumGroups();
   expect(get(spaceAlbumViewSettings).collapsedGroups.Year).toEqual([]);
+});
+
+// S27
+describe('Year grouping availability', () => {
+  const yearOption = () => spaceGroupOptionsMetadata.find(({ id }) => id === SpaceAlbumGroupBy.Year)!;
+
+  // Recently linked is the default sort, so disabling Year for it would leave
+  // Year grouping unreachable out of the box — the e2e suite caught exactly
+  // that. It stays enabled even though it is an album-metadata date.
+  it('is enabled while sorting by Recently linked', () => {
+    spaceAlbumViewSettings.update((s) => ({ ...s, sortBy: SpaceAlbumSortBy.RecentlyLinked }));
+    expect(yearOption().isDisabled()).toBe(false);
+  });
+
+  it('stays disabled for Date created and Date modified', () => {
+    spaceAlbumViewSettings.update((s) => ({ ...s, sortBy: AlbumSortBy.DateCreated }));
+    expect(yearOption().isDisabled()).toBe(true);
+    spaceAlbumViewSettings.update((s) => ({ ...s, sortBy: AlbumSortBy.DateModified }));
+    expect(yearOption().isDisabled()).toBe(true);
+  });
+
+  it('is enabled for the photo-date sorts', () => {
+    spaceAlbumViewSettings.update((s) => ({ ...s, sortBy: AlbumSortBy.MostRecentPhoto }));
+    expect(yearOption().isDisabled()).toBe(false);
+    spaceAlbumViewSettings.update((s) => ({ ...s, sortBy: AlbumSortBy.OldestPhoto }));
+    expect(yearOption().isDisabled()).toBe(false);
+  });
+});
+
+// S28
+describe('grouped lists sort within each group by Recently linked', () => {
+  it('orders each group by linkedAt descending', () => {
+    const settings = {
+      ...get(spaceAlbumViewSettings),
+      groupBy: SpaceAlbumGroupBy.Owner,
+      sortBy: SpaceAlbumSortBy.RecentlyLinked,
+      sortOrder: SortOrder.Desc,
+    };
+    const albums = [
+      A({ id: '1', albumName: 'OwnerA-Early', ownerId: 'a', linkedAt: '2026-01-01T00:00:00Z' }),
+      A({ id: '2', albumName: 'OwnerA-Late', ownerId: 'a', linkedAt: '2026-06-01T00:00:00Z' }),
+    ];
+    // buildSpaceAlbumGroups returns SpaceAlbumGroup[] = { id, name, albums }.
+    // Owner grouping keys the group by ownerId, so select it by id rather than
+    // by album count — a length-based lookup would silently pick the wrong
+    // group if grouping ever changed.
+    const groups = buildSpaceAlbumGroups(albums, settings, CTX);
+    const ownerAGroup = groups.find((g) => g.id === 'a');
+    expect(ownerAGroup?.albums.map((a) => a.albumName)).toEqual(['OwnerA-Late', 'OwnerA-Early']);
+  });
 });

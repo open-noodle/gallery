@@ -1,15 +1,15 @@
 <script lang="ts">
-  import type { AlbumResponseDto, SharedSpaceLinkedAlbumDto, SharedSpaceMemberResponseDto } from '@immich/sdk';
+  import type { SharedSpaceLinkedAlbumDto, SharedSpaceMemberResponseDto } from '@immich/sdk';
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { AlbumViewMode } from '$lib/stores/preferences.store';
   import { SpaceAlbumGroupBy, spaceAlbumViewSettings } from '$lib/stores/space-album-view-settings.store';
-  import { sortAlbums } from '$lib/utils/album-utils';
   import {
     buildSpaceAlbumGroups,
     getSelectedSpaceAlbumGroupOption,
     isSpaceAlbumGroupCollapsed,
     toggleSpaceAlbumGroupCollapsing,
   } from '$lib/utils/space-album-grouping';
+  import { sortSpaceAlbums } from '$lib/utils/space-album-sort';
   import SpaceAlbumCard from '$lib/components/spaces/space-album-card.svelte';
   import SpaceAlbumsTable from '$lib/components/spaces/space-albums-table.svelte';
   import { Icon } from '@immich/ui';
@@ -51,10 +51,10 @@
   });
 
   const sorted = $derived(
-    sortAlbums(filtered as unknown as AlbumResponseDto[], {
+    sortSpaceAlbums(filtered, {
       sortBy: $spaceAlbumViewSettings.sortBy,
       orderBy: $spaceAlbumViewSettings.sortOrder,
-    }) as unknown as SharedSpaceLinkedAlbumDto[],
+    }),
   );
 
   const groups = $derived(
