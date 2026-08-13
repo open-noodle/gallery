@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
-import 'package:immich_mobile/domain/models/person.model.dart';
+import 'package:immich_mobile/models/photos_filter/filter_person.model.dart';
 import 'package:immich_mobile/models/search/search_filter.model.dart';
 import 'package:immich_mobile/providers/photos_filter/chip_id.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
@@ -40,7 +40,7 @@ void main() {
   });
 
   group('togglePerson', () {
-    const alice = PersonDto(id: 'alice', name: 'Alice', isHidden: false, thumbnailPath: '');
+    const alice = FilterPerson(id: 'alice', name: 'Alice');
     test('adding a person sets it in state.people', () {
       final notifier = container.read(photosFilterProvider.notifier);
       notifier.togglePerson(alice);
@@ -53,7 +53,7 @@ void main() {
       expect(container.read(photosFilterProvider).people, isEmpty);
     });
     test('toggling two people leaves both in state', () {
-      const bob = PersonDto(id: 'bob', name: 'Bob', isHidden: false, thumbnailPath: '');
+      const bob = FilterPerson(id: 'bob', name: 'Bob');
       final notifier = container.read(photosFilterProvider.notifier);
       notifier.togglePerson(alice);
       notifier.togglePerson(bob);
@@ -233,7 +233,7 @@ void main() {
   group('clearPeople', () {
     test('empties the people set leaving other dimensions intact', () {
       final notifier = container.read(photosFilterProvider.notifier);
-      const alice = PersonDto(id: 'alice', name: 'Alice', isHidden: false, thumbnailPath: '');
+      const alice = FilterPerson(id: 'alice', name: 'Alice');
       notifier.togglePerson(alice);
       notifier.toggleTag('t1');
       notifier.clearPeople();
@@ -246,7 +246,7 @@ void main() {
   group('clearTags', () {
     test('clears tag list to null leaving other dimensions intact', () {
       final notifier = container.read(photosFilterProvider.notifier);
-      const alice = PersonDto(id: 'alice', name: 'Alice', isHidden: false, thumbnailPath: '');
+      const alice = FilterPerson(id: 'alice', name: 'Alice');
       notifier.togglePerson(alice);
       notifier.toggleTag('t1');
       notifier.clearTags();
@@ -259,7 +259,7 @@ void main() {
   group('clearDimension', () {
     test('clears people dimension', () {
       final notifier = container.read(photosFilterProvider.notifier);
-      const alice = PersonDto(id: 'alice', name: 'Alice', isHidden: false, thumbnailPath: '');
+      const alice = FilterPerson(id: 'alice', name: 'Alice');
       notifier.togglePerson(alice);
       notifier.toggleTag('t1');
       notifier.clearDimension(Dimension.people);
@@ -335,8 +335,8 @@ void main() {
   group('removeChip', () {
     test('PersonChipId removes that person, keeping others', () {
       final notifier = container.read(photosFilterProvider.notifier);
-      const alice = PersonDto(id: 'alice', name: 'Alice', isHidden: false, thumbnailPath: '');
-      const bob = PersonDto(id: 'bob', name: 'Bob', isHidden: false, thumbnailPath: '');
+      const alice = FilterPerson(id: 'alice', name: 'Alice');
+      const bob = FilterPerson(id: 'bob', name: 'Bob');
       notifier.togglePerson(alice);
       notifier.togglePerson(bob);
       notifier.removeChip(const PersonChipId('alice'));
@@ -345,7 +345,7 @@ void main() {
     });
     test('PersonChipId no-op on nonexistent id', () {
       final notifier = container.read(photosFilterProvider.notifier);
-      const alice = PersonDto(id: 'alice', name: 'Alice', isHidden: false, thumbnailPath: '');
+      const alice = FilterPerson(id: 'alice', name: 'Alice');
       notifier.togglePerson(alice);
       notifier.removeChip(const PersonChipId('ghost'));
       expect(container.read(photosFilterProvider).people.map((p) => p.id), ['alice']);
@@ -525,7 +525,7 @@ void main() {
 
     test('removeChip(PersonChipId(nonexistent)) does not emit', () {
       final notifier = container.read(photosFilterProvider.notifier);
-      const alice = PersonDto(id: 'alice', name: 'Alice', isHidden: false, thumbnailPath: '');
+      const alice = FilterPerson(id: 'alice', name: 'Alice');
       notifier.togglePerson(alice);
       final listener = ListenerMock<SearchFilter>();
       container.listen<SearchFilter>(photosFilterProvider, listener.call);
@@ -533,9 +533,9 @@ void main() {
       verifyNever(() => listener(any(), any()));
     });
 
-    test('togglePerson twice for the same PersonDto is a net no-op', () {
+    test('togglePerson twice for the same FilterPerson is a net no-op', () {
       final notifier = container.read(photosFilterProvider.notifier);
-      const alice = PersonDto(id: 'alice', name: 'Alice', isHidden: false, thumbnailPath: '');
+      const alice = FilterPerson(id: 'alice', name: 'Alice');
       final before = container.read(photosFilterProvider);
       notifier.togglePerson(alice);
       notifier.togglePerson(alice);
