@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:immich_mobile/domain/models/person.model.dart';
+import 'package:immich_mobile/models/photos_filter/filter_person.model.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/selected_people_strip.widget.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 
 import '../../../../widget_tester_extensions.dart';
 
-PersonDto _p(String id, String name) => PersonDto(id: id, name: name, isHidden: false, thumbnailPath: '');
+FilterPerson _p(String id, String name) => FilterPerson(id: id, name: name);
 
 void main() {
   group('SelectedPeopleStrip', () {
