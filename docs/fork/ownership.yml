@@ -5,7 +5,7 @@ metadata:
   upstream_branch: main
   fork_remote: origin
   fork_branch: main
-  last_verified_fork_head: 99ce9f8b46e7f86d1320eac87c30f70942404aca
+  last_verified_fork_head: db3b4c2fdb02c929759167018552fc187d0aa42f
 
 coverage_ignore:
   - docs/superpowers/**
@@ -309,6 +309,7 @@ features:
       - server/src/utils/fetch.ts
       - server/src/schema/functions.ts
       - server/helmet.json
+      - web/vite.config.ts
       - README.md
     optional_paths:
       - .claude/**
@@ -394,16 +395,25 @@ features:
         - server/src/schema/migrations-gallery/1779200000000-AddSharedSpaceAlbumDeleteSideTriggers.ts
         - server/src/schema/migrations-gallery/1779300000000-FixUserHasAlbumPathSoftDeleted.ts
         - server/src/schema/migrations-gallery/1779309791424-SharedSpaceAlbumAssetAuditTable.ts
+        - server/src/schema/migrations-gallery/1780000000000-AddFaceRepairScan.ts
+        - server/src/schema/migrations-gallery/1781000000000-AddFaceRepairDecline.ts
         - server/src/schema/migrations-gallery/1781181889688-SharedSpaceLibraryAssetAuditTable.ts
+        - server/src/schema/migrations-gallery/1781500000000-AddFaceRepairScanFlaggedFace.ts
         - server/src/schema/migrations-gallery/1782000000000-AddAssetExifDescriptionTrigramIndex.ts
         - server/src/schema/migrations-gallery/1782050000000-AddAlbumSoftDeleteSharedSpaceAlbumTrigger.ts
         - server/src/schema/migrations-gallery/1782100000000-FixSharedSpaceAlbumGrantRelinkCreateId.ts
         - server/src/schema/migrations-gallery/1782300000000-AddSharedSpaceAlbumAuditSyncIndexes.ts
         - server/src/schema/migrations-gallery/1783000000000-AddAlbumSpaceAssetTable.ts
+        - server/src/schema/migrations-gallery/1783050000000-AddFaceRepairScanInFlightIndex.ts
         - server/src/schema/migrations-gallery/1783100000000-AddAlbumSpaceAssetSyncAndAudit.ts
         - server/src/schema/migrations-gallery/1783628194057-DisablePostgresJit.ts
         - server/src/schema/migrations-gallery/1783700000000-FixSharedSpaceMemberJoinGrantCreateId.ts
+        - server/src/schema/migrations-gallery/1784000000000-FixFaceRepairScanInFlightIndexOverride.ts
         - server/src/schema/migrations-gallery/1784800000000-RepairSharedSpaceAlbumGrantDrift.ts
+        - server/src/schema/migrations-gallery/1787000000000-AddFacePersonVerdict.ts
+        - server/src/schema/migrations-gallery/1788000000000-ReconcileFacePersonVerdictConstraints.ts
+        - server/src/schema/migrations-gallery/1789000000000-AddFacePersonVerdictStatusCreatedAtIdIndex.ts
+        - server/src/schema/migrations-gallery/1790000000000-FixFaceRepairScanInFlightIndex.ts
     required_checks: [ci-invariants-check, fork-patches-check]
 
 checks:
