@@ -50,21 +50,21 @@ class PeopleDatabaseRepository extends DatabaseAccessor<Drift> with $PeopleDatab
     final byId = OrderingTerm(expression: people.id);
 
     return _db.select(people).join([
-            innerJoin(faces, faces.personId.equalsExp(people.id)),
-            innerJoin(assets, assets.id.equalsExp(faces.assetId)),
-          ])
-          ..where(
-            people.isHidden.equals(false) &
-                assets.deletedAt.isNull() &
-                assets.visibility.equalsValue(AssetVisibility.timeline) &
-                faces.isVisible.equals(true) &
-                faces.deletedAt.isNull(),
-          )
-          ..groupBy([people.id], having: faces.id.count().isBiggerOrEqualValue(minFaces) | people.name.equals('').not())
-          ..orderBy(switch (sortBy) {
-            PeopleSortBy.photoCount => [favoritesFirst, namedFirst, byFaceCount, byName, byId],
-            PeopleSortBy.name => [favoritesFirst, namedFirst, byName, byFaceCount, byId],
-          });
+        innerJoin(faces, faces.personId.equalsExp(people.id)),
+        innerJoin(assets, assets.id.equalsExp(faces.assetId)),
+      ])
+      ..where(
+        people.isHidden.equals(false) &
+            assets.deletedAt.isNull() &
+            assets.visibility.equalsValue(AssetVisibility.timeline) &
+            faces.isVisible.equals(true) &
+            faces.deletedAt.isNull(),
+      )
+      ..groupBy([people.id], having: faces.id.count().isBiggerOrEqualValue(minFaces) | people.name.equals('').not())
+      ..orderBy(switch (sortBy) {
+        PeopleSortBy.photoCount => [favoritesFirst, namedFirst, byFaceCount, byName, byId],
+        PeopleSortBy.name => [favoritesFirst, namedFirst, byName, byFaceCount, byId],
+      });
   }
 
   Stream<List<Person>> watchAll({int minFaces = 3, PeopleSortBy sortBy = PeopleSortBy.photoCount}) {
