@@ -3,7 +3,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:immich_mobile/domain/models/person.model.dart';
+import 'package:immich_mobile/models/photos_filter/filter_person.model.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/alpha_scrubber.widget.dart';
 import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
 import 'package:immich_mobile/providers/photos_filter/people_picker.provider.dart';
@@ -14,7 +14,7 @@ const double _kRowHeight = 56;
 const double _kHeaderHeight = 32;
 
 class PersonPickerList extends ConsumerStatefulWidget {
-  final List<PersonDto> people;
+  final List<FilterPerson> people;
   const PersonPickerList({super.key, required this.people});
 
   @override
@@ -116,7 +116,7 @@ class _PersonPickerListState extends ConsumerState<PersonPickerList> {
 }
 
 class _PersonRow extends ConsumerWidget {
-  final PersonDto person;
+  final FilterPerson person;
   const _PersonRow({required this.person});
 
   @override
