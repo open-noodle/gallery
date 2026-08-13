@@ -5,6 +5,7 @@ import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/collection_target.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
+import 'package:immich_mobile/presentation/widgets/images/thumbnail.widget.dart';
 import 'package:immich_mobile/providers/infrastructure/space_album.provider.dart';
 import 'package:immich_mobile/providers/shared_space.provider.dart';
 import 'package:immich_mobile/providers/timeline/multiselect.provider.dart';
@@ -28,6 +29,7 @@ class SpaceCollectionSection extends ConsumerStatefulWidget {
     this.isBusy = false,
     this.searchQuery = '',
     this.assets,
+    this.footer,
   });
 
   final void Function(CollectionTarget target) onTargetSelected;
@@ -48,6 +50,11 @@ class SpaceCollectionSection extends ConsumerStatefulWidget {
   /// Narrows the rows to spaces whose name contains this query — supplied by the picker so
   /// its single search field covers both halves of the sheet.
   final String searchQuery;
+
+  /// Rendered at the bottom of the section, and only when the section renders at all — so a caller
+  /// can attach a label for whatever follows without duplicating the section's visibility rules
+  /// (writable filter, excludeSpaceId, search query).
+  final Widget? footer;
 
   @override
   ConsumerState<SpaceCollectionSection> createState() => _SpaceCollectionSectionState();
@@ -136,6 +143,7 @@ class _SpaceCollectionSectionState extends ConsumerState<SpaceCollectionSection>
           )
         else
           for (final space in writable) ..._rowsFor(space),
+        if (widget.footer != null) widget.footer!,
       ],
     );
   }
@@ -152,7 +160,13 @@ class _SpaceCollectionSectionState extends ConsumerState<SpaceCollectionSection>
       ListTile(
         key: Key('space-row-${space.id}'),
         enabled: !widget.isBusy,
-        leading: CircleAvatar(backgroundColor: spaceGradientColors(space.color.orElse(null)).first, radius: 16),
+        leading: SpaceCollage(
+          recentAssetIds: space.recentAssetIds.orElse(null) ?? const [],
+          recentAssetThumbhashes: space.recentAssetThumbhashes.orElse(null) ?? const [],
+          color: space.color.orElse(null),
+          // Matches the `radius: 16` CircleAvatar this replaces, so row height is unchanged.
+          size: 32,
+        ),
         title: Text(space.name, maxLines: 1, overflow: TextOverflow.ellipsis),
         trailing: expandable ? Icon(expanded ? Icons.expand_less : Icons.expand_more) : null,
         onTap: widget.isBusy
@@ -198,7 +212,18 @@ class _SpaceCollectionSectionState extends ConsumerState<SpaceCollectionSection>
           ListTile(
             key: Key('space-album-child-${album.id}'),
             contentPadding: const EdgeInsets.only(left: 48, right: 16),
-            leading: const Icon(Icons.photo_album_outlined),
+            leading: album.thumbnailAssetId == null
+                ? const Icon(Icons.photo_album_outlined)
+                : SizedBox(
+                    width: 32,
+                    height: 32,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      // SpaceAlbum carries no thumbhash; on Thumbnail.remote the value is only a
+                      // cache-busting URL param, never a blur placeholder, so '' costs nothing here.
+                      child: Thumbnail.remote(remoteId: album.thumbnailAssetId!, thumbhash: ''),
+                    ),
+                  ),
             title: Text(album.name, maxLines: 1, overflow: TextOverflow.ellipsis),
             enabled: !widget.isBusy,
             onTap: widget.isBusy ? null : () => _emit(SpaceAlbumTarget(spaceId: space.id, album: album)),
