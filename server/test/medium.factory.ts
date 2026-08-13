@@ -138,8 +138,14 @@ export class MediumTestContext<S extends ClassConstructor<typeof BaseService> = 
   // PersonService/FaceSuggestionService call and its consequence on the other need a second service
   // sharing the EXACT SAME dependency instances as `sut` — same mocked JobRepository/SystemMetadataRepository
   // config, same real repositories backed by the same DB — not a second, independently-configured context.
-  getService<T extends BaseService>(Service: ClassConstructor<T>): T {
-    return new Service(...this.sutDeps);
+  //
+  // Parameterized by the CONSTRUCTOR, matching `MediumTestContext`'s own `S` and the `sut`
+  // construction above. Upstream's medium-harness retype made `ClassConstructor<T>` expect a
+  // constructor type; handed an instance type it silently falls through to
+  // `new (...args: any[]) => unknown`, which would make `getService` return `unknown` and every
+  // caller's service degrade to `BaseService`.
+  getService<S extends ClassConstructor<typeof BaseService>>(Service: S): InstanceType<S> {
+    return new Service(...this.sutDeps) as InstanceType<S>;
   }
 
   private makeDeps(options: MediumTestOptions) {

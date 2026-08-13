@@ -1229,7 +1229,7 @@ describe('FaceRepairService decline filter', () => {
 
   it('a declined face is not flagged on the next scan', async () => {
     const { sut, ctx } = setupDecline();
-    const jobMock = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+    const jobMock = ctx.getMock(JobRepository);
     jobMock.isActive.mockResolvedValue(false);
     const verdictRepo = ctx.get(FacePersonVerdictRepository);
     const { user } = await ctx.newUser();
@@ -1282,7 +1282,7 @@ describe('FaceRepairService decline filter', () => {
 
   it('resolveFaces does not move a declined face', async () => {
     const { sut, ctx } = setupDecline();
-    const jobMock = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+    const jobMock = ctx.getMock(JobRepository);
     jobMock.isActive.mockResolvedValue(false);
     jobMock.queue.mockResolvedValue();
     const verdictRepo = ctx.get(FacePersonVerdictRepository);
@@ -1414,7 +1414,7 @@ describe('FaceRepairService decline filter', () => {
       'and reads that scope from the flagged set only',
     async () => {
       const { sut, ctx } = setupDecline();
-      const jobMock = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+      const jobMock = ctx.getMock(JobRepository);
       jobMock.isActive.mockResolvedValue(false);
       const declineRepo = ctx.get(FaceRepairDeclineRepository);
       const verdictRepo = ctx.get(FacePersonVerdictRepository);
