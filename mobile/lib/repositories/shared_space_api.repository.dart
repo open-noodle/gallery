@@ -99,7 +99,7 @@ class SharedSpaceApiRepository extends ApiRepository {
   /// with a 400 rather than being clamped, so the page shows its error state and never loads.
   /// Note this differs from `GET /people`, whose `size` caps at 1000 — the 1000 used by
   /// [PersonApiRepository.getAllPeopleWithSharedSpaces] is NOT a precedent for this endpoint.
-  Future<List<DriftPerson>> getSpacePeople(
+  Future<List<Person>> getSpacePeople(
     String spaceId, {
     required PeopleSortBy sortBy,
     int pageSize = 100,
@@ -119,28 +119,25 @@ class SharedSpaceApiRepository extends ApiRepository {
       }
     }
 
-    final people = dtos.map(_spacePersonToDriftPerson).toList();
+    final people = dtos.map(_toPerson).toList();
     people.sort((a, b) => comparePeople(a, b, sortBy));
     return people;
   }
 
-  /// Maps a Space-scoped person profile onto [DriftPerson], following the precedent in
-  /// `PersonApiRepository._personToDriftPerson`.
+  /// Maps a Space-scoped person profile onto [Person], following the precedent in
+  /// `PersonApiRepository._toPerson`.
   ///
-  /// `ownerId`, `isFavorite` and `color` have no equivalent on a space-person profile and are
-  /// filled with neutral values; the People surfaces key every edit off the id plus [spaceId].
+  /// A space-person profile has no favorite flag, so [Person.isFavorite] keeps its `false`
+  /// default and the "favorites first" half of [comparePeople] is inert for this list.
+  /// `isHidden` is not mapped because the unified model dropped it — the query above already
+  /// passes `withHidden: false`, so hidden profiles never reach here.
   /// v3 openapi wraps the optional fields in `Optional<...?>` whose `.value` THROWS when
   /// absent — every read here goes through `orElse(null)`.
-  static DriftPerson _spacePersonToDriftPerson(SharedSpacePersonResponseDto dto) {
-    return DriftPerson(
+  static Person _toPerson(SharedSpacePersonResponseDto dto) {
+    return Person(
       id: dto.id,
-      createdAt: DateTime.parse(dto.createdAt),
       updatedAt: DateTime.parse(dto.updatedAt),
-      ownerId: '',
       name: dto.name,
-      isFavorite: false,
-      isHidden: dto.isHidden,
-      color: null,
       birthDate: dto.birthDate.orElse(null),
       spaceId: dto.spaceId,
       numberOfAssets: dto.assetCount.toInt(),

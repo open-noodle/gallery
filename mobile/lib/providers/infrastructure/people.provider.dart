@@ -29,10 +29,7 @@ final driftSpaceEditableProvider = FutureProvider.family<bool, String>((ref, spa
   return repository.isSpaceEditor(spaceId, userId);
 });
 
-final peopleAssetProvider = FutureProvider.family<List<Person>, ({String id, String ownerId})>((
-  ref,
-  key,
-) async {
+final peopleAssetProvider = FutureProvider.family<List<Person>, ({String id, String ownerId})>((ref, key) async {
   final service = ref.watch(peopleServiceProvider);
   final currentUserId = ref.watch(currentUserProvider.select((user) => user?.id));
   return service.getAssetPeople(key.id, ownedByCurrentUser: key.ownerId == currentUserId);
@@ -76,7 +73,7 @@ final driftGetAllPeopleWithSharedSpacesProvider = FutureProvider.family<List<Per
 /// restarting the app. `autoDispose` tears the provider down when [SpacePeoplePage] is popped
 /// (its only consumer), so re-opening the page always issues a fresh fetch.
 final driftSpacePeopleProvider = FutureProvider.autoDispose
-    .family<List<DriftPerson>, ({String spaceId, PeopleSortBy sortBy})>((ref, key) async {
+    .family<List<Person>, ({String spaceId, PeopleSortBy sortBy})>((ref, key) async {
       final repository = ref.watch(sharedSpaceApiRepositoryProvider);
       return repository.getSpacePeople(key.spaceId, sortBy: key.sortBy);
     });
