@@ -94,6 +94,33 @@ class _RecordingActionNotifier extends ActionNotifier {
 }
 
 void main() {
+  Future<void> pumpPicker(
+    WidgetTester tester, {
+    List<SharedSpaceResponseDto> spaces = const [],
+    List<RemoteAsset> selection = const [],
+  }) async {
+    final userService = _MockUserService();
+    final user = UserStub.user1;
+    when(() => userService.tryGetMyUser()).thenReturn(user);
+    when(() => userService.watchMyUser()).thenAnswer((_) => const Stream.empty());
+
+    await tester.pumpConsumerWidgetRaw(
+      const CustomScrollView(slivers: [CollectionPicker()]),
+      overrides: [
+        currentUserProvider.overrideWith((ref) => _StubCurrentUserNotifier(userService, user)),
+        remoteAlbumProvider.overrideWith(() => _StubRemoteAlbumNotifier()),
+        appConfigProvider.overrideWithValue(const AppConfig()),
+        sharedSpacesProvider.overrideWith((ref) async => spaces),
+        multiSelectProvider.overrideWith(
+          () => MultiSelectNotifier(
+            MultiSelectState(selectedAssets: selection.toSet(), lockedSelectionAssets: const {}),
+          ),
+        ),
+      ],
+    );
+    await tester.pump();
+  }
+
   SharedSpaceMemberResponseDto member(String userId, SharedSpaceRole role) => SharedSpaceMemberResponseDto(
     userId: userId,
     name: userId,
@@ -121,6 +148,17 @@ void main() {
     linkedAt: DateTime(2026, 1, 1),
     updatedAt: DateTime(2026, 1, 1),
     createdAt: DateTime(2026, 1, 1),
+  );
+
+  RemoteAsset asset(String id, {String ownerId = 'user-1'}) => RemoteAsset(
+    id: id,
+    name: id,
+    ownerId: ownerId,
+    checksum: id,
+    type: AssetType.image,
+    createdAt: DateTime(2026, 1, 1),
+    updatedAt: DateTime(2026, 1, 1),
+    isEdited: false,
   );
 
   testWidgets('composes the header, the album selector and the spaces section, in that order', (tester) async {
@@ -153,6 +191,31 @@ void main() {
     final headerY = tester.getTopLeft(find.byKey(const Key('collection-picker-header'))).dy;
     final albumsY = tester.getTopLeft(find.byType(SearchField)).dy;
     expect(headerY, lessThan(albumsY));
+  });
+
+  testWidgets('L1: spaces render above albums, and both below the search field', (tester) async {
+    await pumpPicker(tester, spaces: [space('s1', 'Family')]);
+
+    final searchY = tester.getTopLeft(find.byType(SearchField)).dy;
+    final spacesY = tester.getTopLeft(find.byKey(const Key('space-collection-header'))).dy;
+    final albumsY = tester.getTopLeft(find.byKey(const Key('collection-picker-albums-header'))).dy;
+
+    expect(searchY, lessThan(spacesY));
+    expect(spacesY, lessThan(albumsY));
+  });
+
+  testWidgets('L2: both section labels render when the user has writable spaces', (tester) async {
+    await pumpPicker(tester, spaces: [space('s1', 'Family')]);
+
+    expect(find.byKey(const Key('space-collection-header')), findsOneWidget);
+    expect(find.byKey(const Key('collection-picker-albums-header')), findsOneWidget);
+  });
+
+  testWidgets('L3: neither label renders when the user has no writable spaces', (tester) async {
+    await pumpPicker(tester, spaces: const []);
+
+    expect(find.byKey(const Key('space-collection-header')), findsNothing);
+    expect(find.byKey(const Key('collection-picker-albums-header')), findsNothing);
   });
 
   testWidgets('typing in the search field narrows the spaces section too', (tester) async {
@@ -194,6 +257,52 @@ void main() {
     await tester.pump();
 
     expect(find.byKey(const Key('space-row-s2')), findsOneWidget);
+  });
+
+  testWidgets('L4: a query matching albums but no space collapses the section and both labels', (tester) async {
+    await pumpPicker(tester, spaces: [space('s1', 'Family')]);
+
+    await tester.enterText(find.byType(SearchField), 'zzz-no-space-matches');
+    await tester.pump();
+
+    // Intended: with only one section left, section labels are noise. Do not "fix" this.
+    expect(find.byKey(const Key('space-collection-header')), findsNothing);
+    expect(find.byKey(const Key('collection-picker-albums-header')), findsNothing);
+  });
+
+  testWidgets('L5: the notice path still renders the albums label', (tester) async {
+    // A selection containing a non-owned asset drives the section's notice branch: header and
+    // notice render, space rows do not — and albums still follow.
+    await pumpPicker(
+      tester,
+      spaces: [space('s1', 'Family')],
+      selection: [asset('a1', ownerId: 'someone-else')],
+    );
+
+    expect(find.byKey(const Key('space-collection-notice')), findsOneWidget);
+    expect(find.byKey(const Key('space-row-s1')), findsNothing);
+    expect(find.byKey(const Key('collection-picker-albums-header')), findsOneWidget);
+  });
+
+  testWidgets('L6: typing keeps the search field focused and narrows the spaces section', (tester) async {
+    await pumpPicker(tester, spaces: [space('s1', 'Family'), space('s2', 'Holiday')]);
+
+    // enterText focuses the field itself (it calls showKeyboard), so no explicit tap is needed --
+    // and the focus assertion below is therefore NOT "did typing acquire focus" but "did focus
+    // SURVIVE the rebuild that the keystroke triggered". That is the regression this task guards:
+    // onSearchChanged -> setState -> AlbumSelector is handed a new child.
+    await tester.enterText(find.byType(SearchField), 'Fam');
+    await tester.pump();
+
+    expect(find.byKey(const Key('space-row-s1')), findsOneWidget);
+    expect(find.byKey(const Key('space-row-s2')), findsNothing);
+
+    // Asserting only on the narrowed rows would pass even if every keystroke dropped focus.
+    final editable = tester.widget<EditableText>(find.descendant(
+      of: find.byType(SearchField),
+      matching: find.byType(EditableText),
+    ));
+    expect(editable.focusNode.hasFocus, isTrue);
   });
 
   // #965: the same picker is now mounted from surfaces that have no timeline multiselect —
