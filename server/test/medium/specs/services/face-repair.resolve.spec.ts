@@ -24,7 +24,7 @@ import { FaceRepairResolveErrorCode, FaceRepairService } from 'src/services/face
 import { applyVerdictFilters } from 'src/utils/face-repair';
 import { mediumFactory, newMediumService } from 'test/medium.factory';
 import { getKyselyDB } from 'test/utils';
-import { Mocked, vi } from 'vitest';
+import { vi } from 'vitest';
 
 const EMBEDDING = '[' + Array.from({ length: 512 }, () => 1).join(',') + ']';
 
@@ -47,7 +47,7 @@ const setup = () => {
     ],
     mock: [LoggingRepository, JobRepository],
   });
-  const jobMock = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+  const jobMock = ctx.getMock(JobRepository);
   jobMock.isActive.mockResolvedValue(false);
   jobMock.queueAll.mockResolvedValue();
   return { sut, ctx, jobMock, scanRepo: ctx.get(FaceRepairScanRepository) };
