@@ -17,15 +17,10 @@ import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
 import '../../test_utils.dart';
 import '../../widget_tester_extensions.dart';
 
-DriftPerson _p(String id, String name, {int numberOfAssets = 0}) => DriftPerson(
+Person _p(String id, String name, {int numberOfAssets = 0}) => Person(
   id: id,
-  createdAt: DateTime(2024, 1, 1),
   updatedAt: DateTime(2024, 1, 1),
-  ownerId: '',
   name: name,
-  isFavorite: false,
-  isHidden: false,
-  color: null,
   spaceId: 'space-1',
   numberOfAssets: numberOfAssets,
 );
@@ -58,7 +53,7 @@ void main() {
   // NOT const: canEdit is a runtime variable here.
   Future<void> pumpPage(
     WidgetTester tester, {
-    required Future<List<DriftPerson>> Function() people,
+    required Future<List<Person>> Function() people,
     bool canEdit = true,
   }) => tester.pumpConsumerWidget(
     SpacePeoplePage(spaceId: 'space-1', canEdit: canEdit),
