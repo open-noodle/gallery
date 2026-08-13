@@ -16,17 +16,8 @@ import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
 import '../../../test_utils.dart';
 import '../../../widget_tester_extensions.dart';
 
-DriftPerson _p(String id, String name, {String? spaceId, bool isHidden = false}) => DriftPerson(
-  id: id,
-  createdAt: DateTime(2024, 1, 1),
-  updatedAt: DateTime(2024, 1, 1),
-  ownerId: 'owner',
-  name: name,
-  isFavorite: false,
-  isHidden: isHidden,
-  color: null,
-  spaceId: spaceId,
-);
+Person _p(String id, String name, {String? spaceId}) =>
+    Person(id: id, updatedAt: DateTime(2024, 1, 1), name: name, spaceId: spaceId);
 
 void main() {
   // getPersonThumbnailUrl reads Store.get(StoreKey.serverEndpoint), which throws unless the
@@ -53,9 +44,9 @@ void main() {
 
   Future<void> pumpGrid(
     WidgetTester tester,
-    List<DriftPerson> people, {
+    List<Person> people, {
     required PeopleEditPolicy policy,
-    void Function(DriftPerson)? onTap,
+    void Function(Person)? onTap,
     List<Override> overrides = const [],
   }) => tester.pumpConsumerWidget(
     PeopleGrid(people: people, editPolicy: policy, onPersonTap: onTap ?? (_) {}),
@@ -118,17 +109,12 @@ void main() {
     });
   });
 
-  testWidgets('does not render a hidden person', (tester) async {
-    await pumpGrid(tester, [
-      _p('visible', 'Mia', spaceId: 'space-1'),
-      _p('hidden', 'Ghost', spaceId: 'space-1', isHidden: true),
-    ], policy: const FixedEditability(true));
-
-    expect(find.text('Mia'), findsOneWidget);
-    expect(find.text('Ghost'), findsNothing);
-    // Positive anchor: prove the hidden person's whole tile is gone, not just its name label.
-    expect(find.byWidgetPredicate((w) => w is CircleAvatar && w.key == const ValueKey('hidden')), findsNothing);
-  });
+  // The grid's own defence-in-depth `!person.isHidden` filter is gone: the unified Person
+  // model dropped isHidden, so a hidden person is no longer even representable here. Hidden
+  // people are excluded at every source instead, and that is where the coverage lives:
+  // person_api_repository_test.dart ('withHidden: false' on the global list),
+  // shared_space_api_repository_test.dart ('always requests withHidden: false') and
+  // people_repository_test.dart ('keeps exclusion rules: hidden people ...') for local SQL.
 
   testWidgets('renders a whitespace-only name as a blank label, not "Add a name"', (tester) async {
     // Pre-existing behaviour carried over verbatim from the global People page: the empty
@@ -140,7 +126,7 @@ void main() {
   });
 
   testWidgets('invokes onPersonTap with the space-scoped person', (tester) async {
-    DriftPerson? tapped;
+    Person? tapped;
     await pumpGrid(
       tester,
       [_p('sp1', 'Mia', spaceId: 'space-1')],

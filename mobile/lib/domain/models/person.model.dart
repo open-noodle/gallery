@@ -21,6 +21,11 @@ abstract class Person with _$Person {
     /// Null when unavailable — the owner-scoped local Drift query and the offline fallback path
     /// never populate it, so the picker row hides the count gracefully rather than erroring.
     int? numberOfAssets,
+
+    /// Drives the "favorites first" ordering of the server-backed people list, which is sorted
+    /// client-side by `comparePeople`. The local Drift query sorts favorites in SQL instead, and
+    /// paths that cannot know the flag (offline fallback, the asset-viewer strip) leave it false.
+    @Default(false) bool isFavorite,
   }) = _Person;
 }
 
