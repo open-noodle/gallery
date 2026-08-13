@@ -1,5 +1,24 @@
-import { splitPinnedSpaces } from '$lib/utils/space-utils';
+import { SharedSpaceRole } from '@immich/sdk';
+import { spaceRoleLabelKey, splitPinnedSpaces } from '$lib/utils/space-utils';
 import { sharedSpaceFactory } from '@test-data/factories/shared-space-factory';
+
+describe('spaceRoleLabelKey', () => {
+  it('maps owner to the existing owner key', () => {
+    expect(spaceRoleLabelKey(SharedSpaceRole.Owner)).toBe('owner');
+  });
+
+  it('maps editor to the existing role_editor key', () => {
+    expect(spaceRoleLabelKey(SharedSpaceRole.Editor)).toBe('role_editor');
+  });
+
+  it('maps viewer to the existing role_viewer key', () => {
+    expect(spaceRoleLabelKey(SharedSpaceRole.Viewer)).toBe('role_viewer');
+  });
+
+  it('falls back to the least-privileged label for an unknown role', () => {
+    expect(spaceRoleLabelKey('something-new')).toBe('role_viewer');
+  });
+});
 
 describe('splitPinnedSpaces', () => {
   it('should return empty pinned and all unpinned when no IDs pinned', () => {
