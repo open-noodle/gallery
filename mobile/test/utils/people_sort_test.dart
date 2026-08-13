@@ -2,19 +2,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/utils/people_sort.dart';
 
-DriftPerson _p(String id, {String name = '', bool isFavorite = false, int? numberOfAssets}) => DriftPerson(
+Person _p(String id, {String name = '', bool isFavorite = false, int? numberOfAssets}) => Person(
   id: id,
-  createdAt: DateTime(2024, 1, 1),
   updatedAt: DateTime(2024, 1, 1),
-  ownerId: '',
   name: name,
   isFavorite: isFavorite,
-  isHidden: false,
-  color: null,
   numberOfAssets: numberOfAssets,
 );
 
-List<DriftPerson> _sorted(List<DriftPerson> people, PeopleSortBy sortBy) =>
+List<Person> _sorted(List<Person> people, PeopleSortBy sortBy) =>
     [...people]..sort((a, b) => comparePeople(a, b, sortBy));
 
 void main() {
