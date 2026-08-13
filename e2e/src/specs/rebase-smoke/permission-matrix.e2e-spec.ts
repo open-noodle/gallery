@@ -86,9 +86,8 @@ test.describe('Rebase Smoke — UI Permission Matrix', () => {
   }) => {
     await utils.setAuthCookies(context, owner.accessToken);
     await page.goto(`/spaces/${space.id}`);
-    // hero-role-badge renders the raw lowercase SharedSpaceRole enum ('owner')
-    // with CSS `capitalize` (which does not change textContent), so the match
-    // must be case-insensitive.
+    // hero-role-badge renders the translated role label ('Owner' in English) with CSS
+    // `capitalize` (which does not change textContent), so the match must be case-insensitive.
     await expect(page.locator('[data-testid="hero-role-badge"]')).toContainText('owner', { ignoreCase: true });
     await expect(page.getByLabel('Add photos')).toBeVisible();
     await page.getByRole('button', { name: 'More' }).click();
