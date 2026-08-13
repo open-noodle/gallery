@@ -16,7 +16,6 @@ import { DB } from 'src/schema';
 import { FaceRepairService } from 'src/services/face-repair.service';
 import { newMediumService } from 'test/medium.factory';
 import { getKyselyDB } from 'test/utils';
-import { Mocked } from 'vitest';
 
 let db: Kysely<DB>;
 
@@ -37,7 +36,7 @@ const setup = () => {
     ],
     mock: [LoggingRepository, JobRepository],
   });
-  const jobMock = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+  const jobMock = ctx.getMock(JobRepository);
   jobMock.isActive.mockResolvedValue(false);
   jobMock.queueAll.mockResolvedValue();
   return {
