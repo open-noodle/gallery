@@ -136,6 +136,231 @@ describe('CollectionPickerModal', () => {
 });
 
 // ---------------------------------------------------------------------------
+// #965: a space with linked albums expands into "Add to space" plus one row per
+// linked album, so a specific space album is reachable from every surface — the
+// same accordion mobile's SpaceCollectionSection already offers.
+// ---------------------------------------------------------------------------
+
+describe('CollectionPickerModal — expanding a space into its albums', () => {
+  const spaceWithAlbums = (id: string, name: string, albumCount: number) =>
+    ({ ...space(id, name), albumCount }) as unknown as SharedSpaceResponseDto;
+  const linkedAlbum = (id: string, name: string) =>
+    ({
+      id,
+      albumName: name,
+      assetCount: 2,
+      albumThumbnailAssetId: null,
+      shared: true,
+      updatedAt: '2024-01-01T00:00:00Z',
+      ownerId: 'someone-else',
+      showInTimeline: true,
+      addedById: 'me',
+      linkedAt: '2024-01-01T00:00:00Z',
+    }) as never;
+
+  // A space shows up in both RECENT and All, so every row lookup takes the first occurrence.
+  const expandSpace = async (id: string) => {
+    const rows = await screen.findAllByTestId(`row-space-${id}`);
+    await fireEvent.click(within(rows[0]).getByTestId('space-row'));
+  };
+
+  it('marks a space with linked albums expandable without fetching them up front', async () => {
+    sdkMock.getAllSpaces.mockResolvedValue([spaceWithAlbums('s1', 'Family', 2)]);
+    render(CollectionPickerModal, { assetCount: 3, onClose: vi.fn() });
+
+    const rows = await screen.findAllByTestId('row-space-s1');
+    expect(within(rows[0]).getByTestId('space-row').getAttribute('aria-expanded')).toBe('false');
+    // The whole point of the accordion: albumCount already says it is expandable.
+    expect(sdkMock.getSharedSpaceAlbums).not.toHaveBeenCalled();
+  });
+
+  it('fetches and lists the linked albums plus the pool child on expand', async () => {
+    sdkMock.getAllSpaces.mockResolvedValue([spaceWithAlbums('s1', 'Family', 2)]);
+    sdkMock.getSharedSpaceAlbums.mockResolvedValue([linkedAlbum('sa1', 'Holiday'), linkedAlbum('sa2', 'Birthday')]);
+    render(CollectionPickerModal, { assetCount: 3, onClose: vi.fn() });
+
+    await expandSpace('s1');
+
+    await waitFor(() => expect(screen.getAllByTestId('row-album-sa1').length).toBeGreaterThan(0));
+    expect(sdkMock.getSharedSpaceAlbums).toHaveBeenCalledWith({ id: 's1' });
+    expect(screen.getAllByTestId('row-album-sa2').length).toBeGreaterThan(0);
+    expect(screen.getAllByTestId('space-pool-child-s1').length).toBeGreaterThan(0);
+  });
+
+  it('confirms with the linked album when one is chosen', async () => {
+    const onClose = vi.fn();
+    sdkMock.getAllSpaces.mockResolvedValue([spaceWithAlbums('s1', 'Family', 1)]);
+    sdkMock.getSharedSpaceAlbums.mockResolvedValue([linkedAlbum('sa1', 'Holiday')]);
+    render(CollectionPickerModal, { assetCount: 3, onClose });
+
+    await expandSpace('s1');
+    const albumRows = await screen.findAllByTestId('row-album-sa1');
+    await fireEvent.click(within(albumRows[0]).getByRole('button', { name: /Holiday/ }));
+
+    expect(onClose).toHaveBeenCalledWith([expect.objectContaining({ kind: 'album', id: 'sa1' })]);
+  });
+
+  it('confirms with the space itself when the pool child is chosen', async () => {
+    const onClose = vi.fn();
+    sdkMock.getAllSpaces.mockResolvedValue([spaceWithAlbums('s1', 'Family', 1)]);
+    sdkMock.getSharedSpaceAlbums.mockResolvedValue([linkedAlbum('sa1', 'Holiday')]);
+    render(CollectionPickerModal, { assetCount: 3, onClose });
+
+    await expandSpace('s1');
+    const poolRows = await screen.findAllByTestId('space-pool-child-s1');
+    await fireEvent.click(poolRows[0]);
+
+    expect(onClose).toHaveBeenCalledWith([expect.objectContaining({ kind: 'space', id: 's1' })]);
+  });
+
+  it('keeps one space open at a time and does not re-fetch a space it already loaded', async () => {
+    sdkMock.getAllSpaces.mockResolvedValue([spaceWithAlbums('s1', 'Family', 1), spaceWithAlbums('s2', 'Friends', 1)]);
+    sdkMock.getSharedSpaceAlbums.mockImplementation(({ id }: { id: string }) =>
+      Promise.resolve(id === 's1' ? [linkedAlbum('sa1', 'Holiday')] : [linkedAlbum('sa2', 'Birthday')]),
+    );
+    render(CollectionPickerModal, { assetCount: 3, onClose: vi.fn() });
+
+    await expandSpace('s1');
+    await waitFor(() => expect(screen.getAllByTestId('row-album-sa1').length).toBeGreaterThan(0));
+
+    await expandSpace('s2');
+    await waitFor(() => expect(screen.getAllByTestId('row-album-sa2').length).toBeGreaterThan(0));
+    expect(screen.queryAllByTestId('row-album-sa1')).toHaveLength(0);
+
+    await expandSpace('s1');
+    await waitFor(() => expect(screen.getAllByTestId('row-album-sa1').length).toBeGreaterThan(0));
+    expect(sdkMock.getSharedSpaceAlbums).toHaveBeenCalledTimes(2); // s1 and s2, once each
+  });
+
+  it('collapses again on a second click', async () => {
+    sdkMock.getAllSpaces.mockResolvedValue([spaceWithAlbums('s1', 'Family', 1)]);
+    sdkMock.getSharedSpaceAlbums.mockResolvedValue([linkedAlbum('sa1', 'Holiday')]);
+    render(CollectionPickerModal, { assetCount: 3, onClose: vi.fn() });
+
+    await expandSpace('s1');
+    await waitFor(() => expect(screen.getAllByTestId('row-album-sa1').length).toBeGreaterThan(0));
+    await expandSpace('s1');
+    await waitFor(() => expect(screen.queryAllByTestId('row-album-sa1')).toHaveLength(0));
+  });
+
+  it('still adds straight to the pool for a space with no linked albums', async () => {
+    const onClose = vi.fn();
+    sdkMock.getAllSpaces.mockResolvedValue([spaceWithAlbums('s1', 'Family', 0)]);
+    render(CollectionPickerModal, { assetCount: 3, onClose });
+
+    await expandSpace('s1');
+
+    expect(sdkMock.getSharedSpaceAlbums).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalledWith([expect.objectContaining({ kind: 'space', id: 's1' })]);
+  });
+
+  // The caret is an index into a row list that changes shape when a space opens. Clearing it
+  // (or leaving it pointing at a shifted row) stranded a keyboard user: they could open a space
+  // and then had no way to arrow into the children they had just revealed.
+  it('keeps the keyboard caret on the space row across expand and collapse', async () => {
+    const onClose = vi.fn();
+    sdkMock.getAllSpaces.mockResolvedValue([spaceWithAlbums('s1', 'Family', 1)]);
+    sdkMock.getSharedSpaceAlbums.mockResolvedValue([linkedAlbum('sa1', 'Holiday')]);
+    render(CollectionPickerModal, { assetCount: 3, onClose });
+    await screen.findAllByTestId('row-space-s1');
+    const search = screen.getByPlaceholderText('search');
+
+    // NewAlbum, NewSpace, then the RECENT occurrence of the space.
+    await fireEvent.keyDown(search, { key: 'ArrowDown' });
+    await fireEvent.keyDown(search, { key: 'ArrowDown' });
+    await fireEvent.keyDown(search, { key: 'ArrowDown' });
+    await fireEvent.keyDown(search, { key: 'Enter' }); // expand
+    await waitFor(() => expect(screen.getAllByTestId('row-album-sa1').length).toBeGreaterThan(0));
+
+    // The very next ArrowDown must reach the pool child, not jump back to the top of the list.
+    await fireEvent.keyDown(search, { key: 'ArrowDown' });
+    await fireEvent.keyDown(search, { key: 'Enter' });
+    expect(onClose).toHaveBeenCalledWith([expect.objectContaining({ kind: 'space', id: 's1' })]);
+  });
+
+  it('reports a failed album load and leaves the row collapsed', async () => {
+    sdkMock.getAllSpaces.mockResolvedValue([spaceWithAlbums('s1', 'Family', 2)]);
+    sdkMock.getSharedSpaceAlbums.mockRejectedValue(new Error('boom'));
+    render(CollectionPickerModal, { assetCount: 3, onClose: vi.fn() });
+
+    await expandSpace('s1');
+
+    await waitFor(() => expect(mockHandleError).toHaveBeenCalledOnce());
+    const rows = screen.getAllByTestId('row-space-s1');
+    expect(within(rows[0]).getByTestId('space-row').getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryAllByTestId('space-pool-child-s1')).toHaveLength(0);
+  });
+
+  // A space-linked album owned by another member has no `album_user` row for the caller, so
+  // `getAllAlbums` never returns it — it exists only in the expand-time cache. Resolving
+  // multi-select keys against the album list alone dropped it and closed the modal as a cancel.
+  it('multi-selects a linked album and actually submits it', async () => {
+    const onClose = vi.fn();
+    sdkMock.getAllSpaces.mockResolvedValue([spaceWithAlbums('s1', 'Family', 1)]);
+    sdkMock.getSharedSpaceAlbums.mockResolvedValue([linkedAlbum('sa1', 'Holiday')]);
+    render(CollectionPickerModal, { assetCount: 3, onClose });
+
+    await expandSpace('s1');
+    const albumRows = await screen.findAllByTestId('row-album-sa1');
+    const albumRow = albumRows[0];
+    await fireEvent.mouseEnter(within(albumRow).getByRole('group'));
+    await fireEvent.click(within(albumRow).getByRole('checkbox'));
+    await fireEvent.click(await screen.findByTestId('add-collections-button'));
+
+    expect(onClose).toHaveBeenCalledWith([expect.objectContaining({ kind: 'album', id: 'sa1' })]);
+  });
+
+  it('multi-selects the pool child, and shows the tick on it', async () => {
+    const onClose = vi.fn();
+    sdkMock.getAllSpaces.mockResolvedValue([spaceWithAlbums('s1', 'Family', 1)]);
+    sdkMock.getSharedSpaceAlbums.mockResolvedValue([linkedAlbum('sa1', 'Holiday')]);
+    render(CollectionPickerModal, { assetCount: 3, onClose });
+
+    await expandSpace('s1');
+    const poolChildren = await screen.findAllByTestId('space-pool-child-s1');
+    const poolRow = poolChildren[0].closest('[role="group"]') as HTMLElement;
+    await fireEvent.mouseEnter(poolRow);
+    await fireEvent.click(within(poolRow).getByRole('checkbox'));
+
+    // The pool carries the space's own key, so the tick must be visible on the child too —
+    // not merely computed in the row model.
+    expect(within(poolRow).getByRole('checkbox').getAttribute('aria-checked')).toBe('true');
+    await fireEvent.click(await screen.findByTestId('add-collections-button'));
+    expect(onClose).toHaveBeenCalledWith([expect.objectContaining({ kind: 'space', id: 's1' })]);
+  });
+
+  it('does not fire a second request when re-expanded while the first is still in flight', async () => {
+    sdkMock.getAllSpaces.mockResolvedValue([spaceWithAlbums('s1', 'Family', 1)]);
+    let resolveFetch: (albums: never[]) => void = () => {};
+    sdkMock.getSharedSpaceAlbums.mockReturnValue(
+      new Promise<never[]>((resolve) => {
+        resolveFetch = resolve;
+      }),
+    );
+    render(CollectionPickerModal, { assetCount: 3, onClose: vi.fn() });
+
+    await expandSpace('s1'); // fetch starts
+    await expandSpace('s1'); // collapse
+    await expandSpace('s1'); // re-expand before the first response lands
+    resolveFetch([linkedAlbum('sa1', 'Holiday')]);
+
+    await waitFor(() => expect(screen.getAllByTestId('row-album-sa1').length).toBeGreaterThan(0));
+    expect(sdkMock.getSharedSpaceAlbums).toHaveBeenCalledTimes(1);
+  });
+
+  it('says so when an expanded space turns out to have no linked albums', async () => {
+    sdkMock.getAllSpaces.mockResolvedValue([spaceWithAlbums('s1', 'Family', 2)]);
+    sdkMock.getSharedSpaceAlbums.mockResolvedValue([]);
+    render(CollectionPickerModal, { assetCount: 3, onClose: vi.fn() });
+
+    await expandSpace('s1');
+
+    // Raw i18n key in unit tests.
+    await waitFor(() => expect(screen.getAllByText('no_albums_in_space_yet').length).toBeGreaterThan(0));
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Restricted mode: the selection contains assets the user does not own, so the
 // only targets that can accept the whole selection are albums linked to THIS
 // space (#764 contribution). Everything else is filtered out rather than

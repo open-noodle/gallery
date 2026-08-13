@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/constants/enums.dart';
 import 'package:immich_mobile/domain/models/album/album.model.dart';
+import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/collection_target.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
@@ -19,13 +20,32 @@ import 'package:sliver_tools/sliver_tools.dart';
 /// `AddToAlbumHeader` is not reused because it hardcodes the `add_to_album` key; this
 /// picker supplies its own header so the sheet can honestly say "album or space".
 class CollectionPicker extends ConsumerStatefulWidget {
-  const CollectionPicker({super.key, this.excludeSpaceId, this.onKeyboardExpanded});
+  const CollectionPicker({
+    super.key,
+    this.excludeSpaceId,
+    this.onKeyboardExpanded,
+    this.source = ActionSource.timeline,
+    this.assets,
+    this.onCompleted,
+  });
 
   /// Set on a space's own surface so that space is not offered as a destination for
   /// its own assets.
   final String? excludeSpaceId;
 
   final Function? onKeyboardExpanded;
+
+  /// Where the assets to file come from. The asset viewer dispatches against
+  /// [ActionSource.viewer]; every multi-select surface uses the default.
+  final ActionSource source;
+
+  /// The assets being filed, for the spaces section's ownership / cap notices. Omit on a
+  /// multi-select surface — the section then reads the timeline selection itself.
+  final Iterable<BaseAsset>? assets;
+
+  /// Called after an add that succeeded. Surfaces that dismiss themselves (the asset viewer
+  /// sheet) hook this; a failed add deliberately does not fire it, so the sheet stays open.
+  final VoidCallback? onCompleted;
 
   @override
   ConsumerState<CollectionPicker> createState() => _CollectionPickerState();
@@ -38,12 +58,21 @@ class _CollectionPickerState extends ConsumerState<CollectionPicker> {
   Future<void> _addToAlbum(RemoteAlbum album) async {
     if (_isBusy) return;
     setState(() => _isBusy = true);
-    final result = await ref.read(actionProvider.notifier).addToAlbum(ActionSource.timeline, album);
+    final result = await ref.read(actionProvider.notifier).addToAlbum(widget.source, album);
     if (!mounted) return;
     setState(() => _isBusy = false);
 
     if (!result.success) {
       _toastError();
+      return;
+    }
+    if (result.count == 0 && result.failedCount > 0) {
+      // Nothing landed and the server said why — "already in this album" would be a lie.
+      ImmichToast.show(
+        context: context,
+        msg: 'assets_cannot_be_added_to_album_count'.t(context: context, args: {'count': result.failedCount}),
+        toastType: ToastType.error,
+      );
       return;
     }
     ImmichToast.show(
@@ -52,6 +81,7 @@ class _CollectionPickerState extends ConsumerState<CollectionPicker> {
           ? context.t.add_to_album_bottom_sheet_already_exists(album: album.name)
           : context.t.add_to_album_bottom_sheet_added(album: album.name),
     );
+    widget.onCompleted?.call();
   }
 
   Future<void> _addToTarget(CollectionTarget target) async {
@@ -63,14 +93,14 @@ class _CollectionPickerState extends ConsumerState<CollectionPicker> {
     final String? successMessage;
     switch (target) {
       case AlbumTarget(:final album):
-        result = await notifier.addToAlbum(ActionSource.timeline, album);
+        result = await notifier.addToAlbum(widget.source, album);
         successMessage = null;
       case SpacePoolTarget(:final space):
-        result = await notifier.addToSpace(ActionSource.timeline, space);
+        result = await notifier.addToSpace(widget.source, space);
         // The pool endpoint is 204 with no body, so this count is the request length.
         successMessage = 'added_to_space_count';
       case SpaceAlbumTarget(:final spaceId, :final album):
-        result = await notifier.addToSpaceAlbum(ActionSource.timeline, spaceId, album);
+        result = await notifier.addToSpaceAlbum(widget.source, spaceId, album);
         // This one IS the server's count, so duplicates are already excluded.
         successMessage = 'space_album_add_photos_success';
     }
@@ -89,6 +119,7 @@ class _CollectionPickerState extends ConsumerState<CollectionPicker> {
         toastType: ToastType.success,
       );
     }
+    widget.onCompleted?.call();
   }
 
   void _toastError() {
@@ -121,6 +152,7 @@ class _CollectionPickerState extends ConsumerState<CollectionPicker> {
             excludeSpaceId: widget.excludeSpaceId,
             isBusy: _isBusy,
             searchQuery: _searchQuery,
+            assets: widget.assets,
           ),
         ),
       ],
