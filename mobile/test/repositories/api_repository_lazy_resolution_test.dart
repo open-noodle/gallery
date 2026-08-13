@@ -55,6 +55,7 @@ void main() {
     registerFallbackValue(UpdateAssetDto());
     registerFallbackValue(BulkIdsDto(ids: []));
     registerFallbackValue(PartnerDirection.sharedBy);
+    registerFallbackValue(PersonUpdateDto());
   });
 
   setUp(() {
@@ -114,14 +115,14 @@ void main() {
     final repo = PersonApiRepository(apiService);
 
     when(() => apiService.peopleApi).thenReturn(newApi);
-    when(() => newApi.getAllPeople()).thenAnswer(
-      (_) async => PeopleResponseDto(people: [], hidden: 0, total: 0, hasNextPage: const Optional.present(false)),
+    when(() => newApi.updatePerson(any(), any())).thenAnswer(
+      (_) async => PersonResponseDto(birthDate: null, id: 'person-1', isHidden: false, name: 'Name', thumbnailPath: ''),
     );
 
-    await repo.getAll();
+    await repo.update('person-1', name: 'Name');
 
-    verify(() => newApi.getAllPeople()).called(1);
-    verifyNever(() => oldApi.getAllPeople());
+    verify(() => newApi.updatePerson('person-1', any())).called(1);
+    verifyNever(() => oldApi.updatePerson(any(), any()));
   });
 
   test('PartnerApiRepository resolves partnersApi lazily', () async {
