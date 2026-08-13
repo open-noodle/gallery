@@ -42,9 +42,11 @@ enum SettingsKey<T> {
   peopleSortBy<PeopleSortBy>(codec: EnumCodec(PeopleSortBy.values)),
 
   // Spaces
-  spaceAlbumsSortMode<SpaceAlbumSortMode>(codec: EnumCodec(SpaceAlbumSortMode.values)),
+  spaceAlbumsSortMode<SpaceAlbumSortMode>(
+    codec: EnumCodec(SpaceAlbumSortMode.values, fallback: SpaceAlbumSortMode.recentlyLinked),
+  ),
   spaceAlbumsIsReverse<bool>(),
-  spacesSortMode<SpaceSortMode>(codec: EnumCodec(SpaceSortMode.values)),
+  spacesSortMode<SpaceSortMode>(codec: EnumCodec(SpaceSortMode.values, fallback: SpaceSortMode.recentActivity)),
   spacesIsReverse<bool>(),
 
   // Backup
