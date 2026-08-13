@@ -122,4 +122,51 @@ describe('DemoInterceptor', () => {
     interceptor.intercept(context, callHandler);
     expect(callHandler.handle).toHaveBeenCalled();
   });
+
+  // The one POST that is a READ. Listing a person's cluster takes an exclude-list body, so it could not be a
+  // GET; blocking it here is what made the Face Repair console's manual review page report an empty cluster
+  // for every person on the demo. It is matched by exact anchored path, NOT by prefix like SAFE_POST_PREFIXES
+  // above — the tests below are what hold that distinction in place.
+  it('should allow the cluster-faces POST for demo user', () => {
+    configRepository.getEnv.mockReturnValue({ demo: { enabled: true, email: 'demo@test.com', password: '' } });
+    const context = createContext('POST', '/api/admin/face-repair/scan/person/person-id/cluster-faces', {
+      email: 'demo@test.com',
+    });
+    interceptor.intercept(context, callHandler);
+    expect(callHandler.handle).toHaveBeenCalled();
+  });
+
+  it('should still block every other face-repair POST for demo user', () => {
+    configRepository.getEnv.mockReturnValue({ demo: { enabled: true, email: 'demo@test.com', password: '' } });
+    for (const path of [
+      '/api/admin/face-repair/resolve',
+      '/api/admin/face-repair/scan',
+      '/api/admin/face-repair/unconfirm',
+      '/api/admin/face-repair/scan/person/person-id',
+    ]) {
+      expect(() => interceptor.intercept(createContext('POST', path, { email: 'demo@test.com' }), callHandler)).toThrow(
+        ForbiddenException,
+      );
+    }
+    expect(callHandler.handle).not.toHaveBeenCalled();
+  });
+
+  // Anchoring guard: a prefix match would open every path BELOW cluster-faces too.
+  it('should block a path that merely starts with the cluster-faces route', () => {
+    configRepository.getEnv.mockReturnValue({ demo: { enabled: true, email: 'demo@test.com', password: '' } });
+    const context = createContext('POST', '/api/admin/face-repair/scan/person/person-id/cluster-faces/delete', {
+      email: 'demo@test.com',
+    });
+    expect(() => interceptor.intercept(context, callHandler)).toThrow(ForbiddenException);
+  });
+
+  it('should not open the cluster-faces route to other mutating methods', () => {
+    configRepository.getEnv.mockReturnValue({ demo: { enabled: true, email: 'demo@test.com', password: '' } });
+    for (const method of ['DELETE', 'PUT', 'PATCH']) {
+      const context = createContext(method, '/api/admin/face-repair/scan/person/person-id/cluster-faces', {
+        email: 'demo@test.com',
+      });
+      expect(() => interceptor.intercept(context, callHandler)).toThrow(ForbiddenException);
+    }
+  });
 });
