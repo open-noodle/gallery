@@ -137,8 +137,8 @@ test.describe('Spaces — Albums UI journey & permission matrix', () => {
 
     await gotoSpacesList(page); // hop 1
     await openSpaceFromList(page, space.id); // hops 2–3
-    // hero-role-badge renders the RAW enum ('owner') with CSS `capitalize`,
-    // which does NOT change textContent — so match case-insensitively.
+    // hero-role-badge renders the translated role label, which in English is 'Owner' — plus CSS
+    // `capitalize`, which does NOT change textContent. Match case-insensitively either way.
     await expect(page.locator('[data-testid="hero-role-badge"]')).toContainText('owner', { ignoreCase: true });
 
     await openAlbumsTab(page, space.id); // hop 4
