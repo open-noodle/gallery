@@ -57,3 +57,26 @@ final driftGetAllPeopleWithSharedSpacesProvider = FutureProvider.family<List<Dri
   final prefs = await ref.watch(userMetadataPreferencesProvider.future);
   return service.getAllPeopleWithSharedSpaces(minFaces: prefs?.minimumFaces ?? 3, sortBy: sortBy);
 });
+
+/// People scoped to one shared space, for [SpacePeoplePage] — the mobile equivalent of the web
+/// space People tab.
+///
+/// Goes straight to [SharedSpaceApiRepository] rather than through [DriftPeopleService]: the
+/// service layer exists to host the local-Drift fallback, and there is none here. Space people
+/// have no local rows at all (the person/asset_face sync streams are owner-scoped), and the
+/// owner-scoped local list contains people who are *not* in this space, so degrading to it
+/// would be wrong rather than stale. Failures therefore surface as AsyncError.
+///
+/// `autoDispose` is deliberate: the route to this page (Spaces tab → space detail → app-bar
+/// face icon) invalidates nothing on entry, unlike the Library tab, which the global people
+/// providers sit behind and which the invalidation sites in `tab_shell.page.dart` /
+/// `gallery_bottom_nav.widget.dart` cover. Without `autoDispose`, this provider would keep the
+/// list it fetched for the app's whole session, so leaving and re-entering the page would
+/// re-render a stale cache with no gesture to refresh it short of changing the sort mode or
+/// restarting the app. `autoDispose` tears the provider down when [SpacePeoplePage] is popped
+/// (its only consumer), so re-opening the page always issues a fresh fetch.
+final driftSpacePeopleProvider = FutureProvider.autoDispose
+    .family<List<DriftPerson>, ({String spaceId, PeopleSortBy sortBy})>((ref, key) async {
+      final repository = ref.watch(sharedSpaceApiRepositoryProvider);
+      return repository.getSpacePeople(key.spaceId, sortBy: key.sortBy);
+    });
