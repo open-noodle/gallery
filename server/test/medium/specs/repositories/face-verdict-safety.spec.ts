@@ -21,7 +21,6 @@ import { clearConfigCache } from 'src/utils/config';
 import { newMediumService } from 'test/medium.factory';
 import { newEmbedding } from 'test/small.factory';
 import { getKyselyDB } from 'test/utils';
-import { Mocked } from 'vitest';
 
 // Slice 6: the two source-of-truth safety fixes.
 //   1. searchFaces must exclude soft-deleted faces (the "not a face" tombstone), so neither the suggestion
@@ -216,14 +215,14 @@ const setupReset = () => {
     mock: [JobRepository, LoggingRepository, MachineLearningRepository, StorageRepository, SystemMetadataRepository],
   });
 
-  const jobMock = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+  const jobMock = ctx.getMock(JobRepository);
   jobMock.waitForQueueCompletion.mockResolvedValue();
   jobMock.empty.mockResolvedValue();
   jobMock.queue.mockResolvedValue();
   jobMock.queueAll.mockResolvedValue();
   jobMock.getJobCounts.mockResolvedValue({ active: 0, waiting: 0, delayed: 0, paused: 0, completed: 0, failed: 0 });
 
-  const metadata = ctx.getMock<SystemMetadataRepository, Mocked<SystemMetadataRepository>>(SystemMetadataRepository);
+  const metadata = ctx.getMock(SystemMetadataRepository);
   metadata.get.mockImplementation((key) => {
     if (key === SystemMetadataKey.SystemConfig) {
       return { machineLearning: { facialRecognition: { enabled: true, minFaces: 1 } } } as any;
