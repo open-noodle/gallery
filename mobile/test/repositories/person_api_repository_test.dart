@@ -292,5 +292,74 @@ void main() {
 
       expect(result.single.numberOfAssets, 1204);
     });
+
+    // Edges of the unified-model mapping. updatedAt became genuinely nullable (the old
+    // two-class mapping substituted an epoch-0 sentinel), and isFavorite must survive the
+    // mapping or the client-side "favorites first" sort silently stops working — a break the
+    // type system cannot catch, because the field simply falls back to its default.
+    group('unified-person mapping edges', () {
+      test('an absent updatedAt stays null rather than becoming an epoch-0 sentinel', () async {
+        stubGetAllPeople(() async => peopleResponse([personDto('p1', name: 'Alice')]));
+
+        final result = await repository.getAllPeopleWithSharedSpaces(sortBy: PeopleSortBy.name);
+
+        expect(result.single.updatedAt, isNull);
+      });
+
+      test('an absent isFavorite maps to false', () async {
+        stubGetAllPeople(
+          () async => peopleResponse([
+            api.PersonResponseDto(
+              id: 'p1',
+              name: 'Alice',
+              thumbnailPath: '',
+              isHidden: false,
+              birthDate: null,
+              isFavorite: const api.Optional.absent(),
+            ),
+          ]),
+        );
+
+        final result = await repository.getAllPeopleWithSharedSpaces(sortBy: PeopleSortBy.name);
+
+        expect(result.single.isFavorite, isFalse);
+      });
+
+      test('a present isFavorite is carried onto Person', () async {
+        stubGetAllPeople(() async => peopleResponse([personDto('p1', name: 'Alice', isFavorite: true)]));
+
+        final result = await repository.getAllPeopleWithSharedSpaces(sortBy: PeopleSortBy.name);
+
+        expect(result.single.isFavorite, isTrue);
+      });
+
+      test('an empty page stops paging immediately even when hasNextPage is set', () async {
+        var calls = 0;
+        stubGetAllPeople(() async {
+          calls++;
+          return peopleResponse(const [], hasNextPage: true);
+        });
+
+        final result = await repository.getAllPeopleWithSharedSpaces(sortBy: PeopleSortBy.name);
+
+        expect(result, isEmpty);
+        expect(calls, 1);
+      });
+
+      test('a server that never clears hasNextPage stops at the page ceiling', () async {
+        var calls = 0;
+        stubGetAllPeople(() async {
+          calls++;
+          return peopleResponse([personDto('p$calls', name: 'A$calls')], hasNextPage: true);
+        });
+
+        final result = await repository.getAllPeopleWithSharedSpaces(sortBy: PeopleSortBy.name);
+
+        // The runaway guard is maxPages = 100 in the repository: the call terminates with what
+        // it has instead of looping forever against a misbehaving server.
+        expect(calls, 100);
+        expect(result, hasLength(100));
+      });
+    });
   });
 }
