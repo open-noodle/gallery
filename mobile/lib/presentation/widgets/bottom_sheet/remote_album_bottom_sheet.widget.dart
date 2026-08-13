@@ -86,7 +86,10 @@ class _RemoteAlbumBottomSheetState extends ConsumerState<RemoteAlbumBottomSheet>
       ],
       // #965: the same picker the main timeline offers, so a space album is reachable from
       // inside an album too — not only from the timeline.
-      slivers: ownsAlbum ? [CollectionPicker(onKeyboardExpanded: onKeyboardExpand)] : null,
+      // #965 follow-up: adding assets to a collection needs rights over the DESTINATION, never over
+      // the source album -- the picker and the server both enforce that. Web gates this on view mode
+      // only, with no ownership test. Every other ownsAlbum branch above is deliberately unchanged.
+      slivers: [CollectionPicker(onKeyboardExpanded: onKeyboardExpand)],
     );
   }
 }
