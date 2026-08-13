@@ -145,14 +145,21 @@ class _CollectionPickerState extends ConsumerState<CollectionPicker> {
           onKeyboardExpanded: widget.onKeyboardExpanded,
           onSearchChanged: (query) => setState(() => _searchQuery = query),
           searchHint: context.t.search_albums_and_spaces,
-        ),
-        SliverToBoxAdapter(
-          child: SpaceCollectionSection(
-            onTargetSelected: _addToTarget,
-            excludeSpaceId: widget.excludeSpaceId,
-            isBusy: _isBusy,
-            searchQuery: _searchQuery,
-            assets: widget.assets,
+          sliverAfterSearch: SliverToBoxAdapter(
+            child: SpaceCollectionSection(
+              onTargetSelected: _addToTarget,
+              excludeSpaceId: widget.excludeSpaceId,
+              isBusy: _isBusy,
+              searchQuery: _searchQuery,
+              assets: widget.assets,
+              // Rides on the section's own visibility so a user in no space never sees a lone
+              // "Albums" header over the layout they have today.
+              footer: Padding(
+                key: const Key('collection-picker-albums-header'),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Text(context.t.albums, style: context.textTheme.labelLarge),
+              ),
+            ),
           ),
         ),
       ],
