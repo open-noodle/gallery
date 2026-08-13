@@ -23,6 +23,7 @@ import 'package:immich_mobile/presentation/widgets/bottom_sheet/favorite_bottom_
 import 'package:immich_mobile/presentation/widgets/bottom_sheet/local_album_bottom_sheet.widget.dart';
 import 'package:immich_mobile/presentation/widgets/bottom_sheet/remote_album_bottom_sheet.widget.dart';
 import 'package:immich_mobile/presentation/widgets/collection/collection_picker.widget.dart';
+import 'package:immich_mobile/presentation/widgets/spaces/space_album_bottom_sheet.widget.dart';
 import 'package:immich_mobile/providers/asset_viewer/asset_viewer.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/remote_album.provider.dart';
@@ -92,6 +93,9 @@ void main() {
 
   RemoteAlbum ownedAlbum() => RemoteAlbumFactory.create(ownerId: user.id, ownerName: user.name, assetCount: 1);
 
+  RemoteAlbum foreignAlbum() =>
+      RemoteAlbumFactory.create(ownerId: 'someone-else', ownerName: 'Someone Else', assetCount: 1);
+
   Future<void> pumpSheet(WidgetTester tester, Widget sheet) async {
     final userService = _MockUserService();
     when(() => userService.tryGetMyUser()).thenReturn(user);
@@ -117,11 +121,12 @@ void main() {
 
   /// Assert on the sliver list the sheet was handed, not on the rendered tree.
   ///
-  /// These sheets open at 0.22–0.4 of the screen. Measured: `find.byType(CollectionPicker)`
-  /// finds it in the favorites sheet (0.4) but reports nothing for the remote-album (0.22) and
-  /// archive (0.25) sheets, because the picker sits below the viewport and its sliver is never
-  /// built. That makes a rendered-tree assertion pass or fail on sheet height rather than on
-  /// wiring. What the picker renders once built is covered by the picker's own tests.
+  /// These sheets open at 0.18–0.4 of the screen. Measured: `find.byType(CollectionPicker)`
+  /// finds it in the favorites sheet (0.4) but reports nothing for the remote-album (0.22),
+  /// archive (0.25), and space-album (0.18) sheets, because the picker sits below the viewport
+  /// and its sliver is never built. That makes a rendered-tree assertion pass or fail on sheet
+  /// height rather than on wiring. What the picker renders once built is covered by the picker's
+  /// own tests.
   void expectPickerMounted(WidgetTester tester) {
     final slivers = tester.widget<BaseBottomSheet>(find.byType(BaseBottomSheet)).slivers ?? const <Widget>[];
     // Reverting a surface to `[AddToAlbumHeader(), AlbumSelector(...)]` — upstream's album-only
@@ -184,5 +189,31 @@ void main() {
     expect(picker.source, ActionSource.viewer);
     // The viewer has no multiselect, so it must state the asset the notices reason about.
     expect(picker.assets, [viewed]);
+  });
+
+  testWidgets('S1: the space album sheet offers the collection picker', (tester) async {
+    await pumpSheet(tester, const SpaceAlbumBottomSheet(canEdit: true, albumId: 'al1'));
+    expectPickerMounted(tester);
+  });
+
+  testWidgets('S2: the space album sheet does not exclude its own space', (tester) async {
+    await pumpSheet(tester, const SpaceAlbumBottomSheet(canEdit: true, albumId: 'al1'));
+
+    // Assert on the wiring, not on rendered rows: the space list lives inside the picker, which is
+    // below this sheet's 0.18 viewport and never built. A null excludeSpaceId is exactly what keeps
+    // the current space reachable, so moving a photo between two albums of one space works.
+    final slivers = tester.widget<BaseBottomSheet>(find.byType(BaseBottomSheet)).slivers ?? const <Widget>[];
+    final picker = slivers.whereType<CollectionPicker>().single;
+    expect(picker.excludeSpaceId, isNull);
+  });
+
+  testWidgets('S3: an album the user does not own still offers the picker', (tester) async {
+    await pumpSheet(tester, RemoteAlbumBottomSheet(album: foreignAlbum()));
+    expectPickerMounted(tester);
+  });
+
+  testWidgets('S5: an album the user owns still offers the picker', (tester) async {
+    await pumpSheet(tester, RemoteAlbumBottomSheet(album: ownedAlbum()));
+    expectPickerMounted(tester);
   });
 }

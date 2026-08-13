@@ -40,12 +40,17 @@ class AlbumSelector extends ConsumerStatefulWidget {
   /// Fork hook: replaces the "Search albums" hint when the host's search covers more than albums.
   final String? searchHint;
 
+  /// Fork hook: a sliver rendered between the search field and the album list, so a composing
+  /// picker can put another section under the shared search box. Null for every upstream call site.
+  final Widget? sliverAfterSearch;
+
   const AlbumSelector({
     super.key,
     required this.onAlbumSelected,
     this.onKeyboardExpanded,
     this.onSearchChanged,
     this.searchHint,
+    this.sliverAfterSearch,
   });
 
   @override
@@ -211,6 +216,7 @@ class _AlbumSelectorState extends ConsumerState<AlbumSelector> {
             onClearSearch: clearSearch,
             hint: widget.searchHint,
           ),
+          if (widget.sliverAfterSearch != null) widget.sliverAfterSearch!,
           _QuickFilterButtonRow(
             filterMode: filter.mode,
             onChangeFilter: changeFilter,
