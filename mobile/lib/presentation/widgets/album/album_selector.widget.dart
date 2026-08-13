@@ -13,6 +13,7 @@ import 'package:immich_mobile/models/albums/album_search.model.dart';
 import 'package:immich_mobile/presentation/widgets/album/album_tile.dart';
 import 'package:immich_mobile/presentation/widgets/album/new_album_name_modal.widget.dart';
 import 'package:immich_mobile/presentation/widgets/images/thumbnail.widget.dart';
+import 'package:immich_mobile/utils/album_permissions.dart';
 import 'package:immich_mobile/providers/album/album_sort_by_options.provider.dart';
 import 'package:immich_mobile/providers/asset_viewer/asset_viewer.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
@@ -44,6 +45,13 @@ class AlbumSelector extends ConsumerStatefulWidget {
   /// picker can put another section under the shared search box. Null for every upstream call site.
   final Widget? sliverAfterSearch;
 
+  /// Fork hook: hide albums the user cannot add assets to (see `album_permissions.dart`).
+  ///
+  /// True for the add-to-collection *pickers*, where a viewer-role album is a dead target the
+  /// server rejects outright. False for album *browsers*, where such an album is perfectly
+  /// valid to open — which is why this is opt-in rather than always on.
+  final bool writableOnly;
+
   const AlbumSelector({
     super.key,
     required this.onAlbumSelected,
@@ -51,6 +59,7 @@ class AlbumSelector extends ConsumerStatefulWidget {
     this.onSearchChanged,
     this.searchHint,
     this.sliverAfterSearch,
+    this.writableOnly = false,
   });
 
   @override
@@ -143,9 +152,15 @@ class _AlbumSelectorState extends ConsumerState<AlbumSelector> {
   }
 
   Future<void> sortAlbums() async {
+    // Fork: a picker must not offer albums the user cannot add to. Filter here, at the single
+    // source both the searched and unsearched `shownAlbums` paths derive from, so a hidden
+    // album cannot reappear by typing its name.
+    final albums = ref.read(remoteAlbumProvider).albums;
+    final candidates = widget.writableOnly ? albumsUserCanAddTo(albums) : albums;
+
     final sorted = await ref
         .read(remoteAlbumProvider.notifier)
-        .sortAlbums(ref.read(remoteAlbumProvider).albums, sort.mode, isReverse: sort.isReverse);
+        .sortAlbums(candidates, sort.mode, isReverse: sort.isReverse);
 
     if (!mounted) {
       return;
