@@ -124,9 +124,7 @@ void main() {
 
       await saveName(tester);
 
-      verify(
-        () => service.updateName(any(that: predicate<Person>((p) => p.spaceId == 'space-1')), 'Alicia'),
-      ).called(1);
+      verify(() => service.updateName(any(that: predicate<Person>((p) => p.spaceId == 'space-1')), 'Alicia')).called(1);
       expect(serverFetches, 2);
       expect(find.byType(AlertDialog), findsNothing);
     });

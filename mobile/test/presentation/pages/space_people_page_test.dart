@@ -17,13 +17,8 @@ import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
 import '../../test_utils.dart';
 import '../../widget_tester_extensions.dart';
 
-Person _p(String id, String name, {int numberOfAssets = 0}) => Person(
-  id: id,
-  updatedAt: DateTime(2024, 1, 1),
-  name: name,
-  spaceId: 'space-1',
-  numberOfAssets: numberOfAssets,
-);
+Person _p(String id, String name, {int numberOfAssets = 0}) =>
+    Person(id: id, updatedAt: DateTime(2024, 1, 1), name: name, spaceId: 'space-1', numberOfAssets: numberOfAssets);
 
 void main() {
   // The page renders avatars (Store.get(StoreKey.serverEndpoint)) and reads the persisted
@@ -51,23 +46,17 @@ void main() {
   });
 
   // NOT const: canEdit is a runtime variable here.
-  Future<void> pumpPage(
-    WidgetTester tester, {
-    required Future<List<Person>> Function() people,
-    bool canEdit = true,
-  }) => tester.pumpConsumerWidget(
-    SpacePeoplePage(spaceId: 'space-1', canEdit: canEdit),
-    overrides: [driftSpacePeopleProvider.overrideWith((ref, key) => people())],
-  );
+  Future<void> pumpPage(WidgetTester tester, {required Future<List<Person>> Function() people, bool canEdit = true}) =>
+      tester.pumpConsumerWidget(
+        SpacePeoplePage(spaceId: 'space-1', canEdit: canEdit),
+        overrides: [driftSpacePeopleProvider.overrideWith((ref, key) => people())],
+      );
 
   testWidgets('renders the space empty state when the space has no people', (tester) async {
     await pumpPage(tester, people: () async => []);
 
     expect(find.text('No people found'), findsOneWidget);
-    expect(
-      find.text('People will appear here once photos with faces are added to the space'),
-      findsOneWidget,
-    );
+    expect(find.text('People will appear here once photos with faces are added to the space'), findsOneWidget);
   });
 
   testWidgets('renders an error state with a retry action when the fetch fails', (tester) async {
@@ -145,8 +134,7 @@ void main() {
 
     double topOf(String name) => tester.getTopLeft(find.text(name)).dy;
     double leftOf(String name) => tester.getTopLeft(find.text(name)).dx;
-    bool isBefore(String a, String b) =>
-        topOf(a) != topOf(b) ? topOf(a) < topOf(b) : leftOf(a) < leftOf(b);
+    bool isBefore(String a, String b) => topOf(a) != topOf(b) ? topOf(a) < topOf(b) : leftOf(a) < leftOf(b);
 
     // Default sort is photoCount → Zoe first.
     expect(isBefore('Zoe', 'Alice'), isTrue);
