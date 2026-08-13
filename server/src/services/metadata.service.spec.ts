@@ -2543,7 +2543,7 @@ describe(MetadataService.name, () => {
 
   describe('handleTagAsset', () => {
     it('should queue a sidecar write job', async () => {
-      await sut.handleTagAsset({ assetId: 'asset-1' });
+      await sut.handleTagAsset({ assetId: 'asset-1', userId: 'user-1' });
       expect(mocks.job.queue).toHaveBeenCalledWith({ name: JobName.SidecarWrite, data: { id: 'asset-1' } });
     });
   });
