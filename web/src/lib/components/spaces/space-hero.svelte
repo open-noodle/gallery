@@ -2,6 +2,7 @@
   import ButtonContextMenu from '$lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
   import MenuOption from '$lib/components/shared-components/context-menu/MenuOption.svelte';
   import { getAssetMediaUrl } from '$lib/utils';
+  import { spaceRoleLabelKey } from '$lib/utils/space-utils';
   import { AssetMediaSize, type SharedSpaceResponseDto } from '@immich/sdk';
   import { Icon } from '@immich/ui';
   import { mdiCameraOutline, mdiCursorMove, mdiImageEditOutline, mdiPencilOutline } from '@mdi/js';
@@ -172,10 +173,18 @@
     <div class="absolute top-3 right-3 flex items-center gap-2">
       {#if canEdit}
         <div class="transition" data-testid="hero-edit-menu">
+          <!--
+            The cover is a photo, not a themed surface, so the default ghost variant — theme-coloured
+            ink on a transparent background — is a coin toss against it: in the light theme it painted
+            a near-black ✎ that disappeared into a dark cover (#946). A filled chip carries its own
+            background, the same recipe every other over-image menu in the app uses.
+          -->
           <ButtonContextMenu
             icon={mdiPencilOutline}
             title={$t('edit')}
             color="secondary"
+            variant="filled"
+            buttonClass="icon-white-drop-shadow"
             align="top-right"
             direction="left"
           >
@@ -193,7 +202,7 @@
           class="inline-flex items-center rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-medium text-white capitalize backdrop-blur-sm"
           data-testid="hero-role-badge"
         >
-          {currentRole}
+          {$t(spaceRoleLabelKey(currentRole))}
         </span>
       {/if}
     </div>
