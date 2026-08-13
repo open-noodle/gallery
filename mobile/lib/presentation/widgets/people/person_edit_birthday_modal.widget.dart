@@ -36,8 +36,7 @@ class _PersonNameEditFormState extends ConsumerState<PersonBirthdayEditForm> {
         // A Drift stream can never observe a server-side edit — a space-person birthday edit
         // writes nothing locally — so the server-backed list must still be invalidated by hand.
         ref.invalidate(driftGetAllPeopleWithSharedSpacesProvider);
-
-      if (result != 0 && mounted) {
+        ref.invalidate(driftSpacePeopleProvider);
         context.pop<DateTime>(_selectedDate);
       }
     } catch (error) {

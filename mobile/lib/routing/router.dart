@@ -36,6 +36,7 @@ import 'package:immich_mobile/pages/library/spaces/space_detail.page.dart';
 import 'package:immich_mobile/pages/library/spaces/space_link_album.page.dart';
 import 'package:immich_mobile/pages/library/spaces/space_member_selection.page.dart';
 import 'package:immich_mobile/pages/library/spaces/space_members.page.dart';
+import 'package:immich_mobile/pages/library/spaces/space_people.page.dart';
 import 'package:immich_mobile/pages/library/spaces/spaces.page.dart';
 import 'package:immich_mobile/pages/login/change_password.page.dart';
 import 'package:immich_mobile/pages/login/login.page.dart';
@@ -164,6 +165,7 @@ class AppRouter extends RootStackRouter {
     AutoRoute(page: SpacesRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: SpaceDetailRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: SpaceMembersRoute.page, guards: [_authGuard, _duplicateGuard]),
+    AutoRoute(page: SpacePeopleRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: SpaceAlbumsRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: SpaceAlbumDetailRoute.page, guards: [_authGuard, _duplicateGuard]),
     CustomRoute(

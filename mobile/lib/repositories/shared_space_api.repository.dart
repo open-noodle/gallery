@@ -1,7 +1,9 @@
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/providers/api.provider.dart';
 import 'package:immich_mobile/repositories/api.repository.dart';
 import 'package:immich_mobile/services/api.service.dart';
+import 'package:immich_mobile/utils/people_sort.dart';
 import 'package:immich_mobile/utils/space_permissions.dart';
 import 'package:openapi/api.dart';
 
@@ -75,6 +77,74 @@ class SharedSpaceApiRepository extends ApiRepository {
   /// face→person links. Sibling of issue #727.
   Future<List<String>> getSpacePersonAssets(String spaceId, String personId) async {
     return await checkNull(_api.getSpacePersonAssets(spaceId, personId));
+  }
+
+  /// Every non-hidden person in [spaceId], from the membership-gated
+  /// `GET /shared-spaces/{id}/people` endpoint — the same list the web space People tab reads.
+  ///
+  /// This must NOT be served by filtering [PersonApiRepository.getAllPeopleWithSharedSpaces]:
+  /// `PersonResponseDto.primaryProfile` is singular, so a person who belongs to two spaces has
+  /// one primary profile and would silently vanish from their non-primary space.
+  ///
+  /// The server applies `minimumFaceCount` from the global ML config and excludes pets unless
+  /// the space enables them, so there is deliberately no client-side filtering here.
+  ///
+  /// [pageSize] and [maxPages] exist as test seams and are not meant to be passed in
+  /// production — the runaway guard is otherwise only reachable by allocating 100 000 DTOs in
+  /// a unit test. They are deliberately NOT annotated `@visibleForTesting`: that annotation
+  /// targets declarations, not parameters, and an `invalid_annotation_target` info would fail
+  /// `dart analyze --fatal-infos`.
+  /// [pageSize] must not exceed 100: `SharedSpacePeopleQuerySchema.limit` is `.max(100)`
+  /// (`server/src/dtos/shared-space.dto.ts`), and an over-cap value fails server-side validation
+  /// with a 400 rather than being clamped, so the page shows its error state and never loads.
+  /// Note this differs from `GET /people`, whose `size` caps at 1000 — the 1000 used by
+  /// [PersonApiRepository.getAllPeopleWithSharedSpaces] is NOT a precedent for this endpoint.
+  Future<List<DriftPerson>> getSpacePeople(
+    String spaceId, {
+    required PeopleSortBy sortBy,
+    int pageSize = 100,
+    int maxPages = 100,
+  }) async {
+    // The endpoint returns a bare array with no hasNextPage envelope, so a short page is the
+    // only end-of-list signal. maxPages is a runaway guard against a server that never returns
+    // one; hitting it returns what we have rather than throwing.
+    final dtos = <SharedSpacePersonResponseDto>[];
+    for (var page = 0; page < maxPages; page++) {
+      final batch = await checkNull(
+        _api.getSpacePeople(spaceId, limit: pageSize, offset: page * pageSize, withHidden: false),
+      );
+      dtos.addAll(batch);
+      if (batch.length < pageSize) {
+        break;
+      }
+    }
+
+    final people = dtos.map(_spacePersonToDriftPerson).toList();
+    people.sort((a, b) => comparePeople(a, b, sortBy));
+    return people;
+  }
+
+  /// Maps a Space-scoped person profile onto [DriftPerson], following the precedent in
+  /// `PersonApiRepository._personToDriftPerson`.
+  ///
+  /// `ownerId`, `isFavorite` and `color` have no equivalent on a space-person profile and are
+  /// filled with neutral values; the People surfaces key every edit off the id plus [spaceId].
+  /// v3 openapi wraps the optional fields in `Optional<...?>` whose `.value` THROWS when
+  /// absent — every read here goes through `orElse(null)`.
+  static DriftPerson _spacePersonToDriftPerson(SharedSpacePersonResponseDto dto) {
+    return DriftPerson(
+      id: dto.id,
+      createdAt: DateTime.parse(dto.createdAt),
+      updatedAt: DateTime.parse(dto.updatedAt),
+      ownerId: '',
+      name: dto.name,
+      isFavorite: false,
+      isHidden: dto.isHidden,
+      color: null,
+      birthDate: dto.birthDate.orElse(null),
+      spaceId: dto.spaceId,
+      numberOfAssets: dto.assetCount.toInt(),
+    );
   }
 
   /// Whether [userId] may edit Space-scoped people in [spaceId] (owner or editor role).
