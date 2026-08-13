@@ -194,6 +194,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('person-picker-retry')), findsNothing);
+      expect(calls, 2);
       expect(find.text('Alice'), findsOneWidget);
     });
   });
