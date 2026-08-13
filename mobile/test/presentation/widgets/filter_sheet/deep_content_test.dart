@@ -3,12 +3,12 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
+import 'package:immich_mobile/models/photos_filter/filter_person.model.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/people_section.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/places_cascade_section.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/when_accordion_section.widget.dart';
@@ -140,9 +140,7 @@ void main() {
       addTearDown(scope.dispose);
 
       // Seed a selection.
-      scope
-          .read(photosFilterProvider.notifier)
-          .togglePerson(const PersonDto(id: 'p1', name: 'Emma', isHidden: false, thumbnailPath: ''));
+      scope.read(photosFilterProvider.notifier).togglePerson(const FilterPerson(id: 'p1', name: 'Emma'));
       expect(scope.read(photosFilterProvider).people, hasLength(1));
 
       await tester.pumpWidget(

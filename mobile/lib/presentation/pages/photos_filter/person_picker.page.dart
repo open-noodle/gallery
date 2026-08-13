@@ -1,8 +1,8 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
+import 'package:immich_mobile/models/photos_filter/filter_person.model.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/person_picker_list.widget.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/person_picker_search_header.widget.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/recent_people_strip.widget.dart';
@@ -80,7 +80,7 @@ class _PersonPickerPageState extends ConsumerState<PersonPickerPage> {
     );
   }
 
-  List<Widget> _bodySlivers(AsyncValue<List<PersonDto>> async, String query) {
+  List<Widget> _bodySlivers(AsyncValue<List<FilterPerson>> async, String query) {
     return async.when(
       loading: () => const [SliverFillRemaining(child: Center(child: CircularProgressIndicator()))],
       error: (e, st) => [

@@ -1,6 +1,6 @@
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
-import 'package:immich_mobile/domain/models/person.model.dart';
+import 'package:immich_mobile/models/photos_filter/filter_person.model.dart';
 import 'package:immich_mobile/models/search/search_filter.model.dart';
 import 'package:immich_mobile/providers/photos_filter/chip_id.dart';
 import 'package:immich_mobile/utils/option.dart';
@@ -40,8 +40,8 @@ class PhotosFilterNotifier extends Notifier<SearchFilter> {
   void setSimilarTo(String assetId) =>
       state = SearchFilter.empty().copyWith(assetId: assetId, mediaType: AssetType.image);
 
-  void togglePerson(PersonDto person) {
-    final next = Set<PersonDto>.from(state.people);
+  void togglePerson(FilterPerson person) {
+    final next = Set<FilterPerson>.from(state.people);
     if (!next.add(person)) next.remove(person);
     state = state.copyWith(people: next);
   }
