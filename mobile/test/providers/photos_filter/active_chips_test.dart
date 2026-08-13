@@ -1,19 +1,18 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
-import 'package:immich_mobile/domain/models/person.model.dart';
+import 'package:immich_mobile/models/photos_filter/filter_person.model.dart';
 import 'package:immich_mobile/models/search/search_filter.model.dart';
 import 'package:immich_mobile/providers/photos_filter/active_chips.dart';
 import 'package:immich_mobile/providers/photos_filter/chip_id.dart';
 import 'package:immich_mobile/utils/option.dart';
 import 'package:openapi/api.dart';
 
-PersonDto _person(String id, String name) => PersonDto(id: id, name: name, isHidden: false, thumbnailPath: '');
+FilterPerson _person(String id, String name) => FilterPerson(id: id, name: name);
 
-PersonDto _spacePerson(String id, String name, String spaceId) =>
-    PersonDto(id: id, name: name, isHidden: false, thumbnailPath: '', spaceId: spaceId);
+FilterPerson _spacePerson(String id, String name, String spaceId) => FilterPerson(id: id, name: name, spaceId: spaceId);
 
 SearchFilter _base() => SearchFilter(
-  people: <PersonDto>{},
+  people: <FilterPerson>{},
   location: SearchLocationFilter(),
   camera: SearchCameraFilter(),
   date: SearchDateFilter(),
