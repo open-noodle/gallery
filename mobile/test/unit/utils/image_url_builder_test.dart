@@ -101,8 +101,8 @@ void main() {
   });
 
   // The photos-filter picker/recent/chip surfaces store the tokenized filter id
-  // (`person:<uuid>` / `space-person:<uuid>`) on PersonDto.id and the Space scope on
-  // PersonDto.spaceId. This helper de-tokenizes to the raw profile id and routes a Space
+  // (`person:<uuid>` / `space-person:<uuid>`) on FilterPerson.id and the Space scope on
+  // FilterPerson.spaceId. This helper de-tokenizes to the raw profile id and routes a Space
   // person to the membership-gated space endpoint, everyone else to the owner endpoint.
   // Mirrors web getPhotosPersonFilterThumbnailUrl.
   group('getFilterPersonThumbnailUrl', () {

@@ -2,8 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
+import 'package:immich_mobile/models/photos_filter/filter_person.model.dart';
 import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
 import 'package:immich_mobile/providers/photos_filter/people_picker.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
@@ -18,7 +18,7 @@ class RecentPeopleStrip extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(recentPeopleProvider);
-    final recent = async.valueOrNull ?? const <PersonDto>[];
+    final recent = async.valueOrNull ?? const <FilterPerson>[];
     if (recent.isEmpty) return const SizedBox.shrink();
 
     final theme = Theme.of(context);
@@ -50,7 +50,7 @@ class RecentPeopleStrip extends ConsumerWidget {
 }
 
 class _RecentTile extends ConsumerWidget {
-  final PersonDto person;
+  final FilterPerson person;
   const _RecentTile({required this.person});
 
   @override
