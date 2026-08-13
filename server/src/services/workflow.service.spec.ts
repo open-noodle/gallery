@@ -33,6 +33,7 @@ describe(WorkflowService.name, () => {
     expect(sut.getTriggers()).toEqual([
       { trigger: WorkflowTrigger.AssetCreate, types: [WorkflowType.AssetV1] },
       { trigger: WorkflowTrigger.AssetMetadataExtraction, types: [WorkflowType.AssetV1] },
+      { trigger: WorkflowTrigger.AssetTagged, types: [WorkflowType.AssetV1] },
     ]);
   });
 
