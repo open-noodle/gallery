@@ -20,6 +20,7 @@ import 'package:immich_mobile/providers/sync_status.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:immich_mobile/repositories/shared_space_api.repository.dart';
 import 'package:immich_mobile/routing/router.dart';
+import 'package:immich_mobile/utils/space_face_recognition.dart';
 import 'package:immich_mobile/utils/space_permissions.dart';
 import 'package:immich_mobile/widgets/common/immich_toast.dart';
 import 'package:immich_mobile/widgets/spaces/sync_status_banner.dart';
@@ -374,6 +375,10 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
     );
   }
 
+  void _navigateToSpacePeople() {
+    unawaited(context.pushRoute(SpacePeopleRoute(spaceId: widget.spaceId, canEdit: _canEdit)));
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -449,20 +454,27 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
           floating: true,
           pinned: false,
           snap: false,
+          // Adding photos is the only action that stays on the bar; everything else lives in the
+          // kebab, which is why that menu is no longer hidden for viewers.
           actions: [
-            IconButton(
-              icon: Icon(_showInTimeline ? Icons.visibility : Icons.visibility_off),
-              onPressed: _togglingTimeline ? null : _toggleTimeline,
-              tooltip: _showInTimeline ? 'Hide from timeline' : 'Show in timeline',
-            ),
             if (_canEdit)
               IconButton(
                 icon: const Icon(Icons.add_photo_alternate_outlined),
                 onPressed: _addPhotos,
-                tooltip: 'Add Photos',
+                tooltip: context.t.add_photos,
               ),
-            IconButton(icon: const Icon(Icons.people_outline), onPressed: _navigateToMembers, tooltip: 'Members'),
-            SpaceDetailKebab(canEdit: _canEdit, canDelete: _isOwner, onEdit: _editSpace, onDelete: _deleteSpace),
+            SpaceDetailKebab(
+              canEdit: _canEdit,
+              canDelete: _isOwner,
+              showInTimeline: _showInTimeline,
+              timelineBusy: _togglingTimeline,
+              showPeople: spacePeopleVisible(_space!),
+              onToggleTimeline: _toggleTimeline,
+              onPeople: _navigateToSpacePeople,
+              onMembers: _navigateToMembers,
+              onEdit: _editSpace,
+              onDelete: _deleteSpace,
+            ),
           ],
         ),
         bottomSheet: SpaceBottomSheet(
