@@ -213,6 +213,25 @@ Two classes:
 Both the 64-error count and the resulting 7 unused imports match the 2026-08-08 occurrence of this
 same drift exactly.
 
+**Two — a pre-existing `origin/main` regression the sync imported (fixed here in `02a60b46e6f`).**
+
+Rebase Smoke tests 5 and 6 asserted `toHaveAttribute('title', '')` on
+`[data-testid="detail-panel-edit-date-button"]` and failed with _element(s) not found_. #778's R3/R10
+redesign made the date row a contextual-filter link and moved the edit action onto a separate pencil
+`IconButton` gated behind `{#if isOwner}` in `DetailPanelDate.svelte` — for an editor or viewer it is
+not rendered at all. The old assertion encoded the pre-#778 design, where the whole row was an "edit
+date" button rendered for everyone with an empty `title` for non-owners.
+
+Classified as **pre-existing on `main`**, not a rebase artifact, on three pieces of evidence:
+`DetailPanelDate.svelte` and `permission-matrix.e2e-spec.ts` are both **byte-identical to
+`origin/main`**; #778 never touched the spec; and #778's own `contextual-filters.e2e-spec.ts:588`
+already asserts `toHaveCount(0)` for the same element — so the two specs contradicted each other on
+`main`. Fixed both tests to assert absence, which makes them agree.
+
+It went unnoticed because `gallery-rebase-smoke.yml` is `workflow_dispatch`-only and **has never run
+on `main`**, so no PR gate compiles it — structurally the same shape as the #886 x #911 collision.
+See follow-ups 4 and 5.
+
 ## Pattern Propagation
 
 None new. The person-model unification (#30659–#30662) is the quarantined item and is a
@@ -247,9 +266,31 @@ reconciliation, not a propagation.
 ## Remote CI Verification
 
 - **Test branch**: `rebase/upstream-b89`
-- **Commit validated**: `70d4533fc3a`
+- **Commits validated**: `0d3edd5e892` (9 runs) and `02a60b46e6f` (Rebase Smoke, after its fix)
 
-_(filled in below once the dispatched runs complete)_
+**10/10 GREEN.**
+
+| Workflow                                  | Status | Run         | Notes                                                                      |
+| ----------------------------------------- | ------ | ----------- | -------------------------------------------------------------------------- |
+| `test.yml`                                | GREEN  | 31674484379 | **21/21 jobs, 0 skipped**                                                  |
+| `docker.yml`                              | GREEN  | 31674486426 | all server/web/cli/ml images                                               |
+| `static_analysis.yml`                     | GREEN  | 31674488426 |                                                                            |
+| `gallery-build-mobile.yml`                | GREEN  | 31674521659 | iOS **and** Android both success                                           |
+| `gallery-mobile-smoke.yml`                | GREEN  | 31674525150 |                                                                            |
+| `gallery-ml-smoke.yml`                    | GREEN  | 31674523575 |                                                                            |
+| `gallery-rebase-smoke.yml`                | GREEN  | 31675041694 | **10 passed** (first attempt 31674490511: 8 passed / 2 failed — see below) |
+| `storage-migration-tests.yml`             | GREEN  | 31674502798 |                                                                            |
+| `storage-migration-e2e.yml`               | GREEN  | 31674519975 |                                                                            |
+| `gallery-revert-to-immich-validation.yml` | GREEN  | 31674501293 | read past the coverage grep: `Post-phase drift (0 item(s))` → `PASSED`     |
+
+**Failures fixed**: one — Rebase Smoke tests 5 and 6 (`02a60b46e6f`, analysed in Inconsistencies below).
+**Confirmed flakes**: none. No workflow needed a re-run for flakiness.
+
+**Why the other nine were not re-dispatched.** `02a60b46e6f` changes exactly one file,
+`e2e/src/specs/rebase-smoke/permission-matrix.e2e-spec.ts`. That path belongs to the `rebase-smoke`
+Playwright project (`e2e/playwright.config.ts:63`, `testDir: ./src/specs/rebase-smoke`), which only
+`gallery-rebase-smoke.yml` runs — `test.yml` does not reference it, and no other workflow globs the
+directory. The nine runs' inputs are therefore unchanged and their green on `0d3edd5e892` stands.
 
 ## Post-Rebase Verification
 
@@ -269,4 +310,17 @@ _(filled in below once the dispatched runs complete)_
    sequence it against the reconciliation.
 3. **PR #981** should rebase onto #29043 once that lands (new `assetAddTags` / `AssetTagged` /
    `assetTagFilter` / `AssetV1.tags`).
-4. **Standing**: wire the five unreferenced `branding/scripts/*.sh` into CI.
+4. **★ `main` needs its own PR for the Rebase Smoke regression** — fixed here in `02a60b46e6f`, but
+   `origin/main` still carries the broken spec. `#778` (R3/R10) moved the edit-date action onto a
+   pencil `IconButton` gated behind `{#if isOwner}`, so it is absent for non-owners; Rebase Smoke
+   tests 5 and 6 still asserted the pre-#778 `toHaveAttribute('title', '')`. Both
+   `DetailPanelDate.svelte` and `permission-matrix.e2e-spec.ts` are byte-identical to `origin/main`
+   and #778 never touched the spec, so this is a `main` regression the sync imported, not a rebase
+   artifact. `#778`'s own `contextual-filters.e2e-spec.ts:588` already asserted `toHaveCount(0)` for
+   the same element — the two specs contradicted each other on `main`.
+5. **★ Structural cause worth fixing once**: `gallery-rebase-smoke.yml` is `workflow_dispatch`-only
+   and **has never run on `main`** (`gh run list --workflow gallery-rebase-smoke.yml --branch main`
+   returns nothing), so no PR gate compiles it. That is the same shape as the `#886` × `#911`
+   collision — two independently-green PRs and no gate covering the seam. Consider running it on
+   `main` pushes, or at minimum on PRs touching `web/src/lib/components/asset-viewer/**`.
+6. **Standing**: wire the five unreferenced `branding/scripts/*.sh` into CI.
