@@ -62,22 +62,22 @@ void main() {
       final shiftedLater = await ctx.newRemoteAsset(
         ownerId: user.id,
         createdAt: DateTime.utc(2024, 9, 2, 12),
-        localDateTime: DateTime.utc(2024, 9, 3, 12),
+        localDateTime: Value(DateTime.utc(2024, 9, 3, 12)),
       );
       final shiftedEarlier = await ctx.newRemoteAsset(
         ownerId: user.id,
         createdAt: DateTime.utc(2024, 9, 3, 12),
-        localDateTime: DateTime.utc(2024, 9, 2, 12),
+        localDateTime: Value(DateTime.utc(2024, 9, 2, 12)),
       );
       final normalLater = await ctx.newRemoteAsset(
         ownerId: user.id,
         createdAt: DateTime.utc(2024, 9, 4, 14),
-        localDateTime: DateTime.utc(2024, 9, 4, 14),
+        localDateTime: Value(DateTime.utc(2024, 9, 4, 14)),
       );
       final normalEarlier = await ctx.newRemoteAsset(
         ownerId: user.id,
         createdAt: DateTime.utc(2024, 9, 4, 12),
-        localDateTime: DateTime.utc(2024, 9, 4, 12),
+        localDateTime: Value(DateTime.utc(2024, 9, 4, 12)),
       );
       final seeded = [shiftedLater, shiftedEarlier, normalLater, normalEarlier];
       for (final asset in seeded) {
@@ -138,12 +138,12 @@ void main() {
       final shiftedLater = await ctx.newRemoteAsset(
         ownerId: user.id,
         createdAt: DateTime.utc(2024, 9, 2, 12),
-        localDateTime: DateTime.utc(2024, 9, 3, 12),
+        localDateTime: Value(DateTime.utc(2024, 9, 3, 12)),
       );
       final shiftedEarlier = await ctx.newRemoteAsset(
         ownerId: user.id,
         createdAt: DateTime.utc(2024, 9, 3, 12),
-        localDateTime: DateTime.utc(2024, 9, 2, 12),
+        localDateTime: Value(DateTime.utc(2024, 9, 2, 12)),
       );
       await ctx.newFace(assetId: shiftedLater.id, personId: person.id);
       await ctx.newFace(assetId: shiftedEarlier.id, personId: person.id);
