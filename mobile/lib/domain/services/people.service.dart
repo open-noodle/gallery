@@ -72,7 +72,7 @@ class PeopleService {
   ///
   /// Kept separate from [getAllPeople] so the remaining owner-scoped, local-first surface (the
   /// library people card) is unaffected.
-  Future<List<DriftPerson>> getAllPeopleWithSharedSpaces({
+  Future<List<Person>> getAllPeopleWithSharedSpaces({
     int minFaces = 3,
     PeopleSortBy sortBy = PeopleSortBy.photoCount,
   }) async {
@@ -103,8 +103,8 @@ class PeopleService {
     return _repository.updateName(person.id, name);
   }
 
-  // Upstream's spelling fix (updateBrithday -> updateBirthday) is taken; the fork keeps its
-  // signature, which needs the model rather than an id so it can route on spaceId.
+  // Upstream's fix for the long-standing typo in this method's name is taken; the fork keeps
+  // its signature, which needs the model rather than an id so it can route on spaceId.
   Future<int> updateBirthday(Person person, DateTime birthday) async {
     final spaceId = person.spaceId;
     if (spaceId != null) {

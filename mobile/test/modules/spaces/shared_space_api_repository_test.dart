@@ -687,7 +687,7 @@ void main() {
   });
 
   group('getSpacePeople mapping', () {
-    test('maps a space person onto DriftPerson with the space scope carried', () async {
+    test('maps a space person onto Person with the space scope carried', () async {
       stubGetSpacePeople((_) async => [spacePerson('sp1', name: 'Mia', assetCount: 7)]);
 
       final result = await repository.getSpacePeople('space-1', sortBy: PeopleSortBy.photoCount);
@@ -697,12 +697,9 @@ void main() {
       expect(person.name, 'Mia');
       expect(person.spaceId, 'space-1');
       expect(person.numberOfAssets, 7);
-      expect(person.isHidden, false);
-      // A space-person profile has no owner, favourite or colour concept.
-      expect(person.ownerId, '');
+      // A space-person profile has no favourite concept, so the mapper leaves the unified
+      // model's default and the "favorites first" half of comparePeople is inert for this list.
       expect(person.isFavorite, false);
-      expect(person.color, isNull);
-      expect(person.createdAt, DateTime.parse('2024-01-01T00:00:00.000Z'));
       expect(person.updatedAt, DateTime.parse('2024-02-02T00:00:00.000Z'));
     });
 

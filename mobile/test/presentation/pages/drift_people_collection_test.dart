@@ -18,17 +18,8 @@ import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
 import '../../test_utils.dart';
 import '../../widget_tester_extensions.dart';
 
-DriftPerson _person(String id, String name, {String? spaceId}) => DriftPerson(
-  id: id,
-  createdAt: DateTime(2024, 1, 1),
-  updatedAt: DateTime(2024, 1, 1),
-  ownerId: 'owner',
-  name: name,
-  isFavorite: false,
-  isHidden: false,
-  color: null,
-  spaceId: spaceId,
-);
+Person _person(String id, String name, {String? spaceId}) =>
+    Person(id: id, updatedAt: DateTime(2024, 1, 1), name: name, spaceId: spaceId);
 
 void main() {
   late Drift db;

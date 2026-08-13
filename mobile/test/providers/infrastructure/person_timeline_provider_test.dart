@@ -37,17 +37,8 @@ class _StubCurrentUserNotifier extends CurrentUserProvider {
   }
 }
 
-DriftPerson _person(String id, {String? spaceId}) => DriftPerson(
-  id: id,
-  createdAt: DateTime(2020),
-  updatedAt: DateTime(2020),
-  ownerId: 'owner',
-  name: 'Alice',
-  isFavorite: false,
-  isHidden: false,
-  color: null,
-  spaceId: spaceId,
-);
+Person _person(String id, {String? spaceId}) =>
+    Person(id: id, updatedAt: DateTime(2020), name: 'Alice', spaceId: spaceId);
 
 ProviderContainer _container({
   required TimelineFactory factory,
