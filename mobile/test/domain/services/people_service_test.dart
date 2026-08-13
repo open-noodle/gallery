@@ -21,17 +21,8 @@ void main() {
   late MockPersonApiRepository mockApiRepository;
   late MockSharedSpaceApiRepository mockSharedSpace;
 
-  DriftPerson person(String id, {String? spaceId}) => DriftPerson(
-    id: id,
-    createdAt: DateTime(2020),
-    updatedAt: DateTime(2020),
-    ownerId: 'owner',
-    name: 'Alice',
-    isFavorite: false,
-    isHidden: false,
-    color: null,
-    spaceId: spaceId,
-  );
+  Person person(String id, {String? spaceId}) =>
+      Person(id: id, updatedAt: DateTime(2020), name: 'Alice', spaceId: spaceId);
 
   setUpAll(() {
     registerFallbackValue(PeopleSortBy.photoCount);
@@ -45,7 +36,7 @@ void main() {
 
     // The local sync DB never receives faces for assets the viewer does not own, so the
     // drift query comes back empty for a Space-shared asset.
-    when(() => mockRepository.getAssetPeople(any())).thenAnswer((_) async => <DriftPerson>[]);
+    when(() => mockRepository.getAssetPeople(any())).thenAnswer((_) async => <Person>[]);
     // The server (like the web app) resolves the Space's people for that asset.
     when(() => mockApiRepository.getAssetPeople(any())).thenAnswer((_) async => [person('space-person')]);
   });
@@ -93,7 +84,7 @@ void main() {
           minFaces: any(named: 'minFaces'),
           sortBy: any(named: 'sortBy'),
         ),
-      ).thenAnswer((_) async => <DriftPerson>[]);
+      ).thenAnswer((_) async => <Person>[]);
       when(
         () => mockApiRepository.getAllPeopleWithSharedSpaces(sortBy: any(named: 'sortBy')),
       ).thenAnswer((_) async => [person('space-person')]);
@@ -239,14 +230,14 @@ void main() {
     });
   });
 
-  group('updateBrithday routing', () {
+  group('updateBirthday routing', () {
     final birthday = DateTime(1990, 5, 20);
 
     test('routes a personal person to the owner-only person endpoint and writes locally', () async {
       when(() => mockApiRepository.update(any(), birthday: any(named: 'birthday'))).thenAnswer((_) async {});
       when(() => mockRepository.updateBirthday(any(), any())).thenAnswer((_) async => 1);
 
-      final result = await sut.updateBrithday(person('p1'), birthday);
+      final result = await sut.updateBirthday(person('p1'), birthday);
 
       expect(result, isNonZero);
       verify(() => mockApiRepository.update('p1', birthday: birthday)).called(1);
@@ -271,7 +262,7 @@ void main() {
         ),
       ).thenAnswer((_) async => MockSharedSpacePersonResponseDto());
 
-      final result = await sut.updateBrithday(person('sp1', spaceId: 'space-1'), birthday);
+      final result = await sut.updateBirthday(person('sp1', spaceId: 'space-1'), birthday);
 
       expect(result, isNonZero);
       verify(() => mockSharedSpace.updateSpacePerson('space-1', 'sp1', birthday: birthday)).called(1);

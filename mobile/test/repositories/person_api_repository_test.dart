@@ -91,7 +91,7 @@ void main() {
 
   // Face-tap entry to the person detail page (open a photo → info → tap a face). The asset-info
   // endpoint carries the space-person id separately (spacePersonId) from the global identity id
-  // (dto.id), and the space id on the asset (resolvedSpaceId). To make the face-tap DriftPerson
+  // (dto.id), and the space id on the asset (resolvedSpaceId). To make the face-tap Person
   // shape-identical to the People-page one — so buildPersonTimelineRouteService takes the space
   // branch and the detail page loads photos — a shared-space person must be mapped with
   // id = spacePersonId and spaceId = resolvedSpaceId. This is the face-tap sibling of #727/#737.
@@ -157,12 +157,12 @@ void main() {
     // Regression test for the People-page sibling of issue #727: the web People page
     // surfaces Space-shared people via getAllPeople(withSharedSpaces: true) but mobile
     // read only the owner-scoped local Drift DB, so a viewer's People page was empty.
-    test('requests the shared-space-inclusive list and returns it mapped to DriftPerson', () async {
+    test('requests the shared-space-inclusive list and returns it mapped to Person', () async {
       stubGetAllPeople(() async => peopleResponse([personDto('space-person', name: 'Alice')]));
 
       final result = await repository.getAllPeopleWithSharedSpaces(sortBy: PeopleSortBy.photoCount);
 
-      expect(result, isA<List<DriftPerson>>());
+      expect(result, isA<List<Person>>());
       expect(result.map((p) => p.id), ['space-person']);
       expect(result.single.name, 'Alice');
       // withSharedSpaces mirrors the web People page; withHidden:false matches the local
@@ -283,9 +283,9 @@ void main() {
       expect(result.single.spaceId, isNull);
     });
 
-    // Slice 3: the picker's per-row photo count reads DriftPerson.numberOfAssets, sourced
+    // Slice 3: the picker's per-row photo count reads Person.numberOfAssets, sourced
     // straight from the already-fetched PersonResponseDto — no extra network call.
-    test('carries numberOfAssets from the DTO onto DriftPerson', () async {
+    test('carries numberOfAssets from the DTO onto Person', () async {
       stubGetAllPeople(() async => peopleResponse([personDto('counted', name: 'Alice', numberOfAssets: 1204)]));
 
       final result = await repository.getAllPeopleWithSharedSpaces(sortBy: PeopleSortBy.name);
