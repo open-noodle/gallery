@@ -5,13 +5,8 @@ import 'package:immich_mobile/models/photos_filter/filter_person.model.dart';
 import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/people_picker.provider.dart';
 
-Person _d(String id, String name, {int? numberOfAssets, String? spaceId}) => Person(
-  id: id,
-  updatedAt: DateTime(2024, 1, 1),
-  name: name,
-  numberOfAssets: numberOfAssets,
-  spaceId: spaceId,
-);
+Person _d(String id, String name, {int? numberOfAssets, String? spaceId}) =>
+    Person(id: id, updatedAt: DateTime(2024, 1, 1), name: name, numberOfAssets: numberOfAssets, spaceId: spaceId);
 
 FilterPerson _p(String id, String name) => FilterPerson(id: id, name: name);
 

@@ -712,9 +712,7 @@ void main() {
     });
 
     test('carries a present birthDate through', () async {
-      stubGetSpacePeople(
-        (_) async => [spacePerson('sp1', birthDate: api.Optional.present(DateTime.utc(1990, 5, 4)))],
-      );
+      stubGetSpacePeople((_) async => [spacePerson('sp1', birthDate: api.Optional.present(DateTime.utc(1990, 5, 4)))]);
 
       final result = await repository.getSpacePeople('space-1', sortBy: PeopleSortBy.name);
 
@@ -736,10 +734,7 @@ void main() {
     test('throws when the API returns null', () async {
       stubGetSpacePeople((_) async => null);
 
-      expect(
-        () => repository.getSpacePeople('space-1', sortBy: PeopleSortBy.name),
-        throwsA(isA<Exception>()),
-      );
+      expect(() => repository.getSpacePeople('space-1', sortBy: PeopleSortBy.name), throwsA(isA<Exception>()));
     });
   });
 
@@ -800,12 +795,7 @@ void main() {
         return List.generate(2, (i) => spacePerson('p$calls-$i'));
       });
 
-      final result = await repository.getSpacePeople(
-        'space-1',
-        sortBy: PeopleSortBy.name,
-        pageSize: 2,
-        maxPages: 3,
-      );
+      final result = await repository.getSpacePeople('space-1', sortBy: PeopleSortBy.name, pageSize: 2, maxPages: 3);
 
       expect(calls, 3);
       expect(result, hasLength(6));
@@ -816,9 +806,7 @@ void main() {
 
       await repository.getSpacePeople('space-1', sortBy: PeopleSortBy.name);
 
-      verify(
-        () => mockApi.getSpacePeople('space-1', limit: 100, offset: 0, withHidden: false),
-      ).called(1);
+      verify(() => mockApi.getSpacePeople('space-1', limit: 100, offset: 0, withHidden: false)).called(1);
     });
 
     // Regression guard: the default page size is a SERVER contract, not a free choice.
