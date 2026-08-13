@@ -701,9 +701,10 @@ describe(AuthService.name, () => {
       await expect(authenticateAdmin('GET', uri)).rejects.toBeInstanceOf(ForbiddenException);
     });
 
-    // The face-repair allowlist is read-only by construction: the preview branch requires
-    // metadata.method === 'GET' before the regex is consulted. These are the same paths as the
-    // allowlisted reads above, and they must still be refused when the method mutates.
+    // The face-repair allowlist is read-only by intent, and almost read-only by construction: a GET is
+    // matched against DEMO_ADMIN_PREVIEW_READ_ROUTES, and the ONLY non-GET that can pass is a POST on the
+    // separate, one-entry DEMO_ADMIN_PREVIEW_READ_POST_ROUTES list (cluster-faces, covered below). Everything
+    // else must still be refused when the method mutates.
     it.each([
       ['POST', '/api/admin/face-repair/scan'],
       ['POST', '/api/admin/face-repair/resolve'],
@@ -712,7 +713,12 @@ describe(AuthService.name, () => {
       ['POST', '/api/admin/face-repair/unconfirm'],
       ['POST', '/api/admin/face-repair/resolutions/remove'],
       ['POST', '/api/admin/face-repair/owner/owner-id/people'],
-      ['POST', '/api/admin/face-repair/scan/person/person-id/cluster-faces'],
+      // The GET-only read routes must not become POST-able just because ONE POST is now allowed.
+      ['POST', '/api/admin/face-repair/scan/person/person-id'],
+      ['POST', '/api/admin/face-repair/resolutions'],
+      // ...and the cluster-faces exception is POST-only: no other method rides in on it.
+      ['DELETE', '/api/admin/face-repair/scan/person/person-id/cluster-faces'],
+      ['PUT', '/api/admin/face-repair/scan/person/person-id/cluster-faces'],
     ])('blocks the demo user from %s %s', async (method, uri) => {
       setDemoMode(true);
       mockSessionFor(demoUser);
@@ -727,6 +733,49 @@ describe(AuthService.name, () => {
       await expect(authenticateAdmin('GET', '/api/admin/face-repair/resolutions/export')).rejects.toBeInstanceOf(
         ForbiddenException,
       );
+    });
+
+    // The single POST-shaped READ. Manual review reads its whole face grid from this route, and it cannot be
+    // a GET because it takes an exclude-list body — while it was refused, the page told every visitor the
+    // person had no faces in their cluster.
+    it('allows the demo user to POST cluster-faces', async () => {
+      setDemoMode(true);
+      mockSessionFor(demoUser);
+
+      await expect(
+        authenticateAdmin('POST', '/api/admin/face-repair/scan/person/person-id/cluster-faces'),
+      ).resolves.toMatchObject({
+        user: expect.objectContaining({ email: 'demo@gallery.app', isAdmin: false }),
+      });
+    });
+
+    it('blocks a path that merely starts with the cluster-faces route', async () => {
+      setDemoMode(true);
+      mockSessionFor(demoUser);
+
+      await expect(
+        authenticateAdmin('POST', '/api/admin/face-repair/scan/person/person-id/cluster-faces/delete'),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    // The POST carve-out is for the DEMO user on a demo instance only — it is not a hole any non-admin can
+    // walk through, and it closes with demo mode.
+    it('blocks a non-demo user from the cluster-faces POST', async () => {
+      setDemoMode(true);
+      mockSessionFor(nonDemoUser);
+
+      await expect(
+        authenticateAdmin('POST', '/api/admin/face-repair/scan/person/person-id/cluster-faces'),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('blocks the cluster-faces POST when demo mode is off', async () => {
+      setDemoMode(false);
+      mockSessionFor(demoUser);
+
+      await expect(
+        authenticateAdmin('POST', '/api/admin/face-repair/scan/person/person-id/cluster-faces'),
+      ).rejects.toBeInstanceOf(ForbiddenException);
     });
 
     it('blocks demo user mutating admin requests before route handlers can run', async () => {

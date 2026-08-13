@@ -31,6 +31,7 @@ import { BaseService } from 'src/services/base.service';
 import { StorageService } from 'src/services/storage.service';
 import { isGranted } from 'src/utils/access';
 import { HumanReadableSize } from 'src/utils/bytes';
+import { isDemoReadOnlyPostRoute } from 'src/utils/demo-preview';
 import { mimeTypes } from 'src/utils/mime-types';
 import { generateProfileImage } from 'src/utils/profile-image';
 import { getUserAgentDetails } from 'src/utils/request';
@@ -73,9 +74,11 @@ const DEMO_ADMIN_PREVIEW_READ_ROUTES = [
   /^\/api\/admin\/integrity\/report$/,
   /^\/api\/admin\/database-backups$/,
   // Face Repair console (demo read-only preview). Anchored like every entry above. The write half of
-  // `admin/face-repair` (scan, resolve, decline, unconfirm, cluster-faces, resolutions/remove, and the
-  // POST twin of owner/:id/people) is unreachable here regardless: the preview branch below requires
-  // `metadata.method === 'GET'` before these regexes are tested, and DemoInterceptor refuses it again.
+  // `admin/face-repair` (scan, resolve, decline, unconfirm, resolutions/remove, and the POST twin of
+  // owner/:id/people) is unreachable here regardless: these regexes are only tested for a GET, and
+  // DemoInterceptor refuses the method again. The ONE exception is `scan/person/:id/cluster-faces`, a read
+  // that takes a body and so cannot be a GET — it is NOT in this list, it lives in
+  // src/utils/demo-preview.ts, which both this branch and DemoInterceptor consult for POSTs.
   // `faces/:assetFaceId/thumbnail` is a file-serving route and is opened deliberately — without it the
   // console renders as empty grey tiles. Note what does and does not make that safe: the route itself
   // applies NO owner scope and no `deletedAt` filter (getFaceByIdIncludingTombstoned →
@@ -297,13 +300,17 @@ export class AuthService extends BaseService {
 
     if (!authDto.user.isAdmin && adminRoute) {
       const { demo } = this.configRepository.getEnv();
+      // A GET is matched against the read allowlist; the ONLY other method that can pass is a POST on a
+      // route that reads but cannot be a GET (see isDemoReadOnlyPostRoute). Every other method is refused
+      // before either list is consulted.
       const isDemoPreviewRead =
         demo.enabled &&
         authDto.user.email === demo.email &&
-        metadata.method === 'GET' &&
         !authDto.apiKey &&
         !authDto.sharedLink &&
-        isDemoAdminPreviewReadRoute(uri);
+        (metadata.method === 'GET'
+          ? isDemoAdminPreviewReadRoute(uri)
+          : metadata.method === 'POST' && isDemoReadOnlyPostRoute(uri));
 
       if (!isDemoPreviewRead) {
         this.logger.warn(`Denied access to admin only route: ${uri}`);
