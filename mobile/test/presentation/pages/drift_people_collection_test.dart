@@ -52,8 +52,8 @@ void main() {
     await db.close();
   });
 
-  // .first: the page puts ValueKey(person.id) on BOTH the tile Column and its
-  // CircleAvatar (drift_people_collection.page.dart:82,92), so byKey matches two widgets.
+  // .first: PeopleGrid puts ValueKey(person.id) on BOTH the tile's outer Column and its
+  // CircleAvatar (people_grid.widget.dart), so byKey matches two widgets.
   double dxOf(WidgetTester tester, String personId) => tester.getTopLeft(find.byKey(ValueKey(personId)).first).dx;
   double dyOf(WidgetTester tester, String personId) => tester.getTopLeft(find.byKey(ValueKey(personId)).first).dy;
 
