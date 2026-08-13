@@ -21,7 +21,14 @@ class MockDriftPeopleService extends Mock implements DriftPeopleService {}
 // take the DriftPerson first. A Fake fallback (mocktail's own recommended pattern for this
 // exact case) sidesteps it; a real _person() instance reproduces the failure even though it
 // satisfies the same interface.
-class FakeDriftPerson extends Fake implements DriftPerson {}
+// The toString override is required, not cosmetic: DriftPerson is a freezed class whose
+// generated mixin implements DiagnosticableTreeMixin, so the interface declares
+// `toString({DiagnosticLevel minLevel})`. Object's plain toString() does not conform and the
+// file fails to compile without this.
+class FakeDriftPerson extends Fake implements DriftPerson {
+  @override
+  String toString({DiagnosticLevel minLevel = DiagnosticLevel.info}) => 'FakeDriftPerson';
+}
 
 DriftPerson _person({String id = 'p1', String? spaceId}) => DriftPerson(
   id: id,
