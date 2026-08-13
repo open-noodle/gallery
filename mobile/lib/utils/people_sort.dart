@@ -9,7 +9,7 @@ import 'package:immich_mobile/domain/models/person.model.dart';
 ///
 /// Lives here rather than in `people.utils.dart` so the repository layer can sort without
 /// transitively importing `flutter/material.dart` and the person-edit modal widgets.
-int comparePeople(DriftPerson a, DriftPerson b, PeopleSortBy sortBy) {
+int comparePeople(Person a, Person b, PeopleSortBy sortBy) {
   if (a.isFavorite != b.isFavorite) {
     return a.isFavorite ? -1 : 1;
   }
