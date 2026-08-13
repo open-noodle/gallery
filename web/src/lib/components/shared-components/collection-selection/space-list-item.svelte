@@ -6,7 +6,7 @@
   import { normalizeSearchString } from '$lib/utils/string-utils';
   import type { SharedSpaceResponseDto } from '@immich/sdk';
   import { Icon } from '@immich/ui';
-  import { mdiAccountMultipleOutline, mdiCheckCircle } from '@mdi/js';
+  import { mdiAccountMultipleOutline, mdiCheckCircle, mdiChevronDown, mdiChevronUp } from '@mdi/js';
   import type { Action } from 'svelte/action';
   import { t } from 'svelte-i18n';
 
@@ -15,6 +15,9 @@
     searchQuery?: string;
     selected: boolean;
     multiSelected?: boolean;
+    /** The space has linked albums, so clicking the row opens them instead of picking the pool. */
+    expandable?: boolean;
+    expanded?: boolean;
     onSpaceClick: () => void;
     onMultiSelect: () => void;
   }
@@ -24,6 +27,8 @@
     searchQuery = '',
     selected = false,
     multiSelected = false,
+    expandable = false,
+    expanded = false,
     onSpaceClick,
     onMultiSelect,
   }: Props = $props();
@@ -86,6 +91,7 @@
     class:dark:bg-gray-700={selected}
     use:longPress={{ onLongPress: () => handleMultiSelectClicked() }}
     data-testid="space-row"
+    aria-expanded={expandable ? expanded : undefined}
   >
     <span class="relative size-16 shrink-0">
       <SpaceCollage assets={collageAssets} />
@@ -110,6 +116,13 @@
         {/if}
       </span>
     </span>
+    {#if expandable}
+      <!-- pe-12 clears the multi-select checkbox, which is positioned over the row's last 3rem
+           and paints on top of this on hover — exactly when the chevron matters most. -->
+      <span class="ms-auto flex items-center pe-12" data-testid="space-row-chevron">
+        <Icon icon={expanded ? mdiChevronUp : mdiChevronDown} size="1.25rem" />
+      </span>
+    {/if}
   </button>
 
   {#if mouseOver || multiSelected}
