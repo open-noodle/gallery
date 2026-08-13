@@ -3,12 +3,12 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
+import 'package:immich_mobile/models/photos_filter/filter_person.model.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/active_filter_chip.widget.dart';
 import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
 import 'package:immich_mobile/providers/photos_filter/active_chips.dart';
@@ -17,7 +17,7 @@ import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dar
 
 import '../../../widget_tester_extensions.dart';
 
-const _alice = PersonDto(id: 'a', name: 'Alice', isHidden: false, thumbnailPath: '');
+const _alice = FilterPerson(id: 'a', name: 'Alice');
 
 void main() {
   late Drift db;
