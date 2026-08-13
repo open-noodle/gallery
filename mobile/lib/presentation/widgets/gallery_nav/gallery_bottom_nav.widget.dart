@@ -145,7 +145,9 @@ class _GalleryBottomNavState extends ConsumerState<GalleryBottomNav> {
         unawaited(ref.read(remoteAlbumProvider.notifier).refresh());
       case GalleryTabEnum.library:
         ref.invalidate(localAlbumProvider);
-        ref.invalidate(driftGetAllPeopleProvider);
+        // The local list is a Drift stream now, so its invalidate is obsolete (this file is
+        // fork-only, so upstream's deletion of the equivalent line never reached it).
+        // The server-backed lists are NOT reactive and must still be invalidated here.
         ref.invalidateServerPeopleLists();
     }
 
