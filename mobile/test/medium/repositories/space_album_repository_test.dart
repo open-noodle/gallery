@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/infrastructure/repositories/remote_album.repository.dart';
@@ -122,6 +123,125 @@ void main() {
 
       expect(albums.single.linkedAt, linked);
       expect(albums.single.updatedAt, updated);
+    });
+
+    test('projects the album createdAt from the metadata row', () async {
+      final user = await ctx.newUser();
+      final space = await ctx.newSharedSpace(createdById: user.id);
+      final album = await ctx.newSharedSpaceAlbum(name: 'Hawaii', createdAt: DateTime.utc(2025, 6, 1));
+      await ctx.insertSharedSpaceAlbumLink(spaceId: space.id, albumId: album.id);
+
+      final albums = await repo.watchLinkedAlbums(space.id).first;
+      expect(albums.single.createdAt, album.createdAt);
+    });
+
+    // #973 — the album search box matches the description, so the join has to
+    // carry it. It is only ever read for search, hence no other coverage.
+    test('projects the album description from the metadata row, null when unset', () async {
+      final user = await ctx.newUser();
+      final space = await ctx.newSharedSpace(createdById: user.id);
+      final described = await ctx.newSharedSpaceAlbum(name: 'Hawaii', description: 'Reef dives, 2025');
+      final bare = await ctx.newSharedSpaceAlbum(name: 'Reef');
+      await ctx.insertSharedSpaceAlbumLink(spaceId: space.id, albumId: described.id);
+      await ctx.insertSharedSpaceAlbumLink(spaceId: space.id, albumId: bare.id);
+
+      final albums = await repo.watchLinkedAlbums(space.id).first;
+      expect(albums.firstWhere((a) => a.id == described.id).description, 'Reef dives, 2025');
+      expect(albums.firstWhere((a) => a.id == bare.id).description, isNull);
+    });
+
+    test('derives startDate/endDate from the album assets, truncated to a UTC day', () async {
+      final user = await ctx.newUser();
+      final space = await ctx.newSharedSpace(createdById: user.id);
+      final album = await ctx.newSharedSpaceAlbum(name: 'Hawaii');
+      await ctx.insertSharedSpaceAlbumLink(spaceId: space.id, albumId: album.id);
+
+      for (final at in [
+        DateTime.utc(2026, 1, 5, 9, 30),
+        DateTime.utc(2026, 1, 20, 17, 45),
+        DateTime.utc(2026, 1, 12, 3, 0),
+      ]) {
+        final asset = await ctx.newRemoteAsset(ownerId: user.id, createdAt: at);
+        await ctx.insertSharedSpaceAlbumAsset(albumId: album.id, assetId: asset.id);
+      }
+
+      final albums = await repo.watchLinkedAlbums(space.id).first;
+      // S15 — day precision, matching the server's ::date cast. Times of day gone.
+      expect(albums.single.startDate, DateTime.utc(2026, 1, 5));
+      expect(albums.single.endDate, DateTime.utc(2026, 1, 20));
+    });
+
+    test('leaves startDate/endDate null for an album with no assets', () async {
+      final user = await ctx.newUser();
+      final space = await ctx.newSharedSpace(createdById: user.id);
+      final album = await ctx.newSharedSpaceAlbum(name: 'Empty');
+      await ctx.insertSharedSpaceAlbumLink(spaceId: space.id, albumId: album.id);
+
+      final albums = await repo.watchLinkedAlbums(space.id).first;
+      expect(albums.single.assetCount, 0);
+      expect(albums.single.startDate, isNull);
+      expect(albums.single.endDate, isNull);
+    });
+
+    // S13 — remote_asset.localDateTime is nullable, so MIN/MAX can be null even
+    // for an album that has assets. Such an album must be treated exactly like
+    // an empty one for the date range, but its asset count is unaffected.
+    test('startDate/endDate stay null when every asset has a null localDateTime (S13)', () async {
+      final user = await ctx.newUser();
+      final space = await ctx.newSharedSpace(createdById: user.id);
+      final album = await ctx.newSharedSpaceAlbum(name: 'NoDates');
+      await ctx.insertSharedSpaceAlbumLink(spaceId: space.id, albumId: album.id);
+
+      final asset1 = await ctx.newRemoteAsset(ownerId: user.id, localDateTime: const Value(null));
+      final asset2 = await ctx.newRemoteAsset(ownerId: user.id, localDateTime: const Value(null));
+      await ctx.insertSharedSpaceAlbumAsset(albumId: album.id, assetId: asset1.id);
+      await ctx.insertSharedSpaceAlbumAsset(albumId: album.id, assetId: asset2.id);
+
+      final albums = await repo.watchLinkedAlbums(space.id).first;
+      expect(albums.single.assetCount, 2, reason: 'asset count must be unaffected by missing localDateTime');
+      expect(albums.single.startDate, isNull);
+      expect(albums.single.endDate, isNull);
+    });
+
+    test('excludes deleted and hidden assets from the date range', () async {
+      final user = await ctx.newUser();
+      final space = await ctx.newSharedSpace(createdById: user.id);
+      final album = await ctx.newSharedSpaceAlbum(name: 'Hawaii');
+      await ctx.insertSharedSpaceAlbumLink(spaceId: space.id, albumId: album.id);
+
+      final visible = await ctx.newRemoteAsset(ownerId: user.id, createdAt: DateTime.utc(2026, 1, 10));
+      final deleted = await ctx.newRemoteAsset(
+        ownerId: user.id,
+        createdAt: DateTime.utc(2026, 5, 1),
+        deletedAt: DateTime.utc(2026, 5, 2),
+      );
+      final hidden = await ctx.newRemoteAsset(
+        ownerId: user.id,
+        createdAt: DateTime.utc(2026, 6, 1),
+        visibility: AssetVisibility.hidden,
+      );
+      for (final a in [visible, deleted, hidden]) {
+        await ctx.insertSharedSpaceAlbumAsset(albumId: album.id, assetId: a.id);
+      }
+
+      final albums = await repo.watchLinkedAlbums(space.id).first;
+      expect(albums.single.assetCount, 1);
+      expect(albums.single.endDate, DateTime.utc(2026, 1, 10));
+    });
+
+    // S20
+    test('reports the per-space link date when an album is linked to two spaces', () async {
+      final user = await ctx.newUser();
+      final s1 = await ctx.newSharedSpace(createdById: user.id);
+      final s2 = await ctx.newSharedSpace(createdById: user.id);
+      final album = await ctx.newSharedSpaceAlbum(name: 'Shared');
+      await ctx.insertSharedSpaceAlbumLink(spaceId: s1.id, albumId: album.id, createdAt: DateTime.utc(2026, 1, 1));
+      await ctx.insertSharedSpaceAlbumLink(spaceId: s2.id, albumId: album.id, createdAt: DateTime.utc(2026, 3, 1));
+
+      final inS1 = await repo.watchLinkedAlbums(s1.id).first;
+      final inS2 = await repo.watchLinkedAlbums(s2.id).first;
+      expect(inS1.single.linkedAt, DateTime.utc(2026, 1, 1));
+      expect(inS2.single.linkedAt, DateTime.utc(2026, 3, 1));
     });
   });
 
