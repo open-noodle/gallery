@@ -2,13 +2,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/utils/people_sort.dart';
 
-Person _p(String id, {String name = '', bool isFavorite = false, int? numberOfAssets}) => Person(
-  id: id,
-  updatedAt: DateTime(2024, 1, 1),
-  name: name,
-  isFavorite: isFavorite,
-  numberOfAssets: numberOfAssets,
-);
+Person _p(String id, {String name = '', bool isFavorite = false, int? numberOfAssets}) =>
+    Person(id: id, updatedAt: DateTime(2024, 1, 1), name: name, isFavorite: isFavorite, numberOfAssets: numberOfAssets);
 
 List<Person> _sorted(List<Person> people, PeopleSortBy sortBy) =>
     [...people]..sort((a, b) => comparePeople(a, b, sortBy));
