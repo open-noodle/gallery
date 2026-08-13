@@ -3,8 +3,8 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
+import 'package:immich_mobile/models/photos_filter/filter_person.model.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/strips/strip_scaffold.widget.dart';
 import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
 import 'package:immich_mobile/providers/photos_filter/filter_debounce.provider.dart';
@@ -116,7 +116,7 @@ class _PersonTile extends ConsumerWidget {
           if (existing != null) {
             ref.read(photosFilterProvider.notifier).togglePerson(existing);
           } else {
-            final minimal = PersonDto(id: person.id, name: person.name, isHidden: false, thumbnailPath: '');
+            final minimal = FilterPerson(id: person.id, name: person.name);
             ref.read(photosFilterProvider.notifier).togglePerson(minimal);
           }
         },

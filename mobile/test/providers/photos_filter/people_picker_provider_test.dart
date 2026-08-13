@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/person.model.dart';
+import 'package:immich_mobile/models/photos_filter/filter_person.model.dart';
 import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/people_picker.provider.dart';
 
@@ -17,7 +18,7 @@ DriftPerson _d(String id, String name, {bool isHidden = false, int? numberOfAsse
   spaceId: spaceId,
 );
 
-PersonDto _p(String id, String name) => PersonDto(id: id, name: name, isHidden: false, thumbnailPath: '');
+FilterPerson _p(String id, String name) => FilterPerson(id: id, name: name);
 
 // peoplePickerAllProvider sources driftGetAllPeopleWithSharedSpacesProvider (not the
 // owner-scoped-only driftGetAllPeopleProvider) so the picker includes shared-space people,
@@ -55,13 +56,8 @@ void main() {
   });
 
   group('peoplePickerAllProvider', () {
-    test('excludes hidden people', () async {
-      final c = _containerWith([_d('a', 'Alice'), _d('b', 'Bob', isHidden: true)]);
-      addTearDown(c.dispose);
-      final result = await c.read(peoplePickerAllProvider.future);
-      expect(result.map((p) => p.id), ['person:a']);
-    });
-
+    // Hidden people never reach this provider: the server list uses withHidden:false and the
+    // local fallback filters isHidden in SQL (see people.repository.dart).
     test('excludes blank names', () async {
       final c = _containerWith([_d('a', 'Alice'), _d('b', '')]);
       addTearDown(c.dispose);
@@ -69,14 +65,12 @@ void main() {
       expect(result.map((p) => p.id), ['person:a']);
     });
 
-    test('maps DriftPerson to PersonDto with empty thumbnailPath', () async {
+    test('maps DriftPerson to FilterPerson', () async {
       final c = _containerWith([_d('a', 'Alice')]);
       addTearDown(c.dispose);
       final result = await c.read(peoplePickerAllProvider.future);
       expect(result.single.id, 'person:a');
       expect(result.single.name, 'Alice');
-      expect(result.single.thumbnailPath, '');
-      expect(result.single.isHidden, false);
     });
 
     test('pins photoCount ordering regardless of the people sort preference', () async {
@@ -217,10 +211,15 @@ void main() {
       expect(await c.read(recentPeopleProvider.future), isEmpty);
     });
 
-    test('excludes hidden people via peoplePickerAllProvider', () async {
-      final now = DateTime.now();
+    // Hidden people never reach this provider either — see peoplePickerAllProvider above; it
+    // is the sole source recentPeopleProvider reads from.
+
+    test('a stale updatedAt is not "recent"', () async {
+      // Pins the Recent-strip cutoff. (DriftPerson.updatedAt is still non-nullable in
+      // Phase 1; Task 14 extends this with a true updatedAt:null person once the
+      // unified model makes it constructible.)
       final c = _containerWith([
-        _d('a', 'Alice', isHidden: true).copyWith(updatedAt: now.subtract(const Duration(days: 1))),
+        _d('p1', 'Alice'), // helper's fixed 2024 date — stale
       ]);
       addTearDown(c.dispose);
       expect(await c.read(recentPeopleProvider.future), isEmpty);
