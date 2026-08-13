@@ -147,6 +147,7 @@ class _GalleryBottomNavState extends ConsumerState<GalleryBottomNav> {
         ref.invalidate(localAlbumProvider);
         ref.invalidate(driftGetAllPeopleProvider);
         ref.invalidate(driftGetAllPeopleWithSharedSpacesProvider);
+        ref.invalidate(driftSpacePeopleProvider);
     }
 
     ref.read(hapticFeedbackProvider.notifier).selectionClick();

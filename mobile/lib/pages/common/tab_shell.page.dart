@@ -155,6 +155,7 @@ void _onNavigationSelected(TabsRouter router, int index, WidgetRef ref) {
     // The local list is a Drift stream now, so upstream's invalidate of it is correctly gone.
     // The server-backed list is NOT reactive and must still be invalidated here.
     ref.invalidate(driftGetAllPeopleWithSharedSpacesProvider);
+    ref.invalidate(driftSpacePeopleProvider);
   }
 
   ref.read(hapticFeedbackProvider.notifier).selectionClick();

@@ -3,6 +3,7 @@ import 'package:immich_mobile/data/server/api_repository.dart';
 import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/providers/api.provider.dart';
 import 'package:immich_mobile/services/api.service.dart';
+import 'package:immich_mobile/utils/people_sort.dart';
 import 'package:openapi/api.dart';
 
 final personApiRepositoryProvider = Provider((ref) => PersonApiRepository(ref.watch(apiServiceProvider)));
@@ -39,48 +40,11 @@ class PersonApiRepository extends ApiRepository {
       page += 1;
     }
     // The server returns identity-projected people in name order; re-sort client-side to
-    // honour the People page's sort setting, exactly like the web page (sortPeople).
-    dtos.sort((a, b) => _comparePeople(a, b, sortBy));
-    return dtos.map(_toPerson).toList();
-  }
-
-  // Mirrors the web comparePeople / the local Drift ORDER BY: favorites first, named before
-  // unnamed, then name/asset-count depending on the sort mode, with id as the tiebreaker.
-  // Hidden people are excluded server-side (withHidden:false), so isHidden is not compared.
-  static int _comparePeople(PersonResponseDto a, PersonResponseDto b, PeopleSortBy sortBy) {
-    final aFavorite = a.isFavorite.orElse(null) ?? false;
-    final bFavorite = b.isFavorite.orElse(null) ?? false;
-    if (aFavorite != bFavorite) {
-      return aFavorite ? -1 : 1;
-    }
-
-    final aName = a.name.trim();
-    final bName = b.name.trim();
-    final aHasName = aName.isNotEmpty;
-    final bHasName = bName.isNotEmpty;
-    if (aHasName != bHasName) {
-      return aHasName ? -1 : 1;
-    }
-
-    final nameCompare = aName.toLowerCase().compareTo(bName.toLowerCase());
-    // Most assets first.
-    final countCompare = (b.numberOfAssets.orElse(null) ?? 0).compareTo(a.numberOfAssets.orElse(null) ?? 0);
-    if (aHasName && sortBy == PeopleSortBy.name) {
-      if (nameCompare != 0) {
-        return nameCompare;
-      }
-      if (countCompare != 0) {
-        return countCompare;
-      }
-    } else {
-      if (countCompare != 0) {
-        return countCompare;
-      }
-      if (nameCompare != 0) {
-        return nameCompare;
-      }
-    }
-    return a.id.compareTo(b.id);
+    // honour the People page's sort setting, exactly like the web page (sortPeople). Mapping
+    // first lets both repositories share one comparator over Person.
+    final people = dtos.map(_toPerson).toList();
+    people.sort((a, b) => comparePeople(a, b, sortBy));
+    return people;
   }
 
   // The unified Person model carries no owner/created/face-asset/hidden/colour fields, and
