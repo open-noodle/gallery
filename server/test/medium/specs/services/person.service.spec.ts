@@ -146,9 +146,9 @@ const setupRecognition = (db?: Kysely<DB>) => {
     ],
     mock: [JobRepository, LoggingRepository, SystemMetadataRepository],
   });
-  const metadata = ctx.getMock<SystemMetadataRepository, Mocked<SystemMetadataRepository>>(SystemMetadataRepository);
+  const metadata = ctx.getMock(SystemMetadataRepository);
   metadata.get.mockResolvedValue({ machineLearning: { facialRecognition: { minFaces: 1 } } } as any);
-  const jobs = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+  const jobs = ctx.getMock(JobRepository);
   jobs.queue.mockResolvedValue();
   jobs.queueAll.mockResolvedValue();
   return { sut, ctx };
@@ -2167,9 +2167,7 @@ describe(PersonService.name, () => {
       // instances means the spy below (on the real faceIdentityRepo) is observed by this sut exactly the
       // same as it would have been on PersonService before the move.
       const faceSuggestion = ctx.getService(FaceSuggestionService);
-      ctx
-        .getMock<SystemMetadataRepository, Mocked<SystemMetadataRepository>>(SystemMetadataRepository)
-        .get.mockResolvedValue(enabled as any);
+      ctx.getMock(SystemMetadataRepository).get.mockResolvedValue(enabled as any);
       const faceIdentityRepo = ctx.get(FaceIdentityRepository);
       const verdictRepo = ctx.get(FacePersonVerdictRepository);
       const { user } = await ctx.newUser();
