@@ -2,8 +2,12 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/domain/models/album/album.model.dart';
+import 'package:immich_mobile/domain/models/config/app_config.dart';
 import 'package:immich_mobile/domain/models/setting.model.dart';
 import 'package:immich_mobile/domain/services/setting.service.dart';
+import 'package:immich_mobile/domain/services/user.service.dart';
+import 'package:immich_mobile/models/albums/album_search.model.dart';
 import 'package:immich_mobile/presentation/actions/action.dart';
 import 'package:immich_mobile/presentation/actions/action.widget.dart';
 import 'package:immich_mobile/presentation/actions/download.action.dart';
@@ -11,18 +15,51 @@ import 'package:immich_mobile/presentation/actions/share.action.dart';
 import 'package:immich_mobile/presentation/widgets/action_buttons/remove_from_album_action_button.widget.dart';
 import 'package:immich_mobile/presentation/widgets/spaces/space_album_bottom_sheet.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.state.dart';
+import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
+import 'package:immich_mobile/providers/infrastructure/remote_album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/setting.provider.dart';
+import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
+import 'package:immich_mobile/providers/shared_space.provider.dart';
 import 'package:immich_mobile/providers/timeline/multiselect.provider.dart';
+import 'package:immich_mobile/providers/user.provider.dart';
+import 'package:mocktail/mocktail.dart';
 // easy_localization initializes shared_preferences internally; tests need the mock initializer.
 // ignore: depend_on_referenced_packages
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../fixtures/user.stub.dart';
 import '../../../service.mocks.dart';
 
 // Download and Share both render as ActionMenuItem after upstream's action-model
 // migration, so match on the wrapped action type — byType(ActionMenuItem) alone
 // could not tell them apart.
 Finder _actionOfType<T extends ActionBuilder>() => find.byWidgetPredicate((w) => w is ActionWidget && w.action is T);
+
+class _MockUserService extends Mock implements UserService {}
+
+class _StubCurrentUserNotifier extends CurrentUserProvider {
+  _StubCurrentUserNotifier(super.service) {
+    state = UserStub.user1;
+  }
+}
+
+/// `AlbumSelector` fires a post-frame `refresh()` against a live `RemoteAlbumService` that
+/// this harness has no reason to stand up; the picker composes it, so stub both.
+class _StubRemoteAlbumNotifier extends RemoteAlbumNotifier {
+  @override
+  RemoteAlbumState build() => const RemoteAlbumState(albums: []);
+
+  @override
+  Future<void> refresh() async {}
+
+  @override
+  List<RemoteAlbum> searchAlbums(
+    List<RemoteAlbum> albums,
+    String query,
+    String? userId, [
+    QuickFilterMode filterMode = QuickFilterMode.all,
+  ]) => albums;
+}
 
 // ---------------------------------------------------------------------------
 // Helper
@@ -43,11 +80,22 @@ class _DefaultSettingsNotifier extends SettingsNotifier {
 }
 
 Widget _wrap(Widget widget, {List<Override> overrides = const []}) {
+  final userService = _MockUserService();
+  when(() => userService.tryGetMyUser()).thenReturn(UserStub.user1);
+  when(() => userService.watchMyUser()).thenAnswer((_) => const Stream.empty());
+
   return ProviderScope(
     overrides: [
       timelineStateProvider.overrideWith(TimelineStateNotifier.new),
       multiSelectProvider.overrideWith(MultiSelectNotifier.new),
       settingsProvider.overrideWith(_DefaultSettingsNotifier.new),
+      // The sheet now always mounts CollectionPicker (#965 follow-up), which composes
+      // AlbumSelector + SpaceCollectionSection; both read live providers this harness has no
+      // reason to stand up.
+      currentUserProvider.overrideWith((ref) => _StubCurrentUserNotifier(userService)),
+      remoteAlbumProvider.overrideWith(() => _StubRemoteAlbumNotifier()),
+      appConfigProvider.overrideWithValue(const AppConfig()),
+      sharedSpacesProvider.overrideWith((ref) async => const []),
       ...overrides,
     ],
     child: EasyLocalization(
