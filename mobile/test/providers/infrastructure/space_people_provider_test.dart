@@ -8,17 +8,8 @@ import 'package:mocktail/mocktail.dart';
 
 class MockSharedSpaceApiRepository extends Mock implements SharedSpaceApiRepository {}
 
-DriftPerson _p(String id, {String name = ''}) => DriftPerson(
-  id: id,
-  createdAt: DateTime(2024, 1, 1),
-  updatedAt: DateTime(2024, 1, 1),
-  ownerId: '',
-  name: name,
-  isFavorite: false,
-  isHidden: false,
-  color: null,
-  spaceId: 'space-1',
-);
+Person _p(String id, {String name = ''}) =>
+    Person(id: id, updatedAt: DateTime(2024, 1, 1), name: name, spaceId: 'space-1');
 
 void main() {
   setUpAll(() {

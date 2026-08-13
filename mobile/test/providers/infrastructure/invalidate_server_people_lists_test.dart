@@ -22,7 +22,7 @@ void main() {
             builder: (context, ref, _) {
               ref.watch(driftGetAllPeopleWithSharedSpacesProvider(PeopleSortBy.photoCount));
               ref.watch(driftSpacePeopleProvider((spaceId: 's1', sortBy: PeopleSortBy.photoCount)));
-              ref.watch(driftGetAllPeopleProvider(PeopleSortBy.photoCount));
+              ref.watch(getAllPeopleProvider(PeopleSortBy.photoCount));
               return const SizedBox.shrink();
             },
           ),
@@ -38,15 +38,17 @@ void main() {
       overrides: [
         driftGetAllPeopleWithSharedSpacesProvider.overrideWith((ref, sortBy) async {
           withShared++;
-          return <DriftPerson>[];
+          return <Person>[];
         }),
         driftSpacePeopleProvider.overrideWith((ref, key) async {
           spacePeople++;
-          return <DriftPerson>[];
+          return <Person>[];
         }),
-        driftGetAllPeopleProvider.overrideWith((ref, sortBy) async {
+        // The local list is a StreamProvider now, so the override returns a Stream; the counter
+        // still increments once per subscription, which is what this test distinguishes.
+        getAllPeopleProvider.overrideWith((ref, sortBy) {
           local++;
-          return <DriftPerson>[];
+          return Stream.value(<Person>[]);
         }),
       ],
     );
