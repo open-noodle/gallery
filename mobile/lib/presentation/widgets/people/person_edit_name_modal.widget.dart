@@ -30,10 +30,10 @@ class _PersonNameEditFormState extends ConsumerState<PersonNameEditForm> {
     try {
       final result = await ref.read(peopleServiceProvider).updateName(widget.person, newName);
       if (result != 0 && mounted) {
+        // The local list is a Drift stream now, so upstream correctly dropped its invalidate.
         // A Drift stream can never observe a server-side edit — a space-person rename writes
-        // nothing locally — so the server-backed list must still be invalidated by hand.
-        ref.invalidate(driftGetAllPeopleWithSharedSpacesProvider);
-        ref.invalidate(driftSpacePeopleProvider);
+        // nothing locally — so the server-backed lists must still be invalidated by hand.
+        ref.invalidateServerPeopleLists();
         context.pop<String>(newName);
       }
     } catch (error) {
