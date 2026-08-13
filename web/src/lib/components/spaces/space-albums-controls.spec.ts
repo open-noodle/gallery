@@ -6,12 +6,13 @@ import SpaceAlbumsControls from '$lib/components/spaces/space-albums-controls.sv
 import SpaceAlbumsControlsWrapper from '$lib/components/spaces/space-albums-controls.test-wrapper.svelte';
 import { AlbumSortBy, AlbumViewMode, SortOrder, albumViewSettings } from '$lib/stores/preferences.store';
 import { SpaceAlbumGroupBy, spaceAlbumViewSettings } from '$lib/stores/space-album-view-settings.store';
+import { SpaceAlbumSortBy } from '$lib/utils/space-album-sort';
 
 // The persisted store's reset() re-uses its initial object by reference, and in-place field
 // writes (groupBy/collapsedGroups) can leak across tests. Set a fresh object each time.
 const freshSpaceSettings = () => ({
   view: AlbumViewMode.Cover,
-  sortBy: AlbumSortBy.MostRecentPhoto,
+  sortBy: SpaceAlbumSortBy.RecentlyLinked,
   sortOrder: SortOrder.Desc,
   groupBy: SpaceAlbumGroupBy.None,
   groupOrder: SortOrder.Desc,
@@ -71,7 +72,7 @@ describe('SpaceAlbumsControls sort dropdown', () => {
     expect(screen.getByTestId('space-albums-sort-btn')).toBeInTheDocument();
   });
 
-  it('renders all six sort option labels when dropdown is opened', async () => {
+  it('renders all seven sort option labels when dropdown is opened', async () => {
     render(SpaceAlbumsControls);
     await userEvent.click(screen.getByTestId('space-albums-sort-btn'));
     const menu = screen.getByTestId('space-albums-sort-menu');
@@ -81,6 +82,39 @@ describe('SpaceAlbumsControls sort dropdown', () => {
     expect(within(menu).getByText('Date created')).toBeInTheDocument();
     expect(within(menu).getByText('Most recent photo')).toBeInTheDocument();
     expect(within(menu).getByText('Oldest photo')).toBeInTheDocument();
+    expect(within(menu).getByText('Recently linked')).toBeInTheDocument();
+  });
+
+  it('writes RecentlyLinked to the space store when "Recently linked" is selected', async () => {
+    spaceAlbumViewSettings.set({ ...freshSpaceSettings(), sortBy: AlbumSortBy.Title, sortOrder: SortOrder.Asc });
+    render(SpaceAlbumsControls);
+    await userEvent.click(screen.getByTestId('space-albums-sort-btn'));
+    await userEvent.click(screen.getByTestId('space-albums-sort-option-RecentlyLinked'));
+    expect(get(spaceAlbumViewSettings).sortBy).toBe(SpaceAlbumSortBy.RecentlyLinked);
+    // S3 — a newly selected option applies its own default direction
+    expect(get(spaceAlbumViewSettings).sortOrder).toBe(SortOrder.Desc);
+  });
+
+  // The trigger previously resolved its label through upstream's
+  // findSortOptionMetadata, which falls back to MostRecentPhoto for any id it
+  // does not know — so RecentlyLinked rendered as "Most recent photo".
+  it('shows the Recently linked label on the trigger when that option is active', () => {
+    spaceAlbumViewSettings.set({ ...freshSpaceSettings(), sortBy: SpaceAlbumSortBy.RecentlyLinked });
+    render(SpaceAlbumsControls);
+    expect(screen.getByTestId('space-albums-sort-btn')).toHaveTextContent('Recently linked');
+  });
+
+  // S2
+  it('toggles sort order when Recently linked is re-selected', async () => {
+    spaceAlbumViewSettings.set({
+      ...freshSpaceSettings(),
+      sortBy: SpaceAlbumSortBy.RecentlyLinked,
+      sortOrder: SortOrder.Desc,
+    });
+    render(SpaceAlbumsControls);
+    await userEvent.click(screen.getByTestId('space-albums-sort-btn'));
+    await userEvent.click(screen.getByTestId('space-albums-sort-option-RecentlyLinked'));
+    expect(get(spaceAlbumViewSettings).sortOrder).toBe(SortOrder.Asc);
   });
 
   it('writes AlbumSortBy.Title to the space store when "Title" is selected', async () => {
@@ -125,6 +159,9 @@ describe('SpaceAlbumsControls group dropdown', () => {
   });
 
   it('writes the selected groupBy to the space store', async () => {
+    // Year is disabled under the default RecentlyLinked sort (S27); pin a
+    // Year-compatible sortBy so the option this test selects is clickable.
+    spaceAlbumViewSettings.update((s) => ({ ...s, sortBy: AlbumSortBy.MostRecentPhoto }));
     render(SpaceAlbumsControls);
     await userEvent.click(screen.getByTestId('space-albums-group-btn'));
     await userEvent.click(screen.getByTestId('space-albums-group-option-Year'));
@@ -146,6 +183,31 @@ describe('SpaceAlbumsControls group dropdown', () => {
     expect(screen.getByTestId('space-albums-group-option-Year')).toBeDisabled();
   });
 
+  // #974 — the stored groupBy survives a sort change that disables it, so the
+  // trigger must report the *effective* grouping. Resolving the raw stored
+  // groupBy made the button claim "Group by year" over a flat list.
+  it('shows the effective grouping on the trigger when the stored one is disabled by the sort', () => {
+    spaceAlbumViewSettings.update((s) => ({
+      ...s,
+      groupBy: SpaceAlbumGroupBy.Year,
+      sortBy: AlbumSortBy.DateCreated,
+    }));
+    render(SpaceAlbumsControls);
+    const trigger = screen.getByTestId('space-albums-group-btn');
+    expect(trigger).toHaveTextContent('No grouping');
+    expect(trigger).not.toHaveTextContent('Group by year');
+  });
+
+  it('keeps the stored grouping on the trigger while the sort still allows it', () => {
+    spaceAlbumViewSettings.update((s) => ({
+      ...s,
+      groupBy: SpaceAlbumGroupBy.Year,
+      sortBy: AlbumSortBy.MostRecentPhoto,
+    }));
+    render(SpaceAlbumsControls);
+    expect(screen.getByTestId('space-albums-group-btn')).toHaveTextContent('Group by year');
+  });
+
   it('hides expand/collapse-all buttons when groupBy is None', () => {
     render(SpaceAlbumsControls);
     expect(screen.queryByTestId('space-albums-expand-all')).not.toBeInTheDocument();
@@ -153,14 +215,24 @@ describe('SpaceAlbumsControls group dropdown', () => {
   });
 
   it('shows expand/collapse-all buttons when a group is selected', () => {
-    spaceAlbumViewSettings.update((s) => ({ ...s, groupBy: SpaceAlbumGroupBy.Year }));
+    // Year is disabled under the default RecentlyLinked sort (S27); pin a
+    // Year-compatible sortBy so getSelectedSpaceAlbumGroupOption doesn't fall back to None.
+    spaceAlbumViewSettings.update((s) => ({
+      ...s,
+      groupBy: SpaceAlbumGroupBy.Year,
+      sortBy: AlbumSortBy.MostRecentPhoto,
+    }));
     render(SpaceAlbumsControls, { groupIds: ['2024', '2020'] });
     expect(screen.getByTestId('space-albums-expand-all')).toBeInTheDocument();
     expect(screen.getByTestId('space-albums-collapse-all')).toBeInTheDocument();
   });
 
   it('collapse-all collapses the provided group ids in the space store', async () => {
-    spaceAlbumViewSettings.update((s) => ({ ...s, groupBy: SpaceAlbumGroupBy.Year }));
+    spaceAlbumViewSettings.update((s) => ({
+      ...s,
+      groupBy: SpaceAlbumGroupBy.Year,
+      sortBy: AlbumSortBy.MostRecentPhoto,
+    }));
     render(SpaceAlbumsControls, { groupIds: ['2024', '2020'] });
     await userEvent.click(screen.getByTestId('space-albums-collapse-all'));
     expect(get(spaceAlbumViewSettings).collapsedGroups.Year.sort()).toEqual(['2020', '2024']);
@@ -170,6 +242,7 @@ describe('SpaceAlbumsControls group dropdown', () => {
     spaceAlbumViewSettings.update((s) => ({
       ...s,
       groupBy: SpaceAlbumGroupBy.Year,
+      sortBy: AlbumSortBy.MostRecentPhoto,
       collapsedGroups: { Year: ['2024', '2020'] },
     }));
     render(SpaceAlbumsControls, { groupIds: ['2024', '2020'] });

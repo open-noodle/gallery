@@ -43,6 +43,7 @@ SpaceAlbum _album({required String id, String? name, String? thumbnailAssetId, b
       showInTimeline: showInTimeline,
       linkedAt: DateTime.utc(2026, 1, 1),
       updatedAt: DateTime.utc(2026, 1, 1),
+      createdAt: DateTime.utc(2026, 1, 1),
     );
 
 /// Overrides [spaceAlbumsProvider] with a fixed list, for use with
