@@ -48,7 +48,7 @@ class PersonApiRepository extends ApiRepository {
   }
 
   // The unified Person model carries no owner/created/face-asset/hidden/colour fields, and
-  // updatedAt is nullable — so the epoch-0 sentinel the old DriftPerson mapping needed is gone.
+  // updatedAt is nullable — so the epoch-0 sentinel the old two-class person mapping needed is gone.
   // v3 openapi wraps optional person fields in Optional<...?> → unwrap with orElse.
   //
   // Carry the Space scope so edits route to the editor-gated shared-space endpoint (not the
@@ -64,6 +64,9 @@ class PersonApiRepository extends ApiRepository {
       birthDate: dto.birthDate,
       spaceId: spaceId,
       numberOfAssets: dto.numberOfAssets.orElse(null),
+      // Sorting this list is client-side (comparePeople), so the favourite flag has to survive
+      // the mapping or "favorites first" silently stops working — nothing else reads it here.
+      isFavorite: dto.isFavorite.orElse(null) ?? false,
     );
   }
 
@@ -83,7 +86,7 @@ class PersonApiRepository extends ApiRepository {
   }
 
   // The unified Person model carries no owner/created/face-asset/hidden/colour fields, and
-  // updatedAt is nullable — so the epoch-0 sentinel the old DriftPerson mapping needed is gone.
+  // updatedAt is nullable — so the epoch-0 sentinel the old two-class person mapping needed is gone.
   // v3 openapi wraps optional person fields in Optional<...?> → unwrap with orElse.
   //
   // Face-tap → person detail: for a Space-shared person the asset-info endpoint carries the
