@@ -3,12 +3,12 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
+import 'package:immich_mobile/models/photos_filter/filter_person.model.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/recent_people_strip.widget.dart';
 import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
 import 'package:immich_mobile/providers/photos_filter/people_picker.provider.dart';
@@ -29,8 +29,7 @@ void main() {
     await db.close();
   });
 
-  PersonDto person(String id, String name, {String? spaceId}) =>
-      PersonDto(id: id, name: name, isHidden: false, thumbnailPath: '', spaceId: spaceId);
+  FilterPerson person(String id, String name, {String? spaceId}) => FilterPerson(id: id, name: name, spaceId: spaceId);
 
   group('RecentPeopleStrip', () {
     // Same routing as the picker rows: a recent shared-space person must hit the space endpoint.
@@ -72,7 +71,7 @@ void main() {
     testWidgets('hidden when no recents', (tester) async {
       await tester.pumpConsumerWidget(
         const Column(children: [RecentPeopleStrip()]),
-        overrides: [recentPeopleProvider.overrideWith((ref) async => const <PersonDto>[])],
+        overrides: [recentPeopleProvider.overrideWith((ref) async => const <FilterPerson>[])],
       );
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('recent-person-a')), findsNothing);

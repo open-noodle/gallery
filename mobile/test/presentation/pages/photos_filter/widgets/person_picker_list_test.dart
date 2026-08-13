@@ -3,12 +3,12 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
+import 'package:immich_mobile/models/photos_filter/filter_person.model.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/person_picker_list.widget.dart';
 import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
@@ -39,14 +39,8 @@ void main() {
     await db.close();
   });
 
-  PersonDto person(String id, String name, {int? numberOfAssets, String? spaceId}) => PersonDto(
-    id: id,
-    name: name,
-    isHidden: false,
-    thumbnailPath: '',
-    numberOfAssets: numberOfAssets,
-    spaceId: spaceId,
-  );
+  FilterPerson person(String id, String name, {int? numberOfAssets, String? spaceId}) =>
+      FilterPerson(id: id, name: name, numberOfAssets: numberOfAssets, spaceId: spaceId);
 
   RemoteImageProvider avatarProviderFor(WidgetTester tester, String rowKey) {
     final avatar = tester.widget<CircleAvatar>(
@@ -124,7 +118,7 @@ void main() {
     testWidgets('scrubber tap jumps the list to the target bucket', (tester) async {
       // 500×800 viewport. A...M headers + rows fill well past the fold.
       _setLogicalSize(tester, const Size(500, 800));
-      final people = <PersonDto>[];
+      final people = <FilterPerson>[];
       for (final letter in ['A', 'B', 'C', 'M']) {
         for (var i = 0; i < 5; i++) {
           people.add(person('$letter-$i', '$letter${i}name'));
