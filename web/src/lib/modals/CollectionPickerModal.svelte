@@ -12,10 +12,12 @@
     isWritableSpace,
     pickRecent,
     spaceToCollection,
+    type CollectionModalRow,
     type PickerCollection,
   } from '$lib/components/shared-components/collection-selection/collection-selection-utils';
   import NewSpaceListItem from '$lib/components/shared-components/collection-selection/new-space-list-item.svelte';
   import SpaceListItem from '$lib/components/shared-components/collection-selection/space-list-item.svelte';
+  import SpacePoolListItem from '$lib/components/shared-components/collection-selection/space-pool-list-item.svelte';
   import { MAX_SPACE_ASSETS_PER_REQUEST } from '$lib/constants';
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { eventManager } from '$lib/managers/event-manager.svelte';
@@ -32,6 +34,7 @@
   import { Button, Icon, Modal, ModalBody, ModalFooter, Text } from '@immich/ui';
   import { mdiImageMultipleOutline, mdiInformationOutline, mdiKeyboardReturn } from '@mdi/js';
   import { onMount } from 'svelte';
+  import { SvelteSet } from 'svelte/reactivity';
   import { t } from 'svelte-i18n';
 
   interface Props {
@@ -69,6 +72,16 @@
 
   const recentCollections = $derived(pickRecent(allCollections, 3));
 
+  // #965: the linked albums of the one expanded space. Fetched lazily on expand and kept for
+  // the life of the modal, so re-opening a space costs nothing and opening the picker still
+  // costs exactly two requests however many spaces the user is in.
+  let expandedSpaceId = $state<string | null>(null);
+  let spaceAlbumCache = $state<Record<string, PickerCollection[]>>({});
+  // Guards duplicate requests; nothing renders from it. `SvelteSet` rather than a plain `Set`
+  // because svelte/prefer-svelte-reactivity forbids mutable built-in Sets in components.
+  const spaceAlbumsInFlight = new SvelteSet<string>();
+  const expandedSpaceAlbums = $derived(expandedSpaceId === null ? undefined : spaceAlbumCache[expandedSpaceId]);
+
   const converter = new CollectionModalRowConverter();
   const rows = $derived(
     converter.toModalRows(search, recentCollections, allCollections, selectedRowIndex, multiSelectedKeys, {
@@ -78,6 +91,8 @@
       // would name a collection type that was never on offer.
       emptyText: restricted ? $t('no_albums_in_space_yet') : undefined,
       noMatchText: restricted ? $t('no_albums_found') : undefined,
+      expandedSpaceId,
+      expandedSpaceAlbums,
     }),
   );
   const selectableRowCount = $derived(rows.filter((row) => isSelectableRowType(row.type)).length);
@@ -111,16 +126,93 @@
 
   // `SharedSpaceLinkedAlbumDto` is `AlbumResponseDto` minus `albumUsers` (plus link metadata),
   // so shim the missing field back in for AlbumListItem. The membership list is unused here.
-  const loadSpaceAlbums = async (spaceId: string) => {
+  const fetchSpaceAlbums = async (spaceId: string): Promise<AlbumResponseDto[]> => {
     const linked = await getSharedSpaceAlbums({ id: spaceId });
-    albums = linked.map((album) => ({ ...album, albumUsers: [] }) as AlbumResponseDto);
+    return linked.map((album) => ({ ...album, albumUsers: [] }) as AlbumResponseDto);
+  };
+
+  const loadSpaceAlbums = async (spaceId: string) => {
+    albums = await fetchSpaceAlbums(spaceId);
+  };
+
+  /**
+   * Open a space's linked albums, or close them again.
+   *
+   * Accordion, like mobile: at most one space is open, so the row list stays short and only
+   * one space's albums are ever in memory. A failed fetch collapses the row rather than
+   * leaving it stuck open on a spinner that will never resolve.
+   */
+  const toggleSpaceExpansion = async (collection: PickerCollection) => {
+    if (collection.kind !== 'space') {
+      return;
+    }
+    expandedSpaceId = expandedSpaceId === collection.id ? null : collection.id;
+    // Toggling inserts or removes rows, so every index after this space shifts. Re-anchor the
+    // caret on the space row itself — leaving it where it was would point at a different row,
+    // and clearing it would strand a keyboard user who has to walk the list again to reach the
+    // children they just revealed.
+    reanchorCaretOnSpace(collection.id);
+    if (expandedSpaceId !== collection.id || Object.hasOwn(spaceAlbumCache, collection.id)) {
+      return; // collapsed, or already fetched once this modal was opened
+    }
+    if (spaceAlbumsInFlight.has(collection.id)) {
+      return; // a collapse/re-expand while the first request is still out
+    }
+    spaceAlbumsInFlight.add(collection.id);
+    try {
+      const linked = await fetchSpaceAlbums(collection.id);
+      spaceAlbumCache[collection.id] = linked.map((album) => albumToCollection(album));
+    } catch (error) {
+      handleError(error, $t('errors.unable_to_load_albums'));
+      if (expandedSpaceId === collection.id) {
+        expandedSpaceId = null;
+      }
+    } finally {
+      spaceAlbumsInFlight.delete(collection.id);
+    }
+  };
+
+  /**
+   * Put the arrow-key caret back on a space row after its children appeared or disappeared.
+   *
+   * Only when the caret was already in use — a mouse user who clicks a row should not suddenly
+   * acquire a keyboard selection highlight. `rows` is `$derived`, so reading it here sees the
+   * post-toggle list.
+   */
+  const reanchorCaretOnSpace = (spaceId: string) => {
+    if (selectedRowIndex === -1) {
+      return;
+    }
+    let index = -1;
+    for (const row of rows) {
+      if (!isSelectableRowType(row.type)) {
+        continue;
+      }
+      index++;
+      if (row.type === CollectionModalRowType.COLLECTION_ITEM && row.collection?.id === spaceId) {
+        selectedRowIndex = index;
+        return;
+      }
+    }
+    selectedRowIndex = -1;
   };
 
   const loadSpaces = async () => {
     spaces = await getAllSpaces();
   };
 
-  const findByKey = (key: string) => allCollections.find((collection) => collectionKey(collection) === key);
+  /**
+   * Resolve a multi-select key back to its collection.
+   *
+   * Must search the fetched space albums too, not just `allCollections`: a space-linked album
+   * owned by another member has no `album_user` row for the caller, so `getAllAlbums` never
+   * returns it — which is precisely the #965 case. Missing it here made `submitMulti` resolve
+   * the key to `undefined`, drop it, and close the modal as if the user had cancelled.
+   */
+  const findByKey = (key: string) =>
+    [...allCollections, ...Object.values(spaceAlbumCache).flat()].find(
+      (collection) => collectionKey(collection) === key,
+    );
 
   const toggleMultiSelect = (collection?: PickerCollection) => {
     const target = collection ?? rows.find((row) => row.selected)?.collection;
@@ -143,6 +235,13 @@
     }
     onClose([collection]);
   };
+
+  /**
+   * What clicking a space row's body does. An expandable one opens instead of picking — its
+   * pool stays reachable as the "Add to space" child, and via the row's own checkbox.
+   */
+  const handleSpaceClick = (row: CollectionModalRow, collection: PickerCollection) =>
+    row.expandable ? void toggleSpaceExpansion(collection) : handleCollectionClick(collection);
 
   const submitMulti = () => {
     const selected = multiSelectedKeys
@@ -190,7 +289,12 @@
         }
         break;
       }
-      case CollectionModalRowType.COLLECTION_ITEM: {
+      case CollectionModalRowType.COLLECTION_ITEM:
+      case CollectionModalRowType.SPACE_POOL_CHILD: {
+        if (item.expandable && item.collection) {
+          await toggleSpaceExpansion(item.collection);
+          return; // toggling re-anchored the caret on the space row; don't clear it below
+        }
         if (multiSelectActive) {
           submitMulti();
         } else if (item.collection) {
@@ -286,10 +390,20 @@
             {:else if row.type === CollectionModalRowType.SECTION}
               <p class="px-5 py-3 text-xs">{row.text}</p>
             {:else if row.type === CollectionModalRowType.MESSAGE}
-              <p class="px-5 py-1 text-sm">{row.text}</p>
+              <!-- ps-11 lines the child up with the album children's thumbnails (ps-9 wrapper + p-2). -->
+              <p class={['py-1 text-sm', row.indented ? 'ps-11 pe-5' : 'px-5']}>{row.text}</p>
+            {:else if row.type === CollectionModalRowType.SPACE_POOL_CHILD && row.collection}
+              {@const collection = row.collection}
+              <SpacePoolListItem
+                spaceId={collection.id}
+                selected={row.selected || false}
+                multiSelected={row.multiSelected}
+                onClick={() => handleCollectionClick(collection)}
+                onMultiSelect={() => toggleMultiSelect(collection)}
+              />
             {:else if row.type === CollectionModalRowType.COLLECTION_ITEM && row.collection}
               {@const collection = row.collection}
-              <div data-testid={`row-${collection.kind}-${collection.id}`}>
+              <div data-testid={`row-${collection.kind}-${collection.id}`} class={{ 'ps-9': row.indented }}>
                 {#if collection.kind === 'album'}
                   <AlbumListItem
                     album={collection.album}
@@ -305,8 +419,10 @@
                     space={collection.space}
                     selected={row.selected || false}
                     multiSelected={row.multiSelected}
+                    expandable={row.expandable}
+                    expanded={row.expanded}
                     searchQuery={search}
-                    onSpaceClick={() => handleCollectionClick(collection)}
+                    onSpaceClick={() => handleSpaceClick(row, collection)}
                     onMultiSelect={() => toggleMultiSelect(collection)}
                   />
                 {/if}
