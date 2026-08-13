@@ -89,10 +89,12 @@ void main() {
     required List<SharedSpaceResponseDto> spaces,
     Map<String, List<SpaceAlbum>> albums = const {},
     List<RemoteAsset>? selection,
+    List<RemoteAsset>? assets,
     String? excludeSpaceId,
     String? userId = 'user-1',
     String searchQuery = '',
     bool raw = false,
+    Set<String> pendingAlbumSpaceIds = const {},
   }) async {
     final targets = <CollectionTarget>[];
     final overrides = <Override>[
@@ -109,12 +111,17 @@ void main() {
         ),
       ),
       for (final entry in albums.entries)
-        spaceAlbumsProvider(entry.key).overrideWith((ref) => Stream.value(entry.value)),
+        if (!pendingAlbumSpaceIds.contains(entry.key))
+          spaceAlbumsProvider(entry.key).overrideWith((ref) => Stream.value(entry.value)),
+      // A stream that never emits — the provider stays in its loading state.
+      for (final spaceId in pendingAlbumSpaceIds)
+        spaceAlbumsProvider(spaceId).overrideWith((ref) => const Stream<List<SpaceAlbum>>.empty()),
     ];
     final widget = SpaceCollectionSection(
       onTargetSelected: targets.add,
       excludeSpaceId: excludeSpaceId,
       searchQuery: searchQuery,
+      assets: assets,
     );
     if (raw) {
       await tester.pumpConsumerWidgetRaw(widget, overrides: overrides);
@@ -247,6 +254,23 @@ void main() {
     expect(targets, hasLength(1));
   });
 
+  // "This space has no albums yet" must not flash before the Drift watch has answered — it is
+  // a claim about the space, and while loading we do not know it. Web draws the same line.
+  testWidgets('an expanded space says nothing about its albums until the watch answers', (tester) async {
+    await pump(
+      tester,
+      spaces: [space('s1', albums: 2)],
+      albums: {'s1': const []}, // no stream value pumped for s1 below
+      pendingAlbumSpaceIds: {'s1'},
+    );
+
+    await tester.tap(find.byKey(const Key('space-row-s1')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('space-pool-child-s1')), findsOneWidget, reason: 'the pool is always reachable');
+    expect(find.byKey(const Key('space-albums-empty-s1')), findsNothing);
+  });
+
   testWidgets('a double-tap on a plain row emits exactly one target', (tester) async {
     final targets = await pump(tester, spaces: [space('s1', albums: 0)]);
 
@@ -307,6 +331,35 @@ void main() {
       findsOneWidget,
     );
     expect(find.byKey(const Key('space-row-s1')), findsNothing);
+  });
+
+  // #965: the asset viewer has no multiselect, so it hands the section the one asset the
+  // viewer is on. Falling back to the (empty) multiselect there would read as "nothing
+  // non-owned" and offer space targets for a photo that can never reach one.
+  testWidgets('an explicit asset list is used instead of the multiselect', (tester) async {
+    await pump(
+      tester,
+      spaces: [space('s1')],
+      selection: [asset('a')], // owned — on its own this would show the rows
+      assets: [asset('b', ownerId: 'other')],
+    );
+
+    expect(
+      find.text("Your selection includes photos owned by other members, so it can't be added to a space."),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('space-row-s1')), findsNothing);
+  });
+
+  testWidgets('an explicit owned asset list still offers the rows', (tester) async {
+    await pump(
+      tester,
+      spaces: [space('s1')],
+      selection: [asset('a', ownerId: 'other')], // ignored
+      assets: [asset('b')],
+    );
+
+    expect(find.byKey(const Key('space-row-s1')), findsOneWidget);
   });
 
   testWidgets('an unknown current user hides the rows (fail closed)', (tester) async {
