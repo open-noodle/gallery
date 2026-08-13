@@ -12,35 +12,26 @@ import '../../../widget_tester_extensions.dart';
 
 class MockDriftPeopleService extends Mock implements DriftPeopleService {}
 
-// A mocktail Fake (not a real DriftPerson instance) for registerFallbackValue: DriftPerson
+// A mocktail Fake (not a real Person instance) for registerFallbackValue: Person
 // overrides == by field equality, and mocktail's any() matcher — when a type with custom
 // equality is the FIRST of two-or-more positional arguments in a stubbed call — fails to
 // record the invocation ("No method stub was called from within `when()`"), regardless of
 // which value is registered. This is a mocktail matcher limitation, not production
-// behavior: updateName(DriftPerson, String) and updateBrithday(DriftPerson, DateTime) both
-// take the DriftPerson first. A Fake fallback (mocktail's own recommended pattern for this
+// behavior: updateName(Person, String) and updateBirthday(Person, DateTime) both
+// take the Person first. A Fake fallback (mocktail's own recommended pattern for this
 // exact case) sidesteps it; a real _person() instance reproduces the failure even though it
 // satisfies the same interface.
-// The toString override is required, not cosmetic: DriftPerson is a freezed class whose
+// The toString override is required, not cosmetic: Person is a freezed class whose
 // generated mixin implements DiagnosticableTreeMixin, so the interface declares
 // `toString({DiagnosticLevel minLevel})`. Object's plain toString() does not conform and the
 // file fails to compile without this.
-class FakeDriftPerson extends Fake implements DriftPerson {
+class FakePerson extends Fake implements Person {
   @override
-  String toString({DiagnosticLevel minLevel = DiagnosticLevel.info}) => 'FakeDriftPerson';
+  String toString({DiagnosticLevel minLevel = DiagnosticLevel.info}) => 'FakePerson';
 }
 
-DriftPerson _person({String id = 'p1', String? spaceId}) => DriftPerson(
-  id: id,
-  createdAt: DateTime(2024, 1, 1),
-  updatedAt: DateTime(2024, 1, 1),
-  ownerId: 'owner',
-  name: 'Alice',
-  isFavorite: false,
-  isHidden: false,
-  color: null,
-  spaceId: spaceId,
-);
+Person _person({String id = 'p1', String? spaceId}) =>
+    Person(id: id, updatedAt: DateTime(2024, 1, 1), name: 'Alice', spaceId: spaceId);
 
 void main() {
   late MockDriftPeopleService service;
@@ -50,7 +41,7 @@ void main() {
   late int serverFetches;
 
   setUpAll(() {
-    registerFallbackValue(FakeDriftPerson());
+    registerFallbackValue(FakePerson());
   });
 
   setUp(() {
@@ -62,15 +53,15 @@ void main() {
     driftPeopleServiceProvider.overrideWithValue(service),
     driftGetAllPeopleWithSharedSpacesProvider.overrideWith((ref, sortBy) async {
       serverFetches++;
-      return <DriftPerson>[];
+      return <Person>[];
     }),
-    driftSpacePeopleProvider.overrideWith((ref, key) async => <DriftPerson>[]),
-    driftGetAllPeopleProvider.overrideWith((ref, sortBy) async => <DriftPerson>[]),
+    driftSpacePeopleProvider.overrideWith((ref, key) async => <Person>[]),
+    getAllPeopleProvider.overrideWith((ref, sortBy) => Stream.value(<Person>[])),
   ];
 
   // Keeps the server-backed provider actively listened so invalidation triggers a
   // refetch, and exposes buttons that launch the real modal entry points.
-  Widget harness(DriftPerson person) => Consumer(
+  Widget harness(Person person) => Consumer(
     builder: (context, ref, _) {
       ref.watch(driftGetAllPeopleWithSharedSpacesProvider(PeopleSortBy.photoCount));
       return Column(
@@ -116,7 +107,7 @@ void main() {
 
       await saveName(tester);
 
-      verify(() => service.updateName(any(that: predicate<DriftPerson>((p) => p.id == 'p1')), 'Alicia')).called(1);
+      verify(() => service.updateName(any(that: predicate<Person>((p) => p.id == 'p1')), 'Alicia')).called(1);
       expect(serverFetches, 2);
       expect(find.byType(AlertDialog), findsNothing);
     });
@@ -134,7 +125,7 @@ void main() {
       await saveName(tester);
 
       verify(
-        () => service.updateName(any(that: predicate<DriftPerson>((p) => p.spaceId == 'space-1')), 'Alicia'),
+        () => service.updateName(any(that: predicate<Person>((p) => p.spaceId == 'space-1')), 'Alicia'),
       ).called(1);
       expect(serverFetches, 2);
       expect(find.byType(AlertDialog), findsNothing);
@@ -150,18 +141,18 @@ void main() {
     }
 
     testWidgets('a successful birthday edit refetches the server people list and pops', (tester) async {
-      when(() => service.updateBrithday(any(), any())).thenAnswer((_) async => 1);
+      when(() => service.updateBirthday(any(), any())).thenAnswer((_) async => 1);
       await tester.pumpConsumerWidget(harness(_person()), overrides: overrides());
 
       await saveBirthday(tester);
 
-      verify(() => service.updateBrithday(any(), any())).called(1);
+      verify(() => service.updateBirthday(any(), any())).called(1);
       expect(serverFetches, 2);
       expect(find.byType(AlertDialog), findsNothing);
     });
 
     testWidgets('a space-person birthday edit refetches the server people list', (tester) async {
-      when(() => service.updateBrithday(any(), any())).thenAnswer((_) async => 1);
+      when(() => service.updateBirthday(any(), any())).thenAnswer((_) async => 1);
       await tester.pumpConsumerWidget(
         harness(_person(id: 'sp1', spaceId: 'space-1')),
         overrides: overrides(),
