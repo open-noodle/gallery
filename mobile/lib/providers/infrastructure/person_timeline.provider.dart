@@ -31,7 +31,7 @@ final driftSharedSpacePersonAssetIdsProvider = FutureProvider.family<List<String
 ///    query, so it never dead-ends on the empty local join.
 TimelineService buildPersonTimelineRouteService(
   Ref ref,
-  DriftPerson person,
+  Person person,
   TimelineTemporalScope temporalScope,
   GroupAssetsBy groupBy,
 ) {
