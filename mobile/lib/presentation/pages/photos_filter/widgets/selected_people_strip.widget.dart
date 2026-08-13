@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
+import 'package:immich_mobile/models/photos_filter/filter_person.model.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 
 /// Horizontal strip of currently-selected people chips. Hidden (zero-size)
@@ -23,7 +23,7 @@ class SelectedPeopleStrip extends ConsumerWidget {
         itemCount: list.length,
         separatorBuilder: (_, _) => const SizedBox(width: 8),
         itemBuilder: (context, i) {
-          final PersonDto p = list[i];
+          final FilterPerson p = list[i];
           return ConstrainedBox(
             key: Key('selected-chip-${p.id}'),
             constraints: const BoxConstraints(maxWidth: 160),

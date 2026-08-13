@@ -3,7 +3,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:immich_mobile/domain/models/person.model.dart';
+import 'package:immich_mobile/models/photos_filter/filter_person.model.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/deep_section_scaffold.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/filter_section_id.dart';
 import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
@@ -127,7 +127,7 @@ class _PeopleGridTile extends ConsumerWidget {
           if (existing != null) {
             notifier.togglePerson(existing);
           } else {
-            notifier.togglePerson(PersonDto(id: person.id, name: person.name, isHidden: false, thumbnailPath: ''));
+            notifier.togglePerson(FilterPerson(id: person.id, name: person.name));
           }
         },
         child: Column(
