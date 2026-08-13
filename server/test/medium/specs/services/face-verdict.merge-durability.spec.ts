@@ -18,7 +18,6 @@ import {
 import { newMediumService } from 'test/medium.factory';
 import { factory } from 'test/small.factory';
 import { getKyselyDB } from 'test/utils';
-import { Mocked } from 'vitest';
 
 // The engine fails closed on a destructive plan (a same-space collapse) unless an authorizer ran (#733 review
 // L3). The space fixtures below always merge within one space with an Editor actor, so the collapse is never
@@ -40,13 +39,13 @@ const setup = (db: Kysely<DB> = defaultDatabase) => {
     ],
     mock: [JobRepository, LoggingRepository],
   });
-  const jobRepository = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+  const jobRepository = ctx.getMock(JobRepository);
   jobRepository.queue.mockResolvedValue();
   const sut = new IdentityMergePropagationService({
     databaseRepository: ctx.get(DatabaseRepository),
     faceIdentityRepository: ctx.get(FaceIdentityRepository),
     jobRepository,
-    logger: ctx.getMock<LoggingRepository, Mocked<LoggingRepository>>(LoggingRepository),
+    logger: ctx.getMock(LoggingRepository),
     personRepository: ctx.get(PersonRepository),
     sharedSpaceRepository: ctx.get(SharedSpaceRepository),
   });

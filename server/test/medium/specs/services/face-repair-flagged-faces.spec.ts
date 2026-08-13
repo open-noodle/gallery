@@ -15,7 +15,6 @@ import { DB } from 'src/schema';
 import { FaceRepairService } from 'src/services/face-repair.service';
 import { newMediumService } from 'test/medium.factory';
 import { getKyselyDB } from 'test/utils';
-import { Mocked } from 'vitest';
 
 const EMBEDDING = '[' + Array.from({ length: 512 }, () => 1).join(',') + ']';
 const PARAMS: RepairScanParams = {
@@ -59,7 +58,7 @@ const setup = () => {
     ],
     mock: [LoggingRepository, JobRepository],
   });
-  const jobMock = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+  const jobMock = ctx.getMock(JobRepository);
   jobMock.isActive.mockResolvedValue(false);
   jobMock.queue.mockResolvedValue();
   jobMock.queueAll.mockResolvedValue();

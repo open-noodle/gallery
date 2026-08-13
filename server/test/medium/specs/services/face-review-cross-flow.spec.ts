@@ -24,7 +24,7 @@ import { clearConfigCache } from 'src/utils/config';
 import { MediumTestContext, newMediumService } from 'test/medium.factory';
 import { factory } from 'test/small.factory';
 import { getKyselyDB } from 'test/utils';
-import { Mocked, vi } from 'vitest';
+import { vi } from 'vitest';
 
 // Slice 7 — cross-flow integration. This is the slice that would have caught every leak in the design's
 // defect inventory: it drives BOTH engines against ONE database and asserts that a decision made in one is
@@ -85,7 +85,7 @@ const setupRepair = () => {
     ],
     mock: [LoggingRepository, JobRepository],
   });
-  const jobMock = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+  const jobMock = ctx.getMock(JobRepository);
   jobMock.isActive.mockResolvedValue(false);
   jobMock.queueAll.mockResolvedValue();
   jobMock.queue.mockResolvedValue();
@@ -107,9 +107,9 @@ const setupPerson = () => {
     ],
     mock: [JobRepository, LoggingRepository, SystemMetadataRepository],
   });
-  const metadata = ctx.getMock<SystemMetadataRepository, Mocked<SystemMetadataRepository>>(SystemMetadataRepository);
+  const metadata = ctx.getMock(SystemMetadataRepository);
   metadata.get.mockResolvedValue({ machineLearning: { facialRecognition: { minFaces: 1 } } } as any);
-  const jobs = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+  const jobs = ctx.getMock(JobRepository);
   jobs.queue.mockResolvedValue();
   jobs.queueAll.mockResolvedValue();
   // Slice 13: the suggestion engine (confirm/reject/ignore/dismiss, the four suggestion-scan job handlers)
@@ -131,7 +131,7 @@ const setupSuggestionPerson = () => {
   clearConfigCache();
   const { sut, ctx, faceSuggestion } = setupPerson();
   ctx
-    .getMock<SystemMetadataRepository, Mocked<SystemMetadataRepository>>(SystemMetadataRepository)
+    .getMock(SystemMetadataRepository)
     .get.mockResolvedValue({ machineLearning: { facialRecognition: SUGGESTION_BAND } } as any);
   return { sut, ctx, faceSuggestion };
 };
@@ -379,12 +379,10 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
 
       // When: a non-forced handleQueueRecognizeFaces runs and every queued handleRecognizeFaces job is
       // executed.
-      const jobMock = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+      const jobMock = ctx.getMock(JobRepository);
       jobMock.waitForQueueCompletion.mockResolvedValue();
       jobMock.getJobCounts.mockResolvedValue({ active: 0, waiting: 0, delayed: 0, paused: 0, completed: 0, failed: 0 });
-      const metadata = ctx.getMock<SystemMetadataRepository, Mocked<SystemMetadataRepository>>(
-        SystemMetadataRepository,
-      );
+      const metadata = ctx.getMock(SystemMetadataRepository);
       metadata.set.mockResolvedValue();
 
       await expect(person.handleQueueRecognizeFaces({ force: false })).resolves.toBe(JobStatus.Success);
@@ -1101,7 +1099,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
 
     it('S8.9 — the reaper runs after the identity GC, so a row whose only remaining key is a GC-removed identity is collected', async () => {
       const { sut: person, ctx } = setupPerson();
-      const jobMock = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
+      const jobMock = ctx.getMock(JobRepository);
       jobMock.waitForQueueCompletion.mockResolvedValue();
       jobMock.empty.mockResolvedValue();
       jobMock.queue.mockResolvedValue();
@@ -1114,9 +1112,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
         completed: 0,
         failed: 0,
       });
-      const metadata = ctx.getMock<SystemMetadataRepository, Mocked<SystemMetadataRepository>>(
-        SystemMetadataRepository,
-      );
+      const metadata = ctx.getMock(SystemMetadataRepository);
       metadata.get.mockResolvedValue({ machineLearning: { facialRecognition: { enabled: true, minFaces: 1 } } } as any);
       metadata.set.mockResolvedValue();
       const verdictRepo = ctx.get(FacePersonVerdictRepository);
