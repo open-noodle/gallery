@@ -36,13 +36,19 @@ sealed class ValueCodec<T> {
 final class EnumCodec<T extends Enum> extends ValueCodec<T> {
   final List<T> values;
 
-  const EnumCodec(this.values);
+  /// Value returned when a persisted name matches no enum value — e.g. after a
+  /// downgrade, where an older build reads a mode a newer build wrote. Without
+  /// this, `decode` threw `StateError` and `SettingsRepository`'s unguarded
+  /// startup `refresh()` turned that into a launch crash.
+  final T? fallback;
+
+  const EnumCodec(this.values, {this.fallback});
 
   @override
   String encode(T value) => value.name;
 
   @override
-  T decode(String raw) => values.firstWhere((v) => v.name == raw);
+  T decode(String raw) => values.firstWhere((v) => v.name == raw, orElse: () => fallback ?? values.first);
 }
 
 final class DateTimeCodec extends ValueCodec<DateTime> {

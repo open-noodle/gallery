@@ -45,6 +45,7 @@ SpaceAlbum _album({required String id, String name = 'Album', int assetCount = 0
       showInTimeline: showInTimeline,
       linkedAt: DateTime.utc(2026, 1, 1),
       updatedAt: DateTime.utc(2026, 1, 1),
+      createdAt: DateTime.utc(2026, 1, 1),
     );
 
 List<Override> _overrides({required String spaceId, required List<SpaceAlbum> albums}) => [

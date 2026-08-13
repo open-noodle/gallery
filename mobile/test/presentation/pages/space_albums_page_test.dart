@@ -30,6 +30,7 @@ SpaceAlbum _album({
   bool showInTimeline = true,
   DateTime? linkedAt,
   DateTime? updatedAt,
+  DateTime? createdAt,
 }) => SpaceAlbum(
   id: id,
   name: name ?? 'Album $id',
@@ -37,6 +38,7 @@ SpaceAlbum _album({
   showInTimeline: showInTimeline,
   linkedAt: linkedAt ?? DateTime.utc(2026, 1, 1),
   updatedAt: updatedAt ?? DateTime.utc(2026, 1, 1),
+  createdAt: createdAt ?? DateTime.utc(2026, 1, 1),
 );
 
 /// Overrides [spaceAlbumsProvider] with a fixed list, for use with
@@ -270,7 +272,7 @@ void main() {
 
     await tester.tap(find.byKey(const Key('collection-sort-button-pill')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Photo count'));
+    await tester.tap(find.text('Number of items'));
     await tester.pumpAndSettle();
 
     // Now sorted by asset count desc -> r1 (50) sorts before r2 (5).
@@ -324,7 +326,32 @@ void main() {
     // (recentlyLinked) would instead put r2 first, so this proves the
     // persisted mode was actually read, not just the default applied.
     expect(_firstCardByPosition(tester, ['r1', 'r2']), 'r1');
-    expect(find.text('Sort: Photo count'), findsOneWidget);
+    expect(find.text('Sort: Number of items'), findsOneWidget);
+  });
+
+  testWidgets('offers all seven sort options in the menu', (tester) async {
+    await tester.pumpConsumerWidget(
+      const SpaceAlbumsPage(spaceId: spaceId, canEdit: true),
+      overrides: _overrides(
+        spaceId: spaceId,
+        albums: [_album(id: 'a1', name: 'Alpha'), _album(id: 'a2', name: 'Bravo')],
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('collection-sort-button-pill')));
+    await tester.pumpAndSettle();
+
+    for (final label in [
+      'Title',
+      'Number of items',
+      'Date modified',
+      'Date created',
+      'Most recent photo',
+      'Oldest photo',
+      'Recently linked',
+    ]) {
+      expect(find.text(label), findsWidgets, reason: 'missing sort option $label');
+    }
   });
 
   // ---------------------------------------------------------------------

@@ -1,5 +1,6 @@
 import { persisted } from 'svelte-persisted-store';
-import { AlbumSortBy, AlbumViewMode, SortOrder } from '$lib/stores/preferences.store';
+import { AlbumViewMode, SortOrder } from '$lib/stores/preferences.store';
+import { SpaceAlbumSortBy } from '$lib/utils/space-album-sort';
 
 export enum SpaceAlbumGroupBy {
   None = 'None',
@@ -19,7 +20,7 @@ export interface SpaceAlbumViewSettings {
 
 export const spaceAlbumViewSettings = persisted<SpaceAlbumViewSettings>('space-album-view-settings', {
   view: AlbumViewMode.Cover,
-  sortBy: AlbumSortBy.MostRecentPhoto,
+  sortBy: SpaceAlbumSortBy.RecentlyLinked,
   sortOrder: SortOrder.Desc,
   groupBy: SpaceAlbumGroupBy.None,
   groupOrder: SortOrder.Desc,

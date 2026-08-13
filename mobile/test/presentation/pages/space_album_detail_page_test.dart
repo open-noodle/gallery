@@ -27,6 +27,7 @@ SpaceAlbum _album({required String id, String? name, bool showInTimeline = true,
   assetCount: assetCount,
   linkedAt: DateTime.utc(2026, 1, 1),
   updatedAt: DateTime.utc(2026, 1, 1),
+  createdAt: DateTime.utc(2026, 1, 1),
 );
 
 // ---------------------------------------------------------------------------
