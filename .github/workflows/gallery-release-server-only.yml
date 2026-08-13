@@ -99,6 +99,16 @@ jobs:
             fi
           fi
 
+          # Every release ships the revert-to-immich escape hatch as an asset,
+          # pinned to the release commit. Check the blob at $sha (not the
+          # working tree — the `commit` input can pin an older ancestor) so a
+          # missing script fails here rather than after the image builds and
+          # the force-pushed tag.
+          if ! git cat-file -e "${sha}:scripts/revert-to-immich.sql" 2>/dev/null; then
+            echo "::error::scripts/revert-to-immich.sql is missing at ${sha} — every release must ship the revert script"
+            exit 1
+          fi
+
           major=$(echo "$INPUT_VERSION" | sed 's/^v//' | cut -d. -f1)
           echo "version=$INPUT_VERSION" >> "$GITHUB_OUTPUT"
           echo "major=v${major}" >> "$GITHUB_OUTPUT"
@@ -619,7 +629,8 @@ jobs:
             --latest \
             --notes "$notes" \
             docker/docker-compose.yml \
-            docker/example.env
+            docker/example.env \
+            scripts/revert-to-immich.sql
 
           echo "Released $VERSION from $SHA"
 
