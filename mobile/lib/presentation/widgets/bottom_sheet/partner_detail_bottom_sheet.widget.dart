@@ -72,7 +72,7 @@ class _PartnerDetailBottomSheetState extends ConsumerState<PartnerDetailBottomSh
       ],
       slivers: [
         const AddToAlbumHeader(),
-        AlbumSelector(onAlbumSelected: addToAlbum, onKeyboardExpanded: onKeyboardExpand),
+        AlbumSelector(onAlbumSelected: addToAlbum, onKeyboardExpanded: onKeyboardExpand, writableOnly: true),
       ],
     );
   }
