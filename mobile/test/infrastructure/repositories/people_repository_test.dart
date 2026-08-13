@@ -104,4 +104,63 @@ void main() {
       expect(people.map((p) => p.id), ['named-one-face']);
     });
   });
+
+  // The local people list became reactive upstream (#30660): the provider is a StreamProvider
+  // over this watch(), which is why the fork's edit modals no longer invalidate it. These pin
+  // that the stream actually re-emits — a watch() that silently degraded to a one-shot read
+  // would leave every local people surface stale with no other test noticing.
+  group('watch', () {
+    test('re-emits when a person is renamed', () async {
+      await seedPerson(id: 'p1', name: 'Alice');
+
+      // Deterministic, not timing-based: drift schedules the initial emission on listen, so
+      // drain the event queue and assert the settled state BEFORE mutating. Attaching the
+      // matcher concurrently with the write races the initial query and can coalesce the
+      // two emissions into one.
+      final emissions = <List<String>>[];
+      final sub = sut
+          .watch(sortBy: PeopleSortBy.photoCount)
+          .listen((people) => emissions.add(people.map((p) => p.name).toList()));
+      await pumpEventQueue();
+      expect(emissions.last, ['Alice']);
+
+      await sut.updateName('p1', 'Alicia');
+      await pumpEventQueue();
+
+      expect(emissions.last, ['Alicia']);
+      await sub.cancel();
+    });
+
+    test('re-emits when a face link crosses the minFaces threshold', () async {
+      await seedPerson(id: 'p1', faces: 2); // unnamed and below the threshold: not emitted yet
+
+      final emissions = <List<String>>[];
+      final sub = sut
+          .watch(sortBy: PeopleSortBy.photoCount)
+          .listen((people) => emissions.add(people.map((p) => p.id).toList()));
+      await pumpEventQueue();
+      expect(emissions.last, isEmpty);
+
+      await ctx.newFace(assetId: assetId, personId: 'p1', imageWidth: 1000, imageHeight: 1000);
+      await pumpEventQueue();
+
+      expect(emissions.last, ['p1']);
+      await sub.cancel();
+    });
+
+    test('two sortBy family members order independently', () async {
+      await seedPerson(id: 'b-many', name: 'Bob', faces: 5);
+      await seedPerson(id: 'a-few', name: 'Ann', faces: 3);
+
+      expect((await sut.watch(sortBy: PeopleSortBy.photoCount).first).map((p) => p.id), ['b-many', 'a-few']);
+      expect((await sut.watch(sortBy: PeopleSortBy.name).first).map((p) => p.id), ['a-few', 'b-many']);
+    });
+
+    test('the first emission equals getAllPeople', () async {
+      await seedPerson(id: 'p1', name: 'Alice');
+      await seedPerson(id: 'p2', faces: 5);
+
+      expect(await sut.watch().first, await sut.getAllPeople());
+    });
+  });
 }
