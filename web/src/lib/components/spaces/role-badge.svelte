@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { spaceRoleLabelKey } from '$lib/utils/space-utils';
   import type { UserAvatarColor } from '@immich/sdk';
   import { t } from 'svelte-i18n';
 
@@ -39,9 +40,7 @@
     return `bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300 ${sizeClasses[size]}`;
   });
 
-  const roleLabel = $derived(
-    role === 'owner' ? $t('owner') : role === 'editor' ? $t('role_editor') : $t('role_viewer'),
-  );
+  const roleLabel = $derived($t(spaceRoleLabelKey(role)));
 </script>
 
 <span class="inline-flex items-center rounded-full font-medium capitalize {badgeClass}" data-testid="role-badge-{role}">

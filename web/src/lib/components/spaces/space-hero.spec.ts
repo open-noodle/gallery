@@ -72,9 +72,17 @@ describe('SpaceHero component', () => {
     expect(screen.getByTestId('hero-role-badge')).toBeInTheDocument();
   });
 
-  it('should display role badge text when currentRole is provided', () => {
+  // The badge used to print the raw SharedSpaceRole enum, which is English-only in every locale
+  // (#946). `$t` has no dictionary under test, so it echoes the key back — a badge reading
+  // `role_editor` rather than `editor` is the proof that the value went through i18n at all.
+  it('should display a translated role label, not the raw enum value, for an editor', () => {
     render(SpaceHero, { space: makeSpace(), currentRole: 'editor' });
-    expect(screen.getByTestId('hero-role-badge')).toHaveTextContent('editor');
+    expect(screen.getByTestId('hero-role-badge')).toHaveTextContent(/^role_editor$/);
+  });
+
+  it('should display a translated role label, not the raw enum value, for a viewer', () => {
+    render(SpaceHero, { space: makeSpace(), currentRole: 'viewer' });
+    expect(screen.getByTestId('hero-role-badge')).toHaveTextContent(/^role_viewer$/);
   });
 
   it('should not display role badge when currentRole is not provided', () => {
@@ -105,6 +113,22 @@ describe('SpaceHero component', () => {
   });
 
   // --- Edit control (✎) ---
+
+  // #946: the cover is a photo, not a themed surface, so a control tinted with a theme colour is
+  // a coin toss. `variant="ghost"` painted the ✎ with `text-dark` — near-black in the light theme —
+  // on a transparent background, which vanished against a dark cover. An opaque chip brings its own
+  // background, so it contrasts with itself whatever the photo underneath happens to be.
+  it('paints the edit control as an opaque chip rather than dark ink on the bare cover', () => {
+    render(SpaceHero, {
+      space: makeSpace({ thumbnailAssetId: 'a1' }),
+      canEdit: true,
+      onChangeCover: () => {},
+      onReposition: () => {},
+    });
+    const button = within(screen.getByTestId('hero-edit-menu')).getByLabelText('edit');
+    expect(button.className).not.toContain('text-dark');
+    expect(button.className).toMatch(/(^|\s)bg-\S/);
+  });
 
   it('shows the edit control immediately for an editor with a cover, with no hover interaction', () => {
     render(SpaceHero, {
