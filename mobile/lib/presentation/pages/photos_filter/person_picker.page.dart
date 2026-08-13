@@ -88,7 +88,7 @@ class _PersonPickerPageState extends ConsumerState<PersonPickerPage> {
           child: Center(
             child: TextButton.icon(
               key: const Key('person-picker-retry'),
-              onPressed: () => ref.invalidate(driftGetAllPeopleWithSharedSpacesProvider),
+              onPressed: () => ref.invalidateServerPeopleLists(),
               icon: const Icon(Icons.refresh_rounded),
               label: Text(context.t.filter_sheet_load_error_retry),
             ),

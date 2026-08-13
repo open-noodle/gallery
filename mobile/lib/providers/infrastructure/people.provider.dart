@@ -80,3 +80,19 @@ final driftSpacePeopleProvider = FutureProvider.autoDispose
       final repository = ref.watch(sharedSpaceApiRepositoryProvider);
       return repository.getSpacePeople(key.spaceId, sortBy: key.sortBy);
     });
+
+/// Every server-backed people list. The local list is (post-reconciliation) a Drift
+/// stream and needs no invalidation — but a Drift stream can never observe a
+/// server-side edit (space-person edits write nothing locally), so any surface that
+/// changes people on the server, and any deliberate refresh gesture, must invalidate
+/// these. Register new server-backed people providers HERE, never at call sites —
+/// this list existing is what keeps the paired-invalidation trap deleted (see the
+/// 2026-08-13 person-model reconciliation spec).
+final serverPeopleListProviders = <ProviderOrFamily>[
+  driftGetAllPeopleWithSharedSpacesProvider,
+  driftSpacePeopleProvider,
+];
+
+extension InvalidateServerPeopleLists on WidgetRef {
+  void invalidateServerPeopleLists() => serverPeopleListProviders.forEach(invalidate);
+}
