@@ -202,9 +202,7 @@ void main() {
   // Space-scoped person goes to the editor-gated shared-space endpoint with NO local write.
   group('updateName routing', () {
     test('routes a personal person to the owner-only person endpoint and writes locally', () async {
-      when(
-        () => mockApiRepository.update(any(), name: any(named: 'name')),
-      ).thenAnswer((_) async => const PersonDto(id: 'p1', isHidden: false, name: 'Bob', thumbnailPath: ''));
+      when(() => mockApiRepository.update(any(), name: any(named: 'name'))).thenAnswer((_) async {});
       when(() => mockRepository.updateName(any(), any())).thenAnswer((_) async => 1);
 
       final result = await sut.updateName(person('p1'), 'Bob');
@@ -245,9 +243,7 @@ void main() {
     final birthday = DateTime(1990, 5, 20);
 
     test('routes a personal person to the owner-only person endpoint and writes locally', () async {
-      when(
-        () => mockApiRepository.update(any(), birthday: any(named: 'birthday')),
-      ).thenAnswer((_) async => const PersonDto(id: 'p1', isHidden: false, name: 'Alice', thumbnailPath: ''));
+      when(() => mockApiRepository.update(any(), birthday: any(named: 'birthday'))).thenAnswer((_) async {});
       when(() => mockRepository.updateBirthday(any(), any())).thenAnswer((_) async => 1);
 
       final result = await sut.updateBrithday(person('p1'), birthday);
