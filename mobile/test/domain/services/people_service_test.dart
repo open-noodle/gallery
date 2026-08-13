@@ -149,6 +149,8 @@ void main() {
       final result = await sut.getAllPeopleWithSharedSpaces(minFaces: 5, sortBy: PeopleSortBy.photoCount);
 
       expect(result, [person('local-person')]);
+      // Owner-scoped local list: personal people only.
+      expect(result.single.spaceId, isNull);
       verify(() => mockRepository.getAllPeople(minFaces: 5, sortBy: PeopleSortBy.photoCount)).called(1);
     });
 
