@@ -134,10 +134,11 @@ test.describe('Rebase Smoke — UI Permission Matrix', () => {
     await page.waitForSelector('#immich-asset-viewer');
     await page.keyboard.press('i');
     await expect(page.locator('#detail-panel')).toBeVisible();
-    // The edit-date button is always rendered, but for non-owners the click handler is a no-op,
-    // the pencil indicator is omitted, and the title attribute is empty. Assert on the title
-    // (locale-proof via empty string) as the owner-only gate.
-    await expect(page.locator('[data-testid="detail-panel-edit-date-button"]')).toHaveAttribute('title', '');
+    // Since #778 (R3/R10) the whole row is no longer an "edit date" button: the date text became a
+    // contextual filter and the edit action moved onto its own pencil IconButton, gated behind
+    // `{#if isOwner}` in DetailPanelDate.svelte. For non-owners it is not rendered at all, so assert
+    // absence rather than the old empty-`title` proxy. Matches contextual-filters.e2e-spec.ts.
+    await expect(page.locator('[data-testid="detail-panel-edit-date-button"]')).toHaveCount(0);
     // Since #688 the "Show file location" toggle is gated on asset.originalPath (which the
     // server sends to space members), not on ownership — so editors can reveal the path too.
     await expect(page.getByLabel('Show file location')).toBeVisible();
@@ -149,8 +150,9 @@ test.describe('Rebase Smoke — UI Permission Matrix', () => {
     await page.waitForSelector('#immich-asset-viewer');
     await page.keyboard.press('i');
     await expect(page.locator('#detail-panel')).toBeVisible();
-    // Viewer has same UI gating as editor for these owner-only controls.
-    await expect(page.locator('[data-testid="detail-panel-edit-date-button"]')).toHaveAttribute('title', '');
+    // Viewer has same UI gating as editor for these owner-only controls (see Test 5 for why this is
+    // an absence assertion since #778).
+    await expect(page.locator('[data-testid="detail-panel-edit-date-button"]')).toHaveCount(0);
     // Since #688 the file-path toggle follows asset.originalPath, not ownership (see Test 5).
     await expect(page.getByLabel('Show file location')).toBeVisible();
   });
