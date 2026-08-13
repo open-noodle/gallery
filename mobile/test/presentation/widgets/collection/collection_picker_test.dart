@@ -15,6 +15,7 @@ import 'package:immich_mobile/presentation/widgets/collection/space_collection_s
 import 'package:immich_mobile/presentation/widgets/album/album_selector.widget.dart';
 import 'package:immich_mobile/providers/infrastructure/action.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
+import 'package:immich_mobile/providers/album/album_sort_by_options.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/remote_album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/space_album.provider.dart';
@@ -23,8 +24,9 @@ import 'package:immich_mobile/providers/timeline/multiselect.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:immich_mobile/widgets/common/search_field.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:openapi/api.dart';
+import 'package:openapi/api.dart' hide AlbumUserRole;
 
+import '../../../unit/factories/remote_album_factory.dart';
 import '../../../fixtures/user.stub.dart';
 import '../../../widget_tester_extensions.dart';
 
@@ -61,6 +63,46 @@ class _StubRemoteAlbumNotifier extends RemoteAlbumNotifier {
   ]) => albums;
 }
 
+/// Records the album list `AlbumSelector` passes into `searchAlbums`.
+///
+/// This is the only way to observe the picker's album filtering from a test: `AlbumTile`
+/// needs `driftProvider` overridden and throws, so no row ever renders. Feeding the picker
+/// only albums it must hide keeps `shownAlbums` empty, so nothing tries to build a tile.
+class _CapturingRemoteAlbumNotifier extends RemoteAlbumNotifier {
+  _CapturingRemoteAlbumNotifier(this._albums);
+
+  final List<RemoteAlbum> _albums;
+  List<RemoteAlbum>? searchedOver;
+
+  // Starts empty: the widget only sorts from a `ref.listen` on `state.albums`, which fires on
+  // CHANGE, so publishing from `refresh()` is what actually drives the pipeline.
+  @override
+  RemoteAlbumState build() => const RemoteAlbumState(albums: []);
+
+  @override
+  Future<void> refresh() async {
+    state = RemoteAlbumState(albums: _albums);
+  }
+
+  @override
+  Future<List<RemoteAlbum>> sortAlbums(
+    List<RemoteAlbum> albums,
+    AlbumSortMode sortMode, {
+    bool isReverse = false,
+  }) async => albums;
+
+  @override
+  List<RemoteAlbum> searchAlbums(
+    List<RemoteAlbum> albums,
+    String query,
+    String? userId, [
+    QuickFilterMode filterMode = QuickFilterMode.all,
+  ]) {
+    searchedOver = albums;
+    return albums;
+  }
+}
+
 /// Captures which [ActionSource] the picker dispatched against, and lets a test make the
 /// dispatch fail, without standing up the real action plumbing.
 class _RecordingActionNotifier extends ActionNotifier {
@@ -92,6 +134,8 @@ class _RecordingActionNotifier extends ActionNotifier {
     return ActionResult(count: succeeds ? 1 : 0, success: succeeds);
   }
 }
+
+void _noop(RemoteAlbum _) {}
 
 void main() {
   Future<void> pumpPicker(
@@ -191,6 +235,63 @@ void main() {
     final headerY = tester.getTopLeft(find.byKey(const Key('collection-picker-header'))).dy;
     final albumsY = tester.getTopLeft(find.byType(SearchField)).dy;
     expect(headerY, lessThan(albumsY));
+  });
+
+  // The album rows themselves cannot be asserted on here: `AlbumTile` needs `driftProvider`
+  // overridden and throws in this harness, and `find.text` on an album name is confounded by
+  // the search field's own text. So assert the WIRING -- that the picker asks `AlbumSelector`
+  // to hide albums the user cannot add to -- the same way the bottom-sheet tests assert on
+  // `BaseBottomSheet.slivers` rather than on rows below the fold. The rule itself is covered
+  // exhaustively in test/utils/album_permissions_test.dart.
+  testWidgets('V1: the picker asks the album selector to hide albums the user cannot add to', (tester) async {
+    await pumpPicker(tester);
+
+    expect(tester.widget<AlbumSelector>(find.byType(AlbumSelector)).writableOnly, isTrue);
+  });
+
+  testWidgets('V2: writableOnly is opt-in, so album browsers are unaffected', (tester) async {
+    // drift_album.page.dart mounts AlbumSelector as a browser, where a viewer-role album is
+    // perfectly valid to open. It passes nothing, so the default is what protects it.
+    const browser = AlbumSelector(onAlbumSelected: _noop);
+
+    expect(browser.writableOnly, isFalse);
+  });
+
+  testWidgets('V3: a hidden album is already gone before the search runs', (tester) async {
+    // The filter sits at sortAlbums()'s input rather than on the rendered list, so a hidden
+    // album cannot come back by typing its name. Observed by capturing what the widget hands
+    // to searchAlbums -- rows themselves cannot render (AlbumTile needs driftProvider).
+    final viewerAlbum = RemoteAlbumFactory.create(
+      id: 'al1',
+      name: 'ViewerAlbum',
+      currentUserRole: AlbumUserRole.viewer,
+    );
+    final notifier = _CapturingRemoteAlbumNotifier([viewerAlbum]);
+
+    final userService = _MockUserService();
+    final user = UserStub.user1;
+    when(() => userService.tryGetMyUser()).thenReturn(user);
+    when(() => userService.watchMyUser()).thenAnswer((_) => const Stream.empty());
+
+    await tester.pumpConsumerWidgetRaw(
+      const CustomScrollView(slivers: [CollectionPicker()]),
+      overrides: [
+        currentUserProvider.overrideWith((ref) => _StubCurrentUserNotifier(userService, user)),
+        remoteAlbumProvider.overrideWith(() => notifier),
+        appConfigProvider.overrideWithValue(const AppConfig()),
+        sharedSpacesProvider.overrideWith((ref) async => const []),
+        multiSelectProvider.overrideWith(
+          () => MultiSelectNotifier(const MultiSelectState(selectedAssets: {}, lockedSelectionAssets: {})),
+        ),
+      ],
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(SearchField), 'ViewerAlbum');
+    await tester.pumpAndSettle();
+
+    expect(notifier.searchedOver, isNotNull, reason: 'the search path never ran, so this proves nothing');
+    expect(notifier.searchedOver, isEmpty);
   });
 
   testWidgets('L1: spaces render above albums, and both below the search field', (tester) async {
