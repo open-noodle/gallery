@@ -35,6 +35,8 @@ class SpaceAlbumRepository extends DriftDatabaseRepository {
     // WHERE, so an album with zero visible assets still surfaces with count 0.
     // remote_asset.id.count() ignores the NULLs a LEFT JOIN produces.
     final assetCountExp = asset.id.count();
+    final minDateExp = asset.localDateTime.min();
+    final maxDateExp = asset.localDateTime.max();
 
     final query =
         _db.select(link).join([
@@ -50,7 +52,7 @@ class SpaceAlbumRepository extends DriftDatabaseRepository {
             ),
           ])
           ..where(link.spaceId.equals(spaceId))
-          ..addColumns([assetCountExp])
+          ..addColumns([assetCountExp, minDateExp, maxDateExp])
           ..groupBy([link.spaceId, link.albumId, meta.id])
           ..orderBy([OrderingTerm.asc(meta.name)]);
 
@@ -61,11 +63,15 @@ class SpaceAlbumRepository extends DriftDatabaseRepository {
         return SpaceAlbum(
           id: m.id,
           name: m.name,
+          description: m.description,
           thumbnailAssetId: m.thumbnailAssetId,
           showInTimeline: l.showInTimeline,
           assetCount: row.read(assetCountExp) ?? 0,
           linkedAt: l.createdAt,
           updatedAt: m.updatedAt,
+          createdAt: m.createdAt,
+          startDate: _utcDay(row.read(minDateExp)),
+          endDate: _utcDay(row.read(maxDateExp)),
         );
       }).toList(),
     );
@@ -84,4 +90,28 @@ class SpaceAlbumRepository extends DriftDatabaseRepository {
       _db.sharedSpaceAlbumLinkEntity,
     )..where((t) => t.spaceId.equals(spaceId) & t.albumId.equals(albumId))).go();
   }
+}
+
+/// Truncate to a UTC calendar day so the sort key matches the server's
+/// `MIN/MAX(("asset"."localDateTime" AT TIME ZONE 'UTC')::date)` — both
+/// platforms sort on the same day, not a timestamp.
+///
+/// `.toUtc()` is load-bearing, do not remove it: for synced rows,
+/// `mapDateTime` parses the server's `Z`-suffixed ISO-8601 string with
+/// `DateTime.tryParse`, which yields `isUtc == true`, so those already read
+/// back from Drift as UTC and `.toUtc()` is a no-op on them. It is genuinely
+/// load-bearing for locally-constructed `DateTime`s that are *not* already
+/// UTC — e.g. the medium-test fixture, which writes `createdAt.toLocal()` —
+/// where reading year/month/day straight off `value` would truncate to the
+/// *device's* local calendar day, which can be a day off from the UTC day
+/// the server computed. No test guards this call: mobile CI runs on
+/// ubuntu-latest with no TZ override, where local and UTC digits happen to
+/// coincide, so a dropped `.toUtc()` would pass CI and only misbehave on a
+/// non-UTC device (or a non-UTC locally-constructed row).
+DateTime? _utcDay(DateTime? value) {
+  if (value == null) {
+    return null;
+  }
+  final utc = value.toUtc();
+  return DateTime.utc(utc.year, utc.month, utc.day);
 }

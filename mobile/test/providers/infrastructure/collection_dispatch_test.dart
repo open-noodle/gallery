@@ -87,6 +87,7 @@ void main() {
     showInTimeline: true,
     linkedAt: DateTime(2026, 1, 1),
     updatedAt: DateTime(2026, 1, 1),
+    createdAt: DateTime(2026, 1, 1),
   );
 
   RemoteAsset remote(String id) => RemoteAsset(
