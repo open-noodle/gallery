@@ -1031,6 +1031,7 @@
   "assets_removed_partial_count": "{removedCount} van {totalCount} items verwijderd",
   "assets_restore_confirmation": "Weet je zeker dat je alle verwijderde items wilt herstellen? Je kunt deze actie niet ongedaan maken! Offline items kunnen op deze manier niet worden hersteld.",
   "assets_restored_count": "{count, plural, one {# item} other {# items}} hersteld",
+  "assets_skipped_not_editable": "{count, plural, one {# foto is overgeslagen omdat je deze niet kunt bewerken} other {# foto's zijn overgeslagen omdat je deze niet kunt bewerken}}",
   "assets_trashed": "{count, plural, one {# item} other {# items}} naar de prullenbak verplaatst",
   "assets_trashed_count": "{count, plural, one {# item} other {# items}} naar prullenbak verplaatst",
   "assets_were_part_of_album_count": "{count, plural, one {Item was} other {Items waren}} al onderdeel van het album",

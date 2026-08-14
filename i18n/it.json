@@ -1031,6 +1031,7 @@
   "assets_removed_partial_count": "Rimosse {removedCount} di {totalCount} risorse",
   "assets_restore_confirmation": "Sei sicuro di voler ripristinare tutti le risorse cestinate? Non puoi annullare questa azione! Tieni presente che eventuali risorse offline non potranno essere ripristinate in questo modo.",
   "assets_restored_count": "{count, plural, one {# risorsa ripristinata} other {# risorse ripristinate}}",
+  "assets_skipped_not_editable": "{count, plural, one {# foto è stata ignorata perché non puoi modificarla} other {# foto sono state ignorate perché non puoi modificarle}}",
   "assets_trashed": "{count} risorsa/e cestinati",
   "assets_trashed_count": "{count, plural, one {Spostato # risorsa} other {Spostate # risorse}} nel cestino",
   "assets_were_part_of_album_count": "{count, plural, one {La risorsa fa} other {Le risorse facevano}} già parte dell'album",

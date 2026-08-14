@@ -1031,6 +1031,7 @@
   "assets_removed_partial_count": "Removed {removedCount} of {totalCount} assets",
   "assets_restore_confirmation": "Are you sure you want to restore all your trashed assets? You cannot undo this action! Note that any offline assets cannot be restored this way.",
   "assets_restored_count": "Restored {count, plural, one {# asset} other {# assets}}",
+  "assets_skipped_not_editable": "{count, plural, one {# photo was skipped because you cannot edit it} other {# photos were skipped because you cannot edit them}}",
   "assets_trashed": "{count} asset(s) trashed",
   "assets_trashed_count": "Trashed {count, plural, one {# asset} other {# assets}}",
   "assets_were_part_of_album_count": "{count, plural, one {Asset was} other {Assets were}} already part of the album",

@@ -1026,6 +1026,7 @@
   "assets_removed_partial_count": "已移除 {totalCount} 个资源中的 {removedCount} 个",
   "assets_restore_confirmation": "您确定要恢复回收站中的所有文件吗？此操作无法撤销！请注意，离线文件无法通过此方式恢复。",
   "assets_restored_count": "已恢复{count, plural, one {#个文件} other {#个文件}}",
+  "assets_skipped_not_editable": "{count, plural, one {已跳过 # 张您无权编辑的照片} other {已跳过 # 张您无权编辑的照片}}",
   "assets_trashed": "{count}个文件移至回收站",
   "assets_trashed_count": "已将{count, plural, one {#个文件} other {#个文件}}移至回收站",
   "assets_were_part_of_album_count": "{count, plural, one {个资源} other {个资源}}已在该相册中",

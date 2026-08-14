@@ -1031,6 +1031,7 @@
   "assets_removed_partial_count": "Eliminados {removedCount} de {totalCount} recursos",
   "assets_restore_confirmation": "¿Estás seguro de que quieres restaurar todos tus recursos eliminados? ¡No puede deshacer esta acción! Tenga en cuenta que los recursos sin conexión no se pueden restaurar de esta manera.",
   "assets_restored_count": "Restaurado {count, plural, one {# recurso} other {# recursos}}",
+  "assets_skipped_not_editable": "{count, plural, one {# foto fue saltada porque no puedes editarla} other {# fotos fueron saltadas porque no puedes editarlas}}",
   "assets_trashed": "{count} recurso(s) eliminado(s)",
   "assets_trashed_count": "Borrado {count, plural, one {# recurso} other {# recursos}}",
   "assets_were_part_of_album_count": "{count, plural, one {El recurso ya forma} other {Los recursos ya forman}} parte del álbum",
