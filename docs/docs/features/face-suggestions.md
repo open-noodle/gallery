@@ -4,7 +4,7 @@ Face recognition is deliberately cautious. A face assigned to the **wrong** pers
 
 The cost of that caution is a long tail of near-misses in every library: the profile shot, the one in bad light, the one from four years ago — all sitting unassigned while the person they belong to is named and obvious.
 
-Face Suggestions is the other half of that trade. Gallery collects the faces that were *almost* confident enough and brings them back to you on the person they most likely belong to, so you can make the call the model would not.
+Face Suggestions is the other half of that trade. Gallery collects the faces that were _almost_ confident enough and brings them back to you on the person they most likely belong to, so you can make the call the model would not.
 
 :::info
 Suggestions handle the faces recognition **skipped**. For the ones it got **wrong** — clusters contaminated with another person's photos — see [Face Cleanup](../administration/face-cleanup.md). Both write to the same verdict layer, so a decision made in either is respected by the other.
@@ -18,18 +18,18 @@ Open a named person. If there are near-misses waiting, a banner sits above their
 
 Review shows one face at a time. Each one is presented in the photo it came from, so you keep the context a bare crop throws away, with a **Known photo** of the person beside it for comparison.
 
-| Action | What it does |
-| --- | --- |
-| **Same person** | Assigns the face to this person, and improves future matching |
-| **Different person** | Records that this face is *not* this person. The face stays unassigned and is never suggested for them again |
-| **Ignore face** | Suppresses the suggestion without judging the match — for crops not worth anyone's time, like a stranger in the background or a face on a poster |
+| Action               | What it does                                                                                                                                     |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Same person**      | Assigns the face to this person, and improves future matching                                                                                    |
+| **Different person** | Records that this face is _not_ this person. The face stays unassigned and is never suggested for them again                                     |
+| **Ignore face**      | Suppresses the suggestion without judging the match — for crops not worth anyone's time, like a stranger in the background or a face on a poster |
 
 <img src={require('./img/face-suggestions-review.webp').default} title='Reviewing a single face suggestion against a known photo' />
 
 The difference between the last two is worth knowing. **Different person** is a real verdict: it is stamped against the person's identity, so it answers "not this person" everywhere that identity is checked, not just on the row you were looking at. **Ignore face** only stops the asking.
 
 :::note
-Dismissing a suggestion hides the *suggestion*, not the face. If a future, more confident match brings that same face inside the automatic-recognition threshold, it can still be auto-assigned. That is by design — saying "different person" once should never permanently block normal recognition.
+Dismissing a suggestion hides the _suggestion_, not the face. If a future, more confident match brings that same face inside the automatic-recognition threshold, it can still be auto-assigned. That is by design — saying "different person" once should never permanently block normal recognition.
 :::
 
 ## Shared Spaces
