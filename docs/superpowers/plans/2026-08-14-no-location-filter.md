@@ -1137,7 +1137,7 @@ In `search_filter_empty_test.dart`, beside the existing `untagged display filter
 
 In `search_filter_equality_test.dart`:
 
-````dart
+```dart
     test('filters differing only by locationPresence are unequal', () {
       final a = SearchFilter.empty().copyWith(location: SearchLocationFilter(locationPresence: 'noGps'));
       final b = SearchFilter.empty().copyWith(location: SearchLocationFilter(locationPresence: 'noPlaceName'));
@@ -1151,8 +1151,9 @@ In `search_filter_equality_test.dart`:
 
       expect(SearchLocationFilter.fromMap(original.toMap()).locationPresence, 'noGps');
     });
+```
 
-These last two exercise the notifier rather than the model, so they belong in
+The next two exercise the notifier rather than the model, so they belong in
 `mobile/test/providers/photos_filter/photos_filter_provider_test.dart` — copy its existing
 `ProviderContainer` setup rather than the one sketched here if it differs.
 
@@ -1181,7 +1182,7 @@ These last two exercise the notifier rather than the model, so they belong in
       expect(location.locationPresence, isNull);
       expect(location.country, 'France');
     });
-````
+```
 
 - [ ] **Step 2: Run them to verify they fail**
 
