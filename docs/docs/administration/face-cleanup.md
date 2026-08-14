@@ -2,27 +2,38 @@
 
 ## What it is
 
-During the misattribution event, automatic identity merges fused face clusters from different people — some clusters
-ended up contaminated with another person's photos. The Face Cleanup console finds these mixed clusters and lets an
-admin **re-home** the impostor faces to their true owner.
+Face recognition clusters faces into people automatically, and occasionally it fuses two of them: an identity merge
+pulls in faces that belong to someone else, and one person's page quietly fills up with another person's photos. It
+happens with people who look alike, with runs of photos in bad light, and with children photographed across a decade.
+
+The Face Cleanup console finds those mixed clusters and lets an admin **re-home** the misfiled faces to their true
+owner.
 
 The affected person keeps all of their real faces, their name, and their thumbnail. This tool is **not** a
-person-merge: by default it only moves the scan-flagged impostor faces and leaves the cluster intact. An admin
+person-merge: by default it only moves the scan-flagged faces and leaves the cluster intact. An admin
 can also open the **whole cluster** to add faces the scan missed, or move an entire _unnamed_ cluster into its
 owner in one action — see [Seeing the whole cluster](#seeing-the-whole-cluster).
 
+:::info
+Cleanup handles the faces recognition assigned **incorrectly**. For the ones it was too cautious to assign at all,
+see [Face Suggestions](../features/face-suggestions.md). Both write to the same verdict layer, so a decision made in
+either is permanent and is respected by the other.
+:::
+
 ## When to use it
 
-Gallery's automatic repair handles clusters that are lightly contaminated (under 50% impostor faces). The Face
-Cleanup console handles the rest — the "over-cap" clusters where the contamination is high enough to need human
-confirmation before anything moves.
-
 If someone's People page shows photos that clearly belong to a different person, run the Face Cleanup console.
+
+Gallery's automatic repair already handles clusters that are lightly contaminated (under 50% misfiled faces). The
+console handles the rest — the "over-cap" clusters where the contamination is high enough that a human should
+confirm before anything moves.
 
 ## Two ways to clean up
 
 **Administration → Face cleanup** opens a chooser with two modes. They write exactly the same records, so a
 decision made in either is permanent and is respected by the other — and by every future scan.
+
+<img src={require('./img/face-cleanup-overview.webp').default} title='The Face Cleanup mode chooser' />
 
 |               | **Guided cleanup**                            | **Manual review**                         |
 | ------------- | --------------------------------------------- | ----------------------------------------- |
@@ -52,12 +63,14 @@ decisions and lose them.
    - **Ready to auto-fix** — unnamed, small clusters with a single clean owner. Nothing here needs opening:
      **Approve all** re-homes the whole batch in one action, or approve them one at a time. Use **Exclude from
      this batch** to hold a cluster back, or **Review them** to open the lane and go face by face instead.
-   - **Needs your review** — named people, large clusters, or clusters whose impostor faces route into another
+   - **Needs your review** — named people, large clusters, or clusters whose misfiled faces route into another
      flagged cluster (badged `also flagged`). Nothing here is touched until you open it. Open each row, decide
      each face (see [the six actions](#the-six-actions)), then press **Apply**.
 
 The two lanes are independent: approving the auto-fix batch does not touch anything in the review lane, and vice
 versa.
+
+<img src={require('./img/face-cleanup-scan.webp').default} title='The guided cleanup scan, split into an auto-fix lane and a review lane' />
 
 ### Operating order
 
@@ -78,6 +91,8 @@ cleanup queue. Nothing is written until you press **Apply**.
 | **Unknown person**  | a real face that isn't this person and you can't name; parks it in its own cluster |
 | **Not a face**      | retires the crop entirely. **This is the only irreversible action**                |
 
+<img src={require('./img/face-cleanup-review.webp').default} title='Reviewing one flagged cluster, with every face routed to a destination' />
+
 **Keep here** vs. **Confirm & lock** is the distinction worth learning. Keep here answers one scan's question —
 if a later scan suspects a _different_ person, the face can be flagged again. Confirm & lock silences it for
 good, survives the person being merged or deleted, and is the right choice for faces that genuinely don't
@@ -87,7 +102,7 @@ Declines and locks can be undone later from the [Resolutions](#reviewing-and-und
 
 ## Seeing the whole cluster
 
-The review page opens on the scan's **suggestions** — the impostor faces the detector flagged. But the scan only
+The review page opens on the scan's **suggestions** — the misfiled faces the detector flagged. But the scan only
 flags the faces it is confident about, and sometimes you want to act on the rest of the cluster too. Below the
 suggestions, the **Rest of this cluster** section lists every other face still assigned to the person, loaded a
 page at a time (clusters can hold thousands of faces, so the list pages with **Load more** rather than loading
@@ -219,7 +234,7 @@ logged.
 
 - The scan and the apply step both **refuse to run while facial recognition is active**. If you see a 409 conflict
   message, wait for the recognition queue to drain and try again.
-- Applying a repair **assigns the impostor faces directly to their suspected owner** (an admin-confirmed manual
+- Applying a repair **assigns the misfiled faces directly to their suspected owner** (an admin-confirmed manual
   assignment). The move is immediate and durable — facial recognition will not re-cluster a manually assigned face,
   so the faces cannot drift back to the wrong person. Once an apply succeeds the affected rows leave the list.
 - All moves are reversible: open the affected people on the People page (or run a new scan and use the console) to
@@ -232,3 +247,8 @@ logged.
   and cleanup engines were unified. A database that recorded one of those names has no matching migration file on
   disk in later builds and fails to boot with a "corrupted migrations" error naming the missing migration. There
   is no automatic upgrade path for this — reset the instance (fresh database) rather than carrying it forward.
+
+## See also
+
+- [Face Suggestions](../features/face-suggestions.md) — reviewing the near-miss faces recognition declined to assign
+- [Facial Recognition](../features/facial-recognition.md) — how clustering works, and the settings that govern it
