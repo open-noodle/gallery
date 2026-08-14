@@ -11,6 +11,8 @@ import {
   AssetBulkDeleteDto,
   AssetBulkUpdateDto,
   AssetCopyDto,
+  AssetEditableDto,
+  AssetEditableResponseDto,
   AssetJobName,
   AssetJobsDto,
   AssetMetadataBulkDeleteDto,
@@ -148,7 +150,21 @@ export class AssetService extends BaseService {
       }
     }
 
+    // #734: resolve editability once, here, where the space context already is. Never in
+    // mapAsset — it has no AuthDto and feeds list endpoints, where this would be N+1.
+    if (!auth.sharedLink) {
+      const editable = await this.checkAccess({ auth, permission: Permission.AssetUpdate, ids: [id] });
+      data.canEdit = editable.has(id);
+    }
+
     return data;
+  }
+
+  async getEditable(auth: AuthDto, dto: AssetEditableDto): Promise<AssetEditableResponseDto> {
+    // Deliberately a bare access check, not a second implementation of the rule: this IS
+    // the same call the write will make, so the answer cannot drift from enforcement.
+    const editable = await this.checkAccess({ auth, permission: Permission.AssetUpdate, ids: dto.assetIds });
+    return { editableAssetIds: [...editable] };
   }
 
   private async applyResolvedPersonMetadata(

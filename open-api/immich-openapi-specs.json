@@ -5072,6 +5072,57 @@
         "x-immich-state": "Stable"
       }
     },
+    "/assets/editable": {
+      "post": {
+        "description": "Returns the subset of the requested asset IDs the caller is allowed to edit — owned assets, plus assets belonging to a member of a space where the caller is Owner or Editor.",
+        "operationId": "getEditableAssets",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssetEditableDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetEditableResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Resolve which of the given assets the caller may edit",
+        "tags": [
+          "Assets"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v2",
+            "state": "Added"
+          }
+        ],
+        "x-immich-permission": "asset.read"
+      }
+    },
     "/assets/jobs": {
       "post": {
         "description": "Run a specific job on a set of assets.",
@@ -28252,6 +28303,44 @@
         ],
         "type": "object"
       },
+      "AssetEditableDto": {
+        "properties": {
+          "assetIds": {
+            "description": "Asset IDs to resolve editability for",
+            "items": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "spaceId": {
+            "description": "Space context the assets are being viewed through",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "assetIds"
+        ],
+        "type": "object"
+      },
+      "AssetEditableResponseDto": {
+        "properties": {
+          "editableAssetIds": {
+            "description": "Subset of the requested IDs the caller may edit",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "editableAssetIds"
+        ],
+        "type": "object"
+      },
       "AssetEditsCreateDto": {
         "properties": {
           "edits": {
@@ -28989,6 +29078,10 @@
       },
       "AssetResponseDto": {
         "properties": {
+          "canEdit": {
+            "description": "Whether the caller may edit this asset (owner, or Owner/Editor of a space whose member owns it). Present only on single-asset reads; absent from list responses, where resolving it per asset would be an N+1 access check.",
+            "type": "boolean"
+          },
           "checksum": {
             "description": "Base64 encoded SHA1 hash",
             "type": "string"

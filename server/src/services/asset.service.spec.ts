@@ -3206,4 +3206,69 @@ describe(AssetService.name, () => {
       await expect(sut.upsertMetadata(auth, asset.id, { items: [] })).resolves.not.toThrow();
     });
   });
+
+  describe('canEdit / editable (#734)', () => {
+    it('S-29: sets canEdit true for a space editor viewing a member asset', async () => {
+      const auth = AuthFactory.create();
+      const asset = AssetFactory.create();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
+      // AssetRead's space arm is checkSpaceAccess (any space member, not just editors) — this is what
+      // lets a space editor read the asset at all before the AssetUpdate check below decides canEdit.
+      // The brief's original mock omitted this and the test 400ed on the read gate before ever reaching
+      // canEdit; see also S-15's comment on the same checkSpaceAccess-vs-checkSpaceEditAccess split.
+      mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getById.mockResolvedValue(getForAsset(asset));
+      mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue(void 0 as any);
+
+      const result = (await sut.get(auth, asset.id)) as AssetResponseDto;
+
+      expect(result.canEdit).toBe(true);
+    });
+
+    it('S-30: sets canEdit false when the caller has no edit access', async () => {
+      const auth = AuthFactory.create();
+      const asset = AssetFactory.create();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
+      // Read access via space membership (see S-29's comment), but no edit access — the caller can see
+      // the asset but canEdit must resolve false.
+      mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set());
+      mocks.asset.getById.mockResolvedValue(getForAsset(asset));
+      mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue(void 0 as any);
+
+      const result = (await sut.get(auth, asset.id)) as AssetResponseDto;
+
+      expect(result.canEdit).toBe(false);
+    });
+
+    it('S-33: returns only the editable subset', async () => {
+      const auth = AuthFactory.create();
+      const mine = newUuid();
+      const editable = newUuid();
+      const forbidden = newUuid();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([mine]));
+      mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set([editable]));
+
+      const result = await sut.getEditable(auth, { assetIds: [mine, editable, forbidden] });
+
+      expect(new Set(result.editableAssetIds)).toEqual(new Set([mine, editable]));
+    });
+
+    it('S-34: handles an empty request without error', async () => {
+      const auth = AuthFactory.create();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set());
+
+      await expect(sut.getEditable(auth, { assetIds: [] })).resolves.toEqual({ editableAssetIds: [] });
+    });
+
+    it('S-35: silently excludes an unknown id rather than 404ing', async () => {
+      const auth = AuthFactory.create();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set());
+
+      await expect(sut.getEditable(auth, { assetIds: [newUuid()] })).resolves.toEqual({ editableAssetIds: [] });
+    });
+  });
 });
