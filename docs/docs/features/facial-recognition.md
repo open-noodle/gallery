@@ -67,64 +67,15 @@ If you find the totals distracting (for example on a casual family library where
 
 ## Face Suggestions
 
-Face suggestions are **on by default** — there is nothing to switch on and no job to run. The
-first library scan is queued for you, and from then on suggestions stay current as new photos are
-processed. You can watch the work in Administration → Jobs.
+Recognition deliberately leaves doubtful faces unassigned, because a wrong assignment is much
+harder to undo than one that was never made. **Face Suggestions** brings those near-misses back
+to you as a banner on the named person they most likely belong to, to be reviewed one at a time.
 
-The toggle lives at Administration → Settings → Machine Learning → Facial Recognition, under
-**Enable face suggestions**, if you would rather turn the feature off.
+It is on by default, and the toggle lives under **Enable face suggestions** in the
+[Configuration](#configuration) section below.
 
-A person is only scanned if it has a name, is not hidden, and is a person rather than a pet.
-People in a shared space are scanned only when that space has face recognition enabled.
-
-:::note
-The **Suggestion max distance** must be greater than the **Maximum recognition distance**;
-a smaller value can never match anything, so the settings page refuses to save it. Face
-suggestions also require facial recognition itself to stay enabled.
-:::
-
-### Upgrading an existing library
-
-The first time the server starts on the new version it queues one library-wide catch-up scan, so an
-existing library does not need a trip to the Jobs page either. That scan runs once per instance, on
-the **People backfill** queue, where it is visible and pausable like any other job. It is safe to
-let it run even if you were already using suggestions — a re-scan never duplicates a pending
-suggestion and never re-asks about a face you have already decided.
-
-Your existing setting is preserved. If you had already switched suggestions **on**, they stay on. If
-you had explicitly set a suggestion distance too low to ever match anything, that configuration is
-read as "off" and is left off — turn the toggle on to start using the feature. Only instances that
-never configured the setting at all pick up the new on-by-default.
-
-To re-scan at any other time — for example after widening the suggestion distance, which does not
-rescan on its own — run the **Face suggestion maintenance** job.
-
-### Turning suggestions off and on again
-
-Switching the feature off hides pending suggestions everywhere but **deletes nothing**. Every
-decision you have already made is durable: faces you assigned stay assigned, and faces you
-dismissed stay dismissed. Switching it back on re-queues a scan and your earlier decisions are
-still honoured — a face you said "different person" to is not proposed for that person again.
-
-Suggestions left pending when you switched off are re-validated before they are shown again, so
-anything that changed in the meantime (the face was assigned to someone, the photo was deleted,
-the suggestion distance was narrowed) simply drops out rather than resurfacing as a stale
-suggestion.
-
-When a named person has near-miss faces (similar but below the auto-assign threshold),
-Gallery surfaces them as **suggestions** on that person's page. Review them one at a time:
-
-- **Same person** assigns the face to the person (and improves future matching).
-- **Different person** dismisses the suggestion — it will never be suggested for this
-  person again. The face itself stays unassigned.
-
-> Dismissing only hides the _suggestion_. If a future, more confident match puts that same
-> face within the automatic-recognition threshold, it can still be auto-assigned — by design,
-> so dismissing a suggestion never blocks normal recognition.
-
-People in a [shared space](/features/shared-spaces) work the same way: owners and editors of
-the space get suggestions for a space person, whether they open that person from the space or
-from the main People view. Viewers get none, since they cannot assign faces.
+See [Face Suggestions](face-suggestions.md) for how review works, what each action means, how
+Shared Spaces are handled, and the upgrade and on/off behaviour.
 
 ## How Face Detection Works
 
