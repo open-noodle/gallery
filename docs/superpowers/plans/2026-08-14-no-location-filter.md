@@ -118,11 +118,15 @@ describe('locationPresence', () => {
   it('narrows rather than replaces other dimensions', async () => {
     const { ctx, sut } = setup();
     const { user } = await ctx.newUser();
-    const { a1 } = await newLocationFixture(ctx, user.id);
-    const { tag } = await ctx.newTag({ userId: user.id, value: 'trip' });
-    await ctx.newTagAsset({ assetId: a1.id, tagId: tag.id });
+    const { a1, a2 } = await newLocationFixture(ctx, user.id);
+    // Tag creation goes through upsertTags, not a factory method — see search.repository.spec.ts:110.
+    const [travel] = await upsertTags(ctx.get(TagRepository), { userId: user.id, tags: ['Travel'] });
+    await ctx.newTagAsset({ tagIds: [travel.id], assetIds: [a1.id] });
 
-    await expect(search(sut, user.id, { locationPresence: 'noGps', tagIds: [tag.id] })).resolves.toEqual([a1.id]);
+    const ids = await search(sut, user.id, { locationPresence: 'noGps', tagIds: [travel.id] });
+
+    expect(ids).toEqual([a1.id]);
+    expect(ids).not.toContain(a2.id); // matches noGps, but is untagged
   });
 
   it('does not return another user’s assets', async () => {
@@ -142,7 +146,7 @@ Run: `cd server && pnpm test:medium -- --run src/../test/medium/specs/repositori
 
 Expected: FAIL. TypeScript rejects `locationPresence` as an unknown property of the search options.
 
-> If `ctx.newTag` / `ctx.newTagAsset` do not exist with those names, read `server/test/medium.factory.ts` and use the actual factory methods; the assertion is what matters, not the fixture helper's name.
+> `upsertTags` and `TagRepository` are already imported at the top of this spec file (`:11`, `:8`). `ctx.newTagAsset` takes `{ tagIds, assetIds }` — plural arrays, not a single pair.
 
 - [ ] **Step 3: Add the option types**
 
@@ -163,11 +167,13 @@ Then add one property inside `SearchExifOptions`:
   locationPresence?: LocationPresence;
 ```
 
-In `server/src/repositories/asset.repository.ts`, add the same property to `TimeBucketOptions` (interface at `:143`), importing the type:
+In `server/src/repositories/asset.repository.ts`, add the same property to **`AssetBuilderOptions`** (interface at `:89`), immediately after `state` (`:134`) — that is where its sibling location fields already live, and `TimeBucketOptions extends AssetBuilderOptions`, so `withTimeBucketAssetFilters(qb, options: TimeBucketOptions)` sees it. Import the type:
 
 ```ts
 import { LocationPresence } from 'src/repositories/search.repository';
 ```
+
+> Do **not** put it on `TimeBucketOptions` instead. It compiles either way, but splitting the location group across two interfaces is the kind of drift that makes the next reader miss a member.
 
 - [ ] **Step 4: Add the predicates to `searchAssetBuilderLegacy`**
 
@@ -691,6 +697,14 @@ it('ignores a locationPresence value outside the enum', () => {
 
   expect(decoded.locationPresence).toBeUndefined();
 });
+
+it('clears locationPresence with the rest of the filter params', () => {
+  const params = encode({ locationPresence: 'noGps' });
+  clearFilterParams(params);
+
+  // clearFilterParams iterates FILTER_URL_PARAMS — this fails if the key was never added to it.
+  expect(params.get('locationPresence')).toBeNull();
+});
 ```
 
 In `filter-state.spec.ts`:
@@ -818,53 +832,97 @@ git commit -m "feat(web): carry locationPresence through filter state, URL and r
 
 In `filter-sections.spec.ts`:
 
+These specs render the component directly — there is no shared helper. `countries`, `onCityFetch` and `onSelectionChange` are required props; the `mockCountries` / `mockCityFetch` fixtures already exist at the top of the `describe('LocationFilter', …)` block (`:287-295`).
+
 ```ts
 it('offers both absence-of-location rows when the server says they would match', () => {
-  const { getByTestId } = renderLocationFilter({ hasNoGpsAssets: true, hasNoPlaceNameAssets: true });
+  const { getByTestId } = render(LocationFilter, {
+    props: {
+      countries: mockCountries,
+      onCityFetch: mockCityFetch,
+      onSelectionChange: () => {},
+      hasNoGpsAssets: true,
+      hasNoPlaceNameAssets: true,
+    },
+  });
 
-  expect(getByTestId('location-presence-noGps')).toBeInTheDocument();
-  expect(getByTestId('location-presence-noPlaceName')).toBeInTheDocument();
+  expect(getByTestId('location-presence-noGps')).toBeTruthy();
+  expect(getByTestId('location-presence-noPlaceName')).toBeTruthy();
 });
 
 it('hides a row the server says would match nothing', () => {
-  const { queryByTestId } = renderLocationFilter({ hasNoGpsAssets: false, hasNoPlaceNameAssets: false });
+  const { queryByTestId } = render(LocationFilter, {
+    props: {
+      countries: mockCountries,
+      onCityFetch: mockCityFetch,
+      onSelectionChange: () => {},
+      hasNoGpsAssets: false,
+      hasNoPlaceNameAssets: false,
+    },
+  });
 
-  expect(queryByTestId('location-presence-noGps')).not.toBeInTheDocument();
-  expect(queryByTestId('location-presence-noPlaceName')).not.toBeInTheDocument();
+  expect(queryByTestId('location-presence-noGps')).toBeNull();
+  expect(queryByTestId('location-presence-noPlaceName')).toBeNull();
 });
 
-it('replaces the whole location group when a row is clicked', async () => {
-  const onLocationPresenceChange = vi.fn();
-  const onSelectionChange = vi.fn();
-  const { getByTestId } = renderLocationFilter({
-    hasNoGpsAssets: true,
-    selectedCountry: 'France',
-    selectedCity: 'Paris',
-    onLocationPresenceChange,
-    onSelectionChange,
+it('reports the selection so the panel can replace the whole location group', async () => {
+  let selected: string | undefined | 'unset' = 'unset';
+
+  const { getByTestId } = render(LocationFilter, {
+    props: {
+      countries: mockCountries,
+      onCityFetch: mockCityFetch,
+      onSelectionChange: () => {},
+      hasNoGpsAssets: true,
+      selectedCountry: 'France',
+      selectedCity: 'Paris',
+      onLocationPresenceChange: (value?: 'noGps' | 'noPlaceName') => {
+        selected = value;
+      },
+    },
   });
 
   await fireEvent.click(getByTestId('location-presence-noGps'));
+  expect(selected).toBe('noGps');
 
-  expect(onLocationPresenceChange).toHaveBeenCalledWith('noGps');
+  // Clicking the active row again clears it.
+  await fireEvent.click(getByTestId('location-presence-noGps'));
+  expect(selected).toBeUndefined();
 });
 ```
 
-In `orphaned-selections.spec.ts`:
+> The second click only clears if the component is re-rendered with `selectedLocationPresence: 'noGps'`. If the harness does not re-render on callback, split this into two `render` calls — one with the row unselected asserting `'noGps'`, one with it selected asserting `undefined`.
+
+In `orphaned-selections.spec.ts` (import `LocationFilter` and `render` the same way — this file has no helper either):
 
 ```ts
 it('keeps a selected absence-of-location row visible after its flag goes false', () => {
-  const { getByTestId } = renderLocationFilter({
-    hasNoGpsAssets: false,
-    selectedLocationPresence: 'noGps',
+  const { getByTestId } = render(LocationFilter, {
+    props: {
+      countries: [],
+      onCityFetch: () => Promise.resolve([]),
+      onSelectionChange: () => {},
+      hasNoGpsAssets: false,
+      selectedLocationPresence: 'noGps',
+    },
   });
 
-  // An active filter must never be reachable only through the chip.
-  expect(getByTestId('location-presence-noGps')).toBeInTheDocument();
+  // An active filter must never be reachable only through the chip. Note countries is EMPTY here:
+  // this also proves the empty-state guard admits a lone presence selection instead of rendering
+  // the "No locations found" message over it.
+  expect(getByTestId('location-presence-noGps')).toBeTruthy();
 });
 ```
 
-> Reuse whatever render helper these spec files already define for `location-filter.svelte`; add the new props to it rather than writing a fresh harness.
+Add the panel-wiring direction to `filter-panel.spec.ts`, since it lives in `filter-panel.svelte`, not the row component:
+
+```ts
+it('clears locationPresence when a country is chosen', async () => {
+  // Render the panel with locationPresence active, click a country row, and assert the resulting
+  // filter state has locationPresence undefined and country set. The location group is replaced
+  // wholesale in BOTH directions — the row test above only covers presence-replaces-country.
+});
+```
 
 - [ ] **Step 2: Run them to verify they fail**
 
@@ -1001,12 +1059,18 @@ Expected: the photos test FAILS; the map test may already pass (guard it anyway 
 
 - [ ] **Step 3: Forward it on the four in-scope surfaces**
 
-In each of `photos-filter-options.ts`, `album-filter-options.ts`, `recently-added-filter-options.ts` and `space-filter-options.ts`, beside the existing `if (filters.state)` block:
+`photos-filter-options.ts` (`:56-58`), `album-filter-options.ts` (`:64`) and `space-filter-options.ts` (`:26`) use a guarded-assignment block — add beside the existing `if (filters.state)`:
 
 ```ts
 if (filters.locationPresence) {
   base.locationPresence = filters.locationPresence;
 }
+```
+
+**`recently-added-filter-options.ts` is shaped differently** — it spreads an object literal (`state: filters.state,` at `:67`), so there is no `if` block to copy. Add a plain property there instead:
+
+```ts
+  locationPresence: filters.locationPresence,
 ```
 
 Do the same in `filter-search-terms.ts` (`terms.locationPresence`) and `space-search.ts`'s `buildSmartSearchParams` (`params.locationPresence`).
@@ -1053,7 +1117,7 @@ git commit -m "feat(web): forward locationPresence per surface and suppress it o
 **Files:**
 
 - Modify: `mobile/lib/models/search/search_filter.model.dart:9-49` (`SearchLocationFilter`), `:305-307` (`SearchFilter.isEmpty`)
-- Test: `mobile/test/models/search/search_filter_empty_test.dart`, `search_filter_equality_test.dart`
+- Test: `mobile/test/models/search/search_filter_empty_test.dart`, `search_filter_equality_test.dart`, `mobile/test/providers/photos_filter/photos_filter_provider_test.dart`
 
 **Interfaces:**
 
@@ -1073,7 +1137,7 @@ In `search_filter_empty_test.dart`, beside the existing `untagged display filter
 
 In `search_filter_equality_test.dart`:
 
-```dart
+````dart
     test('filters differing only by locationPresence are unequal', () {
       final a = SearchFilter.empty().copyWith(location: SearchLocationFilter(locationPresence: 'noGps'));
       final b = SearchFilter.empty().copyWith(location: SearchLocationFilter(locationPresence: 'noPlaceName'));
@@ -1087,14 +1151,44 @@ In `search_filter_equality_test.dart`:
 
       expect(SearchLocationFilter.fromMap(original.toMap()).locationPresence, 'noGps');
     });
-```
+
+These last two exercise the notifier rather than the model, so they belong in
+`mobile/test/providers/photos_filter/photos_filter_provider_test.dart` — copy its existing
+`ProviderContainer` setup rather than the one sketched here if it differs.
+
+```dart
+    test('setLocation(null) clears locationPresence', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final notifier = container.read(photosFilterProvider.notifier);
+
+      notifier.setLocation(SearchLocationFilter(locationPresence: 'noGps'));
+      notifier.setLocation(null);
+
+      expect(container.read(photosFilterProvider).location.locationPresence, isNull);
+      expect(container.read(photosFilterProvider).isEmpty, true);
+    });
+
+    test('choosing a country replaces the group and drops locationPresence', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final notifier = container.read(photosFilterProvider.notifier);
+
+      notifier.setLocation(SearchLocationFilter(locationPresence: 'noGps'));
+      notifier.setLocation(SearchLocationFilter(country: 'France'));
+
+      final location = container.read(photosFilterProvider).location;
+      expect(location.locationPresence, isNull);
+      expect(location.country, 'France');
+    });
+````
 
 - [ ] **Step 2: Run them to verify they fail**
 
 ```bash
 cd mobile && flutter pub get
 dart run easy_localization:generate -S ../i18n && dart run bin/generate_keys.dart
-flutter test test/models/search
+flutter test test/models/search test/providers/photos_filter/photos_filter_provider_test.dart
 ```
 
 Expected: FAIL — `SearchLocationFilter` has no `locationPresence` parameter.
@@ -1118,7 +1212,7 @@ Extend `SearchFilter.isEmpty` (`:305-307`):
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
-Run: `cd mobile && flutter test test/models/search`
+Run: `cd mobile && flutter test test/models/search test/providers/photos_filter/photos_filter_provider_test.dart`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
