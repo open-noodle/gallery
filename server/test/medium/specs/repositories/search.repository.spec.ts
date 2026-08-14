@@ -10,7 +10,7 @@ import { DB } from 'src/schema';
 import { BaseService } from 'src/services/base.service';
 import { upsertTags } from 'src/utils/tag';
 import { newMediumService } from 'test/medium.factory';
-import { newEmbedding } from 'test/small.factory';
+import { factory, newEmbedding } from 'test/small.factory';
 import { getKyselyDB } from 'test/utils';
 
 let defaultDatabase: Kysely<DB>;
@@ -1972,9 +1972,32 @@ describe(SearchRepository.name, () => {
 
       const all = await assets.getTimeBuckets({ userIds: [user.id] });
       const noGps = await assets.getTimeBuckets({ userIds: [user.id], locationPresence: 'noGps' });
+      const noPlaceName = await assets.getTimeBuckets({ userIds: [user.id], locationPresence: 'noPlaceName' });
 
       expect(totalBucketCount(all)).toBe(5);
       expect(totalBucketCount(noGps)).toBe(3);
+      expect(totalBucketCount(noPlaceName)).toBe(1);
+    });
+
+    it('keeps getTimeBuckets and getTimeBucket in agreement under a locationPresence filter', async () => {
+      const { ctx } = setup();
+      const assets = ctx.get(AssetRepository);
+      const { user } = await ctx.newUser();
+      const auth = factory.auth({ user: { id: user.id } });
+      await newLocationFixture(ctx, user.id);
+
+      const buckets = await assets.getTimeBuckets({ userIds: [user.id], locationPresence: 'noPlaceName' });
+      expect(buckets).toHaveLength(1);
+      const [bucket] = buckets;
+
+      const page = await assets.getTimeBucket(
+        bucket.timeBucket,
+        { userIds: [user.id], locationPresence: 'noPlaceName' },
+        auth,
+      );
+      const pageAssets = JSON.parse(page.assets) as { id: string[] };
+
+      expect(pageAssets.id).toHaveLength(bucket.count);
     });
 
     it('respects visibility and trash gating', async () => {
