@@ -14,6 +14,7 @@
   import { Route } from '$lib/route';
   import { locale } from '$lib/stores/preferences.store';
   import { getAssetMediaUrl } from '$lib/utils';
+  import { canEditAsset } from '$lib/utils/asset-editability';
   import { delay, getDimensions } from '$lib/utils/asset-utils';
   import { getByteUnitString } from '$lib/utils/byte-units';
   import { getMapProviderLinks } from '$lib/utils/exif-utils';
@@ -58,6 +59,10 @@
   let effectiveSpaceId = $derived(spaceId || asset.resolvedSpaceId);
 
   let isOwner = $derived(authManager.authenticated && authManager.user.id === asset.ownerId);
+  // #734: a space Owner/Editor may edit a member's asset. Server-authoritative via `asset.canEdit`
+  // on a single-asset read; falls back to ownership otherwise (see `canEditAsset`). The people row
+  // stays on `isOwner` — person/face writes have no space-edit arm server-side.
+  let canEdit = $derived(canEditAsset(asset, { userId: authManager.authenticated ? authManager.user.id : undefined }));
 
   // R4/E2 — shared links get NO filter affordance at all (they have no /photos to land on).
   // Threaded down to child rows the same way `isOwner` is; camera/lens live inline here.
@@ -233,8 +238,8 @@
       </section>
     {/if}
 
-    <DetailPanelDescription {asset} {isOwner} {canFilter} />
-    <DetailPanelRating {asset} {isOwner} {canFilter} />
+    <DetailPanelDescription {asset} isOwner={canEdit} {canFilter} />
+    <DetailPanelRating {asset} isOwner={canEdit} {canFilter} />
     <DetailPanelPeople {asset} {isOwner} {canFilter} {previousRoute} spaceId={effectiveSpaceId} />
 
     <div class="p-4">
@@ -246,7 +251,7 @@
         <Text size="small" color="muted">{$t('no_exif_info_available')}</Text>
       {/if}
 
-      <DetailPanelDate {asset} {isOwner} {canFilter} />
+      <DetailPanelDate {asset} isOwner={canEdit} {canFilter} />
 
       <div class="flex gap-4 py-4" data-testid="detail-panel-filename">
         <div><Icon icon={mdiImageOutline} size="24" /></div>
@@ -397,7 +402,7 @@
         </div>
       {/if}
 
-      <DetailPanelLocation {isOwner} {canFilter} {asset} />
+      <DetailPanelLocation isOwner={canEdit} {canFilter} {asset} />
     </div>
   </section>
 
@@ -535,7 +540,7 @@
 
   {#if authManager.authenticated && authManager.preferences.tags.enabled}
     <section class="relative px-2 pb-12 dark:bg-immich-dark-bg dark:text-immich-dark-fg">
-      <DetailPanelTags {asset} {isOwner} {canFilter} spaceId={effectiveSpaceId} />
+      <DetailPanelTags {asset} isOwner={canEdit} {canFilter} spaceId={effectiveSpaceId} />
     </section>
   {/if}
 {/if}
