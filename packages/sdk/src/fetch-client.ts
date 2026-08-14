@@ -1536,6 +1536,16 @@ export type AssetCopyDto = {
     /** Target asset ID */
     targetId: string;
 };
+export type AssetEditableDto = {
+    /** Asset IDs to resolve editability for */
+    assetIds: string[];
+    /** Space context the assets are being viewed through */
+    spaceId?: string;
+};
+export type AssetEditableResponseDto = {
+    /** Subset of the requested IDs the caller may edit */
+    editableAssetIds: string[];
+};
 export type AssetJobsDto = {
     /** Asset IDs */
     assetIds: string[];
@@ -1683,6 +1693,8 @@ export type TagResponseDto = {
     value: string;
 };
 export type AssetResponseDto = {
+    /** Whether the caller may edit this asset (owner, or Owner/Editor of a space whose member owns it). Present only on single-asset reads; absent from list responses, where resolving it per asset would be an N+1 access check. */
+    canEdit?: boolean;
     /** Base64 encoded SHA1 hash */
     checksum: string;
     /** The UTC timestamp when the asset was originally uploaded to Immich. */
@@ -6220,6 +6232,21 @@ export function copyAsset({ assetCopyDto }: {
         ...opts,
         method: "PUT",
         body: assetCopyDto
+    })));
+}
+/**
+ * Resolve which of the given assets the caller may edit
+ */
+export function getEditableAssets({ assetEditableDto }: {
+    assetEditableDto: AssetEditableDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: AssetEditableResponseDto;
+    }>("/assets/editable", oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: assetEditableDto
     })));
 }
 /**
