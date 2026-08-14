@@ -61,7 +61,10 @@
   let isOwner = $derived(authManager.authenticated && authManager.user.id === asset.ownerId);
   // #734: a space Owner/Editor may edit a member's asset. Server-authoritative via `asset.canEdit`
   // on a single-asset read; falls back to ownership otherwise (see `canEditAsset`). The people row
-  // stays on `isOwner` — person/face writes have no space-edit arm server-side.
+  // stays on `isOwner` — person/face writes have no space-edit arm server-side. Tags is the one
+  // row that needs BOTH values: it widens only the "add tag" affordance to `canEdit`, but keeps
+  // per-tag remove on the real `isOwner` — tag removal resolves to tag ownership, which also has
+  // no space-edit arm (see `DetailPanelTags.svelte`).
   let canEdit = $derived(canEditAsset(asset, { userId: authManager.authenticated ? authManager.user.id : undefined }));
 
   // R4/E2 — shared links get NO filter affordance at all (they have no /photos to land on).
@@ -540,7 +543,7 @@
 
   {#if authManager.authenticated && authManager.preferences.tags.enabled}
     <section class="relative px-2 pb-12 dark:bg-immich-dark-bg dark:text-immich-dark-fg">
-      <DetailPanelTags {asset} isOwner={canEdit} {canFilter} spaceId={effectiveSpaceId} />
+      <DetailPanelTags {asset} {isOwner} {canEdit} {canFilter} spaceId={effectiveSpaceId} />
     </section>
   {/if}
 {/if}

@@ -21,6 +21,19 @@ vi.mock(import('$lib/managers/feature-flags-manager.svelte'), function () {
   };
 });
 
+// RatingAction renders no visible markup of its own — it only wires document-level number-key
+// shortcuts (see RatingAction.svelte). The only observable proof it mounted is that pressing a
+// rating key actually calls `updateAsset`, so that call is spied here rather than left to hit the
+// network.
+const { updateAssetMock } = vi.hoisted(() => ({
+  updateAssetMock: vi.fn().mockResolvedValue({}),
+}));
+
+vi.mock('@immich/sdk', async () => {
+  const actual = await vi.importActual<typeof import('@immich/sdk')>('@immich/sdk');
+  return { ...actual, updateAsset: updateAssetMock };
+});
+
 describe('AssetViewerNavBar component', () => {
   const additionalProps = {
     preAction: () => {},
@@ -157,12 +170,66 @@ describe('AssetViewerNavBar component', () => {
       expect(screen.getByText('refresh_metadata')).toBeInTheDocument();
     });
 
+    // RatingAction renders no visible markup — it only wires document-level number-key shortcuts
+    // (`use:shortcuts` on `<svelte:document>`). The rating gate at `AssetViewerNavBar.svelte:146`
+    // has no other observable surface, so these probe it by pressing '5' and checking whether
+    // `updateAsset` fires — the only way to tell the component mounted at all.
+    it('W-rating-1: wires the rating shortcut when canEdit is true', async () => {
+      updateAssetMock.mockClear();
+      authManager.setUser(userAdminFactory.build({ id: 'space-member' }));
+      authManager.setPreferences(
+        preferencesFactory.build({ cast: { gCastEnabled: false }, ratings: { enabled: true } }),
+      );
+      const asset = assetFactory.build({
+        id: 'space-photo',
+        ownerId: 'space-owner',
+        isTrashed: false,
+        type: AssetTypeEnum.Image,
+        canEdit: true,
+      });
+
+      renderWithTooltips(AssetViewerNavBar, {
+        asset,
+        space: { id: 'space-1', canWrite: true },
+        ...additionalProps,
+      });
+
+      await fireEvent.keyDown(document, { key: '5' });
+
+      expect(updateAssetMock).toHaveBeenCalledWith({ id: 'space-photo', updateAssetDto: { rating: 5 } });
+    });
+
+    it('W-rating-2: does not wire the rating shortcut when canEdit is false', async () => {
+      updateAssetMock.mockClear();
+      authManager.setUser(userAdminFactory.build({ id: 'space-member' }));
+      authManager.setPreferences(
+        preferencesFactory.build({ cast: { gCastEnabled: false }, ratings: { enabled: true } }),
+      );
+      const asset = assetFactory.build({
+        id: 'space-photo',
+        ownerId: 'space-owner',
+        isTrashed: false,
+        type: AssetTypeEnum.Image,
+        canEdit: false,
+      });
+
+      renderWithTooltips(AssetViewerNavBar, {
+        asset,
+        space: { id: 'space-1', canWrite: true },
+        ...additionalProps,
+      });
+
+      await fireEvent.keyDown(document, { key: '5' });
+
+      expect(updateAssetMock).not.toHaveBeenCalled();
+    });
+
     it('W-2: still withholds the owner-only actions from a non-owner', async () => {
       await renderEditableSpacePhoto(true);
 
       expect(screen.queryByLabelText('delete')).toBeNull();
-      expect(screen.queryByText('archive')).toBeNull();
-      expect(screen.queryByText('add_to_stack')).toBeNull();
+      expect(screen.queryByText('to_archive')).toBeNull();
+      expect(screen.queryByText('add_upload_to_stack')).toBeNull();
       expect(screen.queryByText('view_in_timeline')).toBeNull();
     });
 
