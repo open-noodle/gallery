@@ -113,8 +113,11 @@ The membership check binds to **the same space** that grants the actor their Own
 ### 3.1 Granted to space Owner/Editor over a member's asset
 
 Rotate ×3 · image editor · video trim · revert-to-original · refresh faces · refresh metadata ·
-refresh thumbnails · transcode video · description · date · location · rating · tags · people/face
-tagging.
+refresh thumbnails · transcode video · description · date · location · rating · tags.
+
+Every one of these routes through `Permission.AssetUpdate` or `Permission.AssetEdit*`, which §4.1
+and §4.2 widen together. **Nothing is granted here whose server path is not widened by this spec** —
+see §3.2's face-tagging row for the capability that failed that test.
 
 Measured against the reporter's list of 8 missing actions: **4 are granted** — rotate left, rotate
 180°, refresh faces, refresh metadata — and **4 are withheld** — add upload to stack, archive, move
@@ -132,6 +135,23 @@ rating, tags, people), the full image editor, video trim, thumbnail regeneration
 | Favorite                  | Not this feature's problem. PR #819 (per-user favorites, `asset_favorite` overlay, drops `asset.isFavorite`) is open against `main` and dissolves the question — everyone favorites into their own list. Designing a rule for a column that is being deleted would be waste. |
 | View in timeline          | Navigates to _your_ timeline, where another user's asset does not appear. The reporter lists it as missing; it is correctly absent.                                                                                                                                          |
 | Set as profile picture    | Already ungated (`asset.service.ts:323-328`) and unrelated to space role — your own profile.                                                                                                                                                                                 |
+| People / face tagging     | **Has no server path, and adding one is a different feature.** See below.                                                                                                                                                                                                    |
+
+**Why face tagging is out**, in detail, because an earlier draft of this spec wrongly included it:
+person and face writes do not go through `AssetUpdate` at all. `Permission.PersonCreate` and
+`Permission.FaceDelete` gate on `access.person.checkFaceOwnerAccess`, and
+`PersonUpdate`/`PersonDelete`/`PersonMerge` on `access.person.checkOwnerAccess`
+(`server/src/utils/access.ts:276-277`, `:315-317`, `:328-332`) — none has a space-edit arm. Widening
+`checkSpaceEditAccess` does **not** reach them, so exposing the face editor to an editor would
+produce a panel whose every write 403s: precisely the "buttons that sometimes fail" outcome this
+design exists to prevent.
+
+It is also unnecessary. Naming people inside a space is already solved by a **separate layer** — the
+`shared_space_person` model, with its own editor gate at `checkSharedSpaceEditAccess`
+(`access.repository.ts:832`) and its own update path. `CLAUDE.md` states the rule directly: _"Never
+send a space-person edit to the owner-only person endpoint."_ Routing space editors into the
+owner-only person endpoints would be that exact mistake. If space editors should be able to tag
+faces on members' assets, that belongs in the space-person layer as its own spec.
 
 ### 3.3 Non-goals (YAGNI)
 
@@ -279,15 +299,48 @@ that asset, via the existing
 Low-volume by construction: owners editing their own assets, which is nearly all editing, logs
 nothing.
 
-- Space resolution reuses `sharedSpaceRepository.findSpaceForAssetAndUser(assetId, userId)`
-  (`asset.service.ts:131`). No space resolved ⇒ no row, never a throw.
-- Write paths that log: `update`, `updateAll`, `run` (jobs), `editAsset`, `removeAssetEdits`, and
-  tag add/remove.
+- Space resolution reuses `sharedSpaceRepository.findSpaceForAssetAndUser(assetId, auth.user.id)`
+  (`asset.service.ts:131`) — the actor's id, so the row lands in a space the actor is actually in.
+  No space resolved ⇒ no row, never a throw.
+- Write paths that log: `update`, `updateAll`, `editAsset`, `removeAssetEdits`, and tag add/remove.
+  **Job dispatch (`run`) does not log** — refresh-thumbnails is maintenance, not a change to shared
+  truth, and an activity row reading "Anna edited 40 photos" after a thumbnail refresh is worse than
+  no row.
 - `data` carries `{ count, assetIds: assetIds.slice(0, 4) }`, matching the existing `AssetAdd`
   convention at `:698`.
-- Coalesce per call, not per asset: one `updateAll` over 30 assets writes one row.
+- **Coalesce per call _and per space_.** A bulk `updateAll` can span assets belonging to several
+  different spaces, or to none. Group the cross-owner ids by resolved space and write **one row per
+  space**, each with that space's own `count`. Assets that resolve to no space contribute no row.
+  A single-space bulk edit therefore still writes exactly one row — the common case — without the
+  multi-space case silently attributing 30 assets to whichever space happened to resolve first.
 - **Logging must never fail the write.** Attribution is secondary; a failed activity insert is
   swallowed and logged, not propagated.
+
+**No migration is required, and it is worth saying so explicitly.** `shared_space_activity.type` is
+`character varying(30)`, not a Postgres enum
+(`server/src/schema/tables/shared-space-activity.table.ts:26-27`), so a new `SharedSpaceActivityType`
+member is a TypeScript-only change. A reader who assumes an enum would go looking for a
+`migrations-gallery/` file that should not exist. The 30-character cap does bind the value:
+`asset_edit` is 10.
+
+### 4.7 Everything else §4.1 widens, deliberately
+
+`checkSpaceEditAccess` sits behind `Permission.AssetUpdate`, so widening it widens **every**
+`AssetUpdate` consumer at once — not only the ones this feature surfaces. The full set, and the
+decision for each:
+
+| Consumer                                                                              | Effect of §4.1                | Decision                                                                                                                                                                   |
+| ------------------------------------------------------------------------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AssetService.update` / `updateAll` (`asset.service.ts:211`, `:298`)                  | reaches album-path assets     | intended — the feature                                                                                                                                                     |
+| `AssetService.run` (jobs) (`:769`)                                                    | reaches album-path assets     | intended — the feature                                                                                                                                                     |
+| `TagService.addAssets` / `removeAssets` (`tag.service.ts:81-82`)                      | reaches album-path assets     | intended — the feature                                                                                                                                                     |
+| `AssetService.upsertMetadata` / `deleteBulkMetadata` (`:719`, `:735`, `:760`, `:765`) | reaches album-path assets     | accepted — already editor-reachable for direct/library assets today; this is the same capability over one more path, and it is app-sync key/value data, not shared content |
+| `StackService.create` (`stack.service.ts:21`)                                         | would reach album-path assets | **blocked** by the new guard, §4.5                                                                                                                                         |
+
+The `rbac-3` visibility guards (`asset.service.ts:219-224`, `:322-327`) sit _inside_ `update` and
+`updateAll`, downstream of the permission check, so they continue to reject regardless of how wide
+`AssetUpdate` becomes. That is why §6.3 pins them as regressions rather than treating them as
+untouched.
 
 ---
 
@@ -312,17 +365,22 @@ export function canEditAsset(
 Resolution order: `asset.canEdit` when present → else `ownerId === userId` → else the space
 derivation → else `false`.
 
-| Site                                                                                                                                                       | Today     | Becomes       |
-| ---------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | ------------- |
-| `canEditImage` / `canEditVideo` (`asset.service.ts:284-305`)                                                                                               | `isOwner` | `canEdit`     |
-| `TagPeople` (`:307-313`)                                                                                                                                   | `isOwner` | `canEdit`     |
-| `RatingAction` (`AssetViewerNavBar.svelte:140`)                                                                                                            | `isOwner` | `canEdit`     |
-| Job block (`AssetViewerNavBar.svelte:204-210`)                                                                                                             | `isOwner` | `canEdit`     |
-| `DetailPanel.svelte:60` → 6 rows (`:236,:237,:238,:249,:400,:538`)                                                                                         | `isOwner` | `canEdit`     |
-| `DeleteAction` (`:147`), stack block (`:169-181`), `ArchiveAction` (`:192`), `SetVisibilityAction` (`:198`), `ViewInTimeline` (`asset.service.ts:330-335`) | `isOwner` | **unchanged** |
+| Site                                                                                                                                                       | Today     | Becomes              |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | -------------------- |
+| `canEditImage` / `canEditVideo` (`asset.service.ts:284-305`)                                                                                               | `isOwner` | `canEdit`            |
+| `RatingAction` (`AssetViewerNavBar.svelte:140`)                                                                                                            | `isOwner` | `canEdit`            |
+| Job block (`AssetViewerNavBar.svelte:204-210`)                                                                                                             | `isOwner` | `canEdit`            |
+| `DetailPanel.svelte:60` → 6 rows (`:236,:237,:238,:249,:400,:538`)                                                                                         | `isOwner` | `canEdit`            |
+| `TagPeople` (`:307-313`)                                                                                                                                   | `isOwner` | **unchanged** (§3.2) |
+| `DeleteAction` (`:147`), stack block (`:169-181`), `ArchiveAction` (`:192`), `SetVisibilityAction` (`:198`), `ViewInTimeline` (`asset.service.ts:330-335`) | `isOwner` | **unchanged**        |
 
 `isOwner` stays defined and in use — this adds a second, wider gate rather than replacing the
 existing one.
+
+`getAssetActions` has two further call sites — `AssetViewer.svelte:471` and
+`DetailPanelTags.svelte:45` — which pass **no** space context. Both pass a full `AssetResponseDto`,
+so `asset.canEdit` is present there and nothing breaks; the helper's `ctx` argument is therefore
+optional, and omitting it must degrade to the ownership check rather than throwing.
 
 ### 5.2 Bulk selection
 
@@ -385,6 +443,10 @@ Cast, used throughout: **Anna** = space Editor · **Bob** = space Member (asset 
 member of an album linked into the space, **not** a space member · **Dave** = Bob's partner, not a
 space member · **Vic** = space Viewer.
 
+Scenario ids are **stable identifiers, not an ordering** — S-43…S-46 were added during spec review
+and sit in the subsection they belong to rather than at the end. Cite them by id; never renumber, or
+the §7 slice mapping silently rots.
+
 ### 6.1 The authority rule (server)
 
 | #    | Given                                                                                                                                                      | When                                    | Then                                                                                   |
@@ -403,6 +465,9 @@ space member · **Vic** = space Viewer.
 | S-12 | Bob's **live photo**; Anna passes the motion `livePhotoVideoId`                                                                                            | Anna requests `AssetUpdate`             | granted — reducer fan-out preserved                                                    |
 | S-13 | Anna is Editor of space **A**. Bob's asset reaches A through an album Carol linked into A, to which Bob contributed. Bob is a member of space **B**, not A | Anna requests `AssetUpdate`             | denied — membership binds to the space granting Anna her role, not to any space (§2.4) |
 | S-14 | A shared-link (unauthenticated) viewer                                                                                                                     | fetches asset info                      | `canEdit` absent ⇒ client resolves `false`                                             |
+| S-43 | Bob's asset via Bob's linked album; the actor is a space **Owner**, not an Editor                                                                          | Owner requests `AssetUpdate`            | granted — `memberRole` includes both roles, and only Editor was otherwise exercised    |
+| S-44 | Bob's asset via Bob's **linked album**                                                                                                                     | **Vic** (Viewer) requests `AssetUpdate` | denied — the new album arm is role-gated like its siblings (S-6 only covered direct)   |
+| S-45 | Anna, Bob's album-path asset                                                                                                                               | `PUT /assets/:id/metadata`              | 200 — `upsertMetadata` widens with `AssetUpdate` (§4.7), accepted deliberately         |
 
 ### 6.2 Widened edit permissions (server)
 
@@ -443,35 +508,38 @@ space member · **Vic** = space Viewer.
 
 ### 6.5 Attribution (server)
 
-| #    | Given                           | When                   | Then                                                        |
-| ---- | ------------------------------- | ---------------------- | ----------------------------------------------------------- |
-| S-37 | Anna edits Bob's asset date     | `PUT /assets/:id`      | one `AssetEdit` activity row in Bob's asset's space         |
-| S-38 | **Bob** edits his own asset     | `PUT /assets/:id`      | **no** activity row                                         |
-| S-39 | Anna bulk-edits 30 of Bob's     | `PUT /assets`          | exactly **one** row, `data.count = 30`, ≤ 4 ids             |
-| S-40 | Anna edits an asset in no space | `PUT /assets/:id`      | no row, no throw                                            |
-| S-41 | `logActivity` rejects           | Anna edits Bob's asset | the **edit still succeeds**; failure logged, not propagated |
-| S-42 | Web renders an unknown type     | activity feed          | falls back to `spaces_activity_default`                     |
+| #    | Given                                                                     | When                   | Then                                                                                                            |
+| ---- | ------------------------------------------------------------------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------- |
+| S-37 | Anna edits Bob's asset date                                               | `PUT /assets/:id`      | one `AssetEdit` activity row in Bob's asset's space                                                             |
+| S-38 | **Bob** edits his own asset                                               | `PUT /assets/:id`      | **no** activity row                                                                                             |
+| S-39 | Anna bulk-edits 30 of Bob's                                               | `PUT /assets`          | exactly **one** row, `data.count = 30`, ≤ 4 ids                                                                 |
+| S-40 | Anna edits an asset in no space                                           | `PUT /assets/:id`      | no row, no throw                                                                                                |
+| S-41 | `logActivity` rejects                                                     | Anna edits Bob's asset | the **edit still succeeds**; failure logged, not propagated                                                     |
+| S-42 | Web renders an unknown type                                               | activity feed          | falls back to `spaces_activity_default`                                                                         |
+| S-46 | Anna bulk-edits Bob's assets spanning **two** spaces plus one in no space | `PUT /assets`          | **two** rows, one per space, counts summing to the in-space assets; the spaceless asset contributes none (§4.6) |
 
 ### 6.6 Web
 
-| #    | Given                                                         | When                | Then                                                                |
-| ---- | ------------------------------------------------------------- | ------------------- | ------------------------------------------------------------------- |
-| W-1  | `canEdit === true`, viewer open                               | render nav bar      | rotate ×3, editor, rating, and the 4 job items are present          |
-| W-2  | `canEdit === true`, non-owner                                 | render nav bar      | delete, archive, set-visibility, stack, view-in-timeline **absent** |
-| W-3  | `canEdit === false`                                           | render nav bar      | reduced menu, as today                                              |
-| W-4  | `canEdit === true`                                            | render detail panel | description, rating, date, location, tags, people all editable      |
-| W-5  | `canEdit` **absent**, user is owner                           | render              | editable — ownership fallback (§5.3)                                |
-| W-6  | `canEdit` absent, non-owner, space Editor, owner in `members` | render              | editable — space derivation                                         |
-| W-7  | `canEdit` absent, non-owner, owner **not** in `members`       | render              | not editable                                                        |
-| W-8  | `canEdit` absent, no space context, non-owner                 | render              | not editable                                                        |
-| W-9  | mixed selection, 7 of 10 editable                             | open toolbar        | `canEditMetadata` true; `canSetVisibility` **false**                |
-| W-10 | mixed selection                                               | Change date         | applies to 7; toast reports 3 skipped                               |
-| W-11 | `editableSelectedAssetIds === undefined`                      | open toolbar        | edit actions rendered **disabled-pending**, not hidden              |
-| W-12 | all-owned selection                                           | select              | resolves synchronously; **no** `POST /assets/editable` issued       |
-| W-13 | `POST /assets/editable` rejects                               | select              | falls back to the §5.3 derivation; no error toast                   |
-| W-14 | rapid selection changes                                       | select repeatedly   | debounced; only the final selection's response is applied           |
-| W-15 | Viewer role (`space.canWrite === false`)                      | render anywhere     | no edit affordances                                                 |
-| W-16 | shared-link surface                                           | render              | no edit affordances (S-14)                                          |
+| #    | Given                                                         | When                | Then                                                                                                                    |
+| ---- | ------------------------------------------------------------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| W-1  | `canEdit === true`, viewer open                               | render nav bar      | rotate ×3, editor, rating, and the 4 job items are present                                                              |
+| W-2  | `canEdit === true`, non-owner                                 | render nav bar      | delete, archive, set-visibility, stack, view-in-timeline **absent**                                                     |
+| W-3  | `canEdit === false`                                           | render nav bar      | reduced menu, as today                                                                                                  |
+| W-4  | `canEdit === true`                                            | render detail panel | description, rating, date, location, tags editable; **people not** (§3.2)                                               |
+| W-5  | `canEdit` **absent**, user is owner                           | render              | editable — ownership fallback (§5.3)                                                                                    |
+| W-6  | `canEdit` absent, non-owner, space Editor, owner in `members` | render              | editable — space derivation                                                                                             |
+| W-7  | `canEdit` absent, non-owner, owner **not** in `members`       | render              | not editable                                                                                                            |
+| W-8  | `canEdit` absent, no space context, non-owner                 | render              | not editable                                                                                                            |
+| W-9  | mixed selection, 7 of 10 editable                             | open toolbar        | `canEditMetadata` true; `canSetVisibility` **false**                                                                    |
+| W-10 | mixed selection                                               | Change date         | applies to 7; toast reports 3 skipped                                                                                   |
+| W-11 | `editableSelectedAssetIds === undefined`                      | open toolbar        | edit actions rendered **disabled-pending**, not hidden                                                                  |
+| W-12 | all-owned selection                                           | select              | resolves synchronously; **no** `POST /assets/editable` issued                                                           |
+| W-13 | `POST /assets/editable` rejects                               | select              | falls back to the §5.3 derivation; no error toast                                                                       |
+| W-14 | rapid selection changes                                       | select repeatedly   | debounced; only the final selection's response is applied                                                               |
+| W-15 | Viewer role (`space.canWrite === false`)                      | render anywhere     | no edit affordances                                                                                                     |
+| W-16 | shared-link surface                                           | render              | no edit affordances (S-14)                                                                                              |
+| W-17 | mixed selection, editor on a space surface                    | bulk **Rotate**     | applies to the editable subset — the one bulk action routing through `AssetEditCreate` rather than `AssetUpdate` (§4.2) |
+| W-18 | `canEdit === true`, non-owner                                 | render detail panel | the people row is present but **read-only** — no add-a-name, no rename                                                  |
 
 ---
 
@@ -488,7 +556,9 @@ existing `shared-space-album-scope.medium.spec.ts`.
 
 This slice is **medium-only by necessity**: the rule is SQL. Unit mocks of `AccessRepository` prove
 nothing about a three-arm `UNION` with correlated `EXISTS` and per-arm visibility gates. Table-driven
-over **S-1 … S-13**.
+over **S-1 … S-13**, plus **S-43** (the actor is a space Owner, not an Editor — `memberRole` admits
+both and only Editor is otherwise exercised) and **S-44** (a Viewer against the _new_ album arm; S-6
+only covers the direct arm, so without S-44 the new arm's role gate is untested).
 
 S-4 (Carol), S-5 (Dave), S-7/S-8 (Hidden/Locked), S-9 (trashed) and S-10 (offline) are the rows that
 matter most — they are precisely what a helper-swap refactor would silently relax, and they can only
@@ -501,7 +571,8 @@ Then implement §4.1.
 
 ### 7.2 Slice 2 — widen the edit permissions
 
-Tests: **S-15 … S-21** in `server/src/services/asset.service.spec.ts`. Then §4.2.
+Tests: **S-15 … S-21** and **S-45** (the deliberately-widened `upsertMetadata` consumer from §4.7) in
+`server/src/services/asset.service.spec.ts`. Then §4.2.
 
 The S-15 (`AssetEditGet`) case is written **first**, because forgetting Get is the failure mode this
 slice exists to prevent, and it fails in a way that misdirects.
@@ -522,23 +593,32 @@ S-32 (list endpoints omit `canEdit`) is the N+1 guard and belongs in this slice,
 
 ### 7.5 Slice 5 — attribution
 
-Tests: **S-37 … S-41** (`asset.service.spec.ts`, `shared-space.service.spec.ts`). Then §4.6.
+Tests: **S-37 … S-42** and **S-46** (the multi-space bulk grouping) in `asset.service.spec.ts` and
+`shared-space.service.spec.ts`. Then §4.6.
+
+S-46 is written before the grouping exists, because the naive one-row-per-call implementation passes
+S-39 and fails only S-46 — the multi-space case is the whole reason the grouping is specified.
 
 S-41 (a failing `logActivity` must not fail the edit) is written before the logging call exists, so
 the swallow is designed in rather than patched on.
 
 ### 7.6 Slice 6 — web viewer and detail panel
 
-Tests: **W-1 … W-8** across `AssetViewerNavBar.spec.ts`, the detail-panel specs, and a new
-`asset-editability.spec.ts` for the pure helper. Then §5.1.
+Tests: **W-1 … W-8** and **W-18** (the people row stays read-only for a non-owner, guarding §3.2)
+across `AssetViewerNavBar.spec.ts`, the detail-panel specs, and a new `asset-editability.spec.ts` for
+the pure helper. Then §5.1.
 
 W-2 is the important negative: it asserts the owner-only items stay **absent** when `canEdit` is
 true, which is the assertion that would otherwise silently pass in either direction.
 
 ### 7.7 Slice 7 — web bulk selection
 
-Tests: **W-9 … W-16** in `selection-capabilities.spec.ts` (extending the existing file) plus toolbar
+Tests: **W-9 … W-17** in `selection-capabilities.spec.ts` (extending the existing file) plus toolbar
 tests. Then §5.2.
+
+W-17 (bulk rotate) is the one bulk action whose server path is `AssetEditCreate` rather than
+`AssetUpdate`, so it depends on Slice 2 having landed; it fails for a different reason than the rest
+of the toolbar if §4.2 is incomplete.
 
 W-9 pins the `canEditMetadata` / `canSetVisibility` split — the split's whole purpose is that one
 assertion.
@@ -565,20 +645,24 @@ a space, rotates it, corrects the date, and sees the activity row.
 
 ## 8. Edge cases and known traps
 
-| Trap                                                                         | Handling                                                                                                                                                                                                                          |
-| ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Helper swap silently drops `spaceVisibilityGate` / `deletedAt` / `isOffline` | §4.1 keeps the bespoke arms; S-7 … S-10 pin it against a real DB                                                                                                                                                                  |
-| `AssetEditGet` left owner-only                                               | S-15, written first in Slice 2                                                                                                                                                                                                    |
-| `canEditMetadata` also wrapping Archive + SetVisibility                      | Capability split, §5.2; pinned by W-9                                                                                                                                                                                             |
-| Required `canEdit` forcing wrong `false` from `mapAsset`                     | Optional field, §4.3; pinned by S-32                                                                                                                                                                                              |
-| Editor rotate clobbering an owner's crop                                     | `mergeRotation` composes; pinned by S-17                                                                                                                                                                                          |
-| Activity logging failing a legitimate edit                                   | Swallowed; pinned by S-41                                                                                                                                                                                                         |
-| Membership matched against the wrong space                                   | Correlated per-arm `EXISTS`, §2.4; pinned by S-13                                                                                                                                                                                 |
-| `make sql` run without a database                                            | **Deletes every query file.** Requires a live Postgres, and the order is fresh DB → `pnpm build` → `migrations:run` → sync, or the regen runs against the previous build's schema and produces a large bogus diff                 |
-| The `ui` Playwright project mocks API routes by glob                         | Adding `POST /assets/editable` and changing viewer fetches is the shape that timed out the #819 suite. `grep -rn "assets" e2e/src/ui` for route mocks before claiming green — neither web unit tests nor `--project=web` catch it |
-| `getSelectionCapabilities` purity contract                                   | Ids are passed in via `ctx.selection`; no fetching inside the pure function                                                                                                                                                       |
-| Debounce races on rapid selection change                                     | Only the final selection's response is applied; pinned by W-14                                                                                                                                                                    |
-| Live-photo motion half                                                       | Reducer fan-out preserved; pinned by S-12                                                                                                                                                                                         |
+| Trap                                                                                                                          | Handling                                                                                                                                                                                                                                                                                                      |
+| ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Helper swap silently drops `spaceVisibilityGate` / `deletedAt` / `isOffline`                                                  | §4.1 keeps the bespoke arms; S-7 … S-10 pin it against a real DB                                                                                                                                                                                                                                              |
+| `AssetEditGet` left owner-only                                                                                                | S-15, written first in Slice 2                                                                                                                                                                                                                                                                                |
+| `canEditMetadata` also wrapping Archive + SetVisibility                                                                       | Capability split, §5.2; pinned by W-9                                                                                                                                                                                                                                                                         |
+| Required `canEdit` forcing wrong `false` from `mapAsset`                                                                      | Optional field, §4.3; pinned by S-32                                                                                                                                                                                                                                                                          |
+| Editor rotate clobbering an owner's crop                                                                                      | `mergeRotation` composes; pinned by S-17                                                                                                                                                                                                                                                                      |
+| Activity logging failing a legitimate edit                                                                                    | Swallowed; pinned by S-41                                                                                                                                                                                                                                                                                     |
+| Membership matched against the wrong space                                                                                    | Correlated per-arm `EXISTS`, §2.4; pinned by S-13                                                                                                                                                                                                                                                             |
+| `make sql` run without a database                                                                                             | **Deletes every query file.** Requires a live Postgres, and the order is fresh DB → `pnpm build` → `migrations:run` → sync, or the regen runs against the previous build's schema and produces a large bogus diff                                                                                             |
+| The `ui` Playwright project mocks API routes by glob                                                                          | Adding `POST /assets/editable` and changing viewer fetches is the shape that timed out the #819 suite. `grep -rn "assets" e2e/src/ui` for route mocks before claiming green — neither web unit tests nor `--project=web` catch it                                                                             |
+| `getSelectionCapabilities` purity contract                                                                                    | Ids are passed in via `ctx.selection`; no fetching inside the pure function                                                                                                                                                                                                                                   |
+| Debounce races on rapid selection change                                                                                      | Only the final selection's response is applied; pinned by W-14                                                                                                                                                                                                                                                |
+| Live-photo motion half                                                                                                        | Reducer fan-out preserved; pinned by S-12                                                                                                                                                                                                                                                                     |
+| **TOCTOU** — role revoked, membership removed, or the asset pulled from the space between the capability answer and the write | The capability response is **advisory only**; every write re-runs `requireAccess`, so a stale `true` yields a clean 403 rather than an unauthorized write, surfacing through the partial-application path (§5.2). Stated because it is the first question a reviewer will ask of any cached permission answer |
+| A capability answer stale in the **other** direction (a `false` that has since become true)                                   | Costs a hidden button until the next selection change. No invalidation machinery — deliberately, per YAGNI                                                                                                                                                                                                    |
+| Face tagging exposed to editors                                                                                               | Out of scope (§3.2) — no server path exists. W-18 pins the people row staying read-only for non-owners                                                                                                                                                                                                        |
+| A new `AssetUpdate` consumer added later inherits the widened rule silently                                                   | §4.7 enumerates today's consumers with a decision each; a future consumer must be added to that table                                                                                                                                                                                                         |
 
 ---
 
