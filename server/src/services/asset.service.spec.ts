@@ -3394,5 +3394,27 @@ describe(AssetService.name, () => {
         expect.objectContaining({ spaceId: 'space-b', data: expect.objectContaining({ count: 1 }) }),
       );
     });
+
+    it('S-47: an owner locking their own space asset does not log a cross-owner edit', async () => {
+      // Pins the review-caught #734 regression: checkOwnerAccess filters out a Locked row when
+      // hasElevatedPermission is falsy (e.g. any API-key session). The rbac-3 guard runs BEFORE the
+      // write, on the still-Timeline row, so it correctly sees the caller as owner (calls #1 and #2
+      // below). If logCrossOwnerEdit ran unguarded AFTER the write, its OWN checkOwnerAccess call
+      // would read the now-Locked row back as not-owned (call #3) and misclassify the owner's own
+      // lock as a cross-owner edit — this is what the skip in update() must prevent.
+      const asset = AssetFactory.create();
+      const auth = AuthFactory.create({ id: asset.ownerId });
+      mocks.access.asset.checkOwnerAccess
+        .mockResolvedValueOnce(new Set([asset.id])) // requireAccess(AssetUpdate): Timeline, owned
+        .mockResolvedValueOnce(new Set([asset.id])) // rbac-3 guard: Timeline, owned
+        .mockResolvedValueOnce(new Set()); // would-be post-write logCrossOwnerEdit check: Locked, not-owned
+      mocks.asset.getById.mockResolvedValue(getForAsset(asset));
+      mocks.asset.update.mockResolvedValue({ ...getForAsset(asset), visibility: AssetVisibility.Locked });
+      mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue({ spaceId: 'space-1' } as any);
+
+      await sut.update(auth, asset.id, { visibility: AssetVisibility.Locked });
+
+      expect(mocks.sharedSpace.logActivity).not.toHaveBeenCalled();
+    });
   });
 });
