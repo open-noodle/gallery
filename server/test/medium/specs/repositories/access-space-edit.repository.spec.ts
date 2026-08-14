@@ -156,6 +156,51 @@ describe('checkSpaceEditAccess — owner must be a space member', () => {
 
     expect(allowed).toEqual(new Set());
   });
+
+  it('S-13b: the DIRECT arm binds membership to the space granting the role, not to any space', async () => {
+    const { ctx, accessRepo } = setup();
+    const { anna, bob, space: spaceA } = await newSpaceWithEditorAndMember(ctx);
+    // Bob leaves A; he is a member of B only. His asset is still direct-added to A.
+    await defaultDatabase
+      .deleteFrom('shared_space_member')
+      .where('spaceId', '=', spaceA.id)
+      .where('userId', '=', bob.id)
+      .execute();
+    const { space: spaceB } = await ctx.newSharedSpace({ createdById: bob.id });
+    await ctx.newSharedSpaceMember({ spaceId: spaceB.id, userId: bob.id, role: 'owner' });
+
+    const { asset } = await ctx.newAsset({ ownerId: bob.id, visibility: AssetVisibility.Timeline });
+    await ctx.newSharedSpaceAsset({ spaceId: spaceA.id, assetId: asset.id });
+
+    const allowed = await accessRepo.asset.checkSpaceEditAccess(anna.id, new Set([asset.id]));
+
+    expect(allowed).toEqual(new Set());
+  });
+
+  it('S-13c: the LIBRARY arm binds membership to the space granting the role, not to any space', async () => {
+    const { ctx, accessRepo } = setup();
+    const { anna, bob, space: spaceA } = await newSpaceWithEditorAndMember(ctx);
+    // Bob leaves A; he is a member of B only. His library asset is still linked into A.
+    await defaultDatabase
+      .deleteFrom('shared_space_member')
+      .where('spaceId', '=', spaceA.id)
+      .where('userId', '=', bob.id)
+      .execute();
+    const { space: spaceB } = await ctx.newSharedSpace({ createdById: bob.id });
+    await ctx.newSharedSpaceMember({ spaceId: spaceB.id, userId: bob.id, role: 'owner' });
+
+    const { library } = await ctx.newLibrary({ ownerId: bob.id });
+    const { asset } = await ctx.newAsset({
+      ownerId: bob.id,
+      libraryId: library.id,
+      visibility: AssetVisibility.Timeline,
+    });
+    await ctx.newSharedSpaceLibrary({ spaceId: spaceA.id, libraryId: library.id });
+
+    const allowed = await accessRepo.asset.checkSpaceEditAccess(anna.id, new Set([asset.id]));
+
+    expect(allowed).toEqual(new Set());
+  });
 });
 
 describe('checkSpaceEditAccess — role gate', () => {
@@ -246,6 +291,25 @@ describe('checkSpaceEditAccess — gates that must survive any refactor', () => 
       visibility: AssetVisibility.Timeline,
     });
     await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id });
+    await markOffline(asset.id);
+
+    const allowed = await accessRepo.asset.checkSpaceEditAccess(anna.id, new Set([asset.id]));
+
+    expect(allowed).toEqual(new Set());
+  });
+
+  it('S-10b: denies an offline asset reached via the album path', async () => {
+    const { ctx, accessRepo } = setup();
+    const { anna, bob, space } = await newSpaceWithEditorAndMember(ctx);
+    const { library } = await ctx.newLibrary({ ownerId: bob.id });
+    const { result: album } = await ctx.newAlbum({ ownerId: bob.id, albumName: 'OfflineViaAlbum' });
+    const { asset } = await ctx.newAsset({
+      ownerId: bob.id,
+      libraryId: library.id,
+      visibility: AssetVisibility.Timeline,
+    });
+    await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+    await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
     await markOffline(asset.id);
 
     const allowed = await accessRepo.asset.checkSpaceEditAccess(anna.id, new Set([asset.id]));
