@@ -1,3 +1,4 @@
+import { AssetTypeEnum } from '@immich/sdk';
 import { modalManager } from '@immich/ui';
 import '@testing-library/jest-dom';
 import { fireEvent, screen } from '@testing-library/svelte';
@@ -118,6 +119,58 @@ describe('AssetViewerNavBar component', () => {
       await renderSpaceViewer({ id: 'space-1', canWrite: false });
 
       expect(screen.queryByText('add_to_album_or_space')).not.toBeInTheDocument();
+    });
+  });
+
+  // #734: a space editor may edit a member's asset. The server answers per asset via
+  // `canEdit`; these tests pin that the nav bar honours it without leaking the owner-only
+  // actions.
+  describe('space editor on a member photo (#734)', () => {
+    const renderEditableSpacePhoto = async (canEdit: boolean) => {
+      authManager.setUser(userAdminFactory.build({ id: 'space-member' }));
+      authManager.setPreferences(preferencesFactory.build({ cast: { gCastEnabled: false } }));
+      const asset = assetFactory.build({
+        id: 'space-photo',
+        ownerId: 'space-owner',
+        isTrashed: false,
+        // Pinned: the factory's default `type` is a random AssetTypeEnum value, which made this
+        // test flaky (canEditImage/canEditVideo both gate on `asset.type`, so a random Video draw
+        // failed W-1 nondeterministically — a brief defect, not a production bug).
+        type: AssetTypeEnum.Image,
+        canEdit,
+      });
+
+      renderWithTooltips(AssetViewerNavBar, {
+        asset,
+        space: { id: 'space-1', canWrite: true },
+        ...additionalProps,
+      });
+      await fireEvent.click(screen.getByLabelText('more'));
+    };
+
+    it('W-1: offers rotate and the re-processing jobs when canEdit is true', async () => {
+      await renderEditableSpacePhoto(true);
+
+      expect(screen.getByText('rotate_left')).toBeInTheDocument();
+      expect(screen.getByText('rotate_180')).toBeInTheDocument();
+      expect(screen.getByText('refresh_faces')).toBeInTheDocument();
+      expect(screen.getByText('refresh_metadata')).toBeInTheDocument();
+    });
+
+    it('W-2: still withholds the owner-only actions from a non-owner', async () => {
+      await renderEditableSpacePhoto(true);
+
+      expect(screen.queryByLabelText('delete')).toBeNull();
+      expect(screen.queryByText('archive')).toBeNull();
+      expect(screen.queryByText('add_to_stack')).toBeNull();
+      expect(screen.queryByText('view_in_timeline')).toBeNull();
+    });
+
+    it('W-3: withholds the edit actions when canEdit is false', async () => {
+      await renderEditableSpacePhoto(false);
+
+      expect(screen.queryByText('rotate_left')).toBeNull();
+      expect(screen.queryByText('refresh_faces')).toBeNull();
     });
   });
 });
