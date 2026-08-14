@@ -1,9 +1,5 @@
 <script lang="ts">
-  import type {
-    SharedSpaceAlbumFolderDto,
-    SharedSpaceLinkedAlbumDto,
-    SharedSpaceMemberResponseDto,
-  } from '@immich/sdk';
+  import type { SharedSpaceAlbumFolderDto, SharedSpaceLinkedAlbumDto, SharedSpaceMemberResponseDto } from '@immich/sdk';
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { AlbumViewMode, SortOrder } from '$lib/stores/preferences.store';
   import { SpaceAlbumGroupBy, spaceAlbumViewSettings } from '$lib/stores/space-album-view-settings.store';
@@ -87,10 +83,10 @@
     }
     const hits = flattenForSearch(folders, albums, searchQuery);
     const pathByAlbumId = new Map(hits.map((hit) => [hit.album.id, hit.path]));
-    const sortedHitAlbums = sortAlbums(hits.map((hit) => hit.album) as unknown as AlbumResponseDto[], {
-      sortBy: $spaceAlbumViewSettings.sortBy,
-      orderBy: $spaceAlbumViewSettings.sortOrder,
-    }) as unknown as SharedSpaceLinkedAlbumDto[];
+    const sortedHitAlbums = sortSpaceAlbums(
+      hits.map((hit) => hit.album),
+      { sortBy: $spaceAlbumViewSettings.sortBy, orderBy: $spaceAlbumViewSettings.sortOrder },
+    );
     return sortedHitAlbums.map((album) => ({ album, path: pathByAlbumId.get(album.id) ?? [] }));
   });
 
