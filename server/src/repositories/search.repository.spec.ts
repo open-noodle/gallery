@@ -837,10 +837,17 @@ describe(SearchRepository.name, () => {
     });
 
     it('keeps not-locked as an inequality (it still admits Hidden — why the new mode exists)', () => {
-      const { sql, parameters } = compileAssetSearch({ visibility: 'not-locked' });
+      const { sql } = compileAssetSearch({ visibility: 'not-locked' });
 
-      expect(sql).toMatch(/"asset"\."visibility" != \$\d+/i);
-      expect(parameters).toContain(AssetVisibility.Locked);
+      // #869 follow-up: the mode now compiles through `isNotLockedAsset`, so the inequality is
+      // spelled with an inlined literal rather than a bound parameter — `sql.lit` is what lets the
+      // partial index back the anti-join — and it is AND-ed with the NOT EXISTS that also drops the
+      // motion half of a locked live photo. The inequality is still an inequality: Hidden is
+      // admitted, which is the whole reason this mode exists.
+      expect(sql).toContain(`"asset"."visibility" != '${AssetVisibility.Locked}'`);
+      expect(sql).toContain('not exists');
+      expect(sql).not.toContain(`'${AssetVisibility.Hidden}'`);
+      expect(sql).not.toMatch(/"asset"\."visibility" in \(/i);
     });
 
     it('applies no visibility clause when visibility is undefined', () => {
