@@ -1539,8 +1539,6 @@ export type AssetCopyDto = {
 export type AssetEditableDto = {
     /** Asset IDs to resolve editability for */
     assetIds: string[];
-    /** Space context the assets are being viewed through */
-    spaceId?: string;
 };
 export type AssetEditableResponseDto = {
     /** Subset of the requested IDs the caller may edit */
