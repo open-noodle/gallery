@@ -737,7 +737,7 @@ describe('canEdit / editable (#734)', () => {
     mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set([asset.id]));
     mocks.asset.getById.mockResolvedValue(getForAsset(asset));
 
-    const result = await sut.get(auth, asset.id, {});
+    const result = (await sut.get(auth, asset.id)) as AssetResponseDto;
 
     expect(result.canEdit).toBe(true);
   });
@@ -749,7 +749,7 @@ describe('canEdit / editable (#734)', () => {
     mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set());
     mocks.asset.getById.mockResolvedValue(getForAsset(asset));
 
-    const result = await sut.get(auth, asset.id, {});
+    const result = (await sut.get(auth, asset.id)) as AssetResponseDto;
 
     expect(result.canEdit).toBe(false);
   });
@@ -857,15 +857,22 @@ In `server/src/controllers/asset.controller.ts`, next to the existing `@Post('jo
 
 ```ts
   @Post('editable')
-  @HttpCode(HttpStatus.OK)
   @Authenticated({ permission: Permission.AssetRead })
-  @Endpoint({ summary: 'Resolve which of the given assets the caller may edit' })
+  @HttpCode(HttpStatus.OK)
+  @Endpoint({
+    summary: 'Resolve which of the given assets the caller may edit',
+    description:
+      'Returns the subset of the requested asset IDs the caller is allowed to edit — owned assets, plus assets belonging to a member of a space where the caller is Owner or Editor.',
+    history: new HistoryBuilder().added('v2'),
+  })
   getEditableAssets(@Auth() auth: AuthDto, @Body() dto: AssetEditableDto): Promise<AssetEditableResponseDto> {
     return this.service.getEditable(auth, dto);
   }
 ```
 
-Gate the route itself on `AssetRead`, not `AssetUpdate` — the API-key permission must not require write to ask a read-only question; the per-asset check inside the service is what enforces the rule.
+Decorator order and the `@Endpoint({ summary, description, history })` shape match the sibling routes in this file (`@Post('jobs')` at `:44`, `@Get(':id')` at `:92`) — a bare `@Endpoint({ summary })` is not the house style here.
+
+Gate the route itself on `AssetRead`, not `AssetUpdate` — the API-key permission must not require write to ask a read-only question, and `@Post('jobs')` sets the precedent that the route-level permission need not match the inner check. The per-asset `AssetUpdate` check inside the service is what enforces the rule.
 
 - [ ] **Step 8: Run the tests and verify they pass**
 
@@ -906,8 +913,10 @@ check and a required field would emit a wrong false for owners."
 
 **Interfaces:**
 
-- Consumes: `sharedSpaceRepository.logActivity({ spaceId, userId, type, data })`, `sharedSpaceRepository.findSpaceForAssetAndUser(assetId, userId)`
-- Produces: `SharedSpaceActivityType.AssetEdit = 'asset_edit'`, and a private `AssetService.logCrossOwnerEdit(auth, assetIds)` helper
+- Consumes: `sharedSpaceRepository.logActivity({ spaceId, userId, type, data })`, `sharedSpaceRepository.findSpaceForAssetAndUser(assetId, userId)`, and `Permission.AssetDelete` as the pure owner arm
+- Produces: `SharedSpaceActivityType.AssetEdit = 'asset_edit'`, and a private `AssetService.logCrossOwnerEdit(auth: AuthDto, assetIds: string[]): Promise<void>` helper
+
+**The helper takes ids, not asset rows.** `updateAll` only ever has ids, and `findSpaceForAssetAndUser` takes an asset id — so the owner id is never actually needed. "Which of these are cross-owner" comes from `checkAccess({ permission: AssetDelete, ids })`, the same pure-owner-arm trick `rbac-3` uses at `asset.service.ts:220-223`. A `getByIds` fetch would work too, but it makes every bulk edit pay for a full asset read just to decide whether to write an activity row.
 
 **No migration.** `shared_space_activity.type` is `character varying(30)`, not a PostgreSQL enum (`server/src/schema/tables/shared-space-activity.table.ts:26-27`). `asset_edit` is 10 characters.
 
@@ -978,7 +987,8 @@ describe('cross-owner edit attribution (#734)', () => {
     const ids = [inA1, inA2, inB, nowhere];
     mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
     mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set(ids));
-    mocks.asset.getByIds.mockResolvedValue(ids.map((id) => getForAsset(AssetFactory.create({ id }))));
+    // No getByIds mock: logCrossOwnerEdit derives cross-owner from the pure owner arm
+    // (checkOwnerAccess above returning empty) rather than fetching asset rows.
     mocks.sharedSpace.findSpaceForAssetAndUser.mockImplementation((assetId: string) =>
       Promise.resolve(assetId === inB ? { spaceId: 'space-b' } : assetId === nowhere ? null : { spaceId: 'space-a' }),
     );
@@ -1025,21 +1035,26 @@ In `server/src/services/asset.service.ts`:
    *
    * Never throws. Attribution is secondary to the edit that triggered it.
    */
-  private async logCrossOwnerEdit(auth: AuthDto, assets: { id: string; ownerId: string }[]): Promise<void> {
+  private async logCrossOwnerEdit(auth: AuthDto, assetIds: string[]): Promise<void> {
     try {
-      const crossOwner = assets.filter((asset) => asset.ownerId !== auth.user.id);
-      if (crossOwner.length === 0) {
+      // Which of these does the caller own? AssetDelete is the pure owner arm — the same
+      // trick rbac-3 uses at :220-223. Deliberately NOT a getByIds fetch: findSpaceForAssetAndUser
+      // takes an asset id, so the owner id itself is never needed, and a bulk edit should not pay
+      // for a full asset read just to decide whether to write an activity row.
+      const ownedIds = await this.checkAccess({ auth, permission: Permission.AssetDelete, ids: assetIds });
+      const crossOwnerIds = assetIds.filter((id) => !ownedIds.has(id));
+      if (crossOwnerIds.length === 0) {
         return;
       }
 
       const bySpace = new Map<string, string[]>();
-      for (const asset of crossOwner) {
-        const space = await this.sharedSpaceRepository.findSpaceForAssetAndUser(asset.id, auth.user.id);
+      for (const assetId of crossOwnerIds) {
+        const space = await this.sharedSpaceRepository.findSpaceForAssetAndUser(assetId, auth.user.id);
         if (!space) {
           continue;
         }
         const ids = bySpace.get(space.spaceId) ?? [];
-        ids.push(asset.id);
+        ids.push(assetId);
         bySpace.set(space.spaceId, ids);
       }
 
@@ -1059,7 +1074,7 @@ In `server/src/services/asset.service.ts`:
 
 - [ ] **Step 5: Call it from the write paths**
 
-Call `await this.logCrossOwnerEdit(auth, [...])` at the end of `update`, `updateAll`, `editAsset`, `removeAssetEdits`, and the tag add/remove paths — **after** the write succeeds, so a rejected write logs nothing.
+Call it with the ids the write touched — `await this.logCrossOwnerEdit(auth, [id])` in `update`, `editAsset` and `removeAssetEdits`; `await this.logCrossOwnerEdit(auth, ids)` in `updateAll`; and the corresponding asset ids in the tag add/remove paths. Always **after** the write succeeds, so a rejected write logs nothing.
 
 **Do not call it from `run` (jobs).** Refresh-thumbnails is maintenance, not a change to shared truth; an activity row reading "Anna edited 40 photos" after a thumbnail refresh is worse than no row.
 
@@ -1214,28 +1229,64 @@ Expected: PASS.
 
 Add to `web/src/lib/components/asset-viewer/AssetViewerNavBar.spec.ts`. Assert presence with `getBy*` and absence with an explicit null check — never `queryBy*` plus a truthiness check, which passes either way.
 
-```ts
-it('W-1: shows rotate, rating and the job actions when canEdit is true', async () => {
-  // render with an asset owned by someone else but carrying canEdit: true
-  expect(screen.getByLabelText('rotate_left')).toBeInTheDocument();
-  expect(screen.getByLabelText('refresh_faces')).toBeInTheDocument();
-});
+**Two mechanics this file already establishes, and which the tests must follow.** Top-bar buttons are reached with `getByLabelText`, but the actions this task unlocks mostly live **inside the "more" context menu**, which must be opened first and whose items are matched by **`getByText`**, not `getByLabelText` — see the `#889` block at `:93-112`. i18n is identity-mocked, so the key _is_ the visible string. The file's existing `renderSpaceViewer` helper is already exactly the fixture needed (non-owned asset, space context), so extend it rather than writing a third render path:
 
-it('W-2: still hides delete, archive, set-visibility, stack and view-in-timeline for a non-owner', async () => {
-  // same render as W-1
-  expect(screen.queryByLabelText('delete')).toBeNull();
-  expect(screen.queryByLabelText('archive')).toBeNull();
-  expect(screen.queryByLabelText('add_to_stack')).toBeNull();
-  expect(screen.queryByLabelText('view_in_timeline')).toBeNull();
+```ts
+// #734: a space editor may edit a member's asset. The server answers per asset via
+// `canEdit`; these tests pin that the nav bar honours it without leaking the owner-only
+// actions.
+describe('space editor on a member photo (#734)', () => {
+  const renderEditableSpacePhoto = async (canEdit: boolean) => {
+    authManager.setUser(userAdminFactory.build({ id: 'space-member' }));
+    authManager.setPreferences(preferencesFactory.build({ cast: { gCastEnabled: false } }));
+    const asset = assetFactory.build({
+      id: 'space-photo',
+      ownerId: 'space-owner',
+      isTrashed: false,
+      canEdit,
+    });
+
+    renderWithTooltips(AssetViewerNavBar, {
+      asset,
+      space: { id: 'space-1', canWrite: true },
+      ...additionalProps,
+    });
+    await fireEvent.click(screen.getByLabelText('more'));
+  };
+
+  it('W-1: offers rotate and the re-processing jobs when canEdit is true', async () => {
+    await renderEditableSpacePhoto(true);
+
+    expect(screen.getByText('rotate_left')).toBeInTheDocument();
+    expect(screen.getByText('rotate_180')).toBeInTheDocument();
+    expect(screen.getByText('refresh_faces')).toBeInTheDocument();
+    expect(screen.getByText('refresh_metadata')).toBeInTheDocument();
+  });
+
+  it('W-2: still withholds the owner-only actions from a non-owner', async () => {
+    await renderEditableSpacePhoto(true);
+
+    expect(screen.queryByLabelText('delete')).toBeNull();
+    expect(screen.queryByText('archive')).toBeNull();
+    expect(screen.queryByText('add_to_stack')).toBeNull();
+    expect(screen.queryByText('view_in_timeline')).toBeNull();
+  });
+
+  it('W-3: withholds the edit actions when canEdit is false', async () => {
+    await renderEditableSpacePhoto(false);
+
+    expect(screen.queryByText('rotate_left')).toBeNull();
+    expect(screen.queryByText('refresh_faces')).toBeNull();
+  });
 });
 ```
 
-W-2 is the important one: it proves widening did not leak past the owner-only gates.
+W-2 is the important one: it proves the widening did not leak past the owner-only gates. W-3 proves the gate is real rather than a menu that always renders — without it, W-1 would pass against a component that ignores `canEdit` entirely.
 
-- [ ] **Step 6: Run to verify W-1 fails and W-2 passes**
+- [ ] **Step 6: Run to verify W-1 fails while W-2 and W-3 pass**
 
 Run: `cd web && pnpm test -- --run src/lib/components/asset-viewer/AssetViewerNavBar.spec.ts`
-Expected: W-1 FAIL, W-2 PASS.
+Expected: **W-1 FAIL** (the actions are still owner-gated), **W-2 and W-3 PASS** (vacuously — nothing renders yet). W-3 becoming meaningful only after Step 7 is expected; what matters is that it must **still** pass afterwards.
 
 - [ ] **Step 7: Swap the gates**
 
