@@ -33,6 +33,8 @@ confirm before anything moves.
 **Administration → Face cleanup** opens a chooser with two modes. They write exactly the same records, so a
 decision made in either is permanent and is respected by the other — and by every future scan.
 
+<img src={require('./img/face-cleanup-overview.webp').default} title='The Face Cleanup mode chooser' />
+
 |               | **Guided cleanup**                            | **Manual review**                         |
 | ------------- | --------------------------------------------- | ----------------------------------------- |
 | Starts from   | a scan                                        | a person you pick                         |
@@ -68,6 +70,8 @@ decisions and lose them.
 The two lanes are independent: approving the auto-fix batch does not touch anything in the review lane, and vice
 versa.
 
+<img src={require('./img/face-cleanup-scan.webp').default} title='The guided cleanup scan, split into an auto-fix lane and a review lane' />
+
 ### Operating order
 
 Clean **owner-first**: start with the people that have the smallest flagged percentage. Rows badged `also flagged`
@@ -86,6 +90,8 @@ cleanup queue. Nothing is written until you press **Apply**.
 | **Confirm & lock**  | like Keep here, but permanent and owner-agnostic — no future scan can flag it      |
 | **Unknown person**  | a real face that isn't this person and you can't name; parks it in its own cluster |
 | **Not a face**      | retires the crop entirely. **This is the only irreversible action**                |
+
+<img src={require('./img/face-cleanup-review.webp').default} title='Reviewing one flagged cluster, with every face routed to a destination' />
 
 **Keep here** vs. **Confirm & lock** is the distinction worth learning. Keep here answers one scan's question —
 if a later scan suspects a _different_ person, the face can be flagged again. Confirm & lock silences it for

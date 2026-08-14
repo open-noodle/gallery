@@ -14,6 +14,8 @@ Suggestions handle the faces recognition **skipped**. For the ones it got **wron
 
 Open a named person. If there are near-misses waiting, a banner sits above their photos — **Faces found that could be Anna** — with a preview of the crops and a **Review** button. **Not now** hides the banner for the session without deciding anything.
 
+<img src={require('./img/face-suggestions-banner.webp').default} title='The face suggestion banner on a person page' />
+
 Review shows one face at a time. Each one is presented in the photo it came from, so you keep the context a bare crop throws away, with a **Known photo** of the person beside it for comparison.
 
 | Action | What it does |
@@ -21,6 +23,8 @@ Review shows one face at a time. Each one is presented in the photo it came from
 | **Same person** | Assigns the face to this person, and improves future matching |
 | **Different person** | Records that this face is *not* this person. The face stays unassigned and is never suggested for them again |
 | **Ignore face** | Suppresses the suggestion without judging the match — for crops not worth anyone's time, like a stranger in the background or a face on a poster |
+
+<img src={require('./img/face-suggestions-review.webp').default} title='Reviewing a single face suggestion against a known photo' />
 
 The difference between the last two is worth knowing. **Different person** is a real verdict: it is stamped against the person's identity, so it answers "not this person" everywhere that identity is checked, not just on the row you were looking at. **Ignore face** only stops the asking.
 
