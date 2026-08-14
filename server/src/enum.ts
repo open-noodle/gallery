@@ -81,6 +81,7 @@ export enum SharedSpaceRole {
 export enum SharedSpaceActivityType {
   AssetAdd = 'asset_add',
   AssetRemove = 'asset_remove',
+  AssetEdit = 'asset_edit',
   MemberJoin = 'member_join',
   MemberLeave = 'member_leave',
   MemberRemove = 'member_remove',

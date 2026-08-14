@@ -47,6 +47,9 @@
       case 'asset_remove': {
         return $t('spaces_activity_removed_photos', { values: { name, count } });
       }
+      case 'asset_edit': {
+        return $t('spaces_activity_edited_photos', { values: { name, count } });
+      }
       case 'member_join': {
         return $t('spaces_activity_joined_as', {
           values: { name, role: String(data.role ?? $t('spaces_role_member')) },
