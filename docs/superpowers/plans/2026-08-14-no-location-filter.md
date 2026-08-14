@@ -257,12 +257,19 @@ it('narrows the timeline buckets, not just metadata search', async () => {
 
   const all = await assets.getTimeBuckets({ userIds: [user.id] });
   const noGps = await assets.getTimeBuckets({ userIds: [user.id], locationPresence: 'noGps' });
+  const noPlaceName = await assets.getTimeBuckets({ userIds: [user.id], locationPresence: 'noPlaceName' });
 
   const total = (buckets: { count: number }[]) => buckets.reduce((sum, b) => sum + b.count, 0);
   expect(total(all)).toBe(5);
   expect(total(noGps)).toBe(3);
+  // The ONLY assertion that guards the join trigger at asset.repository.ts:297. `noGps` cannot
+  // guard it — it lives in a separate .$if AFTER the join block closes, and every other
+  // noPlaceName test goes through searchAssetBuilderLegacy in database.ts, a different function.
+  expect(total(noPlaceName)).toBe(1);
 });
 ```
+
+> **Prove this one red deliberately.** Delete `options.locationPresence === 'noPlaceName' ||` from the trigger (Step 5), confirm the `noPlaceName` assertion reports 5 instead of 1, then restore it. A timeline test that passes with the trigger removed is worthless, and that trigger is this task's single biggest silent-failure risk.
 
 - [ ] **Step 8: Add the scope and visibility tests**
 
