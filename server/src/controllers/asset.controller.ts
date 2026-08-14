@@ -62,7 +62,7 @@ export class AssetController {
     summary: 'Resolve which of the given assets the caller may edit',
     description:
       'Returns the subset of the requested asset IDs the caller is allowed to edit — owned assets, plus assets belonging to a member of a space where the caller is Owner or Editor.',
-    history: new HistoryBuilder().added('v2'),
+    history: new HistoryBuilder().added('v2').stable('v2'),
   })
   getEditableAssets(@Auth() auth: AuthDto, @Body() dto: AssetEditableDto): Promise<AssetEditableResponseDto> {
     return this.service.getEditable(auth, dto);

@@ -3242,6 +3242,26 @@ describe(AssetService.name, () => {
       expect(result.canEdit).toBe(false);
     });
 
+    it('S-14: never sets canEdit for a shared-link caller (showExif: true)', async () => {
+      // showExif: true takes the non-stripMetadata path through mapAsset, so this exercises the
+      // `if (!auth.sharedLink)` guard directly — showExif: false would return early via the
+      // stripMetadata branch and never reach the guard, proving less. Absence is asserted with
+      // `in`, not `.toBe(false)`: `canEdit: false` and "no canEdit" are different signals to the
+      // client (the web falls back to its own derivation only when the field is absent), so a
+      // `=== false` assertion would pass even if the guard were deleted and canEdit resolved false
+      // by accident.
+      const asset = AssetFactory.create();
+      mocks.access.asset.checkSharedLinkAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getById.mockResolvedValue(getForAsset(asset));
+
+      const result = await sut.get(
+        { ...authStub.adminSharedLink, sharedLink: { ...authStub.adminSharedLink.sharedLink!, showExif: true } },
+        asset.id,
+      );
+
+      expect('canEdit' in result).toBe(false);
+    });
+
     it('S-33: returns only the editable subset', async () => {
       const auth = AuthFactory.create();
       const mine = newUuid();

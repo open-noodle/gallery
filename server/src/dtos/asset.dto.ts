@@ -173,7 +173,6 @@ const AssetDownloadOriginalSchema = z
 const AssetEditableSchema = z
   .object({
     assetIds: z.array(z.uuidv4()).describe('Asset IDs to resolve editability for'),
-    spaceId: z.uuidv4().optional().describe('Space context the assets are being viewed through'),
   })
   .meta({ id: 'AssetEditableDto' });
 
