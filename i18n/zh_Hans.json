@@ -3146,6 +3146,7 @@
   "spaces_activity_changed_role": "{name} 将角色更改为 {role}",
   "spaces_activity_default": "{name} 执行了一项操作",
   "spaces_activity_deleted_person": "{name} 删除了人物“{personName}”",
+  "spaces_activity_edited_photos": "{name} 编辑了 {count, plural, one {# 张照片} other {# 张照片}}",
   "spaces_activity_empty": "此 Space 刚刚创建",
   "spaces_activity_empty_description": "添加照片并邀请成员，动态就会显示在这里。",
   "spaces_activity_joined_as": "{name} 以 {role} 身份加入",

@@ -3190,6 +3190,7 @@
   "spaces_activity_changed_role": "{name} изменил(а) роль на «{role}»",
   "spaces_activity_default": "{name} выполнил(а) действие",
   "spaces_activity_deleted_person": "{name} удалил(а) человека «{personName}»",
+  "spaces_activity_edited_photos": "{name} изменил(а) {count, plural, one {# фото} few {# фото} many {# фото} other {# фото}}",
   "spaces_activity_empty": "Этот Space только создан",
   "spaces_activity_empty_description": "Добавьте фото и пригласите участников, чтобы здесь появилась активность.",
   "spaces_activity_joined_as": "{name} присоединился(ась) как {role}",

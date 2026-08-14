@@ -42,6 +42,7 @@ import {
   JobStatus,
   Permission,
   QueueName,
+  SharedSpaceActivityType,
 } from 'src/enum';
 import { ArgOf } from 'src/repositories/event.repository';
 import type { LinkedSpacePerson } from 'src/repositories/shared-space.repository';
@@ -284,6 +285,9 @@ export class AssetService extends BaseService {
       await this.applyVisibilityTransitionSideEffects([id], dto.visibility, new Map([[id, priorVisibility]]));
     }
 
+    // #734: after the write succeeds — a rejected write must log nothing.
+    await this.logCrossOwnerEdit(auth, [id]);
+
     return this.get(auth, id) as Promise<AssetResponseDto>;
   }
 
@@ -394,6 +398,9 @@ export class AssetService extends BaseService {
     if (visibility !== undefined) {
       await this.applyVisibilityTransitionSideEffects(ids, visibility, priorVisibilities);
     }
+
+    // #734: after the write succeeds — a rejected write must log nothing.
+    await this.logCrossOwnerEdit(auth, ids);
 
     await this.jobRepository.queueAll(ids.map((id) => ({ name: JobName.SidecarWrite, data: { id } })));
   }
@@ -799,6 +806,53 @@ export class AssetService extends BaseService {
     return findOrFail(() => this.assetRepository.getById(id), 'Asset');
   }
 
+  /**
+   * #734: record an edit made by someone who is not the asset owner, so the owner can see
+   * what changed and who changed it. Owner self-edits — nearly all editing — log nothing,
+   * which is what keeps this low-volume.
+   *
+   * Grouped by resolved space, one row per space: a bulk edit can span several spaces, and
+   * attributing all of it to whichever space resolved first would be wrong. Assets that
+   * resolve to no space contribute no row.
+   *
+   * Never throws. Attribution is secondary to the edit that triggered it.
+   */
+  private async logCrossOwnerEdit(auth: AuthDto, assetIds: string[]): Promise<void> {
+    try {
+      // Which of these does the caller own? AssetDelete is the pure owner arm — the same
+      // trick rbac-3 uses at :220-223. Deliberately NOT a getByIds fetch: findSpaceForAssetAndUser
+      // takes an asset id, so the owner id itself is never needed, and a bulk edit should not pay
+      // for a full asset read just to decide whether to write an activity row.
+      const ownedIds = await this.checkAccess({ auth, permission: Permission.AssetDelete, ids: assetIds });
+      const crossOwnerIds = assetIds.filter((id) => !ownedIds.has(id));
+      if (crossOwnerIds.length === 0) {
+        return;
+      }
+
+      const bySpace = new Map<string, string[]>();
+      for (const assetId of crossOwnerIds) {
+        const space = await this.sharedSpaceRepository.findSpaceForAssetAndUser(assetId, auth.user.id);
+        if (!space) {
+          continue;
+        }
+        const ids = bySpace.get(space.spaceId) ?? [];
+        ids.push(assetId);
+        bySpace.set(space.spaceId, ids);
+      }
+
+      for (const [spaceId, ids] of bySpace) {
+        await this.sharedSpaceRepository.logActivity({
+          spaceId,
+          userId: auth.user.id,
+          type: SharedSpaceActivityType.AssetEdit,
+          data: { count: ids.length, assetIds: ids.slice(0, 4) },
+        });
+      }
+    } catch (error) {
+      this.logger.warn(`Failed to log cross-owner edit activity: ${error}`);
+    }
+  }
+
   private async updateExif(dto: {
     id: string;
     description?: string;
@@ -979,6 +1033,9 @@ export class AssetService extends BaseService {
     const newEdits = await this.assetEditRepository.replaceAll(id, edits);
     await this.jobRepository.queue({ name: JobName.AssetEditThumbnailGeneration, data: { id } });
 
+    // #734: after the write succeeds — a rejected write must log nothing.
+    await this.logCrossOwnerEdit(auth, [id]);
+
     return {
       assetId: id,
       edits: newEdits,
@@ -1006,5 +1063,8 @@ export class AssetService extends BaseService {
 
     await this.assetEditRepository.replaceAll(id, []);
     await this.jobRepository.queue({ name: JobName.AssetEditThumbnailGeneration, data: { id } });
+
+    // #734: after the write succeeds — a rejected write must log nothing.
+    await this.logCrossOwnerEdit(auth, [id]);
   }
 }

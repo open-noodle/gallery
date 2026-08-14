@@ -3188,6 +3188,7 @@
   "spaces_activity_changed_role": "{name} heeft de rol gewijzigd naar {role}",
   "spaces_activity_default": "{name} heeft een actie uitgevoerd",
   "spaces_activity_deleted_person": "{name} heeft persoon \"{personName}\" verwijderd",
+  "spaces_activity_edited_photos": "{name} heeft {count, plural, one {# foto} other {# foto's}} bewerkt",
   "spaces_activity_empty": "Deze Space is net begonnen",
   "spaces_activity_empty_description": "Voeg foto's toe en nodig leden uit om hier activiteit te zien.",
   "spaces_activity_joined_as": "{name} is toegetreden als {role}",

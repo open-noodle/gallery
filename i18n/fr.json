@@ -3183,6 +3183,7 @@
   "spaces_activity_changed_role": "{name} a changé de rôle pour {role}",
   "spaces_activity_default": "{name} a effectué une action",
   "spaces_activity_deleted_person": "{name} a supprimé la personne \"{personName}\"",
+  "spaces_activity_edited_photos": "{name} a modifié {count, plural, one {# photo} other {# photos}}",
   "spaces_activity_empty": "Cet espace vient d'être créé",
   "spaces_activity_empty_description": "Ajoutez des photos et invitez des membres pour voir l'activité ici.",
   "spaces_activity_joined_as": "{name} a rejoint en tant que {role}",

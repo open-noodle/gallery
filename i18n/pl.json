@@ -3208,6 +3208,7 @@
   "spaces_activity_changed_role": "Użytkownik {name} zmienił rolę na {role}",
   "spaces_activity_default": "Użytkownik {name} wykonał akcję",
   "spaces_activity_deleted_person": "Użytkownik {name} usunął osobę \"{personName}\"",
+  "spaces_activity_edited_photos": "Użytkownik {name} edytował {count, plural, one {# zdjęcie} few {# zdjęcia} many {# zdjęć} other {# zdjęć}}",
   "spaces_activity_empty": "Ten Space dopiero się zaczyna",
   "spaces_activity_empty_description": "Dodaj zdjęcia i zaproś członków, aby zobaczyć tutaj aktywność.",
   "spaces_activity_joined_as": "Użytkownik {name} dołączył jako {role}",

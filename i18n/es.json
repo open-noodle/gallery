@@ -3184,6 +3184,7 @@
   "spaces_activity_changed_role": "{name} cambió el rol a {role}",
   "spaces_activity_default": "{name} realizó una acción",
   "spaces_activity_deleted_person": "{name} eliminó a la persona \"{personName}\"",
+  "spaces_activity_edited_photos": "{name} editó {count, plural, one {# foto} other {# fotos}}",
   "spaces_activity_empty": "Este Space acaba de empezar",
   "spaces_activity_empty_description": "Añade fotos e invita a miembros para ver la actividad aquí.",
   "spaces_activity_joined_as": "{name} se unió como {role}",

@@ -3170,6 +3170,7 @@
   "spaces_activity_changed_role": "{name} 將角色變更為 {role}",
   "spaces_activity_default": "{name} 執行了一項操作",
   "spaces_activity_deleted_person": "{name} 刪除了人物「{personName}」",
+  "spaces_activity_edited_photos": "{name} 編輯了 {count, plural, one {# 張相片} other {# 張相片}}",
   "spaces_activity_empty": "此 Space 剛剛建立",
   "spaces_activity_empty_description": "加入相片並邀請成員，動態就會顯示在這裡。",
   "spaces_activity_joined_as": "{name} 以 {role} 身分加入",

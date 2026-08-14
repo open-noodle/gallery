@@ -5,7 +5,16 @@ import { Readable } from 'node:stream';
 import { AssetResponseDto } from 'src/dtos/asset-response.dto';
 import { AssetJobName, AssetStatsResponseDto } from 'src/dtos/asset.dto';
 import { AssetEditAction, AssetEditsCreateDto } from 'src/dtos/editing.dto';
-import { AssetFileType, AssetMetadataKey, AssetStatus, AssetType, AssetVisibility, JobName, JobStatus } from 'src/enum';
+import {
+  AssetFileType,
+  AssetMetadataKey,
+  AssetStatus,
+  AssetType,
+  AssetVisibility,
+  JobName,
+  JobStatus,
+  SharedSpaceActivityType,
+} from 'src/enum';
 import { AssetStats } from 'src/repositories/asset.repository';
 import { AssetService } from 'src/services/asset.service';
 import { AssetFactory } from 'test/factories/asset.factory';
@@ -3289,6 +3298,101 @@ describe(AssetService.name, () => {
       mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set());
 
       await expect(sut.getEditable(auth, { assetIds: [newUuid()] })).resolves.toEqual({ editableAssetIds: [] });
+    });
+  });
+
+  describe('cross-owner edit attribution (#734)', () => {
+    it('S-37: logs one activity row when an editor edits a member asset', async () => {
+      const auth = AuthFactory.create();
+      const asset = AssetFactory.create();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getById.mockResolvedValue(getForAsset(asset));
+      mocks.asset.update.mockResolvedValue(getForAsset(asset));
+      mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue({ spaceId: 'space-1' } as any);
+
+      await sut.update(auth, asset.id, { description: 'fixed' });
+
+      expect(mocks.sharedSpace.logActivity).toHaveBeenCalledWith(
+        expect.objectContaining({ spaceId: 'space-1', userId: auth.user.id, type: SharedSpaceActivityType.AssetEdit }),
+      );
+    });
+
+    it('S-38: logs nothing when the owner edits their own asset', async () => {
+      const asset = AssetFactory.create();
+      const auth = AuthFactory.create({ id: asset.ownerId });
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getById.mockResolvedValue(getForAsset(asset));
+      mocks.asset.update.mockResolvedValue(getForAsset(asset));
+      // Deliberately mocked to resolve a real space, even though the correct implementation never
+      // reaches this call for an owned asset: findSpaceForAssetAndUser is a strict automock, so
+      // leaving it unconfigured would let a mutant that skips the ownership gate throw its way into
+      // the same silent catch this test is trying to prove doesn't fire — passing for the wrong
+      // reason. Mocking it to succeed makes the assertion below actually exercise the gate.
+      mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue({ spaceId: 'space-1' } as any);
+
+      await sut.update(auth, asset.id, { description: 'mine' });
+
+      expect(mocks.sharedSpace.logActivity).not.toHaveBeenCalled();
+    });
+
+    it('S-40: logs nothing, and does not throw, when no space contains the asset', async () => {
+      const auth = AuthFactory.create();
+      const asset = AssetFactory.create();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getById.mockResolvedValue(getForAsset(asset));
+      mocks.asset.update.mockResolvedValue(getForAsset(asset));
+      mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue(null as any);
+
+      await expect(sut.update(auth, asset.id, { description: 'x' })).resolves.toBeDefined();
+      expect(mocks.sharedSpace.logActivity).not.toHaveBeenCalled();
+    });
+
+    it('S-41: a failing logActivity must not fail the edit', async () => {
+      const auth = AuthFactory.create();
+      const asset = AssetFactory.create();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getById.mockResolvedValue(getForAsset(asset));
+      mocks.asset.update.mockResolvedValue(getForAsset(asset));
+      mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue({ spaceId: 'space-1' } as any);
+      mocks.sharedSpace.logActivity.mockRejectedValue(new Error('activity insert failed'));
+
+      await expect(sut.update(auth, asset.id, { description: 'x' })).resolves.toBeDefined();
+    });
+
+    it('S-46: groups a bulk edit by space — one row per space, none for spaceless assets', async () => {
+      const auth = AuthFactory.create();
+      const inA1 = newUuid();
+      const inA2 = newUuid();
+      const inB = newUuid();
+      const nowhere = newUuid();
+      const ids = [inA1, inA2, inB, nowhere];
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set(ids));
+      // No getByIds mock: logCrossOwnerEdit derives cross-owner from the pure owner arm
+      // (checkOwnerAccess above returning empty) rather than fetching asset rows.
+      mocks.sharedSpace.findSpaceForAssetAndUser.mockImplementation((assetId: string) =>
+        Promise.resolve(
+          (assetId === inB ? { spaceId: 'space-b' } : assetId === nowhere ? null : { spaceId: 'space-a' }) as any,
+        ),
+      );
+      // logActivity is a strict automock: without a resolved value, the first call throws and
+      // (correctly, per logCrossOwnerEdit's single whole-method try/catch) aborts the loop before
+      // the second space's row is ever written, which masks the very grouping behaviour this test
+      // exists to prove. Configure it to succeed like every other repository call here.
+      mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
+
+      await sut.updateAll(auth, { ids, description: 'bulk' });
+
+      expect(mocks.sharedSpace.logActivity).toHaveBeenCalledTimes(2);
+      expect(mocks.sharedSpace.logActivity).toHaveBeenCalledWith(
+        expect.objectContaining({ spaceId: 'space-a', data: expect.objectContaining({ count: 2 }) }),
+      );
+      expect(mocks.sharedSpace.logActivity).toHaveBeenCalledWith(
+        expect.objectContaining({ spaceId: 'space-b', data: expect.objectContaining({ count: 1 }) }),
+      );
     });
   });
 });
