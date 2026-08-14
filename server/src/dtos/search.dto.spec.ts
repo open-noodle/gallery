@@ -169,6 +169,28 @@ describe('SearchSuggestionRequestDto (#858)', () => {
   });
 });
 
+describe('MetadataSearchDto locationPresence query param handling', () => {
+  it.each(['noGps', 'noPlaceName'])('accepts locationPresence=%s', (locationPresence) => {
+    const result = MetadataSearchDto.schema.safeParse({ locationPresence });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a value outside the enum', () => {
+    expect(MetadataSearchDto.schema.safeParse({ locationPresence: 'nogps' }).success).toBe(false);
+  });
+
+  it.each(['city', 'state', 'country'])('rejects locationPresence alongside %s', (sibling) => {
+    const result = MetadataSearchDto.schema.safeParse({ locationPresence: 'noGps', [sibling]: 'Paris' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts city without locationPresence', () => {
+    expect(MetadataSearchDto.schema.safeParse({ city: 'Paris' }).success).toBe(true);
+  });
+});
+
 describe('FilterSuggestionsRequestDto narrowing dimensions', () => {
   it('accepts state, lensModel and ownerId so every suggestion list can narrow by them', () => {
     const ownerId = '00000000-0000-4000-8000-000000000001';

@@ -10,6 +10,7 @@ import {
   TimeBucketSizeSchema,
 } from 'src/enum.js';
 import { boundedTextFilter, stringToBool } from 'src/validation.js';
+import { boundedTextFilter, IsNotSiblingOf, stringToBool } from 'src/validation.js';
 
 const UUID_PATTERN = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}';
 const ScopedPersonTokenSchema = z
@@ -64,6 +65,12 @@ const TimeBucketQueryBaseSchema = z
     model: z.string().optional().describe('Filter by camera model'),
     lensModel: z.string().optional().describe('Filter by camera lens model'),
     state: z.string().optional().describe('Filter by state/province name'),
+    locationPresence: z
+      .enum(['noGps', 'noPlaceName'])
+      .optional()
+      .describe(
+        'Filter for assets with no location: noGps (no coordinates) or noPlaceName (coordinates the geocoder could not name). Cannot be combined with city, state or country.',
+      ),
     ownerId: z
       .uuidv4()
       .optional()
@@ -125,13 +132,19 @@ const TimeBucketQueryBaseSchema = z
   })
   .meta({ id: 'TimeBucketDto' });
 
-const TimeBucketSchema = TimeBucketQueryBaseSchema;
-const TimeBucketAssetSchema = TimeBucketQueryBaseSchema.extend({
+const TimeBucketSchema = TimeBucketQueryBaseSchema.pipe(
+  IsNotSiblingOf(TimeBucketQueryBaseSchema, 'locationPresence', ['city', 'state', 'country']),
+).meta({ id: 'TimeBucketDto' });
+
+const TimeBucketAssetBaseSchema = TimeBucketQueryBaseSchema.extend({
   timeBucket: z
     .string()
     .describe('Time bucket identifier in YYYY-MM-DDT00:00:00.000Z format')
     .meta({ example: '2024-01-01T00:00:00.000Z' }),
-}).meta({ id: 'TimeBucketAssetDto' });
+});
+const TimeBucketAssetSchema = TimeBucketAssetBaseSchema.pipe(
+  IsNotSiblingOf(TimeBucketAssetBaseSchema, 'locationPresence', ['city', 'state', 'country']),
+).meta({ id: 'TimeBucketAssetDto' });
 
 const stackTupleSchema = z.array(z.string()).length(2).nullable();
 
@@ -196,11 +209,14 @@ export const TimeBucketsResponseSchema = z
   })
   .meta({ id: 'TimeBucketsResponseDto' });
 
-const TimeBucketCoverSchema = TimeBucketQueryBaseSchema.extend({
+const TimeBucketCoverBaseSchema = TimeBucketQueryBaseSchema.extend({
   timeBuckets: z
     .preprocess((v) => (v === undefined ? undefined : Array.isArray(v) ? v : [v]), z.array(z.string()))
     .describe('Time bucket identifiers (YYYY-MM-DD) to resolve covers for'),
-}).meta({ id: 'TimeBucketCoverDto' });
+});
+const TimeBucketCoverSchema = TimeBucketCoverBaseSchema.pipe(
+  IsNotSiblingOf(TimeBucketCoverBaseSchema, 'locationPresence', ['city', 'state', 'country']),
+).meta({ id: 'TimeBucketCoverDto' });
 
 export const TimeBucketCoverResponseSchema = z
   .object({
