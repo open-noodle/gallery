@@ -508,6 +508,23 @@ and every existing call site already do. Do not "simplify" a call site to `copyW
 **Inner join drops row-less assets (server).** Covered by the `NOT EXISTS` decision above; the
 scenario for an asset with no `asset_exif` row is what keeps it honest.
 
+**Known limitation — a row-less asset is counted but not rendered.** `getTimeBucket`'s Stage 2
+projection CTE joins `asset_exif` unconditionally (`asset.repository.ts:1469`), so an asset with no
+`asset_exif` row survives Stage 1's filter and the `getTimeBuckets` count, then disappears from the
+returned rows. `noGps` is the one filter designed to surface exactly those assets, so its bucket
+count can exceed the photos actually drawn — for a freshly uploaded asset whose metadata extraction
+has not run yet.
+
+This is **pre-existing and not introduced here**: the join is unconditional, so the same disagreement
+reproduces for any query that lets a row-less asset through, including an unfiltered timeline. It is
+also transient in practice, since extraction normally runs within seconds of upload.
+
+It is deliberately **not fixed as part of this change**. The correct fix is a left join, which alters
+every timeline query in the application — far beyond a filter feature's blast radius, and it would
+start surfacing unprocessed assets in the main timeline, which is a product decision rather than a
+bug fix. The `getTimeBuckets`/`getTimeBucket` agreement test therefore pins the invariant using
+`noPlaceName` (whose matches always have an exif row); the `noGps` case is knowingly unpinned.
+
 **Two suggestion paths, not one (server + web).** `getFilterSuggestions` and `getSmartSearchFacets`
 each compute their own `hasUnnamedPeople`, and `mapSmartSearchFacetsToFilterSuggestions` funnels the
 second into the same shape the panel reads. Wiring only the first leaves the flags `undefined` in
