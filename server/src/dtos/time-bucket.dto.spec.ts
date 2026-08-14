@@ -188,4 +188,26 @@ describe('TimeBucketDto', () => {
       expect(absent.data?.state).toBeUndefined();
     });
   });
+
+  describe('locationPresence query param handling', () => {
+    it.each(['noGps', 'noPlaceName'])('accepts locationPresence=%s', (locationPresence) => {
+      const result = TimeBucketDto.schema.safeParse({ locationPresence });
+
+      expect(result.success).toBe(true);
+    });
+
+    it('rejects a value outside the enum', () => {
+      expect(TimeBucketDto.schema.safeParse({ locationPresence: 'nogps' }).success).toBe(false);
+    });
+
+    it.each(['city', 'state', 'country'])('rejects locationPresence alongside %s', (sibling) => {
+      const result = TimeBucketDto.schema.safeParse({ locationPresence: 'noGps', [sibling]: 'Paris' });
+
+      expect(result.success).toBe(false);
+    });
+
+    it('accepts city without locationPresence', () => {
+      expect(TimeBucketDto.schema.safeParse({ city: 'Paris' }).success).toBe(true);
+    });
+  });
 });
