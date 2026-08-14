@@ -556,6 +556,7 @@ class AssetAccess {
               )
               .select(['asset.id', 'asset.livePhotoVideoId'])
               .where('asset.deletedAt', 'is', null)
+              .where('asset.isOffline', '=', false)
               .where((eb) => spaceVisibilityGate(eb))
               .where((eb) =>
                 eb.or([eb('asset.id', 'in', [...assetIds]), eb('asset.livePhotoVideoId', 'in', [...assetIds])]),

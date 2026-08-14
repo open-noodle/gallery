@@ -383,10 +383,11 @@ from
       and "shared_space_member"."role" in ($17, $18)
     where
       "asset"."deletedAt" is null
-      and "asset"."visibility" in ($19, $20)
+      and "asset"."isOffline" = $19
+      and "asset"."visibility" in ($20, $21)
       and (
-        "asset"."id" in ($21)
-        or "asset"."livePhotoVideoId" in ($22)
+        "asset"."id" in ($22)
+        or "asset"."livePhotoVideoId" in ($23)
       )
       and (
         exists (
