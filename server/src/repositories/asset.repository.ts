@@ -31,6 +31,7 @@ import {
   CalendarHeatmapType,
   TimeBucketSize,
 } from 'src/enum';
+import { LocationPresence } from 'src/repositories/search.repository';
 import { DB } from 'src/schema';
 import { AssetAudioTable, AssetKeyframeTable, AssetVideoTable } from 'src/schema/tables/asset-av.table';
 import { AssetExifTable } from 'src/schema/tables/asset-exif.table';
@@ -145,6 +146,11 @@ interface AssetBuilderOptions {
   model?: string;
   lensModel?: string;
   state?: string;
+  /**
+   * Absence-of-location filter. Mutually exclusive with city/state/country — it is a member of the
+   * same location group, never an extra narrowing on top of one.
+   */
+  locationPresence?: LocationPresence;
   originalFileName?: string;
   description?: string;
   ocr?: string;
@@ -404,6 +410,7 @@ export function withTimeBucketAssetFilters<O>(
           !!options.model ||
           !!options.lensModel ||
           !!options.description ||
+          options.locationPresence === 'noPlaceName' ||
           options.rating !== undefined,
         (qb) => {
           let q = qb.innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId');
@@ -436,6 +443,9 @@ export function withTimeBucketAssetFilters<O>(
           if (options.state) {
             q = q.where('asset_exif.state', '=', options.state) as any;
           }
+          if (options.locationPresence === 'noPlaceName') {
+            q = q.where('asset_exif.latitude', 'is not', null).where('asset_exif.city', 'is', null) as any;
+          }
           if (options.rating !== undefined) {
             q = q.where('asset_exif.rating', '>=', options.rating) as any;
           }
@@ -449,6 +459,21 @@ export function withTimeBucketAssetFilters<O>(
 
           return q;
         },
+      )
+      // Deliberately NOT a join: an asset whose metadata has not been extracted has no asset_exif
+      // row at all, and is exactly the kind of asset "no GPS" must find. Mirrors the tagIds === null
+      // predicate in searchAssetBuilderLegacy (database.ts).
+      .$if(options.locationPresence === 'noGps', (qb) =>
+        qb.where((eb) =>
+          eb.not(
+            eb.exists(
+              eb
+                .selectFrom('asset_exif')
+                .whereRef('asset_exif.assetId', '=', 'asset.id')
+                .where('asset_exif.latitude', 'is not', null),
+            ),
+          ),
+        ),
       )
       .$if(options.visibility === undefined, withDefaultVisibility)
       .$if(!!options.visibility, (qb) => qb.where('asset.visibility', '=', options.visibility!))
