@@ -31,6 +31,7 @@ import {
   CalendarHeatmapType,
   TimeBucketSize,
 } from 'src/enum.js';
+import type { LocationPresence } from 'src/repositories/search.repository.js';
 import { DB } from 'src/schema/index.js';
 import { AssetAudioTable, AssetKeyframeTable, AssetVideoTable } from 'src/schema/tables/asset-av.table.js';
 import { AssetExifTable } from 'src/schema/tables/asset-exif.table.js';
@@ -147,6 +148,11 @@ interface AssetBuilderOptions {
   model?: string;
   lensModel?: string;
   state?: string;
+  /**
+   * Absence-of-location filter. Mutually exclusive with city/state/country — it is a member of the
+   * same location group, never an extra narrowing on top of one.
+   */
+  locationPresence?: LocationPresence;
   originalFileName?: string;
   description?: string;
   ocr?: string;
