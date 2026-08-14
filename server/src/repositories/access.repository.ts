@@ -11,6 +11,7 @@ import {
   sharedLinkCreatorCanPublish,
 } from 'src/utils/shared-link-space-tether.js';
 import {
+  spaceAlbumAssetExists,
   spaceAssetPathBranches,
   spaceVisibilityGate,
   spaceVisibleAssetVisibilities,
@@ -513,6 +514,15 @@ class AssetAccess {
             eb.or([eb('asset.id', 'in', [...assetIds]), eb('asset.livePhotoVideoId', 'in', [...assetIds])]),
           )
           .where('shared_space_member.role', 'in', ['editor', 'owner'])
+          .where((eb) =>
+            eb.exists(
+              eb
+                .selectFrom('shared_space_member as owner_member')
+                .select(eb.lit(1).as('exists'))
+                .whereRef('owner_member.spaceId', '=', 'shared_space_asset.spaceId')
+                .whereRef('owner_member.userId', '=', 'asset.ownerId'),
+            ),
+          )
           .union(
             this.db
               .selectFrom('shared_space_library')
@@ -529,7 +539,50 @@ class AssetAccess {
               .where((eb) =>
                 eb.or([eb('asset.id', 'in', [...assetIds]), eb('asset.livePhotoVideoId', 'in', [...assetIds])]),
               )
-              .where('shared_space_member.role', 'in', ['editor', 'owner']),
+              .where('shared_space_member.role', 'in', ['editor', 'owner'])
+              .where((eb) =>
+                eb.exists(
+                  eb
+                    .selectFrom('shared_space_member as owner_member')
+                    .select(eb.lit(1).as('exists'))
+                    .whereRef('owner_member.spaceId', '=', 'shared_space_library.spaceId')
+                    .whereRef('owner_member.userId', '=', 'asset.ownerId'),
+                ),
+              ),
+          )
+          .union(
+            this.db
+              .selectFrom('asset')
+              .innerJoin('shared_space_member', (join) =>
+                join
+                  .on('shared_space_member.userId', '=', userId)
+                  .on('shared_space_member.role', 'in', [SharedSpaceRole.Editor, SharedSpaceRole.Owner]),
+              )
+              .select(['asset.id', 'asset.livePhotoVideoId'])
+              .where('asset.deletedAt', 'is', null)
+              .where((eb) => spaceVisibilityGate(eb))
+              .where((eb) =>
+                eb.or([eb('asset.id', 'in', [...assetIds]), eb('asset.livePhotoVideoId', 'in', [...assetIds])]),
+              )
+              // The album leg. `spaceIdRef` correlates the album's space to the actor's OWN
+              // membership row, which is what makes the owner-is-member check below bind to the
+              // same space (spec §2.4). Deliberately NO requireShowInTimeline: editability must
+              // not depend on a timeline display toggle.
+              .where((eb) =>
+                spaceAlbumAssetExists(eb, {
+                  correlateAssetId: 'asset.id',
+                  scope: { spaceIdRef: 'shared_space_member.spaceId' },
+                }),
+              )
+              .where((eb) =>
+                eb.exists(
+                  eb
+                    .selectFrom('shared_space_member as owner_member')
+                    .select(eb.lit(1).as('exists'))
+                    .whereRef('owner_member.spaceId', '=', 'shared_space_member.spaceId')
+                    .whereRef('owner_member.userId', '=', 'asset.ownerId'),
+                ),
+              ),
           )
           .as('combined'),
       )
