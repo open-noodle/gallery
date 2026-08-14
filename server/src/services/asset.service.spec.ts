@@ -4,7 +4,7 @@ import path from 'node:path';
 import { Readable } from 'node:stream';
 import { AssetResponseDto } from 'src/dtos/asset-response.dto';
 import { AssetJobName, AssetStatsResponseDto } from 'src/dtos/asset.dto';
-import { AssetEditAction } from 'src/dtos/editing.dto';
+import { AssetEditAction, AssetEditsCreateDto } from 'src/dtos/editing.dto';
 import { AssetFileType, AssetMetadataKey, AssetStatus, AssetType, AssetVisibility, JobName, JobStatus } from 'src/enum';
 import { AssetStats } from 'src/repositories/asset.repository';
 import { AssetService } from 'src/services/asset.service';
@@ -3130,6 +3130,80 @@ describe(AssetService.name, () => {
       await sut.removeAssetEdits(authStub.admin, asset.id);
 
       expect(mocks.asset.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('asset edits — space editor access (#734)', () => {
+    it('S-15: a space member can read the edits of a member asset (via AssetRead, not AssetEditGet)', async () => {
+      // getAssetEdits gates per-asset on Permission.AssetRead, not AssetEditGet — AssetRead's
+      // space arm is checkSpaceAccess, which admits any space member regardless of role. This
+      // does NOT exercise the AssetEditGet widening above (that case is unreachable from any
+      // current call site); do not "fix" this back to mocking checkSpaceEditAccess.
+      const auth = AuthFactory.create();
+      const asset = AssetFactory.create();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.assetEdit.getAll.mockResolvedValue([]);
+
+      await expect(sut.getAssetEdits(auth, asset.id)).resolves.toEqual({ assetId: asset.id, edits: [] });
+    });
+
+    it('S-16: allows a space editor to WRITE edits on a member asset', async () => {
+      const auth = AuthFactory.create();
+      const asset = AssetFactory.create({ type: AssetType.Image });
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getForEdit.mockResolvedValue({
+        type: AssetType.Image,
+        livePhotoVideoId: null,
+        originalPath: asset.originalPath,
+        originalFileName: asset.originalFileName,
+        duration: null,
+        exifImageWidth: 1920,
+        exifImageHeight: 1080,
+        orientation: null,
+        projectionType: null,
+      });
+      mocks.assetEdit.replaceAll.mockResolvedValue([]);
+
+      await sut.editAsset(auth, asset.id, {
+        edits: [{ action: AssetEditAction.Rotate, parameters: { angle: 90 } }],
+      } as AssetEditsCreateDto);
+
+      expect(mocks.assetEdit.replaceAll).toHaveBeenCalled();
+    });
+
+    it('S-18: allows a space editor to REVERT edits on a member asset', async () => {
+      const auth = AuthFactory.create();
+      const asset = AssetFactory.create();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getById.mockResolvedValue(getForAsset(asset));
+      mocks.assetEdit.getAll.mockResolvedValue([]);
+      mocks.assetEdit.replaceAll.mockResolvedValue([]);
+
+      await expect(sut.removeAssetEdits(auth, asset.id)).resolves.not.toThrow();
+    });
+
+    it('S-19: still rejects an asset the caller has no space-edit access to', async () => {
+      const auth = AuthFactory.create();
+      const asset = AssetFactory.create();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set());
+
+      await expect(sut.editAsset(auth, asset.id, { edits: [] } as AssetEditsCreateDto)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+    });
+
+    it('S-45: allows a space editor to upsert asset metadata on a member asset', async () => {
+      const auth = AuthFactory.create();
+      const asset = AssetFactory.create();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.upsertMetadata.mockResolvedValue([]);
+
+      await expect(sut.upsertMetadata(auth, asset.id, { items: [] })).resolves.not.toThrow();
     });
   });
 });
