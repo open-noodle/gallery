@@ -86,6 +86,8 @@ describe('SpaceActivityFeed', () => {
       { type: 'person_update', data: { personName: 'Alice' }, text: 'updated person "Alice"' },
       { type: 'person_delete', data: { personName: 'Alice' }, text: 'deleted person "Alice"' },
       { type: 'person_merge', data: { personName: 'Alice', count: 2 }, text: 'merged 2 people into "Alice"' },
+      { type: 'asset_edit', data: { count: 3 }, text: 'edited 3 photos' },
+      { type: 'asset_edit', data: { count: 1 }, text: 'edited 1 photo' },
     ];
 
     for (const { type, data, text } of cases) {

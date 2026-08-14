@@ -17,7 +17,7 @@
   let { activities, spaceColor, onLoadMore, hasMore }: Props = $props();
 
   const HIGH_IMPACT_TYPES = new Set(['asset_add', 'asset_remove']);
-  const MEDIUM_TYPES = new Set(['member_join', 'member_leave', 'member_remove', 'member_role_change']);
+  const MEDIUM_TYPES = new Set(['member_join', 'member_leave', 'member_remove', 'member_role_change', 'asset_edit']);
 
   function getDayLabel(isoString: string, $t: MessageFormatter): string {
     const date = new Date(isoString);

@@ -285,8 +285,16 @@ export class AssetService extends BaseService {
       await this.applyVisibilityTransitionSideEffects([id], dto.visibility, new Map([[id, priorVisibility]]));
     }
 
-    // #734: after the write succeeds — a rejected write must log nothing.
-    await this.logCrossOwnerEdit(auth, [id]);
+    // #734: after the write succeeds — a rejected write must log nothing. Skipped entirely when
+    // visibility is set: the rbac-3 guard above already required the caller to OWN this id to get
+    // here, but checkOwnerAccess filters on hasElevatedPermission — a Locked row (this write may
+    // have just produced) reads back as not-owned for an API-key session, so logCrossOwnerEdit
+    // would misclassify the owner's own lock as a cross-owner edit. A visibility write can never
+    // legitimately be cross-owner (the guard above is total for it), so skip rather than rely on
+    // logCrossOwnerEdit's own owner check to get this right post-write.
+    if (dto.visibility === undefined) {
+      await this.logCrossOwnerEdit(auth, [id]);
+    }
 
     return this.get(auth, id) as Promise<AssetResponseDto>;
   }
@@ -399,10 +407,16 @@ export class AssetService extends BaseService {
       await this.applyVisibilityTransitionSideEffects(ids, visibility, priorVisibilities);
     }
 
-    // #734: after the write succeeds — a rejected write must log nothing.
-    await this.logCrossOwnerEdit(auth, ids);
-
     await this.jobRepository.queueAll(ids.map((id) => ({ name: JobName.SidecarWrite, data: { id } })));
+
+    // #734: after the write succeeds — a rejected write must log nothing. Skipped entirely when
+    // visibility is set: see the matching comment in update() — the ownership guard above already
+    // requires the caller to own every id when visibility is set, so a visibility write can never
+    // legitimately be cross-owner, and logCrossOwnerEdit's own owner check would misclassify a
+    // just-Locked asset (checkOwnerAccess reads it back as not-owned for a non-elevated session).
+    if (visibility === undefined) {
+      await this.logCrossOwnerEdit(auth, ids);
+    }
   }
 
   /**
@@ -829,15 +843,24 @@ export class AssetService extends BaseService {
         return;
       }
 
+      // findSpaceForAssetAndUser is a UNION of two three-join subqueries; a large cross-owner bulk
+      // edit is this feature's headline case, so resolving one id at a time, sequentially, would add
+      // a serial-latency term proportional to the batch size. Chunk into bounded-concurrency batches
+      // instead of firing all of them at once (connection-pool safety) or one at a time (latency).
       const bySpace = new Map<string, string[]>();
-      for (const assetId of crossOwnerIds) {
-        const space = await this.sharedSpaceRepository.findSpaceForAssetAndUser(assetId, auth.user.id);
-        if (!space) {
-          continue;
+      for (const chunk of _.chunk(crossOwnerIds, 10)) {
+        const spaces = await Promise.all(
+          chunk.map((assetId) => this.sharedSpaceRepository.findSpaceForAssetAndUser(assetId, auth.user.id)),
+        );
+        for (const [index, space] of spaces.entries()) {
+          if (!space) {
+            continue;
+          }
+          const assetId = chunk[index];
+          const ids = bySpace.get(space.spaceId) ?? [];
+          ids.push(assetId);
+          bySpace.set(space.spaceId, ids);
         }
-        const ids = bySpace.get(space.spaceId) ?? [];
-        ids.push(assetId);
-        bySpace.set(space.spaceId, ids);
       }
 
       for (const [spaceId, ids] of bySpace) {
