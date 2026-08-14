@@ -98,6 +98,9 @@ export interface SearchPathOptions {
   thumbnailPath?: string;
 }
 
+/** Which "missing location" state to filter for. The two values are disjoint. */
+export type LocationPresence = 'noGps' | 'noPlaceName';
+
 export interface SearchExifOptions {
   city?: string | null;
   country?: string | null;
@@ -108,6 +111,11 @@ export interface SearchExifOptions {
   description?: string | null;
   rating?: number | null;
   ratingIsMinimum?: boolean;
+  /**
+   * Absence-of-location filter. Mutually exclusive with city/state/country — it is a member of the
+   * same location group, never an extra narrowing on top of one.
+   */
+  locationPresence?: LocationPresence;
 }
 
 export interface SearchEmbeddingOptions {
