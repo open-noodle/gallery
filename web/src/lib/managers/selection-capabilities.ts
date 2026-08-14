@@ -32,13 +32,29 @@ export interface SelectionCapabilities {
    */
   addToAlbumRestrictedToSpace: boolean;
   canFavorite: boolean;
-  /** Rotate, ChangeDate/Description/Location, Archive, SetVisibility */
+  /**
+   * Rotate, ChangeDate, ChangeDescription, ChangeLocation. True on the editable *subset* of
+   * the selection (#734) — the same shape `canShare` already uses for the owned subset — not
+   * all-or-nothing ownership.
+   *
+   * Does NOT cover Archive/SetVisibility: those need `canSetVisibility` instead, because
+   * rbac-3 restricts visibility changes to owned assets, so riding along on the editable
+   * subset would produce guaranteed 403s for a space editor's non-owned assets.
+   */
   canEditMetadata: boolean;
+  /** Archive, SetVisibility. Owner-only — see `canEditMetadata`'s doc comment for why. */
+  canSetVisibility: boolean;
   canTag: boolean;
   canDelete: boolean;
   canSetCover: boolean;
   canRemoveFromAlbum: boolean;
   canRemoveFromSpace: boolean;
+  /**
+   * True while `sel.editableSelectedAssetIds` is still resolving (#734) — an all-owned
+   * selection resolves synchronously and is never pending. A consumer should render the
+   * `canEditMetadata`-gated actions disabled rather than popping them in once this flips.
+   */
+  capabilitiesPending: boolean;
 }
 
 const NO_CAPABILITIES: SelectionCapabilities = {
@@ -50,11 +66,13 @@ const NO_CAPABILITIES: SelectionCapabilities = {
   addToAlbumRestrictedToSpace: false,
   canFavorite: false,
   canEditMetadata: false,
+  canSetVisibility: false,
   canTag: false,
   canDelete: false,
   canSetCover: false,
   canRemoveFromAlbum: false,
   canRemoveFromSpace: false,
+  capabilitiesPending: false,
 };
 
 export function getSelectionCapabilities(ctx: CommandContext, tagsEnabled: boolean): SelectionCapabilities {
@@ -96,6 +114,12 @@ export function getSelectionCapabilities(ctx: CommandContext, tagsEnabled: boole
   // so this arm is deliberately keyed on `space`, not on `isEditorOfContext`.
   const isSpaceEditor = space !== null && space.canWrite;
 
+  // #734: an editable subset, not all-or-nothing — the same shape canShare already uses for
+  // the owned subset. `undefined` means unresolved, which is pending, not denied.
+  const editable = sel.editableSelectedAssetIds;
+  const capabilitiesPending = editable === undefined && !sel.isAllUserOwned;
+  const hasEditable = sel.isAllUserOwned || (editable !== undefined && editable.length > 0);
+
   return {
     canSelectAll: true,
     canDownload: true,
@@ -107,11 +131,15 @@ export function getSelectionCapabilities(ctx: CommandContext, tagsEnabled: boole
     canAddToAlbum: sel.isAllUserOwned || isSpaceEditor,
     addToAlbumRestrictedToSpace: !sel.isAllUserOwned && isSpaceEditor,
     canFavorite: sel.isAllUserOwned,
-    canEditMetadata: sel.isAllUserOwned,
-    canTag: sel.isAllUserOwned && tagsEnabled,
+    canEditMetadata: hasEditable,
+    // Archive / SetVisibility are NOT metadata edits: rbac-3 restricts visibility changes to
+    // owned assets, so they must not ride on canEditMetadata the way they used to.
+    canSetVisibility: sel.isAllUserOwned,
+    canTag: hasEditable && tagsEnabled,
     canDelete: sel.isAllUserOwned,
     canSetCover: isEditorOfContext && sel.selectedAssetIds.length === 1,
     canRemoveFromAlbum,
     canRemoveFromSpace,
+    capabilitiesPending,
   };
 }

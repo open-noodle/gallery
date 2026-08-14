@@ -967,7 +967,7 @@
       timelineManager={showSearchResults ? undefined : timelineManager}
       assetInteraction={assetMultiSelectManager}
       onSelectAll={showSearchResults ? () => selectAllSearchResults(searchResults, assetMultiSelectManager) : undefined}
-      space={{ id: space.id, canWrite: isEditor }}
+      space={{ id: space.id, canWrite: isEditor, members }}
       onRemove={handleRemoveAssets}
       onSetCover={handleSetAsCover}
       onFavorite={handleFavorite}

@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { canEditAsset } from './asset-editability';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { sdkMock } from '$lib/__mocks__/sdk.mock';
+import { canEditAsset, resolveEditableAssetIds } from './asset-editability';
 
 const space = (canWrite: boolean, memberIds: string[]) => ({
   canWrite,
@@ -37,5 +38,50 @@ describe('canEditAsset', () => {
 
   it('W-16: denies when there is no authenticated user (shared link)', () => {
     expect(canEditAsset({ ownerId: 'bob' })).toBe(false);
+  });
+});
+
+describe('resolveEditableAssetIds', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('returns [] without calling the server when there are no assets', async () => {
+    const result = await resolveEditableAssetIds([], { userId: 'anna' });
+
+    expect(result).toEqual([]);
+    expect(sdkMock.getEditableAssets).not.toHaveBeenCalled();
+  });
+
+  it('trusts the server response on success (#734)', async () => {
+    sdkMock.getEditableAssets.mockResolvedValue({ editableAssetIds: ['a1'] });
+
+    const result = await resolveEditableAssetIds(
+      [
+        { id: 'a1', ownerId: 'bob' },
+        { id: 'a2', ownerId: 'carol' },
+      ],
+      {
+        userId: 'anna',
+      },
+    );
+
+    expect(result).toEqual(['a1']);
+    expect(sdkMock.getEditableAssets).toHaveBeenCalledWith({ assetEditableDto: { assetIds: ['a1', 'a2'] } });
+  });
+
+  it('falls back to canEditAsset (space derivation) when the request rejects, without throwing (W-13)', async () => {
+    sdkMock.getEditableAssets.mockRejectedValue(new Error('offline'));
+
+    const result = await resolveEditableAssetIds(
+      [
+        { id: 'mine', ownerId: 'anna' },
+        { id: 'editable', ownerId: 'bob' },
+        { id: 'not-editable', ownerId: 'carol' },
+      ],
+      { userId: 'anna', space: space(true, ['anna', 'bob']) },
+    );
+
+    expect(result).toEqual(['mine', 'editable']);
   });
 });

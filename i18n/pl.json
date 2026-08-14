@@ -1031,6 +1031,7 @@
   "assets_removed_partial_count": "Usunięto {removedCount} z {totalCount} zasobów",
   "assets_restore_confirmation": "Na pewno chcesz przywrócić wszystkie zasoby z kosza? Nie da się tego cofnąć! Należy pamiętać, że w ten sposób nie można przywrócić zasobów offline.",
   "assets_restored_count": "Przywrócono {count, plural, one {# zasób} few {# zasoby} other {# zasobów}}",
+  "assets_skipped_not_editable": "{count, plural, one {Pominięto # zdjęcie, ponieważ nie możesz je edytować} few {Pominięto # zdjęcia, ponieważ nie możesz je edytować} other {Pominięto # zdjęć, ponieważ nie możesz je edytować}}",
   "assets_trashed": "{count} szt. zostało wrzucone do kosza",
   "assets_trashed_count": "Wrzucono do kosza {count, plural, one {# zasób} few {# zasoby} other {# zasobów}}",
   "assets_were_part_of_album_count": "{count, plural, one {Zasób był} other {Zasoby były}} już częścią albumu",

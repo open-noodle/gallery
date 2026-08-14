@@ -1031,6 +1031,7 @@
   "assets_removed_partial_count": "{removedCount} sur {totalCount} médias supprimés",
   "assets_restore_confirmation": "Êtes-vous sûr de vouloir restaurer tous vos médias de la corbeille ? Vous ne pouvez pas annuler cette action ! Notez que les médias hors ligne ne peuvent être restaurés de cette façon.",
   "assets_restored_count": "{count, plural, one {# média restauré} other {# médias restaurés}}",
+  "assets_skipped_not_editable": "{count, plural, one {# photo a été ignorée car vous ne pouvez pas la modifier} other {# photos ont été ignorées car vous ne pouvez pas les modifier}}",
   "assets_trashed": "{count} média(s) déplacé(s) vers la corbeille",
   "assets_trashed_count": "{count, plural, one {# média} other {# médias}} mis à la corbeille",
   "assets_were_part_of_album_count": "{count, plural, one {Un média est} other {Des médias sont}} déjà dans l'album",

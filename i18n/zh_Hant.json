@@ -1029,6 +1029,7 @@
   "assets_removed_partial_count": "已移除 {totalCount} 個項目中的 {removedCount} 個",
   "assets_restore_confirmation": "您確定要還原所有垃圾桶中的項目嗎？此操作無法復原！請注意，任何離線項目都無法透過此方式還原。",
   "assets_restored_count": "已還原 {count, plural, one {# 個項目} other {# 個項目}}",
+  "assets_skipped_not_editable": "{count, plural, one {已跳過 # 張您無權編輯的相片} other {已跳過 # 張您無權編輯的相片}}",
   "assets_trashed": "已將 {count} 個項目移至垃圾桶",
   "assets_trashed_count": "已將 {count, plural, one {# 個項目} other {# 個項目}}移至垃圾桶",
   "assets_were_part_of_album_count": "{count, plural, one {該項目已} other {這些項目已}}在相簿中",

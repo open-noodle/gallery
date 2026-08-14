@@ -20,6 +20,12 @@ import { getSelectionCapabilities, type SelectionCapabilities } from './selectio
  * reporting an empty owned set. A genuinely MIXED selection is expressed by
  * passing both explicitly (see `makeMixedSelection`).
  */
+/**
+ * `editableSelectedAssetIds` defaults to whatever `isAllUserOwned` implies — the whole
+ * selection when it's synchronously resolved (all-owned), `undefined` (unresolved) otherwise
+ * — mirroring `ownedSelectedAssetIds`'s own default above. A test exercising the #734
+ * editable-subset behavior passes it explicitly (see `makeSelection` overrides below).
+ */
 const makeSelection = (overrides: Partial<SelectionCommandContext> = {}): SelectionCommandContext => {
   const selectedAssetIds = overrides.selectedAssetIds ?? ['asset-1'];
   const isAllUserOwned = overrides.isAllUserOwned ?? true;
@@ -34,6 +40,7 @@ const makeSelection = (overrides: Partial<SelectionCommandContext> = {}): Select
     isAllFavorite: false,
     isAllArchived: false,
     isAllTrashed: false,
+    editableSelectedAssetIds: isAllUserOwned ? selectedAssetIds : undefined,
     clearSelection: () => {},
     ...overrides,
   };
@@ -88,6 +95,7 @@ const ALL_FALSE: SelectionCapabilities = {
   canAddToAlbum: false,
   canFavorite: false,
   canEditMetadata: false,
+  canSetVisibility: false,
   canTag: false,
   canDelete: false,
   canSetCover: false,
@@ -95,6 +103,7 @@ const ALL_FALSE: SelectionCapabilities = {
   canRemoveFromSpace: false,
   addToAlbumRestrictedToSpace: false,
   shareScopedToSpace: false,
+  capabilitiesPending: false,
 };
 
 // ---------------------------------------------------------------------------
@@ -112,6 +121,9 @@ describe('getSelectionCapabilities — space timeline (direct space)', () => {
       ...ALL_FALSE,
       canSelectAll: true,
       canDownload: true,
+      // Not all-owned and `editableSelectedAssetIds` was never resolved in this fixture, so
+      // the #734 editable-subset check is still pending — see W-11.
+      capabilitiesPending: true,
     });
   });
 
@@ -128,6 +140,7 @@ describe('getSelectionCapabilities — space timeline (direct space)', () => {
       canAddToAlbum: true,
       canFavorite: true,
       canEditMetadata: true,
+      canSetVisibility: true,
       canTag: true,
       canDelete: true,
       canSetCover: true,
@@ -137,6 +150,8 @@ describe('getSelectionCapabilities — space timeline (direct space)', () => {
       shareScopedToSpace: false,
       // Everything is mine, so the picker offers every album and space.
       addToAlbumRestrictedToSpace: false,
+      // All-owned resolves synchronously — never pending.
+      capabilitiesPending: false,
     });
   });
 
@@ -157,12 +172,15 @@ describe('getSelectionCapabilities — space timeline (direct space)', () => {
       canAddToAlbum: true,
       canFavorite: false,
       canEditMetadata: false,
+      canSetVisibility: false,
       canTag: false,
       canDelete: false,
       canSetCover: true,
       canRemoveFromAlbum: false,
       canRemoveFromSpace: true,
       addToAlbumRestrictedToSpace: true,
+      // Not all-owned and `editableSelectedAssetIds` was never resolved in this fixture.
+      capabilitiesPending: true,
     });
   });
 
@@ -391,6 +409,7 @@ describe('getSelectionCapabilities — cross-cutting edge cases', () => {
       canAddToAlbum: true,
       canFavorite: true,
       canEditMetadata: true,
+      canSetVisibility: true,
       canTag: true,
       canDelete: true,
       canSetCover: true,
@@ -399,6 +418,7 @@ describe('getSelectionCapabilities — cross-cutting edge cases', () => {
       addToAlbumRestrictedToSpace: false,
       // No space is involved, so nothing needs to be scoped to one.
       shareScopedToSpace: false,
+      capabilitiesPending: false,
     });
   });
 
@@ -412,6 +432,88 @@ describe('getSelectionCapabilities — cross-cutting edge cases', () => {
     const adminCaps = getSelectionCapabilities(makeCtx({ ...base, isAdmin: true }), true);
     const nonAdminCaps = getSelectionCapabilities(makeCtx({ ...base, isAdmin: false }), true);
     expect(adminCaps).toEqual(nonAdminCaps);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #734: space-editor bulk editing — canEditMetadata/canTag move from all-or-nothing
+// ownership to the editable subset; Archive/SetVisibility split out into canSetVisibility.
+// ---------------------------------------------------------------------------
+
+describe('space-editor bulk editing (#734)', () => {
+  it('W-9: allows metadata edits on the editable subset but never visibility', () => {
+    const ctx = makeCtx({
+      selection: makeSelection({
+        selectedAssetIds: ['mine-1', 'theirs-1', 'theirs-2'],
+        ownedSelectedAssetIds: ['mine-1'],
+        isAllUserOwned: false,
+        editableSelectedAssetIds: ['mine-1', 'theirs-1'],
+      }),
+      space: makeSpace({ canWrite: true }),
+    });
+
+    const caps = getSelectionCapabilities(ctx, true);
+
+    expect(caps.canEditMetadata).toBe(true);
+    expect(caps.canSetVisibility).toBe(false);
+    expect(caps.canDelete).toBe(false);
+  });
+
+  it('W-11: reports pending while editability is unresolved', () => {
+    const ctx = makeCtx({
+      selection: makeSelection({
+        selectedAssetIds: ['mine-1', 'theirs-1'],
+        ownedSelectedAssetIds: ['mine-1'],
+        isAllUserOwned: false,
+        editableSelectedAssetIds: undefined,
+      }),
+      space: makeSpace({ canWrite: true }),
+    });
+
+    const caps = getSelectionCapabilities(ctx, true);
+
+    expect(caps.capabilitiesPending).toBe(true);
+  });
+
+  it('W-12: an all-owned selection is never pending and never needs a request', () => {
+    const ctx = makeCtx({
+      selection: makeSelection({ selectedAssetIds: ['mine-1'], isAllUserOwned: true }),
+    });
+
+    const caps = getSelectionCapabilities(ctx, true);
+
+    expect(caps.capabilitiesPending).toBe(false);
+    expect(caps.canEditMetadata).toBe(true);
+    expect(caps.canSetVisibility).toBe(true);
+  });
+
+  it('an all-owned selection is never pending even if editableSelectedAssetIds is somehow still unresolved (defensive)', () => {
+    // Isolates the `isAllUserOwned` short-circuit in `capabilitiesPending` from the fixture
+    // default (which otherwise always fills `editableSelectedAssetIds` for an all-owned
+    // selection, masking this term) by overriding it back to `undefined` explicitly.
+    const ctx = makeCtx({
+      selection: makeSelection({
+        selectedAssetIds: ['mine-1'],
+        isAllUserOwned: true,
+        editableSelectedAssetIds: undefined,
+      }),
+    });
+
+    expect(getSelectionCapabilities(ctx, true).capabilitiesPending).toBe(false);
+  });
+
+  it('denies metadata edits when nothing in the selection is editable', () => {
+    const ctx = makeCtx({
+      selection: makeSelection({
+        selectedAssetIds: ['theirs-1'],
+        ownedSelectedAssetIds: [],
+        isAllUserOwned: false,
+        editableSelectedAssetIds: [],
+      }),
+      space: makeSpace({ canWrite: true }),
+    });
+
+    expect(getSelectionCapabilities(ctx, true).canEditMetadata).toBe(false);
   });
 });
 

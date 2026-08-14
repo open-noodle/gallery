@@ -1,5 +1,19 @@
 import type { AssetResponseDto } from '@immich/sdk';
-import { canCopyImageToClipboard, getAssetFilename, getFilenameExtension } from './asset-utils';
+import type { TimelineAsset } from '$lib/managers/timeline-manager/types';
+import {
+  canCopyImageToClipboard,
+  getAssetFilename,
+  getEditableAssetsWithWarning,
+  getFilenameExtension,
+} from './asset-utils';
+
+vi.mock('@immich/ui', async (orig) => {
+  const actual = await orig<typeof import('@immich/ui')>();
+  return {
+    ...actual,
+    toastManager: { primary: vi.fn(), danger: vi.fn(), warning: vi.fn(), success: vi.fn(), info: vi.fn() },
+  };
+});
 
 describe('get file extension from filename', () => {
   it('returns the extension without including the dot', () => {
@@ -61,5 +75,27 @@ describe('copy image to clipboard', () => {
   // This test is dubious, as it totally on the environment where the test is run which is mocked.
   it('should allow copy image to clipboard', () => {
     expect(canCopyImageToClipboard()).toEqual(true);
+  });
+});
+
+describe('getEditableAssetsWithWarning (#734)', () => {
+  const asset = (id: string): TimelineAsset => ({ id }) as unknown as TimelineAsset;
+
+  it('returns the ids that are in editableAssetIds and warns of nothing when all are editable', async () => {
+    const { toastManager } = await import('@immich/ui');
+
+    const ids = getEditableAssetsWithWarning([asset('a'), asset('b')], ['a', 'b']);
+
+    expect(ids).toEqual(['a', 'b']);
+    expect(toastManager.warning).not.toHaveBeenCalled();
+  });
+
+  it('drops non-editable assets and reports the skipped count via a warning toast', async () => {
+    const { toastManager } = await import('@immich/ui');
+
+    const ids = getEditableAssetsWithWarning([asset('a'), asset('b'), asset('c')], ['a']);
+
+    expect(ids).toEqual(['a']);
+    expect(toastManager.warning).toHaveBeenCalledTimes(1);
   });
 });

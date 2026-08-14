@@ -1031,6 +1031,7 @@
   "assets_removed_partial_count": "{removedCount} von {totalCount} Dateien entfernt",
   "assets_restore_confirmation": "Bist du sicher, dass du alle Dateien aus dem Papierkorb wiederherstellen willst? Diese Aktion kann nicht rückgängig gemacht werden! Beachte, dass Offline-Dateien auf diese Weise nicht wiederhergestellt werden können.",
   "assets_restored_count": "{count, plural, one {# Datei} other {# Dateien}} wiederhergestellt",
+  "assets_skipped_not_editable": "{count, plural, one {# Foto wurde übersprungen, weil du es nicht bearbeiten kannst} other {# Fotos wurden übersprungen, weil du sie nicht bearbeiten kannst}}",
   "assets_trashed": "{count} Element(e) gelöscht",
   "assets_trashed_count": "{count, plural, one {# Datei} other {# Dateien}} in den Papierkorb verschoben",
   "assets_were_part_of_album_count": "{count, plural, one {# Datei ist} other {# Dateien sind}} bereits im Album vorhanden",

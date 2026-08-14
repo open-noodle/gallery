@@ -1,3 +1,5 @@
+import { getEditableAssets } from '@immich/sdk';
+
 export interface EditabilityContext {
   userId?: string;
   space?: { canWrite: boolean; members: { userId: string }[] } | null;
@@ -34,4 +36,30 @@ export function canEditAsset(asset: { ownerId?: string; canEdit?: boolean }, ctx
   }
 
   return space.members.some((member) => member.userId === asset.ownerId);
+}
+
+/**
+ * Resolve which of `assets` the caller may edit — the batch counterpart to `canEditAsset`,
+ * for bulk-selection surfaces where resolving `canEdit` per asset would be an N+1 (#734).
+ *
+ * `POST /assets/editable` is server-authoritative and wins outright. Only on a rejected
+ * request (offline, network error) does this fall back to the client-side `canEditAsset`
+ * heuristic — advisory, and only as accurate as `ctx.space.members`.
+ */
+export async function resolveEditableAssetIds(
+  assets: { id: string; ownerId?: string; canEdit?: boolean }[],
+  ctx: EditabilityContext = {},
+): Promise<string[]> {
+  if (assets.length === 0) {
+    return [];
+  }
+
+  try {
+    const { editableAssetIds } = await getEditableAssets({
+      assetEditableDto: { assetIds: assets.map((asset) => asset.id) },
+    });
+    return editableAssetIds;
+  } catch {
+    return assets.filter((asset) => canEditAsset(asset, ctx)).map((asset) => asset.id);
+  }
 }
