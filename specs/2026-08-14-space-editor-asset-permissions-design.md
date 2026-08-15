@@ -137,21 +137,33 @@ rating, tags, people), the full image editor, video trim, thumbnail regeneration
 | Set as profile picture    | Already ungated (`asset.service.ts:323-328`) and unrelated to space role — your own profile.                                                                                                                                                                                 |
 | People / face tagging     | **Has no server path, and adding one is a different feature.** See below.                                                                                                                                                                                                    |
 
-**Why face tagging is out**, in detail, because an earlier draft of this spec wrongly included it:
-person and face writes do not go through `AssetUpdate` at all. `Permission.PersonCreate` and
-`Permission.FaceDelete` gate on `access.person.checkFaceOwnerAccess`, and
-`PersonUpdate`/`PersonDelete`/`PersonMerge` on `access.person.checkOwnerAccess`
-(`server/src/utils/access.ts:276-277`, `:315-317`, `:328-332`) — none has a space-edit arm. Widening
-`checkSpaceEditAccess` does **not** reach them, so exposing the face editor to an editor would
-produce a panel whose every write 403s: precisely the "buttons that sometimes fail" outcome this
-design exists to prevent.
-
-It is also unnecessary. Naming people inside a space is already solved by a **separate layer** — the
+**Why face tagging is out of the web UI**, in detail: `TagPeople` (`AssetViewerNavBar.svelte:307-313`)
+and `DetailPanelPeople` stay gated on the real `isOwner`, never `canEdit`, and that decision is
+unchanged and correct. Naming people inside a space is already solved by a **separate layer** — the
 `shared_space_person` model, with its own editor gate at `checkSharedSpaceEditAccess`
 (`access.repository.ts:832`) and its own update path. `CLAUDE.md` states the rule directly: _"Never
 send a space-person edit to the owner-only person endpoint."_ Routing space editors into the
 owner-only person endpoints would be that exact mistake. If space editors should be able to tag
-faces on members' assets, that belongs in the space-person layer as its own spec.
+faces on members' assets through that layer, that belongs in the space-person layer as its own spec.
+
+**An earlier draft of this spec claimed person and face writes do not go through `AssetUpdate` at
+all, and widening `checkSpaceEditAccess` does not reach them. That is false, and worth correcting
+precisely.** `PersonService.createFace` (`server/src/services/person.service.ts:1503-1507`) gates
+`POST /faces` on `Permission.AssetUpdate` for `dto.assetId` and `Permission.PersonRead` for
+`dto.personId` — no `checkFaceOwnerAccess` is involved in creation at all. So a space editor **can**
+create a face box on a member's asset via the API today, whether or not the web offers a control for
+it. This is not new behaviour introduced by this branch: it was already true for direct- and
+library-path assets, because `AssetUpdate` already carried a space-edit arm before this spec; §4.1
+only extends the set of assets that arm reaches to the album path, exactly as it extends every other
+`AssetUpdate` consumer. See §4.7 for this consumer recorded alongside the others.
+
+There is a real asymmetry worth recording as accepted-and-known rather than silently living with:
+`DELETE /faces/:id` gates on `Permission.FaceDelete` → `access.person.checkFaceOwnerAccess`
+(`server/src/repositories/access.repository.ts:928-941`), which resolves to the **asset owner**, not
+the id of whoever created the face. So an editor who creates a face box on a member's asset cannot
+remove it — the same create-without-manage shape §4.5 closes for stacks, left open here because
+nothing in the reported request touches face tagging. It deserves a follow-up, best scoped together
+with the space-person layer work above rather than as a narrow guard bolted onto `createFace`.
 
 ### 3.3 Non-goals (YAGNI)
 
@@ -218,11 +230,20 @@ The scope shape `{ memberUserId, memberRole }` is already established in this fi
 `AssetEditGet`, `AssetEditCreate`, and `AssetEditDelete` each change from bare `checkOwnerAccess` to
 the same owner ∪ `checkSpaceEditAccess` union `AssetUpdate` already uses at `:155-159`.
 
-**`AssetEditGet` is load-bearing and easy to overlook.** `handleQuickRotate`
-(`web/src/lib/services/asset.service.ts:537-560`) calls `getAssetEdits` **first**, then
-`mergeRotation` composes the new angle onto whatever crop/rotation already exists. Widen Create
-without Get and editor rotate fails on the _read_, before the write is ever attempted, with an error
-pointing at the wrong endpoint.
+**`AssetEditGet` is included for consistency, not because a call site needs it today — Task 2
+disproved the original "load-bearing" reasoning below.** The original justification claimed
+`handleQuickRotate` reads the edit list through `AssetEditGet` before writing, so omitting it would
+fail editor rotate on the read. That is not what happens: `AssetService.getAssetEdits`
+(`server/src/services/asset.service.ts:945-946`) gates per-asset on `Permission.AssetRead`, which
+already admits space members via `checkSpaceAccess` — not on `AssetEditGet` at all. `AssetEditGet`
+currently reaches only the controller's route-scope decorator, never `checkAccess`, so no call site
+is actually gated by it yet.
+
+The widening is kept anyway, and the real reason is the one now recorded directly in the code
+comment at `server/src/utils/access.ts:169-179`: leaving `AssetEditGet` owner-only would make it
+**narrower** than the read path it names, so a future call site routed through it would silently
+disagree with `AssetEditCreate` and `AssetEditDelete`. Widening it now is a consistency guarantee for
+that future call site, not a fix for a load-bearing read today.
 
 Including `AssetEditDelete` is deliberate: revert-to-original is the undo for an edit editors may now
 make, and it is non-destructive by construction (`asset_edit` rows; the original file is never
@@ -256,9 +277,17 @@ New fork-only route on `server/src/controllers/asset.controller.ts`:
 
 ```
 POST /assets/editable
-body     { assetIds: string[], spaceId?: string }
+body     { assetIds: string[] }
 returns  { editableAssetIds: string[] }
 ```
+
+**Shipped without `spaceId`.** An earlier draft of this section specified an optional `spaceId` on
+the request body, justified for symmetry with `getAssetInfo` and for the activity attribution in
+§4.6. It was dropped during implementation: the shipped `AssetEditableSchema`
+(`server/src/dtos/asset.dto.ts:174-178`) takes `assetIds` only, and `AssetService.getEditable`
+(`:164-168`) never reads a `spaceId` — the access check is space-agnostic by construction (the union
+already spans every space the caller belongs to), so the field had no consumer. Do not re-add it
+without a concrete use.
 
 The handler body is a bare `this.checkAccess({ auth, permission: Permission.AssetUpdate, ids })` —
 **deliberately not a second implementation of the rule**, but a direct call to the same access path
@@ -302,10 +331,17 @@ nothing.
 - Space resolution reuses `sharedSpaceRepository.findSpaceForAssetAndUser(assetId, auth.user.id)`
   (`asset.service.ts:131`) — the actor's id, so the row lands in a space the actor is actually in.
   No space resolved ⇒ no row, never a throw.
-- Write paths that log: `update`, `updateAll`, `editAsset`, `removeAssetEdits`, and tag add/remove.
+- Write paths that log: `update`, `updateAll`, `editAsset`, `removeAssetEdits` — all in
+  `AssetService`, via the private `logCrossOwnerEdit` helper (`server/src/services/asset.service.ts:857-900`).
   **Job dispatch (`run`) does not log** — refresh-thumbnails is maintenance, not a change to shared
   truth, and an activity row reading "Anna edited 40 photos" after a thumbnail refresh is worse than
   no row.
+- **Known gap: tag add/remove does not log.** An earlier draft of this section listed tag add/remove
+  among the logging write paths. That attribution was dropped during implementation — `TagService`
+  has no `logActivity`/`logCrossOwnerEdit` call anywhere, so an editor tagging Bob's asset produces no
+  activity row today. This is an accepted omission, not a design decision: tagging is exactly the
+  kind of "shared truth changed silently" case this section exists to cover, so it is a candidate for
+  a follow-up rather than something to reintroduce quietly inside an unrelated change.
 - `data` carries `{ count, assetIds: assetIds.slice(0, 4) }`, matching the existing `AssetAdd`
   convention at `:698`.
 - **Coalesce per call _and per space_.** A bulk `updateAll` can span assets belonging to several
@@ -333,9 +369,10 @@ decision for each:
 | ------------------------------------------------------------------------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `AssetService.update` / `updateAll` (`asset.service.ts:211`, `:298`)                  | reaches album-path assets     | intended — the feature                                                                                                                                                     |
 | `AssetService.run` (jobs) (`:769`)                                                    | reaches album-path assets     | intended — the feature                                                                                                                                                     |
-| `TagService.addAssets` / `removeAssets` (`tag.service.ts:81-82`)                      | reaches album-path assets     | intended — the feature                                                                                                                                                     |
+| `TagService.bulkTagAssets` (`tag.service.ts:82`)                                      | reaches album-path assets     | intended — the feature                                                                                                                                                     |
 | `AssetService.upsertMetadata` / `deleteBulkMetadata` (`:719`, `:735`, `:760`, `:765`) | reaches album-path assets     | accepted — already editor-reachable for direct/library assets today; this is the same capability over one more path, and it is app-sync key/value data, not shared content |
 | `StackService.create` (`stack.service.ts:21`)                                         | would reach album-path assets | **blocked** by the new guard, §4.5                                                                                                                                         |
+| `PersonService.createFace` (`person.service.ts:1505`)                                 | reaches album-path assets     | accepted — pre-existing for the other two paths (direct/library) before this branch; the web UI never offers face tagging (§3.2)                                           |
 
 The `rbac-3` visibility guards (`asset.service.ts:219-224`, `:322-327`) sit _inside_ `update` and
 `updateAll`, downstream of the permission check, so they continue to reject regardless of how wide
@@ -415,8 +452,15 @@ subset" (`selection-capabilities.ts:94-96`).
 applies to 7, and the success toast reports 3 skipped. Silently editing a subset is the worst
 available outcome.
 
-While `editableSelectedAssetIds` is `undefined`, the affected actions render **disabled-pending**
-rather than appearing late — a moving menu is worse than a briefly inert one.
+**Shipped behaviour differs from an earlier draft here.** That draft specified that while
+`editableSelectedAssetIds` is `undefined`, the affected actions should render **disabled-pending**
+rather than appearing late, on the reasoning that a moving menu is worse than a briefly inert one.
+That was overridden during implementation: the shared, app-wide `MenuOption` component these actions
+render through has no `disabled` prop, and extending it just to support this one pending state was
+judged not worth it against a pop-in window of roughly 250ms — the debounce window itself. So the
+shipped behaviour is that `canEditMetadata` (and `canTag`) gate the whole block, and the affected
+actions are simply **hidden** until `editableSelectedAssetIds` resolves and the subset is non-empty
+(`SelectionToolbar.svelte:263`), then they appear. No disabled state exists for them.
 
 `getSelectionCapabilities` stays **pure** (its header contract: no `authManager` reads, no `$state`),
 so the resolved id list is passed in through `ctx.selection`, never fetched inside it.
@@ -532,7 +576,7 @@ the §7 slice mapping silently rots.
 | W-8  | `canEdit` absent, no space context, non-owner                 | render              | not editable                                                                                                            |
 | W-9  | mixed selection, 7 of 10 editable                             | open toolbar        | `canEditMetadata` true; `canSetVisibility` **false**                                                                    |
 | W-10 | mixed selection                                               | Change date         | applies to 7; toast reports 3 skipped                                                                                   |
-| W-11 | `editableSelectedAssetIds === undefined`                      | open toolbar        | edit actions rendered **disabled-pending**, not hidden                                                                  |
+| W-11 | `editableSelectedAssetIds === undefined`                      | open toolbar        | edit actions **hidden** until the subset resolves and is non-empty (§5.2; shipped behaviour, not disabled-pending)      |
 | W-12 | all-owned selection                                           | select              | resolves synchronously; **no** `POST /assets/editable` issued                                                           |
 | W-13 | `POST /assets/editable` rejects                               | select              | falls back to the §5.3 derivation; no error toast                                                                       |
 | W-14 | rapid selection changes                                       | select repeatedly   | debounced; only the final selection's response is applied                                                               |
