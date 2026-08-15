@@ -1,4 +1,13 @@
-import { haversineKm, MAX_ROUND_SCORE, scoreFromError } from 'src/utils/game-scoring';
+import {
+  type LatLon,
+  MIN_SCALE,
+  haversineKm,
+  MAX_ROUND_SCORE,
+  mulberry32,
+  poolScaleDays,
+  poolScaleKm,
+  scoreFromError,
+} from 'src/utils/game-scoring';
 
 describe('haversineKm', () => {
   it('returns zero for identical points', () => {
@@ -42,5 +51,61 @@ describe('scoreFromError', () => {
   it('never returns a negative score or NaN, even for a degenerate scale', () => {
     expect(scoreFromError(500, 0)).toBeGreaterThanOrEqual(0);
     expect(Number.isNaN(scoreFromError(500, 0))).toBe(false);
+  });
+});
+
+describe('poolScaleKm', () => {
+  const cityPool = (): LatLon[] =>
+    Array.from({ length: 200 }, (_, i) => ({ lat: 52.5 + (i % 20) * 0.005, lon: 13.4 + Math.floor(i / 20) * 0.005 }));
+
+  it('returns a small scale for a tightly clustered pool', () => {
+    const scale = poolScaleKm(cityPool(), mulberry32(1));
+    expect(scale).toBeGreaterThan(0);
+    expect(scale).toBeLessThan(30);
+  });
+
+  it('returns a large scale for a globe-spanning pool', () => {
+    const world: LatLon[] = [
+      { lat: 52.5, lon: 13.4 },
+      { lat: -33.9, lon: 18.4 },
+      { lat: 40.7, lon: -74.0 },
+      { lat: 47.9, lon: 106.9 },
+      { lat: 41.9, lon: 12.5 },
+    ];
+    expect(poolScaleKm(world, mulberry32(1))).toBeGreaterThan(5000);
+  });
+
+  // The failure that motivated using a percentile: a bounding box is a min/max
+  // statistic, so a handful of holiday photos redefine the scale for every local
+  // round and the game inverts.
+  it('is not hijacked by a few far-away outliers', () => {
+    const clean = poolScaleKm(cityPool(), mulberry32(7));
+    const polluted = poolScaleKm(
+      [...cityPool(), { lat: 47.9, lon: 106.9 }, { lat: -33.9, lon: 18.4 }, { lat: 40.7, lon: -74.0 }],
+      mulberry32(7),
+    );
+    expect(polluted).toBeLessThan(clean * 3);
+  });
+
+  it('returns the floor for a pool with fewer than two points', () => {
+    expect(poolScaleKm([], mulberry32(1))).toBe(MIN_SCALE);
+    expect(poolScaleKm([{ lat: 1, lon: 1 }], mulberry32(1))).toBe(MIN_SCALE);
+  });
+
+  it('is deterministic for a given seed', () => {
+    expect(poolScaleKm(cityPool(), mulberry32(42))).toBe(poolScaleKm(cityPool(), mulberry32(42)));
+  });
+});
+
+describe('poolScaleDays', () => {
+  it('spans the bulk of the date range', () => {
+    const dates = Array.from({ length: 100 }, (_, i) => new Date(2020, 0, 1 + i * 10));
+    const scale = poolScaleDays(dates, mulberry32(3));
+    expect(scale).toBeGreaterThan(100);
+    expect(scale).toBeLessThan(1200);
+  });
+
+  it('returns at least one day for a single-date pool', () => {
+    expect(poolScaleDays([new Date(2020, 0, 1)], mulberry32(1))).toBeGreaterThanOrEqual(1);
   });
 });
