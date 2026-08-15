@@ -354,8 +354,16 @@ export class GameService extends BaseService {
     // correctly on both disk and S3-backed instances, exactly like AssetMediaService.viewThumbnail
     // does for the identical preview-file case (constructing ImmichFileResponse directly only
     // works for disk paths; serveFromBackend picks disk vs S3 and returns a redirect/stream there
-    // instead). The filename stays generic (`round-<index>`, never the asset's real filename) -
-    // that is the whole point of this endpoint.
+    // instead). The filename stays generic (`round-<index>`, never the asset's real filename).
+    //
+    // Known gap: under IMMICH_S3_SERVE_MODE=redirect, the presigned URL this returns has the
+    // asset id in its path (preview files are keyed `<assetId>_preview.jpeg`, see
+    // StorageCore.getImagePath), so a player can read a round's answer off the Location header
+    // instead of guessing. This is cheating, not disclosure - they're already a space member and
+    // could view the photo directly anyway, just not for free. Proxy mode (the reference
+    // deployment) streams the bytes server-side and is unaffected. Closing the redirect-mode gap
+    // needs a force-proxy option on serveFromBackend or route-specific streaming - a deliberate
+    // follow-up, not an oversight.
     return this.serveFromBackend(
       previewFile.path,
       mimeTypes.lookup(previewFile.path),
