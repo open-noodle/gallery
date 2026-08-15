@@ -111,6 +111,18 @@ const RECENT_CHALLENGE_LOOKBACK = 3;
 /** Mirrors the private MS_PER_DAY in game-scoring.ts, which does not export it. */
 const MS_PER_DAY = 86_400_000;
 
+/**
+ * Calendar-day index (days since the UTC epoch) for a Date, not a raw ms/MS_PER_DAY division on
+ * the instant. `answerDate` (`asset.localDateTime`, frozen onto the round) carries a full
+ * capture timestamp - e.g. 14:23 - that a player who names the correct calendar day cannot know
+ * and must not be charged for. Both the answer and the guess are normalised to their UTC
+ * calendar day before differencing, matching the `(localDateTime at time zone 'UTC')::date`
+ * convention the rest of the codebase already uses for this column (see the index expressions in
+ * asset.table.ts) - so "the same day" scores 5000 regardless of either timestamp's time of day.
+ */
+const toUtcDayIndex = (date: Date): number =>
+  Math.floor(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()) / MS_PER_DAY);
+
 type TypedRoundCandidate = GameCandidate & { type: GameRoundType };
 
 /** Small, stable string hash (djb2-ish) - not for security, only to turn a (spaceId, challenge
@@ -321,11 +333,9 @@ export class GameService extends BaseService {
     } catch (error) {
       // The UNIQUE (roundId, userId) constraint is the source of truth for "already guessed" -
       // deliberately not pre-checked with a SELECT, which would race two concurrent submits.
-      // postgres.js surfaces the violated constraint as `constraint_name`; `constraint` is
-      // checked too so a differently-shaped driver/mock error is still mapped correctly.
-      const constraintName =
-        (error as PostgresError)?.constraint_name ?? (error as { constraint?: string })?.constraint;
-      if (constraintName === 'game_guess_round_user_uq') {
+      // postgres.js surfaces the violated constraint as `constraint_name` (see the identical
+      // pattern in shared-link.service.ts / face-repair-scan.repository.ts).
+      if ((error as PostgresError)?.constraint_name === 'game_guess_round_user_uq') {
         throw new ConflictException('Already guessed');
       }
       throw error;
@@ -417,7 +427,10 @@ export class GameService extends BaseService {
     }
 
     const guessDate = new Date(dto.date);
-    const offsetDays = Math.abs(guessDate.getTime() - round.answerDate.getTime()) / MS_PER_DAY;
+    // Whole-day count already, by construction (toUtcDayIndex subtracts two day boundaries) -
+    // no separate rounding step, so the stored integer offsetDays always agrees with the value
+    // actually scored below.
+    const offsetDays = Math.abs(toUtcDayIndex(guessDate) - toUtcDayIndex(round.answerDate));
     return {
       roundId: round.id,
       userId,
@@ -425,9 +438,7 @@ export class GameService extends BaseService {
       guessLon: null,
       guessDate,
       distanceKm: null,
-      // The integer column stores whole days; scoring uses the unrounded offset above so a
-      // fractional-day difference isn't double-rounded away before it reaches the decay curve.
-      offsetDays: Math.round(offsetDays),
+      offsetDays,
       score: scoreFromError(offsetDays, challenge.scaleDays),
     };
   }
