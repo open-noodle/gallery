@@ -92,7 +92,10 @@
   // it be in no space at all) and the server 400s it. Dropping it here means a hand-typed
   // /map?spaceId=S&albumId=A degrades to the space map instead of erroring.
   const hydrateMapFilters = (url: URL): FilterState => {
-    const decoded = decodeFilterParams(url);
+    // A link copied from /photos (or a hand-edited URL) can carry locationPresence. The map offers
+    // no row for it and no option builder ever forwards it, so keeping it would leave an active
+    // filter that is invisible and unremovable.
+    const { locationPresence: _, ...decoded } = decodeFilterParams(url);
     const urlSpaceId = url.searchParams.get(QueryParameter.SPACE_ID) || undefined;
     return { ...createFilterState(), ...decoded, albumId: urlSpaceId ? undefined : decoded.albumId };
   };

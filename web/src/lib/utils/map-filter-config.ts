@@ -32,8 +32,11 @@ function mapSuggestions(response: Awaited<ReturnType<typeof getFilterSuggestions
     hasFavorites: response.hasFavorites,
     hasAssetsInAlbum: response.hasAssetsInAlbum,
     hasAssetsNotInAlbum: response.hasAssetsNotInAlbum,
-    hasNoGpsAssets: response.hasNoGpsAssets,
-    hasNoPlaceNameAssets: response.hasNoPlaceNameAssets,
+    // The map plots markers from asset_exif.latitude IS NOT NULL (map.repository.ts:187), so a
+    // "no GPS" filter can only ever produce an empty map. Never offer either entry here, no
+    // matter what the server reports.
+    hasNoGpsAssets: false,
+    hasNoPlaceNameAssets: false,
   };
 }
 
