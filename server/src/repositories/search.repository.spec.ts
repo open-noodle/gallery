@@ -889,6 +889,7 @@ describe(SearchRepository.name, () => {
 
       expect(sql).toContain('%>>');
       expect(sql).not.toContain(ESCAPE_CLAUSE);
+    });
   });
 
   // #763 E10 — sibling of the withTimeBucketAssetFilters block in asset.repository.spec.ts, for
