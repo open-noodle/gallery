@@ -34,6 +34,8 @@ const suggestions = (overrides: Partial<FilterSuggestionsResponse> = {}): Filter
   hasFavorites: false,
   hasAssetsInAlbum: false,
   hasAssetsNotInAlbum: false,
+  hasNoGpsAssets: false,
+  hasNoPlaceNameAssets: false,
   ...overrides,
 });
 
