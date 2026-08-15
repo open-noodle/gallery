@@ -512,12 +512,18 @@ scenario for an asset with no `asset_exif` row is what keeps it honest.
 projection CTE joins `asset_exif` unconditionally (`asset.repository.ts:1469`), so an asset with no
 `asset_exif` row survives Stage 1's filter and the `getTimeBuckets` count, then disappears from the
 returned rows. `noGps` is the one filter designed to surface exactly those assets, so its bucket
-count can exceed the photos actually drawn — for a freshly uploaded asset whose metadata extraction
-has not run yet.
+count can exceed the photos actually drawn.
+
+A freshly _uploaded_ asset is not the case to worry about: `asset-media.service.ts:389` upserts an
+`asset_exif` row (carrying `fileSizeInByte`) during upload, before metadata extraction runs — an
+uploaded asset has a row from the first second. The real case is **external library imports**:
+`library.service.ts:275` → `AssetRepository.createAll` inserts into `asset` only, with no
+`asset_exif` row until the extraction job processes it. During a large Connected Libraries scan —
+hours, not seconds — a `noGps` bucket can be counted almost entirely from rows Stage 2 will drop.
+The same applies permanently to any asset whose extraction job failed outright.
 
 This is **pre-existing and not introduced here**: the join is unconditional, so the same disagreement
-reproduces for any query that lets a row-less asset through, including an unfiltered timeline. It is
-also transient in practice, since extraction normally runs within seconds of upload.
+reproduces for any query that lets a row-less asset through, including an unfiltered timeline.
 
 It is deliberately **not fixed as part of this change**. The correct fix is a left join, which alters
 every timeline query in the application — far beyond a filter feature's blast radius, and it would
