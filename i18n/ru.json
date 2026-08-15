@@ -1963,6 +1963,7 @@
   "game_continue": "Продолжить",
   "game_create_failed": "Не удалось создать вызов из фото этого Space",
   "game_delete_challenge": "Удалить вызов",
+  "game_delete_failed": "Не удалось удалить вызов",
   "game_guess": "Угадать",
   "game_guess_year": "Угадать {year}",
   "game_leaderboard": "Таблица лидеров",

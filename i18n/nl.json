@@ -1961,6 +1961,7 @@
   "game_continue": "Doorgaan",
   "game_create_failed": "Kon geen uitdaging maken van de foto's van deze ruimte",
   "game_delete_challenge": "Uitdaging verwijderen",
+  "game_delete_failed": "Kon de uitdaging niet verwijderen",
   "game_guess": "Raden",
   "game_guess_year": "{year} raden",
   "game_leaderboard": "Klassement",

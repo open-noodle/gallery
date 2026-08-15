@@ -1961,6 +1961,7 @@
   "game_continue": "Continua",
   "game_create_failed": "Impossibile creare una sfida dalle foto di questo spazio",
   "game_delete_challenge": "Elimina sfida",
+  "game_delete_failed": "Impossibile eliminare la sfida",
   "game_guess": "Indovina",
   "game_guess_year": "Indovina {year}",
   "game_leaderboard": "Classifica",

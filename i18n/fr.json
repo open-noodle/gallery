@@ -1957,6 +1957,7 @@
   "game_continue": "Continuer",
   "game_create_failed": "Impossible de créer un défi à partir des photos de cet espace",
   "game_delete_challenge": "Supprimer le défi",
+  "game_delete_failed": "Impossible de supprimer le défi",
   "game_guess": "Deviner",
   "game_guess_year": "Deviner {year}",
   "game_leaderboard": "Classement",

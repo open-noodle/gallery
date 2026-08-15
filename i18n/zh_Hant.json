@@ -1957,6 +1957,7 @@
   "game_continue": "繼續",
   "game_create_failed": "無法從此 Space 的相片建立挑戰",
   "game_delete_challenge": "刪除挑戰",
+  "game_delete_failed": "無法刪除挑戰",
   "game_guess": "猜測",
   "game_guess_year": "猜測 {year} 年",
   "game_leaderboard": "排行榜",

@@ -1960,6 +1960,7 @@
   "game_continue": "Continuar",
   "game_create_failed": "No se pudo crear un reto a partir de las fotos de este espacio",
   "game_delete_challenge": "Eliminar reto",
+  "game_delete_failed": "No se pudo eliminar el reto",
   "game_guess": "Adivinar",
   "game_guess_year": "Adivinar {year}",
   "game_leaderboard": "Clasificación",
