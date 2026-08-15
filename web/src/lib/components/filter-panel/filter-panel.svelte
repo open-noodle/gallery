@@ -127,6 +127,11 @@
       // dropping a state widens it. Same for the lens and the contributor narrowing — and the
       // provider reads this reconstructed state, so an untracked field is also an unsent one.
       state: filters.state,
+      // `locationPresence` is part of the same one-filter location group as city/state/country
+      // (mutually exclusive with them). Untracked here, it would never reach the suggestions
+      // provider, so selecting "No location" would leave the People/Tags/Camera lists describing
+      // the unfiltered set.
+      locationPresence: filters.locationPresence,
       make: filters.make,
       model: filters.model,
       lensModel: filters.lensModel,
