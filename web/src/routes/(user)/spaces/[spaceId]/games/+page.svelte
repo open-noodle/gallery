@@ -63,7 +63,7 @@
       challenges = challenges.filter((c) => c.id !== challenge.id);
       toastManager.success($t('game_challenge_deleted'));
     } catch (error) {
-      handleError(error, $t('game_delete_challenge'));
+      handleError(error, $t('game_delete_failed'));
     }
   }
 </script>

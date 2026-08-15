@@ -224,5 +224,16 @@ describe('Space games page', () => {
       await waitFor(() => expect(sdkMock.deleteChallenge).toHaveBeenCalledWith({ id: 'c-1' }));
       await waitFor(() => expect(screen.queryByTestId('challenge-card')).not.toBeInTheDocument());
     });
+
+    it('a failed delete surfaces game_delete_failed and keeps the card', async () => {
+      sdkMock.deleteChallenge.mockRejectedValue(new Error('nope'));
+      renderPage([makeChallenge({ id: 'c-1', name: 'Summer Trip' })], SharedSpaceRole.Editor);
+
+      await fireEvent.click(screen.getByTestId('challenge-card-delete'));
+
+      await waitFor(() => expect(sdkMock.deleteChallenge).toHaveBeenCalledWith({ id: 'c-1' }));
+      await waitFor(() => expect(toastManagerMock.danger).toHaveBeenCalledWith('Could not delete the challenge'));
+      expect(screen.getByTestId('challenge-card')).toBeInTheDocument();
+    });
   });
 });
