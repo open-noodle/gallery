@@ -26,9 +26,15 @@ No code path sets a place name without coordinates. Two consequences drive the w
    as `latitude IS NULL` and `city IS NULL`, a "no place name" entry would return a strict superset
    of a "no GPS" entry — two rows in one list where selecting the lower one silently includes
    everything the upper one matched.
-2. **`asset_exif` rows are not guaranteed.** The row is created by `upsertExif`
-   (`asset.repository.ts:496`) during metadata extraction. An asset that has been uploaded but not
-   yet extracted has _no_ `asset_exif` row at all, and is by definition without a location.
+2. **`asset_exif` rows are not guaranteed.** The row is written by `upsertExif`
+   (`asset.repository.ts:523`), and an asset can exist without one. Note it is _not_ upload that
+   leaves the gap: `asset-media.service.ts:389` upserts a row carrying `fileSizeInByte` at upload
+   time, before metadata extraction runs, so an uploaded asset has a row from the first second.
+   The real source of row-less assets is **external library imports** — `library.service.ts:275`
+   calls `AssetRepository.createAll`, which inserts into `asset` only (`asset.repository.ts:802-805`),
+   with no `asset_exif` row until the extraction job reaches it. That window is hours during a large
+   Connected Libraries scan, and permanent for any asset whose extraction failed. Such an asset has
+   no location by definition, and a filter for the absence of one must still find it.
 
 ## Decisions
 
