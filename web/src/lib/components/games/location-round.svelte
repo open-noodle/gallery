@@ -30,7 +30,12 @@
   <!-- Map inset over the photo, per the approved mockup. -->
   <div class="absolute inset-x-3 bottom-3 flex flex-col gap-2 sm:inset-x-auto sm:inset-e-3 sm:w-72 md:w-80">
     <div class="h-48 overflow-hidden rounded-2xl shadow-lg sm:h-56">
+      <!-- mapMarkers must stay an explicit [] — leaving it undefined makes Map.svelte fetch and
+           render the space's own photo markers (getMapMarkers), which could include the round's
+           answer. The player's placed pin still renders: handleMapClick in Map.svelte drops a
+           plain maplibre-gl Marker on click, independent of mapMarkers. -->
       <Map
+        mapMarkers={[]}
         clickable
         useLocationPin
         simplified
