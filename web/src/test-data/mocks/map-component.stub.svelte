@@ -21,10 +21,16 @@
      * genuinely has no control. Mirror that here: the stub's button exists iff the callback does.
      */
     onOpenInMapView?: () => Promise<void> | void;
+    /**
+     * Map.svelte's click handler for placing a pin (location-round.svelte's guess flow). Mirrored
+     * here as a button so a page test can drive a location guess end to end; the real component
+     * needs a WebGL canvas happy-dom lacks, so it can't be clicked directly.
+     */
+    onClickPoint?: (point: { lat: number; lng: number }) => void;
     [key: string]: unknown;
   }
 
-  let { mapMarkers = [], popup, onClusterSelect, onOpenInMapView, ...rest }: Props = $props();
+  let { mapMarkers = [], popup, onClusterSelect, onOpenInMapView, onClickPoint, ...rest }: Props = $props();
 
   // Mirrors Map.svelte's handleClusterClick: a cluster hands its caller the LEAF ids plus the TIGHT
   // bounding box of those leaves. Deriving the bbox from the markers (rather than hard-coding one)
@@ -54,6 +60,11 @@
   {#if onOpenInMapView}
     <button type="button" data-testid="map-stub-open-in-map-view" onclick={() => onOpenInMapView()}>
       Open in map view
+    </button>
+  {/if}
+  {#if onClickPoint}
+    <button type="button" data-testid="map-stub-click-point" onclick={() => onClickPoint({ lat: 12.5, lng: 45.5 })}>
+      Click map
     </button>
   {/if}
   {#if onClusterSelect && clusterLeaves[0]}
