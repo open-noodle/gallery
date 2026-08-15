@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Insertable } from 'kysely';
 import { PostgresError } from 'postgres';
+import { OnEvent } from 'src/decorators';
 import { AuthDto } from 'src/dtos/auth.dto';
 import {
   GameChallengeDetailResponseDto,
@@ -18,8 +19,16 @@ import {
   GameLeaderboardResponseDto,
   GameRoundDetailResponseDto,
 } from 'src/dtos/game.dto';
-import { AssetFileType, CacheControl, SharedSpaceRole } from 'src/enum';
-import { GameChallengeRow, GameGuessRow, GameRoundRow } from 'src/repositories/game.repository';
+import { CacheControl, SharedSpaceRole } from 'src/enum';
+import { ArgOf } from 'src/repositories/event.repository';
+import {
+  GameChallengeRow,
+  GameGuessRow,
+  GameRoundRow,
+  NOT_PLACE_PROMPT_EMBEDDING,
+  PLACE_PROMPT_EMBEDDING,
+  ScenePromptEmbeddings,
+} from 'src/repositories/game.repository';
 import { GameChallengeTable } from 'src/schema/tables/game-challenge.table';
 import { GameGuessTable } from 'src/schema/tables/game-guess.table';
 import { GameRoundTable, GameRoundType } from 'src/schema/tables/game-round.table';
@@ -36,18 +45,38 @@ import {
   selectLocationRounds,
 } from 'src/utils/game-scoring';
 import { mimeTypes } from 'src/utils/mime-types';
+import { isSmartSearchEnabled } from 'src/utils/misc';
 import { hasSharedSpaceRole } from 'src/utils/shared-space-role';
 
 /** Location rounds fill up to this fraction of the requested round count; the rest are date
  * rounds. See design doc §7.4 - this is what keeps a GPS-poor space playable. */
 const LOCATION_ROUND_SHARE = 0.6;
 
-/** Candidates fetched per pool per generation. Generous relative to any realistic roundCount so
- * both selectLocationRounds' relaxation ladder and the date-round shuffle have real choice. */
+/**
+ * Candidates fetched per pool per generation - and, for the location pool, **the scene gate's
+ * cutoff**: `getLocationCandidates` ranks by the CLIP place-minus-not-place score and truncates
+ * exactly here, so this number is the boundary between "ranked into the pool" and "excluded by
+ * the gate entirely".
+ *
+ * It is NOT a variety knob, despite reading like one - that framing is what hid the fact that
+ * the gate had no teeth at all while `selectLocationRounds` sampled the pool uniformly. What
+ * actually enforces design §2's "a scene gate is mandatory" is the rank-biased draw inside
+ * `selectLocationRounds` (see RANK_BIAS_EXPONENT); this constant only decides how much of the
+ * ranked tail that draw can still reach. Moving it changes both, so read §7.1 first.
+ */
 const CANDIDATE_POOL_LIMIT = 200;
 
 /** How many of the space's most recent challenges to avoid repeating assets from. */
 const RECENT_CHALLENGE_LOOKBACK = 3;
+
+/**
+ * The scene-gate prompts, and the CLIP model the shipped constant vectors were encoded with.
+ * Design §12 flags the wording itself as tunable; the model name is not - it is the contract
+ * that makes PLACE_PROMPT_EMBEDDING / NOT_PLACE_PROMPT_EMBEDDING meaningful.
+ */
+const PLACE_PROMPT = 'an outdoor photo that shows where it was taken';
+const NOT_PLACE_PROMPT = 'a close-up of a person or an indoor room';
+const SHIPPED_PROMPT_MODEL = 'ViT-B-32__openai';
 
 /** Mirrors the private MS_PER_DAY in game-scoring.ts, which does not export it. */
 const MS_PER_DAY = 86_400_000;
@@ -99,6 +128,95 @@ const toPoints = (pool: GameCandidate[]): LatLon[] =>
 
 @Injectable()
 export class GameService extends BaseService {
+  /** Prompt vectors encoded at runtime, keyed by CLIP model name. The shipped constants are not
+   * stored here - they are returned directly for SHIPPED_PROMPT_MODEL. */
+  private scenePromptCache = new Map<string, ScenePromptEmbeddings>();
+  /** Models we have already complained about, so a warn-level line is logged once, not per
+   * challenge creation. */
+  private scenePromptWarnings = new Set<string>();
+
+  /**
+   * The CLIP vectors the scene gate ranks against, for the CURRENTLY configured model.
+   *
+   * `machineLearning.clip.modelName` is admin-configurable and `DatabaseRepository.setDimensionSize`
+   * re-types `smart_search.embedding` to match, so a hardcoded pair of 512-dim ViT-B-32 vectors is
+   * wrong in two different ways once an admin changes the model: against a 768-dim model
+   * (ViT-L-14) every challenge creation 500s with `different vector dimensions`, and against a
+   * *different* 512-dim model there is no error at all - the dot product simply runs in an
+   * unrelated embedding space and the gate becomes noise, which is the silent-failure class this
+   * feature has already produced three times.
+   *
+   * So: shipped constants when the configured model is the one they were encoded with (design
+   * §7.1's "one dot product per candidate and no new inference" holds for the default install),
+   * and otherwise encode the same two prompts against the configured model, cached per model and
+   * cleared when the model changes - the precedent set by
+   * `ClassificationService.getOrEncodePrompt`. If ML is off or unreachable we return undefined,
+   * which drops the ordering rather than ranking against a meaningless vector; the face gate and
+   * the spread rules still apply, so a challenge is still generated.
+   */
+  private async getScenePromptEmbeddings(): Promise<ScenePromptEmbeddings | undefined> {
+    const { machineLearning } = await this.getConfig({ withCache: true });
+    const modelName = machineLearning.clip.modelName;
+
+    if (modelName === SHIPPED_PROMPT_MODEL) {
+      return { place: PLACE_PROMPT_EMBEDDING, notPlace: NOT_PLACE_PROMPT_EMBEDDING };
+    }
+
+    const cached = this.scenePromptCache.get(modelName);
+    if (cached) {
+      return cached;
+    }
+
+    if (!isSmartSearchEnabled(machineLearning)) {
+      this.warnSceneGateDisabled(
+        modelName,
+        `smart search is disabled, so the prompts cannot be encoded against '${modelName}'`,
+      );
+      return undefined;
+    }
+
+    try {
+      const [place, notPlace] = await Promise.all([
+        this.encodeScenePrompt(PLACE_PROMPT, modelName),
+        this.encodeScenePrompt(NOT_PLACE_PROMPT, modelName),
+      ]);
+      const embeddings = { place, notPlace };
+      this.scenePromptCache.set(modelName, embeddings);
+      return embeddings;
+    } catch (error) {
+      this.warnSceneGateDisabled(modelName, `encoding them against '${modelName}' failed: ${error}`);
+      return undefined;
+    }
+  }
+
+  private async encodeScenePrompt(prompt: string, modelName: string): Promise<number[]> {
+    const raw = await this.machineLearningRepository.encodeText(prompt, { modelName });
+    // encodeText hands back the ML service's serialized vector (`[0.1,0.2,...]`); the same
+    // parse ClassificationService does before its own dot products.
+    return typeof raw === 'string' ? raw.replaceAll(/[[\]]/g, '').split(',').map(Number) : (raw as number[]);
+  }
+
+  private warnSceneGateDisabled(modelName: string, reason: string) {
+    if (this.scenePromptWarnings.has(modelName)) {
+      return;
+    }
+    this.scenePromptWarnings.add(modelName);
+    this.logger.warn(
+      `Game scene gate disabled: ${reason}. Location rounds will still be face-gated and spread, but will not be ranked by how much they look like a place.`,
+    );
+  }
+
+  // The cache is already keyed by model name, so this is not load-bearing for correctness - it
+  // keeps a stale model's vectors from lingering, and mirrors ClassificationService.onConfigUpdate.
+  @OnEvent({ name: 'ConfigUpdate', server: true })
+  onConfigUpdate({ oldConfig, newConfig }: ArgOf<'ConfigUpdate'>) {
+    if (oldConfig.machineLearning.clip.modelName === newConfig.machineLearning.clip.modelName) {
+      return;
+    }
+    this.scenePromptCache.clear();
+    this.scenePromptWarnings.clear();
+  }
+
   async create(auth: AuthDto, spaceId: string, dto: GameCreateDto): Promise<GameChallengeResponseDto> {
     await this.requireEditor(spaceId, auth.user.id);
 
@@ -108,11 +226,19 @@ export class GameService extends BaseService {
     // SharedSpaceRole.Viewer in shared-space.service.ts.
     const requestedRoundCount = dto.roundCount ?? 5;
 
-    const [rawLocationPool, rawDatePool, recentlyUsedAssetIds, existingChallenges] = await Promise.all([
-      this.gameRepository.getLocationCandidates(spaceId, CANDIDATE_POOL_LIMIT),
-      this.gameRepository.getDateCandidates(spaceId, CANDIDATE_POOL_LIMIT),
+    // Resolved BEFORE the candidate queries, not alongside them: the challenge count is half of
+    // the generation seed, and the seed now drives which slice of a large space the candidate
+    // queries return (see GameRepository.seededOrder), not just which of them get picked.
+    const existingChallenges = await this.gameRepository.getChallengesForSpace(spaceId);
+    const challengeCount = existingChallenges?.length ?? 0;
+    const seed = `${spaceId}:${challengeCount}`;
+
+    const scenePrompts = await this.getScenePromptEmbeddings();
+
+    const [rawLocationPool, rawDatePool, recentlyUsedAssetIds] = await Promise.all([
+      this.gameRepository.getLocationCandidates(spaceId, CANDIDATE_POOL_LIMIT, seed, scenePrompts),
+      this.gameRepository.getDateCandidates(spaceId, CANDIDATE_POOL_LIMIT, seed),
       this.gameRepository.getRecentlyUsedAssetIds(spaceId, RECENT_CHALLENGE_LOOKBACK),
-      this.gameRepository.getChallengesForSpace(spaceId),
     ]);
 
     // Prefer excluding assets used by recent challenges in this space, but never at the cost of
@@ -125,8 +251,7 @@ export class GameService extends BaseService {
 
     // Seeded from the space and its existing challenge count, not wall-clock or Math.random, so
     // generation is reproducible and successive challenges for the same space still differ.
-    const challengeCount = existingChallenges?.length ?? 0;
-    const random = mulberry32(hashSeed(`${spaceId}:${challengeCount}`));
+    const random = mulberry32(hashSeed(seed));
 
     const locationShare = Math.floor(requestedRoundCount * LOCATION_ROUND_SHARE);
     const filteredLocationPool = withoutRecent(rawLocationPool);
@@ -339,13 +464,22 @@ export class GameService extends BaseService {
     }
 
     // The asset backing this round was deleted after the challenge was created - fail cleanly
-    // rather than querying assetRepository.getById with a null id.
+    // rather than querying the repository with a null id.
     if (!round.assetId) {
       throw new NotFoundException('Round image not available');
     }
 
-    const asset = await this.assetRepository.getById(round.assetId, { files: true });
-    const previewFile = asset?.files?.find((file) => file.type === AssetFileType.Preview);
+    // Space-scoped, and re-checked on EVERY request - deliberately not AssetRepository.getById,
+    // which applies no deletedAt, no visibility and no space predicate. Rounds are frozen by
+    // design (§4.1) so this assetId is permanent; resolving it unscoped meant that once a photo
+    // entered a challenge, removing it from the space, trashing it, or moving it to the locked
+    // folder did not stop the game serving it to every member, forever. getEligibleRoundAsset
+    // re-applies the exact predicate the candidate queries used, so eligibility to be served
+    // and eligibility to be picked cannot diverge.
+    //
+    // A miss is a normal outcome, not corruption: the round remains scoreable from its
+    // denormalised answer (§9), so this 404s the image and leaves the challenge intact.
+    const previewFile = await this.gameRepository.getEligibleRoundAsset(challenge.spaceId, round.assetId);
     if (!previewFile) {
       throw new NotFoundException('Round image not available');
     }
@@ -365,15 +499,20 @@ export class GameService extends BaseService {
     // needs a force-proxy option on serveFromBackend or route-specific streaming - a deliberate
     // follow-up, not an oversight.
     return this.serveFromBackend(
-      previewFile.path,
-      mimeTypes.lookup(previewFile.path),
+      previewFile.previewPath,
+      mimeTypes.lookup(previewFile.previewPath),
       // Private, not public: this is membership-gated content pulled from a private shared space,
       // so a shared/CDN cache must never serve it across sessions or to a non-member. Long
       // browser-side caching is still safe within that: once a challenge is created its rounds are
       // frozen (assetId per round never changes), so the same (challengeId, index) always resolves
       // to the same bytes. Matches AssetMediaService.viewThumbnail's own choice for the same reason.
+      //
+      // Note the eligibility re-check above governs the SERVER; a member who already loaded a
+      // round keeps it in their own private browser cache for up to the max-age after the photo
+      // leaves the space. That is one user re-seeing a photo they were already shown, exactly as
+      // for any other thumbnail in the app - not a path by which a new viewer can reach it.
       CacheControl.PrivateWithCache,
-      `round-${index}${getFilenameExtension(previewFile.path)}`,
+      `round-${index}${getFilenameExtension(previewFile.previewPath)}`,
     );
   }
 

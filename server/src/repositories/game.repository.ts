@@ -1,18 +1,30 @@
 import { Injectable } from '@nestjs/common';
-import { Insertable, Kysely, Selectable, sql } from 'kysely';
+import { Expression, ExpressionBuilder, Insertable, Kysely, Selectable, sql, SqlBool } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { DummyValue, GenerateSql } from 'src/decorators';
-import { AssetType, AssetVisibility } from 'src/enum';
+import { AssetFileType, AssetType, AssetVisibility } from 'src/enum';
 import { DB } from 'src/schema';
 import { GameChallengeTable } from 'src/schema/tables/game-challenge.table';
 import { GameGuessTable } from 'src/schema/tables/game-guess.table';
 import { GameRoundTable } from 'src/schema/tables/game-round.table';
-import { asVector } from 'src/utils/database';
+import { asUuid, asVector } from 'src/utils/database';
 import { GameCandidate } from 'src/utils/game-scoring';
+import { spaceAssetPathBranches } from 'src/utils/shared-space-album-scope';
 
 export type GameChallengeRow = Selectable<GameChallengeTable>;
 export type GameRoundRow = Selectable<GameRoundTable>;
 export type GameGuessRow = Selectable<GameGuessTable>;
+
+/**
+ * The two CLIP text vectors the scene gate ranks against. Supplied by the caller rather than
+ * read from the constants below, because `machineLearning.clip.modelName` is admin-configurable
+ * and `DatabaseRepository.setDimensionSize` re-types `smart_search.embedding` when it changes -
+ * a hardcoded 512-dim ViT-B-32 vector either errors outright against a 768-dim model or, worse,
+ * silently dot-products against an unrelated embedding space. `undefined` means "no usable
+ * prompt vectors for the configured model": the gate's ordering is then skipped entirely rather
+ * than run against nonsense. See GameService.getScenePromptEmbeddings.
+ */
+export type ScenePromptEmbeddings = { place: number[]; notPlace: number[] };
 
 // A face covering more than this fraction of the frame marks the shot as a portrait rather
 // than a place - see the doc comment on getLocationCandidates for the measurement behind it.
@@ -157,6 +169,56 @@ export const NOT_PLACE_PROMPT_EMBEDDING: number[] = [
   0.06934106, 0.03886689, 0.02153531, -0.02139908, -0.02985409, -0.03175486, -0.03614256, -0.01555213,
 ];
 
+/**
+ * "Is this asset one the space can legitimately show right now?" - the single definition of
+ * challenge eligibility, deliberately shared between the two candidate queries and
+ * `getEligibleRoundAsset`, so what a round is generated FROM and what it is later SERVED FROM
+ * can never drift apart.
+ *
+ * Two things it encodes:
+ *
+ *  - **All four of a space's asset paths.** A shared space's asset set is a four-arm union
+ *    everywhere else in this fork - directly added assets, linked libraries, linked albums, and
+ *    cross-owner album contributions - and `spaceAssetPathBranches` is the fork-owned helper
+ *    that encodes them (its album arm ORs `album_asset` with `album_space_asset`). Selecting
+ *    from `shared_space_asset` alone yields ZERO candidates for a space populated entirely
+ *    through a linked album or a connected library, and reports the space as having no usable
+ *    photos. Mirrors `SharedSpaceRepository.getAssetCount` / `getRecentAssets`.
+ *  - **The design §5 visibility rules**: `deletedAt IS NULL`, `type = IMAGE`, and
+ *    `visibility = 'timeline'`. Archived, hidden and locked assets are never eligible - which
+ *    is also why the round-image route must re-run this rather than resolving the frozen
+ *    `assetId` through the unscoped `AssetRepository.getById`.
+ */
+const eligibleSpaceAsset = (eb: ExpressionBuilder<DB, keyof DB>, spaceId: string): Expression<SqlBool> =>
+  eb.and([
+    eb.or(
+      spaceAssetPathBranches(eb, {
+        correlateAssetId: 'asset.id',
+        correlateLibraryId: 'asset.libraryId',
+        scope: { spaceId },
+        requireShowInTimeline: true,
+      }),
+    ),
+    eb('asset.deletedAt', 'is', null),
+    eb('asset.type', '=', AssetType.Image),
+    eb('asset.visibility', '=', AssetVisibility.Timeline),
+  ]);
+
+/**
+ * A deterministic per-challenge shuffle of the candidate rows.
+ *
+ * `ORDER BY asset.id` is deterministic too, but it is *stably* deterministic: it pins every
+ * challenge in a space to the same lowest-id prefix, so in a space with more assets than
+ * `limit` no photo outside that prefix could ever appear in any challenge - falsifying design
+ * §5's "adding photos to the space makes the game better". Hashing the id with the challenge's
+ * own seed keeps reproducibility for a given `(spaceId, challengeCount)` while letting
+ * successive challenges reach the whole space.
+ *
+ * Never `random()`: Postgres re-evaluates it per query, so the same seed could draw from a
+ * different candidate SET on every call and the service's seeded sampling would mean nothing.
+ */
+const seededOrder = (seed: string) => sql`md5("asset"."id"::text || ${seed})`;
+
 @Injectable()
 export class GameRepository {
   constructor(@InjectKysely() private db: Kysely<DB>) {}
@@ -180,17 +242,38 @@ export class GameRepository {
    * `cos_sim_pos - cos_sim_neg` reduces to `(embedding <=> neg) - (embedding <=> pos)`; higher
    * is better, hence ORDER BY ... DESC. This two-term expression cannot use the ivfflat/vchord
    * index - acceptable here because the candidate set is already scoped to one space's assets
-   * via shared_space_asset, so the driving predicate is the space join, not the vector order.
+   * via eligibleSpaceAsset, so the driving predicate is the space scope, not the vector order.
    *
    * Ranked, never thresholded: the measured cosine margin between positive and negative prompts
    * is thin, so an absolute cutoff would pass everything in one library and nothing in another.
+   * The rank this produces is only worth anything because `selectLocationRounds` draws from the
+   * front of it (see RANK_BIAS_EXPONENT) - a uniform draw downstream makes the whole gate inert.
+   *
+   * `scenePrompts` undefined = the configured CLIP model is not one we have prompt vectors for,
+   * so the ordering is dropped and the pool falls back to the seeded shuffle alone. The face
+   * gate still applies.
    */
-  @GenerateSql({ params: [DummyValue.UUID, DummyValue.NUMBER] })
-  async getLocationCandidates(spaceId: string, limit: number): Promise<GameCandidate[]> {
+  @GenerateSql({
+    params: [
+      DummyValue.UUID,
+      DummyValue.NUMBER,
+      DummyValue.STRING,
+      { place: PLACE_PROMPT_EMBEDDING, notPlace: NOT_PLACE_PROMPT_EMBEDDING },
+    ],
+  })
+  async getLocationCandidates(
+    spaceId: string,
+    limit: number,
+    seed: string,
+    scenePrompts?: ScenePromptEmbeddings,
+  ): Promise<GameCandidate[]> {
     const rows = await this.db
-      .selectFrom('shared_space_asset')
-      .innerJoin('asset', 'asset.id', 'shared_space_asset.assetId')
+      .selectFrom('asset')
       .innerJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
+      // Applied before the derived-table joins below purely for typing: once `face_area` is
+      // joined in, `eb` is no longer an ExpressionBuilder over the plain DB and cannot be handed
+      // to the shared helper. WHERE terms are ANDed, so the position carries no semantics.
+      .where((eb) => eligibleSpaceAsset(eb, spaceId))
       .leftJoin(
         (eb) =>
           eb
@@ -213,10 +296,6 @@ export class GameRepository {
         (join) => join.onRef('face_area.assetId', '=', 'asset.id'),
       )
       .leftJoin('smart_search', 'smart_search.assetId', 'asset.id')
-      .where('shared_space_asset.spaceId', '=', spaceId)
-      .where('asset.deletedAt', 'is', null)
-      .where('asset.type', '=', AssetType.Image)
-      .where('asset.visibility', '=', AssetVisibility.Timeline)
       .where('asset_exif.latitude', 'is not', null)
       .where('asset_exif.longitude', 'is not', null)
       .where((eb) =>
@@ -229,15 +308,19 @@ export class GameRepository {
         'asset.localDateTime as takenAt',
         'asset_exif.country as country',
       ])
-      .orderBy(
-        sql<number>`(smart_search.embedding <=> ${asVector(NOT_PLACE_PROMPT_EMBEDDING)}) - (smart_search.embedding <=> ${asVector(PLACE_PROMPT_EMBEDDING)})`,
-        (ob) => ob.desc().nullsLast(),
+      .$if(!!scenePrompts, (qb) =>
+        qb.orderBy(
+          sql<number>`(smart_search.embedding <=> ${asVector(scenePrompts!.notPlace)}) - (smart_search.embedding <=> ${asVector(scenePrompts!.place)})`,
+          (ob) => ob.desc().nullsLast(),
+        ),
       )
       // Stable tiebreak: rows with no smart_search embedding (or an identical score) would
       // otherwise share a rank Postgres is free to order arbitrarily between calls. The caller's
       // generation seed only controls which of these candidates get picked, not the SQL order
-      // they arrive in - an unstable tie order would silently defeat that determinism.
-      .orderBy('asset.id', 'asc')
+      // they arrive in - an unstable tie order would silently defeat that determinism. Seeded
+      // rather than `asset.id asc` so the tie group (and the whole pool, when the CLIP ordering
+      // above is skipped) is not frozen to the same lowest-id prefix for every challenge.
+      .orderBy(seededOrder(seed))
       .limit(limit)
       .execute();
 
@@ -246,27 +329,56 @@ export class GameRepository {
 
   /** Date-round candidates for a space. No face/place gate - any timeline photo with a taken
    * date can carry a "when was this" question, so this is deliberately the simpler of the two
-   * pools. Ordered by asset id, not `random()`: the service layer seeds its own
-   * mulberry32-driven shuffle over whatever this query returns, so randomising here too would
-   * make that seed meaningless - the same seed could draw from a different candidate SET (not
-   * just a different order) on every call, since Postgres re-evaluates `random()` per query.
+   * pools. Ordered by a seeded hash of the asset id (see seededOrder), not `random()` and no
+   * longer by `asset.id`: the service layer seeds its own mulberry32-driven shuffle over
+   * whatever this query returns, so a per-query `random()` would make that seed meaningless,
+   * while a plain id order froze every challenge in the space to the same lowest-id 200 rows.
    */
-  @GenerateSql({ params: [DummyValue.UUID, DummyValue.NUMBER] })
-  async getDateCandidates(spaceId: string, limit: number): Promise<GameCandidate[]> {
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.NUMBER, DummyValue.STRING] })
+  async getDateCandidates(spaceId: string, limit: number, seed: string): Promise<GameCandidate[]> {
     const rows = await this.db
-      .selectFrom('shared_space_asset')
-      .innerJoin('asset', 'asset.id', 'shared_space_asset.assetId')
-      .where('shared_space_asset.spaceId', '=', spaceId)
-      .where('asset.deletedAt', 'is', null)
-      .where('asset.type', '=', AssetType.Image)
-      .where('asset.visibility', '=', AssetVisibility.Timeline)
+      .selectFrom('asset')
+      .where((eb) => eligibleSpaceAsset(eb, spaceId))
       .where('asset.localDateTime', 'is not', null)
       .select(['asset.id as assetId', 'asset.localDateTime as takenAt'])
-      .orderBy('asset.id', 'asc')
+      .orderBy(seededOrder(seed))
       .limit(limit)
       .execute();
 
     return rows.map((row) => ({ assetId: row.assetId, lat: null, lon: null, takenAt: row.takenAt, country: null }));
+  }
+
+  /**
+   * The preview file of a round's asset, resolved through the SAME eligibility predicate the
+   * candidate queries use - not `AssetRepository.getById`, which applies no `deletedAt`, no
+   * visibility and no space predicate at all.
+   *
+   * Rounds are frozen by design (§4.1), so a round's `assetId` is permanent; without this the
+   * round-image route honoured that forever and kept serving a photo the owner had since
+   * removed from the space, trashed (for the whole 30-day soft-delete window), or moved into
+   * the locked folder - to every member, including ones who joined afterwards. Design §5:
+   * "the game never shows anyone a photo they could not already open in Gallery."
+   *
+   * Returning nothing is the correct outcome, not an error: the round stays scoreable from its
+   * denormalised answer (§9), only the image is gone.
+   */
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
+  async getEligibleRoundAsset(spaceId: string, assetId: string): Promise<{ previewPath: string } | undefined> {
+    return (
+      this.db
+        .selectFrom('asset')
+        .innerJoin('asset_file', (join) =>
+          join.onRef('asset_file.assetId', '=', 'asset.id').on('asset_file.type', '=', AssetFileType.Preview),
+        )
+        .select('asset_file.path as previewPath')
+        .where('asset.id', '=', asUuid(assetId))
+        .where((eb) => eligibleSpaceAsset(eb, spaceId))
+        // An edited asset carries a second preview row; prefer the unedited one, matching
+        // AssetRepository.getForThumbnail's default (`isEdited: false`) for the same file type.
+        .orderBy('asset_file.isEdited', 'asc')
+        .limit(1)
+        .executeTakeFirst()
+    );
   }
 
   /**
