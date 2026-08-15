@@ -77,16 +77,6 @@ const toPoints = (pool: GameCandidate[]): LatLon[] =>
     candidate.lat === null || candidate.lon === null ? [] : [{ lat: candidate.lat, lon: candidate.lon }],
   );
 
-const countUniqueAssets = (...pools: GameCandidate[][]): number => {
-  const ids = new Set<string>();
-  for (const pool of pools) {
-    for (const candidate of pool) {
-      ids.add(candidate.assetId);
-    }
-  }
-  return ids.size;
-};
-
 @Injectable()
 export class GameService extends BaseService {
   async create(auth: AuthDto, spaceId: string, dto: GameCreateDto): Promise<GameChallengeResponseDto> {
@@ -102,36 +92,46 @@ export class GameService extends BaseService {
     ]);
 
     // Prefer excluding assets used by recent challenges in this space, but never at the cost of
-    // being unable to fill the request - a thin pool needs every candidate it has.
+    // being unable to fill the request. The decision is made per pool, and for the date pool
+    // against the round count the location pool actually delivered - a well-stocked pool keeps
+    // its exclusion even when the other pool has to give it up to reach requestedRoundCount, and a
+    // location shortfall doesn't wrongly count against the date pool's own supply.
     const recentlyUsed = new Set(recentlyUsedAssetIds);
     const withoutRecent = (pool: GameCandidate[]) => pool.filter((candidate) => !recentlyUsed.has(candidate.assetId));
-
-    const filteredLocationPool = withoutRecent(rawLocationPool);
-    const filteredDatePool = withoutRecent(rawDatePool);
-    const canExcludeRecent = countUniqueAssets(filteredLocationPool, filteredDatePool) >= requestedRoundCount;
-
-    const locationPool = canExcludeRecent ? filteredLocationPool : rawLocationPool;
-    const datePool = canExcludeRecent ? filteredDatePool : rawDatePool;
 
     // Seeded from the space and its existing challenge count, not wall-clock or Math.random, so
     // generation is reproducible and successive challenges for the same space still differ.
     const challengeCount = existingChallenges?.length ?? 0;
     const random = mulberry32(hashSeed(`${spaceId}:${challengeCount}`));
 
-    // Frozen here, once, from the pools actually used to generate this challenge. Scoring divides
-    // by these later - recomputing them as the space gains photos would rewrite every score
+    const locationShare = Math.floor(requestedRoundCount * LOCATION_ROUND_SHARE);
+    const filteredLocationPool = withoutRecent(rawLocationPool);
+    const locationNeeded = Math.min(locationShare, rawLocationPool.length);
+    const locationPool = filteredLocationPool.length >= locationNeeded ? filteredLocationPool : rawLocationPool;
+
+    // Frozen here, once, from the location pool actually used to generate this challenge. Scoring
+    // divides by this later - recomputing it as the space gains photos would rewrite every score
     // already recorded against this challenge.
     const scaleKm = poolScaleKm(toPoints(locationPool), random);
+
+    const locationTarget = Math.min(locationShare, locationPool.length);
+    const locationRounds = selectLocationRounds(locationPool, locationTarget, scaleKm, random);
+
+    const usedAssetIds = new Set(locationRounds.map((candidate) => candidate.assetId));
+    const dateRemaining = requestedRoundCount - locationRounds.length;
+
+    const filteredDatePool = withoutRecent(rawDatePool);
+    const availableExcludingUsed = (pool: GameCandidate[]) =>
+      pool.filter((candidate) => !usedAssetIds.has(candidate.assetId)).length;
+    const dateNeeded = Math.min(dateRemaining, availableExcludingUsed(rawDatePool));
+    const datePool = availableExcludingUsed(filteredDatePool) >= dateNeeded ? filteredDatePool : rawDatePool;
+
+    // Frozen here too, once, from the date pool actually used - same reasoning as scaleKm above.
     const scaleDays = poolScaleDays(
       datePool.map((candidate) => candidate.takenAt),
       random,
     );
 
-    const locationTarget = Math.min(Math.floor(requestedRoundCount * LOCATION_ROUND_SHARE), locationPool.length);
-    const locationRounds = selectLocationRounds(locationPool, locationTarget, scaleKm, random);
-
-    const usedAssetIds = new Set(locationRounds.map((candidate) => candidate.assetId));
-    const dateRemaining = requestedRoundCount - locationRounds.length;
     const dateRounds: GameCandidate[] = [];
     for (const candidate of shuffle(datePool, random)) {
       if (dateRounds.length >= dateRemaining) {

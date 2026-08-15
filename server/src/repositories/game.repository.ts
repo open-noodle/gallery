@@ -233,6 +233,11 @@ export class GameRepository {
         sql<number>`(smart_search.embedding <=> ${asVector(NOT_PLACE_PROMPT_EMBEDDING)}) - (smart_search.embedding <=> ${asVector(PLACE_PROMPT_EMBEDDING)})`,
         (ob) => ob.desc().nullsLast(),
       )
+      // Stable tiebreak: rows with no smart_search embedding (or an identical score) would
+      // otherwise share a rank Postgres is free to order arbitrarily between calls. The caller's
+      // generation seed only controls which of these candidates get picked, not the SQL order
+      // they arrive in - an unstable tie order would silently defeat that determinism.
+      .orderBy('asset.id', 'asc')
       .limit(limit)
       .execute();
 
@@ -241,7 +246,10 @@ export class GameRepository {
 
   /** Date-round candidates for a space. No face/place gate - any timeline photo with a taken
    * date can carry a "when was this" question, so this is deliberately the simpler of the two
-   * pools. Randomly ordered (rather than ranked) because there is no relevance signal to rank on.
+   * pools. Ordered by asset id, not `random()`: the service layer seeds its own
+   * mulberry32-driven shuffle over whatever this query returns, so randomising here too would
+   * make that seed meaningless - the same seed could draw from a different candidate SET (not
+   * just a different order) on every call, since Postgres re-evaluates `random()` per query.
    */
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.NUMBER] })
   async getDateCandidates(spaceId: string, limit: number): Promise<GameCandidate[]> {
@@ -254,7 +262,7 @@ export class GameRepository {
       .where('asset.visibility', '=', AssetVisibility.Timeline)
       .where('asset.localDateTime', 'is not', null)
       .select(['asset.id as assetId', 'asset.localDateTime as takenAt'])
-      .orderBy(sql`random()`)
+      .orderBy('asset.id', 'asc')
       .limit(limit)
       .execute();
 
