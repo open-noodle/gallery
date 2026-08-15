@@ -383,6 +383,15 @@ DROP FUNCTION IF EXISTS album_user_delete();
 DELETE FROM "migration_overrides"
  WHERE "name" IN ('function_album_user_delete', 'trigger_album_user_delete');
 
+-- 1786741078327-AddWorkflowLogsTable (upstream #29878, re-timestamped by #30774)
+-- added the workflow_log table with its two indexes and two foreign keys, plus a
+-- workflow.logging boolean column. The tagged release ships neither, so its
+-- schema-check reports the table and the column as extra. Dropping the table takes
+-- its indexes and constraints with it. Guarded with IF EXISTS because this script
+-- also runs against a tagged-release DB where they were never created.
+DROP TABLE IF EXISTS "workflow_log";
+ALTER TABLE "workflow" DROP COLUMN IF EXISTS "logging";
+
 -- -----------------------------------------------------------------------------
 -- 8. Delete Gallery + post-v<branding upstream.version> upstream migration rows
 --    from kysely_migrations.
@@ -484,7 +493,8 @@ DELETE FROM "kysely_migrations"
    '1784836013770-MinFacePreferenceMigration',
    '1784986754473-ConvertUserPasswordEmptyStringToNull',
    '1784986754474-AlbumDescriptionNullable',
-   '1786385711807-AlbumOwnerDeleteTrigger'
+   '1786385711807-AlbumOwnerDeleteTrigger',
+   '1786741078327-AddWorkflowLogsTable'
  );
 
 -- -----------------------------------------------------------------------------
