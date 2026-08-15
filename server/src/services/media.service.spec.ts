@@ -155,7 +155,7 @@ describe(MediaService.name, () => {
       expect(mocks.storage.unlink).not.toHaveBeenCalled();
     });
 
-    it('uses one resolved backend for every file in a persistImageFiles batch', async () => {
+    it('resolves the thumbnails kind for every file in a persistImageFiles batch', async () => {
       const put = vi.fn().mockResolvedValue(void 0);
       const stream = makeStream([Buffer.from('data')]);
       const { StorageService } = await import('src/services/storage.service.js');
