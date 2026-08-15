@@ -544,6 +544,25 @@ the location-group exclusion on the flags, and without the orphan rendering rule
 can disappear from the panel while still applied — unremovable except through the chip. This is the
 bug `location-filter.svelte:14-29` and `orphaned-selections.spec.ts` already exist to prevent.
 
+**The empty-state guard swallows the feature's own headline case.** The location section renders
+"No locations found" when `countries.length === 0`. A library where _nothing_ is geotagged has no
+countries at all — which is precisely the library this feature exists to serve. Guarding only on a
+_selected_ presence is not enough: on first open nothing is selected yet, so the message paints over
+the very rows the user needs. The guard must also admit `hasNoGpsAssets` / `hasNoPlaceNameAssets`:
+
+```
+countries.length === 0 && !orphanedCountry && !selectedState
+  && !selectedLocationPresence && !hasNoGpsAssets && !hasNoPlaceNameAssets
+```
+
+The orphan rule and this rule are siblings and easy to conflate — one keeps a _selected_ row visible,
+the other keeps an _offerable_ row reachable. Both are needed.
+
+**The section-menu dot.** `hasActiveFilter('location')` must count `locationPresence` alongside
+`city`/`state`/`country`, or a presence-only filter leaves the section looking untouched from
+outside — no dot on the collapsed panel, none on the hidden-section toggle. `state` had exactly this
+bug and carries the precedent fix.
+
 **`QUERY_MODE_FILTER_HANDLING` (web).** Adding to `FilterState` without classifying breaks `tsc`.
 This is the good kind of trap — loud. Do not silence it by widening the type.
 
