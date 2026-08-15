@@ -151,6 +151,34 @@ describe('FilterPanel', () => {
     expect(onFiltersChange).toHaveBeenCalledWith(expect.objectContaining({ country: 'Germany', city: undefined }));
   });
 
+  it('clears locationPresence when a country is chosen', async () => {
+    const onFiltersChange = vi.fn();
+    const filters = { ...createFilterState(), locationPresence: 'noGps' as const };
+
+    render(FilterPanel, {
+      props: {
+        config: {
+          sections: ['location'],
+          providers: {
+            locations: () => Promise.resolve([{ value: 'Germany', type: 'country' as const }]),
+            cities: () => Promise.resolve([]),
+          },
+        },
+        timeBuckets: [],
+        filters,
+        onFiltersChange,
+      },
+    });
+
+    // The location group is replaced wholesale in BOTH directions — the LocationFilter row test
+    // only covers presence-replaces-country; a country click must equally drop locationPresence.
+    await fireEvent.click(await screen.findByTestId('location-country-Germany'));
+
+    expect(onFiltersChange).toHaveBeenCalledWith(
+      expect.objectContaining({ country: 'Germany', locationPresence: undefined }),
+    );
+  });
+
   it('should update filters when has-no-album is selected', async () => {
     const onFiltersChange = vi.fn();
 

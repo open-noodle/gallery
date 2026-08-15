@@ -78,6 +78,8 @@
   // Fetched data for filter sections
   let people = $state<PersonOption[]>([]);
   let hasUnnamedPeople = $state(false);
+  let hasNoGpsAssets = $state(false);
+  let hasNoPlaceNameAssets = $state(false);
   let countries = $state<string[]>([]);
   let cameraMakes = $state<string[]>([]);
   let tags = $state<TagOption[]>([]);
@@ -188,6 +190,8 @@
             // Mounted clean, so this response is already the no-filters baseline — no second request.
             baseline = result;
           }
+          hasNoGpsAssets = result.hasNoGpsAssets;
+          hasNoPlaceNameAssets = result.hasNoPlaceNameAssets;
         })
         .catch((error: unknown) => {
           if (!controller.signal.aborted) {
@@ -611,9 +615,18 @@
 
   // city / state / country are ONE filter and one chip, so a change to any of them REPLACES the
   // group. `state` defaulting to undefined is what makes a country or city click drop a stale state
-  // rather than silently AND-ing an invisible predicate onto the new selection.
+  // rather than silently AND-ing an invisible predicate onto the new selection. `locationPresence`
+  // is dropped for the same reason — a country/city click and a presence selection are mutually
+  // exclusive members of the same group.
   function handleLocationChange(country?: string, city?: string, state?: string) {
-    updateFilters({ ...filters, country, city, state });
+    updateFilters({ ...filters, country, city, state, locationPresence: undefined });
+  }
+
+  // The reverse direction: selecting (or re-clicking to clear) an absence-of-location row replaces
+  // the whole group, dropping any city/state/country the same way `handleLocationChange` drops
+  // `locationPresence`.
+  function handleLocationPresenceChange(locationPresence?: 'noGps' | 'noPlaceName') {
+    updateFilters({ ...filters, locationPresence, country: undefined, city: undefined, state: undefined });
   }
 
   function handleCameraChange(make?: string, model?: string) {
@@ -662,10 +675,10 @@
         return filters.personIds.length > 0;
       }
       case 'location': {
-        // `state` counts: it is part of the same one-filter group, and without it a state-only
-        // filter left the section looking untouched from the outside too (no dot on the collapsed
-        // panel, none on the hidden-section toggle).
-        return !!filters.city || !!filters.country || !!filters.state;
+        // `state` and `locationPresence` count: they are part of the same one-filter group, and
+        // without them a state-only or presence-only filter left the section looking untouched
+        // from the outside too (no dot on the collapsed panel, none on the hidden-section toggle).
+        return !!filters.city || !!filters.country || !!filters.state || !!filters.locationPresence;
       }
       case 'camera': {
         return !!filters.make;
@@ -861,6 +874,10 @@
                       return [];
                     }}
                     onSelectionChange={handleLocationChange}
+                    {hasNoGpsAssets}
+                    {hasNoPlaceNameAssets}
+                    selectedLocationPresence={filters.locationPresence}
+                    onLocationPresenceChange={handleLocationPresenceChange}
                   />
                 {:else if section === 'camera'}
                   <CameraFilter
