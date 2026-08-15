@@ -9,6 +9,7 @@ import { DuplicateRepository } from 'src/repositories/duplicate.repository';
 import { EventRepository } from 'src/repositories/event.repository';
 import { JobRepository } from 'src/repositories/job.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
+import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
 import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository';
 import { TagRepository } from 'src/repositories/tag.repository';
 import { DB } from 'src/schema';
@@ -29,6 +30,13 @@ const setup = (db?: Kysely<DB>) => {
       AssetRepository,
       ConfigRepository,
       DuplicateRepository,
+      // gallery-fork: resolveGroup carries the keeper's shared-space membership (#317), so it
+      // reaches SharedSpaceRepository on every group. Upstream's version of this suite was an
+      // e2e spec running the real DI container, where the repository was always present; the
+      // #30773 conversion to a medium test declares its dependencies explicitly, and without
+      // this entry every resolve throws on an undefined repository. Real rather than mocked:
+      // these fixtures create no spaces, so the query is a genuine empty-set round trip.
+      SharedSpaceRepository,
       SystemMetadataRepository,
       TagRepository,
     ],
