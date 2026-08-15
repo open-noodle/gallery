@@ -200,3 +200,61 @@ describe('selectLocationRounds', () => {
     expect(a).toEqual(b);
   });
 });
+
+// The CLIP scene gate is design §2's one "mandatory, not optional" filter, and the repository
+// implements it as a RANKING - it returns candidates best-place-first. That ranking only changes
+// which photos become rounds if the sampler prefers the front of the list: with a uniform draw
+// its sole remaining effect was the SQL `LIMIT`, so for any space whose gated pool fits inside
+// that limit (the reference space in §5 is ~95 photos) portraits entered location rounds at
+// exactly the naive rate and the gate was inert.
+// Every candidate in its own country, and spread across the globe, so the country cap, the
+// minimum separation and the cell-uniqueness rule never reject a pick. The rank-bias tests below
+// are about WHICH rank gets drawn, not about the relaxation ladder.
+const rankedPool = (size: number): GameCandidate[] =>
+  Array.from({ length: size }, (_, i) => ({
+    assetId: `rank-${i}`,
+    lat: ((i * 7) % 170) - 85,
+    lon: ((i * 53) % 350) - 175,
+    takenAt: new Date(2021, 0, 1),
+    country: `country-${i}`,
+  }));
+
+const rankOf = (picked: GameCandidate) => Number(picked.assetId.split('-', 2)[1]);
+
+describe('selectLocationRounds scene-gate rank bias', () => {
+  it('draws from the top of the ranking far more often than a uniform sampler would', () => {
+    const pool = rankedPool(100);
+    const random = mulberry32(20_260_815);
+    const picks: number[] = [];
+    for (let i = 0; i < 500; i++) {
+      picks.push(rankOf(selectLocationRounds(pool, 1, 20_000, random)[0]));
+    }
+
+    const share = (predicate: (rank: number) => boolean) => picks.filter((r) => predicate(r)).length / picks.length;
+
+    // A uniform draw - the pre-fix behaviour - puts exactly 0.2 in every quintile. Anything at
+    // or near 0.2 here means the ranking has stopped mattering again.
+    expect(share((rank) => rank < 20)).toBeGreaterThan(0.4);
+    expect(share((rank) => rank >= 80)).toBeLessThan(0.12);
+  });
+
+  // Design §7.1 mandates rank-based selection and explicitly rules out an absolute threshold, so
+  // the low-ranked tail must stay reachable - otherwise a large space replays the same handful of
+  // top-ranked photos for every challenge it ever generates.
+  it('still reaches the tail of the ranking, so it is a bias and not a cutoff', () => {
+    const pool = rankedPool(100);
+    const random = mulberry32(7);
+    const seen = new Set<number>();
+    for (let i = 0; i < 500; i++) {
+      seen.add(rankOf(selectLocationRounds(pool, 1, 20_000, random)[0]));
+    }
+    expect([...seen].some((rank) => rank >= 80)).toBe(true);
+  });
+
+  it('stays deterministic for a given seed', () => {
+    const pool = rankedPool(50);
+    const a = selectLocationRounds(pool, 5, 20_000, mulberry32(11)).map((p) => p.assetId);
+    const b = selectLocationRounds(pool, 5, 20_000, mulberry32(11)).map((p) => p.assetId);
+    expect(a).toEqual(b);
+  });
+});
