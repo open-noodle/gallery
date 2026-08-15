@@ -1269,6 +1269,36 @@ where
   "cte"."distance" <= $6
 commit
 
+-- SearchRepository.searchPets
+begin
+set
+  local vchordrq.probes = 1
+with
+  "cte" as (
+    select
+      "asset_face"."id",
+      "asset_face"."personId",
+      pet_search.embedding <=> $1 as "distance"
+    from
+      "asset_face"
+      inner join "asset" on "asset"."id" = "asset_face"."assetId"
+      inner join "pet_search" on "pet_search"."faceId" = "asset_face"."id"
+    where
+      "asset"."ownerId" = any ($2::uuid[])
+      and "asset"."deletedAt" is null
+    order by
+      "distance"
+    limit
+      $3
+  )
+select
+  *
+from
+  "cte"
+where
+  "cte"."distance" <= $4
+commit
+
 -- SearchRepository.searchPlaces
 select
   *

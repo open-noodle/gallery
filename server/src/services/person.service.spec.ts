@@ -2578,6 +2578,9 @@ describe(PersonService.name, () => {
       expect(mocks.person.getAllFaces).toHaveBeenCalledWith({
         personId: null,
         sourceType: SourceType.MachineLearning,
+        // Slice 5 (F9) rides along on this same non-forced arm; the pet exclusion is what this
+        // test is about.
+        excludeManuallyPlaced: true,
         excludePetFaces: true,
       });
     });
