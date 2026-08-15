@@ -8,12 +8,14 @@
 // what can silently regress here is a surface being left behind on the album-only selector.
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:immich_mobile/constants/enums.dart';
 import 'package:immich_mobile/domain/models/album/album.model.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/config/app_config.dart';
+import 'package:immich_mobile/domain/models/setting.model.dart';
 import 'package:immich_mobile/domain/models/user.model.dart';
+import 'package:immich_mobile/domain/services/setting.service.dart';
 import 'package:immich_mobile/domain/services/user.service.dart';
-import 'package:immich_mobile/constants/enums.dart';
 import 'package:immich_mobile/models/albums/album_search.model.dart';
 import 'package:immich_mobile/presentation/widgets/action_buttons/add_action_button.widget.dart';
 import 'package:immich_mobile/presentation/widgets/action_buttons/base_action_button.widget.dart';
@@ -27,20 +29,34 @@ import 'package:immich_mobile/presentation/widgets/spaces/space_album_bottom_she
 import 'package:immich_mobile/providers/asset_viewer/asset_viewer.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/remote_album.provider.dart';
-import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
+import 'package:immich_mobile/providers/infrastructure/setting.provider.dart';
+import 'package:immich_mobile/providers/infrastructure/settings.provider.dart' show appConfigProvider;
 import 'package:immich_mobile/providers/routes.provider.dart';
 import 'package:immich_mobile/providers/server_info.provider.dart';
-import 'package:immich_mobile/services/server_info.service.dart';
 import 'package:immich_mobile/providers/shared_space.provider.dart';
 import 'package:immich_mobile/providers/timeline/multiselect.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
+import 'package:immich_mobile/services/server_info.service.dart';
 import 'package:mocktail/mocktail.dart';
 
 import '../../../fixtures/user.stub.dart';
+import '../../../service.mocks.dart';
 import '../../../unit/factories/remote_album_factory.dart';
 import '../../../widget_tester_extensions.dart';
 
 class _MockUserService extends Mock implements UserService {}
+
+// AssetDebugAction (upstream #30611, carried into every one of these sheets) reads
+// settingsProvider, whose real notifier builds a SettingsService over StoreService — and
+// StoreService needs a Drift-backed init() this deliberately lightweight harness does not do.
+// Serve setting defaults directly instead. Same shape as space_album_bottom_sheet_test.dart.
+class _DefaultSettingsNotifier extends SettingsNotifier {
+  @override
+  SettingsService build() => SettingsService(storeService: MockStoreService());
+
+  @override
+  T get<T>(Setting<T> setting) => setting.defaultValue;
+}
 
 class _StubCurrentUserNotifier extends CurrentUserProvider {
   _StubCurrentUserNotifier(super.service, UserDto? user) {
@@ -106,7 +122,11 @@ void main() {
     await tester.pumpConsumerWidget(
       sheet,
       overrides: [
+        settingsProvider.overrideWith(_DefaultSettingsNotifier.new),
         currentUserProvider.overrideWith((ref) => _StubCurrentUserNotifier(userService, user)),
+        // Reads the auto_route stack, which this harness has none of. Every action these
+        // sheets mount gates on it, so it has to be answered before any of them build.
+        inLockedViewProvider.overrideWithValue(false),
         remoteAlbumProvider.overrideWith(() => _StubRemoteAlbumNotifier()),
         appConfigProvider.overrideWithValue(const AppConfig()),
         sharedSpacesProvider.overrideWith((ref) async => const []),
@@ -163,6 +183,7 @@ void main() {
     await tester.pumpConsumerWidget(
       const AddActionButton(),
       overrides: [
+        settingsProvider.overrideWith(_DefaultSettingsNotifier.new),
         currentUserProvider.overrideWith((ref) => _StubCurrentUserNotifier(userService, user)),
         assetViewerProvider.overrideWith(() => _StubAssetViewerNotifier(viewed)),
         // Reads the auto_route stack, which this harness has none of.
