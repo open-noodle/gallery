@@ -28,6 +28,8 @@ FilterSuggestionsResponseDto _sugg({List<String>? countries}) => FilterSuggestio
   hasFavorites: true,
   hasAssetsInAlbum: true,
   hasAssetsNotInAlbum: true,
+  hasNoGpsAssets: false,
+  hasNoPlaceNameAssets: false,
   countries: countries ?? const [],
 );
 
