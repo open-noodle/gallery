@@ -19,6 +19,8 @@ const defaultResponse: FilterSuggestionsResponse = {
   hasFavorites: true,
   hasAssetsInAlbum: true,
   hasAssetsNotInAlbum: true,
+  hasNoGpsAssets: false,
+  hasNoPlaceNameAssets: false,
 };
 
 const timeBuckets = [

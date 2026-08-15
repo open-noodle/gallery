@@ -228,6 +228,8 @@
       hasFavorites: response.hasFavorites,
       hasAssetsInAlbum: response.hasAssetsInAlbum,
       hasAssetsNotInAlbum: response.hasAssetsNotInAlbum,
+      hasNoGpsAssets: response.hasNoGpsAssets,
+      hasNoPlaceNameAssets: response.hasNoPlaceNameAssets,
     };
   };
 
