@@ -1,4 +1,6 @@
 import {
+  type GameCandidate,
+  geoCellKey,
   haversineKm,
   type LatLon,
   MAX_ROUND_SCORE,
@@ -7,6 +9,7 @@ import {
   poolScaleDays,
   poolScaleKm,
   scoreFromError,
+  selectLocationRounds,
 } from 'src/utils/game-scoring';
 
 describe('haversineKm', () => {
@@ -107,5 +110,83 @@ describe('poolScaleDays', () => {
 
   it('returns at least one day for a single-date pool', () => {
     expect(poolScaleDays([new Date(2020, 0, 1)], mulberry32(1))).toBeGreaterThanOrEqual(1);
+  });
+});
+
+const candidate = (id: string, lat: number, lon: number, country: string): GameCandidate => ({
+  assetId: id,
+  lat,
+  lon,
+  takenAt: new Date(2020, 0, 1),
+  country,
+});
+
+describe('geoCellKey', () => {
+  it('puts nearby points in the same cell', () => {
+    expect(geoCellKey({ lat: 52.5, lon: 13.4 }, 50)).toBe(geoCellKey({ lat: 52.51, lon: 13.41 }, 50));
+  });
+
+  it('puts distant points in different cells', () => {
+    expect(geoCellKey({ lat: 52.5, lon: 13.4 }, 50)).not.toBe(geoCellKey({ lat: 48.9, lon: 2.4 }, 50));
+  });
+});
+
+describe('selectLocationRounds', () => {
+  const spread: GameCandidate[] = [
+    candidate('a', 52.5, 13.4, 'Germany'),
+    candidate('b', -33.9, 18.4, 'South Africa'),
+    candidate('c', 40.7, -74.0, 'United States'),
+    candidate('d', 47.9, 106.9, 'Mongolia'),
+    candidate('e', 41.9, 12.5, 'Italy'),
+    candidate('f', 45.8, 15.9, 'Croatia'),
+  ];
+
+  it('returns the requested number of distinct assets', () => {
+    const picked = selectLocationRounds(spread, 5, 15_000, mulberry32(1));
+    expect(picked).toHaveLength(5);
+    expect(new Set(picked.map((p) => p.assetId)).size).toBe(5);
+  });
+
+  it('never picks two answers closer than the minimum separation', () => {
+    const scaleKm = 15_000;
+    const minSeparation = scaleKm / 75;
+    const picked = selectLocationRounds(spread, 5, scaleKm, mulberry32(2));
+    for (let i = 0; i < picked.length; i++) {
+      for (let j = i + 1; j < picked.length; j++) {
+        const a = { lat: picked[i].lat!, lon: picked[i].lon! };
+        const b = { lat: picked[j].lat!, lon: picked[j].lon! };
+        expect(haversineKm(a, b)).toBeGreaterThanOrEqual(minSeparation);
+      }
+    }
+  });
+
+  it('caps how many rounds share a country when alternatives exist', () => {
+    const germanHeavy: GameCandidate[] = [
+      ...Array.from({ length: 20 }, (_, i) => candidate(`de${i}`, 48 + i * 0.3, 8 + i * 0.3, 'Germany')),
+      candidate('za', -33.9, 18.4, 'South Africa'),
+      candidate('us', 40.7, -74.0, 'United States'),
+      candidate('mn', 47.9, 106.9, 'Mongolia'),
+    ];
+    const picked = selectLocationRounds(germanHeavy, 5, 15_000, mulberry32(3));
+    const germanCount = picked.filter((p) => p.country === 'Germany').length;
+    expect(germanCount).toBeLessThanOrEqual(2);
+  });
+
+  // A clustered pool must still yield a playable set - relaxing beats failing.
+  it('relaxes constraints rather than returning an empty set', () => {
+    const clustered = Array.from({ length: 12 }, (_, i) => candidate(`c${i}`, 52.5 + i * 0.01, 13.4, 'Germany'));
+    const picked = selectLocationRounds(clustered, 5, 20, mulberry32(4));
+    expect(picked.length).toBeGreaterThan(0);
+    expect(new Set(picked.map((p) => p.assetId)).size).toBe(picked.length);
+  });
+
+  it('returns fewer rounds than requested when the pool is genuinely too small', () => {
+    expect(selectLocationRounds(spread.slice(0, 2), 5, 15_000, mulberry32(5))).toHaveLength(2);
+  });
+
+  it('is deterministic for a given seed', () => {
+    const a = selectLocationRounds(spread, 5, 15_000, mulberry32(9)).map((p) => p.assetId);
+    const b = selectLocationRounds(spread, 5, 15_000, mulberry32(9)).map((p) => p.assetId);
+    expect(a).toEqual(b);
   });
 });
