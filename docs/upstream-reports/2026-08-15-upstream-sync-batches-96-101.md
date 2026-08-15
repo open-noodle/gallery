@@ -278,20 +278,49 @@ unmodified.
 ## Remote CI Verification
 
 - **Test branch**: `rebase/upstream-b101`
-- **Commit validated**: (filled in after dispatch)
+- **Commit validated**: `568ace3fce0` (final); the seven unaffected workflows are green on
+  `6b17f7857fc`, with the delta between them being three files — see the skew note below.
 
-| Workflow                                  | Status | Notes |
-| ----------------------------------------- | ------ | ----- |
-| `test.yml`                                |        |       |
-| `docker.yml`                              |        |       |
-| `static_analysis.yml`                     |        |       |
-| `gallery-build-mobile.yml`                |        |       |
-| `gallery-rebase-smoke.yml`                |        |       |
-| `storage-migration-tests.yml`             |        |       |
-| `storage-migration-e2e.yml`               |        |       |
-| `gallery-revert-to-immich-validation.yml` |        |       |
-| `gallery-ml-smoke.yml`                    |        |       |
-| `gallery-mobile-smoke.yml`                |        |       |
+| Workflow                                  | Status | Green on      | Notes                                        |
+| ----------------------------------------- | ------ | ------------- | -------------------------------------------- |
+| `test.yml`                                | GREEN  | `568ace3fce0` | 21/21 jobs, 0 skipped                        |
+| `docker.yml`                              | GREEN  | `568ace3fce0` | re-run because it builds the web bundle      |
+| `gallery-rebase-smoke.yml`                | GREEN  | `568ace3fce0` | re-run because it drives a web build         |
+| `static_analysis.yml`                     | GREEN  | `6b17f7857fc` | mobile-only; unaffected by the delta         |
+| `gallery-build-mobile.yml`                | GREEN  | `6b17f7857fc` | Android **and** iOS legs both success        |
+| `gallery-mobile-smoke.yml`                | GREEN  | `6b17f7857fc` | mobile-only; unaffected                      |
+| `storage-migration-tests.yml`             | GREEN  | `6b17f7857fc` | does not run server medium specs             |
+| `storage-migration-e2e.yml`               | GREEN  | `6b17f7857fc` | does not run server medium specs             |
+| `gallery-revert-to-immich-validation.yml` | GREEN  | `6b17f7857fc` | coverage **and** Docker-boot half; see below |
+| `gallery-ml-smoke.yml`                    | GREEN  | `6b17f7857fc` | `machine-learning/` untouched                |
+
+**On the SHA skew**: the delta from `6b17f7857fc` to `568ace3fce0` is exactly three files — a trailing
+blank line in `web/src/lib/services/album.service.ts`, the DI entry in
+`duplicate.service.spec.ts`, and this report. The three workflows whose inputs that delta actually
+reaches were re-dispatched; the other seven read only paths the delta does not touch.
+
+**Revert-to-immich validation was checked past the coverage grep**, since a passing grep is necessary
+but not sufficient. The run log shows both new statements executing against the tagged `:main` image
+and correctly no-op'ing —
+`NOTICE: table "workflow_log" does not exist, skipping` /
+`NOTICE: column "logging" of relation "workflow" does not exist, skipping` — followed by
+`Post-phase drift (0 item(s))` and `revert-to-immich validation PASSED`. That is the proof the
+`IF EXISTS` guards were load-bearing.
+
+**First-round failures and their classification** (`test.yml` on `6b17f7857fc`, 17/21):
+
+| Job                    | Cause                                                             | Class                    |
+| ---------------------- | ----------------------------------------------------------------- | ------------------------ |
+| Test Web               | trailing blank line from the `handleConfirmAlbumDelete` removal   | real — local gate hole   |
+| Medium Tests (Server)  | `SharedSpaceRepository` absent from upstream's new medium DI list | real — semantic break #6 |
+| End-to-End Tests (Web) | `maintenance.e2e-spec.ts` "enter and exit maintenance mode"       | **flake**                |
+
+The maintenance failure was classified as a flake on evidence, not assumption: the spec and
+`maintenance-auth.guard.ts` are both **byte-identical to `upstream/main`**, the entire maintenance-mode
+surface has zero fork divergence (only the unrelated `database-backups` specs diverge), the batch's
+only change there deleted two unused exports, and it passed on a re-run in which nothing touching it
+had changed. The accompanying `Error: 404` noise points at the server restart that entering
+maintenance mode triggers.
 
 ## Post-Rebase Verification
 
