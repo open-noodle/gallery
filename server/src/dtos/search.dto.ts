@@ -296,6 +296,10 @@ const FilterSuggestionsResponseSchema = z
     hasFavorites: z.boolean().describe('Whether any favourite exists in the filtered set, ignoring isFavorite'),
     hasAssetsInAlbum: z.boolean().describe('Whether any filtered asset belongs to an album'),
     hasAssetsNotInAlbum: z.boolean().describe('Whether any filtered asset belongs to no album'),
+    hasNoGpsAssets: z.boolean().describe('Whether assets without coordinates exist in the filtered set'),
+    hasNoPlaceNameAssets: z
+      .boolean()
+      .describe('Whether assets with coordinates but no place name exist in the filtered set'),
   })
   .meta({ id: 'FilterSuggestionsResponseDto' });
 
@@ -317,6 +321,10 @@ const SmartSearchFacetsResponseSchema = z
     hasFavorites: z.boolean().describe('Whether any favourite exists in the filtered set, ignoring isFavorite'),
     hasAssetsInAlbum: z.boolean().describe('Whether any filtered asset belongs to an album'),
     hasAssetsNotInAlbum: z.boolean().describe('Whether any filtered asset belongs to no album'),
+    hasNoGpsAssets: z.boolean().describe('Whether assets without coordinates exist in the filtered set'),
+    hasNoPlaceNameAssets: z
+      .boolean()
+      .describe('Whether assets with coordinates but no place name exist in the filtered set'),
   })
   .meta({ id: 'SmartSearchFacetsResponseDto' });
 
@@ -328,6 +336,12 @@ const FilterSuggestionsRequestBaseSchema = z.object({
   country: z.string().optional().describe('Filter by country'),
   state: z.string().optional().describe('Filter by state/province'),
   city: z.string().optional().describe('Filter by city'),
+  locationPresence: z
+    .enum(['noGps', 'noPlaceName'])
+    .optional()
+    .describe(
+      'Filter for assets with no location: noGps (no coordinates) or noPlaceName (coordinates the geocoder could not name). Cannot be combined with city, state or country.',
+    ),
   make: z.string().optional().describe('Filter by camera make'),
   model: z.string().optional().describe('Filter by camera model'),
   lensModel: z.string().optional().describe('Filter by lens model'),
@@ -353,6 +367,7 @@ const FilterSuggestionsRequestSchema = FilterSuggestionsRequestBaseSchema.pipe(
   IsNotSiblingOf(FilterSuggestionsRequestBaseSchema, 'albumId', ['spaceId']),
 )
   .pipe(IsNotSiblingOf(FilterSuggestionsRequestBaseSchema, 'albumId', ['withSharedSpaces']))
+  .pipe(IsNotSiblingOf(FilterSuggestionsRequestBaseSchema, 'locationPresence', ['city', 'state', 'country']))
   .meta({ id: 'FilterSuggestionsRequestDto' });
 
 export class RandomSearchDto extends createZodDto(RandomSearchSchema) {}

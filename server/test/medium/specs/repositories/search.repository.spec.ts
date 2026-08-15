@@ -2037,5 +2037,52 @@ describe(SearchRepository.name, () => {
 
       expect(ids).toContain(asset.id);
     });
+
+    it('reports which absence-of-location entries are worth offering', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      await newLocationFixture(ctx, user.id);
+
+      const suggestions = await sut.getFilterSuggestions([user.id], {});
+
+      expect(suggestions.hasNoGpsAssets).toBe(true);
+      expect(suggestions.hasNoPlaceNameAssets).toBe(true);
+    });
+
+    it('reports both false for a fully located library', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newExif({ assetId: asset.id, latitude: 48.85, longitude: 2.35, city: 'Paris', country: 'France' });
+
+      const suggestions = await sut.getFilterSuggestions([user.id], {});
+
+      expect(suggestions.hasNoGpsAssets).toBe(false);
+      expect(suggestions.hasNoPlaceNameAssets).toBe(false);
+    });
+
+    it('keeps the sibling entry offered once one is selected', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      await newLocationFixture(ctx, user.id);
+
+      const suggestions = await sut.getFilterSuggestions([user.id], { locationPresence: 'noGps' });
+
+      // Both flags are computed with the location group excluded, so selecting one entry must not
+      // make the other vanish from the panel.
+      expect(suggestions.hasNoPlaceNameAssets).toBe(true);
+      expect(suggestions.countries).toContain('France');
+    });
+
+    it('reports the same flags through the smart-facets path', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { a1 } = await newLocationFixture(ctx, user.id);
+      await addEmbedding(ctx.database, a1.id);
+
+      const facets = await sut.getSmartSearchFacets({ userIds: [user.id], embedding: matchingEmbedding });
+
+      expect(facets.hasNoGpsAssets).toBe(true);
+    });
   });
 });
