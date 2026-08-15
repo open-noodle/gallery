@@ -45,7 +45,8 @@ where
     or "face_area"."faceAreaRatio" <= $5
   )
 order by
-  (smart_search.embedding <=> $6::vector) - (smart_search.embedding <=> $7::vector) desc nulls last
+  (smart_search.embedding <=> $6::vector) - (smart_search.embedding <=> $7::vector) desc nulls last,
+  "asset"."id" asc
 limit
   $8
 
@@ -63,7 +64,7 @@ where
   and "asset"."visibility" = $3
   and "asset"."localDateTime" is not null
 order by
-  random()
+  "asset"."id" asc
 limit
   $4
 
