@@ -25,4 +25,11 @@ describe('DateRound', () => {
     expect(new Date(iso).getUTCFullYear()).toBeGreaterThanOrEqual(2009);
     expect(new Date(iso).getUTCFullYear()).toBeLessThanOrEqual(2026);
   });
+
+  it('gives the slider an accessible name', () => {
+    render(DateRound, { ...base, onGuess: () => {} });
+    // $t() is untranslated in this test environment (no locale catalog is loaded), so
+    // the accessible name resolves to the raw i18n key rather than its English text.
+    expect(screen.getByLabelText('game_when_was_this')).toBe(screen.getByTestId('date-round-slider'));
+  });
 });
