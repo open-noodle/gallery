@@ -1122,6 +1122,7 @@ describe('/gallery/map/markers', () => {
 
       expect(status).toBe(200);
       expect(markerIds(body)).toEqual([favAssetId]);
+    });
   });
 
   describe('cross-scope favorite markers (#763 slice 4, E23)', () => {

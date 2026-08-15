@@ -13066,7 +13066,7 @@ describe(SharedSpaceService.name, () => {
     // from the marker query. The overlay makes the favourite predicate per-CALLER (asset_favorite
     // resolved for authUserId), so a space asset only pins when *I* favourited it, and withholding
     // the scope now just hides my own favourites inside my spaces.
-    it('widens a favorites query to shared-space assets — the overlay predicate is the caller\'s (#763)', async () => {
+    it("widens a favorites query to shared-space assets — the overlay predicate is the caller's (#763)", async () => {
       const auth = factory.auth();
       const spaceId = newUuid();
       mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId }]);
