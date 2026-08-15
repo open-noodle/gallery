@@ -179,7 +179,7 @@ export const scoreFromError = (error: number, scale: number): number => {
 
 Run: `cd server && pnpm vitest --config test/vitest.config.mjs run src/utils/game-scoring.spec.ts`
 
-Expected: PASS, 8 tests.
+Expected: PASS, 7 tests (3 haversine + 4 scoring).
 
 - [ ] **Step 5: Commit**
 
@@ -360,7 +360,7 @@ export const poolScaleDays = (dates: Date[], random: () => number, sampleCount =
 
 Run: `cd server && pnpm vitest --config test/vitest.config.mjs run src/utils/game-scoring.spec.ts`
 
-Expected: PASS, 15 tests.
+Expected: PASS, 14 tests cumulative (7 from Task 1 + 7 new).
 
 - [ ] **Step 5: Commit**
 
@@ -607,7 +607,7 @@ export const selectLocationRounds = (
 
 Run: `cd server && pnpm vitest --config test/vitest.config.mjs run src/utils/game-scoring.spec.ts`
 
-Expected: PASS, 22 tests.
+Expected: PASS, 22 tests cumulative (14 + 8 new).
 
 Note: the "never picks two answers closer than the minimum separation" test asserts on a pool that comfortably satisfies the constraint, so no relaxation occurs. The relaxation test deliberately uses a pool that cannot.
 
