@@ -12,10 +12,9 @@ import 'package:immich_mobile/models/albums/album_search.model.dart';
 import 'package:immich_mobile/presentation/widgets/album/album_selector.widget.dart';
 import 'package:immich_mobile/presentation/widgets/collection/collection_picker.widget.dart';
 import 'package:immich_mobile/presentation/widgets/collection/space_collection_section.widget.dart';
-import 'package:immich_mobile/presentation/widgets/album/album_selector.widget.dart';
+import 'package:immich_mobile/providers/album/album_sort_by_options.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/action.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
-import 'package:immich_mobile/providers/album/album_sort_by_options.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/remote_album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/space_album.provider.dart';
@@ -26,8 +25,8 @@ import 'package:immich_mobile/widgets/common/search_field.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:openapi/api.dart' hide AlbumUserRole;
 
-import '../../../unit/factories/remote_album_factory.dart';
 import '../../../fixtures/user.stub.dart';
+import '../../../unit/factories/remote_album_factory.dart';
 import '../../../widget_tester_extensions.dart';
 
 class _MockUserService extends Mock implements UserService {}
