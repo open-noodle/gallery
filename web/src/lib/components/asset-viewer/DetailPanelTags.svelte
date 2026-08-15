@@ -17,10 +17,14 @@
     isOwner: boolean;
     /**
      * #734: widens the ADD-tag affordance to a space editor. Per-tag REMOVE stays gated on the
-     * real `isOwner` below — `bulkTagAssets`/`removeTag` resolve tag writes to
-     * `access.tag.checkOwnerAccess` on the tag id, which has no space-edit arm, so offering an
-     * editor a remove control would present a button that always 403s. Defaults to `isOwner` so
-     * every call site keeps today's behavior unless it explicitly widens editability.
+     * real `isOwner` below — not because removal always 403s for an editor (it doesn't:
+     * `TagService.removeAssets` passes `canAlwaysRemove: Permission.TagDelete`, and
+     * `asset.util.ts:81-85` short-circuits the per-asset check for the caller's OWN tags, so an
+     * editor removing a tag they added themselves succeeds today). The real reason is that
+     * `TagResponseDto` carries no `userId`, so the client cannot tell which tags on this asset are
+     * the caller's own versus the owner's, and offering remove on all of them would fail on the
+     * owner's. Defaults to `isOwner` so every call site keeps today's behavior unless it
+     * explicitly widens editability.
      */
     canEdit?: boolean;
     /**

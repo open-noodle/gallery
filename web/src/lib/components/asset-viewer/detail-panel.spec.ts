@@ -487,10 +487,19 @@ describe('DetailPanel', () => {
       renderWithTooltips(DetailPanel, { asset, currentAlbum: null });
 
       await waitFor(() => expect(screen.getAllByTestId('detail-panel-row-probe')).toHaveLength(5));
-      for (const probe of screen.getAllByTestId('detail-panel-row-probe')) {
+      const [descriptionProbe, ratingProbe, dateProbe, locationProbe, tagsProbe] =
+        screen.getAllByTestId('detail-panel-row-probe');
+
+      // Only Tags receives an explicit `canEdit` prop (DetailPanel.svelte:546); Description,
+      // Rating, Date and Location receive `isOwner={canEdit}` with no separate `canEdit` prop, so
+      // the stub's `data-can-edit` for those four is `String(!!undefined)` === 'false' regardless
+      // of state — asserting it there would pass either way (fix #7). Assert it only where the
+      // prop is actually threaded.
+      for (const probe of [descriptionProbe, ratingProbe, dateProbe, locationProbe]) {
         expect(probe).toHaveAttribute('data-is-owner', 'false');
-        expect(probe).toHaveAttribute('data-can-edit', 'false');
       }
+      expect(tagsProbe).toHaveAttribute('data-is-owner', 'false');
+      expect(tagsProbe).toHaveAttribute('data-can-edit', 'false');
     });
 
     // W-18, the hard rule of this task: `canEdit` must never reach the people row. It keeps the
