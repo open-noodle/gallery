@@ -294,11 +294,9 @@ The handler body is a bare `this.checkAccess({ auth, permission: Permission.Asse
 the write itself will take. It cannot drift from enforcement because it _is_ enforcement, minus the
 write.
 
-`spaceId` is accepted for symmetry with `getAssetInfo` and for the activity attribution in §4.6; the
-access check itself is space-agnostic (the union already spans every space the caller belongs to).
-
 Batch size is bounded by `@ChunkedSet` inside the access repository, so a large selection chunks
-rather than building one enormous `IN` list.
+rather than building one enormous `IN` list — in practice a request is already capped well below
+that by Nest's default 10MB JSON body limit, which holds roughly 250,000 ids.
 
 ### 4.5 Harden `stack.service.ts:21`
 
