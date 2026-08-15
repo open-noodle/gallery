@@ -45,10 +45,12 @@ const SCALE_PERCENTILE = 0.9;
 export const mulberry32 = (seed: number): (() => number) => {
   let state = seed;
   return () => {
-    state = (state + 0x6d2b79f5) | 0;
+    // eslint-disable-next-line unicorn/prefer-math-trunc
+    state = (state + 0x6d_2b_79_f5) | 0;
     let t = Math.imul(state ^ (state >>> 15), 1 | state);
+    // eslint-disable-next-line unicorn/operator-assignment
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    return ((t ^ (t >>> 14)) >>> 0) / 4_294_967_296;
   };
 };
 
@@ -106,4 +108,121 @@ export const poolScaleDays = (dates: Date[], random: () => number, sampleCount =
     (a, b) => Math.abs(a.getTime() - b.getTime()) / MS_PER_DAY,
   );
   return Math.max(1, Math.round(percentile(offsets, SCALE_PERCENTILE)));
+};
+
+export type GameCandidate = {
+  assetId: string;
+  lat: number | null;
+  lon: number | null;
+  takenAt: Date;
+  country: string | null;
+};
+
+/** Spread-rule divisors. Both derive from the pool scale rather than being fixed. */
+const CELL_DIVISOR = 300;
+const SEPARATION_DIVISOR = 75;
+const MAX_PER_COUNTRY = 2;
+
+const KM_PER_DEGREE = 111;
+
+export const geoCellKey = (point: LatLon, cellKm: number): string => {
+  const size = Math.max(cellKm, 0.05) / KM_PER_DEGREE;
+  return `${Math.round(point.lat / size)}:${Math.round(point.lon / size)}`;
+};
+
+type Constraints = { enforceCountryCap: boolean; minSeparationKm: number; enforceCellUniqueness: boolean };
+
+const tryFill = (
+  candidates: GameCandidate[],
+  count: number,
+  cellKm: number,
+  constraints: Constraints,
+  random: () => number,
+): GameCandidate[] => {
+  const picked: GameCandidate[] = [];
+  const usedCells = new Set<string>();
+  const usedAssets = new Set<string>();
+  const perCountry = new Map<string, number>();
+
+  // Bounded attempts: the pool may be unable to satisfy the constraints at all.
+  const maxAttempts = Math.max(1000, candidates.length * 20);
+  for (let attempt = 0; attempt < maxAttempts && picked.length < count; attempt++) {
+    const next = candidates[Math.floor(random() * candidates.length)];
+    if (!next || next.lat === null || next.lon === null || usedAssets.has(next.assetId)) {
+      continue;
+    }
+    const point = { lat: next.lat, lon: next.lon };
+    const cell = geoCellKey(point, cellKm);
+
+    if (constraints.enforceCellUniqueness && usedCells.has(cell)) {
+      continue;
+    }
+    if (constraints.minSeparationKm > 0) {
+      const tooClose = picked.some(
+        (p) => haversineKm({ lat: p.lat!, lon: p.lon! }, point) < constraints.minSeparationKm,
+      );
+      if (tooClose) {
+        continue;
+      }
+    }
+    if (constraints.enforceCountryCap) {
+      const country = next.country ?? '(unknown)';
+      if ((perCountry.get(country) ?? 0) >= MAX_PER_COUNTRY) {
+        continue;
+      }
+      perCountry.set(country, (perCountry.get(country) ?? 0) + 1);
+    }
+
+    usedCells.add(cell);
+    usedAssets.add(next.assetId);
+    picked.push(next);
+  }
+
+  return picked;
+};
+
+/**
+ * Pick location rounds under spread rules derived from the pool scale.
+ *
+ * Measurement showed naive sampling already produces decent country variety, but
+ * routinely puts two answers under 50km apart, which reads as a bug. Minimum
+ * separation is the rule that earns its keep; the country cap stops a
+ * home-country-heavy library from rewarding a player who always pins home.
+ *
+ * When a pool is too clustered to satisfy everything, constraints relax in a fixed
+ * order rather than the generator failing: country cap, then minimum separation,
+ * then cell uniqueness.
+ */
+export const selectLocationRounds = (
+  candidates: GameCandidate[],
+  count: number,
+  scaleKm: number,
+  random: () => number,
+): GameCandidate[] => {
+  const usable = candidates.filter((c) => c.lat !== null && c.lon !== null);
+  if (usable.length === 0 || count <= 0) {
+    return [];
+  }
+
+  const cellKm = Math.max(scaleKm / CELL_DIVISOR, 0.05);
+  const separation = Math.max(scaleKm / SEPARATION_DIVISOR, 0.05);
+
+  const ladder: Constraints[] = [
+    { enforceCountryCap: true, minSeparationKm: separation, enforceCellUniqueness: true },
+    { enforceCountryCap: false, minSeparationKm: separation, enforceCellUniqueness: true },
+    { enforceCountryCap: false, minSeparationKm: 0, enforceCellUniqueness: true },
+    { enforceCountryCap: false, minSeparationKm: 0, enforceCellUniqueness: false },
+  ];
+
+  let best: GameCandidate[] = [];
+  for (const constraints of ladder) {
+    const picked = tryFill(usable, count, cellKm, constraints, random);
+    if (picked.length > best.length) {
+      best = picked;
+    }
+    if (best.length === count) {
+      break;
+    }
+  }
+  return best;
 };
