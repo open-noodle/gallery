@@ -486,6 +486,51 @@ export type CalendarHeatmapResponseDto = {
     /** Total activity count over the period */
     totalCount: number;
 };
+export type LibraryManifestAlbumDto = {
+    /** Album ID */
+    id: string;
+    /** Album name */
+    name: string;
+};
+export type LibraryManifestAssetDto = {
+    /** IDs of the owner-owned albums this asset belongs to */
+    albumIds: string[];
+    /** Asset ID */
+    assetId: string;
+    /** Base64 encoded SHA1 hash */
+    checksum: string;
+    /** Checksum algorithm */
+    checksumAlgorithm: ChecksumAlgorithm;
+    /** File creation time */
+    fileCreatedAt: string | null;
+    /** File modification time */
+    fileModifiedAt: string | null;
+    /** Object-storage key (asset.originalPath) */
+    objectKey: string;
+    /** Original file name */
+    originalFileName: string;
+    /** Original file size in bytes; null if unknown */
+    size: number | null;
+    "type": AssetTypeEnum;
+};
+export type LibraryManifestOwnerDto = {
+    /** Owner email */
+    email: string;
+    /** Owner user ID */
+    id: string;
+};
+export type LibraryManifestResponseDto = {
+    /** All albums owned by the target user */
+    albums: LibraryManifestAlbumDto[];
+    assets: LibraryManifestAssetDto[];
+    /** When this page was generated */
+    generatedAt: string;
+    /** Manifest schema version; consumers must guard */
+    manifestSchemaVersion: number;
+    /** Pass as ?cursor for the next page; null when exhausted */
+    nextCursor: string | null;
+    owner: LibraryManifestOwnerDto;
+};
 export type AlbumsResponse = {
     defaultAssetOrder: AssetOrder;
 };
@@ -5270,6 +5315,22 @@ export function getUserCalendarHeatmapAdmin({ $from, id, to, $type }: {
         "from": $from,
         to,
         "type": $type
+    }))}`, {
+        ...opts
+    }));
+}
+/**
+ * Export a user library manifest
+ */
+export function getLibraryManifest({ cursor, id }: {
+    cursor?: string;
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: LibraryManifestResponseDto;
+    }>(`/admin/users/${encodeURIComponent(id)}/library-manifest${QS.query(QS.explode({
+        cursor
     }))}`, {
         ...opts
     }));
@@ -10216,6 +10277,16 @@ export enum CalendarHeatmapType {
     Upload = "Upload",
     Taken = "Taken"
 }
+export enum ChecksumAlgorithm {
+    Sha1 = "sha1",
+    Sha1Path = "sha1-path"
+}
+export enum AssetTypeEnum {
+    Image = "IMAGE",
+    Video = "VIDEO",
+    Audio = "AUDIO",
+    Other = "OTHER"
+}
 export enum AssetOrder {
     Asc = "asc",
     Desc = "desc"
@@ -10447,12 +10518,6 @@ export enum AssetJobName {
 export enum Type {
     UserPerson = "user-person",
     SpacePerson = "space-person"
-}
-export enum AssetTypeEnum {
-    Image = "IMAGE",
-    Video = "VIDEO",
-    Audio = "AUDIO",
-    Other = "OTHER"
 }
 export enum AssetEditAction {
     Crop = "crop",
