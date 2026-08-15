@@ -166,7 +166,9 @@ export class GameRepository {
    * against the 54 spike images showed each catches what the other misses:
    *
    *   - face area <= 5% of the frame, so portraits (where the place is background behind a
-   *     face) are excluded;
+   *     face) are excluded. Verified against a real Postgres that the ratio below is true
+   *     floating-point division, not integer division truncating every sub-100% ratio to 0 -
+   *     see the inline comment on the SQL expression;
    *   - ranked (never thresholded - see below) by CLIP similarity to "an outdoor photo that
    *     shows where it was taken" minus similarity to "a close-up of a person or an indoor
    *     room", because a face-free indoor kitchen passes the face gate and carries no location
@@ -195,7 +197,12 @@ export class GameRepository {
             .selectFrom('asset_face')
             .select('asset_face.assetId as assetId')
             .select((eb) =>
-              sql<number>`sum((${eb.ref('asset_face.boundingBoxX2')} - ${eb.ref('asset_face.boundingBoxX1')}) * (${eb.ref('asset_face.boundingBoxY2')} - ${eb.ref('asset_face.boundingBoxY1')})) / nullif(max(${eb.ref('asset_face.imageWidth')}) * max(${eb.ref('asset_face.imageHeight')}), 0)`.as(
+              // All four bbox columns plus imageWidth/imageHeight are `integer` (asset-face.table.ts).
+              // Postgres: sum(integer) -> bigint, max(integer)*max(integer) -> integer, and
+              // bigint/integer is TRUNCATING integer division - every ratio below 1.0 collapses to
+              // 0, which made the <= 0.05 gate below pass every portrait unconditionally. Casting the
+              // numerator (and one denominator factor) to double precision forces real division.
+              sql<number>`sum((${eb.ref('asset_face.boundingBoxX2')} - ${eb.ref('asset_face.boundingBoxX1')}) * (${eb.ref('asset_face.boundingBoxY2')} - ${eb.ref('asset_face.boundingBoxY1')}))::double precision / nullif(max(${eb.ref('asset_face.imageWidth')})::double precision * max(${eb.ref('asset_face.imageHeight')}), 0)`.as(
                 'faceAreaRatio',
               ),
             )
