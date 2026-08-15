@@ -58,6 +58,7 @@ import { SharedLinkAssetRepository } from 'src/repositories/shared-link-asset.re
 import { SharedLinkRepository } from 'src/repositories/shared-link.repository';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
 import { StackRepository } from 'src/repositories/stack.repository';
+import { StorageMigrationRepository } from 'src/repositories/storage-migration.repository';
 import { StorageRepository } from 'src/repositories/storage.repository';
 import { SyncCheckpointRepository } from 'src/repositories/sync-checkpoint.repository';
 import { SyncRepository } from 'src/repositories/sync.repository';
@@ -593,6 +594,7 @@ const newRealRepository = <T>(key: ClassConstructor<T>, db: Kysely<DB>): T => {
     case SharedLinkAssetRepository:
     case SharedSpaceRepository:
     case StackRepository:
+    case StorageMigrationRepository:
     case SyncRepository:
     case SyncCheckpointRepository:
     case SystemMetadataRepository:

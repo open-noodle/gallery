@@ -1267,7 +1267,16 @@ export class AssetRepository {
 
   @GenerateSql()
   getFileSamples() {
-    return this.db.selectFrom('asset_file').select(['assetId', 'path']).limit(sql.lit(3)).execute();
+    // Only disk-resident files: the media location describes filesystem paths, so a relative
+    // S3 key is never a valid sample. Without this filter, an unordered `limit 3` on a mixed
+    // install returns an S3 key at random and the location check in StorageService.onBootstrap
+    // throws InconsistentMediaLocation on some restarts but not others.
+    return this.db
+      .selectFrom('asset_file')
+      .select(['assetId', 'path'])
+      .where('path', 'like', '/%')
+      .limit(sql.lit(3))
+      .execute();
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })

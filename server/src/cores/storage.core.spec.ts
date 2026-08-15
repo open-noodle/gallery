@@ -283,5 +283,21 @@ describe('StorageCore', () => {
       expect(mocks.move.create).not.toHaveBeenCalled();
       expect(mocks.storage.rename).not.toHaveBeenCalled();
     });
+
+    // Pins existing behaviour: the `!isAbsolute(oldPath)` guard above already exists and
+    // already no-ops on a relative S3 key, regardless of pathType. This is the case that
+    // becomes far more likely once mixed disk+S3 storage is a permanent state rather than a
+    // brief migration window.
+    it('should not move a file whose path is a relative S3 key', async () => {
+      await core.moveFile({
+        entityId: 'asset-1',
+        pathType: AssetPathType.Original,
+        oldPath: 'thumbs/user/ab/cd/abcd_thumbnail.webp',
+        newPath: '/data/thumbs/user/ab/cd/abcd_thumbnail.webp',
+      });
+
+      expect(mocks.move.create).not.toHaveBeenCalled();
+      expect(mocks.storage.rename).not.toHaveBeenCalled();
+    });
   });
 });
