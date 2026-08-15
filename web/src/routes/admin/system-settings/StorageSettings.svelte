@@ -2,6 +2,7 @@
   import SettingButtonsRow from '$lib/components/shared-components/settings/SystemConfigButtonRow.svelte';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import { systemConfigManager } from '$lib/managers/system-config-manager.svelte';
+  import { handleError } from '$lib/utils/handle-error';
   import { getRoutingStatus, StorageRouting, type StorageRoutingStatusDto } from '@immich/sdk';
   import { Icon } from '@immich/ui';
   import { mdiHelpCircleOutline } from '@mdi/js';
@@ -13,10 +14,16 @@
   const disabled = $derived(featureFlagsManager.value.configFile);
   const s3Available = $derived(featureFlagsManager.value.s3Storage);
   let configToEdit = $state(systemConfigManager.cloneValue());
+  // Left undefined on failure (mirroring the loading state) rather than guessing — see optionsFor,
+  // which must not assert a resolved backend when this is unset.
   let status = $state<StorageRoutingStatusDto>();
 
   onMount(async () => {
-    status = await getRoutingStatus();
+    try {
+      status = await getRoutingStatus();
+    } catch (error) {
+      handleError(error, $t('admin.storage_routing_fetch_status_failed'));
+    }
   });
 
   // The three storage-routing knobs, each backed by its own SystemConfigStorageRoutingDto field
@@ -36,9 +43,12 @@
   const optionsFor = (resolved: string | undefined) => [
     {
       value: StorageRouting.Auto,
-      text: $t('admin.storage_routing_option_auto', {
-        values: { backend: resolved === 's3' ? 'S3' : $t('admin.storage_routing_option_disk') },
-      }),
+      // Still loading or the status fetch failed: don't assert a backend we don't actually know.
+      text: resolved
+        ? $t('admin.storage_routing_option_auto', {
+            values: { backend: resolved === 's3' ? 'S3' : $t('admin.storage_routing_option_disk') },
+          })
+        : $t('admin.storage_routing_option_auto_unresolved'),
     },
     { value: StorageRouting.Disk, text: $t('admin.storage_routing_option_disk') },
     { value: StorageRouting.S3, text: $t('admin.storage_routing_option_s3'), disabled: !s3Available },

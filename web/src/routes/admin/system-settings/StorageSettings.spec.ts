@@ -1,9 +1,18 @@
-import { RoutedTo, type ServerFeaturesDto, type StorageRoutingStatusDto, type SystemConfigDto } from '@immich/sdk';
+import {
+  getRoutingStatus,
+  RoutedTo,
+  type ServerFeaturesDto,
+  type StorageRoutingStatusDto,
+  type SystemConfigDto,
+} from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { render, screen, waitFor } from '@testing-library/svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import StorageSettings from './StorageSettings.svelte';
+
+const { handleErrorMock } = vi.hoisted(() => ({ handleErrorMock: vi.fn() }));
+vi.mock(import('$lib/utils/handle-error'), () => ({ handleError: handleErrorMock }));
 
 const makeStorageConfig = () =>
   ({
@@ -140,5 +149,19 @@ describe('StorageSettings', () => {
       'href',
       '/admin/storage-migration?direction=toDisk&fileTypes=thumbnails,previews,fullsize,personThumbnails,profileImages',
     );
+  });
+
+  it('does not claim a backend or offer a migrate link when the routing status fetch fails', async () => {
+    vi.mocked(getRoutingStatus).mockRejectedValueOnce(new Error('network error'));
+
+    render(StorageSettings);
+
+    await waitFor(() =>
+      expect(handleErrorMock).toHaveBeenCalledWith(expect.any(Error), 'Failed to fetch routing status'),
+    );
+
+    expect(screen.getAllByRole('option', { name: 'Follow IMMICH_STORAGE_BACKEND' })).toHaveLength(3);
+    expect(screen.queryAllByRole('option', { name: /currently:/ })).toHaveLength(0);
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
 });
