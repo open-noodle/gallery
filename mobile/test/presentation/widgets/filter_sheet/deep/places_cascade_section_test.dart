@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -23,13 +24,17 @@ class _FakePrefs implements FilterSectionPrefs {
 
 Override _noCollapsed() => filterSectionPrefsProvider.overrideWithValue(_FakePrefs({}));
 
-FilterSuggestionsResponseDto _sugg({List<String>? countries}) => FilterSuggestionsResponseDto(
+FilterSuggestionsResponseDto _sugg({
+  List<String>? countries,
+  bool hasNoGpsAssets = false,
+  bool hasNoPlaceNameAssets = false,
+}) => FilterSuggestionsResponseDto(
   hasUnnamedPeople: false,
   hasFavorites: true,
   hasAssetsInAlbum: true,
   hasAssetsNotInAlbum: true,
-  hasNoGpsAssets: false,
-  hasNoPlaceNameAssets: false,
+    hasNoGpsAssets: hasNoGpsAssets,
+  hasNoPlaceNameAssets: hasNoPlaceNameAssets,
   countries: countries ?? const [],
 );
 
@@ -259,6 +264,106 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('places-section-search-more')), findsNothing);
+    });
+
+    testWidgets('offers the no-location entries when the server allows them', (tester) async {
+      await tester.pumpConsumerWidget(
+        const Material(child: PlacesCascadeSection()),
+        overrides: [
+          _noCollapsed(),
+          photosFilterSuggestionsProvider.overrideWith(
+            (ref, filter) =>
+                Future.value(_sugg(countries: ['France'], hasNoGpsAssets: true, hasNoPlaceNameAssets: true)),
+          ),
+        ],
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.widgetWithText(FilterChip, 'filter_location_no_gps'.tr()), findsOneWidget);
+      expect(find.widgetWithText(FilterChip, 'filter_location_no_place_name'.tr()), findsOneWidget);
+    });
+
+    testWidgets('hides the no-location entries when the server says they would match nothing', (tester) async {
+      await tester.pumpConsumerWidget(
+        const Material(child: PlacesCascadeSection()),
+        overrides: [
+          _noCollapsed(),
+          photosFilterSuggestionsProvider.overrideWith((ref, filter) => Future.value(_sugg(countries: ['France']))),
+        ],
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.widgetWithText(FilterChip, 'filter_location_no_gps'.tr()), findsNothing);
+      expect(find.widgetWithText(FilterChip, 'filter_location_no_place_name'.tr()), findsNothing);
+    });
+
+    // A selected `state` (with no country) still resolves selectedCountry to null, so the
+    // country Wrap — and this chip — stays reachable. That makes this the one scenario in
+    // this surface where a stale field can genuinely leak through: proves the handler builds
+    // a FRESH SearchLocationFilter rather than `copyWith(locationPresence: ...)`, whose
+    // `state ?? this.state` semantics would silently keep the old state alongside the new
+    // presence value.
+    testWidgets('tapping the no-gps entry constructs a fresh filter, clearing an existing state', (tester) async {
+      await tester.pumpConsumerWidget(
+        const Material(child: PlacesCascadeSection()),
+        overrides: [
+          _noCollapsed(),
+          photosFilterSuggestionsProvider.overrideWith(
+            (ref, filter) => Future.value(_sugg(countries: ['France'], hasNoGpsAssets: true)),
+          ),
+        ],
+      );
+      await tester.pumpAndSettle();
+
+      final container = ProviderScope.containerOf(tester.element(find.byType(PlacesCascadeSection)));
+      container.read(photosFilterProvider.notifier).setLocation(SearchLocationFilter(state: 'California'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(FilterChip, 'filter_location_no_gps'.tr()));
+      await tester.pumpAndSettle();
+
+      final loc = container.read(photosFilterProvider).location;
+      expect(loc.locationPresence, 'noGps');
+      expect(loc.state, isNull);
+    });
+
+    testWidgets('tapping the already-selected no-gps entry clears the location filter', (tester) async {
+      await tester.pumpConsumerWidget(
+        const Material(child: PlacesCascadeSection()),
+        overrides: [
+          _noCollapsed(),
+          photosFilterSuggestionsProvider.overrideWith(
+            (ref, filter) => Future.value(_sugg(countries: ['France'], hasNoGpsAssets: true)),
+          ),
+        ],
+      );
+      await tester.pumpAndSettle();
+
+      final container = ProviderScope.containerOf(tester.element(find.byType(PlacesCascadeSection)));
+      container.read(photosFilterProvider.notifier).setLocation(SearchLocationFilter(locationPresence: 'noGps'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(FilterChip, 'filter_location_no_gps'.tr()));
+      await tester.pumpAndSettle();
+
+      expect(container.read(photosFilterProvider).location.locationPresence, isNull);
+    });
+
+    testWidgets('keeps the no-gps entry visible when already selected even if the flag turns false', (tester) async {
+      await tester.pumpConsumerWidget(
+        const Material(child: PlacesCascadeSection()),
+        overrides: [
+          _noCollapsed(),
+          photosFilterSuggestionsProvider.overrideWith((ref, filter) => Future.value(_sugg(countries: ['France']))),
+        ],
+      );
+      await tester.pumpAndSettle();
+
+      final container = ProviderScope.containerOf(tester.element(find.byType(PlacesCascadeSection)));
+      container.read(photosFilterProvider.notifier).setLocation(SearchLocationFilter(locationPresence: 'noGps'));
+      await tester.pumpAndSettle();
+
+      expect(find.widgetWithText(FilterChip, 'filter_location_no_gps'.tr()), findsOneWidget);
     });
   });
 }

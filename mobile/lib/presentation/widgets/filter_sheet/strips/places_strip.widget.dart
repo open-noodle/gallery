@@ -23,6 +23,19 @@ class PlacesStrip extends ConsumerWidget {
     final filter = ref.watch(photosFilterDebouncedProvider);
     final async = ref.watch(photosFilterSuggestionsProvider(filter));
     final items = async.whenData((s) => s.countries);
+    final suggestions = async.valueOrNull;
+    final selectedPresence = ref.watch(photosFilterProvider.select((f) => f.location.locationPresence));
+
+    // Location presence ("no GPS" / "coordinates but no name") is a member of the same
+    // location group as country/city — mutually exclusive with them, ONE chip. Offered
+    // ahead of the country tiles, gated on the server flag OR the value already being
+    // selected (so a selection made under a different filter combo stays reachable here).
+    final presenceEntries = <_PresenceEntry>[
+      if ((suggestions?.hasNoGpsAssets ?? false) || selectedPresence == 'noGps')
+        const _PresenceEntry('noGps', 'filter_location_no_gps'),
+      if ((suggestions?.hasNoPlaceNameAssets ?? false) || selectedPresence == 'noPlaceName')
+        const _PresenceEntry('noPlaceName', 'filter_location_no_place_name'),
+    ];
 
     return StripScaffold(
       titleKey: 'filter_sheet_places',
@@ -36,11 +49,50 @@ class PlacesStrip extends ConsumerWidget {
         return ListView.separated(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 20),
-          itemCount: shown.length + (overflow > 0 ? 1 : 0),
+          itemCount: presenceEntries.length + shown.length + (overflow > 0 ? 1 : 0),
           separatorBuilder: (_, _) => const SizedBox(width: 10),
-          itemBuilder: (ctx, i) => i < shown.length ? _PlaceTile(country: shown[i]) : _MorePlaceTile(count: overflow),
+          itemBuilder: (ctx, i) {
+            if (i < presenceEntries.length) {
+              return _PresenceChip(entry: presenceEntries[i]);
+            }
+            final j = i - presenceEntries.length;
+            return j < shown.length ? _PlaceTile(country: shown[j]) : _MorePlaceTile(count: overflow);
+          },
         );
       },
+    );
+  }
+}
+
+/// One entry of the location-presence group: `value` is the wire value sent as
+/// `locationPresence` ('noGps' / 'noPlaceName'), `labelKey` the i18n key for its chip label.
+class _PresenceEntry {
+  final String value;
+  final String labelKey;
+  const _PresenceEntry(this.value, this.labelKey);
+}
+
+class _PresenceChip extends ConsumerWidget {
+  final _PresenceEntry entry;
+  const _PresenceChip({required this.entry});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selected = ref.watch(photosFilterProvider.select((f) => f.location.locationPresence == entry.value));
+    return Center(
+      child: FilterChip(
+        key: Key('places-presence-${entry.value}'),
+        label: Text(entry.labelKey.tr()),
+        selected: selected,
+        onSelected: (_) {
+          HapticFeedback.selectionClick();
+          // Selecting/clearing a presence entry replaces the whole location group — a fresh
+          // SearchLocationFilter, never copyWith (copyWith's `x ?? this.x` can't clear a field).
+          ref
+              .read(photosFilterProvider.notifier)
+              .setLocation(selected ? null : SearchLocationFilter(locationPresence: entry.value));
+        },
+      ),
     );
   }
 }

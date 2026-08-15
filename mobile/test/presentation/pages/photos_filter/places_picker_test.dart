@@ -2,26 +2,38 @@ import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/models/search/search_filter.model.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/places_picker.page.dart';
 import 'package:immich_mobile/providers/photos_filter/city_suggestions.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/filter_suggestions.provider.dart';
+import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/places_picker.provider.dart';
 import 'package:openapi/api.dart';
 
 import '../../../widget_tester_extensions.dart';
 
-FilterSuggestionsResponseDto _sugg(List<String> countries) => FilterSuggestionsResponseDto(
+FilterSuggestionsResponseDto _sugg(
+  List<String> countries, {
+  bool hasNoGpsAssets = false,
+  bool hasNoPlaceNameAssets = false,
+}) => FilterSuggestionsResponseDto(
   hasUnnamedPeople: false,
   hasFavorites: true,
   hasAssetsInAlbum: true,
   hasAssetsNotInAlbum: true,
-  hasNoGpsAssets: false,
-  hasNoPlaceNameAssets: false,
+    hasNoGpsAssets: hasNoGpsAssets,
+  hasNoPlaceNameAssets: hasNoPlaceNameAssets,
   countries: countries,
 );
 
-List<Override> _overrideCountries(List<String> countries) => [
-  photosFilterSuggestionsProvider.overrideWith((ref, filter) async => _sugg(countries)),
+List<Override> _overrideCountries(
+  List<String> countries, {
+  bool hasNoGpsAssets = false,
+  bool hasNoPlaceNameAssets = false,
+}) => [
+  photosFilterSuggestionsProvider.overrideWith(
+    (ref, filter) async => _sugg(countries, hasNoGpsAssets: hasNoGpsAssets, hasNoPlaceNameAssets: hasNoPlaceNameAssets),
+  ),
 ];
 
 void main() {
@@ -183,6 +195,87 @@ void main() {
 
       expect(find.byKey(const Key('places-picker-retry')), findsNothing);
       expect(find.byKey(const Key('places-picker-country-France')), findsOneWidget);
+    });
+  });
+
+  group('PlacesPickerPage no-location entries', () {
+    testWidgets('offers the no-location entries when the server allows them', (tester) async {
+      await tester.pumpConsumerWidget(
+        const PlacesPickerPage(),
+        overrides: _overrideCountries(['France'], hasNoGpsAssets: true, hasNoPlaceNameAssets: true),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.widgetWithText(InkWell, 'filter_location_no_gps'.tr()), findsOneWidget);
+      expect(find.widgetWithText(InkWell, 'filter_location_no_place_name'.tr()), findsOneWidget);
+    });
+
+    testWidgets('hides the no-location entries when the server says they would match nothing', (tester) async {
+      await tester.pumpConsumerWidget(const PlacesPickerPage(), overrides: _overrideCountries(['France']));
+      await tester.pumpAndSettle();
+
+      expect(find.widgetWithText(InkWell, 'filter_location_no_gps'.tr()), findsNothing);
+      expect(find.widgetWithText(InkWell, 'filter_location_no_place_name'.tr()), findsNothing);
+    });
+
+    // Zero countries must not hide the presence rows — this is the primary use case: a
+    // library with nothing geotagged has an empty `countries` list but still needs the
+    // "no GPS" row reachable (matches web's location-filter.svelte parity behaviour).
+    testWidgets('offers the entries even with zero countries', (tester) async {
+      await tester.pumpConsumerWidget(
+        const PlacesPickerPage(),
+        overrides: _overrideCountries([], hasNoGpsAssets: true),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.widgetWithText(InkWell, 'filter_location_no_gps'.tr()), findsOneWidget);
+    });
+
+    testWidgets('tapping the no-gps entry constructs a fresh filter, clearing any selected country', (tester) async {
+      await tester.pumpConsumerWidget(
+        const PlacesPickerPage(),
+        overrides: _overrideCountries(['France'], hasNoGpsAssets: true),
+      );
+      await tester.pumpAndSettle();
+
+      final container = ProviderScope.containerOf(tester.element(find.byType(PlacesPickerPage)));
+      container.read(photosFilterProvider.notifier).setLocation(SearchLocationFilter(country: 'France'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(InkWell, 'filter_location_no_gps'.tr()));
+      await tester.pumpAndSettle();
+
+      final loc = container.read(photosFilterProvider).location;
+      expect(loc.locationPresence, 'noGps');
+      expect(loc.country, isNull);
+    });
+
+    testWidgets('tapping the already-selected entry clears the location filter', (tester) async {
+      await tester.pumpConsumerWidget(
+        const PlacesPickerPage(),
+        overrides: _overrideCountries(['France'], hasNoGpsAssets: true),
+      );
+      await tester.pumpAndSettle();
+
+      final container = ProviderScope.containerOf(tester.element(find.byType(PlacesPickerPage)));
+      container.read(photosFilterProvider.notifier).setLocation(SearchLocationFilter(locationPresence: 'noGps'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(InkWell, 'filter_location_no_gps'.tr()));
+      await tester.pumpAndSettle();
+
+      expect(container.read(photosFilterProvider).location.locationPresence, isNull);
+    });
+
+    testWidgets('keeps the entry visible when already selected even if the flag turns false', (tester) async {
+      await tester.pumpConsumerWidget(const PlacesPickerPage(), overrides: _overrideCountries(['France']));
+      await tester.pumpAndSettle();
+
+      final container = ProviderScope.containerOf(tester.element(find.byType(PlacesPickerPage)));
+      container.read(photosFilterProvider.notifier).setLocation(SearchLocationFilter(locationPresence: 'noGps'));
+      await tester.pumpAndSettle();
+
+      expect(find.widgetWithText(InkWell, 'filter_location_no_gps'.tr()), findsOneWidget);
     });
   });
 }
