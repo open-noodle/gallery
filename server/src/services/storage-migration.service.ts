@@ -7,6 +7,13 @@ import { AssetFileType, JobName, JobStatus, QueueName } from 'src/enum.js';
 import { StorageMigrationDirection } from 'src/repositories/storage-migration.repository.js';
 import { BaseService } from 'src/services/base.service.js';
 import { StorageService } from 'src/services/storage.service.js';
+import {
+  MIGRATION_FILE_TYPE_TO_KIND,
+  resolveRouting,
+  StorageMigrationFileType,
+  StorageRoutingKind,
+} from 'src/backends/storage-router.js';
+import { StorageRouting } from 'src/gallery/config.dto.js';
 
 interface StorageMigrationFileTypes {
   originals: boolean;
@@ -21,14 +28,34 @@ interface StorageMigrationFileTypes {
 
 @Injectable()
 export class StorageMigrationService extends BaseService {
-  private validateBackendConfig(direction: StorageMigrationDirection): void {
-    const backend = this.configRepository.getEnv().storage.backend;
-    if (direction === 'toS3' && backend !== 's3') {
-      throw new BadRequestException('Storage backend must be set to "s3" (IMMICH_STORAGE_BACKEND=s3) to migrate to S3');
+  private async validateRouting(
+    direction: StorageMigrationDirection,
+    fileTypes: StorageMigrationFileTypes,
+  ): Promise<void> {
+    const target = direction === 'toS3' ? 's3' : 'disk';
+    const config = await this.getConfig({ withCache: true });
+    const envBackend = this.configRepository.getEnv().storage.backend;
+
+    // A kind whose new writes go elsewhere would never converge: migrate the backlog and the
+    // very next thumbnail lands back on the other backend. Reject before queueing anything.
+    const offending = new Map<StorageRoutingKind, string>();
+    for (const [fileType, selected] of Object.entries(fileTypes) as Array<[StorageMigrationFileType, boolean]>) {
+      if (!selected) {
+        continue;
+      }
+      const kind = MIGRATION_FILE_TYPE_TO_KIND[fileType];
+      const routing = config.storage.routing[kind];
+      const resolved = resolveRouting(routing, envBackend);
+      if (resolved !== target) {
+        const via = routing === StorageRouting.Auto ? ' (via IMMICH_STORAGE_BACKEND)' : '';
+        offending.set(kind, `${kind} is routed to ${resolved}${via}`);
+      }
     }
-    if (direction === 'toDisk' && backend !== 'disk') {
+
+    if (offending.size > 0) {
       throw new BadRequestException(
-        'Storage backend must be set to "disk" (IMMICH_STORAGE_BACKEND=disk) to migrate to disk',
+        `Cannot migrate to ${target}: ${offending.values().toArray().join('; ')}. ` +
+          `Change the storage routing for those kinds first.`,
       );
     }
   }
@@ -75,7 +102,7 @@ export class StorageMigrationService extends BaseService {
     fileTypes: StorageMigrationFileTypes;
     concurrency: number;
   }) {
-    this.validateBackendConfig(options.direction);
+    await this.validateRouting(options.direction, options.fileTypes);
     await this.validateS3Connection();
 
     const fileCounts = await this.storageMigrationRepository.getFileCounts(options.direction);
@@ -120,7 +147,7 @@ export class StorageMigrationService extends BaseService {
   async handleQueueAll(job: JobOf<JobName.StorageBackendMigrationQueueAll>): Promise<JobStatus> {
     const { direction, deleteSource, fileTypes, concurrency, batchId } = job;
 
-    this.validateBackendConfig(direction);
+    await this.validateRouting(direction, fileTypes);
     this.jobRepository.setConcurrency(QueueName.StorageBackendMigration, concurrency);
 
     let totalQueued = 0;
