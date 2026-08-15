@@ -166,6 +166,28 @@ describe(GameService.name, () => {
       expect(result.distanceKm).toBeCloseTo(0, 5);
     });
 
+    // Pins challenge.scaleKm (15_000) as the actual divisor: the guess is placed exactly scaleKm/10
+    // from the answer (due north, so the great-circle distance is exact), which makes the score
+    // decay ratio exactly 0.1 and the expected score exactly 5000 * e^-1 ≈ 1839 - a value that only
+    // comes out right if the frozen challenge scale, not some other/recomputed scale, is the divisor.
+    it('scores a non-perfect location guess against the frozen scale', async () => {
+      mocks.game.getRound.mockResolvedValue({
+        id: 'round-1',
+        challengeId: 'challenge-1',
+        index: 0,
+        type: 'location',
+        answerLat: 0,
+        answerLon: 0,
+        answerDate: null,
+      } as any);
+      mocks.game.createGuess.mockImplementation((guess: any) => guess);
+
+      const result = await sut.guess(authStub, 'challenge-1', 0, { lat: 13.4898, lon: 0 });
+
+      expect(result.distanceKm).toBeCloseTo(1500, 0);
+      expect(result.score).toBe(1839);
+    });
+
     it('scores a date guess from the day offset', async () => {
       mocks.game.getRound.mockResolvedValue({
         id: 'round-2',
@@ -175,6 +197,27 @@ describe(GameService.name, () => {
         answerLat: null,
         answerLon: null,
         answerDate: new Date(2020, 6, 1),
+      } as any);
+      mocks.game.createGuess.mockImplementation((guess: any) => guess);
+
+      const result = await sut.guess(authStub, 'challenge-1', 1, { date: new Date(2020, 6, 1).toISOString() });
+
+      expect(result.score).toBe(5000);
+      expect(result.offsetDays).toBe(0);
+    });
+
+    // The answer's timestamp (asset.localDateTime) carries a real time of day the player cannot
+    // know. Naming the correct calendar day must score 5000 regardless of that time of day - both
+    // sides are normalised to their UTC calendar day before differencing, not diffed as instants.
+    it('scores a date guess naming the correct calendar day, regardless of the answer time of day', async () => {
+      mocks.game.getRound.mockResolvedValue({
+        id: 'round-2',
+        challengeId: 'challenge-1',
+        index: 1,
+        type: 'date',
+        answerLat: null,
+        answerLon: null,
+        answerDate: new Date(2020, 6, 1, 14, 23),
       } as any);
       mocks.game.createGuess.mockImplementation((guess: any) => guess);
 
@@ -195,7 +238,7 @@ describe(GameService.name, () => {
         answerDate: null,
       } as any);
       mocks.game.createGuess.mockRejectedValue(
-        Object.assign(new Error('duplicate key'), { constraint: 'game_guess_round_user_uq' }),
+        Object.assign(new Error('duplicate key'), { constraint_name: 'game_guess_round_user_uq' }),
       );
 
       await expect(sut.guess(authStub, 'challenge-1', 0, { lat: 1, lon: 1 })).rejects.toBeInstanceOf(ConflictException);
