@@ -544,13 +544,15 @@ test.describe('Spaces FilterPanel', () => {
       const locationFilter = page.locator('[data-testid="location-filter"]');
       await expect(locationFilter).toBeVisible();
 
-      // Without EXIF data, should show empty message
-      const emptyMsg = page.locator('[data-testid="location-empty"]');
       const countryItems = page.locator('[data-testid^="location-country-"]');
       const hasLocations = (await countryItems.count()) > 0;
 
       if (!hasLocations) {
-        await expect(emptyMsg).toBeVisible();
+        // These assets carry no EXIF, so there are no countries — but they ARE the assets the
+        // "No location" filter exists to find, so the section offers that entry rather than the
+        // "no locations found" message it used to show (#868).
+        await expect(page.locator('[data-testid="location-presence-noGps"]')).toBeVisible();
+        await expect(page.locator('[data-testid="location-empty"]')).toHaveCount(0);
       }
     });
 
@@ -1627,12 +1629,14 @@ test.describe('Spaces FilterPanel', () => {
     // #910: createPopulatedSpace now seeds real GPS/camera EXIF (see the helper above) so every
     // OTHER test in this file gets a populated location/camera facet. This test needs the opposite —
     // a space that structurally has none — so it builds its own bare fixture rather than reusing the
-    // shared helper. Under slice 5 that scope hides the sections outright instead of showing an
-    // "-empty" placeholder inside them (there are no active filters, so "current" and "baseline"
-    // facets are identical — an always-empty scope is 'unavailable', never merely 'empty'). Asserting
-    // the absence is the coverage here: a scope with genuinely no location/camera data cannot filter
-    // by either, and that is a fact about the seed, not a concession to a missing seed.
-    test('hides location and camera sections when space has no EXIF data', async ({ context, page }) => {
+    // shared helper. Camera cannot filter anything in that scope, so slice 5 hides its section
+    // outright rather than showing an "-empty" placeholder inside it. Location is the exception
+    // since #868: assets with no coordinates are exactly what the "No location" entry filters for,
+    // so that section stays and offers the entry.
+    test('hides the camera section but offers the no-location entry when space has no EXIF data', async ({
+      context,
+      page,
+    }) => {
       const space = await utils.createSpace(admin.accessToken, { name: 'No EXIF Data' });
       const asset1 = await utils.createAsset(admin.accessToken);
       const asset2 = await utils.createAsset(admin.accessToken);
@@ -1640,7 +1644,11 @@ test.describe('Spaces FilterPanel', () => {
 
       await gotoSpace(context, page, space.id);
 
-      await expect(page.locator('[data-testid="filter-section-location"]')).toHaveCount(0);
+      // Camera has nothing to offer at all, so #910 hides its whole section. Location does NOT:
+      // these assets have no coordinates, which is precisely what the "No location" entry filters
+      // for, so the section stays and offers that row instead (#868).
+      await expect(page.locator('[data-testid="location-presence-noGps"]')).toBeVisible();
+      await expect(page.locator('[data-testid="location-empty"]')).toHaveCount(0);
       await expect(page.locator('[data-testid="filter-section-camera"]')).toHaveCount(0);
     });
 
