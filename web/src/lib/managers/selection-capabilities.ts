@@ -49,12 +49,6 @@ export interface SelectionCapabilities {
   canSetCover: boolean;
   canRemoveFromAlbum: boolean;
   canRemoveFromSpace: boolean;
-  /**
-   * True while `sel.editableSelectedAssetIds` is still resolving (#734) — an all-owned
-   * selection resolves synchronously and is never pending. A consumer should render the
-   * `canEditMetadata`-gated actions disabled rather than popping them in once this flips.
-   */
-  capabilitiesPending: boolean;
 }
 
 const NO_CAPABILITIES: SelectionCapabilities = {
@@ -72,7 +66,6 @@ const NO_CAPABILITIES: SelectionCapabilities = {
   canSetCover: false,
   canRemoveFromAlbum: false,
   canRemoveFromSpace: false,
-  capabilitiesPending: false,
 };
 
 export function getSelectionCapabilities(ctx: CommandContext, tagsEnabled: boolean): SelectionCapabilities {
@@ -115,9 +108,9 @@ export function getSelectionCapabilities(ctx: CommandContext, tagsEnabled: boole
   const isSpaceEditor = space !== null && space.canWrite;
 
   // #734: an editable subset, not all-or-nothing — the same shape canShare already uses for
-  // the owned subset. `undefined` means unresolved, which is pending, not denied.
+  // the owned subset. `undefined` means unresolved, which SelectionToolbar treats as denied
+  // (hidden) rather than pending — see that component's resolution effect.
   const editable = sel.editableSelectedAssetIds;
-  const capabilitiesPending = editable === undefined && !sel.isAllUserOwned;
   const hasEditable = sel.isAllUserOwned || (editable !== undefined && editable.length > 0);
 
   return {
@@ -140,6 +133,5 @@ export function getSelectionCapabilities(ctx: CommandContext, tagsEnabled: boole
     canSetCover: isEditorOfContext && sel.selectedAssetIds.length === 1,
     canRemoveFromAlbum,
     canRemoveFromSpace,
-    capabilitiesPending,
   };
 }

@@ -55,7 +55,7 @@ export interface SelectionCommandContext {
   isAllTrashed: boolean;
   /**
    * Which of `selectedAssetIds` the caller may edit (#734). `undefined` means not yet
-   * resolved — a consumer should render the affected actions disabled-pending rather than
+   * resolved — a consumer should hide the affected actions until it resolves, rather than
    * popping them in late. An all-owned selection resolves synchronously, without a request.
    *
    * Always `undefined` on this context: nothing today gates on `canEditMetadata` /
