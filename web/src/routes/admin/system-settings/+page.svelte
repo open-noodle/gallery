@@ -16,6 +16,7 @@
   import NotificationSettings from './NotificationSettings.svelte';
   import ServerSettings from './ServerSettings.svelte';
   import StorageTemplateSettings from '$lib/components/admin-settings/StorageTemplateSettings.svelte';
+  import StorageSettings from './StorageSettings.svelte';
   import StorageUsageSettings from './StorageUsageSettings.svelte';
   import ThemeSettings from './ThemeSettings.svelte';
   import TrashSettings from './TrashSettings.svelte';
@@ -38,6 +39,7 @@
     mdiFileCheckOutline,
     mdiFileDocumentOutline,
     mdiFolderOutline,
+    mdiFolderSwapOutline,
     mdiHistory,
     mdiImageOutline,
     mdiLockOutline,
@@ -173,6 +175,14 @@
       subtitle: $t('admin.server_settings_description'),
       key: 'server',
       icon: mdiServerOutline,
+    },
+    // Gallery-fork: per-file-type storage routing (disk vs S3).
+    {
+      component: StorageSettings,
+      title: $t('admin.storage_routing_settings'),
+      subtitle: $t('admin.storage_routing_settings_description'),
+      key: 'storage-routing',
+      icon: mdiFolderSwapOutline,
     },
     {
       component: StorageTemplateSettings,
