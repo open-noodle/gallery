@@ -12,9 +12,7 @@ type FacialRecognitionOverrides = Partial<
   }
 >;
 
-type MachineLearningOverrides = Partial<
-  Pick<SystemConfigDto['machineLearning'], 'petDetection' | 'petRecognition'>
->;
+type MachineLearningOverrides = Partial<Pick<SystemConfigDto['machineLearning'], 'petDetection' | 'petRecognition'>>;
 
 const makeMachineLearningConfig = (
   facialRecognitionOverrides: FacialRecognitionOverrides = {},

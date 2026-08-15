@@ -6,6 +6,7 @@ import { AssetRepository } from 'src/repositories/asset.repository';
 import { ConfigRepository } from 'src/repositories/config.repository';
 import { DatabaseRepository } from 'src/repositories/database.repository';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository';
+import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository';
 import { JobRepository } from 'src/repositories/job.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { MachineLearningRepository } from 'src/repositories/machine-learning.repository';
@@ -47,6 +48,7 @@ const setup = (db?: Kysely<DB>) => {
       ConfigRepository,
       DatabaseRepository,
       FaceIdentityRepository,
+      FacePersonVerdictRepository,
       PersonRepository,
       SharedSpaceRepository,
     ],
