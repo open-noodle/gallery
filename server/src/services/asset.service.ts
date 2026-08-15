@@ -841,6 +841,14 @@ export class AssetService extends BaseService {
    * Never throws. Attribution is secondary to the edit that triggered it.
    */
   private async logCrossOwnerEdit(auth: AuthDto, assetIds: string[]): Promise<void> {
+    // assetIds arrives here via a zod-validated DTO, so it's already guaranteed to be a real
+    // array — this check is defence in depth at the helper boundary, not a suspicion that the
+    // DTO lies. It also matters for static analysis: it's what makes the chunking below
+    // provably bounded rather than relying on a `.length` that isn't necessarily an array's own.
+    if (!Array.isArray(assetIds)) {
+      return;
+    }
+
     try {
       // Which of these does the caller own? AssetDelete is the pure owner arm — the same
       // trick rbac-3 uses at :220-223. Deliberately NOT a getByIds fetch: findSpaceForAssetAndUser
