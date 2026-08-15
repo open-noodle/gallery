@@ -1,0 +1,423 @@
+import { Injectable } from '@nestjs/common';
+import { Insertable, Kysely, Selectable, sql } from 'kysely';
+import { InjectKysely } from 'nestjs-kysely';
+import { DummyValue, GenerateSql } from 'src/decorators';
+import { AssetType, AssetVisibility } from 'src/enum';
+import { DB } from 'src/schema';
+import { GameChallengeTable } from 'src/schema/tables/game-challenge.table';
+import { GameGuessTable } from 'src/schema/tables/game-guess.table';
+import { GameRoundTable } from 'src/schema/tables/game-round.table';
+import { asVector } from 'src/utils/database';
+import { GameCandidate } from 'src/utils/game-scoring';
+
+export type GameChallengeRow = Selectable<GameChallengeTable>;
+export type GameRoundRow = Selectable<GameRoundTable>;
+export type GameGuessRow = Selectable<GameGuessTable>;
+
+// A face covering more than this fraction of the frame marks the shot as a portrait rather
+// than a place - see the doc comment on getLocationCandidates for the measurement behind it.
+const MAX_FACE_AREA_RATIO = 0.05;
+
+/**
+ * CLIP text embedding for "an outdoor photo that shows where it was taken", encoded with
+ * ViT-B-32__openai - the model Gallery's smart search uses. Paired with
+ * NOT_PLACE_PROMPT_EMBEDDING below; see getLocationCandidates for why both are needed.
+ *
+ * Regenerate with, from machine-learning/:
+ *   uv run --project machine-learning python -c "from immich_ml.models.clip.textual import OpenClipTextualEncoder; \
+ *     m = OpenClipTextualEncoder('ViT-B-32__openai'); m.load(); \
+ *     print(m.predict('an outdoor photo that shows where it was taken'))"
+ */
+export const PLACE_PROMPT_EMBEDDING: number[] = [
+  -0.03565011, 0.04119933, 0.01333595, -0.01572146, 0.00014742, -0.01074514, -0.00938183, -0.10144751, 0.01633137,
+  -0.00570935, 0.01585284, -0.02488416, 0.01326679, -0.02903384, 0.0031385, -0.0092501, 0.00491203, 0.03014844,
+  0.0154667, 0.01722844, 0.06752882, -0.00456453, 0.01514293, -0.02354148, 0.0192754, -0.00704748, -0.02427393,
+  -0.00363509, -0.01776161, -0.02864841, -0.01343763, 0.01432632, 0.0097616, -0.01000545, -0.01486041, -0.00378936,
+  0.01796454, -0.0173474, -0.01160319, 0.05725082, -0.00485439, 0.02071633, 0.02593069, 0.01364317, 0.01745008,
+  -0.02577067, 0.01379383, 0.02026937, 0.00417087, 0.0108376, 0.01115624, -0.00470062, 0.00473881, -0.02181567,
+  -0.02316737, -0.00334229, -0.02153531, 0.02684961, 0.01777776, -0.00170086, 0.01424351, -0.03169496, 0.01697521,
+  0.00513031, 0.01008756, -0.01758164, -0.00079429, 0.02032729, -0.01775224, -0.0060782, -0.02640892, -0.02896196,
+  -0.05269371, 0.02443811, -0.00373854, -0.02002827, 0.04337476, 0.01313461, 0.01697449, -0.01724268, 0.0169794,
+  0.01263569, 0.01476912, -0.01922106, -0.00059291, 0.00326119, -0.00301224, -0.00345135, 0.03339328, 0.00993915,
+  0.02955169, -0.01912368, -0.1368987, 0.03298316, 0.01600578, -0.00045929, -0.03521221, 0.0081017, -0.01914166,
+  -0.04802696, -0.01550323, -0.00752189, -0.01554134, 0.00437131, 0.00009113, -0.03753269, -0.01551559, 0.03279093,
+  0.03515922, 0.00420018, -0.03761362, -0.05966753, -0.00693837, 0.01753425, -0.02956902, 0.00672304, 0.02304751,
+  0.01418293, -0.00864077, 0.02256521, 0.03284034, -0.02263047, 0.00729757, -0.04204169, 0.01333652, 0.01281837,
+  -0.01987715, -0.02237567, -0.0145562, 0.05693359, 0.01547049, -0.02298284, -0.02497104, 0.57325917, -0.02129506,
+  0.01973542, 0.0017443, -0.03539589, 0.00505409, 0.01194552, -0.00532682, 0.00342391, -0.05141503, 0.03160568,
+  0.0196205, -0.01525842, 0.01461286, -0.02115116, -0.00516747, -0.000298, -0.01774376, -0.00489959, 0.02788112,
+  0.00509321, 0.03923067, -0.01367269, -0.01176961, 0.01580284, 0.00516844, 0.01547243, 0.00259872, -0.00836698,
+  -0.02149737, -0.02818627, 0.01809538, 0.02233366, 0.04570988, 0.00894792, -0.00906434, -0.0032996, -0.02596167,
+  -0.02552693, -0.01541364, -0.00362549, -0.01417085, -0.00789733, 0.00244975, 0.02079234, -0.01666823, -0.01066814,
+  -0.02111618, -0.00501444, -0.02884045, -0.01028973, -0.03450879, 0.02706483, -0.02533589, -0.03977542, 0.0168976,
+  0.02547891, 0.02856828, 0.00295601, 0.03053878, -0.01188758, -0.04223999, 0.0129645, 0.01642841, -0.02450766,
+  -0.00613648, -0.00313555, -0.00820707, 0.00286439, 0.00388309, 0.04685178, 0.01969445, -0.02145819, 0.02995754,
+  -0.03644379, 0.01087859, 0.02312868, 0.00517449, 0.00625752, -0.01269547, 0.05175751, 0.01708674, 0.01131673,
+  -0.00847883, -0.01709724, -0.03306906, 0.02226213, 0.00258377, -0.00729825, -0.00060625, -0.00989763, -0.01128472,
+  -0.00269302, -0.0080765, -0.00441235, -0.0264556, 0.00322071, 0.00354458, -0.00548854, 0.00133255, 0.01442194,
+  0.02672829, -0.01541648, -0.01288324, -0.00647826, -0.02152042, -0.01647528, 0.01507615, 0.01227487, -0.03837489,
+  0.02895872, 0.00182888, 0.01487559, 0.04642617, 0.03986979, -0.03662466, -0.00954801, -0.0081344, -0.01499752,
+  0.01952527, -0.01981483, -0.00753664, 0.00218387, -0.00862531, -0.01012128, 0.06705435, 0.04260367, 0.00891241,
+  0.03467292, 0.00511627, -0.01061139, -0.00989996, -0.00052099, 0.00629362, -0.00984653, 0.00532146, -0.0080895,
+  -0.00151943, 0.02221185, 0.01324994, -0.00758895, 0.00470217, 0.02987928, -0.01447782, 0.00225108, 0.03452649,
+  -0.02080118, -0.00822271, 0.00968781, 0.01840568, 0.01259417, 0.00629021, 0.03243105, -0.00499793, 0.01049649,
+  0.03372281, -0.0093778, -0.00325473, 0.02137516, -0.01295912, 0.00613091, 0.01010848, -0.01979412, 0.01407333,
+  -0.00024641, 0.01543495, 0.00837985, 0.02815301, 0.00351987, -0.02768026, -0.01530652, -0.03475158, -0.03886753,
+  0.00784356, 0.00353163, 0.0352168, 0.02944364, 0.01521325, -0.01859849, 0.57271135, -0.01167175, 0.01548798,
+  -0.01337727, -0.01429647, 0.02127417, 0.03816451, 0.02730765, 0.00344544, 0.02227476, 0.02520717, -0.01569453,
+  -0.05453049, -0.01031092, -0.02036737, -0.00302029, 0.00727488, -0.19261433, 0.0011036, 0.0244845, 0.04317967,
+  -0.00776433, 0.01035016, -0.02418255, 0.04174931, 0.00658663, 0.02920964, -0.00182587, 0.01774054, -0.01215491,
+  0.02723038, -0.0153521, 0.00715404, -0.02627724, 0.00029763, 0.01728641, -0.00171982, -0.02573624, 0.02256717,
+  -0.01383729, 0.02384946, 0.02505303, -0.03766847, -0.00638346, 0.02317786, 0.00651214, -0.01165954, -0.00201343,
+  0.00439168, -0.02203845, 0.00346685, 0.01925999, -0.03510653, 0.00964268, 0.00923398, 0.00135642, -0.00236627,
+  0.01999338, -0.02531821, -0.01992169, -0.01954874, 0.00950056, 0.00502003, -0.02159357, 0.0222213, -0.00891244,
+  -0.01077263, -0.00482766, 0.05029133, 0.04116416, 0.02540104, -0.02233087, -0.00124202, -0.01086042, -0.03249955,
+  -0.0114133, -0.02900061, 0.00290873, -0.08172268, 0.02701079, -0.02618168, 0.01003767, 0.00611602, 0.02087832,
+  0.00393038, 0.00031947, -0.00318548, -0.01173826, 0.02778, 0.00605681, 0.01739915, 0.02690274, -0.00985536,
+  -0.02601787, 0.00984417, 0.0042631, 0.01742411, -0.00582852, -0.00528874, -0.03026248, -0.00705265, -0.00616391,
+  0.01463998, 0.0172171, 0.00304002, -0.01359662, 0.02097134, 0.00542725, 0.06238439, -0.04048368, 0.03980203,
+  -0.07002119, 0.01144235, 0.00337658, -0.02945969, 0.01772812, 0.02449782, 0.01382573, 0.01919165, 0.01017774,
+  0.0021893, -0.04589008, -0.01634806, -0.01878912, -0.00476136, 0.01331673, 0.02322203, 0.02022227, -0.02594628,
+  0.00634721, 0.01030519, -0.03688602, -0.0040136, -0.02633961, 0.00617153, -0.03702287, 0.0246152, 0.04485991,
+  -0.06056247, 0.0224271, -0.01869726, -0.00165792, -0.02130081, -0.0112317, 0.03358975, -0.0038052, -0.01208503,
+  -0.0312748, -0.02541404, 0.00703386, 0.00832212, 0.04617887, 0.0051285, 0.0453952, -0.02346631, -0.02396337,
+  -0.03237309, -0.03037936, 0.015901, -0.01390338, 0.01524195, -0.02731557, 0.02373794, 0.00475458, 0.02459203,
+  -0.023426, -0.03376574, 0.02028145, 0.01253085, -0.1081608, 0.04907747, 0.00486162, 0.04648707, -0.02634849,
+  0.00077304, 0.01293567, 0.03034823, -0.01349263, 0.01749041, -0.02974608, 0.04520539, 0.05770895, 0.00785155,
+  0.01517758, 0.0127582, -0.01032453, -0.00929551, 0.01217034, 0.01887272, 0.02208971, 0.00597955, 0.02339009,
+  0.07025582, 0.01280948, 0.02993186, -0.007097, -0.01964995, -0.07739552, -0.01471389, -0.0121104,
+];
+
+/**
+ * CLIP text embedding for "a close-up of a person or an indoor room", encoded the same way as
+ * PLACE_PROMPT_EMBEDDING (ViT-B-32__openai). See getLocationCandidates for how it is used.
+ *
+ * Regenerate with, from machine-learning/:
+ *   uv run --project machine-learning python -c "from immich_ml.models.clip.textual import OpenClipTextualEncoder; \
+ *     m = OpenClipTextualEncoder('ViT-B-32__openai'); m.load(); \
+ *     print(m.predict('a close-up of a person or an indoor room'))"
+ */
+export const NOT_PLACE_PROMPT_EMBEDDING: number[] = [
+  0.00499068, 0.01676853, 0.01774894, 0.01421952, -0.00543273, -0.02298078, -0.00498926, -0.08493787, -0.03860839,
+  0.02356507, 0.01267078, -0.01815343, 0.01747182, 0.00334179, -0.00219845, -0.00431961, 0.02201596, 0.00739468,
+  -0.00624563, 0.02471453, 0.03840766, 0.00222552, 0.02622628, -0.00943226, -0.03717678, 0.02235266, 0.00690686,
+  0.01781799, -0.01523419, -0.00818739, 0.05583083, -0.01627958, -0.01217731, 0.00882362, -0.01437743, -0.02139949,
+  0.02257989, -0.03144243, -0.03668782, -0.00959044, 0.00659652, -0.01683651, -0.04046286, 0.03330789, 0.02274995,
+  -0.00153706, -0.02735649, 0.02660811, -0.03213148, 0.0245413, -0.02379678, -0.01452899, 0.00839827, -0.01315032,
+  -0.02433945, -0.02913877, -0.01113416, 0.01168093, -0.00285383, -0.02353719, 0.05495016, 0.00821668, -0.00129711,
+  -0.01096784, -0.00219558, -0.0017068, -0.00748336, 0.00775258, 0.00411402, -0.01048065, -0.02025758, -0.03019106,
+  -0.01559553, 0.00133022, -0.00980256, 0.02414393, 0.02568031, 0.01231696, 0.00576614, -0.0418281, -0.02278911,
+  -0.00025097, -0.0278212, 0.00366628, 0.00013374, 0.01710985, 0.06793708, 0.00371683, -0.01104862, 0.01500127,
+  0.00777547, -0.02272478, -0.14902355, 0.00082254, 0.02559667, -0.00389556, 0.03804256, -0.01426474, 0.02843362,
+  -0.01301594, 0.01959088, 0.02437085, 0.05381303, 0.01657947, -0.01849251, -0.02783064, -0.01341908, 0.01080868,
+  0.00808432, 0.0065203, 0.00334005, -0.01859339, -0.00671069, 0.02246239, 0.00042222, -0.01478708, -0.00159055,
+  -0.00363028, 0.01731975, 0.01204036, -0.00194085, -0.04293044, 0.0224578, 0.00521225, 0.01836793, -0.02823189,
+  -0.04263729, -0.02687893, -0.01192167, 0.03643989, 0.0083533, -0.04224554, -0.01870756, 0.57167578, -0.01354722,
+  0.00662591, -0.0192761, -0.01885469, -0.0004145, -0.04334338, -0.0062521, 0.03305725, -0.04324888, 0.02415036,
+  0.01161697, 0.00279526, 0.00787274, -0.06507976, -0.00363148, -0.00522054, -0.01254025, -0.00725958, 0.0184439,
+  0.02032097, -0.02336169, -0.04318334, -0.00240307, -0.02298763, 0.00672544, 0.00932529, -0.01175196, -0.01786065,
+  -0.05636103, -0.0395234, -0.03143852, 0.00103145, -0.00692399, 0.02264861, 0.01100259, -0.00249052, 0.01464831,
+  -0.02250617, -0.00678741, 0.00102582, 0.007507, -0.00583296, -0.00751295, 0.01454266, 0.01258856, -0.00747909,
+  -0.00728146, -0.00193591, 0.00593682, -0.01548694, -0.07337853, 0.01374464, 0.00261108, -0.02744343, 0.01162509,
+  0.00580418, 0.03012566, 0.02573866, -0.01325675, -0.01948425, 0.0426581, 0.01464763, 0.01496633, 0.02042549,
+  -0.05863054, 0.01790393, -0.00447702, 0.00434461, -0.01354767, 0.05793799, 0.00642729, -0.02073517, -0.00348909,
+  -0.04924462, -0.01087034, 0.00724102, -0.00231852, 0.00990648, 0.00229773, 0.03585136, 0.01672505, -0.0174989,
+  0.0193256, -0.00569454, 0.01784368, 0.01261739, 0.02682391, 0.01149951, -0.03354555, -0.0438417, 0.00657066,
+  -0.01760186, 0.01610183, 0.01079252, -0.002526, -0.0209553, 0.00766297, -0.00499994, 0.02046581, -0.03319299,
+  0.04841204, 0.00985947, -0.0021672, 0.01917944, -0.00074544, -0.00422848, 0.00877089, 0.00455714, 0.00129543,
+  0.00717554, -0.01559418, 0.034906, -0.00162567, 0.00026964, -0.01504279, -0.02577666, -0.03659505, -0.01561173,
+  0.01418338, 0.00471486, -0.00967715, -0.0029456, 0.00450604, -0.04707296, -0.02236751, 0.04615192, 0.0083386,
+  -0.00304826, 0.03064076, -0.01196138, -0.00785356, 0.01304492, 0.01981447, 0.01854688, -0.00776941, 0.01114016,
+  -0.02489028, -0.00219987, 0.00786067, -0.0244182, -0.02482546, 0.01911989, 0.01484486, 0.01952244, 0.02265968,
+  -0.01433376, 0.02145316, -0.03156412, 0.04414507, 0.04407892, 0.01008628, 0.04889466, -0.02840327, -0.00188268,
+  -0.01283382, -0.04194267, 0.00113203, -0.00724659, 0.06023359, 0.06804467, -0.00228, 0.0326224, -0.03774272,
+  0.02267313, 0.01661863, 0.00929053, 0.00417246, 0.0050409, -0.02227189, 0.0438426, 0.0265494, -0.00394396,
+  -0.01030146, 0.01086017, 0.01705457, 0.0119889, 0.01578316, 0.02190566, 0.57158995, 0.02027945, 0.00426042,
+  0.03882293, 0.0196687, 0.00239701, 0.02692918, -0.01972526, -0.00507183, 0.0322121, 0.01887202, 0.01773559,
+  -0.00707932, -0.01234239, -0.00109019, -0.03032061, 0.00557411, -0.16234888, 0.00687283, 0.06850953, -0.00042395,
+  -0.01979411, -0.04934375, 0.01417759, -0.01005549, 0.02129199, -0.0152379, -0.00438842, 0.02017439, 0.01126768,
+  0.04196106, 0.01350462, -0.00533116, -0.01534032, -0.00949103, 0.05612484, 0.00997827, -0.00723835, 0.02215079,
+  0.01115607, 0.01922809, -0.0009568, -0.01488468, -0.02657908, -0.01884833, 0.02087243, -0.00756608, 0.01254074,
+  -0.03094159, -0.03202398, 0.00937415, 0.01136758, -0.00181953, -0.02682307, 0.01591562, -0.04449606, 0.00982043,
+  -0.01937127, 0.00027583, -0.01697211, -0.0085707, 0.01646928, 0.02572413, 0.02415506, 0.01599057, -0.05290264,
+  -0.06863185, 0.04458595, -0.00516357, 0.00228111, 0.02601136, -0.05307885, 0.04075215, 0.00037651, -0.00924557,
+  0.04160193, -0.03055851, 0.01277849, 0.0000068, 0.0340275, -0.01544172, 0.00316221, -0.00569185, 0.0207845,
+  0.02643099, 0.02043694, -0.03147743, 0.04050598, 0.03667032, 0.00301181, 0.02560152, -0.00721392, -0.0009727,
+  0.00163737, 0.02351824, -0.00602529, -0.01628637, -0.00279682, 0.04254608, -0.02454531, 0.00973255, 0.05536029,
+  0.0127326, 0.00989514, 0.01029364, 0.00323119, -0.03687746, 0.00692138, 0.04021878, -0.00580412, 0.04886137,
+  -0.00763243, -0.02928867, 0.01126446, -0.01280451, 0.03333422, -0.00605735, 0.0044366, 0.03983374, 0.02387487,
+  0.01442343, 0.02602173, 0.0130047, -0.01783184, -0.00206966, -0.01938208, 0.01732914, 0.01224175, -0.0405199,
+  -0.03542753, 0.01281625, -0.04376696, -0.01718682, -0.00980208, -0.04286815, -0.03636957, -0.00482342, 0.0021419,
+  0.0191913, -0.01367328, 0.01899786, -0.01468559, 0.00363038, 0.01283451, 0.0108633, 0.00657239, 0.00545056,
+  -0.00128527, 0.00990517, 0.01836394, 0.01849052, 0.01649776, 0.03327582, 0.00306578, 0.01578847, -0.01063592,
+  0.01617989, 0.00718611, 0.01174998, 0.0070046, 0.0548162, -0.03660438, 0.05096142, -0.00139583, 0.01225012,
+  0.00266356, -0.03360029, 0.05885835, 0.02758033, -0.0435594, 0.02186792, -0.01650203, -0.00270818, 0.00438335,
+  0.00560111, 0.00824204, -0.00203019, 0.00294989, 0.02758028, 0.02987815, -0.01888488, 0.05577072, 0.01433602,
+  0.00727538, 0.03509136, 0.00072143, -0.0347084, 0.00336468, 0.03621271, -0.02161429, -0.00248776, 0.05744356,
+  0.06934106, 0.03886689, 0.02153531, -0.02139908, -0.02985409, -0.03175486, -0.03614256, -0.01555213,
+];
+
+@Injectable()
+export class GameRepository {
+  constructor(@InjectKysely() private db: Kysely<DB>) {}
+
+  /**
+   * Location-round candidates for a space. Two gates, and they are complementary - measurement
+   * against the 54 spike images showed each catches what the other misses:
+   *
+   *   - face area <= 5% of the frame, so portraits (where the place is background behind a
+   *     face) are excluded;
+   *   - ranked (never thresholded - see below) by CLIP similarity to "an outdoor photo that
+   *     shows where it was taken" minus similarity to "a close-up of a person or an indoor
+   *     room", because a face-free indoor kitchen passes the face gate and carries no location
+   *     signal, and a single positive prompt alone under-ranks some known-good outdoor photos
+   *     (measured: ranks 29 and 35 of 54 on positive-only; all six known-good photos moved into
+   *     the top 20 once the negative prompt was subtracted).
+   *
+   * `smart_search.embedding <=> x` is cosine DISTANCE (1 - cosine similarity), so
+   * `cos_sim_pos - cos_sim_neg` reduces to `(embedding <=> neg) - (embedding <=> pos)`; higher
+   * is better, hence ORDER BY ... DESC. This two-term expression cannot use the ivfflat/vchord
+   * index - acceptable here because the candidate set is already scoped to one space's assets
+   * via shared_space_asset, so the driving predicate is the space join, not the vector order.
+   *
+   * Ranked, never thresholded: the measured cosine margin between positive and negative prompts
+   * is thin, so an absolute cutoff would pass everything in one library and nothing in another.
+   */
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.NUMBER] })
+  async getLocationCandidates(spaceId: string, limit: number): Promise<GameCandidate[]> {
+    const rows = await this.db
+      .selectFrom('shared_space_asset')
+      .innerJoin('asset', 'asset.id', 'shared_space_asset.assetId')
+      .innerJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
+      .leftJoin(
+        (eb) =>
+          eb
+            .selectFrom('asset_face')
+            .select('asset_face.assetId as assetId')
+            .select((eb) =>
+              sql<number>`sum((${eb.ref('asset_face.boundingBoxX2')} - ${eb.ref('asset_face.boundingBoxX1')}) * (${eb.ref('asset_face.boundingBoxY2')} - ${eb.ref('asset_face.boundingBoxY1')})) / nullif(max(${eb.ref('asset_face.imageWidth')}) * max(${eb.ref('asset_face.imageHeight')}), 0)`.as(
+                'faceAreaRatio',
+              ),
+            )
+            .where('asset_face.deletedAt', 'is', null)
+            .where('asset_face.isVisible', '=', true)
+            .groupBy('asset_face.assetId')
+            .as('face_area'),
+        (join) => join.onRef('face_area.assetId', '=', 'asset.id'),
+      )
+      .leftJoin('smart_search', 'smart_search.assetId', 'asset.id')
+      .where('shared_space_asset.spaceId', '=', spaceId)
+      .where('asset.deletedAt', 'is', null)
+      .where('asset.type', '=', AssetType.Image)
+      .where('asset.visibility', '=', AssetVisibility.Timeline)
+      .where('asset_exif.latitude', 'is not', null)
+      .where('asset_exif.longitude', 'is not', null)
+      .where((eb) =>
+        eb.or([eb('face_area.faceAreaRatio', 'is', null), eb('face_area.faceAreaRatio', '<=', MAX_FACE_AREA_RATIO)]),
+      )
+      .select([
+        'asset.id as assetId',
+        'asset_exif.latitude as lat',
+        'asset_exif.longitude as lon',
+        'asset.localDateTime as takenAt',
+        'asset_exif.country as country',
+      ])
+      .orderBy(
+        sql<number>`(smart_search.embedding <=> ${asVector(NOT_PLACE_PROMPT_EMBEDDING)}) - (smart_search.embedding <=> ${asVector(PLACE_PROMPT_EMBEDDING)})`,
+        (ob) => ob.desc().nullsLast(),
+      )
+      .limit(limit)
+      .execute();
+
+    return rows;
+  }
+
+  /** Date-round candidates for a space. No face/place gate - any timeline photo with a taken
+   * date can carry a "when was this" question, so this is deliberately the simpler of the two
+   * pools. Randomly ordered (rather than ranked) because there is no relevance signal to rank on.
+   */
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.NUMBER] })
+  async getDateCandidates(spaceId: string, limit: number): Promise<GameCandidate[]> {
+    const rows = await this.db
+      .selectFrom('shared_space_asset')
+      .innerJoin('asset', 'asset.id', 'shared_space_asset.assetId')
+      .where('shared_space_asset.spaceId', '=', spaceId)
+      .where('asset.deletedAt', 'is', null)
+      .where('asset.type', '=', AssetType.Image)
+      .where('asset.visibility', '=', AssetVisibility.Timeline)
+      .where('asset.localDateTime', 'is not', null)
+      .select(['asset.id as assetId', 'asset.localDateTime as takenAt'])
+      .orderBy(sql`random()`)
+      .limit(limit)
+      .execute();
+
+    return rows.map((row) => ({ assetId: row.assetId, lat: null, lon: null, takenAt: row.takenAt, country: null }));
+  }
+
+  /**
+   * Asset ids used by rounds of the space's `challengeLimit` most recently created challenges -
+   * so a new challenge can avoid repeating a photo the same group just played.
+   */
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.NUMBER] })
+  async getRecentlyUsedAssetIds(spaceId: string, challengeLimit: number): Promise<string[]> {
+    const rows = await this.db
+      .selectFrom('game_round')
+      .where(
+        'game_round.challengeId',
+        'in',
+        this.db
+          .selectFrom('game_challenge')
+          .select('game_challenge.id')
+          .where('game_challenge.spaceId', '=', spaceId)
+          .orderBy('game_challenge.createdAt', 'desc')
+          .limit(challengeLimit),
+      )
+      .where('game_round.assetId', 'is not', null)
+      .select('game_round.assetId as assetId')
+      .distinct()
+      .$narrowType<{ assetId: string }>()
+      .execute();
+
+    return rows.map((row) => row.assetId);
+  }
+
+  /**
+   * Inserts a challenge and its rounds atomically. `rounds[].challengeId` is stamped with the
+   * newly created challenge's id here rather than trusted from the caller - the caller cannot
+   * know the id before this insert runs.
+   */
+  @GenerateSql({
+    params: [
+      {
+        spaceId: DummyValue.UUID,
+        createdById: DummyValue.UUID,
+        name: DummyValue.STRING,
+        roundCount: 5,
+        scaleKm: 1000,
+        scaleDays: 365,
+      },
+      [
+        {
+          challengeId: DummyValue.UUID,
+          index: 0,
+          type: 'location',
+          assetId: DummyValue.UUID,
+          answerLat: 0,
+          answerLon: 0,
+          answerDate: null,
+        },
+      ],
+    ],
+  })
+  async createChallenge(
+    challenge: Insertable<GameChallengeTable>,
+    rounds: Insertable<GameRoundTable>[],
+  ): Promise<string> {
+    return this.db.transaction().execute(async (trx) => {
+      const inserted = await trx
+        .insertInto('game_challenge')
+        .values(challenge)
+        .returning('id')
+        .executeTakeFirstOrThrow();
+
+      if (rounds.length > 0) {
+        await trx
+          .insertInto('game_round')
+          .values(rounds.map((round) => ({ ...round, challengeId: inserted.id })))
+          .execute();
+      }
+
+      return inserted.id;
+    });
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID] })
+  async getChallenge(id: string): Promise<GameChallengeRow | undefined> {
+    return this.db.selectFrom('game_challenge').selectAll().where('id', '=', id).executeTakeFirst();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID] })
+  async getChallengesForSpace(spaceId: string): Promise<GameChallengeRow[]> {
+    return this.db
+      .selectFrom('game_challenge')
+      .selectAll()
+      .where('spaceId', '=', spaceId)
+      .orderBy('createdAt', 'desc')
+      .execute();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID] })
+  async getRounds(challengeId: string): Promise<GameRoundRow[]> {
+    return this.db
+      .selectFrom('game_round')
+      .selectAll()
+      .where('challengeId', '=', challengeId)
+      .orderBy('index', 'asc')
+      .execute();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.NUMBER] })
+  async getRound(challengeId: string, index: number): Promise<GameRoundRow | undefined> {
+    return this.db
+      .selectFrom('game_round')
+      .selectAll()
+      .where('challengeId', '=', challengeId)
+      .where('index', '=', index)
+      .executeTakeFirst();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
+  async getGuessesForUser(challengeId: string, userId: string): Promise<GameGuessRow[]> {
+    return this.db
+      .selectFrom('game_guess')
+      .innerJoin('game_round', 'game_round.id', 'game_guess.roundId')
+      .where('game_round.challengeId', '=', challengeId)
+      .where('game_guess.userId', '=', userId)
+      .selectAll('game_guess')
+      .execute();
+  }
+
+  // Uniqueness (one guess per round per user) is enforced by the game_guess_round_user_uq
+  // constraint, not here - a duplicate submit surfaces as a Postgres unique-violation error
+  // (with `.constraint === 'game_guess_round_user_uq'`) that the caller maps to a 409.
+  @GenerateSql({
+    params: [
+      {
+        roundId: DummyValue.UUID,
+        userId: DummyValue.UUID,
+        guessLat: 0,
+        guessLon: 0,
+        guessDate: null,
+        distanceKm: 0,
+        offsetDays: null,
+        score: 5000,
+      },
+    ],
+  })
+  async createGuess(guess: Insertable<GameGuessTable>): Promise<GameGuessRow> {
+    return this.db.insertInto('game_guess').values(guess).returningAll().executeTakeFirstOrThrow();
+  }
+
+  @GenerateSql({ params: [DummyValue.UUID] })
+  async getLeaderboard(challengeId: string): Promise<{ userId: string; total: number; answered: number }[]> {
+    const rows = await this.db
+      .selectFrom('game_guess')
+      .innerJoin('game_round', 'game_round.id', 'game_guess.roundId')
+      .where('game_round.challengeId', '=', challengeId)
+      .groupBy('game_guess.userId')
+      .select('game_guess.userId as userId')
+      .select((eb) => eb.fn.sum<string>('game_guess.score').as('total'))
+      .select((eb) => eb.fn.count<string>('game_guess.id').as('answered'))
+      .orderBy('total', 'desc')
+      .execute();
+
+    return rows.map((row) => ({ userId: row.userId, total: Number(row.total), answered: Number(row.answered) }));
+  }
+
+  // Rounds and guesses cascade-delete via their FKs (game_round.challengeId, game_guess.roundId
+  // both ON DELETE CASCADE) - deleting the challenge row is enough.
+  @GenerateSql({ params: [DummyValue.UUID] })
+  async deleteChallenge(id: string): Promise<void> {
+    await this.db.deleteFrom('game_challenge').where('id', '=', id).execute();
+  }
+}
