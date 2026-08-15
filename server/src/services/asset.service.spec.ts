@@ -2,7 +2,7 @@ import { BadRequestException, ForbiddenException, UnauthorizedException } from '
 import { DateTime } from 'luxon';
 import path from 'node:path';
 import { Readable } from 'node:stream';
-import type { AssetResponseDto } from 'src/dtos/asset-response.dto.js';
+import type { AssetResponseDto, mapAsset } from 'src/dtos/asset-response.dto.js';
 import { AssetJobName, AssetStatsResponseDto } from 'src/dtos/asset.dto.js';
 import { AssetEditAction, AssetEditsCreateDto } from 'src/dtos/editing.dto.js';
 import { AssetFileType, AssetMetadataKey, AssetStatus, AssetType, AssetVisibility, JobName, JobStatus, SharedSpaceActivityType } from 'src/enum.js';
@@ -3240,6 +3240,16 @@ describe(AssetService.name, () => {
       const result = (await sut.get(auth, asset.id)) as AssetResponseDto;
 
       expect(result.canEdit).toBe(false);
+    });
+
+    it('S-32: mapAsset (the list-endpoint mapper) never carries a canEdit key — the N+1 guard', () => {
+      // canEdit is resolved once in get(), never inside mapAsset itself (see the comment above the
+      // call site in asset.service.ts): mapAsset has no AuthDto and feeds list endpoints, where
+      // resolving edit access per asset would be an N+1 access check. `in`, not `.toBe(false)` — see
+      // S-14's comment on why absence and `false` are different signals to the client.
+      const result = mapAsset(getForAsset(AssetFactory.create()));
+
+      expect('canEdit' in result).toBe(false);
     });
 
     it('S-14: never sets canEdit for a shared-link caller (showExif: true)', async () => {
