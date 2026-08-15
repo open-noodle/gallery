@@ -286,6 +286,33 @@ describe(GameService.name, () => {
     });
   });
 
+  describe('getRoundImage', () => {
+    it('serves a thumbnail that is not the original file', async () => {
+      mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Viewer } as any);
+      mocks.game.getChallenge.mockResolvedValue({ id: 'challenge-1', spaceId: 'space-1' } as any);
+      mocks.game.getRound.mockResolvedValue({ id: 'r0', index: 0, type: 'location', assetId: 'asset-1' } as any);
+      mocks.asset.getById.mockResolvedValue({
+        id: 'asset-1',
+        originalPath: '/originals/secret-name.jpg',
+        files: [{ type: 'preview', path: '/thumbs/asset-1_preview.jpeg' }],
+      } as any);
+
+      const result = await sut.getRoundImage(authStub, 'challenge-1', 0);
+
+      // The preview is already re-encoded and EXIF-free; the original never is.
+      expect(result.path).toBe('/thumbs/asset-1_preview.jpeg');
+      expect(result.path).not.toContain('secret-name');
+    });
+
+    it('refuses a round belonging to a different challenge', async () => {
+      mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Viewer } as any);
+      mocks.game.getChallenge.mockResolvedValue({ id: 'challenge-1', spaceId: 'space-1' } as any);
+      mocks.game.getRound.mockResolvedValue(void 0);
+
+      await expect(sut.getRoundImage(authStub, 'challenge-1', 99)).rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
+
   describe('list', () => {
     it('rejects a caller who is not a member of the space', async () => {
       mocks.sharedSpace.getMember.mockResolvedValue(void 0);
