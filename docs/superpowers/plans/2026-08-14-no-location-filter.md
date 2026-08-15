@@ -311,7 +311,7 @@ it('returns an un-geotagged asset shared through a timeline-enabled space', asyn
 Run: `cd server && pnpm test:medium -- --run test/medium/specs/repositories/search.repository.spec.ts -t locationPresence`
 Expected: PASS, nine tests.
 
-Run: `make lint-server && make check-server`
+Run: `cd server && pnpm check && pnpm lint && pnpm format`
 Expected: clean.
 
 - [ ] **Step 10: Commit**
@@ -421,7 +421,7 @@ Expected: PASS.
 
 `timeline.service.ts` passes timeline options through untouched and `AssetSearchOptions` composes `SearchExifOptions`, so no service edit should be needed. Verify by typechecking:
 
-Run: `make check-server && make lint-server`
+Run: `cd server && pnpm check && pnpm lint && pnpm format`
 Expected: clean. If `tsc` reports `locationPresence` missing on an options object, add the passthrough it names.
 
 - [ ] **Step 7: Commit**
@@ -558,7 +558,7 @@ Expected: PASS, all eleven tests.
 
 - [ ] **Step 6: Lint and typecheck, then commit**
 
-Run: `make lint-server && make check-server`
+Run: `cd server && pnpm check && pnpm lint && pnpm format`
 
 ```bash
 git add server/src/dtos/search.dto.ts server/src/repositories/search.repository.ts server/test/medium/specs/repositories/search.repository.spec.ts
@@ -1437,18 +1437,25 @@ test.describe('no-location filter', () => {
 
 - [ ] **Step 2: Run it**
 
-Run: `make e2e-web-dev`
+Run: `cd e2e && pnpm test:web -- no-location-filter` (needs a dev stack on :2283)
 Expected: PASS. This needs a running dev stack on :2283.
 
 - [ ] **Step 3: Full verification sweep**
 
 ```bash
-cd server && pnpm test:medium && cd ..
-make lint-server && make check-server
+# Scope the medium run to the files this change touches. The FULL medium suite
+# exhausts the Postgres connection pool in this environment and has twice taken
+# the Docker daemon down mid-run.
+cd server && pnpm test:medium --run test/medium/specs/repositories/search.repository.spec.ts
+cd server && pnpm check && pnpm lint && pnpm format
 cd web && pnpm test -- --run && pnpm check:typescript && pnpm check:svelte && cd ..
 cd mobile && flutter test test/providers/photos_filter test/models/search && dart analyze --fatal-infos && cd ..
 npx prettier --check i18n/*.json
 ```
+
+> **The `pnpm test -- --run <file>` passthrough silently drops the file filter**, running the whole
+> suite instead. Always confirm the reported file count matches what you asked for — this is what
+> ran the full medium suite and crashed Docker twice during this plan's execution.
 
 - [ ] **Step 4: Commit**
 
