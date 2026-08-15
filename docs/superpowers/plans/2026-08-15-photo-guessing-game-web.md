@@ -21,8 +21,9 @@
 - **`svelte-check` can silently scan 0 files locally.** After running it, confirm from its output that it actually checked files; a "0 errors" line over 0 files is not a pass.
 - **Web vitest does not clear mocks between tests in a file** — mock call history leaks across cases. Reset explicitly in `beforeEach` where it matters.
 - **Assertions that cannot fail are a defect.** `queryBy…` returning `null` makes `expect(x).not.toBeInTheDocument()` pass whether or not the component rendered. Prove a negative by first asserting the positive case renders.
-- Web checks: `cd web && pnpm check:typescript`, `pnpm check:svelte`, `pnpm lint`, `pnpm format`, `pnpm test -- --run`.
-- **`pnpm test` without `--run` starts watch mode** and will hang a non-interactive session.
+- Web checks: `cd web && pnpm check:typescript`, `pnpm check:svelte`, `pnpm lint`, `pnpm format`.
+- **To run ONE spec file, use `cd web && pnpm exec vitest run <path>`.** `pnpm test -- --run <path>` SILENTLY DROPS the path filter and runs the whole 364-file suite (~63s) — verified. That wastes a minute per iteration and buries your file's result in thousands of lines, which has already caused one implementer to wrongly conclude the harness was broken.
+- **`pnpm test` without `--run` starts watch mode** and will hang a non-interactive session. The whole suite, when you want it, is `cd web && pnpm exec vitest run`.
 - **NEVER use `git stash`** — this repo's stash stack is shared across ~100 worktrees and concurrent sessions.
 - **NEVER use a `//`-prefixed mise task** — `//` resolves to the MAIN CHECKOUT, not this worktree.
 
@@ -233,7 +234,7 @@ describe('yearFromIso', () => {
 
 - [ ] **Step 2: Run the test to verify it fails**
 
-Run: `cd web && pnpm test -- --run src/lib/utils/game.spec.ts`
+Run: `cd web && pnpm exec vitest run src/lib/utils/game.spec.ts`
 
 Expected: FAIL — cannot resolve `$lib/utils/game`.
 
@@ -268,7 +269,7 @@ export const yearFromIso = (iso: string): number => new Date(iso).getUTCFullYear
 
 - [ ] **Step 4: Run the test to verify it passes**
 
-Run: `cd web && pnpm test -- --run src/lib/utils/game.spec.ts`
+Run: `cd web && pnpm exec vitest run src/lib/utils/game.spec.ts`
 
 Expected: PASS, 6 tests.
 
@@ -338,7 +339,7 @@ describe('ChallengeCard', () => {
 
 - [ ] **Step 2: Run the test to verify it fails**
 
-Run: `cd web && pnpm test -- --run src/lib/components/games/challenge-card.spec.ts`
+Run: `cd web && pnpm exec vitest run src/lib/components/games/challenge-card.spec.ts`
 
 Expected: FAIL — component does not exist.
 
@@ -348,7 +349,7 @@ Create `web/src/lib/components/games/challenge-card.svelte` using Svelte 5 runes
 
 - [ ] **Step 4: Run the test to verify it passes**
 
-Run: `cd web && pnpm test -- --run src/lib/components/games/challenge-card.spec.ts`
+Run: `cd web && pnpm exec vitest run src/lib/components/games/challenge-card.spec.ts`
 
 Expected: PASS, 3 tests.
 
@@ -463,7 +464,7 @@ The mock above is **verified**, not a guess: it is copied from `map-page.spec.ts
 
 - [ ] **Step 2: Run the test to verify it fails**
 
-Run: `cd web && pnpm test -- --run src/lib/components/games/location-round.spec.ts`
+Run: `cd web && pnpm exec vitest run src/lib/components/games/location-round.spec.ts`
 
 Expected: FAIL — component does not exist.
 
@@ -480,7 +481,7 @@ Note the axis name change: `Map.svelte` emits `lng`, the game's API takes `lon`.
 
 - [ ] **Step 4: Run the test to verify it passes**
 
-Run: `cd web && pnpm test -- --run src/lib/components/games/location-round.spec.ts`
+Run: `cd web && pnpm exec vitest run src/lib/components/games/location-round.spec.ts`
 
 Expected: PASS, 2 tests.
 
@@ -556,7 +557,7 @@ describe('DateRound', () => {
 
 - [ ] **Step 2: Run the test to verify it fails**
 
-Run: `cd web && pnpm test -- --run src/lib/components/games/date-round.spec.ts`
+Run: `cd web && pnpm exec vitest run src/lib/components/games/date-round.spec.ts`
 
 Expected: FAIL — component does not exist.
 
@@ -566,7 +567,7 @@ A native `<input type="range">` bound to a `$state` year, defaulting to the midp
 
 - [ ] **Step 4: Run the test to verify it passes**
 
-Run: `cd web && pnpm test -- --run src/lib/components/games/date-round.spec.ts`
+Run: `cd web && pnpm exec vitest run src/lib/components/games/date-round.spec.ts`
 
 Expected: PASS, 2 tests.
 
@@ -625,7 +626,7 @@ Write the actual assertions using `screen.getByTestId` / `getAllByTestId`, follo
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `cd web && pnpm test -- --run src/lib/components/games/round-result.spec.ts src/lib/components/games/game-leaderboard.spec.ts`
+Run: `cd web && pnpm exec vitest run src/lib/components/games/round-result.spec.ts src/lib/components/games/game-leaderboard.spec.ts`
 
 Expected: FAIL — components do not exist.
 
@@ -635,7 +636,7 @@ Expected: FAIL — components do not exist.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
-Run: `cd web && pnpm test -- --run src/lib/components/games/round-result.spec.ts src/lib/components/games/game-leaderboard.spec.ts`
+Run: `cd web && pnpm exec vitest run src/lib/components/games/round-result.spec.ts src/lib/components/games/game-leaderboard.spec.ts`
 
 Expected: PASS.
 
@@ -729,7 +730,7 @@ Run:
 ```bash
 cd web && pnpm check:svelte
 cd web && pnpm check:typescript
-cd web && pnpm test -- --run
+cd web && pnpm exec vitest run
 ```
 
 Expected: all clean; the web suite passes with no regressions.
@@ -758,7 +759,7 @@ Find how the space route tree surfaces its sections (albums, members, people, ac
 Run each and confirm clean:
 
 ```bash
-cd web && pnpm test -- --run
+cd web && pnpm exec vitest run
 cd web && pnpm check:typescript
 cd web && pnpm check:svelte
 cd web && pnpm lint
