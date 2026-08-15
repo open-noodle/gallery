@@ -150,9 +150,9 @@
   });
 
   // #734: which of the selection the caller may edit. `undefined` means unresolved — the
-  // canEditMetadata-gated actions below render disabled-pending rather than popping in late.
-  // An all-owned selection resolves synchronously, without a request (design constraint: an
-  // all-owned selection must issue no request).
+  // canEditMetadata-gated actions below stay hidden until it resolves, rather than popping in
+  // late (there's no `disabled` affordance on MenuOption to render a pending state instead).
+  // An all-owned selection resolves synchronously, without a request.
   let editableSelectedAssetIds = $state<string[] | undefined>(undefined);
 
   $effect(() => {
@@ -288,7 +288,7 @@
         {/if}
       {/if}
       {#if caps.canTag}
-        <TagAction menuItem />
+        <TagAction menuItem editableSelectedAssetIds={editableSelectedAssetIds ?? []} />
       {/if}
       {#if caps.canRemoveFromAlbum && album}
         <RemoveFromAlbum menuItem bind:album={localAlbum} {onRemove} />

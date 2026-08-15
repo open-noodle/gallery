@@ -21,15 +21,32 @@
   let { menuItem = false, editableSelectedAssetIds }: Props = $props();
 
   const handleChangeDate = async () => {
-    // The modal narrows to `editableAssetIds` itself (and reports the skipped count) at
-    // submit time — mirrors ChangeDescription/ChangeLocation, which likewise pass the full
-    // selection through and let the eventual API call do the filtering.
+    if (editableSelectedAssetIds === undefined) {
+      // Pre-#734 behaviour, unchanged: only the owned subset is ever shown to the modal, so
+      // its own getEditableAssetsWithWarning call can never find anything to skip (no toast),
+      // and initialDate reflects only that subset too.
+      const assets = assetMultiSelectManager.ownedAssets;
+      const initialDate = assets.length === 1 ? fromTimelinePlainDateTime(assets[0].localDateTime) : DateTime.now();
+      const success = await modalManager.show(AssetSelectionChangeDateModal, {
+        initialDate,
+        assets,
+        editableAssetIds: assets.map((asset) => asset.id),
+      });
+      if (success) {
+        assetMultiSelectManager.clear();
+      }
+      return;
+    }
+
+    // #734: the modal narrows to `editableSelectedAssetIds` itself (and reports the skipped
+    // count) at submit time — mirrors ChangeDescription/ChangeLocation, which likewise pass
+    // the full selection through and let the eventual API call do the filtering.
     const assets = assetMultiSelectManager.assets;
     const initialDate = assets.length === 1 ? fromTimelinePlainDateTime(assets[0].localDateTime) : DateTime.now();
     const success = await modalManager.show(AssetSelectionChangeDateModal, {
       initialDate,
       assets,
-      editableAssetIds: editableSelectedAssetIds ?? assetMultiSelectManager.getOwnedAssets().map((asset) => asset.id),
+      editableAssetIds: editableSelectedAssetIds,
     });
     if (success) {
       assetMultiSelectManager.clear();
