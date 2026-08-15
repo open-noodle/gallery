@@ -27,6 +27,7 @@ import { mimeTypes } from 'src/utils/mime-types.js';
 import { findOrFail } from 'src/utils/misc.js';
 import { getPreferences, getPreferencesPartial, mergePreferences } from 'src/utils/preferences.js';
 import { generateProfileImage } from 'src/utils/profile-image.js';
+import { StorageRoutingKind } from 'src/backends/storage-router.js';
 
 @Injectable()
 export class UserService extends BaseService {
@@ -125,7 +126,11 @@ export class UserService extends BaseService {
       throw new BadRequestException('Unable to process profile image', { cause: error });
     }
 
-    const writeBackend = StorageService.getWriteBackend();
+    // Cached: cheap to fetch again outside the try block above, which must keep scoping
+    // generateProfileImage failures into BadRequestException without also catching a
+    // getWriteBackend/config failure below.
+    const config = await this.getConfig({ withCache: true });
+    const writeBackend = StorageService.getWriteBackend(StorageRoutingKind.Thumbnails, config);
 
     if (!(writeBackend instanceof DiskStorageBackend)) {
       const filename = basename(profileImagePath);
