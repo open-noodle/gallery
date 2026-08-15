@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { defaults, SystemConfig } from 'src/config';
-import { ReleaseChannel, SystemConfigSchema } from 'src/dtos/system-config.dto';
+import { ReleaseChannel, StorageRouting, SystemConfigSchema } from 'src/dtos/system-config.dto';
 import {
   AudioCodec,
   Colorspace,
@@ -233,6 +233,13 @@ const updatedConfig = Object.freeze<SystemConfig>({
     loginPageMessage: '',
     publicUsers: true,
     mergePeopleAcrossOwners: false,
+  },
+  storage: {
+    routing: {
+      originals: StorageRouting.Auto,
+      thumbnails: StorageRouting.Auto,
+      encodedVideo: StorageRouting.Auto,
+    },
   },
   storageTemplate: {
     enabled: false,
@@ -1075,6 +1082,50 @@ describe(SystemConfigService.name, () => {
       const config = await sut.getConfig({ withCache: false });
 
       expect(config.storageUsage.includeDerivatives).toBe(false);
+    });
+  });
+
+  describe('storage routing defaults', () => {
+    it('should default every kind to auto', async () => {
+      const config = await sut.getConfig({ withCache: false });
+
+      expect(config.storage.routing).toEqual({
+        originals: StorageRouting.Auto,
+        thumbnails: StorageRouting.Auto,
+        encodedVideo: StorageRouting.Auto,
+      });
+    });
+
+    it('should accept storage routing from a config file', async () => {
+      mocks.config.getEnv.mockReturnValue(mockEnvData({ configFile: 'immich-config.json' }));
+      mocks.systemMetadata.readFile.mockResolvedValue(JSON.stringify({ storage: { routing: { thumbnails: 'disk' } } }));
+
+      const config = await sut.getConfig({ withCache: false });
+
+      expect(config.storage.routing.thumbnails).toBe(StorageRouting.Disk);
+      expect(config.storage.routing.originals).toBe(StorageRouting.Auto);
+    });
+
+    it('should drop a knob from the persisted partial config when set back to auto', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({ storage: { routing: { thumbnails: StorageRouting.Disk } } });
+
+      await sut.updateSystemConfig({
+        ...defaults,
+        storage: {
+          routing: {
+            originals: StorageRouting.Auto,
+            thumbnails: StorageRouting.Auto,
+            encodedVideo: StorageRouting.Auto,
+          },
+        },
+      });
+
+      // updateConfig strips values equal to the default, so the key disappears entirely and
+      // the install goes back to following IMMICH_STORAGE_BACKEND.
+      expect(mocks.systemMetadata.set).toHaveBeenCalledWith(
+        SystemMetadataKey.SystemConfig,
+        expect.not.objectContaining({ storage: expect.anything() }),
+      );
     });
   });
 });

@@ -464,6 +464,29 @@ const SystemConfigTrashSchema = z
   })
   .meta({ id: 'SystemConfigTrashDto' });
 
+// Gallery-fork: per-file-type storage routing. `Auto` follows IMMICH_STORAGE_BACKEND.
+export enum StorageRouting {
+  Auto = 'auto',
+  Disk = 'disk',
+  S3 = 's3',
+}
+
+const StorageRoutingSchema = z.enum(StorageRouting).describe('Storage routing').meta({ id: 'StorageRouting' });
+
+const SystemConfigStorageSchema = z
+  .object({
+    routing: z
+      .object({
+        originals: StorageRoutingSchema.describe('Where newly written original files and sidecars are stored'),
+        thumbnails: StorageRoutingSchema.describe(
+          'Where newly written thumbnails, previews, fullsize images, person thumbnails and profile images are stored',
+        ),
+        encodedVideo: StorageRoutingSchema.describe('Where newly written transcoded videos are stored'),
+      })
+      .meta({ id: 'SystemConfigStorageRoutingDto' }),
+  })
+  .meta({ id: 'SystemConfigStorageDto' });
+
 // Gallery-fork: opt-in accounting for server-generated files (thumbnails, transcodes).
 const SystemConfigStorageUsageSchema = z
   .object({
@@ -491,6 +514,8 @@ export const SystemConfigSchema = z
     passwordLogin: SystemConfigPasswordLoginSchema,
     reverseGeocoding: SystemConfigReverseGeocodingSchema,
     metadata: SystemConfigMetadataSchema,
+    // Gallery-fork: see SystemConfigStorageSchema above.
+    storage: SystemConfigStorageSchema,
     storageTemplate: SystemConfigStorageTemplateSchema,
     // Gallery-fork: see SystemConfigStorageUsageSchema above.
     storageUsage: SystemConfigStorageUsageSchema,

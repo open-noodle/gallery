@@ -1,5 +1,5 @@
 import { CronExpression } from '@nestjs/schedule';
-import { ReleaseChannel } from 'src/dtos/system-config.dto';
+import { ReleaseChannel, StorageRouting } from 'src/dtos/system-config.dto';
 import {
   AudioCodec,
   Colorspace,
@@ -155,6 +155,14 @@ export type SystemConfig = {
   };
   passwordLogin: {
     enabled: boolean;
+  };
+  // Gallery-fork: per-file-type storage routing; `auto` follows IMMICH_STORAGE_BACKEND.
+  storage: {
+    routing: {
+      originals: StorageRouting;
+      thumbnails: StorageRouting;
+      encodedVideo: StorageRouting;
+    };
   };
   storageTemplate: {
     enabled: boolean;
@@ -412,6 +420,15 @@ export const defaults = Object.freeze<SystemConfig>({
   },
   passwordLogin: {
     enabled: true,
+  },
+  // Gallery-fork: defaults to `auto` everywhere, so behaviour matches IMMICH_STORAGE_BACKEND
+  // exactly and no existing install changes on upgrade.
+  storage: {
+    routing: {
+      originals: StorageRouting.Auto,
+      thumbnails: StorageRouting.Auto,
+      encodedVideo: StorageRouting.Auto,
+    },
   },
   storageTemplate: {
     enabled: false,

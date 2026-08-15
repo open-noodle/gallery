@@ -95,9 +95,8 @@ A new `server/src/backends/storage-router.ts` owns one pure function:
 resolveRouting(routing: StorageRouting, envBackend: 'disk' | 's3'): 'disk' | 's3';
 ```
 
-`auto` returns `envBackend`; `disk` and `s3` return themselves. A thin
-`BaseService.getWriteBackend(kind)` combines it with `getConfig({ withCache: true })` and the
-`StorageService` backend statics.
+`auto` returns `envBackend`; `disk` and `s3` return themselves. A `StorageService.getWriteBackend(kind, config)`
+static combines it with `getConfig({ withCache: true })` and the `StorageService` backend statics.
 
 | Knob   | `IMMICH_STORAGE_BACKEND` | S3 configured | Resolved                                      |
 | ------ | ------------------------ | ------------- | --------------------------------------------- |
@@ -485,8 +484,10 @@ over `i18n/*.json` and `docs/`.
 - `src/dtos/server.dto.ts` — `s3Storage` feature flag
 - `src/services/server.service.ts` — populate the flag
 - `src/backends/storage-router.ts` — new; resolution and the kind-mapping table
-- `src/services/base.service.ts` — `getWriteBackend(kind)`
-- `src/services/storage.service.ts` — `ConfigValidate` / `ConfigInit` handlers
+- `src/services/storage.service.ts` — `getWriteBackend(kind, config)` static, `ConfigValidate` /
+  `ConfigInit` handlers. Deliberately not on `BaseService`: that would close an import cycle
+  (`base.service` → `storage.service` → `base.service`), and every call site already imports
+  `StorageService`.
 - `src/services/media.service.ts`, `asset-media.service.ts`, `user.service.ts`, `auth.service.ts` —
   pass the kind
 - `src/services/storage-migration.service.ts` — per-kind validation, routing status
