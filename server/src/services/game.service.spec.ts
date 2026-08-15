@@ -1,6 +1,9 @@
 import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
-import { SharedSpaceRole } from 'src/enum';
+import { DiskStorageBackend } from 'src/backends/disk-storage.backend';
+import { CacheControl, SharedSpaceRole } from 'src/enum';
 import { GameService } from 'src/services/game.service';
+import { StorageService } from 'src/services/storage.service';
+import { ImmichFileResponse } from 'src/utils/file';
 import { newTestService, ServiceMocks } from 'test/utils';
 
 const locationCandidate = (id: string, lat: number, lon: number, country: string) => ({
@@ -14,6 +17,13 @@ const locationCandidate = (id: string, lat: number, lon: number, country: string
 describe(GameService.name, () => {
   let sut: GameService;
   let mocks: ServiceMocks;
+
+  beforeAll(() => {
+    // Initialize the disk backend for StorageService so that getRoundImage's serveFromBackend
+    // call works in tests. The DiskStorageBackend returns absolute paths as-is, so the
+    // mediaLocation value doesn't matter. Same pattern as asset-media.service.spec.ts.
+    (StorageService as any).diskBackend = new DiskStorageBackend('/data');
+  });
 
   beforeEach(() => {
     ({ sut, mocks } = newTestService(GameService));
@@ -299,9 +309,19 @@ describe(GameService.name, () => {
 
       const result = await sut.getRoundImage(authStub, 'challenge-1', 0);
 
-      // The preview is already re-encoded and EXIF-free; the original never is.
-      expect(result.path).toBe('/thumbs/asset-1_preview.jpeg');
-      expect(result.path).not.toContain('secret-name');
+      // The preview is already re-encoded and EXIF-free; the original never is. Asserting the
+      // full response (routed through serveFromBackend, not a bare `new ImmichFileResponse`) pins
+      // both the preview path AND the generic filename - `result.path` alone isn't type-safe once
+      // getRoundImage returns the ImmichMediaResponse union serveFromBackend produces.
+      expect(result).toEqual(
+        new ImmichFileResponse({
+          path: '/thumbs/asset-1_preview.jpeg',
+          contentType: 'image/jpeg',
+          cacheControl: CacheControl.PrivateWithCache,
+          fileName: 'round-0.jpeg',
+        }),
+      );
+      expect(JSON.stringify(result)).not.toContain('secret-name');
     });
 
     it('refuses a round belonging to a different challenge', async () => {
