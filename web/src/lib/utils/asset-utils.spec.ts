@@ -15,14 +15,6 @@ vi.mock('@immich/ui', async (orig) => {
   };
 });
 
-// The web vitest config does not clear mocks between tests, and this file's `toastManager` mock is
-// module-scoped, so call history leaks across tests unless reset explicitly here. Without this,
-// `getEditableAssetsWithWarning`'s "warns of nothing" assertion below only passes because it
-// happens to run before any test that calls `toastManager.warning`.
-beforeEach(() => {
-  vi.clearAllMocks();
-});
-
 describe('get file extension from filename', () => {
   it('returns the extension without including the dot', () => {
     expect(getFilenameExtension('filename.txt')).toEqual('txt');
