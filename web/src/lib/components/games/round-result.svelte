@@ -45,6 +45,10 @@
 
   // mapMarkers must stay explicit — leaving it undefined makes Map.svelte fetch and render the
   // space's own photo markers (see location-round.svelte's identical comment / Map.svelte:281-284).
+  // 'guess'/'answer' are not real asset IDs (MapMarkerResponseDto.id is normally an asset ID), so
+  // `useLocationPin` MUST be passed below — otherwise Map.svelte's default marker layer renders an
+  // <img> keyed off this id (Map.svelte:432-433) and both pins 404. The id doubles as the popup
+  // snippet's discriminator, since the pin icon itself is identical for every marker (see below).
   let mapMarkers = $derived(
     type === 'location' && guess && answer?.lat != null && answer?.lon != null
       ? ([
@@ -94,7 +98,19 @@
 
       {#if type === 'location'}
         <div class="mt-2 h-40 overflow-hidden rounded-2xl shadow-lg sm:h-48">
-          <Map {mapMarkers} autoFitBounds simplified rounded showSimpleControls={false} />
+          <!-- useLocationPin: our marker ids ('guess'/'answer') are not real asset IDs, so the
+               default image-marker branch would 404 (see the mapMarkers comment above). -->
+          <Map {mapMarkers} autoFitBounds useLocationPin simplified rounded showSimpleControls={false}>
+            {#snippet popup({ marker })}
+              <!-- Map.svelte's location-pin branch draws the SAME icon (colour, shape, size) for
+                   every marker (Map.svelte:429-431) — there is no per-marker style override in its
+                   public API, and redesigning Map.svelte is out of scope here. This on-tap label is
+                   the only differentiation available: the guess and answer pins are visually
+                   identical at rest, and two guesses within ~35px still collapse into one cluster
+                   badge (Map.svelte:404), which is worse for a near-perfect guess. -->
+              <span class="text-sm font-medium">{marker.id === 'guess' ? $t('game_guess') : $t('game_actual')}</span>
+            {/snippet}
+          </Map>
         </div>
       {/if}
 
