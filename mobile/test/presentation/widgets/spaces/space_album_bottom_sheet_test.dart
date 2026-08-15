@@ -18,7 +18,9 @@ import 'package:immich_mobile/presentation/widgets/timeline/timeline.state.dart'
 import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/remote_album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/setting.provider.dart';
-import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
+// Both provider files export a `settingsProvider`; this harness overrides the notifier one from
+// setting.provider.dart, so take only `appConfigProvider` from here.
+import 'package:immich_mobile/providers/infrastructure/settings.provider.dart' show appConfigProvider;
 import 'package:immich_mobile/providers/shared_space.provider.dart';
 import 'package:immich_mobile/providers/timeline/multiselect.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
