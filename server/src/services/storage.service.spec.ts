@@ -496,6 +496,29 @@ describe(StorageService.name, () => {
     });
   });
 
+  describe('media location check with mixed storage', () => {
+    it('should skip the location check when no disk-resident file exists', async () => {
+      // getFileSamples now only returns absolute (disk) paths, so an install that is entirely
+      // on S3 — or mid-migration with no disk-resident asset_file rows left — reports no
+      // samples. The `if (samples.length > 0)` guard must then skip the location check
+      // entirely rather than comparing a stale saved location against the freshly detected one.
+      mocks.systemMetadata.get.mockResolvedValue({ location: '/old/location' });
+      mocks.asset.getFileSamples.mockResolvedValue([]);
+      mocks.config.getEnv.mockReturnValue(
+        mockEnvData({
+          storage: {
+            ignoreMountCheckErrors: false,
+            mediaLocation: '/data',
+          },
+        }),
+      );
+
+      await expect(sut.onBootstrap()).resolves.not.toThrow();
+
+      expect(mocks.database.migrateFilePaths).not.toHaveBeenCalled();
+    });
+  });
+
   describe('handleDeleteFiles', () => {
     it('should handle null values', async () => {
       await sut.handleDeleteFiles({ files: [undefined, null] });
