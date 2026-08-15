@@ -1,0 +1,174 @@
+<script lang="ts">
+  import DateRound from '$lib/components/games/date-round.svelte';
+  import GameLeaderboard from '$lib/components/games/game-leaderboard.svelte';
+  import LocationRound from '$lib/components/games/location-round.svelte';
+  import RoundResult from '$lib/components/games/round-result.svelte';
+  import { handleError } from '$lib/utils/handle-error';
+  import { yearFromIso } from '$lib/utils/game';
+  import {
+    GameRoundType,
+    getChallenge,
+    getLeaderboard,
+    guessRound,
+    isHttpError,
+    type GameChallengeDetailResponseDto,
+    type GameGuessDto,
+    type GameLeaderboardResponseDto,
+  } from '@immich/sdk';
+  import { t } from 'svelte-i18n';
+  import type { PageData } from './$types';
+
+  // GameRoundDetailResponseDto.answer is withheld until a round is guessed (spec §6), so no round in
+  // the payload ever carries a pool date the client hasn't already revealed to the player - there is
+  // no year range anywhere to derive a slider lower bound from. Fixed instead of derived.
+  const GAME_MIN_YEAR = 1970;
+
+  interface Props {
+    data: PageData;
+  }
+
+  let { data }: Props = $props();
+
+  let challenge = $state<GameChallengeDetailResponseDto>(data.challenge);
+  let leaderboard = $state<GameLeaderboardResponseDto>();
+
+  type ResultView = {
+    type: 'location' | 'date';
+    score: number;
+    distanceKm?: number;
+    offsetDays?: number;
+    answer?: { date: string | null; lat: number | null; lon: number | null };
+    guess?: { lat: number; lon: number };
+  };
+  let result = $state<ResultView>();
+
+  // The response already tells us which rounds this caller has answered - a round carries
+  // `answer`/`score` only once guessed - so the starting round is derived from the payload itself
+  // rather than tracked client-side across reloads.
+  function firstUnansweredIndex(c: GameChallengeDetailResponseDto): number {
+    const index = c.rounds.findIndex((round) => round.score === undefined);
+    return index === -1 ? c.rounds.length : index;
+  }
+
+  // Set once from the initial payload. Re-fetching `challenge` after a guess must NOT recompute
+  // this: the just-answered round becomes scored on that same re-fetch, and recomputing would skip
+  // straight past its own result screen instead of showing it.
+  let currentIndex = $state(firstUnansweredIndex(data.challenge));
+
+  const currentRound = $derived(currentIndex < challenge.rounds.length ? challenge.rounds[currentIndex] : undefined);
+  const maxYear = $derived(yearFromIso(challenge.createdAt));
+
+  async function loadLeaderboard() {
+    try {
+      leaderboard = await getLeaderboard({ id: challenge.id });
+    } catch (error) {
+      handleError(error, $t('errors.something_went_wrong'));
+    }
+  }
+
+  // Covers a challenge that was already fully answered when this page loaded (e.g. reopening a
+  // finished game).
+  if (currentIndex >= challenge.rounds.length) {
+    void loadLeaderboard();
+  }
+
+  // The only source for the revealed answer: GameGuessResponseDto carries score/distanceKm/
+  // offsetDays but no answer (spec §9/API verified). Re-fetching the challenge is also the recovery
+  // path for a duplicate (409) guess, so both callers below share this one function.
+  async function showResult(extra?: {
+    score: number;
+    distanceKm?: number;
+    offsetDays?: number;
+    guess?: { lat: number; lon: number };
+  }) {
+    challenge = await getChallenge({ id: challenge.id });
+    const round = challenge.rounds[currentIndex];
+    result = {
+      type: round.type === GameRoundType.Location ? 'location' : 'date',
+      score: extra?.score ?? round.score ?? 0,
+      distanceKm: extra?.distanceKm,
+      offsetDays: extra?.offsetDays,
+      answer: round.answer,
+      guess: extra?.guess,
+    };
+  }
+
+  async function submitGuess(gameGuessDto: GameGuessDto, guessPoint?: { lat: number; lon: number }) {
+    try {
+      const response = await guessRound({ id: challenge.id, index: currentIndex, gameGuessDto });
+      await showResult({
+        score: response.score,
+        distanceKm: response.distanceKm ?? undefined,
+        offsetDays: response.offsetDays ?? undefined,
+        guess: guessPoint,
+      });
+    } catch (error) {
+      if (isHttpError(error) && error.status === 409) {
+        // Already answered - a page left open and replayed. Reuse the exact same re-fetch as a
+        // successful guess rather than surfacing a raw error the player can't act on.
+        await showResult();
+      } else {
+        handleError(error, $t('errors.something_went_wrong'));
+      }
+    }
+  }
+
+  function handleLocationGuess(point: { lat: number; lon: number }) {
+    void submitGuess({ lat: point.lat, lon: point.lon }, point);
+  }
+
+  function handleDateGuess(isoDate: string) {
+    void submitGuess({ date: isoDate });
+  }
+
+  function handleNext() {
+    result = undefined;
+    currentIndex += 1;
+    if (currentIndex >= challenge.rounds.length) {
+      void loadLeaderboard();
+    }
+  }
+</script>
+
+<div class="flex h-full flex-col">
+  {#if currentRound}
+    <p class="px-4 py-2 text-sm text-gray-500 dark:text-gray-400" data-testid="game-progress">
+      {$t('game_round_progress', { values: { current: currentIndex + 1, total: challenge.rounds.length } })}
+    </p>
+  {/if}
+
+  <div class="min-h-0 flex-1">
+    {#if result && currentRound}
+      <RoundResult
+        challengeId={challenge.id}
+        index={currentIndex}
+        type={result.type}
+        score={result.score}
+        distanceKm={result.distanceKm}
+        offsetDays={result.offsetDays}
+        answer={result.answer}
+        guess={result.guess}
+        onNext={handleNext}
+      />
+    {:else if currentRound}
+      {#if currentRound.type === GameRoundType.Location}
+        <LocationRound challengeId={challenge.id} index={currentIndex} onGuess={handleLocationGuess} />
+      {:else}
+        <DateRound
+          challengeId={challenge.id}
+          index={currentIndex}
+          minYear={GAME_MIN_YEAR}
+          {maxYear}
+          onGuess={handleDateGuess}
+        />
+      {/if}
+    {:else}
+      <div class="flex h-full flex-col gap-4 overflow-y-auto p-4" data-testid="game-completed">
+        <h1 class="text-xl font-semibold dark:text-white">{$t('game_completed')}</h1>
+        {#if leaderboard}
+          <GameLeaderboard entries={leaderboard.entries} roundCount={challenge.rounds.length} />
+        {/if}
+      </div>
+    {/if}
+  </div>
+</div>

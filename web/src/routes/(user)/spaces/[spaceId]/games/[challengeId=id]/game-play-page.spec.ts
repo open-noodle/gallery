@@ -1,0 +1,372 @@
+import {
+  GameRoundType,
+  type GameChallengeDetailResponseDto,
+  type GameLeaderboardResponseDto,
+  type GameRoundDetailResponseDto,
+} from '@immich/sdk';
+import '@testing-library/jest-dom';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import type { Component } from 'svelte';
+import { init, register, waitLocale } from 'svelte-i18n';
+import { sdkMock } from '$lib/__mocks__/sdk.mock';
+import TestWrapper from '$lib/components/TestWrapper.svelte';
+import GamePlayPage from './+page.svelte';
+
+// Map.svelte pulls in maplibre-gl, which needs a WebGL canvas happy-dom lacks. Copied verbatim from
+// location-round.spec.ts (itself copied from map-page.spec.ts:58-61). Note the @test-data ALIAS; a
+// relative path to the stub does not resolve.
+vi.mock('$lib/components/shared-components/map/Map.svelte', async () => {
+  const { default: MockComponent } = await import('@test-data/mocks/map-component.stub.svelte');
+  return { default: MockComponent };
+});
+
+const { toastManagerMock } = vi.hoisted(() => ({
+  toastManagerMock: { danger: vi.fn(), primary: vi.fn(), success: vi.fn(), warning: vi.fn() },
+}));
+
+vi.mock('@immich/ui', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@immich/ui')>();
+  return {
+    ...original,
+    toastManager: toastManagerMock,
+  };
+});
+
+function makeRound(overrides: Partial<GameRoundDetailResponseDto> = {}): GameRoundDetailResponseDto {
+  return {
+    index: 0,
+    type: GameRoundType.Date,
+    ...overrides,
+  };
+}
+
+function makeChallenge(overrides: Partial<GameChallengeDetailResponseDto> = {}): GameChallengeDetailResponseDto {
+  return {
+    id: 'challenge-1',
+    spaceId: 'space-1',
+    name: 'Summer Trip',
+    roundCount: 2,
+    // 1970 (GAME_MIN_YEAR) + 2026 (this createdAt's year) averages to a clean 1998, so the
+    // date-round's default slider position is deterministic in these tests.
+    createdAt: '2026-06-01T00:00:00.000Z',
+    scaleDays: 30,
+    scaleKm: 100,
+    closedAt: null,
+    rounds: [makeRound({ index: 0 }), makeRound({ index: 1 })],
+    ...overrides,
+  };
+}
+
+function renderPage(challenge: GameChallengeDetailResponseDto) {
+  const props = { data: { challenge } };
+  return render(TestWrapper as Component<{ component: typeof GamePlayPage; componentProps: typeof props }>, {
+    component: GamePlayPage,
+    componentProps: props,
+  });
+}
+
+describe('Game play page', () => {
+  beforeAll(async () => {
+    register('en-US', () => import('$i18n/en.json'));
+    await init({ fallbackLocale: 'en-US', initialLocale: 'en-US' });
+    await waitLocale('en-US');
+  });
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    // Every guess re-fetches the challenge (task-9 correction #1); give every test a safe default
+    // so a guess never resolves to `challenge = undefined`, and let tests that care about the
+    // answer override it explicitly.
+    sdkMock.getChallenge.mockResolvedValue(makeChallenge());
+  });
+
+  describe('resuming', () => {
+    it('opens at the first unanswered round, derived from the payload rather than client state', () => {
+      const challenge = makeChallenge({
+        rounds: [
+          makeRound({
+            index: 0,
+            type: GameRoundType.Date,
+            score: 3000,
+            answer: { date: '2020-01-01', lat: null, lon: null },
+          }),
+          makeRound({ index: 1, type: GameRoundType.Location, score: 4000, answer: { date: null, lat: 1, lon: 2 } }),
+          makeRound({ index: 2, type: GameRoundType.Location }),
+        ],
+      });
+
+      renderPage(challenge);
+
+      expect(screen.getByTestId('location-round')).toBeInTheDocument();
+      expect(screen.queryByTestId('round-result')).not.toBeInTheDocument();
+      expect(screen.getByTestId('game-progress')).toHaveTextContent('Round 3 of 3');
+    });
+
+    it('shows the leaderboard immediately for a challenge that was already fully answered', async () => {
+      const challenge = makeChallenge({
+        rounds: [
+          makeRound({ index: 0, score: 3000, answer: { date: '2020-01-01', lat: null, lon: null } }),
+          makeRound({ index: 1, score: 4000, answer: { date: '2021-01-01', lat: null, lon: null } }),
+        ],
+      });
+      sdkMock.getLeaderboard.mockResolvedValue({
+        entries: [{ userId: 'u1', name: 'Alice', total: 7000, answered: 2 }],
+      } as GameLeaderboardResponseDto);
+
+      renderPage(challenge);
+
+      await waitFor(() => expect(screen.getByTestId('game-leaderboard')).toBeInTheDocument());
+      expect(screen.getByTestId('game-completed')).toHaveTextContent('Completed');
+      expect(screen.queryByTestId('game-progress')).not.toBeInTheDocument();
+      expect(sdkMock.getLeaderboard).toHaveBeenCalledWith({ id: 'challenge-1' });
+    });
+  });
+
+  describe('round rendering', () => {
+    it('renders location-round for a location round', () => {
+      renderPage(makeChallenge({ rounds: [makeRound({ index: 0, type: GameRoundType.Location })] }));
+      expect(screen.getByTestId('location-round')).toBeInTheDocument();
+      expect(screen.queryByTestId('date-round')).not.toBeInTheDocument();
+    });
+
+    it('renders date-round for a date round', () => {
+      renderPage(makeChallenge({ rounds: [makeRound({ index: 0, type: GameRoundType.Date })] }));
+      expect(screen.getByTestId('date-round')).toBeInTheDocument();
+      expect(screen.queryByTestId('location-round')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('guessing', () => {
+    it('calls guessRound with exactly {lat, lon} for a location round', async () => {
+      sdkMock.guessRound.mockResolvedValue({
+        roundId: 'r0',
+        userId: 'u1',
+        guessLat: 12.5,
+        guessLon: 45.5,
+        guessDate: null,
+        distanceKm: 42,
+        offsetDays: null,
+        score: 3500,
+      });
+      renderPage(makeChallenge({ rounds: [makeRound({ index: 0, type: GameRoundType.Location })] }));
+
+      await fireEvent.click(screen.getByTestId('map-stub-click-point'));
+      await fireEvent.click(screen.getByTestId('location-round-guess'));
+
+      await waitFor(() =>
+        expect(sdkMock.guessRound).toHaveBeenCalledWith({
+          id: 'challenge-1',
+          index: 0,
+          gameGuessDto: { lat: 12.5, lon: 45.5 },
+        }),
+      );
+    });
+
+    it('calls guessRound with exactly {date} for a date round', async () => {
+      sdkMock.guessRound.mockResolvedValue({
+        roundId: 'r0',
+        userId: 'u1',
+        guessLat: null,
+        guessLon: null,
+        guessDate: '1998-01-01T00:00:00.000Z',
+        distanceKm: null,
+        offsetDays: 2,
+        score: 4800,
+      });
+      renderPage(makeChallenge({ rounds: [makeRound({ index: 0, type: GameRoundType.Date })] }));
+
+      await fireEvent.click(screen.getByTestId('date-round-guess'));
+
+      await waitFor(() =>
+        expect(sdkMock.guessRound).toHaveBeenCalledWith({
+          id: 'challenge-1',
+          index: 0,
+          gameGuessDto: { date: '1998-01-01T00:00:00.000Z' },
+        }),
+      );
+    });
+
+    it('shows round-result with the answer obtained from the post-guess re-fetch, not the guess response (which carries none)', async () => {
+      sdkMock.guessRound.mockResolvedValue({
+        roundId: 'r0',
+        userId: 'u1',
+        guessLat: null,
+        guessLon: null,
+        guessDate: '1998-01-01T00:00:00.000Z',
+        distanceKm: null,
+        offsetDays: 2,
+        score: 4800,
+      });
+      // The only place this distinctive year can come from is this re-fetch - it is nowhere in the
+      // guess response and nowhere in the page's initial data.
+      sdkMock.getChallenge.mockResolvedValue(
+        makeChallenge({
+          rounds: [
+            makeRound({
+              index: 0,
+              type: GameRoundType.Date,
+              score: 4800,
+              answer: { date: '2015-07-04T00:00:00.000Z', lat: null, lon: null },
+            }),
+          ],
+        }),
+      );
+      renderPage(makeChallenge({ rounds: [makeRound({ index: 0, type: GameRoundType.Date })] }));
+
+      await fireEvent.click(screen.getByTestId('date-round-guess'));
+
+      await waitFor(() => expect(sdkMock.getChallenge).toHaveBeenCalledWith({ id: 'challenge-1' }));
+      expect(screen.getByTestId('round-result')).toBeInTheDocument();
+      expect(screen.getByTestId('round-result-answer-date')).toHaveTextContent('2015');
+    });
+
+    it('a 409 on guess is treated as already-answered: reloads and shows the result, no raw error toast', async () => {
+      sdkMock.isHttpError.mockImplementation((error) => !!(error as { __http?: boolean })?.__http);
+      sdkMock.guessRound.mockRejectedValue({ __http: true, status: 409, data: {}, message: 'raw' });
+      sdkMock.getChallenge.mockResolvedValue(
+        makeChallenge({
+          rounds: [
+            makeRound({
+              index: 0,
+              type: GameRoundType.Date,
+              score: 2500,
+              answer: { date: '2011-11-11T00:00:00.000Z', lat: null, lon: null },
+            }),
+          ],
+        }),
+      );
+      renderPage(makeChallenge({ rounds: [makeRound({ index: 0, type: GameRoundType.Date })] }));
+
+      await fireEvent.click(screen.getByTestId('date-round-guess'));
+
+      await waitFor(() => expect(screen.getByTestId('round-result')).toBeInTheDocument());
+      expect(sdkMock.getChallenge).toHaveBeenCalledWith({ id: 'challenge-1' });
+      expect(screen.getByTestId('round-result-answer-date')).toHaveTextContent('2011');
+      expect(screen.getByTestId('round-result-score')).toHaveTextContent('2500');
+      expect(toastManagerMock.danger).not.toHaveBeenCalled();
+    });
+
+    it('a non-409 guess failure surfaces a toast instead of a silent no-op', async () => {
+      sdkMock.guessRound.mockRejectedValue(new Error('server exploded'));
+      renderPage(makeChallenge({ rounds: [makeRound({ index: 0, type: GameRoundType.Date })] }));
+
+      await fireEvent.click(screen.getByTestId('date-round-guess'));
+
+      await waitFor(() => expect(toastManagerMock.danger).toHaveBeenCalledWith('Something went wrong'));
+      expect(screen.queryByTestId('round-result')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('advancing', () => {
+    it('game_next_round advances to the next round, and the leaderboard renders after the last one', async () => {
+      sdkMock.guessRound
+        .mockResolvedValueOnce({
+          roundId: 'r0',
+          userId: 'u1',
+          guessLat: null,
+          guessLon: null,
+          guessDate: '1998-01-01T00:00:00.000Z',
+          distanceKm: null,
+          offsetDays: 2,
+          score: 1000,
+        })
+        .mockResolvedValueOnce({
+          roundId: 'r1',
+          userId: 'u1',
+          guessLat: null,
+          guessLon: null,
+          guessDate: '1998-01-01T00:00:00.000Z',
+          distanceKm: null,
+          offsetDays: 1,
+          score: 2000,
+        });
+      sdkMock.getChallenge
+        .mockResolvedValueOnce(
+          makeChallenge({
+            rounds: [
+              makeRound({
+                index: 0,
+                type: GameRoundType.Date,
+                score: 1000,
+                answer: { date: null, lat: null, lon: null },
+              }),
+              makeRound({ index: 1, type: GameRoundType.Date }),
+            ],
+          }),
+        )
+        .mockResolvedValueOnce(
+          makeChallenge({
+            rounds: [
+              makeRound({
+                index: 0,
+                type: GameRoundType.Date,
+                score: 1000,
+                answer: { date: null, lat: null, lon: null },
+              }),
+              makeRound({
+                index: 1,
+                type: GameRoundType.Date,
+                score: 2000,
+                answer: { date: null, lat: null, lon: null },
+              }),
+            ],
+          }),
+        );
+      sdkMock.getLeaderboard.mockResolvedValue({
+        entries: [{ userId: 'u1', name: 'Alice', total: 3000, answered: 2 }],
+      } as GameLeaderboardResponseDto);
+
+      renderPage(
+        makeChallenge({
+          rounds: [
+            makeRound({ index: 0, type: GameRoundType.Date }),
+            makeRound({ index: 1, type: GameRoundType.Date }),
+          ],
+        }),
+      );
+
+      expect(screen.getByTestId('game-progress')).toHaveTextContent('Round 1 of 2');
+
+      await fireEvent.click(screen.getByTestId('date-round-guess'));
+      await waitFor(() => expect(screen.getByTestId('round-result')).toBeInTheDocument());
+
+      await fireEvent.click(screen.getByTestId('round-result-next'));
+      await waitFor(() => expect(screen.getByTestId('date-round')).toBeInTheDocument());
+      expect(screen.getByTestId('game-progress')).toHaveTextContent('Round 2 of 2');
+
+      await fireEvent.click(screen.getByTestId('date-round-guess'));
+      await waitFor(() => expect(screen.getByTestId('round-result')).toBeInTheDocument());
+
+      await fireEvent.click(screen.getByTestId('round-result-next'));
+
+      await waitFor(() => expect(screen.getByTestId('game-leaderboard')).toBeInTheDocument());
+      expect(screen.getByText('Alice')).toBeInTheDocument();
+      expect(screen.queryByTestId('game-progress')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('date round bounds', () => {
+    it("derives minYear from the fixed constant and maxYear from the challenge's createdAt, not from a round's answer", () => {
+      const challenge = makeChallenge({
+        createdAt: '2020-03-01T00:00:00.000Z',
+        rounds: [
+          // An already-answered round with a wildly different (future) answer year, to prove the
+          // slider bounds are not being read off it.
+          makeRound({
+            index: 0,
+            type: GameRoundType.Date,
+            score: 1000,
+            answer: { date: '2099-01-01', lat: null, lon: null },
+          }),
+          makeRound({ index: 1, type: GameRoundType.Date }),
+        ],
+      });
+
+      renderPage(challenge);
+
+      const slider = screen.getByTestId('date-round-slider') as HTMLInputElement;
+      expect(slider.min).toBe('1970');
+      expect(slider.max).toBe('2020');
+    });
+  });
+});
