@@ -18,13 +18,20 @@
  * another member of that same space, once the asset is reachable through the space (here: Bob
  * direct-adds his own new photo to the space he owns).
  */
-import { AssetVisibility, getSpaceActivities } from '@immich/sdk';
+import { AssetVisibility, createTag, getSpaceActivities } from '@immich/sdk';
 import { Socket } from 'socket.io-client';
-import { authHeaders, buildSpaceContext, type SpaceContext } from 'src/actors';
+import { type Actor, authHeaders, buildSpaceContext, forEachActor, type SpaceContext } from 'src/actors';
 import { errorDto } from 'src/responses';
 import { app, asBearerAuth, utils } from 'src/utils';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
+const actorsFor = (ctx: SpaceContext): Actor[] => [
+  ctx.spaceOwner,
+  ctx.spaceEditor,
+  ctx.spaceViewer,
+  ctx.spaceNonMember,
+];
 
 describe('Space editor asset-edit journey (#734)', () => {
   let ctx: SpaceContext;
@@ -130,5 +137,120 @@ describe('Space editor asset-edit journey (#734)', () => {
 
       expect(status).toBe(204);
     });
+  });
+
+  // #992 audit item 3: an actor matrix over every route family this feature widened, at HTTP
+  // level. Each test targets a fresh asset owned by Bob (spaceOwner) and added to the space, so
+  // one route's mutation can never contaminate another route's expectations. `spaceNonMember` is
+  // a real non-member of THIS space (built by buildSpaceContext, not a stranger with no space at
+  // all) — the weaker "stranger" version would leave the asset unreachable for two independent
+  // reasons and prove nothing about the space-membership gate specifically.
+  describe('actor matrix over the widened routes (#992 audit item 3)', () => {
+    it('PUT /assets/:id/edits (rotate): owner/editor 2xx, viewer/non-member 4xx', async () => {
+      const rotateWebsocket = await utils.connectWebsocket(ctx.spaceOwner.token!);
+      const asset = await utils.createAsset(ctx.spaceOwner.token!);
+      await utils.waitForWebsocketEvent({ event: 'assetUpload', id: asset.id });
+      utils.disconnectWebsocket(rotateWebsocket);
+      await utils.addSpaceAssets(ctx.spaceOwner.token!, ctx.spaceId, [asset.id]);
+
+      await forEachActor(
+        actorsFor(ctx),
+        (actor) =>
+          request(app)
+            .put(`/assets/${asset.id}/edits`)
+            .set(authHeaders(actor))
+            .send({ edits: [{ action: 'rotate', parameters: { angle: 90 } }] }),
+        { spaceOwner: 200, spaceEditor: 200, spaceViewer: 400, spaceNonMember: 400 },
+      );
+    });
+
+    it('POST /assets/jobs (refresh-metadata): owner/editor 2xx, viewer/non-member 4xx', async () => {
+      const asset = await utils.createAsset(ctx.spaceOwner.token!);
+      await utils.addSpaceAssets(ctx.spaceOwner.token!, ctx.spaceId, [asset.id]);
+
+      await forEachActor(
+        actorsFor(ctx),
+        (actor) =>
+          request(app)
+            .post('/assets/jobs')
+            .set(authHeaders(actor))
+            .send({ assetIds: [asset.id], name: 'refresh-metadata' }),
+        { spaceOwner: 204, spaceEditor: 204, spaceViewer: 400, spaceNonMember: 400 },
+      );
+    });
+
+    it('PUT /assets/:id/metadata: owner/editor 2xx, viewer/non-member 4xx', async () => {
+      const asset = await utils.createAsset(ctx.spaceOwner.token!);
+      await utils.addSpaceAssets(ctx.spaceOwner.token!, ctx.spaceId, [asset.id]);
+
+      await forEachActor(
+        actorsFor(ctx),
+        (actor) =>
+          request(app)
+            .put(`/assets/${asset.id}/metadata`)
+            .set(authHeaders(actor))
+            .send({ items: [{ key: 'e2e-matrix.probe', value: { touched: true } }] }),
+        { spaceOwner: 200, spaceEditor: 200, spaceViewer: 400, spaceNonMember: 400 },
+      );
+    });
+
+    it('PUT /tags/assets: count > 0 for owner/editor, count === 0 for viewer/non-member (non-throwing checkAccess)', async () => {
+      // TagService.bulkTagAssets checks access with `checkAccess`, not `requireAccess` — a denied
+      // actor gets HTTP 200 with `count: 0`, indistinguishable from success by status alone. The
+      // body IS the assertion here; a status-only check would pass even if the access filter were
+      // deleted entirely.
+      const asset = await utils.createAsset(ctx.spaceOwner.token!);
+      await utils.addSpaceAssets(ctx.spaceOwner.token!, ctx.spaceId, [asset.id]);
+
+      for (const actor of actorsFor(ctx)) {
+        const tag = await createTag(
+          { tagCreateDto: { name: `e2e-matrix-${actor.id}` } },
+          { headers: asBearerAuth(actor.token!) },
+        );
+
+        const { status, body } = await request(app)
+          .put('/tags/assets')
+          .set(authHeaders(actor))
+          .send({ tagIds: [tag.id], assetIds: [asset.id] });
+
+        expect(status, `actor=${actor.id} unexpected status: ${JSON.stringify(body)}`).toBe(200);
+        if (actor.id === 'spaceOwner' || actor.id === 'spaceEditor') {
+          expect(body.count, `actor=${actor.id}`).toBeGreaterThan(0);
+        } else {
+          expect(body.count, `actor=${actor.id}`).toBe(0);
+        }
+      }
+    });
+  });
+});
+
+// #992 audit item 4: pins the one user-visible §2.3 removal at HTTP level. Before #734, a space
+// editor could act on an asset another member direct-added to the space even if the asset's
+// owner was NOT a space member themselves, because the direct-add arm accepted
+// `Permission.AssetShare` (owner ∪ partner). #734 tightened this — see S-5 in
+// access-space-edit.repository.spec.ts for the rule-level pin — so the same setup must now 4xx.
+describe('space editor asset edit — the tightened partner-share regression (#992 audit item 4)', () => {
+  let ctx: SpaceContext;
+  let daveAssetId: string;
+
+  beforeAll(async () => {
+    await utils.resetDatabase();
+    ctx = await buildSpaceContext({ withPartner: true });
+
+    // Dave (partner) has shared his library with Bob (spaceOwner). Bob direct-adds Dave's asset
+    // to the space HE owns — Dave himself is never a member of the space.
+    await utils.addSpaceAssets(ctx.spaceOwner.token!, ctx.spaceId, [ctx.partnerAssetId!]);
+    daveAssetId = ctx.partnerAssetId!;
+  });
+
+  it("Anna (space Editor) is refused editing Dave's partner-shared, direct-added asset", async () => {
+    const { status, body } = await request(app)
+      .put(`/assets/${daveAssetId}`)
+      .set(authHeaders(ctx.spaceEditor))
+      .send({ description: 'should not be allowed' });
+
+    expect(status).toBeGreaterThanOrEqual(400);
+    expect(status).toBeLessThan(500);
+    expect(body).toEqual(errorDto.noPermission);
   });
 });
