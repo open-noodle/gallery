@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-15
 **Status:** Design approved, spec under review
-**Scope:** A multiplayer guessing game inside Gallery, played on a shared space's members' photos. Web only.
+**Scope:** A multiplayer guessing game inside Gallery, played on a shared space's photos. Web only.
 
 ## 1. What this is
 
@@ -29,7 +29,7 @@ not from assumption. The findings that shaped the design:
 | Naive sampling already yields 3.2 countries per 5-round set; only 3% single-country        | Spread rules are polish, not rescue — keep them cheap              |
 | Naive sampling produces 1.24 answer-pairs under 50 km apart per set                        | A minimum-separation rule is the one spread rule that earns itself |
 | **Most photos are people-centric — the place is background behind a face**                 | A scene gate is mandatory, not optional                            |
-| 62% of GPS photos have no detected face; the one multi-member space has 0%                 | Pool cannot be the space's own assets alone                        |
+| 62% of GPS photos have no detected face; the one multi-member space has 0%                 | A space-only pool is thin — date rounds must carry it              |
 | Face-area filtering passes indoor kitchens and bookshelves                                 | Face filtering alone is insufficient; CLIP gate needed             |
 | CLIP + face gates are complementary — each catches what the other misses                   | Both gates, composed                                               |
 | A fixed scoring constant collapses on narrow libraries (20-point spread on a city library) | Scoring scale must derive from the pool                            |
@@ -60,7 +60,7 @@ only upstream coupling is reading `asset`, `asset_exif`, `asset_face`, and `smar
 
 ### 4.1 Schema
 
-Four tables. Migration goes in `server/src/schema/migrations-gallery/` with timestamp
+Three tables. Migration goes in `server/src/schema/migrations-gallery/` with timestamp
 `1791000000000`; table definitions in `server/src/schema/tables/`.
 
 **`game_challenge`**
@@ -111,16 +111,6 @@ scoreable for players who already saw it, and is skipped for those who have not.
 
 `UNIQUE (roundId, userId)` — one guess per player per round, and it is final.
 
-**`game_library_optin`**
-
-| Column      | Type        | Notes                                 |
-| ----------- | ----------- | ------------------------------------- |
-| `spaceId`   | uuid FK     | → `shared_space`, `ON DELETE CASCADE` |
-| `userId`    | uuid FK     | → `user`, `ON DELETE CASCADE`         |
-| `createdAt` | timestamptz |                                       |
-
-Primary key `(spaceId, userId)`. See §5.
-
 ### 4.2 Server
 
 - `server/src/services/game.service.ts` — extends `BaseService`; challenge lifecycle, round
@@ -132,17 +122,22 @@ Primary key `(spaceId, userId)`. See §5.
 
 ### 4.3 Endpoints
 
-| Method | Path                                   | Purpose                                              |
-| ------ | -------------------------------------- | ---------------------------------------------------- |
-| POST   | `/shared-spaces/:spaceId/games`        | Create a challenge; generates and freezes its rounds |
-| GET    | `/shared-spaces/:spaceId/games`        | List challenges with the caller's progress           |
-| GET    | `/games/:id`                           | Challenge detail, answers withheld (see §6)          |
-| GET    | `/games/:id/rounds/:index/image`       | The round photo, re-encoded and stripped             |
-| POST   | `/games/:id/rounds/:index/guess`       | Submit a guess; returns score and the answer         |
-| GET    | `/games/:id/leaderboard`               | Per-player totals                                    |
-| PUT    | `/shared-spaces/:spaceId/games/opt-in` | Opt the caller's library in or out (see §5)          |
+| Method | Path                             | Purpose                                              |
+| ------ | -------------------------------- | ---------------------------------------------------- |
+| POST   | `/shared-spaces/:spaceId/games`  | Create a challenge; generates and freezes its rounds |
+| GET    | `/shared-spaces/:spaceId/games`  | List challenges with the caller's progress           |
+| GET    | `/games/:id`                     | Challenge detail, answers withheld (see §6)          |
+| GET    | `/games/:id/rounds/:index/image` | The round photo, re-encoded and stripped             |
+| POST   | `/games/:id/rounds/:index/guess` | Submit a guess; returns score and the answer         |
+| GET    | `/games/:id/leaderboard`         | Per-player totals                                    |
+| DELETE | `/games/:id`                     | Delete a challenge; cascades rounds and guesses      |
 
 All endpoints require space membership, enforced through the existing access layer.
+
+**Creating and deleting a challenge require the space-editor role**; playing one requires only
+membership. This reuses the existing editor gate — the same check that governs who may edit a space's
+people and albums (`SharedSpaceApiRepository.isSpaceEditor` on the client, the server-side role check
+in `shared-space.service.ts`). Viewers can play every challenge but cannot create or remove one.
 
 ### 4.4 Web
 
@@ -150,23 +145,25 @@ Routes under `web/src/routes/(user)/spaces/[spaceId]/games/`, following the exis
 structure. The map uses `maplibre-gl` / `svelte-maplibre`, both already dependencies. The layout is
 responsive by requirement — a phone browser is the expected device.
 
-## 5. The photo pool, and consent
+## 5. The photo pool
 
-The space's own assets are too thin and too portrait-heavy to feed a location game: in the reference
-library the only multi-member space held 1,076 GPS photos, of which roughly 95 survived scene
-filtering, across 5 countries. So the pool draws from **participating members' own libraries**.
+**The pool is the space's own assets, and nothing else.** A challenge draws only from photos already
+shared into the space, so the game never shows anyone a photo they could not already open in Gallery.
+Playing a game grants no visibility that space membership did not already grant. This is a deliberate
+constraint, chosen over a wider pool.
 
-That widens the pool beyond what space RBAC already permits, so it requires explicit consent:
+It has a real cost, and the design absorbs it rather than hiding it. In the reference library the only
+multi-member space held 1,076 GPS photos, of which roughly 95 survived scene filtering, across 5
+countries — enough for about 19 non-repeating five-round location sets, and skewed. Three consequences
+follow:
 
-- A member opts their library in per space, recorded in `game_library_optin`. Opting in is a
-  deliberate act with plain-language wording about what it means — that photos from their library may
-  be shown to other members of that space inside a game.
-- Only opted-in members' libraries contribute candidates.
-- Opting out stops future challenges from drawing on that library. It does not retroactively rewrite
-  challenges already generated, because doing so would void other players' scores; existing challenges
-  finish on the round set they were created with.
-- With nobody opted in, the pool falls back to the space's own assets, and the game still works — just
-  from a smaller pool.
+- **Date rounds carry the game in thin spaces.** Every asset in a space is eligible for a date round,
+  so the type mix (§7.4) shifts toward date as location candidates run out. A space with no GPS at all
+  still yields a playable challenge.
+- **Repeat avoidance matters more.** With a small pool, generation must actively avoid assets used by
+  recent challenges in the same space, or the third challenge is the first one again.
+- **Adding photos to the space makes the game better.** That is the correct incentive, and it is worth
+  surfacing in the UI when a challenge comes out short.
 
 Candidates are always filtered to `visibility = 'timeline'`, `deletedAt IS NULL`, `type = 'IMAGE'`.
 Archived, hidden, and locked assets are never eligible.
@@ -284,7 +281,7 @@ later cannot rewrite historical leaderboards.
 | Situation                                    | Behaviour                                                                    |
 | -------------------------------------------- | ---------------------------------------------------------------------------- |
 | Not a member of the space                    | 403 from the existing access layer                                           |
-| Pool too small to generate any round         | 400 with a message naming the reason (no opted-in libraries, etc.)           |
+| Pool too small to generate any round         | 400 naming the reason, and suggesting adding photos to the space             |
 | Pool fills fewer rounds than requested       | Challenge created shorter; response reports the actual count                 |
 | Guess submitted twice for a round            | 409; the first guess stands                                                  |
 | Guess on a round whose asset was deleted     | Allowed if the player already loaded it; scored from the denormalised answer |
@@ -297,7 +294,7 @@ later cannot rewrite historical leaderboards.
   invariance** — the same relative error must score the same across wildly different pool scales.
   Sampler determinism under a fixed seed. Spread-rule relaxation order. Gate composition.
 - **Medium** (real DB via testcontainers): repository queries, including the CLIP dot-product ranking
-  and the face-area aggregation, plus the RBAC and opt-in filtering of candidates.
+  and the face-area aggregation, plus the space-membership filtering of candidates.
 - **Service** (`game.service.spec.ts`, mocked repositories): answer withholding, duplicate-guess
   rejection, deleted-asset handling.
 - **E2E**: create a challenge, play it as two users, assert the leaderboard. Plus an explicit
@@ -314,11 +311,13 @@ later cannot rewrite historical leaderboards.
 
 ## 12. Open questions
 
-1. **The opt-in model in §5 needs explicit sign-off.** It is the one part of this design that widens
-   photo visibility beyond what space RBAC already grants. The consent mechanism is designed to make
-   that legitimate, but the decision is a product and privacy call, not a technical one.
-2. **Should a challenge be deletable, and by whom?** Assumed: the creator or a space owner may delete
-   one, which cascades its rounds and guesses. Not yet confirmed.
-3. **Scene-gate prompt wording** is empirical. The prompts used in the spike separated the extremes
+1. **Scene-gate prompt wording** is empirical. The prompts used in the spike separated the extremes
    well but left a wide ambiguous middle. They should be treated as tunable constants and revisited
    with a broader photo sample than the 54 used in the spike.
+
+Resolved during review:
+
+- **Pool scope** — the pool is the space's own assets only (§5). A wider, consent-gated pool was
+  considered and rejected: the game must not widen photo visibility beyond space membership.
+- **Who may create and delete a challenge** — space editors (§4.3). Deleting cascades to the
+  challenge's rounds and guesses.
