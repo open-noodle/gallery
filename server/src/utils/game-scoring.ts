@@ -126,8 +126,22 @@ const MAX_PER_COUNTRY = 2;
 const KM_PER_DEGREE = 111;
 
 export const geoCellKey = (point: LatLon, cellKm: number): string => {
-  const size = Math.max(cellKm, 0.05) / KM_PER_DEGREE;
-  return `${Math.round(point.lat / size)}:${Math.round(point.lon / size)}`;
+  const size = Math.max(cellKm, 0.05);
+  const latSize = size / KM_PER_DEGREE;
+
+  // A degree of longitude spans 111km only at the equator; it shrinks with
+  // latitude and vanishes at the poles. Without this correction a "50km" cell is
+  // ~40% too narrow at 52N and collapses entirely in the arctic. The clamp keeps
+  // the divisor away from zero at the pole itself.
+  const lonKmPerDegree = Math.max(KM_PER_DEGREE * Math.cos(toRadians(point.lat)), 0.1);
+  const lonSize = size / lonKmPerDegree;
+
+  // Wrap the longitude bucket around the globe so points either side of the
+  // antimeridian land in the same cell rather than opposite extremes.
+  const bucketsAround = Math.max(1, Math.round(360 / lonSize));
+  const lonBucket = ((Math.round(point.lon / lonSize) % bucketsAround) + bucketsAround) % bucketsAround;
+
+  return `${Math.round(point.lat / latSize)}:${lonBucket}`;
 };
 
 type Constraints = { enforceCountryCap: boolean; minSeparationKm: number; enforceCellUniqueness: boolean };
