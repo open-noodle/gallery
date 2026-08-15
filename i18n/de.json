@@ -1777,6 +1777,8 @@
   "filter_has_no_album": "Kein Album",
   "filter_invalid_from_date": "Gib ein gültiges Von-Datum ein",
   "filter_invalid_to_date": "Gib ein gültiges Bis-Datum ein",
+  "filter_location_no_gps": "Kein Standort",
+  "filter_location_no_place_name": "Unbenannter Ort",
   "filter_manage_sections": "Bereiche ein- oder ausblenden",
   "filter_name_people_hint": "Benenne Personen, um diesen Filter zu verwenden",
   "filter_no_cameras_found": "Keine Kameras gefunden",

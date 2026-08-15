@@ -1777,6 +1777,8 @@
   "filter_has_no_album": "Nie należy do albumu",
   "filter_invalid_from_date": "Podaj prawidłową datę początkową",
   "filter_invalid_to_date": "Podaj prawidłową datę końcową",
+  "filter_location_no_gps": "Brak lokalizacji",
+  "filter_location_no_place_name": "Nienazwane miejsce",
   "filter_manage_sections": "Pokaż lub ukryj sekcje",
   "filter_name_people_hint": "Nazwij osoby, aby użyć tego filtra",
   "filter_no_cameras_found": "Nie znaleziono aparatów",
