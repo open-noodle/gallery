@@ -100,6 +100,7 @@ import { newMetadataRepositoryMock } from 'test/repositories/metadata.repository
 import { newStorageRepositoryMock } from 'test/repositories/storage.repository.mock.js';
 import { newSystemMetadataRepositoryMock } from 'test/repositories/system-metadata.repository.mock.js';
 import { ITelemetryRepositoryMock, newTelemetryRepositoryMock } from 'test/repositories/telemetry.repository.mock.js';
+import { GameRepository } from 'src/repositories/game.repository.js';
 
 export type ControllerContext = {
   authenticate: Mock;
@@ -272,6 +273,7 @@ export type ServiceOverrides = {
   faceRepairScan: FaceRepairScanRepository;
   faceRepairDecline: FaceRepairDeclineRepository;
   facePersonVerdict: FacePersonVerdictRepository;
+  game: GameRepository;
   integrityReport: IntegrityRepository;
   job: JobRepository;
   library: LibraryRepository;
@@ -375,6 +377,7 @@ export const getMocks = () => {
     faceRepairScan: automock(FaceRepairScanRepository, { strict: false }),
     faceRepairDecline: automock(FaceRepairDeclineRepository, { strict: false }),
     facePersonVerdict: automock(FacePersonVerdictRepository, { strict: false }),
+    game: automock(GameRepository, { strict: false }),
     integrityReport: automock(IntegrityRepository, { strict: false }),
     job: newJobRepositoryMock(),
     apiKey: automock(ApiKeyRepository),
@@ -461,6 +464,7 @@ export const newTestService = <T extends BaseService>(
     overrides.faceRepairScan || (mocks.faceRepairScan as As<FaceRepairScanRepository>),
     overrides.faceRepairDecline || (mocks.faceRepairDecline as As<FaceRepairDeclineRepository>),
     overrides.facePersonVerdict || (mocks.facePersonVerdict as As<FacePersonVerdictRepository>),
+    overrides.game || (mocks.game as As<GameRepository>),
     overrides.integrityReport || (mocks.integrityReport as As<IntegrityRepository>),
     overrides.job || (mocks.job as As<JobRepository>),
     overrides.library || (mocks.library as As<LibraryRepository>),
