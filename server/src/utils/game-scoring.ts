@@ -125,6 +125,33 @@ const MAX_PER_COUNTRY = 2;
 
 const KM_PER_DEGREE = 111;
 
+/**
+ * Steepness of the rank-biased draw in `tryFill`. Location candidates arrive from
+ * `GameRepository.getLocationCandidates` in CLIP scene-gate rank order - best "picture of a
+ * place" first - and this is what makes that ranking actually change which photos become
+ * rounds.
+ *
+ * It exists because a uniform draw over the handed-in list made the scene gate INERT: the
+ * repository's only remaining effect was the `LIMIT` cutoff, so for any space whose gated pool
+ * fits inside that limit (the design doc's own reference space is ~95 photos) portraits entered
+ * location rounds at exactly the naive rate. Design §2 calls the scene gate mandatory.
+ *
+ * `u ** 3` puts the expected pick at the 25th percentile of the ranking: the top fifth of the
+ * ranking takes ~58% of draws (uniform: 20%) and the bottom fifth ~7% (uniform: 20%). A BIAS,
+ * not a cutoff - design §7.1 requires rank-based selection and explicitly rules out an absolute
+ * threshold, and keeping the tail reachable is also what stops a large space from replaying the
+ * same handful of top-ranked photos forever.
+ */
+export const RANK_BIAS_EXPONENT = 3;
+
+/**
+ * Index into a rank-ordered candidate list, biased toward the front. `random()` is in [0, 1),
+ * so the product can never reach `length`; the clamp is belt-and-braces against a future PRNG
+ * that returns 1.
+ */
+export const rankBiasedIndex = (length: number, random: () => number): number =>
+  Math.min(length - 1, Math.floor(random() ** RANK_BIAS_EXPONENT * length));
+
 export const geoCellKey = (point: LatLon, cellKm: number): string => {
   const size = Math.max(cellKm, 0.05);
   const latSize = size / KM_PER_DEGREE;
@@ -161,7 +188,9 @@ const tryFill = (
   // Bounded attempts: the pool may be unable to satisfy the constraints at all.
   const maxAttempts = Math.max(1000, candidates.length * 20);
   for (let attempt = 0; attempt < maxAttempts && picked.length < count; attempt++) {
-    const next = candidates[Math.floor(random() * candidates.length)];
+    // Rank-biased, NOT uniform - `candidates` is in CLIP scene-gate order and a uniform draw
+    // here is what made that gate inert. See RANK_BIAS_EXPONENT.
+    const next = candidates[rankBiasedIndex(candidates.length, random)];
     if (!next || next.lat === null || next.lon === null || usedAssets.has(next.assetId)) {
       continue;
     }
@@ -197,6 +226,10 @@ const tryFill = (
 
 /**
  * Pick location rounds under spread rules derived from the pool scale.
+ *
+ * `candidates` MUST arrive in scene-gate rank order (best "picture of a place" first, as
+ * `GameRepository.getLocationCandidates` returns them): the draw is rank-biased, so reordering
+ * the input silently downgrades the CLIP gate to noise. See RANK_BIAS_EXPONENT.
  *
  * Measurement showed naive sampling already produces decent country variety, but
  * routinely puts two answers under 50km apart, which reads as a bug. Minimum
