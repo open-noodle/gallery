@@ -22,6 +22,7 @@ final photosFilterSuggestionsProvider = FutureProvider.autoDispose.family<Filter
     // #910: the albums facet is computed with this filter excluded, but every OTHER facet must still
     // honour it — dropping it here made all of them ignore the not-in-album toggle.
     isNotInAlbum: filter.display.isNotInAlbum ? true : null,
+    locationPresence: filter.location.locationPresence,
     make: filter.camera.make,
     mediaType: mapAssetType(filter.mediaType),
     model: filter.camera.model,
