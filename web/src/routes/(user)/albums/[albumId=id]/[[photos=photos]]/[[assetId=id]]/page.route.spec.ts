@@ -103,6 +103,8 @@ function renderPage(album = albumFactory.build({ assetCount: 2 })) {
         hasFavorites: true,
         hasAssetsInAlbum: true,
         hasAssetsNotInAlbum: true,
+        hasNoGpsAssets: false,
+        hasNoPlaceNameAssets: false,
       });
     }
 
@@ -120,6 +122,8 @@ function renderPage(album = albumFactory.build({ assetCount: 2 })) {
       hasFavorites: true,
       hasAssetsInAlbum: true,
       hasAssetsNotInAlbum: true,
+      hasNoGpsAssets: false,
+      hasNoPlaceNameAssets: false,
     });
   });
 

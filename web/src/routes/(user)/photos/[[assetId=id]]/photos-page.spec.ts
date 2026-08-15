@@ -268,6 +268,8 @@ describe('Photos page search URL state', () => {
       hasFavorites: false,
       hasAssetsInAlbum: false,
       hasAssetsNotInAlbum: false,
+      hasNoGpsAssets: false,
+      hasNoPlaceNameAssets: false,
     });
     sdkMock.searchSmartFacets.mockResolvedValue({
       total: 12,
@@ -284,6 +286,8 @@ describe('Photos page search URL state', () => {
       hasFavorites: true,
       hasAssetsInAlbum: true,
       hasAssetsNotInAlbum: true,
+      hasNoGpsAssets: false,
+      hasNoPlaceNameAssets: false,
     });
     sdkMock.getSearchSuggestions.mockResolvedValue([]);
   });
