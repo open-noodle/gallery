@@ -1,8 +1,10 @@
-import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend';
 import { CacheControl, SharedSpaceRole } from 'src/enum';
+import { NOT_PLACE_PROMPT_EMBEDDING, PLACE_PROMPT_EMBEDDING } from 'src/repositories/game.repository';
 import { GameService } from 'src/services/game.service';
 import { StorageService } from 'src/services/storage.service';
+import { clearConfigCache } from 'src/utils/config';
 import { ImmichFileResponse } from 'src/utils/file';
 import { newTestService, ServiceMocks } from 'test/utils';
 
@@ -13,6 +15,18 @@ const locationCandidate = (id: string, lat: number, lon: number, country: string
   takenAt: new Date(2021, 5, 1),
   country,
 });
+
+/** The minimum an editor needs to reach `createChallenge` - one candidate in each pool. */
+const stockPools = (mocks: ServiceMocks) => {
+  mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Editor } as any);
+  mocks.game.getLocationCandidates.mockResolvedValue([locationCandidate('a', 52.5, 13.4, 'Germany')]);
+  mocks.game.getDateCandidates.mockResolvedValue([locationCandidate('e', 41.9, 12.5, 'Italy')]);
+  mocks.game.getRecentlyUsedAssetIds.mockResolvedValue([]);
+  mocks.game.createChallenge.mockResolvedValue('challenge-1');
+};
+
+/** The scene-prompt vectors handed to the location-candidate query on the call under test. */
+const scenePromptsUsed = (mocks: ServiceMocks) => mocks.game.getLocationCandidates.mock.calls[0][3];
 
 describe(GameService.name, () => {
   let sut: GameService;
@@ -27,6 +41,9 @@ describe(GameService.name, () => {
 
   beforeEach(() => {
     ({ sut, mocks } = newTestService(GameService));
+    // getScenePromptEmbeddings reads the system config with the process-wide cache; without this
+    // a config stubbed by one test would leak into the next.
+    clearConfigCache();
   });
 
   const authStub = { user: { id: 'user-1' } } as any;
@@ -142,6 +159,97 @@ describe(GameService.name, () => {
     expect(rounds).toHaveLength(5);
     const ids = rounds.map((r: any) => r.assetId);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  // The two CLIP prompt vectors are 512-dim ViT-B-32__openai constants, but the model is
+  // admin-configurable and setDimensionSize re-types smart_search.embedding to match. Against a
+  // 768-dim model the ordering errors outright; against a *different* 512-dim model it silently
+  // ranks in an unrelated embedding space, which is worse. So the vectors must follow the
+  // configured model, and the gate must degrade rather than lie when they cannot.
+  describe('scene-gate prompt vectors', () => {
+    it('passes the shipped constants when the configured model is the one they were encoded with', async () => {
+      stockPools(mocks);
+
+      await sut.create(authStub, 'space-1', { roundCount: 2 });
+
+      expect(mocks.game.getLocationCandidates).toHaveBeenCalledWith('space-1', expect.any(Number), expect.any(String), {
+        place: PLACE_PROMPT_EMBEDDING,
+        notPlace: NOT_PLACE_PROMPT_EMBEDDING,
+      });
+      // No inference for the default install - design §7.1's "one dot product per candidate and
+      // no new inference".
+      expect(mocks.machineLearning.encodeText).not.toHaveBeenCalled();
+    });
+
+    it('encodes the prompts against a different configured model instead of reusing the constants', async () => {
+      stockPools(mocks);
+      mocks.systemMetadata.get.mockResolvedValue({ machineLearning: { clip: { modelName: 'ViT-L-14__openai' } } });
+      mocks.machineLearning.encodeText.mockResolvedValue('[0.5,0.25]');
+
+      await sut.create(authStub, 'space-1', { roundCount: 2 });
+
+      expect(mocks.machineLearning.encodeText).toHaveBeenCalledWith(expect.any(String), {
+        modelName: 'ViT-L-14__openai',
+      });
+      const prompts = scenePromptsUsed(mocks);
+      expect(prompts).toEqual({ place: [0.5, 0.25], notPlace: [0.5, 0.25] });
+      expect(prompts?.place).not.toEqual(PLACE_PROMPT_EMBEDDING);
+    });
+
+    it('drops the scene ordering rather than ranking against the wrong embedding space when encoding fails', async () => {
+      stockPools(mocks);
+      mocks.systemMetadata.get.mockResolvedValue({ machineLearning: { clip: { modelName: 'ViT-L-14__openai' } } });
+      mocks.machineLearning.encodeText.mockRejectedValue(new Error('ml is down'));
+
+      await sut.create(authStub, 'space-1', { roundCount: 2 });
+
+      // Undefined prompts, not the shipped 512-dim constants: the challenge is still generated
+      // (face gate + spread rules), just without the CLIP rank.
+      expect(mocks.game.getLocationCandidates).toHaveBeenCalledWith(
+        'space-1',
+        expect.any(Number),
+        expect.any(String),
+        undefined,
+      );
+      expect(mocks.logger.warn).toHaveBeenCalled();
+    });
+
+    it('does not encode against a model when smart search is disabled', async () => {
+      stockPools(mocks);
+      mocks.systemMetadata.get.mockResolvedValue({
+        machineLearning: { clip: { modelName: 'ViT-L-14__openai', enabled: false } },
+      });
+
+      await sut.create(authStub, 'space-1', { roundCount: 2 });
+
+      expect(mocks.machineLearning.encodeText).not.toHaveBeenCalled();
+      expect(scenePromptsUsed(mocks)).toBeUndefined();
+    });
+  });
+
+  // ORDER BY asset.id ASC LIMIT 200 was deterministic but *stably* so: in a space with more
+  // than 200 assets no photo outside that lowest-id prefix could ever reach a round, in any
+  // challenge, which falsifies design §5's "adding photos to the space makes the game better".
+  // The seed makes the sample move between challenges while staying reproducible per challenge.
+  it('passes a per-challenge seed to both candidate queries so the sample is not frozen to one prefix', async () => {
+    mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Editor } as any);
+    mocks.game.getLocationCandidates.mockResolvedValue([locationCandidate('a', 52.5, 13.4, 'Germany')]);
+    mocks.game.getDateCandidates.mockResolvedValue([locationCandidate('e', 41.9, 12.5, 'Italy')]);
+    mocks.game.getRecentlyUsedAssetIds.mockResolvedValue([]);
+    mocks.game.getChallengesForSpace.mockResolvedValue([{ id: 'c1' }, { id: 'c2' }] as any);
+    mocks.game.createChallenge.mockResolvedValue('challenge-3');
+
+    await sut.create(authStub, 'space-1', { roundCount: 2 });
+
+    // Same seed for both pools, derived from the space and how many challenges it already has -
+    // so challenge 3 draws a different slice of a large space than challenges 1 and 2 did.
+    expect(mocks.game.getDateCandidates).toHaveBeenCalledWith('space-1', expect.any(Number), 'space-1:2');
+    expect(mocks.game.getLocationCandidates).toHaveBeenCalledWith(
+      'space-1',
+      expect.any(Number),
+      'space-1:2',
+      expect.anything(),
+    );
   });
 
   describe('guess', () => {
@@ -301,11 +409,7 @@ describe(GameService.name, () => {
       mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Viewer } as any);
       mocks.game.getChallenge.mockResolvedValue({ id: 'challenge-1', spaceId: 'space-1' } as any);
       mocks.game.getRound.mockResolvedValue({ id: 'r0', index: 0, type: 'location', assetId: 'asset-1' } as any);
-      mocks.asset.getById.mockResolvedValue({
-        id: 'asset-1',
-        originalPath: '/originals/secret-name.jpg',
-        files: [{ type: 'preview', path: '/thumbs/asset-1_preview.jpeg' }],
-      } as any);
+      mocks.game.getEligibleRoundAsset.mockResolvedValue({ previewPath: '/thumbs/asset-1_preview.jpeg' } as any);
 
       const result = await sut.getRoundImage(authStub, 'challenge-1', 0);
 
@@ -321,7 +425,25 @@ describe(GameService.name, () => {
           fileName: 'round-0.jpeg',
         }),
       );
-      expect(JSON.stringify(result)).not.toContain('secret-name');
+      // The lookup is space-scoped, and the unscoped one (no deletedAt / visibility / space
+      // predicate) must never be reached from this route.
+      expect(mocks.game.getEligibleRoundAsset).toHaveBeenCalledWith('space-1', 'asset-1');
+      expect(mocks.asset.getById).not.toHaveBeenCalled();
+    });
+
+    // Rounds are frozen by design (§4.1), so this assetId is permanent - which is exactly why
+    // eligibility has to be re-checked on every request. Removed from the space, trashed (a
+    // 30-day window), or moved to the locked folder all present here as "no eligible row", and
+    // all of them must stop the image being served rather than being honoured forever.
+    it('404s a round whose asset is no longer eligible in the space', async () => {
+      mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Viewer } as any);
+      mocks.game.getChallenge.mockResolvedValue({ id: 'challenge-1', spaceId: 'space-1' } as any);
+      mocks.game.getRound.mockResolvedValue({ id: 'r0', index: 0, type: 'location', assetId: 'asset-1' } as any);
+      mocks.game.getEligibleRoundAsset.mockResolvedValue(void 0);
+
+      await expect(sut.getRoundImage(authStub, 'challenge-1', 0)).rejects.toBeInstanceOf(NotFoundException);
+      expect(mocks.game.getEligibleRoundAsset).toHaveBeenCalledWith('space-1', 'asset-1');
+      expect(mocks.asset.getById).not.toHaveBeenCalled();
     });
 
     it('refuses a round belonging to a different challenge', async () => {
