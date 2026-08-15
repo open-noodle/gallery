@@ -2,7 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { Kysely, Transaction } from 'kysely';
 import { AssetFace, SharedSpacePerson } from 'src/database';
 import { OnEvent, OnJob } from 'src/decorators';
-import { MapAlbumDto, mapAlbum } from 'src/dtos/album.dto';
+import { mapAlbum, MapAlbumDto } from 'src/dtos/album.dto';
 import { AuthDto } from 'src/dtos/auth.dto';
 import type { FilteredMapMarkerDto } from 'src/dtos/gallery-map.dto';
 import type { MapMarkerResponseDto } from 'src/dtos/map.dto';
@@ -87,14 +87,8 @@ import { ImmichMediaResponse } from 'src/utils/file';
 import { createCrossOwnerMergeAuthorizer } from 'src/utils/merge-policy';
 import { mimeTypes } from 'src/utils/mime-types';
 import { isFaceSuggestionEnabled } from 'src/utils/misc';
+import { getSharedSpaceRoleScore, SHARED_SPACE_ROLE_HIERARCHY as ROLE_HIERARCHY } from 'src/utils/shared-space-role';
 
-const ROLE_HIERARCHY: Record<SharedSpaceRole, number> = {
-  [SharedSpaceRole.Viewer]: 0,
-  [SharedSpaceRole.Editor]: 1,
-  [SharedSpaceRole.Owner]: 2,
-};
-
-const getSharedSpaceRoleScore = (role: string) => ROLE_HIERARCHY[role as SharedSpaceRole] ?? 0;
 const getMetadataSourceScore = (sourceProfileType?: string | null) => (sourceProfileType === 'user-person' ? 1 : 0);
 
 /** nameSource collapse precedence: a manually-set name wins over an inherited/auto/empty one. */
