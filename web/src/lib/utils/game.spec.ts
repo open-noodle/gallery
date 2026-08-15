@@ -12,7 +12,7 @@ describe('formatDistanceKm', () => {
 
   it('rounds to whole kilometres above 10', () => {
     expect(formatDistanceKm(550.4)).toBe('550 km');
-    expect(formatDistanceKm(17755)).toBe('17,755 km');
+    expect(formatDistanceKm(17_755)).toBe('17,755 km');
   });
 });
 
