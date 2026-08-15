@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Insertable, Kysely } from 'kysely';
+import { Expression, ExpressionBuilder, Insertable, Kysely, SqlBool } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { MIGRATION_FILE_TYPE_TO_KIND, StorageMigrationFileType, StorageRoutingKind } from 'src/backends/storage-router';
 import { AssetFileType } from 'src/enum';
@@ -9,12 +9,31 @@ import { StorageMigrationLogTable } from 'src/schema/tables/storage-migration-lo
 export type StorageMigrationDirection = 'toS3' | 'toDisk';
 
 /**
- * Path-shape predicate shared by every stream, `getFileCounts`, and `getRoutingCounts`. A
- * hand-copied second predicate is how the settings page ends up nagging an admin toward a
- * migration that does not actually match what the streams would move.
+ * Path-shape predicate shared by every stream, `getFileCounts`, `getOriginalsSizeEstimate`, and
+ * `getRoutingCounts`. A hand-copied second predicate is how the settings page ends up nagging an
+ * admin toward a migration that does not actually match what the streams would move.
  */
 const pathOperator = (direction: StorageMigrationDirection) => (direction === 'toS3' ? 'like' : ('not like' as const));
 const PATH_PATTERN = '/%';
+
+/**
+ * External-library originals live outside the media location and are matched on by the library
+ * scanner (originalPath.startsWith(importPath)). Rewriting the path on migration detaches the
+ * asset from its source file. Every query that touches originals — the stream, `getFileCounts`,
+ * and the size estimate the admin sees alongside those counts — excludes them through this one
+ * predicate so none of them can drift from what a migration would actually move.
+ */
+const excludeExternalLibraryOriginals = (eb: ExpressionBuilder<DB, keyof DB>): Expression<SqlBool> =>
+  eb('asset.libraryId', 'is', null);
+
+/**
+ * Sidecars of an external-library asset are excluded for the same reason as the original itself;
+ * Immich-generated derivatives (thumbnails, previews, fullsize, encoded video) of an external
+ * asset stay migratable since only the source file is scanner-matched. Shared by every query
+ * that filters `asset_file` rows on the sidecar/non-sidecar split.
+ */
+const excludeExternalLibrarySidecars = (eb: ExpressionBuilder<DB, keyof DB>): Expression<SqlBool> =>
+  eb.or([eb('asset_file.type', '!=', AssetFileType.Sidecar), eb('asset.libraryId', 'is', null)]);
 
 export interface StorageMigrationFileCounts {
   originals: number;
@@ -34,33 +53,23 @@ export class StorageMigrationRepository {
   // --- Streaming queries ---
 
   streamOriginals(direction: StorageMigrationDirection) {
-    return (
-      this.db
-        .selectFrom('asset')
-        .select(['id', 'originalPath'])
-        // External-library originals live outside the media location and are matched on by the
-        // library scanner (originalPath.startsWith(importPath)). Rewriting the path on migration
-        // detaches the asset from its source file.
-        .where('libraryId', 'is', null)
-        .where('originalPath', pathOperator(direction), PATH_PATTERN)
-        .stream()
-    );
+    return this.db
+      .selectFrom('asset')
+      .select(['id', 'originalPath'])
+      .where((eb) => excludeExternalLibraryOriginals(eb))
+      .where('originalPath', pathOperator(direction), PATH_PATTERN)
+      .stream();
   }
 
   streamAssetFiles(direction: StorageMigrationDirection, fileTypes: AssetFileType[]) {
-    return (
-      this.db
-        .selectFrom('asset_file')
-        .innerJoin('asset', 'asset.id', 'asset_file.assetId')
-        .select(['asset_file.id', 'asset_file.assetId', 'asset_file.path', 'asset_file.type'])
-        .where('asset_file.type', 'in', fileTypes)
-        // Sidecars of an external-library asset are excluded for the same reason as the
-        // original itself. Immich-generated derivatives (thumbnails, previews, encoded video) of
-        // an external asset stay migratable — only the source file is scanner-matched.
-        .where((eb) => eb.or([eb('asset_file.type', '!=', AssetFileType.Sidecar), eb('asset.libraryId', 'is', null)]))
-        .where('asset_file.path', pathOperator(direction), PATH_PATTERN)
-        .stream()
-    );
+    return this.db
+      .selectFrom('asset_file')
+      .innerJoin('asset', 'asset.id', 'asset_file.assetId')
+      .select(['asset_file.id', 'asset_file.assetId', 'asset_file.path', 'asset_file.type'])
+      .where('asset_file.type', 'in', fileTypes)
+      .where((eb) => excludeExternalLibrarySidecars(eb))
+      .where('asset_file.path', pathOperator(direction), PATH_PATTERN)
+      .stream();
   }
 
   streamEncodedVideos(direction: StorageMigrationDirection) {
@@ -98,6 +107,7 @@ export class StorageMigrationRepository {
       .selectFrom('asset')
       .innerJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
       .select((eb) => eb.fn.coalesce(eb.fn.sum<number>('asset_exif.fileSizeInByte'), eb.lit(0)).as('totalSize'))
+      .where((eb) => excludeExternalLibraryOriginals(eb))
       .where('asset.originalPath', pathOperator(direction), PATH_PATTERN)
       .executeTakeFirstOrThrow();
 
@@ -109,8 +119,7 @@ export class StorageMigrationRepository {
       this.db
         .selectFrom('asset')
         .select((eb) => eb.fn.countAll<number>().as('count'))
-        // See streamOriginals: external-library originals are never migrated.
-        .where('libraryId', 'is', null)
+        .where((eb) => excludeExternalLibraryOriginals(eb))
         .where('originalPath', pathOperator(direction), PATH_PATTERN)
         .executeTakeFirstOrThrow(),
 
@@ -123,9 +132,7 @@ export class StorageMigrationRepository {
           eb.fn.countAll<number>().filterWhere('asset_file.type', '=', AssetFileType.FullSize).as('fullsize'),
           eb.fn.countAll<number>().filterWhere('asset_file.type', '=', AssetFileType.Sidecar).as('sidecars'),
         ])
-        // See streamAssetFiles: only sidecars of an external-library asset are excluded;
-        // thumbnails/previews/fullsize of an external asset stay migratable.
-        .where((eb) => eb.or([eb('asset_file.type', '!=', AssetFileType.Sidecar), eb('asset.libraryId', 'is', null)]))
+        .where((eb) => excludeExternalLibrarySidecars(eb))
         .where('asset_file.path', pathOperator(direction), PATH_PATTERN)
         .executeTakeFirstOrThrow(),
 

@@ -7,11 +7,12 @@ import { BaseService } from 'src/services/base.service';
 import { newMediumService } from 'test/medium.factory';
 import { getKyselyDB } from 'test/utils';
 
-let defaultDatabase: Kysely<DB>;
-
-const setup = (db?: Kysely<DB>) => {
+// Every test in this file asserts absolute counts (totals, exact rows), so each gets its own
+// isolated database rather than sharing one across the file — there is no `defaultDatabase`
+// fallback to keep in sync.
+const setup = (db: Kysely<DB>) => {
   const { ctx } = newMediumService(BaseService, {
-    database: db || defaultDatabase,
+    database: db,
     real: [],
     mock: [LoggingRepository],
   });
@@ -80,10 +81,6 @@ const seedMixedFixture = async (ctx: ReturnType<typeof setup>['ctx']) => {
     encodedVideoTotal: 3,
   };
 };
-
-beforeAll(async () => {
-  defaultDatabase = await getKyselyDB();
-});
 
 describe(StorageMigrationRepository.name, () => {
   describe('external library exclusion', () => {
@@ -193,6 +190,28 @@ describe(StorageMigrationRepository.name, () => {
         expect(streamed.thumbnails).toBe(counts.thumbnails[side]);
         expect(streamed.encodedVideo).toBe(counts.encodedVideo[side]);
       }
+    });
+  });
+
+  describe('getOriginalsSizeEstimate', () => {
+    it('should exclude external-library originals from the estimate', async () => {
+      const { ctx, sut } = setup(await getKyselyDB());
+      const { user } = await ctx.newUser();
+      const { library } = await ctx.newLibrary({ ownerId: user.id });
+
+      const { asset: owned } = await ctx.newAsset({ ownerId: user.id, originalPath: '/data/library/u/owned.jpg' });
+      await ctx.newExif({ assetId: owned.id, fileSizeInByte: 1000 });
+
+      // Same disk-resident shape as the owned asset — if the exclusion were missing, this
+      // would still match the 'toS3' direction filter and inflate the estimate.
+      const { asset: external } = await ctx.newAsset({
+        ownerId: user.id,
+        libraryId: library.id,
+        originalPath: '/mnt/nas/photos/external.jpg',
+      });
+      await ctx.newExif({ assetId: external.id, fileSizeInByte: 5000 });
+
+      await expect(sut.getOriginalsSizeEstimate('toS3')).resolves.toBe(1000);
     });
   });
 });
