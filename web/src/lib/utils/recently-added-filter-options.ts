@@ -65,6 +65,7 @@ export function buildRecentlyAddedSuggestionRequest(filters: FilterState) {
     personIds: filters.personIds.length > 0 ? filters.personIds : undefined,
     country: filters.country,
     state: filters.state,
+    locationPresence: filters.locationPresence,
     city: filters.city,
     make: filters.make,
     model: filters.model,
