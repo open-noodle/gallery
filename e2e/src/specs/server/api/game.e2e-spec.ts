@@ -176,8 +176,9 @@ describe('/games', () => {
     it('lets a viewer play a challenge, but rejects viewer create and delete with 403', async () => {
       const { spaceId, assets } = await freshSpaceWithPhotos('viewer-play', 4);
 
-      // GameService.getRoundImage (server/src/services/game.service.ts:347-351) 404s unless the
-      // round's asset already has an AssetFileType.Preview file. That file is written by the
+      // GameService.getRoundImage (via GameRepository.getEligibleRoundAsset, which inner-joins
+      // asset_file) 404s unless the round's asset already has an AssetFileType.Preview file -
+      // and it re-checks that on every request, not just at generation. That file is written by the
       // async thumbnailGeneration job, not synchronously at upload (asset-media.service.ts:352-
       // 371 only sets localDateTime/type/visibility on the sync path). `on_upload_success` is
       // emitted from inside the AssetGenerateThumbnails job case (job.service.ts:216-249), i.e.
