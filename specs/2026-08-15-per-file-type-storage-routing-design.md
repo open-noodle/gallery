@@ -140,6 +140,12 @@ file) or an unlink with no upload (data loss).
 Reads, deletes and serving are untouched: all three go through the shape-based
 `resolveBackendForKey`.
 
+`StorageCore.moveFile` early-returns on `!isAbsolute(oldPath)` (`storage.core.ts:203`), so the
+media-location moves in `media.service.ts:218-221` (fullsize, preview, thumbnail, encoded video) and
+`person.service.ts:1433` (face thumbnails) are inert for any kind routed to S3. That is correct — an
+S3 key has no media-location prefix to rewrite — but it reads like a bug, so it is called out here
+to stop a later refactor from "fixing" it into a data-loss path.
+
 External-library originals are never written by Immich — they are scanned in place — so the
 `originals` knob does not affect them. Their thumbnails and transcodes are Immich-generated and do
 follow the knobs.
@@ -205,7 +211,34 @@ nag admins into running a migration they do not need:
 - `person.thumbnailPath != ''` and `user.profileImagePath != ''`
 - external-library exclusion for originals and sidecars (see below)
 
-### Pre-existing bug: external libraries in the migrator
+### Known limitation: integrity checks stay off
+
+`integrity.service.ts:76` `skipIfS3Configured()` short-circuits **nine** job handlers whenever
+`StorageService.getS3Backend()` returns non-null, and its comment at `:71-74` explicitly covers
+"mixed disk+S3 setups mid-migration" (open-noodle/gallery#685).
+
+This matters more than it looks. Today a mixed install is a _transient_ state that exists only for
+the duration of a migration. Per-kind routing makes mixed the intended permanent steady state — so
+every admin who adopts this feature permanently loses all integrity checking, and gets no warning
+that they have.
+
+The feature ships with this limitation rather than blocking on it, because making integrity checks
+S3-aware is a substantially larger piece of work with its own design. Two obligations follow:
+
+- The docs for routing state plainly that configuring S3 at all disables integrity checks today, and
+  link #685.
+- #685 is promoted to a coupled follow-up rather than a background nice-to-have, since this feature
+  turns its blast radius from "during migrations" into "always".
+
+No code changes here — the existing skip already handles mixed correctly. This section exists so the
+limitation is a decision rather than an oversight.
+
+### Pre-existing defects to fix alongside
+
+Two latent bugs become materially more likely once mixed storage is a permanent state rather than a
+migration window. Both ship as companion fixes.
+
+#### External libraries in the migrator
 
 `storage-migration.repository.ts` filters on path shape alone, with no `libraryId` predicate.
 External-library assets have an absolute `originalPath` outside the media location, so
@@ -221,18 +254,56 @@ fix: add `where('asset.libraryId', 'is', null)` to `streamOriginals` and to `str
 the type is `Sidecar`. Thumbnails and transcodes of external assets are Immich-generated and stay
 migratable.
 
+The counts query and the stream queries must apply one shared predicate builder, not two
+hand-copied ones. A drift between them is exactly what produces a settings page nagging an admin
+toward a migration that detaches their external library.
+
+#### Non-deterministic startup on a mixed install
+
+`asset.repository.ts:1068` is `select assetId, path from asset_file limit 3` with **no `order by`**.
+`storage.service.ts:148` reads `samples[0].path`, and when the media location has changed it throws
+`ErrorMessages.InconsistentMediaLocation` at `:163` if that path does not start with the previous
+location.
+
+On a mixed install, whether `samples[0]` is an absolute disk path or a relative S3 key is arbitrary
+— and can differ **between restarts of the same instance**. An admin who changes
+`IMMICH_MEDIA_LOCATION` therefore gets a server that boots or refuses to boot depending on Postgres'
+row order. The `previous` inference at `:157` (`path.startsWith('upload/') ? 'upload' : ...`) is
+wrong for S3 keys in the same way, and `asset-media.service` writes S3 originals under exactly the
+`upload/` prefix, so it misfires on the most common key shape.
+
+Fix: restrict `getFileSamples()` to absolute paths (`where('path', 'like', '/%')`). The media
+location only ever describes disk files, so an S3 key is never a valid sample for this check. If
+that returns nothing, there is no disk-resident file and the location check is vacuous — skip it.
+
+`migrateFilePaths(previous, current)` itself needs no change: it rewrites only paths under the old
+location, so relative keys are untouched.
+
 ### Web UI
 
-`StorageSettings.svelte` in `web/src/routes/admin/system-settings/`, registered in the page's
-settings list. It follows `StorageTemplateSettings.svelte` exactly —
+`StorageSettings.svelte` in `web/src/routes/admin/system-settings/`, added to the typed `settings`
+array at `+page.svelte:65` with `component` / `title` / `subtitle` / `key` / `icon`. Title and
+subtitle also feed the settings search filter at `:231`, so they are two of the i18n keys, not
+decoration.
+
+It follows `StorageTemplateSettings.svelte` exactly —
 `const disabled = $derived(featureFlagsManager.value.configFile)` and
-`<SettingButtonsRow keys={['storage']} {disabled} />` — which yields the config-file lock, dirty
-tracking, save/reset and the settings search index for free.
+`<SettingButtonsRow bind:configToEdit keys={['storage']} {disabled} />`, where `SettingButtonsRow`
+is the local import alias for
+`$lib/components/shared-components/settings/SystemConfigButtonRow.svelte`. That yields the
+config-file lock, dirty tracking, save/reset and the search index for free.
 
 Three `SettingSelect` rows, each offering `Follow IMMICH_STORAGE_BACKEND (currently: S3)`, `Disk`
 and `S3`, with a status line beneath: _"40,182 thumbnails still on S3 — Migrate them"_, linking to
 `/admin/storage-migration` with direction and file types prefilled. The line is omitted when the
 count is zero.
+
+`SettingSelect` needs a small extension first. Its `options` prop is typed
+`{ value: string | number; text: string }[]` (`SettingSelect.svelte:12`) and its `disabled` prop
+(`:15`) applies to the whole `<select>` — there is no way to disable one option. Add an optional
+`disabled?: boolean` to the option type and forward it to the rendered `<option>`. This is a
+two-line change to a shared component used by several settings panels, so it ships with its own test
+asserting existing callers are unaffected.
 
 The storage-migration page disables checkboxes whose routing contradicts the selected direction and
 shows the reason, so the invalid combination is unreachable before the server rejects it.
@@ -244,6 +315,11 @@ Adding `s3Storage: boolean` (true when `IMMICH_S3_BUCKET` is set) lets the S3 op
 _disabled with its reason_ — "Set `IMMICH_S3_BUCKET` to enable" — rather than silently offering a
 choice that fails validation. Hiding the section entirely would leave an admin mid-setup with no
 signal about what is missing.
+
+It is populated in `server.service.ts:119` `getFeatures()` from
+`this.configRepository.getEnv().storage.s3.bucket`, alongside the existing env-derived `configFile`
+flag. `getFeatures` is cached and invalidated on `ConfigUpdate`; since the bucket comes from the
+environment and cannot change at runtime, no extra invalidation is needed.
 
 ## Edge cases
 
@@ -266,6 +342,10 @@ signal about what is missing.
 | 15  | Mixed routing and storage-usage accounting                            | Already correct — `storage-usage.ts` sums disk folders and S3 prefixes unconditionally.                                                                                                                                          |
 | 16  | Deleting an asset with files split across backends                    | Already correct — `handleDeleteFiles` branches per file on `isAbsolute`.                                                                                                                                                         |
 | 17  | Invalid routing value in a config file                                | Rejected by the zod enum during config load, as with any other malformed `SystemConfig` value.                                                                                                                                   |
+| 18  | Media location changed on a mixed install                             | Fixed here: `getFileSamples()` is restricted to absolute paths, so the check never sees an S3 key and boots deterministically. Vacuous and skipped when no disk-resident file exists.                                            |
+| 19  | Integrity check jobs on a mixed install                               | All nine are skipped, as they already are for any S3-configured install. Documented limitation, not a change; see #685.                                                                                                          |
+| 20  | Media-location move of an S3-routed derivative                        | `moveFile` no-ops on relative keys. Correct — there is no location prefix to rewrite — and pinned by a test so it is not "fixed" later.                                                                                          |
+| 21  | Migration run with `deleteSource: false`                              | The file genuinely exists on both backends and storage usage counts it twice until the source is cleaned up. Pre-existing, but longer-lived now that mixed is a steady state. Documented in the migration docs.                  |
 
 ## Test plan
 
@@ -325,49 +405,70 @@ signal about what is missing.
 28. Empty library returns all zeros.
 29. Disk count plus S3 count equals the total for every kind, from the single-pass query.
 30. `streamOriginals` and `streamAssetFiles` no longer emit external-library rows (companion fix).
+31. Counts and streams agree on the same fixture: for every kind and direction, the count equals the
+    number of rows the corresponding stream yields. This is the drift guard for the shared predicate
+    builder — a hand-copied second predicate fails here.
+
+### Unit — startup determinism (companion fix)
+
+32. `getFileSamples()` returns only absolute paths, given a fixture mixing disk paths and S3 keys.
+33. `StorageService.onBootstrap` with a changed media location and an S3-only `asset_file` table
+    skips the location check instead of throwing `InconsistentMediaLocation`.
+34. Same with a mixed table: the check runs against the disk sample and succeeds regardless of row
+    order (asserted by running the fixture with both orderings).
+35. `StorageCore.moveFile` no-ops on a relative key and does not touch the DB — pinning edge case 20.
 
 ### Unit — `system-config.service.spec.ts`
 
-31. The full-config literal is extended with `storage.routing`.
-32. Defaults are `auto` for all three knobs.
-33. `storage.routing` is accepted from a config file.
-34. Setting a knob back to `auto` removes it from the persisted partial config.
+36. The full-config literal is extended with `storage.routing`.
+37. Defaults are `auto` for all three knobs.
+38. `storage.routing` is accepted from a config file.
+39. Setting a knob back to `auto` removes it from the persisted partial config.
+
+### Web — `SettingSelect.spec.ts`
+
+40. A per-option `disabled` renders a disabled `<option>` and cannot be selected.
+41. Options without the field are unaffected, and the whole-component `disabled` prop still behaves
+    as before — the regression guard for the panels already using this component.
 
 ### Web — `StorageSettings.spec.ts` (new)
 
-35. The S3 option is disabled with its hint when the `s3Storage` feature flag is false.
-36. The whole section is disabled when `configFile` is true.
-37. The `auto` option label interpolates the resolved env backend.
-38. Status line and migrate link render only when `misplacedCount > 0`.
-39. The migrate link carries the correct direction and file-type query params.
+42. The S3 option is disabled with its hint when the `s3Storage` feature flag is false.
+43. The whole section is disabled when `configFile` is true.
+44. The `auto` option label interpolates the resolved env backend.
+45. Status line and migrate link render only when `misplacedCount > 0`.
+46. The migrate link carries the correct direction and file-type query params.
 
 ### Web — storage-migration page
 
-40. Checkboxes contradicting the selected direction render disabled with a reason.
-41. Query-param prefill selects the right direction and checkboxes.
+47. Checkboxes contradicting the selected direction render disabled with a reason.
+48. Query-param prefill selects the right direction and checkboxes.
 
 ### e2e API
 
-42. `GET /storage-migration/routing` requires an admin.
-43. The system-config e2e default shape includes `storage.routing`.
+49. `GET /storage-migration/routing` requires an admin.
+50. The system-config e2e default shape includes `storage.routing`.
 
 ### e2e harness — `e2e/storage-migration.sh` (real MinIO, `make storage-migration-tests`)
 
 This is the only place real S3 is exercised, and the shape-based read resolution is the feature's
 load-bearing assumption, so the mixed case belongs here.
 
-44. Set `originals: s3`, `thumbnails: disk`, `encodedVideo: disk`; upload an image and a video.
+51. Set `originals: s3`, `thumbnails: disk`, `encodedVideo: disk`; upload an image and a video.
     Assert `originalPath` is a relative key present in MinIO, that thumbnail and preview paths are
     absolute and present on disk and absent from MinIO, and that both serve correctly over HTTP.
-45. Flip `thumbnails` to `s3` and upload a second asset. Assert the new thumbnail is in MinIO while
+52. Flip `thumbnails` to `s3` and upload a second asset. Assert the new thumbnail is in MinIO while
     the first asset's thumbnail still serves from disk — the "flipping is safe" guarantee.
-46. Run the migrator for thumbnails `toS3`; assert `misplacedCount` reaches zero and the old
+53. Run the migrator for thumbnails `toS3`; assert `misplacedCount` reaches zero and the old
     thumbnails now serve from MinIO.
-47. Roll that batch back; assert paths revert and files still serve.
-48. Delete an asset whose files span both backends; assert the S3 object and the disk file are both
+54. Roll that batch back; assert paths revert and files still serve.
+55. Delete an asset whose files span both backends; assert the S3 object and the disk file are both
     removed.
-49. Pin a knob to `s3` with the bucket unset; assert the server starts, logs the error and writes to
+56. Pin a knob to `s3` with the bucket unset; assert the server starts, logs the error and writes to
     disk.
+57. With the mixed routing of step 51 in place, restart the server with a changed
+    `IMMICH_MEDIA_LOCATION` and assert it boots — the end-to-end form of the `getFileSamples` fix,
+    and the only test that exercises real row ordering rather than a fixture.
 
 ### Gates
 
@@ -389,21 +490,26 @@ over `i18n/*.json` and `docs/`.
 - `src/services/media.service.ts`, `asset-media.service.ts`, `user.service.ts`, `auth.service.ts` —
   pass the kind
 - `src/services/storage-migration.service.ts` — per-kind validation, routing status
-- `src/repositories/storage-migration.repository.ts` — counts query, external-library fix
+- `src/repositories/storage-migration.repository.ts` — counts query, shared predicate builder,
+  external-library fix
+- `src/repositories/asset.repository.ts` — `getFileSamples()` restricted to absolute paths
 - `src/controllers/storage-migration.controller.ts` — `GET /routing`
 - `src/dtos/storage-migration.dto.ts` — response DTO
 
 **Web**
 
 - `src/routes/admin/system-settings/StorageSettings.svelte` — new
-- `src/routes/admin/system-settings/+page.svelte` — register the section
+- `src/routes/admin/system-settings/+page.svelte` — add to the `settings` array at `:65`
+- `src/routes/admin/system-settings/SettingSelect.svelte` — per-option `disabled`
 - `src/routes/admin/storage-migration/+page.svelte` — disabled checkboxes, query-param prefill
 
 **Shared**
 
-- `i18n/en.json` plus `de` `fr` `it` `nl` `pl` `es` `ru` `zh_Hans` `zh_Hant` — roughly ten keys
-- `docs/docs/features/s3-storage.md` — routing section
-- `docs/docs/features/storage-migration.md` — per-kind validation rule
+- `i18n/en.json` plus `de` `fr` `it` `nl` `pl` `es` `ru` `zh_Hans` `zh_Hant` — roughly twelve keys,
+  including the section title and subtitle that feed the settings search
+- `docs/docs/features/s3-storage.md` — routing section, and the integrity-check limitation
+- `docs/docs/features/storage-migration.md` — per-kind validation rule, and the double-counting note
+  for `deleteSource: false`
 - `docs/docs/install/environment-variables.md` — `IMMICH_STORAGE_BACKEND` is now the `auto` fallback
 
 ## Rollout
@@ -422,3 +528,8 @@ knob.
 - **The external-library fix changes existing migrator behaviour.** An admin who already migrated
   external originals to S3 is in a broken state this fix does not repair; it only prevents new
   occurrences. Called out in the docs.
+- **Integrity checks stay disabled for anyone using this feature.** The largest known cost of
+  adopting routing, and not something this work fixes. It is a decision, documented as such, with
+  #685 as the coupled follow-up.
+- **`SettingSelect` is shared.** Adding a per-option `disabled` touches a component several settings
+  panels render. The change is additive and optional, and test 41 guards the existing callers.
