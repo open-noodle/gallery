@@ -1,0 +1,228 @@
+import {
+  SharedSpaceRole,
+  type GameChallengeListItemResponseDto,
+  type SharedSpaceMemberResponseDto,
+  type SharedSpaceResponseDto,
+} from '@immich/sdk';
+import '@testing-library/jest-dom';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import type { Component } from 'svelte';
+import { init, register, waitLocale } from 'svelte-i18n';
+import { goto } from '$app/navigation';
+import { sdkMock } from '$lib/__mocks__/sdk.mock';
+import TestWrapper from '$lib/components/TestWrapper.svelte';
+import { authManager } from '$lib/managers/auth-manager.svelte';
+import { preferencesFactory } from '@test-data/factories/preferences-factory';
+import { userAdminFactory } from '@test-data/factories/user-factory';
+import SpaceGamesPage from './+page.svelte';
+
+vi.mock('$app/navigation', () => ({ goto: vi.fn(), invalidateAll: vi.fn() }));
+
+const { toastManagerMock } = vi.hoisted(() => ({
+  toastManagerMock: { danger: vi.fn(), primary: vi.fn(), success: vi.fn(), warning: vi.fn() },
+}));
+
+vi.mock('@immich/ui', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@immich/ui')>();
+  return {
+    ...original,
+    toastManager: toastManagerMock,
+  };
+});
+
+const BASE_SPACE: SharedSpaceResponseDto = {
+  id: 'space-1',
+  name: 'Test Space',
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
+  ownerId: 'owner-user-id',
+  createdById: 'owner-user-id',
+  description: '',
+  slug: null,
+  isPublic: false,
+  publicSlug: null,
+  allowDownload: true,
+  showMetadata: true,
+  showExif: true,
+  password: null,
+  expiresAt: null,
+  assets: [],
+  albumId: null,
+  assetCount: 0,
+  faceRecognitionEnabled: true,
+  petsEnabled: true,
+} as SharedSpaceResponseDto;
+
+function makeChallenge(overrides: Partial<GameChallengeListItemResponseDto> = {}): GameChallengeListItemResponseDto {
+  return {
+    id: 'challenge-1',
+    spaceId: 'space-1',
+    name: 'Summer Trip',
+    roundCount: 5,
+    answered: 2,
+    total: 340,
+    scaleDays: 30,
+    scaleKm: 100,
+    closedAt: null,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+function makeMember(role: SharedSpaceRole): SharedSpaceMemberResponseDto {
+  return {
+    userId: 'current-user-id',
+    email: 'user@example.com',
+    name: 'Current User',
+    role,
+    showInTimeline: false,
+    sharePersonMetadata: true,
+    joinedAt: '2026-01-01T00:00:00.000Z',
+  };
+}
+
+function renderPage(challenges: GameChallengeListItemResponseDto[], role: SharedSpaceRole = SharedSpaceRole.Editor) {
+  const props = {
+    data: {
+      space: BASE_SPACE,
+      members: [makeMember(role)],
+      challenges,
+      meta: { title: 'Test Space - Games' },
+    },
+  };
+  return render(TestWrapper as Component<{ component: typeof SpaceGamesPage; componentProps: typeof props }>, {
+    component: SpaceGamesPage,
+    componentProps: props,
+  });
+}
+
+describe('Space games page', () => {
+  beforeAll(async () => {
+    register('en-US', () => import('$i18n/en.json'));
+    await init({ fallbackLocale: 'en-US', initialLocale: 'en-US' });
+    await waitLocale('en-US');
+  });
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    authManager.setUser(userAdminFactory.build({ id: 'current-user-id' }));
+    authManager.setPreferences(preferencesFactory.build());
+  });
+
+  it('shows the empty state when there are no challenges', () => {
+    renderPage([], SharedSpaceRole.Viewer);
+    expect(screen.getByTestId('empty-state-message')).toHaveTextContent('No challenges yet');
+  });
+
+  it('renders one challenge-card per challenge, linking to the challenge route', () => {
+    renderPage([makeChallenge({ id: 'c-1', name: 'Summer Trip' }), makeChallenge({ id: 'c-2', name: 'Winter Trip' })]);
+
+    const cards = screen.getAllByTestId('challenge-card');
+    expect(cards).toHaveLength(2);
+    expect(screen.getByText('Summer Trip')).toBeInTheDocument();
+    expect(screen.getByText('Winter Trip')).toBeInTheDocument();
+
+    const links = screen.getAllByRole('link');
+    expect(links.map((link) => link.getAttribute('href'))).toEqual(
+      expect.arrayContaining(['./games/c-1', './games/c-2']),
+    );
+  });
+
+  // ── Editor/viewer gating: assert both directions, not just the editor case ──
+
+  it('editor sees the new-challenge action and gets a delete control on each card', () => {
+    renderPage([makeChallenge({ id: 'c-1' })], SharedSpaceRole.Editor);
+    expect(screen.getByTestId('new-challenge-button')).toBeInTheDocument();
+    expect(screen.getByTestId('challenge-card-delete')).toBeInTheDocument();
+  });
+
+  it('owner sees the new-challenge action and gets a delete control on each card', () => {
+    renderPage([makeChallenge({ id: 'c-1' })], SharedSpaceRole.Owner);
+    expect(screen.getByTestId('new-challenge-button')).toBeInTheDocument();
+    expect(screen.getByTestId('challenge-card-delete')).toBeInTheDocument();
+  });
+
+  it('viewer sees neither the new-challenge action nor a delete control', () => {
+    renderPage([makeChallenge({ id: 'c-1' })], SharedSpaceRole.Viewer);
+    expect(screen.queryByTestId('new-challenge-button')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('challenge-card-delete')).not.toBeInTheDocument();
+  });
+
+  it('editor with no challenges sees the empty-state create action', () => {
+    renderPage([], SharedSpaceRole.Editor);
+    expect(screen.getByTestId('empty-new-challenge-button')).toBeInTheDocument();
+  });
+
+  it('viewer with no challenges sees no empty-state create action', () => {
+    renderPage([], SharedSpaceRole.Viewer);
+    expect(screen.queryByTestId('empty-new-challenge-button')).not.toBeInTheDocument();
+  });
+
+  describe('create', () => {
+    it('creates a challenge with the requested round count and navigates to it', async () => {
+      sdkMock.createChallenge.mockResolvedValue(makeChallenge({ id: 'new-1', roundCount: 5 }));
+      renderPage([makeChallenge({ id: 'c-1' })], SharedSpaceRole.Editor);
+
+      await fireEvent.click(screen.getByTestId('new-challenge-button'));
+
+      await waitFor(() =>
+        expect(sdkMock.createChallenge).toHaveBeenCalledWith({
+          spaceId: 'space-1',
+          gameCreateDto: { roundCount: 5 },
+        }),
+      );
+      expect(goto).toHaveBeenCalledWith('./games/new-1');
+    });
+
+    it('empty-state create: creates a challenge and navigates to it', async () => {
+      sdkMock.createChallenge.mockResolvedValue(makeChallenge({ id: 'new-1', roundCount: 5 }));
+      renderPage([], SharedSpaceRole.Editor);
+
+      await fireEvent.click(screen.getByTestId('empty-new-challenge-button'));
+
+      await waitFor(() => expect(goto).toHaveBeenCalledWith('./games/new-1'));
+    });
+
+    it('a 400 (no usable photos) surfaces game_create_failed and does not navigate', async () => {
+      sdkMock.createChallenge.mockRejectedValue(new Error('no usable photos'));
+      renderPage([makeChallenge({ id: 'c-1' })], SharedSpaceRole.Editor);
+
+      await fireEvent.click(screen.getByTestId('new-challenge-button'));
+
+      await waitFor(() =>
+        expect(toastManagerMock.danger).toHaveBeenCalledWith("Could not create a challenge from this space's photos"),
+      );
+      expect(goto).not.toHaveBeenCalled();
+    });
+
+    it('a roundCount lower than requested surfaces game_rounds_fewer_than_requested and still navigates', async () => {
+      sdkMock.createChallenge.mockResolvedValue(makeChallenge({ id: 'new-1', roundCount: 3 }));
+      renderPage([makeChallenge({ id: 'c-1' })], SharedSpaceRole.Editor);
+
+      await fireEvent.click(screen.getByTestId('new-challenge-button'));
+
+      await waitFor(() =>
+        expect(toastManagerMock.warning).toHaveBeenCalledWith("This space's photos filled 3 of 5 rounds"),
+      );
+      expect(goto).toHaveBeenCalledWith('./games/new-1');
+    });
+
+    it('viewer sees no create action to trigger', () => {
+      renderPage([makeChallenge({ id: 'c-1' })], SharedSpaceRole.Viewer);
+      expect(screen.queryByTestId('new-challenge-button')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('empty-new-challenge-button')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('delete', () => {
+    it('deletes the challenge and removes its card', async () => {
+      sdkMock.deleteChallenge.mockResolvedValue(undefined as never);
+      renderPage([makeChallenge({ id: 'c-1', name: 'Summer Trip' })], SharedSpaceRole.Editor);
+
+      await fireEvent.click(screen.getByTestId('challenge-card-delete'));
+
+      await waitFor(() => expect(sdkMock.deleteChallenge).toHaveBeenCalledWith({ id: 'c-1' }));
+      await waitFor(() => expect(screen.queryByTestId('challenge-card')).not.toBeInTheDocument());
+    });
+  });
+});
