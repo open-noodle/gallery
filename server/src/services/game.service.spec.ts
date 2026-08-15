@@ -100,4 +100,37 @@ describe(GameService.name, () => {
     const ids = rounds.map((r: any) => r.assetId);
     expect(new Set(ids).size).toBe(ids.length);
   });
+
+  // Regression for a joint (both-pools-or-neither) recency decision: a well-stocked location
+  // pool with zero recently-used assets must not lose its exclusion just because the date pool's
+  // candidates are all recently used. The date pool alone should fall back to its raw
+  // (recency-inclusive) candidates, and the challenge should still reach the requested count.
+  it('tops up only the pool that needs it when recency exclusion would otherwise leave it short', async () => {
+    mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Editor } as any);
+    mocks.game.getLocationCandidates.mockResolvedValue([
+      locationCandidate('l1', 52.5, 13.4, 'Germany'),
+      locationCandidate('l2', -33.9, 18.4, 'South Africa'),
+      locationCandidate('l3', 40.7, -74, 'United States'),
+      locationCandidate('l4', 47.9, 106.9, 'Mongolia'),
+      locationCandidate('l5', 41.9, 12.5, 'Italy'),
+    ]);
+    mocks.game.getDateCandidates.mockResolvedValue([
+      locationCandidate('d1', 45.8, 15.9, 'Croatia'),
+      locationCandidate('d2', 10, 10, 'Kenya'),
+      locationCandidate('d3', 20, 20, 'Chad'),
+      locationCandidate('d4', -10, -70, 'Peru'),
+      locationCandidate('d5', 35, 139, 'Japan'),
+    ]);
+    // Every date candidate was used by a recent challenge; none of the location candidates were.
+    mocks.game.getRecentlyUsedAssetIds.mockResolvedValue(['d1', 'd2', 'd3', 'd4', 'd5']);
+    mocks.game.createChallenge.mockResolvedValue('challenge-4');
+
+    await sut.create(authStub, 'space-1', { roundCount: 5 });
+
+    const [challenge, rounds] = mocks.game.createChallenge.mock.calls[0];
+    expect(challenge.roundCount).toBe(5);
+    expect(rounds).toHaveLength(5);
+    const ids = rounds.map((r: any) => r.assetId);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
 });
