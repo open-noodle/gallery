@@ -403,9 +403,13 @@ interface FilterSuggestionFilterOptions {
   state?: string;
   city?: string;
   /**
-   * Absence-of-location filter. A member of the location group like `country` / `state` / `city` —
-   * it must join the same self-exclusion `without(...)` calls those do, or the entry that reports it
-   * (`hasNoGpsAssets` / `hasNoPlaceNameAssets`) would collapse the moment it is selected.
+   * Absence-of-location filter. A first-class facet key like `state`, so that an active selection
+   * narrows *every* suggestion list — people, tags, camera makes, ratings, media types — the way
+   * `country` / `state` / `city` already do. It is also a member of the location group, so it must
+   * join the same self-exclusion `without(...)` calls those do, or the entry that reports it
+   * (`hasNoGpsAssets` / `hasNoPlaceNameAssets`) would collapse the moment it is selected. The location
+   * group members that a list must NOT be narrowed by are excluded per call site via `without(...)`,
+   * never here.
    */
   locationPresence?: LocationPresence;
   make?: string;
