@@ -130,6 +130,9 @@ import { UserMetadataAuditTable } from 'src/schema/tables/user-metadata-audit.ta
 import { UserMetadataTable } from 'src/schema/tables/user-metadata.table.js';
 import { UserTable } from 'src/schema/tables/user.table.js';
 import { VersionHistoryTable } from 'src/schema/tables/version-history.table.js';
+import { GameChallengeTable } from 'src/schema/tables/game-challenge.table.js';
+import { GameGuessTable } from 'src/schema/tables/game-guess.table.js';
+import { GameRoundTable } from 'src/schema/tables/game-round.table.js';
 import {
   VideoStreamSegmentTable,
   VideoStreamSessionTable,
@@ -200,6 +203,9 @@ export class ImmichDatabase {
     PersonGroupAuditTable,
     FacePersonVerdictTable,
     PetSearchTable,
+    GameChallengeTable,
+    GameRoundTable,
+    GameGuessTable,
     SessionTable,
     SharedLinkAssetTable,
     SharedLinkTable,
@@ -368,6 +374,10 @@ export interface DB {
   face_person_verdict: FacePersonVerdictTable;
 
   pet_search: PetSearchTable;
+
+  game_challenge: GameChallengeTable;
+  game_round: GameRoundTable;
+  game_guess: GameGuessTable;
 
   session: SessionTable;
   session_sync_checkpoint: SessionSyncCheckpointTable;
