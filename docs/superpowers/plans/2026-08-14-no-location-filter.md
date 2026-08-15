@@ -402,7 +402,7 @@ const TimeBucketAssetSchema = locationPresenceIsExclusive(
 
 Apply the same wrapper to `TimeBucketCoverSchema` (`:194`), keeping its `.meta({ id: 'TimeBucketCoverDto' })` **after** the pipe.
 
-> **Watch the OpenAPI ids.** `TimeBucketQueryBaseSchema` already carries `.meta({ id: 'TimeBucketDto' })`. Piping must not change the emitted schema names. After `make open-api` in Task 4, confirm `TimeBucketDto`, `TimeBucketAssetDto` and `TimeBucketCoverDto` still appear in `open-api/immich-openapi-specs.json` with the same names. If a name moved, re-apply `.meta({ id })` on the piped schema rather than the base.
+> **Watch the OpenAPI ids.** `TimeBucketQueryBaseSchema` already carries `.meta({ id: 'TimeBucketDto' })`, and piping must not disturb it. Note that the timeline DTOs are `@Query()` bindings, so they are **unrolled into per-endpoint parameters and never emitted as named schema components** — grepping `open-api/immich-openapi-specs.json` for `TimeBucketDto` correctly returns nothing, before and after this change. The real check is the one that caught the boot crash: call `_OPENAPI_METADATA_FACTORY()` on each exported DTO class and confirm it returns a flat list of real field names rather than throwing `Duplicate schema id` or collapsing to a lone `root` key. Body DTOs such as `SmartSearchFacetsDto` _do_ appear as components and can be grepped normally.
 
 - [ ] **Step 4: Do the same for the search DTOs**
 
@@ -580,15 +580,25 @@ git commit -m "feat(server): report whether absence-of-location filters would ma
 
 - [ ] **Step 1: Build the server and regenerate**
 
+`make open-api` and `make sql` are **removal stubs** in this repo — they print "this command has been removed, use mise" and exit 1. The mise equivalent is `mise open-api`, but **`mise //:open-api` resolves task refs against the MAIN checkout, not this worktree**, so running it here silently builds and regenerates the wrong tree. Invoke the underlying steps directly with explicit `cd`s instead:
+
 ```bash
-cd server && pnpm build && pnpm sync:open-api
-cd .. && make open-api
+cd server && pnpm build && node dist/bin/sync-open-api.js
+# then the TypeScript SDK (oazapfts) and the Dart client (generate-dart-sdk.sh),
+# each run from its own directory — read the mise task definition for the exact
+# invocations rather than guessing.
 ```
 
-- [ ] **Step 2: Verify the OpenAPI schema names did not move**
+The Dart generator requires **Java**. If it is missing, stop — mobile tasks 9–11 depend on the generated client.
 
-Run: `grep -c '"TimeBucketDto"\|"TimeBucketAssetDto"\|"TimeBucketCoverDto"' open-api/immich-openapi-specs.json`
-Expected: all three present. If any disappeared, the `.pipe()` in Task 2 moved the `.meta({ id })` — fix it there and regenerate.
+- [ ] **Step 2: Verify the schemas are intact**
+
+The timeline DTOs are `@Query()` bindings, so they are unrolled into per-endpoint parameters and **never appear as named schema components**. Grepping the spec for `TimeBucketDto` returns nothing both before and after this change — that is expected, not a regression. Verify against a pre-feature baseline before concluding anything moved.
+
+Run: `grep -c '"SmartSearchFacetsDto"' open-api/immich-openapi-specs.json`
+Expected: non-zero — body DTOs _are_ emitted as components.
+
+The check that actually catches the Task 2 defect is at the DTO layer, not in the generated spec: call `_OPENAPI_METADATA_FACTORY()` on each exported DTO class and confirm a flat list of real field names, rather than a thrown `Duplicate schema id` or a lone `root` key.
 
 - [ ] **Step 3: Verify the new fields landed in both clients**
 
@@ -1469,7 +1479,8 @@ git commit -m "test(e2e): cover the no-location filter end to end"
 ## Notes for the executor
 
 - **`dart analyze` is not a substitute for `flutter test`.** Generated-code compile errors only surface when a test actually compiles.
-- **`make sql` must never run without a running database** — it deletes all query files.
+- **`mise sql` must never run without a running database** — it deletes all query files. (`make sql`, like `make open-api`, is a removal stub that exits 1.)
+- **`mise //:<task>` resolves against the MAIN checkout, not this worktree.** Any mise task invoked with the `//:` prefix will build, test, or regenerate the wrong tree. Run the underlying commands with explicit `cd`s instead.
 - **Do not add an index** on `asset_exif.latitude` or `city`. The spec defers that pending `EXPLAIN ANALYZE` on a real library; a partial index on a low-selectivity predicate is unlikely to pay for itself.
 - **The V3 branch filter** (`SearchFilterBranchSchema`, `database.ts:1225-1227`) is deliberately untouched — it is dormant and unwired (`database.ts:1269`).
 - **`getTimeBucketCovers` needs no separate work.** All three timeline consumers share `withTimeBucketAssetFilters` (`asset.repository.ts:1323`, `:1372`, `:1429`), so Task 1 reaches it.
