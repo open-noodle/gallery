@@ -849,9 +849,8 @@ describe('/search', () => {
         .get('/timeline/buckets')
         .set('Authorization', `Bearer ${admin.accessToken}`);
 
-      const sum = (buckets: { count: number }[]) => buckets.reduce((total, b) => total + b.count, 0);
-      const totalFiltered = sum(body);
-      const totalAll = sum(allBuckets);
+      const totalFiltered = body.reduce((total: number, b: { count: number }) => total + b.count, 0);
+      const totalAll = allBuckets.reduce((total: number, b: { count: number }) => total + b.count, 0);
 
       expect(totalAll).toBeGreaterThan(0);
       expect(totalFiltered).toBeLessThan(totalAll);
