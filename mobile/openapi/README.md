@@ -342,6 +342,7 @@ Class | Method | HTTP request | Description
 *SharedSpacesApi* | [**linkLibrary**](doc//SharedSpacesApi.md#linklibrary) | **PUT** /shared-spaces/{id}/libraries | Link a library to a shared space
 *SharedSpacesApi* | [**markSpaceViewed**](doc//SharedSpacesApi.md#markspaceviewed) | **PATCH** /shared-spaces/{id}/view | Mark space as viewed
 *SharedSpacesApi* | [**mergeSpacePeople**](doc//SharedSpacesApi.md#mergespacepeople) | **POST** /shared-spaces/{id}/people/{personId}/merge | Merge people in a shared space
+*SharedSpacesApi* | [**reassignSpacePersonFaces**](doc//SharedSpacesApi.md#reassignspacepersonfaces) | **POST** /shared-spaces/{id}/people/{personId}/reassign | Reassign faces from a person in a shared space
 *SharedSpacesApi* | [**rejectSpacePersonFaceSuggestion**](doc//SharedSpacesApi.md#rejectspacepersonfacesuggestion) | **POST** /shared-spaces/{id}/people/{personId}/face-suggestions/{assetFaceId}/reject | Reject a face suggestion for a person in a shared space
 *SharedSpacesApi* | [**removeAssets**](doc//SharedSpacesApi.md#removeassets) | **DELETE** /shared-spaces/{id}/assets | Remove assets from a shared space
 *SharedSpacesApi* | [**removeMember**](doc//SharedSpacesApi.md#removemember) | **DELETE** /shared-spaces/{id}/members/{userId} | Remove a member from a shared space
@@ -762,6 +763,11 @@ Class | Method | HTTP request | Description
  - [SharedSpacePeopleStatisticsResponseDto](doc//SharedSpacePeopleStatisticsResponseDto.md)
  - [SharedSpacePersonAliasDto](doc//SharedSpacePersonAliasDto.md)
  - [SharedSpacePersonMergeDto](doc//SharedSpacePersonMergeDto.md)
+ - [SharedSpacePersonReassignDto](doc//SharedSpacePersonReassignDto.md)
+ - [SharedSpacePersonReassignDtoTarget](doc//SharedSpacePersonReassignDtoTarget.md)
+ - [SharedSpacePersonReassignDtoTargetOneOf](doc//SharedSpacePersonReassignDtoTargetOneOf.md)
+ - [SharedSpacePersonReassignDtoTargetOneOf1](doc//SharedSpacePersonReassignDtoTargetOneOf1.md)
+ - [SharedSpacePersonReassignResponseDto](doc//SharedSpacePersonReassignResponseDto.md)
  - [SharedSpacePersonResponseDto](doc//SharedSpacePersonResponseDto.md)
  - [SharedSpacePersonUpdateDto](doc//SharedSpacePersonUpdateDto.md)
  - [SharedSpaceResponseDto](doc//SharedSpaceResponseDto.md)
