@@ -1,4 +1,4 @@
-import { AssetOrder, AssetTypeEnum, Type } from '@immich/sdk';
+import { AssetOrder, AssetTypeEnum, LocationPresence, Type } from '@immich/sdk';
 import { describe, expect, it } from 'vitest';
 import type { FilterState } from '$lib/components/filter-panel/filter-panel';
 import {
@@ -375,6 +375,32 @@ describe('buildSmartSearchParams', () => {
       expect(result).not.toHaveProperty('originalFileName');
     });
   });
+
+  describe('locationPresence', () => {
+    it('forwards noGps as the SDK enum value', () => {
+      const result = buildSmartSearchParams({
+        query: 'beach',
+        filters: { ...baseFilters, locationPresence: 'noGps' },
+      });
+
+      expect(result.locationPresence).toBe(LocationPresence.NoGps);
+    });
+
+    it('forwards noPlaceName as the SDK enum value', () => {
+      const result = buildSmartSearchParams({
+        query: 'beach',
+        filters: { ...baseFilters, locationPresence: 'noPlaceName' },
+      });
+
+      expect(result.locationPresence).toBe(LocationPresence.NoPlaceName);
+    });
+
+    it('omits locationPresence when unset', () => {
+      const result = buildSmartSearchParams({ query: 'beach', filters: baseFilters });
+
+      expect(result.locationPresence).toBeUndefined();
+    });
+  });
 });
 
 describe('QUERY_MODE_FILTER_HANDLING', () => {
@@ -387,6 +413,10 @@ describe('QUERY_MODE_FILTER_HANDLING', () => {
     expect(QUERY_MODE_FILTER_HANDLING.ownerId).toBe('sent');
     expect(QUERY_MODE_FILTER_HANDLING.ocr).toBe('sent');
     expect(QUERY_MODE_FILTER_HANDLING.albumId).toBe('sent');
+  });
+
+  it('classifies locationPresence as sent', () => {
+    expect(QUERY_MODE_FILTER_HANDLING.locationPresence).toBe('sent');
   });
 
   it('records the two SmartSearchDto gaps and the derived date fields', () => {
@@ -418,6 +448,15 @@ describe('buildSmartSearchFacetsParams', () => {
     expect(result).not.toHaveProperty('order');
     expect(result).not.toHaveProperty('page');
     expect(result).not.toHaveProperty('size');
+  });
+
+  it('forwards locationPresence', () => {
+    const result = buildSmartSearchFacetsParams({
+      query: 'beach',
+      filters: { ...baseFilters, locationPresence: 'noGps' },
+    });
+
+    expect(result.locationPresence).toBe(LocationPresence.NoGps);
   });
 
   it('maps space people to spacePersonIds and omits withSharedSpaces for spaces', () => {
@@ -522,6 +561,8 @@ describe('mapSmartSearchFacetsToFilterSuggestions', () => {
         hasFavorites: true,
         hasAssetsInAlbum: true,
         hasAssetsNotInAlbum: true,
+        hasNoGpsAssets: true,
+        hasNoPlaceNameAssets: false,
       },
       { spaceId: 'space-1' },
     );
@@ -545,6 +586,8 @@ describe('mapSmartSearchFacetsToFilterSuggestions', () => {
       hasFavorites: true,
       hasAssetsInAlbum: true,
       hasAssetsNotInAlbum: true,
+      hasNoGpsAssets: true,
+      hasNoPlaceNameAssets: false,
     });
   });
 
@@ -570,6 +613,8 @@ describe('mapSmartSearchFacetsToFilterSuggestions', () => {
       hasFavorites: false,
       hasAssetsInAlbum: false,
       hasAssetsNotInAlbum: false,
+      hasNoGpsAssets: false,
+      hasNoPlaceNameAssets: false,
     });
 
     expect(result.people).toEqual([
@@ -604,6 +649,8 @@ describe('mapSmartSearchFacetsToFilterSuggestions', () => {
       hasFavorites: false,
       hasAssetsInAlbum: false,
       hasAssetsNotInAlbum: false,
+      hasNoGpsAssets: false,
+      hasNoPlaceNameAssets: false,
     });
 
     expect(result.people[0]).toEqual(
