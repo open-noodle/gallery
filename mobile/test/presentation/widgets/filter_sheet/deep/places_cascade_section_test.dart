@@ -283,6 +283,48 @@ void main() {
       expect(find.widgetWithText(FilterChip, 'filter_location_no_place_name'.tr()), findsOneWidget);
     });
 
+    // The headline case: a library with nothing geotagged has an empty `countries` list, but
+    // the section must still offer the presence chip instead of collapsing entirely (the
+    // shared DeepSectionScaffold otherwise hides body + disables the header whenever the
+    // resolved data list is empty).
+    testWidgets('offers the no-gps entry even with zero countries', (tester) async {
+      await tester.pumpConsumerWidget(
+        const Material(child: PlacesCascadeSection()),
+        overrides: [
+          _noCollapsed(),
+          photosFilterSuggestionsProvider.overrideWith(
+            (ref, filter) => Future.value(_sugg(countries: const [], hasNoGpsAssets: true)),
+          ),
+        ],
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.widgetWithText(FilterChip, 'filter_location_no_gps'.tr()), findsOneWidget);
+    });
+
+    // The presence chip alone isn't the whole story: the "Search N places →" affordance is
+    // this section's only route to the full PlacesPickerPage (see PlacesStrip's separate "+N"
+    // tile for the strip's own route). With zero countries `count` is 0, so without accounting
+    // for the presence entries too, that affordance — and the picker it opens — would stay
+    // unreachable even after the chip above starts rendering.
+    testWidgets('keeps the picker entry point reachable when there are zero countries', (tester) async {
+      var opened = false;
+      await tester.pumpConsumerWidget(
+        Material(child: PlacesCascadeSection(onOpenPicker: () => opened = true)),
+        overrides: [
+          _noCollapsed(),
+          photosFilterSuggestionsProvider.overrideWith(
+            (ref, filter) => Future.value(_sugg(countries: const [], hasNoGpsAssets: true)),
+          ),
+        ],
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('places-section-search-more')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('places-section-search-more')));
+      expect(opened, isTrue);
+    });
+
     testWidgets('hides the no-location entries when the server says they would match nothing', (tester) async {
       await tester.pumpConsumerWidget(
         const Material(child: PlacesCascadeSection()),
