@@ -6,10 +6,11 @@ import {
   LoginResponseDto,
   SharedSpaceRole,
 } from '@immich/sdk';
+import { Socket } from 'socket.io-client';
 import { createUserDto } from 'src/fixtures';
 import { app, utils } from 'src/utils';
 import request from 'supertest';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /**
  * A round's guess payload, branched on its type (GameGuessDto: `{lat, lon}` for a location round,
@@ -103,6 +104,9 @@ describe('/games', () => {
 
   describe('POST /shared-spaces/:spaceId/games', () => {
     it('lets an editor create a challenge that comes back with rounds', async () => {
+      // 4 photos vs the default roundCount of 5 - deliberately thin, so this doubles as coverage
+      // of "actual rounds may be fewer than requested" (GameChallengeResponseDto.roundCount's own
+      // doc comment); expect fewer rounds than requested, not exactly 5.
       const { spaceId } = await freshSpaceWithPhotos('create-challenge', 4);
 
       const { status, body } = await request(app)
@@ -157,8 +161,32 @@ describe('/games', () => {
   });
 
   describe('viewer permissions', () => {
+    // Only this block touches GET .../image expecting 200, so the websocket connection needed
+    // to wait for it is scoped here rather than to the whole file.
+    let websocket: Socket;
+
+    beforeAll(async () => {
+      websocket = await utils.connectWebsocket(owner.accessToken);
+    });
+
+    afterAll(() => {
+      utils.disconnectWebsocket(websocket);
+    });
+
     it('lets a viewer play a challenge, but rejects viewer create and delete with 403', async () => {
-      const { spaceId } = await freshSpaceWithPhotos('viewer-play', 4);
+      const { spaceId, assets } = await freshSpaceWithPhotos('viewer-play', 4);
+
+      // GameService.getRoundImage (server/src/services/game.service.ts:347-351) 404s unless the
+      // round's asset already has an AssetFileType.Preview file. That file is written by the
+      // async thumbnailGeneration job, not synchronously at upload (asset-media.service.ts:352-
+      // 371 only sets localDateTime/type/visibility on the sync path). `on_upload_success` is
+      // emitted from inside the AssetGenerateThumbnails job case (job.service.ts:216-249), i.e.
+      // only once that file exists - so waiting for it on every uploaded photo guarantees
+      // whichever one the challenge picks for round 0 is already servable, regardless of which
+      // asset that turns out to be (round-to-asset assignment is intentionally hidden pre-guess,
+      // see the leakage test below, so we can't target the wait at just one asset id).
+      await Promise.all(assets.map((asset) => utils.waitForWebsocketEvent({ event: 'assetUpload', id: asset.id })));
+
       const challenge = await createChallenge(spaceId, 4);
 
       const detail = await getDetail(challenge.id, viewer.accessToken);
