@@ -48,16 +48,35 @@ Each candidate was checked against its diff rather than its subject:
 
 ## Zero-Conflict Semantic Breaks
 
-Five this cycle — four found before the rebase, one during the fork sync. All merge clean and break in
-a file upstream never touched.
+Six this cycle — four found before the rebase, one during the fork sync, one only in remote CI. All
+merge clean and break in a file upstream never touched.
 
-| Upstream change                                                                 | What broke, elsewhere                                                                                                             | Caught by                                                    |
-| ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| #30768 deleted `userFactory` from `web/src/test-data/factories/user-factory.ts` | fork-diverged `album-factory.ts` (fork added `albumUsers`) + fork-only `SpaceLinkAlbumModal.spec.ts`                              | pre-rebase symbol sweep; confirmed by `web check:typescript` |
-| #30772 deleted `DatabaseRepository.revertLastMigration`                         | fork-only `database-migration.service.spec.ts` scenarios D and G                                                                  | pre-rebase symbol sweep; confirmed by `server pnpm check`    |
-| #30772 deleted `StorageCore.getTempPathInDir`                                   | fork-only `describe('getTempPathInDir')` block in `storage.core.spec.ts`                                                          | `server pnpm check`                                          |
-| #30774 re-timestamped `AddWorkflowLogsTable`                                    | `revert-to-immich.sql` coverage gate                                                                                              | the step-7i detector                                         |
-| #30667–#30672 deleted `lib/extensions/translate_extensions.dart`                | fork-sync commit #970 (authored on `main`, where it still exists) called `'<key>'.t(context:)` in `collection_picker.widget.dart` | `dart analyze --fatal-infos`                                 |
+| Upstream change                                                                 | What broke, elsewhere                                                                                                                                             | Caught by                                                    |
+| ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| #30768 deleted `userFactory` from `web/src/test-data/factories/user-factory.ts` | fork-diverged `album-factory.ts` (fork added `albumUsers`) + fork-only `SpaceLinkAlbumModal.spec.ts`                                                              | pre-rebase symbol sweep; confirmed by `web check:typescript` |
+| #30772 deleted `DatabaseRepository.revertLastMigration`                         | fork-only `database-migration.service.spec.ts` scenarios D and G                                                                                                  | pre-rebase symbol sweep; confirmed by `server pnpm check`    |
+| #30772 deleted `StorageCore.getTempPathInDir`                                   | fork-only `describe('getTempPathInDir')` block in `storage.core.spec.ts`                                                                                          | `server pnpm check`                                          |
+| #30774 re-timestamped `AddWorkflowLogsTable`                                    | `revert-to-immich.sql` coverage gate                                                                                                                              | the step-7i detector                                         |
+| #30667–#30672 deleted `lib/extensions/translate_extensions.dart`                | fork-sync commit #970 (authored on `main`, where it still exists) called `'<key>'.t(context:)` in `collection_picker.widget.dart`                                 | `dart analyze --fatal-infos`                                 |
+| #30773 converted the duplicate suite from an **e2e** spec to a **medium** spec  | the fork's #317 space-membership carry-over in `resolveGroup` reaches `SharedSpaceRepository`, which upstream's new DI list does not name → 14 of 25 tests failed | **remote `Medium Tests (Server)` only**                      |
+
+### The sixth is a new shape worth naming: e2e → medium conversion drops a fork repository
+
+An e2e spec boots the real DI container, so every fork repository is present whether the test knows
+about it or not. A medium spec declares its dependencies **explicitly** — and upstream's list only
+names upstream's. So the moment upstream converts a suite covering a service the fork has extended,
+the fork's extra repository is silently `undefined` and every call through it throws.
+
+It surfaces as a _behavioural_ failure, not a type error: `resolveGroup` throws
+`Cannot read properties of undefined (reading 'getEditableByAssetIds')`, `resolve` catches it, and the
+suite sees `success: false, error: "unknown"` — 14 assertions reading
+`expected [ { …(3) } ] to deeply equal [ { …(2) } ]`, which looks like a DTO-shape drift and is not.
+`tsc` cannot see it (the property access is on an injected class, typed fine), and no audit looks at
+medium DI lists. **Only running the medium suite finds it.**
+
+Generalise: **after any batch that converts an upstream e2e spec into a medium/unit spec, check whether
+the service under test is one the fork extends, and diff the new spec's `real`/`mock` lists against
+`BASE_SERVICE_DEPENDENCIES` for fork repositories the fork's code path reaches.**
 
 Ruled out on inspection: `SidebarSettings` was a **false positive** — the fork's hits are a Svelte
 component of that name from the sidebar rail (#921), not the deleted `preferences.store.ts` interface.
@@ -276,7 +295,8 @@ unmodified.
 
 ## Post-Rebase Verification
 
-- Fork commits ahead of upstream: 1173
+- Fork commits ahead of upstream: 1179 (1167 → 1165 through the replay as two pure OpenAPI-regen
+  commits emptied and were dropped, then +14 from the fork sync, the fix commits and this report)
 - Commits behind upstream: 0
 - `make upstream-rolling-status`: 101 / 101 batches, 0 fork commits pending
 - Fork diff looks clean: YES
