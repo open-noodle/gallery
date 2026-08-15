@@ -288,6 +288,24 @@ describe('the panel reflects a contextual STATE filter', () => {
     expect(screen.getByTestId('section-toggle-dot-location')).toBeInTheDocument();
   });
 
+  // Same bug class, same fix, for the absence-of-location rows: a locationPresence-only filter must
+  // mark the section active too.
+  it('marks the location section active for a locationPresence-only filter', async () => {
+    renderPanel(
+      {
+        sections: ['location', 'rating'],
+        suggestionsProvider: () => Promise.resolve(suggestions({ hasNoGpsAssets: true })),
+        providers: {},
+      },
+      { locationPresence: 'noGps' },
+    );
+
+    await fireEvent.click(await screen.findByTestId('section-menu-btn'));
+
+    await fireEvent.click(await screen.findByTestId('section-toggle-location'));
+    expect(screen.getByTestId('section-toggle-dot-location')).toBeInTheDocument();
+  });
+
   // The healthy path this bug was mistaken for — pinned here so a regression in it is unambiguous.
   it('still ticks a contextual CITY under its country', async () => {
     renderPanel(locationConfig({ 'Czech Republic': ['Prague', 'Brno'] }), {
