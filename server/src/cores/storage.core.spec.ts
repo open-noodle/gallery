@@ -124,19 +124,6 @@ describe('StorageCore', () => {
     });
   });
 
-  describe('getTempPathInDir', () => {
-    it('should return a path in the given directory with a .tmp extension', () => {
-      const result = StorageCore.getTempPathInDir('/tmp/immich');
-      expect(result).toMatch(/^\/tmp\/immich\/[\da-f-]+\.tmp$/);
-    });
-
-    it('should return a unique path each time', () => {
-      const result1 = StorageCore.getTempPathInDir('/tmp/immich');
-      const result2 = StorageCore.getTempPathInDir('/tmp/immich');
-      expect(result1).not.toBe(result2);
-    });
-  });
-
   describe('relative keys', () => {
     beforeEach(() => {
       StorageCore.setMediaLocation('/data');
