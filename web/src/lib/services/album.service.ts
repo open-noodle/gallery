@@ -404,4 +404,3 @@ export const handleLinkAlbumToSpace = async (album: AlbumResponseDto) => {
     return false;
   }
 };
-
