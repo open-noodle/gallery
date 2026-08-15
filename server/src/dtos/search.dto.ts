@@ -141,7 +141,9 @@ const SmartSearchSchema = SmartSearchBaseSchema.pipe(
   IsNotSiblingOf(SmartSearchBaseSchema, 'locationPresence', ['city', 'state', 'country']),
 ).meta({ id: 'SmartSearchDto' });
 
-const SmartSearchFacetsSchema = BaseSearchSchema.pick({
+// Kept as a plain object schema (no pipe) so the id can be applied to the piped export below,
+// matching the established pattern (see RandomSearchObjectSchema / MetadataSearchBaseSchema).
+const SmartSearchFacetsBaseSchema = BaseSearchSchema.pick({
   type: true,
   isFavorite: true,
   isNotInAlbum: true,
@@ -150,6 +152,10 @@ const SmartSearchFacetsSchema = BaseSearchSchema.pick({
   takenAfter: true,
   city: true,
   country: true,
+  // `state` is deliberately NOT picked here (see the un-picked keys above) — `locationPresence`'s
+  // sibling list below is only `city`/`country`, not `state`, because `IsNotSiblingOf`'s key
+  // parameter is constrained to keys this schema actually has.
+  locationPresence: true,
   make: true,
   model: true,
   personIds: true,
@@ -162,14 +168,16 @@ const SmartSearchFacetsSchema = BaseSearchSchema.pick({
   albumIds: true,
   spaceId: true,
   spacePersonIds: true,
-})
-  .extend({
-    query: z.string().trim().optional().describe('Natural language search query'),
-    queryAssetId: z.uuidv4().optional().describe('Asset ID to use as search reference'),
-    language: z.string().optional().describe('Search language code'),
-    withSharedSpaces: z.boolean().optional().describe('Include shared spaces the user is a member of'),
-  })
-  .meta({ id: 'SmartSearchFacetsDto' });
+}).extend({
+  query: z.string().trim().optional().describe('Natural language search query'),
+  queryAssetId: z.uuidv4().optional().describe('Asset ID to use as search reference'),
+  language: z.string().optional().describe('Search language code'),
+  withSharedSpaces: z.boolean().optional().describe('Include shared spaces the user is a member of'),
+});
+
+const SmartSearchFacetsSchema = SmartSearchFacetsBaseSchema.pipe(
+  IsNotSiblingOf(SmartSearchFacetsBaseSchema, 'locationPresence', ['city', 'country']),
+).meta({ id: 'SmartSearchFacetsDto' });
 
 const SearchPlacesSchema = z
   .object({

@@ -2074,6 +2074,31 @@ describe(SearchRepository.name, () => {
       expect(suggestions.countries).toContain('France');
     });
 
+    it('narrows the camera-makes list, not just the flags and countries, when locationPresence is selected', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+
+      const { asset: noGpsCanon } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newExif({ assetId: noGpsCanon.id, latitude: null, longitude: null, make: 'Canon' });
+
+      const { asset: locatedNikon } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newExif({
+        assetId: locatedNikon.id,
+        latitude: 48.85,
+        longitude: 2.35,
+        city: 'Paris',
+        country: 'France',
+        make: 'Nikon',
+      });
+
+      const suggestions = await sut.getFilterSuggestions([user.id], { locationPresence: 'noGps' });
+
+      // Unlike countries (excluded because it's the location group's own entry), every other
+      // suggestion list must narrow by locationPresence the same way it narrows by city/country —
+      // otherwise selecting "No GPS" leaves the panel's other lists showing unfiltered options.
+      expect(suggestions.cameraMakes).toEqual(['Canon']);
+    });
+
     it('reports the same flags through the smart-facets path', async () => {
       const { ctx, sut } = setup();
       const { user } = await ctx.newUser();
@@ -2083,6 +2108,54 @@ describe(SearchRepository.name, () => {
       const facets = await sut.getSmartSearchFacets({ userIds: [user.id], embedding: matchingEmbedding });
 
       expect(facets.hasNoGpsAssets).toBe(true);
+    });
+
+    it('reports hasNoPlaceNameAssets through the smart-facets path', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { a3 } = await newLocationFixture(ctx, user.id);
+      await addEmbedding(ctx.database, a3.id);
+
+      const facets = await sut.getSmartSearchFacets({ userIds: [user.id], embedding: matchingEmbedding });
+
+      expect(facets.hasNoPlaceNameAssets).toBe(true);
+    });
+
+    it('reports both false for a fully located smart-search result set', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newExif({ assetId: asset.id, latitude: 48.85, longitude: 2.35, city: 'Paris', country: 'France' });
+      await addEmbedding(ctx.database, asset.id);
+
+      const facets = await sut.getSmartSearchFacets({ userIds: [user.id], embedding: matchingEmbedding });
+
+      expect(facets.hasNoGpsAssets).toBe(false);
+      expect(facets.hasNoPlaceNameAssets).toBe(false);
+    });
+
+    it('keeps the sibling entry and countries offered when locationPresence is selected on smart facets', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { a1, a3, a4 } = await newLocationFixture(ctx, user.id);
+      await addEmbedding(ctx.database, a1.id);
+      await addEmbedding(ctx.database, a3.id);
+      await addEmbedding(ctx.database, a4.id);
+
+      const facets = await sut.getSmartSearchFacets({
+        userIds: [user.id],
+        embedding: matchingEmbedding,
+        locationPresence: 'noGps',
+      });
+
+      // Both flags and the countries list are computed with the location group excluded, so
+      // selecting one entry must not make the sibling vanish from the panel. This also pins that
+      // `locationPresence` must stay OUT of the shared smart-facet candidate table (excluded there,
+      // like city/country) — if it leaked in, a3/a4 would never reach the candidate set at all and
+      // both assertions below would fail.
+      expect(facets.hasNoGpsAssets).toBe(true);
+      expect(facets.hasNoPlaceNameAssets).toBe(true);
+      expect(facets.countries).toContain('France');
     });
   });
 });

@@ -336,9 +336,13 @@ interface FilterSuggestionFilterOptions {
   state?: string;
   city?: string;
   /**
-   * Absence-of-location filter. A member of the location group like `country` / `state` / `city` —
-   * it must join the same self-exclusion `without(...)` calls those do, or the entry that reports it
-   * (`hasNoGpsAssets` / `hasNoPlaceNameAssets`) would collapse the moment it is selected.
+   * Absence-of-location filter. A first-class facet key like `state`, so that an active selection
+   * narrows *every* suggestion list — people, tags, camera makes, ratings, media types — the way
+   * `country` / `state` / `city` already do. It is also a member of the location group, so it must
+   * join the same self-exclusion `without(...)` calls those do, or the entry that reports it
+   * (`hasNoGpsAssets` / `hasNoPlaceNameAssets`) would collapse the moment it is selected. The location
+   * group members that a list must NOT be narrowed by are excluded per call site via `without(...)`,
+   * never here.
    */
   locationPresence?: LocationPresence;
   make?: string;
@@ -1710,6 +1714,12 @@ export class SearchRepository {
   }
 
   private buildFilteredAssetIds(userIds: string[], options: FilterSuggestionsOptions) {
+    // `noPlaceName` requires an existing exif row with coordinates, so it can safely ride the shared
+    // inner join below. `noGps` is deliberately kept OUT of that join and applied as its own NOT
+    // EXISTS further down — an inner join would drop exactly the exif-row-less assets it must find.
+    // Mirrors the identical split in buildSmartFacetFilteredAssetIds.
+    const appliesNoPlaceName = options.locationPresence === 'noPlaceName';
+    const appliesNoGps = options.locationPresence === 'noGps';
     const needsExifJoin = !!(
       options.country ||
       options.state ||
@@ -1717,81 +1727,101 @@ export class SearchRepository {
       options.make ||
       options.model ||
       options.lensModel ||
-      options.rating
+      options.rating ||
+      appliesNoPlaceName
     );
     const visibility = options.visibility;
 
-    return this.applySuggestionScope(
-      this.db
-        .selectFrom('asset')
-        .select('asset.id')
-        .$if(!!visibility, (qb) =>
-          visibility === 'not-locked'
-            ? qb.where('asset.visibility', '!=', AssetVisibility.Locked)
-            : qb.where('asset.visibility', '=', visibility!),
+    return (
+      this.applySuggestionScope(
+        this.db
+          .selectFrom('asset')
+          .select('asset.id')
+          .$if(!!visibility, (qb) =>
+            visibility === 'not-locked'
+              ? qb.where('asset.visibility', '!=', AssetVisibility.Locked)
+              : qb.where('asset.visibility', '=', visibility!),
+          )
+          .where('asset.deletedAt', 'is', null),
+        userIds,
+        options,
+      )
+        .$if(!!options.forceEmptyResult, (qb) => qb.where(sql<SqlBool>`false`))
+        .$if(!!options.isNotInAlbum && !options.albumId, (qb) =>
+          qb.where((eb) =>
+            eb.not(eb.exists((eb) => eb.selectFrom('album_asset').whereRef('album_asset.assetId', '=', 'asset.id'))),
+          ),
         )
-        .where('asset.deletedAt', 'is', null),
-      userIds,
-      options,
-    )
-      .$if(!!options.forceEmptyResult, (qb) => qb.where(sql<SqlBool>`false`))
-      .$if(!!options.isNotInAlbum && !options.albumId, (qb) =>
-        qb.where((eb) =>
-          eb.not(eb.exists((eb) => eb.selectFrom('album_asset').whereRef('album_asset.assetId', '=', 'asset.id'))),
-        ),
-      )
-      .$if(!!options.isInAlbum && !options.albumId, (qb) =>
-        qb.where((eb) =>
-          eb.exists((eb) => eb.selectFrom('album_asset').whereRef('album_asset.assetId', '=', 'asset.id')),
-        ),
-      )
-      .$if(!!options.takenAfter, (qb) => qb.where('asset.fileCreatedAt', '>=', options.takenAfter!))
-      .$if(!!options.takenBefore, (qb) => qb.where('asset.fileCreatedAt', '<', options.takenBefore!))
-      .$if(needsExifJoin, (qb) =>
-        qb
-          .innerJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
-          .$if(!!options.country, (qb) => qb.where('asset_exif.country', '=', options.country!))
-          .$if(!!options.state, (qb) => qb.where('asset_exif.state', '=', options.state!))
-          .$if(!!options.city, (qb) => qb.where('asset_exif.city', '=', options.city!))
-          .$if(!!options.make, (qb) => qb.where('asset_exif.make', '=', options.make!))
-          .$if(!!options.model, (qb) => qb.where('asset_exif.model', '=', options.model!))
-          .$if(!!options.lensModel, (qb) => qb.where('asset_exif.lensModel', '=', options.lensModel!))
-          .$if(!!options.rating, (qb) => qb.where('asset_exif.rating', '>=', options.rating!)),
-      )
-      .$if(options.ownerId !== undefined, (qb) => qb.where('asset.ownerId', '=', asUuid(options.ownerId!)))
-      .$if(!!options.personIds?.length && !!options.spaceId, (qb) => hasSpacePeople(qb, options.personIds!))
-      .$if(!!options.personIds?.length && !options.spaceId, (qb) => hasPeople(qb, options.personIds!))
-      .$if(!!options.identityIds?.length, (qb) =>
-        qb.where((eb) =>
-          eb.and(
-            options.identityIds!.map((identityId) =>
+        .$if(!!options.isInAlbum && !options.albumId, (qb) =>
+          qb.where((eb) =>
+            eb.exists((eb) => eb.selectFrom('album_asset').whereRef('album_asset.assetId', '=', 'asset.id')),
+          ),
+        )
+        .$if(!!options.takenAfter, (qb) => qb.where('asset.fileCreatedAt', '>=', options.takenAfter!))
+        .$if(!!options.takenBefore, (qb) => qb.where('asset.fileCreatedAt', '<', options.takenBefore!))
+        .$if(needsExifJoin, (qb) =>
+          qb
+            .innerJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
+            .$if(!!options.country, (qb) => qb.where('asset_exif.country', '=', options.country!))
+            .$if(!!options.state, (qb) => qb.where('asset_exif.state', '=', options.state!))
+            .$if(!!options.city, (qb) => qb.where('asset_exif.city', '=', options.city!))
+            .$if(!!options.make, (qb) => qb.where('asset_exif.make', '=', options.make!))
+            .$if(!!options.model, (qb) => qb.where('asset_exif.model', '=', options.model!))
+            .$if(!!options.lensModel, (qb) => qb.where('asset_exif.lensModel', '=', options.lensModel!))
+            .$if(!!options.rating, (qb) => qb.where('asset_exif.rating', '>=', options.rating!))
+            .$if(appliesNoPlaceName, (qb) =>
+              qb.where('asset_exif.latitude', 'is not', null).where('asset_exif.city', 'is', null),
+            ),
+        )
+        // Deliberately NOT part of the join above: an asset whose metadata has not been extracted has
+        // no asset_exif row at all, and is exactly the kind of asset "no GPS" must find.
+        .$if(appliesNoGps, (qb) =>
+          qb.where((eb) =>
+            eb.not(
               eb.exists(
                 eb
-                  .selectFrom('asset_face')
-                  .innerJoin('face_identity_face', 'face_identity_face.assetFaceId', 'asset_face.id')
-                  .whereRef('asset_face.assetId', '=', 'asset.id')
-                  .where('asset_face.deletedAt', 'is', null)
-                  .where('asset_face.isVisible', 'is', true)
-                  .where('face_identity_face.identityId', '=', asUuid(identityId)),
+                  .selectFrom('asset_exif')
+                  .whereRef('asset_exif.assetId', '=', 'asset.id')
+                  .where('asset_exif.latitude', 'is not', null),
               ),
             ),
           ),
-        ),
-      )
-      .$if(!!options.tagIds?.length, (qb) =>
-        qb.where((eb) =>
-          eb.exists(
-            eb
-              .selectFrom('tag_asset')
-              .whereRef('tag_asset.assetId', '=', 'asset.id')
-              .where('tag_asset.tagId', '=', anyUuid(options.tagIds!)),
+        )
+        .$if(options.ownerId !== undefined, (qb) => qb.where('asset.ownerId', '=', asUuid(options.ownerId!)))
+        .$if(!!options.personIds?.length && !!options.spaceId, (qb) => hasSpacePeople(qb, options.personIds!))
+        .$if(!!options.personIds?.length && !options.spaceId, (qb) => hasPeople(qb, options.personIds!))
+        .$if(!!options.identityIds?.length, (qb) =>
+          qb.where((eb) =>
+            eb.and(
+              options.identityIds!.map((identityId) =>
+                eb.exists(
+                  eb
+                    .selectFrom('asset_face')
+                    .innerJoin('face_identity_face', 'face_identity_face.assetFaceId', 'asset_face.id')
+                    .whereRef('asset_face.assetId', '=', 'asset.id')
+                    .where('asset_face.deletedAt', 'is', null)
+                    .where('asset_face.isVisible', 'is', true)
+                    .where('face_identity_face.identityId', '=', asUuid(identityId)),
+                ),
+              ),
+            ),
           ),
-        ),
-      )
-      .$if(!!options.mediaType, (qb) => qb.where('asset.type', '=', options.mediaType!))
-      .$if(options.isFavorite !== undefined && options.isFavorite !== null, (qb) =>
-        qb.where('asset.isFavorite', '=', options.isFavorite!),
-      );
+        )
+        .$if(!!options.tagIds?.length, (qb) =>
+          qb.where((eb) =>
+            eb.exists(
+              eb
+                .selectFrom('tag_asset')
+                .whereRef('tag_asset.assetId', '=', 'asset.id')
+                .where('tag_asset.tagId', '=', anyUuid(options.tagIds!)),
+            ),
+          ),
+        )
+        .$if(!!options.mediaType, (qb) => qb.where('asset.type', '=', options.mediaType!))
+        .$if(options.isFavorite !== undefined && options.isFavorite !== null, (qb) =>
+          qb.where('asset.isFavorite', '=', options.isFavorite!),
+        )
+    );
   }
 
   /**
