@@ -206,6 +206,11 @@ export class StorageService extends BaseService {
       const current = StorageCore.getMediaLocation();
       const samples = await this.assetRepository.getFileSamples();
       const savedValue = await this.systemMetadataRepository.get(SystemMetadataKey.MediaLocation);
+      // Load-bearing: getFileSamples now only returns disk-resident (absolute-path) rows, so on
+      // an install that is entirely on S3 — or mid-migration with no disk-resident asset_file
+      // rows left — samples is empty and the location check below is skipped entirely. Without
+      // this guard, an unordered sample could be a relative S3 key on one restart and an
+      // absolute disk path on the next, making InconsistentMediaLocation fire nondeterministically.
       if (samples.length > 0) {
         const path = samples[0].path;
 
