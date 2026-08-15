@@ -626,14 +626,24 @@ describe(SearchRepository.name, () => {
 
       await repository.getFilterSuggestions([userId], { ...allDimensions });
 
-      // countries, cameraMakes, tags, people, ratings, mediaTypes, hasFavorites, then the two
-      // album-membership probes (filed / unfiled) — in construction order.
-      const [countries, ...rest] = options();
+      // countries, cameraMakes, tags, people, ratings, mediaTypes, hasFavorites, the two
+      // album-membership probes (filed / unfiled), then the location-presence flags — in
+      // construction order. The location-presence flags call excludes the whole location group too,
+      // exactly like countries — otherwise selecting one absence-of-location entry would recompute
+      // the other inside the already-narrowed set and the sibling entry would vanish.
+      const calls = options();
+      expect(calls).toHaveLength(10);
+      const [countries, ...rest] = calls.slice(0, -1);
+      const [locationPresenceFlags] = calls.slice(-1);
       expect(rest).toHaveLength(8);
 
       expect(countries.state).toBeUndefined();
       expect(countries.lensModel).toBe('RF24-105mm F4 L IS USM');
       expect(countries.ownerId).toBe('00000000-0000-4000-8000-000000000009');
+
+      expect(locationPresenceFlags.state).toBeUndefined();
+      expect(locationPresenceFlags.lensModel).toBe('RF24-105mm F4 L IS USM');
+      expect(locationPresenceFlags.ownerId).toBe('00000000-0000-4000-8000-000000000009');
 
       for (const list of rest) {
         expect(list.state).toBe('Bavaria');
