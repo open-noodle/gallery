@@ -24,7 +24,7 @@ import { GameChallengeTable } from 'src/schema/tables/game-challenge.table';
 import { GameGuessTable } from 'src/schema/tables/game-guess.table';
 import { GameRoundTable, GameRoundType } from 'src/schema/tables/game-round.table';
 import { BaseService } from 'src/services/base.service';
-import { getFilenameExtension, ImmichFileResponse } from 'src/utils/file';
+import { getFilenameExtension, ImmichMediaResponse } from 'src/utils/file';
 import {
   GameCandidate,
   haversineKm,
@@ -329,7 +329,7 @@ export class GameService extends BaseService {
    * filename; the original file and the real filename are never touched here. Membership only
    * (any role), like `get`/`guess`/`leaderboard` - a viewer can view every round's image.
    */
-  async getRoundImage(auth: AuthDto, challengeId: string, index: number): Promise<ImmichFileResponse> {
+  async getRoundImage(auth: AuthDto, challengeId: string, index: number): Promise<ImmichMediaResponse> {
     const challenge = await this.loadChallenge(challengeId);
     await this.requireMember(challenge.spaceId, auth.user.id);
 
@@ -350,17 +350,23 @@ export class GameService extends BaseService {
       throw new NotFoundException('Round image not available');
     }
 
-    return new ImmichFileResponse({
-      path: previewFile.path,
-      contentType: mimeTypes.lookup(previewFile.path),
-      // Private, not public: this is membership-gated content, so a shared/CDN cache must never
-      // serve it across sessions. Long browser-side caching is safe within that, though - once a
-      // challenge is created its rounds are frozen (assetId per round never changes), so the same
-      // (challengeId, index) always resolves to the same bytes. Matches the asset thumbnail
-      // endpoint's own choice (AssetMediaService.viewThumbnail) for the same reason.
-      cacheControl: CacheControl.PrivateWithCache,
-      fileName: `round-${index}${getFilenameExtension(previewFile.path)}`,
-    });
+    // Routed through serveFromBackend - not a bare `new ImmichFileResponse` - so this resolves
+    // correctly on both disk and S3-backed instances, exactly like AssetMediaService.viewThumbnail
+    // does for the identical preview-file case (constructing ImmichFileResponse directly only
+    // works for disk paths; serveFromBackend picks disk vs S3 and returns a redirect/stream there
+    // instead). The filename stays generic (`round-<index>`, never the asset's real filename) -
+    // that is the whole point of this endpoint.
+    return this.serveFromBackend(
+      previewFile.path,
+      mimeTypes.lookup(previewFile.path),
+      // Private, not public: this is membership-gated content pulled from a private shared space,
+      // so a shared/CDN cache must never serve it across sessions or to a non-member. Long
+      // browser-side caching is still safe within that: once a challenge is created its rounds are
+      // frozen (assetId per round never changes), so the same (challengeId, index) always resolves
+      // to the same bytes. Matches AssetMediaService.viewThumbnail's own choice for the same reason.
+      CacheControl.PrivateWithCache,
+      `round-${index}${getFilenameExtension(previewFile.path)}`,
+    );
   }
 
   async leaderboard(auth: AuthDto, challengeId: string): Promise<GameLeaderboardResponseDto> {
