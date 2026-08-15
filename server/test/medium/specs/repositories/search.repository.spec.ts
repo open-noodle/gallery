@@ -371,6 +371,8 @@ describe(SearchRepository.name, () => {
         hasFavorites: false,
         hasAssetsInAlbum: false,
         hasAssetsNotInAlbum: false,
+        hasNoGpsAssets: false,
+        hasNoPlaceNameAssets: false,
       });
     });
 
@@ -767,6 +769,8 @@ describe(SearchRepository.name, () => {
         hasFavorites: false,
         hasAssetsInAlbum: false,
         hasAssetsNotInAlbum: false,
+        hasNoGpsAssets: false,
+        hasNoPlaceNameAssets: false,
       });
     });
 
