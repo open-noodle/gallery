@@ -1,8 +1,8 @@
 import {
-  type LatLon,
-  MIN_SCALE,
   haversineKm,
+  type LatLon,
   MAX_ROUND_SCORE,
+  MIN_SCALE,
   mulberry32,
   poolScaleDays,
   poolScaleKm,
