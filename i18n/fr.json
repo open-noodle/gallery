@@ -1974,7 +1974,7 @@
   "game_when_was_this": "Quand était-ce ?",
   "game_where_was_this": "Où était-ce ?",
   "game_you_were_away": "Vous étiez à {distance}",
-  "game_you_were_off": "Vous étiez à {offset} près",
+  "game_you_were_off": "Vous avez manqué de {offset}",
   "gcast_enabled": "Diffusion Google Cast",
   "gcast_enabled_description": "Cette fonctionnalité charge des ressources externes depuis Google pour fonctionner.",
   "general": "Général",
