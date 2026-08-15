@@ -2350,4 +2350,41 @@ describe(AssetRepository.name, () => {
       await expect(sut.getExternalAssetIds(user.id)).resolves.toEqual(new Set());
     });
   });
+
+  describe('getFileSamples', () => {
+    it('should only sample disk-resident (absolute-path) files', async () => {
+      // Isolated DB: getFileSamples has no filter beyond path shape, so a shared database
+      // (with hundreds of rows from earlier tests in this file) would make the sample draw
+      // from data this test doesn't control.
+      const { ctx, sut } = setup(await getKyselyDB());
+      const { user } = await ctx.newUser();
+
+      // 10 relative S3 keys against 2 absolute disk paths: an unordered, unfiltered `limit 3`
+      // drawing 3 of 12 rows has only a 2/12 * 1/11 * 0/10 = 0% chance of landing on all-absolute
+      // by luck, so this is a real guard against a dropped `where` clause, not a coin flip.
+      for (let i = 0; i < 10; i++) {
+        const { asset } = await ctx.newAsset({ ownerId: user.id });
+        await ctx.newAssetFile({
+          assetId: asset.id,
+          type: AssetFileType.Thumbnail,
+          path: `thumbs/${user.id}/${i}/relative.webp`,
+        });
+      }
+      for (let i = 0; i < 2; i++) {
+        const { asset } = await ctx.newAsset({ ownerId: user.id });
+        await ctx.newAssetFile({
+          assetId: asset.id,
+          type: AssetFileType.Thumbnail,
+          path: `/data/thumbs/${user.id}/${i}/absolute.webp`,
+        });
+      }
+
+      const samples = await sut.getFileSamples();
+
+      expect(samples.length).toBeGreaterThan(0);
+      for (const sample of samples) {
+        expect(sample.path.startsWith('/')).toBe(true);
+      }
+    });
+  });
 });
