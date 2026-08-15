@@ -716,35 +716,38 @@ const SmartSearchSchema = withLocationPresenceExclusivity(
   ),
 ).meta({ id: 'SmartSearchDto' });
 
-const SmartSearchFacetsSchema = BaseSearchSchema.pick({
-  type: true,
-  isFavorite: true,
-  isNotInAlbum: true,
-  isInAlbum: true,
-  takenBefore: true,
-  takenAfter: true,
-  city: true,
-  country: true,
-  make: true,
-  model: true,
-  personIds: true,
-  tagIds: true,
-  rating: true,
-  // An album detail page runs its page-aware search scoped to its own album, so the facets that
-  // drive that page's result count and time-bucket rail have to carry the same scope. Omitting it
-  // here does not merely lose a filter: zod strips the field, so the facets would silently describe
-  // the whole library beside a result grid showing one album.
-  albumIds: true,
-  spaceId: true,
-  spacePersonIds: true,
-})
-  .extend({
+const SmartSearchFacetsSchema = withLocationPresenceExclusivity(
+  BaseSearchSchema.pick({
+    type: true,
+    isFavorite: true,
+    isNotInAlbum: true,
+    isInAlbum: true,
+    takenBefore: true,
+    takenAfter: true,
+    city: true,
+    country: true,
+    // `state` is deliberately NOT picked here (see the un-picked keys above), so only
+    // `city`/`country` can ever collide with `locationPresence` on this endpoint.
+    locationPresence: true,
+    make: true,
+    model: true,
+    personIds: true,
+    tagIds: true,
+    rating: true,
+    // An album detail page runs its page-aware search scoped to its own album, so the facets that
+    // drive that page's result count and time-bucket rail have to carry the same scope. Omitting it
+    // here does not merely lose a filter: zod strips the field, so the facets would silently
+    // describe the whole library beside a result grid showing one album.
+    albumIds: true,
+    spaceId: true,
+    spacePersonIds: true,
+  }).extend({
     query: z.string().trim().optional().describe('Natural language search query'),
     queryAssetId: z.uuidv4().optional().describe('Asset ID to use as search reference'),
     language: z.string().optional().describe('Search language code'),
     withSharedSpaces: z.boolean().optional().describe('Include shared spaces the user is a member of'),
-  })
-  .meta({ id: 'SmartSearchFacetsDto' });
+  }),
+).meta({ id: 'SmartSearchFacetsDto' });
 
 // Declared last: every schema these wrap must exist at class-evaluation time, and the fork's
 // suggestion/facet schemas are interleaved with upstream's V3 block further down.
