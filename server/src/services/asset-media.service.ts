@@ -5,6 +5,7 @@ import type { UploadFile, UploadRequest } from 'src/types.js';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { Asset, AuthSharedLink } from 'src/database.js';
+import { StorageRoutingKind } from 'src/backends/storage-router.js';
 import {
   AssetBulkUploadCheckResponseDto,
   AssetMediaResponseDto,
@@ -400,7 +401,8 @@ export class AssetMediaService extends BaseService {
       });
 
       // If S3 backend, upload the file and update the path
-      writeBackend = StorageService.getWriteBackend();
+      const config = await this.getConfig({ withCache: true });
+      writeBackend = StorageService.getWriteBackend(StorageRoutingKind.Originals, config);
       if (!(writeBackend instanceof DiskStorageBackend)) {
         const relativeKey = StorageCore.getRelativeNestedPath(
           StorageFolder.Upload,

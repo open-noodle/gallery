@@ -20,6 +20,7 @@ import { systemConfigStub } from 'test/fixtures/system-config.stub.js';
 import { userStub } from 'test/fixtures/user.stub.js';
 import { factory, newUuid } from 'test/small.factory.js';
 import { ServiceMocks, newTestService } from 'test/utils.js';
+import { StorageRoutingKind } from 'src/backends/storage-router.js';
 
 vi.mock('node:fs', async (importOriginal) => {
   const original = await importOriginal<typeof import('node:fs')>();
@@ -1262,6 +1263,37 @@ describe(AuthService.name, () => {
           user.id,
           expect.objectContaining({ profileImagePath: expect.any(String) }),
         );
+      });
+
+      describe('routing', () => {
+        afterEach(() => {
+          // Same leak hazard as elsewhere: vitest.config.mjs sets no restoreMocks and
+          // there are no setupFiles, so a getWriteBackend spy leaks into every later test.
+          vi.restoreAllMocks();
+        });
+
+        it('resolves the write backend with StorageRoutingKind.Thumbnails', async () => {
+          const fileId = newUuid();
+          const user = UserFactory.create({ oauthId: 'oauth-id' });
+          const profile = OAuthProfileFactory.create({ picture: 'https://auth.immich.cloud/profiles/1.jpg' });
+
+          mocks.systemMetadata.get.mockResolvedValue(systemConfigStub.oauthEnabled);
+          mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({ profile });
+          mocks.user.getByOAuthId.mockResolvedValue(user);
+          mocks.crypto.randomUUID.mockReturnValue(fileId);
+          mocks.oauth.getProfilePicture.mockResolvedValue(new Uint8Array([1, 2, 3, 4, 5]).buffer);
+          mocks.user.update.mockResolvedValue(user);
+          mocks.session.create.mockResolvedValue(SessionFactory.create());
+          const getWriteBackend = vi.spyOn(StorageService, 'getWriteBackend');
+
+          await sut.callback(
+            { url: 'http://immich/auth/login?code=abc123', state: 'xyz789', codeVerifier: 'foo' },
+            {},
+            loginDetails,
+          );
+
+          expect(getWriteBackend).toHaveBeenCalledWith(StorageRoutingKind.Thumbnails, expect.anything());
+        });
       });
     });
 
