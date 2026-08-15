@@ -829,6 +829,27 @@ describe('/search', () => {
       expect(totalFiltered).toBeLessThanOrEqual(cityCount);
     });
 
+    it('should filter buckets by locationPresence=noGps', async () => {
+      // Every asset in this describe's fixture gets a lat/long via updateAsset in the outer
+      // beforeAll (see the `coordinates` array — one entry per asset, none left unset), so
+      // noGps (no asset_exif row, or latitude IS NULL) matches nothing in this fixture. That is
+      // the point of the assertion: if locationPresence were dropped anywhere between the DTO,
+      // the service and the repository, this would silently return the same non-zero count as
+      // the unfiltered baseline instead of zero.
+      const { status, body } = await request(app)
+        .get('/timeline/buckets?locationPresence=noGps')
+        .set('Authorization', `Bearer ${admin.accessToken}`);
+      expect(status).toBe(200);
+      expect(Array.isArray(body)).toBe(true);
+      expect(body).toHaveLength(0);
+
+      const { body: allBuckets } = await request(app)
+        .get('/timeline/buckets')
+        .set('Authorization', `Bearer ${admin.accessToken}`);
+      const totalAll = allBuckets.reduce((sum: number, b: { count: number }) => sum + b.count, 0);
+      expect(totalAll).toBeGreaterThan(0);
+    });
+
     it('should return zero when combined filters match no assets', async () => {
       // Tokyo + Canon: assetDenali (Canon EOS 7D) is in Tokyo — this should match
       // But Accra + Canon: no Canon camera in Accra
