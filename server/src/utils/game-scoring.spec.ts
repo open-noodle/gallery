@@ -58,6 +58,7 @@ describe('scoreFromError', () => {
 });
 
 describe('poolScaleKm', () => {
+  // eslint-disable-next-line unicorn/consistent-function-scoping
   const cityPool = (): LatLon[] =>
     Array.from({ length: 200 }, (_, i) => ({ lat: 52.5 + (i % 20) * 0.005, lon: 13.4 + Math.floor(i / 20) * 0.005 }));
 
@@ -71,7 +72,7 @@ describe('poolScaleKm', () => {
     const world: LatLon[] = [
       { lat: 52.5, lon: 13.4 },
       { lat: -33.9, lon: 18.4 },
-      { lat: 40.7, lon: -74.0 },
+      { lat: 40.7, lon: -74 },
       { lat: 47.9, lon: 106.9 },
       { lat: 41.9, lon: 12.5 },
     ];
@@ -84,7 +85,7 @@ describe('poolScaleKm', () => {
   it('is not hijacked by a few far-away outliers', () => {
     const clean = poolScaleKm(cityPool(), mulberry32(7));
     const polluted = poolScaleKm(
-      [...cityPool(), { lat: 47.9, lon: 106.9 }, { lat: -33.9, lon: 18.4 }, { lat: 40.7, lon: -74.0 }],
+      [...cityPool(), { lat: 47.9, lon: 106.9 }, { lat: -33.9, lon: 18.4 }, { lat: 40.7, lon: -74 }],
       mulberry32(7),
     );
     expect(polluted).toBeLessThan(clean * 3);
@@ -129,13 +130,22 @@ describe('geoCellKey', () => {
   it('puts distant points in different cells', () => {
     expect(geoCellKey({ lat: 52.5, lon: 13.4 }, 50)).not.toBe(geoCellKey({ lat: 48.9, lon: 2.4 }, 50));
   });
+
+  it('keeps nearby high-latitude points in the same cell despite converging meridians', () => {
+    // At 89N, 10 degrees of longitude is only ~19km - well inside a 50km cell.
+    expect(geoCellKey({ lat: 89, lon: 0 }, 50)).toBe(geoCellKey({ lat: 89, lon: 10 }, 50));
+  });
+
+  it('puts points either side of the antimeridian in the same cell', () => {
+    expect(geoCellKey({ lat: 60, lon: 179.99 }, 50)).toBe(geoCellKey({ lat: 60, lon: -179.99 }, 50));
+  });
 });
 
 describe('selectLocationRounds', () => {
   const spread: GameCandidate[] = [
     candidate('a', 52.5, 13.4, 'Germany'),
     candidate('b', -33.9, 18.4, 'South Africa'),
-    candidate('c', 40.7, -74.0, 'United States'),
+    candidate('c', 40.7, -74, 'United States'),
     candidate('d', 47.9, 106.9, 'Mongolia'),
     candidate('e', 41.9, 12.5, 'Italy'),
     candidate('f', 45.8, 15.9, 'Croatia'),
@@ -164,7 +174,7 @@ describe('selectLocationRounds', () => {
     const germanHeavy: GameCandidate[] = [
       ...Array.from({ length: 20 }, (_, i) => candidate(`de${i}`, 48 + i * 0.3, 8 + i * 0.3, 'Germany')),
       candidate('za', -33.9, 18.4, 'South Africa'),
-      candidate('us', 40.7, -74.0, 'United States'),
+      candidate('us', 40.7, -74, 'United States'),
       candidate('mn', 47.9, 106.9, 'Mongolia'),
     ];
     const picked = selectLocationRounds(germanHeavy, 5, 15_000, mulberry32(3));
