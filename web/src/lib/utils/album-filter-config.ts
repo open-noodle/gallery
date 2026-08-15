@@ -50,6 +50,7 @@ function toSuggestionRequest(filters: FilterState) {
     country: filters.country,
     state: filters.state,
     city: filters.city,
+    locationPresence: filters.locationPresence,
     make: filters.make,
     model: filters.model,
     lensModel: filters.lensModel,
