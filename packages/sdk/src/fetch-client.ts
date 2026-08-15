@@ -3468,6 +3468,8 @@ export type ServerFeaturesDto = {
     realtimeTranscoding: boolean;
     /** Whether reverse geocoding is enabled */
     reverseGeocoding: boolean;
+    /** Whether an S3 storage backend is configured */
+    s3Storage: boolean;
     /** Whether search is enabled */
     search: boolean;
     /** Whether sidecar files are supported */
@@ -4025,6 +4027,17 @@ export type StackCreateDto = {
 export type StackUpdateDto = {
     /** Primary asset ID */
     primaryAssetId?: string;
+};
+export type StorageRoutingStatusEntryDto = {
+    /** Number of files of this kind currently stored on the other backend */
+    misplacedCount: number;
+    /** The resolved backend new files of this kind are written to */
+    routedTo: RoutedTo;
+};
+export type StorageRoutingStatusDto = {
+    encodedVideo: StorageRoutingStatusEntryDto;
+    originals: StorageRoutingStatusEntryDto;
+    thumbnails: StorageRoutingStatusEntryDto;
 };
 export type StorageMigrationFileTypesDto = {
     /** Include encoded video files */
@@ -9723,6 +9736,17 @@ export function rollback({ batchId }: {
     }));
 }
 /**
+ * Get storage routing status
+ */
+export function getRoutingStatus(opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: StorageRoutingStatusDto;
+    }>("/storage-migration/routing", {
+        ...opts
+    }));
+}
+/**
  * Start storage migration
  */
 export function start({ storageMigrationStartDto }: {
@@ -11408,6 +11432,10 @@ export enum StorageMigrationDirection {
     ToS3 = "toS3",
     ToDisk = "toDisk"
 }
+export enum RoutedTo {
+    Disk = "disk",
+    S3 = "s3"
+}
 export enum SyncEntityType {
     AuthUserV1 = "AuthUserV1",
     UserV1 = "UserV1",
@@ -11558,6 +11586,11 @@ export enum SyncRequestType {
     SharedSpaceAlbumAssetsV1 = "SharedSpaceAlbumAssetsV1",
     SharedSpaceAlbumAssetExifsV1 = "SharedSpaceAlbumAssetExifsV1",
     SharedSpaceAlbumHiddensV1 = "SharedSpaceAlbumHiddensV1"
+}
+export enum StorageRouting {
+    Auto = "auto",
+    Disk = "disk",
+    S3 = "s3"
 }
 export enum TimeBucketSize {
     Year = "year",
