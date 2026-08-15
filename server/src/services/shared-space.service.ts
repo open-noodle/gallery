@@ -92,15 +92,12 @@ import { ImmichMediaResponse } from 'src/utils/file.js';
 import { createCrossOwnerMergeAuthorizer } from 'src/utils/merge-policy.js';
 import { mimeTypes } from 'src/utils/mime-types.js';
 import { isFaceSuggestionEnabled } from 'src/utils/misc.js';
+import {
+  getSharedSpaceRoleScore,
+  SHARED_SPACE_ROLE_HIERARCHY as ROLE_HIERARCHY,
+} from 'src/utils/shared-space-role.js';
 import { transformFaceBoundingBox } from 'src/utils/transform.js';
 
-const ROLE_HIERARCHY: Record<SharedSpaceRole, number> = {
-  [SharedSpaceRole.Viewer]: 0,
-  [SharedSpaceRole.Editor]: 1,
-  [SharedSpaceRole.Owner]: 2,
-};
-
-const getSharedSpaceRoleScore = (role: string) => ROLE_HIERARCHY[role as SharedSpaceRole] ?? 0;
 const getMetadataSourceScore = (sourceProfileType?: string | null) => (sourceProfileType === 'user-person' ? 1 : 0);
 
 /** nameSource collapse precedence: a manually-set name wins over an inherited/auto/empty one. */
