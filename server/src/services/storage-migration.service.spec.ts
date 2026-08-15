@@ -1,10 +1,15 @@
 import { Readable } from 'node:stream';
 import { StorageCore } from 'src/cores/storage.core';
+import { StorageRouting } from 'src/dtos/system-config.dto';
 import { AssetFileType, JobName, JobStatus, QueueName } from 'src/enum';
 import { StorageMigrationService } from 'src/services/storage-migration.service';
 import { StorageService } from 'src/services/storage.service';
 import { mockEnvData } from 'test/repositories/config.repository.mock';
 import { makeStream, newTestService, ServiceMocks } from 'test/utils';
+
+const routing = (originals: StorageRouting, thumbnails: StorageRouting, encodedVideo: StorageRouting) => ({
+  storage: { routing: { originals, thumbnails, encodedVideo } },
+});
 
 describe(StorageMigrationService.name, () => {
   let sut: StorageMigrationService;
@@ -150,16 +155,14 @@ describe(StorageMigrationService.name, () => {
     it('should throw if backend config does not match direction (toS3 but backend=disk)', async () => {
       mocks.config.getEnv.mockReturnValue(mockEnvData({ storage: { backend: 'disk' } }));
 
-      await expect(sut.start(defaultOptions)).rejects.toThrow(
-        'Storage backend must be set to "s3" (IMMICH_STORAGE_BACKEND=s3) to migrate to S3',
-      );
+      await expect(sut.start(defaultOptions)).rejects.toThrow(/Cannot migrate to s3[\s\S]*IMMICH_STORAGE_BACKEND/);
     });
 
     it('should throw if backend config does not match direction (toDisk but backend=s3)', async () => {
       mocks.config.getEnv.mockReturnValue(mockEnvData({ storage: { backend: 's3' } }));
 
       await expect(sut.start({ ...defaultOptions, direction: 'toDisk' })).rejects.toThrow(
-        'Storage backend must be set to "disk" (IMMICH_STORAGE_BACKEND=disk) to migrate to disk',
+        /Cannot migrate to disk[\s\S]*IMMICH_STORAGE_BACKEND/,
       );
     });
 
@@ -188,6 +191,126 @@ describe(StorageMigrationService.name, () => {
 
       await expect(sut.start(defaultOptions)).rejects.toThrow('No files to migrate');
       expect(mocks.job.queue).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('per-kind routing validation', () => {
+    const allFileTypes = {
+      originals: false,
+      thumbnails: false,
+      previews: false,
+      fullsize: false,
+      encodedVideos: false,
+      sidecars: false,
+      personThumbnails: false,
+      profileImages: false,
+    };
+
+    const nonZeroThumbnailsFileCounts = {
+      originals: 0,
+      thumbnails: 3,
+      previews: 0,
+      fullsize: 0,
+      sidecars: 0,
+      encodedVideos: 0,
+      personThumbnails: 0,
+      profileImages: 0,
+    };
+
+    beforeEach(() => {
+      mocks.config.getEnv.mockReturnValue(mockEnvData({ storage: { backend: 'disk' } }));
+    });
+
+    it('should reject migrating thumbnails to disk while they route to s3', async () => {
+      mocks.systemMetadata.get.mockResolvedValue(routing(StorageRouting.Auto, StorageRouting.S3, StorageRouting.Auto));
+
+      await expect(
+        sut.start({
+          direction: 'toDisk',
+          deleteSource: false,
+          concurrency: 5,
+          fileTypes: { ...allFileTypes, thumbnails: true },
+        }),
+      ).rejects.toThrow(/thumbnails/);
+    });
+
+    it('should name every contradicting kind, not just the first', async () => {
+      mocks.systemMetadata.get.mockResolvedValue(routing(StorageRouting.S3, StorageRouting.S3, StorageRouting.Auto));
+
+      await expect(
+        sut.start({
+          direction: 'toDisk',
+          deleteSource: false,
+          concurrency: 5,
+          fileTypes: { ...allFileTypes, originals: true, thumbnails: true },
+        }),
+      ).rejects.toThrow(/originals[\s\S]*thumbnails|thumbnails[\s\S]*originals/);
+    });
+
+    it('should explain that an auto knob resolved via the env var', async () => {
+      mocks.systemMetadata.get.mockResolvedValue(
+        routing(StorageRouting.Auto, StorageRouting.Auto, StorageRouting.Auto),
+      );
+      mocks.config.getEnv.mockReturnValue(mockEnvData({ storage: { backend: 's3' } }));
+
+      await expect(
+        sut.start({
+          direction: 'toDisk',
+          deleteSource: false,
+          concurrency: 5,
+          fileTypes: { ...allFileTypes, thumbnails: true },
+        }),
+      ).rejects.toThrow(/IMMICH_STORAGE_BACKEND/);
+    });
+
+    it('should accept a selection whose kinds all match the direction', async () => {
+      mocks.systemMetadata.get.mockResolvedValue(
+        routing(StorageRouting.Auto, StorageRouting.Disk, StorageRouting.Auto),
+      );
+      mocks.storageMigration.getFileCounts.mockResolvedValue(nonZeroThumbnailsFileCounts);
+      mocks.job.isActive.mockResolvedValue(false);
+
+      await expect(
+        sut.start({
+          direction: 'toDisk',
+          deleteSource: false,
+          concurrency: 5,
+          fileTypes: { ...allFileTypes, thumbnails: true },
+        }),
+      ).resolves.toEqual({ batchId: expect.any(String) });
+    });
+
+    it('should re-validate at dequeue and fail when routing changed after start', async () => {
+      // start() validated against the old routing; the job runs later. A batch that would no
+      // longer converge must fail rather than half-migrate.
+      mocks.systemMetadata.get.mockResolvedValue(routing(StorageRouting.Auto, StorageRouting.S3, StorageRouting.Auto));
+
+      await expect(
+        sut.handleQueueAll({
+          direction: 'toDisk',
+          deleteSource: false,
+          concurrency: 5,
+          batchId: 'batch-1',
+          fileTypes: { ...allFileTypes, thumbnails: true },
+        } as never),
+      ).rejects.toThrow(/thumbnails/);
+
+      expect(mocks.job.queueAll).not.toHaveBeenCalled();
+    });
+
+    it('should ignore the routing of file types that were not selected', async () => {
+      mocks.systemMetadata.get.mockResolvedValue(routing(StorageRouting.S3, StorageRouting.Disk, StorageRouting.S3));
+      mocks.storageMigration.getFileCounts.mockResolvedValue(nonZeroThumbnailsFileCounts);
+      mocks.job.isActive.mockResolvedValue(false);
+
+      await expect(
+        sut.start({
+          direction: 'toDisk',
+          deleteSource: false,
+          concurrency: 5,
+          fileTypes: { ...allFileTypes, thumbnails: true },
+        }),
+      ).resolves.toEqual({ batchId: expect.any(String) });
     });
   });
 
