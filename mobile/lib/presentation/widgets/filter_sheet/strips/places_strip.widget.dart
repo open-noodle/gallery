@@ -41,6 +41,10 @@ class PlacesStrip extends ConsumerWidget {
       titleKey: 'filter_sheet_places',
       items: items,
       height: 84,
+      // Zero countries must not hide the strip: a fully-unlocated library is the headline
+      // case for this filter, and it would otherwise have no route to it at all (the "+N"
+      // tile that opens the full picker is itself gated on there being country overflow).
+      hasExtraEntries: presenceEntries.isNotEmpty,
       onRetry: () => ref.invalidate(photosFilterSuggestionsProvider(filter)),
       childBuilder: (data) {
         final countries = data.cast<String>();

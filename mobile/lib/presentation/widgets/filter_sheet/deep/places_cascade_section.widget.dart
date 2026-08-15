@@ -36,13 +36,27 @@ class PlacesCascadeSection extends ConsumerWidget {
     final countriesAsync = async.whenData((s) => s.countries);
     final suggestions = async.valueOrNull;
     final selectedCountry = ref.watch(photosFilterProvider.select((f) => f.location.country));
+    final selectedPresence = ref.watch(photosFilterProvider.select((f) => f.location.locationPresence));
     final count = countriesAsync.valueOrNull?.length ?? 0;
+
+    // Same gate as each individual presence chip below (server flag OR already selected) —
+    // computed once here because it also has to keep the *section itself* (and its route to
+    // the full picker) from collapsing when there are zero countries. See hasExtraEntries /
+    // _SearchMoreRow's gate below.
+    final hasExtraEntries =
+        (suggestions?.hasNoGpsAssets ?? false) ||
+        (suggestions?.hasNoPlaceNameAssets ?? false) ||
+        selectedPresence == 'noGps' ||
+        selectedPresence == 'noPlaceName';
 
     return DeepSectionScaffold<String>(
       sectionId: FilterSectionId.places,
       titleKey: 'filter_sheet_deep_places_section',
       emptyCaptionKey: 'filter_sheet_deep_empty_places',
       items: countriesAsync,
+      // Zero countries must not collapse the section: a fully-unlocated library is the
+      // headline case for this filter, and it needs the presence chips below to still render.
+      hasExtraEntries: hasExtraEntries,
       onRetry: () => ref.invalidate(photosFilterSuggestionsProvider(filter)),
       childBuilder: (countries) {
         return Column(
@@ -57,7 +71,9 @@ class PlacesCascadeSection extends ConsumerWidget {
               )
             else
               _CityCascade(country: selectedCountry),
-            if (count > 0) _SearchMoreRow(count: count, onOpenPicker: onOpenPicker),
+            // Also gated on hasExtraEntries: with zero countries this is otherwise the
+            // section's only route to the full PlacesPickerPage, and count alone is 0.
+            if (count > 0 || hasExtraEntries) _SearchMoreRow(count: count, onOpenPicker: onOpenPicker),
           ],
         );
       },

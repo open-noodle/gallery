@@ -328,6 +328,17 @@ void main() {
       expect(find.widgetWithText(FilterChip, 'filter_location_no_place_name'.tr()), findsOneWidget);
     });
 
+    // The headline case: a library with nothing geotagged has an empty `countries` list, but
+    // the strip must still offer the presence chip instead of collapsing entirely (the shared
+    // StripScaffold otherwise hides title + body whenever the resolved data list is empty).
+    testWidgets('offers the no-gps entry even with zero countries', (tester) async {
+      final s = _suggestions(countries: const [], hasNoGpsAssets: true);
+      await tester.pumpConsumerWidget(const PlacesStrip(), overrides: _overrideSuggestions(s));
+      await tester.pumpAndSettle();
+
+      expect(find.widgetWithText(FilterChip, 'filter_location_no_gps'.tr()), findsOneWidget);
+    });
+
     testWidgets('hides the no-location entries when the server says they would match nothing', (tester) async {
       final s = _suggestions(countries: ['France']);
       await tester.pumpConsumerWidget(const PlacesStrip(), overrides: _overrideSuggestions(s));
