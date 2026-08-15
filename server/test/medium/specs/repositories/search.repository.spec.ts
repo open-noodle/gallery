@@ -762,10 +762,10 @@ describe(SearchRepository.name, () => {
       await ctx.newExif({ assetId: asset.id, city: 'Berlin' });
       await ctx.database.insertInto('asset_favorite').values({ userId: viewer.id, assetId: asset.id }).execute();
 
-      const asViewer = await sut.getAssetsByCity([owner.id], viewer.id);
+      const asViewer = await sut.getAssetsByCity([owner.id], undefined, viewer.id);
       expect(asViewer.find((item) => item.id === asset.id)?.isFavoriteForUser).toBe(true);
 
-      const asOwner = await sut.getAssetsByCity([owner.id], owner.id);
+      const asOwner = await sut.getAssetsByCity([owner.id], undefined, owner.id);
       expect(asOwner.find((item) => item.id === asset.id)?.isFavoriteForUser).toBe(false);
 
       const withoutAuthUserId = await sut.getAssetsByCity([owner.id]);

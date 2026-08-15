@@ -2027,7 +2027,12 @@ describe(SearchService.name, () => {
       await sut.getAssetsByCity(authStub.user1);
 
       expect(mocks.sharedSpace.getSpaceIdsForTimeline).toHaveBeenCalledWith(authStub.user1.user.id);
-      expect(mocks.search.getAssetsByCity).toHaveBeenCalledWith([authStub.user1.user.id], [spaceId]);
+      // #763 threads the caller as a third argument so the row can project isFavoriteForUser.
+      expect(mocks.search.getAssetsByCity).toHaveBeenCalledWith(
+        [authStub.user1.user.id],
+        [spaceId],
+        authStub.user1.user.id,
+      );
     });
   });
 

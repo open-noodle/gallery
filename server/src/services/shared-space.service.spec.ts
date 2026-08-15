@@ -13054,19 +13054,19 @@ describe(SharedSpaceService.name, () => {
           isFavorite: true,
           spacePersonIds: ['space-person-1'],
           forceEmptyResult: false,
-          // ...but the QUERY still must NOT widen to shared-space assets — see below.
-          timelineSpaceIds: undefined,
+          // #763: the query widens too — see below.
+          timelineSpaceIds: [spaceId],
         }),
       );
     });
 
-    // The other half of the same fix: a favourite is the ASSET OWNER'S flag, so widening a
-    // favorites query to shared-space assets would pin other members' favourites on the caller's
-    // favourites map (timeline.service.ts:158-168 rejects the same combination outright rather than
-    // answer it). timelineSpaceIds is therefore computed for the person-token consumer but NOT
-    // forwarded to the marker query, which stays owner-scoped (searchAssetBuilder database.ts:688
-    // only widens when timelineSpaceIds AND userIds are both set).
-    it('does not widen a favorites query to shared-space assets even when a scoped token forced timelineSpaceIds to be resolved', async () => {
+    // #763 inverted the other half of this fix. A favourite used to be the ASSET OWNER'S flag, so
+    // widening a favorites query to shared-space assets would have pinned other members' favourites
+    // on the caller's map — timelineSpaceIds was computed for the person-token consumer but withheld
+    // from the marker query. The overlay makes the favourite predicate per-CALLER (asset_favorite
+    // resolved for authUserId), so a space asset only pins when *I* favourited it, and withholding
+    // the scope now just hides my own favourites inside my spaces.
+    it('widens a favorites query to shared-space assets — the overlay predicate is the caller\'s (#763)', async () => {
       const auth = factory.auth();
       const spaceId = newUuid();
       mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId }]);
@@ -13086,11 +13086,16 @@ describe(SharedSpaceService.name, () => {
 
       const args = mocks.sharedSpace.getFilteredMapMarkers.mock.calls[0][0];
       expect(args.userIds).toEqual([auth.user.id]);
-      expect(args.timelineSpaceIds).toBeUndefined();
+      expect(args.timelineSpaceIds).toEqual([spaceId]);
+      expect(args.authUserId).toBe(auth.user.id);
     });
 
-    it('does not resolve timelineSpaceIds for a favorites query whose person filter carries no scoped token', async () => {
+    // #763: a favorites query resolves timelineSpaceIds like any other withSharedSpaces query now —
+    // it is the widening consumer in its own right, not just the person-token one. Only the scoped
+    // TOKEN resolution stays conditional on a scoped token actually being present.
+    it('resolves timelineSpaceIds for a favorites query whose person filter carries no scoped token', async () => {
       const auth = factory.auth();
+      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
       mocks.sharedSpace.getFilteredMapMarkers.mockResolvedValue([]);
 
       await sut.getFilteredMapMarkers(auth, {
@@ -13099,7 +13104,7 @@ describe(SharedSpaceService.name, () => {
         personIds: ['ffffffff-ffff-4fff-bfff-ffffffffffff'],
       });
 
-      expect(mocks.sharedSpace.getSpaceIdsForTimeline).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.getSpaceIdsForTimeline).toHaveBeenCalledWith(auth.user.id);
       expect(mocks.faceIdentity.resolveScopedPersonTokens).not.toHaveBeenCalled();
     });
 

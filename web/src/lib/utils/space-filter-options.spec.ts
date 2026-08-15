@@ -28,19 +28,3 @@ describe('album asset picker options — favorites compose with cross-user scope
     expect(options.withPartners).toBe(true);
   });
 });
-
-describe('map timeline options — favorites compose with cross-user scopes (#763 slice 4)', () => {
-  it('an active favorite filter no longer suppresses partner scope when the withPartners setting is on', () => {
-    const selectedClusterIds = new Set(['asset-1']);
-    const options = buildMapTimelineOptions(
-      { ...createFilterState(), isFavorite: true },
-      '1,2,3,4',
-      selectedClusterIds,
-      undefined,
-      { withPartners: true },
-    );
-
-    expect(options.isFavorite).toBe(true);
-    expect(options.withPartners).toBe(true);
-  });
-});

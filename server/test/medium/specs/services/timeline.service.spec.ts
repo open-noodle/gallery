@@ -81,10 +81,21 @@ const createPhotosAlbumFixture = async (ctx: ReturnType<typeof setup>['ctx']) =>
   const { user: carol } = await ctx.newUser(); // in NO space of the viewer's
 
   const myAsset = await createTimelineAsset(ctx, viewer.id, SPACE_DATE);
-  const myFavoriteAsset = await createTimelineAsset(ctx, viewer.id, SPACE_DATE, { isFavorite: true });
+  const myFavoriteAsset = await createTimelineAsset(ctx, viewer.id, SPACE_DATE);
   // Album-only assets of another user: the co-member contributions the D3 bug leaked.
   const carolAsset = await createTimelineAsset(ctx, carol.id, SPACE_DATE);
-  const carolFavoriteAsset = await createTimelineAsset(ctx, carol.id, SPACE_DATE, { isFavorite: true });
+  const carolFavoriteAsset = await createTimelineAsset(ctx, carol.id, SPACE_DATE);
+
+  // #763: a favourite is an `asset_favorite` row per USER, not `asset.isFavorite` on the asset.
+  // Carol favourites hers, the viewer favourites theirs — which is exactly what the assertion
+  // below distinguishes.
+  await ctx.database
+    .insertInto('asset_favorite')
+    .values([
+      { userId: viewer.id, assetId: myFavoriteAsset.id },
+      { userId: carol.id, assetId: carolFavoriteAsset.id },
+    ])
+    .execute();
 
   const { album } = await ctx.newAlbum({ ownerId: viewer.id }, [
     myAsset.id,
@@ -860,9 +871,9 @@ describe(TimelineService.name, () => {
       const { viewer, album, myFavoriteAsset, carolFavoriteAsset } = await createPhotosAlbumFixture(ctx);
       const auth = factory.auth({ user: viewer });
 
-      // `isFavorite` is the asset OWNER's flag, and /photos drops withPartners/withSharedSpaces for
-      // a favourites query (the server 400s that combination anyway) — so here `userId` is the ONLY
-      // thing standing between me and a co-member's favourites.
+      // #763: `isFavorite` resolves the per-user `asset_favorite` overlay for the CALLER, so a
+      // co-member's favourite on their own asset is not mine. `userId` still scopes the album
+      // query to my own timeline; the overlay is what makes the chip mean "mine".
       const ids = await photosBucketAssetIds(sut, auth, {
         userId: viewer.id,
         albumId: album.id,
