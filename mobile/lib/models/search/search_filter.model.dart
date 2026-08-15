@@ -10,14 +10,20 @@ class SearchLocationFilter {
   String? country;
   String? state;
   String? city;
-  SearchLocationFilter({this.country, this.state, this.city});
+  String? locationPresence;
+  SearchLocationFilter({this.country, this.state, this.city, this.locationPresence});
 
-  SearchLocationFilter copyWith({String? country, String? state, String? city}) {
-    return SearchLocationFilter(country: country ?? this.country, state: state ?? this.state, city: city ?? this.city);
+  SearchLocationFilter copyWith({String? country, String? state, String? city, String? locationPresence}) {
+    return SearchLocationFilter(
+      country: country ?? this.country,
+      state: state ?? this.state,
+      city: city ?? this.city,
+      locationPresence: locationPresence ?? this.locationPresence,
+    );
   }
 
   Map<String, dynamic> toMap() {
-    return <String, dynamic>{'country': country, 'state': state, 'city': city};
+    return <String, dynamic>{'country': country, 'state': state, 'city': city, 'locationPresence': locationPresence};
   }
 
   factory SearchLocationFilter.fromMap(Map<String, dynamic> map) {
@@ -25,6 +31,7 @@ class SearchLocationFilter {
       country: map['country'] != null ? map['country'] as String : null,
       state: map['state'] != null ? map['state'] as String : null,
       city: map['city'] != null ? map['city'] as String : null,
+      locationPresence: map['locationPresence'] != null ? map['locationPresence'] as String : null,
     );
   }
 
@@ -34,7 +41,8 @@ class SearchLocationFilter {
       SearchLocationFilter.fromMap(json.decode(source) as Map<String, dynamic>);
 
   @override
-  String toString() => 'SearchLocationFilter(country: $country, state: $state, city: $city)';
+  String toString() =>
+      'SearchLocationFilter(country: $country, state: $state, city: $city, locationPresence: $locationPresence)';
 
   @override
   bool operator ==(covariant SearchLocationFilter other) {
@@ -42,11 +50,14 @@ class SearchLocationFilter {
       return true;
     }
 
-    return other.country == country && other.state == state && other.city == city;
+    return other.country == country &&
+        other.state == state &&
+        other.city == city &&
+        other.locationPresence == locationPresence;
   }
 
   @override
-  int get hashCode => country.hashCode ^ state.hashCode ^ city.hashCode;
+  int get hashCode => country.hashCode ^ state.hashCode ^ city.hashCode ^ locationPresence.hashCode;
 }
 
 class SearchCameraFilter {
@@ -305,6 +316,7 @@ class SearchFilter {
         location.country == null &&
         location.state == null &&
         location.city == null &&
+        location.locationPresence == null &&
         camera.make == null &&
         camera.model == null &&
         date.takenBefore == null &&
