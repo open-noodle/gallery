@@ -20,6 +20,7 @@ import {
 } from 'src/enum';
 import { StorageBackend } from 'src/interfaces/storage-backend.interface';
 import { ArgOf } from 'src/repositories/event.repository';
+import { LoggingRepository } from 'src/repositories/logging.repository';
 import { BaseService } from 'src/services/base.service';
 import { JobOf, SystemFlags } from 'src/types';
 import { ImmichStartupError } from 'src/utils/misc';
@@ -57,12 +58,20 @@ export class StorageService extends BaseService {
 
   private static warnedKinds = new Set<StorageRoutingKind>();
 
+  // getWriteBackend is static and has no `this.logger`. LoggingRepository.create(context) is the
+  // established seam for logging from a static/free-standing context elsewhere in the codebase
+  // (see plugin.repository.ts, base.service.ts, and the migrations) — it routes through the same
+  // structured JSON logging as instance loggers, unlike a raw console.warn.
+  private static staticLogger = LoggingRepository.create(StorageService.name);
+
   private static warnMissingS3Backend(kind: StorageRoutingKind) {
     if (StorageService.warnedKinds.has(kind)) {
       return;
     }
     StorageService.warnedKinds.add(kind);
-    console.warn(`Storage routing for "${kind}" is set to s3 but no S3 backend is configured; writing to disk.`);
+    StorageService.staticLogger.warn(
+      `Storage routing for "${kind}" is set to s3 but no S3 backend is configured; writing to disk.`,
+    );
   }
 
   static resolveBackendForKey(key: string): StorageBackend {

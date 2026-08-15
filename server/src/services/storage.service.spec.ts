@@ -551,6 +551,9 @@ describe(StorageService.name, () => {
 
     afterEach(() => {
       (StorageService as any).writeBackendType = previousWriteBackendType;
+      // vitest.config.mjs sets no restoreMocks and there are no setupFiles, so a
+      // getDiskBackend/getS3Backend spy would leak into every later test in this file.
+      vi.restoreAllMocks();
     });
 
     it('should route a kind pinned to disk to the disk backend even when the env is s3', () => {
