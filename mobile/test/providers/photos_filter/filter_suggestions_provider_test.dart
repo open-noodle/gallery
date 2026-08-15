@@ -244,6 +244,52 @@ void main() {
       ).called(1);
     });
 
+    test('forwards locationPresence to getFilterSuggestions', () async {
+      when(
+        () => mockSearchApi.getFilterSuggestions(
+          city: any(named: 'city'),
+          country: any(named: 'country'),
+          locationPresence: any(named: 'locationPresence'),
+          isFavorite: any(named: 'isFavorite'),
+          make: any(named: 'make'),
+          mediaType: any(named: 'mediaType'),
+          model: any(named: 'model'),
+          personIds: any(named: 'personIds'),
+          rating: any(named: 'rating'),
+          spaceId: any(named: 'spaceId'),
+          tagIds: any(named: 'tagIds'),
+          takenAfter: any(named: 'takenAfter'),
+          takenBefore: any(named: 'takenBefore'),
+          withSharedSpaces: any(named: 'withSharedSpaces'),
+        ),
+      ).thenAnswer(
+        (_) async =>
+            FilterSuggestionsResponseDto(hasUnnamedPeople: false, hasNoGpsAssets: false, hasNoPlaceNameAssets: false),
+      );
+
+      final filter = SearchFilter.empty().copyWith(location: SearchLocationFilter(locationPresence: 'noPlaceName'));
+
+      await container.read(photosFilterSuggestionsProvider(filter).future);
+
+      verify(
+        () => mockSearchApi.getFilterSuggestions(
+          city: null,
+          country: null,
+          locationPresence: 'noPlaceName',
+          isFavorite: null,
+          make: null,
+          mediaType: null,
+          model: null,
+          personIds: null,
+          rating: null,
+          tagIds: null,
+          takenAfter: null,
+          takenBefore: null,
+          withSharedSpaces: true,
+        ),
+      ).called(1);
+    });
+
     test('maps AssetType.other to null mediaType (unconstrained)', () async {
       when(
         () => mockSearchApi.getFilterSuggestions(
