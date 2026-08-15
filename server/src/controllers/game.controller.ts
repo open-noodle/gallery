@@ -1,5 +1,6 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Next, Param, Post, Res } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { NextFunction, Response } from 'express';
 import { Endpoint, HistoryBuilder } from 'src/decorators';
 import { AuthDto } from 'src/dtos/auth.dto';
 import {
@@ -14,14 +15,21 @@ import {
   GameSpaceParamDto,
 } from 'src/dtos/game.dto';
 import { ApiTag, Permission } from 'src/enum';
-import { Auth, Authenticated } from 'src/middleware/auth.guard';
+import { Auth, Authenticated, FileResponse } from 'src/middleware/auth.guard';
+import { LoggingRepository } from 'src/repositories/logging.repository';
 import { GameService } from 'src/services/game.service';
+import { sendFile } from 'src/utils/file';
 import { UUIDParamDto } from 'src/validation';
 
 @ApiTags(ApiTag.Games)
 @Controller()
 export class GameController {
-  constructor(private service: GameService) {}
+  constructor(
+    private service: GameService,
+    private logger: LoggingRepository,
+  ) {
+    this.logger.setContext(GameController.name);
+  }
 
   @Post('shared-spaces/:spaceId/games')
   @Authenticated({ permission: Permission.SharedSpaceUpdate })
@@ -76,6 +84,24 @@ export class GameController {
     @Body() dto: GameGuessDto,
   ): Promise<GameGuessResponseDto> {
     return this.service.guess(auth, id, index, dto);
+  }
+
+  @Get('games/:id/rounds/:index/image')
+  @FileResponse()
+  @Authenticated({ permission: Permission.SharedSpaceRead })
+  @Endpoint({
+    summary: 'Get a round image',
+    description:
+      "Serve a round's photo as a generic, EXIF-free preview keyed by (challenge, round index). Never discloses the underlying asset id or original filename.",
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  async getRoundImage(
+    @Auth() auth: AuthDto,
+    @Param() { id, index }: GameRoundParamDto,
+    @Res() res: Response,
+    @Next() next: NextFunction,
+  ): Promise<void> {
+    await sendFile(res, next, () => this.service.getRoundImage(auth, id, index), this.logger);
   }
 
   @Get('games/:id/leaderboard')

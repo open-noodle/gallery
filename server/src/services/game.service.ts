@@ -18,22 +18,24 @@ import {
   GameLeaderboardResponseDto,
   GameRoundDetailResponseDto,
 } from 'src/dtos/game.dto';
-import { SharedSpaceRole } from 'src/enum';
+import { AssetFileType, CacheControl, SharedSpaceRole } from 'src/enum';
 import { GameChallengeRow, GameGuessRow, GameRoundRow } from 'src/repositories/game.repository';
 import { GameChallengeTable } from 'src/schema/tables/game-challenge.table';
 import { GameGuessTable } from 'src/schema/tables/game-guess.table';
 import { GameRoundTable, GameRoundType } from 'src/schema/tables/game-round.table';
 import { BaseService } from 'src/services/base.service';
+import { getFilenameExtension, ImmichFileResponse } from 'src/utils/file';
 import {
   GameCandidate,
-  LatLon,
   haversineKm,
+  LatLon,
   mulberry32,
   poolScaleDays,
   poolScaleKm,
   scoreFromError,
   selectLocationRounds,
 } from 'src/utils/game-scoring';
+import { mimeTypes } from 'src/utils/mime-types';
 import { hasSharedSpaceRole } from 'src/utils/shared-space-role';
 
 /** Location rounds fill up to this fraction of the requested round count; the rest are date
@@ -317,6 +319,48 @@ export class GameService extends BaseService {
       }
       throw error;
     }
+  }
+
+  /**
+   * The only path by which a round's photo ever reaches a client. Keyed by `(challengeId,
+   * index)` - the asset id never appears in the request, so a client cannot pivot from a round
+   * straight to `/api/assets/:id`. Serves the asset's existing **preview** derivative (already
+   * re-encoded, EXIF-stripped by the thumbnail generator) under a generic `round-<index>`
+   * filename; the original file and the real filename are never touched here. Membership only
+   * (any role), like `get`/`guess`/`leaderboard` - a viewer can view every round's image.
+   */
+  async getRoundImage(auth: AuthDto, challengeId: string, index: number): Promise<ImmichFileResponse> {
+    const challenge = await this.loadChallenge(challengeId);
+    await this.requireMember(challenge.spaceId, auth.user.id);
+
+    const round = await this.gameRepository.getRound(challengeId, index);
+    if (!round) {
+      throw new BadRequestException('Round not found');
+    }
+
+    // The asset backing this round was deleted after the challenge was created - fail cleanly
+    // rather than querying assetRepository.getById with a null id.
+    if (!round.assetId) {
+      throw new NotFoundException('Round image not available');
+    }
+
+    const asset = await this.assetRepository.getById(round.assetId, { files: true });
+    const previewFile = asset?.files?.find((file) => file.type === AssetFileType.Preview);
+    if (!previewFile) {
+      throw new NotFoundException('Round image not available');
+    }
+
+    return new ImmichFileResponse({
+      path: previewFile.path,
+      contentType: mimeTypes.lookup(previewFile.path),
+      // Private, not public: this is membership-gated content, so a shared/CDN cache must never
+      // serve it across sessions. Long browser-side caching is safe within that, though - once a
+      // challenge is created its rounds are frozen (assetId per round never changes), so the same
+      // (challengeId, index) always resolves to the same bytes. Matches the asset thumbnail
+      // endpoint's own choice (AssetMediaService.viewThumbnail) for the same reason.
+      cacheControl: CacheControl.PrivateWithCache,
+      fileName: `round-${index}${getFilenameExtension(previewFile.path)}`,
+    });
   }
 
   async leaderboard(auth: AuthDto, challengeId: string): Promise<GameLeaderboardResponseDto> {
