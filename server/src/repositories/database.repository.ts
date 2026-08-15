@@ -487,6 +487,39 @@ export class DatabaseRepository {
     await sql`SELECT pg_advisory_unlock(${lock})`.execute(connection);
   }
 
+  // gallery-fork: upstream removed this in #30772 as unused on their side. The fork keeps it
+  // because it is the ONLY way to exercise revert against the composite (upstream +
+  // migrations-gallery) provider — `sql-tools`' own revert reads a single directory, so it cannot
+  // cover the fork's interleaved chain. See database-migration.service.spec.ts scenarios D and G.
+  async revertLastMigration(): Promise<string | undefined> {
+    this.logger.debug('Reverting last migration');
+
+    const migrator = this.createMigrator();
+    const { error, results } = await migrator.migrateDown();
+
+    for (const result of results ?? []) {
+      if (result.status === 'Success') {
+        this.logger.log(`Reverted migration "${result.migrationName}"`);
+      } else if (result.status === 'Error') {
+        this.logger.warn(`Failed to revert migration "${result.migrationName}"`);
+      }
+    }
+
+    if (error) {
+      this.logger.error(`Failed to revert migrations: ${error}`);
+      throw error;
+    }
+
+    const reverted = results?.find((result) => result.direction === 'Down' && result.status === 'Success');
+    if (!reverted) {
+      this.logger.debug('No migrations to revert');
+      return undefined;
+    }
+
+    this.logger.debug('Finished reverting migration');
+    return reverted.migrationName;
+  }
+
   private createMigrator(): Migrator {
     return new Migrator({
       db: this.db,
