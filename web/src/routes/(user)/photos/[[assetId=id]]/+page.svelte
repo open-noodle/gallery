@@ -187,6 +187,7 @@
       country: nextFilters.country,
       state: nextFilters.state,
       city: nextFilters.city,
+      locationPresence: nextFilters.locationPresence,
       make: nextFilters.make,
       model: nextFilters.model,
       lensModel: nextFilters.lensModel,
