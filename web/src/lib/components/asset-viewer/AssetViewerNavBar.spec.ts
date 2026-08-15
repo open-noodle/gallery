@@ -146,10 +146,15 @@ describe('AssetViewerNavBar component', () => {
         id: 'space-photo',
         ownerId: 'space-owner',
         isTrashed: false,
-        // Pinned: the factory's default `type` is a random AssetTypeEnum value, which made this
-        // test flaky (canEditImage/canEditVideo both gate on `asset.type`, so a random Video draw
-        // failed W-1 nondeterministically — a brief defect, not a production bug).
+        // Both fields below are pinned because the factory draws them randomly, and
+        // canEditImage/canEditVideo (`asset.service.ts:290-296`) gate on both: the default `type`
+        // is a random AssetTypeEnum value, which made this test flaky (a random Video draw failed
+        // W-1 nondeterministically); the default `originalPath` is `faker.system.filePath()`,
+        // which occasionally draws a `.gif`/`.svg`/`.insp` extension that canEditImage rejects —
+        // roughly 1 run in 70. Neither is a production bug; both are pinned to keep this test
+        // deterministic.
         type: AssetTypeEnum.Image,
+        originalPath: '/photos/photo.jpg',
         canEdit,
       });
 

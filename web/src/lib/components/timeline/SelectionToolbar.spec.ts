@@ -351,7 +351,7 @@ describe('SelectionToolbar — #734 editable-subset resolution', () => {
     expect(getEditableAssets).not.toHaveBeenCalled();
   });
 
-  it('a mixed selection renders Rotate disabled-pending, then shows it once the resolved subset is non-empty — Archive never appears', async () => {
+  it('a mixed selection hides Rotate until the resolved subset is non-empty, then shows it — Archive never appears', async () => {
     vi.mocked(getEditableAssets).mockResolvedValue({ editableAssetIds: ['mine', 'theirs'] });
 
     renderToolbar({
