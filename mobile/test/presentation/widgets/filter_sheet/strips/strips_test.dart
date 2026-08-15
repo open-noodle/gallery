@@ -77,6 +77,8 @@ FilterSuggestionsResponseDto _suggestions({
   hasFavorites: true,
   hasAssetsInAlbum: true,
   hasAssetsNotInAlbum: true,
+  hasNoGpsAssets: false,
+  hasNoPlaceNameAssets: false,
   people: people,
   tags: tags,
   countries: countries,

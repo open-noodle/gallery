@@ -114,6 +114,8 @@ void main() {
         hasFavorites: false,
         hasAssetsInAlbum: false,
         hasAssetsNotInAlbum: false,
+        hasNoGpsAssets: false,
+        hasNoPlaceNameAssets: false,
         tags: [FilterSuggestionsTagDto(id: 't1', value: 'wedding')],
       );
       final chips = activeChipsFromFilter(f, suggestions: suggestions);
@@ -282,6 +284,8 @@ void main() {
         hasFavorites: false,
         hasAssetsInAlbum: false,
         hasAssetsNotInAlbum: false,
+        hasNoGpsAssets: false,
+        hasNoPlaceNameAssets: false,
       ); // no people field
       final chips = activeChipsFromFilter(f, suggestions: suggestions);
       expect(chips.single.label, 'Alice');
