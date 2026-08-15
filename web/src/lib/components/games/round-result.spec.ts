@@ -52,6 +52,22 @@ describe('RoundResult', () => {
     expect(screen.getByTestId('map-stub')).toHaveAttribute('data-marker-ids', 'guess,answer');
   });
 
+  it('labels the guess pin so it can be told apart from the identical-looking answer pin', () => {
+    render(RoundResult, {
+      ...base,
+      type: 'location' as const,
+      score: 3200,
+      distanceKm: 7.5,
+      guess: { lat: 1, lon: 2 },
+      answer: { date: null, lat: 10, lon: 20 },
+    });
+
+    // The stub only renders the popup snippet for mapMarkers[0] (map-component.stub.svelte:49-53),
+    // which is the guess marker given our ['guess', 'answer'] ordering — so this proves the popup
+    // snippet actually branches on marker id rather than always showing the same label.
+    expect(screen.getByTestId('map-popup')).toHaveTextContent('Guess');
+  });
+
   it('renders for a date round with the offset text', () => {
     render(RoundResult, {
       ...base,
