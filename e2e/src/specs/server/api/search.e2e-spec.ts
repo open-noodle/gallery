@@ -830,24 +830,31 @@ describe('/search', () => {
     });
 
     it('should filter buckets by locationPresence=noGps', async () => {
-      // Every asset in this describe's fixture gets a lat/long via updateAsset in the outer
-      // beforeAll (see the `coordinates` array — one entry per asset, none left unset), so
-      // noGps (no asset_exif row, or latitude IS NULL) matches nothing in this fixture. That is
-      // the point of the assertion: if locationPresence were dropped anywhere between the DTO,
-      // the service and the repository, this would silently return the same non-zero count as
-      // the unfiltered baseline instead of zero.
+      // Every asset in THIS describe's fixture gets a lat/long via updateAsset in the outer
+      // beforeAll (the `coordinates` array — one entry per asset, none left unset), so noGps
+      // must exclude all of them. It cannot assert an empty result, though: other describes in
+      // this file create admin-owned assets with no coordinates (e.g. :386, :404-409), and they
+      // share one database, so noGps legitimately matches those.
+      //
+      // Comparing against the unfiltered baseline is what makes this falsifiable: if
+      // locationPresence were dropped anywhere between the DTO, the service and the repository,
+      // the filtered total would come back EQUAL to the unfiltered one rather than smaller.
       const { status, body } = await request(app)
         .get('/timeline/buckets?locationPresence=noGps')
         .set('Authorization', `Bearer ${admin.accessToken}`);
       expect(status).toBe(200);
       expect(Array.isArray(body)).toBe(true);
-      expect(body).toHaveLength(0);
 
       const { body: allBuckets } = await request(app)
         .get('/timeline/buckets')
         .set('Authorization', `Bearer ${admin.accessToken}`);
-      const totalAll = allBuckets.reduce((sum: number, b: { count: number }) => sum + b.count, 0);
+
+      const sum = (buckets: { count: number }[]) => buckets.reduce((total, b) => total + b.count, 0);
+      const totalFiltered = sum(body);
+      const totalAll = sum(allBuckets);
+
       expect(totalAll).toBeGreaterThan(0);
+      expect(totalFiltered).toBeLessThan(totalAll);
     });
 
     it('should return zero when combined filters match no assets', async () => {
