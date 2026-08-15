@@ -200,7 +200,7 @@ describe(GameService.name, () => {
       } as any);
       mocks.game.createGuess.mockImplementation((guess: any) => guess);
 
-      const result = await sut.guess(authStub, 'challenge-1', 1, { date: new Date(2020, 6, 1).toISOString() });
+      const result = await sut.guess(authStub, 'challenge-1', 1, { date: new Date(2020, 6, 1) });
 
       expect(result.score).toBe(5000);
       expect(result.offsetDays).toBe(0);
@@ -221,7 +221,7 @@ describe(GameService.name, () => {
       } as any);
       mocks.game.createGuess.mockImplementation((guess: any) => guess);
 
-      const result = await sut.guess(authStub, 'challenge-1', 1, { date: new Date(2020, 6, 1).toISOString() });
+      const result = await sut.guess(authStub, 'challenge-1', 1, { date: new Date(2020, 6, 1) });
 
       expect(result.score).toBe(5000);
       expect(result.offsetDays).toBe(0);
@@ -283,6 +283,63 @@ describe(GameService.name, () => {
       expect(result.rounds[0].answer).toBeDefined();
       expect(result.rounds[1].answer).toBeUndefined();
       expect(JSON.stringify(result.rounds[1])).not.toContain('asset-2');
+    });
+  });
+
+  describe('list', () => {
+    it('rejects a caller who is not a member of the space', async () => {
+      mocks.sharedSpace.getMember.mockResolvedValue(void 0);
+      await expect(sut.list(authStub, 'space-1')).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('returns an empty list for a space with no challenges', async () => {
+      mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Viewer } as any);
+      mocks.game.getChallengesForSpace.mockResolvedValue([]);
+
+      const result = await sut.list(authStub, 'space-1');
+
+      expect(result).toEqual([]);
+    });
+
+    it("annotates each challenge with the caller's own progress, not another member's", async () => {
+      mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Viewer } as any);
+      mocks.game.getChallengesForSpace.mockResolvedValue([
+        {
+          id: 'challenge-1',
+          spaceId: 'space-1',
+          name: 'Challenge 1',
+          roundCount: 5,
+          scaleKm: 100,
+          scaleDays: 30,
+          createdAt: new Date(2024, 0, 1),
+          closedAt: null,
+        },
+        {
+          id: 'challenge-2',
+          spaceId: 'space-1',
+          name: 'Challenge 2',
+          roundCount: 3,
+          scaleKm: 200,
+          scaleDays: 10,
+          createdAt: new Date(2024, 1, 1),
+          closedAt: null,
+        },
+      ] as any);
+      mocks.game.getGuessesForUser.mockImplementation((challengeId: unknown) => {
+        if (challengeId === 'challenge-1') {
+          return Promise.resolve([{ score: 4000 }, { score: 3000 }] as any);
+        }
+        return Promise.resolve([]);
+      });
+
+      const result = await sut.list(authStub, 'space-1');
+
+      expect(result).toEqual([
+        expect.objectContaining({ id: 'challenge-1', answered: 2, total: 7000 }),
+        expect.objectContaining({ id: 'challenge-2', answered: 0, total: 0 }),
+      ]);
+      expect(mocks.game.getGuessesForUser).toHaveBeenCalledWith('challenge-1', authStub.user.id);
+      expect(mocks.game.getGuessesForUser).toHaveBeenCalledWith('challenge-2', authStub.user.id);
     });
   });
 });
