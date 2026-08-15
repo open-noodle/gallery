@@ -20,6 +20,7 @@ class SmartSearchFacetsDto {
     this.isInAlbum = const Optional.absent(),
     this.isNotInAlbum = const Optional.absent(),
     this.language = const Optional.absent(),
+    this.locationPresence = const Optional.absent(),
     this.make = const Optional.absent(),
     this.model = const Optional.absent(),
     this.personIds = const Optional.present(const []),
@@ -79,6 +80,9 @@ class SmartSearchFacetsDto {
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
   Optional<String?> language;
+
+  /// Filter for assets with no location: noGps (no coordinates) or noPlaceName (coordinates the geocoder could not name). Cannot be combined with city, state or country.
+  Optional<SmartSearchFacetsDtoLocationPresenceEnum?> locationPresence;
 
   /// Filter by camera make
   Optional<String?> make;
@@ -172,6 +176,7 @@ class SmartSearchFacetsDto {
     other.isInAlbum == isInAlbum &&
     other.isNotInAlbum == isNotInAlbum &&
     other.language == language &&
+    other.locationPresence == locationPresence &&
     other.make == make &&
     other.model == model &&
     _deepEquality.equals(other.personIds, personIds) &&
@@ -196,6 +201,7 @@ class SmartSearchFacetsDto {
     (isInAlbum == null ? 0 : isInAlbum!.hashCode) +
     (isNotInAlbum == null ? 0 : isNotInAlbum!.hashCode) +
     (language == null ? 0 : language!.hashCode) +
+    (locationPresence == null ? 0 : locationPresence!.hashCode) +
     (make == null ? 0 : make!.hashCode) +
     (model == null ? 0 : model!.hashCode) +
     (personIds.hashCode) +
@@ -211,7 +217,7 @@ class SmartSearchFacetsDto {
     (withSharedSpaces == null ? 0 : withSharedSpaces!.hashCode);
 
   @override
-  String toString() => 'SmartSearchFacetsDto[albumIds=$albumIds, city=$city, country=$country, isFavorite=$isFavorite, isInAlbum=$isInAlbum, isNotInAlbum=$isNotInAlbum, language=$language, make=$make, model=$model, personIds=$personIds, query=$query, queryAssetId=$queryAssetId, rating=$rating, spaceId=$spaceId, spacePersonIds=$spacePersonIds, tagIds=$tagIds, takenAfter=$takenAfter, takenBefore=$takenBefore, type=$type, withSharedSpaces=$withSharedSpaces]';
+  String toString() => 'SmartSearchFacetsDto[albumIds=$albumIds, city=$city, country=$country, isFavorite=$isFavorite, isInAlbum=$isInAlbum, isNotInAlbum=$isNotInAlbum, language=$language, locationPresence=$locationPresence, make=$make, model=$model, personIds=$personIds, query=$query, queryAssetId=$queryAssetId, rating=$rating, spaceId=$spaceId, spacePersonIds=$spacePersonIds, tagIds=$tagIds, takenAfter=$takenAfter, takenBefore=$takenBefore, type=$type, withSharedSpaces=$withSharedSpaces]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -242,6 +248,10 @@ class SmartSearchFacetsDto {
     if (this.language.isPresent) {
       final value = this.language.value;
       json[r'language'] = value;
+    }
+    if (this.locationPresence.isPresent) {
+      final value = this.locationPresence.value;
+      json[r'locationPresence'] = value;
     }
     if (this.make.isPresent) {
       final value = this.make.value;
@@ -320,6 +330,7 @@ class SmartSearchFacetsDto {
         isInAlbum: json.containsKey(r'isInAlbum') ? Optional.present(mapValueOfType<bool>(json, r'isInAlbum')) : const Optional.absent(),
         isNotInAlbum: json.containsKey(r'isNotInAlbum') ? Optional.present(mapValueOfType<bool>(json, r'isNotInAlbum')) : const Optional.absent(),
         language: json.containsKey(r'language') ? Optional.present(mapValueOfType<String>(json, r'language')) : const Optional.absent(),
+        locationPresence: json.containsKey(r'locationPresence') ? Optional.present(SmartSearchFacetsDtoLocationPresenceEnum.fromJson(json[r'locationPresence'])) : const Optional.absent(),
         make: json.containsKey(r'make') ? Optional.present(mapValueOfType<String>(json, r'make')) : const Optional.absent(),
         model: json.containsKey(r'model') ? Optional.present(mapValueOfType<String>(json, r'model')) : const Optional.absent(),
         personIds: json.containsKey(r'personIds') ? Optional.present(json[r'personIds'] is Iterable
@@ -388,4 +399,82 @@ class SmartSearchFacetsDto {
   static const requiredKeys = <String>{
   };
 }
+
+/// Filter for assets with no location: noGps (no coordinates) or noPlaceName (coordinates the geocoder could not name). Cannot be combined with city, state or country.
+enum SmartSearchFacetsDtoLocationPresenceEnum {
+  noGps._(r'noGps'),
+  noPlaceName._(r'noPlaceName'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const SmartSearchFacetsDtoLocationPresenceEnum._(this._value);
+
+  /// The underlying value of this enum member.
+  final String _value;
+
+  @override
+  String toString() => _value;
+
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
+
+  /// Returns the instance of [SmartSearchFacetsDtoLocationPresenceEnum] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
+  static SmartSearchFacetsDtoLocationPresenceEnum? fromJson(dynamic value) => SmartSearchFacetsDtoLocationPresenceEnumTypeTransformer().decode(value);
+
+  /// Returns a [List] containing instances of [SmartSearchFacetsDtoLocationPresenceEnum]
+  /// that were successfully decoded from the passed [JSON][json].
+  static List<SmartSearchFacetsDtoLocationPresenceEnum> listFromJson(dynamic json, {bool growable = false,}) {
+    final result = <SmartSearchFacetsDtoLocationPresenceEnum>[];
+    if (json is List && json.isNotEmpty) {
+      for (final row in json) {
+        final value = SmartSearchFacetsDtoLocationPresenceEnum.fromJson(row);
+        if (value != null) {
+          result.add(value);
+        }
+      }
+    }
+    return result.toList(growable: growable);
+  }
+}
+
+/// Transformation class that can [encode] an instance of [SmartSearchFacetsDtoLocationPresenceEnum] to Optional<String?>,
+/// and [decode] dynamic data back to [SmartSearchFacetsDtoLocationPresenceEnum].
+class SmartSearchFacetsDtoLocationPresenceEnumTypeTransformer {
+  factory SmartSearchFacetsDtoLocationPresenceEnumTypeTransformer() => _instance ??= const SmartSearchFacetsDtoLocationPresenceEnumTypeTransformer._();
+
+  const SmartSearchFacetsDtoLocationPresenceEnumTypeTransformer._();
+
+  String encode(SmartSearchFacetsDtoLocationPresenceEnum data) => data._value;
+
+  /// Returns the instance of [SmartSearchFacetsDtoLocationPresenceEnum] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
+  ///
+  /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
+  /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
+  /// cannot be decoded successfully, then an [UnimplementedError] is thrown.
+  ///
+  /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
+  /// and users are still using an old app with the old code.
+  SmartSearchFacetsDtoLocationPresenceEnum? decode(dynamic data, {bool allowNull = true}) {
+    if (data is SmartSearchFacetsDtoLocationPresenceEnum) {
+      return data;
+    }
+    if (data != null) {
+      switch (data) {
+        case r'noGps': return SmartSearchFacetsDtoLocationPresenceEnum.noGps;
+        case r'noPlaceName': return SmartSearchFacetsDtoLocationPresenceEnum.noPlaceName;
+        default:
+          if (!allowNull) {
+            throw ArgumentError('Unknown enum value to decode: $data');
+          }
+      }
+    }
+    return null;
+  }
+
+  /// The singleton instance of this transformer.
+  static SmartSearchFacetsDtoLocationPresenceEnumTypeTransformer? _instance;
+}
+
 

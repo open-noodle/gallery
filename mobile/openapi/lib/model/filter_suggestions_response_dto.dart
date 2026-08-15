@@ -18,6 +18,8 @@ class FilterSuggestionsResponseDto {
     required this.hasAssetsInAlbum,
     required this.hasAssetsNotInAlbum,
     required this.hasFavorites,
+    required this.hasNoGpsAssets,
+    required this.hasNoPlaceNameAssets,
     required this.hasUnnamedPeople,
     this.mediaTypes = const [],
     this.people = const [],
@@ -39,6 +41,11 @@ class FilterSuggestionsResponseDto {
 
   /// Whether any favourite exists in the filtered set, ignoring isFavorite
   bool hasFavorites;
+  /// Whether assets without coordinates exist in the filtered set
+  bool hasNoGpsAssets;
+
+  /// Whether assets with coordinates but no place name exist in the filtered set
+  bool hasNoPlaceNameAssets;
 
   /// Whether unnamed people exist in the filtered set
   bool hasUnnamedPeople;
@@ -62,6 +69,8 @@ class FilterSuggestionsResponseDto {
     other.hasAssetsInAlbum == hasAssetsInAlbum &&
     other.hasAssetsNotInAlbum == hasAssetsNotInAlbum &&
     other.hasFavorites == hasFavorites &&
+    other.hasNoGpsAssets == hasNoGpsAssets &&
+    other.hasNoPlaceNameAssets == hasNoPlaceNameAssets &&
     other.hasUnnamedPeople == hasUnnamedPeople &&
     _deepEquality.equals(other.mediaTypes, mediaTypes) &&
     _deepEquality.equals(other.people, people) &&
@@ -76,6 +85,8 @@ class FilterSuggestionsResponseDto {
     (hasAssetsInAlbum.hashCode) +
     (hasAssetsNotInAlbum.hashCode) +
     (hasFavorites.hashCode) +
+    (hasNoGpsAssets.hashCode) +
+    (hasNoPlaceNameAssets.hashCode) +
     (hasUnnamedPeople.hashCode) +
     (mediaTypes.hashCode) +
     (people.hashCode) +
@@ -83,7 +94,7 @@ class FilterSuggestionsResponseDto {
     (tags.hashCode);
 
   @override
-  String toString() => 'FilterSuggestionsResponseDto[cameraMakes=$cameraMakes, countries=$countries, hasAssetsInAlbum=$hasAssetsInAlbum, hasAssetsNotInAlbum=$hasAssetsNotInAlbum, hasFavorites=$hasFavorites, hasUnnamedPeople=$hasUnnamedPeople, mediaTypes=$mediaTypes, people=$people, ratings=$ratings, tags=$tags]';
+  String toString() => 'FilterSuggestionsResponseDto[cameraMakes=$cameraMakes, countries=$countries, hasAssetsInAlbum=$hasAssetsInAlbum, hasAssetsNotInAlbum=$hasAssetsNotInAlbum, hasFavorites=$hasFavorites, hasNoGpsAssets=$hasNoGpsAssets, hasNoPlaceNameAssets=$hasNoPlaceNameAssets, hasUnnamedPeople=$hasUnnamedPeople, mediaTypes=$mediaTypes, people=$people, ratings=$ratings, tags=$tags]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -92,6 +103,8 @@ class FilterSuggestionsResponseDto {
       json[r'hasAssetsInAlbum'] = this.hasAssetsInAlbum;
       json[r'hasAssetsNotInAlbum'] = this.hasAssetsNotInAlbum;
       json[r'hasFavorites'] = this.hasFavorites;
+      json[r'hasNoGpsAssets'] = this.hasNoGpsAssets;
+      json[r'hasNoPlaceNameAssets'] = this.hasNoPlaceNameAssets;
       json[r'hasUnnamedPeople'] = this.hasUnnamedPeople;
       json[r'mediaTypes'] = this.mediaTypes;
       json[r'people'] = this.people;
@@ -118,6 +131,8 @@ class FilterSuggestionsResponseDto {
         hasAssetsInAlbum: mapValueOfType<bool>(json, r'hasAssetsInAlbum')!,
         hasAssetsNotInAlbum: mapValueOfType<bool>(json, r'hasAssetsNotInAlbum')!,
         hasFavorites: mapValueOfType<bool>(json, r'hasFavorites')!,
+        hasNoGpsAssets: mapValueOfType<bool>(json, r'hasNoGpsAssets')!,
+        hasNoPlaceNameAssets: mapValueOfType<bool>(json, r'hasNoPlaceNameAssets')!,
         hasUnnamedPeople: mapValueOfType<bool>(json, r'hasUnnamedPeople')!,
         mediaTypes: json[r'mediaTypes'] is Iterable
             ? (json[r'mediaTypes'] as Iterable).cast<String>().toList(growable: false)
@@ -179,6 +194,8 @@ class FilterSuggestionsResponseDto {
     'hasAssetsInAlbum',
     'hasAssetsNotInAlbum',
     'hasFavorites',
+    'hasNoGpsAssets',
+    'hasNoPlaceNameAssets',
     'hasUnnamedPeople',
     'mediaTypes',
     'people',

@@ -12502,6 +12502,19 @@
             }
           },
           {
+            "name": "locationPresence",
+            "required": false,
+            "in": "query",
+            "description": "Filter for assets with no location: noGps (no coordinates) or noPlaceName (coordinates the geocoder could not name). Cannot be combined with city, state or country.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "noGps",
+                "noPlaceName"
+              ]
+            }
+          },
+          {
             "name": "make",
             "required": false,
             "in": "query",
@@ -13625,6 +13638,19 @@
             "description": "Filter by lens model",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "locationPresence",
+            "required": false,
+            "in": "query",
+            "description": "Filter for assets with no location: noGps (no coordinates) or noPlaceName (coordinates the geocoder could not name). Cannot be combined with city, state or country.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "noGps",
+                "noPlaceName"
+              ]
             }
           },
           {
@@ -20677,6 +20703,19 @@
             }
           },
           {
+            "name": "locationPresence",
+            "required": false,
+            "in": "query",
+            "description": "Filter for assets with no location: noGps (no coordinates) or noPlaceName (coordinates the geocoder could not name). Cannot be combined with city, state or country.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "noGps",
+                "noPlaceName"
+              ]
+            }
+          },
+          {
             "name": "make",
             "required": false,
             "in": "query",
@@ -21104,6 +21143,19 @@
             "description": "Filter by camera lens model",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "locationPresence",
+            "required": false,
+            "in": "query",
+            "description": "Filter for assets with no location: noGps (no coordinates) or noPlaceName (coordinates the geocoder could not name). Cannot be combined with city, state or country.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "noGps",
+                "noPlaceName"
+              ]
             }
           },
           {
@@ -21539,6 +21591,19 @@
             "description": "Filter by camera lens model",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "locationPresence",
+            "required": false,
+            "in": "query",
+            "description": "Filter for assets with no location: noGps (no coordinates) or noPlaceName (coordinates the geocoder could not name). Cannot be combined with city, state or country.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "noGps",
+                "noPlaceName"
+              ]
             }
           },
           {
@@ -27770,6 +27835,14 @@
             "description": "Whether any favourite exists in the filtered set, ignoring isFavorite",
             "type": "boolean"
           },
+          "hasNoGpsAssets": {
+            "description": "Whether assets without coordinates exist in the filtered set",
+            "type": "boolean"
+          },
+          "hasNoPlaceNameAssets": {
+            "description": "Whether assets with coordinates but no place name exist in the filtered set",
+            "type": "boolean"
+          },
           "hasUnnamedPeople": {
             "description": "Whether unnamed people exist in the filtered set",
             "type": "boolean"
@@ -27809,6 +27882,8 @@
           "hasAssetsInAlbum",
           "hasAssetsNotInAlbum",
           "hasFavorites",
+          "hasNoGpsAssets",
+          "hasNoPlaceNameAssets",
           "hasUnnamedPeople",
           "mediaTypes",
           "people",
@@ -29113,6 +29188,14 @@
             "format": "uuid",
             "nullable": true,
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
+          "locationPresence": {
+            "description": "Filter for assets with no location: noGps (no coordinates) or noPlaceName (coordinates the geocoder could not name). Cannot be combined with city, state or country.",
+            "enum": [
+              "noGps",
+              "noPlaceName"
+            ],
             "type": "string"
           },
           "make": {
@@ -31248,6 +31331,14 @@
             "format": "uuid",
             "nullable": true,
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
+          "locationPresence": {
+            "description": "Filter for assets with no location: noGps (no coordinates) or noPlaceName (coordinates the geocoder could not name). Cannot be combined with city, state or country.",
+            "enum": [
+              "noGps",
+              "noPlaceName"
+            ],
             "type": "string"
           },
           "make": {
@@ -33670,6 +33761,14 @@
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
             "type": "string"
           },
+          "locationPresence": {
+            "description": "Filter for assets with no location: noGps (no coordinates) or noPlaceName (coordinates the geocoder could not name). Cannot be combined with city, state or country.",
+            "enum": [
+              "noGps",
+              "noPlaceName"
+            ],
+            "type": "string"
+          },
           "make": {
             "description": "Filter by camera make",
             "nullable": true,
@@ -33883,6 +33982,14 @@
             "description": "Search language code",
             "type": "string"
           },
+          "locationPresence": {
+            "description": "Filter for assets with no location: noGps (no coordinates) or noPlaceName (coordinates the geocoder could not name). Cannot be combined with city, state or country.",
+            "enum": [
+              "noGps",
+              "noPlaceName"
+            ],
+            "type": "string"
+          },
           "make": {
             "description": "Filter by camera make",
             "nullable": true,
@@ -34031,6 +34138,14 @@
             "description": "Whether any favourite exists in the filtered set, ignoring isFavorite",
             "type": "boolean"
           },
+          "hasNoGpsAssets": {
+            "description": "Whether assets without coordinates exist in the filtered set",
+            "type": "boolean"
+          },
+          "hasNoPlaceNameAssets": {
+            "description": "Whether assets with coordinates but no place name exist in the filtered set",
+            "type": "boolean"
+          },
           "hasUnnamedPeople": {
             "description": "Whether unnamed people exist in the filtered smart-search set",
             "type": "boolean"
@@ -34085,6 +34200,8 @@
           "hasAssetsInAlbum",
           "hasAssetsNotInAlbum",
           "hasFavorites",
+          "hasNoGpsAssets",
+          "hasNoPlaceNameAssets",
           "hasUnnamedPeople",
           "mediaTypes",
           "people",
@@ -34250,6 +34367,14 @@
             "format": "uuid",
             "nullable": true,
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
+          "locationPresence": {
+            "description": "Filter for assets with no location: noGps (no coordinates) or noPlaceName (coordinates the geocoder could not name). Cannot be combined with city, state or country.",
+            "enum": [
+              "noGps",
+              "noPlaceName"
+            ],
             "type": "string"
           },
           "make": {
