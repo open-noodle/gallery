@@ -8,6 +8,16 @@ import {
 import { Insertable } from 'kysely';
 import { PostgresError } from 'postgres';
 import { AuthDto } from 'src/dtos/auth.dto';
+import {
+  GameChallengeDetailResponseDto,
+  GameChallengeListItemResponseDto,
+  GameChallengeResponseDto,
+  GameCreateDto,
+  GameGuessDto,
+  GameGuessResponseDto,
+  GameLeaderboardResponseDto,
+  GameRoundDetailResponseDto,
+} from 'src/dtos/game.dto';
 import { SharedSpaceRole } from 'src/enum';
 import { GameChallengeRow, GameGuessRow, GameRoundRow } from 'src/repositories/game.repository';
 import { GameChallengeTable } from 'src/schema/tables/game-challenge.table';
@@ -25,77 +35,6 @@ import {
   selectLocationRounds,
 } from 'src/utils/game-scoring';
 import { hasSharedSpaceRole } from 'src/utils/shared-space-role';
-
-// Minimal shapes for the service surface this task owns. Task 9 (DTO/controller) formalises these
-// as real class-validator DTOs in src/dtos/game.dto.ts; keep this type in sync with that file once
-// it exists rather than letting the two drift.
-export type GameCreateDto = {
-  name?: string;
-  roundCount: number;
-};
-
-export type GameChallengeResponseDto = {
-  id: string;
-  spaceId: string;
-  name: string;
-  roundCount: number;
-  scaleKm: number;
-  scaleDays: number;
-  createdAt: Date;
-};
-
-export type GameGuessDto = {
-  lat?: number;
-  lon?: number;
-  date?: string;
-};
-
-export type GameGuessResponseDto = {
-  roundId: string;
-  userId: string;
-  guessLat: number | null;
-  guessLon: number | null;
-  guessDate: Date | null;
-  distanceKm: number | null;
-  offsetDays: number | null;
-  score: number;
-};
-
-// The withheld shape for a round the caller has not guessed yet: only `index` and `type`. No
-// coordinates, date, asset id or filename - see `toRoundDetail` below, which is the only place
-// that is allowed to add the rest.
-export type GameRoundDetailDto = {
-  index: number;
-  type: GameRoundType;
-  assetId?: string;
-  score?: number;
-  answer?: {
-    lat: number | null;
-    lon: number | null;
-    date: Date | null;
-  };
-};
-
-export type GameChallengeDetailResponseDto = {
-  id: string;
-  spaceId: string;
-  name: string;
-  roundCount: number;
-  scaleKm: number;
-  scaleDays: number;
-  createdAt: Date;
-  closedAt: Date | null;
-  rounds: GameRoundDetailDto[];
-};
-
-export type GameLeaderboardResponseDto = {
-  entries: {
-    userId: string;
-    name: string;
-    total: number;
-    answered: number;
-  }[];
-};
 
 /** Location rounds fill up to this fraction of the requested round count; the rest are date
  * rounds. See design doc §7.4 - this is what keeps a GPS-poor space playable. */
@@ -161,7 +100,11 @@ export class GameService extends BaseService {
   async create(auth: AuthDto, spaceId: string, dto: GameCreateDto): Promise<GameChallengeResponseDto> {
     await this.requireEditor(spaceId, auth.user.id);
 
-    const requestedRoundCount = dto.roundCount;
+    // GameCreateDto.roundCount has a zod .default(5), but chaining .optional() after .default()
+    // (the codebase's own convention, e.g. SharedSpaceMemberCreateDto.role) keeps the inferred TS
+    // type `number | undefined` - the fallback still has to be applied here, same as dto.role ??
+    // SharedSpaceRole.Viewer in shared-space.service.ts.
+    const requestedRoundCount = dto.roundCount ?? 5;
 
     const [rawLocationPool, rawDatePool, recentlyUsedAssetIds, existingChallenges] = await Promise.all([
       this.gameRepository.getLocationCandidates(spaceId, CANDIDATE_POOL_LIMIT),
@@ -274,6 +217,40 @@ export class GameService extends BaseService {
   }
 
   /**
+   * All of a space's challenges, each annotated with the caller's own progress (rounds answered
+   * and total score so far) - never another member's. Membership only, like `get`/`guess` - a
+   * viewer can see and play every challenge in the space. One `getGuessesForUser` call per
+   * challenge rather than a new aggregate query: the design doc's own numbers put a space at
+   * ~19 challenges in the reference library, so this stays cheap without adding a new
+   * @GenerateSql-decorated repository method for what is otherwise a thin composition of two
+   * calls the service already makes elsewhere (`get`, `leaderboard`).
+   */
+  async list(auth: AuthDto, spaceId: string): Promise<GameChallengeListItemResponseDto[]> {
+    await this.requireMember(spaceId, auth.user.id);
+
+    const challenges = await this.gameRepository.getChallengesForSpace(spaceId);
+    const guessesByChallenge = await Promise.all(
+      challenges.map((challenge) => this.gameRepository.getGuessesForUser(challenge.id, auth.user.id)),
+    );
+
+    return challenges.map((challenge, i) => {
+      const guesses = guessesByChallenge[i];
+      return {
+        id: challenge.id,
+        spaceId: challenge.spaceId,
+        name: challenge.name,
+        roundCount: challenge.roundCount,
+        scaleKm: challenge.scaleKm,
+        scaleDays: challenge.scaleDays,
+        createdAt: challenge.createdAt,
+        closedAt: challenge.closedAt,
+        answered: guesses.length,
+        total: guesses.reduce((sum, guess) => sum + guess.score, 0),
+      };
+    });
+  }
+
+  /**
    * The withheld-answer view of a challenge: `answer`, `score` and `assetId` are present only
    * for rounds the caller has already submitted a guess for. This is the security property of
    * the endpoint, so it lives here in the service rather than being trusted to the client.
@@ -379,7 +356,7 @@ export class GameService extends BaseService {
 
   // The only place allowed to attach `answer`/`score`/`assetId` to a round - and only once a
   // `game_guess` row for this caller proves they already played it.
-  private toRoundDetail(round: GameRoundRow, guess: GameGuessRow | undefined): GameRoundDetailDto {
+  private toRoundDetail(round: GameRoundRow, guess: GameGuessRow | undefined): GameRoundDetailResponseDto {
     if (!guess) {
       return { index: round.index, type: round.type };
     }
@@ -426,7 +403,10 @@ export class GameService extends BaseService {
       throw new BadRequestException('This round has no date answer');
     }
 
-    const guessDate = new Date(dto.date);
+    // Already a Date by construction - GameGuessDto validates and parses `date` at the HTTP
+    // boundary (isoDatetimeToDate), so an unparseable string 400s before ever reaching this code
+    // rather than becoming an Invalid Date that fails the `score integer NOT NULL` column.
+    const guessDate = dto.date;
     // Whole-day count already, by construction (toUtcDayIndex subtracts two day boundaries) -
     // no separate rounding step, so the stored integer offsetDays always agrees with the value
     // actually scored below.
