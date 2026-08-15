@@ -16,6 +16,8 @@ FilterSuggestionsResponseDto emptySuggestions() => FilterSuggestionsResponseDto(
   hasFavorites: false,
   hasAssetsInAlbum: false,
   hasAssetsNotInAlbum: false,
+  hasNoGpsAssets: false,
+  hasNoPlaceNameAssets: false,
 );
 
 void main() {
@@ -140,6 +142,8 @@ void main() {
         hasFavorites: false,
         hasAssetsInAlbum: false,
         hasAssetsNotInAlbum: false,
+        hasNoGpsAssets: false,
+        hasNoPlaceNameAssets: false,
         countries: ['France'],
       );
       when(
