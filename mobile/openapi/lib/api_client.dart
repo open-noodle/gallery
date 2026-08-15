@@ -863,6 +863,12 @@ class ApiClient {
           return StorageMigrationFileTypesDto.fromJson(value);
         case 'StorageMigrationStartDto':
           return StorageMigrationStartDto.fromJson(value);
+        case 'StorageRouting':
+          return StorageRoutingTypeTransformer().decode(value);
+        case 'StorageRoutingStatusDto':
+          return StorageRoutingStatusDto.fromJson(value);
+        case 'StorageRoutingStatusEntryDto':
+          return StorageRoutingStatusEntryDto.fromJson(value);
         case 'SyncAckDeleteDto':
           return SyncAckDeleteDto.fromJson(value);
         case 'SyncAckDto':
@@ -1033,6 +1039,10 @@ class ApiClient {
           return SystemConfigSmtpDto.fromJson(value);
         case 'SystemConfigSmtpTransportDto':
           return SystemConfigSmtpTransportDto.fromJson(value);
+        case 'SystemConfigStorageDto':
+          return SystemConfigStorageDto.fromJson(value);
+        case 'SystemConfigStorageRoutingDto':
+          return SystemConfigStorageRoutingDto.fromJson(value);
         case 'SystemConfigStorageTemplateDto':
           return SystemConfigStorageTemplateDto.fromJson(value);
         case 'SystemConfigStorageUsageDto':

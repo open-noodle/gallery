@@ -150,6 +150,7 @@ const ServerFeaturesSchema = z
     email: z.boolean().describe('Whether email notifications are enabled'),
     ocr: z.boolean().describe('Whether OCR is enabled'),
     realtimeTranscoding: z.boolean().describe('Whether real-time transcoding is enabled'),
+    s3Storage: z.boolean().describe('Whether an S3 storage backend is configured'),
     peopleStatistics: z.boolean().describe('Whether the people face statistics UI is enabled'),
     // Deliberately plain strings, not the SyncRequestType enum: a client must be able to
     // parse a newer server's list without choking on values its own enum doesn't know yet.

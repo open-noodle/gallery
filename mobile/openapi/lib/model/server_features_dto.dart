@@ -26,6 +26,7 @@ class ServerFeaturesDto {
     required this.peopleStatistics,
     required this.realtimeTranscoding,
     required this.reverseGeocoding,
+    required this.s3Storage,
     required this.search,
     required this.sidecar,
     required this.smartSearch,
@@ -73,6 +74,9 @@ class ServerFeaturesDto {
   /// Whether reverse geocoding is enabled
   bool reverseGeocoding;
 
+  /// Whether an S3 storage backend is configured
+  bool s3Storage;
+
   /// Whether search is enabled
   bool search;
 
@@ -106,6 +110,7 @@ class ServerFeaturesDto {
     other.peopleStatistics == peopleStatistics &&
     other.realtimeTranscoding == realtimeTranscoding &&
     other.reverseGeocoding == reverseGeocoding &&
+    other.s3Storage == s3Storage &&
     other.search == search &&
     other.sidecar == sidecar &&
     other.smartSearch == smartSearch &&
@@ -129,6 +134,7 @@ class ServerFeaturesDto {
     (peopleStatistics.hashCode) +
     (realtimeTranscoding.hashCode) +
     (reverseGeocoding.hashCode) +
+    (s3Storage.hashCode) +
     (search.hashCode) +
     (sidecar.hashCode) +
     (smartSearch.hashCode) +
@@ -137,7 +143,7 @@ class ServerFeaturesDto {
     (trash.hashCode);
 
   @override
-  String toString() => 'ServerFeaturesDto[configFile=$configFile, duplicateDetection=$duplicateDetection, email=$email, facialRecognition=$facialRecognition, importFaces=$importFaces, map=$map, oauth=$oauth, oauthAutoLaunch=$oauthAutoLaunch, ocr=$ocr, passwordLogin=$passwordLogin, peopleStatistics=$peopleStatistics, realtimeTranscoding=$realtimeTranscoding, reverseGeocoding=$reverseGeocoding, search=$search, sidecar=$sidecar, smartSearch=$smartSearch, smartSearchHasCutoff=$smartSearchHasCutoff, syncRequestTypes=$syncRequestTypes, trash=$trash]';
+  String toString() => 'ServerFeaturesDto[configFile=$configFile, duplicateDetection=$duplicateDetection, email=$email, facialRecognition=$facialRecognition, importFaces=$importFaces, map=$map, oauth=$oauth, oauthAutoLaunch=$oauthAutoLaunch, ocr=$ocr, passwordLogin=$passwordLogin, peopleStatistics=$peopleStatistics, realtimeTranscoding=$realtimeTranscoding, reverseGeocoding=$reverseGeocoding, s3Storage=$s3Storage, search=$search, sidecar=$sidecar, smartSearch=$smartSearch, smartSearchHasCutoff=$smartSearchHasCutoff, syncRequestTypes=$syncRequestTypes, trash=$trash]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -154,6 +160,7 @@ class ServerFeaturesDto {
       json[r'peopleStatistics'] = this.peopleStatistics;
       json[r'realtimeTranscoding'] = this.realtimeTranscoding;
       json[r'reverseGeocoding'] = this.reverseGeocoding;
+      json[r's3Storage'] = this.s3Storage;
       json[r'search'] = this.search;
       json[r'sidecar'] = this.sidecar;
       json[r'smartSearch'] = this.smartSearch;
@@ -188,6 +195,7 @@ class ServerFeaturesDto {
         peopleStatistics: mapValueOfType<bool>(json, r'peopleStatistics')!,
         realtimeTranscoding: mapValueOfType<bool>(json, r'realtimeTranscoding')!,
         reverseGeocoding: mapValueOfType<bool>(json, r'reverseGeocoding')!,
+        s3Storage: mapValueOfType<bool>(json, r's3Storage')!,
         search: mapValueOfType<bool>(json, r'search')!,
         sidecar: mapValueOfType<bool>(json, r'sidecar')!,
         smartSearch: mapValueOfType<bool>(json, r'smartSearch')!,
@@ -256,6 +264,7 @@ class ServerFeaturesDto {
     'peopleStatistics',
     'realtimeTranscoding',
     'reverseGeocoding',
+    's3Storage',
     'search',
     'sidecar',
     'smartSearch',

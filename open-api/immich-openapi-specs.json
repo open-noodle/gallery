@@ -19278,6 +19278,53 @@
         "x-immich-state": "Alpha"
       }
     },
+    "/storage-migration/routing": {
+      "get": {
+        "description": "Report, per file kind, which backend new files are written to and how many existing files are on the other backend.",
+        "operationId": "getRoutingStatus",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageRoutingStatusDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Get storage routing status",
+        "tags": [
+          "Storage Migration (admin)"
+        ],
+        "x-immich-admin-only": true,
+        "x-immich-history": [
+          {
+            "version": "v3.1.0",
+            "state": "Added"
+          },
+          {
+            "version": "v3.1.0",
+            "state": "Alpha"
+          }
+        ],
+        "x-immich-permission": "job.read",
+        "x-immich-state": "Alpha"
+      }
+    },
     "/storage-migration/start": {
       "post": {
         "description": "Start a storage backend migration job to move files between disk and S3 storage.",
@@ -32072,6 +32119,10 @@
             "description": "Whether reverse geocoding is enabled",
             "type": "boolean"
           },
+          "s3Storage": {
+            "description": "Whether an S3 storage backend is configured",
+            "type": "boolean"
+          },
           "search": {
             "description": "Whether search is enabled",
             "type": "boolean"
@@ -32114,6 +32165,7 @@
           "peopleStatistics",
           "realtimeTranscoding",
           "reverseGeocoding",
+          "s3Storage",
           "search",
           "sidecar",
           "smartSearch",
@@ -34487,6 +34539,57 @@
         ],
         "type": "object"
       },
+      "StorageRouting": {
+        "description": "Storage routing",
+        "enum": [
+          "auto",
+          "disk",
+          "s3"
+        ],
+        "type": "string"
+      },
+      "StorageRoutingStatusDto": {
+        "properties": {
+          "encodedVideo": {
+            "$ref": "#/components/schemas/StorageRoutingStatusEntryDto"
+          },
+          "originals": {
+            "$ref": "#/components/schemas/StorageRoutingStatusEntryDto"
+          },
+          "thumbnails": {
+            "$ref": "#/components/schemas/StorageRoutingStatusEntryDto"
+          }
+        },
+        "required": [
+          "encodedVideo",
+          "originals",
+          "thumbnails"
+        ],
+        "type": "object"
+      },
+      "StorageRoutingStatusEntryDto": {
+        "properties": {
+          "misplacedCount": {
+            "description": "Number of files of this kind currently stored on the other backend",
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
+          },
+          "routedTo": {
+            "description": "The resolved backend new files of this kind are written to",
+            "enum": [
+              "disk",
+              "s3"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "misplacedCount",
+          "routedTo"
+        ],
+        "type": "object"
+      },
       "SyncAckDeleteDto": {
         "properties": {
           "types": {
@@ -36837,6 +36940,9 @@
           "server": {
             "$ref": "#/components/schemas/SystemConfigServerDto"
           },
+          "storage": {
+            "$ref": "#/components/schemas/SystemConfigStorageDto"
+          },
           "storageTemplate": {
             "$ref": "#/components/schemas/SystemConfigStorageTemplateDto"
           },
@@ -36876,6 +36982,7 @@
           "passwordLogin",
           "reverseGeocoding",
           "server",
+          "storage",
           "storageTemplate",
           "storageUsage",
           "templates",
@@ -37768,6 +37875,39 @@
           "port",
           "secure",
           "username"
+        ],
+        "type": "object"
+      },
+      "SystemConfigStorageDto": {
+        "properties": {
+          "routing": {
+            "$ref": "#/components/schemas/SystemConfigStorageRoutingDto"
+          }
+        },
+        "required": [
+          "routing"
+        ],
+        "type": "object"
+      },
+      "SystemConfigStorageRoutingDto": {
+        "properties": {
+          "encodedVideo": {
+            "$ref": "#/components/schemas/StorageRouting",
+            "description": "Where newly written transcoded videos are stored"
+          },
+          "originals": {
+            "$ref": "#/components/schemas/StorageRouting",
+            "description": "Where newly written original files and sidecars are stored"
+          },
+          "thumbnails": {
+            "$ref": "#/components/schemas/StorageRouting",
+            "description": "Where newly written thumbnails, previews, fullsize images, person thumbnails and profile images are stored"
+          }
+        },
+        "required": [
+          "encodedVideo",
+          "originals",
+          "thumbnails"
         ],
         "type": "object"
       },

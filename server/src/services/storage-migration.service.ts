@@ -143,6 +143,24 @@ export class StorageMigrationService extends BaseService {
     return { isActive, ...counts };
   }
 
+  async getRoutingStatus() {
+    const config = await this.getConfig({ withCache: true });
+    const envBackend = this.configRepository.getEnv().storage.backend;
+    const counts = await this.storageMigrationRepository.getRoutingCounts();
+
+    const entry = (kind: StorageRoutingKind) => {
+      const routedTo = resolveRouting(config.storage.routing[kind], envBackend);
+      // "Misplaced" is whatever sits on the backend this kind is NOT routed to.
+      return { routedTo, misplacedCount: routedTo === 's3' ? counts[kind].disk : counts[kind].s3 };
+    };
+
+    return {
+      originals: entry(StorageRoutingKind.Originals),
+      thumbnails: entry(StorageRoutingKind.Thumbnails),
+      encodedVideo: entry(StorageRoutingKind.EncodedVideo),
+    };
+  }
+
   @OnJob({ name: JobName.StorageBackendMigrationQueueAll, queue: QueueName.StorageBackendMigration })
   async handleQueueAll(job: JobOf<JobName.StorageBackendMigrationQueueAll>): Promise<JobStatus> {
     const { direction, deleteSource, fileTypes, concurrency, batchId } = job;

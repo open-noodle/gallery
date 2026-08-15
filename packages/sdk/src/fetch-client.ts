@@ -2634,6 +2634,8 @@ export type ServerFeaturesDto = {
     realtimeTranscoding: boolean;
     /** Whether reverse geocoding is enabled */
     reverseGeocoding: boolean;
+    /** Whether an S3 storage backend is configured */
+    s3Storage: boolean;
     /** Whether search is enabled */
     search: boolean;
     /** Whether sidecar files are supported */
@@ -3148,6 +3150,17 @@ export type StackUpdateDto = {
     /** Primary asset ID */
     primaryAssetId?: string;
 };
+export type StorageRoutingStatusEntryDto = {
+    /** Number of files of this kind currently stored on the other backend */
+    misplacedCount: number;
+    /** The resolved backend new files of this kind are written to */
+    routedTo: RoutedTo;
+};
+export type StorageRoutingStatusDto = {
+    encodedVideo: StorageRoutingStatusEntryDto;
+    originals: StorageRoutingStatusEntryDto;
+    thumbnails: StorageRoutingStatusEntryDto;
+};
 export type StorageMigrationFileTypesDto = {
     /** Include encoded video files */
     encodedVideos?: boolean;
@@ -3547,6 +3560,17 @@ export type SystemConfigServerDto = {
     /** Public users */
     publicUsers: boolean;
 };
+export type SystemConfigStorageRoutingDto = {
+    /** Where newly written transcoded videos are stored */
+    encodedVideo: StorageRouting;
+    /** Where newly written original files and sidecars are stored */
+    originals: StorageRouting;
+    /** Where newly written thumbnails, previews, fullsize images, person thumbnails and profile images are stored */
+    thumbnails: StorageRouting;
+};
+export type SystemConfigStorageDto = {
+    routing: SystemConfigStorageRoutingDto;
+};
 export type SystemConfigStorageTemplateDto = {
     /** Enabled */
     enabled: boolean;
@@ -3604,6 +3628,7 @@ export type SystemConfigDto = {
     passwordLogin: SystemConfigPasswordLoginDto;
     reverseGeocoding: SystemConfigReverseGeocodingDto;
     server: SystemConfigServerDto;
+    storage: SystemConfigStorageDto;
     storageTemplate: SystemConfigStorageTemplateDto;
     storageUsage: SystemConfigStorageUsageDto;
     templates: SystemConfigTemplatesDto;
@@ -8894,6 +8919,17 @@ export function rollback({ batchId }: {
     }));
 }
 /**
+ * Get storage routing status
+ */
+export function getRoutingStatus(opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: StorageRoutingStatusDto;
+    }>("/storage-migration/routing", {
+        ...opts
+    }));
+}
+/**
  * Start storage migration
  */
 export function start({ storageMigrationStartDto }: {
@@ -10429,6 +10465,10 @@ export enum StorageMigrationDirection {
     ToS3 = "toS3",
     ToDisk = "toDisk"
 }
+export enum RoutedTo {
+    Disk = "disk",
+    S3 = "s3"
+}
 export enum SyncEntityType {
     AuthUserV1 = "AuthUserV1",
     UserV1 = "UserV1",
@@ -10655,6 +10695,11 @@ export enum ReleaseChannel {
 export enum OAuthTokenEndpointAuthMethod {
     ClientSecretPost = "client_secret_post",
     ClientSecretBasic = "client_secret_basic"
+}
+export enum StorageRouting {
+    Auto = "auto",
+    Disk = "disk",
+    S3 = "s3"
 }
 export enum TimeBucketSize {
     Year = "year",

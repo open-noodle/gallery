@@ -365,6 +365,7 @@ Class | Method | HTTP request | Description
 *StacksApi* | [**searchStacks**](doc//StacksApi.md#searchstacks) | **GET** /stacks | Retrieve stacks
 *StacksApi* | [**updateStack**](doc//StacksApi.md#updatestack) | **PUT** /stacks/{id} | Update a stack
 *StorageMigrationAdminApi* | [**getEstimate**](doc//StorageMigrationAdminApi.md#getestimate) | **GET** /storage-migration/estimate | Get storage migration estimate
+*StorageMigrationAdminApi* | [**getRoutingStatus**](doc//StorageMigrationAdminApi.md#getroutingstatus) | **GET** /storage-migration/routing | Get storage routing status
 *StorageMigrationAdminApi* | [**getStatus**](doc//StorageMigrationAdminApi.md#getstatus) | **GET** /storage-migration/status | Get storage migration status
 *StorageMigrationAdminApi* | [**rollback**](doc//StorageMigrationAdminApi.md#rollback) | **POST** /storage-migration/rollback/{batchId} | Rollback a storage migration batch
 *StorageMigrationAdminApi* | [**start**](doc//StorageMigrationAdminApi.md#start) | **POST** /storage-migration/start | Start storage migration
@@ -782,6 +783,9 @@ Class | Method | HTTP request | Description
  - [StorageMigrationDirection](doc//StorageMigrationDirection.md)
  - [StorageMigrationFileTypesDto](doc//StorageMigrationFileTypesDto.md)
  - [StorageMigrationStartDto](doc//StorageMigrationStartDto.md)
+ - [StorageRouting](doc//StorageRouting.md)
+ - [StorageRoutingStatusDto](doc//StorageRoutingStatusDto.md)
+ - [StorageRoutingStatusEntryDto](doc//StorageRoutingStatusEntryDto.md)
  - [SyncAckDeleteDto](doc//SyncAckDeleteDto.md)
  - [SyncAckDto](doc//SyncAckDto.md)
  - [SyncAckSetDto](doc//SyncAckSetDto.md)
@@ -867,6 +871,8 @@ Class | Method | HTTP request | Description
  - [SystemConfigServerDto](doc//SystemConfigServerDto.md)
  - [SystemConfigSmtpDto](doc//SystemConfigSmtpDto.md)
  - [SystemConfigSmtpTransportDto](doc//SystemConfigSmtpTransportDto.md)
+ - [SystemConfigStorageDto](doc//SystemConfigStorageDto.md)
+ - [SystemConfigStorageRoutingDto](doc//SystemConfigStorageRoutingDto.md)
  - [SystemConfigStorageTemplateDto](doc//SystemConfigStorageTemplateDto.md)
  - [SystemConfigStorageUsageDto](doc//SystemConfigStorageUsageDto.md)
  - [SystemConfigTemplateEmailsDto](doc//SystemConfigTemplateEmailsDto.md)

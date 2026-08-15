@@ -710,6 +710,44 @@ describe(StorageMigrationService.name, () => {
     });
   });
 
+  describe('getRoutingStatus', () => {
+    it('should report the resolved backend and the count on the other backend', async () => {
+      mocks.config.getEnv.mockReturnValue(
+        mockEnvData({ storage: { backend: 's3', s3: { bucket: 'photos' } } } as never),
+      );
+      mocks.systemMetadata.get.mockResolvedValue(
+        routing(StorageRouting.Auto, StorageRouting.Disk, StorageRouting.Auto),
+      );
+      mocks.storageMigration.getRoutingCounts.mockResolvedValue({
+        originals: { disk: 4, s3: 100 },
+        thumbnails: { disk: 20, s3: 7 },
+        encodedVideo: { disk: 0, s3: 3 },
+      });
+
+      await expect(sut.getRoutingStatus()).resolves.toEqual({
+        originals: { routedTo: 's3', misplacedCount: 4 },
+        thumbnails: { routedTo: 'disk', misplacedCount: 7 },
+        encodedVideo: { routedTo: 's3', misplacedCount: 0 },
+      });
+    });
+
+    it('should never return auto as the resolved backend', async () => {
+      mocks.config.getEnv.mockReturnValue(mockEnvData({ storage: { backend: 'disk', s3: { bucket: '' } } } as never));
+      mocks.systemMetadata.get.mockResolvedValue({});
+      mocks.storageMigration.getRoutingCounts.mockResolvedValue({
+        originals: { disk: 0, s3: 0 },
+        thumbnails: { disk: 0, s3: 0 },
+        encodedVideo: { disk: 0, s3: 0 },
+      });
+
+      const status = await sut.getRoutingStatus();
+
+      for (const value of Object.values(status)) {
+        expect(['disk', 's3']).toContain(value.routedTo);
+      }
+    });
+  });
+
   describe('rollback', () => {
     it('should revert paths from migration log and delete log entries', async () => {
       const entries = [
