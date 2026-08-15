@@ -5,10 +5,28 @@
  * Rule: you may edit an asset if you own it, or if you are Owner/Editor of a space
  * that shows it AND its owner is a member of that space.
  *
- * These tests are the only place S-4 (Carol), S-5 (Dave), S-7/S-8 (Hidden/Locked),
- * S-9 (trashed) and S-10 (offline) can fail. A refactor that swaps the bespoke arms
- * for `spaceAssetPathBranches` drops those gates and still compiles — this file is
- * what catches it.
+ * These tests are the only place S-7/S-8 (Hidden/Locked), S-9 (trashed), S-10/S-10b
+ * (offline), S-11 (showInTimeline), S-12 (live-photo motion) and S-13/S-13b/S-13c
+ * (wrong-space membership) can fail. A refactor that swaps the bespoke arms for
+ * `spaceAssetPathBranches` drops those gates and still compiles — this file is what
+ * catches it.
+ *
+ * The role × reach-path × owner-membership rule itself is covered below by a full
+ * `describe.each`/`it.each` cross-product (`checkSpaceEditAccess — the full grant
+ * matrix`), not by hand-written cases: reach path ∈ {direct, library, album,
+ * contribution} × actor role ∈ {owner, editor, viewer, non-member} × asset-owner
+ * membership ∈ {member, not-member}. `contribution` is the #764 cross-owner arm
+ * (`album_space_asset`, folded into the album path via `spaceAlbumAssetExists` —
+ * see `src/utils/shared-space-album-scope.ts`) and previously had zero coverage at
+ * this rule level.
+ *
+ * Discipline: every deny cell must be non-vacuous. Each reach path's fixture
+ * builder is reused, unchanged, by at least one GRANT cell (role ∈ {owner, editor}
+ * with a member owner) in the same describe block — so a deny cell can never pass
+ * merely because the asset was unreachable in the first place; it can only pass
+ * because the specific gate (role, or owner membership) under test denied it. This
+ * is exactly the bug item 1 of the #992 audit found in the sibling service spec:
+ * a VIEWER-denial fixture that never made the asset editor-reachable at all.
  */
 import { Kysely } from 'kysely';
 import { AssetVisibility } from 'src/enum';
@@ -51,202 +69,95 @@ const newSpaceWithEditorAndMember = async (ctx: ReturnType<typeof setup>['ctx'])
   return { anna, bob, space };
 };
 
-describe('checkSpaceEditAccess — the three access paths', () => {
-  it('S-1: grants a directly-added asset owned by a space member', async () => {
-    const { ctx, accessRepo } = setup();
-    const { anna, bob, space } = await newSpaceWithEditorAndMember(ctx);
-    const { asset } = await ctx.newAsset({ ownerId: bob.id, visibility: AssetVisibility.Timeline });
-    await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+// ---------------------------------------------------------------------------
+// The full grant matrix: reach path × actor role × owner membership.
+// ---------------------------------------------------------------------------
 
-    const allowed = await accessRepo.asset.checkSpaceEditAccess(anna.id, new Set([asset.id]));
+type ReachPath = 'direct' | 'library' | 'album' | 'contribution';
+type ActorRole = 'owner' | 'editor' | 'viewer' | 'non-member';
+type OwnerMembership = 'member' | 'not-member';
 
-    expect(allowed).toEqual(new Set([asset.id]));
-  });
-
-  it('S-2: grants an asset reaching the space through a linked library', async () => {
-    const { ctx, accessRepo } = setup();
-    const { anna, bob, space } = await newSpaceWithEditorAndMember(ctx);
-    const { library } = await ctx.newLibrary({ ownerId: bob.id });
-    const { asset } = await ctx.newAsset({
-      ownerId: bob.id,
-      libraryId: library.id,
-      visibility: AssetVisibility.Timeline,
-    });
-    await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id });
-
-    const allowed = await accessRepo.asset.checkSpaceEditAccess(anna.id, new Set([asset.id]));
-
-    expect(allowed).toEqual(new Set([asset.id]));
-  });
-
-  it('S-3: grants an asset reaching the space through a linked album (NEW)', async () => {
-    const { ctx, accessRepo } = setup();
-    const { anna, bob, space } = await newSpaceWithEditorAndMember(ctx);
-    const { result: album } = await ctx.newAlbum({ ownerId: bob.id, albumName: 'Trip' });
-    const { asset } = await ctx.newAsset({ ownerId: bob.id, visibility: AssetVisibility.Timeline });
+/**
+ * Builds the asset and its single reach path into `spaceId`, owned by `ownerId`.
+ * Each builder inserts exactly the rows that path needs — nothing shared with the
+ * other paths — so a deny result can only be explained by the role/membership gate
+ * under test, never by an unrelated missing row.
+ */
+const reachPathBuilders: Record<
+  ReachPath,
+  (ctx: ReturnType<typeof setup>['ctx'], args: { spaceId: string; ownerId: string }) => Promise<{ assetId: string }>
+> = {
+  direct: async (ctx, { spaceId, ownerId }) => {
+    const { asset } = await ctx.newAsset({ ownerId, visibility: AssetVisibility.Timeline });
+    await ctx.newSharedSpaceAsset({ spaceId, assetId: asset.id });
+    return { assetId: asset.id };
+  },
+  library: async (ctx, { spaceId, ownerId }) => {
+    const { library } = await ctx.newLibrary({ ownerId });
+    const { asset } = await ctx.newAsset({ ownerId, libraryId: library.id, visibility: AssetVisibility.Timeline });
+    await ctx.newSharedSpaceLibrary({ spaceId, libraryId: library.id });
+    return { assetId: asset.id };
+  },
+  album: async (ctx, { spaceId, ownerId }) => {
+    const { result: album } = await ctx.newAlbum({ ownerId, albumName: 'Matrix album' });
+    const { asset } = await ctx.newAsset({ ownerId, visibility: AssetVisibility.Timeline });
     await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
-    await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
+    await ctx.newSharedSpaceAlbum({ spaceId, albumId: album.id });
+    return { assetId: asset.id };
+  },
+  // #764 cross-owner contribution: the asset is deliberately never added to the album
+  // owner's own `album_asset` rows — its only path into the linked album is
+  // `album_space_asset`, so this exercises `spaceContributedAssetExists` in isolation.
+  contribution: async (ctx, { spaceId, ownerId }) => {
+    const { user: albumOwner } = await ctx.newUser();
+    const { result: album } = await ctx.newAlbum({ ownerId: albumOwner.id, albumName: 'Matrix contribution' });
+    const { asset } = await ctx.newAsset({ ownerId, visibility: AssetVisibility.Timeline });
+    await ctx.newSharedSpaceAlbum({ spaceId, albumId: album.id });
+    await ctx.newAlbumSpaceAsset({ albumId: album.id, assetId: asset.id, spaceId });
+    return { assetId: asset.id };
+  },
+};
 
-    const allowed = await accessRepo.asset.checkSpaceEditAccess(anna.id, new Set([asset.id]));
+const reachPaths: ReachPath[] = ['direct', 'library', 'album', 'contribution'];
+const actorRoles: ActorRole[] = ['owner', 'editor', 'viewer', 'non-member'];
+const ownerMemberships: OwnerMembership[] = ['member', 'not-member'];
 
-    expect(allowed).toEqual(new Set([asset.id]));
-  });
+describe('checkSpaceEditAccess — the full grant matrix (reach path × actor role × owner membership)', () => {
+  describe.each(reachPaths)('reach path: %s', (reachPath) => {
+    it.each(actorRoles.flatMap((role) => ownerMemberships.map((ownerMembership) => [role, ownerMembership] as const)))(
+      'actor role=%s, owner membership=%s',
+      async (actorRole, ownerMembership) => {
+        const { ctx, accessRepo } = setup();
+        const { user: owner } = await ctx.newUser();
+        const { user: actor } = await ctx.newUser();
+        const { space } = await ctx.newSharedSpace({ createdById: owner.id });
 
-  it('S-11: the album arm ignores showInTimeline', async () => {
-    const { ctx, accessRepo } = setup();
-    const { anna, bob, space } = await newSpaceWithEditorAndMember(ctx);
-    const { result: album } = await ctx.newAlbum({ ownerId: bob.id, albumName: 'Quiet' });
-    const { asset } = await ctx.newAsset({ ownerId: bob.id, visibility: AssetVisibility.Timeline });
-    await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
-    await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id, showInTimeline: false });
+        if (actorRole !== 'non-member') {
+          await ctx.newSharedSpaceMember({ spaceId: space.id, userId: actor.id, role: actorRole });
+        }
 
-    const allowed = await accessRepo.asset.checkSpaceEditAccess(anna.id, new Set([asset.id]));
+        if (ownerMembership === 'member') {
+          // Role is irrelevant to the owner-membership gate — 'viewer' proves that: the
+          // asset owner never needs edit rights of their own for a fellow editor to act.
+          await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: 'viewer' });
+        }
 
-    expect(allowed).toEqual(new Set([asset.id]));
+        const { assetId } = await reachPathBuilders[reachPath](ctx, { spaceId: space.id, ownerId: owner.id });
+
+        const expectGranted = (actorRole === 'owner' || actorRole === 'editor') && ownerMembership === 'member';
+
+        const allowed = await accessRepo.asset.checkSpaceEditAccess(actor.id, new Set([assetId]));
+
+        expect(allowed).toEqual(expectGranted ? new Set([assetId]) : new Set());
+      },
+    );
   });
 });
 
-describe('checkSpaceEditAccess — owner must be a space member', () => {
-  it('S-4: denies Carol’s asset, reached via a linked album, when Carol is not in the space', async () => {
-    const { ctx, accessRepo } = setup();
-    const { anna, bob, space } = await newSpaceWithEditorAndMember(ctx);
-    const { user: carol } = await ctx.newUser();
-    const { result: album } = await ctx.newAlbum({ ownerId: bob.id, albumName: 'Shared' });
-    await ctx.newAlbumUser({ albumId: album.id, userId: carol.id });
-    const { asset } = await ctx.newAsset({ ownerId: carol.id, visibility: AssetVisibility.Timeline });
-    await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
-    await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
-
-    const allowed = await accessRepo.asset.checkSpaceEditAccess(anna.id, new Set([asset.id]));
-
-    expect(allowed).toEqual(new Set());
-  });
-
-  it('S-5: denies Dave’s partner-shared asset that Bob direct-added (tightening, spec §2.3)', async () => {
-    const { ctx, accessRepo } = setup();
-    const { anna, bob, space } = await newSpaceWithEditorAndMember(ctx);
-    const { user: dave } = await ctx.newUser();
-    await ctx.newPartner({ sharedById: dave.id, sharedWithId: bob.id });
-    const { asset } = await ctx.newAsset({ ownerId: dave.id, visibility: AssetVisibility.Timeline });
-    await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: bob.id });
-
-    const allowed = await accessRepo.asset.checkSpaceEditAccess(anna.id, new Set([asset.id]));
-
-    expect(allowed).toEqual(new Set());
-  });
-
-  it('S-13: membership binds to the space granting the role, not to any space', async () => {
-    const { ctx, accessRepo } = setup();
-    const { anna, bob, space: spaceA } = await newSpaceWithEditorAndMember(ctx);
-    // Bob leaves A; he is a member of B only. His asset still reaches A via a linked album.
-    await defaultDatabase
-      .deleteFrom('shared_space_member')
-      .where('spaceId', '=', spaceA.id)
-      .where('userId', '=', bob.id)
-      .execute();
-    const { space: spaceB } = await ctx.newSharedSpace({ createdById: bob.id });
-    await ctx.newSharedSpaceMember({ spaceId: spaceB.id, userId: bob.id, role: 'owner' });
-
-    const { result: album } = await ctx.newAlbum({ ownerId: bob.id, albumName: 'Cross' });
-    const { asset } = await ctx.newAsset({ ownerId: bob.id, visibility: AssetVisibility.Timeline });
-    await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
-    await ctx.newSharedSpaceAlbum({ spaceId: spaceA.id, albumId: album.id });
-
-    const allowed = await accessRepo.asset.checkSpaceEditAccess(anna.id, new Set([asset.id]));
-
-    expect(allowed).toEqual(new Set());
-  });
-
-  it('S-13b: the DIRECT arm binds membership to the space granting the role, not to any space', async () => {
-    const { ctx, accessRepo } = setup();
-    const { anna, bob, space: spaceA } = await newSpaceWithEditorAndMember(ctx);
-    // Bob leaves A; he is a member of B only. His asset is still direct-added to A.
-    await defaultDatabase
-      .deleteFrom('shared_space_member')
-      .where('spaceId', '=', spaceA.id)
-      .where('userId', '=', bob.id)
-      .execute();
-    const { space: spaceB } = await ctx.newSharedSpace({ createdById: bob.id });
-    await ctx.newSharedSpaceMember({ spaceId: spaceB.id, userId: bob.id, role: 'owner' });
-
-    const { asset } = await ctx.newAsset({ ownerId: bob.id, visibility: AssetVisibility.Timeline });
-    await ctx.newSharedSpaceAsset({ spaceId: spaceA.id, assetId: asset.id });
-
-    const allowed = await accessRepo.asset.checkSpaceEditAccess(anna.id, new Set([asset.id]));
-
-    expect(allowed).toEqual(new Set());
-  });
-
-  it('S-13c: the LIBRARY arm binds membership to the space granting the role, not to any space', async () => {
-    const { ctx, accessRepo } = setup();
-    const { anna, bob, space: spaceA } = await newSpaceWithEditorAndMember(ctx);
-    // Bob leaves A; he is a member of B only. His library asset is still linked into A.
-    await defaultDatabase
-      .deleteFrom('shared_space_member')
-      .where('spaceId', '=', spaceA.id)
-      .where('userId', '=', bob.id)
-      .execute();
-    const { space: spaceB } = await ctx.newSharedSpace({ createdById: bob.id });
-    await ctx.newSharedSpaceMember({ spaceId: spaceB.id, userId: bob.id, role: 'owner' });
-
-    const { library } = await ctx.newLibrary({ ownerId: bob.id });
-    const { asset } = await ctx.newAsset({
-      ownerId: bob.id,
-      libraryId: library.id,
-      visibility: AssetVisibility.Timeline,
-    });
-    await ctx.newSharedSpaceLibrary({ spaceId: spaceA.id, libraryId: library.id });
-
-    const allowed = await accessRepo.asset.checkSpaceEditAccess(anna.id, new Set([asset.id]));
-
-    expect(allowed).toEqual(new Set());
-  });
-});
-
-describe('checkSpaceEditAccess — role gate', () => {
-  it('S-6: denies a Viewer on the direct path', async () => {
-    const { ctx, accessRepo } = setup();
-    const { bob, space } = await newSpaceWithEditorAndMember(ctx);
-    const { user: vic } = await ctx.newUser();
-    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: vic.id, role: 'viewer' });
-    const { asset } = await ctx.newAsset({ ownerId: bob.id, visibility: AssetVisibility.Timeline });
-    await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
-
-    const allowed = await accessRepo.asset.checkSpaceEditAccess(vic.id, new Set([asset.id]));
-
-    expect(allowed).toEqual(new Set());
-  });
-
-  it('S-44: denies a Viewer on the NEW album path', async () => {
-    const { ctx, accessRepo } = setup();
-    const { bob, space } = await newSpaceWithEditorAndMember(ctx);
-    const { user: vic } = await ctx.newUser();
-    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: vic.id, role: 'viewer' });
-    const { result: album } = await ctx.newAlbum({ ownerId: bob.id, albumName: 'ViewerAlbum' });
-    const { asset } = await ctx.newAsset({ ownerId: bob.id, visibility: AssetVisibility.Timeline });
-    await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
-    await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
-
-    const allowed = await accessRepo.asset.checkSpaceEditAccess(vic.id, new Set([asset.id]));
-
-    expect(allowed).toEqual(new Set());
-  });
-
-  it('S-43: grants a space Owner, not only an Editor', async () => {
-    const { ctx, accessRepo } = setup();
-    const { bob, space } = await newSpaceWithEditorAndMember(ctx);
-    const { user: olive } = await ctx.newUser();
-    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: olive.id, role: 'owner' });
-    const { result: album } = await ctx.newAlbum({ ownerId: bob.id, albumName: 'OwnerAlbum' });
-    const { asset } = await ctx.newAsset({ ownerId: bob.id, visibility: AssetVisibility.Timeline });
-    await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
-    await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
-
-    const allowed = await accessRepo.asset.checkSpaceEditAccess(olive.id, new Set([asset.id]));
-
-    expect(allowed).toEqual(new Set([asset.id]));
-  });
-});
+// ---------------------------------------------------------------------------
+// Gates the matrix above cannot express — visibility, lifecycle, timeline display,
+// live-photo resolution, and wrong-space membership binding.
+// ---------------------------------------------------------------------------
 
 describe('checkSpaceEditAccess — gates that must survive any refactor', () => {
   it.each([
@@ -317,6 +228,19 @@ describe('checkSpaceEditAccess — gates that must survive any refactor', () => 
     expect(allowed).toEqual(new Set());
   });
 
+  it('S-11: the album arm ignores showInTimeline', async () => {
+    const { ctx, accessRepo } = setup();
+    const { anna, bob, space } = await newSpaceWithEditorAndMember(ctx);
+    const { result: album } = await ctx.newAlbum({ ownerId: bob.id, albumName: 'Quiet' });
+    const { asset } = await ctx.newAsset({ ownerId: bob.id, visibility: AssetVisibility.Timeline });
+    await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+    await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id, showInTimeline: false });
+
+    const allowed = await accessRepo.asset.checkSpaceEditAccess(anna.id, new Set([asset.id]));
+
+    expect(allowed).toEqual(new Set([asset.id]));
+  });
+
   it('S-12: resolves the motion half of a live photo', async () => {
     const { ctx, accessRepo } = setup();
     const { anna, bob, space } = await newSpaceWithEditorAndMember(ctx);
@@ -331,5 +255,72 @@ describe('checkSpaceEditAccess — gates that must survive any refactor', () => 
     const allowed = await accessRepo.asset.checkSpaceEditAccess(anna.id, new Set([motion.id]));
 
     expect(allowed).toEqual(new Set([motion.id]));
+  });
+
+  it('S-13: membership binds to the space granting the role, not to any space', async () => {
+    const { ctx, accessRepo } = setup();
+    const { anna, bob, space: spaceA } = await newSpaceWithEditorAndMember(ctx);
+    // Bob leaves A; he is a member of B only. His asset still reaches A via a linked album.
+    await defaultDatabase
+      .deleteFrom('shared_space_member')
+      .where('spaceId', '=', spaceA.id)
+      .where('userId', '=', bob.id)
+      .execute();
+    const { space: spaceB } = await ctx.newSharedSpace({ createdById: bob.id });
+    await ctx.newSharedSpaceMember({ spaceId: spaceB.id, userId: bob.id, role: 'owner' });
+
+    const { result: album } = await ctx.newAlbum({ ownerId: bob.id, albumName: 'Cross' });
+    const { asset } = await ctx.newAsset({ ownerId: bob.id, visibility: AssetVisibility.Timeline });
+    await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+    await ctx.newSharedSpaceAlbum({ spaceId: spaceA.id, albumId: album.id });
+
+    const allowed = await accessRepo.asset.checkSpaceEditAccess(anna.id, new Set([asset.id]));
+
+    expect(allowed).toEqual(new Set());
+  });
+
+  it('S-13b: the DIRECT arm binds membership to the space granting the role, not to any space', async () => {
+    const { ctx, accessRepo } = setup();
+    const { anna, bob, space: spaceA } = await newSpaceWithEditorAndMember(ctx);
+    // Bob leaves A; he is a member of B only. His asset is still direct-added to A.
+    await defaultDatabase
+      .deleteFrom('shared_space_member')
+      .where('spaceId', '=', spaceA.id)
+      .where('userId', '=', bob.id)
+      .execute();
+    const { space: spaceB } = await ctx.newSharedSpace({ createdById: bob.id });
+    await ctx.newSharedSpaceMember({ spaceId: spaceB.id, userId: bob.id, role: 'owner' });
+
+    const { asset } = await ctx.newAsset({ ownerId: bob.id, visibility: AssetVisibility.Timeline });
+    await ctx.newSharedSpaceAsset({ spaceId: spaceA.id, assetId: asset.id });
+
+    const allowed = await accessRepo.asset.checkSpaceEditAccess(anna.id, new Set([asset.id]));
+
+    expect(allowed).toEqual(new Set());
+  });
+
+  it('S-13c: the LIBRARY arm binds membership to the space granting the role, not to any space', async () => {
+    const { ctx, accessRepo } = setup();
+    const { anna, bob, space: spaceA } = await newSpaceWithEditorAndMember(ctx);
+    // Bob leaves A; he is a member of B only. His library asset is still linked into A.
+    await defaultDatabase
+      .deleteFrom('shared_space_member')
+      .where('spaceId', '=', spaceA.id)
+      .where('userId', '=', bob.id)
+      .execute();
+    const { space: spaceB } = await ctx.newSharedSpace({ createdById: bob.id });
+    await ctx.newSharedSpaceMember({ spaceId: spaceB.id, userId: bob.id, role: 'owner' });
+
+    const { library } = await ctx.newLibrary({ ownerId: bob.id });
+    const { asset } = await ctx.newAsset({
+      ownerId: bob.id,
+      libraryId: library.id,
+      visibility: AssetVisibility.Timeline,
+    });
+    await ctx.newSharedSpaceLibrary({ spaceId: spaceA.id, libraryId: library.id });
+
+    const allowed = await accessRepo.asset.checkSpaceEditAccess(anna.id, new Set([asset.id]));
+
+    expect(allowed).toEqual(new Set());
   });
 });
