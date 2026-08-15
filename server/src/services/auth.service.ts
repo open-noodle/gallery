@@ -5,6 +5,7 @@ import { createReadStream } from 'node:fs';
 import { IncomingHttpHeaders } from 'node:http';
 import { basename } from 'node:path';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend';
+import { StorageRoutingKind } from 'src/backends/storage-router';
 import { LOGIN_DUMMY_HASH, LOGIN_URL, MOBILE_CALLBACK_URI, MOBILE_REDIRECT, SALT_ROUNDS } from 'src/constants';
 import { StorageCore } from 'src/cores/storage.core';
 import { AuthSharedLink, AuthUser, UserAdmin } from 'src/database';
@@ -404,7 +405,7 @@ export class AuthService extends BaseService {
         Buffer.from(data),
       );
 
-      const writeBackend = StorageService.getWriteBackend();
+      const writeBackend = StorageService.getWriteBackend(StorageRoutingKind.Thumbnails, config);
 
       if (!(writeBackend instanceof DiskStorageBackend)) {
         const filename = basename(profileImagePath);

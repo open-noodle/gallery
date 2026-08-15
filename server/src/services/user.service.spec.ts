@@ -1,6 +1,7 @@
 import { BadRequestException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { Readable } from 'node:stream';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend';
+import { StorageRoutingKind } from 'src/backends/storage-router';
 import { StorageCore } from 'src/cores/storage.core';
 import { UserAdmin } from 'src/database';
 import { CacheControl, JobName, JobStatus, UserMetadataKey } from 'src/enum';
@@ -499,6 +500,34 @@ describe(UserService.name, () => {
           profileImagePath: relativeKey,
           profileChangedAt,
         });
+      });
+    });
+
+    describe('routing', () => {
+      afterEach(() => {
+        // Same leak hazard as elsewhere: vitest.config.mjs sets no restoreMocks and there
+        // are no setupFiles, so a getWriteBackend spy leaks into every later test in this file.
+        vi.restoreAllMocks();
+      });
+
+      it('resolves the write backend with StorageRoutingKind.Thumbnails, not Originals', async () => {
+        const user = factory.userAdmin({ profileImagePath: '' });
+        const file = {
+          path: '/data/profile/user-id/temp-file.jpg',
+          originalname: 'avatar.jpg',
+        } as Express.Multer.File;
+
+        mocks.user.get.mockResolvedValue(user);
+        mocks.user.update.mockResolvedValue({
+          ...user,
+          profileImagePath: 'profile/user-id/random-uuid.webp',
+          profileChangedAt: new Date(),
+        });
+        const getWriteBackend = vi.spyOn(StorageService, 'getWriteBackend');
+
+        await sut.createProfileImage(factory.auth({ user }), file);
+
+        expect(getWriteBackend).toHaveBeenCalledWith(StorageRoutingKind.Thumbnails, expect.anything());
       });
     });
   });

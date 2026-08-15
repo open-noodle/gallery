@@ -1,3 +1,5 @@
+import { StorageRoutingKind } from 'src/backends/storage-router';
+import { StorageRouting } from 'src/dtos/system-config.dto';
 import { JobStatus, SystemMetadataKey } from 'src/enum';
 import { StorageService } from 'src/services/storage.service';
 import { ImmichStartupError } from 'src/utils/misc';
@@ -538,6 +540,139 @@ describe(StorageService.name, () => {
       expect(mocks.storage.unlink).toHaveBeenCalledTimes(2);
       expect(mocks.storage.unlink).toHaveBeenCalledWith('/path/to/file1');
       expect(mocks.storage.unlink).toHaveBeenCalledWith('/path/to/file2');
+    });
+  });
+
+  describe('getWriteBackend', () => {
+    // getWriteBackend is static and resolves the "auto" env backend from StorageService.writeBackendType
+    // (cached at bootstrap), not from an injected repository — a static method has no `this`. Setting the
+    // field directly is how the sibling S3-mode tests in asset-media/user/auth .service.spec.ts drive it too.
+    const previousWriteBackendType = (StorageService as any).writeBackendType;
+
+    afterEach(() => {
+      (StorageService as any).writeBackendType = previousWriteBackendType;
+    });
+
+    it('should route a kind pinned to disk to the disk backend even when the env is s3', () => {
+      const disk = {} as never;
+      const s3 = {} as never;
+      vi.spyOn(StorageService, 'getDiskBackend').mockReturnValue(disk);
+      vi.spyOn(StorageService, 'getS3Backend').mockReturnValue(s3);
+      (StorageService as any).writeBackendType = 's3';
+
+      const config = {
+        storage: {
+          routing: { originals: StorageRouting.S3, thumbnails: StorageRouting.Disk, encodedVideo: StorageRouting.Auto },
+        },
+      } as never;
+
+      expect(StorageService.getWriteBackend(StorageRoutingKind.Thumbnails, config)).toBe(disk);
+      expect(StorageService.getWriteBackend(StorageRoutingKind.Originals, config)).toBe(s3);
+      expect(StorageService.getWriteBackend(StorageRoutingKind.EncodedVideo, config)).toBe(s3);
+    });
+
+    it('should fall back to disk when a kind resolves to s3 but no s3 backend exists', () => {
+      const disk = {} as never;
+      vi.spyOn(StorageService, 'getDiskBackend').mockReturnValue(disk);
+      vi.spyOn(StorageService, 'getS3Backend').mockReturnValue(undefined);
+      (StorageService as any).writeBackendType = 'disk';
+
+      const config = {
+        storage: {
+          routing: { originals: StorageRouting.S3, thumbnails: StorageRouting.Auto, encodedVideo: StorageRouting.Auto },
+        },
+      } as never;
+
+      expect(StorageService.getWriteBackend(StorageRoutingKind.Originals, config)).toBe(disk);
+    });
+  });
+
+  describe('existing env-only startup check', () => {
+    it('should still throw when IMMICH_STORAGE_BACKEND is s3 and no bucket is configured', async () => {
+      // Unchanged behaviour, pinned so the new validation layers do not accidentally replace it.
+      // It runs before SystemConfig is available (BootstrapEventPriority.StorageService = -195 vs
+      // SystemConfig = 100), so it cannot become routing-aware.
+      mocks.config.getEnv.mockReturnValue(mockEnvData({ storage: { backend: 's3', s3: { bucket: '' } } } as never));
+
+      await expect(sut.onBootstrap()).rejects.toThrow(/IMMICH_STORAGE_BACKEND/);
+    });
+  });
+
+  describe('onConfigValidate', () => {
+    it('should reject a kind pinned to s3 when no bucket is configured', () => {
+      mocks.config.getEnv.mockReturnValue({ storage: { s3: { bucket: '' } } } as never);
+
+      expect(() =>
+        sut.onConfigValidate({
+          newConfig: {
+            storage: {
+              routing: {
+                originals: StorageRouting.S3,
+                thumbnails: StorageRouting.Auto,
+                encodedVideo: StorageRouting.S3,
+              },
+            },
+          },
+        } as never),
+      ).toThrow(/originals, encodedVideo/);
+    });
+
+    it('should allow s3 pins when a bucket is configured', () => {
+      mocks.config.getEnv.mockReturnValue({ storage: { s3: { bucket: 'photos' } } } as never);
+
+      expect(() =>
+        sut.onConfigValidate({
+          newConfig: {
+            storage: {
+              routing: {
+                originals: StorageRouting.S3,
+                thumbnails: StorageRouting.Auto,
+                encodedVideo: StorageRouting.Auto,
+              },
+            },
+          },
+        } as never),
+      ).not.toThrow();
+    });
+
+    it('should allow disk and auto pins with no bucket', () => {
+      mocks.config.getEnv.mockReturnValue({ storage: { s3: { bucket: '' } } } as never);
+
+      expect(() =>
+        sut.onConfigValidate({
+          newConfig: {
+            storage: {
+              routing: {
+                originals: StorageRouting.Disk,
+                thumbnails: StorageRouting.Auto,
+                encodedVideo: StorageRouting.Disk,
+              },
+            },
+          },
+        } as never),
+      ).not.toThrow();
+    });
+  });
+
+  describe('onStorageConfigInit', () => {
+    it('should log an error but not throw for an s3 pin with no bucket', () => {
+      mocks.config.getEnv.mockReturnValue({ storage: { s3: { bucket: '' } } } as never);
+
+      expect(() =>
+        sut.onStorageConfigInit({
+          newConfig: {
+            storage: {
+              routing: {
+                originals: StorageRouting.S3,
+                thumbnails: StorageRouting.Auto,
+                encodedVideo: StorageRouting.Auto,
+              },
+            },
+          },
+        } as never),
+      ).not.toThrow();
+
+      expect(mocks.logger.error).toHaveBeenCalledWith(expect.stringContaining('originals'));
     });
   });
 });

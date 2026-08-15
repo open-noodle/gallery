@@ -3,9 +3,12 @@ import { isAbsolute, join } from 'node:path';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend';
 import { S3StorageBackend } from 'src/backends/s3-storage.backend';
 import { resolveBackend } from 'src/backends/storage-backend.provider';
+import { resolveRouting, StorageRoutingKind } from 'src/backends/storage-router';
+import { SystemConfig } from 'src/config';
 import { ErrorMessages } from 'src/constants';
 import { StorageCore } from 'src/cores/storage.core';
 import { OnEvent, OnJob } from 'src/decorators';
+import { StorageRouting } from 'src/dtos/system-config.dto';
 import {
   BootstrapEventPriority,
   DatabaseLock,
@@ -16,6 +19,7 @@ import {
   SystemMetadataKey,
 } from 'src/enum';
 import { StorageBackend } from 'src/interfaces/storage-backend.interface';
+import { ArgOf } from 'src/repositories/event.repository';
 import { BaseService } from 'src/services/base.service';
 import { JobOf, SystemFlags } from 'src/types';
 import { ImmichStartupError } from 'src/utils/misc';
@@ -36,11 +40,29 @@ export class StorageService extends BaseService {
     return StorageService.s3Backend;
   }
 
-  static getWriteBackend(): StorageBackend {
-    if (StorageService.writeBackendType === 's3' && StorageService.s3Backend) {
-      return StorageService.s3Backend;
+  static getWriteBackend(kind: StorageRoutingKind, config: SystemConfig): StorageBackend {
+    const resolved = resolveRouting(config.storage.routing[kind], StorageService.writeBackendType);
+    if (resolved === 's3') {
+      const s3Backend = StorageService.getS3Backend();
+      if (s3Backend) {
+        return s3Backend;
+      }
+      // Credentials can be removed from the environment after routing was configured. Failing
+      // every write would brick a running instance; disk is always safe because stored keys are
+      // self-describing, so the file remains readable wherever it lands.
+      StorageService.warnMissingS3Backend(kind);
     }
-    return StorageService.diskBackend;
+    return StorageService.getDiskBackend();
+  }
+
+  private static warnedKinds = new Set<StorageRoutingKind>();
+
+  private static warnMissingS3Backend(kind: StorageRoutingKind) {
+    if (StorageService.warnedKinds.has(kind)) {
+      return;
+    }
+    StorageService.warnedKinds.add(kind);
+    console.warn(`Storage routing for "${kind}" is set to s3 but no S3 backend is configured; writing to disk.`);
   }
 
   static resolveBackendForKey(key: string): StorageBackend {
@@ -48,6 +70,37 @@ export class StorageService extends BaseService {
       return resolveBackend(key, StorageService.diskBackend, StorageService.s3Backend);
     }
     return StorageService.diskBackend;
+  }
+
+  private getS3PinnedKindsWithoutBucket(config: SystemConfig): StorageRoutingKind[] {
+    const { bucket } = this.configRepository.getEnv().storage.s3;
+    if (bucket) {
+      return [];
+    }
+    return Object.values(StorageRoutingKind).filter((kind) => config.storage.routing[kind] === StorageRouting.S3);
+  }
+
+  @OnEvent({ name: 'ConfigValidate' })
+  onConfigValidate({ newConfig }: ArgOf<'ConfigValidate'>) {
+    const offending = this.getS3PinnedKindsWithoutBucket(newConfig);
+    if (offending.length > 0) {
+      throw new Error(
+        `Storage routing cannot be set to S3 for ${offending.join(', ')} because IMMICH_S3_BUCKET is not configured.`,
+      );
+    }
+  }
+
+  // Config-file installs never emit ConfigValidate (SystemConfigService.updateSystemConfig rejects
+  // outright when IMMICH_CONFIG_FILE is set), so this is their only signal. It logs rather than
+  // throws: a config edit must not prevent a running instance from starting.
+  @OnEvent({ name: 'ConfigInit' })
+  onStorageConfigInit({ newConfig }: ArgOf<'ConfigInit'>) {
+    const offending = this.getS3PinnedKindsWithoutBucket(newConfig);
+    if (offending.length > 0) {
+      this.logger.error(
+        `Storage routing is set to S3 for ${offending.join(', ')} but IMMICH_S3_BUCKET is not configured; those files will be written to disk instead.`,
+      );
+    }
   }
 
   private detectMediaLocation(): string {

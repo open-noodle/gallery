@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Readable } from 'node:stream';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend';
+import { StorageRoutingKind } from 'src/backends/storage-router';
 import { AssetFile } from 'src/database';
 import { AssetMediaStatus, AssetRejectReason, AssetUploadAction } from 'src/dtos/asset-media-response.dto';
 import { AssetMediaCreateDto, AssetMediaSize, UploadFieldName } from 'src/dtos/asset-media.dto';
@@ -663,6 +664,98 @@ describe(AssetMediaService.name, () => {
         (StorageService as any).s3Backend = previousS3Backend;
         (StorageService as any).writeBackendType = previousWriteBackendType;
       }
+    });
+
+    describe('routing', () => {
+      afterEach(() => {
+        // Same leak hazard noted in media.service.spec.ts: vitest.config.mjs sets no
+        // restoreMocks and there are no setupFiles, so a getWriteBackend spy leaks into
+        // every later test in this file.
+        vi.restoreAllMocks();
+      });
+
+      it('resolves the write backend with StorageRoutingKind.Originals', async () => {
+        const file = {
+          uuid: 'random-uuid',
+          originalPath: 'fake_path/asset_1.jpeg',
+          mimeType: 'image/jpeg',
+          checksum: Buffer.from('file hash', 'utf8'),
+          originalName: 'asset_1.jpeg',
+          size: 42,
+        };
+
+        mocks.asset.create.mockResolvedValue(assetEntity);
+        const getWriteBackend = vi.spyOn(StorageService, 'getWriteBackend');
+
+        await sut.uploadAsset(authStub.user1, createDto, file);
+
+        expect(getWriteBackend).toHaveBeenCalledWith(StorageRoutingKind.Originals, expect.anything());
+      });
+
+      it('uploads both original and sidecar to an S3 stub and queues both temp paths for cleanup', async () => {
+        const file = {
+          uuid: 'random-uuid',
+          originalPath: '/dev/null',
+          mimeType: 'image/heic',
+          checksum: Buffer.from('file hash', 'utf8'),
+          originalName: 'asset_1.HEIC',
+          size: 42,
+        };
+        const sidecarFile = {
+          uuid: 'random-sidecar-uuid',
+          originalPath: '/dev/null',
+          mimeType: 'application/xml',
+          checksum: Buffer.from('sidecar hash', 'utf8'),
+          originalName: 'asset_1.xmp',
+          size: 12,
+        };
+        const expectedOriginalKey = 'upload/user-id/id/_1/id_1';
+        const expectedSidecarKey = 'upload/user-id/id/_1/id_1.xmp';
+        const s3Stub = {
+          put: vi.fn().mockResolvedValue(void 0),
+          delete: vi.fn().mockResolvedValue(void 0),
+        };
+
+        mocks.asset.create.mockResolvedValue(assetEntity);
+        vi.spyOn(StorageService, 'getWriteBackend').mockReturnValue(s3Stub as any);
+
+        await sut.uploadAsset(authStub.user1, createDto, file, sidecarFile);
+
+        expect(s3Stub.put).toHaveBeenCalledWith(expectedOriginalKey, expect.anything(), {
+          contentType: 'application/octet-stream',
+        });
+        expect(s3Stub.put).toHaveBeenCalledWith(expectedSidecarKey, expect.anything());
+        expect(mocks.job.queue).toHaveBeenCalledWith({
+          name: JobName.FileDelete,
+          data: { files: [file.originalPath] },
+        });
+        expect(mocks.job.queue).toHaveBeenCalledWith({
+          name: JobName.FileDelete,
+          data: { files: [sidecarFile.originalPath] },
+        });
+      });
+
+      it('does not upload and keeps the DB path unset when the resolved backend is a DiskStorageBackend instance', async () => {
+        const file = {
+          uuid: 'random-uuid',
+          originalPath: 'fake_path/asset_1.jpeg',
+          mimeType: 'image/jpeg',
+          checksum: Buffer.from('file hash', 'utf8'),
+          originalName: 'asset_1.jpeg',
+          size: 42,
+        };
+        const diskBackend = Object.create(DiskStorageBackend.prototype);
+
+        mocks.asset.create.mockResolvedValue(assetEntity);
+        // No `put` on this stub: if the disk-instance check ever regressed to the S3
+        // branch, this would throw instead of silently passing.
+        vi.spyOn(StorageService, 'getWriteBackend').mockReturnValue(diskBackend);
+
+        const result = await sut.uploadAsset(authStub.user1, createDto, file);
+
+        expect(result).toEqual({ id: assetEntity.id, status: AssetMediaStatus.CREATED });
+        expect(mocks.asset.update).not.toHaveBeenCalled();
+      });
     });
 
     it('should handle a duplicate', async () => {
