@@ -20,7 +20,11 @@ import { UserTable } from 'src/schema/tables/user.table';
   referencingOldTableAs: 'old',
 })
 export class AssetFavoriteTable {
-  @ForeignKeyColumn(() => UserTable, { onDelete: 'CASCADE', onUpdate: 'CASCADE', primary: true })
+  // index: false — userId is the leading column of the composite PK, so its btree already serves
+  // "my favorites" and a separate FK index would be redundant. The migration creates no such index;
+  // saying so here is what keeps the declarative schema and a migrated database in agreement
+  // (medium test `schema-drift.spec.ts`). Same shape as asset_duplicate_checksum.
+  @ForeignKeyColumn(() => UserTable, { onDelete: 'CASCADE', onUpdate: 'CASCADE', primary: true, index: false })
   userId!: string;
 
   @ForeignKeyColumn(() => AssetTable, { onDelete: 'CASCADE', onUpdate: 'CASCADE', primary: true, index: true })
