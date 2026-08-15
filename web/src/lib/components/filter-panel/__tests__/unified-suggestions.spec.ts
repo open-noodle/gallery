@@ -234,4 +234,23 @@ describe('Unified suggestionsProvider', () => {
       );
     });
   });
+
+  it('should forward locationPresence to the suggestions provider when a no-location entry is selected', async () => {
+    const config = createUnifiedConfig({
+      suggestionsProvider: vi.fn().mockResolvedValue({ ...defaultResponse, hasNoGpsAssets: true }),
+    });
+    render(FilterPanel, { props: { config, timeBuckets } });
+
+    await vi.advanceTimersByTimeAsync(0);
+    await waitFor(() => expect(screen.getByTestId('location-presence-noGps')).toBeTruthy());
+
+    await fireEvent.click(screen.getByTestId('location-presence-noGps'));
+    await vi.advanceTimersByTimeAsync(50);
+
+    await waitFor(() => {
+      expect(config.suggestionsProvider).toHaveBeenLastCalledWith(
+        expect.objectContaining({ locationPresence: 'noGps' }),
+      );
+    });
+  });
 });
