@@ -70,7 +70,7 @@ class _CollectionPickerState extends ConsumerState<CollectionPicker> {
       // Nothing landed and the server said why — "already in this album" would be a lie.
       ImmichToast.show(
         context: context,
-        msg: 'assets_cannot_be_added_to_album_count'.t(context: context, args: {'count': result.failedCount}),
+        msg: context.t.assets_cannot_be_added_to_album_count(count: result.failedCount),
         toastType: ToastType.error,
       );
       return;
