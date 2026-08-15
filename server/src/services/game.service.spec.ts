@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { SharedSpaceRole } from 'src/enum';
 import { GameService } from 'src/services/game.service';
 import { newTestService, ServiceMocks } from 'test/utils';
@@ -132,5 +132,114 @@ describe(GameService.name, () => {
     expect(rounds).toHaveLength(5);
     const ids = rounds.map((r: any) => r.assetId);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  describe('guess', () => {
+    const challengeStub = {
+      id: 'challenge-1',
+      spaceId: 'space-1',
+      scaleKm: 15_000,
+      scaleDays: 3000,
+      roundCount: 5,
+    } as any;
+
+    beforeEach(() => {
+      mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Viewer } as any);
+      mocks.game.getChallenge.mockResolvedValue(challengeStub);
+    });
+
+    it('scores a location guess from the distance to the frozen answer', async () => {
+      mocks.game.getRound.mockResolvedValue({
+        id: 'round-1',
+        challengeId: 'challenge-1',
+        index: 0,
+        type: 'location',
+        answerLat: 52.5,
+        answerLon: 13.4,
+        answerDate: null,
+      } as any);
+      mocks.game.createGuess.mockImplementation((guess: any) => guess);
+
+      const result = await sut.guess(authStub, 'challenge-1', 0, { lat: 52.5, lon: 13.4 });
+
+      expect(result.score).toBe(5000);
+      expect(result.distanceKm).toBeCloseTo(0, 5);
+    });
+
+    it('scores a date guess from the day offset', async () => {
+      mocks.game.getRound.mockResolvedValue({
+        id: 'round-2',
+        challengeId: 'challenge-1',
+        index: 1,
+        type: 'date',
+        answerLat: null,
+        answerLon: null,
+        answerDate: new Date(2020, 6, 1),
+      } as any);
+      mocks.game.createGuess.mockImplementation((guess: any) => guess);
+
+      const result = await sut.guess(authStub, 'challenge-1', 1, { date: new Date(2020, 6, 1).toISOString() });
+
+      expect(result.score).toBe(5000);
+      expect(result.offsetDays).toBe(0);
+    });
+
+    it('rejects a second guess on the same round', async () => {
+      mocks.game.getRound.mockResolvedValue({
+        id: 'round-1',
+        challengeId: 'challenge-1',
+        index: 0,
+        type: 'location',
+        answerLat: 52.5,
+        answerLon: 13.4,
+        answerDate: null,
+      } as any);
+      mocks.game.createGuess.mockRejectedValue(
+        Object.assign(new Error('duplicate key'), { constraint: 'game_guess_round_user_uq' }),
+      );
+
+      await expect(sut.guess(authStub, 'challenge-1', 0, { lat: 1, lon: 1 })).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('rejects a location guess with no coordinates', async () => {
+      mocks.game.getRound.mockResolvedValue({ id: 'r', type: 'location', challengeId: 'challenge-1' } as any);
+      await expect(sut.guess(authStub, 'challenge-1', 0, {} as any)).rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
+
+  describe('get', () => {
+    it('withholds the answer for a round the caller has not guessed', async () => {
+      mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Viewer } as any);
+      mocks.game.getChallenge.mockResolvedValue({ id: 'challenge-1', spaceId: 'space-1', roundCount: 2 } as any);
+      mocks.game.getRounds.mockResolvedValue([
+        {
+          id: 'r0',
+          index: 0,
+          type: 'location',
+          answerLat: 52.5,
+          answerLon: 13.4,
+          answerDate: null,
+          assetId: 'asset-1',
+        },
+        {
+          id: 'r1',
+          index: 1,
+          type: 'date',
+          answerLat: null,
+          answerLon: null,
+          answerDate: new Date(),
+          assetId: 'asset-2',
+        },
+      ] as any);
+      mocks.game.getGuessesForUser.mockResolvedValue([{ roundId: 'r0', score: 4000 }] as any);
+
+      const result = await sut.get(authStub, 'challenge-1');
+
+      // Guessed: answer present. Unguessed: answer absent - and no asset id, which
+      // would otherwise resolve straight back to /api/assets/:id.
+      expect(result.rounds[0].answer).toBeDefined();
+      expect(result.rounds[1].answer).toBeUndefined();
+      expect(JSON.stringify(result.rounds[1])).not.toContain('asset-2');
+    });
   });
 });
