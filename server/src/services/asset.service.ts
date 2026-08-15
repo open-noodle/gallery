@@ -64,6 +64,15 @@ import { batched, findOrFail } from 'src/utils/misc';
 import { applyResolvedIdentityMetadata } from 'src/utils/person-identity';
 import { transformOcrBoundingBox } from 'src/utils/transform';
 
+// Bounds how many cross-owner ids logCrossOwnerEdit will resolve a space for, per bulk edit —
+// it does NOT bound how many assets a user may edit. A bulk edit can carry an id list large
+// enough that resolving a space (a two-subquery UNION join) for every cross-owner id would fan
+// one request out into tens of thousands of heavy queries; logCrossOwnerEdit is best-effort
+// activity-feed attribution whose failure is already swallowed, so it is the one place in this
+// feature safe to degrade under a huge selection. Never apply this constant to AssetBulkUpdateDto
+// or to POST /assets/editable — both must answer for the user's whole selection.
+const MAX_ATTRIBUTION_ASSETS = 500;
+
 @Injectable()
 export class AssetService extends BaseService {
   async getStatistics(auth: AuthDto, dto: AssetStatsDto) {
@@ -847,8 +856,10 @@ export class AssetService extends BaseService {
       // edit is this feature's headline case, so resolving one id at a time, sequentially, would add
       // a serial-latency term proportional to the batch size. Chunk into bounded-concurrency batches
       // instead of firing all of them at once (connection-pool safety) or one at a time (latency).
+      const truncated = crossOwnerIds.length > MAX_ATTRIBUTION_ASSETS;
+      const sampledIds = crossOwnerIds.slice(0, MAX_ATTRIBUTION_ASSETS);
       const bySpace = new Map<string, string[]>();
-      for (const chunk of _.chunk(crossOwnerIds, 10)) {
+      for (const chunk of _.chunk(sampledIds, 10)) {
         const spaces = await Promise.all(
           chunk.map((assetId) => this.sharedSpaceRepository.findSpaceForAssetAndUser(assetId, auth.user.id)),
         );
@@ -868,7 +879,7 @@ export class AssetService extends BaseService {
           spaceId,
           userId: auth.user.id,
           type: SharedSpaceActivityType.AssetEdit,
-          data: { count: ids.length, assetIds: ids.slice(0, 4) },
+          data: { count: ids.length, assetIds: ids.slice(0, 4), ...(truncated && { truncated: true }) },
         });
       }
     } catch (error) {

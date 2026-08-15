@@ -3395,6 +3395,43 @@ describe(AssetService.name, () => {
       );
     });
 
+    it('S-52: caps space resolution at MAX_ATTRIBUTION_ASSETS cross-owner ids and marks the row truncated', async () => {
+      const auth = AuthFactory.create();
+      // Mirrors MAX_ATTRIBUTION_ASSETS in asset.service.ts — this pins the cap's VALUE together
+      // with its enforcement, so a change to the constant must update this test too.
+      const CAP = 500;
+      const ids = Array.from({ length: CAP + 1 }, () => newUuid());
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set(ids));
+      mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue({ spaceId: 'space-1' } as any);
+      mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
+
+      await sut.updateAll(auth, { ids, description: 'bulk' });
+
+      // At most CAP queries — one over the cap would mean the amplification this fix closes is back.
+      expect(mocks.sharedSpace.findSpaceForAssetAndUser).toHaveBeenCalledTimes(CAP);
+      expect(mocks.sharedSpace.logActivity).toHaveBeenCalledWith(
+        expect.objectContaining({ spaceId: 'space-1', data: expect.objectContaining({ count: CAP, truncated: true }) }),
+      );
+    });
+
+    it('S-53: a bulk edit under the cap resolves every cross-owner id and never sets truncated', async () => {
+      const auth = AuthFactory.create();
+      const ids = Array.from({ length: 10 }, () => newUuid());
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set(ids));
+      mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue({ spaceId: 'space-1' } as any);
+      mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
+
+      await sut.updateAll(auth, { ids, description: 'bulk' });
+
+      expect(mocks.sharedSpace.findSpaceForAssetAndUser).toHaveBeenCalledTimes(10);
+      expect(mocks.sharedSpace.logActivity).toHaveBeenCalledTimes(1);
+      const [[{ data }]] = mocks.sharedSpace.logActivity.mock.calls;
+      expect(data).toMatchObject({ count: 10 });
+      expect(Object.hasOwn(data as object, 'truncated')).toBe(false);
+    });
+
     it('S-47: an owner locking their own space asset does not log a cross-owner edit', async () => {
       // Pins the review-caught #734 regression: checkOwnerAccess filters out a Locked row when
       // hasElevatedPermission is falsy (e.g. any API-key session). The rbac-3 guard runs BEFORE the
