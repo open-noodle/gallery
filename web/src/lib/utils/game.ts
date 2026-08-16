@@ -52,3 +52,36 @@ export const yearFromIso = (iso: string): number => new Date(iso).getUTCFullYear
  * `z.number().min(-180).max(180)` and 400s on anything outside it.
  */
 export const wrapLongitude = (lng: number): number => ((((lng + 180) % 360) + 360) % 360) - 180;
+
+/**
+ * Competition ranks - `1, 2, 2, 4` - for a board already sorted best-first.
+ *
+ * Rank ties on the displayed VALUE only. Two players on 4,200 points share second place even
+ * though the ordering put one above the other on a tie-break the board does not show; numbering
+ * them 2 and 3 would claim a winner the score does not support.
+ */
+export const competitionRanks = (totals: number[]): number[] => {
+  let lastTotal: number | undefined;
+  let lastRank = 0;
+  return totals.map((total, index) => {
+    if (total !== lastTotal) {
+      lastTotal = total;
+      lastRank = index + 1;
+    }
+    return lastRank;
+  });
+};
+
+/**
+ * A `YYYY-MM` standings key as a month name, e.g. `August 2026`.
+ *
+ * Built with `Date.UTC` rather than `new Date('2026-08')`: the string form is parsed as UTC by
+ * spec but formatted in the viewer's zone, so anyone west of Greenwich would be shown the previous
+ * month. The server's month is a UTC month; this renders that same month.
+ */
+export const formatStandingsMonth = (month: string, locale?: string): string => {
+  const [year, monthNumber] = month.split('-').map(Number);
+  return new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(
+    new Date(Date.UTC(year, monthNumber - 1, 1)),
+  );
+};
