@@ -50,8 +50,25 @@ describe('space games page load', () => {
       scaleKm: 100,
       closedAt: null,
       createdAt: '2026-01-01T00:00:00.000Z',
+      dailyOn: null,
+      locationRoundCount: 3,
     },
   ];
+
+  const daily = {
+    id: 'daily-1',
+    spaceId: 'space-1',
+    name: '2026-08-16',
+    roundCount: 5,
+    answered: 0,
+    total: 0,
+    scaleDays: 30,
+    scaleKm: 100,
+    closedAt: null,
+    createdAt: '2026-08-16T00:00:00.000Z',
+    dailyOn: '2026-08-16',
+    locationRoundCount: 3,
+  };
 
   const makeEvent = (overrides: { spaceId?: string } = {}) => ({
     url: new URL(`https://gallery.test/spaces/${overrides.spaceId ?? 'space-1'}/games`),
@@ -62,12 +79,14 @@ describe('space games page load', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     sdkMock.getChallenges.mockResolvedValue(challenges as never);
+    sdkMock.getDailyChallenge.mockResolvedValue({ challenge: daily } as never);
   });
 
-  it('authenticates, loads the parent layout, then loads the space challenges', async () => {
+  it('authenticates, loads the parent layout, then loads the challenges and the daily', async () => {
     const event = makeEvent();
     await expect(load(event as never)).resolves.toEqual({
       challenges,
+      daily,
       meta: { title: 'Test Space - Challenges' },
     });
 
@@ -77,6 +96,20 @@ describe('space games page load', () => {
     expect(sdkMock.getSpace).not.toHaveBeenCalled();
     expect(sdkMock.getMembers).not.toHaveBeenCalled();
     expect(sdkMock.getChallenges).toHaveBeenCalledWith({ spaceId: 'space-1' });
+    expect(sdkMock.getDailyChallenge).toHaveBeenCalledWith({ spaceId: 'space-1' });
+  });
+
+  // A space with nothing playable has no daily, and that is an ordinary page state - the server
+  // says so with a null challenge rather than an error, and the load must pass it through as null
+  // instead of treating it as a missing field.
+  it('passes through a null daily for a space that cannot produce one', async () => {
+    sdkMock.getDailyChallenge.mockResolvedValue({ challenge: null } as never);
+
+    await expect(load(makeEvent() as never)).resolves.toEqual({
+      challenges,
+      daily: null,
+      meta: { title: 'Test Space - Challenges' },
+    });
   });
 
   it('rejects when the challenge list fails to load', async () => {
