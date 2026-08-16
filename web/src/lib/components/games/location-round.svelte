@@ -31,9 +31,15 @@
   <div class="absolute inset-x-3 bottom-3 flex flex-col gap-2 sm:inset-x-auto sm:inset-e-3 sm:w-72 md:w-80">
     <div class="h-48 overflow-hidden rounded-2xl shadow-lg sm:h-56">
       <!-- mapMarkers must stay an explicit [] — leaving it undefined makes Map.svelte fetch and
-           render the space's own photo markers (getMapMarkers), which could include the round's
-           answer. The player's placed pin still renders: handleMapClick in Map.svelte drops a
-           plain maplibre-gl Marker on click, independent of mapMarkers. -->
+           render the player's ENTIRE geotagged library (getMapMarkers, global — not space-scoped;
+           the space-scoped endpoint needs a spaceId prop that isn't passed here), which could
+           include the round's answer. That [] guard only covers the mount-time fetch, though:
+           mapMarkers is $bindable(), and both the settings-cog path (handleSettingsClick) and
+           onAssetsChanged (Map.svelte) write a freshly-fetched marker set back into it regardless
+           of what was passed in. showSettings={false} below closes the settings-cog path, the only
+           other way this component can trigger that fetch. The player's placed pin still renders:
+           handleMapClick in Map.svelte drops a plain maplibre-gl Marker on click, independent of
+           mapMarkers. -->
       <Map
         mapMarkers={[]}
         clickable
@@ -41,6 +47,7 @@
         simplified
         rounded
         showSimpleControls={false}
+        showSettings={false}
         onClickPoint={({ lat, lng }) => (pin = { lat, lon: lng })}
       />
     </div>

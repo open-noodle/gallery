@@ -105,7 +105,15 @@
         <div class="mt-2 h-40 overflow-hidden rounded-2xl shadow-lg sm:h-48">
           <!-- useLocationPin: our marker ids ('guess'/'answer') are not real asset IDs, so the
                default image-marker branch would 404 (see the mapMarkers comment above). -->
-          <Map {mapMarkers} autoFitBounds useLocationPin simplified rounded showSimpleControls={false}>
+          <Map
+            {mapMarkers}
+            autoFitBounds
+            useLocationPin
+            simplified
+            rounded
+            showSimpleControls={false}
+            showSettings={false}
+          >
             {#snippet popup({ marker })}
               <!-- Map.svelte's location-pin branch draws the SAME icon (colour, shape, size) for
                    every marker (Map.svelte:429-431) — there is no per-marker style override in its

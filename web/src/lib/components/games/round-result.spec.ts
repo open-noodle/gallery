@@ -52,6 +52,22 @@ describe('RoundResult', () => {
     expect(screen.getByTestId('map-stub')).toHaveAttribute('data-marker-ids', 'guess,answer');
   });
 
+  // The settings cog on Map.svelte defaults to visible; clicking it isn't an answer leak here (the
+  // reveal has already happened), but it would refetch and overwrite mapMarkers, destroying the
+  // guess/answer pins mid-reveal. showSettings={false} must be passed explicitly.
+  it('never exposes the map settings control on the reveal map', () => {
+    render(RoundResult, {
+      ...base,
+      type: 'location' as const,
+      score: 3200,
+      distanceKm: 7.5,
+      guess: { lat: 1, lon: 2 },
+      answer: { date: null, lat: 10, lon: 20 },
+    });
+
+    expect(screen.getByTestId('map-stub')).toHaveAttribute('showsettings', 'false');
+  });
+
   it('labels the guess pin so it can be told apart from the identical-looking answer pin', () => {
     render(RoundResult, {
       ...base,
