@@ -1493,16 +1493,72 @@ and replace the render at lines 219-221:
 
 (remove the now-unused default `GameLeaderboard` import line if it duplicates the new one).
 
-- [ ] **Step 5: Run the component and play-page tests**
+- [ ] **Step 5: Fix the three things this breaks in the play-page spec**
+
+These are not "may need" — each one is a confirmed break, and the third is a test that keeps passing while testing nothing.
+
+**5a. `authManager.user` throws when unset.** `auth-manager.svelte.ts:28-34` throws `TypeError: AuthManager.user is undefined`, and this spec never sets a user — it mocks `UserPageLayout` precisely to avoid the NavigationBar reading it. Add to the imports and the `beforeEach` (line 87), matching `space-games-page.spec.ts`:
+
+```ts
+import { authManager } from '$lib/managers/auth-manager.svelte';
+import { preferencesFactory } from '@test-data/factories/preferences-factory';
+import { userAdminFactory } from '@test-data/factories/user-factory';
+
+beforeEach(() => {
+  vi.resetAllMocks();
+  authManager.setUser(userAdminFactory.build({ id: 'current-user-id' }));
+  authManager.setPreferences(preferencesFactory.build());
+  sdkMock.getChallenge.mockResolvedValue(makeChallenge());
+});
+```
+
+**5b. `renderPage` passes no members.** It builds `props = { data: { challenge } }` (line 73). SvelteKit merges layout data at runtime, but a directly-rendered component gets only what the test hands it, so `data.members` is `undefined` and `.map` throws. Give it a default that covers the existing fixture:
+
+```ts
+function renderPage(
+  challenge: GameChallengeDetailResponseDto,
+  members: SharedSpaceMemberResponseDto[] = [
+    {
+      userId: 'u1',
+      name: 'Alice',
+      email: 'alice@example.com',
+      role: SharedSpaceRole.Viewer,
+      showInTimeline: false,
+      sharePersonMetadata: true,
+      joinedAt: '2026-01-01T00:00:00.000Z',
+    } as SharedSpaceMemberResponseDto,
+  ],
+) {
+  const props = { data: { challenge, members } };
+  return render(TestWrapper as Component<{ component: typeof GamePlayPage; componentProps: typeof props }>, {
+    component: GamePlayPage,
+    componentProps: props,
+  });
+}
+```
+
+`u1` is the userId the existing leaderboard fixture at line 155 already uses.
+
+**5c. The existing leaderboard assertion is now vacuous.** `data-testid="game-leaderboard"` sits on the `<table>`, which renders even with zero rows — so `getByTestId('game-leaderboard')` would pass even if the member lookup dropped every entry. Strengthen the test at line 148 so it fails when no row renders:
+
+```ts
+await waitFor(() => expect(screen.getByTestId('game-leaderboard')).toBeInTheDocument());
+expect(screen.getByTestId('leaderboard-row')).toHaveTextContent('Alice');
+expect(screen.getByTestId('game-completed')).toHaveTextContent('Completed');
+```
+
+Do the same at the second leaderboard assertion (line 455) if it has a non-empty entries fixture.
+
+- [ ] **Step 6: Run the component and play-page tests**
 
 ```bash
 cd web && pnpm test -- --run src/lib/components/games/game-leaderboard.spec.ts
 cd web && pnpm test -- --run "src/routes/(user)/spaces/[spaceId]/games/[challengeId=id]/game-play-page.spec.ts"
 ```
 
-Expected: both PASS. The play-page spec may need its leaderboard assertions and its `data.members` fixture updated; update them rather than loosening them.
+Expected: both PASS, with every pre-existing play-page test still green.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add web/src/lib/components/games/game-leaderboard.svelte \
