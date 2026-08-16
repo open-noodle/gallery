@@ -8,6 +8,7 @@ import {
   GameChallengeListItemResponseDto,
   GameChallengeResponseDto,
   GameCreateDto,
+  GameDailyResponseDto,
   GameGuessDto,
   GameGuessResponseDto,
   GameLeaderboardResponseDto,
@@ -60,6 +61,18 @@ export class GameController {
     @Param() { spaceId }: GameSpaceParamDto,
   ): Promise<GameChallengeListItemResponseDto[]> {
     return this.service.list(auth, spaceId);
+  }
+
+  @Get('shared-spaces/:spaceId/games/daily')
+  @Authenticated({ permission: Permission.SharedSpaceRead })
+  @Endpoint({
+    summary: "Get the space's daily challenge",
+    description:
+      "Get today's daily challenge for a shared space, generating it on first read. Returns a null challenge when the space has no photos usable for one.",
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  getDailyChallenge(@Auth() auth: AuthDto, @Param() { spaceId }: GameSpaceParamDto): Promise<GameDailyResponseDto> {
+    return this.service.getDaily(auth, spaceId);
   }
 
   @Get('games/:id')
