@@ -20979,6 +20979,63 @@
         "x-immich-state": "Beta"
       }
     },
+    "/shared-spaces/{spaceId}/games/daily": {
+      "get": {
+        "description": "Get today's daily challenge for a shared space, generating it on first read. Returns a null challenge when the space has no photos usable for one.",
+        "operationId": "getDailyChallenge",
+        "parameters": [
+          {
+            "name": "spaceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameDailyResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Get the space's daily challenge",
+        "tags": [
+          "Games"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "sharedSpace.read",
+        "x-immich-state": "Beta"
+      }
+    },
     "/stacks": {
       "delete": {
         "description": "Delete multiple stacks by providing a list of stack IDs.",
@@ -32170,6 +32227,11 @@
             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
             "type": "string"
           },
+          "dailyOn": {
+            "description": "The UTC date this is the space's daily challenge for, or null for a player-created one",
+            "nullable": true,
+            "type": "string"
+          },
           "id": {
             "description": "Challenge ID",
             "type": "string"
@@ -32205,6 +32267,7 @@
         "required": [
           "closedAt",
           "createdAt",
+          "dailyOn",
           "id",
           "name",
           "roundCount",
@@ -32236,9 +32299,18 @@
             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
             "type": "string"
           },
+          "dailyOn": {
+            "description": "The UTC date this is the space's daily challenge for, or null for a player-created one",
+            "nullable": true,
+            "type": "string"
+          },
           "id": {
             "description": "Challenge ID",
             "type": "string"
+          },
+          "locationRoundCount": {
+            "description": "How many of the rounds are location rounds",
+            "type": "number"
           },
           "name": {
             "description": "Challenge name",
@@ -32269,7 +32341,9 @@
           "answered",
           "closedAt",
           "createdAt",
+          "dailyOn",
           "id",
+          "locationRoundCount",
           "name",
           "roundCount",
           "scaleDays",
@@ -32286,6 +32360,11 @@
             "example": "2024-01-01T00:00:00.000Z",
             "format": "date-time",
             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "type": "string"
+          },
+          "dailyOn": {
+            "description": "The UTC date this is the space's daily challenge for, or null for a player-created one",
+            "nullable": true,
             "type": "string"
           },
           "id": {
@@ -32315,6 +32394,7 @@
         },
         "required": [
           "createdAt",
+          "dailyOn",
           "id",
           "name",
           "roundCount",
@@ -32323,6 +32403,14 @@
           "spaceId"
         ],
         "type": "object"
+      },
+      "GameChallengeType": {
+        "enum": [
+          "mixed",
+          "location",
+          "date"
+        ],
+        "type": "string"
       },
       "GameCreateDto": {
         "properties": {
@@ -32337,8 +32425,30 @@
             "maximum": 20,
             "minimum": 1,
             "type": "integer"
+          },
+          "type": {
+            "$ref": "#/components/schemas/GameChallengeType",
+            "default": "mixed",
+            "description": "Which kinds of round to generate"
           }
         },
+        "type": "object"
+      },
+      "GameDailyResponseDto": {
+        "properties": {
+          "challenge": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/GameChallengeListItemResponseDto"
+              }
+            ],
+            "description": "Today's daily, if one could be generated",
+            "nullable": true
+          }
+        },
+        "required": [
+          "challenge"
+        ],
         "type": "object"
       },
       "GameGuessDto": {

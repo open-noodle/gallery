@@ -6,12 +6,18 @@ import z from 'zod';
 // plain string union rather than a real enum, so there is nothing to import here.
 const GameRoundTypeSchema = z.enum(['location', 'date']).meta({ id: 'GameRoundType' });
 
+// Which kinds of round to build. 'mixed' is the historical behaviour; the other two are an explicit
+// request that must be met exactly or refused, never quietly filled with the other kind.
+const GameChallengeTypeSchema = z.enum(['mixed', 'location', 'date']).meta({ id: 'GameChallengeType' });
+export type GameChallengeType = z.infer<typeof GameChallengeTypeSchema>;
+
 const GameCreateSchema = z
   .object({
     // No .min(1): GameService.create() falls back to a generated name ("Challenge N") when this
     // trims to empty, so rejecting an empty string here would take that fallback away from callers.
     name: z.string().trim().max(100).optional().describe('Challenge name'),
     roundCount: z.int().min(1).max(20).default(5).optional().describe('Number of rounds to generate'),
+    type: GameChallengeTypeSchema.default('mixed').optional().describe('Which kinds of round to generate'),
   })
   .meta({ id: 'GameCreateDto' });
 
@@ -50,6 +56,13 @@ const GameChallengeResponseSchema = z
     scaleKm: z.number().describe('Frozen distance scale used to score location rounds'),
     scaleDays: z.number().describe('Frozen day scale used to score date rounds'),
     createdAt: isoDatetimeToDate.describe('Creation date'),
+    // A plain YYYY-MM-DD string, not a datetime: the daily is keyed to a UTC CALENDAR day, and
+    // parsing it into a Date would reintroduce the timezone question the date column exists to
+    // settle.
+    dailyOn: z
+      .string()
+      .nullable()
+      .describe("The UTC date this is the space's daily challenge for, or null for a player-created one"),
   })
   .meta({ id: 'GameChallengeResponseDto' });
 
@@ -57,7 +70,20 @@ const GameChallengeListItemResponseSchema = GameChallengeResponseSchema.extend({
   closedAt: isoDatetimeToDate.nullable().describe('When this challenge was closed, if at all'),
   answered: z.number().describe('Number of rounds the caller has answered'),
   total: z.number().describe("The caller's total score across answered rounds"),
+  // The count of rounds that ARE location rounds, so the client can label the challenge from what
+  // it actually contains. Deliberately not a stored "requested type", which would keep claiming
+  // 'location' for a challenge the generator could only partly fill.
+  locationRoundCount: z.number().describe('How many of the rounds are location rounds'),
 }).meta({ id: 'GameChallengeListItemResponseDto' });
+
+// A wrapper rather than a bare nullable challenge: a space with no usable photos has no daily, and
+// that is an ordinary state of the page, not an error. Returning 404 would make the client treat a
+// normal empty space as a failure.
+const GameDailyResponseSchema = z
+  .object({
+    challenge: GameChallengeListItemResponseSchema.nullable().describe("Today's daily, if one could be generated"),
+  })
+  .meta({ id: 'GameDailyResponseDto' });
 
 // The withheld shape for a round the caller has not guessed yet carries only index/type - no
 // assetId, coordinates, date or filename. GameService.toRoundDetail() is the only place allowed to
@@ -115,6 +141,7 @@ export class GameRoundParamDto extends createZodDto(GameRoundParamSchema) {}
 export class GameGuessDto extends createZodDto(GameGuessSchema) {}
 export class GameChallengeResponseDto extends createZodDto(GameChallengeResponseSchema) {}
 export class GameChallengeListItemResponseDto extends createZodDto(GameChallengeListItemResponseSchema) {}
+export class GameDailyResponseDto extends createZodDto(GameDailyResponseSchema) {}
 export class GameRoundDetailResponseDto extends createZodDto(GameRoundDetailResponseSchema) {}
 export class GameChallengeDetailResponseDto extends createZodDto(GameChallengeDetailResponseSchema) {}
 export class GameGuessResponseDto extends createZodDto(GameGuessResponseSchema) {}

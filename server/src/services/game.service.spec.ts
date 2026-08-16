@@ -507,6 +507,7 @@ describe(GameService.name, () => {
     it('returns an empty list for a space with no challenges', async () => {
       mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Viewer } as any);
       mocks.game.getChallengesForSpace.mockResolvedValue([]);
+      mocks.game.getLocationRoundCounts.mockResolvedValue([]);
 
       const result = await sut.list(authStub, 'space-1');
 
@@ -515,6 +516,7 @@ describe(GameService.name, () => {
 
     it("annotates each challenge with the caller's own progress, not another member's", async () => {
       mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Viewer } as any);
+      mocks.game.getLocationRoundCounts.mockResolvedValue([{ challengeId: 'challenge-1', locationCount: 3 }]);
       mocks.game.getChallengesForSpace.mockResolvedValue([
         {
           id: 'challenge-1',
@@ -552,6 +554,171 @@ describe(GameService.name, () => {
       ]);
       expect(mocks.game.getGuessesForUser).toHaveBeenCalledWith('challenge-1', authStub.user.id);
       expect(mocks.game.getGuessesForUser).toHaveBeenCalledWith('challenge-2', authStub.user.id);
+    });
+  });
+
+  /** The round types actually handed to the repository on the call under test. */
+  const insertedRoundTypes = (mocks: ServiceMocks) =>
+    (mocks.game.createChallenge.mock.calls[0][1] as Array<{ type: string }>).map((round) => round.type);
+
+  describe('game type', () => {
+    it('builds only date rounds when date is requested', async () => {
+      stockPools(mocks);
+
+      await sut.create(authStub, 'space-1', { roundCount: 5, type: 'date' });
+
+      expect(insertedRoundTypes(mocks)).not.toHaveLength(0);
+      expect(new Set(insertedRoundTypes(mocks))).toEqual(new Set(['date']));
+    });
+
+    it('builds only location rounds when location is requested', async () => {
+      stockPools(mocks);
+
+      await sut.create(authStub, 'space-1', { roundCount: 5, type: 'location' });
+
+      expect(insertedRoundTypes(mocks)).not.toHaveLength(0);
+      expect(new Set(insertedRoundTypes(mocks))).toEqual(new Set(['location']));
+    });
+
+    // An explicit request must not be quietly satisfied with the other kind of round: asking for a
+    // location game in a space with no GPS photos is a request that cannot be met, and silently
+    // handing back date rounds would look like the type picker did nothing.
+    it('rejects a location game in a space with no GPS photos, rather than substituting date rounds', async () => {
+      mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Editor } as any);
+      mocks.game.getLocationCandidates.mockResolvedValue([]);
+      mocks.game.getDateCandidates.mockResolvedValue([locationCandidate('e', 41.9, 12.5, 'Italy')]);
+      mocks.game.getRecentlyUsedAssetIds.mockResolvedValue([]);
+
+      await expect(sut.create(authStub, 'space-1', { roundCount: 5, type: 'location' })).rejects.toThrow(/GPS/);
+      expect(mocks.game.createChallenge).not.toHaveBeenCalled();
+    });
+
+    it('still mixes both kinds by default', async () => {
+      stockPools(mocks);
+
+      await sut.create(authStub, 'space-1', { roundCount: 5 });
+
+      expect(new Set(insertedRoundTypes(mocks))).toEqual(new Set(['location', 'date']));
+    });
+  });
+
+  describe('daily challenge', () => {
+    const TODAY = '2026-08-16';
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      // Deliberately late in the UTC day: a daily keyed off local time would roll over to the 17th
+      // for anyone east of UTC, giving members of the same space different "todays" on one board.
+      vi.setSystemTime(new Date('2026-08-16T23:30:00.000Z'));
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('generates the daily on first read, stamped with the UTC date', async () => {
+      stockPools(mocks);
+      mocks.game.getDailyChallenge.mockResolvedValue(void 0);
+      mocks.game.getGuessesForUser.mockResolvedValue([]);
+      mocks.game.getRounds.mockResolvedValue([]);
+
+      await sut.getDaily(authStub, 'space-1');
+
+      expect(mocks.game.createChallenge).toHaveBeenCalledWith(
+        expect.objectContaining({ dailyOn: TODAY, createdById: null }),
+        expect.anything(),
+      );
+    });
+
+    // A viewer has to be able to trigger generation: the daily belongs to the space, and whoever
+    // opens the page first that day should not need the editor role to see it.
+    it('lets a viewer read (and so generate) the daily', async () => {
+      stockPools(mocks);
+      mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Viewer } as any);
+      mocks.game.getDailyChallenge.mockResolvedValue(void 0);
+      mocks.game.getGuessesForUser.mockResolvedValue([]);
+      mocks.game.getRounds.mockResolvedValue([]);
+
+      await expect(sut.getDaily(authStub, 'space-1')).resolves.toBeDefined();
+    });
+
+    it('reuses the existing daily instead of generating a second one', async () => {
+      stockPools(mocks);
+      mocks.game.getDailyChallenge.mockResolvedValue({
+        id: 'daily-1',
+        spaceId: 'space-1',
+        name: 'Daily',
+        roundCount: 5,
+        scaleKm: 100,
+        scaleDays: 30,
+        dailyOn: TODAY,
+        closedAt: null,
+        createdAt: new Date(),
+      } as any);
+      mocks.game.getGuessesForUser.mockResolvedValue([]);
+      mocks.game.getRounds.mockResolvedValue([]);
+
+      const result = await sut.getDaily(authStub, 'space-1');
+
+      expect(result.challenge?.id).toBe('daily-1');
+      expect(mocks.game.createChallenge).not.toHaveBeenCalled();
+    });
+
+    // Two members opening the page in the same second both find no daily and both generate one.
+    // The partial unique index on (spaceId, dailyOn) makes the loser fail; it must then read the
+    // winner's row rather than surfacing a 500, so both players get the SAME challenge.
+    it('recovers from losing the generation race by re-reading the winner', async () => {
+      stockPools(mocks);
+      mocks.game.getDailyChallenge.mockResolvedValueOnce(void 0).mockResolvedValueOnce({
+        id: 'daily-winner',
+        spaceId: 'space-1',
+        name: 'Daily',
+        roundCount: 5,
+        scaleKm: 100,
+        scaleDays: 30,
+        dailyOn: TODAY,
+        closedAt: null,
+        createdAt: new Date(),
+      } as any);
+      mocks.game.createChallenge.mockRejectedValue({ constraint_name: 'game_challenge_daily_uq' });
+      mocks.game.getGuessesForUser.mockResolvedValue([]);
+      mocks.game.getRounds.mockResolvedValue([]);
+
+      const result = await sut.getDaily(authStub, 'space-1');
+
+      expect(result.challenge?.id).toBe('daily-winner');
+    });
+
+    // A space with nothing playable must not 500 or 400 the whole page - the daily is simply
+    // unavailable today, which the page renders as its own state.
+    it('reports the daily as unavailable when the space has no usable photos', async () => {
+      mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Viewer } as any);
+      mocks.game.getDailyChallenge.mockResolvedValue(void 0);
+      mocks.game.getLocationCandidates.mockResolvedValue([]);
+      mocks.game.getDateCandidates.mockResolvedValue([]);
+      mocks.game.getRecentlyUsedAssetIds.mockResolvedValue([]);
+
+      await expect(sut.getDaily(authStub, 'space-1')).resolves.toEqual({ challenge: null });
+    });
+
+    it('refuses to delete the daily, which is shared state rather than one member’s row', async () => {
+      mocks.game.getChallenge.mockResolvedValue({ id: 'daily-1', spaceId: 'space-1', dailyOn: TODAY } as any);
+      mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Owner } as any);
+
+      await expect(sut.delete(authStub, 'daily-1')).rejects.toBeInstanceOf(BadRequestException);
+      expect(mocks.game.deleteChallenge).not.toHaveBeenCalled();
+    });
+
+    it('keeps the daily out of the space challenge list', async () => {
+      mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Viewer } as any);
+      mocks.game.getChallengesForSpace.mockResolvedValue([]);
+      mocks.game.getLocationRoundCounts.mockResolvedValue([]);
+
+      await sut.list(authStub, 'space-1');
+
+      // The exclusion belongs in the query, not in a post-filter here: a service-side filter would
+      // still pay for loading every daily the space has ever had.
+      expect(mocks.game.getChallengesForSpace).toHaveBeenCalledWith('space-1');
     });
   });
 });

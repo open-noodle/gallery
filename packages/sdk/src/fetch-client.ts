@@ -2159,6 +2159,8 @@ export type GameChallengeDetailResponseDto = {
     closedAt: string | null;
     /** Creation date */
     createdAt: string;
+    /** The UTC date this is the space's daily challenge for, or null for a player-created one */
+    dailyOn: string | null;
     /** Challenge ID */
     id: string;
     /** Challenge name */
@@ -4096,8 +4098,12 @@ export type GameChallengeListItemResponseDto = {
     closedAt: string | null;
     /** Creation date */
     createdAt: string;
+    /** The UTC date this is the space's daily challenge for, or null for a player-created one */
+    dailyOn: string | null;
     /** Challenge ID */
     id: string;
+    /** How many of the rounds are location rounds */
+    locationRoundCount: number;
     /** Challenge name */
     name: string;
     /** Number of rounds actually generated (may be less than requested) */
@@ -4116,10 +4122,14 @@ export type GameCreateDto = {
     name?: string;
     /** Number of rounds to generate */
     roundCount?: number;
+    /** Which kinds of round to generate */
+    "type"?: GameChallengeType;
 };
 export type GameChallengeResponseDto = {
     /** Creation date */
     createdAt: string;
+    /** The UTC date this is the space's daily challenge for, or null for a player-created one */
+    dailyOn: string | null;
     /** Challenge ID */
     id: string;
     /** Challenge name */
@@ -4132,6 +4142,10 @@ export type GameChallengeResponseDto = {
     scaleKm: number;
     /** Shared space ID */
     spaceId: string;
+};
+export type GameDailyResponseDto = {
+    /** Today's daily, if one could be generated */
+    challenge: (GameChallengeListItemResponseDto) | null;
 };
 export type StackResponseDto = {
     assets: AssetResponseDto[];
@@ -9825,6 +9839,19 @@ export function createChallenge({ spaceId, gameCreateDto }: {
     })));
 }
 /**
+ * Get the space's daily challenge
+ */
+export function getDailyChallenge({ spaceId }: {
+    spaceId: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: GameDailyResponseDto;
+    }>(`/shared-spaces/${encodeURIComponent(spaceId)}/games/daily`, {
+        ...opts
+    }));
+}
+/**
  * Delete stacks
  */
 export function deleteStacks({ bulkIdsDto }: {
@@ -11626,6 +11653,11 @@ export enum SharedSpaceRole {
 export enum RepresentativeFaceSource {
     Auto = "auto",
     Manual = "manual"
+}
+export enum GameChallengeType {
+    Mixed = "mixed",
+    Location = "location",
+    Date = "date"
 }
 export enum StorageMigrationDirection {
     ToS3 = "toS3",
