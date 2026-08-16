@@ -89,7 +89,7 @@ function renderPage(challenges: GameChallengeListItemResponseDto[], role: Shared
       space: BASE_SPACE,
       members: [makeMember(role)],
       challenges,
-      meta: { title: 'Test Space - Games' },
+      meta: { title: 'Test Space - Challenges' },
     },
   };
   return render(TestWrapper as Component<{ component: typeof SpaceGamesPage; componentProps: typeof props }>, {

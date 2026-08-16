@@ -48,16 +48,19 @@ describe('LocationRound', () => {
 
   // Placing a pin is mouse/touch-only, so the Guess button's enabled state was changing with
   // nothing announced to a screen reader. The aria-live region must be empty beforehand (an
-  // aria-live region only announces a CHANGE) and populated once a pin lands.
-  it('announces the guess button becoming available once a pin is placed', async () => {
+  // aria-live region only announces a CHANGE) and populated with the placed coordinates once a
+  // pin lands - genuinely informative content, not just a state-change tone (no i18n key needed
+  // since it's numbers, not a translated sentence).
+  it('announces the placed coordinates once a pin is placed', async () => {
     render(LocationRound, base);
 
     const announcement = screen.getByTestId('location-round-pin-announcement');
     expect(announcement).toHaveAttribute('aria-live', 'polite');
     expect(announcement).toHaveTextContent('');
 
+    // map-component.stub.svelte's click-point button fires { lat: 12.5, lng: 45.5 }.
     await fireEvent.click(screen.getByTestId('map-stub-click-point'));
 
-    expect(announcement).not.toHaveTextContent('');
+    expect(announcement).toHaveTextContent('12.50, 45.50');
   });
 });
