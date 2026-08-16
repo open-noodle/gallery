@@ -58,6 +58,21 @@ jobs:
       - name: 'Phase: estimate'
         run: pnpm tsx src/storage-migration.ts estimate
 
+      # Per-file-type routing (originals/thumbnails/encodedVideo pinned independently
+      # of IMMICH_STORAGE_BACKEND) never needs a restart — the S3 backend is initialized
+      # whenever IMMICH_S3_BUCKET is set, which docker-compose.storage-migration.yml
+      # always sets regardless of the active backend. Must run after 'estimate', which
+      # asserts every file is still on disk (toDisk total == 0) — these phases route new
+      # files to S3, which would make that assertion false if run first.
+      - name: 'Phase: routing-mixed-write'
+        run: pnpm tsx src/storage-migration.ts routing-mixed-write
+
+      - name: 'Phase: routing-flip-safe'
+        run: pnpm tsx src/storage-migration.ts routing-flip-safe
+
+      - name: 'Phase: routing-migrate-converge'
+        run: pnpm tsx src/storage-migration.ts routing-migrate-converge
+
       # ---------------------------------------------------------------
       # Phase group 2: backend=s3 — migrate to S3, verify
       # ---------------------------------------------------------------
