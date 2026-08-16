@@ -89,6 +89,10 @@ function renderPage(
   challenges: GameChallengeListItemResponseDto[],
   role: SharedSpaceRole = SharedSpaceRole.Editor,
   daily: GameChallengeListItemResponseDto | null = null,
+  boards: {
+    standings?: { month: string; entries: Array<{ userId: string; name: string; total: number; daysPlayed: number }> };
+    todayBoard?: { entries: Array<{ userId: string; name: string; total: number; answered: number }> } | null;
+  } = {},
 ) {
   const props = {
     data: {
@@ -96,6 +100,8 @@ function renderPage(
       members: [makeMember(role)],
       challenges,
       daily,
+      standings: boards.standings ?? { month: '2026-08', entries: [] },
+      todayBoard: boards.todayBoard ?? null,
       meta: { title: 'Test Space - Challenges' },
     },
   };
@@ -413,6 +419,43 @@ describe('Space games page', () => {
 
       await waitFor(() => expect(toastManagerMock.danger).toHaveBeenCalledWith('boom\n(Immich Server Error)'));
       expect(screen.getByTestId('challenge-card')).toBeInTheDocument();
+    });
+  });
+
+  describe('standings', () => {
+    const entriesFor = (userId: string) => ({
+      standings: { month: '2026-08', entries: [{ userId, name: 'Current User', total: 400, daysPlayed: 1 }] },
+      todayBoard: { entries: [{ userId, name: 'Current User', total: 400, answered: 5 }] },
+    });
+
+    it('renders the standings below the daily hero and above the challenge list', () => {
+      renderPage(
+        [],
+        SharedSpaceRole.Viewer,
+        makeChallenge({ id: 'daily-1', dailyOn: '2026-08-16', answered: 5 }),
+        entriesFor('current-user-id'),
+      );
+
+      const section = screen.getByTestId('standings-section');
+      const hero = screen.getByTestId('daily-challenge');
+      // Bitmask, not equality: compareDocumentPosition returns a set of flags.
+      expect(section.compareDocumentPosition(hero) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+      expect(screen.getAllByTestId('leaderboard-row')).toHaveLength(1);
+      expect(screen.getByTestId('leaderboard-row')).toHaveAttribute('data-me', 'true');
+    });
+
+    it('still renders the standings when the space has no daily today, without tabs', () => {
+      renderPage([], SharedSpaceRole.Viewer, null, {
+        standings: {
+          month: '2026-08',
+          entries: [{ userId: 'current-user-id', name: 'Current User', total: 0, daysPlayed: 0 }],
+        },
+        todayBoard: null,
+      });
+
+      expect(screen.getByTestId('standings-section')).toBeInTheDocument();
+      expect(screen.queryByTestId('standings-tab-today')).not.toBeInTheDocument();
+      expect(screen.getByTestId('leaderboard-row')).toHaveTextContent('Not played');
     });
   });
 });
