@@ -47,7 +47,7 @@ The three routing knobs map onto the migration's file types as follows:
 
 ### External Libraries Are Never Migrated
 
-Originals and sidecars belonging to an [external library](/administration/libraries) are deliberately never included in a migration, regardless of which file types you select. Those files are scanned in place from a path outside Gallery's media location, and the library scanner matches assets against that exact path. Migrating them would rewrite the database path to an S3 key, detaching the asset from the file the scanner expects — effectively importing a file you configured the library to keep external.
+Originals and sidecars belonging to an [external library](/features/libraries) are deliberately never included in a migration, regardless of which file types you select. Those files are scanned in place from a path outside Gallery's media location, and the library scanner matches assets against that exact path. Migrating them would rewrite the database path to an S3 key, detaching the asset from the file the scanner expects — effectively importing a file you configured the library to keep external.
 
 Thumbnails and transcoded videos generated for external-library assets are Gallery-generated files, not scanned originals, so they remain migratable as normal.
 
@@ -64,7 +64,7 @@ Thumbnails and transcoded videos generated for external-library assets are Galle
 7. Click **Start Migration**.
 
 :::note
-If you leave **Delete source files** unchecked, each migrated file is copied to the new backend but the original is left in place — the file now exists on both backends. Until you separately remove the source, storage-usage accounting counts that file twice.
+If you leave **Delete source files** unchecked, each migrated file is copied to the new backend but the original is left in place — the file now exists on both backends until you separately remove the source. That leftover copy consumes real disk or S3 space (and cost) either way. It only shows up as double-counted in the storage usage figure users see if you've enabled `storageUsage.includeDerivatives`, since that setting is what makes usage walk actual files on disk and in S3 rather than sum database rows. With the default configuration, the reported per-user usage is unaffected — it's computed from one database row per file, and a migration updates that row's path without adding a row.
 :::
 
 ### Monitoring Progress
