@@ -1,6 +1,7 @@
 <script lang="ts">
   import RoundPhoto from '$lib/components/games/round-photo.svelte';
   import Map from '$lib/components/shared-components/map/Map.svelte';
+  import { wrapLongitude } from '$lib/utils/game';
   import { Button } from '@immich/ui';
   import { t } from 'svelte-i18n';
 
@@ -48,7 +49,7 @@
         rounded
         showSimpleControls={false}
         showSettings={false}
-        onClickPoint={({ lat, lng }) => (pin = { lat, lon: lng })}
+        onClickPoint={({ lat, lng }) => (pin = { lat, lon: wrapLongitude(lng) })}
       />
     </div>
 

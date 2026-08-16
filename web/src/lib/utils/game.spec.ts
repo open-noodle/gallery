@@ -1,4 +1,4 @@
-import { formatDistanceKm, MAX_ROUND_SCORE, scorePercent, yearFromIso } from '$lib/utils/game';
+import { formatDistanceKm, MAX_ROUND_SCORE, scorePercent, wrapLongitude, yearFromIso } from '$lib/utils/game';
 
 describe('formatDistanceKm', () => {
   it('uses metres below one kilometre', () => {
@@ -32,5 +32,23 @@ describe('scorePercent', () => {
 describe('yearFromIso', () => {
   it('reads the calendar year', () => {
     expect(yearFromIso('2020-07-01T14:23:00.000Z')).toBe(2020);
+  });
+});
+
+describe('wrapLongitude', () => {
+  it('leaves an in-range longitude untouched', () => {
+    expect(wrapLongitude(45.5)).toBe(45.5);
+    expect(wrapLongitude(-179)).toBe(-179);
+  });
+
+  // 180 and -180 are the same meridian; the modulo formula normalises the exact boundary to -180.
+  it('normalises the antimeridian boundary to -180', () => {
+    expect(wrapLongitude(180)).toBe(-180);
+    expect(wrapLongitude(-180)).toBe(-180);
+  });
+
+  it('wraps a longitude past the antimeridian back into [-180, 180]', () => {
+    expect(wrapLongitude(200)).toBe(-160);
+    expect(wrapLongitude(-230)).toBe(130);
   });
 });
