@@ -21,7 +21,7 @@
             {entry.name}
           </td>
           <td class="py-2 text-sm text-gray-500 dark:text-gray-400">
-            {$t('game_leaderboard_answered', { values: { answered: entry.answered, total: roundCount } })}
+            {$t('game_rounds_answered', { values: { answered: entry.answered, total: roundCount } })}
           </td>
           <td class="py-2 text-end font-semibold">
             {$t('game_points', { values: { score: entry.total } })}

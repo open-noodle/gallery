@@ -49,7 +49,7 @@
       {name}
     </p>
     <p class="text-sm dark:text-immich-dark-fg">
-      {$t('game_leaderboard_answered', { values: { answered, total: roundCount } })}
+      {$t('game_rounds_answered', { values: { answered, total: roundCount } })}
     </p>
     <p class="text-sm font-medium text-primary" data-testid="challenge-card-cta">
       {cta}
