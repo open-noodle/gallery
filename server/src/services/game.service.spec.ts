@@ -771,31 +771,37 @@ describe(GameService.name, () => {
       expect(result.entries).toEqual([{ userId: 'user-1', name: 'Ana', total: 100, daysPlayed: 1 }]);
     });
 
-    it('queries the current UTC calendar month as a half-open range and reports it', async () => {
-      vi.useFakeTimers();
-      vi.setSystemTime(new Date('2026-08-16T12:00:00.000Z'));
-      mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Viewer } as any);
-      mocks.sharedSpace.getMembers.mockResolvedValue([]);
-      mocks.game.getMonthlyStandings.mockResolvedValue([]);
+    describe('UTC month boundaries', () => {
+      beforeEach(() => {
+        vi.useFakeTimers();
+      });
 
-      const result = await sut.standings(authStub, 'space-1');
+      afterEach(() => {
+        vi.useRealTimers();
+      });
 
-      expect(mocks.game.getMonthlyStandings).toHaveBeenCalledWith('space-1', '2026-08-01', '2026-09-01');
-      expect(result.month).toBe('2026-08');
-      vi.useRealTimers();
-    });
+      it('queries the current UTC calendar month as a half-open range and reports it', async () => {
+        vi.setSystemTime(new Date('2026-08-16T12:00:00.000Z'));
+        mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Viewer } as any);
+        mocks.sharedSpace.getMembers.mockResolvedValue([]);
+        mocks.game.getMonthlyStandings.mockResolvedValue([]);
 
-    it('rolls the exclusive bound into the next year in December', async () => {
-      vi.useFakeTimers();
-      vi.setSystemTime(new Date('2026-12-31T23:59:00.000Z'));
-      mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Viewer } as any);
-      mocks.sharedSpace.getMembers.mockResolvedValue([]);
-      mocks.game.getMonthlyStandings.mockResolvedValue([]);
+        const result = await sut.standings(authStub, 'space-1');
 
-      await sut.standings(authStub, 'space-1');
+        expect(mocks.game.getMonthlyStandings).toHaveBeenCalledWith('space-1', '2026-08-01', '2026-09-01');
+        expect(result.month).toBe('2026-08');
+      });
 
-      expect(mocks.game.getMonthlyStandings).toHaveBeenCalledWith('space-1', '2026-12-01', '2027-01-01');
-      vi.useRealTimers();
+      it('rolls the exclusive bound into the next year in December', async () => {
+        vi.setSystemTime(new Date('2026-12-31T23:59:00.000Z'));
+        mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Viewer } as any);
+        mocks.sharedSpace.getMembers.mockResolvedValue([]);
+        mocks.game.getMonthlyStandings.mockResolvedValue([]);
+
+        await sut.standings(authStub, 'space-1');
+
+        expect(mocks.game.getMonthlyStandings).toHaveBeenCalledWith('space-1', '2026-12-01', '2027-01-01');
+      });
     });
   });
 });
