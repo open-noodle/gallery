@@ -61,6 +61,7 @@ const GameChallengeResponseSchema = z
     // settle.
     dailyOn: z
       .string()
+      .meta({ format: 'date' })
       .nullable()
       .describe("The UTC date this is the space's daily challenge for, or null for a player-created one"),
   })

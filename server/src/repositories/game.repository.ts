@@ -486,12 +486,16 @@ export class GameRepository {
   // dailyOn is a YYYY-MM-DD string, not a Date - DummyValue.DATE would hand this a timestamp.
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.STRING] })
   async getDailyChallenge(spaceId: string, dailyOn: string): Promise<GameChallengeRow | undefined> {
-    return this.db
-      .selectFrom('game_challenge')
-      .selectAll()
-      .where('spaceId', '=', spaceId)
-      .where('dailyOn', '=', dailyOn)
-      .executeTakeFirst();
+    return (
+      this.db
+        .selectFrom('game_challenge')
+        .selectAll()
+        .where('spaceId', '=', spaceId)
+        // Cast explicitly: the column reads back as a Date (the `date` convention this codebase uses
+        // for person.birthDate too), while the caller holds the UTC calendar day as a string.
+        .where('dailyOn', '=', sql<Date>`${dailyOn}::date`)
+        .executeTakeFirst()
+    );
   }
 
   /**

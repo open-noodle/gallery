@@ -32229,6 +32229,7 @@
           },
           "dailyOn": {
             "description": "The UTC date this is the space's daily challenge for, or null for a player-created one",
+            "format": "date",
             "nullable": true,
             "type": "string"
           },
@@ -32301,6 +32302,7 @@
           },
           "dailyOn": {
             "description": "The UTC date this is the space's daily challenge for, or null for a player-created one",
+            "format": "date",
             "nullable": true,
             "type": "string"
           },
@@ -32364,6 +32366,7 @@
           },
           "dailyOn": {
             "description": "The UTC date this is the space's daily challenge for, or null for a player-created one",
+            "format": "date",
             "nullable": true,
             "type": "string"
           },
