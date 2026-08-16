@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import DateRound from '$lib/components/games/date-round.svelte';
 
@@ -26,12 +26,11 @@ describe('DateRound', () => {
     expect(new Date(iso).getUTCFullYear()).toBeLessThanOrEqual(2026);
   });
 
-  // Mid-year (July 1), not January 1: the slider only picks a year, so the emitted date's
-  // day-of-year offset from the photo's real date IS the client's best-case error. Jan 1 makes
-  // that 0-364 days (~182 average); July 1 roughly halves the worst case, which matters because
-  // the server's exponential day-offset scoring can floor every date round at ~0 on a
-  // single-trip/season pool (narrow scaleDays) regardless of what the player picks.
-  it('centres the guess in the year (July 1) rather than January 1', async () => {
+  // July is simply the mid-year default the month select opens on, so an untouched round still
+  // emits the date it always did. It is no longer a scoring mitigation: the server now grades a
+  // date round at month granularity (monthOffsetDays), so naming the right month scores full marks
+  // and there is nothing left to "centre" against.
+  it('defaults to July of the mid-range year', async () => {
     const onGuess = vi.fn();
     // minYear 2009 + maxYear 2026 averages to 2017.5, rounding to the default slider year 2018.
     render(DateRound, { ...base, onGuess });
@@ -46,5 +45,45 @@ describe('DateRound', () => {
     // $t() is untranslated in this test environment (no locale catalog is loaded), so
     // the accessible name resolves to the raw i18n key rather than its English text.
     expect(screen.getByLabelText('game_when_was_this')).toBe(screen.getByTestId('date-round-slider'));
+  });
+
+  // A year-only guess could never score full marks: the server graded the exact day, so whatever
+  // the player picked the emitted date still missed the real capture day by up to half a year.
+  // Picking the month is what makes a perfect score reachable.
+  describe('month selection', () => {
+    const monthSelect = () => screen.getByTestId('date-round-month') as HTMLSelectElement;
+
+    it('offers all twelve months', () => {
+      render(DateRound, { ...base, onGuess: () => {} });
+      expect(monthSelect().options).toHaveLength(12);
+    });
+
+    it('emits the first of the selected month', async () => {
+      const onGuess = vi.fn();
+      render(DateRound, { ...base, onGuess });
+
+      await userEvent.selectOptions(monthSelect(), '3');
+      await userEvent.click(screen.getByTestId('date-round-guess'));
+
+      // The 1st, at midnight UTC: the server grades by month, so the day only has to identify
+      // which month was picked - and a local-midnight Date could land in the neighbouring one.
+      expect(onGuess).toHaveBeenCalledWith('2018-03-01T00:00:00.000Z');
+    });
+
+    it('keeps the selected month when the year changes', async () => {
+      const onGuess = vi.fn();
+      render(DateRound, { ...base, onGuess });
+
+      await userEvent.selectOptions(monthSelect(), '11');
+      await fireEvent.input(screen.getByTestId('date-round-slider'), { target: { value: '2022' } });
+      await userEvent.click(screen.getByTestId('date-round-guess'));
+
+      expect(onGuess).toHaveBeenCalledWith('2022-11-01T00:00:00.000Z');
+    });
+
+    it('gives the month select an accessible name', () => {
+      render(DateRound, { ...base, onGuess: () => {} });
+      expect(screen.getByLabelText('month')).toBe(monthSelect());
+    });
   });
 });
