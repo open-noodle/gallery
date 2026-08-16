@@ -49,10 +49,15 @@
   // `useLocationPin` MUST be passed below — otherwise Map.svelte's default marker layer renders an
   // <img> keyed off this id (Map.svelte:432-433) and both pins 404. The id doubles as the popup
   // snippet's discriminator, since the pin icon itself is identical for every marker (see below).
+  //
+  // `guess` is optional: the 409-recovery path (a duplicate guess, caught and re-shown from the
+  // challenge re-fetch) has an answer but no guess of its own to plot, since that request never
+  // reached the server. Render the answer alone rather than an empty map in that case — the reveal
+  // is still informative without a guess pin to compare it against.
   let mapMarkers = $derived(
-    type === 'location' && guess && answer?.lat != null && answer?.lon != null
+    type === 'location' && answer?.lat != null && answer?.lon != null
       ? ([
-          { id: 'guess', lat: guess.lat, lon: guess.lon, city: null, state: null, country: null },
+          ...(guess ? [{ id: 'guess', lat: guess.lat, lon: guess.lon, city: null, state: null, country: null }] : []),
           { id: 'answer', lat: answer.lat, lon: answer.lon, city: null, state: null, country: null },
         ] satisfies MapMarkerResponseDto[])
       : [],

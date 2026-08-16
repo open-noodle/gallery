@@ -1,6 +1,7 @@
 import {
   GameRoundType,
   type GameChallengeDetailResponseDto,
+  type GameGuessResponseDto,
   type GameLeaderboardResponseDto,
   type GameRoundDetailResponseDto,
 } from '@immich/sdk';
@@ -137,7 +138,7 @@ describe('Game play page', () => {
   });
 
   describe('guessing', () => {
-    it('calls guessRound with exactly {lat, lon} for a location round', async () => {
+    it('calls guessRound with exactly {lat, lon} for a location round, and shows the distance and both map pins', async () => {
       sdkMock.guessRound.mockResolvedValue({
         roundId: 'r0',
         userId: 'u1',
@@ -148,6 +149,21 @@ describe('Game play page', () => {
         offsetDays: null,
         score: 3500,
       });
+      // Distinct from the beforeEach default (two date rounds with no lat/lon) - a location round
+      // with a real answer, so a dropped `guess`/`distanceKm` or a distanceKm<->offsetDays swap in
+      // the page's ResultView is actually observable here.
+      sdkMock.getChallenge.mockResolvedValue(
+        makeChallenge({
+          rounds: [
+            makeRound({
+              index: 0,
+              type: GameRoundType.Location,
+              score: 3500,
+              answer: { date: null, lat: 10, lon: 20 },
+            }),
+          ],
+        }),
+      );
       renderPage(makeChallenge({ rounds: [makeRound({ index: 0, type: GameRoundType.Location })] }));
 
       await fireEvent.click(screen.getByTestId('map-stub-click-point'));
@@ -160,6 +176,12 @@ describe('Game play page', () => {
           gameGuessDto: { lat: 12.5, lon: 45.5 },
         }),
       );
+
+      await waitFor(() => expect(screen.getByTestId('round-result')).toBeInTheDocument());
+      expect(screen.getByTestId('round-result-distance')).toHaveTextContent('You were 42 km away');
+      // The result screen's own map (the round-input map has already unmounted by now) must carry
+      // both the player's guess pin and the revealed answer pin.
+      expect(screen.getByTestId('map-stub')).toHaveAttribute('data-marker-ids', 'guess,answer');
     });
 
     it('calls guessRound with exactly {date} for a date round', async () => {
@@ -244,6 +266,48 @@ describe('Game play page', () => {
       expect(screen.getByTestId('round-result-answer-date')).toHaveTextContent('2011');
       expect(screen.getByTestId('round-result-score')).toHaveTextContent('2500');
       expect(toastManagerMock.danger).not.toHaveBeenCalled();
+    });
+
+    it('a 409 recovery whose own re-fetch also fails shows a toast rather than an unhandled rejection', async () => {
+      sdkMock.isHttpError.mockImplementation((error) => !!(error as { __http?: boolean })?.__http);
+      sdkMock.guessRound.mockRejectedValue({ __http: true, status: 409, data: {}, message: 'raw' });
+      // The 409 recovery re-fetch is itself a network call and can fail independently of the guess.
+      sdkMock.getChallenge.mockRejectedValue(new Error('network dropped'));
+      renderPage(makeChallenge({ rounds: [makeRound({ index: 0, type: GameRoundType.Date })] }));
+
+      await fireEvent.click(screen.getByTestId('date-round-guess'));
+
+      await waitFor(() => expect(toastManagerMock.danger).toHaveBeenCalledWith('Something went wrong'));
+      expect(screen.queryByTestId('round-result')).not.toBeInTheDocument();
+    });
+
+    it('ignores a second guess fired while the first is still in flight', async () => {
+      let resolveGuess!: (value: GameGuessResponseDto) => void;
+      sdkMock.guessRound.mockImplementation(
+        () =>
+          new Promise<GameGuessResponseDto>((resolve) => {
+            resolveGuess = resolve;
+          }),
+      );
+      renderPage(makeChallenge({ rounds: [makeRound({ index: 0, type: GameRoundType.Date })] }));
+
+      await fireEvent.click(screen.getByTestId('date-round-guess'));
+      await fireEvent.click(screen.getByTestId('date-round-guess'));
+
+      expect(sdkMock.guessRound).toHaveBeenCalledTimes(1);
+
+      resolveGuess({
+        roundId: 'r0',
+        userId: 'u1',
+        guessLat: null,
+        guessLon: null,
+        guessDate: '1998-01-01T00:00:00.000Z',
+        distanceKm: null,
+        offsetDays: 2,
+        score: 1000,
+      });
+
+      await waitFor(() => expect(screen.getByTestId('round-result')).toBeInTheDocument());
     });
 
     it('a non-409 guess failure surfaces a toast instead of a silent no-op', async () => {

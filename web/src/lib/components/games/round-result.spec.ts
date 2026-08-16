@@ -68,6 +68,20 @@ describe('RoundResult', () => {
     expect(screen.getByTestId('map-popup')).toHaveTextContent('Guess');
   });
 
+  // The 409-recovery path (task 9's play page) re-shows a result with an answer but no guess of its
+  // own - that request never reached the server, so there is nothing to plot for it.
+  it('renders an answer-only marker when there is no guess to plot alongside it', () => {
+    render(RoundResult, {
+      ...base,
+      type: 'location' as const,
+      score: 3200,
+      answer: { date: null, lat: 10, lon: 20 },
+    });
+
+    expect(screen.getByTestId('map-stub')).toHaveAttribute('data-marker-count', '1');
+    expect(screen.getByTestId('map-stub')).toHaveAttribute('data-marker-ids', 'answer');
+  });
+
   it('renders for a date round with the offset text', () => {
     render(RoundResult, {
       ...base,
