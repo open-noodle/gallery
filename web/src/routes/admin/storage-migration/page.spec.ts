@@ -1,4 +1,4 @@
-import { RoutedTo, type StorageRoutingStatusDto } from '@immich/sdk';
+import { RoutedTo, StorageMigrationDirection, type StorageRoutingStatusDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -121,5 +121,46 @@ describe('storage migration +page.svelte', () => {
     ]) {
       expect(screen.getByRole('checkbox', { name })).not.toBeChecked();
     }
+  });
+
+  // Disabling a checkbox never clears its bound value: thumbnails starts checked (the page's
+  // default) and isn't blocked yet (direction is toS3, thumbnails routedTo 's3' — matches).
+  // Flipping direction to "S3 to disk" makes it non-convergent, but its checkbox stays checked
+  // (see the "disables ..." test above) — only handleStart's own `&& !isBlocked(key)` guard keeps
+  // it out of the request actually sent to the server. Without that guard this test fails: the
+  // stale `true` would be submitted and the server would reject the whole migration.
+  it('excludes a now-blocked file type from the submitted migration even though its checkbox is still checked', async () => {
+    mocks.getRoutingStatus.mockResolvedValue(
+      makeRoutingStatus({ thumbnails: { routedTo: RoutedTo.S3, misplacedCount: 5 } }),
+    );
+    mocks.getEstimate.mockResolvedValue(
+      JSON.stringify({ direction: 'toDisk', fileCounts: { total: 10 }, estimatedSizeBytes: 1000 }),
+    );
+    mocks.start.mockResolvedValue({ batchId: 'batch-1' });
+
+    render(Page, { props: { data: makePageData() } });
+
+    await waitFor(() => expect(mocks.getRoutingStatus).toHaveBeenCalledTimes(1));
+
+    await fireEvent.click(screen.getByRole('radio', { name: 'admin.storage_migration_s3_to_disk' }));
+
+    const thumbnailsCheckbox = screen.getByRole('checkbox', { name: 'admin.storage_migration_file_type_thumbnails' });
+    await waitFor(() => expect(thumbnailsCheckbox).toBeDisabled());
+    expect(thumbnailsCheckbox).toBeChecked();
+
+    const startButton = await screen.findByRole('button', { name: 'admin.storage_migration_start_heading' });
+    await waitFor(() => expect(startButton).not.toBeDisabled());
+    await fireEvent.click(startButton);
+
+    await waitFor(() => expect(mocks.start).toHaveBeenCalledTimes(1));
+    expect(mocks.start).toHaveBeenCalledWith({
+      storageMigrationStartDto: expect.objectContaining({
+        direction: StorageMigrationDirection.ToDisk,
+        fileTypes: expect.objectContaining({
+          thumbnails: false, // blocked kind, checkbox still checked — excluded anyway
+          originals: true, // still-convergent kind — included
+        }),
+      }),
+    });
   });
 });
