@@ -74,4 +74,18 @@ describe('game play page load', () => {
 
     await expect(load(makeEvent() as never)).rejects.toThrow(error);
   });
+
+  // Realistic in a shared space: an editor deletes the challenge while another member still has it
+  // open. Same precedent as the [spaceId] layout's own space-gone handling.
+  it.each([403, 404])(
+    'redirects to the space challenge list when the challenge is gone or access was revoked (%i)',
+    async (status) => {
+      sdkMock.getChallenge.mockRejectedValue({ status });
+
+      await expect(load(makeEvent() as never)).rejects.toMatchObject({
+        status: 302,
+        location: '/spaces/space-1/games',
+      });
+    },
+  );
 });
