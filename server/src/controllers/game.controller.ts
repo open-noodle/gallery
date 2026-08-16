@@ -14,6 +14,7 @@ import {
   GameLeaderboardResponseDto,
   GameRoundParamDto,
   GameSpaceParamDto,
+  GameStandingsResponseDto,
 } from 'src/dtos/game.dto';
 import { ApiTag, Permission } from 'src/enum';
 import { Auth, Authenticated, FileResponse } from 'src/middleware/auth.guard';
@@ -73,6 +74,18 @@ export class GameController {
   })
   getDailyChallenge(@Auth() auth: AuthDto, @Param() { spaceId }: GameSpaceParamDto): Promise<GameDailyResponseDto> {
     return this.service.getDaily(auth, spaceId);
+  }
+
+  @Get('shared-spaces/:spaceId/games/standings')
+  @Authenticated({ permission: Permission.SharedSpaceRead })
+  @Endpoint({
+    summary: "Get the space's monthly standings",
+    description:
+      "Per-player totals across this UTC calendar month's daily challenges. Custom challenges never contribute. Membership-gated, like the daily.",
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  getStandings(@Auth() auth: AuthDto, @Param() { spaceId }: GameSpaceParamDto): Promise<GameStandingsResponseDto> {
+    return this.service.standings(auth, spaceId);
   }
 
   @Get('games/:id')

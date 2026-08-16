@@ -136,6 +136,24 @@ const GameLeaderboardResponseSchema = z
   })
   .meta({ id: 'GameLeaderboardResponseDto' });
 
+const GameStandingsEntrySchema = z.object({
+  userId: z.string().describe('User ID'),
+  name: z.string().describe('User name'),
+  total: z.number().describe("Total score across the month's daily challenges"),
+  daysPlayed: z.number().describe('Number of daily challenges played this month'),
+});
+
+// No `average` field: it is total / daysPlayed, and carrying a derived value alongside its own
+// inputs only creates a way for the two to disagree. The client divides.
+const GameStandingsResponseSchema = z
+  .object({
+    month: z
+      .string()
+      .describe('The UTC calendar month these standings cover, as YYYY-MM. The client formats the name.'),
+    entries: z.array(GameStandingsEntrySchema).describe('Per-player totals, best first, non-players last'),
+  })
+  .meta({ id: 'GameStandingsResponseDto' });
+
 export class GameCreateDto extends createZodDto(GameCreateSchema) {}
 export class GameSpaceParamDto extends createZodDto(GameSpaceParamSchema) {}
 export class GameRoundParamDto extends createZodDto(GameRoundParamSchema) {}
@@ -147,3 +165,4 @@ export class GameRoundDetailResponseDto extends createZodDto(GameRoundDetailResp
 export class GameChallengeDetailResponseDto extends createZodDto(GameChallengeDetailResponseSchema) {}
 export class GameGuessResponseDto extends createZodDto(GameGuessResponseSchema) {}
 export class GameLeaderboardResponseDto extends createZodDto(GameLeaderboardResponseSchema) {}
+export class GameStandingsResponseDto extends createZodDto(GameStandingsResponseSchema) {}
