@@ -66,6 +66,17 @@
     <button type="button" data-testid="map-stub-click-point" onclick={() => onClickPoint({ lat: 12.5, lng: 45.5 })}>
       Click map
     </button>
+    <!-- maplibre's real lngLat (from map.unproject) is not wrapped to [-180, 180] — panning across
+         the antimeridian on a world guessing map routinely yields values like 200 or -230. This
+         button lets a test drive that out-of-range case end to end through a real onClickPoint
+         consumer, the way the fixed-value button above can't. -->
+    <button
+      type="button"
+      data-testid="map-stub-click-point-antimeridian"
+      onclick={() => onClickPoint({ lat: 5, lng: 200 })}
+    >
+      Click map past the antimeridian
+    </button>
   {/if}
   {#if onClusterSelect && clusterLeaves[0]}
     <button

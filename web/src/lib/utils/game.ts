@@ -20,3 +20,11 @@ export const scorePercent = (score: number): number =>
   Math.max(0, Math.min(100, Math.round((100 * score) / MAX_ROUND_SCORE)));
 
 export const yearFromIso = (iso: string): number => new Date(iso).getUTCFullYear();
+
+/**
+ * Wraps a longitude into the server-accepted [-180, 180] range. maplibre's `lngLat` (from
+ * `map.unproject`) is not wrapped — panning across the antimeridian on a world guessing map
+ * routinely yields values like 200 or -230 — but the server's longitudeSchema is
+ * `z.number().min(-180).max(180)` and 400s on anything outside it.
+ */
+export const wrapLongitude = (lng: number): number => (((lng + 180) % 360) + 360) % 360 - 180;
