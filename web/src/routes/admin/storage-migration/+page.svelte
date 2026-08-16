@@ -227,8 +227,14 @@
     const requestedFileTypes = params.get('fileTypes');
     if (requestedFileTypes) {
       const wanted = new Set(requestedFileTypes.split(','));
-      for (const key of Object.keys(FILE_TYPE_TO_KIND)) {
-        selectedFileTypes[key] = wanted.has(key);
+      // Only apply the prefill when at least one requested value is a file type we know about —
+      // a typo'd or stale ?fileTypes= (nothing recognized) must leave the "all checked" defaults
+      // alone rather than silently clearing every checkbox.
+      const knownKeys = Object.keys(FILE_TYPE_TO_KIND);
+      if (knownKeys.some((key) => wanted.has(key))) {
+        for (const key of knownKeys) {
+          selectedFileTypes[key] = wanted.has(key);
+        }
       }
     }
 
