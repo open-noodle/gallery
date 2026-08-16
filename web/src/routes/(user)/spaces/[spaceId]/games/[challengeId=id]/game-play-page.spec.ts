@@ -56,6 +56,7 @@ function makeChallenge(overrides: Partial<GameChallengeDetailResponseDto> = {}):
     id: 'challenge-1',
     spaceId: 'space-1',
     name: 'Summer Trip',
+    dailyOn: null,
     roundCount: 2,
     // 1970 (GAME_MIN_YEAR) + 2026 (this createdAt's year) averages to a clean 1998, so the
     // date-round's default slider position is deterministic in these tests.
