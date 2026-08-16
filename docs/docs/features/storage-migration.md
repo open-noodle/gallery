@@ -21,9 +21,35 @@ Noodle Gallery includes a built-in tool for migrating files between disk and S3-
    - To migrate **to S3**: set `IMMICH_STORAGE_BACKEND=s3`
    - To migrate **to disk**: set `IMMICH_STORAGE_BACKEND=disk`
 
-   This ensures that new uploads during migration go to the correct backend.
+   This ensures that new uploads during migration go to the correct backend. If you use [per-file-type storage routing](/features/s3-storage#choosing-where-each-file-kind-is-stored), the routing for the file types you're migrating must already point the same way as the migration direction — see [Storage Routing Compatibility](#storage-routing-compatibility) below.
 
 3. **Restart Gallery** after changing environment variables.
+
+## Storage Routing Compatibility
+
+If you use [per-file-type storage routing](/features/s3-storage#choosing-where-each-file-kind-is-stored), a migration can only move a file type in the direction its routing already points. This prevents a migration from immediately becoming stale — if thumbnails are pinned to S3, migrating thumbnails **to disk** would just have every newly generated thumbnail land straight back on S3.
+
+Starting a migration for a file type whose routing disagrees with the chosen direction is rejected. The error names every offending file type and explains how each one is currently routed, for example:
+
+```
+Cannot migrate to disk: Thumbnails are routed to S3 via IMMICH_STORAGE_BACKEND.
+```
+
+To fix this, either change the routing for the affected file type(s) in **Administration > System Settings > Storage routing** first, or deselect those file types from the migration.
+
+The three routing knobs map onto the migration's file types as follows:
+
+| Knob              | File types                                                                |
+| :---------------- | :------------------------------------------------------------------------ |
+| **Originals**     | `originals`, `sidecars`                                                   |
+| **Thumbnails**    | `thumbnails`, `previews`, `fullsize`, `personThumbnails`, `profileImages` |
+| **Encoded video** | `encodedVideos`                                                           |
+
+### External Libraries Are Never Migrated
+
+Originals and sidecars belonging to an [external library](/administration/libraries) are deliberately never included in a migration, regardless of which file types you select. Those files are scanned in place from a path outside Gallery's media location, and the library scanner matches assets against that exact path. Migrating them would rewrite the database path to an S3 key, detaching the asset from the file the scanner expects — effectively importing a file you configured the library to keep external.
+
+Thumbnails and transcoded videos generated for external-library assets are Gallery-generated files, not scanned originals, so they remain migratable as normal.
 
 ## Using the Admin UI
 
@@ -36,6 +62,10 @@ Noodle Gallery includes a built-in tool for migrating files between disk and S3-
 5. Set the concurrency level (default: 5). Higher values migrate faster but use more resources.
 6. Choose whether to delete source files after successful migration.
 7. Click **Start Migration**.
+
+:::note
+If you leave **Delete source files** unchecked, each migrated file is copied to the new backend but the original is left in place — the file now exists on both backends. Until you separately remove the source, storage-usage accounting counts that file twice.
+:::
 
 ### Monitoring Progress
 
