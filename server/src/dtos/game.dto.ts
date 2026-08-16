@@ -15,12 +15,16 @@ const GameCreateSchema = z
   })
   .meta({ id: 'GameCreateDto' });
 
+// shared_space.id is a v4 uuid (@PrimaryGeneratedColumn), so this stays uuidv4 - unlike the
+// challenge `id` below.
 const GameSpaceParamSchema = z.object({
   spaceId: z.uuidv4(),
 });
 
 const GameRoundParamSchema = z.object({
-  id: z.uuidv4(),
+  // A challenge id is a v7 uuid - game_challenge.id is @PrimaryGeneratedUuidV7Column (DEFAULT
+  // immich_uuid_v7()), so validating it as v4 rejects every real id with a 400 "Invalid UUID".
+  id: z.uuidv7(),
   index: z.coerce.number().int().min(0),
 });
 
