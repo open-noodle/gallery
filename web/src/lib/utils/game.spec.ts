@@ -1,5 +1,7 @@
 import {
+  competitionRanks,
   formatDistanceKm,
+  formatStandingsMonth,
   MAX_ROUND_SCORE,
   scorePercent,
   timeUntilNextDaily,
@@ -80,5 +82,43 @@ describe('timeUntilNextDaily', () => {
   // month-length arithmetic of our own.
   it('rolls over the end of a month', () => {
     expect(timeUntilNextDaily(new Date('2026-08-31T23:00:00.000Z'))).toBe('1h 0m');
+  });
+});
+
+describe('competitionRanks', () => {
+  it('numbers a strictly descending board 1, 2, 3', () => {
+    expect(competitionRanks([9100, 4200, 100])).toEqual([1, 2, 3]);
+  });
+
+  it('gives tied totals the same rank and skips the one after, like a race result', () => {
+    expect(competitionRanks([9100, 4200, 4200, 100])).toEqual([1, 2, 2, 4]);
+  });
+
+  it('ties on the leading position too', () => {
+    expect(competitionRanks([4200, 4200, 100])).toEqual([1, 1, 3]);
+  });
+
+  it('ties every member of an untouched board at rank 1', () => {
+    expect(competitionRanks([0, 0, 0])).toEqual([1, 1, 1]);
+  });
+
+  it('returns an empty array for an empty board', () => {
+    expect(competitionRanks([])).toEqual([]);
+  });
+});
+
+describe('formatStandingsMonth', () => {
+  it('renders the month name and year from a YYYY-MM key', () => {
+    expect(formatStandingsMonth('2026-08', 'en-GB')).toBe('August 2026');
+  });
+
+  it('renders in the given locale', () => {
+    expect(formatStandingsMonth('2026-08', 'de-DE')).toBe('August 2026');
+    expect(formatStandingsMonth('2026-12', 'fr-FR')).toBe('décembre 2026');
+  });
+
+  it('reads the month as UTC, so a negative-offset viewer does not see the previous month', () => {
+    // '2026-08' parsed as local time in UTC-5 would be 31 July; the helper must not do that.
+    expect(formatStandingsMonth('2026-08', 'en-GB')).not.toContain('July');
   });
 });
