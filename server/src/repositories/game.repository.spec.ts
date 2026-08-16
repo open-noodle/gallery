@@ -35,6 +35,7 @@ describe('GameRepository', () => {
       'getGuessesForUser',
       'createGuess',
       'getLeaderboard',
+      'getMonthlyStandings',
       'deleteChallenge',
     ]) {
       expect(typeof GameRepository.prototype[method as keyof GameRepository]).toBe('function');
