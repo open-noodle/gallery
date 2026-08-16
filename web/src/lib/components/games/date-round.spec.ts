@@ -26,6 +26,21 @@ describe('DateRound', () => {
     expect(new Date(iso).getUTCFullYear()).toBeLessThanOrEqual(2026);
   });
 
+  // Mid-year (July 1), not January 1: the slider only picks a year, so the emitted date's
+  // day-of-year offset from the photo's real date IS the client's best-case error. Jan 1 makes
+  // that 0-364 days (~182 average); July 1 roughly halves the worst case, which matters because
+  // the server's exponential day-offset scoring can floor every date round at ~0 on a
+  // single-trip/season pool (narrow scaleDays) regardless of what the player picks.
+  it('centres the guess in the year (July 1) rather than January 1', async () => {
+    const onGuess = vi.fn();
+    // minYear 2009 + maxYear 2026 averages to 2017.5, rounding to the default slider year 2018.
+    render(DateRound, { ...base, onGuess });
+
+    await userEvent.click(screen.getByTestId('date-round-guess'));
+
+    expect(onGuess).toHaveBeenCalledWith('2018-07-01T00:00:00.000Z');
+  });
+
   it('gives the slider an accessible name', () => {
     render(DateRound, { ...base, onGuess: () => {} });
     // $t() is untranslated in this test environment (no locale catalog is loaded), so
