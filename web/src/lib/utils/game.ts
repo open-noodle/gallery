@@ -77,7 +77,9 @@ export const competitionRanks = (totals: number[]): number[] => {
  *
  * Built with `Date.UTC` rather than `new Date('2026-08')`: the string form is parsed as UTC by
  * spec but formatted in the viewer's zone, so anyone west of Greenwich would be shown the previous
- * month. The server's month is a UTC month; this renders that same month.
+ * month. The server's month is a UTC month; this renders that same month. The `timeZone: 'UTC'`
+ * option is enforced by inspection rather than test, because the web vitest suite pins TZ=UTC
+ * and therefore cannot distinguish the two code paths.
  */
 export const formatStandingsMonth = (month: string, locale?: string): string => {
   const [year, monthNumber] = month.split('-').map(Number);

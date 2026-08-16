@@ -105,6 +105,14 @@ describe('competitionRanks', () => {
   it('returns an empty array for an empty board', () => {
     expect(competitionRanks([])).toEqual([]);
   });
+
+  it('numbers a one-row board 1', () => {
+    expect(competitionRanks([4200])).toEqual([1]);
+  });
+
+  it('ties a pair that ends the board, with nothing following to renumber', () => {
+    expect(competitionRanks([9100, 4200, 4200])).toEqual([1, 2, 2]);
+  });
 });
 
 describe('formatStandingsMonth', () => {
@@ -115,10 +123,5 @@ describe('formatStandingsMonth', () => {
   it('renders in the given locale', () => {
     expect(formatStandingsMonth('2026-08', 'de-DE')).toBe('August 2026');
     expect(formatStandingsMonth('2026-12', 'fr-FR')).toBe('décembre 2026');
-  });
-
-  it('reads the month as UTC, so a negative-offset viewer does not see the previous month', () => {
-    // '2026-08' parsed as local time in UTC-5 would be 31 July; the helper must not do that.
-    expect(formatStandingsMonth('2026-08', 'en-GB')).not.toContain('July');
   });
 });
