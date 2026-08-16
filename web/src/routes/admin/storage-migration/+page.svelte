@@ -1,13 +1,18 @@
 <script lang="ts">
+  import { page } from '$app/state';
   import AdminPageLayout from '$lib/components/layouts/AdminPageLayout.svelte';
   import { handleError } from '$lib/utils/handle-error';
   import {
+    RoutedTo,
     StorageMigrationDirection,
     getEstimate as getEstimateRaw,
+    getRoutingStatus,
     getStatus as getStatusRaw,
     start as startMigrationRaw,
     rollback as rollbackRaw,
+    type StorageMigrationFileTypesDto,
     type StorageMigrationStartDto,
+    type StorageRoutingStatusDto,
   } from '@immich/sdk';
   import { Button, Container } from '@immich/ui';
   import { onMount } from 'svelte';
@@ -48,18 +53,40 @@
     paused: number;
   }
 
+  // Maps each of the 8 migrator file types onto the storage-routing knob (Task 1) that governs
+  // where new writes of that kind land, mirrored here from the server's own mapping.
+  const FILE_TYPE_TO_KIND: Record<string, 'originals' | 'thumbnails' | 'encodedVideo'> = {
+    originals: 'originals',
+    sidecars: 'originals',
+    thumbnails: 'thumbnails',
+    previews: 'thumbnails',
+    fullsize: 'thumbnails',
+    personThumbnails: 'thumbnails',
+    profileImages: 'thumbnails',
+    encodedVideos: 'encodedVideo',
+  };
+
   // StorageMigrationDirection
   let direction: StorageMigrationDirection = $state(StorageMigrationDirection.ToS3);
 
-  // File types
-  let originals = $state(true);
-  let thumbnails = $state(true);
-  let previews = $state(true);
-  let fullsize = $state(true);
-  let encodedVideos = $state(true);
-  let sidecars = $state(true);
-  let personThumbnails = $state(true);
-  let profileImages = $state(true);
+  // File types — a single keyed record (rather than one binding per type) so the query-param
+  // prefill and the routing-blocked lookup can both index by the DTO's field name.
+  let selectedFileTypes = $state<Record<string, boolean>>({
+    originals: true,
+    thumbnails: true,
+    previews: true,
+    fullsize: true,
+    encodedVideos: true,
+    sidecars: true,
+    personThumbnails: true,
+    profileImages: true,
+  });
+
+  // Resolved storage-routing status (Task 6), used to disable file types whose new writes go the
+  // other way. Left undefined on failure, same as the estimate/status fetches — fetchRoutingStatus's
+  // catch leaves it unset, and isBlocked below fails open (nothing blocked) when it's unset, since
+  // the server still enforces the rule either way.
+  let routingStatus = $state<StorageRoutingStatusDto | undefined>(undefined);
 
   // Options
   let deleteSource = $state(false);
@@ -86,6 +113,16 @@
     personThumbnails: $t('admin.storage_migration_file_type_person_thumbnails'),
     profileImages: $t('admin.storage_migration_file_type_profile_images'),
   });
+
+  // A file type whose new writes go the other way can never converge, and the server rejects it
+  // anyway — disable it in the UI so the invalid combination is unreachable there too.
+  const isBlocked = (fileType: string) => {
+    if (!routingStatus) {
+      return false;
+    }
+    const target = direction === StorageMigrationDirection.ToS3 ? RoutedTo.S3 : RoutedTo.Disk;
+    return routingStatus[FILE_TYPE_TO_KIND[fileType]].routedTo !== target;
+  };
 
   function formatBytes(bytes: number): string {
     if (bytes === 0) {
@@ -121,6 +158,16 @@
     }
   }
 
+  // Fetched once on mount; not on an interval like status/estimate — routing only changes via the
+  // system-settings form, which is a full page navigation away.
+  async function fetchRoutingStatus() {
+    try {
+      routingStatus = await getRoutingStatus();
+    } catch (error) {
+      handleError(error, $t('admin.storage_routing_fetch_status_failed'));
+    }
+  }
+
   async function handleStart() {
     starting = true;
     try {
@@ -128,16 +175,12 @@
         direction,
         deleteSource,
         concurrency,
-        fileTypes: {
-          originals,
-          thumbnails,
-          previews,
-          fullsize,
-          encodedVideos,
-          sidecars,
-          personThumbnails,
-          profileImages,
-        },
+        // Re-applies isBlocked rather than trusting selectedFileTypes as-is: a type left checked
+        // from before a direction change (or before routingStatus resolved) that's now blocked
+        // must never reach the server, even though its checkbox is merely disabled, not cleared.
+        fileTypes: Object.fromEntries(
+          Object.keys(FILE_TYPE_TO_KIND).map((key) => [key, selectedFileTypes[key] && !isBlocked(key)]),
+        ) as StorageMigrationFileTypesDto,
       };
       await startMigrationRaw({ storageMigrationStartDto: dto });
       await fetchStatus();
@@ -169,6 +212,25 @@
   onMount(() => {
     mounted = true;
     void fetchStatus();
+    void fetchRoutingStatus();
+
+    // Prefill from the migrate link on the storage-routing settings page (Task 6's migrateHref):
+    // ?direction=toS3&fileTypes=thumbnails,previews,...
+    const params = page.url.searchParams;
+    const requestedDirection = params.get('direction');
+    if (
+      requestedDirection === StorageMigrationDirection.ToS3 ||
+      requestedDirection === StorageMigrationDirection.ToDisk
+    ) {
+      direction = requestedDirection as StorageMigrationDirection;
+    }
+    const requestedFileTypes = params.get('fileTypes');
+    if (requestedFileTypes) {
+      const wanted = new Set(requestedFileTypes.split(','));
+      for (const key of Object.keys(FILE_TYPE_TO_KIND)) {
+        selectedFileTypes[key] = wanted.has(key);
+      }
+    }
 
     const interval = setInterval(() => void fetchStatus(), 5000);
     return () => clearInterval(interval);
@@ -211,38 +273,17 @@
       <section class="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
         <h2 class="mb-4 text-lg font-semibold">{$t('admin.storage_migration_file_types')}</h2>
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <label class="flex cursor-pointer items-center gap-2">
-            <input type="checkbox" bind:checked={originals} />
-            <span>{$t('admin.storage_migration_file_type_originals')}</span>
-          </label>
-          <label class="flex cursor-pointer items-center gap-2">
-            <input type="checkbox" bind:checked={thumbnails} />
-            <span>{$t('admin.storage_migration_file_type_thumbnails')}</span>
-          </label>
-          <label class="flex cursor-pointer items-center gap-2">
-            <input type="checkbox" bind:checked={previews} />
-            <span>{$t('admin.storage_migration_file_type_previews')}</span>
-          </label>
-          <label class="flex cursor-pointer items-center gap-2">
-            <input type="checkbox" bind:checked={fullsize} />
-            <span>{$t('admin.storage_migration_file_type_full_size')}</span>
-          </label>
-          <label class="flex cursor-pointer items-center gap-2">
-            <input type="checkbox" bind:checked={encodedVideos} />
-            <span>{$t('admin.storage_migration_file_type_encoded_videos')}</span>
-          </label>
-          <label class="flex cursor-pointer items-center gap-2">
-            <input type="checkbox" bind:checked={sidecars} />
-            <span>{$t('admin.storage_migration_file_type_sidecars')}</span>
-          </label>
-          <label class="flex cursor-pointer items-center gap-2">
-            <input type="checkbox" bind:checked={personThumbnails} />
-            <span>{$t('admin.storage_migration_file_type_person_thumbnails')}</span>
-          </label>
-          <label class="flex cursor-pointer items-center gap-2">
-            <input type="checkbox" bind:checked={profileImages} />
-            <span>{$t('admin.storage_migration_file_type_profile_images')}</span>
-          </label>
+          {#each Object.entries(fileTypeLabels) as [key, label] (key)}
+            <label class="flex cursor-pointer items-center gap-2">
+              <input
+                type="checkbox"
+                bind:checked={selectedFileTypes[key]}
+                disabled={isBlocked(key)}
+                title={isBlocked(key) ? $t('admin.storage_migration_blocked_by_routing') : undefined}
+              />
+              <span>{label}</span>
+            </label>
+          {/each}
         </div>
       </section>
 
