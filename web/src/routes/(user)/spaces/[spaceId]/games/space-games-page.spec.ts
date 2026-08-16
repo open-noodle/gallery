@@ -199,7 +199,8 @@ describe('Space games page', () => {
         __http: true,
         status: 400,
         data: {
-          message: 'This space has no photos usable for a challenge - add photos with GPS data or capture dates to play',
+          message:
+            'This space has no photos usable for a challenge - add photos with GPS data or capture dates to play',
         },
         message: 'raw',
       });
