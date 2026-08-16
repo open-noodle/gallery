@@ -6,6 +6,7 @@
   import {
     createChallenge,
     deleteChallenge,
+    isHttpError,
     SharedSpaceRole,
     type GameChallengeListItemResponseDto,
     type SharedSpaceMemberResponseDto,
@@ -35,6 +36,19 @@
     currentMember?.role === SharedSpaceRole.Owner || currentMember?.role === SharedSpaceRole.Editor,
   );
 
+  // handleError prefers the server's raw message for any HttpError, truncated to 75 chars
+  // (handle-error.ts) - fine for a generic failure, but it drowns out the localized string for
+  // these two KNOWN cases, whose real bodies are longer than that and cut off mid-sentence
+  // ("This space has no photos usable for a challenge - add photos with GPS data ..."). Branch on
+  // the status so the localized message wins here, falling through to handleError otherwise.
+  function reportGameError(error: unknown, knownStatus: number, localizedMessage: string) {
+    if (isHttpError(error) && error.status === knownStatus) {
+      toastManager.danger(localizedMessage);
+      return;
+    }
+    handleError(error, localizedMessage);
+  }
+
   async function handleCreate() {
     try {
       const challenge = await createChallenge({
@@ -53,7 +67,8 @@
       // Relative to this list page (/spaces/{id}/games): resolves to /spaces/{id}/games/{challengeId}.
       await goto(`./games/${challenge.id}`);
     } catch (error) {
-      handleError(error, $t('game_create_failed'));
+      // 400: the space has no photos usable for a challenge.
+      reportGameError(error, 400, $t('game_create_failed'));
     }
   }
 
@@ -74,7 +89,8 @@
       challenges = challenges.filter((c) => c.id !== challenge.id);
       toastManager.success($t('game_challenge_deleted'));
     } catch (error) {
-      handleError(error, $t('game_delete_failed'));
+      // 403: the caller's role no longer permits deleting (e.g. demoted mid-session).
+      reportGameError(error, 403, $t('game_delete_failed'));
     }
   }
 </script>
