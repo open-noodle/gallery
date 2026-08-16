@@ -286,8 +286,31 @@ from
   "game_challenge"
 where
   "spaceId" = $1
+  and "dailyOn" is null
 order by
   "createdAt" desc
+
+-- GameRepository.getDailyChallenge
+select
+  *
+from
+  "game_challenge"
+where
+  "spaceId" = $1
+  and "dailyOn" = $2::date
+
+-- GameRepository.getLocationRoundCounts
+select
+  "game_round"."challengeId",
+  count(*) as "locationCount"
+from
+  "game_round"
+  inner join "game_challenge" on "game_challenge"."id" = "game_round"."challengeId"
+where
+  "game_challenge"."spaceId" = $1
+  and "game_round"."type" = $2
+group by
+  "game_round"."challengeId"
 
 -- GameRepository.getRounds
 select
@@ -349,6 +372,23 @@ group by
   "game_guess"."userId"
 order by
   "total" desc
+
+-- GameRepository.getMonthlyStandings
+select
+  "game_guess"."userId" as "userId",
+  sum("game_guess"."score") as "total",
+  count(distinct "game_round"."challengeId") as "daysPlayed"
+from
+  "game_guess"
+  inner join "game_round" on "game_round"."id" = "game_guess"."roundId"
+  inner join "game_challenge" on "game_challenge"."id" = "game_round"."challengeId"
+where
+  "game_challenge"."spaceId" = $1
+  and "game_challenge"."dailyOn" is not null
+  and "game_challenge"."dailyOn" >= $2::date
+  and "game_challenge"."dailyOn" < $3::date
+group by
+  "game_guess"."userId"
 
 -- GameRepository.deleteChallenge
 delete from "game_challenge"
