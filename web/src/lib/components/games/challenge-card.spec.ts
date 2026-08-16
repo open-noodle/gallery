@@ -21,4 +21,19 @@ describe('ChallengeCard', () => {
     render(ChallengeCard, base);
     expect(screen.queryByTestId('challenge-card-delete')).not.toBeInTheDocument();
   });
+
+  it('shows a Play call-to-action when no rounds have been answered', () => {
+    render(ChallengeCard, { ...base, answered: 0 });
+    expect(screen.getByTestId('challenge-card-cta')).toHaveTextContent('game_play');
+  });
+
+  it('shows a Continue call-to-action when some but not all rounds have been answered', () => {
+    render(ChallengeCard, { ...base, answered: 2, roundCount: 5 });
+    expect(screen.getByTestId('challenge-card-cta')).toHaveTextContent('game_continue');
+  });
+
+  it('shows a Completed call-to-action when every round has been answered', () => {
+    render(ChallengeCard, { ...base, answered: 5, roundCount: 5 });
+    expect(screen.getByTestId('challenge-card-cta')).toHaveTextContent('game_completed');
+  });
 });
