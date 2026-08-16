@@ -1,5 +1,6 @@
 import {
   GameChallengeDetailResponseDto,
+  GameChallengeListItemResponseDto,
   GameChallengeResponseDto,
   GameRoundDetailResponseDto,
   GameRoundType,
@@ -362,6 +363,146 @@ describe('/games', () => {
       expect(guessedRound?.assetId).toBeDefined();
       expect(guessedRound?.answer).toBeDefined();
       expect(assets.map((asset) => asset.id)).toContain(guessedRound?.assetId);
+    });
+  });
+
+  describe('challenge id format', () => {
+    // Regression guard for the v4/v7 mismatch that made every challenge-scoped route 400 with
+    // "Invalid UUID": game_challenge.id is @PrimaryGeneratedUuidV7Column (DEFAULT immich_uuid_v7()),
+    // but the routes keyed by that id validated it as a v4 uuid, so no real id could ever pass.
+    // Asserted here as an explicit contract because the failure otherwise surfaces as a bare
+    // "expected 400 to be 200" in every other test in this file, which does not name the cause.
+    it('issues a v7 challenge id that every challenge-scoped route accepts', async () => {
+      const { spaceId } = await freshSpaceWithPhotos('id-format', 4);
+      const challenge = await createChallenge(spaceId, 4);
+
+      // Version nibble (first character of the 3rd group) must be 7 - this is what the route
+      // validators have to agree with.
+      expect(challenge.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+
+      const auth = `Bearer ${editor.accessToken}`;
+      const routes: Array<() => request.Test> = [
+        () => request(app).get(`/games/${challenge.id}`).set('Authorization', auth),
+        () => request(app).get(`/games/${challenge.id}/rounds/0/image`).set('Authorization', auth),
+        () => request(app).get(`/games/${challenge.id}/leaderboard`).set('Authorization', auth),
+        () =>
+          request(app)
+            .post(`/games/${challenge.id}/rounds/0/guess`)
+            .set('Authorization', auth)
+            .send({ date: '2020-06-15T00:00:00.000Z' }),
+        () => request(app).delete(`/games/${challenge.id}`).set('Authorization', auth),
+      ];
+      for (const route of routes) {
+        const { status } = await route();
+        // Asserting "not a validation rejection" rather than a specific success code: these five
+        // routes answer with a spread of codes (200/201/204), and GET .../image additionally 404s
+        // unless the round's photo already has a Preview file - a timing concern this test
+        // deliberately does not take on, since all it needs to prove is that the id reached the
+        // handler instead of being rejected at the param boundary. The malformed-id test below is
+        // the control that keeps this non-vacuous.
+        expect(status).not.toBe(400);
+      }
+    });
+
+    it('still rejects a malformed challenge id with 400', async () => {
+      // Positive control: proves the assertions above pass because the id is valid, not because
+      // param validation stopped running altogether.
+      const { status } = await request(app)
+        .get('/games/not-a-uuid')
+        .set('Authorization', `Bearer ${editor.accessToken}`);
+      expect(status).toBe(400);
+    });
+  });
+
+  describe('full play-through', () => {
+    // Needs GET .../image to serve a real file, so the uploaded photos' Preview files must exist -
+    // same websocket wait (and reasoning) as the 'viewer permissions' block above.
+    let websocket: Socket;
+
+    beforeAll(async () => {
+      websocket = await utils.connectWebsocket(owner.accessToken);
+    });
+
+    afterAll(() => {
+      utils.disconnectWebsocket(websocket);
+    });
+
+    it('walks create -> list -> detail -> round image -> guess every round -> leaderboard', async () => {
+      const { spaceId, assets } = await freshSpaceWithPhotos('full-flow', 4);
+      await Promise.all(assets.map((asset) => utils.waitForWebsocketEvent({ event: 'assetUpload', id: asset.id })));
+
+      const challenge = await createChallenge(spaceId, 4);
+
+      // 1. The challenge appears in its space's listing, with the caller's progress zeroed. The
+      // list endpoint's body is otherwise unasserted in this file - only its status code is.
+      const listBefore = await request(app)
+        .get(`/shared-spaces/${spaceId}/games`)
+        .set('Authorization', `Bearer ${viewer.accessToken}`);
+      expect(listBefore.status).toBe(200);
+      const entryBefore = (listBefore.body as GameChallengeListItemResponseDto[]).find(
+        (item) => item.id === challenge.id,
+      );
+      expect(entryBefore).toBeDefined();
+      expect(entryBefore?.answered).toBe(0);
+      expect(entryBefore?.total).toBe(0);
+      expect(entryBefore?.closedAt).toBeNull();
+
+      // 2. Detail returns every generated round.
+      const detail = await getDetail(challenge.id, viewer.accessToken);
+      expect(detail.rounds).toHaveLength(challenge.roundCount);
+
+      // 3. Each round's photo is actually servable as an image.
+      for (const round of detail.rounds) {
+        const imageRes = await request(app)
+          .get(`/games/${challenge.id}/rounds/${round.index}/image`)
+          .set('Authorization', `Bearer ${viewer.accessToken}`);
+        expect(imageRes.status).toBe(200);
+        expect(imageRes.headers['content-type']).toMatch(/^image\//);
+        expect(imageRes.body.length).toBeGreaterThan(0);
+      }
+
+      // 4. Guessing every round scores each one and reveals that round's answer.
+      let expectedTotal = 0;
+      for (const round of detail.rounds) {
+        const { status, body } = await request(app)
+          .post(`/games/${challenge.id}/rounds/${round.index}/guess`)
+          .set('Authorization', `Bearer ${viewer.accessToken}`)
+          .send(guessPayloadFor(round));
+        expect(status).toBe(201);
+        expect(body.score).toBeGreaterThanOrEqual(0);
+        expect(body.score).toBeLessThanOrEqual(5000);
+        expectedTotal += body.score as number;
+      }
+
+      // 5. Every round now carries its answer and asset id.
+      const played = await getDetail(challenge.id, viewer.accessToken);
+      for (const round of played.rounds) {
+        expect(round.answer).toBeDefined();
+        expect(round.assetId).toBeDefined();
+        expect(round.score).toBeGreaterThanOrEqual(0);
+      }
+
+      // 6. The leaderboard totals the caller's rounds.
+      const leaderboardRes = await request(app)
+        .get(`/games/${challenge.id}/leaderboard`)
+        .set('Authorization', `Bearer ${viewer.accessToken}`);
+      expect(leaderboardRes.status).toBe(200);
+      const standing = (leaderboardRes.body.entries as Array<{ userId: string; total: number; answered: number }>).find(
+        (e) => e.userId === viewer.userId,
+      );
+      expect(standing?.answered).toBe(detail.rounds.length);
+      expect(standing?.total).toBe(expectedTotal);
+
+      // 7. ...and the space listing reflects the same finished progress.
+      const listAfter = await request(app)
+        .get(`/shared-spaces/${spaceId}/games`)
+        .set('Authorization', `Bearer ${viewer.accessToken}`);
+      expect(listAfter.status).toBe(200);
+      const entryAfter = (listAfter.body as GameChallengeListItemResponseDto[]).find(
+        (item) => item.id === challenge.id,
+      );
+      expect(entryAfter?.answered).toBe(detail.rounds.length);
+      expect(entryAfter?.total).toBe(expectedTotal);
     });
   });
 });

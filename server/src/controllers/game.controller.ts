@@ -19,7 +19,9 @@ import { Auth, Authenticated, FileResponse } from 'src/middleware/auth.guard';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { GameService } from 'src/services/game.service';
 import { sendFile } from 'src/utils/file';
-import { UUIDParamDto } from 'src/validation';
+// Challenge ids are v7 uuids (game_challenge.id is @PrimaryGeneratedUuidV7Column), so these routes
+// take UUIDv7ParamDto - UUIDParamDto validates v4 and would reject every real id with a 400.
+import { UUIDv7ParamDto } from 'src/validation';
 
 @ApiTags(ApiTag.Games)
 @Controller()
@@ -67,7 +69,7 @@ export class GameController {
     description: 'Get challenge detail. Round answers are withheld until the caller has guessed that round.',
     history: new HistoryBuilder().added('v1').beta('v1'),
   })
-  getChallenge(@Auth() auth: AuthDto, @Param() { id }: UUIDParamDto): Promise<GameChallengeDetailResponseDto> {
+  getChallenge(@Auth() auth: AuthDto, @Param() { id }: UUIDv7ParamDto): Promise<GameChallengeDetailResponseDto> {
     return this.service.get(auth, id);
   }
 
@@ -111,7 +113,7 @@ export class GameController {
     description: 'Get per-player totals for a challenge.',
     history: new HistoryBuilder().added('v1').beta('v1'),
   })
-  getLeaderboard(@Auth() auth: AuthDto, @Param() { id }: UUIDParamDto): Promise<GameLeaderboardResponseDto> {
+  getLeaderboard(@Auth() auth: AuthDto, @Param() { id }: UUIDv7ParamDto): Promise<GameLeaderboardResponseDto> {
     return this.service.leaderboard(auth, id);
   }
 
@@ -123,7 +125,7 @@ export class GameController {
     description: 'Permanently delete a challenge, cascading its rounds and guesses.',
     history: new HistoryBuilder().added('v1').beta('v1'),
   })
-  deleteChallenge(@Auth() auth: AuthDto, @Param() { id }: UUIDParamDto): Promise<void> {
+  deleteChallenge(@Auth() auth: AuthDto, @Param() { id }: UUIDv7ParamDto): Promise<void> {
     return this.service.delete(auth, id);
   }
 }
