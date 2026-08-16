@@ -17,6 +17,38 @@
   // styled) while this is undefined, and a click can't fire onGuess before it is set.
   let pin: { lat: number; lon: number } | undefined = $state();
 
+  // GeoGuessr-style: the map sits small over the photo and grows to a usable size on hover, so a
+  // mouse user never spends a click opening it.
+  let expanded = $state(false);
+
+  // Only a real mouse may expand by hovering. Touch browsers fire an emulated pointerenter on tap
+  // immediately before the click; honouring it would expand the map and let that same tap land as
+  // a pin, dropping a guess wherever the player happened to touch the small map. Touch instead
+  // expands through handleClickPoint below, which costs the tap rather than misplacing a pin.
+  function handlePointerEnter(event: PointerEvent) {
+    if (event.pointerType === 'mouse') {
+      expanded = true;
+    }
+  }
+
+  function handlePointerLeave(event: PointerEvent) {
+    if (event.pointerType === 'mouse') {
+      expanded = false;
+    }
+  }
+
+  // The map is only a guessing surface once it is big enough to aim at, so a click on the collapsed
+  // map expands it instead of placing a pin. On a mouse this branch is effectively unreachable -
+  // pointerenter has already expanded the map before any click - so it is the touch path, and the
+  // reason no transparent overlay is needed to intercept the tap.
+  function handleClickPoint({ lat, lng }: { lat: number; lng: number }) {
+    if (!expanded) {
+      expanded = true;
+      return;
+    }
+    pin = { lat, lon: wrapLongitude(lng) };
+  }
+
   function handleGuess() {
     if (!pin) {
       return;
@@ -28,9 +60,30 @@
 <div data-testid="location-round" class="relative size-full overflow-hidden">
   <RoundPhoto {challengeId} {index} alt={$t('game_where_was_this')} />
 
-  <!-- Map inset over the photo, per the approved mockup. -->
-  <div class="absolute inset-x-3 bottom-3 flex flex-col gap-2 sm:inset-x-auto sm:inset-e-3 sm:w-72 md:w-80">
-    <div class="h-48 overflow-hidden rounded-2xl shadow-lg sm:h-56">
+  <!-- Map inset over the photo, per the approved mockup. The pointer handlers sit on this outer
+       container rather than on the map itself so that moving from the map down to the Guess button
+       does not count as leaving - otherwise the map would collapse out from under the pointer on
+       the way to clicking Guess. -->
+  <!-- role/aria-label: this is a genuine grouping of the map and its guess button, and a div
+       carrying pointer handlers needs a role (svelte-check runs with --fail-on-warnings). Labelled
+       with the existing game_place_your_pin string, which is already the visible caption below -
+       reusing it keeps this from adding an eleventh translation of the same sentence. -->
+  <div
+    role="group"
+    aria-label={$t('game_place_your_pin')}
+    data-testid="location-round-map"
+    data-expanded={expanded}
+    onpointerenter={handlePointerEnter}
+    onpointerleave={handlePointerLeave}
+    class="absolute inset-x-3 bottom-3 flex flex-col gap-2 transition-[width] duration-200 ease-out motion-reduce:transition-none sm:inset-x-auto sm:inset-e-3 {expanded
+      ? 'sm:w-[min(90vw,44rem)]'
+      : 'sm:w-72 md:w-80'}"
+  >
+    <div
+      class="overflow-hidden rounded-2xl shadow-lg transition-[height] duration-200 ease-out motion-reduce:transition-none {expanded
+        ? 'h-[min(70vh,32rem)]'
+        : 'h-48 sm:h-56'}"
+    >
       <!-- mapMarkers must stay an explicit [] — leaving it undefined makes Map.svelte fetch and
            render the player's ENTIRE geotagged library (getMapMarkers, global — not space-scoped;
            the space-scoped endpoint needs a spaceId prop that isn't passed here), which could
@@ -50,7 +103,7 @@
         rounded
         showSimpleControls={false}
         showSettings={false}
-        onClickPoint={({ lat, lng }) => (pin = { lat, lon: wrapLongitude(lng) })}
+        onClickPoint={handleClickPoint}
       />
     </div>
 

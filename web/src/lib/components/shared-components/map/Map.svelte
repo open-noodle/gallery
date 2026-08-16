@@ -313,6 +313,24 @@
     abortController?.abort();
   });
 
+  // maplibre sizes its canvas when the map is created and never re-reads the container afterwards,
+  // so any in-page resize leaves a stretched, clipped canvas until something calls resize(). The
+  // only existing call site is afterNavigate, which by definition does not fire for a container
+  // that changes size while staying on the page - e.g. the guessing map growing on hover, or any
+  // panel this map lives in being opened, collapsed or dragged. Observing the container covers
+  // every frame of a CSS transition, not just its end state.
+  $effect(() => {
+    if (!map) {
+      return;
+    }
+
+    const currentMap = map;
+    const observer = new ResizeObserver(() => currentMap.resize());
+    observer.observe(currentMap.getContainer());
+
+    return () => observer.disconnect();
+  });
+
   $effect(() => {
     map?.setStyle(styleUrl, {
       transformStyle: (previousStyle, nextStyle) => {
