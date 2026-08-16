@@ -20,6 +20,7 @@ import {
   GameGuessResponseDto,
   GameLeaderboardResponseDto,
   GameRoundDetailResponseDto,
+  GameStandingsResponseDto,
 } from 'src/dtos/game.dto';
 import { CacheControl, SharedSpaceRole } from 'src/enum';
 import { ArgOf } from 'src/repositories/event.repository';
@@ -48,6 +49,7 @@ import {
   scoreFromError,
   selectLocationRounds,
 } from 'src/utils/game-scoring';
+import { compareStandings } from 'src/utils/game-standings';
 import { mimeTypes } from 'src/utils/mime-types';
 import { isSmartSearchEnabled } from 'src/utils/misc';
 import { hasSharedSpaceRole } from 'src/utils/shared-space-role';
@@ -96,6 +98,25 @@ const DAILY_UNIQUE_CONSTRAINT = 'game_challenge_daily_uq';
  * two people comparing scores on the same leaderboard while playing different challenges.
  */
 const utcDateKey = (now: Date): string => now.toISOString().slice(0, 10);
+
+/**
+ * The current UTC calendar month as `{ key: 'YYYY-MM', start: 'YYYY-MM-DD', endExclusive:
+ * 'YYYY-MM-DD' }`.
+ *
+ * UTC for the same reason `utcDateKey` is: one space's members can sit in different timezones, and
+ * a per-viewer month would give them different boards. `Date.UTC` with a month index of 12 rolls
+ * into January of the next year on its own, so December needs no special case.
+ */
+const utcMonthBounds = (now: Date) => {
+  const year = now.getUTCFullYear();
+  const month = now.getUTCMonth();
+  const asDay = (date: number) => new Date(date).toISOString().slice(0, 10);
+  return {
+    key: now.toISOString().slice(0, 7),
+    start: asDay(Date.UTC(year, month, 1)),
+    endExclusive: asDay(Date.UTC(year, month + 1, 1)),
+  };
+};
 
 /**
  * Candidates fetched per pool per generation - and, for the location pool, **the scene gate's
@@ -686,6 +707,40 @@ export class GameService extends BaseService {
         answered: row.answered,
       })),
     };
+  }
+
+  /**
+   * The space's monthly standings: total points across THIS UTC calendar month's dailies.
+   *
+   * Dailies only, because they are the only level field - every member gets the identical
+   * challenge, one attempt each - while custom challenges are created on demand by editors and
+   * scored on a per-challenge frozen scale. See the design doc for the whole argument.
+   *
+   * Zero-filled from the member list so the board shows the space, not just the people who have
+   * played, and so an aggregate row belonging to someone who has since left the space is dropped
+   * rather than rendered under a placeholder name.
+   */
+  async standings(auth: AuthDto, spaceId: string): Promise<GameStandingsResponseDto> {
+    await this.requireMember(spaceId, auth.user.id);
+
+    const month = utcMonthBounds(new Date());
+    const [rows, members] = await Promise.all([
+      this.gameRepository.getMonthlyStandings(spaceId, month.start, month.endExclusive),
+      this.sharedSpaceRepository.getMembers(spaceId),
+    ]);
+
+    const rowByUserId = new Map(rows.map((row) => [row.userId, row]));
+
+    const entries = members
+      .map((member) => ({
+        userId: member.userId,
+        name: member.name,
+        total: rowByUserId.get(member.userId)?.total ?? 0,
+        daysPlayed: rowByUserId.get(member.userId)?.daysPlayed ?? 0,
+      }))
+      .sort((a, b) => compareStandings({ ...a, played: a.daysPlayed }, { ...b, played: b.daysPlayed }));
+
+    return { month: month.key, entries };
   }
 
   async delete(auth: AuthDto, challengeId: string): Promise<void> {

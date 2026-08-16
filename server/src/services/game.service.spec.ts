@@ -721,4 +721,81 @@ describe(GameService.name, () => {
       expect(mocks.game.getChallengesForSpace).toHaveBeenCalledWith('space-1');
     });
   });
+
+  describe('standings', () => {
+    const members = [
+      { userId: 'user-1', name: 'Ana' },
+      { userId: 'user-2', name: 'Ben' },
+      { userId: 'user-3', name: 'Cara' },
+    ];
+
+    it('rejects a caller who is not a member of the space', async () => {
+      mocks.sharedSpace.getMember.mockResolvedValue(void 0);
+      await expect(sut.standings(authStub, 'space-1')).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('zero-fills every member who has not played, and puts them last', async () => {
+      mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Viewer } as any);
+      mocks.sharedSpace.getMembers.mockResolvedValue(members as any);
+      mocks.game.getMonthlyStandings.mockResolvedValue([{ userId: 'user-2', total: 4200, daysPlayed: 2 }]);
+
+      const result = await sut.standings(authStub, 'space-1');
+
+      expect(result.entries).toEqual([
+        { userId: 'user-2', name: 'Ben', total: 4200, daysPlayed: 2 },
+        { userId: 'user-1', name: 'Ana', total: 0, daysPlayed: 0 },
+        { userId: 'user-3', name: 'Cara', total: 0, daysPlayed: 0 },
+      ]);
+    });
+
+    it('ranks a member who played and scored nothing above a member who never played', async () => {
+      mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Viewer } as any);
+      mocks.sharedSpace.getMembers.mockResolvedValue([members[0], members[1]] as any);
+      mocks.game.getMonthlyStandings.mockResolvedValue([{ userId: 'user-2', total: 0, daysPlayed: 1 }]);
+
+      const result = await sut.standings(authStub, 'space-1');
+
+      expect(result.entries.map((entry) => entry.name)).toEqual(['Ben', 'Ana']);
+    });
+
+    it('drops an aggregate row for someone who has left the space', async () => {
+      mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Viewer } as any);
+      mocks.sharedSpace.getMembers.mockResolvedValue([members[0]] as any);
+      mocks.game.getMonthlyStandings.mockResolvedValue([
+        { userId: 'user-1', total: 100, daysPlayed: 1 },
+        { userId: 'departed-user', total: 9000, daysPlayed: 9 },
+      ]);
+
+      const result = await sut.standings(authStub, 'space-1');
+
+      expect(result.entries).toEqual([{ userId: 'user-1', name: 'Ana', total: 100, daysPlayed: 1 }]);
+    });
+
+    it('queries the current UTC calendar month as a half-open range and reports it', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-08-16T12:00:00.000Z'));
+      mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Viewer } as any);
+      mocks.sharedSpace.getMembers.mockResolvedValue([]);
+      mocks.game.getMonthlyStandings.mockResolvedValue([]);
+
+      const result = await sut.standings(authStub, 'space-1');
+
+      expect(mocks.game.getMonthlyStandings).toHaveBeenCalledWith('space-1', '2026-08-01', '2026-09-01');
+      expect(result.month).toBe('2026-08');
+      vi.useRealTimers();
+    });
+
+    it('rolls the exclusive bound into the next year in December', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-12-31T23:59:00.000Z'));
+      mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Viewer } as any);
+      mocks.sharedSpace.getMembers.mockResolvedValue([]);
+      mocks.game.getMonthlyStandings.mockResolvedValue([]);
+
+      await sut.standings(authStub, 'space-1');
+
+      expect(mocks.game.getMonthlyStandings).toHaveBeenCalledWith('space-1', '2026-12-01', '2027-01-01');
+      vi.useRealTimers();
+    });
+  });
 });
