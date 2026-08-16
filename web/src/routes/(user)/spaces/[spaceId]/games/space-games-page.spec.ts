@@ -189,8 +189,20 @@ describe('Space games page', () => {
       await waitFor(() => expect(goto).toHaveBeenCalledWith('./games/new-1'));
     });
 
-    it('a 400 (no usable photos) surfaces game_create_failed and does not navigate', async () => {
-      sdkMock.createChallenge.mockRejectedValue(new Error('no usable photos'));
+    it('a 400 (no usable photos) surfaces game_create_failed, not the truncated raw server message', async () => {
+      // handleError prefers an HttpError's own message (truncated to 75 chars) over the localized
+      // string it's given. The real 400 body is 99 chars, so a plain handleError call here would
+      // surface it cut off mid-sentence instead of game_create_failed - a genuine HttpError-shaped
+      // rejection (not a plain Error) is required to actually exercise that branch.
+      sdkMock.isHttpError.mockImplementation((error) => !!(error as { __http?: boolean })?.__http);
+      sdkMock.createChallenge.mockRejectedValue({
+        __http: true,
+        status: 400,
+        data: {
+          message: 'This space has no photos usable for a challenge - add photos with GPS data or capture dates to play',
+        },
+        message: 'raw',
+      });
       renderPage([makeChallenge({ id: 'c-1' })], SharedSpaceRole.Editor);
 
       await fireEvent.click(screen.getByTestId('new-challenge-button'));
@@ -198,6 +210,22 @@ describe('Space games page', () => {
       await waitFor(() =>
         expect(toastManagerMock.danger).toHaveBeenCalledWith("Could not create a challenge from this space's photos"),
       );
+      expect(goto).not.toHaveBeenCalled();
+    });
+
+    it('a non-400 create failure falls through to the raw server message', async () => {
+      sdkMock.isHttpError.mockImplementation((error) => !!(error as { __http?: boolean })?.__http);
+      sdkMock.createChallenge.mockRejectedValue({
+        __http: true,
+        status: 500,
+        data: { message: 'boom' },
+        message: 'raw',
+      });
+      renderPage([makeChallenge({ id: 'c-1' })], SharedSpaceRole.Editor);
+
+      await fireEvent.click(screen.getByTestId('new-challenge-button'));
+
+      await waitFor(() => expect(toastManagerMock.danger).toHaveBeenCalledWith('boom\n(Immich Server Error)'));
       expect(goto).not.toHaveBeenCalled();
     });
 
@@ -257,14 +285,38 @@ describe('Space games page', () => {
       expect(screen.getByTestId('challenge-card')).toBeInTheDocument();
     });
 
-    it('a failed delete surfaces game_delete_failed and keeps the card', async () => {
-      sdkMock.deleteChallenge.mockRejectedValue(new Error('nope'));
+    it('a 403 (insufficient role) surfaces game_delete_failed, not the raw server message', async () => {
+      // Same shape requirement as the create case above: a genuine HttpError-shaped rejection is
+      // needed to actually exercise the status-branch rather than the "no HttpError match" fallback.
+      sdkMock.isHttpError.mockImplementation((error) => !!(error as { __http?: boolean })?.__http);
+      sdkMock.deleteChallenge.mockRejectedValue({
+        __http: true,
+        status: 403,
+        data: { message: 'Insufficient role' },
+        message: 'raw',
+      });
       renderPage([makeChallenge({ id: 'c-1', name: 'Summer Trip' })], SharedSpaceRole.Editor);
 
       await fireEvent.click(screen.getByTestId('challenge-card-delete'));
 
       await waitFor(() => expect(sdkMock.deleteChallenge).toHaveBeenCalledWith({ id: 'c-1' }));
       await waitFor(() => expect(toastManagerMock.danger).toHaveBeenCalledWith('Could not delete the challenge'));
+      expect(screen.getByTestId('challenge-card')).toBeInTheDocument();
+    });
+
+    it('a non-403 delete failure falls through to the raw server message', async () => {
+      sdkMock.isHttpError.mockImplementation((error) => !!(error as { __http?: boolean })?.__http);
+      sdkMock.deleteChallenge.mockRejectedValue({
+        __http: true,
+        status: 500,
+        data: { message: 'boom' },
+        message: 'raw',
+      });
+      renderPage([makeChallenge({ id: 'c-1', name: 'Summer Trip' })], SharedSpaceRole.Editor);
+
+      await fireEvent.click(screen.getByTestId('challenge-card-delete'));
+
+      await waitFor(() => expect(toastManagerMock.danger).toHaveBeenCalledWith('boom\n(Immich Server Error)'));
       expect(screen.getByTestId('challenge-card')).toBeInTheDocument();
     });
   });
