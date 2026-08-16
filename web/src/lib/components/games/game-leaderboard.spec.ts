@@ -32,4 +32,12 @@ describe('GameLeaderboard', () => {
 
     expect(screen.getByTestId('leaderboard-row')).toHaveTextContent('Unknown');
   });
+
+  // Four columns (rank/name/rounds-answered/points) with no <thead> and no <caption> - a screen
+  // reader had nothing naming the table. $t() is untranslated in this test environment, so the
+  // accessible name resolves to the raw i18n key rather than its English text ("Leaderboard").
+  it('gives the table an accessible name via a caption', () => {
+    render(GameLeaderboard, { ...base, entries: [{ userId: 'u1', name: 'Alice', total: 100, answered: 1 }] });
+    expect(screen.getByRole('table', { name: 'game_leaderboard' })).toBeInTheDocument();
+  });
 });

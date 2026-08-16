@@ -2,6 +2,7 @@
   import { goto } from '$app/navigation';
   import ChallengeCard from '$lib/components/games/challenge-card.svelte';
   import { authManager } from '$lib/managers/auth-manager.svelte';
+  import { Route } from '$lib/route';
   import { handleError } from '$lib/utils/handle-error';
   import {
     createChallenge,
@@ -64,8 +65,7 @@
       } else {
         toastManager.success($t('game_challenge_created'));
       }
-      // Relative to this list page (/spaces/{id}/games): resolves to /spaces/{id}/games/{challengeId}.
-      await goto(`./games/${challenge.id}`);
+      await goto(Route.viewSpaceGame({ spaceId: space.id, challengeId: challenge.id }));
     } catch (error) {
       // 400: the space has no photos usable for a challenge.
       reportGameError(error, 400, $t('game_create_failed'));
@@ -134,7 +134,7 @@
             name={challenge.name}
             roundCount={challenge.roundCount}
             answered={challenge.answered}
-            href={`./games/${challenge.id}`}
+            href={Route.viewSpaceGame({ spaceId: space.id, challengeId: challenge.id })}
             onDelete={isEditor ? () => void handleDelete(challenge) : undefined}
           />
         {/each}
