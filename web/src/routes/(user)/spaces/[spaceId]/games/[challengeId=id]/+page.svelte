@@ -1,10 +1,11 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import DateRound from '$lib/components/games/date-round.svelte';
-  import GameLeaderboard from '$lib/components/games/game-leaderboard.svelte';
+  import GameLeaderboard, { toAvatarUser } from '$lib/components/games/game-leaderboard.svelte';
   import LocationRound from '$lib/components/games/location-round.svelte';
   import RoundResult from '$lib/components/games/round-result.svelte';
   import UserPageLayout from '$lib/components/layouts/UserPageLayout.svelte';
+  import { authManager } from '$lib/managers/auth-manager.svelte';
   import { Route } from '$lib/route';
   import { handleError } from '$lib/utils/handle-error';
   import { yearFromIso } from '$lib/utils/game';
@@ -17,6 +18,7 @@
     type GameChallengeDetailResponseDto,
     type GameGuessDto,
     type GameLeaderboardResponseDto,
+    type SharedSpaceMemberResponseDto,
   } from '@immich/sdk';
   import { IconButton } from '@immich/ui';
   import { mdiArrowLeft } from '@mdi/js';
@@ -72,6 +74,33 @@
 
   const currentRound = $derived(findRound(currentIndex));
   const maxYear = $derived(yearFromIso(challenge.createdAt));
+
+  const memberById = $derived(
+    new Map((data.members as SharedSpaceMemberResponseDto[]).map((member) => [member.userId, member])),
+  );
+
+  const leaderboardRows = $derived(
+    (leaderboard?.entries ?? []).flatMap((entry) => {
+      const member = memberById.get(entry.userId);
+      // The server only returns current members, so a miss here means the member list is stale -
+      // skip rather than render a nameless avatar.
+      if (!member) {
+        return [];
+      }
+      return [
+        {
+          user: toAvatarUser(member),
+          total: entry.total,
+          detail:
+            entry.answered === 0
+              ? $t('game_not_played')
+              : $t('game_rounds_answered', { values: { answered: entry.answered, total: challenge.rounds.length } }),
+          value: entry.answered === 0 ? '—' : $t('game_points', { values: { score: entry.total } }),
+          isMe: entry.userId === authManager.user.id,
+        },
+      ];
+    }),
+  );
 
   async function loadLeaderboard() {
     try {
@@ -217,7 +246,7 @@
         <div class="flex h-full flex-col gap-4 overflow-y-auto p-4" data-testid="game-completed">
           <h1 class="text-xl font-semibold dark:text-white">{$t('game_completed')}</h1>
           {#if leaderboard}
-            <GameLeaderboard entries={leaderboard.entries} roundCount={challenge.rounds.length} />
+            <GameLeaderboard rows={leaderboardRows} />
           {/if}
         </div>
       {/if}

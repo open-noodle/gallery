@@ -1,9 +1,11 @@
 import {
   GameRoundType,
+  SharedSpaceRole,
   type GameChallengeDetailResponseDto,
   type GameGuessResponseDto,
   type GameLeaderboardResponseDto,
   type GameRoundDetailResponseDto,
+  type SharedSpaceMemberResponseDto,
 } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
@@ -11,6 +13,9 @@ import type { Component } from 'svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import TestWrapper from '$lib/components/TestWrapper.svelte';
+import { authManager } from '$lib/managers/auth-manager.svelte';
+import { preferencesFactory } from '@test-data/factories/preferences-factory';
+import { userAdminFactory } from '@test-data/factories/user-factory';
 import GamePlayPage from './+page.svelte';
 
 // Map.svelte pulls in maplibre-gl, which needs a WebGL canvas happy-dom lacks. Copied verbatim from
@@ -69,8 +74,21 @@ function makeChallenge(overrides: Partial<GameChallengeDetailResponseDto> = {}):
   };
 }
 
-function renderPage(challenge: GameChallengeDetailResponseDto) {
-  const props = { data: { challenge } };
+function renderPage(
+  challenge: GameChallengeDetailResponseDto,
+  members: SharedSpaceMemberResponseDto[] = [
+    {
+      userId: 'u1',
+      name: 'Alice',
+      email: 'alice@example.com',
+      role: SharedSpaceRole.Viewer,
+      showInTimeline: false,
+      sharePersonMetadata: true,
+      joinedAt: '2026-01-01T00:00:00.000Z',
+    } as SharedSpaceMemberResponseDto,
+  ],
+) {
+  const props = { data: { challenge, members } };
   return render(TestWrapper as Component<{ component: typeof GamePlayPage; componentProps: typeof props }>, {
     component: GamePlayPage,
     componentProps: props,
@@ -86,6 +104,8 @@ describe('Game play page', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    authManager.setUser(userAdminFactory.build({ id: 'current-user-id' }));
+    authManager.setPreferences(preferencesFactory.build());
     // Every guess re-fetches the challenge (task-9 correction #1); give every test a safe default
     // so a guess never resolves to `challenge = undefined`, and let tests that care about the
     // answer override it explicitly.
@@ -159,6 +179,7 @@ describe('Game play page', () => {
       renderPage(challenge);
 
       await waitFor(() => expect(screen.getByTestId('game-leaderboard')).toBeInTheDocument());
+      expect(screen.getByTestId('leaderboard-row')).toHaveTextContent('Alice');
       expect(screen.getByTestId('game-completed')).toHaveTextContent('Completed');
       expect(screen.queryByTestId('game-progress')).not.toBeInTheDocument();
       expect(sdkMock.getLeaderboard).toHaveBeenCalledWith({ id: 'challenge-1' });
@@ -453,6 +474,7 @@ describe('Game play page', () => {
       await fireEvent.click(screen.getByTestId('round-result-next'));
 
       await waitFor(() => expect(screen.getByTestId('game-leaderboard')).toBeInTheDocument());
+      expect(screen.getByTestId('leaderboard-row')).toHaveTextContent('Alice');
       expect(screen.getByText('Alice')).toBeInTheDocument();
       expect(screen.queryByTestId('game-progress')).not.toBeInTheDocument();
     });
