@@ -165,6 +165,9 @@ export const Route = {
     `/spaces/${id}/albums` + asQueryString({ folder: folderId ?? undefined }),
   viewSpaceAlbum: ({ spaceId, albumId }: { spaceId: string; albumId: string }) =>
     `/spaces/${spaceId}/albums/${albumId}`,
+  viewSpaceGames: ({ id }: { id: string }) => `/spaces/${id}/games`,
+  viewSpaceGame: ({ spaceId, challengeId }: { spaceId: string; challengeId: string }) =>
+    `/spaces/${spaceId}/games/${challengeId}`,
 
   // shared links
   sharedLinks: (params?: { filter?: SharedLinkTab }) => '/shared-links' + asQueryString(params),

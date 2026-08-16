@@ -130,7 +130,7 @@ describe('Space games page', () => {
 
     const links = screen.getAllByRole('link');
     expect(links.map((link) => link.getAttribute('href'))).toEqual(
-      expect.arrayContaining(['./games/c-1', './games/c-2']),
+      expect.arrayContaining(['/spaces/space-1/games/c-1', '/spaces/space-1/games/c-2']),
     );
   });
 
@@ -177,7 +177,7 @@ describe('Space games page', () => {
           gameCreateDto: { roundCount: 5 },
         }),
       );
-      expect(goto).toHaveBeenCalledWith('./games/new-1');
+      expect(goto).toHaveBeenCalledWith('/spaces/space-1/games/new-1');
     });
 
     it('empty-state create: creates a challenge and navigates to it', async () => {
@@ -186,7 +186,7 @@ describe('Space games page', () => {
 
       await fireEvent.click(screen.getByTestId('empty-new-challenge-button'));
 
-      await waitFor(() => expect(goto).toHaveBeenCalledWith('./games/new-1'));
+      await waitFor(() => expect(goto).toHaveBeenCalledWith('/spaces/space-1/games/new-1'));
     });
 
     it('a 400 (no usable photos) surfaces game_create_failed, not the truncated raw server message', async () => {
@@ -238,7 +238,7 @@ describe('Space games page', () => {
       await waitFor(() =>
         expect(toastManagerMock.warning).toHaveBeenCalledWith("This space's photos filled 3 of 5 rounds"),
       );
-      expect(goto).toHaveBeenCalledWith('./games/new-1');
+      expect(goto).toHaveBeenCalledWith('/spaces/space-1/games/new-1');
     });
 
     it('viewer sees no create action to trigger', () => {

@@ -57,6 +57,17 @@
       {$t('game_place_your_pin')}
     </p>
 
+    <!-- Placing a pin is mouse/touch-only today (a keyboard-only user can never trigger this) - a
+         full fix (coordinate or place-search entry) is a separate design decision. In the meantime,
+         this announces the Guess button's enabled state changing for anyone relying on a screen
+         reader, mirroring the loading-state pattern elsewhere (infinite-scroll-sentinel.svelte,
+         people-grid.svelte) of reusing a short existing key rather than composing new copy. -->
+    <div class="sr-only" aria-live="polite" data-testid="location-round-pin-announcement">
+      {#if pin}
+        {$t('game_guess')}
+      {/if}
+    </div>
+
     <Button variant="filled" fullWidth disabled={!pin} onclick={handleGuess} data-testid="location-round-guess">
       {$t('game_guess')}
     </Button>

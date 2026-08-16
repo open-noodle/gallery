@@ -5,6 +5,7 @@
   import LocationRound from '$lib/components/games/location-round.svelte';
   import RoundResult from '$lib/components/games/round-result.svelte';
   import UserPageLayout from '$lib/components/layouts/UserPageLayout.svelte';
+  import { Route } from '$lib/route';
   import { handleError } from '$lib/utils/handle-error';
   import { yearFromIso } from '$lib/utils/game';
   import {
@@ -173,7 +174,7 @@
       shape="round"
       color="secondary"
       aria-label={$t('back')}
-      onclick={() => void goto(`/spaces/${challenge.spaceId}/games`)}
+      onclick={() => void goto(Route.viewSpaceGames({ id: challenge.spaceId }))}
       icon={mdiArrowLeft}
     />
   {/snippet}

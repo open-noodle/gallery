@@ -105,7 +105,7 @@
         {
           key: 'games',
           label: $t('game_challenges'),
-          href: `${base}/games`,
+          href: Route.viewSpaceGames({ id: spaceId }),
           active: path.startsWith(`${base}/games`),
         },
       ] as (Tab | undefined)[]

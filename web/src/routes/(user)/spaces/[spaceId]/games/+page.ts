@@ -4,7 +4,9 @@ import type { PageLoad } from './$types';
 
 export const load = (async ({ url, params, parent }) => {
   await authenticate(url);
-  await parent();
+  const { space } = await parent();
   const challenges = await getChallenges({ spaceId: params.spaceId });
-  return { challenges };
+  // "Challenges", matching the space-tabs.svelte label for this tab ($t('game_challenges')) - same
+  // convention as the sibling Activity/Members pages (space name + the tab's own English label).
+  return { challenges, meta: { title: `${space.name} - Challenges` } };
 }) satisfies PageLoad;
