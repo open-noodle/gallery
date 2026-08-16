@@ -21,13 +21,25 @@ import { ImmichFileResponse } from 'src/utils/file.js';
 import { mediumFactory, newMediumService } from 'test/medium.factory.js';
 import { factory } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
+import { ConfigRepository } from 'src/repositories/config.repository.js';
+import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository.js';
 
 let defaultDatabase: Kysely<DB>;
 
 const setup = (db?: Kysely<DB>) => {
   return newMediumService(AssetMediaService, {
     database: db || defaultDatabase,
-    real: [AccessRepository, AlbumRepository, AssetRepository, SharedLinkRepository, UserRepository],
+    // ConfigRepository + SystemMetadataRepository are required because `create` now resolves the
+    // write backend per file kind, which reads SystemConfig via getConfig() -> buildConfig().
+    real: [
+      AccessRepository,
+      AlbumRepository,
+      AssetRepository,
+      ConfigRepository,
+      SharedLinkRepository,
+      SystemMetadataRepository,
+      UserRepository,
+    ],
     mock: [EventRepository, LoggingRepository, JobRepository, StorageRepository],
   });
 };
