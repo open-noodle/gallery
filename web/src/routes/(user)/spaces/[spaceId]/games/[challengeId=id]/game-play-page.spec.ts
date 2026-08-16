@@ -102,6 +102,14 @@ describe('Game play page', () => {
       expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-title', 'Summer Trip');
     });
 
+    // A daily has no user-facing name - the server stores its UTC date in `name` purely so the
+    // column stays non-null - so titling the page with it would put a raw "2026-08-16" at the top
+    // of the screen in every language.
+    it('titles a daily challenge with the localized daily label, not its stored date', () => {
+      renderPage(makeChallenge({ name: '2026-08-16', dailyOn: '2026-08-16' }));
+      expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-title', 'Daily challenge');
+    });
+
     it('renders a back control that returns to the challenge list', async () => {
       renderPage(makeChallenge({ spaceId: 'space-1' }));
 

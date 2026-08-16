@@ -44,9 +44,11 @@ export class GameChallengeTable {
   @Column()
   name!: string;
 
-  // The UTC date this challenge is the daily for; NULL for a player-created challenge.
+  // The UTC date this challenge is the daily for; NULL for a player-created challenge. Typed as a
+  // Timestamp because that is what the driver hands back for a `date` column - the same convention
+  // as person.birthDate, whose DTO runs it through asDateString() to get a yyyy-mm-dd back out.
   @Column({ type: 'date', nullable: true })
-  dailyOn!: string | null;
+  dailyOn!: Timestamp | null;
 
   @Column({ type: 'integer' })
   roundCount!: number;

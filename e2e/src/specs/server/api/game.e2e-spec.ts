@@ -26,6 +26,17 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 const guessPayloadFor = (round: GameRoundDetailResponseDto): { lat: number; lon: number } | { date: string } =>
   round.type === GameRoundType.Location ? { lat: 12.34, lon: 56.78 } : { date: '2020-06-15T00:00:00.000Z' };
 
+const getDaily = async (
+  spaceId: string,
+  accessToken: string,
+): Promise<{ challenge: (GameChallengeListItemResponseDto & { dailyOn: string | null }) | null }> => {
+  const { status, body } = await request(app)
+    .get(`/shared-spaces/${spaceId}/games/daily`)
+    .set('Authorization', `Bearer ${accessToken}`);
+  expect(status).toBe(200);
+  return body as { challenge: (GameChallengeListItemResponseDto & { dailyOn: string | null }) | null };
+};
+
 const getDetail = async (challengeId: string, accessToken: string): Promise<GameChallengeDetailResponseDto> => {
   const { status, body } = await request(app)
     .get(`/games/${challengeId}`)
@@ -363,6 +374,107 @@ describe('/games', () => {
       expect(guessedRound?.assetId).toBeDefined();
       expect(guessedRound?.answer).toBeDefined();
       expect(assets.map((asset) => asset.id)).toContain(guessedRound?.assetId);
+    });
+  });
+
+  describe('the daily challenge', () => {
+    // The one thing unit tests cannot prove: the daily is generated lazily by whoever opens the
+    // page first, so two members arriving together really do both try to insert one. The partial
+    // unique index on (spaceId, dailyOn) is what makes the loser re-read the winner instead of
+    // creating a second, divergent daily - if that broke, these two players would be competing on
+    // different photos while sharing a leaderboard.
+    it('hands every member the same daily, even when two of them generate it at once', async () => {
+      const { spaceId } = await freshSpaceWithPhotos('daily-race', 6);
+
+      const [first, second, third] = await Promise.all([
+        getDaily(spaceId, viewer.accessToken),
+        getDaily(spaceId, editor.accessToken),
+        getDaily(spaceId, owner.accessToken),
+      ]);
+
+      expect(first.challenge).not.toBeNull();
+      expect(second.challenge?.id).toBe(first.challenge?.id);
+      expect(third.challenge?.id).toBe(first.challenge?.id);
+      // Stamped with a UTC calendar day, not a timestamp.
+      expect(first.challenge?.dailyOn).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    });
+
+    it('keeps handing back the same daily on a later read', async () => {
+      const { spaceId } = await freshSpaceWithPhotos('daily-stable', 6);
+
+      const first = await getDaily(spaceId, viewer.accessToken);
+      const second = await getDaily(spaceId, viewer.accessToken);
+
+      expect(second.challenge?.id).toBe(first.challenge?.id);
+    });
+
+    // The daily belongs to the space, so it must not turn up in the player-created list - where it
+    // would carry a delete control the server then refuses.
+    it('never appears in the space challenge list', async () => {
+      const { spaceId } = await freshSpaceWithPhotos('daily-not-listed', 6);
+      const daily = await getDaily(spaceId, viewer.accessToken);
+      await createChallenge(spaceId, 2);
+
+      const { status, body } = await request(app)
+        .get(`/shared-spaces/${spaceId}/games`)
+        .set('Authorization', `Bearer ${viewer.accessToken}`);
+
+      expect(status).toBe(200);
+      const ids = (body as GameChallengeListItemResponseDto[]).map((item) => item.id);
+      expect(ids).not.toHaveLength(0);
+      expect(ids).not.toContain(daily.challenge?.id);
+    });
+
+    it('refuses to delete the daily, even for an editor', async () => {
+      const { spaceId } = await freshSpaceWithPhotos('daily-undeletable', 6);
+      const daily = await getDaily(spaceId, viewer.accessToken);
+
+      const { status } = await request(app)
+        .delete(`/games/${daily.challenge?.id}`)
+        .set('Authorization', `Bearer ${editor.accessToken}`);
+
+      expect(status).toBe(400);
+    });
+
+    it('rejects a non-member reading the daily', async () => {
+      const { spaceId } = await freshSpaceWithPhotos('daily-nonmember', 6);
+
+      const { status } = await request(app)
+        .get(`/shared-spaces/${spaceId}/games/daily`)
+        .set('Authorization', `Bearer ${nonMember.accessToken}`);
+
+      expect(status).toBe(403);
+    });
+  });
+
+  describe('game type', () => {
+    // Every fixture photo here is a generated PNG with no EXIF GPS, so this space can only make
+    // date rounds - which is exactly what makes it a real test of both branches.
+    it('builds only date rounds when a date game is requested', async () => {
+      const { spaceId } = await freshSpaceWithPhotos('type-date', 4);
+
+      const { status, body } = await request(app)
+        .post(`/shared-spaces/${spaceId}/games`)
+        .set('Authorization', `Bearer ${editor.accessToken}`)
+        .send({ roundCount: 4, type: 'date' });
+
+      expect(status).toBe(201);
+      const detail = await getDetail(body.id, editor.accessToken);
+      expect(detail.rounds).not.toHaveLength(0);
+      expect(detail.rounds.every((round) => round.type === GameRoundType.Date)).toBe(true);
+    });
+
+    // The request is explicit, so it must be refused rather than filled with the date rounds this
+    // space does have - otherwise the type picker silently does nothing.
+    it('refuses a location game in a space with no GPS photos', async () => {
+      const { spaceId } = await freshSpaceWithPhotos('type-location-impossible', 4);
+
+      const { status } = await request(app)
+        .post(`/shared-spaces/${spaceId}/games`)
+        .set('Authorization', `Bearer ${editor.accessToken}`)
+        .send({ roundCount: 4, type: 'location' });
+
+      expect(status).toBe(400);
     });
   });
 

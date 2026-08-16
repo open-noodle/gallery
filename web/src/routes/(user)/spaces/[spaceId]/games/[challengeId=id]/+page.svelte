@@ -167,7 +167,9 @@
 <!-- The challenge's own name is the title (mirrors the space-album detail page's back-nav +
      title pattern); unlike that page, there is no editable title inline in the round/result
      surfaces below, so the header is the only place it's shown. -->
-<UserPageLayout title={challenge.name}>
+<!-- A daily has no user-facing name: the server stores its UTC date in `name` only to keep the
+     column non-null, so titling the page with it would show a raw "2026-08-16" in every language. -->
+<UserPageLayout title={challenge.dailyOn ? $t('game_daily_challenge') : challenge.name}>
   {#snippet leading()}
     <IconButton
       variant="ghost"
