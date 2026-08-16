@@ -34,13 +34,14 @@
       <!-- mapMarkers must stay an explicit [] — leaving it undefined makes Map.svelte fetch and
            render the player's ENTIRE geotagged library (getMapMarkers, global — not space-scoped;
            the space-scoped endpoint needs a spaceId prop that isn't passed here), which could
-           include the round's answer. That [] guard only covers the mount-time fetch, though:
-           mapMarkers is $bindable(), and both the settings-cog path (handleSettingsClick) and
-           onAssetsChanged (Map.svelte) write a freshly-fetched marker set back into it regardless
-           of what was passed in. showSettings={false} below closes the settings-cog path, the only
-           other way this component can trigger that fetch. The player's placed pin still renders:
-           handleMapClick in Map.svelte drops a plain maplibre-gl Marker on click, independent of
-           mapMarkers. -->
+           include the round's answer. mapMarkers is $bindable(), so a self-fetch inside Map.svelte
+           can still write a freshly-fetched marker set back into it after mount — Map.svelte now
+           gates its two self-fetch paths (the mount-time fetch and onAssetsChanged, its handler for
+           the global asset-changed websocket event) on whether markers were supplied at init, so
+           this [] closes both. The one remaining path is the settings-cog click handler
+           (handleSettingsClick), which is not gated the same way — showSettings={false} below hides
+           the cog so it can't be reached at all. The player's placed pin still renders: handleMapClick
+           in Map.svelte drops a plain maplibre-gl Marker on click, independent of mapMarkers. -->
       <Map
         mapMarkers={[]}
         clickable
@@ -60,11 +61,11 @@
     <!-- Placing a pin is mouse/touch-only today (a keyboard-only user can never trigger this) - a
          full fix (coordinate or place-search entry) is a separate design decision. In the meantime,
          this announces the Guess button's enabled state changing for anyone relying on a screen
-         reader, mirroring the loading-state pattern elsewhere (infinite-scroll-sentinel.svelte,
-         people-grid.svelte) of reusing a short existing key rather than composing new copy. -->
+         reader. The coordinates themselves (not a translated sentence) are the announced content -
+         genuinely informative on their own, and numbers need no new i18n key. -->
     <div class="sr-only" aria-live="polite" data-testid="location-round-pin-announcement">
       {#if pin}
-        {$t('game_guess')}
+        {pin.lat.toFixed(2)}, {pin.lon.toFixed(2)}
       {/if}
     </div>
 

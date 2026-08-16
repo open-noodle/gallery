@@ -44,7 +44,10 @@
   );
 
   // mapMarkers must stay explicit — leaving it undefined makes Map.svelte fetch and render the
-  // space's own photo markers (see location-round.svelte's identical comment / Map.svelte:281-284).
+  // player's ENTIRE geotagged library (getMapMarkers, global — not space-scoped; see
+  // location-round.svelte's identical comment for the full self-fetch-gating explanation). Not an
+  // answer leak here (the reveal has already happened), but a settings-cog click or a background
+  // asset change would otherwise destroy the guess/answer pins mid-reveal.
   // 'guess'/'answer' are not real asset IDs (MapMarkerResponseDto.id is normally an asset ID), so
   // `useLocationPin` MUST be passed below — otherwise Map.svelte's default marker layer renders an
   // <img> keyed off this id (Map.svelte:432-433) and both pins 404. The id doubles as the popup
