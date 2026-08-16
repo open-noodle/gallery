@@ -13,6 +13,10 @@
   <h2 class="text-lg font-semibold">{$t('game_leaderboard')}</h2>
 
   <table class="mt-2 w-full text-start">
+    <!-- sr-only: the visible h2 above already names the table for sighted users: a second visible
+         "Leaderboard" would be redundant. Reuses the same existing key rather than inventing
+         column-specific ones (rank/rounds-answered/points have no existing generic i18n key). -->
+    <caption class="sr-only">{$t('game_leaderboard')}</caption>
     <tbody>
       {#each entries as entry, rank (entry.userId)}
         <tr data-testid="leaderboard-row" class="border-b border-gray-200 last:border-0 dark:border-gray-800">

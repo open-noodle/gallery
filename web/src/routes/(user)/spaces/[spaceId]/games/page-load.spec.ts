@@ -66,7 +66,10 @@ describe('space games page load', () => {
 
   it('authenticates, loads the parent layout, then loads the space challenges', async () => {
     const event = makeEvent();
-    await expect(load(event as never)).resolves.toEqual({ challenges });
+    await expect(load(event as never)).resolves.toEqual({
+      challenges,
+      meta: { title: 'Test Space - Challenges' },
+    });
 
     expect(authenticate).toHaveBeenCalledWith(event.url);
     expect(event.parent).toHaveBeenCalled();

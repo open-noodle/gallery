@@ -45,4 +45,19 @@ describe('LocationRound', () => {
 
     expect(onGuess).toHaveBeenCalledWith({ lat: 5, lon: -160 });
   });
+
+  // Placing a pin is mouse/touch-only, so the Guess button's enabled state was changing with
+  // nothing announced to a screen reader. The aria-live region must be empty beforehand (an
+  // aria-live region only announces a CHANGE) and populated once a pin lands.
+  it('announces the guess button becoming available once a pin is placed', async () => {
+    render(LocationRound, base);
+
+    const announcement = screen.getByTestId('location-round-pin-announcement');
+    expect(announcement).toHaveAttribute('aria-live', 'polite');
+    expect(announcement).toHaveTextContent('');
+
+    await fireEvent.click(screen.getByTestId('map-stub-click-point'));
+
+    expect(announcement).not.toHaveTextContent('');
+  });
 });

@@ -58,7 +58,10 @@ describe('game play page load', () => {
 
   it('authenticates, loads the parent layout, then loads the challenge', async () => {
     const event = makeEvent();
-    await expect(load(event as never)).resolves.toEqual({ challenge });
+    await expect(load(event as never)).resolves.toEqual({
+      challenge,
+      meta: { title: 'Summer Trip' },
+    });
 
     expect(authenticate).toHaveBeenCalledWith(event.url);
     expect(event.parent).toHaveBeenCalled();
