@@ -12,6 +12,12 @@
   }
 
   let { name, roundCount, answered, href, onDelete }: Props = $props();
+
+  // Not started / partway / done — mirrors the play page's own game_completed heading for the
+  // finished case.
+  const cta = $derived(
+    answered <= 0 ? $t('game_play') : answered >= roundCount ? $t('game_completed') : $t('game_continue'),
+  );
 </script>
 
 <div
@@ -44,6 +50,9 @@
     </p>
     <p class="text-sm dark:text-immich-dark-fg">
       {$t('game_leaderboard_answered', { values: { answered, total: roundCount } })}
+    </p>
+    <p class="text-sm font-medium text-primary" data-testid="challenge-card-cta">
+      {cta}
     </p>
   </a>
 </div>

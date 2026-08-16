@@ -102,6 +102,12 @@
           href: `${base}/activity`,
           active: path.startsWith(`${base}/activity`),
         },
+        {
+          key: 'games',
+          label: $t('game_challenges'),
+          href: `${base}/games`,
+          active: path.startsWith(`${base}/games`),
+        },
       ] as (Tab | undefined)[]
     ).filter((tab): tab is Tab => tab !== undefined),
   );
