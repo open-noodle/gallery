@@ -18,8 +18,9 @@ import SpaceGamesPage from './+page.svelte';
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn(), invalidateAll: vi.fn() }));
 
-const { toastManagerMock } = vi.hoisted(() => ({
+const { toastManagerMock, modalManagerMock } = vi.hoisted(() => ({
   toastManagerMock: { danger: vi.fn(), primary: vi.fn(), success: vi.fn(), warning: vi.fn() },
+  modalManagerMock: { show: vi.fn(), showDialog: vi.fn() },
 }));
 
 vi.mock('@immich/ui', async (importOriginal) => {
@@ -27,6 +28,7 @@ vi.mock('@immich/ui', async (importOriginal) => {
   return {
     ...original,
     toastManager: toastManagerMock,
+    modalManager: modalManagerMock,
   };
 });
 
@@ -107,6 +109,10 @@ describe('Space games page', () => {
     vi.resetAllMocks();
     authManager.setUser(userAdminFactory.build({ id: 'current-user-id' }));
     authManager.setPreferences(preferencesFactory.build());
+    // Deleting a challenge is destructive and now confirms first (mirrors library unlink /
+    // space delete); default to "confirmed" so tests that aren't about the dialog itself don't
+    // each have to stub it.
+    modalManagerMock.showDialog.mockResolvedValue(true);
   });
 
   it('shows the empty state when there are no challenges', () => {
@@ -215,7 +221,22 @@ describe('Space games page', () => {
   });
 
   describe('delete', () => {
-    it('deletes the challenge and removes its card', async () => {
+    it('confirms, naming the challenge, before calling deleteChallenge', async () => {
+      sdkMock.deleteChallenge.mockResolvedValue(undefined as never);
+      renderPage([makeChallenge({ id: 'c-1', name: 'Summer Trip' })], SharedSpaceRole.Editor);
+
+      await fireEvent.click(screen.getByTestId('challenge-card-delete'));
+
+      await waitFor(() =>
+        expect(modalManagerMock.showDialog).toHaveBeenCalledWith({
+          prompt: 'Are you sure you want to delete "Summer Trip"? This cannot be undone.',
+          title: 'Delete challenge',
+        }),
+      );
+      expect(sdkMock.deleteChallenge).toHaveBeenCalledWith({ id: 'c-1' });
+    });
+
+    it('deletes the challenge and removes its card once confirmed', async () => {
       sdkMock.deleteChallenge.mockResolvedValue(undefined as never);
       renderPage([makeChallenge({ id: 'c-1', name: 'Summer Trip' })], SharedSpaceRole.Editor);
 
@@ -223,6 +244,17 @@ describe('Space games page', () => {
 
       await waitFor(() => expect(sdkMock.deleteChallenge).toHaveBeenCalledWith({ id: 'c-1' }));
       await waitFor(() => expect(screen.queryByTestId('challenge-card')).not.toBeInTheDocument());
+    });
+
+    it('dismissing the confirmation calls neither deleteChallenge nor removes the card', async () => {
+      modalManagerMock.showDialog.mockResolvedValue(false);
+      renderPage([makeChallenge({ id: 'c-1', name: 'Summer Trip' })], SharedSpaceRole.Editor);
+
+      await fireEvent.click(screen.getByTestId('challenge-card-delete'));
+
+      await waitFor(() => expect(modalManagerMock.showDialog).toHaveBeenCalled());
+      expect(sdkMock.deleteChallenge).not.toHaveBeenCalled();
+      expect(screen.getByTestId('challenge-card')).toBeInTheDocument();
     });
 
     it('a failed delete surfaces game_delete_failed and keeps the card', async () => {
