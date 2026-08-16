@@ -13,7 +13,9 @@ import {
   GameChallengeDetailResponseDto,
   GameChallengeListItemResponseDto,
   GameChallengeResponseDto,
+  GameChallengeType,
   GameCreateDto,
+  GameDailyResponseDto,
   GameGuessDto,
   GameGuessResponseDto,
   GameLeaderboardResponseDto,
@@ -52,6 +54,47 @@ import { hasSharedSpaceRole } from 'src/utils/shared-space-role';
 /** Location rounds fill up to this fraction of the requested round count; the rest are date
  * rounds. See design doc §7.4 - this is what keeps a GPS-poor space playable. */
 const LOCATION_ROUND_SHARE = 0.6;
+
+/**
+ * The share of location rounds for each requested challenge type.
+ *
+ * 'mixed' keeps the historical 0.6 and its cross-pool fallback: a shortfall in one pool is made up
+ * from the other, because the player asked for "whatever you have". 'location' and 'date' are
+ * explicit requests, so they get 1 and 0 and NO fallback - see buildRounds, where honouring an
+ * explicit request means returning fewer rounds (or refusing) rather than quietly handing back the
+ * other kind, which would make the type picker look inert.
+ */
+const LOCATION_SHARE_BY_TYPE: Record<GameChallengeType, number> = {
+  mixed: LOCATION_ROUND_SHARE,
+  location: 1,
+  date: 0,
+};
+
+/**
+ * Why no rounds could be built, phrased per requested type. The remedy differs - a location game
+ * needs GPS data specifically - so a single generic sentence would send half of these callers after
+ * the wrong thing.
+ */
+const NO_ROUNDS_MESSAGE: Record<GameChallengeType, string> = {
+  mixed: 'This space has no photos usable for a challenge - add photos with GPS data or capture dates to play',
+  location: 'This space has no photos with GPS data - a location game needs photos that know where they were taken',
+  date: 'This space has no photos with capture dates - a date game needs photos that know when they were taken',
+};
+
+/** The daily is always this size; it is the same game for everyone, so it takes no parameters. */
+const DAILY_ROUND_COUNT = 5;
+
+/** Postgres constraint behind the lazy daily generation race - see the migration. */
+const DAILY_UNIQUE_CONSTRAINT = 'game_challenge_daily_uq';
+
+/**
+ * Today's date as the UTC calendar day, `YYYY-MM-DD`.
+ *
+ * UTC rather than the caller's local day, and this is the whole point of the choice: members of one
+ * space can be in different timezones, and a per-viewer day would give them different "today"s -
+ * two people comparing scores on the same leaderboard while playing different challenges.
+ */
+const utcDateKey = (now: Date): string => now.toISOString().slice(0, 10);
 
 /**
  * Candidates fetched per pool per generation - and, for the location pool, **the scene gate's
@@ -206,19 +249,50 @@ export class GameService extends BaseService {
   async create(auth: AuthDto, spaceId: string, dto: GameCreateDto): Promise<GameChallengeResponseDto> {
     await this.requireEditor(spaceId, auth.user.id);
 
-    // GameCreateDto.roundCount has a zod .default(5), but chaining .optional() after .default()
-    // (the codebase's own convention, e.g. SharedSpaceMemberCreateDto.role) keeps the inferred TS
-    // type `number | undefined` - the fallback still has to be applied here, same as dto.role ??
-    // SharedSpaceRole.Viewer in shared-space.service.ts.
-    const requestedRoundCount = dto.roundCount ?? 5;
-
     // Resolved BEFORE the candidate queries, not alongside them: the challenge count is half of
     // the generation seed, and the seed now drives which slice of a large space the candidate
     // queries return (see GameRepository.seededOrder), not just which of them get picked.
     const existingChallenges = await this.gameRepository.getChallengesForSpace(spaceId);
     const challengeCount = existingChallenges?.length ?? 0;
-    const seed = `${spaceId}:${challengeCount}`;
 
+    return this.generateChallenge({
+      spaceId,
+      createdById: auth.user.id,
+      // GameCreateDto.roundCount has a zod .default(5), but chaining .optional() after .default()
+      // (the codebase's own convention, e.g. SharedSpaceMemberCreateDto.role) keeps the inferred TS
+      // type `number | undefined` - the fallback still has to be applied here, same as dto.role ??
+      // SharedSpaceRole.Viewer in shared-space.service.ts.
+      requestedRoundCount: dto.roundCount ?? 5,
+      type: dto.type ?? 'mixed',
+      seed: `${spaceId}:${challengeCount}`,
+      dailyOn: null,
+      name: dto.name?.trim() || `Challenge ${challengeCount + 1}`,
+    });
+  }
+
+  /**
+   * Builds and stores one challenge. Shared by the player-created path and the daily, which differ
+   * only in their seed, their author and whether `dailyOn` is set - the generation itself is
+   * identical, and keeping it in one place is what guarantees the daily is a real challenge rather
+   * than a second, subtly different generator.
+   */
+  private async generateChallenge({
+    spaceId,
+    createdById,
+    requestedRoundCount,
+    type,
+    seed,
+    dailyOn,
+    name,
+  }: {
+    spaceId: string;
+    createdById: string | null;
+    requestedRoundCount: number;
+    type: GameChallengeType;
+    seed: string;
+    dailyOn: string | null;
+    name: string;
+  }): Promise<GameChallengeResponseDto> {
     const scenePrompts = await this.getScenePromptEmbeddings();
 
     const [rawLocationPool, rawDatePool, recentlyUsedAssetIds] = await Promise.all([
@@ -239,7 +313,9 @@ export class GameService extends BaseService {
     // generation is reproducible and successive challenges for the same space still differ.
     const random = mulberry32(hashSeed(seed));
 
-    const locationShare = Math.floor(requestedRoundCount * LOCATION_ROUND_SHARE);
+    // Still floored, which is exact for the explicit types (a share of 1 or 0 cannot have a
+    // fractional part) and leaves 'mixed' rounding exactly as it always did.
+    const locationShare = Math.floor(requestedRoundCount * LOCATION_SHARE_BY_TYPE[type]);
     const filteredLocationPool = withoutRecent(rawLocationPool);
     const locationNeeded = Math.min(locationShare, rawLocationPool.length);
     const locationPool = filteredLocationPool.length >= locationNeeded ? filteredLocationPool : rawLocationPool;
@@ -253,7 +329,10 @@ export class GameService extends BaseService {
     const locationRounds = selectLocationRounds(locationPool, locationTarget, scaleKm, random);
 
     const usedAssetIds = new Set(locationRounds.map((candidate) => candidate.assetId));
-    const dateRemaining = requestedRoundCount - locationRounds.length;
+    // Only 'mixed' lets the date pool cover a location shortfall. For an explicit 'location'
+    // request the remainder must stay 0, or a GPS-poor space would answer a location game with
+    // date rounds and look like the type picker did nothing.
+    const dateRemaining = type === 'location' ? 0 : requestedRoundCount - locationRounds.length;
 
     const filteredDatePool = withoutRecent(rawDatePool);
     const availableExcludingUsed = (pool: GameCandidate[]) =>
@@ -288,15 +367,17 @@ export class GameService extends BaseService {
     );
 
     if (typedRounds.length === 0) {
-      throw new BadRequestException(
-        'This space has no photos usable for a challenge - add photos with GPS data or capture dates to play',
-      );
+      // Named by requested type, because the fix differs: a location game needs GPS data
+      // specifically, and telling someone to "add photos with capture dates" when they asked for a
+      // location game sends them after the wrong thing.
+      throw new BadRequestException(NO_ROUNDS_MESSAGE[type]);
     }
 
     const challenge: Insertable<GameChallengeTable> = {
       spaceId,
-      createdById: auth.user.id,
-      name: dto.name?.trim() || `Challenge ${challengeCount + 1}`,
+      createdById,
+      dailyOn,
+      name,
       // The actual number of rounds built, not the number requested - a thin pool creates a
       // shorter challenge rather than failing outright.
       roundCount: typedRounds.length,
@@ -326,6 +407,7 @@ export class GameService extends BaseService {
       scaleKm: challenge.scaleKm,
       scaleDays: challenge.scaleDays,
       createdAt: new Date(),
+      dailyOn,
     };
   }
 
@@ -341,26 +423,107 @@ export class GameService extends BaseService {
   async list(auth: AuthDto, spaceId: string): Promise<GameChallengeListItemResponseDto[]> {
     await this.requireMember(spaceId, auth.user.id);
 
+    // getChallengesForSpace excludes dailies in the query - see its own comment for why that is not
+    // a filter here.
     const challenges = await this.gameRepository.getChallengesForSpace(spaceId);
-    const guessesByChallenge = await Promise.all(
-      challenges.map((challenge) => this.gameRepository.getGuessesForUser(challenge.id, auth.user.id)),
-    );
+    const [guessesByChallenge, locationCounts] = await Promise.all([
+      Promise.all(challenges.map((challenge) => this.gameRepository.getGuessesForUser(challenge.id, auth.user.id))),
+      this.gameRepository.getLocationRoundCounts(spaceId),
+    ]);
+    const locationCountById = new Map(locationCounts.map((row) => [row.challengeId, row.locationCount]));
 
     return challenges.map((challenge, i) => {
       const guesses = guessesByChallenge[i];
       return {
-        id: challenge.id,
-        spaceId: challenge.spaceId,
-        name: challenge.name,
-        roundCount: challenge.roundCount,
-        scaleKm: challenge.scaleKm,
-        scaleDays: challenge.scaleDays,
-        createdAt: challenge.createdAt,
-        closedAt: challenge.closedAt,
-        answered: guesses.length,
-        total: guesses.reduce((sum, guess) => sum + guess.score, 0),
+        ...this.toListItem(challenge, guesses, locationCountById.get(challenge.id) ?? 0),
       };
     });
+  }
+
+  /** The list shape: a challenge plus the CALLER's progress. Never another member's. */
+  private toListItem(
+    challenge: GameChallengeRow,
+    guesses: { score: number }[],
+    locationRoundCount: number,
+  ): GameChallengeListItemResponseDto {
+    return {
+      id: challenge.id,
+      spaceId: challenge.spaceId,
+      name: challenge.name,
+      roundCount: challenge.roundCount,
+      scaleKm: challenge.scaleKm,
+      scaleDays: challenge.scaleDays,
+      createdAt: challenge.createdAt,
+      closedAt: challenge.closedAt,
+      dailyOn: challenge.dailyOn,
+      locationRoundCount,
+      answered: guesses.length,
+      total: guesses.reduce((sum, guess) => sum + guess.score, 0),
+    };
+  }
+
+  /**
+   * The space's daily challenge for today, generated on first read.
+   *
+   * Generation is lazy rather than scheduled: there is nothing to run for a space nobody opens, a
+   * missed day heals itself, and the seed makes every member's "first" generation identical anyway.
+   * Membership - not the editor role - is the gate, because the daily belongs to the space and
+   * whoever happens to open the page first should not need permission to see it.
+   */
+  async getDaily(auth: AuthDto, spaceId: string): Promise<GameDailyResponseDto> {
+    await this.requireMember(spaceId, auth.user.id);
+
+    const dailyOn = utcDateKey(new Date());
+    const existing = await this.gameRepository.getDailyChallenge(spaceId, dailyOn);
+    const challenge = existing ?? (await this.generateDaily(spaceId, dailyOn));
+
+    if (!challenge) {
+      return { challenge: null };
+    }
+
+    const [guesses, rounds] = await Promise.all([
+      this.gameRepository.getGuessesForUser(challenge.id, auth.user.id),
+      this.gameRepository.getRounds(challenge.id),
+    ]);
+
+    return {
+      challenge: this.toListItem(challenge, guesses, rounds.filter((round) => round.type === 'location').length),
+    };
+  }
+
+  /**
+   * Generates today's daily, or returns undefined when the space has nothing playable.
+   *
+   * Two things are deliberate. A space with no usable photos yields `undefined` rather than the
+   * 400 `generateChallenge` throws: "no daily today" is an ordinary state of the page, not a failed
+   * request. And a lost race - two members generating at once, the partial unique index rejecting
+   * the second - is resolved by re-reading the winner, so both players get the SAME challenge
+   * instead of one of them seeing a 500.
+   */
+  private async generateDaily(spaceId: string, dailyOn: string): Promise<GameChallengeRow | undefined> {
+    try {
+      await this.generateChallenge({
+        spaceId,
+        // No human author: the daily is the space's, not the first reader's.
+        createdById: null,
+        requestedRoundCount: DAILY_ROUND_COUNT,
+        type: 'mixed',
+        // Keyed to the date, so every member generating "first" builds an identical challenge.
+        seed: `${spaceId}:daily:${dailyOn}`,
+        dailyOn,
+        name: dailyOn,
+      });
+    } catch (error) {
+      if ((error as PostgresError)?.constraint_name === DAILY_UNIQUE_CONSTRAINT) {
+        return this.gameRepository.getDailyChallenge(spaceId, dailyOn);
+      }
+      if (error instanceof BadRequestException) {
+        return undefined;
+      }
+      throw error;
+    }
+
+    return this.gameRepository.getDailyChallenge(spaceId, dailyOn);
   }
 
   /**
@@ -383,6 +546,7 @@ export class GameService extends BaseService {
       id: challenge.id,
       spaceId: challenge.spaceId,
       name: challenge.name,
+      dailyOn: challenge.dailyOn,
       roundCount: challenge.roundCount,
       scaleKm: challenge.scaleKm,
       scaleDays: challenge.scaleDays,
@@ -526,6 +690,12 @@ export class GameService extends BaseService {
   async delete(auth: AuthDto, challengeId: string): Promise<void> {
     const challenge = await this.loadChallenge(challengeId);
     await this.requireEditor(challenge.spaceId, auth.user.id);
+    // The daily is shared state, not one member's row: deleting it would take away a game the rest
+    // of the space may already have played today, and it would simply regenerate on the next read
+    // anyway - with a different id, orphaning the leaderboard everyone was competing on.
+    if (challenge.dailyOn !== null) {
+      throw new BadRequestException('The daily challenge cannot be deleted');
+    }
     await this.gameRepository.deleteChallenge(challengeId);
   }
 

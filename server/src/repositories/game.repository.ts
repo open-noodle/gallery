@@ -463,14 +463,54 @@ export class GameRepository {
     return this.db.selectFrom('game_challenge').selectAll().where('id', '=', id).executeTakeFirst();
   }
 
+  /**
+   * A space's player-created challenges, newest first. Dailies are excluded in the QUERY rather
+   * than filtered by the caller: they accumulate one per day forever, so a service-side filter
+   * would load an unbounded and growing set only to discard it.
+   *
+   * This also feeds the generation seed (`spaceId:challengeCount`), which is why the count has to
+   * stay player-created-only - letting dailies bump it would change which photos every future
+   * custom challenge draws, once a day, for reasons the player never sees.
+   */
   @GenerateSql({ params: [DummyValue.UUID] })
   async getChallengesForSpace(spaceId: string): Promise<GameChallengeRow[]> {
     return this.db
       .selectFrom('game_challenge')
       .selectAll()
       .where('spaceId', '=', spaceId)
+      .where('dailyOn', 'is', null)
       .orderBy('createdAt', 'desc')
       .execute();
+  }
+
+  // dailyOn is a YYYY-MM-DD string, not a Date - DummyValue.DATE would hand this a timestamp.
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.STRING] })
+  async getDailyChallenge(spaceId: string, dailyOn: string): Promise<GameChallengeRow | undefined> {
+    return this.db
+      .selectFrom('game_challenge')
+      .selectAll()
+      .where('spaceId', '=', spaceId)
+      .where('dailyOn', '=', dailyOn)
+      .executeTakeFirst();
+  }
+
+  /**
+   * How many location rounds each of a space's challenges has, as one aggregate rather than a
+   * per-challenge round fetch - the list endpoint only needs the count, and loading whole rounds
+   * would pull every answer coordinate into the service to throw away.
+   */
+  @GenerateSql({ params: [DummyValue.UUID] })
+  async getLocationRoundCounts(spaceId: string): Promise<{ challengeId: string; locationCount: number }[]> {
+    const rows = await this.db
+      .selectFrom('game_round')
+      .innerJoin('game_challenge', 'game_challenge.id', 'game_round.challengeId')
+      .where('game_challenge.spaceId', '=', spaceId)
+      .where('game_round.type', '=', 'location')
+      .groupBy('game_round.challengeId')
+      .select((eb) => ['game_round.challengeId', eb.fn.countAll<string>().as('locationCount')])
+      .execute();
+
+    return rows.map((row) => ({ challengeId: row.challengeId, locationCount: Number(row.locationCount) }));
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })
