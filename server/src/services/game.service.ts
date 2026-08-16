@@ -35,6 +35,7 @@ import { GameChallengeTable } from 'src/schema/tables/game-challenge.table';
 import { GameGuessTable } from 'src/schema/tables/game-guess.table';
 import { GameRoundTable, GameRoundType } from 'src/schema/tables/game-round.table';
 import { BaseService } from 'src/services/base.service';
+import { asDateString } from 'src/utils/date';
 import { getFilenameExtension, ImmichMediaResponse } from 'src/utils/file';
 import {
   GameCandidate,
@@ -455,7 +456,7 @@ export class GameService extends BaseService {
       scaleDays: challenge.scaleDays,
       createdAt: challenge.createdAt,
       closedAt: challenge.closedAt,
-      dailyOn: challenge.dailyOn,
+      dailyOn: asDateString(challenge.dailyOn),
       locationRoundCount,
       answered: guesses.length,
       total: guesses.reduce((sum, guess) => sum + guess.score, 0),
@@ -546,7 +547,7 @@ export class GameService extends BaseService {
       id: challenge.id,
       spaceId: challenge.spaceId,
       name: challenge.name,
-      dailyOn: challenge.dailyOn,
+      dailyOn: asDateString(challenge.dailyOn),
       roundCount: challenge.roundCount,
       scaleKm: challenge.scaleKm,
       scaleDays: challenge.scaleDays,
