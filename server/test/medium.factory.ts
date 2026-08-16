@@ -103,6 +103,7 @@ import { mockEnvData } from 'test/repositories/config.repository.mock.js';
 import { newTelemetryRepositoryMock } from 'test/repositories/telemetry.repository.mock.js';
 import { factory, newDate, newEmbedding, newUuid } from 'test/small.factory.js';
 import { automock, wait } from 'test/utils.js';
+import { GameRepository } from 'src/repositories/game.repository.js';
 
 export const testAssetsDir = resolve(import.meta.dirname, '../../e2e/test-assets');
 
@@ -665,6 +666,7 @@ const newRealRepository = <T extends BaseServiceDeps[number]>(key: T, db: Kysely
     case FaceRepairRepository:
     case FaceRepairScanRepository:
     case FacePersonVerdictRepository:
+    case GameRepository:
     case IntegrityRepository:
     case MemoryRepository:
     case LibraryRepository:
