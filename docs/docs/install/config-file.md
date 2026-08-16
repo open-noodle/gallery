@@ -237,6 +237,13 @@ The default configuration looks like this:
     "publicUsers": true,
     "mergePeopleAcrossOwners": false
   },
+  "storage": {
+    "routing": {
+      "originals": "auto",
+      "thumbnails": "auto",
+      "encodedVideo": "auto"
+    }
+  },
   "storageTemplate": {
     "enabled": false,
     "hashVerificationEnabled": true,
@@ -369,6 +376,42 @@ See the [Memories docs](/features/memories) for details about how retention and 
 `storageUsage.includeDerivatives` controls whether server-generated files — thumbnails and transcoded videos — count toward a user's storage usage. It defaults to `false`, matching upstream Immich, where only original files are counted. Turning it on changes both the figure shown to users and what their storage quota is enforced against, so the two can never disagree; it also reduces how much original media a user can upload within the same quota.
 
 Storage usage is cached per user rather than computed on every request, so the figure has to be recalculated after you change this setting. On a config file install there is no "save settings" moment to trigger that, so the server recalculates it at startup whenever the flag is on — after editing the config file, restart the server and the figure will be correct once the recalculation finishes. From then on it is kept up to date by the nightly `nightlyTasks.syncQuotaUsage` task. If you set `syncQuotaUsage` to `false`, the figure is only refreshed on the next restart.
+:::
+
+:::info Storage Routing
+The `storage.routing` section configures [per-file-type storage routing](/features/s3-storage#choosing-where-each-file-kind-is-stored) — which backend, disk or S3, each kind of newly written file goes to. The same values are available in **Administration > System Settings > Storage routing** when no config file is in use, but that page is unreachable on a config-file install — `updateSystemConfig` rejects outright when `IMMICH_CONFIG_FILE` is set — so the config file is the only way to set these on such an install.
+
+```json
+"storage": {
+  "routing": {
+    "originals": "auto",
+    "thumbnails": "auto",
+    "encodedVideo": "auto"
+  }
+}
+```
+
+Each knob accepts one of:
+
+- `"auto"` — the default for all three. Resolves to whatever `IMMICH_STORAGE_BACKEND` currently says.
+- `"disk"` — this kind is always written to disk, regardless of `IMMICH_STORAGE_BACKEND`.
+- `"s3"` — this kind is always written to S3, regardless of `IMMICH_STORAGE_BACKEND`. Requires `IMMICH_S3_BUCKET` to actually take effect — see the caveat below.
+
+For example, to keep originals on S3 while thumbnails and encoded video keep following the environment variable:
+
+```json
+"storage": {
+  "routing": {
+    "originals": "s3",
+    "thumbnails": "auto",
+    "encodedVideo": "auto"
+  }
+}
+```
+
+**Config-file installs get no save-time validation of routing.** The UI and API reject pinning a knob to `s3` without `IMMICH_S3_BUCKET` configured, but that check (`ConfigValidate`) only fires from `updateSystemConfig`, which a config-file install never calls. If a config file pins a kind to `s3` with no bucket configured, the server does not refuse to start: it logs an error at startup naming the offending kind, and that kind falls back to disk at runtime. Check the startup logs after changing this section.
+
+See the [S3-Compatible Storage docs](/features/s3-storage#choosing-where-each-file-kind-is-stored) for what each knob covers, why changing a knob only affects newly created files, and the integrity-check limitation of running mixed storage.
 :::
 
 ### Step 2 - Specify the file location
