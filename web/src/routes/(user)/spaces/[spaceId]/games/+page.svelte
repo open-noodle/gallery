@@ -11,7 +11,7 @@
     type SharedSpaceMemberResponseDto,
     type SharedSpaceResponseDto,
   } from '@immich/sdk';
-  import { Button, Icon, toastManager } from '@immich/ui';
+  import { Button, Icon, modalManager, toastManager } from '@immich/ui';
   import { mdiGamepadVariantOutline, mdiPlus } from '@mdi/js';
   import { t } from 'svelte-i18n';
   import type { PageData } from './$types';
@@ -58,6 +58,17 @@
   }
 
   async function handleDelete(challenge: GameChallengeListItemResponseDto) {
+    // Deleting a challenge is irreversible and cascades every round, every player's guesses, and
+    // the leaderboard - confirm first, mirroring every other destructive action in this space UI
+    // (leave/delete space in the [spaceId] layout, unlink library). spaces_delete_confirmation's
+    // wording is generic (just "delete {name}?"), so it's reused as-is rather than adding a key.
+    const confirmed = await modalManager.showDialog({
+      prompt: $t('spaces_delete_confirmation', { values: { name: challenge.name } }),
+      title: $t('game_delete_challenge'),
+    });
+    if (!confirmed) {
+      return;
+    }
     try {
       await deleteChallenge({ id: challenge.id });
       challenges = challenges.filter((c) => c.id !== challenge.id);
