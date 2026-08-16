@@ -1,8 +1,10 @@
 <script lang="ts">
+  import { goto } from '$app/navigation';
   import DateRound from '$lib/components/games/date-round.svelte';
   import GameLeaderboard from '$lib/components/games/game-leaderboard.svelte';
   import LocationRound from '$lib/components/games/location-round.svelte';
   import RoundResult from '$lib/components/games/round-result.svelte';
+  import UserPageLayout from '$lib/components/layouts/UserPageLayout.svelte';
   import { handleError } from '$lib/utils/handle-error';
   import { yearFromIso } from '$lib/utils/game';
   import {
@@ -15,6 +17,8 @@
     type GameGuessDto,
     type GameLeaderboardResponseDto,
   } from '@immich/sdk';
+  import { IconButton } from '@immich/ui';
+  import { mdiArrowLeft } from '@mdi/js';
   import { t } from 'svelte-i18n';
   import type { PageData } from './$types';
 
@@ -159,45 +163,61 @@
   }
 </script>
 
-<div class="flex h-full flex-col">
-  {#if currentRound}
-    <p class="px-4 py-2 text-sm text-gray-500 dark:text-gray-400" data-testid="game-progress">
-      {$t('game_round_progress', { values: { current: currentIndex + 1, total: challenge.rounds.length } })}
-    </p>
-  {/if}
+<!-- The challenge's own name is the title (mirrors the space-album detail page's back-nav +
+     title pattern); unlike that page, there is no editable title inline in the round/result
+     surfaces below, so the header is the only place it's shown. -->
+<UserPageLayout title={challenge.name}>
+  {#snippet leading()}
+    <IconButton
+      variant="ghost"
+      shape="round"
+      color="secondary"
+      aria-label={$t('back')}
+      onclick={() => void goto(`/spaces/${challenge.spaceId}/games`)}
+      icon={mdiArrowLeft}
+    />
+  {/snippet}
 
-  <div class="min-h-0 flex-1">
-    {#if result && currentRound}
-      <RoundResult
-        challengeId={challenge.id}
-        index={currentIndex}
-        type={result.type}
-        score={result.score}
-        distanceKm={result.distanceKm}
-        offsetDays={result.offsetDays}
-        answer={result.answer}
-        guess={result.guess}
-        onNext={handleNext}
-      />
-    {:else if currentRound}
-      {#if currentRound.type === GameRoundType.Location}
-        <LocationRound challengeId={challenge.id} index={currentIndex} onGuess={handleLocationGuess} />
-      {:else}
-        <DateRound
+  <div class="flex h-full flex-col">
+    {#if currentRound}
+      <p class="px-4 py-2 text-sm text-gray-500 dark:text-gray-400" data-testid="game-progress">
+        {$t('game_round_progress', { values: { current: currentIndex + 1, total: challenge.rounds.length } })}
+      </p>
+    {/if}
+
+    <div class="min-h-0 flex-1">
+      {#if result && currentRound}
+        <RoundResult
           challengeId={challenge.id}
           index={currentIndex}
-          minYear={GAME_MIN_YEAR}
-          {maxYear}
-          onGuess={handleDateGuess}
+          type={result.type}
+          score={result.score}
+          distanceKm={result.distanceKm}
+          offsetDays={result.offsetDays}
+          answer={result.answer}
+          guess={result.guess}
+          onNext={handleNext}
         />
-      {/if}
-    {:else}
-      <div class="flex h-full flex-col gap-4 overflow-y-auto p-4" data-testid="game-completed">
-        <h1 class="text-xl font-semibold dark:text-white">{$t('game_completed')}</h1>
-        {#if leaderboard}
-          <GameLeaderboard entries={leaderboard.entries} roundCount={challenge.rounds.length} />
+      {:else if currentRound}
+        {#if currentRound.type === GameRoundType.Location}
+          <LocationRound challengeId={challenge.id} index={currentIndex} onGuess={handleLocationGuess} />
+        {:else}
+          <DateRound
+            challengeId={challenge.id}
+            index={currentIndex}
+            minYear={GAME_MIN_YEAR}
+            {maxYear}
+            onGuess={handleDateGuess}
+          />
         {/if}
-      </div>
-    {/if}
+      {:else}
+        <div class="flex h-full flex-col gap-4 overflow-y-auto p-4" data-testid="game-completed">
+          <h1 class="text-xl font-semibold dark:text-white">{$t('game_completed')}</h1>
+          {#if leaderboard}
+            <GameLeaderboard entries={leaderboard.entries} roundCount={challenge.rounds.length} />
+          {/if}
+        </div>
+      {/if}
+    </div>
   </div>
-</div>
+</UserPageLayout>
