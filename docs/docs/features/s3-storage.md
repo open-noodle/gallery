@@ -33,30 +33,30 @@ For most deployments, use `redirect`. Only use `proxy` when browsers cannot reac
 
 Go to **Administration > System Settings > Storage routing** to set three independent knobs:
 
-| Knob              | Covers                                                                        |
-| :---------------- | :---------------------------------------------------------------------------- |
-| **Originals**     | Original photo and video files, plus their sidecar (XMP) files                |
-| **Thumbnails**    | Thumbnails, previews, full-size images, person thumbnails, and profile images |
-| **Encoded video** | Transcoded videos and edited videos                                           |
+| Knob                  | Covers                                                                        |
+| :-------------------- | :---------------------------------------------------------------------------- |
+| **Original files**    | Original photo and video files, plus their sidecar (XMP) files                |
+| **Thumbnails**        | Thumbnails, previews, full-size images, person thumbnails, and profile images |
+| **Transcoded videos** | Transcoded videos and edited videos                                           |
 
 Each knob is one of:
 
 - **Follow `IMMICH_STORAGE_BACKEND`** (`auto`) — the default for all three. Resolves to whatever the environment variable currently says, so upgrading to this feature changes nothing until you deliberately pin a knob.
-- **Disk** — this kind is always written to local disk, regardless of `IMMICH_STORAGE_BACKEND`.
+- **Local disk** — this kind is always written to local disk, regardless of `IMMICH_STORAGE_BACKEND`.
 - **S3** — this kind is always written to S3. This option is disabled in the UI until `IMMICH_S3_BUCKET` is set.
 
 Changing a knob affects only **newly created files** — it never rewrites anything that already exists. Existing files stay exactly where they are and remain fully readable, because the stored path itself identifies which backend serves it: an absolute path is disk, a relative key is S3 (see [Dual Backend Routing](#dual-backend-routing)). To actually move existing files onto the backend a knob now points to, run a [Storage Migration](/features/storage-migration) for that file type afterwards — flipping a knob never queues one automatically.
 
 Routing is entirely config-driven (the admin UI, `IMMICH_CONFIG_FILE`, or config import/export) — there are no new environment variables to set. The whole section is read-only in the UI when `IMMICH_CONFIG_FILE` is in use.
 
-The **Storage routing** section itself reports, per knob, how many files currently sit on the backend that knob does _not_ point to (for example, "1,204 thumbnails still on S3"), and links directly into a pre-filled [Storage Migration](/features/storage-migration) for that file type.
+The **Storage routing** section itself reports, per knob, how many files currently sit on the backend that knob does _not_ point to (for example, "1,204 files are still stored on the other backend"), and links directly into a pre-filled [Storage Migration](/features/storage-migration) for that file type.
 
 :::warning Integrity checks are disabled while any S3 backend is configured
 Gallery's [System Integrity](/administration/system-integrity) job handlers skip all of their checks whenever an S3 backend is configured at all — this is existing behavior for any mixed disk+S3 install ([open-noodle/gallery#685](https://github.com/open-noodle/gallery/issues/685)), not something introduced by storage routing. What routing changes is how long that limitation applies: without routing, a mixed install is a transient state that exists only for the duration of a migration; with routing, mixed disk+S3 is the intended permanent steady state. If you pin different file kinds to different backends, you are giving up integrity checking for as long as you keep that configuration, not just for a migration window.
 :::
 
 :::danger Do not remove S3 credentials while files still live on S3
-If any knob has ever pointed at S3, some files may still be stored there even after you route that kind back to disk. Removing `IMMICH_S3_BUCKET` or the S3 credentials makes those files **unreadable** — Gallery cannot serve a relative key without a configured S3 backend. Before removing S3 configuration, set every knob to Disk and check the **Storage routing** section: it must report zero files remaining on S3 for every kind. If it doesn't, use the linked migration to move the rest off S3 first.
+If any knob has ever pointed at S3, some files may still be stored there even after you route that kind back to disk. Removing `IMMICH_S3_BUCKET` or the S3 credentials makes those files **unreadable** — Gallery cannot serve a relative key without a configured S3 backend. Before removing S3 configuration, set every knob to Local disk and check the **Storage routing** section: it must report zero files remaining on S3 for every kind. If it doesn't, use the linked migration to move the rest off S3 first.
 :::
 
 ## Environment Variables

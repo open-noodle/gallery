@@ -39,17 +39,23 @@ To fix this, either change the routing for the affected file type(s) in **Admini
 
 The three routing knobs map onto the migration's file types as follows:
 
-| Knob              | File types                                                                |
-| :---------------- | :------------------------------------------------------------------------ |
-| **Originals**     | `originals`, `sidecars`                                                   |
-| **Thumbnails**    | `thumbnails`, `previews`, `fullsize`, `personThumbnails`, `profileImages` |
-| **Encoded video** | `encodedVideos`                                                           |
+| Knob                  | File types                                                                |
+| :-------------------- | :------------------------------------------------------------------------ |
+| **Original files**    | `originals`, `sidecars`                                                   |
+| **Thumbnails**        | `thumbnails`, `previews`, `fullsize`, `personThumbnails`, `profileImages` |
+| **Transcoded videos** | `encodedVideos`                                                           |
 
 ### External Libraries Are Never Migrated
 
 Originals and sidecars belonging to an [external library](/features/libraries) are deliberately never included in a migration, regardless of which file types you select. Those files are scanned in place from a path outside Gallery's media location, and the library scanner matches assets against that exact path. Migrating them would rewrite the database path to an S3 key, detaching the asset from the file the scanner expects — effectively importing a file you configured the library to keep external.
 
 Thumbnails and transcoded videos generated for external-library assets are Gallery-generated files, not scanned originals, so they remain migratable as normal.
+
+:::warning This is a behaviour change
+Earlier versions of Gallery did not exclude external-library originals from migration. If you previously ran a disk-to-S3 migration before this exclusion existed, any external-library originals it moved are still on S3 today, but they are now **invisible** to both the migrator and the **Storage routing** settings page: `streamOriginals` skips them regardless of direction, so a to-disk migration can never select them, and the misplaced-file counts on the settings page are built from the same exclusion, so they report zero misplaced originals even though these files sit in S3 with a path the library scanner can no longer match.
+
+If you're affected, the only way back is [rollback](#rolling-back) — `POST /storage-migration/rollback/{batchId}` — using the batch ID of the original migration, and only while that batch's log rows still exist. A rollback deletes its log rows once every file in the batch rolls back successfully, so this stops being possible after that. If you no longer have the batch ID or the log rows are already gone, these files need to be moved back to disk manually.
+:::
 
 ## Using the Admin UI
 
