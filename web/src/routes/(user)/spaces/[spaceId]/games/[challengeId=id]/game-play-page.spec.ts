@@ -233,10 +233,12 @@ describe('Game play page', () => {
       await fireEvent.click(screen.getByTestId('date-round-guess'));
 
       await waitFor(() =>
+        // Mid-year (July 1), not January 1 - centres the client's best-case error within the year
+        // rather than maximising it (date-round.svelte).
         expect(sdkMock.guessRound).toHaveBeenCalledWith({
           id: 'challenge-1',
           index: 0,
-          gameGuessDto: { date: '1998-01-01T00:00:00.000Z' },
+          gameGuessDto: { date: '1998-07-01T00:00:00.000Z' },
         }),
       );
     });
