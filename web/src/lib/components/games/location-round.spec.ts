@@ -13,6 +13,10 @@ vi.mock('$lib/components/shared-components/map/Map.svelte', async () => {
 describe('LocationRound', () => {
   const base = { challengeId: 'c1', index: 0, onGuess: () => {} };
 
+  const mapPanel = () => screen.getByTestId('location-round-map');
+  /** Puts the map in its expanded state the way a mouse user does, so a click can place a pin. */
+  const hoverMapWithMouse = () => fireEvent.pointerEnter(mapPanel(), { pointerType: 'mouse' });
+
   it('renders the round surface', () => {
     render(LocationRound, base);
     expect(screen.getByTestId('location-round')).toBeInTheDocument();
@@ -40,6 +44,9 @@ describe('LocationRound', () => {
     const onGuess = vi.fn();
     render(LocationRound, { ...base, onGuess });
 
+    // The map must be expanded first - a click on the collapsed map is spent expanding it and
+    // never reaches the pin (see the expand/collapse tests below).
+    await hoverMapWithMouse();
     await fireEvent.click(screen.getByTestId('map-stub-click-point-antimeridian'));
     await fireEvent.click(screen.getByTestId('location-round-guess'));
 
@@ -59,8 +66,63 @@ describe('LocationRound', () => {
     expect(announcement).toHaveTextContent('');
 
     // map-component.stub.svelte's click-point button fires { lat: 12.5, lng: 45.5 }.
+    await hoverMapWithMouse();
     await fireEvent.click(screen.getByTestId('map-stub-click-point'));
 
     expect(announcement).toHaveTextContent('12.50, 45.50');
+  });
+
+  // GeoGuessr-style expand-on-hover. The map is a small inset while the player studies the photo
+  // and grows to a usable size the moment the pointer reaches it, so no click is spent opening it.
+  describe('expanding the guess map', () => {
+    it('expands while a mouse pointer is over the map and collapses when it leaves', async () => {
+      render(LocationRound, base);
+      expect(mapPanel()).toHaveAttribute('data-expanded', 'false');
+
+      await hoverMapWithMouse();
+      expect(mapPanel()).toHaveAttribute('data-expanded', 'true');
+
+      await fireEvent.pointerLeave(mapPanel(), { pointerType: 'mouse' });
+      expect(mapPanel()).toHaveAttribute('data-expanded', 'false');
+    });
+
+    // Load-bearing pointerType check. Touch browsers fire an emulated pointerenter on tap, right
+    // before the click. If that emulated enter expanded the map, the very same tap would then land
+    // as a pin - dropping a guess wherever the player happened to touch a 288px-wide map, which is
+    // exactly what expand-on-tap exists to prevent. Only a real mouse may expand by hovering.
+    it('ignores a touch pointerenter, so one tap cannot both expand the map and drop a pin', async () => {
+      render(LocationRound, base);
+
+      await fireEvent.pointerEnter(mapPanel(), { pointerType: 'touch' });
+
+      expect(mapPanel()).toHaveAttribute('data-expanded', 'false');
+    });
+
+    // The touch path: with no hover available, the first tap is spent expanding the map. Asserting
+    // the guess button stays disabled proves the tap really did not reach the pin - a data-expanded
+    // assertion alone would still pass if the tap both expanded the map AND placed a pin.
+    it('spends a tap on the collapsed map expanding it, placing no pin', async () => {
+      render(LocationRound, base);
+
+      await fireEvent.click(screen.getByTestId('map-stub-click-point'));
+
+      expect(mapPanel()).toHaveAttribute('data-expanded', 'true');
+      expect(screen.getByTestId('location-round-guess')).toBeDisabled();
+      expect(screen.getByTestId('location-round-pin-announcement')).toHaveTextContent('');
+    });
+
+    it('places the pin on the second tap, once the first has expanded the map', async () => {
+      render(LocationRound, base);
+
+      // The full touch sequence, asserted step by step. Checking the button is still disabled
+      // between the two taps is what makes this fail against an ungated map, where the first tap
+      // already places the pin - without it the test passes either way and proves nothing.
+      await fireEvent.click(screen.getByTestId('map-stub-click-point'));
+      expect(screen.getByTestId('location-round-guess')).toBeDisabled();
+
+      await fireEvent.click(screen.getByTestId('map-stub-click-point'));
+      expect(screen.getByTestId('location-round-guess')).toBeEnabled();
+      expect(screen.getByTestId('location-round-pin-announcement')).toHaveTextContent('12.50, 45.50');
+    });
   });
 });

@@ -199,6 +199,10 @@ describe('Game play page', () => {
       );
       renderPage(makeChallenge({ rounds: [makeRound({ index: 0, type: GameRoundType.Location })] }));
 
+      // Hovering first is what a mouse user does, and it is required: the guess map expands on
+      // hover, and a click on the still-collapsed map is spent expanding it rather than placing a
+      // pin (see location-round.spec.ts).
+      await fireEvent.pointerEnter(screen.getByTestId('location-round-map'), { pointerType: 'mouse' });
       await fireEvent.click(screen.getByTestId('map-stub-click-point'));
       await fireEvent.click(screen.getByTestId('location-round-guess'));
 
