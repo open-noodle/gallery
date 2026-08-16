@@ -1,4 +1,11 @@
-import { formatDistanceKm, MAX_ROUND_SCORE, scorePercent, wrapLongitude, yearFromIso } from '$lib/utils/game';
+import {
+  formatDistanceKm,
+  MAX_ROUND_SCORE,
+  scorePercent,
+  timeUntilNextDaily,
+  wrapLongitude,
+  yearFromIso,
+} from '$lib/utils/game';
 
 describe('formatDistanceKm', () => {
   it('uses metres below one kilometre', () => {
@@ -50,5 +57,28 @@ describe('wrapLongitude', () => {
   it('wraps a longitude past the antimeridian back into [-180, 180]', () => {
     expect(wrapLongitude(200)).toBe(-160);
     expect(wrapLongitude(-230)).toBe(130);
+  });
+});
+
+describe('timeUntilNextDaily', () => {
+  it('counts the remaining hours and minutes of the UTC day', () => {
+    expect(timeUntilNextDaily(new Date('2026-08-16T21:45:00.000Z'))).toBe('2h 15m');
+    expect(timeUntilNextDaily(new Date('2026-08-16T00:00:00.000Z'))).toBe('24h 0m');
+    expect(timeUntilNextDaily(new Date('2026-08-16T23:59:00.000Z'))).toBe('0h 1m');
+  });
+
+  // The whole point of the UTC choice: the server keys the daily on the UTC calendar day, so a
+  // countdown built from local time would run to the wrong instant for every viewer outside UTC -
+  // and for one east of it, would still be counting after the new daily had already appeared.
+  it('is driven by the UTC day, not the local one', () => {
+    // 22:30 UTC on 16 August is already 00:30 on the 17th in UTC+2. A local-day countdown would
+    // read ~23h30m here; the UTC answer is 1h30m.
+    expect(timeUntilNextDaily(new Date('2026-08-16T22:30:00.000Z'))).toBe('1h 30m');
+  });
+
+  // Crossing a month boundary relies on Date.UTC normalising day 32 into the 1st, rather than any
+  // month-length arithmetic of our own.
+  it('rolls over the end of a month', () => {
+    expect(timeUntilNextDaily(new Date('2026-08-31T23:00:00.000Z'))).toBe('1h 0m');
   });
 });

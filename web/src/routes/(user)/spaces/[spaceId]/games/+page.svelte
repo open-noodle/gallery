@@ -1,26 +1,26 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import ChallengeCard from '$lib/components/games/challenge-card.svelte';
+  import ChallengeCreatePanel from '$lib/components/games/challenge-create-panel.svelte';
+  import DailyChallengeCard from '$lib/components/games/daily-challenge-card.svelte';
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { Route } from '$lib/route';
   import { handleError } from '$lib/utils/handle-error';
   import {
     createChallenge,
     deleteChallenge,
+    GameChallengeType,
     isHttpError,
     SharedSpaceRole,
     type GameChallengeListItemResponseDto,
     type SharedSpaceMemberResponseDto,
     type SharedSpaceResponseDto,
   } from '@immich/sdk';
-  import { Button, Icon, modalManager, toastManager } from '@immich/ui';
-  import { mdiGamepadVariantOutline, mdiPlus } from '@mdi/js';
+  import { Button, modalManager, toastManager } from '@immich/ui';
+  import { mdiPlus } from '@mdi/js';
+  import { onMount } from 'svelte';
   import { t } from 'svelte-i18n';
   import type { PageData } from './$types';
-
-  // The server defaults roundCount to 5 when omitted, but game_rounds_fewer_than_requested needs a
-  // concrete {requested} value to compare the response against — so request it explicitly.
-  const REQUESTED_ROUND_COUNT = 5;
 
   interface Props {
     data: PageData;
@@ -31,6 +31,18 @@
   const space = $derived<SharedSpaceResponseDto>(data.space);
   const members = $derived<SharedSpaceMemberResponseDto[]>(data.members);
   let challenges = $state<GameChallengeListItemResponseDto[]>(data.challenges);
+  const daily = $derived<GameChallengeListItemResponseDto | null>(data.daily);
+
+  let showCreatePanel = $state(false);
+  let creating = $state(false);
+
+  // Ticks once a minute, which is the countdown's own resolution - a per-second clock would
+  // re-render the hero sixty times a minute to change nothing visible.
+  let now = $state(new Date());
+  onMount(() => {
+    const timer = setInterval(() => (now = new Date()), 60_000);
+    return () => clearInterval(timer);
+  });
 
   const currentMember = $derived(members.find((m) => m.userId === authManager.user.id));
   const isEditor = $derived(
@@ -50,16 +62,25 @@
     handleError(error, localizedMessage);
   }
 
-  async function handleCreate() {
+  /** The 400 the server sends when the requested type cannot be built from this space's photos. */
+  const createFailureMessage = (type: GameChallengeType) => {
+    if (type === GameChallengeType.Location) {
+      return $t('game_create_location_failed');
+    }
+    return type === GameChallengeType.Date ? $t('game_create_date_failed') : $t('game_create_failed');
+  };
+
+  async function handleCreate({ roundCount, type }: { roundCount: number; type: GameChallengeType }) {
+    creating = true;
     try {
       const challenge = await createChallenge({
         spaceId: space.id,
-        gameCreateDto: { roundCount: REQUESTED_ROUND_COUNT },
+        gameCreateDto: { roundCount, type },
       });
-      if (challenge.roundCount < REQUESTED_ROUND_COUNT) {
+      if (challenge.roundCount < roundCount) {
         toastManager.warning(
           $t('game_rounds_fewer_than_requested', {
-            values: { actual: challenge.roundCount, requested: REQUESTED_ROUND_COUNT },
+            values: { actual: challenge.roundCount, requested: roundCount },
           }),
         );
       } else {
@@ -67,8 +88,10 @@
       }
       await goto(Route.viewSpaceGame({ spaceId: space.id, challengeId: challenge.id }));
     } catch (error) {
-      // 400: the space has no photos usable for a challenge.
-      reportGameError(error, 400, $t('game_create_failed'));
+      // 400: the space has no photos usable for the requested kind of challenge.
+      reportGameError(error, 400, createFailureMessage(type));
+    } finally {
+      creating = false;
     }
   }
 
@@ -95,42 +118,43 @@
   }
 </script>
 
-<div class="flex h-full flex-col">
-  {#if challenges.length === 0}
-    <div class="flex min-h-[calc(66vh-11rem)] w-full place-content-center items-center dark:text-white">
-      <div class="flex max-w-sm flex-col content-center items-center gap-4 text-center">
-        <Icon icon={mdiGamepadVariantOutline} size="3.5em" />
-        <p class="text-lg text-gray-500 dark:text-gray-400" data-testid="empty-state-message">
-          {$t('game_no_challenges')}
-        </p>
-        <p class="text-sm text-gray-400 dark:text-gray-500">
-          {$t('game_no_challenges_description')}
-        </p>
-        {#if isEditor}
-          <Button leadingIcon={mdiPlus} onclick={() => void handleCreate()} data-testid="empty-new-challenge-button">
-            {$t('game_new_challenge')}
-          </Button>
-        {/if}
-      </div>
-    </div>
-  {:else}
-    <div class="flex items-center justify-between px-4 py-2">
-      <h2 class="text-lg font-semibold">{$t('game_challenges')}</h2>
+<div class="flex h-full flex-col gap-8 p-4">
+  <!-- The daily leads the page even when the space has no custom challenges at all: it is the
+       reason to come back, and burying it under an empty-state would hide the only game there is. -->
+  <DailyChallengeCard
+    challenge={daily}
+    href={daily ? Route.viewSpaceGame({ spaceId: space.id, challengeId: daily.id }) : ''}
+    {now}
+  />
+
+  <section class="flex flex-col gap-4">
+    <div class="flex items-center justify-between">
+      <h2 class="text-lg font-semibold">{$t('game_your_challenges')}</h2>
       {#if isEditor}
         <Button
           size="small"
           leadingIcon={mdiPlus}
-          onclick={() => void handleCreate()}
+          onclick={() => (showCreatePanel = !showCreatePanel)}
           data-testid="new-challenge-button"
         >
           {$t('game_new_challenge')}
         </Button>
       {/if}
     </div>
-    <div class="px-4 pt-4">
+
+    {#if isEditor && showCreatePanel}
+      <ChallengeCreatePanel {creating} onCreate={(options) => void handleCreate(options)} />
+    {/if}
+
+    {#if challenges.length === 0}
+      <p class="py-6 text-center text-sm text-gray-500 dark:text-gray-400" data-testid="empty-state-message">
+        {$t('game_no_challenges_description')}
+      </p>
+    {:else}
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3" data-testid="challenge-list">
         {#each challenges as challenge (challenge.id)}
           <ChallengeCard
+            challengeId={challenge.id}
             name={challenge.name}
             roundCount={challenge.roundCount}
             answered={challenge.answered}
@@ -139,6 +163,6 @@
           />
         {/each}
       </div>
-    </div>
-  {/if}
+    {/if}
+  </section>
 </div>
