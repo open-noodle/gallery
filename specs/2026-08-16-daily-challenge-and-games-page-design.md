@@ -1,7 +1,17 @@
 # Daily challenge and the games page redesign
 
 Date: 2026-08-16
-Status: approved, ready to implement
+Status: implemented
+
+Implementation notes (where the build differed from this design):
+
+- `dailyOn` is stored as a `date` column, which the driver returns as a `Date`. It is serialised
+  through `asDateString()` and typed `Timestamp` on the table, matching `person.birthDate` — the DTO
+  still promises `YYYY-MM-DD`. Response DTOs are not validated on the way out, so the mismatch was
+  invisible to tsc and was caught only by an e2e assertion on the response shape.
+- The daily's `name` column holds its UTC date purely to keep the column non-null. The play page
+  titles a daily with the localised `game_daily_challenge` label instead, so that raw date never
+  reaches the screen.
 
 ## Problem
 
