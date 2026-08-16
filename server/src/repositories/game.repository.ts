@@ -585,6 +585,48 @@ export class GameRepository {
     return rows.map((row) => ({ userId: row.userId, total: Number(row.total), answered: Number(row.answered) }));
   }
 
+  /**
+   * Per-player totals across a space's DAILY challenges within one month.
+   *
+   * The bounds are half-open - `[monthStart, monthEndExclusive)` - so no daily can be claimed by
+   * two months and no `23:59:59` boundary has to be written down anywhere. Both are `YYYY-MM-DD`
+   * and are cast to `date` for the same reason `getDailyChallenge` does it: the column reads back
+   * as a Date while the caller holds a UTC calendar day as a string.
+   *
+   * `dailyOn IS NOT NULL` is what excludes player-created challenges. It is redundant against the
+   * range comparisons (a NULL fails both) and kept anyway, because it is the line that states the
+   * rule - a later edit that loosens the range must not silently start counting custom challenges.
+   *
+   * Deliberately unordered: ties are broken by player NAME, which lives in the member list this
+   * repository knows nothing about. GameService sorts.
+   */
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.STRING, DummyValue.STRING] })
+  async getMonthlyStandings(
+    spaceId: string,
+    monthStart: string,
+    monthEndExclusive: string,
+  ): Promise<{ userId: string; total: number; daysPlayed: number }[]> {
+    const rows = await this.db
+      .selectFrom('game_guess')
+      .innerJoin('game_round', 'game_round.id', 'game_guess.roundId')
+      .innerJoin('game_challenge', 'game_challenge.id', 'game_round.challengeId')
+      .where('game_challenge.spaceId', '=', spaceId)
+      .where('game_challenge.dailyOn', 'is not', null)
+      .where('game_challenge.dailyOn', '>=', sql<Date>`${monthStart}::date`)
+      .where('game_challenge.dailyOn', '<', sql<Date>`${monthEndExclusive}::date`)
+      .groupBy('game_guess.userId')
+      .select('game_guess.userId as userId')
+      .select((eb) => eb.fn.sum<string>('game_guess.score').as('total'))
+      .select((eb) => eb.fn.count<string>('game_round.challengeId').distinct().as('daysPlayed'))
+      .execute();
+
+    return rows.map((row) => ({
+      userId: row.userId,
+      total: Number(row.total),
+      daysPlayed: Number(row.daysPlayed),
+    }));
+  }
+
   // Rounds and guesses cascade-delete via their FKs (game_round.challengeId, game_guess.roundId
   // both ON DELETE CASCADE) - deleting the challenge row is enough.
   @GenerateSql({ params: [DummyValue.UUID] })
