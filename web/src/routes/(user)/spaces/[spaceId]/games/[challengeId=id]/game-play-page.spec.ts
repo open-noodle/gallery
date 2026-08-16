@@ -237,8 +237,9 @@ describe('Game play page', () => {
       await fireEvent.click(screen.getByTestId('date-round-guess'));
 
       await waitFor(() =>
-        // Mid-year (July 1), not January 1 - centres the client's best-case error within the year
-        // rather than maximising it (date-round.svelte).
+        // The 1st of the month the picker opens on (July, mid-year) for the mid-range year. The
+        // day is always the 1st because the server grades a date round by month, so the emitted
+        // day only has to identify which month was picked (date-round.svelte).
         expect(sdkMock.guessRound).toHaveBeenCalledWith({
           id: 'challenge-1',
           index: 0,

@@ -345,6 +345,49 @@ describe(GameService.name, () => {
       expect(result.offsetDays).toBe(0);
     });
 
+    // The player picks a year and a month, so grading has to stop at the month: before this, a
+    // guess that named the right month still lost points for not naming the right DAY - which the
+    // UI gives no way to pick - and against a narrow pool scale that alone could zero the round.
+    it('scores a date guess naming the correct month at the maximum, whatever day it falls on', async () => {
+      mocks.game.getRound.mockResolvedValue({
+        id: 'round-2',
+        challengeId: 'challenge-1',
+        index: 1,
+        type: 'date',
+        answerLat: null,
+        answerLon: null,
+        answerDate: new Date(Date.UTC(2020, 6, 12)),
+      } as any);
+      mocks.game.createGuess.mockImplementation((guess: any) => guess);
+
+      // The 1st of the month, exactly as date-round.svelte emits it.
+      const result = await sut.guess(authStub, 'challenge-1', 1, { date: new Date(Date.UTC(2020, 6, 1)) });
+
+      expect(result.score).toBe(5000);
+      expect(result.offsetDays).toBe(0);
+    });
+
+    // A miss is still measured in days, from the edge of the month the player picked - so being one
+    // day out stays clearly better than being two months out.
+    it('measures a missed month from that month edge, in days', async () => {
+      mocks.game.getRound.mockResolvedValue({
+        id: 'round-2',
+        challengeId: 'challenge-1',
+        index: 1,
+        type: 'date',
+        answerLat: null,
+        answerLon: null,
+        answerDate: new Date(Date.UTC(2020, 7, 5)),
+      } as any);
+      mocks.game.createGuess.mockImplementation((guess: any) => guess);
+
+      // Picked July; the answer is 5 August, i.e. 5 days past the end of July.
+      const result = await sut.guess(authStub, 'challenge-1', 1, { date: new Date(Date.UTC(2020, 6, 1)) });
+
+      expect(result.offsetDays).toBe(5);
+      expect(result.score).toBeLessThan(5000);
+    });
+
     it('rejects a second guess on the same round', async () => {
       mocks.game.getRound.mockResolvedValue({
         id: 'round-1',

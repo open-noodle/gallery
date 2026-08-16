@@ -1946,7 +1946,7 @@
   "game_delete_challenge": "删除挑战",
   "game_delete_failed": "无法删除挑战",
   "game_guess": "猜测",
-  "game_guess_year": "猜测{year}年",
+  "game_guess_month_year": "猜测{year}年{month}",
   "game_leaderboard": "排行榜",
   "game_new_challenge": "新建挑战",
   "game_next_round": "下一轮",

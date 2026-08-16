@@ -1965,7 +1965,7 @@
   "game_delete_challenge": "Удалить вызов",
   "game_delete_failed": "Не удалось удалить вызов",
   "game_guess": "Угадать",
-  "game_guess_year": "Угадать {year}",
+  "game_guess_month_year": "Угадать {month} {year}",
   "game_leaderboard": "Таблица лидеров",
   "game_new_challenge": "Новый вызов",
   "game_next_round": "Следующий раунд",

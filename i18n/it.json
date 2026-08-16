@@ -1963,7 +1963,7 @@
   "game_delete_challenge": "Elimina sfida",
   "game_delete_failed": "Impossibile eliminare la sfida",
   "game_guess": "Indovina",
-  "game_guess_year": "Indovina {year}",
+  "game_guess_month_year": "Indovina {month} {year}",
   "game_leaderboard": "Classifica",
   "game_new_challenge": "Nuova sfida",
   "game_next_round": "Turno successivo",

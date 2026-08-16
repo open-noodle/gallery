@@ -1963,7 +1963,7 @@
   "game_delete_challenge": "Uitdaging verwijderen",
   "game_delete_failed": "Kon de uitdaging niet verwijderen",
   "game_guess": "Raden",
-  "game_guess_year": "{year} raden",
+  "game_guess_month_year": "{month} {year} raden",
   "game_leaderboard": "Klassement",
   "game_new_challenge": "Nieuwe uitdaging",
   "game_next_round": "Volgende ronde",

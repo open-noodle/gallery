@@ -1981,7 +1981,7 @@
   "game_delete_challenge": "Usuń wyzwanie",
   "game_delete_failed": "Nie udało się usunąć wyzwania",
   "game_guess": "Zgadnij",
-  "game_guess_year": "Zgadnij {year}",
+  "game_guess_month_year": "Zgadnij {month} {year}",
   "game_leaderboard": "Ranking",
   "game_new_challenge": "Nowe wyzwanie",
   "game_next_round": "Następna runda",

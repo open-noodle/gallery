@@ -1967,7 +1967,7 @@
   "game_delete_challenge": "Delete challenge",
   "game_delete_failed": "Could not delete the challenge",
   "game_guess": "Guess",
-  "game_guess_year": "Guess {year}",
+  "game_guess_month_year": "Guess {month} {year}",
   "game_leaderboard": "Leaderboard",
   "game_new_challenge": "New challenge",
   "game_next_round": "Next round",

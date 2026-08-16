@@ -1959,7 +1959,7 @@
   "game_delete_challenge": "刪除挑戰",
   "game_delete_failed": "無法刪除挑戰",
   "game_guess": "猜測",
-  "game_guess_year": "猜測 {year} 年",
+  "game_guess_month_year": "猜測 {year} 年 {month}",
   "game_leaderboard": "排行榜",
   "game_new_challenge": "新增挑戰",
   "game_next_round": "下一輪",

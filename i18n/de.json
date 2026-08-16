@@ -1962,7 +1962,7 @@
   "game_delete_challenge": "Herausforderung löschen",
   "game_delete_failed": "Die Herausforderung konnte nicht gelöscht werden",
   "game_guess": "Raten",
-  "game_guess_year": "{year} raten",
+  "game_guess_month_year": "{month} {year} raten",
   "game_leaderboard": "Bestenliste",
   "game_new_challenge": "Neue Herausforderung",
   "game_next_round": "Nächste Runde",

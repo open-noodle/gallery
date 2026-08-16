@@ -1959,7 +1959,7 @@
   "game_delete_challenge": "Supprimer le défi",
   "game_delete_failed": "Impossible de supprimer le défi",
   "game_guess": "Deviner",
-  "game_guess_year": "Deviner {year}",
+  "game_guess_month_year": "Deviner {month} {year}",
   "game_leaderboard": "Classement",
   "game_new_challenge": "Nouveau défi",
   "game_next_round": "Manche suivante",
