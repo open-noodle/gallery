@@ -327,6 +327,42 @@ export async function triggerQueueCommand(token: string, queueName: string): Pro
   await api('PUT', `/jobs/${queueName}`, { body: { command: 'start' }, token });
 }
 
+type StorageRoutingValue = 'auto' | 'disk' | 's3';
+
+export async function setStorageRouting(
+  token: string,
+  routing: Partial<{
+    originals: StorageRoutingValue;
+    thumbnails: StorageRoutingValue;
+    encodedVideo: StorageRoutingValue;
+  }>,
+): Promise<void> {
+  const config = await api('GET', '/system-config', { token });
+  config.storage.routing = { ...config.storage.routing, ...routing };
+  await api('PUT', '/system-config', { body: config, token });
+}
+
+export async function fetchAssetMedia(token: string, url: string): Promise<{ status: number; bytes: Buffer }> {
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  const bytes = Buffer.from(await res.arrayBuffer());
+  return { status: res.status, bytes };
+}
+
+export function toS3Key(absPath: string): string {
+  return absPath.replace(`${MEDIA_LOCATION}/`, '');
+}
+
+export function createTestVideo(filenamePrefix: string, durationSec = 2): Buffer {
+  const remotePath = `/tmp/${filenamePrefix}.mp4`;
+  const base64 = dockerExec(
+    'immich-server',
+    `ffmpeg -y -loglevel error -f lavfi -i testsrc=duration=${durationSec}:size=192x144:rate=10 ` +
+      `-c:v libx264 -pix_fmt yuv420p ${remotePath} ` +
+      String.raw`&& base64 ${remotePath} | tr -d "\n"`,
+  );
+  return Buffer.from(base64, 'base64');
+}
+
 export async function countMoveHistory(assetId?: string): Promise<number> {
   const rows = assetId
     ? await queryDb<{ c: string }>('SELECT COUNT(*)::text c FROM move_history WHERE "entityId" = $1', [assetId])
@@ -2188,6 +2224,307 @@ async function phaseVideoTrimS3(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Phase: Routing Mixed Write
+// Precondition: setup has run (admin exists).
+// Backend: disk. Per-kind routing resolves independently of IMMICH_STORAGE_BACKEND —
+// the S3 backend is initialized whenever IMMICH_S3_BUCKET is set, which
+// docker-compose.storage-migration.yml always sets regardless of the active
+// IMMICH_STORAGE_BACKEND value — so these phases never need a server restart.
+//
+// Sets originals=s3, thumbnails=disk, encodedVideo=disk and uploads an image +
+// video, asserting each kind lands on its configured backend and serves
+// correctly. Baseline for routing-flip-safe / routing-migrate-converge.
+// ---------------------------------------------------------------------------
+async function phaseRoutingMixedWrite(): Promise<void> {
+  console.log('=== Phase: Routing Mixed Write ===');
+  const token = await loginAdmin();
+  minioSetupAlias();
+
+  console.log('  Setting storage.routing: originals=s3, thumbnails=disk, encodedVideo=disk...');
+  await setStorageRouting(token, { originals: 's3', thumbnails: 'disk', encodedVideo: 'disk' });
+
+  // Force transcoding so the video asset gets an encoded_video row to assert on
+  // (the default `required` policy would skip transcoding this tiny clip).
+  const originalConfig = await api('GET', '/system-config', { token });
+  const transcodeConfig = structuredClone(originalConfig);
+  transcodeConfig.ffmpeg.transcode = 'all';
+  await api('PUT', '/system-config', { body: transcodeConfig, token });
+  console.log('  ffmpeg.transcode = all (for encoded_video coverage)');
+
+  // createPng() resets its module counter each tsx invocation, so the first few PNGs of
+  // every phase are deterministic (R=0,G=0,B=0 -> the same checksum as setup's first
+  // upload). Burn the counter ahead — same admin owner, so the server's checksum dedup
+  // would otherwise return setup's existing asset instead of creating a new one — see
+  // copy-asset-sidecar-s3 for the established precedent (burn 200 there; a distinct,
+  // higher range here so routing-mixed-write and routing-flip-safe never collide either).
+  for (let i = 0; i < 1000; i++) {
+    createPng();
+  }
+
+  console.log('  Uploading image asset...');
+  const png = createPng();
+  const imageAsset = await uploadAsset(token, 'routing-mixed-image.png', png);
+  console.log(`  Uploaded image asset: ${imageAsset.id}`);
+
+  console.log('  Generating and uploading video asset...');
+  const video = createTestVideo('routing-mixed-video');
+  const videoAsset = await uploadAsset(token, 'routing-mixed-video.mp4', video);
+  console.log(`  Uploaded video asset: ${videoAsset.id}`);
+
+  await waitForProcessing(token, 120_000);
+
+  // Restore ffmpeg.transcode immediately — later phases (migrate-to-s3 etc.) rely
+  // on the default policy, and it has nothing to do with routing.
+  await api('PUT', '/system-config', { body: originalConfig, token });
+  console.log('  ffmpeg.transcode restored');
+
+  // Originals (routed s3): relative key, present in MinIO.
+  const assetRows = await queryDb<{ id: string; originalPath: string }>(
+    'SELECT id, "originalPath" FROM asset WHERE id = ANY($1)',
+    [[imageAsset.id, videoAsset.id]],
+  );
+  assert.equal(assetRows.length, 2, `Expected 2 asset rows, got ${assetRows.length}`);
+  for (const row of assetRows) {
+    assert.ok(
+      !row.originalPath.startsWith('/'),
+      `Expected S3 (relative) originalPath for ${row.id}, got ${row.originalPath}`,
+    );
+    assert.ok(minioFileExists(row.originalPath), `Expected original in MinIO: ${row.originalPath}`);
+  }
+
+  // Thumbnails/previews (routed disk): absolute, on disk, absent from MinIO.
+  const thumbPreviewRows = await queryDb<{ assetId: string; path: string; type: string }>(
+    `SELECT "assetId", path, type FROM asset_file WHERE "assetId" = ANY($1) AND type IN ('thumbnail', 'preview')`,
+    [[imageAsset.id, videoAsset.id]],
+  );
+  assert.ok(thumbPreviewRows.length >= 2, `Expected >= 2 thumbnail/preview rows, got ${thumbPreviewRows.length}`);
+  for (const row of thumbPreviewRows) {
+    assert.ok(row.path.startsWith('/'), `Expected disk (absolute) ${row.type} path, got ${row.path}`);
+    assert.ok(diskFileExists(row.path), `Expected ${row.type} on disk: ${row.path}`);
+    assert.ok(!minioFileExists(toS3Key(row.path)), `Expected ${row.type} absent from MinIO: ${toS3Key(row.path)}`);
+  }
+
+  // Encoded video (routed disk): absolute, on disk, absent from MinIO.
+  const encodedVideoRows = await queryDb<{ path: string }>(
+    `SELECT path FROM asset_file WHERE "assetId" = $1 AND type = 'encoded_video'`,
+    [videoAsset.id],
+  );
+  assert.equal(encodedVideoRows.length, 1, `Expected 1 encoded_video row, got ${encodedVideoRows.length}`);
+  const encodedVideoPath = encodedVideoRows[0].path;
+  assert.ok(encodedVideoPath.startsWith('/'), `Expected disk (absolute) encoded_video path, got ${encodedVideoPath}`);
+  assert.ok(diskFileExists(encodedVideoPath), `Expected encoded_video on disk: ${encodedVideoPath}`);
+  assert.ok(
+    !minioFileExists(toS3Key(encodedVideoPath)),
+    `Expected encoded_video absent from MinIO: ${toS3Key(encodedVideoPath)}`,
+  );
+
+  // Thumbnail + preview both serve over HTTP with 200 and non-empty bytes.
+  console.log('  Verifying thumbnail + preview HTTP serve...');
+  const imageThumb = await fetchAssetMedia(token, `${BASE_URL}/assets/${imageAsset.id}/thumbnail`);
+  assert.equal(imageThumb.status, 200, `Expected 200 for image thumbnail, got ${imageThumb.status}`);
+  assert.ok(imageThumb.bytes.byteLength > 0, 'Expected non-empty image thumbnail bytes');
+
+  const imagePreview = await fetchAssetMedia(token, `${BASE_URL}/assets/${imageAsset.id}/thumbnail?size=preview`);
+  assert.equal(imagePreview.status, 200, `Expected 200 for image preview, got ${imagePreview.status}`);
+  assert.ok(imagePreview.bytes.byteLength > 0, 'Expected non-empty image preview bytes');
+
+  const videoThumb = await fetchAssetMedia(token, `${BASE_URL}/assets/${videoAsset.id}/thumbnail`);
+  assert.equal(videoThumb.status, 200, `Expected 200 for video thumbnail, got ${videoThumb.status}`);
+  assert.ok(videoThumb.bytes.byteLength > 0, 'Expected non-empty video thumbnail bytes');
+
+  saveState({
+    routingImageAssetId: imageAsset.id,
+    routingVideoAssetId: videoAsset.id,
+    routingImageThumbHashBefore: sha256(imageThumb.bytes),
+  });
+
+  console.log('=== Phase: Routing Mixed Write complete ===');
+}
+
+// ---------------------------------------------------------------------------
+// Phase: Routing Flip Safe
+// Precondition: routing-mixed-write has run (originals=s3, thumbnails=disk,
+// encodedVideo=disk; routingImageAssetId in state).
+// Backend: disk.
+//
+// Flips thumbnails to s3 and uploads a THIRD asset. The critical assertion:
+// the FIRST asset's thumbnail — written under the old (disk) routing and never
+// migrated — must still serve correctly. Storage keys are self-describing
+// (absolute = disk, relative = s3), so flipping the routing knob must never
+// strand files already written under the old backend. This is the single most
+// important property the whole design rests on.
+// ---------------------------------------------------------------------------
+async function phaseRoutingFlipSafe(): Promise<void> {
+  console.log('=== Phase: Routing Flip Safe ===');
+  const token = await loginAdmin();
+  const savedState = loadState();
+  minioSetupAlias();
+
+  const firstImageAssetId: string | undefined = savedState.routingImageAssetId;
+  const firstThumbHashBefore: string | undefined = savedState.routingImageThumbHashBefore;
+  assert.ok(firstImageAssetId, 'No routingImageAssetId in state — run routing-mixed-write first');
+
+  console.log('  Flipping storage.routing: thumbnails=s3 (originals stays s3, encodedVideo stays disk)...');
+  await setStorageRouting(token, { thumbnails: 's3' });
+
+  // See the burn comment in phaseRoutingMixedWrite — a distinct range so this phase's
+  // PNG never collides with setup's or routing-mixed-write's (same admin owner).
+  for (let i = 0; i < 1010; i++) {
+    createPng();
+  }
+
+  console.log('  Uploading second image asset (post-flip)...');
+  const png = createPng();
+  const secondAsset = await uploadAsset(token, 'routing-flip-image.png', png);
+  console.log(`  Uploaded second asset: ${secondAsset.id}`);
+
+  await waitForProcessing(token);
+
+  // New asset's thumbnail must be on S3 — it was written after the flip.
+  const secondThumbRows = await queryDb<{ path: string }>(
+    `SELECT path FROM asset_file WHERE "assetId" = $1 AND type = 'thumbnail'`,
+    [secondAsset.id],
+  );
+  assert.equal(secondThumbRows.length, 1, `Expected 1 thumbnail row for second asset, got ${secondThumbRows.length}`);
+  const secondThumbPath = secondThumbRows[0].path;
+  assert.ok(!secondThumbPath.startsWith('/'), `Expected S3 (relative) thumbnail path, got ${secondThumbPath}`);
+  assert.ok(minioFileExists(secondThumbPath), `Expected new thumbnail in MinIO: ${secondThumbPath}`);
+
+  const secondThumb = await fetchAssetMedia(token, `${BASE_URL}/assets/${secondAsset.id}/thumbnail`);
+  assert.equal(secondThumb.status, 200, `Expected 200 for second asset thumbnail, got ${secondThumb.status}`);
+  assert.ok(secondThumb.bytes.byteLength > 0, 'Expected non-empty second thumbnail bytes');
+
+  // THE critical assertion: the first asset's thumbnail — written before the
+  // flip, still on disk, never migrated — must be unaffected and still serve.
+  console.log('  Verifying the FIRST asset thumbnail still serves from disk after the flip...');
+  const firstThumbRows = await queryDb<{ path: string }>(
+    `SELECT path FROM asset_file WHERE "assetId" = $1 AND type = 'thumbnail'`,
+    [firstImageAssetId],
+  );
+  assert.equal(firstThumbRows.length, 1, `Expected 1 thumbnail row for first asset, got ${firstThumbRows.length}`);
+  const firstThumbPath = firstThumbRows[0].path;
+  assert.ok(
+    firstThumbPath.startsWith('/'),
+    `First asset thumbnail path should still be absolute (untouched by the flip): ${firstThumbPath}`,
+  );
+  assert.ok(diskFileExists(firstThumbPath), `First asset thumbnail should still be on disk: ${firstThumbPath}`);
+  assert.ok(
+    !minioFileExists(toS3Key(firstThumbPath)),
+    `First asset thumbnail must not be in MinIO: ${toS3Key(firstThumbPath)}`,
+  );
+
+  const firstThumb = await fetchAssetMedia(token, `${BASE_URL}/assets/${firstImageAssetId}/thumbnail`);
+  assert.equal(firstThumb.status, 200, `Expected 200 for first asset thumbnail after flip, got ${firstThumb.status}`);
+  assert.ok(firstThumb.bytes.byteLength > 0, 'Expected non-empty first thumbnail bytes after flip');
+  if (firstThumbHashBefore) {
+    assert.equal(
+      sha256(firstThumb.bytes),
+      firstThumbHashBefore,
+      'First asset thumbnail bytes changed after flipping the routing knob',
+    );
+  }
+
+  saveState({ routingSecondAssetId: secondAsset.id });
+
+  console.log('=== Phase: Routing Flip Safe complete ===');
+}
+
+// ---------------------------------------------------------------------------
+// Phase: Routing Migrate Converge
+// Precondition: routing-flip-safe has run (thumbnails routed to s3; the first
+// asset's thumbnail and all pre-flip thumbnail-kind files are still on disk).
+// Backend: disk.
+//
+// Runs a selective migration for the whole "thumbnails" routing kind (thumbnail,
+// preview, fullsize, personThumbnails, profileImages file types — the kind
+// groups these because a deployment never wants previews on S3 while
+// thumbnails sit on disk) toS3, then asserts GET /storage-migration/routing
+// reports the kind fully converged (misplacedCount === 0) and that the
+// previously-disk-resident thumbnail now serves from MinIO with unchanged
+// bytes. Resets storage.routing back to `auto` at the end so later, unrelated
+// phases (migrate-to-s3, migrate-to-disk) are unaffected.
+// ---------------------------------------------------------------------------
+async function phaseRoutingMigrateConverge(): Promise<void> {
+  console.log('=== Phase: Routing Migrate Converge ===');
+  const token = await loginAdmin();
+  const savedState = loadState();
+  minioSetupAlias();
+
+  const firstImageAssetId: string | undefined = savedState.routingImageAssetId;
+  assert.ok(firstImageAssetId, 'No routingImageAssetId in state — run routing-mixed-write first');
+
+  try {
+    console.log('  Migrating the "thumbnails" routing kind to S3...');
+    const batchId = await startMigration(token, 'toS3', {
+      fileTypes: {
+        originals: false,
+        thumbnails: true,
+        previews: true,
+        fullsize: true,
+        encodedVideos: false,
+        sidecars: false,
+        personThumbnails: true,
+        profileImages: true,
+      },
+    });
+    console.log(`  Batch ID: ${batchId}`);
+
+    await waitForMigration(token);
+
+    console.log('  Verifying GET /storage-migration/routing reports convergence...');
+    const routingStatus = await api('GET', '/storage-migration/routing', { token });
+    assert.equal(
+      routingStatus.thumbnails.routedTo,
+      's3',
+      `Expected thumbnails routedTo=s3, got ${routingStatus.thumbnails.routedTo}`,
+    );
+    assert.equal(
+      routingStatus.thumbnails.misplacedCount,
+      0,
+      `Expected thumbnails.misplacedCount=0 after convergence, got ${routingStatus.thumbnails.misplacedCount}`,
+    );
+
+    console.log('  Verifying the first asset thumbnail now serves from MinIO...');
+    const firstThumbRows = await queryDb<{ path: string }>(
+      `SELECT path FROM asset_file WHERE "assetId" = $1 AND type = 'thumbnail'`,
+      [firstImageAssetId],
+    );
+    assert.equal(firstThumbRows.length, 1, `Expected 1 thumbnail row for first asset, got ${firstThumbRows.length}`);
+    const firstThumbPath = firstThumbRows[0].path;
+    assert.ok(
+      !firstThumbPath.startsWith('/'),
+      `Expected S3 (relative) thumbnail path after migration, got ${firstThumbPath}`,
+    );
+    assert.ok(minioFileExists(firstThumbPath), `Expected migrated thumbnail in MinIO: ${firstThumbPath}`);
+
+    const firstThumb = await fetchAssetMedia(token, `${BASE_URL}/assets/${firstImageAssetId}/thumbnail`);
+    assert.equal(
+      firstThumb.status,
+      200,
+      `Expected 200 for first asset thumbnail post-migration, got ${firstThumb.status}`,
+    );
+    assert.ok(firstThumb.bytes.byteLength > 0, 'Expected non-empty first thumbnail bytes post-migration');
+    const firstThumbHashBefore: string | undefined = savedState.routingImageThumbHashBefore;
+    if (firstThumbHashBefore) {
+      assert.equal(
+        sha256(firstThumb.bytes),
+        firstThumbHashBefore,
+        'First asset thumbnail bytes changed across the disk -> S3 migration',
+      );
+    }
+
+    saveState({ routingMigrateBatchId: batchId });
+  } finally {
+    // Reset routing to `auto` so subsequent phases (migrate-to-s3, migrate-to-disk)
+    // are unaffected by the per-kind pins this phase group introduced.
+    console.log('  Resetting storage.routing to auto...');
+    await setStorageRouting(token, { originals: 'auto', thumbnails: 'auto', encodedVideo: 'auto' });
+  }
+
+  console.log('=== Phase: Routing Migrate Converge complete ===');
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 async function main() {
@@ -2284,9 +2621,21 @@ async function main() {
         await phaseVideoTrimS3();
         break;
       }
+      case 'routing-mixed-write': {
+        await phaseRoutingMixedWrite();
+        break;
+      }
+      case 'routing-flip-safe': {
+        await phaseRoutingFlipSafe();
+        break;
+      }
+      case 'routing-migrate-converge': {
+        await phaseRoutingMigrateConverge();
+        break;
+      }
       default: {
         throw new Error(
-          `Unknown phase: ${phase}. Valid phases: setup, estimate, migrate-to-s3, migrate-to-disk, rollback, no-files, concurrent-rejection, selective-to-s3, selective-cleanup, delete-source-false, content-verify, sidecar-verify, template-s3-bulk-skipped, template-s3-upload-skipped, template-s3-live-photo-skipped, template-s3-sidecar-skipped, template-s3-queue-migration-skipped, template-disk-baseline, copy-asset-sidecar-s3, user-delete-s3-orphans, video-trim-s3`,
+          `Unknown phase: ${phase}. Valid phases: setup, estimate, migrate-to-s3, migrate-to-disk, rollback, no-files, concurrent-rejection, selective-to-s3, selective-cleanup, delete-source-false, content-verify, sidecar-verify, template-s3-bulk-skipped, template-s3-upload-skipped, template-s3-live-photo-skipped, template-s3-sidecar-skipped, template-s3-queue-migration-skipped, template-disk-baseline, copy-asset-sidecar-s3, user-delete-s3-orphans, video-trim-s3, routing-mixed-write, routing-flip-safe, routing-migrate-converge`,
         );
       }
     }
