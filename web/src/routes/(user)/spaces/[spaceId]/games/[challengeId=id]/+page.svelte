@@ -31,6 +31,9 @@
 
   let challenge = $state<GameChallengeDetailResponseDto>(data.challenge);
   let leaderboard = $state<GameLeaderboardResponseDto>();
+  // Guards against a double-tap on mobile firing two guesses for the same round - the second would
+  // 409 and overwrite a complete reveal with a degraded one (no distance/offset/guess pin).
+  let submitting = $state(false);
 
   type ResultView = {
     type: 'location' | 'date';
@@ -55,7 +58,14 @@
   // straight past its own result screen instead of showing it.
   let currentIndex = $state(firstUnansweredIndex(data.challenge));
 
-  const currentRound = $derived(currentIndex < challenge.rounds.length ? challenge.rounds[currentIndex] : undefined);
+  // By the round's own `.index`, not array position. Correct either way only because the server
+  // orders rounds by `index asc` over a contiguous 0..N-1 set - looking it up keeps that invariant
+  // local instead of leaning on it silently at every call site.
+  function findRound(index: number) {
+    return challenge.rounds.find((round) => round.index === index);
+  }
+
+  const currentRound = $derived(findRound(currentIndex));
   const maxYear = $derived(yearFromIso(challenge.createdAt));
 
   async function loadLeaderboard() {
@@ -82,7 +92,12 @@
     guess?: { lat: number; lon: number };
   }) {
     challenge = await getChallenge({ id: challenge.id });
-    const round = challenge.rounds[currentIndex];
+    const round = findRound(currentIndex);
+    if (!round) {
+      // Cannot happen under the server's index-ordering guarantee (see findRound) - guard rather
+      // than build a result view with no round to read `type`/`answer` from.
+      throw new Error(`Round ${currentIndex} missing from the refreshed challenge`);
+    }
     result = {
       type: round.type === GameRoundType.Location ? 'location' : 'date',
       score: extra?.score ?? round.score ?? 0,
@@ -94,6 +109,10 @@
   }
 
   async function submitGuess(gameGuessDto: GameGuessDto, guessPoint?: { lat: number; lon: number }) {
+    if (submitting) {
+      return;
+    }
+    submitting = true;
     try {
       const response = await guessRound({ id: challenge.id, index: currentIndex, gameGuessDto });
       await showResult({
@@ -105,11 +124,21 @@
     } catch (error) {
       if (isHttpError(error) && error.status === 409) {
         // Already answered - a page left open and replayed. Reuse the exact same re-fetch as a
-        // successful guess rather than surfacing a raw error the player can't act on.
-        await showResult();
+        // successful guess rather than surfacing a raw error the player can't act on. That re-fetch
+        // is itself a network call and can fail on its own: a throw inside a catch block is NOT
+        // caught by the enclosing try, and every caller below invokes this fire-and-forget
+        // (`void submitGuess(...)`), so without this nested try/catch a failed recovery here would
+        // surface as an unhandled rejection - no toast, a frozen screen - instead of a toast.
+        try {
+          await showResult();
+        } catch (refetchError) {
+          handleError(refetchError, $t('errors.something_went_wrong'));
+        }
       } else {
         handleError(error, $t('errors.something_went_wrong'));
       }
+    } finally {
+      submitting = false;
     }
   }
 
