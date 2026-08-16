@@ -22,4 +22,13 @@ describe('LocationRound', () => {
     render(LocationRound, base);
     expect(screen.getByTestId('location-round-guess')).toBeDisabled();
   });
+
+  // The settings cog on Map.svelte defaults to visible and, when clicked, refetches and
+  // overwrites mapMarkers with the player's entire geotagged library (bypassing the mapMarkers={[]}
+  // guard, since mapMarkers is $bindable()) — on a location round that can repopulate the guessing
+  // map with pins that include the round's answer. showSettings={false} must be passed explicitly.
+  it('never exposes the map settings control, which can leak the answer', () => {
+    render(LocationRound, base);
+    expect(screen.getByTestId('map-stub')).toHaveAttribute('showsettings', 'false');
+  });
 });
