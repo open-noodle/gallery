@@ -912,8 +912,10 @@ git commit -m "fix(game): show every member on a challenge leaderboard"
 - [ ] **Step 1: Build the server and sync the spec**
 
 ```bash
-cd server && pnpm build && pnpm sync:open-api
+cd server && pnpm build
 ```
+
+(The spec sync itself is a mise task, `//server:sync-open-api`, which `mise open-api` already depends on — there is no `pnpm sync:open-api` script. Building `dist/` is the part that must happen first.)
 
 - [ ] **Step 2: Regenerate both clients**
 
