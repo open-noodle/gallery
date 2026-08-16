@@ -5,6 +5,7 @@ import {
   type LatLon,
   MAX_ROUND_SCORE,
   MIN_SCALE,
+  monthOffsetDays,
   mulberry32,
   poolScaleDays,
   poolScaleKm,
@@ -256,5 +257,57 @@ describe('selectLocationRounds scene-gate rank bias', () => {
     const a = selectLocationRounds(pool, 5, 20_000, mulberry32(11)).map((p) => p.assetId);
     const b = selectLocationRounds(pool, 5, 20_000, mulberry32(11)).map((p) => p.assetId);
     expect(a).toEqual(b);
+  });
+});
+
+/**
+ * A date guess names a year and a month, so the grading granularity has to match it: naming the
+ * right month is exactly right, and anything else is measured from the edge of the month the player
+ * picked. Deliberately measured in DAYS rather than months - that keeps `offsetDays`, its stored
+ * column and the "you were N days off" result line meaning what they already meant (no migration,
+ * no DTO change), and keeps a near miss (one day past the month end) distinguishable from a bad one
+ * (sixty days past), which whole-month arithmetic would flatten together.
+ */
+const utc = (y: number, m: number, d: number) => new Date(Date.UTC(y, m - 1, d));
+/** What date-round.svelte emits: the 1st of the picked month, UTC. */
+const guessOf = (y: number, m: number) => utc(y, m, 1);
+
+describe('monthOffsetDays', () => {
+  it('is zero anywhere inside the picked month, so naming the month scores full marks', () => {
+    expect(monthOffsetDays(guessOf(2021, 3), utc(2021, 3, 1))).toBe(0);
+    expect(monthOffsetDays(guessOf(2021, 3), utc(2021, 3, 12))).toBe(0);
+    expect(monthOffsetDays(guessOf(2021, 3), utc(2021, 3, 31))).toBe(0);
+  });
+
+  it('measures from the end of the picked month when the answer is later', () => {
+    // March ends on the 31st, so April 5 is 5 days past it.
+    expect(monthOffsetDays(guessOf(2021, 3), utc(2021, 4, 5))).toBe(5);
+  });
+
+  it('measures from the start of the picked month when the answer is earlier', () => {
+    // March starts on the 1st, so February 20 is 9 days before it.
+    expect(monthOffsetDays(guessOf(2021, 3), utc(2021, 2, 20))).toBe(9);
+  });
+
+  it('measures across a year boundary', () => {
+    // January 2021 starts on the 1st, so December 27 2020 is 5 days before it.
+    expect(monthOffsetDays(guessOf(2021, 1), utc(2020, 12, 27))).toBe(5);
+  });
+
+  it('uses the real length of February in a leap year', () => {
+    // 2020 is a leap year: the 29th is still inside February...
+    expect(monthOffsetDays(guessOf(2020, 2), utc(2020, 2, 29))).toBe(0);
+    // ...so March 1 is one day past its end, not two.
+    expect(monthOffsetDays(guessOf(2020, 2), utc(2020, 3, 1))).toBe(1);
+  });
+
+  it('ignores the time of day on either side', () => {
+    // The answer carries a real capture time, not midnight; a photo taken at 23:00 on the last day
+    // of the picked month is still inside that month.
+    expect(monthOffsetDays(guessOf(2021, 3), new Date(Date.UTC(2021, 2, 31, 23, 0, 0)))).toBe(0);
+  });
+
+  it('scores a correct month at the maximum, whatever the pool scale', () => {
+    expect(scoreFromError(monthOffsetDays(guessOf(2021, 3), utc(2021, 3, 12)), 40)).toBe(MAX_ROUND_SCORE);
   });
 });

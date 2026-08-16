@@ -110,6 +110,37 @@ export const poolScaleDays = (dates: Date[], random: () => number, sampleCount =
   return Math.max(1, Math.round(percentile(offsets, SCALE_PERCENTILE)));
 };
 
+/**
+ * The error of a date guess, in days, graded at the granularity the player actually chose.
+ *
+ * A date round is answered by picking a year and a month, so grading on the exact day made a
+ * perfect score unreachable: whatever the player picked, the emitted date still missed the real
+ * capture day by up to half a month, and against a single-trip pool's day-gap scale that alone
+ * could zero the round. Naming the right month is therefore worth the full score, and a miss is
+ * measured from the nearest edge of the month that was picked.
+ *
+ * Kept in DAYS rather than months so `offsetDays` - the stored column, the response field and the
+ * "you were N days off" result line - keeps meaning exactly what it did, and so a one-day miss
+ * stays distinguishable from a two-month one instead of both reading as "1 month".
+ */
+export const monthOffsetDays = (guess: Date, answer: Date): number => {
+  const monthStart = Date.UTC(guess.getUTCFullYear(), guess.getUTCMonth(), 1);
+  // Day 0 of the following month is the last day of this one, so this handles month lengths and
+  // leap Februaries without a table.
+  const monthEnd = Date.UTC(guess.getUTCFullYear(), guess.getUTCMonth() + 1, 0);
+  // Normalised to a UTC calendar day for the same reason toUtcDayIndex does it: the answer carries
+  // a real capture time, and 23:00 on the last day of the month is still inside that month.
+  const answerDay = Date.UTC(answer.getUTCFullYear(), answer.getUTCMonth(), answer.getUTCDate());
+
+  if (answerDay < monthStart) {
+    return (monthStart - answerDay) / MS_PER_DAY;
+  }
+  if (answerDay > monthEnd) {
+    return (answerDay - monthEnd) / MS_PER_DAY;
+  }
+  return 0;
+};
+
 export type GameCandidate = {
   assetId: string;
   lat: number | null;

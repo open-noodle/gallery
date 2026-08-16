@@ -38,6 +38,7 @@ import {
   GameCandidate,
   haversineKm,
   LatLon,
+  monthOffsetDays,
   mulberry32,
   poolScaleDays,
   poolScaleKm,
@@ -77,21 +78,6 @@ const RECENT_CHALLENGE_LOOKBACK = 3;
 const PLACE_PROMPT = 'an outdoor photo that shows where it was taken';
 const NOT_PLACE_PROMPT = 'a close-up of a person or an indoor room';
 const SHIPPED_PROMPT_MODEL = 'ViT-B-32__openai';
-
-/** Mirrors the private MS_PER_DAY in game-scoring.ts, which does not export it. */
-const MS_PER_DAY = 86_400_000;
-
-/**
- * Calendar-day index (days since the UTC epoch) for a Date, not a raw ms/MS_PER_DAY division on
- * the instant. `answerDate` (`asset.localDateTime`, frozen onto the round) carries a full
- * capture timestamp - e.g. 14:23 - that a player who names the correct calendar day cannot know
- * and must not be charged for. Both the answer and the guess are normalised to their UTC
- * calendar day before differencing, matching the `(localDateTime at time zone 'UTC')::date`
- * convention the rest of the codebase already uses for this column (see the index expressions in
- * asset.table.ts) - so "the same day" scores 5000 regardless of either timestamp's time of day.
- */
-const toUtcDayIndex = (date: Date): number =>
-  Math.floor(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()) / MS_PER_DAY);
 
 type TypedRoundCandidate = GameCandidate & { type: GameRoundType };
 
@@ -604,10 +590,13 @@ export class GameService extends BaseService {
     // boundary (isoDatetimeToDate), so an unparseable string 400s before ever reaching this code
     // rather than becoming an Invalid Date that fails the `score integer NOT NULL` column.
     const guessDate = dto.date;
-    // Whole-day count already, by construction (toUtcDayIndex subtracts two day boundaries) -
-    // no separate rounding step, so the stored integer offsetDays always agrees with the value
-    // actually scored below.
-    const offsetDays = Math.abs(toUtcDayIndex(guessDate) - toUtcDayIndex(round.answerDate));
+    // Graded at MONTH granularity, because that is the granularity the player can actually pick
+    // (date-round.svelte offers a year and a month, and emits the 1st of it). Scoring the exact day
+    // charged the player for a day they had no way to name: the emitted date missed the real
+    // capture day by up to half a month, which against a narrow pool scale could zero the round
+    // however well they guessed. Still a whole-day count, so the stored integer offsetDays agrees
+    // with the value scored below and keeps meaning days. See monthOffsetDays.
+    const offsetDays = monthOffsetDays(guessDate, round.answerDate);
     return {
       roundId: round.id,
       userId,
