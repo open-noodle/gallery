@@ -17,7 +17,7 @@
 - **Server imports.** No relative imports; use the `src/` path alias.
 - **Formatting.** Prettier, 120 char width, single quotes, trailing commas, semicolons.
 - **`make sql` / `mise sql` deletes every generated query file when no database is running.** Run it only against a live stack.
-- **Single test file:** `pnpm test -- --run <path>` from `server/` or `web/`. The `--` is required; without it vitest silently ignores the path and runs everything.
+- **Single test file:** `pnpm test --run <path>` from `server/` or `web/`. Do **not** insert a bare `--` before `--run` — that makes pnpm swallow the path filter, so vitest runs the entire suite while still printing a green summary that looks like a scoped pass. Measured on this repo: the `--` form ran 173 files in `server/` and 375 in `web/`; the correct form ran 1. Medium tests take the same shape: `pnpm test:medium --run <path>`.
 - **Commits.** Conventional style, lowercase subject. Never add `Co-Authored-By` or `Generated with` trailers.
 - **Every test must be seen to fail first.** A test that passes before the implementation exists is not a test.
 
@@ -85,7 +85,7 @@ describe('compareStandings', () => {
 - [ ] **Step 2: Run the test to verify it fails**
 
 ```bash
-cd server && pnpm test -- --run src/utils/game-standings.spec.ts
+cd server && pnpm test --run src/utils/game-standings.spec.ts
 ```
 
 Expected: FAIL — `Cannot find module 'src/utils/game-standings'`.
@@ -134,7 +134,7 @@ export const compareStandings = (a: StandingsSortable, b: StandingsSortable): nu
 - [ ] **Step 4: Run the test to verify it passes**
 
 ```bash
-cd server && pnpm test -- --run src/utils/game-standings.spec.ts
+cd server && pnpm test --run src/utils/game-standings.spec.ts
 ```
 
 Expected: PASS, 5 tests.
@@ -410,7 +410,7 @@ describe('GameRepository.getMonthlyStandings', () => {
 - [ ] **Step 3: Run the test to verify it fails**
 
 ```bash
-cd server && pnpm test:medium -- --run test/medium/specs/repositories/game.repository.spec.ts
+cd server && pnpm test:medium --run test/medium/specs/repositories/game.repository.spec.ts
 ```
 
 Expected: FAIL — `gameRepo.getMonthlyStandings is not a function`.
@@ -470,7 +470,7 @@ In `server/src/repositories/game.repository.ts`, insert after `getLeaderboard` (
 - [ ] **Step 5: Run the medium test to verify it passes**
 
 ```bash
-cd server && pnpm test:medium -- --run test/medium/specs/repositories/game.repository.spec.ts
+cd server && pnpm test:medium --run test/medium/specs/repositories/game.repository.spec.ts
 ```
 
 Expected: PASS, 5 tests.
@@ -480,7 +480,7 @@ Expected: PASS, 5 tests.
 In `server/src/repositories/game.repository.spec.ts`, add `'getMonthlyStandings',` to the array after `'getLeaderboard',` (line 37).
 
 ```bash
-cd server && pnpm test -- --run src/repositories/game.repository.spec.ts
+cd server && pnpm test --run src/repositories/game.repository.spec.ts
 ```
 
 Expected: PASS.
@@ -608,7 +608,7 @@ describe('standings', () => {
 - [ ] **Step 2: Run the test to verify it fails**
 
 ```bash
-cd server && pnpm test -- --run src/services/game.service.spec.ts -t standings
+cd server && pnpm test --run src/services/game.service.spec.ts -t standings
 ```
 
 Expected: FAIL — `sut.standings is not a function`.
@@ -734,7 +734,7 @@ In `server/src/controllers/game.controller.ts`, add `GameStandingsResponseDto` t
 - [ ] **Step 6: Run the test to verify it passes**
 
 ```bash
-cd server && pnpm test -- --run src/services/game.service.spec.ts
+cd server && pnpm test --run src/services/game.service.spec.ts
 ```
 
 Expected: PASS, including the 6 new `standings` tests and every pre-existing one.
@@ -837,7 +837,7 @@ describe('leaderboard', () => {
 - [ ] **Step 2: Run the test to verify it fails**
 
 ```bash
-cd server && pnpm test -- --run src/services/game.service.spec.ts -t leaderboard
+cd server && pnpm test --run src/services/game.service.spec.ts -t leaderboard
 ```
 
 Expected: FAIL — the first test returns one entry (only `user-2`), not two.
@@ -882,7 +882,7 @@ Replace the body of `leaderboard` in `server/src/services/game.service.ts` (line
 - [ ] **Step 4: Run the tests to verify they pass**
 
 ```bash
-cd server && pnpm test -- --run src/services/game.service.spec.ts
+cd server && pnpm test --run src/services/game.service.spec.ts
 ```
 
 Expected: PASS. If a pre-existing test asserted the old player-only shape, update it to the new one and say so in the commit body.
@@ -1152,7 +1152,7 @@ Add `competitionRanks` and `formatStandingsMonth` to the existing import from `$
 - [ ] **Step 2: Run the tests to verify they fail**
 
 ```bash
-cd web && pnpm test -- --run src/lib/utils/game.spec.ts
+cd web && pnpm test --run src/lib/utils/game.spec.ts
 ```
 
 Expected: FAIL — `competitionRanks is not a function`.
@@ -1199,7 +1199,7 @@ export const formatStandingsMonth = (month: string, locale?: string): string => 
 - [ ] **Step 4: Run the tests to verify they pass**
 
 ```bash
-cd web && pnpm test -- --run src/lib/utils/game.spec.ts
+cd web && pnpm test --run src/lib/utils/game.spec.ts
 ```
 
 Expected: PASS.
@@ -1353,7 +1353,7 @@ describe('toAvatarUser', () => {
 - [ ] **Step 2: Run the test to verify it fails**
 
 ```bash
-cd web && pnpm test -- --run src/lib/components/games/game-leaderboard.spec.ts
+cd web && pnpm test --run src/lib/components/games/game-leaderboard.spec.ts
 ```
 
 Expected: FAIL — no `toAvatarUser` export, and the component still expects `entries`.
@@ -1552,8 +1552,8 @@ Do the same at the second leaderboard assertion (line 455) if it has a non-empty
 - [ ] **Step 6: Run the component and play-page tests**
 
 ```bash
-cd web && pnpm test -- --run src/lib/components/games/game-leaderboard.spec.ts
-cd web && pnpm test -- --run "src/routes/(user)/spaces/[spaceId]/games/[challengeId=id]/game-play-page.spec.ts"
+cd web && pnpm test --run src/lib/components/games/game-leaderboard.spec.ts
+cd web && pnpm test --run "src/routes/(user)/spaces/[spaceId]/games/[challengeId=id]/game-play-page.spec.ts"
 ```
 
 Expected: both PASS, with every pre-existing play-page test still green.
@@ -1707,7 +1707,7 @@ describe('StandingsSection', () => {
 - [ ] **Step 2: Run the test to verify it fails**
 
 ```bash
-cd web && pnpm test -- --run src/lib/components/games/standings-section.spec.ts
+cd web && pnpm test --run src/lib/components/games/standings-section.spec.ts
 ```
 
 Expected: FAIL — the component file does not exist.
@@ -1828,7 +1828,7 @@ Create `web/src/lib/components/games/standings-section.svelte`:
 - [ ] **Step 4: Run the test to verify it passes**
 
 ```bash
-cd web && pnpm test -- --run src/lib/components/games/standings-section.spec.ts
+cd web && pnpm test --run src/lib/components/games/standings-section.spec.ts
 ```
 
 Expected: PASS, 6 tests.
@@ -1911,7 +1911,7 @@ it("skips today's board for a space with no daily, rather than calling with an e
 - [ ] **Step 2: Run it to verify it fails**
 
 ```bash
-cd web && pnpm test -- --run "src/routes/(user)/spaces/[spaceId]/games/page-load.spec.ts"
+cd web && pnpm test --run "src/routes/(user)/spaces/[spaceId]/games/page-load.spec.ts"
 ```
 
 Expected: FAIL — `result.standings` is undefined.
@@ -2037,7 +2037,7 @@ describe('standings', () => {
 - [ ] **Step 5: Run it to verify it fails**
 
 ```bash
-cd web && pnpm test -- --run "src/routes/(user)/spaces/[spaceId]/games/space-games-page.spec.ts"
+cd web && pnpm test --run "src/routes/(user)/spaces/[spaceId]/games/space-games-page.spec.ts"
 ```
 
 Expected: FAIL — `standings-section` is not in the document.
@@ -2071,8 +2071,8 @@ and insert between the `DailyChallengeCard` and the `Your challenges` section (a
 - [ ] **Step 7: Run both test files to verify they pass**
 
 ```bash
-cd web && pnpm test -- --run "src/routes/(user)/spaces/[spaceId]/games/page-load.spec.ts"
-cd web && pnpm test -- --run "src/routes/(user)/spaces/[spaceId]/games/space-games-page.spec.ts"
+cd web && pnpm test --run "src/routes/(user)/spaces/[spaceId]/games/page-load.spec.ts"
+cd web && pnpm test --run "src/routes/(user)/spaces/[spaceId]/games/space-games-page.spec.ts"
 ```
 
 Expected: both PASS, pre-existing tests included.
@@ -2080,7 +2080,7 @@ Expected: both PASS, pre-existing tests included.
 - [ ] **Step 8: Run the web gate**
 
 ```bash
-cd web && pnpm check:typescript && pnpm check:svelte && pnpm lint && pnpm test -- --run
+cd web && pnpm check:typescript && pnpm check:svelte && pnpm lint && pnpm test --run
 ```
 
 Expected: clean, all tests pass. `check:svelte` can silently scan 0 files locally — check the file count in its output and treat a zero as a failed run, not a pass.
@@ -2230,7 +2230,7 @@ make e2e-api-dev
 Or, targeting the one file:
 
 ```bash
-cd e2e && pnpm test -- --run src/specs/server/api/game.e2e-spec.ts
+cd e2e && pnpm test --run src/specs/server/api/game.e2e-spec.ts
 ```
 
 Expected: PASS, with the pre-existing game tests unaffected.
@@ -2251,13 +2251,13 @@ git commit -m "test(game): cover the standings endpoint end to end"
 - [ ] **Step 1: Server**
 
 ```bash
-cd server && pnpm check && pnpm lint && pnpm test -- --run
+cd server && pnpm check && pnpm lint && pnpm test --run
 ```
 
 - [ ] **Step 2: Web**
 
 ```bash
-cd web && pnpm check:typescript && pnpm check:svelte && pnpm lint && pnpm test -- --run
+cd web && pnpm check:typescript && pnpm check:svelte && pnpm lint && pnpm test --run
 ```
 
 `check:svelte` reporting 0 files scanned is a failed run, not a pass.
