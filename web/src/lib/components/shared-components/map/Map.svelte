@@ -95,6 +95,12 @@
     spaceId,
   }: Props = $props();
 
+  // Every current caller supplies `mapMarkers` (even an explicit `[]`); the self-fetch paths below
+  // exist only for a hypothetical caller that doesn't. Capture at init, before either self-fetch
+  // path can run - checking `mapMarkers === undefined` later would flip to false the instant the
+  // first self-fetch populates it, silently re-opening both paths for every caller.
+  const selfManagedMarkers = mapMarkers === undefined;
+
   // Calculate initial bounds from markers once during initialization
   const initialBounds = (() => {
     if (!autoFitBounds || center || zoom !== undefined || !mapMarkers || mapMarkers.length === 0) {
@@ -287,7 +293,7 @@
   });
 
   onMount(async () => {
-    if (!mapMarkers) {
+    if (selfManagedMarkers && !mapMarkers) {
       mapMarkers = await loadMapMarkers();
     }
     if (autoOpenPanel) {
@@ -370,6 +376,13 @@
   };
 
   const onAssetsChanged = async () => {
+    // Fires on a GLOBAL websocket event (asset delete/archive/unarchive) sent to every one of the
+    // owner's sessions, regardless of which page is open or what triggered it (another tab, mobile,
+    // a background job) - not gated by any interaction on this page. A caller-supplied mapMarkers
+    // must never be clobbered by it; see `selfManagedMarkers` above.
+    if (!selfManagedMarkers) {
+      return;
+    }
     mapMarkers = await loadMapMarkers();
   };
 </script>
