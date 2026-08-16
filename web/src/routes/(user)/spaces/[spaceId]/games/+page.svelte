@@ -3,6 +3,7 @@
   import ChallengeCard from '$lib/components/games/challenge-card.svelte';
   import ChallengeCreatePanel from '$lib/components/games/challenge-create-panel.svelte';
   import DailyChallengeCard from '$lib/components/games/daily-challenge-card.svelte';
+  import StandingsSection from '$lib/components/games/standings-section.svelte';
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { Route } from '$lib/route';
   import { handleError } from '$lib/utils/handle-error';
@@ -32,6 +33,8 @@
   const members = $derived<SharedSpaceMemberResponseDto[]>(data.members);
   let challenges = $state<GameChallengeListItemResponseDto[]>(data.challenges);
   const daily = $derived<GameChallengeListItemResponseDto | null>(data.daily);
+  const standings = $derived(data.standings);
+  const todayBoard = $derived(data.todayBoard);
 
   let showCreatePanel = $state(false);
   let creating = $state(false);
@@ -125,6 +128,13 @@
     challenge={daily}
     href={daily ? Route.viewSpaceGame({ spaceId: space.id, challengeId: daily.id }) : ''}
     {now}
+  />
+
+  <StandingsSection
+    today={todayBoard && daily ? { entries: todayBoard.entries, roundCount: daily.roundCount } : null}
+    month={standings}
+    {members}
+    currentUserId={authManager.user.id}
   />
 
   <section class="flex flex-col gap-4">

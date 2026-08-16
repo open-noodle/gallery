@@ -76,10 +76,15 @@ describe('space games page load', () => {
     parent: vi.fn().mockResolvedValue({ space, members, linkedAlbums }),
   });
 
+  const standings = { month: '2026-08', entries: [] };
+  const todayBoard = { entries: [] };
+
   beforeEach(() => {
     vi.resetAllMocks();
     sdkMock.getChallenges.mockResolvedValue(challenges as never);
     sdkMock.getDailyChallenge.mockResolvedValue({ challenge: daily } as never);
+    sdkMock.getStandings.mockResolvedValue(standings as never);
+    sdkMock.getLeaderboard.mockResolvedValue(todayBoard as never);
   });
 
   it('authenticates, loads the parent layout, then loads the challenges and the daily', async () => {
@@ -87,6 +92,8 @@ describe('space games page load', () => {
     await expect(load(event as never)).resolves.toEqual({
       challenges,
       daily,
+      standings,
+      todayBoard,
       meta: { title: 'Test Space - Challenges' },
     });
 
@@ -108,6 +115,8 @@ describe('space games page load', () => {
     await expect(load(makeEvent() as never)).resolves.toEqual({
       challenges,
       daily: null,
+      standings,
+      todayBoard: null,
       meta: { title: 'Test Space - Challenges' },
     });
   });
@@ -117,5 +126,25 @@ describe('space games page load', () => {
     sdkMock.getChallenges.mockRejectedValue(error);
 
     await expect(load(makeEvent() as never)).rejects.toThrow(error);
+  });
+
+  it('loads the monthly standings in parallel with the challenges and the daily', async () => {
+    await expect(load(makeEvent() as never)).resolves.toMatchObject({ standings });
+
+    expect(sdkMock.getStandings).toHaveBeenCalledWith({ spaceId: 'space-1' });
+  });
+
+  it("loads today's board once the daily's id is known", async () => {
+    await expect(load(makeEvent() as never)).resolves.toMatchObject({ todayBoard });
+
+    expect(sdkMock.getLeaderboard).toHaveBeenCalledWith({ id: 'daily-1' });
+  });
+
+  it("skips today's board for a space with no daily, rather than calling with an empty id", async () => {
+    sdkMock.getDailyChallenge.mockResolvedValue({ challenge: null } as never);
+
+    await expect(load(makeEvent() as never)).resolves.toMatchObject({ todayBoard: null });
+
+    expect(sdkMock.getLeaderboard).not.toHaveBeenCalled();
   });
 });
