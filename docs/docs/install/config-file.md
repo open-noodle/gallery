@@ -379,7 +379,7 @@ Storage usage is cached per user rather than computed on every request, so the f
 :::
 
 :::info Storage Routing
-The `storage.routing` section configures [per-file-type storage routing](/features/s3-storage#choosing-where-each-file-kind-is-stored) — which backend, disk or S3, each kind of newly written file goes to. The same values are available in **Administration > System Settings > Storage routing** when no config file is in use, but that page is unreachable on a config-file install — `updateSystemConfig` rejects outright when `IMMICH_CONFIG_FILE` is set — so the config file is the only way to set these on such an install.
+The `storage.routing` section configures [per-file-type storage routing](/features/s3-storage#choosing-where-each-file-kind-is-stored) — which backend, disk or S3, each kind of newly written file goes to. **Administration > System Settings > Storage routing** stays visible on a config-file install; it is read-only there — `updateSystemConfig` rejects outright when `IMMICH_CONFIG_FILE` is set — so the config file is the only way to change these knobs. The page's per-kind counts of misplaced files remain readable there even on a config-file install; use them the same way the [S3 storage guide](/features/s3-storage#choosing-where-each-file-kind-is-stored) recommends, to confirm a kind has zero files left on the backend you're moving away from before you remove that backend's credentials.
 
 ```json
 "storage": {

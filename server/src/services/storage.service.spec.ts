@@ -611,6 +611,66 @@ describe(StorageService.name, () => {
 
       expect(StorageService.getWriteBackend(StorageRoutingKind.Originals, config)).toBe(disk);
     });
+
+    describe('warnMissingS3Backend', () => {
+      // warnedKinds is a static Set that persists across tests in this file (module state, not
+      // per-test) — reset it so an earlier test's fallback doesn't silently suppress this one's
+      // warning, and restore it afterwards so we don't leak into later tests/files.
+      const previousWarnedKinds = (StorageService as any).warnedKinds;
+
+      beforeEach(() => {
+        (StorageService as any).warnedKinds = new Set();
+      });
+
+      afterEach(() => {
+        (StorageService as any).warnedKinds = previousWarnedKinds;
+      });
+
+      it('logs a warning when a kind resolves to s3 but no s3 backend exists', () => {
+        const disk = {} as never;
+        vi.spyOn(StorageService, 'getDiskBackend').mockReturnValue(disk);
+        vi.spyOn(StorageService, 'getS3Backend').mockReturnValue(undefined);
+        (StorageService as any).writeBackendType = 'disk';
+        const warn = vi.spyOn((StorageService as any).staticLogger, 'warn');
+
+        const config = {
+          storage: {
+            routing: {
+              originals: StorageRouting.S3,
+              thumbnails: StorageRouting.Auto,
+              encodedVideo: StorageRouting.Auto,
+            },
+          },
+        } as never;
+
+        StorageService.getWriteBackend(StorageRoutingKind.Originals, config);
+
+        expect(warn).toHaveBeenCalledWith(
+          expect.stringContaining('Storage routing for "originals" is set to s3 but no S3 backend is configured'),
+        );
+      });
+
+      it('warns once per kind, not on every write', () => {
+        const disk = {} as never;
+        vi.spyOn(StorageService, 'getDiskBackend').mockReturnValue(disk);
+        vi.spyOn(StorageService, 'getS3Backend').mockReturnValue(undefined);
+        (StorageService as any).writeBackendType = 'disk';
+        const warn = vi.spyOn((StorageService as any).staticLogger, 'warn');
+
+        const config = {
+          storage: {
+            routing: { originals: StorageRouting.S3, thumbnails: StorageRouting.S3, encodedVideo: StorageRouting.Auto },
+          },
+        } as never;
+
+        // Three calls, but only two distinct kinds — a per-write warning would log 3 times.
+        StorageService.getWriteBackend(StorageRoutingKind.Originals, config);
+        StorageService.getWriteBackend(StorageRoutingKind.Originals, config);
+        StorageService.getWriteBackend(StorageRoutingKind.Thumbnails, config);
+
+        expect(warn).toHaveBeenCalledTimes(2);
+      });
+    });
   });
 
   describe('existing env-only startup check', () => {

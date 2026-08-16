@@ -284,20 +284,35 @@ describe('StorageCore', () => {
       expect(mocks.storage.rename).not.toHaveBeenCalled();
     });
 
-    // Pins existing behaviour: the `!isAbsolute(oldPath)` guard above already exists and
-    // already no-ops on a relative S3 key, regardless of pathType. This is the case that
-    // becomes far more likely once mixed disk+S3 storage is a permanent state rather than a
-    // brief migration window.
-    it('should not move a file whose path is a relative S3 key', async () => {
+    // Positive control for the two skip-cases above: without this, a `moveFile` that
+    // early-returned unconditionally (the exact data-loss shape edge case 20 exists to guard
+    // against) would pass every test in this describe block.
+    it('should move a file whose oldPath is a legitimate absolute disk path', async () => {
+      const oldPath = '/data/library/user/2021/old.mp4';
+      const newPath = '/data/library/user/2021/new.mp4';
+      mocks.move.create.mockResolvedValue({
+        id: 'move-1',
+        entityId: 'asset-1',
+        pathType: AssetPathType.EncodedVideo,
+        oldPath,
+        newPath,
+      } as any);
+
       await core.moveFile({
         entityId: 'asset-1',
-        pathType: AssetPathType.Original,
-        oldPath: 'thumbs/user/ab/cd/abcd_thumbnail.webp',
-        newPath: '/data/thumbs/user/ab/cd/abcd_thumbnail.webp',
+        pathType: AssetPathType.EncodedVideo,
+        oldPath,
+        newPath,
       });
 
-      expect(mocks.move.create).not.toHaveBeenCalled();
-      expect(mocks.storage.rename).not.toHaveBeenCalled();
+      expect(mocks.move.create).toHaveBeenCalledWith({
+        entityId: 'asset-1',
+        pathType: AssetPathType.EncodedVideo,
+        oldPath,
+        newPath,
+      });
+      expect(mocks.storage.rename).toHaveBeenCalledWith(oldPath, newPath);
+      expect(mocks.move.delete).toHaveBeenCalledWith('move-1');
     });
   });
 });

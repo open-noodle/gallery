@@ -54,8 +54,13 @@
   }
 
   // Maps each of the 8 migrator file types onto the storage-routing knob (Task 1) that governs
-  // where new writes of that kind land, mirrored here from the server's own mapping.
-  const FILE_TYPE_TO_KIND: Record<string, 'originals' | 'thumbnails' | 'encodedVideo'> = {
+  // where new writes of that kind land, mirrored here from the server's own mapping. Keyed on the
+  // DTO's own keys (not `Record<string, ...>`) so a 9th migrator file type added to the DTO forces
+  // a compile error here too, instead of an `undefined` lookup crashing the checkbox grid at runtime.
+  const FILE_TYPE_TO_KIND: Record<
+    keyof Required<StorageMigrationFileTypesDto>,
+    'originals' | 'thumbnails' | 'encodedVideo'
+  > = {
     originals: 'originals',
     sidecars: 'originals',
     thumbnails: 'thumbnails',
@@ -103,7 +108,7 @@
   // Rollback
   let rollbackBatchId = $state('');
 
-  const fileTypeLabels = $derived<Record<string, string>>({
+  const fileTypeLabels = $derived<Record<keyof Required<StorageMigrationFileTypesDto>, string>>({
     originals: $t('admin.storage_migration_file_type_originals'),
     thumbnails: $t('admin.storage_migration_file_type_thumbnails'),
     previews: $t('admin.storage_migration_file_type_previews'),
@@ -116,12 +121,17 @@
 
   // A file type whose new writes go the other way can never converge, and the server rejects it
   // anyway — disable it in the UI so the invalid combination is unreachable there too.
+  //
+  // Callers pass keys sourced from FILE_TYPE_TO_KIND/fileTypeLabels themselves (Object.keys /
+  // Object.entries), which TypeScript's lib types always widen back to `string` — the cast below
+  // is trusting that provenance, not bypassing the exhaustiveness check FILE_TYPE_TO_KIND itself enforces.
   const isBlocked = (fileType: string) => {
     if (!routingStatus) {
       return false;
     }
     const target = direction === StorageMigrationDirection.ToS3 ? RoutedTo.S3 : RoutedTo.Disk;
-    return routingStatus[FILE_TYPE_TO_KIND[fileType]].routedTo !== target;
+    const kind = FILE_TYPE_TO_KIND[fileType as keyof Required<StorageMigrationFileTypesDto>];
+    return routingStatus[kind].routedTo !== target;
   };
 
   function formatBytes(bytes: number): string {
