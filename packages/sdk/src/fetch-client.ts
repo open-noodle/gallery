@@ -4284,6 +4284,21 @@ export type GameDailyResponseDto = {
     /** Today's daily, if one could be generated */
     challenge: (GameChallengeListItemResponseDto) | null;
 };
+export type GameStandingsResponseDto = {
+    /** Per-player totals, best first, non-players last */
+    entries: {
+        /** Number of daily challenges played this month */
+        daysPlayed: number;
+        /** User name */
+        name: string;
+        /** Total score across the month's daily challenges */
+        total: number;
+        /** User ID */
+        userId: string;
+    }[];
+    /** The UTC calendar month these standings cover, as YYYY-MM. The client formats the name. */
+    month: string;
+};
 export type StackResponseDto = {
     assets: AssetResponseDto[];
     /** Stack ID */
@@ -10253,6 +10268,19 @@ export function getDailyChallenge({ spaceId }: {
         status: 200;
         data: GameDailyResponseDto;
     }>(`/shared-spaces/${encodeURIComponent(spaceId)}/games/daily`, {
+        ...opts
+    }));
+}
+/**
+ * Get the space's monthly standings
+ */
+export function getStandings({ spaceId }: {
+    spaceId: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: GameStandingsResponseDto;
+    }>(`/shared-spaces/${encodeURIComponent(spaceId)}/games/standings`, {
         ...opts
     }));
 }
