@@ -21,6 +21,16 @@ vi.mock('$lib/components/shared-components/map/Map.svelte', async () => {
   return { default: MockComponent };
 });
 
+// UserPageLayout renders the real NavigationBar, which reads authManager.user - copied verbatim
+// from space-album-detail-page.spec.ts, the sibling detail page this page's chrome now mirrors.
+vi.mock('$lib/components/layouts/UserPageLayout.svelte', async () => {
+  const { default: MockComponent } = await import('$lib/components/spaces/mock-user-page-layout.test-wrapper.svelte');
+  return { default: MockComponent };
+});
+
+const navigationMock = vi.hoisted(() => ({ goto: vi.fn() }));
+vi.mock('$app/navigation', () => navigationMock);
+
 const { toastManagerMock } = vi.hoisted(() => ({
   toastManagerMock: { danger: vi.fn(), primary: vi.fn(), success: vi.fn(), warning: vi.fn() },
 }));
@@ -79,6 +89,29 @@ describe('Game play page', () => {
     // so a guess never resolves to `challenge = undefined`, and let tests that care about the
     // answer override it explicitly.
     sdkMock.getChallenge.mockResolvedValue(makeChallenge());
+  });
+
+  describe('chrome', () => {
+    // Prior to this, the play page rendered a bare <div>: no navbar, no back control, no
+    // challenge name, so the browser back button was the only way out once a player opened a
+    // challenge. Mirrors space-album-detail-page.spec.ts's identical assertions for its sibling
+    // detail route.
+    it('shows the challenge name as the page title', () => {
+      renderPage(makeChallenge({ name: 'Summer Trip' }));
+      expect(screen.getByTestId('user-page-layout')).toHaveAttribute('data-title', 'Summer Trip');
+    });
+
+    it('renders a back control that returns to the challenge list', async () => {
+      renderPage(makeChallenge({ spaceId: 'space-1' }));
+
+      const leading = screen.getByTestId('layout-leading');
+      const backButton = leading.querySelector('button');
+      expect(backButton).not.toBeNull();
+
+      await fireEvent.click(backButton!);
+
+      expect(navigationMock.goto).toHaveBeenCalledWith('/spaces/space-1/games');
+    });
   });
 
   describe('resuming', () => {
