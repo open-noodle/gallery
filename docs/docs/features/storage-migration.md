@@ -29,10 +29,10 @@ Noodle Gallery includes a built-in tool for migrating files between disk and S3-
 
 If you use [per-file-type storage routing](/features/s3-storage#choosing-where-each-file-kind-is-stored), a migration can only move a file type in the direction its routing already points. This prevents a migration from immediately becoming stale — if thumbnails are pinned to S3, migrating thumbnails **to disk** would just have every newly generated thumbnail land straight back on S3.
 
-Starting a migration for a file type whose routing disagrees with the chosen direction is rejected. The error names every offending file type and explains how each one is currently routed, for example:
+Starting a migration for a file type whose routing disagrees with the chosen direction is rejected. The error lists every offending knob, semicolon-separated, and says how each one resolved — adding `(via IMMICH_STORAGE_BACKEND)` when that knob is set to `auto` so it doesn't read as a mystery. For example, migrating to disk while thumbnails are pinned to S3 and following the `auto` default for encoded video (with `IMMICH_STORAGE_BACKEND=s3`) produces:
 
 ```
-Cannot migrate to disk: Thumbnails are routed to S3 via IMMICH_STORAGE_BACKEND.
+Cannot migrate to disk: thumbnails is routed to s3; encodedVideo is routed to s3 (via IMMICH_STORAGE_BACKEND). Change the storage routing for those kinds first.
 ```
 
 To fix this, either change the routing for the affected file type(s) in **Administration > System Settings > Storage routing** first, or deselect those file types from the migration.
