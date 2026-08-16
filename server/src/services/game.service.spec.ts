@@ -722,6 +722,63 @@ describe(GameService.name, () => {
     });
   });
 
+  describe('leaderboard', () => {
+    const challenge = {
+      id: 'challenge-1',
+      spaceId: 'space-1',
+      roundCount: 5,
+      dailyOn: null,
+    };
+
+    beforeEach(() => {
+      mocks.game.getChallenge.mockResolvedValue(challenge as any);
+      mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Viewer } as any);
+    });
+
+    it('includes every member, zero-filling the ones who have not played, last', async () => {
+      mocks.sharedSpace.getMembers.mockResolvedValue([
+        { userId: 'user-1', name: 'Ana' },
+        { userId: 'user-2', name: 'Ben' },
+      ] as any);
+      mocks.game.getLeaderboard.mockResolvedValue([{ userId: 'user-2', total: 4200, answered: 5 }]);
+
+      const result = await sut.leaderboard(authStub, 'challenge-1');
+
+      expect(result.entries).toEqual([
+        { userId: 'user-2', name: 'Ben', total: 4200, answered: 5 },
+        { userId: 'user-1', name: 'Ana', total: 0, answered: 0 },
+      ]);
+    });
+
+    it('drops a departed member rather than naming them "Unknown"', async () => {
+      mocks.sharedSpace.getMembers.mockResolvedValue([{ userId: 'user-1', name: 'Ana' }] as any);
+      mocks.game.getLeaderboard.mockResolvedValue([
+        { userId: 'user-1', total: 100, answered: 1 },
+        { userId: 'departed-user', total: 4900, answered: 5 },
+      ]);
+
+      const result = await sut.leaderboard(authStub, 'challenge-1');
+
+      expect(result.entries).toEqual([{ userId: 'user-1', name: 'Ana', total: 100, answered: 1 }]);
+      expect(JSON.stringify(result)).not.toContain('Unknown');
+    });
+
+    it('breaks a tie on points in favour of the player who used fewer rounds', async () => {
+      mocks.sharedSpace.getMembers.mockResolvedValue([
+        { userId: 'user-1', name: 'Ana' },
+        { userId: 'user-2', name: 'Ben' },
+      ] as any);
+      mocks.game.getLeaderboard.mockResolvedValue([
+        { userId: 'user-1', total: 4200, answered: 5 },
+        { userId: 'user-2', total: 4200, answered: 3 },
+      ]);
+
+      const result = await sut.leaderboard(authStub, 'challenge-1');
+
+      expect(result.entries.map((entry) => entry.name)).toEqual(['Ben', 'Ana']);
+    });
+  });
+
   describe('standings', () => {
     const members = [
       { userId: 'user-1', name: 'Ana' },

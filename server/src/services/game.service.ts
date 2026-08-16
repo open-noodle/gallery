@@ -688,6 +688,14 @@ export class GameService extends BaseService {
     );
   }
 
+  /**
+   * Today's-challenge board: one entry per CURRENT member, zero-filled.
+   *
+   * Members who have not played are included rather than omitted, so this board and the monthly
+   * standings show the same people - a member who is absent from one tab and present on the other
+   * reads as a bug. Rows belonging to someone who has left the space are dropped; they used to
+   * render under a hardcoded English 'Unknown'.
+   */
   async leaderboard(auth: AuthDto, challengeId: string): Promise<GameLeaderboardResponseDto> {
     const challenge = await this.loadChallenge(challengeId);
     await this.requireMember(challenge.spaceId, auth.user.id);
@@ -697,16 +705,18 @@ export class GameService extends BaseService {
       this.sharedSpaceRepository.getMembers(challenge.spaceId),
     ]);
 
-    const nameByUserId = new Map(members.map((member) => [member.userId, member.name]));
+    const rowByUserId = new Map(rows.map((row) => [row.userId, row]));
 
-    return {
-      entries: rows.map((row) => ({
-        userId: row.userId,
-        name: nameByUserId.get(row.userId) ?? 'Unknown',
-        total: row.total,
-        answered: row.answered,
-      })),
-    };
+    const entries = members
+      .map((member) => ({
+        userId: member.userId,
+        name: member.name,
+        total: rowByUserId.get(member.userId)?.total ?? 0,
+        answered: rowByUserId.get(member.userId)?.answered ?? 0,
+      }))
+      .sort((a, b) => compareStandings({ ...a, played: a.answered }, { ...b, played: b.answered }));
+
+    return { entries };
   }
 
   /**
