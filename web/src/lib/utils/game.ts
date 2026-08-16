@@ -27,4 +27,4 @@ export const yearFromIso = (iso: string): number => new Date(iso).getUTCFullYear
  * routinely yields values like 200 or -230 — but the server's longitudeSchema is
  * `z.number().min(-180).max(180)` and 400s on anything outside it.
  */
-export const wrapLongitude = (lng: number): number => (((lng + 180) % 360) + 360) % 360 - 180;
+export const wrapLongitude = (lng: number): number => ((((lng + 180) % 360) + 360) % 360) - 180;
