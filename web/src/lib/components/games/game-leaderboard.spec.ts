@@ -21,20 +21,15 @@ describe('GameLeaderboard', () => {
     expect(screen.getByText('Carol')).toBeInTheDocument();
   });
 
-  // The server deliberately returns name: null for a departed member so the client localises the
-  // fallback. Proves the negative honestly: the positive case above shows a name CAN render as
-  // itself, so this row rendering the fallback key (not the literal string "null") is a real
-  // signal, not an always-empty query.
-  it('renders a fallback for a departed member instead of the literal string "null"', () => {
+  // The server hardcodes 'Unknown' for a departed member (game.service.ts) - name is non-nullable
+  // end to end (GameLeaderboardResponseDto, the SDK type), so there is no null-name case for the
+  // client to fall back on. This just proves that hardcoded name renders as-is, like any other.
+  it("renders the server's own placeholder name for a departed member as-is", () => {
     render(GameLeaderboard, {
       ...base,
-      entries: [{ userId: 'u1', name: null, total: 500, answered: 1 }],
+      entries: [{ userId: 'u1', name: 'Unknown', total: 500, answered: 1 }],
     });
 
-    const row = screen.getByTestId('leaderboard-row');
-    expect(row).not.toHaveTextContent('null');
-    // $t() is untranslated in this test environment (no locale catalog is loaded), so the
-    // fallback resolves to the raw i18n key rather than its English text ("Unknown").
-    expect(screen.getByText('unknown')).toBeInTheDocument();
+    expect(screen.getByTestId('leaderboard-row')).toHaveTextContent('Unknown');
   });
 });

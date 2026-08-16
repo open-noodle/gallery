@@ -2,7 +2,7 @@
   import { t } from 'svelte-i18n';
 
   type Props = {
-    entries: Array<{ userId: string; name: string | null; total: number; answered: number }>;
+    entries: Array<{ userId: string; name: string; total: number; answered: number }>;
     roundCount: number;
   };
 
@@ -18,9 +18,7 @@
         <tr data-testid="leaderboard-row" class="border-b border-gray-200 last:border-0 dark:border-gray-800">
           <td class="w-8 py-2 text-sm text-gray-500 dark:text-gray-400">{rank + 1}</td>
           <td class="py-2 text-start font-medium">
-            <!-- The server deliberately returns a null name for a departed member so the client
-                 localises the fallback rather than rendering the literal string "null". -->
-            {entry.name ?? $t('unknown')}
+            {entry.name}
           </td>
           <td class="py-2 text-sm text-gray-500 dark:text-gray-400">
             {$t('game_leaderboard_answered', { values: { answered: entry.answered, total: roundCount } })}
