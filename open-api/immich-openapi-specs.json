@@ -21036,6 +21036,63 @@
         "x-immich-state": "Beta"
       }
     },
+    "/shared-spaces/{spaceId}/games/standings": {
+      "get": {
+        "description": "Per-player totals across this UTC calendar month's daily challenges. Custom challenges never contribute. Membership-gated, like the daily.",
+        "operationId": "getStandings",
+        "parameters": [
+          {
+            "name": "spaceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameStandingsResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Get the space's monthly standings",
+        "tags": [
+          "Games"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "sharedSpace.read",
+        "x-immich-state": "Beta"
+      }
+    },
     "/stacks": {
       "delete": {
         "description": "Delete multiple stacks by providing a list of stack IDs.",
@@ -32632,6 +32689,50 @@
           "date"
         ],
         "type": "string"
+      },
+      "GameStandingsResponseDto": {
+        "properties": {
+          "entries": {
+            "description": "Per-player totals, best first, non-players last",
+            "items": {
+              "properties": {
+                "daysPlayed": {
+                  "description": "Number of daily challenges played this month",
+                  "type": "number"
+                },
+                "name": {
+                  "description": "User name",
+                  "type": "string"
+                },
+                "total": {
+                  "description": "Total score across the month's daily challenges",
+                  "type": "number"
+                },
+                "userId": {
+                  "description": "User ID",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "userId",
+                "name",
+                "total",
+                "daysPlayed"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "month": {
+            "description": "The UTC calendar month these standings cover, as YYYY-MM. The client formats the name.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "entries",
+          "month"
+        ],
+        "type": "object"
       },
       "HlsVideoResolution": {
         "description": "HLS video resolution",
