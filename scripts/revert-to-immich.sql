@@ -512,6 +512,7 @@ DELETE FROM "kysely_migrations"
   '1792000000000-AddDailyGameChallenge',
   '1792123120451-AddSharedLinkSpaceId',
   '1793000000000-AddSharedSpaceAlbumHidden',
+  '1793000000000-AddSpaceDailyChallengeEnabled',
   '1793100000000-AddSharedSpaceAlbumFolderTable',
   '1793200000000-SharedSpaceAlbumFolderAuditTable',
   '1793300000000-ClearPreOptionMFaceRepairScans',
