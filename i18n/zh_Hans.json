@@ -1951,6 +1951,7 @@
   "game_daily_enable": "启用",
   "game_daily_enable_description": "每天在此 Space 玩一个共享挑战。得分计入月度排行榜。",
   "game_daily_enable_title": "启用每日挑战？",
+  "game_daily_generating": "正在生成今天的挑战…",
   "game_daily_next_in": "下次挑战将在 {time} 后开始",
   "game_daily_played": "您已完成今天的挑战",
   "game_daily_toggle_failed": "无法更改每日挑战设置",

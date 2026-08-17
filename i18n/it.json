@@ -1968,6 +1968,7 @@
   "game_daily_enable": "Attiva",
   "game_daily_enable_description": "Gioca una sfida condivisa al giorno in questo Space. I punti contano per la classifica mensile.",
   "game_daily_enable_title": "Attivare la sfida del giorno?",
+  "game_daily_generating": "Creazione della sfida del giorno…",
   "game_daily_next_in": "Prossima sfida tra {time}",
   "game_daily_played": "Hai giocato la sfida di oggi",
   "game_daily_toggle_failed": "Impossibile modificare l'impostazione della sfida del giorno",

@@ -1972,6 +1972,7 @@
   "game_daily_enable": "Enable",
   "game_daily_enable_description": "Play one shared challenge a day with this space. Scores count toward the monthly leaderboard.",
   "game_daily_enable_title": "Turn on the daily challenge?",
+  "game_daily_generating": "Generating today's challenge…",
   "game_daily_next_in": "Next challenge in {time}",
   "game_daily_played": "You've played today's challenge",
   "game_daily_toggle_failed": "Could not change the daily challenge setting",

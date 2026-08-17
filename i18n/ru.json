@@ -1970,6 +1970,7 @@
   "game_daily_enable": "Включить",
   "game_daily_enable_description": "Играйте в один общий вызов в день в этом Space. Очки идут в зачёт месячной таблицы лидеров.",
   "game_daily_enable_title": "Включить ежедневный вызов?",
+  "game_daily_generating": "Создаётся сегодняшний вызов…",
   "game_daily_next_in": "Следующий вызов через {time}",
   "game_daily_played": "Вы прошли сегодняшний вызов",
   "game_daily_toggle_failed": "Не удалось изменить настройку ежедневного вызова",

@@ -1967,6 +1967,7 @@
   "game_daily_enable": "Activar",
   "game_daily_enable_description": "Juega un reto compartido al día en este Space. Los puntos cuentan para la clasificación mensual.",
   "game_daily_enable_title": "¿Activar el reto diario?",
+  "game_daily_generating": "Creando el reto de hoy…",
   "game_daily_next_in": "Próximo reto en {time}",
   "game_daily_played": "Has jugado el reto de hoy",
   "game_daily_toggle_failed": "No se pudo cambiar la configuración del reto diario",

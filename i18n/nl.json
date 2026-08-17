@@ -1968,6 +1968,7 @@
   "game_daily_enable": "Inschakelen",
   "game_daily_enable_description": "Speel elke dag één gedeelde uitdaging in deze Space. Punten tellen mee voor het maandelijkse klassement.",
   "game_daily_enable_title": "Dagelijkse uitdaging inschakelen?",
+  "game_daily_generating": "De uitdaging van vandaag wordt gemaakt…",
   "game_daily_next_in": "Volgende uitdaging over {time}",
   "game_daily_played": "Je hebt de uitdaging van vandaag gespeeld",
   "game_daily_toggle_failed": "Kon de instelling voor de dagelijkse uitdaging niet wijzigen",

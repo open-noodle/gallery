@@ -1964,6 +1964,7 @@
   "game_daily_enable": "Activer",
   "game_daily_enable_description": "Jouez un défi partagé par jour dans cet espace. Les points comptent pour le classement mensuel.",
   "game_daily_enable_title": "Activer le défi du jour ?",
+  "game_daily_generating": "Génération du défi du jour…",
   "game_daily_next_in": "Prochain défi dans {time}",
   "game_daily_played": "Vous avez joué le défi du jour",
   "game_daily_toggle_failed": "Impossible de modifier le réglage du défi du jour",
