@@ -282,9 +282,18 @@ prerequisites resolve against the MAIN checkout and would regenerate from the wr
 
 - [ ] **Step 2: Regenerate the TypeScript SDK**
 
+Use the **canonical flag set**, copied from `mise.toml`'s `[tasks.open-api-typescript]` (the source of
+truth) — not a bare `oazapfts --optimistic`:
+
 ```bash
-cd .. && npx oazapfts --optimistic open-api/immich-openapi-specs.json packages/sdk/src/fetch-client.ts
+cd .. && npx oazapfts --optimistic --argumentStyle=object --useEnumType --allSchemas open-api/immich-openapi-specs.json packages/sdk/src/fetch-client.ts
 ```
+
+**All three extra flags are load-bearing.** Dropping `--useEnumType` alone re-emits every enum in the
+SDK as an inline string-literal union instead of a TS `enum` — a ~2,700-line diff that compiles but
+breaks every `SomeEnum.Member` reference in `web/` and `mobile/`. The correct regen for a single added
+field is a handful of lines; if your diff is thousands, you used the wrong flags, so check the diff size
+before committing rather than after.
 
 - [ ] **Step 3: Regenerate the Dart client**
 
