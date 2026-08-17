@@ -4,6 +4,7 @@ import {
   formatStandingsMonth,
   MAX_ROUND_SCORE,
   scorePercent,
+  shouldShowStandings,
   timeUntilNextDaily,
   wrapLongitude,
   yearFromIso,
@@ -123,5 +124,39 @@ describe('formatStandingsMonth', () => {
   it('renders in the given locale', () => {
     expect(formatStandingsMonth('2026-08', 'de-DE')).toBe('August 2026');
     expect(formatStandingsMonth('2026-12', 'fr-FR')).toBe('décembre 2026');
+  });
+});
+
+describe('shouldShowStandings', () => {
+  it('hides the board while nobody has been asked, even when earlier play left scores', () => {
+    // A space where a daily was generated during RC testing arrives un-asked WITH history. Showing a
+    // populated board directly under a prompt asking whether to switch the feature on reads as a
+    // contradiction, so the prompt wins. Nothing is deleted - the board returns once answered.
+    expect(shouldShowStandings(null, [{ daysPlayed: 3 }])).toBe(false);
+  });
+
+  it('hides the board for a never-asked empty space', () => {
+    expect(shouldShowStandings(null, [{ daysPlayed: 0 }])).toBe(false);
+  });
+
+  it('shows the board whenever the daily is on, even before anyone plays', () => {
+    expect(shouldShowStandings(true, [{ daysPlayed: 0 }])).toBe(true);
+  });
+
+  it('keeps the board after the daily is switched off, if members earned something', () => {
+    expect(shouldShowStandings(false, [{ daysPlayed: 0 }, { daysPlayed: 2 }])).toBe(true);
+  });
+
+  it('hides the board for a declined space nobody played in', () => {
+    expect(shouldShowStandings(false, [{ daysPlayed: 0 }, { daysPlayed: 0 }])).toBe(false);
+  });
+
+  it('hides the board rather than throwing when there are no entries at all', () => {
+    expect(shouldShowStandings(false, [])).toBe(false);
+  });
+
+  it('treats an absent field as never-asked', () => {
+    // The SDK types the response field as optional, so undefined reaches this helper in practice.
+    expect(shouldShowStandings(undefined, [{ daysPlayed: 5 }])).toBe(false);
   });
 });

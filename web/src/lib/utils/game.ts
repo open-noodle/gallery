@@ -87,3 +87,21 @@ export const formatStandingsMonth = (month: string, locale?: string): string => 
     new Date(Date.UTC(year, monthNumber - 1, 1)),
   );
 };
+
+/**
+ * Whether the monthly standings section belongs on the page.
+ *
+ * The null branch is not redundant with the others: an un-asked space can already hold daily history
+ * (any space where a daily was generated before this setting existed), and the prompt asking whether
+ * to turn the feature on must not sit above a populated board. Answering the prompt brings it back,
+ * because disabling never deletes anything.
+ */
+export const shouldShowStandings = (
+  dailyChallengeEnabled: boolean | null | undefined,
+  entries: { daysPlayed: number }[],
+): boolean => {
+  if (dailyChallengeEnabled === null || dailyChallengeEnabled === undefined) {
+    return false;
+  }
+  return dailyChallengeEnabled || entries.some((entry) => entry.daysPlayed > 0);
+};
