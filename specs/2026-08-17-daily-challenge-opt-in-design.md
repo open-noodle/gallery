@@ -53,9 +53,16 @@ plain `ADD COLUMN` up and a `DROP COLUMN IF EXISTS` down. No index and no expres
 override caused schema drift on every boot. `server/test/medium/specs/schema-drift.spec.ts` is the
 check that settles this either way; it must be run, not assumed.
 
-Nothing to add to `scripts/revert-to-immich.sql`: it drops `shared_space` wholesale
-(`DROP TABLE IF EXISTS "shared_space" CASCADE`), so a new column on that table needs no separate
-teardown.
+`scripts/revert-to-immich.sql` needs **one** change, and the reasoning that says otherwise is a trap
+worth spelling out. The column itself needs no teardown — the script already drops `shared_space`
+wholesale (`DROP TABLE IF EXISTS "shared_space" CASCADE`). But that file carries a _second, unrelated_
+obligation: a `DELETE FROM "kysely_migrations"` block naming every fork migration, so a user reverting
+to upstream Immich has the fork's migration rows removed. **Every new `migrations-gallery` migration must
+be added there**, regardless of whether its schema change needs undoing.
+
+`server/src/schema/revert-to-immich.spec.ts` enforces this and is the only thing that catches it. It is
+a plain unit test, so it fails in the full `pnpm test --run` and not in any scoped run — which is
+exactly how this was missed until the final gate.
 
 Existing spaces get `null` and are therefore asked. That is correct rather than merely convenient: the
 games feature is unreleased, so no space has a daily anyone has agreed to keep.
