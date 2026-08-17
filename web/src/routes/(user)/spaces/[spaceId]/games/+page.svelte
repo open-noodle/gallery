@@ -1,24 +1,29 @@
 <script lang="ts">
-  import { goto } from '$app/navigation';
+  import { goto, invalidateAll } from '$app/navigation';
   import ChallengeCard from '$lib/components/games/challenge-card.svelte';
   import ChallengeCreatePanel from '$lib/components/games/challenge-create-panel.svelte';
   import DailyChallengeCard from '$lib/components/games/daily-challenge-card.svelte';
+  import DailyChallengePrompt from '$lib/components/games/daily-challenge-prompt.svelte';
+  import ButtonContextMenu from '$lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
+  import MenuOption from '$lib/components/shared-components/context-menu/MenuOption.svelte';
   import StandingsSection from '$lib/components/games/standings-section.svelte';
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { Route } from '$lib/route';
   import { handleError } from '$lib/utils/handle-error';
+  import { shouldShowStandings } from '$lib/utils/game';
   import {
     createChallenge,
     deleteChallenge,
     GameChallengeType,
     isHttpError,
     SharedSpaceRole,
+    updateSpace,
     type GameChallengeListItemResponseDto,
     type SharedSpaceMemberResponseDto,
     type SharedSpaceResponseDto,
   } from '@immich/sdk';
   import { Button, modalManager, toastManager } from '@immich/ui';
-  import { mdiPlus } from '@mdi/js';
+  import { mdiCalendarStarOutline, mdiDotsVertical, mdiPlus } from '@mdi/js';
   import { onMount } from 'svelte';
   import { t } from 'svelte-i18n';
   import type { PageData } from './$types';
@@ -51,6 +56,25 @@
   const isEditor = $derived(
     currentMember?.role === SharedSpaceRole.Owner || currentMember?.role === SharedSpaceRole.Editor,
   );
+
+  let togglingDaily = $state(false);
+  const dailyEnabled = $derived(space.dailyChallengeEnabled === true);
+  const dailyUnanswered = $derived(space.dailyChallengeEnabled === null || space.dailyChallengeEnabled === undefined);
+  const showStandings = $derived(shouldShowStandings(space.dailyChallengeEnabled, standings.entries));
+
+  async function setDailyEnabled(enabled: boolean) {
+    togglingDaily = true;
+    try {
+      await updateSpace({ id: space.id, sharedSpaceUpdateDto: { dailyChallengeEnabled: enabled } });
+      // Enabling generates the daily during this reload, which is the slow part the button is
+      // disabled for.
+      await invalidateAll();
+    } catch (error) {
+      handleError(error, $t('game_daily_toggle_failed'));
+    } finally {
+      togglingDaily = false;
+    }
+  }
 
   // handleError prefers the server's raw message for any HttpError, truncated to 75 chars
   // (handle-error.ts) - fine for a generic failure, but it drowns out the localized string for
@@ -122,20 +146,47 @@
 </script>
 
 <div class="flex h-full flex-col gap-8 p-4">
+  {#if isEditor}
+    <div class="flex justify-end">
+      <ButtonContextMenu
+        icon={mdiDotsVertical}
+        size="medium"
+        title={$t('game_daily_challenge')}
+        data-testid="daily-toggle"
+      >
+        <MenuOption
+          text={dailyEnabled ? $t('game_daily_turn_off') : $t('game_daily_turn_on')}
+          icon={mdiCalendarStarOutline}
+          onClick={() => setDailyEnabled(!dailyEnabled)}
+        />
+      </ButtonContextMenu>
+    </div>
+  {/if}
+
   <!-- The daily leads the page even when the space has no custom challenges at all: it is the
        reason to come back, and burying it under an empty-state would hide the only game there is. -->
-  <DailyChallengeCard
-    challenge={daily}
-    href={daily ? Route.viewSpaceGame({ spaceId: space.id, challengeId: daily.id }) : ''}
-    {now}
-  />
+  {#if dailyEnabled}
+    <DailyChallengeCard
+      challenge={daily}
+      href={daily ? Route.viewSpaceGame({ spaceId: space.id, challengeId: daily.id }) : ''}
+      {now}
+    />
+  {:else if dailyUnanswered && isEditor}
+    <DailyChallengePrompt
+      pending={togglingDaily}
+      onEnable={() => setDailyEnabled(true)}
+      onDecline={() => setDailyEnabled(false)}
+    />
+  {/if}
 
-  <StandingsSection
-    today={todayBoard && daily ? { entries: todayBoard.entries, roundCount: daily.roundCount } : null}
-    month={standings}
-    {members}
-    currentUserId={authManager.user.id}
-  />
+  {#if showStandings}
+    <StandingsSection
+      today={todayBoard && daily ? { entries: todayBoard.entries, roundCount: daily.roundCount } : null}
+      month={standings}
+      {members}
+      currentUserId={authManager.user.id}
+    />
+  {/if}
 
   <section class="flex flex-col gap-4">
     <div class="flex items-center justify-between">

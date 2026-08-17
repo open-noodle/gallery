@@ -13,6 +13,7 @@ describe('space games page load', () => {
     name: 'Test Space',
     createdAt: '2026-01-01T00:00:00.000Z',
     createdById: 'owner-user-id',
+    dailyChallengeEnabled: true,
   };
 
   const members = [
@@ -70,10 +71,10 @@ describe('space games page load', () => {
     locationRoundCount: 3,
   };
 
-  const makeEvent = (overrides: { spaceId?: string } = {}) => ({
+  const makeEvent = (overrides: { spaceId?: string; space?: Record<string, unknown> } = {}) => ({
     url: new URL(`https://gallery.test/spaces/${overrides.spaceId ?? 'space-1'}/games`),
     params: { spaceId: overrides.spaceId ?? 'space-1' },
-    parent: vi.fn().mockResolvedValue({ space, members, linkedAlbums }),
+    parent: vi.fn().mockResolvedValue({ space: { ...space, ...overrides.space }, members, linkedAlbums }),
   });
 
   const standings = { month: '2026-08', entries: [] };
@@ -146,5 +147,41 @@ describe('space games page load', () => {
     await expect(load(makeEvent() as never)).resolves.toMatchObject({ todayBoard: null });
 
     expect(sdkMock.getLeaderboard).not.toHaveBeenCalled();
+  });
+
+  it('does not ask for the daily or its board when the space has not opted in', async () => {
+    // Not merely an optimisation: the first read of the daily is what GENERATES it, so a page that
+    // asks for a space which never opted in is asking the server to do the thing this feature exists
+    // to prevent.
+    const event = makeEvent({ space: { dailyChallengeEnabled: null } });
+
+    await expect(load(event as never)).resolves.toEqual({
+      challenges,
+      daily: null,
+      standings,
+      todayBoard: null,
+      meta: { title: 'Test Space - Challenges' },
+    });
+
+    expect(sdkMock.getDailyChallenge).not.toHaveBeenCalled();
+    expect(sdkMock.getLeaderboard).not.toHaveBeenCalled();
+    // The challenges list is unaffected: player-created challenges are not opt-in.
+    expect(sdkMock.getChallenges).toHaveBeenCalledWith({ spaceId: 'space-1' });
+  });
+
+  it('does not ask for the daily when an editor has declined', async () => {
+    const event = makeEvent({ space: { dailyChallengeEnabled: false } });
+
+    await expect(load(event as never)).resolves.toMatchObject({ daily: null, todayBoard: null });
+
+    expect(sdkMock.getDailyChallenge).not.toHaveBeenCalled();
+  });
+
+  it('still asks for the standings when the daily is off, because past scores may remain', async () => {
+    const event = makeEvent({ space: { dailyChallengeEnabled: false } });
+
+    await load(event as never);
+
+    expect(sdkMock.getStandings).toHaveBeenCalledWith({ spaceId: 'space-1' });
   });
 });
