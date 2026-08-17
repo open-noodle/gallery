@@ -69,11 +69,13 @@
   </div>
 
   <div class="flex justify-end">
-    <!-- Disabled while generating: the candidate queries and CLIP prompts behind a challenge take
-         long enough for a second click to land and create a duplicate from one intent. -->
+    <!-- `loading` rather than `disabled`, and it implies disabled so the double-submit guard still
+         holds: the candidate queries and CLIP prompts behind a challenge take long enough for a
+         second click to land and create a duplicate from one intent - and long enough that a merely
+         greyed-out button reads as a frozen page rather than as work in progress. -->
     <Button
       size="small"
-      disabled={creating}
+      loading={creating}
       onclick={() => onCreate({ roundCount, type })}
       data-testid="challenge-create-submit"
     >
