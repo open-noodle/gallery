@@ -409,6 +409,27 @@ describe(GameService.name, () => {
       mocks.game.getRound.mockResolvedValue({ id: 'r', type: 'location', challengeId: 'challenge-1' } as any);
       await expect(sut.guess(authStub, 'challenge-1', 0, {} as any)).rejects.toBeInstanceOf(BadRequestException);
     });
+
+    it('still scores a guess on a daily whose space has since turned the daily off', async () => {
+      // Disabling stops generation and hides the card; it must not snatch away a game someone is
+      // part-way through. `guess` gates on membership only, and that is deliberate - do not "fix"
+      // this into a rejection when reading the opt-in code.
+      mocks.sharedSpace.getById.mockResolvedValue({ dailyChallengeEnabled: false } as any);
+      mocks.game.getRound.mockResolvedValue({
+        id: 'round-1',
+        challengeId: 'challenge-1',
+        index: 0,
+        type: 'location',
+        answerLat: 52.5,
+        answerLon: 13.4,
+        answerDate: null,
+      } as any);
+      mocks.game.createGuess.mockImplementation((guess: any) => guess);
+
+      const result = await sut.guess(authStub, 'challenge-1', 0, { lat: 52.5, lon: 13.4 });
+
+      expect(result.score).toBe(5000);
+    });
   });
 
   describe('get', () => {
@@ -610,6 +631,8 @@ describe(GameService.name, () => {
       // Deliberately late in the UTC day: a daily keyed off local time would roll over to the 17th
       // for anyone east of UTC, giving members of the same space different "todays" on one board.
       vi.setSystemTime(new Date('2026-08-16T23:30:00.000Z'));
+      // The daily is opt-in; every test in this block is about a space that has opted in.
+      mocks.sharedSpace.getById.mockResolvedValue({ dailyChallengeEnabled: true } as any);
     });
 
     afterEach(() => {
@@ -719,6 +742,32 @@ describe(GameService.name, () => {
       // The exclusion belongs in the query, not in a post-filter here: a service-side filter would
       // still pay for loading every daily the space has ever had.
       expect(mocks.game.getChallengesForSpace).toHaveBeenCalledWith('space-1');
+    });
+
+    it.each([
+      { state: null as boolean | null, label: 'nobody has been asked' },
+      { state: false as boolean | null, label: 'an editor declined' },
+    ])('generates nothing when $label', async ({ state }) => {
+      stockPools(mocks);
+      mocks.sharedSpace.getById.mockResolvedValue({ dailyChallengeEnabled: state } as any);
+
+      const result = await sut.getDaily(authStub, 'space-1');
+
+      expect(result).toEqual({ challenge: null });
+      // The assertion that matters: a guard placed AFTER the lookup would satisfy the line above
+      // while still generating today's daily.
+      expect(mocks.game.createChallenge).not.toHaveBeenCalled();
+      expect(mocks.game.getDailyChallenge).not.toHaveBeenCalled();
+    });
+
+    it('returns no daily when the space is deleted between the membership check and the read', async () => {
+      stockPools(mocks);
+      mocks.sharedSpace.getById.mockResolvedValue(void 0);
+
+      // requireMember already passed, so this is a race, not an authorization failure - a 500 would
+      // be wrong for a page that is about to redirect anyway.
+      await expect(sut.getDaily(authStub, 'space-1')).resolves.toEqual({ challenge: null });
+      expect(mocks.game.createChallenge).not.toHaveBeenCalled();
     });
   });
 
