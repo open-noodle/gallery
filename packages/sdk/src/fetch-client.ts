@@ -3908,6 +3908,8 @@ export type SharedSpaceResponseDto = {
     createdAt: string;
     /** Creator user ID */
     createdById: string;
+    /** Whether the daily challenge is enabled; null when nobody has been asked yet */
+    dailyChallengeEnabled?: boolean | null;
     /** Space description */
     description?: string | null;
     /** Whether face recognition is enabled for this space */
@@ -3958,6 +3960,8 @@ export type SharedSpaceCreateDto = {
 export type SharedSpaceUpdateDto = {
     /** Space color */
     color?: UserAvatarColor;
+    /** Enable the daily challenge for this space */
+    dailyChallengeEnabled?: boolean;
     /** Space description */
     description?: string;
     /** Enable face recognition for this space */
