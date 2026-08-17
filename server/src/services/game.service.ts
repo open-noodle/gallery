@@ -495,6 +495,14 @@ export class GameService extends BaseService {
   async getDaily(auth: AuthDto, spaceId: string): Promise<GameDailyResponseDto> {
     await this.requireMember(spaceId, auth.user.id);
 
+    // The daily is opt-in per space, and this guard sits AHEAD of the lookup because the lookup is
+    // what generates it. `?.` and `!== true` in one expression cover all three of: nobody asked yet,
+    // an editor declined, and the space was deleted between the membership check and here.
+    const space = await this.sharedSpaceRepository.getById(spaceId);
+    if (space?.dailyChallengeEnabled !== true) {
+      return { challenge: null };
+    }
+
     const dailyOn = utcDateKey(new Date());
     const existing = await this.gameRepository.getDailyChallenge(spaceId, dailyOn);
     const challenge = existing ?? (await this.generateDaily(spaceId, dailyOn));
