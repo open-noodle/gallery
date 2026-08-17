@@ -36,6 +36,10 @@
 
   const space = $derived<SharedSpaceResponseDto>(data.space);
   const members = $derived<SharedSpaceMemberResponseDto[]>(data.members);
+  // A one-time snapshot, not $derived - unlike daily/standings/todayBoard below, this does NOT
+  // refresh when invalidateAll() runs (e.g. from setDailyEnabled). Harmless today because enabling
+  // the daily never changes the custom challenge list, but do not assume this list is fresh after
+  // an invalidateAll() if that stops being true.
   let challenges = $state<GameChallengeListItemResponseDto[]>(data.challenges);
   const daily = $derived<GameChallengeListItemResponseDto | null>(data.daily);
   const standings = $derived(data.standings);
@@ -63,6 +67,12 @@
   const showStandings = $derived(shouldShowStandings(space.dailyChallengeEnabled, standings.entries));
 
   async function setDailyEnabled(enabled: boolean) {
+    // The prompt's own buttons lock via `pending`, but the overflow menu's MenuOption has no
+    // disabled prop and closes on click - without this guard, re-opening the menu mid-write (the
+    // slow enable path generates the daily) fires a second updateSpace + invalidateAll().
+    if (togglingDaily) {
+      return;
+    }
     togglingDaily = true;
     try {
       await updateSpace({ id: space.id, sharedSpaceUpdateDto: { dailyChallengeEnabled: enabled } });
@@ -151,7 +161,7 @@
       <ButtonContextMenu
         icon={mdiDotsVertical}
         size="medium"
-        title={$t('game_daily_challenge')}
+        title={dailyEnabled ? $t('game_daily_turn_off') : $t('game_daily_turn_on')}
         data-testid="daily-toggle"
       >
         <MenuOption

@@ -561,5 +561,39 @@ describe('Space games page', () => {
 
       expect(screen.getByTestId('standings-section')).toBeInTheDocument();
     });
+
+    // The overflow menu is the ONLY way back from a decline (no prompt, no card once declined), so
+    // both its label and the value it writes matter - a wrong label misdescribes the action, and a
+    // wrong write (e.g. re-sending the current value instead of the flipped one) would make a
+    // decline permanently unrecoverable.
+    it('offers to turn the daily on from a declined space, and writes true when clicked', async () => {
+      renderPage([], SharedSpaceRole.Editor, null, {}, { dailyChallengeEnabled: false });
+
+      const option = screen.getByText('Turn on daily challenge');
+      await fireEvent.click(option);
+
+      expect(sdkMock.updateSpace).toHaveBeenCalledWith({
+        id: BASE_SPACE.id,
+        sharedSpaceUpdateDto: { dailyChallengeEnabled: true },
+      });
+    });
+
+    it('offers to turn the daily off from an enabled space, and writes false when clicked', async () => {
+      renderPage(
+        [],
+        SharedSpaceRole.Editor,
+        makeChallenge({ id: 'daily-1', dailyOn: '2026-08-16' }),
+        {},
+        { dailyChallengeEnabled: true },
+      );
+
+      const option = screen.getByText('Turn off daily challenge');
+      await fireEvent.click(option);
+
+      expect(sdkMock.updateSpace).toHaveBeenCalledWith({
+        id: BASE_SPACE.id,
+        sharedSpaceUpdateDto: { dailyChallengeEnabled: false },
+      });
+    });
   });
 });
