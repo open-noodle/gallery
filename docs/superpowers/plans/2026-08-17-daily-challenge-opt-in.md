@@ -351,7 +351,7 @@ would have gone green while testing nothing.
 
 - [ ] **Step 1: Keep the existing daily tests alive**
 
-The guard reads a space that the existing tests never stub, so all six tests in the
+The guard reads a space that the existing tests never stub, so the tests in the
 `describe('daily challenge')` block would fail on the guard rather than on their own subject. Add to
 that block's `beforeEach` (`server/src/services/game.service.spec.ts:608`), after the fake-timer setup:
 
@@ -1265,7 +1265,7 @@ Add a helper beside the existing ones:
 ```ts
 const setDailyEnabled = async (spaceId: string, accessToken: string, enabled: boolean) => {
   const { status } = await request(app)
-    .put(`/shared-spaces/${spaceId}`)
+    .patch(`/shared-spaces/${spaceId}`)
     .set('Authorization', `Bearer ${accessToken}`)
     .send({ dailyChallengeEnabled: enabled });
   expect(status).toBe(200);
@@ -1303,7 +1303,7 @@ describe('daily challenge opt-in', () => {
     const { spaceId } = await freshSpaceWithPhotos('daily-optin-viewer', 4);
 
     const { status } = await request(app)
-      .put(`/shared-spaces/${spaceId}`)
+      .patch(`/shared-spaces/${spaceId}`)
       .set('Authorization', `Bearer ${viewer.accessToken}`)
       .send({ dailyChallengeEnabled: true });
 
