@@ -1640,6 +1640,54 @@ describe(SharedSpaceService.name, () => {
         sut.update(factory.auth(), spaceId, { faceRecognitionEnabled: true, petsEnabled: false }),
       ).rejects.toThrow('Insufficient role');
     });
+
+    it('lets an EDITOR turn the daily challenge on', async () => {
+      const auth = factory.auth();
+      mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: 'space-1' }));
+      mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Editor } as any);
+      mocks.sharedSpace.update.mockResolvedValue(factory.sharedSpace({ id: 'space-1', dailyChallengeEnabled: true }));
+
+      await sut.update(auth, 'space-1', { dailyChallengeEnabled: true });
+
+      expect(mocks.sharedSpace.update).toHaveBeenCalledWith('space-1', { dailyChallengeEnabled: true });
+    });
+
+    it('still requires OWNER when the daily setting is sent alongside an owner-only one', async () => {
+      const auth = factory.auth();
+      mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: 'space-1' }));
+      mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Editor } as any);
+
+      // Mixed payload: adding a field beside petsEnabled must not lower the bar for petsEnabled.
+      await expect(sut.update(auth, 'space-1', { dailyChallengeEnabled: true, petsEnabled: false })).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(mocks.sharedSpace.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects a VIEWER turning the daily challenge on', async () => {
+      const auth = factory.auth();
+      mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: 'space-1' }));
+      mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Viewer } as any);
+
+      await expect(sut.update(auth, 'space-1', { dailyChallengeEnabled: true })).rejects.toThrow(ForbiddenException);
+      expect(mocks.sharedSpace.update).not.toHaveBeenCalled();
+    });
+
+    it('maps a never-asked space to null rather than defaulting it on', async () => {
+      const auth = factory.auth();
+      // The two lines above this field in mapSpace use `?? true` because their columns default to true.
+      // Copying that idiom here would opt every space in and the first-visit prompt would never render.
+      // tsc cannot see that mistake, so this test is the only thing guarding it.
+      mocks.sharedSpace.getById.mockResolvedValue(factory.sharedSpace({ id: 'space-1', dailyChallengeEnabled: null }));
+      mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Owner, lastViewedAt: null } as any);
+      mocks.sharedSpace.getMembers.mockResolvedValue([]);
+      mocks.sharedSpace.getAssetCount.mockResolvedValue(0);
+      mocks.sharedSpace.getRecentAssets.mockResolvedValue([]);
+
+      const result = await sut.get(auth, 'space-1');
+
+      expect(result.dailyChallengeEnabled).toBeNull();
+    });
   });
 
   describe('remove', () => {

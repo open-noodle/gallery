@@ -433,6 +433,9 @@ export class SharedSpaceService extends BaseService {
     if (dto.petsEnabled !== undefined) {
       updatePayload.petsEnabled = dto.petsEnabled;
     }
+    if (dto.dailyChallengeEnabled !== undefined) {
+      updatePayload.dailyChallengeEnabled = dto.dailyChallengeEnabled;
+    }
 
     const space =
       Object.keys(updatePayload).length > 0 && existing
@@ -4114,6 +4117,7 @@ export class SharedSpaceService extends BaseService {
     color?: string | null;
     faceRecognitionEnabled?: boolean;
     petsEnabled?: boolean;
+    dailyChallengeEnabled?: boolean | null;
     lastActivityAt?: Date | null;
   }): SharedSpaceResponseDto {
     return {
@@ -4128,6 +4132,9 @@ export class SharedSpaceService extends BaseService {
       color: (space.color as UserAvatarColor) ?? null,
       faceRecognitionEnabled: space.faceRecognitionEnabled ?? true,
       petsEnabled: space.petsEnabled ?? true,
+      // NOT `?? true`, unlike the two lines above: their columns default to true, this one is
+      // tri-state and null is a meaningful value the web page branches on.
+      dailyChallengeEnabled: space.dailyChallengeEnabled ?? null,
       lastActivityAt: space.lastActivityAt ? space.lastActivityAt.toISOString() : null,
     };
   }
