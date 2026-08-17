@@ -381,6 +381,14 @@ it('returns no daily when the space is deleted between the membership check and 
   // requireMember already passed, so this is a race, not an authorization failure - a 500 would
   // be wrong for a page that is about to redirect anyway.
   await expect(sut.getDaily(authStub, 'space-1')).resolves.toEqual({ challenge: null });
+  // BOTH mock assertions are load-bearing, the getDailyChallenge one especially: `game` is automocked
+  // with strict:false, so an unstubbed lookup returns undefined rather than throwing. Without this
+  // line the test still passes when the guard is moved to just AFTER the lookup - the exact
+  // mis-placement this task exists to prevent. The same is true of the it.each pair above: their
+  // `resolves.toEqual({ challenge: null })` passes even with NO guard at all, because generateDaily's
+  // own re-read is unstubbed and yields undefined. The not.toHaveBeenCalled() checks are the only
+  // assertions in these three tests that can actually fail on a mis-placed guard.
+  expect(mocks.game.getDailyChallenge).not.toHaveBeenCalled();
   expect(mocks.game.createChallenge).not.toHaveBeenCalled();
 });
 ```
