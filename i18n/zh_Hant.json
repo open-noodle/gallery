@@ -1962,7 +1962,7 @@
   "game_daily_challenge": "每日挑戰",
   "game_daily_decline": "不用了",
   "game_daily_enable": "啟用",
-  "game_daily_enable_description": "每天在此 Space 玩一個共享挑戰。得分計入月度排名。",
+  "game_daily_enable_description": "每天在此 Space 玩一個共享挑戰。得分計入月度排行榜。",
   "game_daily_enable_title": "啟用每日挑戰？",
   "game_daily_next_in": "下次挑戰將在 {time} 後開始",
   "game_daily_played": "您已完成今天的挑戰",
