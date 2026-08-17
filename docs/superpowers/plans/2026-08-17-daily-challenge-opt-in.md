@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - **Scoped test commands differ per package.** `server/` and `web/`: `pnpm test --run <path>`. **`e2e/`: `pnpm test <path>`** — that package's `test` script is already `vitest --run`, so adding `--run` dies with `Expected a single value for option "--run"`. Never use `pnpm test -- --run <path>`; the `--` makes pnpm swallow the path filter and silently run the whole suite green.
-- **Read the `Test Files` line, never the exit code.** A medium-test run without `packages/sdk/dist` built exits 0 with mass collection failures. Build it first: `cd packages/sdk && pnpm build`.
+- **Read the `Test Files` line, never the exit code.** A medium-test run without the SDK built exits 0 with mass collection failures. Build it first: `cd packages/sdk && pnpm build` (it outputs to `packages/sdk/build/`, not `dist/`). Rebuild it again after any task that regenerates the SDK source, or `web`'s typecheck resolves the stale copy.
 - **`dailyChallengeEnabled` must NEVER be added to `isOwnerOnlySettingsUpdate`** in `shared-space.service.ts`. Leaving it out is what makes the setting editor-writable.
 - **`dailyChallengeEnabled` must NEVER be mapped with `?? true`.** The two lines above it in `mapSpace` use that idiom legitimately; copying it collapses `null` into `true` and makes the prompt unreachable. `tsc` cannot catch this.
 - Every test must be able to fail. No assertion that passes on an empty array, and none that is subsumed by a stronger assertion directly above it.
