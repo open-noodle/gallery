@@ -495,7 +495,7 @@ differ per file (`pl` and `ru` are offset), so locate by key, not by line.
 ```json
   "game_daily_decline": "No thanks",
   "game_daily_enable": "Enable",
-  "game_daily_enable_description": "Play one shared challenge a day with this space. Scores count toward the monthly standings.",
+  "game_daily_enable_description": "Play one shared challenge a day with this space. Scores count toward the monthly leaderboard.",
   "game_daily_enable_title": "Turn on the daily challenge?",
   "game_daily_toggle_failed": "Could not change the daily challenge setting",
   "game_daily_turn_off": "Turn off daily challenge",
@@ -507,7 +507,7 @@ differ per file (`pl` and `ru` are offset), so locate by key, not by line.
 ```json
   "game_daily_decline": "Nein danke",
   "game_daily_enable": "Aktivieren",
-  "game_daily_enable_description": "Spiele täglich eine gemeinsame Herausforderung in diesem Space. Die Punkte zählen für die Monatswertung.",
+  "game_daily_enable_description": "Spiele täglich eine gemeinsame Herausforderung in diesem Space. Die Punkte zählen für die monatliche Bestenliste.",
   "game_daily_enable_title": "Tägliche Herausforderung aktivieren?",
   "game_daily_toggle_failed": "Die Einstellung für die tägliche Herausforderung konnte nicht geändert werden",
   "game_daily_turn_off": "Tägliche Herausforderung deaktivieren",
@@ -543,7 +543,7 @@ differ per file (`pl` and `ru` are offset), so locate by key, not by line.
 ```json
   "game_daily_decline": "Nee, bedankt",
   "game_daily_enable": "Inschakelen",
-  "game_daily_enable_description": "Speel elke dag één gedeelde uitdaging in deze Space. Punten tellen mee voor de maandstand.",
+  "game_daily_enable_description": "Speel elke dag één gedeelde uitdaging in deze Space. Punten tellen mee voor het maandelijkse klassement.",
   "game_daily_enable_title": "Dagelijkse uitdaging inschakelen?",
   "game_daily_toggle_failed": "Kon de instelling voor de dagelijkse uitdaging niet wijzigen",
   "game_daily_turn_off": "Dagelijkse uitdaging uitschakelen",
@@ -555,7 +555,7 @@ differ per file (`pl` and `ru` are offset), so locate by key, not by line.
 ```json
   "game_daily_decline": "Nie, dziękuję",
   "game_daily_enable": "Włącz",
-  "game_daily_enable_description": "Graj w jedno wspólne wyzwanie dziennie w tym Space. Punkty liczą się do klasyfikacji miesięcznej.",
+  "game_daily_enable_description": "Graj w jedno wspólne wyzwanie dziennie w tym Space. Punkty liczą się do miesięcznego rankingu.",
   "game_daily_enable_title": "Włączyć codzienne wyzwanie?",
   "game_daily_toggle_failed": "Nie udało się zmienić ustawienia codziennego wyzwania",
   "game_daily_turn_off": "Wyłącz codzienne wyzwanie",
@@ -579,7 +579,7 @@ differ per file (`pl` and `ru` are offset), so locate by key, not by line.
 ```json
   "game_daily_decline": "Нет, спасибо",
   "game_daily_enable": "Включить",
-  "game_daily_enable_description": "Играйте в один общий вызов в день в этом Space. Очки идут в зачёт месячного рейтинга.",
+  "game_daily_enable_description": "Играйте в один общий вызов в день в этом Space. Очки идут в зачёт месячной таблицы лидеров.",
   "game_daily_enable_title": "Включить ежедневный вызов?",
   "game_daily_toggle_failed": "Не удалось изменить настройку ежедневного вызова",
   "game_daily_turn_off": "Отключить ежедневный вызов",
@@ -591,7 +591,7 @@ differ per file (`pl` and `ru` are offset), so locate by key, not by line.
 ```json
   "game_daily_decline": "不用了",
   "game_daily_enable": "启用",
-  "game_daily_enable_description": "每天在此 Space 玩一个共享挑战。得分计入月度排名。",
+  "game_daily_enable_description": "每天在此 Space 玩一个共享挑战。得分计入月度排行榜。",
   "game_daily_enable_title": "启用每日挑战？",
   "game_daily_toggle_failed": "无法更改每日挑战设置",
   "game_daily_turn_off": "关闭每日挑战",
@@ -603,7 +603,7 @@ differ per file (`pl` and `ru` are offset), so locate by key, not by line.
 ```json
   "game_daily_decline": "不用了",
   "game_daily_enable": "啟用",
-  "game_daily_enable_description": "每天在此 Space 玩一個共享挑戰。得分計入月度排名。",
+  "game_daily_enable_description": "每天在此 Space 玩一個共享挑戰。得分計入月度排行榜。",
   "game_daily_enable_title": "啟用每日挑戰？",
   "game_daily_toggle_failed": "無法變更每日挑戰設定",
   "game_daily_turn_off": "關閉每日挑戰",
