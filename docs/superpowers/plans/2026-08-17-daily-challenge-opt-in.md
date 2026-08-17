@@ -29,7 +29,11 @@
 
 - Modify: `server/src/schema/tables/shared-space.table.ts:77-78`
 - Create: `server/src/schema/migrations-gallery/1793000000000-AddSpaceDailyChallengeEnabled.ts`
-- Modify: `server/test/small.factory.ts:401`
+- Modify: `server/src/database.ts:288` — **`SharedSpace` there is a HAND-WRITTEN type**, not
+  `Selectable<SharedSpaceTable>`, so a new column does not reach it automatically. Several row types in
+  that file are hand-maintained the same way; adding a column to any of their tables means editing both.
+- Modify: `server/test/small.factory.ts:401` — returns `SharedSpace`, so it cannot compile until the
+  line above is done
 
 **Interfaces:**
 
