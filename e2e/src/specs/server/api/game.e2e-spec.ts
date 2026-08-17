@@ -2,8 +2,10 @@ import {
   GameChallengeDetailResponseDto,
   GameChallengeListItemResponseDto,
   GameChallengeResponseDto,
+  GameLeaderboardResponseDto,
   GameRoundDetailResponseDto,
   GameRoundType,
+  GameStandingsResponseDto,
   LoginResponseDto,
   SharedSpaceRole,
 } from '@immich/sdk';
@@ -22,9 +24,18 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
  * these fixtures always yields zero location candidates and every generated round is a 'date'
  * round (see LOCATION_ROUND_SHARE / dateRemaining math in GameService.create). The 'location'
  * branch is kept so this stays correct if a future edit adds a GPS-tagged fixture.
+ *
+ * The default date deliberately scores ZERO. Every fixture photo is uploaded seconds before the
+ * challenge, so the pool's day spread collapses to poolScaleDays' floor of 1 and a guess six years
+ * out decays to nothing (scoreFromError). Tests that need a player to actually put points on the
+ * board pass a date inside the photos' own month instead, which monthOffsetDays grades as a direct
+ * hit - see the standings ordering test.
  */
-const guessPayloadFor = (round: GameRoundDetailResponseDto): { lat: number; lon: number } | { date: string } =>
-  round.type === GameRoundType.Location ? { lat: 12.34, lon: 56.78 } : { date: '2020-06-15T00:00:00.000Z' };
+const guessPayloadFor = (
+  round: GameRoundDetailResponseDto,
+  date = '2020-06-15T00:00:00.000Z',
+): { lat: number; lon: number } | { date: string } =>
+  round.type === GameRoundType.Location ? { lat: 12.34, lon: 56.78 } : { date };
 
 const getDaily = async (
   spaceId: string,
@@ -35,6 +46,14 @@ const getDaily = async (
     .set('Authorization', `Bearer ${accessToken}`);
   expect(status).toBe(200);
   return body as { challenge: (GameChallengeListItemResponseDto & { dailyOn: string | null }) | null };
+};
+
+const getStandings = async (spaceId: string, accessToken: string): Promise<GameStandingsResponseDto> => {
+  const { status, body } = await request(app)
+    .get(`/shared-spaces/${spaceId}/games/standings`)
+    .set('Authorization', `Bearer ${accessToken}`);
+  expect(status).toBe(200);
+  return body as GameStandingsResponseDto;
 };
 
 const getDetail = async (challengeId: string, accessToken: string): Promise<GameChallengeDetailResponseDto> => {
@@ -615,6 +634,135 @@ describe('/games', () => {
       );
       expect(entryAfter?.answered).toBe(detail.rounds.length);
       expect(entryAfter?.total).toBe(expectedTotal);
+    });
+  });
+
+  describe('GET /shared-spaces/:spaceId/games/standings', () => {
+    it('rejects a non-member', async () => {
+      const { spaceId } = await freshSpaceWithPhotos('standings-nonmember', 4);
+
+      const { status } = await request(app)
+        .get(`/shared-spaces/${spaceId}/games/standings`)
+        .set('Authorization', `Bearer ${nonMember.accessToken}`);
+
+      expect(status).toBe(403);
+    });
+
+    it('lists every member of the space, zero-filled, before anyone has played', async () => {
+      const { spaceId } = await freshSpaceWithPhotos('standings-zero-fill', 4);
+
+      const standings = await getStandings(spaceId, viewer.accessToken);
+
+      expect(standings.month).toMatch(/^\d{4}-\d{2}$/);
+      expect(standings.entries).toHaveLength(3); // owner + editor + viewer
+      // Paired with the length above, so an empty board cannot satisfy this vacuously.
+      expect(standings.entries.every((entry) => entry.total === 0 && entry.daysPlayed === 0)).toBe(true);
+      // Zero-filled rows carry the real member names, not a placeholder.
+      expect(standings.entries.map((entry) => entry.name).toSorted((a, b) => a.localeCompare(b))).toEqual(
+        [owner.name, editor.name, viewer.name].toSorted((a, b) => a.localeCompare(b)),
+      );
+    });
+
+    it("counts a member's daily score and orders the board by it", async () => {
+      const { spaceId } = await freshSpaceWithPhotos('standings-order', 4);
+      const daily = await getDaily(spaceId, viewer.accessToken);
+      expect(daily.challenge).not.toBeNull();
+
+      // Three genuinely different states on one board: the viewer answers every round with a date
+      // in the photos' own month and scores, the editor answers one round with the far-off default
+      // and scores nothing, and the owner never plays at all.
+      const detail = await getDetail(daily.challenge!.id, viewer.accessToken);
+      expect(detail.rounds).not.toHaveLength(0);
+
+      let viewerTotal = 0;
+      for (const round of detail.rounds) {
+        const { status, body } = await request(app)
+          .post(`/games/${daily.challenge!.id}/rounds/${round.index}/guess`)
+          .set('Authorization', `Bearer ${viewer.accessToken}`)
+          .send(guessPayloadFor(round, new Date().toISOString()));
+        expect(status).toBe(201);
+        viewerTotal += body.score as number;
+      }
+      // Guard on the premise: if the viewer's guesses ever stopped scoring, every total on the
+      // board would be 0 and the ordering below would be settled by the name tie-break instead of
+      // by the points - passing while proving nothing about the standings query.
+      expect(viewerTotal).toBeGreaterThan(0);
+
+      const [firstRound] = detail.rounds;
+      const { status: editorStatus } = await request(app)
+        .post(`/games/${daily.challenge!.id}/rounds/${firstRound.index}/guess`)
+        .set('Authorization', `Bearer ${editor.accessToken}`)
+        .send(guessPayloadFor(firstRound));
+      expect(editorStatus).toBe(201);
+
+      const standings = await getStandings(spaceId, viewer.accessToken);
+
+      expect(standings.entries).toHaveLength(3);
+      expect(standings.entries[0].userId).toBe(viewer.userId);
+      // The board totals the guesses themselves, not the number of rounds touched.
+      expect(standings.entries[0].total).toBe(viewerTotal);
+      expect(standings.entries[0].daysPlayed).toBe(1);
+      // The editor scored nothing, so they and the owner are level on points: only the
+      // never-played rule in compareStandings can separate these two rows.
+      expect(standings.entries[1].userId).toBe(editor.userId);
+      expect(standings.entries[1].total).toBe(0);
+      expect(standings.entries[1].daysPlayed).toBe(1);
+      expect(standings.entries[2].userId).toBe(owner.userId);
+      expect(standings.entries[2].daysPlayed).toBe(0);
+    });
+
+    it('never counts points earned on a player-created challenge', async () => {
+      const { spaceId } = await freshSpaceWithPhotos('standings-custom-excluded', 4);
+      const challenge = await createChallenge(spaceId, 4);
+      const detail = await getDetail(challenge.id, viewer.accessToken);
+
+      // Scoring guesses, so a standings query that forgot its `dailyOn IS NOT NULL` filter would
+      // show up in BOTH halves of the assertion below rather than only in daysPlayed. The 201
+      // check keeps the test honest: guesses that silently failed would leave nothing to leak.
+      let earned = 0;
+      for (const round of detail.rounds) {
+        const { status, body } = await request(app)
+          .post(`/games/${challenge.id}/rounds/${round.index}/guess`)
+          .set('Authorization', `Bearer ${viewer.accessToken}`)
+          .send(guessPayloadFor(round, new Date().toISOString()));
+        expect(status).toBe(201);
+        earned += body.score as number;
+      }
+      expect(earned).toBeGreaterThan(0);
+
+      const standings = await getStandings(spaceId, viewer.accessToken);
+
+      expect(standings.entries).toHaveLength(3);
+      expect(standings.entries.every((entry) => entry.total === 0 && entry.daysPlayed === 0)).toBe(true);
+    });
+
+    it('puts every member on a challenge leaderboard, played or not', async () => {
+      const { spaceId } = await freshSpaceWithPhotos('leaderboard-zero-fill', 4);
+      const challenge = await createChallenge(spaceId, 4);
+      const detail = await getDetail(challenge.id, viewer.accessToken);
+      const [firstRound] = detail.rounds;
+
+      const guessRes = await request(app)
+        .post(`/games/${challenge.id}/rounds/${firstRound.index}/guess`)
+        .set('Authorization', `Bearer ${viewer.accessToken}`)
+        .send(guessPayloadFor(firstRound));
+      expect(guessRes.status).toBe(201);
+
+      const { status, body } = await request(app)
+        .get(`/games/${challenge.id}/leaderboard`)
+        .set('Authorization', `Bearer ${viewer.accessToken}`);
+
+      expect(status).toBe(200);
+      const { entries } = body as GameLeaderboardResponseDto;
+      expect(entries).toHaveLength(3);
+      // The one player who turned up leads, even on nil points - the editor and owner never
+      // guessed, so nothing but the never-played rule puts the viewer first.
+      expect(entries[0].userId).toBe(viewer.userId);
+      // Members the leaderboard zero-fills keep their real names; 'Unknown' was the placeholder
+      // the old implementation emitted for anyone with no rows of their own.
+      expect(entries.map((entry) => entry.name).toSorted((a, b) => a.localeCompare(b))).toEqual(
+        [owner.name, editor.name, viewer.name].toSorted((a, b) => a.localeCompare(b)),
+      );
     });
   });
 });
