@@ -1965,7 +1965,7 @@
   "game_daily_challenge": "Tägliche Herausforderung",
   "game_daily_decline": "Nein danke",
   "game_daily_enable": "Aktivieren",
-  "game_daily_enable_description": "Spiele täglich eine gemeinsame Herausforderung in diesem Space. Die Punkte zählen für die Monatswertung.",
+  "game_daily_enable_description": "Spiele täglich eine gemeinsame Herausforderung in diesem Space. Die Punkte zählen für die monatliche Bestenliste.",
   "game_daily_enable_title": "Tägliche Herausforderung aktivieren?",
   "game_daily_next_in": "Nächste Herausforderung in {time}",
   "game_daily_played": "Du hast die heutige Herausforderung gespielt",
