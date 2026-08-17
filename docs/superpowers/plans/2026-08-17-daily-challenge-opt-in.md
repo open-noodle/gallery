@@ -4,7 +4,7 @@
 
 **Goal:** Make the daily challenge opt-in per shared space — prompt an editor on first visit to a space's Challenges page, and let them turn it off and on again afterwards.
 
-**Architecture:** One nullable boolean on `shared_space` carries three states (`null` never asked, `true` on, `false` declined). The write path reuses the existing `PUT /shared-spaces/:id` endpoint, whose per-field role escalation already defaults to Editor. `GameService.getDaily` gains a guard ahead of the lookup, because the lookup is what generates the daily. The web page reads the setting from the space it already loads and renders one of three things where the daily card goes.
+**Architecture:** One nullable boolean on `shared_space` carries three states (`null` never asked, `true` on, `false` declined). The write path reuses the existing `PATCH /shared-spaces/:id` endpoint, whose per-field role escalation already defaults to Editor. `GameService.getDaily` gains a guard ahead of the lookup, because the lookup is what generates the daily. The web page reads the setting from the space it already loads and renders one of three things where the daily card goes.
 
 **Tech Stack:** NestJS 11, Kysely, `@immich/sql-tools`, Zod DTOs, SvelteKit + Svelte 5 runes, `@immich/ui`, Vitest, Playwright/supertest e2e.
 
@@ -341,6 +341,13 @@ git commit -m "chore(game): regenerate the API spec and clients for the daily se
 
 - Consumes: `SharedSpaceTable.dailyChallengeEnabled` (Task 1) via `this.sharedSpaceRepository.getById(spaceId)`, which already exists and uses `selectAll()`.
 - Produces: no new signature. `getDaily` keeps returning `GameDailyResponseDto`.
+
+**Fallout warning this plan originally missed:** this guard also breaks or silently vacuates
+pre-existing tests in `e2e/src/specs/server/api/game.e2e-spec.ts`, whose daily tests assume a space
+generates a daily on first read. Task 9 repairs them by opting each space in. Two failed outright and
+three passed vacuously (`undefined === undefined`, and a `DELETE /games/undefined` that 400'd on
+malformed-id validation rather than on the business rule it was written to check) - so the e2e suite
+would have gone green while testing nothing.
 
 - [ ] **Step 1: Keep the existing daily tests alive**
 
