@@ -39901,6 +39901,11 @@
             "description": "Creator user ID",
             "type": "string"
           },
+          "dailyChallengeEnabled": {
+            "description": "Whether the daily challenge is enabled; null when nobody has been asked yet",
+            "nullable": true,
+            "type": "boolean"
+          },
           "description": {
             "description": "Space description",
             "nullable": true,
@@ -40051,6 +40056,10 @@
           "color": {
             "$ref": "#/components/schemas/UserAvatarColor",
             "description": "Space color"
+          },
+          "dailyChallengeEnabled": {
+            "description": "Enable the daily challenge for this space",
+            "type": "boolean"
           },
           "description": {
             "description": "Space description",
