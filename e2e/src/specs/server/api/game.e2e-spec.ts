@@ -64,6 +64,16 @@ const getDetail = async (challengeId: string, accessToken: string): Promise<Game
   return body as GameChallengeDetailResponseDto;
 };
 
+const setDailyEnabled = async (spaceId: string, accessToken: string, enabled: boolean) => {
+  // PATCH, not PUT: SharedSpaceController's update route is `@Patch(':id')` (shared-space.controller.ts),
+  // matching the generated SDK's updateSpace, which the web app's toggle actually calls.
+  const { status } = await request(app)
+    .patch(`/shared-spaces/${spaceId}`)
+    .set('Authorization', `Bearer ${accessToken}`)
+    .send({ dailyChallengeEnabled: enabled });
+  expect(status).toBe(200);
+};
+
 describe('/games', () => {
   // owner = the space creator (Owner role); editor/viewer are explicit non-owner memberships so
   // "an editor" / "a viewer" in the assertions below exercise those roles specifically, not the
@@ -404,6 +414,7 @@ describe('/games', () => {
     // different photos while sharing a leaderboard.
     it('hands every member the same daily, even when two of them generate it at once', async () => {
       const { spaceId } = await freshSpaceWithPhotos('daily-race', 6);
+      await setDailyEnabled(spaceId, editor.accessToken, true);
 
       const [first, second, third] = await Promise.all([
         getDaily(spaceId, viewer.accessToken),
@@ -420,10 +431,14 @@ describe('/games', () => {
 
     it('keeps handing back the same daily on a later read', async () => {
       const { spaceId } = await freshSpaceWithPhotos('daily-stable', 6);
+      await setDailyEnabled(spaceId, editor.accessToken, true);
 
       const first = await getDaily(spaceId, viewer.accessToken);
       const second = await getDaily(spaceId, viewer.accessToken);
 
+      // Guard the premise: without a real daily on both sides, `undefined === undefined` would pass
+      // vacuously and prove nothing about stability.
+      expect(first.challenge).not.toBeNull();
       expect(second.challenge?.id).toBe(first.challenge?.id);
     });
 
@@ -431,7 +446,11 @@ describe('/games', () => {
     // would carry a delete control the server then refuses.
     it('never appears in the space challenge list', async () => {
       const { spaceId } = await freshSpaceWithPhotos('daily-not-listed', 6);
+      await setDailyEnabled(spaceId, editor.accessToken, true);
       const daily = await getDaily(spaceId, viewer.accessToken);
+      // Guard the premise: with no real daily, `not.toContain(undefined)` below would pass
+      // vacuously regardless of whether the exclusion actually works.
+      expect(daily.challenge).not.toBeNull();
       await createChallenge(spaceId, 2);
 
       const { status, body } = await request(app)
@@ -446,7 +465,11 @@ describe('/games', () => {
 
     it('refuses to delete the daily, even for an editor', async () => {
       const { spaceId } = await freshSpaceWithPhotos('daily-undeletable', 6);
+      await setDailyEnabled(spaceId, editor.accessToken, true);
       const daily = await getDaily(spaceId, viewer.accessToken);
+      // Guard the premise: a null challenge would DELETE /games/undefined, which 400s on malformed
+      // id format alone - passing the assertion below for the wrong reason.
+      expect(daily.challenge).not.toBeNull();
 
       const { status } = await request(app)
         .delete(`/games/${daily.challenge?.id}`)
@@ -463,6 +486,74 @@ describe('/games', () => {
         .set('Authorization', `Bearer ${nonMember.accessToken}`);
 
       expect(status).toBe(403);
+    });
+  });
+
+  describe('daily challenge opt-in', () => {
+    it('returns no daily and creates nothing until a space opts in', async () => {
+      const { spaceId } = await freshSpaceWithPhotos('daily-optin-unasked', 4);
+
+      const daily = await getDaily(spaceId, viewer.accessToken);
+      expect(daily.challenge).toBeNull();
+
+      // The response alone would also be satisfied by a guard placed after the lookup, which would
+      // still have generated the challenge. The list is what proves nothing was created.
+      const { body } = await request(app)
+        .get(`/shared-spaces/${spaceId}/games`)
+        .set('Authorization', `Bearer ${viewer.accessToken}`);
+      expect(body).toHaveLength(0);
+    });
+
+    it('generates the daily once an editor opts in', async () => {
+      const { spaceId } = await freshSpaceWithPhotos('daily-optin-enabled', 4);
+
+      await setDailyEnabled(spaceId, editor.accessToken, true);
+
+      const daily = await getDaily(spaceId, viewer.accessToken);
+      expect(daily.challenge).not.toBeNull();
+    });
+
+    it('rejects a viewer changing the setting', async () => {
+      const { spaceId } = await freshSpaceWithPhotos('daily-optin-viewer', 4);
+
+      const { status } = await request(app)
+        .patch(`/shared-spaces/${spaceId}`)
+        .set('Authorization', `Bearer ${viewer.accessToken}`)
+        .send({ dailyChallengeEnabled: true });
+
+      expect(status).toBe(403);
+    });
+
+    it('keeps the standings board across a disable and re-enable', async () => {
+      const { spaceId } = await freshSpaceWithPhotos('daily-optin-roundtrip', 4);
+      await setDailyEnabled(spaceId, editor.accessToken, true);
+
+      const daily = await getDaily(spaceId, viewer.accessToken);
+      const detail = await getDetail(daily.challenge!.id, viewer.accessToken);
+      for (const round of detail.rounds) {
+        const { status } = await request(app)
+          .post(`/games/${daily.challenge!.id}/rounds/${round.index}/guess`)
+          .set('Authorization', `Bearer ${viewer.accessToken}`)
+          .send(guessPayloadFor(round, new Date().toISOString()));
+        expect(status).toBe(201);
+      }
+
+      const standings = await getStandings(spaceId, viewer.accessToken);
+      const earned = standings.entries.find((entry) => entry.userId === viewer.userId)!;
+      // Guard the premise: the default guess date scores zero, which would make every assertion
+      // below compare 0 to 0 and prove nothing.
+      expect(earned.total).toBeGreaterThan(0);
+
+      await setDailyEnabled(spaceId, editor.accessToken, false);
+      const standingsAfterDisable = await getStandings(spaceId, viewer.accessToken);
+      const afterDisable = standingsAfterDisable.entries.find((entry) => entry.userId === viewer.userId)!;
+      expect(afterDisable.total).toBe(earned.total);
+      expect(afterDisable.daysPlayed).toBe(earned.daysPlayed);
+
+      await setDailyEnabled(spaceId, editor.accessToken, true);
+      const standingsAfterReEnable = await getStandings(spaceId, viewer.accessToken);
+      const afterReEnable = standingsAfterReEnable.entries.find((entry) => entry.userId === viewer.userId)!;
+      expect(afterReEnable.total).toBe(earned.total);
     });
   });
 
@@ -665,6 +756,7 @@ describe('/games', () => {
 
     it("counts a member's daily score and orders the board by it", async () => {
       const { spaceId } = await freshSpaceWithPhotos('standings-order', 4);
+      await setDailyEnabled(spaceId, editor.accessToken, true);
       const daily = await getDaily(spaceId, viewer.accessToken);
       expect(daily.challenge).not.toBeNull();
 
