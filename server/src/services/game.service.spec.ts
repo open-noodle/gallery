@@ -768,6 +768,7 @@ describe(GameService.name, () => {
       // be wrong for a page that is about to redirect anyway.
       await expect(sut.getDaily(authStub, 'space-1')).resolves.toEqual({ challenge: null });
       expect(mocks.game.createChallenge).not.toHaveBeenCalled();
+      expect(mocks.game.getDailyChallenge).not.toHaveBeenCalled();
     });
   });
 
