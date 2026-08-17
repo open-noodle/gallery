@@ -53,6 +53,7 @@ const BASE_SPACE: SharedSpaceResponseDto = {
   assetCount: 0,
   faceRecognitionEnabled: true,
   petsEnabled: true,
+  dailyChallengeEnabled: true,
 } as SharedSpaceResponseDto;
 
 function makeChallenge(overrides: Partial<GameChallengeListItemResponseDto> = {}): GameChallengeListItemResponseDto {
@@ -93,10 +94,11 @@ function renderPage(
     standings?: { month: string; entries: Array<{ userId: string; name: string; total: number; daysPlayed: number }> };
     todayBoard?: { entries: Array<{ userId: string; name: string; total: number; answered: number }> } | null;
   } = {},
+  space: Partial<typeof BASE_SPACE> = {},
 ) {
   const props = {
     data: {
-      space: BASE_SPACE,
+      space: { ...BASE_SPACE, ...space },
       members: [makeMember(role)],
       challenges,
       daily,
@@ -456,6 +458,108 @@ describe('Space games page', () => {
       expect(screen.getByTestId('standings-section')).toBeInTheDocument();
       expect(screen.queryByTestId('standings-tab-today')).not.toBeInTheDocument();
       expect(screen.getByTestId('leaderboard-row')).toHaveTextContent('Not played');
+    });
+  });
+
+  describe('daily challenge opt-in', () => {
+    it('prompts an editor when nobody has been asked yet', () => {
+      renderPage([], SharedSpaceRole.Editor, null, {}, { dailyChallengeEnabled: null });
+
+      expect(screen.getByTestId('daily-prompt')).toBeInTheDocument();
+      expect(screen.queryByTestId('daily-challenge')).not.toBeInTheDocument();
+    });
+
+    it('never prompts a viewer and gives them no toggle', () => {
+      renderPage([], SharedSpaceRole.Viewer, null, {}, { dailyChallengeEnabled: null });
+
+      expect(screen.queryByTestId('daily-prompt')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('daily-toggle')).not.toBeInTheDocument();
+    });
+
+    it('shows the daily card, not the prompt, once enabled', () => {
+      renderPage(
+        [],
+        SharedSpaceRole.Editor,
+        makeChallenge({ id: 'daily-1', dailyOn: '2026-08-16' }),
+        {},
+        { dailyChallengeEnabled: true },
+      );
+
+      expect(screen.getByTestId('daily-challenge')).toBeInTheDocument();
+      expect(screen.queryByTestId('daily-prompt')).not.toBeInTheDocument();
+    });
+
+    it("shows an enabled space's card to a viewer too, without a toggle", () => {
+      renderPage(
+        [],
+        SharedSpaceRole.Viewer,
+        makeChallenge({ id: 'daily-1', dailyOn: '2026-08-16' }),
+        {},
+        { dailyChallengeEnabled: true },
+      );
+
+      expect(screen.getByTestId('daily-challenge')).toBeInTheDocument();
+      expect(screen.queryByTestId('daily-toggle')).not.toBeInTheDocument();
+    });
+
+    it('shows neither prompt nor card after a decline, but keeps the way back', () => {
+      renderPage([], SharedSpaceRole.Editor, null, {}, { dailyChallengeEnabled: false });
+
+      expect(screen.queryByTestId('daily-prompt')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('daily-challenge')).not.toBeInTheDocument();
+      // Without this the decline is a one-way door: no card means no card-mounted control could ever
+      // bring it back.
+      expect(screen.getByTestId('daily-toggle')).toBeInTheDocument();
+    });
+
+    it('writes false when an editor declines', async () => {
+      renderPage([], SharedSpaceRole.Editor, null, {}, { dailyChallengeEnabled: null });
+
+      await fireEvent.click(screen.getByTestId('daily-prompt-decline'));
+
+      // false, not undefined: a decline is a decision. undefined would leave the column null and
+      // re-prompt on the next visit, which is the behaviour we deliberately did not build.
+      expect(sdkMock.updateSpace).toHaveBeenCalledWith({
+        id: BASE_SPACE.id,
+        sharedSpaceUpdateDto: { dailyChallengeEnabled: false },
+      });
+    });
+
+    it('writes true when an editor enables', async () => {
+      renderPage([], SharedSpaceRole.Editor, null, {}, { dailyChallengeEnabled: null });
+
+      await fireEvent.click(screen.getByTestId('daily-prompt-enable'));
+
+      expect(sdkMock.updateSpace).toHaveBeenCalledWith({
+        id: BASE_SPACE.id,
+        sharedSpaceUpdateDto: { dailyChallengeEnabled: true },
+      });
+    });
+
+    it('hides the standings while the prompt is showing, even with earlier scores', () => {
+      // The case a simplification of shouldShowStandings would break: history exists, but a populated
+      // board must not sit under a prompt asking whether to switch the feature on.
+      renderPage(
+        [],
+        SharedSpaceRole.Editor,
+        null,
+        { standings: { month: '2026-08', entries: [{ userId: 'u1', name: 'Ana', total: 900, daysPlayed: 3 }] } },
+        { dailyChallengeEnabled: null },
+      );
+
+      expect(screen.queryByTestId('standings-section')).not.toBeInTheDocument();
+    });
+
+    it('keeps the standings after a decline when members already earned scores', () => {
+      renderPage(
+        [],
+        SharedSpaceRole.Editor,
+        null,
+        { standings: { month: '2026-08', entries: [{ userId: 'u1', name: 'Ana', total: 900, daysPlayed: 3 }] } },
+        { dailyChallengeEnabled: false },
+      );
+
+      expect(screen.getByTestId('standings-section')).toBeInTheDocument();
     });
   });
 });
