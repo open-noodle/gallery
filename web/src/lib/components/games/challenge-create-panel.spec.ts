@@ -61,4 +61,21 @@ describe('ChallengeCreatePanel', () => {
 
     expect(screen.getByTestId('challenge-create-submit')).toBeDisabled();
   });
+
+  it('spins the create button while generating, so the wait does not read as a frozen page', () => {
+    // Disabling alone was reported as a freeze: generation takes several seconds, and a greyed-out
+    // button communicates nothing. `loading` implies disabled, so the double-submit guard above
+    // still holds - both assertions must keep passing together.
+    render(ChallengeCreatePanel, { creating: true, onCreate: () => {} });
+
+    const submit = screen.getByTestId('challenge-create-submit');
+    expect(submit.querySelector('[data-testid="loading-spinner"]')).not.toBeNull();
+    expect(submit).toBeDisabled();
+  });
+
+  it('shows no spinner when idle', () => {
+    render(ChallengeCreatePanel, { ...base, onCreate: () => {} });
+
+    expect(screen.queryByTestId('loading-spinner')).not.toBeInTheDocument();
+  });
 });
