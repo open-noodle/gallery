@@ -43,4 +43,18 @@ describe('DailyChallengePrompt', () => {
     await userEvent.click(screen.getByTestId('daily-prompt-enable'));
     expect(onEnable).not.toHaveBeenCalled();
   });
+
+  it('shows a spinner in the enable button while pending, not just a disabled button', async () => {
+    // Disabling alone is what a user reported as a freeze: generation takes ~10s, and a greyed-out
+    // button says nothing is happening. The spinner is the difference between "working" and "broken".
+    const { rerender } = render(DailyChallengePrompt, { pending: false, onEnable: vi.fn(), onDecline: vi.fn() });
+
+    expect(screen.queryByTestId('loading-spinner')).not.toBeInTheDocument();
+
+    await rerender({ pending: true, onEnable: vi.fn(), onDecline: vi.fn() });
+
+    // Scoped to the enable button: the decline write is a plain column update and needs no spinner.
+    expect(screen.getByTestId('daily-prompt-enable').querySelector('[data-testid="loading-spinner"]')).not.toBeNull();
+    expect(screen.getByTestId('daily-prompt-decline').querySelector('[data-testid="loading-spinner"]')).toBeNull();
+  });
 });

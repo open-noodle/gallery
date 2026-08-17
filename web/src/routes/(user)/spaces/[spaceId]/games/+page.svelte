@@ -22,7 +22,7 @@
     type SharedSpaceMemberResponseDto,
     type SharedSpaceResponseDto,
   } from '@immich/sdk';
-  import { Button, modalManager, toastManager } from '@immich/ui';
+  import { Button, LoadingSpinner, modalManager, toastManager } from '@immich/ui';
   import { mdiCalendarStarOutline, mdiDotsVertical, mdiPlus } from '@mdi/js';
   import { onMount } from 'svelte';
   import { t } from 'svelte-i18n';
@@ -62,6 +62,10 @@
   );
 
   let togglingDaily = $state(false);
+  // Tracked separately from togglingDaily because only the ENABLE direction generates anything.
+  // Declining is a plain column write, so claiming to be "generating today's challenge" there would
+  // be a lie.
+  let generatingDaily = $state(false);
   const dailyEnabled = $derived(space.dailyChallengeEnabled === true);
   const dailyUnanswered = $derived(space.dailyChallengeEnabled === null || space.dailyChallengeEnabled === undefined);
   const showStandings = $derived(shouldShowStandings(space.dailyChallengeEnabled, standings.entries));
@@ -74,15 +78,18 @@
       return;
     }
     togglingDaily = true;
+    generatingDaily = enabled;
     try {
       await updateSpace({ id: space.id, sharedSpaceUpdateDto: { dailyChallengeEnabled: enabled } });
-      // Enabling generates the daily during this reload, which is the slow part the button is
-      // disabled for.
+      // Enabling generates the daily during this reload - candidate queries plus the CLIP scene
+      // prompts, so seconds rather than milliseconds. This await is the whole wait the user sees,
+      // which is why generatingDaily drives a placeholder for its duration.
       await invalidateAll();
     } catch (error) {
       handleError(error, $t('game_daily_toggle_failed'));
     } finally {
       togglingDaily = false;
+      generatingDaily = false;
     }
   }
 
@@ -175,7 +182,19 @@
 
   <!-- The daily leads the page even when the space has no custom challenges at all: it is the
        reason to come back, and burying it under an empty-state would hide the only game there is. -->
-  {#if dailyEnabled}
+  {#if generatingDaily}
+    <!-- Sits ahead of both branches below so it covers BOTH slow enable paths: the prompt's button
+         (which also spins) and the overflow menu (which cannot - MenuOption has no pending state and
+         the menu closes on click, so this placeholder is the only feedback that path can give).
+         Card-shaped and in the card's slot, so the feedback appears where the result will. -->
+    <section
+      class="flex items-center justify-center gap-3 rounded-3xl border border-gray-300 p-6 dark:border-gray-700"
+      data-testid="daily-generating"
+    >
+      <LoadingSpinner size="medium" />
+      <p class="text-sm text-gray-600 dark:text-gray-300">{$t('game_daily_generating')}</p>
+    </section>
+  {:else if dailyEnabled}
     <DailyChallengeCard
       challenge={daily}
       href={daily ? Route.viewSpaceGame({ spaceId: space.id, challengeId: daily.id }) : ''}

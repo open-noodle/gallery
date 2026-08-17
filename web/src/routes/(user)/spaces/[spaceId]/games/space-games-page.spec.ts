@@ -595,5 +595,35 @@ describe('Space games page', () => {
         sharedSpaceUpdateDto: { dailyChallengeEnabled: false },
       });
     });
+
+    // Turning the daily ON from the menu is the one slow path with no button to put a spinner in:
+    // MenuOption cannot show pending state and the menu closes on click, so before this there was
+    // NOTHING on screen for the ~10s of candidate queries and CLIP prompts that generation takes.
+    // A user reported exactly that as a freeze.
+    it('shows a generating placeholder while an enable from the menu is in flight', async () => {
+      // Never resolves, so the page stays in its in-flight state for the assertions.
+      sdkMock.updateSpace.mockReturnValue(new Promise(() => {}) as never);
+      renderPage([], SharedSpaceRole.Editor, null, {}, { dailyChallengeEnabled: false });
+
+      expect(screen.queryByTestId('daily-generating')).not.toBeInTheDocument();
+
+      await fireEvent.click(screen.getByText('Turn on daily challenge'));
+
+      const placeholder = screen.getByTestId('daily-generating');
+      expect(placeholder).toBeInTheDocument();
+      expect(placeholder.querySelector('[data-testid="loading-spinner"]')).not.toBeNull();
+      expect(screen.getByText("Generating today's challenge…")).toBeInTheDocument();
+    });
+
+    it('does not claim to be generating while a decline is in flight', async () => {
+      // Declining generates nothing - it writes a column. Showing "Generating today's challenge"
+      // there would be a plain lie, so the placeholder must be scoped to the enable direction.
+      sdkMock.updateSpace.mockReturnValue(new Promise(() => {}) as never);
+      renderPage([], SharedSpaceRole.Editor, null, {}, { dailyChallengeEnabled: null });
+
+      await fireEvent.click(screen.getByTestId('daily-prompt-decline'));
+
+      expect(screen.queryByTestId('daily-generating')).not.toBeInTheDocument();
+    });
   });
 });

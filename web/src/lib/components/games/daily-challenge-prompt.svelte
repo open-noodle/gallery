@@ -20,8 +20,11 @@
   <p class="max-w-lg text-sm text-gray-600 dark:text-gray-300">{$t('game_daily_enable_description')}</p>
 
   <div class="flex gap-2">
-    <!-- Enabling generates the daily on the reload, so both buttons lock for the whole round trip. -->
-    <Button size="small" disabled={pending} onclick={onEnable} data-testid="daily-prompt-enable">
+    <!-- Enabling generates the daily on the reload, so both buttons lock for the whole round trip.
+         Enable gets `loading` rather than `disabled` (it implies disabled) because that generation
+         takes seconds: a greyed-out button with no spinner reads as a frozen page, which is exactly
+         how this was first reported. Decline is a plain column write and needs no spinner. -->
+    <Button size="small" loading={pending} onclick={onEnable} data-testid="daily-prompt-enable">
       {$t('game_daily_enable')}
     </Button>
     <Button size="small" variant="outline" disabled={pending} onclick={onDecline} data-testid="daily-prompt-decline">
