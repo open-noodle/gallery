@@ -38,7 +38,9 @@ class MatchCountLabel extends ConsumerWidget {
     // key returns the variant Map; `.plural()` hits Localization._locale which
     // is a late field that isn't set without an EasyLocalization ancestor
     // (e.g. in unit tests). Looking up the nested `.zero` leaf sidesteps both.
-    if (count == 0) return StaticTranslations.instance.filter_sheet_match_count_photos.zero;
+    if (count == 0) {
+      return StaticTranslations.instance.filter_sheet_match_count_photos.zero;
+    }
     final formatted = NumberFormat.decimalPattern(Intl.getCurrentLocale()).format(count);
     return 'filter_sheet_match_count_photos'.plural(count, args: [formatted]);
   }

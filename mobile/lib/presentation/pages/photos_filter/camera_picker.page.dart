@@ -132,7 +132,9 @@ class _CameraPickerPageState extends ConsumerState<CameraPickerPage> {
   /// looked at make names.
   bool _expandedMakeHasModelMatch(String trimmedQuery) {
     final expanded = _expandedMake;
-    if (expanded == null || trimmedQuery.isEmpty) return false;
+    if (expanded == null || trimmedQuery.isEmpty) {
+      return false;
+    }
     final query = trimmedQuery.toLowerCase();
     final cachedModels = ref.watch(cameraModelSuggestionsProvider(expanded)).valueOrNull;
     return cachedModels?.any((m) => m.toLowerCase().contains(query)) ?? false;

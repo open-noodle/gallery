@@ -194,7 +194,9 @@ class _RemoteAlbumPageState extends ConsumerState<RemoteAlbumPage> {
   /// inside a space (B6 / [SpaceDetailPage._onAlbumsPicked]).
   Future<void> linkToSpace(BuildContext context) async {
     final space = await SpaceLinkPickerSheet.show(context);
-    if (space == null || !context.mounted) return;
+    if (space == null || !context.mounted) {
+      return;
+    }
 
     try {
       await ref.read(spaceAlbumActionsProvider).link(space.id, [_album.id]);

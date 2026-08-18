@@ -84,7 +84,9 @@ class _FakeAssetBundle extends CachingAssetBundle {
 
   @override
   Future<ByteData> load(String key) async {
-    if (key.startsWith('AssetManifest')) return _emptyManifest;
+    if (key.startsWith('AssetManifest')) {
+      return _emptyManifest;
+    }
     return ByteData.view(Uint8List.fromList(_transparentPng).buffer);
   }
 }
@@ -94,7 +96,9 @@ TimelineService _service({required List<Bucket> buckets, required List<BaseAsset
     bucketSource: () => Stream.value(buckets),
     assetSource: (offset, count) async {
       final end = (offset + count).clamp(0, assets.length);
-      if (offset >= end) return const <BaseAsset>[];
+      if (offset >= end) {
+        return const <BaseAsset>[];
+      }
       return assets.sublist(offset, end);
     },
     origin: TimelineOrigin.main,

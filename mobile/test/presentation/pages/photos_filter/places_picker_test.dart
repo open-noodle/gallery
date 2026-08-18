@@ -162,7 +162,9 @@ void main() {
         overrides: [
           photosFilterSuggestionsProvider.overrideWith((ref, filter) async {
             calls++;
-            if (calls == 1) throw Exception('network down');
+            if (calls == 1) {
+              throw Exception('network down');
+            }
             return _sugg(['France']);
           }),
         ],

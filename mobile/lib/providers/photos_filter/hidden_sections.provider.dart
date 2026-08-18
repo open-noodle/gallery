@@ -14,7 +14,9 @@ String encodeHiddenSections(Set<FilterSectionId> ids) => jsonEncode(ids.map((e) 
 Set<FilterSectionId> decodeHiddenSections(String json) {
   try {
     final raw = jsonDecode(json);
-    if (raw is! List) return {};
+    if (raw is! List) {
+      return {};
+    }
     return raw.whereType<String>().map(FilterSectionId.fromStorageId).whereType<FilterSectionId>().toSet();
   } catch (_) {
     return {};

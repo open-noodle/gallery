@@ -24,9 +24,13 @@ class _GalleryTabShellPageState extends ConsumerState<GalleryTabShellPage> {
   /// need to fire on same-tab re-taps (which the listener wouldn't catch).
   void _syncTab() {
     final router = _router;
-    if (router == null || !mounted) return;
+    if (router == null || !mounted) {
+      return;
+    }
     final i = router.activeIndex;
-    if (i == _lastIndex) return;
+    if (i == _lastIndex) {
+      return;
+    }
     _lastIndex = i;
     ref.read(galleryTabProvider.notifier).state = GalleryTabEnum.values[i];
   }
@@ -55,7 +59,9 @@ class _GalleryTabShellPageState extends ConsumerState<GalleryTabShellPage> {
         return PopScope(
           canPop: tabsRouter.activeIndex == 0,
           onPopInvokedWithResult: (didPop, _) {
-            if (!didPop) tabsRouter.setActiveIndex(0);
+            if (!didPop) {
+              tabsRouter.setActiveIndex(0);
+            }
           },
           child: Scaffold(
             resizeToAvoidBottomInset: false,

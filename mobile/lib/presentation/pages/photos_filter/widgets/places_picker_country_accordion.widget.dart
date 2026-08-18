@@ -49,7 +49,9 @@ class PlacesPickerCountryAccordion extends ConsumerWidget {
             display = [...display, expanded];
           }
         }
-        if (display.isEmpty) return const SizedBox.shrink();
+        if (display.isEmpty) {
+          return const SizedBox.shrink();
+        }
         return Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -152,7 +154,9 @@ class _CityList extends ConsumerWidget {
       child: citiesAsync.when(
         data: (cities) {
           final filtered = query.isEmpty ? cities : cities.where((c) => c.toLowerCase().contains(query)).toList();
-          if (filtered.isEmpty) return const SizedBox.shrink();
+          if (filtered.isEmpty) {
+            return const SizedBox.shrink();
+          }
           return Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
