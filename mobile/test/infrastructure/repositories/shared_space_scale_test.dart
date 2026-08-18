@@ -160,7 +160,7 @@ void main() {
 
       // Time the bucket query — the hot path when a user opens the space on
       // mobile. Target is 200ms; we assert <500ms with noise tolerance.
-      final timelineRepo = DriftTimelineRepository(db);
+      final timelineRepo = TimelineRepository(db);
       final query = timelineRepo.sharedSpace(spaceId, GroupAssetsBy.day);
 
       final queryStart = DateTime.now();
@@ -309,7 +309,7 @@ void main() {
       expect(rowCount, halfCount * 2);
 
       // Time the UNION bucket query across both sources.
-      final timelineRepo = DriftTimelineRepository(db);
+      final timelineRepo = TimelineRepository(db);
       final query = timelineRepo.sharedSpace(spaceId, GroupAssetsBy.day);
 
       final queryStart = DateTime.now();

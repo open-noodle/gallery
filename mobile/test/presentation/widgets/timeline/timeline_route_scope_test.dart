@@ -50,7 +50,7 @@ void main() {
   setUpAll(() async {
     db = Drift(drift.DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true));
     await SettingsRepository.ensureInitialized(db);
-    await StoreService.init(storeRepository: DriftStoreRepository(db), listenUpdates: false);
+    await StoreService.init(storeRepository: StoreRepository(db), listenUpdates: false);
   });
 
   setUp(() async {
@@ -244,7 +244,8 @@ void main() {
                 child: Consumer(
                   builder: (context, ref, child) => TextButton(
                     key: const Key('left-grouping'),
-                    onPressed: () => unawaited(ref.read(timelineOverviewModeProvider.notifier).set(TimelineOverviewMode.months)),
+                    onPressed: () =>
+                        unawaited(ref.read(timelineOverviewModeProvider.notifier).set(TimelineOverviewMode.months)),
                     child: Text('left:${ref.watch(timelineOverviewModeProvider).name}'),
                   ),
                 ),
@@ -342,7 +343,8 @@ void main() {
                 ref.watch(timelineServiceProvider);
                 return TextButton(
                   key: const Key('grouping-service'),
-                  onPressed: () => unawaited(ref.read(timelineOverviewModeProvider.notifier).set(TimelineOverviewMode.months)),
+                  onPressed: () =>
+                      unawaited(ref.read(timelineOverviewModeProvider.notifier).set(TimelineOverviewMode.months)),
                   child: Text('grouping:${ref.watch(timelineOverviewModeProvider).name}'),
                 );
               },
