@@ -23,6 +23,8 @@ final timeBucketsProvider = FutureProvider.autoDispose.family<List<BucketLite>, 
     tagIds: filter.tagIds,
     type: mapAssetType(filter.mediaType),
   );
-  if (buckets == null) return const [];
+  if (buckets == null) {
+    return const [];
+  }
   return [for (final b in buckets) (timeBucket: b.timeBucket, count: b.count)];
 });

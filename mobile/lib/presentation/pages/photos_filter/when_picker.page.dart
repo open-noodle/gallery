@@ -45,14 +45,18 @@ class _WhenPickerPageState extends ConsumerState<WhenPickerPage> {
   Future<void> _scrollToYear(int year) async {
     final key = _yearKeys[year];
     final ctx = key?.currentContext;
-    if (ctx == null) return;
+    if (ctx == null) {
+      return;
+    }
     await Scrollable.ensureVisible(ctx, alignment: 0.1, duration: const Duration(milliseconds: 300));
   }
 
   Future<void> _scrollToDecade(int decadeStart) async {
     final years = await ref.read(whenPickerFilteredYearsProvider.future);
     final inDecade = years.where((y) => y.year >= decadeStart && y.year < decadeStart + 10).toList();
-    if (inDecade.isEmpty) return;
+    if (inDecade.isEmpty) {
+      return;
+    }
     // aggregateYears returns years sorted descending, so first = newest.
     final newest = inDecade.first.year;
     await _scrollToYear(newest);
@@ -71,12 +75,18 @@ class _WhenPickerPageState extends ConsumerState<WhenPickerPage> {
 
     // Auto-expand + scroll to a typed year query.
     ref.listen<WhenQuery>(whenPickerParsedProvider, (prev, next) {
-      if (prev == next) return;
+      if (prev == next) {
+        return;
+      }
       final year = next.yearValue;
-      if (year == null) return;
+      if (year == null) {
+        return;
+      }
       setState(() => _expandedYear = year);
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
+        if (!mounted) {
+          return;
+        }
         unawaited(_scrollToYear(year));
       });
     });

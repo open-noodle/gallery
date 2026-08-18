@@ -222,9 +222,11 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
     // fresh by the navigation (e.g. coming from a memory or a notification)
     // before its segments have loaded and laid out.
     scrollToAssetNotifierProvider.addListener(_requestScrollDrain);
-    ref.listenManual(timelineSegmentProvider, (_, __) => _requestScrollDrain());
+    ref.listenManual(timelineSegmentProvider, (_, _) => _requestScrollDrain());
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _requestScrollDrain();
+      if (mounted) {
+        _requestScrollDrain();
+      }
     });
 
     ref.listenManual(timelineOverviewModeProvider, _onGroupingChanged);
@@ -425,7 +427,9 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
   /// Ensures a single retry loop is running to apply a pending scroll request.
   void _requestScrollDrain() {
     final pending = scrollToAssetNotifierProvider.value;
-    if (pending == null) return;
+    if (pending == null) {
+      return;
+    }
     if (_scrollDrainScheduled) {
       if (pending != _drainingTarget) {
         _drainingTarget = pending;
@@ -535,7 +539,9 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
       _scrollDrainScheduled = false;
       _drainingTarget = null;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _requestScrollDrain();
+        if (mounted) {
+          _requestScrollDrain();
+        }
       });
       return;
     }
@@ -573,7 +579,9 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
         _drainingTarget = null;
         if (mounted) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) _requestScrollDrain();
+            if (mounted) {
+              _requestScrollDrain();
+            }
           });
         }
         return;
@@ -583,7 +591,9 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
         _daySwitchRequested = false;
         _drainingTarget = null;
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _requestScrollDrain();
+          if (mounted) {
+            _requestScrollDrain();
+          }
         });
         return;
       case ScrollResolveOutcome.proceed:

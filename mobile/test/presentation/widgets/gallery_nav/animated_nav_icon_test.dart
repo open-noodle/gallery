@@ -52,7 +52,7 @@ void main() {
         home: Material(
           child: ValueListenableBuilder<bool>(
             valueListenable: active,
-            builder: (_, v, __) => AnimatedNavIcon(
+            builder: (_, v, _) => AnimatedNavIcon(
               idleIcon: Icons.photo_library_outlined,
               activeIcon: Icons.photo_library,
               active: v,

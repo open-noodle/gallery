@@ -173,7 +173,9 @@ void main() {
         overrides: [
           driftGetAllPeopleWithSharedSpacesProvider.overrideWith((ref, sortBy) async {
             calls++;
-            if (calls == 1) throw Exception('network down');
+            if (calls == 1) {
+              throw Exception('network down');
+            }
             return [_d('a', 'Alice')];
           }),
         ],
