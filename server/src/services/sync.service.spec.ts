@@ -1,7 +1,11 @@
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Writable } from 'node:stream';
-import { SyncEntityType } from 'src/enum';
-import { send } from 'src/services/sync.service';
-import { serialize } from 'src/utils/sync';
+import { AlbumUserRole, AssetVisibility, SyncEntityType, SyncRequestType } from 'src/enum';
+import { send, SyncService } from 'src/services/sync.service';
+import { serialize, toAck } from 'src/utils/sync';
+import { authStub } from 'test/fixtures/auth.stub';
+import { newUuid } from 'test/small.factory';
+import { makeStream, newTestService, ServiceMocks } from 'test/utils';
 
 type TestStream = {
   stream: Writable;
@@ -74,14 +78,8 @@ describe('send', () => {
 
     expect(resolved).toBe(true);
     expect(chunks).toEqual([serialize(item)]);
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
-import { Writable } from 'node:stream';
-import { AlbumUserRole, AssetVisibility, SyncEntityType, SyncRequestType } from 'src/enum';
-import { SyncService } from 'src/services/sync.service';
-import { toAck } from 'src/utils/sync';
-import { authStub } from 'test/fixtures/auth.stub';
-import { newUuid } from 'test/small.factory';
-import { makeStream, newTestService, ServiceMocks } from 'test/utils';
+  });
+});
 
 const makeWritable = () => {
   const chunks: string[] = [];
