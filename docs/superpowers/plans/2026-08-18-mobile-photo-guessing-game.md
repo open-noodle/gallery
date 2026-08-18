@@ -22,6 +22,90 @@
 - **Every test is proven red before it is trusted green.** Mobile widget tests in this repo have produced false greens.
 - Both CI gates are hard: `dart analyze --fatal-infos` and `dart format` over `lib` (not `test/`).
 
+### Verified codebase facts (checked 2026-08-18 — trust these over your recollection)
+
+- **`ApiService` has NO `gamesApi` field.** Task 3 Step 0 adds it. `GamesApi` exists in the generated
+  `openapi` package and is exported from its barrel, but nothing constructs it.
+- **`MapThemeOverride.mapBuilder` is `Widget Function(AsyncValue<String> style)`,** and every caller
+  consumes it with the project's `style.widgetWhen(onData: (style) => ...)` extension
+  (`lib/extensions/asyncvalue_extensions.dart`), **not** `.when(...)`. Use `widgetWhen`.
+- **`addCircle` / `addLine` throw if the style has not loaded.** They call
+  `_ensureManagerInitialized`. Capture the controller in `onMapCreated`, then draw in
+  `onStyleLoadedCallback` — never straight from `onMapCreated`.
+- `OnMapClickCallback` is `void Function(Point<double> point, LatLng coordinates)` (`Point` from
+  `dart:math`). `CameraUpdate.newLatLngBounds(bounds, {left, top, right, bottom})`.
+- **Widget tests must use `tester.pumpConsumerWidget(...)`** from `test/widget_tester_extensions.dart`,
+  which wraps the widget in `EasyLocalization > ProviderScope(overrides:) > MaterialApp > Material`.
+  A bare `MaterialApp` leaves easy_localization uninitialised, and `.t()` **swallows the failure and
+  returns the raw key**, so assertions on translated text would silently compare against key names.
+- **Any test that renders a `RemoteImageProvider` needs `TestUtils.init()`** (installs
+  `MockHttpOverrides`) plus `StoreService.init(...)` and
+  `Store.put(StoreKey.serverEndpoint, 'http://localhost:0')` in `setUpAll`/`setUp`. See
+  `test/presentation/widgets/people/people_grid_test.dart:35-52` for the canonical block, or reuse
+  `test/unit/presentation/presentation_context.dart`. Image fetches failing is expected and fine —
+  assert on the provider's `url`, never on pixels.
+- **`String.t({BuildContext? context, Map<String, Object>? args})`** — named `args`, values
+  non-nullable `Object`, substitution via ICU `MessageFormat`. A wrong arg name renders the key name
+  rather than throwing, so any test covering a key with placeholders must assert on the **rendered
+  text**, not merely on a widget key.
+- Exact i18n placeholders: `game_round_progress` → `{current}`,`{total}`; `game_points` → `{score}`;
+  `game_rounds_answered` → `{answered}`,`{total}`; `game_daily_next_in` → `{time}`;
+  `game_guess_month_year` → `{month}`,`{year}`; `game_you_were_away` → `{distance}` (**pre-formatted,
+  unit included**); `game_you_were_off` → `{offset}` (**pre-formatted, unit included**);
+  **`game_days_played` → `{count}` and is an ICU plural** (`{count, plural, one {# day} other {# days}}`),
+  so pass a number under the key `count`.
+- The day unit for `game_you_were_off` comes from the existing generic `cutoff_day` key
+  (`{count, plural, one {day} other {days}}`), exactly as web's `round-result.svelte` does it.
+- Riverpod 2.6.1 exposes `AsyncNotifierProvider.autoDispose.family` with base class
+  `AutoDisposeFamilyAsyncNotifier<State, Arg>` (`build(Arg arg)`, `late final Arg arg`).
+- `test/presentation/widgets/spaces/space_detail_kebab_test.dart` **already exists** with a
+  `pumpKebab(...)` helper — extend it rather than creating a new file.
+
+### The canonical widget-test harness
+
+Every widget test below shows its assertions in full, but its **pump helper is a sketch**. Replace
+the bare `MaterialApp` wrappers with this, adapting the overrides per test:
+
+```dart
+import 'package:drift/drift.dart' as drift;
+import 'package:drift/native.dart';
+import 'package:immich_mobile/domain/models/store.model.dart';
+import 'package:immich_mobile/domain/services/store.service.dart';
+import 'package:immich_mobile/entities/store.entity.dart';
+import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
+import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
+
+import '../../../test_utils.dart';            // depth depends on the test's directory
+import '../../../widget_tester_extensions.dart';
+
+late Drift db;
+
+setUpAll(() async {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  TestUtils.init();                            // installs MockHttpOverrides
+  db = Drift(drift.DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true));
+  await StoreService.init(storeRepository: DriftStoreRepository(db), listenUpdates: false);
+});
+
+setUp(() async {
+  await Store.clear();
+  await Store.put(StoreKey.serverEndpoint, 'http://localhost:0');
+});
+
+tearDownAll(() async {
+  await Store.clear();
+  await db.close();
+});
+
+// ...then, inside each testWidgets:
+await tester.pumpConsumerWidget(TheWidget(...), overrides: [someProvider.overrideWith(...)]);
+```
+
+`pumpConsumerWidget` wraps in `EasyLocalization > ProviderScope > MaterialApp > Material` and
+pump-and-settles for you. The `Store` block is required only for tests whose widget builds a
+`RemoteImageProvider` URL — Tasks 6, 7, 8, 11, 12 and 13. Tasks 1, 3, 5 and 10 are pure/provider
+tests and need neither.
+
 ### Running tests locally
 
 Flutter **3.44.8**, pinned in `mobile/mise.toml`. Do not use `mise run` — it resolves its own Flutter and ignores `PATH`.
@@ -440,12 +524,38 @@ git commit -m "feat(mobile): add the game round image URL and guard its single c
 
 **Files:**
 
+- Modify: `mobile/lib/services/api.service.dart`
 - Create: `mobile/lib/repositories/game_api.repository.dart`
 - Test: `mobile/test/repositories/game_api_repository_test.dart`
 
 **Interfaces:**
 
 - Consumes: `ApiRepository.checkNull`, `apiServiceProvider`.
+
+> **`ApiService` has no `gamesApi` field yet — verified, `grep -rn "gamesApi" mobile/lib` returns
+> nothing.** The generated `GamesApi` class exists in the `openapi` package and is exported from its
+> barrel, but nothing constructs it. Step 0 below adds it. This is an edit to an upstream file, so
+> keep it to the two lines and place them adjacent to `sharedSpacesApi` to minimise rebase surface.
+
+- [ ] **Step 0: Wire `GamesApi` into `ApiService`**
+
+In `mobile/lib/services/api.service.dart`, beside the other `late` API fields (`sharedSpacesApi` is
+around line 39):
+
+```dart
+  late GamesApi gamesApi;
+```
+
+and beside the matching assignment in the constructor / `setEndpoint` body (around line 82):
+
+```dart
+    gamesApi = GamesApi(_apiClient);
+```
+
+Both fields are assigned in the same place the existing ones are — find `sharedSpacesApi =
+SharedSpacesApi(_apiClient);` and add the line next to it. If that assignment appears in more than
+one method, add it to every one, or the repository's lazy getter will hand back a stale client.
+
 - Produces:
   - `final gameApiRepositoryProvider = Provider((ref) => GameApiRepository(ref.watch(apiServiceProvider)))`
   - `Future<GameChallengeListItemResponseDto?> getDaily(String spaceId)`
@@ -1528,18 +1638,22 @@ class _GuessMapState extends State<GuessMap> {
   MapLibreMapController? _controller;
   Symbol? _marker;
 
+  bool _styleLoaded = false;
+
   @override
   Widget build(BuildContext context) {
     return MapThemeOverride(
-      mapBuilder: (style) => style.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, __) => const SizedBox.shrink(),
-        data: (styleString) => MapLibreMap(
+      mapBuilder: (style) => style.widgetWhen(
+        onData: (styleString) => MapLibreMap(
           styleString: styleString,
           initialCameraPosition: const CameraPosition(target: LatLng(20, 0), zoom: 0.5),
           onMapCreated: (controller) => _controller = controller,
+          // Annotation managers are only initialised once the style has loaded; adding a symbol
+          // before then throws.
+          onStyleLoadedCallback: () => _styleLoaded = true,
           onMapClick: (_, coordinates) async {
             widget.onTap(coordinates.latitude, coordinates.longitude);
+            if (!_styleLoaded) return;
             if (_marker == null) {
               _marker = await _controller?.addSymbol(
                 SymbolOptions(geometry: coordinates, iconImage: 'mapMarker', iconSize: 0.15, iconAnchor: 'bottom'),
@@ -2046,11 +2160,18 @@ class _DateStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final answerDate = result.answer?.date;
+    // `game_you_were_off` takes a single PRE-FORMATTED {offset} with its unit included, mirroring
+    // `game_you_were_away`. The day noun comes from the existing generic `cutoff_day` pluraliser
+    // rather than a new key — exactly what web's round-result.svelte does.
+    final offsetLabel = result.offsetDays == null
+        ? null
+        : '${result.offsetDays} ${'cutoff_day'.t(context: context, args: {'count': result.offsetDays!})}';
+
     return Column(
       key: const Key('round-reveal-timeline'),
       children: [
-        if (result.offsetDays != null)
-          Text('game_you_were_off'.t(context: context, args: {'offset': '${result.offsetDays}'})),
+        if (offsetLabel != null)
+          Text('game_you_were_off'.t(context: context, args: {'offset': offsetLabel})),
         if (answerDate != null)
           Text(
             DateFormat.yMMMM().format(answerDate.toUtc()),
@@ -2085,7 +2206,13 @@ class RevealMap extends StatefulWidget {
 }
 
 class _RevealMapState extends State<RevealMap> {
-  Future<void> _draw(MapLibreMapController controller) async {
+  MapLibreMapController? _controller;
+
+  /// Drawn from `onStyleLoadedCallback`, never from `onMapCreated`: `addCircle` and `addLine` call
+  /// `_ensureManagerInitialized`, which throws while the style is still loading.
+  Future<void> _draw() async {
+    final controller = _controller;
+    if (controller == null) return;
     final answer = LatLng(widget.answer.lat, widget.answer.lon);
     await controller.addCircle(
       CircleOptions(geometry: answer, circleRadius: 8, circleColor: '#EF5350', circleStrokeWidth: 2),
@@ -2127,14 +2254,12 @@ class _RevealMapState extends State<RevealMap> {
   @override
   Widget build(BuildContext context) {
     return MapThemeOverride(
-      mapBuilder: (style) => style.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, __) => const SizedBox.shrink(),
-        data: (styleString) => MapLibreMap(
+      mapBuilder: (style) => style.widgetWhen(
+        onData: (styleString) => MapLibreMap(
           styleString: styleString,
           initialCameraPosition: CameraPosition(target: LatLng(widget.answer.lat, widget.answer.lon), zoom: 3),
-          onStyleLoadedCallback: () {},
-          onMapCreated: _draw,
+          onMapCreated: (controller) => _controller = controller,
+          onStyleLoadedCallback: () => unawaited(_draw()),
         ),
       ),
     );
@@ -2597,9 +2722,12 @@ class _StandingsSectionState extends State<StandingsSection> {
                   name: entry.name,
                   total: entry.total,
                   played: entry.daysPlayed,
+                  // `game_days_played` is an ICU plural keyed on `count`, so it takes a NUMBER
+                  // under `count` — not a pre-stringified `days`. A wrong arg name renders the raw
+                  // key, silently.
                   detail: entry.daysPlayed == 0
                       ? 'game_not_played'.t(context: context)
-                      : 'game_days_played'.t(context: context, args: {'days': '${entry.daysPlayed}'}),
+                      : 'game_days_played'.t(context: context, args: {'count': entry.daysPlayed}),
                 ),
           ];
 
