@@ -8,7 +8,7 @@ import 'package:immich_mobile/infrastructure/repositories/timeline.repository.da
 import 'package:maplibre_gl/maplibre_gl.dart';
 import 'package:mocktail/mocktail.dart';
 
-class _MockTimelineRepository extends Mock implements DriftTimelineRepository {}
+class _MockTimelineRepository extends Mock implements TimelineRepository {}
 
 class _MockSettingsRepository extends Mock implements SettingsRepository {}
 
