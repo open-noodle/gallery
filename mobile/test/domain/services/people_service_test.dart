@@ -7,7 +7,7 @@ import 'package:immich_mobile/repositories/shared_space_api.repository.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:openapi/api.dart' as api;
 
-class MockDriftPeopleRepository extends Mock implements DriftPeopleRepository {}
+class MockPeopleRepository extends Mock implements PeopleRepository {}
 
 class MockPersonApiRepository extends Mock implements PersonApiRepository {}
 
@@ -17,7 +17,7 @@ class MockSharedSpacePersonResponseDto extends Mock implements api.SharedSpacePe
 
 void main() {
   late DriftPeopleService sut;
-  late MockDriftPeopleRepository mockRepository;
+  late MockPeopleRepository mockRepository;
   late MockPersonApiRepository mockApiRepository;
   late MockSharedSpaceApiRepository mockSharedSpace;
 
@@ -29,7 +29,7 @@ void main() {
   });
 
   setUp(() {
-    mockRepository = MockDriftPeopleRepository();
+    mockRepository = MockPeopleRepository();
     mockApiRepository = MockPersonApiRepository();
     mockSharedSpace = MockSharedSpaceApiRepository();
     sut = DriftPeopleService(mockRepository, mockApiRepository, mockSharedSpace);

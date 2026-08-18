@@ -53,6 +53,7 @@ import 'package:immich_mobile/infrastructure/repositories/partner.repository.dar
 import 'package:immich_mobile/infrastructure/repositories/remote_album.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/remote_asset.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/remote_exif.repository.dart';
+import 'package:immich_mobile/infrastructure/repositories/space_album.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/sync_migration.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/sync_stream.repository.dart';
@@ -116,6 +117,8 @@ import 'package:sqlite_async/sqlite_async.dart';
     RemoteAlbumRepository,
     RemoteAssetRepository,
     RemoteExifRepository,
+    // gallery-fork: the fork's own shared-space album accessor joins upstream's registry.
+    SpaceAlbumRepository,
     StoreRepository,
     SyncMigrationRepository,
     SyncStreamRepository,

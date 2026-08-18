@@ -28,7 +28,7 @@ void main() {
 
   setUpAll(() async {
     db = Drift(drift.DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true));
-    await StoreService.init(storeRepository: DriftStoreRepository(db), listenUpdates: false);
+    await StoreService.init(storeRepository: StoreRepository(db), listenUpdates: false);
     await SettingsRepository.ensureInitialized(db);
   });
 
@@ -44,27 +44,30 @@ void main() {
     await db.close();
   });
 
-  test('years activation zooms to months, stores a year anchor, and preserves filters without changing scope', () async {
-    container.read(photosFilterProvider.notifier).setText('paris');
-    container.read(timelineTemporalScopeProvider.notifier).setYear(2024);
-    var scrollEvents = 0;
-    final subscription = EventStream.shared.listen<ScrollToTopEvent>((_) => scrollEvents++);
-    addTearDown(subscription.cancel);
+  test(
+    'years activation zooms to months, stores a year anchor, and preserves filters without changing scope',
+    () async {
+      container.read(photosFilterProvider.notifier).setText('paris');
+      container.read(timelineTemporalScopeProvider.notifier).setYear(2024);
+      var scrollEvents = 0;
+      final subscription = EventStream.shared.listen<ScrollToTopEvent>((_) => scrollEvents++);
+      addTearDown(subscription.cancel);
 
-    await container.read(sharedTimelineOverviewDrilldownProvider)(
-      TimeBucket(date: DateTime(2025), assetCount: 4),
-      TimelineOverviewMode.years,
-    );
+      await container.read(sharedTimelineOverviewDrilldownProvider)(
+        TimeBucket(date: DateTime(2025), assetCount: 4),
+        TimelineOverviewMode.years,
+      );
 
-    expect(container.read(timelineTemporalScopeProvider), const TimelineTemporalScope.year(2024));
-    expect(container.read(timelineZoomAnchorProvider), const TimelineZoomAnchor.year(2025));
-    expect(container.read(timelineOverviewModeProvider), TimelineOverviewMode.months);
-    // Drilldown is view state: the "Group by" setting must not move with it.
-    expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.day);
-    expect(container.read(photosFilterProvider).context, 'paris');
-    await Future<void>.delayed(Duration.zero);
-    expect(scrollEvents, 0);
-  });
+      expect(container.read(timelineTemporalScopeProvider), const TimelineTemporalScope.year(2024));
+      expect(container.read(timelineZoomAnchorProvider), const TimelineZoomAnchor.year(2025));
+      expect(container.read(timelineOverviewModeProvider), TimelineOverviewMode.months);
+      // Drilldown is view state: the "Group by" setting must not move with it.
+      expect(SettingsRepository.instance.appConfig.timeline.groupAssetsBy, GroupAssetsBy.day);
+      expect(container.read(photosFilterProvider).context, 'paris');
+      await Future<void>.delayed(Duration.zero);
+      expect(scrollEvents, 0);
+    },
+  );
 
   test('months activation zooms to all, stores a month anchor, and leaves temporal scope unchanged', () async {
     await container.read(timelineOverviewModeProvider.notifier).set(TimelineOverviewMode.months);

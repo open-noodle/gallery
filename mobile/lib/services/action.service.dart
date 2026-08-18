@@ -15,7 +15,7 @@ final actionServiceProvider = Provider<ActionService>(
     ref.watch(driftProvider).remoteAssetRepository,
     ref.watch(sharedSpaceApiRepositoryProvider),
     ref.watch(driftAlbumApiRepositoryProvider),
-    ref.watch(remoteAlbumRepository),
+    ref.watch(driftProvider).remoteAlbumRepository,
   ),
 );
 
@@ -24,7 +24,7 @@ class ActionService {
   final RemoteAssetRepository _remoteAssetRepository;
   final SharedSpaceApiRepository _sharedSpaceApiRepository;
   final DriftAlbumApiRepository _albumApiRepository;
-  final DriftRemoteAlbumRepository _remoteAlbumRepository;
+  final RemoteAlbumRepository _remoteAlbumRepository;
 
   const ActionService(
     this._assetApiRepository,

@@ -280,7 +280,7 @@ void main() {
     test('local junction write throws on an absorbed album (no remote_album row), leaving no junction row', () async {
       final user = await ctx.newUser();
       final asset = await ctx.newRemoteAsset(ownerId: user.id);
-      final localRepo = DriftRemoteAlbumRepository(ctx.db);
+      final localRepo = RemoteAlbumRepository(ctx.db);
 
       // An absorbed linked album lives only in shared_space_album — it has no
       // remote_album row. The personal-album add path batch-inserts into
