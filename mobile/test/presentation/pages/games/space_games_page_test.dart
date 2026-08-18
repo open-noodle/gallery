@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:drift/drift.dart' as drift;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -15,6 +17,7 @@ import 'package:immich_mobile/presentation/widgets/games/challenge_card.widget.d
 import 'package:immich_mobile/providers/game/game.provider.dart';
 import 'package:immich_mobile/providers/shared_space.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
+import 'package:immich_mobile/repositories/game_api.repository.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:openapi/api.dart';
 
@@ -22,6 +25,8 @@ import '../../../test_utils.dart';
 import '../../../widget_tester_extensions.dart';
 
 class _MockUserService extends Mock implements UserService {}
+
+class _MockGameApiRepository extends Mock implements GameApiRepository {}
 
 /// Test-local stand-in for the real [CurrentUserProvider] (mirrors
 /// `shared_space_provider_test.dart`'s `MockCurrentUserProvider`): the real notifier's constructor
@@ -70,6 +75,9 @@ void main() {
   setUpAll(() async {
     TestWidgetsFlutterBinding.ensureInitialized();
     TestUtils.init();
+    // mocktail's `any(named: ...)` needs a fallback instance for a non-primitive type like
+    // GameChallengeType before it can be used in a `when()` stub.
+    registerFallbackValue(GameChallengeType.mixed);
     db = Drift(drift.DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true));
     await StoreService.init(storeRepository: DriftStoreRepository(db), listenUpdates: false);
   });
@@ -104,6 +112,15 @@ void main() {
       ...extraOverrides,
     ],
   );
+
+  /// `ImmichToast` schedules a 3s fluttertoast Timer outside the frame scheduler, so a plain
+  /// `pumpAndSettle()` leaves it pending and teardown fails with "A Timer is still pending". Pump
+  /// past its lifetime instead. Mirrors `game_play_page_test.dart`'s `settleToast`.
+  Future<void> settleToast(WidgetTester tester) async {
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 4));
+    await tester.pumpAndSettle();
+  }
 
   testWidgets('an editor is offered the create control', (tester) async {
     await pump(tester, canEdit: true);
@@ -208,5 +225,159 @@ void main() {
     // Proves the {time} placeholder in DailySlot's `game_daily_next_in` actually resolved for a
     // played daily reached through the composed page, not just in DailySlot's own isolated tests.
     expect(find.textContaining(RegExp(r'\d+h \d+m')), findsOneWidget);
+  });
+
+  testWidgets('a failed create surfaces a message rather than swallowing the error', (tester) async {
+    final repository = _MockGameApiRepository();
+    when(
+      () => repository.createChallenge(
+        any(),
+        roundCount: any(named: 'roundCount'),
+        type: any(named: 'type'),
+      ),
+    ).thenThrow(Exception('offline'));
+
+    await pump(tester, canEdit: true, extraOverrides: [gameApiRepositoryProvider.overrideWithValue(repository)]);
+
+    await tester.tap(find.byKey(const Key('space-games-create')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('create-submit')));
+    await tester.pumpAndSettle();
+
+    // Proves the message came from the localized 'game_create_failed' key resolving, not from the
+    // raw key rendering because of a swallowed exception nobody surfaced.
+    expect(find.text("Could not create a challenge from this space's photos"), findsOneWidget);
+    // The page itself is not left broken: the create control is still there to retry with.
+    expect(find.byKey(const Key('space-games-create')), findsOneWidget);
+
+    await settleToast(tester);
+  });
+
+  testWidgets('a failed delete surfaces a message rather than leaving a dead card', (tester) async {
+    final repository = _MockGameApiRepository();
+    when(() => repository.deleteChallenge(any())).thenThrow(Exception('offline'));
+
+    await pump(
+      tester,
+      canEdit: true,
+      challenges: [_challenge('c1')],
+      extraOverrides: [gameApiRepositoryProvider.overrideWithValue(repository)],
+    );
+
+    await tester.tap(find.byKey(const Key('challenge-card-delete-c1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('challenge-card-delete-confirm')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Could not delete the challenge'), findsOneWidget);
+    // Without the catch, `ref.invalidate` is never reached and the card is simply never refreshed —
+    // indistinguishable from a dead button. It must still be on screen, unchanged.
+    expect(find.byType(ChallengeCard), findsOneWidget);
+
+    await settleToast(tester);
+  });
+
+  testWidgets('a played daily with standings still loading shows the section loading, not absent', (tester) async {
+    final daily = GameChallengeListItemResponseDto(
+      id: 'daily-1',
+      spaceId: 's1',
+      name: '2026-08-18',
+      roundCount: 5,
+      locationRoundCount: 3,
+      answered: 5,
+      total: 18420,
+      scaleKm: 1,
+      scaleDays: 1,
+      createdAt: DateTime.utc(2026, 8, 18),
+      closedAt: null,
+      dailyOn: DateTime.utc(2026, 8, 18),
+    );
+
+    // `pumpConsumerWidget`'s automatic `pumpAndSettle()` would hang forever here: the standings
+    // provider below never resolves, and the section's own CircularProgressIndicator is an
+    // indeterminate (indefinitely repeating) animation — nothing "settles". Use the raw pump and
+    // drive frames manually instead, matching daily_challenge_card_test.dart's narrow-phone group.
+    await tester.pumpConsumerWidgetRaw(
+      const SpaceGamesPage(spaceId: 's1', canEdit: false),
+      overrides: [
+        currentUserProvider.overrideWith((ref) => _StubCurrentUserNotifier(_user('u1'))),
+        gameChallengesProvider('s1').overrideWith((ref) async => []),
+        sharedSpaceProvider('s1').overrideWith(
+          (ref) async => SharedSpaceResponseDto(
+            id: 's1',
+            name: 'Space',
+            createdAt: '2026-08-01T00:00:00Z',
+            updatedAt: '2026-08-01T00:00:00Z',
+            createdById: 'u1',
+            dailyChallengeEnabled: const Optional.present(true),
+          ),
+        ),
+        gameDailyProvider('s1').overrideWith((ref) async => daily),
+        gameLeaderboardProvider('daily-1').overrideWith((ref) async => GameLeaderboardResponseDto(entries: [])),
+        sharedSpaceMembersProvider('s1').overrideWith((ref) async => []),
+        // Never resolves, on purpose: proves the section renders its OWN loading state instead of
+        // vanishing from the tree while standings are still in flight.
+        gameStandingsProvider('s1').overrideWith((ref) => Completer<GameStandingsResponseDto>().future),
+      ],
+    );
+
+    // Enough frames for the challenges/space/daily/leaderboard/members futures (all synchronous
+    // `async =>` bodies) to resolve and rebuild, without ever settling the perpetual spinner.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    // The button that would scroll to the section is offered...
+    expect(find.byKey(const Key('daily-standings')), findsOneWidget);
+    // ...and the section itself is already present to scroll to, mid-load.
+    expect(find.byKey(const Key('standings-loading')), findsOneWidget);
+  });
+
+  testWidgets('tapping the daily leaderboard button drives the scroll wiring without throwing', (tester) async {
+    // Exercises the actual `onStandings` -> `_scrollToStandings` -> `Scrollable.ensureVisible` path
+    // end to end, rather than only checking that the button and the section both exist. A `key:
+    // () {}` no-op would also pass every other assertion in this file; only a real tap proves the
+    // callback is wired to something rather than decorative.
+    final daily = GameChallengeListItemResponseDto(
+      id: 'daily-1',
+      spaceId: 's1',
+      name: '2026-08-18',
+      roundCount: 5,
+      locationRoundCount: 3,
+      answered: 5,
+      total: 18420,
+      scaleKm: 1,
+      scaleDays: 1,
+      createdAt: DateTime.utc(2026, 8, 18),
+      closedAt: null,
+      dailyOn: DateTime.utc(2026, 8, 18),
+    );
+
+    await pump(
+      tester,
+      canEdit: false,
+      extraOverrides: [
+        sharedSpaceProvider('s1').overrideWith(
+          (ref) async => SharedSpaceResponseDto(
+            id: 's1',
+            name: 'Space',
+            createdAt: '2026-08-01T00:00:00Z',
+            updatedAt: '2026-08-01T00:00:00Z',
+            createdById: 'u1',
+            dailyChallengeEnabled: const Optional.present(true),
+          ),
+        ),
+        gameDailyProvider('s1').overrideWith((ref) async => daily),
+        gameLeaderboardProvider('daily-1').overrideWith((ref) async => GameLeaderboardResponseDto(entries: [])),
+      ],
+    );
+
+    expect(find.byKey(const Key('daily-standings')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('daily-standings')));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    // The board it scrolled to is the real, resolved section — not the loading/error placeholder.
+    expect(find.byKey(const Key('standings-tab-today')), findsOneWidget);
   });
 }
