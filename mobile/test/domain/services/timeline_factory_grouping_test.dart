@@ -7,7 +7,7 @@ import 'package:immich_mobile/infrastructure/repositories/settings.repository.da
 import 'package:immich_mobile/infrastructure/repositories/timeline.repository.dart';
 import 'package:mocktail/mocktail.dart';
 
-class _MockTimelineRepository extends Mock implements DriftTimelineRepository {}
+class _MockTimelineRepository extends Mock implements TimelineRepository {}
 
 class _MockSettingsRepository extends Mock implements SettingsRepository {}
 

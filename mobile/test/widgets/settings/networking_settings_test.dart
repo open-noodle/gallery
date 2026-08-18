@@ -76,7 +76,7 @@ void main() {
     TestWidgetsFlutterBinding.ensureInitialized();
     TestUtils.init();
     db = Drift(drift.DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true));
-    await StoreService.init(storeRepository: DriftStoreRepository(db));
+    await StoreService.init(storeRepository: StoreRepository(db));
     await SettingsRepository.ensureInitialized(db);
   });
 
