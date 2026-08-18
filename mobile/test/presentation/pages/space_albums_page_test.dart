@@ -73,7 +73,7 @@ void main() {
     TestWidgetsFlutterBinding.ensureInitialized();
     TestUtils.init();
     db = Drift(drift.DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true));
-    await StoreService.init(storeRepository: DriftStoreRepository(db), listenUpdates: false);
+    await StoreService.init(storeRepository: StoreRepository(db), listenUpdates: false);
     await SettingsRepository.ensureInitialized(db);
   });
 
@@ -334,7 +334,10 @@ void main() {
       const SpaceAlbumsPage(spaceId: spaceId, canEdit: true),
       overrides: _overrides(
         spaceId: spaceId,
-        albums: [_album(id: 'a1', name: 'Alpha'), _album(id: 'a2', name: 'Bravo')],
+        albums: [
+          _album(id: 'a1', name: 'Alpha'),
+          _album(id: 'a2', name: 'Bravo'),
+        ],
       ),
     );
     await tester.pumpAndSettle();

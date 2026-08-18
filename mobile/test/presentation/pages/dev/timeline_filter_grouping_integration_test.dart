@@ -2,7 +2,7 @@
 //
 // These wire the REAL provider chain:
 //   SearchService (mocked) → photosFilterSearchProvider (real) →
-//   TimelineFactory (real) → DriftTimelineRepository (real, in-memory Drift) →
+//   TimelineFactory (real) → TimelineRepository (real, in-memory Drift) →
 //   fromAssetStream (real, with GroupAssetsBy) → TimelineService →
 //   timelineSegmentProvider (real)
 //
@@ -125,7 +125,7 @@ void main() {
   setUpAll(() async {
     registerFallbackValue(_FakeFilter());
     db = Drift(drift.DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true));
-    await StoreService.init(storeRepository: DriftStoreRepository(db), listenUpdates: false);
+    await StoreService.init(storeRepository: StoreRepository(db), listenUpdates: false);
     await SettingsRepository.ensureInitialized(db);
     await Store.put(StoreKey.serverEndpoint, 'http://localhost:0');
   });
@@ -170,7 +170,7 @@ void main() {
     addTearDown(sub.close);
 
     // Read the photos timeline query provider — this builds the search-backed
-    // TimelineService backed by the REAL TimelineFactory / DriftTimelineRepository.
+    // TimelineService backed by the REAL TimelineFactory / TimelineRepository.
     final svc = container.read(timelineServiceProvider);
     expect(svc.origin, TimelineOrigin.search);
 

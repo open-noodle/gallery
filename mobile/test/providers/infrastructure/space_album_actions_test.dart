@@ -165,7 +165,7 @@ void main() {
       verify(() => albumApiRepo.addAssets(_albumId, ['a1', 'a2'])).called(1);
       verify(() => syncMgr.syncRemote()).called(1);
       // The absorbed-album invariant: the server-only path never touches the
-      // local junction repository (no DriftRemoteAlbumRepository write).
+      // local junction repository (no RemoteAlbumRepository write).
       verifyNoMoreInteractions(repo);
     });
 

@@ -7,6 +7,7 @@ import 'package:immich_mobile/constants/locales.dart';
 import 'package:immich_mobile/domain/models/album/album.model.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/generated/codegen_loader.g.dart';
+import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/space_album.repository.dart';
 import 'package:immich_mobile/presentation/actions/action.widget.dart';
 import 'package:immich_mobile/presentation/actions/remove_from_album.action.dart';
@@ -16,6 +17,7 @@ import 'package:immich_mobile/providers/asset_viewer/asset_viewer.provider.dart'
 import 'package:immich_mobile/providers/background_sync.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/asset.provider.dart';
+import 'package:immich_mobile/providers/infrastructure/db.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/space_album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/user.provider.dart';
 import 'package:immich_mobile/providers/routes.provider.dart';
@@ -32,6 +34,7 @@ import 'package:immich_mobile/utils/action_button.utils.dart';
 import 'package:immich_ui/immich_ui.dart';
 import 'package:mocktail/mocktail.dart';
 
+import '../../infrastructure/repository.mock.dart';
 import '../../unit/factories/remote_asset_factory.dart';
 import '../../unit/presentation/presentation_context.dart';
 
@@ -101,6 +104,14 @@ void main() {
 
   tearDown(() => ctx.dispose());
 
+  /// Stubs the Drift accessors this test's real `remoteAlbumServiceProvider` reaches.
+  Drift mockDrift() {
+    final drift = MockDrift();
+    when(() => drift.remoteAssetRepository).thenReturn(ctx.repository.remoteAsset.repo);
+    when(() => drift.remoteAlbumRepository).thenReturn(ctx.repository.remoteAlbum);
+    return drift;
+  }
+
   /// Mirrors `PresentationContext.overrides` MINUS `remoteAlbumServiceProvider`, plus the
   /// providers the real one reaches. Keep in step with that list if it grows.
   List<Override> overridesFor(Set<BaseAsset> selection) => [
@@ -113,10 +124,13 @@ void main() {
     gCastServiceProvider.overrideWithValue(ctx.service.cast),
     serverInfoServiceProvider.overrideWithValue(ctx.service.serverInfo),
     inLockedViewProvider.overrideWithValue(false),
-    remoteAssetRepositoryProvider.overrideWithValue(ctx.repository.remoteAsset.repo),
+    // Upstream #30693 collapsed the per-repository providers into accessors on Drift, so the
+    // repositories are now stubbed on a mocked Drift rather than overridden individually —
+    // same approach as PresentationContext.mockDrift().
+    driftProvider.overrideWithValue(mockDrift()),
     assetMediaRepositoryProvider.overrideWithValue(ctx.repository.assetMedia.api),
-    // Dependencies of the REAL remoteAlbumServiceProvider (deliberately not overridden).
-    remoteAlbumRepository.overrideWithValue(ctx.repository.remoteAlbum),
+    // Dependencies of the REAL remoteAlbumServiceProvider (deliberately not overridden);
+    // remoteAlbumRepository is stubbed on the mocked Drift above.
     driftAlbumApiRepositoryProvider.overrideWithValue(ctx.repository.albumApi),
     spaceAlbumRepositoryProvider.overrideWithValue(spaceAlbumRepo),
     backgroundSyncProvider.overrideWithValue(ctx.service.backgroundSync),

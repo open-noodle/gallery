@@ -2,10 +2,13 @@ import 'package:drift/drift.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/space_album.model.dart';
 import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
+import 'package:immich_mobile/infrastructure/repositories/space_album.repository.drift.dart';
 
-class SpaceAlbumRepository extends DriftDatabaseRepository {
-  final Drift _db;
-  const SpaceAlbumRepository(this._db) : super(_db);
+@DriftAccessor()
+class SpaceAlbumRepository extends DatabaseAccessor<Drift> with $SpaceAlbumRepositoryMixin {
+  SpaceAlbumRepository(super.attachedDatabase);
+
+  Drift get _db => attachedDatabase;
 
   /// Whether [albumId] is linked to at least one space. Cheap point lookup used to
   /// decide if an album mutation needs the space sync-nudge.
