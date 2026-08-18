@@ -78,7 +78,9 @@ class _PersonPickerListState extends ConsumerState<PersonPickerList> {
 
   void _jumpToLetter(String letter, Map<String, double> offsets) {
     final target = offsets[letter];
-    if (target == null || !_controller.hasClients) return;
+    if (target == null || !_controller.hasClients) {
+      return;
+    }
     _controller.jumpTo(target.clamp(0.0, _controller.position.maxScrollExtent));
   }
 

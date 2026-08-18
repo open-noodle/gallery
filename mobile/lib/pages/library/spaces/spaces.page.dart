@@ -100,7 +100,9 @@ class SpacesPage extends HookConsumerWidget {
           ],
         ),
       );
-      if (confirmed != true) return;
+      if (confirmed != true) {
+        return;
+      }
 
       try {
         await ref.read(sharedSpaceApiRepositoryProvider).delete(space.id);
@@ -116,7 +118,9 @@ class SpacesPage extends HookConsumerWidget {
       final userId = ref.read(currentUserProvider)?.id;
       // A viewer has no actions at all, so opening an empty sheet would be worse
       // than not reacting.
-      if (!spaceIsWritable(space, userId)) return;
+      if (!spaceIsWritable(space, userId)) {
+        return;
+      }
 
       await showModalBottomSheet<void>(
         context: context,
@@ -131,7 +135,9 @@ class SpacesPage extends HookConsumerWidget {
                 onTap: () async {
                   Navigator.of(sheetContext).pop();
                   final saved = await SpaceEditSheet.show(context, space);
-                  if (saved == true) ref.invalidate(sharedSpacesProvider);
+                  if (saved == true) {
+                    ref.invalidate(sharedSpacesProvider);
+                  }
                 },
               ),
               if (spaceIsOwned(space, userId))

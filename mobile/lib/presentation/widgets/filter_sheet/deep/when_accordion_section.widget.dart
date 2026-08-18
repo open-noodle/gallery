@@ -21,9 +21,15 @@ const int _kPreviewCap = 10;
 /// is treated as open-ended, so `takenBefore` alone matches every earlier year;
 /// the caller bounds how many of those it actually pins.
 bool _rangeCoversYear({required int year, DateTime? after, DateTime? before}) {
-  if (after == null && before == null) return false;
-  if (after != null && after.year > year) return false;
-  if (before != null && before.year < year) return false;
+  if (after == null && before == null) {
+    return false;
+  }
+  if (after != null && after.year > year) {
+    return false;
+  }
+  if (before != null && before.year < year) {
+    return false;
+  }
   return true;
 }
 
@@ -55,7 +61,9 @@ class _WhenAccordionSectionState extends ConsumerState<WhenAccordionSection> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       final stored = PageStorage.of(context).readState(context, identifier: _storageId);
       if (stored is int && stored != _expandedYear) {
         setState(() => _expandedYear = stored);
