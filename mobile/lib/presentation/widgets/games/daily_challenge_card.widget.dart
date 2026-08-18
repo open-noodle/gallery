@@ -7,12 +7,32 @@ import 'package:immich_mobile/providers/game/game.provider.dart';
 import 'package:immich_mobile/utils/game_format.dart';
 import 'package:immich_mobile/utils/image_url_builder.dart';
 
-/// Fixed height for the whole slot, in every state that renders something.
+/// Height reserved for the opted-in card (played or unplayed).
 ///
 /// The sliver must declare its height BEFORE the daily arrives — the scrubber consumes it
 /// synchronously at layout time — so this is a constant rather than a measurement. The played and
 /// unplayed cards are the same height for the same reason.
-const double kDailySlotHeight = 108;
+///
+/// Kept separate from [kDailyPromptHeight]: this card's labels are fixed-length strings across
+/// every shipped locale (a short title, an optional "next in Xh Ym" line, a one-word button), so a
+/// constant is safe here. The opt-in prompt's free-form description is not — see
+/// [kDailyPromptHeight] and `DailyChallengePrompt`.
+const double kDailyCardHeight = 108;
+
+/// Height reserved for the opt-in prompt shown to editors of an un-asked space.
+///
+/// Deliberately a *different* constant from [kDailyCardHeight]: the prompt carries a full
+/// localised sentence (`game_daily_enable_description`) whose length varies a lot by locale — the
+/// same "no overflow, ever" requirement as the card, but the card's fixed-length labels can share
+/// one height while this can't safely share it with them. This value is sized generously enough
+/// for every locale measured against a 360dp phone (see the widget test's narrow-phone/German
+/// group), but it is not itself what makes overflow impossible — `DailyChallengePrompt` caps the
+/// title and description to `maxLines` + ellipsis, wraps its whole column in a
+/// `SingleChildScrollView`, and lays the decline/enable buttons out in an `OverflowBar` (which
+/// stacks them instead of overflowing horizontally when they don't fit — the failure this height
+/// alone cannot prevent, since it's a width problem). A future locale longer than any of these
+/// degrades or scrolls; it does not throw.
+const double kDailyPromptHeight = 132;
 
 /// The tri-state daily slot.
 ///
@@ -41,8 +61,8 @@ class DailySlot extends ConsumerWidget {
   /// The height to reserve. Depends only on values the page already holds synchronously, never on
   /// the daily provider's async state.
   static double reservedHeight({required bool? dailyChallengeEnabled, required bool canEdit}) {
-    if (dailyChallengeEnabled == null) return canEdit ? kDailySlotHeight : 0;
-    return dailyChallengeEnabled ? kDailySlotHeight : 0;
+    if (dailyChallengeEnabled == null) return canEdit ? kDailyPromptHeight : 0;
+    return dailyChallengeEnabled ? kDailyCardHeight : 0;
   }
 
   @override
@@ -50,7 +70,7 @@ class DailySlot extends ConsumerWidget {
     if (dailyChallengeEnabled == null) {
       return canEdit
           ? SizedBox(
-              height: kDailySlotHeight,
+              height: kDailyPromptHeight,
               child: DailyChallengePrompt(onDecide: onDecide),
             )
           : const SizedBox.shrink();
@@ -61,7 +81,7 @@ class DailySlot extends ConsumerWidget {
     final daily = ref.watch(gameDailyProvider(spaceId));
 
     return SizedBox(
-      height: kDailySlotHeight,
+      height: kDailyCardHeight,
       child: daily.when(
         loading: () => const Card(child: Center(child: CircularProgressIndicator())),
         error: (_, _) => Card(
