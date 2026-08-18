@@ -1534,6 +1534,9 @@ describe(AssetRepository.name, () => {
     it('should return an empty array when given an empty input', async () => {
       const { sut } = setup();
       await expect(sut.createAll([])).resolves.toStrictEqual([]);
+    });
+  });
+
   describe('people filters use AND semantics', () => {
     it('requires every selected person for time bucket assets', async () => {
       const { ctx, sut } = setup();
