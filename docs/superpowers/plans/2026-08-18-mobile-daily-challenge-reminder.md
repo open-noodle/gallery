@@ -23,6 +23,32 @@
 - **Five new i18n keys, in all ten maintained locales** (`de fr it nl pl es ru zh_Hans zh_Hant` + `en`), inserted alphabetically, then `npx prettier --write i18n/*.json`.
 - Both CI gates are hard: `dart analyze --fatal-infos` and `dart format` over `lib`.
 
+### Verified codebase facts (checked 2026-08-18 — trust these over your recollection)
+
+- **There is no `settingsServiceProvider` with `get`/`set`.** Any sketch below using that shape is
+  wrong; use these instead:
+  - **Write:** `ref.read(settingsProvider).write(SettingsKey.x, value)` — `settingsProvider` is a
+    `Provider.autoDispose<SettingsRepository>` in `lib/providers/infrastructure/settings.provider.dart`,
+    and the method is `Future<void> write<T, U extends T>(SettingsKey<T> key, U value)`.
+  - **Read:** `ref.read(appConfigProvider).read(SettingsKey.x)`, or
+    `ref.watch(appConfigProvider.select((c) => c.games.dailyReminderEnabled))` to rebuild on change.
+    `appConfigProvider` lives in the same file.
+- **`SettingsKey` carries no default.** See Task 3 — defaults live on `AppConfig`'s section classes
+  and every key needs a case in both the `read` and `write` switches.
+- **`NotificationSetting` is a `HookConsumerWidget` that currently uses no hooks** and builds a plain
+  `List` of tiles handed to `SettingsSubPageScaffold(settings: [...])`. Add tiles to that list. The
+  canonical hook-using sibling to copy is
+  `lib/widgets/settings/asset_list_settings/asset_list_settings.dart`.
+- **`SettingsSwitchListTile`** takes `{required ValueNotifier<bool> valueNotifier, required String
+title, String? subtitle, IconData? icon, bool enabled = true, Function(bool)? onChanged, ...}`. It
+  mutates `valueNotifier.value` itself before calling `onChanged`, so the parent supplies a
+  `useValueNotifier` and does **not** set the value again.
+- **Widget tests use `tester.pumpConsumerWidget(widget, overrides: [...])`** from
+  `test/widget_tester_extensions.dart`; a bare `MaterialApp` leaves easy_localization uninitialised
+  and `.t()` silently returns the raw key.
+- **`String.t({BuildContext? context, Map<String, Object>? args})`** — and `.tr()` from
+  easy_localization works without a context, which is what the notification body needs.
+
 ### Running tests locally
 
 Flutter **3.44.8**, pinned in `mobile/mise.toml`. Do not use `mise run`.
@@ -355,67 +381,151 @@ git commit -m "feat(mobile): add the daily reminder scheduling policy"
 
 **Files:**
 
+- Create: `mobile/lib/domain/models/config/games_config.dart`
+- Modify: `mobile/lib/domain/models/config/app_config.dart`
 - Modify: `mobile/lib/domain/models/settings_key.dart`
-- Test: `mobile/test/domain/models/settings_key_game_test.dart`
+- Test: `mobile/test/domain/models/config/app_config_test.dart` (extend — it already exists)
 
 **Interfaces:**
 
-- Produces: `SettingsKey.gameDailyReminderEnabled<bool>`, `SettingsKey.gameDailyReminderMinuteOfDay<int>`, `SettingsKey.gameDailyLastPlayed<String?>`.
+- Produces: `SettingsKey.gameDailyReminderEnabled<bool>`, `SettingsKey.gameDailyReminderMinuteOfDay<int>`, `SettingsKey.gameDailyLastPlayed<String?>`, and `GamesConfig`.
+
+> **`SettingsKey` has no `defaultValue` — verified.** Its constructor is
+> `const SettingsKey({ValueCodec<T>? codec})` and nothing else. Defaults live as Dart constructor
+> defaults on per-section config classes aggregated by `const defaultConfig = AppConfig()`, and every
+> key must appear in **two exhaustive switches** — `AppConfig.read<T>` and `AppConfig.write<T, U>`.
+> Adding a key without both cases is a compile error, which is the safety net here.
 
 - [ ] **Step 1: Write the failing test**
 
-`mobile/test/domain/models/settings_key_game_test.dart`:
+Extend `mobile/test/domain/models/config/app_config_test.dart` (read its existing style first and
+match it):
 
 ```dart
-import 'package:flutter_test/flutter_test.dart';
-import 'package:immich_mobile/domain/models/settings_key.dart';
+  group('games config', () {
+    test('the reminder defaults to off at 18:00 with no daily recorded', () {
+      expect(defaultConfig.read(SettingsKey.gameDailyReminderEnabled), isFalse);
+      expect(defaultConfig.read(SettingsKey.gameDailyReminderMinuteOfDay), 18 * 60);
+      expect(defaultConfig.read(SettingsKey.gameDailyLastPlayed), isNull);
+    });
 
-void main() {
-  test('the reminder defaults to off at 18:00 with no play recorded', () {
-    expect(SettingsKey.gameDailyReminderEnabled.defaultValue, isFalse);
-    expect(SettingsKey.gameDailyReminderMinuteOfDay.defaultValue, 18 * 60);
-    expect(SettingsKey.gameDailyLastPlayed.defaultValue, isNull);
+    test('each games key round-trips through write then read', () {
+      expect(
+        defaultConfig.write(SettingsKey.gameDailyReminderEnabled, true).read(SettingsKey.gameDailyReminderEnabled),
+        isTrue,
+      );
+      expect(
+        defaultConfig
+            .write(SettingsKey.gameDailyReminderMinuteOfDay, 9 * 60)
+            .read(SettingsKey.gameDailyReminderMinuteOfDay),
+        9 * 60,
+      );
+      expect(
+        defaultConfig.write(SettingsKey.gameDailyLastPlayed, '2026-08-18').read(SettingsKey.gameDailyLastPlayed),
+        '2026-08-18',
+      );
+    });
+
+    test('writing one games key leaves the others alone', () {
+      final config = defaultConfig.write(SettingsKey.gameDailyReminderEnabled, true);
+
+      expect(config.read(SettingsKey.gameDailyReminderMinuteOfDay), 18 * 60);
+      expect(config.read(SettingsKey.gameDailyLastPlayed), isNull);
+    });
   });
-
-  test('the keys are distinct — a shared storage key would make one overwrite another', () {
-    final names = {
-      SettingsKey.gameDailyReminderEnabled.name,
-      SettingsKey.gameDailyReminderMinuteOfDay.name,
-      SettingsKey.gameDailyLastPlayed.name,
-    };
-
-    expect(names.length, 3);
-  });
-}
 ```
-
-Read the enum's existing entries first: if `SettingsKey` members declare defaults differently in this
-codebase (e.g. `defaultValue:` named argument versus a `Setting<T>` wrapper), match that form exactly
-rather than the shape sketched above, and adjust the assertions to the real accessor.
 
 - [ ] **Step 2: Run the test and confirm it fails**
 
-Run: `flutter test test/domain/models/settings_key_game_test.dart`
-Expected: FAIL — the members do not exist.
+Run: `flutter test test/domain/models/config/app_config_test.dart`
+Expected: FAIL — the `SettingsKey` members do not exist.
 
-- [ ] **Step 3: Implement**
+- [ ] **Step 3: Create the config section**
+
+`mobile/lib/domain/models/config/games_config.dart`, following `spaces_config.dart` exactly
+(constructor defaults, `copyWith`, `==`, `hashCode`, `toString`):
+
+```dart
+class GamesConfig {
+  final bool dailyReminderEnabled;
+
+  /// Minutes since local midnight. 18:00 — not UTC midnight, which is 1-2 am across Europe.
+  final int dailyReminderMinuteOfDay;
+
+  /// The UTC `YYYY-MM-DD` of the last DAILY challenge finished on this device, or null.
+  ///
+  /// One date, not a per-space map: the rule is "you have already played today", so a single day is
+  /// all it needs. A per-space map would require reading every opted-in space's daily to evaluate —
+  /// and that read GENERATES the daily server-side.
+  final String? dailyLastPlayed;
+
+  const GamesConfig({
+    this.dailyReminderEnabled = false,
+    this.dailyReminderMinuteOfDay = 18 * 60,
+    this.dailyLastPlayed,
+  });
+
+  GamesConfig copyWith({bool? dailyReminderEnabled, int? dailyReminderMinuteOfDay, String? dailyLastPlayed}) =>
+      GamesConfig(
+        dailyReminderEnabled: dailyReminderEnabled ?? this.dailyReminderEnabled,
+        dailyReminderMinuteOfDay: dailyReminderMinuteOfDay ?? this.dailyReminderMinuteOfDay,
+        dailyLastPlayed: dailyLastPlayed ?? this.dailyLastPlayed,
+      );
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is GamesConfig &&
+          other.dailyReminderEnabled == dailyReminderEnabled &&
+          other.dailyReminderMinuteOfDay == dailyReminderMinuteOfDay &&
+          other.dailyLastPlayed == dailyLastPlayed);
+
+  @override
+  int get hashCode => Object.hash(dailyReminderEnabled, dailyReminderMinuteOfDay, dailyLastPlayed);
+
+  @override
+  String toString() =>
+      'GamesConfig(dailyReminderEnabled: $dailyReminderEnabled, '
+      'dailyReminderMinuteOfDay: $dailyReminderMinuteOfDay, dailyLastPlayed: $dailyLastPlayed)';
+}
+```
+
+- [ ] **Step 4: Add the keys and wire `AppConfig`**
 
 In `mobile/lib/domain/models/settings_key.dart`, after the `// Spaces` block:
 
 ```dart
   // Games
-  gameDailyReminderEnabled<bool>(defaultValue: false),
-  gameDailyReminderMinuteOfDay<int>(defaultValue: 18 * 60),
-
-  /// The UTC `YYYY-MM-DD` of the last DAILY challenge finished on this device.
-  ///
-  /// One date, not a per-space map: the reminder's rule is "you have already played today", so a
-  /// single day is all it needs. A per-space map would require reading every opted-in space's daily
-  /// to evaluate — and that read GENERATES the daily server-side.
+  gameDailyReminderEnabled<bool>(),
+  gameDailyReminderMinuteOfDay<int>(),
   gameDailyLastPlayed<String?>(),
 ```
 
-Match the file's existing declaration style for defaults exactly.
+In `mobile/lib/domain/models/config/app_config.dart` make **all six** edits — the field, the
+constructor default, `copyWith`, `toString`, and one case in each switch:
+
+```dart
+  final GamesConfig games;                                    // field
+  // in the const constructor's parameter list:
+  this.games = const GamesConfig(),
+  // in copyWith's parameters and body, matching the file's existing style:
+  GamesConfig? games,
+  games: games ?? this.games,
+  // in read<T>:
+            .gameDailyReminderEnabled => games.dailyReminderEnabled,
+            .gameDailyReminderMinuteOfDay => games.dailyReminderMinuteOfDay,
+            .gameDailyLastPlayed => games.dailyLastPlayed,
+  // in write<T, U>:
+      .gameDailyReminderEnabled => copyWith(games: games.copyWith(dailyReminderEnabled: value as bool)),
+      .gameDailyReminderMinuteOfDay => copyWith(games: games.copyWith(dailyReminderMinuteOfDay: value as int)),
+      .gameDailyLastPlayed => copyWith(games: games.copyWith(dailyLastPlayed: value as String?)),
+```
+
+Also add `games` to `AppConfig`'s `==` / `hashCode` if the file implements them, and to `toString`.
+
+> **`copyWith(dailyLastPlayed: null)` cannot clear the field** — the `?? this.x` idiom this codebase
+> uses everywhere treats null as "leave alone". Nothing in this feature ever clears it (a recorded
+> play only moves forward), so that is acceptable and deliberate. Do not add a sentinel for it.
 
 - [ ] **Step 4: Run the test and confirm it passes**
 
@@ -464,7 +574,7 @@ import 'package:openapi/api.dart';
 
 class _MockScheduler extends Mock implements DailyReminderScheduler {}
 
-class _FakeSettings extends Mock implements SettingsService {
+class _FakeSettings extends Mock implements SettingsRepository {
   final Map<SettingsKey, Object?> values = {};
 
   @override
@@ -505,7 +615,7 @@ void main() {
     final result = ProviderContainer(
       overrides: [
         dailyReminderSchedulerProvider.overrideWithValue(scheduler),
-        settingsServiceProvider.overrideWithValue(settings),
+        settingsProvider.overrideWithValue(settings),
         sharedSpacesProvider.overrideWith((ref) async => spaces),
       ],
     );
@@ -613,7 +723,7 @@ void main() {
     final c = ProviderContainer(
       overrides: [
         dailyReminderSchedulerProvider.overrideWithValue(scheduler),
-        settingsServiceProvider.overrideWithValue(settings),
+        settingsProvider.overrideWithValue(settings),
         sharedSpacesProvider.overrideWith((ref) async => throw Exception('offline')),
       ],
     );
@@ -739,7 +849,7 @@ class DailyReminderController {
 
     await _ref.read(dailyReminderSchedulerProvider).cancelAll();
 
-    final settings = _ref.read(settingsServiceProvider);
+    final config = _ref.read(appConfigProvider);
     final scheduler = _ref.read(dailyReminderSchedulerProvider);
 
     // `dailyChallengeEnabled` is Optional<bool?> and `Absent.value` THROWS, so this must stay
@@ -748,11 +858,11 @@ class DailyReminderController {
 
     final occurrences = dailyReminderOccurrences(
       now: now ?? DateTime.now(),
-      minuteOfDay: settings.get(SettingsKey.gameDailyReminderMinuteOfDay),
-      enabled: settings.get(SettingsKey.gameDailyReminderEnabled),
+      minuteOfDay: config.read(SettingsKey.gameDailyReminderMinuteOfDay),
+      enabled: config.read(SettingsKey.gameDailyReminderEnabled),
       permissionGranted: await scheduler.hasPermission(),
       hasOptedInSpace: hasOptedInSpace,
-      lastPlayedDate: settings.get(SettingsKey.gameDailyLastPlayed),
+      lastPlayedDate: config.read(SettingsKey.gameDailyLastPlayed),
     );
 
     for (var i = 0; i < occurrences.length; i++) {
@@ -769,7 +879,7 @@ class DailyReminderController {
   /// Records that a daily was finished, then reschedules so today's occurrence drops immediately
   /// rather than waiting for the next resume.
   Future<void> recordDailyCompleted(DateTime dailyOn) async {
-    await _ref.read(settingsServiceProvider).set(SettingsKey.gameDailyLastPlayed, dailyKeyFor(dailyOn));
+    await _ref.read(settingsProvider).write(SettingsKey.gameDailyLastPlayed, dailyKeyFor(dailyOn));
     await refresh();
   }
 }
@@ -891,7 +1001,7 @@ Append to the `notificationSettings` list in `mobile/lib/widgets/settings/notifi
         title: 'game_daily_reminder_title'.tr(),
         subtitle: 'game_daily_reminder_subtitle'.tr(),
         onChanged: (value) async {
-          await ref.read(settingsServiceProvider).set(SettingsKey.gameDailyReminderEnabled, value);
+          await ref.read(settingsProvider).write(SettingsKey.gameDailyReminderEnabled, value);
           await ref.read(dailyReminderProvider).refresh();
         },
       ),
@@ -906,9 +1016,7 @@ Append to the `notificationSettings` list in `mobile/lib/widgets/settings/notifi
           );
           if (picked == null) return;
           reminderMinute.value = picked.hour * 60 + picked.minute;
-          await ref
-              .read(settingsServiceProvider)
-              .set(SettingsKey.gameDailyReminderMinuteOfDay, reminderMinute.value);
+          await ref.read(settingsProvider).write(SettingsKey.gameDailyReminderMinuteOfDay, reminderMinute.value);
           await ref.read(dailyReminderProvider).refresh();
         },
       ),
@@ -918,10 +1026,10 @@ with, above the list:
 
 ```dart
     final reminderEnabled = useValueNotifier(
-      ref.read(settingsServiceProvider).get(SettingsKey.gameDailyReminderEnabled),
+      ref.read(appConfigProvider).read(SettingsKey.gameDailyReminderEnabled),
     );
     final reminderMinute = useValueNotifier(
-      ref.read(settingsServiceProvider).get(SettingsKey.gameDailyReminderMinuteOfDay),
+      ref.read(appConfigProvider).read(SettingsKey.gameDailyReminderMinuteOfDay),
     );
 ```
 
