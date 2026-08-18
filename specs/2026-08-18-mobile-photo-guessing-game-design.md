@@ -11,11 +11,15 @@ game code at all. This design covers the Flutter client, which the original desi
 
 Three things are already done and must not be redone:
 
-- **Seven endpoints**, scoring, the per-space daily, monthly standings, and the per-space opt-in.
+- **Nine operations across seven routes**, scoring, the per-space daily, monthly standings, and the
+  per-space opt-in.
 - **The Dart OpenAPI client is generated** — `mobile/openapi/lib/api/games_api.dart` carries all
-  eight methods (`getDailyChallenge`, `getChallenges`, `getChallenge`, `guessRound`,
-  `getLeaderboard`, `getStandings`, `createChallenge`, `deleteChallenge`), and both space DTOs
-  already carry `dailyChallengeEnabled`.
+  nine methods (`getDailyChallenge`, `getChallenges`, `getChallenge`, `guessRound`,
+  `getLeaderboard`, `getStandings`, `createChallenge`, `deleteChallenge`, `getRoundImage`), and both
+  space DTOs already carry `dailyChallengeEnabled`.
+  **`getRoundImage` is deliberately unused.** It returns a `MultipartFile`, which cannot feed an
+  `ImageProvider` without buffering the whole body in Dart and bypassing the native image cache.
+  Round photos go through `RemoteImageProvider` over a URL instead (see the answer-leak rules).
 - **All 51 `game_*` i18n keys exist in all ten maintained locales.**
 
 **This feature therefore requires zero server changes, zero migrations, and no OpenAPI
@@ -204,13 +208,27 @@ player who guessed right.
 
 ### The Challenges page
 
-Reached from the space kebab. Composition mirrors web: daily hero, a `Standings` section tabbed
+Reached from the space kebab. Composition mirrors web: daily hero, a standings section tabbed
 `Today` / `This month`, then the custom challenge list with create behind a `+` for editors.
 
-Standings rows honour the standings design: competition ranks, and **anyone who has not played sorts
-last** regardless of score, rendering `—`. That rule is not redundant with ordering by total — a
-guess can legitimately score zero, and someone who showed up must never rank beneath someone who did
-not.
+**The two boards come from different endpoints.** `This month` is `getStandings`. `Today` is the
+**daily challenge's own leaderboard** — `getLeaderboard(dailyId)` — so it exists only when the space
+has a daily today. When it does not, there are no tabs at all and the monthly board renders alone.
+Following `standings-section.svelte`, the section opens on `Today` whenever a daily exists.
+
+**Neither board is sorted on the client.** `GameService` already applies `compareStandings` to both
+(`game.service.ts:725` for the leaderboard, `:759` for the monthly board), and the DTOs say so —
+"Per-player totals, highest first" and "best first, non-players last". The client renders in the
+order received. Re-sorting would at best duplicate the server and at worst break the rule that rank
+depends on: a member who played and scored zero must still outrank one who never turned up, which
+sorting by total alone destroys.
+
+The only ranking work on the client is `competitionRanks` over the received totals, so a tie reads
+`1, 2, 2, 4` rather than inventing a winner.
+
+Entry `name` comes from the DTO. **The member list is needed only for avatars**
+(`sharedSpaceMembersProvider`), and an entry whose member is missing is skipped rather than rendered
+without one — the member list is the stale side of that pair, not the board.
 
 ### The daily card and the opt-in
 
@@ -239,6 +257,16 @@ who pays.
 The toggle for an already-answered space lives on the Challenges page and goes through
 `SharedSpaceApiRepository.update`, which must keep its `Optional.absent()` discipline so a toggle
 never clobbers a field it did not show.
+
+**The Dart field is `Optional<bool?>`, but `null` is not sendable.** The server schema is
+`z.boolean().optional()` — optional, not nullable — so `Optional.present(null)` is a 400, exactly as
+it already is for `name` / `description` / `color`. There is deliberately no way to write the column
+back to "never asked", and none is wanted. Only `absent`, `present(true)` and `present(false)` are
+valid.
+
+Permissions come free: `SharedSpaceService.update` defaults to an Editor minimum, and
+`dailyChallengeEnabled` is **not** part of its `isOwnerOnlySettingsUpdate` check. Mobile must not
+gate the toggle to owners either, or the two clients disagree about who may switch it.
 
 ### Create and delete
 
@@ -299,9 +327,21 @@ That is read from the existing `sharedSpacesProvider`, which needs no extra requ
 every row of the list response — verified rather than assumed, because a list endpoint that
 projected a narrower column set would leave the gate permanently false with nothing to see.
 
-The refresh runs in `daily_reminder.provider.dart`, driven by `AppLifeCycleEnum.resumed` from
-`app_life_cycle.provider.dart`, and again when `GameSessionController` finishes a daily. When the
-last opted-in space is switched off, pending notifications are cancelled on that next run.
+The refresh runs in `daily_reminder.provider.dart` and is driven by three triggers, all of which are
+needed:
+
+1. **Cold start**, once the user and spaces list are available. `AppLifeCycleEnum.resumed` does not
+   fire on a cold launch, so relying on it alone would leave a freshly-installed or freshly-killed
+   app with nothing scheduled until it was backgrounded and reopened.
+2. **`AppLifeCycleEnum.resumed`** from `app_life_cycle.provider.dart`, for the returning case.
+3. **Finishing a daily**, so the nearest occurrence is dropped without waiting for a resume.
+
+When the last opted-in space is switched off, pending notifications are cancelled on that next run.
+
+**Permission is checked at schedule time, not only at toggle time.** A user can revoke notification
+permission in OS settings long after enabling the toggle, so the scheduler treats a denied
+permission as "schedule nothing" and the settings row reflects the OS state rather than asserting
+reminders are on when the OS will silently drop them.
 
 Permission reuses the flow already on that page rather than adding a second prompt.
 
@@ -366,36 +406,44 @@ so `build_runner` is not needed.
 
 Against a fake `GameApiRepository`, no widget tree.
 
-| Given                                               | When                 | Then                                                                                  |
-| --------------------------------------------------- | -------------------- | ------------------------------------------------------------------------------------- |
-| A challenge with no rounds answered                 | Loaded               | `currentIndex` 0, phase `guessing`                                                    |
-| Rounds 0–2 answered                                 | Loaded               | `currentIndex` 3                                                                      |
-| Every round answered                                | Loaded               | Phase `finished`, leaderboard fetched                                                 |
-| Phase `guessing`                                    | A guess is submitted | Exactly one `guessRound` call; phase `revealing`; result carries the refetched answer |
-| A guess already in flight                           | A second guess fires | Still exactly one call — the guard is real, not styling                               |
-| The server answers 409                              | A guess is submitted | Phase `revealing` with an answer and no guess pin; no error shown                     |
-| The post-guess refetch scores the current round     | The refetch lands    | `currentIndex` does not move                                                          |
-| Phase `revealing`, rounds remain                    | Next                 | Index advances, phase `guessing`                                                      |
-| Phase `revealing` on the final round                | Next                 | Phase `finished`, leaderboard fetched                                                 |
-| The network fails on guess                          | A guess is submitted | Phase stays `guessing`, `submitting` false, error surfaced                            |
-| The challenge is the daily and its last round lands | Completion           | `gameDailyLastPlayed` is written with the daily's UTC date                            |
-| The challenge is custom and its last round lands    | Completion           | `gameDailyLastPlayed` is **not** written                                              |
+| Given                                               | When                 | Then                                                                                     |
+| --------------------------------------------------- | -------------------- | ---------------------------------------------------------------------------------------- |
+| A challenge with no rounds answered                 | Loaded               | `currentIndex` 0, phase `guessing`                                                       |
+| Rounds 0–2 answered                                 | Loaded               | `currentIndex` 3                                                                         |
+| Every round answered                                | Loaded               | Phase `finished`, leaderboard fetched                                                    |
+| Phase `guessing`                                    | A guess is submitted | Exactly one `guessRound` call; phase `revealing`; result carries the refetched answer    |
+| A guess already in flight                           | A second guess fires | Still exactly one call — the guard is real, not styling                                  |
+| The server answers 409                              | A guess is submitted | Phase `revealing` with an answer and no guess pin; no error shown                        |
+| The post-guess refetch scores the current round     | The refetch lands    | `currentIndex` does not move                                                             |
+| Phase `revealing`, rounds remain                    | Next                 | Index advances, phase `guessing`                                                         |
+| Phase `revealing` on the final round                | Next                 | Phase `finished`, leaderboard fetched                                                    |
+| The network fails on guess                          | A guess is submitted | Phase stays `guessing`, `submitting` false, error surfaced                               |
+| The challenge is the daily and its last round lands | Completion           | `gameDailyLastPlayed` is written with the daily's UTC date                               |
+| The challenge is custom and its last round lands    | Completion           | `gameDailyLastPlayed` is **not** written                                                 |
+| Phase `revealing`, rounds remain                    | Next fires twice     | The index advances by exactly one — a double tap must not skip a round                   |
+| A challenge whose `rounds` list is empty            | Loaded               | Phase `finished`, no index out of range, no throw                                        |
+| A round whose asset was deleted server-side         | Guessed              | Scored from the frozen answer; the reveal renders without the photo rather than erroring |
+| The challenge refetch itself fails after a guess    | The refetch rejects  | The score is still shown, degraded; the session is not left stuck in `guessing`          |
 
 ### `daily_reminder_schedule_test.dart` — the scheduling policy
 
-| Given                                                         | Then                                             |
-| ------------------------------------------------------------- | ------------------------------------------------ |
-| Reminders disabled                                            | No occurrences                                   |
-| Enabled but no opted-in space                                 | No occurrences                                   |
-| Enabled, opted in, never played, time not yet passed today    | 7 occurrences, the first today                   |
-| Enabled, opted in, the local time already passed today        | The first occurrence is tomorrow                 |
-| `lastPlayedDate` equals the UTC date of the first occurrence  | That occurrence is dropped; 6 remain             |
-| `lastPlayedDate` is an earlier date                           | Nothing is dropped                               |
-| A viewer at UTC−10 whose 18:00 falls on the following UTC day | The comparison uses that following UTC date      |
-| A viewer at UTC+13                                            | The comparison uses the same UTC date            |
-| A local time that DST skips or repeats                        | No throw; the sequence stays strictly increasing |
-| `horizonDays` of 0                                            | No occurrences                                   |
-| Any result                                                    | Every occurrence is in the future                |
+| Given                                                         | Then                                                                 |
+| ------------------------------------------------------------- | -------------------------------------------------------------------- |
+| Reminders disabled                                            | No occurrences                                                       |
+| Enabled but no opted-in space                                 | No occurrences                                                       |
+| Enabled, opted in, never played, time not yet passed today    | 7 occurrences, the first today                                       |
+| Enabled, opted in, the local time already passed today        | The first occurrence is tomorrow                                     |
+| `lastPlayedDate` equals the UTC date of the first occurrence  | That occurrence is dropped; 6 remain                                 |
+| `lastPlayedDate` is an earlier date                           | Nothing is dropped                                                   |
+| A viewer at UTC−10 whose 18:00 falls on the following UTC day | The comparison uses that following UTC date                          |
+| A viewer at UTC+13                                            | The comparison uses the same UTC date                                |
+| A local time that DST skips or repeats                        | No throw; the sequence stays strictly increasing                     |
+| `horizonDays` of 0                                            | No occurrences                                                       |
+| Any result                                                    | Every occurrence is in the future                                    |
+| Notification permission denied                                | No occurrences, whatever the toggle says                             |
+| `lastPlayedDate` is in the future (clock skew)                | Treated as not-today; nothing beyond the matching day is dropped     |
+| `lastPlayedDate` is unparseable or empty                      | Treated as never played, no throw                                    |
+| The device timezone changes between two calls                 | Occurrences are recomputed against the new zone, not the old offsets |
 
 ### Widget tests
 
@@ -410,18 +458,34 @@ Each proven red first.
   connecting line; a date reveal draws the tick strip with both markers; Next advances.
 - **`daily_challenge_card_test.dart`** — all four tri-state cases, and the reserved height is the
   same for played and unplayed so the sliver does not jitter.
-- **`space_games_page_test.dart`** — standings tabs switch; ranks render 1, 2, 2, 4; a member who
-  has not played sorts last with `—`; create is absent for a viewer; delete confirms; delete is not
-  offered for the daily.
+- **`space_games_page_test.dart`** — the section opens on `Today` when a daily exists and shows no
+  tabs at all when it does not; ranks render 1, 2, 2, 4; a member who has not played renders `—`;
+  **rows appear in the order the server sent them**, asserted with a deliberately
+  "wrongly-sorted-looking" fixture — a zero-score player above a never-played one — so a client-side
+  re-sort fails the test; an entry with no matching member is skipped; create is absent for a
+  viewer; delete confirms; delete is not offered for the daily.
 - **`space_detail_kebab_test.dart`** — the `Challenges` item is present for viewers and editors
   alike, matching how People and Members are gated.
 - **`notification_setting_test.dart`** — the toggle and time persist; disabling cancels pending
   notifications; the toggle renders without any network call.
+- **`game_round_image_url_test.dart`** — `getGameRoundImageUrl` builds
+  `/games/{id}/rounds/{index}/image` against the stored endpoint and carries no asset id. Paired
+  with a **source guard**: no file outside that helper may construct a game round image path. The
+  single-helper rule is the answer-leak boundary, so it gets a test rather than a comment.
+- **`space_games_opt_in_test.dart`** — an editor toggling on sends `present(true)` and never
+  `present(null)`; toggling off sends `present(false)`; every other space field stays `absent`; the
+  control is offered to editors, not only owners.
+- **Error and offline states** — the daily card, the Challenges page and the play page each render a
+  failure state with a retry rather than an empty frame or an indefinite spinner when their request
+  rejects. These are the states a flaky connection actually produces, and none of them is reachable
+  from the happy-path tests above.
 
 ### What is deliberately not tested
 
-There is no e2e coverage for mobile in this repo, and none is added. The server's own e2e suite
-already covers the endpoints this client calls.
+`mobile/integration_test/` exists but hosts one background-sync teardown test, not a general
+end-to-end harness, and nothing here justifies building one. `mobile/test/medium/` is for Drift, and
+this feature never touches Drift. The server's own e2e suite already covers every endpoint this
+client calls, including the answer-leakage assertions.
 
 ## i18n
 
