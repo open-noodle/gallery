@@ -116,6 +116,76 @@ void main() {
     expect(find.byType(StandingsRow), findsNWidgets(1));
   });
 
+  testWidgets('tapping the month tab switches boards, and tapping back returns to Today', (tester) async {
+    await pump(
+      tester,
+      today: GameLeaderboardResponseDto(
+        entries: [GameLeaderboardResponseDtoEntriesInner(userId: 'a', name: 'Ana', total: 4000, answered: 5)],
+      ),
+    );
+
+    // Opens on Today, per the existing "opens on Today" test — just the starting point here.
+    expect(find.byType(StandingsRow), findsNWidgets(1));
+    expect(tester.widget<StandingsRow>(find.byType(StandingsRow)).userId, 'a');
+
+    await tester.tap(find.byKey(const Key('standings-tab-month')));
+    await tester.pumpAndSettle();
+
+    final monthRows = tester.widgetList(find.byType(StandingsRow)).cast<StandingsRow>().toList();
+    expect(
+      monthRows.map((row) => row.userId),
+      ['a', 'b', 'c', 'd'],
+      reason: 'An inverted showToday computation would still show the 1-row daily board here',
+    );
+
+    await tester.tap(find.byKey(const Key('standings-tab-today')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(StandingsRow), findsNWidgets(1));
+    expect(
+      tester.widget<StandingsRow>(find.byType(StandingsRow)).userId,
+      'a',
+      reason: 'A selection.first bug (e.g. reading the wrong side of the Set) would strand it on month',
+    );
+  });
+
+  // The tie-focused `month` fixture above is already in the exact order a descending-total sort
+  // produces (30, 30, 0, 0 — non-increasing), so a `sort((a, b) => b.total.compareTo(a.total))`
+  // mutation is a no-op on it BY CONSTRUCTION, not merely because Dart's sort happens to be stable
+  // for small lists. Real standings always arrive highest-first, so no realistic fixture can ever
+  // catch that specific accidental re-sort. This fixture is deliberately non-monotonic — total
+  // INCREASES from the first entry to the second, which a real server would never send — precisely
+  // so a re-sort has something to visibly disturb.
+  testWidgets(
+    'renders in arrival order even when totals are non-monotonic (synthetic — a real server never sends this)',
+    (tester) async {
+      final nonMonotonic = GameStandingsResponseDto(
+        month: '2026-08',
+        entries: [
+          GameStandingsResponseDtoEntriesInner(userId: 'x', name: 'Xen', total: 10, daysPlayed: 1),
+          GameStandingsResponseDtoEntriesInner(userId: 'y', name: 'Yara', total: 50, daysPlayed: 1),
+        ],
+      );
+
+      await tester.pumpConsumerWidget(
+        StandingsSection(
+          today: null,
+          todayRoundCount: 5,
+          month: nonMonotonic,
+          members: [_member('x'), _member('y')],
+          currentUserId: 'x',
+        ),
+      );
+
+      final rows = tester.widgetList(find.byType(StandingsRow)).cast<StandingsRow>().toList();
+      expect(
+        rows.map((row) => row.userId),
+        ['x', 'y'],
+        reason: 'A descending-total sort would swap these — the widget must trust array order unconditionally',
+      );
+    },
+  );
+
   testWidgets('an entry with no matching member is skipped rather than rendered nameless', (tester) async {
     await tester.pumpConsumerWidget(
       StandingsSection(today: null, todayRoundCount: 5, month: month, members: [_member('a')], currentUserId: 'a'),
