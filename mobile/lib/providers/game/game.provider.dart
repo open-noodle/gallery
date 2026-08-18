@@ -4,8 +4,9 @@ import 'package:openapi/api.dart';
 
 /// Today's daily for a space, or null when it has none.
 ///
-/// Reading this generates the daily server-side, so only watch it for a space whose
-/// `dailyChallengeEnabled` is true.
+/// Reading this generates the daily server-side when the space has opted in and none exists yet.
+/// For a space that has not opted in, the server returns a null challenge immediately, before any
+/// generation or DB write, so watching this unconditionally is cheap and harmless.
 final gameDailyProvider = FutureProvider.family<GameChallengeListItemResponseDto?, String>((ref, spaceId) {
   return ref.watch(gameApiRepositoryProvider).getDaily(spaceId);
 });

@@ -218,7 +218,11 @@ void main() {
     expect(state.result!.guess, isNull, reason: 'That request never reached the server');
   });
 
-  test('a network failure leaves the round guessable again', () async {
+  test('an offline guess, wrapped by the client as ApiException(400), leaves the round guessable '
+      'again', () async {
+    // The generated client wraps SocketException/TlsException/IOException/ClientException into
+    // ApiException(400, ...) (see openapi/lib/api_client.dart) -- this is the shape a real offline
+    // guess actually takes, not a bare Exception.
     when(() => repository.getChallenge('challenge-1')).thenAnswer((_) async => _challenge([_round(0), _round(1)]));
     when(
       () => repository.guessLocation(
@@ -227,7 +231,7 @@ void main() {
         lat: any(named: 'lat'),
         lon: any(named: 'lon'),
       ),
-    ).thenThrow(Exception('offline'));
+    ).thenThrow(ApiException(400, 'Socket operation failed'));
 
     final container = _container(repository);
     await container.read(gameSessionProvider('challenge-1').future);
@@ -236,6 +240,64 @@ void main() {
     final state = container.read(gameSessionProvider('challenge-1')).requireValue;
     expect(state.phase, GamePhase.guessing);
     expect(state.submitting, isFalse);
+    expect(state.lastError, isNotNull);
+  });
+
+  test('a non-ApiException guess failure also leaves the round guessable again', () async {
+    when(() => repository.getChallenge('challenge-1')).thenAnswer((_) async => _challenge([_round(0), _round(1)]));
+    when(
+      () => repository.guessLocation(
+        any(),
+        any(),
+        lat: any(named: 'lat'),
+        lon: any(named: 'lon'),
+      ),
+    ).thenThrow(Exception('unexpected'));
+
+    final container = _container(repository);
+    await container.read(gameSessionProvider('challenge-1').future);
+    await container.read(gameSessionProvider('challenge-1').notifier).guessLocation(lat: 1, lon: 1);
+
+    final state = container.read(gameSessionProvider('challenge-1')).requireValue;
+    expect(state.phase, GamePhase.guessing);
+    expect(state.submitting, isFalse);
+    expect(state.lastError, isNotNull);
+  });
+
+  test('lastError clears on a subsequent successful guess', () async {
+    var fetches = 0;
+    var attempts = 0;
+    when(() => repository.getChallenge('challenge-1')).thenAnswer((_) async {
+      fetches++;
+      return _challenge([if (fetches == 1) _round(0) else _round(0, score: 1), _round(1)]);
+    });
+    when(
+      () => repository.guessLocation(
+        any(),
+        any(),
+        lat: any(named: 'lat'),
+        lon: any(named: 'lon'),
+      ),
+    ).thenAnswer((_) async {
+      attempts++;
+      // The first attempt fails; the retry (same round, still `guessing`) succeeds.
+      if (attempts == 1) {
+        throw ApiException(400, 'Socket operation failed');
+      }
+      return _guessResponse(score: 1);
+    });
+
+    final container = _container(repository);
+    await container.read(gameSessionProvider('challenge-1').future);
+    final controller = container.read(gameSessionProvider('challenge-1').notifier);
+
+    await controller.guessLocation(lat: 1, lon: 1);
+    expect(container.read(gameSessionProvider('challenge-1')).requireValue.lastError, isNotNull);
+
+    await controller.guessLocation(lat: 1, lon: 1);
+    final state = container.read(gameSessionProvider('challenge-1')).requireValue;
+    expect(state.lastError, isNull, reason: 'A stale error banner must not survive a later successful guess');
+    expect(state.phase, GamePhase.revealing);
   });
 
   test('next advances exactly one round even when tapped twice', () async {
@@ -289,10 +351,16 @@ void main() {
 
     final state = container.read(gameSessionProvider('challenge-1')).requireValue;
     expect(state.phase, GamePhase.finished);
+    expect(
+      state.currentRound,
+      isNull,
+      reason:
+          'finished must imply no current round, or Task 9 re-renders the guessing surface for an already-answered round',
+    );
     verify(() => repository.getLeaderboard('challenge-1')).called(1);
   });
 
-  test('completing a daily reports its dailyOn date; a custom challenge reports nothing', () async {
+  test('completing a daily reports its dailyOn date', () async {
     final reported = <DateTime>[];
     var fetches = 0;
     when(() => repository.getChallenge('challenge-1')).thenAnswer((_) async {
@@ -316,6 +384,33 @@ void main() {
     await Future<void>.delayed(Duration.zero);
 
     expect(reported, [DateTime.utc(2026, 8, 18)]);
+  });
+
+  test('completing a custom (non-daily) challenge reports nothing', () async {
+    final reported = <DateTime>[];
+    var fetches = 0;
+    when(() => repository.getChallenge('challenge-1')).thenAnswer((_) async {
+      fetches++;
+      // dailyOn stays null: a player-created challenge, not a daily.
+      return _challenge([if (fetches == 1) _round(0) else _round(0, score: 1)]);
+    });
+    when(
+      () => repository.guessLocation(
+        any(),
+        any(),
+        lat: any(named: 'lat'),
+        lon: any(named: 'lon'),
+      ),
+    ).thenAnswer((_) async => _guessResponse(score: 1));
+
+    final container = _container(repository);
+    await container.read(gameSessionProvider('challenge-1').future);
+    final controller = container.read(gameSessionProvider('challenge-1').notifier)..onDailyCompleted = reported.add;
+    await controller.guessLocation(lat: 1, lon: 1);
+    controller.next();
+    await Future<void>.delayed(Duration.zero);
+
+    expect(reported, isEmpty);
   });
 
   test('a failed post-guess refetch still shows the score rather than sticking in guessing', () async {
