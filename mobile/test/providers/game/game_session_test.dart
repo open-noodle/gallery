@@ -1,0 +1,346 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/providers/game/game_session.provider.dart';
+import 'package:immich_mobile/repositories/game_api.repository.dart';
+import 'package:mocktail/mocktail.dart';
+import 'package:openapi/api.dart';
+
+class _MockGameApiRepository extends Mock implements GameApiRepository {}
+
+GameRoundDetailResponseDto _round(int index, {GameRoundType type = GameRoundType.location, num? score, num? lat}) =>
+    GameRoundDetailResponseDto(
+      index: index,
+      type: type,
+      score: score == null ? const Optional.absent() : Optional.present(score),
+      answer: score == null
+          ? const Optional.absent()
+          : Optional.present(GameRoundDetailResponseDtoAnswer(date: null, lat: lat ?? 1, lon: 2)),
+    );
+
+GameChallengeDetailResponseDto _challenge(List<GameRoundDetailResponseDto> rounds, {DateTime? dailyOn}) =>
+    GameChallengeDetailResponseDto(
+      id: 'challenge-1',
+      spaceId: 'space-1',
+      name: 'Challenge 1',
+      roundCount: rounds.length,
+      scaleKm: 100,
+      scaleDays: 100,
+      createdAt: DateTime.utc(2026, 8, 18),
+      closedAt: null,
+      dailyOn: dailyOn,
+      rounds: rounds,
+    );
+
+// GameGuessResponseDto has several other required-but-nullable fields (guessDate, guessLat,
+// guessLon, offsetDays) that the individual tests below do not care about — this fills them with
+// null so each call site can stay focused on the fields the assertions actually check.
+GameGuessResponseDto _guessResponse({required num score, num? distanceKm, num? offsetDays}) => GameGuessResponseDto(
+  roundId: 'r0',
+  userId: 'u',
+  score: score,
+  distanceKm: distanceKm,
+  offsetDays: offsetDays,
+  guessDate: null,
+  guessLat: null,
+  guessLon: null,
+);
+
+// Every test below drives `gameSessionProvider('challenge-1')` purely through `container.read`,
+// never `container.listen`. A bare `read` does not keep an autoDispose provider alive: Riverpod
+// schedules disposal (via a zero-duration Timer, see ProviderScheduler.scheduleProviderDispose)
+// the moment a read leaves zero listeners. That timer never fires while a test's awaits all
+// resolve on microtasks, but a real event-loop gap — `await Future<void>.delayed(Duration.zero)`,
+// used below to let `next()`'s un-awaited `_finish()` tail settle — is exactly the kind of gap
+// that lets it run, disposing the notifier and silently rebuilding it (a fresh `AsyncLoading`)
+// on the next read. Pinning a no-op listener keeps the same instance alive for the test's
+// lifetime, matching how a real widget tree (which always has a listener) would behave.
+ProviderContainer _container(GameApiRepository repository) {
+  final container = ProviderContainer(overrides: [gameApiRepositoryProvider.overrideWithValue(repository)]);
+  addTearDown(container.dispose);
+  container.listen(gameSessionProvider('challenge-1'), (_, __) {});
+  return container;
+}
+
+void main() {
+  late _MockGameApiRepository repository;
+
+  setUp(() {
+    repository = _MockGameApiRepository();
+    when(() => repository.getLeaderboard(any())).thenAnswer((_) async => GameLeaderboardResponseDto(entries: []));
+  });
+
+  test('starts at round 0 when nothing is answered', () async {
+    when(() => repository.getChallenge('challenge-1')).thenAnswer((_) async => _challenge([_round(0), _round(1)]));
+
+    final container = _container(repository);
+    final state = await container.read(gameSessionProvider('challenge-1').future);
+
+    expect(state.currentIndex, 0);
+    expect(state.phase, GamePhase.guessing);
+  });
+
+  test('resumes at the first unanswered round', () async {
+    when(
+      () => repository.getChallenge('challenge-1'),
+    ).thenAnswer((_) async => _challenge([_round(0, score: 10), _round(1, score: 20), _round(2)]));
+
+    final container = _container(repository);
+    final state = await container.read(gameSessionProvider('challenge-1').future);
+
+    expect(state.currentIndex, 2);
+  });
+
+  test('a fully answered challenge opens finished, with the leaderboard loaded', () async {
+    when(() => repository.getChallenge('challenge-1')).thenAnswer((_) async => _challenge([_round(0, score: 10)]));
+
+    final container = _container(repository);
+    final state = await container.read(gameSessionProvider('challenge-1').future);
+
+    expect(state.phase, GamePhase.finished);
+    expect(state.leaderboard, isNotNull);
+  });
+
+  test('an empty round list is finished rather than out of range', () async {
+    when(() => repository.getChallenge('challenge-1')).thenAnswer((_) async => _challenge([]));
+
+    final container = _container(repository);
+    final state = await container.read(gameSessionProvider('challenge-1').future);
+
+    expect(state.phase, GamePhase.finished);
+    expect(state.currentRound, isNull);
+  });
+
+  test('a guess reveals the answer from the refetch, not from the guess response', () async {
+    var fetches = 0;
+    when(() => repository.getChallenge('challenge-1')).thenAnswer((_) async {
+      fetches++;
+      // The second fetch is the post-guess one, where round 0 has become scored.
+      return _challenge([if (fetches == 1) _round(0) else _round(0, score: 4200, lat: 48.85), _round(1)]);
+    });
+    when(
+      () => repository.guessLocation(
+        any(),
+        any(),
+        lat: any(named: 'lat'),
+        lon: any(named: 'lon'),
+      ),
+    ).thenAnswer((_) async => _guessResponse(score: 4200, distanceKm: 38));
+
+    final container = _container(repository);
+    await container.read(gameSessionProvider('challenge-1').future);
+    final controller = container.read(gameSessionProvider('challenge-1').notifier);
+
+    await controller.guessLocation(lat: 48.0, lon: 2.0);
+    final state = container.read(gameSessionProvider('challenge-1')).requireValue;
+
+    expect(state.phase, GamePhase.revealing);
+    expect(state.result!.score, 4200);
+    expect(state.result!.distanceKm, 38);
+    expect(state.result!.answer!.lat, 48.85);
+    expect(state.result!.guess, isNotNull);
+  });
+
+  test('the resume index does not move when the refetch scores the current round', () async {
+    var fetches = 0;
+    when(() => repository.getChallenge('challenge-1')).thenAnswer((_) async {
+      fetches++;
+      return _challenge([if (fetches == 1) _round(0) else _round(0, score: 4200), _round(1)]);
+    });
+    when(
+      () => repository.guessLocation(
+        any(),
+        any(),
+        lat: any(named: 'lat'),
+        lon: any(named: 'lon'),
+      ),
+    ).thenAnswer((_) async => _guessResponse(score: 4200));
+
+    final container = _container(repository);
+    await container.read(gameSessionProvider('challenge-1').future);
+    await container.read(gameSessionProvider('challenge-1').notifier).guessLocation(lat: 1, lon: 1);
+
+    // Recomputing from the refreshed payload would jump to 1 and skip round 0's own reveal.
+    expect(container.read(gameSessionProvider('challenge-1')).requireValue.currentIndex, 0);
+  });
+
+  test('a second guess while one is in flight does not reach the server', () async {
+    when(() => repository.getChallenge('challenge-1')).thenAnswer((_) async => _challenge([_round(0), _round(1)]));
+    when(
+      () => repository.guessLocation(
+        any(),
+        any(),
+        lat: any(named: 'lat'),
+        lon: any(named: 'lon'),
+      ),
+    ).thenAnswer((_) async {
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+      return _guessResponse(score: 100);
+    });
+
+    final container = _container(repository);
+    await container.read(gameSessionProvider('challenge-1').future);
+    final controller = container.read(gameSessionProvider('challenge-1').notifier);
+
+    await Future.wait([controller.guessLocation(lat: 1, lon: 1), controller.guessLocation(lat: 2, lon: 2)]);
+
+    verify(
+      () => repository.guessLocation(
+        any(),
+        any(),
+        lat: any(named: 'lat'),
+        lon: any(named: 'lon'),
+      ),
+    ).called(1);
+  });
+
+  test('a 409 duplicate reveals the answer without a guess pin instead of erroring', () async {
+    var fetches = 0;
+    when(() => repository.getChallenge('challenge-1')).thenAnswer((_) async {
+      fetches++;
+      return _challenge([if (fetches == 1) _round(0) else _round(0, score: 900, lat: 10), _round(1)]);
+    });
+    when(
+      () => repository.guessLocation(
+        any(),
+        any(),
+        lat: any(named: 'lat'),
+        lon: any(named: 'lon'),
+      ),
+    ).thenThrow(ApiException(409, 'Already guessed'));
+
+    final container = _container(repository);
+    await container.read(gameSessionProvider('challenge-1').future);
+    await container.read(gameSessionProvider('challenge-1').notifier).guessLocation(lat: 1, lon: 1);
+
+    final state = container.read(gameSessionProvider('challenge-1')).requireValue;
+    expect(state.phase, GamePhase.revealing);
+    expect(state.result!.score, 900);
+    expect(state.result!.guess, isNull, reason: 'That request never reached the server');
+  });
+
+  test('a network failure leaves the round guessable again', () async {
+    when(() => repository.getChallenge('challenge-1')).thenAnswer((_) async => _challenge([_round(0), _round(1)]));
+    when(
+      () => repository.guessLocation(
+        any(),
+        any(),
+        lat: any(named: 'lat'),
+        lon: any(named: 'lon'),
+      ),
+    ).thenThrow(Exception('offline'));
+
+    final container = _container(repository);
+    await container.read(gameSessionProvider('challenge-1').future);
+    await container.read(gameSessionProvider('challenge-1').notifier).guessLocation(lat: 1, lon: 1);
+
+    final state = container.read(gameSessionProvider('challenge-1')).requireValue;
+    expect(state.phase, GamePhase.guessing);
+    expect(state.submitting, isFalse);
+  });
+
+  test('next advances exactly one round even when tapped twice', () async {
+    var fetches = 0;
+    when(() => repository.getChallenge('challenge-1')).thenAnswer((_) async {
+      fetches++;
+      return _challenge([if (fetches == 1) _round(0) else _round(0, score: 1), _round(1), _round(2)]);
+    });
+    when(
+      () => repository.guessLocation(
+        any(),
+        any(),
+        lat: any(named: 'lat'),
+        lon: any(named: 'lon'),
+      ),
+    ).thenAnswer((_) async => _guessResponse(score: 1));
+
+    final container = _container(repository);
+    await container.read(gameSessionProvider('challenge-1').future);
+    final controller = container.read(gameSessionProvider('challenge-1').notifier);
+    await controller.guessLocation(lat: 1, lon: 1);
+
+    controller.next();
+    controller.next();
+
+    expect(container.read(gameSessionProvider('challenge-1')).requireValue.currentIndex, 1);
+  });
+
+  test('next on the final round finishes and loads the leaderboard', () async {
+    var fetches = 0;
+    when(() => repository.getChallenge('challenge-1')).thenAnswer((_) async {
+      fetches++;
+      return _challenge([if (fetches == 1) _round(0) else _round(0, score: 1)]);
+    });
+    when(
+      () => repository.guessLocation(
+        any(),
+        any(),
+        lat: any(named: 'lat'),
+        lon: any(named: 'lon'),
+      ),
+    ).thenAnswer((_) async => _guessResponse(score: 1));
+
+    final container = _container(repository);
+    // Start unanswered so the session opens in `guessing`, then guess and advance.
+    await container.read(gameSessionProvider('challenge-1').future);
+    final controller = container.read(gameSessionProvider('challenge-1').notifier);
+    await controller.guessLocation(lat: 1, lon: 1);
+    controller.next();
+    await Future<void>.delayed(Duration.zero);
+
+    final state = container.read(gameSessionProvider('challenge-1')).requireValue;
+    expect(state.phase, GamePhase.finished);
+    verify(() => repository.getLeaderboard('challenge-1')).called(1);
+  });
+
+  test('completing a daily reports its dailyOn date; a custom challenge reports nothing', () async {
+    final reported = <DateTime>[];
+    var fetches = 0;
+    when(() => repository.getChallenge('challenge-1')).thenAnswer((_) async {
+      fetches++;
+      return _challenge([if (fetches == 1) _round(0) else _round(0, score: 1)], dailyOn: DateTime.utc(2026, 8, 18));
+    });
+    when(
+      () => repository.guessLocation(
+        any(),
+        any(),
+        lat: any(named: 'lat'),
+        lon: any(named: 'lon'),
+      ),
+    ).thenAnswer((_) async => _guessResponse(score: 1));
+
+    final container = _container(repository);
+    await container.read(gameSessionProvider('challenge-1').future);
+    final controller = container.read(gameSessionProvider('challenge-1').notifier)..onDailyCompleted = reported.add;
+    await controller.guessLocation(lat: 1, lon: 1);
+    controller.next();
+    await Future<void>.delayed(Duration.zero);
+
+    expect(reported, [DateTime.utc(2026, 8, 18)]);
+  });
+
+  test('a failed post-guess refetch still shows the score rather than sticking in guessing', () async {
+    var fetches = 0;
+    when(() => repository.getChallenge('challenge-1')).thenAnswer((_) async {
+      fetches++;
+      if (fetches > 1) throw Exception('offline');
+      return _challenge([_round(0), _round(1)]);
+    });
+    when(
+      () => repository.guessLocation(
+        any(),
+        any(),
+        lat: any(named: 'lat'),
+        lon: any(named: 'lon'),
+      ),
+    ).thenAnswer((_) async => _guessResponse(score: 2500, distanceKm: 12));
+
+    final container = _container(repository);
+    await container.read(gameSessionProvider('challenge-1').future);
+    await container.read(gameSessionProvider('challenge-1').notifier).guessLocation(lat: 1, lon: 1);
+
+    final state = container.read(gameSessionProvider('challenge-1')).requireValue;
+    expect(state.phase, GamePhase.revealing);
+    expect(state.result!.score, 2500);
+    expect(state.result!.answer, isNull, reason: 'The answer was never retrieved');
+  });
+}
