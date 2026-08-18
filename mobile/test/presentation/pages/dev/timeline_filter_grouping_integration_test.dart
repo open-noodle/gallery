@@ -166,7 +166,7 @@ void main() {
     // this test by subscribing a listener.  Without a listener the autoDispose
     // machinery would collect it between the `await` and the bucket read,
     // causing PhotosFilterSearchNotifier.getAssets to throw "after dispose".
-    final sub = container.listen(photosFilterSearchProvider, (_, __) {});
+    final sub = container.listen(photosFilterSearchProvider, (_, _) {});
     addTearDown(sub.close);
 
     // Read the photos timeline query provider — this builds the search-backed
@@ -226,7 +226,7 @@ void main() {
     container.read(photosFilterProvider.notifier).setNotInAlbum(true);
 
     // Keep `photosFilterSearchProvider` alive across the awaits.
-    final sub = container.listen(photosFilterSearchProvider, (_, __) {});
+    final sub = container.listen(photosFilterSearchProvider, (_, _) {});
     addTearDown(sub.close);
 
     // Selecting Months groups the filtered results by month.
@@ -295,7 +295,7 @@ void main() {
 
     container.read(photosFilterProvider.notifier).setNotInAlbum(true);
 
-    final sub = container.listen(photosFilterSearchProvider, (_, __) {});
+    final sub = container.listen(photosFilterSearchProvider, (_, _) {});
     addTearDown(sub.close);
 
     expect(container.read(timelineOverviewModeProvider), TimelineOverviewMode.all, reason: 'Selector opens on All');

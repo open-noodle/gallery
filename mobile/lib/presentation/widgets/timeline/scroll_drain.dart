@@ -54,15 +54,23 @@ ScrollDrainAction decideScrollDrain({
   required int attempts,
   required int maxAttempts,
 }) {
-  if (!hasPending) return ScrollDrainAction.idle;
+  if (!hasPending) {
+    return ScrollDrainAction.idle;
+  }
   // `scroll` stays ahead of the budget check so a request that becomes ready on the
   // very last frame still scrolls. `!isOverviewTimeline` gates it so an overview
   // timeline can never scroll to a year/month card — the #822 symptom.
-  if (segmentsLoaded && laidOut && segmentMatched && !isOverviewTimeline) return ScrollDrainAction.scroll;
+  if (segmentsLoaded && laidOut && segmentMatched && !isOverviewTimeline) {
+    return ScrollDrainAction.scroll;
+  }
   // The budget sits AHEAD of the switch so a grouping write that never lands
   // (pinned by timelineArgs, or a dateless bucket source) cannot spin forever.
-  if (attempts >= maxAttempts) return ScrollDrainAction.giveUp;
-  if (isOverviewTimeline) return ScrollDrainAction.switchToDayGrouping;
+  if (attempts >= maxAttempts) {
+    return ScrollDrainAction.giveUp;
+  }
+  if (isOverviewTimeline) {
+    return ScrollDrainAction.switchToDayGrouping;
+  }
   return ScrollDrainAction.retry;
 }
 
@@ -125,7 +133,11 @@ ScrollResolveOutcome decideScrollResolve({
   required bool stillHasClients,
   required bool targetUnchanged,
 }) {
-  if (!stillMounted || !stillHasClients) return ScrollResolveOutcome.abandonUnmounted;
-  if (!targetUnchanged) return ScrollResolveOutcome.abandonStale;
+  if (!stillMounted || !stillHasClients) {
+    return ScrollResolveOutcome.abandonUnmounted;
+  }
+  if (!targetUnchanged) {
+    return ScrollResolveOutcome.abandonStale;
+  }
   return ScrollResolveOutcome.proceed;
 }

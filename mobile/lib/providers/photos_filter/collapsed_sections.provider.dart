@@ -14,7 +14,9 @@ String encodeCollapsedSections(Set<FilterSectionId> ids) => jsonEncode(ids.map((
 Set<FilterSectionId> decodeCollapsedSections(String json) {
   try {
     final raw = jsonDecode(json);
-    if (raw is! List) return {};
+    if (raw is! List) {
+      return {};
+    }
     return raw.whereType<String>().map(FilterSectionId.fromStorageId).whereType<FilterSectionId>().toSet();
   } catch (_) {
     return {};
@@ -54,7 +56,9 @@ class CollapsedSectionsNotifier extends Notifier<Set<FilterSectionId>> {
 
   void toggle(FilterSectionId id) {
     final next = Set<FilterSectionId>.from(state);
-    if (!next.remove(id)) next.add(id);
+    if (!next.remove(id)) {
+      next.add(id);
+    }
     state = next;
     // Fire-and-forget persist; state is source of truth in-memory.
     unawaited(ref.read(filterSectionPrefsProvider).saveCollapsed(next));

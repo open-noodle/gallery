@@ -215,7 +215,9 @@ void main() {
         overrides: [
           timeBucketsProvider.overrideWith((ref, filter) async {
             calls++;
-            if (calls == 1) throw Exception('network down');
+            if (calls == 1) {
+              throw Exception('network down');
+            }
             return const <BucketLite>[(timeBucket: '2024-06-01', count: 10)];
           }),
         ],

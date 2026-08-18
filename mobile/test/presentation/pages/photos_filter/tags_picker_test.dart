@@ -31,7 +31,9 @@ class _FlakyTagNotifier extends TagNotifier {
   @override
   Future<Set<Tag>> build() async {
     calls++;
-    if (calls == 1) throw Exception('network down');
+    if (calls == 1) {
+      throw Exception('network down');
+    }
     return tags;
   }
 }

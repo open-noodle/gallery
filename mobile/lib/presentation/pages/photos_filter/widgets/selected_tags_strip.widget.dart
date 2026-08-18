@@ -15,7 +15,9 @@ class SelectedTagsStrip extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tagIds = ref.watch(photosFilterProvider.select((f) => f.tagIds ?? const <String>[]));
-    if (tagIds.isEmpty) return const SizedBox.shrink();
+    if (tagIds.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
     final tagsById = {for (final t in ref.watch(tagProvider).valueOrNull ?? const {}) t.id: t.value};
 

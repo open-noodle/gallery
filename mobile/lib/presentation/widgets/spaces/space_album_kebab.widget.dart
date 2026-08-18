@@ -37,7 +37,9 @@ class SpaceAlbumKebab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (!canEdit) return const SizedBox.shrink();
+    if (!canEdit) {
+      return const SizedBox.shrink();
+    }
 
     return PopupMenuButton<_KebabAction>(
       onSelected: (action) {

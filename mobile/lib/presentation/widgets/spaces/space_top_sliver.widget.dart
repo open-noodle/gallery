@@ -85,7 +85,7 @@ double computeTopSliverHeight({
   final albumsAsync = ref.watch(spaceAlbumsProvider(spaceId));
   final shelfHeight = albumsAsync.when(
     loading: () => canEdit ? kSpaceAlbumsShelfHeight : 0.0,
-    error: (_, __) => 0.0,
+    error: (_, _) => 0.0,
     data: (albums) => (albums.isNotEmpty || canEdit) ? kSpaceAlbumsShelfHeight : 0.0,
   );
 

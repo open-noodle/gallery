@@ -50,7 +50,9 @@ class CameraPickerMakeAccordion extends ConsumerWidget {
             display = [...display, expanded];
           }
         }
-        if (display.isEmpty) return const SizedBox.shrink();
+        if (display.isEmpty) {
+          return const SizedBox.shrink();
+        }
         return Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -153,7 +155,9 @@ class _ModelList extends ConsumerWidget {
       child: modelsAsync.when(
         data: (models) {
           final filtered = query.isEmpty ? models : models.where((m) => m.toLowerCase().contains(query)).toList();
-          if (filtered.isEmpty) return const SizedBox.shrink();
+          if (filtered.isEmpty) {
+            return const SizedBox.shrink();
+          }
           return Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,

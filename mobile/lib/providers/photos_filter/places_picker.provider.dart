@@ -14,7 +14,9 @@ final placesPickerCountriesProvider = Provider.autoDispose<AsyncValue<List<Strin
   final query = ref.watch(placesPickerQueryProvider).trim().toLowerCase();
   return suggestions.whenData((s) {
     final countries = s.countries;
-    if (query.isEmpty) return countries;
+    if (query.isEmpty) {
+      return countries;
+    }
     return countries.where((c) => c.toLowerCase().contains(query)).toList();
   });
 });

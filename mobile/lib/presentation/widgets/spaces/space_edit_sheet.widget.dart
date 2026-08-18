@@ -68,7 +68,9 @@ class _SpaceEditSheetState extends ConsumerState<SpaceEditSheet> {
   bool get _canSave => _nameController.text.trim().isNotEmpty && !_isSaving;
 
   Future<void> _save() async {
-    if (!_canSave) return;
+    if (!_canSave) {
+      return;
+    }
     setState(() => _isSaving = true);
 
     final description = _descriptionController.text;
@@ -84,7 +86,9 @@ class _SpaceEditSheetState extends ConsumerState<SpaceEditSheet> {
             description: description == _originalDescription ? null : description,
             color: _color,
           );
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       // Reset the in-flight guard even on success: the widget isn't guaranteed to be
       // unmounted synchronously by onClose (its production wiring pops the sheet, but
       // e.g. a bare pump in tests can keep this same State alive), and leaving save
@@ -94,7 +98,9 @@ class _SpaceEditSheetState extends ConsumerState<SpaceEditSheet> {
       ImmichToast.show(context: context, msg: context.t.spaces_edit_success, toastType: ToastType.success);
       widget.onClose(true);
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       setState(() => _isSaving = false);
       // The sheet staying open is not, on its own, feedback: the user taps Save and sees
       // nothing change. A revoked role (403) has to say so. `ImmichToast` schedules a
