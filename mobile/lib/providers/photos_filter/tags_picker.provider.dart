@@ -13,6 +13,8 @@ final tagsPickerFilteredProvider = FutureProvider.autoDispose<List<Tag>>((ref) a
   final all = (await ref.watch(tagProvider.future)).toList()
     ..sort((a, b) => a.value.toLowerCase().compareTo(b.value.toLowerCase()));
   final query = ref.watch(tagsPickerQueryProvider).trim().toLowerCase();
-  if (query.isEmpty) return all;
+  if (query.isEmpty) {
+    return all;
+  }
   return all.where((t) => t.value.toLowerCase().contains(query)).toList();
 });

@@ -124,7 +124,9 @@ void main() {
     // infinite-scroll test) so the widget assertions can run.
     final prevOnError = FlutterError.onError;
     FlutterError.onError = (details) {
-      if (details.exception.toString().contains('overflowed')) return;
+      if (details.exception.toString().contains('overflowed')) {
+        return;
+      }
       prevOnError?.call(details);
     };
     addTearDown(() => FlutterError.onError = prevOnError);

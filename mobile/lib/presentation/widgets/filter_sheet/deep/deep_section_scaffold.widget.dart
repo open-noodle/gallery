@@ -46,7 +46,9 @@ class _DeepSectionScaffoldState<T> extends State<DeepSectionScaffold<T>> {
   Widget build(BuildContext context) {
     final items = widget.items;
     final data = items.valueOrNull;
-    if (data != null) _lastData = data;
+    if (data != null) {
+      _lastData = data;
+    }
 
     final cache = _lastData;
     final isEmpty = cache != null && cache.isEmpty;

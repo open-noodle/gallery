@@ -26,6 +26,8 @@ final sharedSpaceMembersProvider = FutureProvider.family<List<SharedSpaceMemberR
 final currentSpaceMemberProvider = FutureProvider.family<SharedSpaceMemberResponseDto?, String>((ref, spaceId) async {
   final members = await ref.watch(sharedSpaceMembersProvider(spaceId).future);
   final currentUser = ref.watch(currentUserProvider);
-  if (currentUser == null) return null;
+  if (currentUser == null) {
+    return null;
+  }
   return members.where((m) => m.userId == currentUser.id).firstOrNull;
 });

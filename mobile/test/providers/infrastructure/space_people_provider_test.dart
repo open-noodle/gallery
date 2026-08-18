@@ -71,7 +71,7 @@ void main() {
 
       const key = (spaceId: 'space-1', sortBy: PeopleSortBy.name);
 
-      final subscription = container.listen(driftSpacePeopleProvider(key), (_, __) {});
+      final subscription = container.listen(driftSpacePeopleProvider(key), (_, _) {});
       async.flushMicrotasks();
       verify(() => mockRepository.getSpacePeople('space-1', sortBy: PeopleSortBy.name)).called(1);
 
@@ -81,7 +81,7 @@ void main() {
       async.elapse(const Duration(milliseconds: 1));
       async.flushMicrotasks();
 
-      container.listen(driftSpacePeopleProvider(key), (_, __) {});
+      container.listen(driftSpacePeopleProvider(key), (_, _) {});
       async.flushMicrotasks();
 
       verify(() => mockRepository.getSpacePeople('space-1', sortBy: PeopleSortBy.name)).called(1);

@@ -10,7 +10,9 @@ import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dar
 Future<void> _openPicker(BuildContext context, WidgetRef ref) async {
   final now = DateTime.now();
   final range = await showDateRangePicker(context: context, firstDate: DateTime(1970), lastDate: now);
-  if (range == null) return;
+  if (range == null) {
+    return;
+  }
   unawaited(HapticFeedback.selectionClick());
   ref.read(photosFilterProvider.notifier).setDateRange(start: range.start, end: range.end);
 }
@@ -80,7 +82,9 @@ class WhenStrip extends ConsumerWidget {
   bool _matches(SearchDateRange date, _WhenPreset preset) {
     final a = date.takenAfter;
     final b = date.takenBefore;
-    if (a == null || b == null) return false;
+    if (a == null || b == null) {
+      return false;
+    }
     bool sameDay(DateTime x, DateTime y) => x.year == y.year && x.month == y.month && x.day == y.day;
     return sameDay(a, preset.start) && sameDay(b, preset.end);
   }

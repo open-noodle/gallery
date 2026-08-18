@@ -44,7 +44,9 @@ class WhenPickerYearAccordion extends ConsumerWidget {
       loading: () => const SizedBox.shrink(),
       error: (e, st) => const SizedBox.shrink(),
       data: (years) {
-        if (years.isEmpty) return const SizedBox.shrink();
+        if (years.isEmpty) {
+          return const SizedBox.shrink();
+        }
         return Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,

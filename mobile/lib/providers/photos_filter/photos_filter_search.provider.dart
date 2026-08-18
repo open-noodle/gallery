@@ -60,11 +60,15 @@ class PhotosFilterSearchNotifier extends StateNotifier<PhotosFilterSearchState> 
   bool get isLoading => state.isLoading;
 
   Future<void> loadMore() async {
-    if (state.nextPage == null || state.isLoading || _disposed) return;
+    if (state.nextPage == null || state.isLoading || _disposed) {
+      return;
+    }
     state = state.copyWith(isLoading: true);
 
     final result = await _search.search(_filter, state.nextPage!);
-    if (_disposed) return;
+    if (_disposed) {
+      return;
+    }
 
     if (result == null) {
       // Empty results or an error — stop paging (no page-1 retry loop).
@@ -75,7 +79,9 @@ class PhotosFilterSearchNotifier extends StateNotifier<PhotosFilterSearchState> 
     final fresh = result.assets.where((a) => _ids.add(_assetKey(a))).toList(growable: false);
     final assets = [...state.assets, ...fresh];
     state = PhotosFilterSearchState(assets: assets, nextPage: result.nextPage, isLoading: false);
-    if (!_countController.isClosed) _countController.add(assets.length);
+    if (!_countController.isClosed) {
+      _countController.add(assets.length);
+    }
   }
 
   /// Returns a stable unique key for deduplication.
