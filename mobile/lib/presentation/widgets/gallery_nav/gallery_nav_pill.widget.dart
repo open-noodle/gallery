@@ -47,16 +47,24 @@ class _GalleryNavPillState extends State<GalleryNavPill> {
   }
 
   void _measure() {
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     final pillBox = _pillKey.currentContext?.findRenderObject() as RenderBox?;
-    if (pillBox == null) return;
+    if (pillBox == null) {
+      return;
+    }
 
     final rects = <GalleryTabEnum, Rect>{};
     for (final entry in _keys.entries) {
       final ctx = entry.value.currentContext;
-      if (ctx == null) continue;
+      if (ctx == null) {
+        continue;
+      }
       final box = ctx.findRenderObject() as RenderBox?;
-      if (box == null) continue;
+      if (box == null) {
+        continue;
+      }
       // Project through the full transform rather than diffing origins: the
       // segments sit inside a `FittedBox` that may scale them down (#909), so
       // their raw `size` is the pre-scale size and would leave the underlay
@@ -69,9 +77,13 @@ class _GalleryNavPillState extends State<GalleryNavPill> {
   }
 
   bool _rectsEqual(Map<GalleryTabEnum, Rect> a, Map<GalleryTabEnum, Rect> b) {
-    if (a.length != b.length) return false;
+    if (a.length != b.length) {
+      return false;
+    }
     for (final entry in a.entries) {
-      if (b[entry.key] != entry.value) return false;
+      if (b[entry.key] != entry.value) {
+        return false;
+      }
     }
     return true;
   }
