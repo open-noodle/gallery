@@ -804,7 +804,9 @@ class SyncStreamRepository extends DatabaseAccessor<Drift> with $SyncStreamRepos
 
   Future<void> deleteLibrariesV1(Iterable<SyncLibraryDeleteV1> data, {required String currentUserId}) async {
     final libraryIds = data.map((d) => d.libraryId).toList();
-    if (libraryIds.isEmpty) return;
+    if (libraryIds.isEmpty) {
+      return;
+    }
 
     try {
       await _db.transaction(() async {

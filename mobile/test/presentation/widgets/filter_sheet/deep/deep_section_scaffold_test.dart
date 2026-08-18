@@ -27,7 +27,7 @@ Future<ValueNotifier<AsyncValue<List<int>>>> _pump(
   await tester.pumpConsumerWidget(
     ValueListenableBuilder<AsyncValue<List<int>>>(
       valueListenable: notifier,
-      builder: (_, value, __) => DeepSectionScaffold<int>(
+      builder: (_, value, _) => DeepSectionScaffold<int>(
         sectionId: FilterSectionId.people,
         titleKey: 'filter_sheet_deep_people_section',
         emptyCaptionKey: emptyKey,
