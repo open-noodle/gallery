@@ -31,7 +31,7 @@ void main() {
 
   setUpAll(() async {
     db = Drift(DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true));
-    storeService = await StoreService.init(storeRepository: DriftStoreRepository(db), listenUpdates: false);
+    storeService = await StoreService.init(storeRepository: StoreRepository(db), listenUpdates: false);
     // Upstream #30072 ("do not show the whats new page on fresh login") made the
     // fresh-install branch of migrateDatabaseIfNeeded call
     // FeatureMessageService(SettingsRepository.instance), so the singleton must
