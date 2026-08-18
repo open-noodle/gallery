@@ -24,7 +24,9 @@ class SortIconButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final filter = ref.watch(photosFilterProvider);
-    if (filter.isEmpty) return const SizedBox.shrink();
+    if (filter.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
     final smart = filter.context != null && filter.context!.isNotEmpty;
     final effective = (!smart && filter.sort == SearchSortOrder.relevance) ? SearchSortOrder.newest : filter.sort;
@@ -57,7 +59,9 @@ class SortIconButton extends ConsumerWidget {
               RadioGroup<SearchSortOrder>(
                 groupValue: current,
                 onChanged: (v) {
-                  if (v != null) ref.read(photosFilterProvider.notifier).setSort(v);
+                  if (v != null) {
+                    ref.read(photosFilterProvider.notifier).setSort(v);
+                  }
                   Navigator.of(ctx).pop();
                 },
                 child: Column(
