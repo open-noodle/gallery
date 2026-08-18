@@ -33,7 +33,7 @@ LatLngBounds globeBounds() => LatLngBounds(southwest: const LatLng(-89, -179), n
 
 void main() {
   late MediumRepositoryContext ctx;
-  late DriftTimelineRepository sut;
+  late TimelineRepository sut;
 
   setUpAll(() async {
     await initializeDateFormatting('en');
@@ -41,7 +41,7 @@ void main() {
 
   setUp(() {
     ctx = MediumRepositoryContext();
-    sut = DriftTimelineRepository(ctx.db);
+    sut = TimelineRepository(ctx.db);
   });
 
   tearDown(() async {

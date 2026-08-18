@@ -62,7 +62,7 @@ class MemoryData {
 }
 
 /// A specialized collection of assets with some novel display mechanism
-// TODO(agg23): DriftMemoryRepository currently mutates `assets`
+// TODO(agg23): MemoryRepository currently mutates `assets`
 @Freezed(makeCollectionsUnmodifiable: false)
 abstract class Memory with _$Memory {
   const factory Memory({
