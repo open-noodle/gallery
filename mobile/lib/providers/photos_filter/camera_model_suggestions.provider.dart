@@ -8,7 +8,9 @@ import 'package:openapi/api.dart';
 /// make is null/empty. Not debounced — a single user tap (make-expand) drives
 /// re-fetch. Mirrors citySuggestionsProvider.
 final cameraModelSuggestionsProvider = FutureProvider.autoDispose.family<List<String>, String?>((ref, make) async {
-  if (make == null || make.isEmpty) return const <String>[];
+  if (make == null || make.isEmpty) {
+    return const <String>[];
+  }
   final api = ref.watch(apiServiceProvider).searchApi;
   final response = await api.getSearchSuggestionsWithHttpInfo(
     SearchSuggestionType.cameraModel,

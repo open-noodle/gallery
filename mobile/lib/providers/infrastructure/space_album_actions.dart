@@ -30,7 +30,9 @@ class SpaceAlbumActions {
   /// Calls PUT for each albumId sequentially. On success fires one sync-nudge.
   /// If [albumIds] is empty, does nothing (no API call, no nudge).
   Future<void> link(String spaceId, List<String> albumIds) async {
-    if (albumIds.isEmpty) return;
+    if (albumIds.isEmpty) {
+      return;
+    }
     for (final albumId in albumIds) {
       await _repo.linkAlbum(spaceId, albumId);
     }
@@ -65,7 +67,9 @@ class SpaceAlbumActions {
   /// empty, does nothing (no API call, no nudge). On API failure the exception
   /// propagates and the nudge is skipped (fail-fast).
   Future<int> addAssets(String albumId, List<String> assetIds) async {
-    if (assetIds.isEmpty) return 0;
+    if (assetIds.isEmpty) {
+      return 0;
+    }
     final result = await _albumApiRepo.addAssets(albumId, assetIds);
     await _syncManager.syncRemote();
     return result.added.length;

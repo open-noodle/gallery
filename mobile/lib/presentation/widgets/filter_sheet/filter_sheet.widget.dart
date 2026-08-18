@@ -77,12 +77,18 @@ class _FilterSheetState extends ConsumerState<FilterSheet> {
   @override
   Widget build(BuildContext context) {
     final snap = ref.watch(photosFilterSheetProvider);
-    if (snap == FilterSheetSnap.hidden) return const SizedBox.shrink();
+    if (snap == FilterSheetSnap.hidden) {
+      return const SizedBox.shrink();
+    }
 
     ref.listen<FilterSheetSnap>(photosFilterSheetProvider, (prev, next) {
-      if (next == FilterSheetSnap.hidden || !_controller.isAttached) return;
+      if (next == FilterSheetSnap.hidden || !_controller.isAttached) {
+        return;
+      }
       final target = _targetExtent(next);
-      if ((_controller.size - target).abs() < 0.01) return;
+      if ((_controller.size - target).abs() < 0.01) {
+        return;
+      }
       unawaited(_controller.animateTo(target, duration: const Duration(milliseconds: 280), curve: Curves.easeOutCubic));
       if (MediaQuery.of(context).accessibleNavigation) {
         unawaited(
@@ -100,7 +106,9 @@ class _FilterSheetState extends ConsumerState<FilterSheet> {
       // hidden does back propagate up to the tab shell / app.
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
-        if (didPop) return;
+        if (didPop) {
+          return;
+        }
         ref.read(photosFilterSheetProvider.notifier).state = FilterSheetSnap.hidden;
       },
       child: Stack(

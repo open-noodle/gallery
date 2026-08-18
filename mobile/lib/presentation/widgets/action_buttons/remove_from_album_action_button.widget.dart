@@ -40,7 +40,9 @@ class RemoveFromAlbumActionButton extends ConsumerWidget {
 
     final result = await ref.read(actionProvider.notifier).removeFromAlbum(source, albumId);
     ref.read(multiSelectProvider.notifier).reset();
-    if (result.success) onComplete?.call();
+    if (result.success) {
+      onComplete?.call();
+    }
     if (!context.mounted) {
       return;
     }

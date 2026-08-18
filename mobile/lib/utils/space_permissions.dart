@@ -16,7 +16,9 @@ import 'package:openapi/api.dart';
 SharedSpaceRole? _roleOf(SharedSpaceResponseDto space, String currentUserId) {
   final members = space.members.orElse(null) ?? const <SharedSpaceMemberResponseDto>[];
   for (final member in members) {
-    if (member.userId == currentUserId) return member.role;
+    if (member.userId == currentUserId) {
+      return member.role;
+    }
   }
   return null;
 }
@@ -27,15 +29,23 @@ SharedSpaceRole? _roleOf(SharedSpaceResponseDto space, String currentUserId) {
 /// row: `getAll` does not guarantee the creator appears in `members`, so relying on
 /// the list alone would lock a space's own creator out of it.
 bool spaceIsWritable(SharedSpaceResponseDto space, String? currentUserId) {
-  if (currentUserId == null) return false;
-  if (space.createdById == currentUserId) return true;
+  if (currentUserId == null) {
+    return false;
+  }
+  if (space.createdById == currentUserId) {
+    return true;
+  }
   return roleIsWritable(_roleOf(space, currentUserId));
 }
 
 /// Whether [currentUserId] owns [space] — the gate for destructive actions.
 bool spaceIsOwned(SharedSpaceResponseDto space, String? currentUserId) {
-  if (currentUserId == null) return false;
-  if (space.createdById == currentUserId) return true;
+  if (currentUserId == null) {
+    return false;
+  }
+  if (space.createdById == currentUserId) {
+    return true;
+  }
   return _roleOf(space, currentUserId) == SharedSpaceRole.owner;
 }
 

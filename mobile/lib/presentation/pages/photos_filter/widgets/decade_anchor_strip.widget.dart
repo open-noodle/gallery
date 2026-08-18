@@ -24,7 +24,9 @@ class DecadeAnchorStrip extends ConsumerWidget {
       orElse: () => const <DecadeBucket>[],
     );
 
-    if (decades.isEmpty) return const SizedBox.shrink();
+    if (decades.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
     return SizedBox(
       height: 44,
