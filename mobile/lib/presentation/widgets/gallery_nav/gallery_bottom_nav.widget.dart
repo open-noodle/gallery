@@ -41,7 +41,9 @@ class _GalleryBottomNavState extends ConsumerState<GalleryBottomNav> {
   void initState() {
     super.initState();
     _multiSelectSub = EventStream.shared.listen<MultiSelectToggleEvent>((e) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       setState(() => _hiddenForMultiSelect = e.isEnabled);
     });
   }
@@ -56,7 +58,9 @@ class _GalleryBottomNavState extends ConsumerState<GalleryBottomNav> {
   /// bottom to the top of the floating pill's outer padding.
   void _writeHeight(double h) {
     final current = ref.read(bottomNavHeightProvider);
-    if (current != h) ref.read(bottomNavHeightProvider.notifier).state = h;
+    if (current != h) {
+      ref.read(bottomNavHeightProvider.notifier).state = h;
+    }
   }
 
   @override
@@ -88,7 +92,9 @@ class _GalleryBottomNavState extends ConsumerState<GalleryBottomNav> {
       duration: _hideAnimation,
       curve: Curves.easeOutCubic,
       onEnd: () {
-        if (hiding) _writeHeight(0);
+        if (hiding) {
+          _writeHeight(0);
+        }
       },
       builder: (_, slide, child) => Transform.translate(offset: Offset(0, slide), child: child),
       child: AnimatedOpacity(
@@ -161,7 +167,9 @@ class _GalleryBottomNavState extends ConsumerState<GalleryBottomNav> {
       selectedIndex: widget.tabsRouter.activeIndex,
       onDestinationSelected: (i) {
         final tab = GalleryTabEnum.values[i];
-        if (isReadonly && tab != GalleryTabEnum.photos) return;
+        if (isReadonly && tab != GalleryTabEnum.photos) {
+          return;
+        }
         _onTabTap(tab);
       },
       labelType: NavigationRailLabelType.all,

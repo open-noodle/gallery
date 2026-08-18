@@ -230,7 +230,9 @@ class _AlbumCover extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final cs = context.colorScheme;
     final thumbnailId = album.thumbnailAssetId;
-    if (thumbnailId == null) return _buildFallback(cs);
+    if (thumbnailId == null) {
+      return _buildFallback(cs);
+    }
     return SizedBox(
       width: 52,
       height: 52,

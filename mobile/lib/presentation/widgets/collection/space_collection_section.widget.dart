@@ -68,7 +68,9 @@ class _SpaceCollectionSectionState extends ConsumerState<SpaceCollectionSection>
   bool _emitted = false;
 
   void _emit(CollectionTarget target) {
-    if (_emitted || widget.isBusy) return;
+    if (_emitted || widget.isBusy) {
+      return;
+    }
     _emitted = true;
     widget.onTargetSelected(target);
   }
@@ -94,7 +96,9 @@ class _SpaceCollectionSectionState extends ConsumerState<SpaceCollectionSection>
     final spaces = spacesAsync.valueOrNull;
     // Offline or still loading: the album half of the picker still works, so stay out of
     // the way rather than surfacing an error into someone else's sheet.
-    if (spaces == null) return const SizedBox.shrink();
+    if (spaces == null) {
+      return const SizedBox.shrink();
+    }
 
     final query = widget.searchQuery.trim().toLowerCase();
     final writable =
@@ -107,7 +111,9 @@ class _SpaceCollectionSectionState extends ConsumerState<SpaceCollectionSection>
             )
             .toList()
           ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-    if (writable.isEmpty) return const SizedBox.shrink();
+    if (writable.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
     final String? notice;
     if (selectionHasNonOwned(selection, userId)) {

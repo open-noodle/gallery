@@ -31,7 +31,7 @@ void main() {
     await tester.pumpConsumerWidget(
       ValueListenableBuilder<bool>(
         valueListenable: active,
-        builder: (_, v, __) => GalleryNavSegment(tab: GalleryTabEnum.photos, active: v, onTap: () {}),
+        builder: (_, v, _) => GalleryNavSegment(tab: GalleryTabEnum.photos, active: v, onTap: () {}),
       ),
     );
     await tester.pumpAndSettle();

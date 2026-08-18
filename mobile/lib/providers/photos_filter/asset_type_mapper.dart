@@ -5,7 +5,9 @@ import 'package:openapi/api.dart';
 /// `AssetType.other` and `null` both map to `null` — "no server-side
 /// media-type constraint" (match all).
 AssetTypeEnum? mapAssetType(AssetType? type) {
-  if (type == null) return null;
+  if (type == null) {
+    return null;
+  }
   switch (type) {
     case AssetType.image:
       return AssetTypeEnum.IMAGE;

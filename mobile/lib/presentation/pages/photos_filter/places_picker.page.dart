@@ -132,7 +132,9 @@ class _PlacesPickerPageState extends ConsumerState<PlacesPickerPage> {
   /// looked at country names.
   bool _expandedCountryHasCityMatch(String trimmedQuery) {
     final expanded = _expandedCountry;
-    if (expanded == null || trimmedQuery.isEmpty) return false;
+    if (expanded == null || trimmedQuery.isEmpty) {
+      return false;
+    }
     final query = trimmedQuery.toLowerCase();
     final cachedCities = ref.watch(citySuggestionsProvider(expanded)).valueOrNull;
     return cachedCities?.any((c) => c.toLowerCase().contains(query)) ?? false;

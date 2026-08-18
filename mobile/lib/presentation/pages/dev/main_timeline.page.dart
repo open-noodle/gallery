@@ -76,7 +76,9 @@ class _MainTimelinePageState extends ConsumerState<MainTimelinePage> {
             builder: (context, scopedRef, _) => NotificationListener<ScrollUpdateNotification>(
               onNotification: (n) {
                 final m = n.metrics;
-                if (m.axis != Axis.vertical) return false;
+                if (m.axis != Axis.vertical) {
+                  return false;
+                }
                 final isSheet = n.context?.findAncestorWidgetOfExactType<DraggableScrollableSheet>() != null;
                 if (!isSheet && m.maxScrollExtent - m.pixels < m.viewportDimension) {
                   unawaited(scopedRef.read(photosFilterSearchProvider.notifier).loadMore());
@@ -111,7 +113,9 @@ class _SearchLoadMoreFooter extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isActive = ref.watch(photosFilterProvider.select((f) => !f.isEmpty));
-    if (!isActive) return const SliverToBoxAdapter(child: SizedBox.shrink());
+    if (!isActive) {
+      return const SliverToBoxAdapter(child: SizedBox.shrink());
+    }
     final isLoading = ref.watch(photosFilterSearchProvider.select((s) => s.isLoading));
     if (isLoading) {
       return const SliverToBoxAdapter(
@@ -122,7 +126,9 @@ class _SearchLoadMoreFooter extends ConsumerWidget {
       );
     }
     final done = ref.watch(photosFilterSearchProvider.select((s) => s.nextPage == null));
-    if (!done) return const SliverToBoxAdapter(child: SizedBox.shrink());
+    if (!done) {
+      return const SliverToBoxAdapter(child: SizedBox.shrink());
+    }
     return SliverToBoxAdapter(
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 24),

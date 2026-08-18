@@ -75,9 +75,15 @@ int _byName(String a, String b) => a.toLowerCase().compareTo(b.toLowerCase());
 /// are equivalent in practice — both dates come from the same aggregate, so an
 /// album has both or neither — so do not "fix" this to match upstream's quirk.
 int? _unknownDateLast(DateTime? a, DateTime? b) {
-  if (a == null && b == null) return null;
-  if (a == null) return 1;
-  if (b == null) return -1;
+  if (a == null && b == null) {
+    return null;
+  }
+  if (a == null) {
+    return 1;
+  }
+  if (b == null) {
+    return -1;
+  }
   return null;
 }
 
@@ -97,7 +103,9 @@ List<SpaceAlbum> filterAndSortSpaceAlbums(
       SpaceAlbumSortMode.oldestPhoto => _unknownDateLast(a.startDate, b.startDate),
       _ => null,
     };
-    if (unknown != null) return unknown;
+    if (unknown != null) {
+      return unknown;
+    }
 
     final c = switch (mode) {
       SpaceAlbumSortMode.name => _byName(a.name, b.name),
@@ -111,7 +119,9 @@ List<SpaceAlbum> filterAndSortSpaceAlbums(
       SpaceAlbumSortMode.mostRecentPhoto => a.endDate == null ? 0 : a.endDate!.compareTo(b.endDate!),
       SpaceAlbumSortMode.oldestPhoto => a.startDate == null ? 0 : a.startDate!.compareTo(b.startDate!),
     };
-    if (c != 0) return sign * c;
+    if (c != 0) {
+      return sign * c;
+    }
     final n = _byName(a.name, b.name);
     return n != 0 ? n : a.id.compareTo(b.id);
   });
@@ -130,7 +140,9 @@ num _photos(SharedSpaceResponseDto s) => (s.assetCount.isPresent ? s.assetCount.
 
 DateTime _activity(SharedSpaceResponseDto s) {
   final la = s.lastActivityAt;
-  if (la.isPresent && la.value != null) return DateTime.parse(la.value!);
+  if (la.isPresent && la.value != null) {
+    return DateTime.parse(la.value!);
+  }
   return DateTime.parse(s.updatedAt.isNotEmpty ? s.updatedAt : s.createdAt);
 }
 
@@ -150,7 +162,9 @@ List<SharedSpaceResponseDto> filterAndSortSpaces(
       SpaceSortMode.members => _members(a).compareTo(_members(b)),
       SpaceSortMode.photos => _photos(a).compareTo(_photos(b)),
     };
-    if (c != 0) return sign * c;
+    if (c != 0) {
+      return sign * c;
+    }
     final n = _byName(a.name, b.name);
     return n != 0 ? n : a.id.compareTo(b.id);
   });

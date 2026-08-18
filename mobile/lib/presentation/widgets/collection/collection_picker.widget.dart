@@ -56,10 +56,14 @@ class _CollectionPickerState extends ConsumerState<CollectionPicker> {
   String _searchQuery = '';
 
   Future<void> _addToAlbum(RemoteAlbum album) async {
-    if (_isBusy) return;
+    if (_isBusy) {
+      return;
+    }
     setState(() => _isBusy = true);
     final result = await ref.read(actionProvider.notifier).addToAlbum(widget.source, album);
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     setState(() => _isBusy = false);
 
     if (!result.success) {
@@ -85,7 +89,9 @@ class _CollectionPickerState extends ConsumerState<CollectionPicker> {
   }
 
   Future<void> _addToTarget(CollectionTarget target) async {
-    if (_isBusy) return;
+    if (_isBusy) {
+      return;
+    }
     setState(() => _isBusy = true);
 
     final notifier = ref.read(actionProvider.notifier);
@@ -105,7 +111,9 @@ class _CollectionPickerState extends ConsumerState<CollectionPicker> {
         successMessage = 'space_album_add_photos_success';
     }
 
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     setState(() => _isBusy = false);
 
     if (!result.success) {

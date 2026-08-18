@@ -42,7 +42,9 @@ List<YearCount> aggregateYears(List<BucketLite> buckets) {
 List<MonthCount> getMonthsForYear(List<BucketLite> buckets, int year) {
   final counts = List<int>.filled(12, 0);
   for (final b in buckets) {
-    if (!b.timeBucket.startsWith('$year-')) continue;
+    if (!b.timeBucket.startsWith('$year-')) {
+      continue;
+    }
     final month = int.parse(b.timeBucket.substring(5, 7));
     counts[month - 1] += b.count;
   }

@@ -71,7 +71,9 @@ TimelineService _service(List<Bucket> buckets) {
     bucketSource: () => Stream.value(buckets),
     assetSource: (offset, count) async {
       final end = (offset + count).clamp(0, assets.length);
-      if (offset >= end) return const <BaseAsset>[];
+      if (offset >= end) {
+        return const <BaseAsset>[];
+      }
       return assets.sublist(offset, end);
     },
     origin: TimelineOrigin.remoteAlbum,
