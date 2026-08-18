@@ -158,7 +158,9 @@ class _ModelCascade extends ConsumerWidget {
         const SizedBox(height: 8),
         modelsAsync.when(
           data: (models) {
-            if (models.isEmpty) return const SizedBox.shrink();
+            if (models.isEmpty) {
+              return const SizedBox.shrink();
+            }
             return Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -179,7 +181,7 @@ class _ModelCascade extends ConsumerWidget {
             );
           },
           loading: () => const LinearProgressIndicator(),
-          error: (_, __) => TextButton.icon(
+          error: (_, _) => TextButton.icon(
             onPressed: () => ref.invalidate(cameraModelSuggestionsProvider(make)),
             icon: const Icon(Icons.refresh_rounded),
             label: Text(context.t.filter_sheet_load_error_retry),
