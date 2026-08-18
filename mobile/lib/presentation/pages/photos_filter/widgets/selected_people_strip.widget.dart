@@ -12,7 +12,9 @@ class SelectedPeopleStrip extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final people = ref.watch(photosFilterProvider.select((f) => f.people));
-    if (people.isEmpty) return const SizedBox.shrink();
+    if (people.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
     final list = people.toList();
     return SizedBox(
