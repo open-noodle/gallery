@@ -30,6 +30,7 @@ import 'package:immich_mobile/pages/library/locked/pin_auth.page.dart';
 import 'package:immich_mobile/pages/library/partner/partner.page.dart';
 import 'package:immich_mobile/pages/library/shared_link/shared_link.page.dart';
 import 'package:immich_mobile/pages/library/shared_link/shared_link_edit.page.dart';
+import 'package:immich_mobile/pages/library/spaces/games/game_play.page.dart';
 import 'package:immich_mobile/pages/library/spaces/space_album_detail.page.dart';
 import 'package:immich_mobile/pages/library/spaces/space_albums.page.dart';
 import 'package:immich_mobile/pages/library/spaces/space_detail.page.dart';
@@ -185,6 +186,7 @@ class AppRouter extends RootStackRouter {
     // otherwise have reintroduced by dropping _duplicateGuard entirely.
     AutoRoute(page: SpaceAlbumsRoute.page, guards: [_authGuard, _spaceAlbumsDuplicateGuard]),
     AutoRoute(page: SpaceAlbumDetailRoute.page, guards: [_authGuard, _duplicateGuard]),
+    AutoRoute(page: GamePlayRoute.page, guards: [_authGuard, _duplicateGuard]),
     CustomRoute(
       page: SpaceLinkAlbumRoute.page,
       guards: [_authGuard, _duplicateGuard],
