@@ -60,7 +60,9 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
   }
 
   Future<void> _loadData() async {
-    if (_isRefreshing) return;
+    if (_isRefreshing) {
+      return;
+    }
     _isRefreshing = true;
     try {
       final repo = ref.read(sharedSpaceApiRepositoryProvider);
@@ -102,32 +104,42 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
 
   SharedSpaceMemberResponseDto? get _currentMember {
     final currentUser = ref.read(currentUserProvider);
-    if (currentUser == null || _members == null) return null;
+    if (currentUser == null || _members == null) {
+      return null;
+    }
     return _members!.where((m) => m.userId == currentUser.id).firstOrNull;
   }
 
   bool get _isOwner {
     final space = _space;
-    if (space == null) return false;
+    if (space == null) {
+      return false;
+    }
     return spaceIsOwned(space, ref.read(currentUserProvider)?.id);
   }
 
   bool get _canEdit {
     final space = _space;
-    if (space == null) return false;
+    if (space == null) {
+      return false;
+    }
     return spaceIsWritable(space, ref.read(currentUserProvider)?.id);
   }
 
   SharedSpaceRole get _currentRole {
     final member = _currentMember;
-    if (member == null) return SharedSpaceRole.viewer;
+    if (member == null) {
+      return SharedSpaceRole.viewer;
+    }
     return SharedSpaceRole.fromJson(member.role.toString()) ?? SharedSpaceRole.viewer;
   }
 
   Future<void> _addPhotos() async {
     final newAssets = await context.pushRoute<Set<BaseAsset>>(DriftAssetSelectionTimelineRoute());
 
-    if (newAssets == null || newAssets.isEmpty) return;
+    if (newAssets == null || newAssets.isEmpty) {
+      return;
+    }
 
     try {
       final assetIds = newAssets.whereType<RemoteAsset>().map((a) => a.id).toList();
@@ -203,10 +215,14 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
 
   Future<void> _editSpace() async {
     final space = _space;
-    if (space == null) return;
+    if (space == null) {
+      return;
+    }
 
     final saved = await SpaceEditSheet.show(context, space);
-    if (saved != true) return;
+    if (saved != true) {
+      return;
+    }
 
     // The grid reads sharedSpacesProvider; the app bar reads this page's own
     // `_space`, which is network-loaded rather than Drift-backed. A sync nudge would
@@ -222,7 +238,9 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
   }
 
   Future<void> _toggleTimeline() async {
-    if (_togglingTimeline) return;
+    if (_togglingTimeline) {
+      return;
+    }
     setState(() => _togglingTimeline = true);
     try {
       final newValue = !_showInTimeline;
@@ -269,18 +287,24 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
             .valueOrNull ??
         <String>[];
 
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     final picked = await context.pushRoute<List<String>>(
       SpaceLinkAlbumRoute(spaceId: widget.spaceId, linkedAlbumIds: linkedAlbumIds),
     );
-    if (picked == null || picked.isEmpty) return;
+    if (picked == null || picked.isEmpty) {
+      return;
+    }
     await _onAlbumsPicked(picked);
   }
 
   /// B6: Loop PUT /shared-spaces/:id/albums/:albumId for each picked album,
   /// then fire the sync-nudge and show a success toast.
   Future<void> _onAlbumsPicked(List<String> ids) async {
-    if (ids.isEmpty) return;
+    if (ids.isEmpty) {
+      return;
+    }
     try {
       await ref.read(spaceAlbumActionsProvider).link(widget.spaceId, ids);
       if (mounted) {
@@ -301,7 +325,9 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
   Future<void> _onToggleAlbumTimeline(String albumId) async {
     final albumsAsync = ref.read(spaceAlbumsProvider(widget.spaceId));
     final album = albumsAsync.valueOrNull?.where((a) => a.id == albumId).firstOrNull;
-    if (album == null) return;
+    if (album == null) {
+      return;
+    }
 
     try {
       await ref.read(spaceAlbumActionsProvider).toggleTimeline(widget.spaceId, albumId, current: album.showInTimeline);
@@ -341,7 +367,9 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
       ),
     );
 
-    if (confirmed != true) return;
+    if (confirmed != true) {
+      return;
+    }
 
     try {
       await ref.read(spaceAlbumActionsProvider).unlink(widget.spaceId, albumId);
@@ -362,7 +390,9 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
   void _navigateToMembers() {
     unawaited(
       context.pushRoute<String>(SpaceMembersRoute(spaceId: widget.spaceId)).then((result) async {
-        if (!mounted) return;
+        if (!mounted) {
+          return;
+        }
         if (result == 'left') {
           // The user just left this space from the members page. Re-fetching
           // the space metadata would 403, so just pop ourselves back to the

@@ -25,7 +25,9 @@ class PhotosFilterSubheader extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isFilterEmpty = ref.watch(photosFilterProvider.select((f) => f.isEmpty));
-    if (isFilterEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
+    if (isFilterEmpty) {
+      return const SliverToBoxAdapter(child: SizedBox.shrink());
+    }
 
     final filter = ref.watch(photosFilterProvider);
     final debounced = ref.watch(photosFilterDebouncedProvider);
