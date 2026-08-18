@@ -38,25 +38,43 @@ class SharedSpaceApiRepository extends ApiRepository {
     return await checkNull(_api.createSpace(dto));
   }
 
-  /// Update a space's name, description and/or colour (PATCH /shared-spaces/{id}).
+  /// Update a space's name, description, colour and/or daily-challenge opt-in
+  /// (PATCH /shared-spaces/{id}).
   ///
   /// A `null` argument means **absent** — the field is left untouched. A non-null
   /// argument is sent verbatim, so `description: ''` clears the description while
   /// `description: null` leaves the existing text alone. That distinction is how a
   /// pure rename avoids clobbering a description it never showed the user.
   ///
-  /// Never sends `Optional.present(null)`: `name`, `description` and `color` are
-  /// `.optional()` but not `.nullable()` server-side, so an explicit null is a 400
-  /// rather than a field-clear. The four fields this feature does not own
-  /// (faceRecognitionEnabled, petsEnabled, thumbnailAssetId, thumbnailCropY) are
-  /// left at their `Optional.absent()` defaults.
+  /// Never sends `Optional.present(null)`: `name`, `description`, `color` and
+  /// `dailyChallengeEnabled` are `.optional()` but not `.nullable()` server-side, so
+  /// an explicit null is a 400 rather than a field-clear. The four fields this
+  /// feature does not own (faceRecognitionEnabled, petsEnabled, thumbnailAssetId,
+  /// thumbnailCropY) are left at their `Optional.absent()` defaults.
   ///
   /// Naming and appearance are editor-level server-side; the role is enforced there.
-  Future<SharedSpaceResponseDto> update(String id, {String? name, String? description, UserAvatarColor? color}) async {
+  ///
+  /// [dailyChallengeEnabled] is EDITOR-level too, not owner-level: `SharedSpaceService.update`
+  /// computes its minimum role from the payload and deliberately leaves this field out of
+  /// `isOwnerOnlySettingsUpdate`. Gating it to owners on the client would disagree with web.
+  ///
+  /// `null` here means absent — leave it alone. There is no way to write the column back to
+  /// "never asked", and none is wanted: only `absent`, `present(true)` and `present(false)` are
+  /// valid states for this field.
+  Future<SharedSpaceResponseDto> update(
+    String id, {
+    String? name,
+    String? description,
+    UserAvatarColor? color,
+    bool? dailyChallengeEnabled,
+  }) async {
     final dto = SharedSpaceUpdateDto(
       name: name == null ? const Optional.absent() : Optional.present(name.trim()),
       description: description == null ? const Optional.absent() : Optional.present(description),
       color: color == null ? const Optional.absent() : Optional.present(color),
+      dailyChallengeEnabled: dailyChallengeEnabled == null
+          ? const Optional.absent()
+          : Optional.present(dailyChallengeEnabled),
     );
     return await checkNull(_api.updateSpace(id, dto));
   }
