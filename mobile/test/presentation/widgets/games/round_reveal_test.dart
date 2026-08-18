@@ -11,6 +11,7 @@ import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/models/map/map_state.model.dart';
+import 'package:immich_mobile/presentation/widgets/games/reveal_map.widget.dart';
 import 'package:immich_mobile/presentation/widgets/games/round_reveal.widget.dart';
 import 'package:immich_mobile/providers/game/game_session.provider.dart';
 import 'package:immich_mobile/providers/locale_provider.dart';
@@ -114,6 +115,29 @@ void main() {
 
     expect(find.byKey(const Key('round-reveal-score')), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a failed post-guess refetch (answer null, guess real) renders without a fabricated answer pin', (
+    tester,
+  ) async {
+    // Distinct from the 409-recovery case above: here `guess` survives and `answer` is the one
+    // that's null (GameSessionController._reveal keeps the stale pre-guess challenge when the
+    // refetch fails, so the round's answer never arrives). round_reveal.widget.dart must pass
+    // that null straight through to RevealMap rather than substituting (0, 0) — substituting
+    // would draw the "actual location" circle at Null Island as if it were the real answer.
+    await pump(tester, RoundResult(type: GameRoundType.location, score: 2200, guess: (lat: 48.85, lon: 2.35)));
+
+    expect(find.byKey(const Key('round-reveal-score')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    // RevealMap only ever requests an answer-circle draw when `answer` is non-null (see its
+    // `_draw()`); asserting the null survived the handoff from RoundReveal is therefore the
+    // available proxy for "no answer annotation is requested" — MapLibre's own onMapCreated/
+    // onStyleLoadedCallback never fire in this widget-test harness (no real platform view), so
+    // `_draw()` itself cannot be exercised or spied on here.
+    final map = tester.widget<RevealMap>(find.byKey(const Key('round-reveal-map')));
+    expect(map.answer, isNull);
+    expect(map.guess, (lat: 48.85, lon: 2.35));
   });
 
   testWidgets('Next fires once per tap', (tester) async {

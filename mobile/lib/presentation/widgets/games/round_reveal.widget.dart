@@ -42,11 +42,19 @@ class RoundReveal extends StatelessWidget {
     colorBlendMode: BlendMode.darken,
   );
 
-  Widget _map() => RevealMap(
-    key: const Key('round-reveal-map'),
-    answer: (lat: result.answer?.lat?.toDouble() ?? 0, lon: result.answer?.lon?.toDouble() ?? 0),
-    guess: result.guess,
-  );
+  // Null, not (0, 0): a failed post-guess refetch leaves `result.answer` null while `score`/`guess`
+  // stay real (see `RevealMap`'s doc comment for the full explanation). Fabricating (0, 0) there
+  // would draw the "actual location" pin at Null Island as if it were the real answer.
+  Widget _map() {
+    final answer = result.answer;
+    final lat = answer?.lat;
+    final lon = answer?.lon;
+    return RevealMap(
+      key: const Key('round-reveal-map'),
+      answer: lat != null && lon != null ? (lat: lat.toDouble(), lon: lon.toDouble()) : null,
+      guess: result.guess,
+    );
+  }
 
   Widget _summary(BuildContext context) {
     return Padding(

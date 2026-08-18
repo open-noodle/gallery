@@ -30,6 +30,49 @@ void main() {
     });
   });
 
+  group('revealBounds', () {
+    test('an ordinary pair uses plain min/max on both axes', () {
+      final bounds = revealBounds((lat: 48.85, lon: 2.35), (lat: 51.5, lon: -0.13));
+
+      expect(bounds.southLat, 48.85);
+      expect(bounds.northLat, 51.5);
+      expect(bounds.westLon, -0.13);
+      expect(bounds.eastLon, 2.35);
+    });
+
+    test('a pair straddling the antimeridian wraps instead of spanning the long way round', () {
+      // ~110 km apart the short way, across the dateline — not the ~359°-wide box naive min/max
+      // would produce.
+      final bounds = revealBounds((lat: 10, lon: 179.5), (lat: 10, lon: -179.5));
+
+      // LatLngBounds (maplibre_gl) reads southwest.longitude > northeast.longitude as "wraps the
+      // dateline", so the west corner must carry the LARGER longitude here.
+      expect(bounds.westLon, 179.5);
+      expect(bounds.eastLon, -179.5);
+      expect(bounds.westLon, greaterThan(bounds.eastLon));
+
+      // The short arc from 179.5° to -179.5° going east (wrapping at 180°) is 1°, not 359°.
+      final shortSpan = 180 - bounds.westLon + (bounds.eastLon - -180);
+      expect(shortSpan, closeTo(1, 1e-9));
+    });
+
+    test('a pair exactly 180 degrees apart uses plain min/max (the boundary case)', () {
+      final bounds = revealBounds((lat: 0, lon: 90), (lat: 0, lon: -90));
+
+      expect(bounds.westLon, -90);
+      expect(bounds.eastLon, 90);
+    });
+
+    test('identical points collapse to a zero-size box, not a NaN or wrapped one', () {
+      final bounds = revealBounds((lat: 36.9, lon: -4.5), (lat: 36.9, lon: -4.5));
+
+      expect(bounds.southLat, 36.9);
+      expect(bounds.northLat, 36.9);
+      expect(bounds.westLon, -4.5);
+      expect(bounds.eastLon, -4.5);
+    });
+  });
+
   group('formatDistanceKm', () {
     test('uses metres below a kilometre, with no decimals', () {
       expect(formatDistanceKm(0.38), '380 m');
