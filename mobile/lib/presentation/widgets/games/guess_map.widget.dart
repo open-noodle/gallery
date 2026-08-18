@@ -11,9 +11,15 @@ import 'package:maplibre_gl/maplibre_gl.dart';
 /// Deliberately NOT DriftMap. DriftMap fetches asset markers, which on a guessing surface would
 /// paint the space's geotagged photos — including the round's own answer — onto the map.
 class GuessMap extends StatefulWidget {
-  const GuessMap({super.key, required this.onTap});
+  const GuessMap({super.key, required this.onTap, this.initialPin});
 
   final void Function(double lat, double lon) onTap;
+
+  /// A pin already placed before this widget mounted, e.g. by the location round's own state
+  /// surviving a dismiss-to-strip/restore cycle. GuessMap itself is unmounted while dismissed —
+  /// _marker, _controller and _styleLoaded all reset on remount — so without this the map would
+  /// come back empty even though the parent still holds the coordinates Guess would submit.
+  final ({double lat, double lon})? initialPin;
 
   @override
   State<GuessMap> createState() => _GuessMapState();
@@ -33,6 +39,13 @@ class _GuessMapState extends State<GuessMap> {
     final bytes = await rootBundle.load('assets/location-pin.png');
     await _controller?.addImage('mapMarker', bytes.buffer.asUint8List());
     _styleLoaded = true;
+
+    final pin = widget.initialPin;
+    if (pin != null) {
+      _marker = await _controller?.addSymbol(
+        SymbolOptions(geometry: LatLng(pin.lat, pin.lon), iconImage: 'mapMarker', iconSize: 0.15, iconAnchor: 'bottom'),
+      );
+    }
   }
 
   @override
