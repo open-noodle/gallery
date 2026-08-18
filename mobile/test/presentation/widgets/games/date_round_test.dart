@@ -89,4 +89,25 @@ void main() {
     expect(state.years.last, 2026);
     expect(state.years.length, 57);
   });
+
+  testWidgets('the Guess button resolves the month/year placeholders instead of showing the raw key', (tester) async {
+    await tester.pumpConsumerWidget(
+      DateRound(
+        challengeId: 'challenge-1',
+        index: 0,
+        minYear: 1970,
+        maxYear: 2026,
+        roundNumber: 1,
+        roundCount: 5,
+        onGuess: (_) {},
+      ),
+    );
+
+    // A wrong args key in 'game_guess_month_year'.t(args: {...}) renders the raw key instead of
+    // this text — .t() swallows the MessageFormat failure silently.
+    tester.state<DateRoundState>(find.byType(DateRound)).debugSelect(year: 2019, month: 7);
+    await tester.pump();
+
+    expect(find.text('Guess July 2019'), findsOneWidget);
+  });
 }

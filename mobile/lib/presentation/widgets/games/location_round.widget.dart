@@ -73,6 +73,7 @@ class LocationRoundState extends State<LocationRound> {
                 // geotagged assets onto the surface the answer is hidden on.
                 GuessMap(
                   key: const Key('location-round-map'),
+                  initialPin: _pin,
                   onTap: (lat, lon) => setState(() => _pin = (lat: lat, lon: lon)),
                 ),
                 Positioned(
