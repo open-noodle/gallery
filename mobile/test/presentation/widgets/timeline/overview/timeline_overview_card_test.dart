@@ -31,7 +31,7 @@ void main() {
     await EasyLocalization.ensureInitialized();
     await initializeDateFormatting('en');
     db = Drift(drift.DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true));
-    await StoreService.init(storeRepository: DriftStoreRepository(db), listenUpdates: false);
+    await StoreService.init(storeRepository: StoreRepository(db), listenUpdates: false);
   });
 
   setUp(() async {
