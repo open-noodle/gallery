@@ -187,9 +187,11 @@ void main() {
       expect(wrapLongitude(-230), closeTo(130, 1e-9));
     });
 
-    test('leaves in-range values alone', () {
+    test('normalises the antimeridian boundary to -180', () {
+      // 180 and -180 are the same meridian; the modulo formula normalises the exact boundary to
+      // -180. Matches web's shipped game.spec.ts, which documents this as intentional.
       expect(wrapLongitude(0), 0);
-      expect(wrapLongitude(180), closeTo(180, 1e-9));
+      expect(wrapLongitude(180), closeTo(-180, 1e-9));
       expect(wrapLongitude(-180), closeTo(-180, 1e-9));
     });
 
