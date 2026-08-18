@@ -103,7 +103,7 @@ await tester.pumpConsumerWidget(TheWidget(...), overrides: [someProvider.overrid
 
 `pumpConsumerWidget` wraps in `EasyLocalization > ProviderScope > MaterialApp > Material` and
 pump-and-settles for you. The `Store` block is required only for tests whose widget builds a
-`RemoteImageProvider` URL — Tasks 6, 7, 8, 11, 12 and 13. Tasks 1, 3, 5 and 10 are pure/provider
+`RemoteImageProvider` URL — Tasks 6, 7, 8, 9, 11, 12 and 13. Tasks 1, 3, 5 and 10 are pure/provider
 tests and need neither.
 
 ### Running tests locally
@@ -402,7 +402,7 @@ int? firstUnansweredIndex(List<GameRoundDetailResponseDto> rounds) {
 - [ ] **Step 4: Run the test and confirm it passes**
 
 Run: `flutter test test/utils/game_format_test.dart`
-Expected: PASS, 22 tests.
+Expected: PASS (the plan's stated counts are indicative — report the actual number).
 
 - [ ] **Step 5: Prove the Optional trap is really covered**
 
@@ -2545,10 +2545,10 @@ void main() {
     ),
   );
 
+  // No `today` is passed, so there are no tabs and the monthly board renders directly. Tapping a
+  // tab here would fail: the segmented button only exists when a daily exists.
   testWidgets('renders rows in the order the server sent them', (tester) async {
     await pump(tester);
-    await tester.tap(find.byKey(const Key('standings-tab-month')));
-    await tester.pump();
 
     final rows = tester.widgetList(find.byType(StandingsRow)).cast<StandingsRow>().toList();
     expect(rows.map((row) => row.userId), ['a', 'b', 'c', 'd'],
@@ -2557,8 +2557,6 @@ void main() {
 
   testWidgets('ranks ties as 1, 2, 2, 4 rather than inventing a winner', (tester) async {
     await pump(tester);
-    await tester.tap(find.byKey(const Key('standings-tab-month')));
-    await tester.pump();
 
     final rows = tester.widgetList(find.byType(StandingsRow)).cast<StandingsRow>().toList();
     expect(rows.map((row) => row.rank), [1, 2, 2, 4]);
@@ -2566,8 +2564,6 @@ void main() {
 
   testWidgets('a member who has not played shows a dash', (tester) async {
     await pump(tester);
-    await tester.tap(find.byKey(const Key('standings-tab-month')));
-    await tester.pump();
 
     final di = tester.widget<StandingsRow>(find.byKey(const Key('standings-row-d'))) ;
     expect(di.value, '—');
