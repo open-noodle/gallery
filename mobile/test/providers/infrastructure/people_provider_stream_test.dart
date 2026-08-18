@@ -124,7 +124,7 @@ void main() {
     }, fireImmediately: true);
     await container.read(getAllPeopleProvider(PeopleSortBy.photoCount).future);
 
-    await DriftPeopleRepository(ctx.db).updateName('p1', 'Alicia');
+    await PeopleRepository(ctx.db).updateName('p1', 'Alicia');
     await pumpEventQueue(); // deterministic drain, not a sleep
 
     expect(names.last, 'Alicia');
