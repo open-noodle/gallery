@@ -14,7 +14,9 @@ final cameraPickerMakesProvider = Provider.autoDispose<AsyncValue<List<String>>>
   final query = ref.watch(cameraPickerQueryProvider).trim().toLowerCase();
   return suggestions.whenData((s) {
     final makes = s.cameraMakes;
-    if (query.isEmpty) return makes;
+    if (query.isEmpty) {
+      return makes;
+    }
     return makes.where((m) => m.toLowerCase().contains(query)).toList();
   });
 });

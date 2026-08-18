@@ -28,13 +28,21 @@ SearchFilter applyTimelineTemporalScope(SearchFilter filter, TimelineTemporalSco
 }
 
 DateTime? _maxDate(DateTime? a, DateTime? b) {
-  if (a == null) return b;
-  if (b == null) return a;
+  if (a == null) {
+    return b;
+  }
+  if (b == null) {
+    return a;
+  }
   return a.isAfter(b) ? a : b;
 }
 
 DateTime? _minDate(DateTime? a, DateTime? b) {
-  if (a == null) return b;
-  if (b == null) return a;
+  if (a == null) {
+    return b;
+  }
+  if (b == null) {
+    return a;
+  }
   return a.isBefore(b) ? a : b;
 }
