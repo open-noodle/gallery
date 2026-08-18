@@ -2301,6 +2301,18 @@ git commit -m "feat(mobile): add the round reveal"
 - Consumes: `gameSessionProvider`, `LocationRound`, `DateRound`, `RoundReveal`, `yearFromDate`.
 - Produces: `GamePlayPage({required String challengeId})` + `GamePlayRoute`.
 
+> **Contract changes made in Task 5 that this task must honour.** The code sketch below predates
+> them — follow these where they differ:
+>
+> - **`GamePhase.finished` now always implies `currentRound == null`.** Both the resume path and
+>   `next()` set `currentIndex` to `rounds.length`, so branching on `currentRound == null` for the
+>   completion screen is correct.
+> - **`guessLocation` / `guessDate` never throw.** A failed guess resets `submitting`, leaves the
+>   phase at `guessing`, and records the error on `GameSessionState.lastError`. The page must
+>   surface `lastError` — a snackbar, following the repo's existing `ImmichToast` /
+>   `ScaffoldMessenger` usage — rather than relying on an exception. Without it a failed guess looks
+>   like a dead button. Add a widget test that a non-null `lastError` renders a visible message.
+
 - [ ] **Step 1: Write the failing test**
 
 `mobile/test/presentation/pages/games/game_play_page_test.dart`:
