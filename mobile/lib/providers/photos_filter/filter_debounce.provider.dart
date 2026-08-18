@@ -30,10 +30,14 @@ SearchFilter _debouncedFilter(Ref ref, Duration delay) {
   Timer? timer;
 
   ref.listen<SearchFilter>(photosFilterProvider, (prev, next) {
-    if (prev == next) return;
+    if (prev == next) {
+      return;
+    }
     timer?.cancel();
     timer = Timer(delay, () {
-      if (timer == null) return;
+      if (timer == null) {
+        return;
+      }
       ref.invalidateSelf();
     });
   });

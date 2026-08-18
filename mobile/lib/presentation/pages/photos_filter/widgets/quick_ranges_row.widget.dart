@@ -64,7 +64,9 @@ class QuickRangesRow extends ConsumerWidget {
   bool _matches(SearchDateFilter date, _WhenPreset preset) {
     final a = date.takenAfter;
     final b = date.takenBefore;
-    if (a == null || b == null) return false;
+    if (a == null || b == null) {
+      return false;
+    }
     bool sameDay(DateTime x, DateTime y) => x.year == y.year && x.month == y.month && x.day == y.day;
     return sameDay(a, preset.start) && sameDay(b, preset.end);
   }

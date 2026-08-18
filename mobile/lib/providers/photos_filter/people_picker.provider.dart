@@ -46,7 +46,9 @@ final peoplePickerQueryProvider = StateProvider<String>((ref) => '');
 final peoplePickerFilteredProvider = FutureProvider.autoDispose<List<FilterPerson>>((ref) async {
   final all = await ref.watch(peoplePickerAllProvider.future);
   final query = ref.watch(peoplePickerQueryProvider).trim().toLowerCase();
-  if (query.isEmpty) return all;
+  if (query.isEmpty) {
+    return all;
+  }
   return all.where((p) => p.name.toLowerCase().contains(query)).toList();
 });
 
