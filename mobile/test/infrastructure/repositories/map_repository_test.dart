@@ -1,4 +1,4 @@
-// Visibility regression tests for DriftMapRepository.remote().
+// Visibility regression tests for MapRepository.remote().
 //
 // The bug we're guarding against: marker queries scoped only by `ownerId IN
 // userIds` hide assets that the viewer can legitimately see via shared spaces
@@ -26,7 +26,7 @@ import '_shared_permission_matrix.dart';
 
 void main() {
   late Drift db;
-  late DriftMapRepository sut;
+  late MapRepository sut;
 
   setUpAll(() async {
     await initializeDateFormatting('en_US');
@@ -34,7 +34,7 @@ void main() {
 
   setUp(() {
     db = Drift(DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true));
-    sut = DriftMapRepository(db);
+    sut = MapRepository(db);
   });
 
   tearDown(() async {
@@ -90,7 +90,7 @@ void main() {
 
   LatLngBounds globeBounds() => LatLngBounds(southwest: const LatLng(-89, -179), northeast: const LatLng(89, 179));
 
-  group('DriftMapRepository.remote()', () {
+  group('MapRepository.remote()', () {
     test('owner marker returned', () async {
       await insertUser('viewer');
       await insertImage('a1', 'viewer');
@@ -118,7 +118,7 @@ void main() {
     });
   });
 
-  group('Cross-method permission matrix — DriftMapRepository.remote() markers', () {
+  group('Cross-method permission matrix — MapRepository.remote() markers', () {
     final bounds = LatLngBounds(southwest: const LatLng(-89, -179), northeast: const LatLng(89, 179));
     runPermissionMatrix(
       methodName: 'marker',
