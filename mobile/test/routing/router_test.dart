@@ -1,6 +1,5 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:immich_mobile/providers/gallery_permission.provider.dart';
 import 'package:immich_mobile/routing/router.dart';
 import 'package:immich_mobile/services/api.service.dart';
 import 'package:immich_mobile/services/auth.service.dart';
@@ -12,8 +11,6 @@ class _MockApiService extends Mock implements ApiService {}
 
 class _MockAuthService extends Mock implements AuthService {}
 
-class _MockGalleryPermissionNotifier extends Mock implements GalleryPermissionNotifier {}
-
 class _MockSecureStorageService extends Mock implements SecureStorageService {}
 
 class _MockLocalAuthService extends Mock implements LocalAuthService {}
@@ -24,13 +21,7 @@ void main() {
   setUp(() {
     // The guards only stash their dependencies at construction time, so mocks
     // are enough to read the route table back.
-    router = AppRouter(
-      _MockApiService(),
-      _MockAuthService(),
-      _MockGalleryPermissionNotifier(),
-      _MockSecureStorageService(),
-      _MockLocalAuthService(),
-    );
+    router = AppRouter(_MockApiService(), _MockAuthService(), _MockSecureStorageService(), _MockLocalAuthService());
   });
 
   /// The route type auto_route actually builds the page route from: the
