@@ -1,0 +1,194 @@
+import 'package:drift/drift.dart' as drift;
+import 'package:drift/native.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/domain/models/settings_key.dart';
+import 'package:immich_mobile/domain/models/store.model.dart';
+import 'package:immich_mobile/domain/services/store.service.dart';
+import 'package:immich_mobile/entities/store.entity.dart';
+import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
+import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
+import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
+import 'package:immich_mobile/models/map/map_state.model.dart';
+import 'package:immich_mobile/pages/library/spaces/games/game_play.page.dart';
+import 'package:immich_mobile/presentation/widgets/games/date_round.widget.dart';
+import 'package:immich_mobile/presentation/widgets/games/location_round.widget.dart';
+import 'package:immich_mobile/providers/locale_provider.dart';
+import 'package:immich_mobile/providers/map/map_state.provider.dart';
+import 'package:immich_mobile/repositories/game_api.repository.dart';
+import 'package:mocktail/mocktail.dart';
+import 'package:openapi/api.dart';
+
+import '../../../test_utils.dart';
+import '../../../widget_tester_extensions.dart';
+
+class _MockGameApiRepository extends Mock implements GameApiRepository {}
+
+/// `GamePlayPage` renders `LocationRound` for a location round, which embeds `GuessMap` and wraps
+/// in `MapThemeOverride`. That reads `mapStateNotifierProvider`, whose real `build()` reaches
+/// `appConfigProvider` (`SettingsRepository.instance`) and `serverInfoProvider` — neither of which
+/// this widget test wants to stand up. Overriding the notifier's `build()` sidesteps that whole
+/// chain, exactly as `location_round_test.dart` does.
+class _FakeMapStateNotifier extends MapStateNotifier {
+  @override
+  MapState build() => const MapState(themeMode: ThemeMode.light, lightStyleFetched: AsyncData('mock-style'));
+}
+
+GameChallengeDetailResponseDto _challenge(GameRoundType type) => GameChallengeDetailResponseDto(
+  id: 'c1',
+  spaceId: 's1',
+  name: 'Challenge 1',
+  roundCount: 1,
+  scaleKm: 1,
+  scaleDays: 1,
+  createdAt: DateTime.utc(2026, 8, 18),
+  closedAt: null,
+  dailyOn: null,
+  rounds: [GameRoundDetailResponseDto(index: 0, type: type)],
+);
+
+// Every round already carries a score, so `firstUnansweredIndex` finds nothing and
+// `GameSessionController.build()` resumes straight into `GamePhase.finished` with
+// `currentIndex == rounds.length` — `currentRound` is therefore null from the very first frame,
+// with no guess or reveal step in between. Exercises the resume-already-finished path, distinct
+// from `next()` reaching `finished` in-session (covered by the provider's own unit tests).
+GameChallengeDetailResponseDto _finishedChallenge() => GameChallengeDetailResponseDto(
+  id: 'c1',
+  spaceId: 's1',
+  name: 'Challenge 1',
+  roundCount: 1,
+  scaleKm: 1,
+  scaleDays: 1,
+  createdAt: DateTime.utc(2026, 8, 18),
+  closedAt: null,
+  dailyOn: null,
+  rounds: [GameRoundDetailResponseDto(index: 0, type: GameRoundType.location, score: const Optional.present(100))],
+);
+
+void main() {
+  // getGameRoundImageUrl (used by both round surfaces) reads Store.get(StoreKey.serverEndpoint),
+  // which throws unless the Store is initialized (mirrors location_round_test.dart /
+  // round_reveal_test.dart). The location round additionally needs MapThemeOverride's
+  // SettingsRepository wiring.
+  late Drift db;
+  late _MockGameApiRepository repository;
+
+  setUpAll(() async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    TestUtils.init();
+    db = Drift(drift.DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true));
+    await StoreService.init(storeRepository: DriftStoreRepository(db), listenUpdates: false);
+    await SettingsRepository.ensureInitialized(db);
+  });
+
+  setUp(() async {
+    await Store.clear();
+    await SettingsRepository.instance.clear(SettingsKey.values);
+    await Store.put(StoreKey.serverEndpoint, 'http://localhost:0');
+    repository = _MockGameApiRepository();
+  });
+
+  tearDownAll(() async {
+    await Store.clear();
+    await db.close();
+  });
+
+  /// `ImmichToast` schedules a 3s fluttertoast Timer outside the frame scheduler, so a plain
+  /// `pumpAndSettle()` leaves it pending and teardown fails with "A Timer is still pending". Pump
+  /// past its lifetime instead. Mirrors `space_edit_sheet_test.dart`.
+  Future<void> settleToast(WidgetTester tester) async {
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 4));
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> pump(WidgetTester tester) {
+    return tester.pumpConsumerWidget(
+      const GamePlayPage(challengeId: 'c1'),
+      overrides: [
+        gameApiRepositoryProvider.overrideWithValue(repository),
+        mapStateNotifierProvider.overrideWith(_FakeMapStateNotifier.new),
+        localeProvider.overrideWithValue(const Locale('en')),
+      ],
+    );
+  }
+
+  testWidgets('a location round renders the location surface', (tester) async {
+    when(() => repository.getChallenge('c1')).thenAnswer((_) async => _challenge(GameRoundType.location));
+
+    await pump(tester);
+
+    expect(find.byType(LocationRound), findsOneWidget);
+    expect(find.byType(DateRound), findsNothing);
+
+    // Proves the page wires currentIndex/rounds.length into LocationRound's roundNumber/roundCount
+    // correctly, not just that LocationRound itself can resolve 'game_round_progress' in isolation
+    // (already covered by location_round_test.dart) — a swapped or off-by-one arg here would still
+    // render SOME text, just the wrong one, since .t() only falls back to the raw key on a wrong
+    // arg NAME, not a wrong arg VALUE.
+    expect(find.text('Round 1 of 1'), findsOneWidget);
+  });
+
+  testWidgets('a date round renders the wheel surface', (tester) async {
+    when(() => repository.getChallenge('c1')).thenAnswer((_) async => _challenge(GameRoundType.date));
+
+    await pump(tester);
+
+    expect(find.byType(DateRound), findsOneWidget);
+    expect(find.byType(LocationRound), findsNothing);
+  });
+
+  testWidgets('a challenge with every round already answered shows the completion screen', (tester) async {
+    when(() => repository.getChallenge('c1')).thenAnswer((_) async => _finishedChallenge());
+    when(() => repository.getLeaderboard('c1')).thenAnswer((_) async => GameLeaderboardResponseDto(entries: []));
+
+    await pump(tester);
+
+    // `GamePhase.finished` always implies `currentRound == null` (both the resume path and
+    // `next()` move `currentIndex` past the last round) -- the page branches on the null round,
+    // not the phase enum, so this proves that branch actually renders the completion text rather
+    // than re-showing a guess surface for the round just answered.
+    expect(find.text('Completed'), findsOneWidget);
+    expect(find.byType(LocationRound), findsNothing);
+    expect(find.byType(DateRound), findsNothing);
+  });
+
+  testWidgets('a load failure shows a retry rather than an endless spinner', (tester) async {
+    when(() => repository.getChallenge('c1')).thenThrow(Exception('offline'));
+
+    await pump(tester);
+
+    expect(find.byKey(const Key('game-play-retry')), findsOneWidget);
+  });
+
+  testWidgets('a failed guess surfaces lastError as a visible message rather than a dead button', (tester) async {
+    when(() => repository.getChallenge('c1')).thenAnswer((_) async => _challenge(GameRoundType.location));
+    when(
+      () => repository.guessLocation(
+        any(),
+        any(),
+        lat: any(named: 'lat'),
+        lon: any(named: 'lon'),
+      ),
+    ).thenThrow(Exception('offline'));
+
+    await pump(tester);
+
+    tester.state<LocationRoundState>(find.byType(LocationRound)).debugSetPin(lat: 48.85, lon: 2.35);
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('location-round-guess')));
+    await tester.pumpAndSettle();
+
+    // Proves the message came from the localized 'game_guess_failed' key resolving, not from the
+    // raw key rendering because of a wrong args name (.t() swallows a MessageFormat failure
+    // silently and would otherwise leave the raw key on screen unnoticed).
+    expect(find.text('Could not submit your guess'), findsOneWidget);
+
+    // The round stays guessable: a failed guess must not strand the player mid-round.
+    expect(find.byType(LocationRound), findsOneWidget);
+
+    await settleToast(tester);
+  });
+}
