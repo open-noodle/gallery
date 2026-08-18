@@ -617,7 +617,10 @@ void main() {
     final dto = verify(() => gamesApi.guessRound('challenge-1', 2, captureAny())).captured.single as GameGuessDto;
     expect(dto.lat.orElse(null), 12.5);
     expect(dto.lon.orElse(null), -3.25);
-    expect(dto.date.orElse(null), isNull, reason: 'A location guess must not carry a date');
+    // isPresent, not orElse(null): `Absent.orElse(null)` and `Present(null).orElse(null)` both
+    // return null, so only isPresent proves the field was omitted rather than sent as an explicit
+    // null — which is the property the "never send Optional.present(null)" rule protects.
+    expect(dto.date.isPresent, isFalse, reason: 'A location guess must not carry a date at all');
   });
 
   test('a date guess sends the date and leaves lat/lon absent', () async {
@@ -629,8 +632,8 @@ void main() {
 
     final dto = verify(() => gamesApi.guessRound('challenge-1', 0, captureAny())).captured.single as GameGuessDto;
     expect(dto.date.orElse(null), DateTime.utc(2019, 7, 1));
-    expect(dto.lat.orElse(null), isNull);
-    expect(dto.lon.orElse(null), isNull);
+    expect(dto.lat.isPresent, isFalse);
+    expect(dto.lon.isPresent, isFalse);
   });
 
   test('createChallenge sends the requested round count and type', () async {
