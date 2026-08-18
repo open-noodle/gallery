@@ -52,7 +52,9 @@ class _AlphaScrubberState extends State<AlphaScrubber> {
         .clamp(0, AlphaScrubber.letters.length - 1)
         .floor();
     final letter = AlphaScrubber.letters[idx];
-    if (letter == _currentLetter) return;
+    if (letter == _currentLetter) {
+      return;
+    }
     setState(() => _currentLetter = letter);
     if (widget.letterToIndex.containsKey(letter)) {
       unawaited(HapticFeedback.selectionClick());

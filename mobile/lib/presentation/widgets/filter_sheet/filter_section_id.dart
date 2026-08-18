@@ -20,7 +20,9 @@ enum FilterSectionId {
 
   static FilterSectionId? fromStorageId(String id) {
     for (final section in values) {
-      if (section.storageId == id) return section;
+      if (section.storageId == id) {
+        return section;
+      }
     }
     return null;
   }

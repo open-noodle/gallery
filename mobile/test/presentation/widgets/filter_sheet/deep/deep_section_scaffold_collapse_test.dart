@@ -58,7 +58,7 @@ Future<ValueNotifier<AsyncValue<List<String>>>> _pumpMutable(
             children: [
               ValueListenableBuilder<AsyncValue<List<String>>>(
                 valueListenable: notifier,
-                builder: (_, value, __) => DeepSectionScaffold<String>(
+                builder: (_, value, _) => DeepSectionScaffold<String>(
                   sectionId: FilterSectionId.tags,
                   titleKey: FilterSectionId.tags.titleKey,
                   emptyCaptionKey: 'filter_sheet_deep_empty_tags',
