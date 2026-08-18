@@ -60,7 +60,9 @@ class _NoneQuery extends WhenQuery {
 /// years with `s` (e.g. `2025s`) are rejected as [WhenQuery.none].
 WhenQuery parseWhenQuery(String raw) {
   final s = raw.trim().toLowerCase();
-  if (s.isEmpty) return const WhenQuery.none();
+  if (s.isEmpty) {
+    return const WhenQuery.none();
+  }
 
   // 4-digit year
   if (RegExp(r'^\d{4}$').hasMatch(s)) {
@@ -71,7 +73,9 @@ WhenQuery parseWhenQuery(String raw) {
   final mDec4 = RegExp(r'^(\d{4})s$').firstMatch(s);
   if (mDec4 != null) {
     final year = int.parse(mDec4.group(1)!);
-    if (year % 10 == 0) return WhenQuery.decade(year);
+    if (year % 10 == 0) {
+      return WhenQuery.decade(year);
+    }
     return const WhenQuery.none();
   }
 

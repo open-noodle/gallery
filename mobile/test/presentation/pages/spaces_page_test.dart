@@ -252,7 +252,9 @@ void main() {
   testWidgets('loading state renders a spinner without search/sort controls', (tester) async {
     final completer = Completer<List<SharedSpaceResponseDto>>();
     addTearDown(() {
-      if (!completer.isCompleted) completer.complete(const []);
+      if (!completer.isCompleted) {
+        completer.complete(const []);
+      }
     });
 
     await tester.pumpConsumerWidgetRaw(
