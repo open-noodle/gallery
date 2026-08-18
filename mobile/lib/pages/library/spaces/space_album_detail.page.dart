@@ -70,12 +70,16 @@ class _SpaceAlbumDetailPageState extends ConsumerState<SpaceAlbumDetailPage> {
   /// surface a false "Failed to add photos" toast (mobile F1).
   Future<void> _addPhotos() async {
     final newAssets = await context.pushRoute<Set<BaseAsset>>(DriftAssetSelectionTimelineRoute());
-    if (newAssets == null || newAssets.isEmpty) return;
+    if (newAssets == null || newAssets.isEmpty) {
+      return;
+    }
 
     // Filter to remote assets only (local assets can't be added to a space
     // album via the REST endpoint — the server requires remote asset ids).
     final remoteAssetIds = newAssets.whereType<RemoteAsset>().map((a) => a.id).toList();
-    if (remoteAssetIds.isEmpty) return;
+    if (remoteAssetIds.isEmpty) {
+      return;
+    }
 
     try {
       final count = await ref.read(spaceAlbumActionsProvider).addAssets(widget.albumId, remoteAssetIds);
@@ -96,7 +100,9 @@ class _SpaceAlbumDetailPageState extends ConsumerState<SpaceAlbumDetailPage> {
   Future<void> _toggleTimeline() async {
     final albumsAsync = ref.read(spaceAlbumsProvider(widget.spaceId));
     final album = albumsAsync.valueOrNull?.where((a) => a.id == widget.albumId).firstOrNull;
-    if (album == null) return;
+    if (album == null) {
+      return;
+    }
 
     try {
       await ref
@@ -137,7 +143,9 @@ class _SpaceAlbumDetailPageState extends ConsumerState<SpaceAlbumDetailPage> {
       ),
     );
 
-    if (confirmed != true) return;
+    if (confirmed != true) {
+      return;
+    }
 
     try {
       await ref.read(spaceAlbumActionsProvider).unlink(widget.spaceId, widget.albumId);

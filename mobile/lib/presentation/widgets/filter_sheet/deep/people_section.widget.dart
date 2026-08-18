@@ -175,7 +175,9 @@ class _PeopleGridTile extends ConsumerWidget {
 extension<E> on Iterable<E> {
   E? firstWhereOrNull(bool Function(E) test) {
     for (final e in this) {
-      if (test(e)) return e;
+      if (test(e)) {
+        return e;
+      }
     }
     return null;
   }
