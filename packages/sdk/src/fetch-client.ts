@@ -3252,8 +3252,8 @@ export type SharedSpaceMemberUpdateDto = {
     role: SharedSpaceRole;
 };
 export type SharedSpaceMemberMetadataContributionDto = {
-    /** Disable person metadata contribution for this member */
-    sharePersonMetadata: false;
+    /** Disable person metadata contribution for this member; only false is accepted */
+    sharePersonMetadata: boolean;
 };
 export type SharedSpacePersonResponseDto = {
     /** User-specific alias for this person */
