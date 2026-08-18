@@ -50,7 +50,7 @@ void main() {
     final dto = verify(() => gamesApi.guessRound('challenge-1', 2, captureAny())).captured.single as GameGuessDto;
     expect(dto.lat.orElse(null), 12.5);
     expect(dto.lon.orElse(null), -3.25);
-    expect(dto.date.orElse(null), isNull, reason: 'A location guess must not carry a date');
+    expect(dto.date.isPresent, isFalse, reason: 'A location guess must not carry a date at all');
   });
 
   test('a date guess sends the date and leaves lat/lon absent', () async {
@@ -71,8 +71,8 @@ void main() {
 
     final dto = verify(() => gamesApi.guessRound('challenge-1', 0, captureAny())).captured.single as GameGuessDto;
     expect(dto.date.orElse(null), DateTime.utc(2019, 7, 1));
-    expect(dto.lat.orElse(null), isNull);
-    expect(dto.lon.orElse(null), isNull);
+    expect(dto.lat.isPresent, isFalse, reason: 'A date guess must not carry a latitude at all');
+    expect(dto.lon.isPresent, isFalse, reason: 'A date guess must not carry a longitude at all');
   });
 
   test('createChallenge sends the requested round count and type', () async {

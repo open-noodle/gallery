@@ -20,8 +20,9 @@ class GameApiRepository extends ApiRepository {
 
   /// Today's daily for [spaceId], or null when the space has none.
   ///
-  /// Reading this GENERATES the daily server-side if it does not exist yet, so only call it for a
-  /// space that has opted in.
+  /// Reading this GENERATES the daily server-side when the space has opted in and none exists yet.
+  /// For a space that has not opted in, the server returns a null challenge immediately, before any
+  /// generation or DB write, so calling this unconditionally is cheap and harmless.
   Future<GameChallengeListItemResponseDto?> getDaily(String spaceId) async {
     final response = await checkNull(_api.getDailyChallenge(spaceId));
     return response.challenge;
