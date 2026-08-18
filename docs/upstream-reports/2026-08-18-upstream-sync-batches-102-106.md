@@ -185,6 +185,49 @@ signature-changing rule. After any batch enabling one, grep fork-only code for c
 the affected classes — the fork's own call sites are exactly the ones upstream's sweep did not
 see.
 
+## Second zero-conflict semantic break — `const` in an OpenAPI 3.0 spec
+
+Found by remote CI, not locally. `OpenAPI Clients` failed at `Run API generation`:
+
+```
+-attribute components.schemas.SharedSpaceMemberMetadataContributionDto.const is unexpected
+```
+
+The chain:
+
+1. The lockfile regeneration above moved **`nestjs-zod` 5.4.0 → 5.5.0**.
+2. 5.5.0 emits `const` rather than `enum: [value]` for `z.literal()`.
+3. `const` is a JSON-Schema 2020-12 keyword and is **not valid in OpenAPI 3.0**, which is the version
+   this spec declares (`"openapi": "3.0.0"`), so `openapi-generator` 7.24.0 rejects the whole document
+   and the Dart client is never generated.
+
+**The bump is correct and stays.** `upstream/main` resolves `nestjs-zod@5.5.0` too, and after the
+regeneration **no package in the fork's lockfile differs from upstream's resolution** — the regen moved
+the fork _to_ parity. Pinning back to 5.4.0 would create a divergence that re-breaks at the next rebase.
+
+**Only the fork is affected**, which is exactly why upstream never sees it: the fork's
+`SharedSpaceMemberMetadataContributionDto` carries the **only `z.literal()` in any server DTO** — upstream
+has none, and upstream's committed spec contains zero `const`. Same family as the `AppRouter` break: a
+dependency the fork shares changes behaviour, and the damage lands in fork-only code that nothing
+conflicted with.
+
+Fixed on the fork side (`47440d06322`) with `z.boolean()` plus the constraint stated in the description.
+Nothing is lost — `updateMemberMetadataContribution` already rejects a `true` payload with
+`Cannot enable person metadata contribution for another member`, a clearer error than a schema violation,
+so the literal was redundant belt-and-braces. The generated SDK type moves from `false` to `boolean`;
+every caller passes `false`, so nothing breaks, and `web check:typescript` is clean against the rebuilt SDK.
+
+### The false green that hid it locally, and how to avoid it
+
+The first OpenAPI check in this cycle was run as `node server/dist/bin/sync-open-api.js >/dev/null 2>&1`
+followed by `git status -- open-api/`, which reported no drift. That was **wrong**: with output
+suppressed, a clean `git status` is indistinguishable from a run that never produced output. Re-running it
+visibly showed the drift immediately.
+
+**Rule: never judge a generated-artifact check by `git status` alone when the generator's output was
+redirected.** Run it visibly, or assert on its exit code as well as the tree. This is the same shape as
+the skill's existing warning that an unbuilt medium-test run exits 0 with mass collection failures.
+
 ## Pattern propagation — Dart lint rule set
 
 | Refactor                                          | Old → new                            | Fork files affected | Decision    | Commit        |
@@ -264,12 +307,22 @@ untouched by arc A; `mobile-drift-rebase-check BATCH=106` confirms the chain is 
 
 ## Inconsistencies found
 
-1. **`web/package.json`'s `lint` script is missing `--max-warnings 0`.** The fork runs
-   `eslint . --concurrency 6`; upstream runs `eslint . --max-warnings 0 --concurrency 6`, and
+1. **`web/package.json`'s `lint` script was missing `--max-warnings 0` — found and fixed.** The fork ran
+   `eslint . --concurrency 6` while upstream runs `eslint . --max-warnings 0 --concurrency 6`, and
    `CLAUDE.md` documents a zero-warnings policy. **Pre-existing, not caused by this arc** — verified
-   character-identical before and after (`backup/rolling-pre-arcA-20260818:web/package.json`). Left
-   alone deliberately: restoring the flag changes lint strictness and could surface a backlog
-   unrelated to this rebase. Worth its own change.
+   character-identical before and after (`backup/rolling-pre-arcA-20260818:web/package.json`).
+
+   Provenance: fork commit **`chore(web): allow lint warnings during rolling rebase` (2026-05-14)**
+   dropped it as a deliberate _temporary_ escape hatch for that cycle, and it was never restored — so
+   the gate silently accepted warnings for three months.
+
+   Restored in `ac6f291d7e7`. It cost nothing: a full `eslint .` over `web/` on this tip exits 0 with
+   no output at all — zero problems of any severity — and CI's Lint Web job, which runs this exact
+   script, is green on the same tree. The script is character-identical to upstream's again.
+
+   **Worth generalising**: a temporary relaxation committed during a rebase has no expiry and no owner.
+   Grepping fork commit subjects for "temporarily", "allow … during rebase" and similar is a cheap
+   periodic audit.
 
 ## Local CI verification
 
@@ -281,7 +334,7 @@ untouched by arc A; `mobile-drift-rebase-check BATCH=106` confirms the chain is 
 | `web check:typescript`                              | PASS    |                                                                                |
 | `web check:svelte`                                  | PASS    | 609 files, 0 errors, 0 warnings (not the 0-file no-op)                         |
 | `server pnpm lint`                                  | PASS    | `--max-warnings 0`                                                             |
-| web eslint (`tscompat` off)                         | PENDING | Ran >25 min locally without finishing; CI's Lint Web job is the authority      |
+| web eslint (`tscompat` off)                         | PASS    | Exit 0 with no output at all — zero problems of any severity (~45 min locally) |
 | Server unit tests                                   | PASS    | 171 files, 5685 passed / 12 skipped / 0 failed                                 |
 | Web unit tests                                      | PASS    | 363 files, 5694 passed / 2 skipped / 8 todo / 0 failed                         |
 | `dart analyze --fatal-infos lib test`               | PASS    | **No issues found**                                                            |
@@ -289,7 +342,7 @@ untouched by arc A; `mobile-drift-rebase-check BATCH=106` confirms the chain is 
 | `flutter test` (Flutter 3.44.9)                     | PASS    | **3342 passed / 1 skipped / 0 failed**                                         |
 | `flutter pub get --enforce-lockfile`                | PASS    | validates the hand-resolved `pubspec.lock`                                     |
 | `pnpm install --frozen-lockfile`                    | PASS    | after the regen                                                                |
-| OpenAPI regeneration                                | PASS    | no drift (arc A changes no DTO/controller/repository)                          |
+| OpenAPI regeneration                                | PASS    | after the `const` fix below; `mise run //:open-api` completes TS SDK + Dart    |
 | `make sql`                                          | SKIPPED | no repository method changed; running it without a DB deletes every query file |
 
 ## Remote CI verification
