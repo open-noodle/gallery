@@ -242,7 +242,9 @@ void main() {
       overrides: [
         timelineServiceProvider.overrideWith((ref) {
           final s = ref.watch(serviceSwitch);
-          if (s == null) throw StateError('no service');
+          if (s == null) {
+            throw StateError('no service');
+          }
           return s;
         }),
         timelineOverviewRepresentativeCacheProvider.overrideWith(TimelineOverviewRepresentativeCacheNotifier.new),

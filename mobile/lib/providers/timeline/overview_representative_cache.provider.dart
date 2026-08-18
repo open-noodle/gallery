@@ -43,11 +43,15 @@ class TimelineOverviewRepresentativeCacheNotifier extends Notifier<Map<String, T
   /// post-frame callback (never during build — it mutates provider state).
   Future<void> ensure(String key, int index, int assetCount) async {
     final existing = state[key];
-    if (existing != null && existing.assetCount == assetCount) return; // fresh
+    if (existing != null && existing.assetCount == assetCount) {
+      return; // fresh
+    }
     // Skip if a resolve is already running for this key. A count-change that arrives mid-resolve is
     // picked up by the next frame's re-scheduled ensure (the stale-but-plausible cover stays painted
     // meanwhile) rather than being applied immediately.
-    if (_inFlight.contains(key)) return;
+    if (_inFlight.contains(key)) {
+      return;
+    }
     _inFlight.add(key);
     final generation = _generation;
     try {
