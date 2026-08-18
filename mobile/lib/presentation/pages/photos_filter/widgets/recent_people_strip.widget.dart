@@ -19,7 +19,9 @@ class RecentPeopleStrip extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(recentPeopleProvider);
     final recent = async.valueOrNull ?? const <FilterPerson>[];
-    if (recent.isEmpty) return const SizedBox.shrink();
+    if (recent.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
     final theme = Theme.of(context);
     return Padding(
