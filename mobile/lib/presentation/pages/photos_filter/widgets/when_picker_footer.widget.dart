@@ -76,7 +76,9 @@ class WhenPickerFooter extends ConsumerWidget {
   /// `Text.data` assertions. Note that in unit tests `.tr()` returns the
   /// i18n key verbatim (no bundles loaded), so assertions target keys.
   static String _formatLabel(DateTime? start, DateTime? end) {
-    if (start == null || end == null) return StaticTranslations.instance.filter_sheet_picker_all_time;
+    if (start == null || end == null) {
+      return StaticTranslations.instance.filter_sheet_picker_all_time;
+    }
 
     final startMonth = _monthKeys[start.month - 1].tr();
     final endMonth = _monthKeys[end.month - 1].tr();

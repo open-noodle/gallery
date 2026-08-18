@@ -159,7 +159,9 @@ class _CityCascade extends ConsumerWidget {
         const SizedBox(height: 8),
         citiesAsync.when(
           data: (cities) {
-            if (cities.isEmpty) return const SizedBox.shrink();
+            if (cities.isEmpty) {
+              return const SizedBox.shrink();
+            }
             return Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -182,7 +184,7 @@ class _CityCascade extends ConsumerWidget {
             );
           },
           loading: () => const LinearProgressIndicator(),
-          error: (_, __) => TextButton.icon(
+          error: (_, _) => TextButton.icon(
             onPressed: () => ref.invalidate(citySuggestionsProvider(country)),
             icon: const Icon(Icons.refresh_rounded),
             label: Text(context.t.filter_sheet_load_error_retry),
