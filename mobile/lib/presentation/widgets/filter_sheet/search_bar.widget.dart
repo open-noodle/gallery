@@ -33,7 +33,9 @@ class _FilterSheetSearchBarState extends ConsumerState<FilterSheetSearchBar> {
   void _onChanged() {
     _debounce?.cancel();
     _debounce = Timer(_debounceMs, () {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       ref.read(photosFilterProvider.notifier).setText(_controller.text);
     });
     setState(() {}); // re-render to toggle clear button
@@ -77,7 +79,9 @@ class _FilterSheetSearchBarState extends ConsumerState<FilterSheetSearchBar> {
     final focusConsumed = ref.read(photosFilterSearchFocusConsumedProvider);
     if (focusRequest > focusConsumed) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
+        if (!mounted) {
+          return;
+        }
         _focusNode.requestFocus();
         ref.read(photosFilterSearchFocusConsumedProvider.notifier).state = focusRequest;
       });
@@ -85,7 +89,9 @@ class _FilterSheetSearchBarState extends ConsumerState<FilterSheetSearchBar> {
 
     ref.listen<String?>(photosFilterProvider.select((f) => f.context), (prev, next) {
       final v = next ?? '';
-      if (_controller.text == v) return;
+      if (_controller.text == v) {
+        return;
+      }
       _controller.removeListener(_onChanged);
       _controller.text = v;
       _controller.selection = TextSelection.collapsed(offset: v.length);

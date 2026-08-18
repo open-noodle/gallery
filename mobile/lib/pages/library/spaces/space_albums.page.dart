@@ -290,7 +290,9 @@ class _AlbumCard extends ConsumerWidget {
 
   Widget _buildCoverArt(BuildContext context, WidgetRef ref, ColorScheme cs) {
     final thumbnailId = album.thumbnailAssetId;
-    if (thumbnailId == null) return _buildFallback(cs);
+    if (thumbnailId == null) {
+      return _buildFallback(cs);
+    }
     return FutureBuilder<RemoteAsset?>(
       future: ref.read(assetServiceProvider).getRemoteAsset(thumbnailId),
       builder: (context, snapshot) {

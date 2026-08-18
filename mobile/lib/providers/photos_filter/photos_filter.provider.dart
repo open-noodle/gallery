@@ -42,7 +42,9 @@ class PhotosFilterNotifier extends Notifier<SearchFilter> {
 
   void togglePerson(FilterPerson person) {
     final next = Set<FilterPerson>.from(state.people);
-    if (!next.add(person)) next.remove(person);
+    if (!next.add(person)) {
+      next.remove(person);
+    }
     state = state.copyWith(people: next);
   }
 

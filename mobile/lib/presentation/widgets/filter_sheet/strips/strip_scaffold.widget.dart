@@ -36,7 +36,9 @@ class _StripScaffoldState extends ConsumerState<StripScaffold> {
   Widget build(BuildContext context) {
     final items = widget.items;
     final data = items.valueOrNull;
-    if (data != null) _lastData = data;
+    if (data != null) {
+      _lastData = data;
+    }
 
     // Cached-empty → stay collapsed, including through subsequent refetches.
     // Avoids the skeleton briefly pushing content down only to snap back up.

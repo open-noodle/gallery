@@ -143,7 +143,9 @@ void main() {
       // The service is free to return a short page; the offset must come from the
       // requested window, not from a running count of what came back.
       Future<List<BaseAsset>> shortLoad(int index, int count) async {
-        if (index == 0) return [_remote('asset-0')]; // asked for 4, got 1
+        if (index == 0) {
+          return [_remote('asset-0')]; // asked for 4, got 1
+        }
         return [for (var i = index; i < index + count; i++) _remote('asset-$i')];
       }
 

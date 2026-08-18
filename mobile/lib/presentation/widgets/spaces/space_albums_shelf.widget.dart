@@ -65,14 +65,16 @@ class SpaceAlbumsShelf extends ConsumerWidget {
 
     return albumsAsync.when(
       loading: () => const SizedBox.shrink(),
-      error: (_, __) => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
       data: (albums) => _buildShelf(context, albums),
     );
   }
 
   Widget _buildShelf(BuildContext context, List<SpaceAlbum> albums) {
     // Case 3: viewer + no albums → hide entirely
-    if (albums.isEmpty && !canEdit) return const SizedBox.shrink();
+    if (albums.isEmpty && !canEdit) {
+      return const SizedBox.shrink();
+    }
 
     return SizedBox(
       key: const Key('space-albums-shelf'),
@@ -89,7 +91,7 @@ class SpaceAlbumsShelf extends ConsumerWidget {
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16),
               itemCount: albums.length + (canEdit ? 1 : 0),
-              separatorBuilder: (_, __) => const SizedBox(width: 10),
+              separatorBuilder: (_, _) => const SizedBox(width: 10),
               itemBuilder: (context, index) {
                 if (index < albums.length) {
                   final album = albums[index];
@@ -182,7 +184,9 @@ class _SpaceAlbumCoverTile extends ConsumerWidget {
 
   Widget _buildCoverArt(BuildContext context, WidgetRef ref, ColorScheme cs) {
     final thumbnailId = album.thumbnailAssetId;
-    if (thumbnailId == null) return _buildFallback(cs);
+    if (thumbnailId == null) {
+      return _buildFallback(cs);
+    }
     return FutureBuilder<RemoteAsset?>(
       future: ref.read(assetServiceProvider).getRemoteAsset(thumbnailId),
       builder: (context, snapshot) {

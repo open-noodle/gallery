@@ -145,7 +145,9 @@ TimelineService _service() {
     bucketSource: () => Stream.value([TimeBucket(date: DateTime(2025, 1), assetCount: 4)]),
     assetSource: (offset, count) async {
       final end = (offset + count).clamp(0, assets.length);
-      if (offset >= end) return const <BaseAsset>[];
+      if (offset >= end) {
+        return const <BaseAsset>[];
+      }
       return assets.sublist(offset, end);
     },
     origin: TimelineOrigin.main,

@@ -338,7 +338,9 @@ void main() {
     final timelineService = TimelineService((
       bucketSource: () => Stream.value([TimeBucket(date: DateTime(2025), assetCount: pool.length)]),
       assetSource: (offset, count) async {
-        if (useNeverCompleter) return neverCompleter.future;
+        if (useNeverCompleter) {
+          return neverCompleter.future;
+        }
         final end = (offset + count).clamp(0, pool.length);
         final start = offset.clamp(0, end);
         return pool.sublist(start, end);
