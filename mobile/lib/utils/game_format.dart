@@ -11,6 +11,40 @@ const int kMaxRoundScore = 5000;
 /// `min(-180).max(180)` and 400s on anything outside it.
 double wrapLongitude(double lng) => ((((lng + 180) % 360) + 360) % 360) - 180;
 
+/// The southwest/northeast corners framing two points on a map, along the SHORTER arc between
+/// them.
+///
+/// Latitude is always plain min/max. Longitude is too, whenever the pair doesn't straddle the
+/// antimeridian — but when it does (e.g. an answer at 179.5° and a guess at -179.5°, ~110 km apart
+/// the short way), plain min/max would span 359° of longitude the LONG way round the globe instead
+/// of the ~1° the two points actually span. `LatLngBounds` (maplibre_gl) treats
+/// `southwest.longitude > northeast.longitude` as "this box wraps the dateline", so the short-arc
+/// case below deliberately flips which side gets the larger value: west takes the larger longitude,
+/// east the smaller — producing exactly that wrapped form.
+///
+/// Both inputs are assumed already wrapped into [-180, 180] (guesses are, via [wrapLongitude],
+/// before submission; answers come from the server, which stores them in the same range).
+({double southLat, double westLon, double northLat, double eastLon}) revealBounds(
+  ({double lat, double lon}) a,
+  ({double lat, double lon}) b,
+) {
+  final southLat = a.lat < b.lat ? a.lat : b.lat;
+  final northLat = a.lat > b.lat ? a.lat : b.lat;
+
+  final double westLon;
+  final double eastLon;
+  if ((a.lon - b.lon).abs() <= 180) {
+    westLon = a.lon < b.lon ? a.lon : b.lon;
+    eastLon = a.lon > b.lon ? a.lon : b.lon;
+  } else {
+    // The short arc crosses the dateline: the usual min/max roles swap.
+    westLon = a.lon > b.lon ? a.lon : b.lon;
+    eastLon = a.lon < b.lon ? a.lon : b.lon;
+  }
+
+  return (southLat: southLat, westLon: westLon, northLat: northLat, eastLon: eastLon);
+}
+
 /// Human-readable distance. Precision shrinks as distance grows: metres are meaningful for a near
 /// miss, decimals are noise at continental scale.
 String formatDistanceKm(double km) {
