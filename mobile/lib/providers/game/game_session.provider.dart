@@ -7,8 +7,10 @@ enum GamePhase { guessing, revealing, finished }
 
 /// Everything the reveal needs, assembled from the guess response and the post-guess refetch.
 ///
-/// [guess] is null on the 409 recovery path: that request never reached the server, so there is no
-/// guess of ours to plot. The reveal is still informative without it.
+/// [guess] is null in two cases, neither of which means an error happened: on the 409 recovery
+/// path, where that request never reached the server so there is no guess of ours to plot, and on
+/// every date round, where a guess has no lat/lon to plot in the first place. `guess == null` is
+/// therefore not, by itself, a signal that a 409 occurred.
 class RoundResult {
   final GameRoundType type;
   final int score;
@@ -35,6 +37,11 @@ class GameSessionState {
   final bool submitting;
   final GameLeaderboardResponseDto? leaderboard;
 
+  /// The most recent guess failure, or null once cleared. Set on any non-409 guess failure
+  /// (`_submit` never rethrows — see its doc comment); cleared when a guess is next attempted and
+  /// whenever a reveal completes successfully, including the 409 recovery reveal.
+  final Object? lastError;
+
   const GameSessionState({
     required this.challenge,
     required this.currentIndex,
@@ -42,11 +49,17 @@ class GameSessionState {
     this.result,
     this.submitting = false,
     this.leaderboard,
+    this.lastError,
   });
 
   /// Looked up by the round's own `index`, not by array position. Correct either way only because
   /// the server orders rounds over a contiguous 0..N-1 set; looking it up keeps that invariant
   /// local rather than leaning on it silently at every call site.
+  ///
+  /// Null whenever `phase == finished`: `next()` moves `currentIndex` past the last round on
+  /// completion (mirroring the web client) precisely so this stays the single signal a page needs
+  /// to tell "still playing" from "done" apart — a page that instead branched on `currentIndex ==
+  /// rounds.length - 1` would re-render the guessing surface for the round just answered.
   GameRoundDetailResponseDto? get currentRound {
     for (final round in challenge.rounds) {
       if (round.index.toInt() == currentIndex) return round;
@@ -61,7 +74,9 @@ class GameSessionState {
     RoundResult? result,
     bool? submitting,
     GameLeaderboardResponseDto? leaderboard,
+    Object? lastError,
     bool clearResult = false,
+    bool clearLastError = false,
   }) => GameSessionState(
     challenge: challenge ?? this.challenge,
     currentIndex: currentIndex ?? this.currentIndex,
@@ -69,6 +84,7 @@ class GameSessionState {
     result: clearResult ? null : (result ?? this.result),
     submitting: submitting ?? this.submitting,
     leaderboard: leaderboard ?? this.leaderboard,
+    lastError: clearLastError ? null : (lastError ?? this.lastError),
   );
 }
 
@@ -118,6 +134,12 @@ class GameSessionController extends AutoDisposeFamilyAsyncNotifier<GameSessionSt
   Future<void> guessDate(DateTime utcMonthStart) =>
       _submit((current) => _repository.guessDate(arg, current, utcMonthStart: utcMonthStart));
 
+  /// Never rethrows. The generated client wraps `SocketException`/`TlsException`/`IOException`/
+  /// `ClientException` into `ApiException(400, ...)` (see `openapi/lib/api_client.dart`), so a real
+  /// offline guess takes the same catch branch as any other non-409 failure — and this is called
+  /// from a fire-and-forget context (a tap handler), where a rethrow would become an unhandled
+  /// async error instead of UI the player can act on. Failures are surfaced on
+  /// [GameSessionState.lastError] instead, with the round left guessable again.
   Future<void> _submit(
     Future<GameGuessResponseDto> Function(int index) send, {
     ({double lat, double lon})? guess,
@@ -126,11 +148,14 @@ class GameSessionController extends AutoDisposeFamilyAsyncNotifier<GameSessionSt
     // A real guard, not styling: a double tap's second guess would 409 and overwrite a complete
     // reveal with a degraded one.
     if (current == null || current.submitting || current.phase != GamePhase.guessing) return;
+    // `phase == guessing` guarantees a round to guess, so this is never null here.
+    final type = current.currentRound!.type;
 
-    state = AsyncData(current.copyWith(submitting: true));
+    state = AsyncData(current.copyWith(submitting: true, clearLastError: true));
     try {
       final response = await send(current.currentIndex);
       await _reveal(
+        type: type,
         score: response.score.toInt(),
         distanceKm: response.distanceKm?.toDouble(),
         offsetDays: response.offsetDays?.toInt(),
@@ -139,19 +164,22 @@ class GameSessionController extends AutoDisposeFamilyAsyncNotifier<GameSessionSt
     } on ApiException catch (error) {
       if (error.code == 409) {
         // Not a failure: the first guess stands. Re-read it and reveal without our own pin.
-        await _reveal(score: null, guess: null);
+        await _reveal(type: type, score: null, guess: null);
         return;
       }
-      state = AsyncData(state.requireValue.copyWith(submitting: false));
-      rethrow;
-    } catch (_) {
-      state = AsyncData(state.requireValue.copyWith(submitting: false));
+      state = AsyncData(state.requireValue.copyWith(submitting: false, lastError: error));
+    } catch (error) {
+      state = AsyncData(state.requireValue.copyWith(submitting: false, lastError: error));
     }
   }
 
   /// The guess response carries score/distance/offset but never the answer, so the answer can only
-  /// come from a refetched challenge.
+  /// come from a refetched challenge. [type] comes from the round as it stood before this refetch —
+  /// not from the refetched round — because it is intrinsic to the round (unlike score/answer, it
+  /// never changes once guessed) and must stay correct even on the rare refetch that returns a
+  /// round the lookup below cannot find.
   Future<void> _reveal({
+    required GameRoundType type,
     required int? score,
     double? distanceKm,
     int? offsetDays,
@@ -177,7 +205,7 @@ class GameSessionController extends AutoDisposeFamilyAsyncNotifier<GameSessionSt
     state = AsyncData(
       refreshed.copyWith(
         result: RoundResult(
-          type: round?.type ?? GameRoundType.location,
+          type: type,
           score: score ?? round?.score.orElse(null)?.toInt() ?? 0,
           distanceKm: distanceKm,
           offsetDays: offsetDays,
@@ -199,7 +227,12 @@ class GameSessionController extends AutoDisposeFamilyAsyncNotifier<GameSessionSt
       return;
     }
 
-    state = AsyncData(current.copyWith(phase: GamePhase.finished, clearResult: true));
+    // Move currentIndex past the last round (mirroring the web client's `currentIndex += 1`, then
+    // `currentIndex >= rounds.length` for "done"), so `finished` always implies `currentRound ==
+    // null` — see the doc comment on that getter for why that invariant matters.
+    state = AsyncData(
+      current.copyWith(currentIndex: current.challenge.rounds.length, phase: GamePhase.finished, clearResult: true),
+    );
     _finish(current.challenge);
   }
 
