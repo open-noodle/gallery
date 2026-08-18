@@ -119,7 +119,14 @@ const SharedSpaceMemberPreferencesSchema = z
 
 const SharedSpaceMemberMetadataContributionSchema = z
   .object({
-    sharePersonMetadata: z.literal(false).describe('Disable person metadata contribution for this member'),
+    // Deliberately z.boolean() and not z.literal(false): nestjs-zod >= 5.5.0 emits `const` for a
+    // literal, which is a JSON-Schema 2020-12 keyword that is not valid in OpenAPI 3.0 (the version
+    // this spec targets), and openapi-generator rejects it outright, breaking the Dart client build.
+    // Nothing is lost — updateMemberMetadataContribution already rejects a `true` payload with a
+    // clearer message than a schema violation would produce.
+    sharePersonMetadata: z
+      .boolean()
+      .describe('Disable person metadata contribution for this member; only false is accepted'),
   })
   .meta({ id: 'SharedSpaceMemberMetadataContributionDto' });
 
