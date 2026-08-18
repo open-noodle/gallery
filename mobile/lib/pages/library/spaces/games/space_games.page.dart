@@ -1,5 +1,6 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/extensions/translate_extensions.dart';
 import 'package:immich_mobile/presentation/widgets/games/challenge_card.widget.dart';
@@ -13,6 +14,7 @@ import 'package:immich_mobile/repositories/game_api.repository.dart';
 import 'package:immich_mobile/repositories/shared_space_api.repository.dart';
 import 'package:immich_mobile/routing/router.dart';
 import 'package:immich_mobile/utils/game_format.dart';
+import 'package:immich_mobile/widgets/common/immich_toast.dart';
 
 /// The space Challenges page — composes the daily slot, the standings section and the custom
 /// challenge list, with create behind a `+` for editors.
@@ -23,8 +25,13 @@ import 'package:immich_mobile/utils/game_format.dart';
 /// standings and today's leaderboard — is read through `.valueOrNull`/`.orElse(null)` rather than
 /// `.requireValue`/`.when`, so a slow network or a transient failure on any one of them just hides
 /// that section instead of throwing and blanking the whole page.
+///
+/// `HookConsumerWidget` rather than plain `ConsumerWidget`: the standings section needs a stable
+/// [GlobalKey] and the list needs a [ScrollController] that both survive rebuilds without being
+/// recreated on every provider change — `useMemoized`/`useScrollController` give that, matching the
+/// pattern already used by `space_link_album.page.dart`/`space_albums.page.dart` in this directory.
 @RoutePage()
-class SpaceGamesPage extends ConsumerWidget {
+class SpaceGamesPage extends HookConsumerWidget {
   const SpaceGamesPage({super.key, required this.spaceId, required this.canEdit});
 
   final String spaceId;
@@ -33,15 +40,35 @@ class SpaceGamesPage extends ConsumerWidget {
   Future<void> _create(BuildContext context, WidgetRef ref) async {
     final choice = await ChallengeCreateSheet.show(context);
     if (choice == null) return;
-    await ref
-        .read(gameApiRepositoryProvider)
-        .createChallenge(spaceId, roundCount: choice.roundCount, type: choice.type);
-    ref.invalidate(gameChallengesProvider(spaceId));
+    try {
+      await ref
+          .read(gameApiRepositoryProvider)
+          .createChallenge(spaceId, roundCount: choice.roundCount, type: choice.type);
+      ref.invalidate(gameChallengesProvider(spaceId));
+    } catch (_) {
+      if (context.mounted) {
+        ImmichToast.show(
+          context: context,
+          msg: 'game_create_failed'.t(context: context),
+          toastType: ToastType.error,
+        );
+      }
+    }
   }
 
-  Future<void> _delete(WidgetRef ref, String challengeId) async {
-    await ref.read(gameApiRepositoryProvider).deleteChallenge(challengeId);
-    ref.invalidate(gameChallengesProvider(spaceId));
+  Future<void> _delete(BuildContext context, WidgetRef ref, String challengeId) async {
+    try {
+      await ref.read(gameApiRepositoryProvider).deleteChallenge(challengeId);
+      ref.invalidate(gameChallengesProvider(spaceId));
+    } catch (_) {
+      if (context.mounted) {
+        ImmichToast.show(
+          context: context,
+          msg: 'game_delete_failed'.t(context: context),
+          toastType: ToastType.error,
+        );
+      }
+    }
   }
 
   Future<void> _decideDaily(WidgetRef ref, bool enabled) async {
@@ -50,8 +77,21 @@ class SpaceGamesPage extends ConsumerWidget {
     ref.invalidate(gameDailyProvider(spaceId));
   }
 
+  /// Scrolls the standings section (whatever state it's currently in — loading, error, or the real
+  /// board) into view. Null-guarded: the key's context is only absent if the section isn't mounted
+  /// at all, which [showStandings] (see `build`) guarantees can't happen whenever `DailySlot` is
+  /// offering the button that calls this.
+  Future<void> _scrollToStandings(GlobalKey key) async {
+    final standingsContext = key.currentContext;
+    if (standingsContext == null) return;
+    await Scrollable.ensureVisible(standingsContext, duration: const Duration(milliseconds: 300));
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final standingsKey = useMemoized(() => GlobalKey());
+    final scrollController = useScrollController();
+
     final space = ref.watch(sharedSpaceProvider(spaceId));
     final challenges = ref.watch(gameChallengesProvider(spaceId));
     final standings = ref.watch(gameStandingsProvider(spaceId));
@@ -70,9 +110,14 @@ class SpaceGamesPage extends ConsumerWidget {
     final todayBoard = dailyChallenge == null ? null : ref.watch(gameLeaderboardProvider(dailyChallenge.id));
 
     final monthStandings = standings.valueOrNull;
-    final showStandings =
-        monthStandings != null &&
-        shouldShowStandings(enabled, [for (final entry in monthStandings.entries) entry.daysPlayed]);
+    // Deliberately NOT gated on `monthStandings != null`: `shouldShowStandings` only needs the
+    // entries when `enabled == false` (checking for pre-opt-in history); when `enabled == true` it
+    // returns true unconditionally, which is exactly the case where DailySlot's `daily-standings`
+    // button can appear — that button must always have a section to scroll to, even mid-load or on
+    // a standings error, not just once the data resolves.
+    final showStandings = shouldShowStandings(enabled, [
+      for (final entry in monthStandings?.entries ?? const []) entry.daysPlayed,
+    ]);
 
     return Scaffold(
       appBar: AppBar(title: Text('game_challenges'.t(context: context))),
@@ -86,6 +131,7 @@ class SpaceGamesPage extends ConsumerWidget {
           ),
         ),
         data: (list) => ListView(
+          controller: scrollController,
           padding: const EdgeInsets.all(12),
           children: [
             DailySlot(
@@ -94,18 +140,37 @@ class SpaceGamesPage extends ConsumerWidget {
               canEdit: canEdit,
               onDecide: (value) => _decideDaily(ref, value),
               onPlay: () => context.pushRoute(GamePlayRoute(challengeId: dailyChallenge!.id)),
-              // The monthly/today board already sits inline below on this same page, so there is
-              // nowhere else to navigate to yet.
-              onStandings: () {},
+              onStandings: () => _scrollToStandings(standingsKey),
             ),
             const SizedBox(height: 16),
             if (showStandings) ...[
-              StandingsSection(
-                today: todayBoard?.valueOrNull,
-                todayRoundCount: dailyChallenge?.roundCount.toInt() ?? 0,
-                month: monthStandings,
-                members: members.valueOrNull ?? const [],
-                currentUserId: currentUserId,
+              // Keyed on the wrapper, not on `StandingsSection` itself, so `standingsKey` resolves
+              // to a real context in every one of the three states below — a tap on
+              // `daily-standings` must have somewhere to scroll to even while standings are still
+              // loading or failed to load, not just once they resolve.
+              KeyedSubtree(
+                key: standingsKey,
+                child: standings.when(
+                  loading: () => const Padding(
+                    key: Key('standings-loading'),
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                  error: (_, _) => Center(
+                    child: FilledButton(
+                      key: const Key('standings-retry'),
+                      onPressed: () => ref.invalidate(gameStandingsProvider(spaceId)),
+                      child: Text('retry'.t(context: context)),
+                    ),
+                  ),
+                  data: (month) => StandingsSection(
+                    today: todayBoard?.valueOrNull,
+                    todayRoundCount: dailyChallenge?.roundCount.toInt() ?? 0,
+                    month: month,
+                    members: members.valueOrNull ?? const [],
+                    currentUserId: currentUserId,
+                  ),
+                ),
               ),
               const SizedBox(height: 16),
             ],
@@ -137,7 +202,7 @@ class SpaceGamesPage extends ConsumerWidget {
                       challenge: challenge,
                       canDelete: canEdit,
                       onTap: () => context.pushRoute(GamePlayRoute(challengeId: challenge.id)),
-                      onDelete: () => _delete(ref, challenge.id),
+                      onDelete: () => _delete(context, ref, challenge.id),
                     ),
                   ),
                 ),
