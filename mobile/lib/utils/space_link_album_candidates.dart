@@ -20,13 +20,19 @@ List<RemoteAlbum> linkableAlbumCandidates({
     // Must be owner or editor.
     final isOwner = album.ownerId == currentUserId;
     final isEditor = album.currentUserRole == AlbumUserRole.editor;
-    if (!isOwner && !isEditor) return false;
+    if (!isOwner && !isEditor) {
+      return false;
+    }
 
     // Must not already be linked.
-    if (linkedAlbumIds.contains(album.id)) return false;
+    if (linkedAlbumIds.contains(album.id)) {
+      return false;
+    }
 
     // Optional name-contains filter.
-    if (lowerQuery.isNotEmpty && !album.name.toLowerCase().contains(lowerQuery)) return false;
+    if (lowerQuery.isNotEmpty && !album.name.toLowerCase().contains(lowerQuery)) {
+      return false;
+    }
 
     return true;
   }).toList();
