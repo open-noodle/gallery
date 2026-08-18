@@ -392,6 +392,26 @@ DELETE FROM "migration_overrides"
 DROP TABLE IF EXISTS "workflow_log";
 ALTER TABLE "workflow" DROP COLUMN IF EXISTS "logging";
 
+-- 1786972746371-AssetOcrUpdatedAtTrigger (upstream #29303) added an updatedAt column
+-- to asset_ocr, an updated_at() trigger on it, and the matching migration_overrides
+-- row. The tagged release has none of the three, so it reports the column and the
+-- trigger as extra. Everything is guarded because this script also runs against a
+-- tagged-release DB where asset_ocr itself may predate none of this — and DROP COLUMN
+-- IF EXISTS still errors when the TABLE is absent, hence the to_regclass guard.
+DO $$
+BEGIN
+  IF to_regclass('public.asset_ocr') IS NOT NULL THEN
+    DROP TRIGGER IF EXISTS "asset_ocr_updatedAt" ON "asset_ocr";
+    ALTER TABLE "asset_ocr" DROP COLUMN IF EXISTS "updatedAt";
+  END IF;
+END $$;
+DELETE FROM "migration_overrides" WHERE "name" = 'trigger_asset_ocr_updatedAt';
+
+-- 1786972746372-AssetOcrSyncReset (upstream #29303) is data-only: it deletes the
+-- AssetOcrV1 sync checkpoints so clients re-sync OCR rows that were missed before the
+-- trigger above existed. There is no schema to reverse, and re-adding checkpoints
+-- would be wrong, so only its kysely_migrations row is removed in step 8.
+
 -- -----------------------------------------------------------------------------
 -- 8. Delete Gallery + post-v<branding upstream.version> upstream migration rows
 --    from kysely_migrations.
@@ -494,7 +514,9 @@ DELETE FROM "kysely_migrations"
    '1784986754473-ConvertUserPasswordEmptyStringToNull',
    '1784986754474-AlbumDescriptionNullable',
    '1786385711807-AlbumOwnerDeleteTrigger',
-   '1786741078327-AddWorkflowLogsTable'
+   '1786741078327-AddWorkflowLogsTable',
+   '1786972746371-AssetOcrUpdatedAtTrigger',
+   '1786972746372-AssetOcrSyncReset'
  );
 
 -- -----------------------------------------------------------------------------
