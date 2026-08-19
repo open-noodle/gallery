@@ -1062,7 +1062,11 @@ export class SyncService extends BaseService {
       // is nullable in the database now, but the sync wire contract is still non-nullable and
       // mobile decodes it as such, so a null would break the client.
       // TODO: return null instead of '' in v4
-      await send(response, { type: upsertType, ids: [updateId], data: { ...data, description: data.description ?? '' } });
+      await send(response, {
+        type: upsertType,
+        ids: [updateId],
+        data: { ...data, description: data.description ?? '' },
+      });
     }
   }
 
