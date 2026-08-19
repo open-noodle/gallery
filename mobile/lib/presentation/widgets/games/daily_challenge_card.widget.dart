@@ -158,9 +158,24 @@ class DailySlot extends ConsumerWidget {
                           errorBuilder: (_, _, _) => gradientFill(),
                         ),
                 ),
-                // Scrim tinted to the card surface rather than plain black: it keeps the theme's
-                // own text colours legible over any cover, in light and dark alike.
-                Positioned.fill(child: ColoredBox(color: theme.colorScheme.surface.withValues(alpha: 0.6))),
+                // Anchored where the text is, not spread across the whole card. Tinting the lot
+                // toward the theme surface (the first attempt) kept theme ink legible but washed
+                // the cover out, so the card read as faded rather than as a photo. Dark at the
+                // left behind the title and subtitle, clear by the right where only the button
+                // sits — and that carries its own fill.
+                const Positioned.fill(
+                  child: DecoratedBox(
+                    key: Key('daily-card-scrim'),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                        colors: [Colors.black87, Colors.black45, Colors.transparent],
+                        stops: [0.0, 0.45, 1.0],
+                      ),
+                    ),
+                  ),
+                ),
                 Padding(
                   padding: const EdgeInsets.all(12),
                   child: Row(
@@ -174,7 +189,12 @@ class DailySlot extends ConsumerWidget {
                           children: [
                             Text(
                               'game_daily_challenge'.t(context: context),
-                              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                              // White, not theme ink: this sits on the cover, and the scrim above
+                              // is what it reads against in either theme.
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -184,7 +204,7 @@ class DailySlot extends ConsumerWidget {
                                   context: context,
                                   args: {'time': timeUntilNextDaily(DateTime.now().toUtc())},
                                 ),
-                                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                                style: theme.textTheme.bodySmall?.copyWith(color: Colors.white.withValues(alpha: 0.85)),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
