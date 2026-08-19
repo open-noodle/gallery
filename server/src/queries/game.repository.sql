@@ -831,6 +831,15 @@ where
   "spaceId" = $1
   and "dailyOn" = $2::date
 
+-- GameRepository.getSoloDailyChallenge
+select
+  *
+from
+  "game_challenge"
+where
+  "ownerId" = $1
+  and "dailyOn" = $2::date
+
 -- GameRepository.getLocationRoundCounts
 select
   "game_round"."challengeId",

@@ -61,6 +61,7 @@ import { VideoStreamController } from 'src/controllers/video-stream.controller.j
 import { ViewController } from 'src/controllers/view.controller.js';
 import { WorkflowController } from 'src/controllers/workflow.controller.js';
 import { GameController } from 'src/controllers/game.controller.js';
+import { GameSoloController } from 'src/controllers/game-solo.controller.js';
 
 export const controllers = [
   ApiKeyController,
@@ -85,6 +86,7 @@ export const controllers = [
   FaceSuggestionController,
   GalleryMapController,
   GameController,
+  GameSoloController,
   IntegrityAdminController,
   JobController,
   LibraryManifestController,

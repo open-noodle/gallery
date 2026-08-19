@@ -21,6 +21,28 @@ const GameCreateSchema = z
   })
   .meta({ id: 'GameCreateDto' });
 
+// Which libraries beyond the player's own to draw this one game from. Both are optional and
+// independent: an omitted toggle keeps the player's stored default rather than being read as
+// "off", so overriding one source in the create panel cannot silently switch the other off.
+const GameSoloSourcesSchema = z
+  .object({
+    includePartners: z.boolean().optional().describe("Also draw from partners' photos"),
+    includeSpaces: z.boolean().optional().describe('Also draw from shared-space photos'),
+  })
+  .meta({ id: 'GameSoloSourcesDto' });
+
+// No `name`: a solo challenge is nobody else's to read, so there is nothing to label it for.
+// GameService.createSolo generates "Challenge N" for the history list.
+const GameSoloCreateSchema = z
+  .object({
+    roundCount: z.int().min(1).max(20).default(5).optional().describe('Number of rounds to generate'),
+    type: GameChallengeTypeSchema.default('mixed').optional().describe('Which kinds of round to generate'),
+    // Per-game, and frozen onto the challenge: the stored preference decides what a new game
+    // starts from, this decides what THIS game is, and neither can change once it is generated.
+    sources: GameSoloSourcesSchema.optional().describe('Override the stored source toggles for this game'),
+  })
+  .meta({ id: 'GameSoloCreateDto' });
+
 // shared_space.id is a v4 uuid (@PrimaryGeneratedColumn), so this stays uuidv4 - unlike the
 // challenge `id` below.
 const GameSpaceParamSchema = z.object({
@@ -160,6 +182,7 @@ const GameStandingsResponseSchema = z
   .meta({ id: 'GameStandingsResponseDto' });
 
 export class GameCreateDto extends createZodDto(GameCreateSchema) {}
+export class GameSoloCreateDto extends createZodDto(GameSoloCreateSchema) {}
 export class GameSpaceParamDto extends createZodDto(GameSpaceParamSchema) {}
 export class GameRoundParamDto extends createZodDto(GameRoundParamSchema) {}
 export class GameGuessDto extends createZodDto(GameGuessSchema) {}
