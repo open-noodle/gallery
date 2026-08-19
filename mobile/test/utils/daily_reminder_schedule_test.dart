@@ -106,24 +106,29 @@ void main() {
   });
 
   group('the UTC comparison', () {
-    // The skip compares against the UTC date of the occurrence's own INSTANT, so it is correct
-    // whichever side of Greenwich the player is on. Asserted through the public behaviour rather
-    // than by faking a timezone, which a unit test cannot do portably.
-    test('the dropped day is the UTC day of the occurrence, not the local calendar day', () {
-      final first = DateTime(2026, 8, 18, 18);
-      final localKey = '2026-08-18';
-      final utc = first.toUtc();
-      final utcKey = '${utc.year}-${utc.month.toString().padLeft(2, '0')}-${utc.day.toString().padLeft(2, '0')}';
+    // dailyKeyFor is exercised directly here, rather than only indirectly through
+    // dailyReminderOccurrences: CI (mobile-unit-tests, ubuntu-latest) runs as Etc/UTC, where local
+    // time and UTC time are the same instant, so a test that only compares "dropped by UTC key" vs
+    // "not dropped by local key" degenerates into a tautology on that runner and would not catch a
+    // regression that swapped instant.toUtc() for the instant's own local calendar fields. Fully
+    // distinguishing UTC-keyed from local-keyed behaviour end-to-end requires running under a
+    // non-UTC TZ, which this suite does not attempt.
+    test('dailyKeyFor uses the UTC calendar day of the instant', () {
+      expect(dailyKeyFor(DateTime.utc(2026, 8, 19, 23, 59)), '2026-08-19');
+      expect(dailyKeyFor(DateTime.utc(2026, 8, 20, 0, 1)), '2026-08-20');
+    });
 
-      final droppedByUtc = occurrences(now: morning, lastPlayedDate: utcKey);
-      expect(droppedByUtc.first, isNot(first));
+    test('dailyKeyFor zero-pads single-digit months and days', () {
+      expect(dailyKeyFor(DateTime.utc(2026, 3, 5, 12, 0)), '2026-03-05');
+    });
 
-      if (utcKey != localKey) {
-        // Only meaningful where the two differ; where they agree this assertion is vacuous and the
-        // test above already carries the weight.
-        final notDroppedByLocal = occurrences(now: morning, lastPlayedDate: localKey);
-        expect(notDroppedByLocal.first, first);
-      }
+    test('dailyKeyFor keys the same instant identically whether given in UTC or local time', () {
+      final instant = DateTime.utc(2026, 8, 18, 23, 30);
+
+      // A tautology on a UTC runner (toLocal() is a no-op there), but on any non-UTC developer
+      // machine this fails immediately if the implementation ever reads local calendar fields
+      // instead of the instant itself — free insurance where most of us actually work.
+      expect(dailyKeyFor(instant), dailyKeyFor(instant.toLocal()));
     });
   });
 }
