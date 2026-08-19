@@ -381,10 +381,12 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
 
-    // The button that would scroll to the section is offered...
-    expect(find.byKey(const Key('daily-standings')), findsOneWidget);
-    // ...and the section itself is already present to scroll to, mid-load.
+    // The section holds its place mid-load rather than vanishing from the tree — the point of
+    // this test, and unaffected by the button's removal.
     expect(find.byKey(const Key('standings-loading')), findsOneWidget);
+    // No Leaderboard button here even while the board is still loading: the card is on the page
+    // that owns the board, so there is nowhere for it to send anyone regardless of load state.
+    expect(find.byKey(const Key('daily-standings')), findsNothing);
   });
 
   group('the daily opt-in decision', () {
@@ -465,11 +467,11 @@ void main() {
     });
   });
 
-  testWidgets('tapping the daily leaderboard button drives the scroll wiring without throwing', (tester) async {
-    // Exercises the actual `onStandings` -> `_scrollToStandings` -> `Scrollable.ensureVisible` path
-    // end to end, rather than only checking that the button and the section both exist. A `key:
-    // () {}` no-op would also pass every other assertion in this file; only a real tap proves the
-    // callback is wired to something rather than decorative.
+  testWidgets('a played daily offers no Leaderboard button here — the board is already on the page', (tester) async {
+    // This page IS the leaderboard, so the button used to scroll to a section sitting directly
+    // beneath it. Not merely usually redundant: the card only renders when dailyChallengeEnabled
+    // is true, and `shouldShowStandings` returns `enabled || ...`, so whenever this card is on
+    // this page the standings section is guaranteed to be there too.
     final daily = GameChallengeListItemResponseDto(
       id: 'daily-1',
       spaceId: 's1',
@@ -504,13 +506,12 @@ void main() {
       ],
     );
 
-    expect(find.byKey(const Key('daily-standings')), findsOneWidget);
+    expect(find.byKey(const Key('daily-standings')), findsNothing);
 
-    await tester.tap(find.byKey(const Key('daily-standings')));
-    await tester.pumpAndSettle();
-
-    expect(tester.takeException(), isNull);
-    // The board it scrolled to is the real, resolved section — not the loading/error placeholder.
+    // The board itself is present and resolved, which is exactly why the button is not needed —
+    // and the card still renders, so removing the button did not remove the card with it.
     expect(find.byKey(const Key('standings-tab-today')), findsOneWidget);
+    expect(find.byKey(const Key('daily-card')), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }
