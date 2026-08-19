@@ -104,34 +104,47 @@ describe('GameRepository', () => {
       const sql = readGeneratedSql();
 
       // A shared space's asset set is direct + linked library + linked album + cross-owner
-      // contribution. Selecting from shared_space_asset alone is a SAFE error direction (a strict
-      // subset, never widened visibility) and therefore silent: a space filled entirely through a
-      // linked album or a connected library yields zero candidates and reports itself as having
-      // no photos usable for a challenge. Routing through spaceAssetPathBranches is what keeps
-      // all four arms - forgetting one is a recurring defect here (see
-      // shared-space-album-scope.guard.spec.ts).
+      // contribution. Dropping an arm is a SAFE error direction (a strict subset, never widened
+      // visibility) and therefore silent: a space filled entirely through a linked album yields
+      // zero candidates and reports itself as having no photos usable for a challenge.
       //
-      // Matched on each arm's CORRELATION predicate, not the bare table name: a table name still
-      // appears in the surviving join of an arm whose correlation was dropped.
-      const arms = {
-        'directly added asset': '"shared_space_asset"."assetId" = "asset"."id"',
-        'linked library': '"shared_space_library"."libraryId" = "asset"."libraryId"',
-        'linked album': '"album_asset"."assetId" = "asset"."id"',
-        'cross-owner album contribution': '"album_space_asset"."assetId" = "asset"."id"',
+      // getLocationCandidates and getDateCandidates now DRIVE FROM the space tables (a union of
+      // the four paths) rather than scanning asset and testing membership, so each arm is matched
+      // on its own source table plus the spaceId filter that scopes it - not on a correlation
+      // predicate against "asset", which the union form no longer has.
+      const drivenArms = {
+        'directly added asset': /from "shared_space_asset" where "shared_space_asset"\."spaceId" =/,
+        // The library arm drives from `asset` and joins the link table, so its scoping lives in
+        // the ON clause rather than a WHERE: `on <libraryId match> and <spaceId filter>`.
+        'linked library':
+          /"shared_space_library"\."libraryId" = "asset"\."libraryId" and "shared_space_library"\."spaceId" =/,
+        'linked album': /"album_asset"\."albumId" = "shared_space_album"\."albumId"/,
+        'cross-owner album contribution': /"album_space_asset"\."albumId" = "shared_space_album"\."albumId"/,
       };
 
-      for (const method of ['getLocationCandidates', 'getDateCandidates', 'getEligibleRoundAsset']) {
+      for (const method of ['getLocationCandidates', 'getDateCandidates']) {
         const block = queryBlock(sql, method).replaceAll(/\s+/g, ' ');
-        for (const [arm, predicate] of Object.entries(arms)) {
+        for (const [arm, pattern] of Object.entries(drivenArms)) {
           expect(
             block,
             `GameRepository.${method} no longer covers the "${arm}" access path. A space populated\n` +
               `only through that path becomes invisible to the game - zero candidates, and a\n` +
               `"this space has no photos usable for a challenge" error on a space full of photos.\n` +
-              `Scope the query with spaceAssetPathBranches (via the eligibleSpaceAsset helper) and\n` +
-              `regenerate with \`mise sql\`.`,
-          ).toContain(predicate);
+              `Scope stage 1 with spaceAssetIdUnion and regenerate with \`mise sql\`.`,
+          ).toMatch(pattern);
         }
+      }
+
+      // getEligibleRoundAsset still resolves ONE known asset id, so it keeps the correlated
+      // eligibleSpaceAsset form - driving from the space tables there would be strictly worse.
+      const roundAsset = queryBlock(sql, 'getEligibleRoundAsset').replaceAll(/\s+/g, ' ');
+      for (const predicate of [
+        '"shared_space_asset"."assetId" = "asset"."id"',
+        '"shared_space_library"."libraryId" = "asset"."libraryId"',
+        '"album_asset"."assetId" = "asset"."id"',
+        '"album_space_asset"."assetId" = "asset"."id"',
+      ]) {
+        expect(roundAsset, 'getEligibleRoundAsset must keep the correlated four-arm form').toContain(predicate);
       }
     });
 
