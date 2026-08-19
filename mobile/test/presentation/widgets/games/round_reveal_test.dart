@@ -125,7 +125,10 @@ void main() {
     // refetch fails, so the round's answer never arrives). round_reveal.widget.dart must pass
     // that null straight through to RevealMap rather than substituting (0, 0) — substituting
     // would draw the "actual location" circle at Null Island as if it were the real answer.
-    await pump(tester, RoundResult(type: GameRoundType.location, score: 2200, guess: (lat: 48.85, lon: 2.35)));
+    await pump(
+      tester,
+      const RoundResult(type: GameRoundType.location, score: 2200, guess: (lat: 48.85, lon: 2.35)),
+    );
 
     expect(find.byKey(const Key('round-reveal-score')), findsOneWidget);
     expect(tester.takeException(), isNull);
