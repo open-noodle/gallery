@@ -8,6 +8,7 @@ import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/presentation/widgets/games/date_round.widget.dart';
+import 'package:immich_mobile/presentation/widgets/games/round_progress_hud.widget.dart';
 
 import '../../../test_utils.dart';
 import '../../../widget_tester_extensions.dart';
@@ -88,6 +89,28 @@ void main() {
     expect(state.years.first, 1970);
     expect(state.years.last, 2026);
     expect(state.years.length, 57);
+  });
+
+  // `roundNumber`/`roundCount` were required parameters this widget never used: LocationRound drew
+  // a progress HUD and DateRound drew nothing, so in a mixed challenge the indicator vanished on
+  // every date round.
+  testWidgets('the round HUD is drawn, with the round-progress placeholders resolved', (tester) async {
+    await tester.pumpConsumerWidget(
+      DateRound(
+        challengeId: 'challenge-1',
+        index: 0,
+        minYear: 1970,
+        maxYear: 2026,
+        roundNumber: 2,
+        roundCount: 5,
+        onGuess: (_) {},
+      ),
+    );
+
+    expect(find.byType(RoundProgressHud), findsOneWidget);
+    // A wrong args key in 'game_round_progress'.t(args: {...}) renders the raw key instead of this
+    // text — .t() swallows the MessageFormat failure silently.
+    expect(find.text('Round 2 of 5'), findsOneWidget);
   });
 
   testWidgets('the Guess button resolves the month/year placeholders instead of showing the raw key', (tester) async {
