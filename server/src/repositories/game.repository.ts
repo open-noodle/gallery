@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Expression, ExpressionBuilder, Insertable, Kysely, Selectable, sql, SqlBool } from 'kysely';
+import { Expression, ExpressionBuilder, Insertable, Kysely, QueryCreator, Selectable, sql, SqlBool } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { DummyValue, GenerateSql } from 'src/decorators';
 import { AssetFileType, AssetType, AssetVisibility } from 'src/enum';
@@ -9,6 +9,7 @@ import { GameGuessTable } from 'src/schema/tables/game-guess.table';
 import { GameRoundTable } from 'src/schema/tables/game-round.table';
 import { asUuid, asVector } from 'src/utils/database';
 import { GameCandidate } from 'src/utils/game-scoring';
+import { eligibleSoloAsset, soloPoolAssetIdUnion, SoloPoolSources } from 'src/utils/game-solo-eligibility';
 import { spaceAssetIdUnion, spaceAssetPathBranches } from 'src/utils/shared-space-album-scope';
 
 export type GameChallengeRow = Selectable<GameChallengeTable>;
@@ -27,7 +28,7 @@ export type GameGuessRow = Selectable<GameGuessTable>;
 export type ScenePromptEmbeddings = { place: number[]; notPlace: number[] };
 
 // A face covering more than this fraction of the frame marks the shot as a portrait rather
-// than a place - see the doc comment on getLocationCandidates for the measurement behind it.
+// than a place - see the doc comment on rankLocationSample for the measurement behind it.
 const MAX_FACE_AREA_RATIO = 0.05;
 
 /**
@@ -47,7 +48,7 @@ export const LOCATION_SAMPLE_SIZE = 4000;
 /**
  * CLIP text embedding for "an outdoor photo that shows where it was taken", encoded with
  * ViT-B-32__openai - the model Gallery's smart search uses. Paired with
- * NOT_PLACE_PROMPT_EMBEDDING below; see getLocationCandidates for why both are needed.
+ * NOT_PLACE_PROMPT_EMBEDDING below; see rankLocationSample for why both are needed.
  *
  * Regenerate with, from machine-learning/:
  *   uv run --project machine-learning python -c "from immich_ml.models.clip.textual import OpenClipTextualEncoder; \
@@ -116,7 +117,7 @@ export const PLACE_PROMPT_EMBEDDING: number[] = [
 
 /**
  * CLIP text embedding for "a close-up of a person or an indoor room", encoded the same way as
- * PLACE_PROMPT_EMBEDDING (ViT-B-32__openai). See getLocationCandidates for how it is used.
+ * PLACE_PROMPT_EMBEDDING (ViT-B-32__openai). See rankLocationSample for how it is used.
  *
  * Regenerate with, from machine-learning/:
  *   uv run --project machine-learning python -c "from immich_ml.models.clip.textual import OpenClipTextualEncoder; \
@@ -250,8 +251,9 @@ export class GameRepository {
   constructor(@InjectKysely() private db: Kysely<DB>) {}
 
   /**
-   * Location-round candidates for a space. Two gates, and they are complementary - measurement
-   * against the 54 spike images showed each catches what the other misses:
+   * Stage 2 of the location pool, shared by every scope: rank a stage-1 sample and return the
+   * best `limit` rows. Two gates, and they are complementary - measurement against the 54 spike
+   * images showed each catches what the other misses:
    *
    *   - face area <= 5% of the frame, so portraits (where the place is background behind a
    *     face) are excluded. Verified against a real Postgres that the ratio below is true
@@ -269,11 +271,11 @@ export class GameRepository {
    * is better, hence ORDER BY ... DESC. This two-term expression cannot use the ivfflat/vchord
    * index, so scoring every eligible row would be a full sequential scan over the vector column -
    * 30,212 rows and 133 MB of TOAST reads on the reference library (measured: 482ms warm,
-   * 17-19s cold). That is why this runs as two stages instead of one query: stage 1 (the `sample`
-   * CTE) picks LOCATION_SAMPLE_SIZE rows using only narrow, indexable columns - no smart_search,
-   * no asset_face - ordered by the same seeded hash as the final tiebreak; stage 2 joins the
-   * vector column and the face gate onto just that sample and does the CLIP ranking there. The
-   * expensive work is bounded by the sample size, not the library size.
+   * 17-19s cold). That is why the pool runs as two stages instead of one query: stage 1 (the
+   * caller's `sample` CTE) picks LOCATION_SAMPLE_SIZE rows using only narrow, indexable columns -
+   * no smart_search, no asset_face - ordered by the same seeded hash as the final tiebreak; stage
+   * 2 joins the vector column and the face gate onto just that sample and does the CLIP ranking
+   * here. The expensive work is bounded by the sample size, not the library size.
    *
    * Ranked, never thresholded: the measured cosine margin between positive and negative prompts
    * is thin, so an absolute cutoff would pass everything in one library and nothing in another.
@@ -283,66 +285,23 @@ export class GameRepository {
    * `scenePrompts` undefined = the configured CLIP model is not one we have prompt vectors for,
    * so the ordering is dropped and the pool falls back to the seeded shuffle alone. The face
    * gate still applies.
+   *
+   * Shared between the scopes rather than copied per scope: the face gate and the CLIP ordering
+   * are the two pieces of this file that have each already been broken once (integer division, an
+   * unscoped aggregate), and a second copy is a second place for that to happen - one the
+   * existing shape guards do not look at.
    */
-  @GenerateSql({
-    params: [
-      DummyValue.UUID,
-      DummyValue.NUMBER,
-      DummyValue.STRING,
-      { place: PLACE_PROMPT_EMBEDDING, notPlace: NOT_PLACE_PROMPT_EMBEDDING },
-    ],
-  })
-  async getLocationCandidates(
-    spaceId: string,
+  private async rankLocationSample(
+    // Typed as an Expression of the row, not as a SelectQueryBuilder: each scope's stage 1 joins a
+    // different set of tables, and a builder type is invariant in that set, so the space and solo
+    // samples have no common builder type to name.
+    sample: (db: QueryCreator<DB>) => Expression<GameCandidate>,
     limit: number,
     seed: string,
     scenePrompts?: ScenePromptEmbeddings,
   ): Promise<GameCandidate[]> {
     const rows = await this.db
-      // Stage 1: a cheap seeded sample of eligible rows, narrow columns only - no smart_search,
-      // no asset_face. This is what keeps the expensive stage-2 work below bounded by
-      // LOCATION_SAMPLE_SIZE instead of the whole eligible library.
-      .with('sample', (db) =>
-        db
-          .selectFrom('asset')
-          .innerJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
-          // Lives in stage 1, not stage 2: the eligibility scope (and the GPS presence check
-          // below) is what the sample is drawn FROM, so it has to apply before the LIMIT, not
-          // after.
-          //
-          // The face gate deliberately does NOT live here - it runs in stage 2, against the
-          // sample only (see the NOT EXISTS block below for why). That means CANDIDATE_POOL_LIMIT
-          // (200, in game.service.ts) is the top of the GATED SUBSET of this LOCATION_SAMPLE_SIZE
-          // (4,000-row) sample, not of the full eligible set: in a space with more than 4,000 GPS
-          // photos and a low gate pass rate, this can return fewer than 200 candidates where the
-          // old exhaustive form always filled the pool.
-          //
-          // Driven FROM the space's membership rows, not tested per asset row: the correlated
-          // `eligibleSpaceAsset` form made this scan the whole asset table for every space,
-          // however small the space. The union is built off `this.db` (like the four-way union
-          // at access.repository.ts:284) and handed in as a prebuilt subquery - the CTE
-          // callback's QueryCreator and the join's ExpressionBuilder are different types and
-          // will not accept a `Kysely`-rooted `.union()`.
-          .innerJoin(spaceAssetIdUnion(this.db, spaceId).as('space_asset'), (join) =>
-            join.onRef('space_asset.assetId', '=', 'asset.id'),
-          )
-          .where('asset.deletedAt', 'is', null)
-          .where('asset.type', '=', AssetType.Image)
-          // The visibility floor stays here, ANDed outside the space union. None of the space
-          // helpers exclude archived on their own - the shared-space visibility set admits it.
-          .where('asset.visibility', '=', AssetVisibility.Timeline)
-          .where('asset_exif.latitude', 'is not', null)
-          .where('asset_exif.longitude', 'is not', null)
-          .select([
-            'asset.id as assetId',
-            'asset_exif.latitude as lat',
-            'asset_exif.longitude as lon',
-            'asset.localDateTime as takenAt',
-            'asset_exif.country as country',
-          ])
-          .orderBy(seededOrder(seed, 'asset.id'))
-          .limit(LOCATION_SAMPLE_SIZE),
-      )
+      .with('sample', sample)
       // Stage 2: rank just the sample. The vector join and the face gate only ever touch these
       // LOCATION_SAMPLE_SIZE rows, not the whole eligible set.
       .selectFrom('sample')
@@ -403,6 +362,74 @@ export class GameRepository {
     return rows;
   }
 
+  /**
+   * Location-round candidates for a space: stage 1 only. The face gate, the CLIP ranking and the
+   * reason this is two stages at all are documented on `rankLocationSample` above.
+   */
+  @GenerateSql({
+    params: [
+      DummyValue.UUID,
+      DummyValue.NUMBER,
+      DummyValue.STRING,
+      { place: PLACE_PROMPT_EMBEDDING, notPlace: NOT_PLACE_PROMPT_EMBEDDING },
+    ],
+  })
+  async getLocationCandidates(
+    spaceId: string,
+    limit: number,
+    seed: string,
+    scenePrompts?: ScenePromptEmbeddings,
+  ): Promise<GameCandidate[]> {
+    return this.rankLocationSample(
+      // Stage 1: a cheap seeded sample of eligible rows, narrow columns only - no smart_search,
+      // no asset_face. This is what keeps the expensive stage-2 work bounded by
+      // LOCATION_SAMPLE_SIZE instead of the whole eligible library.
+      (db) =>
+        db
+          .selectFrom('asset')
+          .innerJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
+          // Lives in stage 1, not stage 2: the eligibility scope (and the GPS presence check
+          // below) is what the sample is drawn FROM, so it has to apply before the LIMIT, not
+          // after.
+          //
+          // The face gate deliberately does NOT live here - it runs in stage 2, against the
+          // sample only (see the NOT EXISTS block there for why). That means CANDIDATE_POOL_LIMIT
+          // (200, in game.service.ts) is the top of the GATED SUBSET of this LOCATION_SAMPLE_SIZE
+          // (4,000-row) sample, not of the full eligible set: in a space with more than 4,000 GPS
+          // photos and a low gate pass rate, this can return fewer than 200 candidates where the
+          // old exhaustive form always filled the pool.
+          //
+          // Driven FROM the space's membership rows, not tested per asset row: the correlated
+          // `eligibleSpaceAsset` form made this scan the whole asset table for every space,
+          // however small the space. The union is built off `this.db` (like the four-way union
+          // at access.repository.ts:284) and handed in as a prebuilt subquery - the CTE
+          // callback's QueryCreator and the join's ExpressionBuilder are different types and
+          // will not accept a `Kysely`-rooted `.union()`.
+          .innerJoin(spaceAssetIdUnion(this.db, { spaceId }).as('space_asset'), (join) =>
+            join.onRef('space_asset.assetId', '=', 'asset.id'),
+          )
+          .where('asset.deletedAt', 'is', null)
+          .where('asset.type', '=', AssetType.Image)
+          // The visibility floor stays here, ANDed outside the space union. None of the space
+          // helpers exclude archived on their own - the shared-space visibility set admits it.
+          .where('asset.visibility', '=', AssetVisibility.Timeline)
+          .where('asset_exif.latitude', 'is not', null)
+          .where('asset_exif.longitude', 'is not', null)
+          .select([
+            'asset.id as assetId',
+            'asset_exif.latitude as lat',
+            'asset_exif.longitude as lon',
+            'asset.localDateTime as takenAt',
+            'asset_exif.country as country',
+          ])
+          .orderBy(seededOrder(seed, 'asset.id'))
+          .limit(LOCATION_SAMPLE_SIZE),
+      limit,
+      seed,
+      scenePrompts,
+    );
+  }
+
   /** Date-round candidates for a space. No face/place gate - any timeline photo with a taken
    * date can carry a "when was this" question, so this is deliberately the simpler of the two
    * pools. Ordered by a seeded hash of the asset id (see seededOrder), not `random()` and no
@@ -416,7 +443,7 @@ export class GameRepository {
       .selectFrom('asset')
       // Driven FROM the space's membership rows for the same reason as getLocationCandidates'
       // stage 1 - see the comment there.
-      .innerJoin(spaceAssetIdUnion(this.db, spaceId).as('space_asset'), (join) =>
+      .innerJoin(spaceAssetIdUnion(this.db, { spaceId }).as('space_asset'), (join) =>
         join.onRef('space_asset.assetId', '=', 'asset.id'),
       )
       .where('asset.deletedAt', 'is', null)
@@ -493,6 +520,215 @@ export class GameRepository {
       .execute();
 
     return rows.map((row) => row.assetId);
+  }
+
+  // ── the solo pool ─────────────────────────────────────────────────────────────────────────
+  //
+  // The same questions as the space pool, asked of one player's own scope. The three that read
+  // photos are each generated TWICE - see the names on the decorators - because their read arms
+  // are conditional on the player's frozen source toggles, and one generated variant would pin
+  // only one of the two shapes the server actually runs.
+
+  /**
+   * Location-round candidates for a solo player: stage 1 only, ranked by the shared
+   * `rankLocationSample` above.
+   *
+   * Stage 1's driver is the only thing that differs from the space pool, and it is conditional.
+   * With both toggles off the pool is exactly `asset."ownerId" = me`: one indexed predicate, and
+   * the shape every performance figure in the design was measured against. Turning either toggle
+   * on switches the driver to `soloPoolAssetIdUnion` - see there for why the arms cannot simply
+   * be ORed onto this scan instead.
+   */
+  @GenerateSql(
+    {
+      name: 'own library only',
+      params: [
+        { userId: DummyValue.UUID, withPartners: false, withSpaces: false },
+        DummyValue.NUMBER,
+        DummyValue.STRING,
+        { place: PLACE_PROMPT_EMBEDDING, notPlace: NOT_PLACE_PROMPT_EMBEDDING },
+      ],
+    },
+    {
+      name: 'all sources',
+      params: [
+        { userId: DummyValue.UUID, withPartners: true, withSpaces: true },
+        DummyValue.NUMBER,
+        DummyValue.STRING,
+        { place: PLACE_PROMPT_EMBEDDING, notPlace: NOT_PLACE_PROMPT_EMBEDDING },
+      ],
+    },
+  )
+  async getSoloLocationCandidates(
+    sources: SoloPoolSources,
+    limit: number,
+    seed: string,
+    scenePrompts?: ScenePromptEmbeddings,
+  ): Promise<GameCandidate[]> {
+    const poolIds = soloPoolAssetIdUnion(this.db, sources);
+
+    return this.rankLocationSample(
+      (db) =>
+        db
+          .selectFrom('asset')
+          .innerJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
+          .$if(!poolIds, (qb) => qb.where('asset.ownerId', '=', asUuid(sources.userId)))
+          .$if(!!poolIds, (qb) =>
+            qb.innerJoin(poolIds!.as('pool_asset'), (join) => join.onRef('pool_asset.assetId', '=', 'asset.id')),
+          )
+          .where('asset.deletedAt', 'is', null)
+          .where('asset.type', '=', AssetType.Image)
+          // The floor stays here, ANDed outside whichever driver ran. The id sources answer only
+          // "can this player reach the asset" - archived, hidden and locked photos are reachable
+          // through them, and this is the one clause that keeps all three out of the pool.
+          .where('asset.visibility', '=', AssetVisibility.Timeline)
+          .where('asset_exif.latitude', 'is not', null)
+          .where('asset_exif.longitude', 'is not', null)
+          .select([
+            'asset.id as assetId',
+            'asset_exif.latitude as lat',
+            'asset_exif.longitude as lon',
+            'asset.localDateTime as takenAt',
+            'asset_exif.country as country',
+          ])
+          .orderBy(seededOrder(seed, 'asset.id'))
+          .limit(LOCATION_SAMPLE_SIZE),
+      limit,
+      seed,
+      scenePrompts,
+    );
+  }
+
+  /** Date-round candidates for a solo player. The space pool's simpler twin, driven the same way
+   * `getSoloLocationCandidates`' stage 1 is - see the note there on why the driver is conditional.
+   */
+  @GenerateSql(
+    {
+      name: 'own library only',
+      params: [
+        { userId: DummyValue.UUID, withPartners: false, withSpaces: false },
+        DummyValue.NUMBER,
+        DummyValue.STRING,
+      ],
+    },
+    {
+      name: 'all sources',
+      params: [{ userId: DummyValue.UUID, withPartners: true, withSpaces: true }, DummyValue.NUMBER, DummyValue.STRING],
+    },
+  )
+  async getSoloDateCandidates(sources: SoloPoolSources, limit: number, seed: string): Promise<GameCandidate[]> {
+    const poolIds = soloPoolAssetIdUnion(this.db, sources);
+
+    const rows = await this.db
+      .selectFrom('asset')
+      .$if(!poolIds, (qb) => qb.where('asset.ownerId', '=', asUuid(sources.userId)))
+      .$if(!!poolIds, (qb) =>
+        qb.innerJoin(poolIds!.as('pool_asset'), (join) => join.onRef('pool_asset.assetId', '=', 'asset.id')),
+      )
+      .where('asset.deletedAt', 'is', null)
+      .where('asset.type', '=', AssetType.Image)
+      // The floor stays here, ANDed outside whichever driver ran - see getSoloLocationCandidates.
+      .where('asset.visibility', '=', AssetVisibility.Timeline)
+      .where('asset.localDateTime', 'is not', null)
+      .select(['asset.id as assetId', 'asset.localDateTime as takenAt'])
+      .orderBy(seededOrder(seed, 'asset.id'))
+      .limit(limit)
+      .execute();
+
+    return rows.map((row) => ({ assetId: row.assetId, lat: null, lon: null, takenAt: row.takenAt, country: null }));
+  }
+
+  /**
+   * The preview file of a solo round's asset, resolved through `eligibleSoloAsset` - the
+   * correlated per-asset form of the same eligibility the two candidate queries above express as
+   * an id-source union - and never through `AssetRepository.getById`, which applies no
+   * `deletedAt`, no visibility and no scope predicate at all.
+   *
+   * The `sources` handed in are the ones FROZEN on the challenge row, not the player's live
+   * preference: a round drawn from a partner's library when the toggle was on stays servable
+   * after the player turns it off, and a round can never become servable because they turned one
+   * on. Access itself is still live - unpartnering, or leaving the space, stops the image at the
+   * next request, which is the same contract the space game has for a photo removed from a space.
+   *
+   * Returning nothing is the correct outcome, not an error: the round stays scoreable from its
+   * denormalised answer (§9), only the image is gone.
+   */
+  @GenerateSql(
+    {
+      name: 'own library only',
+      params: [{ userId: DummyValue.UUID, withPartners: false, withSpaces: false }, DummyValue.UUID],
+    },
+    {
+      name: 'all sources',
+      params: [{ userId: DummyValue.UUID, withPartners: true, withSpaces: true }, DummyValue.UUID],
+    },
+  )
+  async getSoloEligibleRoundAsset(
+    sources: SoloPoolSources,
+    assetId: string,
+  ): Promise<{ previewPath: string } | undefined> {
+    return (
+      this.db
+        .selectFrom('asset')
+        .innerJoin('asset_file', (join) =>
+          join.onRef('asset_file.assetId', '=', 'asset.id').on('asset_file.type', '=', AssetFileType.Preview),
+        )
+        .select('asset_file.path as previewPath')
+        .where('asset.id', '=', asUuid(assetId))
+        .where((eb) => eligibleSoloAsset(eb, sources))
+        // An edited asset carries a second preview row; prefer the unedited one, matching
+        // AssetRepository.getForThumbnail's default (`isEdited: false`) for the same file type.
+        .orderBy('asset_file.isEdited', 'asc')
+        .limit(1)
+        .executeTakeFirst()
+    );
+  }
+
+  /**
+   * Asset ids used by rounds of the player's `challengeLimit` most recently created solo
+   * challenges - so a new one can avoid repeating a photo they just played. Scoped by owner
+   * rather than by space; otherwise identical to `getRecentlyUsedAssetIds`.
+   */
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.NUMBER] })
+  async getSoloRecentlyUsedAssetIds(ownerId: string, challengeLimit: number): Promise<string[]> {
+    const rows = await this.db
+      .selectFrom('game_round')
+      .where(
+        'game_round.challengeId',
+        'in',
+        this.db
+          .selectFrom('game_challenge')
+          .select('game_challenge.id')
+          .where('game_challenge.ownerId', '=', ownerId)
+          .orderBy('game_challenge.createdAt', 'desc')
+          .limit(challengeLimit),
+      )
+      .where('game_round.assetId', 'is not', null)
+      .select('game_round.assetId as assetId')
+      .distinct()
+      .$narrowType<{ assetId: string }>()
+      .execute();
+
+    return rows.map((row) => row.assetId);
+  }
+
+  /**
+   * How many player-created solo challenges this user already has. A count rather than the rows,
+   * because the only caller wants the number - and it feeds the generation seed
+   * (`user:<id>:<count>`), which is why dailies are excluded here for exactly the reason
+   * `getChallengesForSpace` excludes them: letting a daily bump the count would change which
+   * photos every future custom challenge draws, once a day, for reasons the player never sees.
+   */
+  @GenerateSql({ params: [DummyValue.UUID] })
+  async getSoloChallengeCount(ownerId: string): Promise<number> {
+    const row = await this.db
+      .selectFrom('game_challenge')
+      .select((eb) => eb.fn.countAll<string>().as('count'))
+      .where('game_challenge.ownerId', '=', ownerId)
+      .where('game_challenge.dailyOn', 'is', null)
+      .executeTakeFirstOrThrow();
+
+    return Number(row.count);
   }
 
   /**
