@@ -14,6 +14,7 @@ import 'package:immich_mobile/models/map/map_state.model.dart';
 import 'package:immich_mobile/pages/library/spaces/games/game_play.page.dart';
 import 'package:immich_mobile/presentation/widgets/games/date_round.widget.dart';
 import 'package:immich_mobile/presentation/widgets/games/location_round.widget.dart';
+import 'package:immich_mobile/providers/game/daily_reminder.provider.dart';
 import 'package:immich_mobile/providers/locale_provider.dart';
 import 'package:immich_mobile/providers/map/map_state.provider.dart';
 import 'package:immich_mobile/repositories/game_api.repository.dart';
@@ -24,6 +25,8 @@ import '../../../test_utils.dart';
 import '../../../widget_tester_extensions.dart';
 
 class _MockGameApiRepository extends Mock implements GameApiRepository {}
+
+class _MockDailyReminderController extends Mock implements DailyReminderController {}
 
 /// `GamePlayPage` renders `LocationRound` for a location round, which embeds `GuessMap` and wraps
 /// in `MapThemeOverride`. That reads `mapStateNotifierProvider`, whose real `build()` reaches
@@ -66,6 +69,28 @@ GameChallengeDetailResponseDto _finishedChallenge() => GameChallengeDetailRespon
   rounds: [GameRoundDetailResponseDto(index: 0, type: GameRoundType.location, score: const Optional.present(100))],
 );
 
+// A DAILY challenge (non-null `dailyOn`), single round, so one guess reaches `finished`. The
+// `answered` flag models the pre- vs post-guess refetch inside `_reveal` — `getChallenge` is
+// called twice per guess, unanswered then answered, mirroring `daily_reminder_triggers_test.dart`.
+GameChallengeDetailResponseDto _dailyChallenge({required bool answered}) => GameChallengeDetailResponseDto(
+  id: 'c1',
+  spaceId: 's1',
+  name: 'Daily',
+  roundCount: 1,
+  scaleKm: 1,
+  scaleDays: 1,
+  createdAt: DateTime.utc(2026, 8, 18),
+  closedAt: null,
+  dailyOn: DateTime.utc(2026, 8, 18),
+  rounds: [
+    GameRoundDetailResponseDto(
+      index: 0,
+      type: GameRoundType.location,
+      score: answered ? const Optional.present(10) : const Optional.absent(),
+    ),
+  ],
+);
+
 void main() {
   // getGameRoundImageUrl (used by both round surfaces) reads Store.get(StoreKey.serverEndpoint),
   // which throws unless the Store is initialized (mirrors location_round_test.dart /
@@ -103,13 +128,14 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  Future<void> pump(WidgetTester tester) {
+  Future<void> pump(WidgetTester tester, {List<Override> extraOverrides = const []}) {
     return tester.pumpConsumerWidget(
       const GamePlayPage(challengeId: 'c1'),
       overrides: [
         gameApiRepositoryProvider.overrideWithValue(repository),
         mapStateNotifierProvider.overrideWith(_FakeMapStateNotifier.new),
         localeProvider.overrideWithValue(const Locale('en')),
+        ...extraOverrides,
       ],
     );
   }
@@ -190,5 +216,56 @@ void main() {
     expect(find.byType(LocationRound), findsOneWidget);
 
     await settleToast(tester);
+  });
+
+  // The rest of this file drives GamePlayPage entirely through gameApiRepositoryProvider/
+  // mapStateNotifierProvider — it never touches `dailyReminderProvider`, so it stays silent about
+  // whether the page wires `GameSessionController.onDailyCompleted` at all. This test is the one
+  // that would go red if that wiring (game_play.page.dart, the `ref.read(...).onDailyCompleted =
+  // ...` line) were ever deleted: unlike daily_reminder_triggers_test.dart, it does NOT assign
+  // `onDailyCompleted` itself — only the page may do that — so a call to `recordDailyCompleted`
+  // proves the page's own wiring ran, not the controller's callback contract in isolation.
+  testWidgets('finishing a daily reports its completion to the reminder', (tester) async {
+    final reminder = _MockDailyReminderController();
+    when(() => reminder.recordDailyCompleted(any())).thenAnswer((_) async {});
+
+    var fetches = 0;
+    when(() => repository.getChallenge('c1')).thenAnswer((_) async {
+      fetches++;
+      return _dailyChallenge(answered: fetches > 1);
+    });
+    when(
+      () => repository.guessLocation(
+        any(),
+        any(),
+        lat: any(named: 'lat'),
+        lon: any(named: 'lon'),
+      ),
+    ).thenAnswer(
+      (_) async => GameGuessResponseDto(
+        roundId: 'r',
+        userId: 'u',
+        score: 10,
+        distanceKm: null,
+        guessDate: null,
+        guessLat: null,
+        guessLon: null,
+        offsetDays: null,
+      ),
+    );
+    when(() => repository.getLeaderboard('c1')).thenAnswer((_) async => GameLeaderboardResponseDto(entries: []));
+
+    await pump(tester, extraOverrides: [dailyReminderProvider.overrideWithValue(reminder)]);
+
+    tester.state<LocationRoundState>(find.byType(LocationRound)).debugSetPin(lat: 48.85, lon: 2.35);
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('location-round-guess')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('round-reveal-next')));
+    await tester.pumpAndSettle();
+
+    verify(() => reminder.recordDailyCompleted(DateTime.utc(2026, 8, 18))).called(1);
   });
 }
