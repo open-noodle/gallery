@@ -5,9 +5,12 @@ import 'package:immich_mobile/extensions/translate_extensions.dart';
 import 'package:immich_mobile/presentation/widgets/games/date_round.widget.dart';
 import 'package:immich_mobile/presentation/widgets/games/location_round.widget.dart';
 import 'package:immich_mobile/presentation/widgets/games/round_reveal.widget.dart';
+import 'package:immich_mobile/presentation/widgets/games/standings_section.widget.dart';
 import 'package:immich_mobile/providers/game/daily_reminder.provider.dart';
 import 'package:immich_mobile/providers/game/game_session.provider.dart';
+import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:immich_mobile/utils/debug_print.dart';
+import 'package:immich_mobile/utils/game_format.dart';
 import 'package:immich_mobile/widgets/common/immich_toast.dart';
 import 'package:openapi/api.dart';
 
@@ -81,7 +84,11 @@ class GamePlayPage extends ConsumerWidget {
     // guards the `.type` dispatch below, which needs a non-null round anyway.
     final round = state.currentRound;
     if (round == null) {
-      return Center(child: Text('game_completed'.t(context: context)));
+      return _Completed(
+        leaderboard: state.leaderboard,
+        roundCount: state.challenge.rounds.length,
+        currentUserId: ref.watch(currentUserProvider)?.id ?? '',
+      );
     }
 
     final roundNumber = state.currentIndex + 1;
@@ -107,6 +114,64 @@ class GamePlayPage extends ConsumerWidget {
       roundNumber: roundNumber,
       roundCount: roundCount,
       onGuess: controller.guessDate,
+    );
+  }
+}
+
+/// The completion screen.
+///
+/// [GameSessionController] already fetches the challenge's leaderboard on finishing (and on
+/// resuming an already-finished challenge) — rendering it here is what makes that fetch worth
+/// anything, and it mirrors what web puts on the same screen.
+///
+/// Rows are NOT filtered against the space's member list. Unlike web, [StandingsRow] shows no
+/// avatar — a rank, the name the server already sent, and the score — so a member lookup would buy
+/// nothing here except the chance to silently drop a real player whose membership row happened not
+/// to load. Same reasoning as `StandingsSection`.
+class _Completed extends StatelessWidget {
+  const _Completed({required this.leaderboard, required this.roundCount, required this.currentUserId});
+
+  final GameLeaderboardResponseDto? leaderboard;
+  final int roundCount;
+  final String currentUserId;
+
+  @override
+  Widget build(BuildContext context) {
+    // Never re-sorted: the server already applied its own comparator, and re-sorting by total
+    // would break the rule that a player who scored zero still outranks one who never turned up.
+    final entries = leaderboard?.entries ?? const <GameLeaderboardResponseDtoEntriesInner>[];
+    final ranks = competitionRanks([for (final entry in entries) entry.total]);
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Text(
+          'game_completed'.t(context: context),
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.headlineSmall,
+        ),
+        if (entries.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Text('game_leaderboard'.t(context: context), style: Theme.of(context).textTheme.titleMedium),
+          for (var i = 0; i < entries.length; i++)
+            StandingsRow(
+              key: Key('game-leaderboard-row-${entries[i].userId}'),
+              userId: entries[i].userId,
+              rank: ranks[i],
+              name: entries[i].name,
+              detail: entries[i].answered == 0
+                  ? 'game_not_played'.t(context: context)
+                  : 'game_rounds_answered'.t(
+                      context: context,
+                      args: {'answered': '${entries[i].answered}', 'total': '$roundCount'},
+                    ),
+              value: entries[i].answered == 0
+                  ? '—'
+                  : 'game_points'.t(context: context, args: {'score': '${entries[i].total}'}),
+              isMe: entries[i].userId == currentUserId,
+            ),
+        ],
+      ],
     );
   }
 }
