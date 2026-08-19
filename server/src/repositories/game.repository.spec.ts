@@ -47,15 +47,23 @@ describe('GameRepository', () => {
   // query shape changes - which is precisely when these two defects came back before.
   describe('generated query shape', () => {
     it('divides the face-area ratio in floating point, not integer arithmetic', () => {
-      const sql = readGeneratedSql();
-      const end = sql.indexOf('as "faceAreaRatio"');
+      // The ratio expression moved from a SELECTed `as "faceAreaRatio"` alias (the old
+      // uncorrelated LEFT JOIN form) into a bare HAVING comparison (the correlated NOT EXISTS
+      // form) - HAVING has nothing to alias against, so the anchor is "having ... > $" instead.
+      const block = queryBlock(readGeneratedSql(), 'getLocationCandidates');
+      const start = block.indexOf('having');
+      expect(
+        start,
+        'the face-area HAVING clause is gone from the generated SQL - if the face gate moved, move this guard with it',
+      ).toBeGreaterThan(-1);
+      const end = block.indexOf(' > $', start);
       expect(
         end,
-        'the faceAreaRatio expression is gone from the generated SQL - if the face gate moved, move this guard with it',
+        'could not find the HAVING comparison operator (`> 0.05`) after the ratio expression',
       ).toBeGreaterThan(-1);
       // The whole `sum(...) / nullif(...)` ratio, whitespace-collapsed so sql-formatter's line
       // wrapping cannot change what this matches.
-      const expression = sql.slice(sql.lastIndexOf('sum(', end), end).replaceAll(/\s+/g, ' ');
+      const expression = block.slice(start, end).replaceAll(/\s+/g, ' ');
 
       // Specifically the cast on the NUMERATOR, immediately before the division - that is the one
       // that decides whether Postgres divides in floating point. A cast on the denominator alone
@@ -69,6 +77,27 @@ describe('GameRepository', () => {
           'looks completely healthy - this cost two review cycles already. Restore the cast in\n' +
           'getLocationCandidates, then regenerate with `mise sql`.',
       ).toMatch(/\)::double precision \/ nullif/);
+    });
+
+    it('scopes the face-area aggregate to the candidate rows, not the whole asset_face table', () => {
+      const block = queryBlock(readGeneratedSql(), 'getLocationCandidates').replaceAll(/\s+/g, ' ');
+
+      // An uncorrelated `group by "asset_face"."assetId"` with no reference to the outer row means
+      // Postgres aggregates EVERY visible face in the database before joining - 58k rows on the
+      // reference library, to gate a few thousand candidates. The correlated form carries the outer
+      // asset id into the subquery.
+      expect(
+        block,
+        'The face-area gate is aggregating asset_face unscoped. It must correlate on the outer\n' +
+          'asset id (NOT EXISTS ... where f."assetId" = <outer> ... having ratio > 0.05) so the\n' +
+          'aggregate is bounded by the candidate sample. Regenerate with `mise sql`.',
+      ).toMatch(/not exists .*"asset_face".*"assetId" =/);
+
+      expect(
+        block,
+        'The face gate should express exclusion via HAVING on the ratio, so that a row with no\n' +
+          'faces (no group) and a row with zero image area (NULL ratio) are both KEPT.',
+      ).toContain('having');
     });
 
     it("scopes every asset query to all four of a space's asset paths", () => {

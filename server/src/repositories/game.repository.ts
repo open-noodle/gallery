@@ -274,32 +274,42 @@ export class GameRepository {
       // joined in, `eb` is no longer an ExpressionBuilder over the plain DB and cannot be handed
       // to the shared helper. WHERE terms are ANDed, so the position carries no semantics.
       .where((eb) => eligibleSpaceAsset(eb, spaceId))
-      .leftJoin(
-        (eb) =>
-          eb
-            .selectFrom('asset_face')
-            .select('asset_face.assetId as assetId')
-            .select((eb) =>
-              // All four bbox columns plus imageWidth/imageHeight are `integer` (asset-face.table.ts).
-              // Postgres: sum(integer) -> bigint, max(integer)*max(integer) -> integer, and
-              // bigint/integer is TRUNCATING integer division - every ratio below 1.0 collapses to
-              // 0, which made the <= 0.05 gate below pass every portrait unconditionally. Casting the
-              // numerator (and one denominator factor) to double precision forces real division.
-              sql<number>`sum((${eb.ref('asset_face.boundingBoxX2')} - ${eb.ref('asset_face.boundingBoxX1')}) * (${eb.ref('asset_face.boundingBoxY2')} - ${eb.ref('asset_face.boundingBoxY1')}))::double precision / nullif(max(${eb.ref('asset_face.imageWidth')})::double precision * max(${eb.ref('asset_face.imageHeight')}), 0)`.as(
-                'faceAreaRatio',
-              ),
-            )
-            .where('asset_face.deletedAt', 'is', null)
-            .where('asset_face.isVisible', '=', true)
-            .groupBy('asset_face.assetId')
-            .as('face_area'),
-        (join) => join.onRef('face_area.assetId', '=', 'asset.id'),
-      )
       .leftJoin('smart_search', 'smart_search.assetId', 'asset.id')
       .where('asset_exif.latitude', 'is not', null)
       .where('asset_exif.longitude', 'is not', null)
+      // Correlated, not an uncorrelated LEFT JOIN to a grouped subquery: the latter aggregates
+      // every visible face row in the database before joining, which is 58k rows on the
+      // reference library to gate a few thousand candidates.
+      //
+      // Equivalent to the old `ratio IS NULL OR ratio <= 0.05` in all three cases, and the
+      // equivalence was verified against a real 56,730-row library (symmetric difference 0):
+      //   - no faces        -> no group -> NOT EXISTS is true  -> kept
+      //   - zero image area -> nullif gives NULL, `NULL > 0.05` is NULL, HAVING drops the group
+      //                        -> NOT EXISTS is true           -> kept
+      //   - ratio > 0.05    -> group survives HAVING           -> excluded
+      // The zero-image-area branch has no rows in any library measured, so it is covered by
+      // game-face-gate.spec.ts rather than by production data.
+      // NOTE the SHADOWED inner `eb` in the exists() callback. The outer builder is scoped to the
+      // outer query, so using outer `eb.ref('f.…')` here would resolve against the wrong context.
+      // The callback form is the codebase pattern - see database.ts:893 and
+      // asset.repository.ts:386.
       .where((eb) =>
-        eb.or([eb('face_area.faceAreaRatio', 'is', null), eb('face_area.faceAreaRatio', '<=', MAX_FACE_AREA_RATIO)]),
+        eb.not(
+          eb.exists((eb) =>
+            eb
+              .selectFrom('asset_face as f')
+              .select(sql`1`.as('one'))
+              .whereRef('f.assetId', '=', 'asset.id')
+              .where('f.deletedAt', 'is', null)
+              .where('f.isVisible', '=', true)
+              .groupBy('f.assetId')
+              .having(
+                sql<number>`sum(("f"."boundingBoxX2" - "f"."boundingBoxX1") * ("f"."boundingBoxY2" - "f"."boundingBoxY1"))::double precision / nullif(max("f"."imageWidth")::double precision * max("f"."imageHeight"), 0)`,
+                '>',
+                MAX_FACE_AREA_RATIO,
+              ),
+          ),
+        ),
       )
       .select([
         'asset.id as assetId',

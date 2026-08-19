@@ -10,27 +10,6 @@ select
 from
   "asset"
   inner join "asset_exif" on "asset_exif"."assetId" = "asset"."id"
-  left join (
-    select
-      "asset_face"."assetId" as "assetId",
-      sum(
-        (
-          "asset_face"."boundingBoxX2" - "asset_face"."boundingBoxX1"
-        ) * (
-          "asset_face"."boundingBoxY2" - "asset_face"."boundingBoxY1"
-        )
-      )::double precision / nullif(
-        max("asset_face"."imageWidth")::double precision * max("asset_face"."imageHeight"),
-        0
-      ) as "faceAreaRatio"
-    from
-      "asset_face"
-    where
-      "asset_face"."deletedAt" is null
-      and "asset_face"."isVisible" = $1
-    group by
-      "asset_face"."assetId"
-  ) as "face_area" on "face_area"."assetId" = "asset"."id"
   left join "smart_search" on "smart_search"."assetId" = "asset"."id"
 where
   (
@@ -42,7 +21,7 @@ where
           "shared_space_asset"
         where
           "shared_space_asset"."assetId" = "asset"."id"
-          and "shared_space_asset"."spaceId" = $2::uuid
+          and "shared_space_asset"."spaceId" = $1::uuid
       )
       or exists (
         select
@@ -51,7 +30,7 @@ where
           "shared_space_library"
         where
           "shared_space_library"."libraryId" = "asset"."libraryId"
-          and "shared_space_library"."spaceId" = $3::uuid
+          and "shared_space_library"."spaceId" = $2::uuid
       )
       or (
         exists (
@@ -64,8 +43,8 @@ where
             and "album"."deletedAt" is null
           where
             "album_asset"."assetId" = "asset"."id"
-            and "shared_space_album"."spaceId" = $4::uuid
-            and "shared_space_album"."showInTimeline" = $5
+            and "shared_space_album"."spaceId" = $3::uuid
+            and "shared_space_album"."showInTimeline" = $4
         )
         or exists (
           select
@@ -78,20 +57,35 @@ where
             and "album"."deletedAt" is null
           where
             "album_space_asset"."assetId" = "asset"."id"
-            and "shared_space_album"."spaceId" = $6::uuid
-            and "shared_space_album"."showInTimeline" = $7
+            and "shared_space_album"."spaceId" = $5::uuid
+            and "shared_space_album"."showInTimeline" = $6
         )
       )
     )
     and "asset"."deletedAt" is null
-    and "asset"."type" = $8
-    and "asset"."visibility" = $9
+    and "asset"."type" = $7
+    and "asset"."visibility" = $8
   )
   and "asset_exif"."latitude" is not null
   and "asset_exif"."longitude" is not null
-  and (
-    "face_area"."faceAreaRatio" is null
-    or "face_area"."faceAreaRatio" <= $10
+  and not exists (
+    select
+      1 as "one"
+    from
+      "asset_face" as "f"
+    where
+      "f"."assetId" = "asset"."id"
+      and "f"."deletedAt" is null
+      and "f"."isVisible" = $9
+    group by
+      "f"."assetId"
+    having
+      sum(
+        ("f"."boundingBoxX2" - "f"."boundingBoxX1") * ("f"."boundingBoxY2" - "f"."boundingBoxY1")
+      )::double precision / nullif(
+        max("f"."imageWidth")::double precision * max("f"."imageHeight"),
+        0
+      ) > $10
   )
 order by
   (smart_search.embedding <=> $11::vector) - (smart_search.embedding <=> $12::vector) desc nulls last,
