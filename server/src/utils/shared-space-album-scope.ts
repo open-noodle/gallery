@@ -423,7 +423,15 @@ export function spaceAssetPathBranches(
 }
 
 /**
- * Every asset id reachable from one space, as a UNION over the four access paths.
+ * How a `spaceAssetIdUnion` is bound: to ONE space, or to every space a user belongs to. The
+ * narrower cousin of `SpaceScope` - the union form has no correlated outer row to reference, so
+ * the `spaceIdRef` and `spaceIds` cases have no meaning here.
+ */
+export type SpaceAssetUnionScope = { spaceId: string } | { memberUserId: string };
+
+/**
+ * Every asset id reachable from one space - or from every space a user belongs to - as a UNION
+ * over the four access paths.
  *
  * The counterpart to `spaceAssetPathBranches`, which tests membership per candidate row. Both
  * express the same set; they differ in which side drives. Use the branches when you already have
@@ -433,27 +441,51 @@ export function spaceAssetPathBranches(
  * 169 ms driving from here.
  *
  * `union` (not `union all`) because the paths overlap: an asset can be both directly added and
- * present through a linked album.
+ * present through a linked album. Under `{ memberUserId }` they overlap harder still - two of the
+ * user's spaces can each hold the same asset - and the dedup is what keeps that from weighting a
+ * photo twice in whatever the caller does downstream.
  *
  * `requireShowInTimeline` defaults to `true` here, unlike `spaceAssetPathBranches` (whose default
- * is `false`) - both current callers (`GameRepository`'s candidate queries) are timeline surfaces,
+ * is `false`) - every current caller (`GameRepository`'s candidate queries) is a timeline surface,
  * so this keeps their call sites unchanged. The two album arms below hardcode the flag onto their
  * own `shared_space_album.showInTimeline` filter with no other escape hatch, so a non-timeline
  * consumer MUST pass `requireShowInTimeline: false` explicitly rather than relying on the default.
  */
-export function spaceAssetIdUnion(db: Kysely<DB>, spaceId: string, options: { requireShowInTimeline?: boolean } = {}) {
+export function spaceAssetIdUnion(
+  db: Kysely<DB>,
+  scope: SpaceAssetUnionScope,
+  options: { requireShowInTimeline?: boolean } = {},
+) {
   const requireShowInTimeline = options.requireShowInTimeline ?? true;
+  // Keyed off which case of the scope was passed, never off the truthiness of the id it carries.
+  // An empty-string id under a truthiness test would drop the filter entirely and hand back every
+  // space's assets - failing OPEN, the one direction this function must never fail in. Written
+  // this way it emits `= ''`, which matches nothing.
+  const bySpaceId = 'spaceId' in scope;
+  const byMember = 'memberUserId' in scope;
+  const spaceId = bySpaceId ? scope.spaceId : '';
+  const memberUserId = byMember ? scope.memberUserId : '';
+
   return db
     .selectFrom('shared_space_asset')
     .select('shared_space_asset.assetId as assetId')
-    .where('shared_space_asset.spaceId', '=', asUuid(spaceId))
+    .$if(bySpaceId, (qb) => qb.where('shared_space_asset.spaceId', '=', asUuid(spaceId)))
+    .$if(byMember, (qb) =>
+      qb
+        .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_asset.spaceId')
+        .where('shared_space_member.userId', '=', asUuid(memberUserId)),
+    )
     .union(
       db
         .selectFrom('asset')
-        .innerJoin('shared_space_library', (join) =>
-          join
-            .onRef('shared_space_library.libraryId', '=', 'asset.libraryId')
-            .on('shared_space_library.spaceId', '=', asUuid(spaceId)),
+        .innerJoin('shared_space_library', (join) => {
+          const onLibrary = join.onRef('shared_space_library.libraryId', '=', 'asset.libraryId');
+          return bySpaceId ? onLibrary.on('shared_space_library.spaceId', '=', asUuid(spaceId)) : onLibrary;
+        })
+        .$if(byMember, (qb) =>
+          qb
+            .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_library.spaceId')
+            .where('shared_space_member.userId', '=', asUuid(memberUserId)),
         )
         .select('asset.id as assetId'),
     )
@@ -464,8 +496,13 @@ export function spaceAssetIdUnion(db: Kysely<DB>, spaceId: string, options: { re
         .innerJoin('album', (join) =>
           join.onRef('album.id', '=', 'shared_space_album.albumId').on('album.deletedAt', 'is', null),
         )
+        .$if(byMember, (qb) =>
+          qb
+            .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_album.spaceId')
+            .where('shared_space_member.userId', '=', asUuid(memberUserId)),
+        )
         .select('album_asset.assetId as assetId')
-        .where('shared_space_album.spaceId', '=', asUuid(spaceId))
+        .$if(bySpaceId, (qb) => qb.where('shared_space_album.spaceId', '=', asUuid(spaceId)))
         .$if(requireShowInTimeline, (qb) => qb.where('shared_space_album.showInTimeline', '=', true)),
     )
     .union(
@@ -479,8 +516,13 @@ export function spaceAssetIdUnion(db: Kysely<DB>, spaceId: string, options: { re
         .innerJoin('album', (join) =>
           join.onRef('album.id', '=', 'shared_space_album.albumId').on('album.deletedAt', 'is', null),
         )
+        .$if(byMember, (qb) =>
+          qb
+            .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_album.spaceId')
+            .where('shared_space_member.userId', '=', asUuid(memberUserId)),
+        )
         .select('album_space_asset.assetId as assetId')
-        .where('shared_space_album.spaceId', '=', asUuid(spaceId))
+        .$if(bySpaceId, (qb) => qb.where('shared_space_album.spaceId', '=', asUuid(spaceId)))
         .$if(requireShowInTimeline, (qb) => qb.where('shared_space_album.showInTimeline', '=', true)),
     );
 }
