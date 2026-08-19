@@ -16,7 +16,7 @@
 // touches it; each upstream call site shrinks to a single, stable helper call.
 //
 // See docs / data/sa-abstraction-spec-t8/report.md for the full design + slices.
-import { Expression, ExpressionBuilder, RawBuilder, ReferenceExpression, sql, SqlBool } from 'kysely';
+import { Expression, ExpressionBuilder, Kysely, RawBuilder, ReferenceExpression, sql, SqlBool } from 'kysely';
 import { AssetVisibility, SharedSpaceRole } from 'src/enum';
 import { DB } from 'src/schema';
 import { anyUuid, asUuid } from 'src/utils/database';
@@ -411,6 +411,62 @@ export function spaceAssetPathBranches(
       viewerId: options.viewerId,
     }),
   ];
+}
+
+/**
+ * Every asset id reachable from one space, as a UNION over the four access paths.
+ *
+ * The counterpart to `spaceAssetPathBranches`, which tests membership per candidate row. Both
+ * express the same set; they differ in which side drives. Use the branches when you already have
+ * a specific asset (one index probe); use this union when you are SELECTING the space's assets,
+ * because the correlated form makes cost proportional to the whole asset table rather than to the
+ * space - measured at 3.7 GB of buffers and 14 s cold for a 56.5k-asset space, versus 406 MB and
+ * 169 ms driving from here.
+ *
+ * `union` (not `union all`) because the paths overlap: an asset can be both directly added and
+ * present through a linked album.
+ */
+export function spaceAssetIdUnion(db: Kysely<DB>, spaceId: string) {
+  return db
+    .selectFrom('shared_space_asset')
+    .select('shared_space_asset.assetId as assetId')
+    .where('shared_space_asset.spaceId', '=', spaceId)
+    .union(
+      db
+        .selectFrom('asset')
+        .innerJoin('shared_space_library', (join) =>
+          join
+            .onRef('shared_space_library.libraryId', '=', 'asset.libraryId')
+            .on('shared_space_library.spaceId', '=', spaceId),
+        )
+        .select('asset.id as assetId'),
+    )
+    .union(
+      db
+        .selectFrom('shared_space_album')
+        .innerJoin('album_asset', 'album_asset.albumId', 'shared_space_album.albumId')
+        .innerJoin('album', (join) =>
+          join.onRef('album.id', '=', 'shared_space_album.albumId').on('album.deletedAt', 'is', null),
+        )
+        .select('album_asset.assetId as assetId')
+        .where('shared_space_album.spaceId', '=', spaceId)
+        .where('shared_space_album.showInTimeline', '=', true),
+    )
+    .union(
+      db
+        .selectFrom('shared_space_album')
+        .innerJoin('album_space_asset', (join) =>
+          join
+            .onRef('album_space_asset.albumId', '=', 'shared_space_album.albumId')
+            .onRef('album_space_asset.spaceId', '=', 'shared_space_album.spaceId'),
+        )
+        .innerJoin('album', (join) =>
+          join.onRef('album.id', '=', 'shared_space_album.albumId').on('album.deletedAt', 'is', null),
+        )
+        .select('album_space_asset.assetId as assetId')
+        .where('shared_space_album.spaceId', '=', spaceId)
+        .where('shared_space_album.showInTimeline', '=', true),
+    );
 }
 
 // ---------------------------------------------------------------------------
