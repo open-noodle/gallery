@@ -5,7 +5,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/settings_key.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
+import 'package:immich_mobile/domain/models/user.model.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
+import 'package:immich_mobile/domain/services/user.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
@@ -14,9 +16,11 @@ import 'package:immich_mobile/models/map/map_state.model.dart';
 import 'package:immich_mobile/pages/library/spaces/games/game_play.page.dart';
 import 'package:immich_mobile/presentation/widgets/games/date_round.widget.dart';
 import 'package:immich_mobile/presentation/widgets/games/location_round.widget.dart';
+import 'package:immich_mobile/presentation/widgets/games/standings_section.widget.dart';
 import 'package:immich_mobile/providers/game/daily_reminder.provider.dart';
 import 'package:immich_mobile/providers/locale_provider.dart';
 import 'package:immich_mobile/providers/map/map_state.provider.dart';
+import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:immich_mobile/repositories/game_api.repository.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:openapi/api.dart';
@@ -27,6 +31,28 @@ import '../../../widget_tester_extensions.dart';
 class _MockGameApiRepository extends Mock implements GameApiRepository {}
 
 class _MockDailyReminderController extends Mock implements DailyReminderController {}
+
+class _MockUserService extends Mock implements UserService {}
+
+/// Test-local stand-in for the real [CurrentUserProvider] — the completion screen reads it to bold
+/// the player's own leaderboard row. Copied from `space_games_page_test.dart`: the real notifier's
+/// constructor calls `tryGetMyUser()`/`watchMyUser()` on a `UserService` backed by Isar/Drift,
+/// which this widget test never stands up, and a bare unstubbed mock crashes on `watchMyUser()`'s
+/// non-nullable `Stream<UserDto?>` return type.
+class _StubCurrentUserNotifier extends CurrentUserProvider {
+  _StubCurrentUserNotifier([UserDto? initial]) : super(_noopUserService()) {
+    state = initial;
+  }
+
+  static UserService _noopUserService() {
+    final service = _MockUserService();
+    when(() => service.tryGetMyUser()).thenReturn(null);
+    when(() => service.watchMyUser()).thenAnswer((_) => const Stream<UserDto?>.empty());
+    return service;
+  }
+}
+
+UserDto _user(String id) => UserDto(id: id, email: '$id@example.com', name: id, profileChangedAt: DateTime(2024));
 
 /// `GamePlayPage` renders `LocationRound` for a location round, which embeds `GuessMap` and wraps
 /// in `MapThemeOverride`. That reads `mapStateNotifierProvider`, whose real `build()` reaches
@@ -135,6 +161,7 @@ void main() {
         gameApiRepositoryProvider.overrideWithValue(repository),
         mapStateNotifierProvider.overrideWith(_FakeMapStateNotifier.new),
         localeProvider.overrideWithValue(const Locale('en')),
+        currentUserProvider.overrideWith((ref) => _StubCurrentUserNotifier(_user('u1'))),
         ...extraOverrides,
       ],
     );
@@ -178,6 +205,52 @@ void main() {
     expect(find.text('Completed'), findsOneWidget);
     expect(find.byType(LocationRound), findsNothing);
     expect(find.byType(DateRound), findsNothing);
+  });
+
+  testWidgets('the completion screen renders the leaderboard the session already fetched', (tester) async {
+    when(() => repository.getChallenge('c1')).thenAnswer((_) async => _finishedChallenge());
+    when(() => repository.getLeaderboard('c1')).thenAnswer(
+      (_) async => GameLeaderboardResponseDto(
+        entries: [
+          GameLeaderboardResponseDtoEntriesInner(userId: 'u1', name: 'Alice', total: 4200, answered: 1),
+          GameLeaderboardResponseDtoEntriesInner(userId: 'u2', name: 'Bob', total: 4200, answered: 1),
+          GameLeaderboardResponseDtoEntriesInner(userId: 'u3', name: 'Cy', total: 0, answered: 0),
+        ],
+      ),
+    );
+
+    await pump(tester);
+
+    // The provider has stored `leaderboard` since task 3; until now nothing read it, so the
+    // completion screen was a bare "Completed" line with the fetched board thrown away.
+    expect(find.byKey(const Key('game-leaderboard-row-u1')), findsOneWidget);
+    expect(find.byKey(const Key('game-leaderboard-row-u2')), findsOneWidget);
+    expect(find.byKey(const Key('game-leaderboard-row-u3')), findsOneWidget);
+    expect(find.byType(StandingsRow), findsNWidgets(3));
+
+    final rows = tester.widgetList(find.byType(StandingsRow)).cast<StandingsRow>().toList();
+    expect(rows.map((row) => row.userId), ['u1', 'u2', 'u3'], reason: 'A client-side re-sort would disturb this');
+    expect(rows.map((row) => row.rank), [1, 1, 3], reason: 'Tied totals share a place');
+    expect(rows.singleWhere((row) => row.isMe).userId, 'u1');
+    // A player who never turned up shows a dash, not a zero score.
+    expect(rows.last.value, '—');
+    // Proves the {score}/{answered}/{total} placeholders resolved rather than `.t()` silently
+    // falling back to the raw key on a wrong arg name.
+    expect(find.text('4200 pts'), findsNWidgets(2));
+    expect(find.text('1 of 1 rounds answered'), findsNWidgets(2));
+  });
+
+  testWidgets('a completion with no leaderboard still shows the completion line', (tester) async {
+    when(() => repository.getChallenge('c1')).thenAnswer((_) async => _finishedChallenge());
+    // `_safeLeaderboard` swallows the failure, leaving `leaderboard` null: the completion screen
+    // must degrade to the bare line rather than throwing on a null board.
+    when(() => repository.getLeaderboard('c1')).thenThrow(Exception('offline'));
+
+    await pump(tester);
+
+    expect(find.text('Completed'), findsOneWidget);
+    expect(find.byType(StandingsRow), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('a load failure shows a retry rather than an endless spinner', (tester) async {
