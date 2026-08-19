@@ -60,7 +60,7 @@
 
 - Create: `server/src/schema/migrations-gallery/1794000000000-AddSoloGameChallenge.ts`
 - Modify: `server/src/schema/tables/game-challenge.table.ts`
-- Test: `server/test/medium/specs/game-challenge-scope.medium.spec.ts` (create)
+- Test: `server/test/medium/specs/migrations/game-challenge-scope.migration.spec.ts` (create)
 
 **Interfaces:**
 
@@ -68,7 +68,7 @@
 
 - [ ] **Step 1: Write the failing medium test**
 
-Create `server/test/medium/specs/game-challenge-scope.medium.spec.ts`. Medium tests run against a real Postgres via testcontainers — these constraints cannot be proven against a mock, and a nullable `spaceId` silently breaks the daily uniqueness rule, so a real database is the only honest check.
+Create `server/test/medium/specs/migrations/game-challenge-scope.migration.spec.ts`. Medium tests run against a real Postgres via testcontainers — these constraints cannot be proven against a mock, and a nullable `spaceId` silently breaks the daily uniqueness rule, so a real database is the only honest check.
 
 ```ts
 import { Kysely } from 'kysely';
@@ -130,7 +130,7 @@ Add a `seedSpaceAndUser` helper in the same file that inserts one `user` row and
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd server && pnpm test:medium -- --run test/medium/specs/game-challenge-scope.medium.spec.ts`
+Run: `cd server && pnpm test:medium -- --run test/medium/specs/migrations/game-challenge-scope.migration.spec.ts`
 Expected: FAIL. The first two cases fail because no CHECK exists; the third fails because the second index does not exist and the insert succeeds.
 
 - [ ] **Step 3: Update the declarative table**
@@ -259,7 +259,7 @@ export async function down(db: Kysely<any>): Promise<void> {
 
 - [ ] **Step 5: Run the medium test to verify it passes**
 
-Run: `cd server && pnpm test:medium -- --run test/medium/specs/game-challenge-scope.medium.spec.ts`
+Run: `cd server && pnpm test:medium -- --run test/medium/specs/migrations/game-challenge-scope.migration.spec.ts`
 Expected: PASS, 5 tests.
 
 If a failure set looks unrelated to your change, re-run the file alone and then the suite with `--no-file-parallelism` before believing it — medium runs shift their failure set under DB contention.
@@ -273,7 +273,7 @@ Start the server against a migrated database and confirm the boot log contains n
 ```bash
 git add server/src/schema/tables/game-challenge.table.ts \
         server/src/schema/migrations-gallery/1794000000000-AddSoloGameChallenge.ts \
-        server/test/medium/specs/game-challenge-scope.medium.spec.ts
+        server/test/medium/specs/migrations/game-challenge-scope.migration.spec.ts
 git commit -m "feat(game): let a challenge belong to a user instead of a space
 
 spaceId becomes nullable, ownerId is added with ON DELETE CASCADE, and a
@@ -307,28 +307,43 @@ same day. Proven by a medium test, because a mock cannot show this."
 
 Add to `e2e/src/specs/server/api/game.e2e-spec.ts`:
 
-```ts
-describe('challenge scope serialisation', () => {
-  it('declares spaceId and ownerId as nullable so a solo challenge is representable', async () => {
-    // The OpenAPI spec is the contract the Dart and TypeScript clients are generated from. A
-    // non-nullable spaceId there means the Dart model deserialises into a non-nullable String
-    // and THROWS on a solo challenge - the server itself stays quiet, because response DTOs are
-    // not validated on output.
-    const spec = await request(app).get('/api/specs.json');
-    const challenge = spec.body.components.schemas.GameChallengeResponseDto;
+There is **no HTTP route serving the OpenAPI JSON** — `misc.ts:325` mounts Swagger UI at `/doc` and `misc.ts:329` writes the artifact to `open-api/immich-openapi-specs.json`. That checked-in file is what the TypeScript and Dart generators actually read, so it is the right thing to assert against. This belongs as a server unit test, not an e2e.
 
-    expect(challenge.properties.spaceId.type, 'spaceId must accept null for a solo challenge').toContain('null');
-    expect(challenge.properties.ownerId.type, 'ownerId must accept null for a space challenge').toContain('null');
-    expect(challenge.required).not.toContain('spaceId');
+Create `server/src/dtos/game-scope-contract.spec.ts`:
+
+```ts
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
+
+// vitest runs with cwd at server/ - same convention as game.repository.spec.ts.
+const SPEC = join(process.cwd(), '../open-api/immich-openapi-specs.json');
+
+describe('game challenge scope contract', () => {
+  it('declares spaceId and ownerId as nullable so a solo challenge is representable', () => {
+    // This checked-in file is the contract the Dart and TypeScript clients are GENERATED from.
+    // A non-nullable spaceId here means the Dart model deserialises into a non-nullable String
+    // and throws on a solo challenge - the server itself stays quiet, because response DTOs are
+    // not validated on output. The failure lands in the client, far from the cause.
+    const spec = JSON.parse(readFileSync(SPEC, 'utf8'));
+    const challenge = spec.components.schemas.GameChallengeResponseDto;
+
+    // zod-to-openapi emits a nullable string as `type: ['string', 'null']`.
+    expect([challenge.properties.spaceId.type].flat(), 'spaceId must accept null for a solo challenge').toContain(
+      'null',
+    );
+    expect([challenge.properties.ownerId.type].flat(), 'ownerId must accept null for a space challenge').toContain(
+      'null',
+    );
   });
 });
 ```
 
-Adjust the spec route to whatever this repo serves the OpenAPI document at; if it is not served, assert against `open-api/immich-openapi-specs.json` read from disk instead, which is the checked-in artifact the generators consume.
+If the emitted shape turns out to be `anyOf: [{type: 'string'}, {type: 'null'}]` rather than a type array, adjust the assertion to match what `pnpm sync:open-api` actually produces — but assert on nullability either way, never delete the test.
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd e2e && pnpm test src/specs/server/api/game.e2e-spec.ts`
+Run: `cd server && pnpm test -- --run src/dtos/game-scope-contract.spec.ts`
 Expected: FAIL — `spaceId.type` is `"string"`, not `["string","null"]`.
 
 - [ ] **Step 3: Write minimal implementation**
@@ -373,6 +388,7 @@ Resolve each hit to handle a null.
 
 - [ ] **Step 6: Run the checks**
 
+Run: `cd server && pnpm test -- --run src/dtos/game-scope-contract.spec.ts`
 Run: `cd e2e && pnpm test src/specs/server/api/game.e2e-spec.ts`
 Run: `make check-web`
 Run: `cd mobile && dart analyze --fatal-infos`
@@ -381,8 +397,8 @@ Expected: all PASS.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add server/src/dtos/game.dto.ts open-api/ web/src mobile/openapi mobile/lib \
-        e2e/src/specs/server/api/game.e2e-spec.ts
+git add server/src/dtos/game.dto.ts server/src/dtos/game-scope-contract.spec.ts open-api/ \
+        web/src mobile/openapi mobile/lib
 git commit -m "feat(game): make challenge scope nullable in the API contract
 
 spaceId was a non-nullable string in the response schema. Response DTOs are
@@ -610,7 +626,10 @@ describe('solo pool read arms', () => {
     const mine = await utils.createAsset(player.accessToken, { assetData: { filename: 'solo-mine.png' } });
     const theirs = await utils.createAsset(partner.accessToken, { assetData: { filename: 'solo-partner.png' } });
     await utils.createPartner(partner.accessToken, player.userId);
-    await utils.updatePartner(player.accessToken, partner.userId, { inTimeline: false });
+    await updatePartner(
+      { id: partner.userId, partnerUpdateDto: { inTimeline: false } },
+      { headers: asBearerAuth(player.accessToken) },
+    );
 
     const drawn = await soloAssetIds(2, { includePartners: true, includeSpaces: false });
 
@@ -623,7 +642,10 @@ describe('solo pool read arms', () => {
     const mine = await utils.createAsset(player.accessToken, { assetData: { filename: 'solo-mine2.png' } });
     const theirs = await utils.createAsset(partner.accessToken, { assetData: { filename: 'solo-hidden.png' } });
     await utils.createPartner(partner.accessToken, player.userId);
-    await utils.updatePartner(player.accessToken, partner.userId, { inTimeline: true });
+    await updatePartner(
+      { id: partner.userId, partnerUpdateDto: { inTimeline: true } },
+      { headers: asBearerAuth(player.accessToken) },
+    );
     await updateAssets(
       { assetBulkUpdateDto: { ids: [theirs.id], visibility: AssetVisibility.Hidden } },
       { headers: asBearerAuth(partner.accessToken) },
@@ -673,7 +695,10 @@ describe('solo pool read arms', () => {
     const mine = await utils.createAsset(player.accessToken, { assetData: { filename: 'solo-mine6.png' } });
     const theirs = await utils.createAsset(partner.accessToken, { assetData: { filename: 'solo-off.png' } });
     await utils.createPartner(partner.accessToken, player.userId);
-    await utils.updatePartner(player.accessToken, partner.userId, { inTimeline: true });
+    await updatePartner(
+      { id: partner.userId, partnerUpdateDto: { inTimeline: true } },
+      { headers: asBearerAuth(player.accessToken) },
+    );
 
     const drawn = await soloAssetIds(2, { includePartners: false, includeSpaces: false });
 
@@ -684,6 +709,22 @@ describe('solo pool read arms', () => {
 ```
 
 Add the three fixture helpers (`spaceLinkedAlbumWithLockedAsset`, `spaceWithArchivedAsset`, `albumSharedWithPlayer`) in the same file, each creating a fresh space/album owned by a third user, adding `player` as a member, and setting the visibility via `updateAssets` as the asset owner — the pattern at `shared-space-visibility-negatives.e2e-spec.ts:96-106`.
+
+**Import the partner and user operations from the SDK, not from `utils`.** `e2e/src/utils.ts` wraps only `createPartner` (line 678) and `updateMyPreferences` (line 681); there is **no** `utils.updatePartner`, `utils.removePartner`, `utils.deleteUser` or `utils.runJob`. Use the generated functions directly, the same way `shared-space-visibility-negatives.e2e-spec.ts` imports `updateAssets`:
+
+```ts
+import {
+  AssetVisibility,
+  LoginResponseDto,
+  ManualJobName,
+  createJob,
+  deleteUserAdmin,
+  removePartner,
+  updateAssets,
+  updatePartner,
+} from '@immich/sdk';
+import { app, asBearerAuth, utils } from 'src/utils';
+```
 
 - [ ] **Step 2: Run tests to verify they fail**
 
@@ -1218,7 +1259,7 @@ A pure refactor of the space play page, done before the solo page exists so drif
 
 - [ ] **Step 2: Run the existing suite**
 
-Run: `cd web && pnpm test -- --run src/routes/\(user\)/spaces/\[spaceId\]/games/`
+Run: `cd web && pnpm test -- --run spaces/.*games`
 Expected: PASS with no test edits. Needing an edit means behaviour changed.
 
 - [ ] **Step 3: Commit**
@@ -1249,7 +1290,7 @@ Use `getBy*` for presence — `queryBy*` passes whether or not the element exist
 
 - [ ] **Step 2: Run to verify they fail**
 
-Run: `cd web && pnpm test -- --run src/routes/\(user\)/photoguesser/`
+Run: `cd web && pnpm test -- --run photoguesser`
 
 - [ ] **Step 3: Implement**
 
@@ -1257,7 +1298,7 @@ Add `Route.photoGuesser()` and `Route.viewPhotoGuesserGame({ challengeId })`; ad
 
 - [ ] **Step 4: Run the checks and commit**
 
-Run: `cd web && pnpm test -- --run src/routes/\(user\)/photoguesser/ src/lib/components/games/`
+Run: `cd web && pnpm test -- --run photoguesser games/`
 Run: `make check-web`
 
 ```bash
@@ -1420,7 +1461,9 @@ it('lets the request body override the stored source preference for one game', a
   // The preference drives the DAILY, which is generated lazily server-side. Free play may
   // override per game, and doing so must not mutate the preference - otherwise starting one
   // wide game silently rewrites every future daily.
-  await updateMyPreferences(player, { photoGuesser: { includePartners: false, includeSpaces: false } });
+  await utils.updateMyPreferences(player.accessToken, {
+    photoGuesser: { includePartners: false, includeSpaces: false },
+  });
 
   await soloAssetIds(2, { includePartners: true, includeSpaces: false });
 
@@ -1433,7 +1476,7 @@ it('keeps a round scoreable after the partner revokes sharing mid-game', async (
   // live - the photo is genuinely no longer readable. Same contract the space game has for a
   // photo removed from a space: the round survives its photo.
   const { challengeId, roundIndex } = await startSoloGameOverPartnerPhoto();
-  await utils.removePartner(partner.accessToken, player.userId);
+  await removePartner({ id: player.userId }, { headers: asBearerAuth(partner.accessToken) });
 
   const image = await request(app)
     .get(`/games/${challengeId}/rounds/${roundIndex}/image`)
@@ -1468,8 +1511,12 @@ it('removes a solo challenge, its rounds and its guesses when the owner is delet
   const doomed = await utils.userSetup(admin.accessToken, createUserDto.create('solo-doomed'));
   const challenge = await createSoloChallenge(doomed);
 
-  await utils.deleteUser(admin.accessToken, doomed.userId);
-  await utils.runJob(admin.accessToken, JobName.UserDeleteCheck);
+  await deleteUserAdmin(
+    { id: doomed.userId, userAdminDeleteDto: { force: true } },
+    { headers: asBearerAuth(admin.accessToken) },
+  );
+  await createJob({ jobCreateDto: { name: ManualJobName.UserCleanup } }, { headers: asBearerAuth(admin.accessToken) });
+  await utils.waitForQueueFinish(admin.accessToken, 'backgroundTask');
 
   const { status } = await request(app)
     .get(`/games/${challenge.id}`)
@@ -1519,9 +1566,9 @@ git commit -m "test(game): cover a full solo playthrough end to end"
 ## Done when
 
 - [ ] `cd server && pnpm test -- --run src/services/game src/repositories/game.repository.spec.ts src/utils/game-streak.spec.ts src/utils/preferences.spec.ts` passes
-- [ ] `cd server && pnpm test:medium -- --run test/medium/specs/game-challenge-scope.medium.spec.ts` passes
+- [ ] `cd server && pnpm test:medium -- --run test/medium/specs/migrations/game-challenge-scope.migration.spec.ts` passes
 - [ ] `cd e2e && pnpm test src/specs/server/api/game.e2e-spec.ts src/specs/server/api/game-solo.e2e-spec.ts src/specs/server/api/game-visibility-negatives.e2e-spec.ts` passes
-- [ ] `cd web && pnpm test -- --run src/routes/\(user\)/photoguesser/ src/lib/components/games/` passes
+- [ ] `cd web && pnpm test -- --run photoguesser games/` passes
 - [ ] `cd mobile && flutter test` passes, and `dart analyze --fatal-infos` and `dart format --set-exit-if-changed .` are clean
 - [ ] `make check-all` and `make lint-all` pass
 - [ ] Ten i18n files changed with matching key counts
