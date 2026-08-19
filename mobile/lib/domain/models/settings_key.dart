@@ -53,6 +53,11 @@ enum SettingsKey<T> {
   // Navigation
   navShowSpaces<bool>(),
 
+  // Games
+  gameDailyReminderEnabled<bool>(),
+  gameDailyReminderMinuteOfDay<int>(),
+  gameDailyLastPlayed<String?>(),
+
   // Backup
   backupEnabled<bool>(),
   backupUseCellularForVideos<bool>(),
