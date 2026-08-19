@@ -78,4 +78,36 @@ void main() {
       expect(config.read(SettingsKey.albumIsGrid), true);
     });
   });
+
+  group('games config', () {
+    test('the reminder defaults to off at 18:00 with no daily recorded', () {
+      expect(defaultConfig.read(SettingsKey.gameDailyReminderEnabled), isFalse);
+      expect(defaultConfig.read(SettingsKey.gameDailyReminderMinuteOfDay), 18 * 60);
+      expect(defaultConfig.read(SettingsKey.gameDailyLastPlayed), isNull);
+    });
+
+    test('each games key round-trips through write then read', () {
+      expect(
+        defaultConfig.write(SettingsKey.gameDailyReminderEnabled, true).read(SettingsKey.gameDailyReminderEnabled),
+        isTrue,
+      );
+      expect(
+        defaultConfig
+            .write(SettingsKey.gameDailyReminderMinuteOfDay, 9 * 60)
+            .read(SettingsKey.gameDailyReminderMinuteOfDay),
+        9 * 60,
+      );
+      expect(
+        defaultConfig.write(SettingsKey.gameDailyLastPlayed, '2026-08-18').read(SettingsKey.gameDailyLastPlayed),
+        '2026-08-18',
+      );
+    });
+
+    test('writing one games key leaves the others alone', () {
+      final config = defaultConfig.write(SettingsKey.gameDailyReminderEnabled, true);
+
+      expect(config.read(SettingsKey.gameDailyReminderMinuteOfDay), 18 * 60);
+      expect(config.read(SettingsKey.gameDailyLastPlayed), isNull);
+    });
+  });
 }
