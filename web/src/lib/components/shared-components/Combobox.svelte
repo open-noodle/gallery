@@ -328,6 +328,7 @@
       class:cursor-pointer={!isActive}
       class="immich-form-input w-full pe-12! text-sm transition-all"
       id={inputId}
+      {...hideLabel ? { 'aria-label': label } : {}}
       onfocus={activate}
       oninput={onInput}
       role="combobox"
