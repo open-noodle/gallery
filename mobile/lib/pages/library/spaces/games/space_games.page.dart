@@ -39,9 +39,16 @@ class SpaceGamesPage extends HookConsumerWidget {
   final String spaceId;
   final bool canEdit;
 
-  Future<void> _create(BuildContext context, WidgetRef ref) async {
+  /// Creating is slow — the server runs the candidate queries and a CLIP encode, measured at ~9.6s
+  /// cold on a real library — so [creating] drives a visible placeholder for the whole await.
+  /// Before it existed the page sat unchanged for ten seconds and the challenge simply appeared.
+  ///
+  /// It also shuts the create control for the duration: a second tap during that silence submitted
+  /// a second challenge.
+  Future<void> _create(BuildContext context, WidgetRef ref, ValueNotifier<bool> creating) async {
     final choice = await ChallengeCreateSheet.show(context);
     if (choice == null) return;
+    creating.value = true;
     try {
       await ref
           .read(gameApiRepositoryProvider)
@@ -54,6 +61,13 @@ class SpaceGamesPage extends HookConsumerWidget {
           msg: 'game_create_failed'.t(context: context),
           toastType: ToastType.error,
         );
+      }
+    } finally {
+      // In `finally`, so a failure clears it too rather than leaving the placeholder spinning for
+      // a create that is never coming. Guarded because the page can be popped mid-flight, and
+      // writing to a disposed hook's notifier throws.
+      if (context.mounted) {
+        creating.value = false;
       }
     }
   }
@@ -106,6 +120,7 @@ class SpaceGamesPage extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final standingsKey = useMemoized(() => GlobalKey());
     final scrollController = useScrollController();
+    final creating = useState(false);
 
     final space = ref.watch(sharedSpaceProvider(spaceId));
     final challenges = ref.watch(gameChallengesProvider(spaceId));
@@ -205,11 +220,26 @@ class SpaceGamesPage extends HookConsumerWidget {
                     key: const Key('space-games-create'),
                     icon: const Icon(Icons.add),
                     tooltip: 'game_new_challenge'.t(context: context),
-                    onPressed: () => _create(context, ref),
+                    onPressed: creating.value ? null : () => unawaited(_create(context, ref, creating)),
                   ),
               ],
             ),
-            if (list.isEmpty)
+            // Sits at the top of the list, the same size as a real card, so the wait appears
+            // exactly where the finished challenge will land instead of somewhere unrelated.
+            if (creating.value)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 12),
+                child: SizedBox(
+                  key: Key('space-games-creating'),
+                  height: 100,
+                  child: Card(
+                    child: Center(
+                      child: SizedBox(height: 24, width: 24, child: CircularProgressIndicator.adaptive(strokeWidth: 2)),
+                    ),
+                  ),
+                ),
+              ),
+            if (list.isEmpty && !creating.value)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 24),
                 child: Text('game_no_challenges'.t(context: context), textAlign: TextAlign.center),
