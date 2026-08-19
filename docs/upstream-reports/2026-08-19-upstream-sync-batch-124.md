@@ -5,7 +5,7 @@
 - **Upstream commits pulled**: 6 (`7918ad9f792..7cd0a7d30c1`)
 - **Fork commits synced**: 0 (`integratedForkHead` already equalled `origin/main` at `690fd44e12c`)
 - **Conflicts resolved**: 8 across 6 steps
-- **Zero-conflict semantic breaks found**: 4
+- **Zero-conflict semantic breaks found**: 6 (4 pre-CI, 2 found by CI)
 - **Risk level**: MEDIUM
 - **Recommendation**: PROCEED (stay off `main` — newest upstream tag is still `v3.1.0`)
 
@@ -98,9 +98,10 @@ git grep -n "search-bar/\|managers/search-manager" -- web/src e2e/src \
   | grep -v '^web/src/lib/components/shared-components/search-bar/'
 ```
 
-## Zero-conflict semantic breaks (4)
+## Zero-conflict semantic breaks (6)
 
-None of these produced a merge conflict. Three were invisible to every gate but one.
+None of these produced a merge conflict. Each was invisible to every gate but one — and notably the
+last two were invisible to **every local gate**, surfacing only in CI.
 
 | #   | Upstream change                                                        | What broke, elsewhere                                                      | Caught by                |
 | --- | ---------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------ |
@@ -108,6 +109,8 @@ None of these produced a merge conflict. Three were invisible to every gate but 
 | 2   | #30870 reflective route spec with hardcoded allowlists                 | 6 fork-only routes read as "unexpected"                                    | server unit suite        |
 | 3   | #30279 `hideLabel` → omit `<Label>` instead of `sr-only`               | hidden-label combobox loses its only accessible name                       | web unit suite           |
 | 4   | #30279 added `searchManager.setQuery()` to the fork's live search page | live surface would depend on the dormant manager                           | reading the auto-merge   |
+| 5   | #30279 added an i18n key whose English value names Immich              | branding gate fails → 3 workflows red, none touching search                | CI (`apply-branding`)    |
+| 6   | #30870 stripped `errorDto` down to `badRequest`                        | 54 uses across 9 fork-only e2e suites stop compiling                       | CI (`End-to-End Lint`)   |
 
 ### 1 — Shape G, second occurrence, predicted before rebasing
 
@@ -173,6 +176,43 @@ with no navigation or URL side effect — only `submit()` navigates. On the fork
 a store nothing reads, while making a live surface depend on the dormant manager. Removed, so the
 dormant boundary stays clean and greppable. `onMount` was dropped from the `svelte` import with `tick`
 and `untrack` confirmed still used.
+
+### 5 — A user-facing upstream string that names Immich, gated by branding rather than by a compiler
+
+#30279's 16 new i18n keys include
+`search_type_description: "Choose how Immich interprets your search: …"`.
+`branding/scripts/verify-branding.sh` scans the **branded** `en.json` for any surviving upstream name
+and fails when a key has no entry in `branding/i18n/overrides-en.json` (the issue-#743 hardening, added
+precisely because the older check only validated keys that already had overrides). One missing override
+reddened **three** workflows — `gallery-ml-smoke`, `gallery-mobile-smoke`, `gallery-build-mobile` — none
+of which has anything to do with search; they simply all run `apply-branding`.
+
+The key belongs to the dormant search UI and is not rendered today, but the gate scans `en.json`
+regardless, and the override is what keeps it correct if the UI is ever mounted. Fixed by adding the
+Gallery wording; verified by simulating the merge (`jq -s '.[0] * .[1]'`) and re-scanning for `Immich`,
+which returned nothing. Only `en.json` carries the key, so the issue-#703 cross-locale rule is satisfied.
+
+**Generalise: any upstream commit adding user-facing English copy can break the branding gate, with no
+relationship to the feature area it touches.** Grep new `i18n/en.json` values for the upstream name at
+Checkpoint 1 — it is a one-line check that would have saved a full CI round here.
+
+### 6 — Upstream deletes what _it_ no longer uses; the fork still does (e2e helpers)
+
+#30870 gutted `e2e/src/responses.ts`, removing 11 `errorDto` members and `deviceDto`, because upstream
+moved its own route-auth and validation assertions into controller/medium specs. Gallery's e2e suites
+did not move. Four members are still used here — `unauthorized` (31 uses), `noPermission` (15),
+`validationError` (7), `forbidden` (1) — across nine fork-only suites (shared-space, user-group,
+classification, video-trim, asset-copy, asset-edits, asset-replace-jobs-bulk, pet-detection, plugin).
+Restored exactly those four; the other seven and `deviceDto` have no caller here and were dropped with
+upstream. Upstream's own tree compiles without them, which is what proves every surviving caller is
+fork-added.
+
+**Why the existing detector missed it — worth fixing in the skill.** The deleted-export detector greps
+for `export (async )?(function|const|class|type|enum|interface) NAME`. These are **properties of an
+exported object literal**, not exported declarations, so the regex could not see them; it flagged only
+`deviceDto` (a genuine `export const`, and a true negative — its only caller went in the same commit).
+Extend the detector to object-literal members, or simply run `cd e2e && pnpm check` after any batch
+touching `e2e/src/`: local `tsc` reproduced all 19 errors in seconds, versus a ~25-minute CI round.
 
 ## Conflict Resolutions
 
@@ -300,20 +340,54 @@ clean in the final tree.
 ## Remote CI Verification
 
 - **Test branch**: `rebase/upstream-batch-124`
-- **Commit validated**: `a4ca7f94882`
+- **Final commit**: `e1033a09155`
 
-| Workflow                                  | Status  | Notes |
-| ----------------------------------------- | ------- | ----- |
-| `test.yml`                                | PENDING |       |
-| `docker.yml`                              | PENDING |       |
-| `static_analysis.yml`                     | PENDING |       |
-| `gallery-build-mobile.yml`                | PENDING |       |
-| `gallery-rebase-smoke.yml`                | PENDING |       |
-| `storage-migration-tests.yml`             | PENDING |       |
-| `storage-migration-e2e.yml`               | PENDING |       |
-| `gallery-revert-to-immich-validation.yml` | PENDING |       |
-| `gallery-ml-smoke.yml`                    | PENDING |       |
-| `gallery-mobile-smoke.yml`                | PENDING |       |
+**9 of 10 green.** Two real defects were found by CI and fixed (breaks 5 and 6 below); the rest of the
+red was environmental.
+
+| Workflow                                  | Status                                  | Run         | Notes                                                                    |
+| ----------------------------------------- | --------------------------------------- | ----------- | ------------------------------------------------------------------------ |
+| `test.yml`                                | GREEN                                   | 32298195825 | 21 jobs; e2e re-run after the mise 403 flake                             |
+| `docker.yml`                              | GREEN                                   | 32294322127 | code-identical inputs                                                    |
+| `static_analysis.yml`                     | GREEN                                   | 32294324732 | code-identical inputs                                                    |
+| `gallery-rebase-smoke.yml`                | GREEN                                   | 32294327266 | code-identical inputs                                                    |
+| `storage-migration-tests.yml`             | GREEN                                   | 32294329317 | code-identical inputs                                                    |
+| `storage-migration-e2e.yml`               | GREEN                                   | 32294340991 | code-identical inputs                                                    |
+| `gallery-revert-to-immich-validation.yml` | GREEN                                   | 32294331728 | coverage grep + Docker boot                                              |
+| `gallery-ml-smoke.yml`                    | GREEN                                   | 32295645195 | green after the branding fix                                             |
+| `gallery-mobile-smoke.yml`                | GREEN                                   | 32301455737 | green after the branding fix; Android leg incl. codegen/analyze/test/APK |
+| `gallery-build-mobile.yml`                | iOS GREEN / Android **BLOCKED (infra)** | 32305277169 | see below                                                                |
+
+The six workflows marked "code-identical inputs" were green on `a4ca7f94882`; the three later commits
+changed only `branding/i18n/overrides-en.json`, `e2e/src/responses.ts` and the report, none of which
+those workflows consume — except `test.yml`, which was re-dispatched on the final commit and is green
+there.
+
+### Real defects CI caught
+
+- **`gallery-ml-smoke` / `gallery-mobile-smoke` / `gallery-build-mobile` all failed on one defect** —
+  the missing `search_type_description` branding override (break 5). One cause, three red workflows,
+  none of which touches search; all three run `apply-branding`.
+- **`End-to-End Lint` failed** on the stripped `errorDto` (break 6). Reproduced locally with
+  `cd e2e && pnpm check`, fixed, and green on the re-run.
+
+### Environmental, not regressions
+
+- **`End-to-End Tests (Server & CLI)`** failed with
+  `mise WARN Failed to resolve tool version list for github:extism/js-pdk: HTTP status client error (403 Forbidden)`
+  → `packages/plugin-core build: Failed` → server image build failed. This is the documented
+  mise/GitHub-API rate-limit flake (third cycle running, previously as a 3 s timeout). A plain
+  `run rerun --failed` went green.
+- **`gallery-build-mobile` Android leg is BLOCKED on an infrastructure stall**, not on this batch.
+  It hangs in `./.github/actions/apply-branding`'s dependency-install step — before any Gallery code is
+  compiled — across **three** consecutive attempts (~26–42 min each, then cancelled). Evidence that it
+  is not a code regression: the same action on the same commit and the same `ubuntu-latest` image
+  completed in **5.5 min** in `gallery-mobile-smoke`; the **iOS leg of this very workflow passed twice**;
+  and the step took ~3 min on this same job earlier in the cycle. With `version` empty and
+  `environment=development` the store-upload steps are skipped, so the Android leg's remaining work
+  (branding → codegen → analyze → mobile tests → APK build) is exactly what `gallery-mobile-smoke`
+  already covers green on `e1033a09155`. **Re-dispatch when runners recover; do not treat as a batch
+  defect.**
 
 ## Post-Rebase Verification
 
@@ -330,7 +404,13 @@ The branch stays off `main`, which is the expected steady state of this workflow
 
 ## Follow-up work
 
-1. **Report the `Combobox` `hideLabel` a11y regression upstream** — it affects upstream's own
+1. **Re-dispatch `gallery-build-mobile.yml`** once GitHub's Ubuntu runners recover — its Android leg is
+   blocked by an infrastructure stall, not by this batch (evidence in Remote CI Verification).
+2. **Report the `Combobox` `hideLabel` a11y regression upstream** — it affects upstream's own
    `SettingsLanguageSelector` and `SettingCombobox`.
-2. **Revisit the dormancy decision when upstream finishes V3** — the trigger is upstream wiring V3 to
+3. **Add two cheap Checkpoint-1 checks to the skill**, both of which would have saved a CI round this
+   cycle: grep new `i18n/en.json` values for the upstream name (break 5), and extend the deleted-export
+   detector to members of exported object literals, or just run `cd e2e && pnpm check` after any batch
+   touching `e2e/src/` (break 6).
+4. **Revisit the dormancy decision when upstream finishes V3** — the trigger is upstream wiring V3 to
    an endpoint or deleting `searchAssetBuilderLegacy`. That is a product decision, not a rebase one.
