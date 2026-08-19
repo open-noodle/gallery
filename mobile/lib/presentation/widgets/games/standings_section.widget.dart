@@ -115,9 +115,25 @@ class _StandingsSectionState extends State<StandingsSection> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('game_leaderboard'.t(context: context), style: Theme.of(context).textTheme.titleMedium),
+            // Flexible, because the heading and the tabs share this Row unconstrained: at 360dp
+            // (or in a longer locale) the pair does not fit, and the heading is the half that
+            // should yield. Without this the Row overflows instead.
+            Flexible(
+              child: Text(
+                'game_leaderboard'.t(context: context),
+                style: Theme.of(context).textTheme.titleMedium,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
             if (hasToday)
               SegmentedButton<bool>(
+                // No leading check on the selected segment. It is what made the SELECTED segment
+                // wider than the unselected one, so picking the longer label ("August 2026") blew
+                // the Row by ~6px on a 402dp phone while "Today" looked fine - and it resized the
+                // control on every toggle. The filled background still shows the selection.
+                // Matches media_type_section and free_up_space_settings.
+                showSelectedIcon: false,
                 segments: [
                   ButtonSegment(
                     value: true,
