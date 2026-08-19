@@ -6,6 +6,7 @@ import {
   addAssetsToAlbum,
   addUsersToAlbum,
   updateAssets,
+  updateMemberTimeline,
   updatePartner,
 } from '@immich/sdk';
 import { createUserDto } from 'src/fixtures';
@@ -219,6 +220,34 @@ describe('/games (visibility negatives)', () => {
     return { archivedId: archived.id, visibleId: visible.id };
   };
 
+  /**
+   * A space the player belongs to and has HIDDEN from their own timeline, holding one perfectly
+   * ordinary timeline photo.
+   *
+   * Nothing about the photo disqualifies it - only the player's per-space preference does, which is
+   * why this fixture needs no control asset of its own: the player's own photo is the control, and
+   * a pool that ignored the preference would draw two rounds instead of one.
+   */
+  const spaceHiddenFromPlayerTimeline = async (key: string, player: LoginResponseDto) => {
+    const spaceOwner = await host(key);
+    const space = await utils.createSpace(spaceOwner.accessToken, { name: key });
+    await utils.addSpaceMember(spaceOwner.accessToken, space.id, {
+      userId: player.userId,
+      role: SharedSpaceRole.Viewer,
+    });
+
+    const theirs = await utils.createAsset(spaceOwner.accessToken, {
+      assetData: { filename: `${key}-hidden-space.png` },
+    });
+    await utils.addSpaceAssets(spaceOwner.accessToken, space.id, [theirs.id]);
+    await updateMemberTimeline(
+      { id: space.id, sharedSpaceMemberTimelineDto: { showInTimeline: false } },
+      { headers: asBearerAuth(player.accessToken) },
+    );
+
+    return { hiddenSpaceAssetId: theirs.id };
+  };
+
   /** A third user's timeline photo, reachable by the player ONLY through a shared album. */
   const albumSharedWithPlayer = async (key: string, player: LoginResponseDto) => {
     const albumOwner = await host(key);
@@ -320,6 +349,20 @@ describe('/games (visibility negatives)', () => {
         sorted([mineId, visibleId]),
       );
       expect(drawn, 'an archived asset reached the pool through a space arm').not.toContain(archivedId);
+    });
+
+    it('never draws from a space the player has hidden from their own timeline', async () => {
+      // includeSpaces is a coarse global opt-in; shared_space_member.showInTimeline is the finer,
+      // per-space expression of the same intent, and the finer one wins - exactly as the partner
+      // arm honours partner.inTimeline even though the player opted into partner photos. This fork
+      // has dropped this same gate once before, from album-scoped search, and had to restore it.
+      const { player, mineId } = await freshPlayer('solo-hidden-space');
+      const { hiddenSpaceAssetId } = await spaceHiddenFromPlayerTimeline('solo-hidden-space', player);
+
+      const drawn = await soloAssetIds(player, 2, { includePartners: false, includeSpaces: true });
+
+      expect(drawn).toEqual([mineId]);
+      expect(drawn, 'a space the player hid from their timeline still fed the game').not.toContain(hiddenSpaceAssetId);
     });
 
     it('never draws an asset shared with the player only through a shared album', async () => {
