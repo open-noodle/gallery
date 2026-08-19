@@ -1,3 +1,7 @@
+// ─── This is Gallery's live search. ─────────────────────────────
+// Upstream's own search UI is carried dormant alongside it (present, verbatim, never mounted):
+// see web/src/lib/components/shared-components/search-bar/DORMANT.md before touching either.
+// Do not import `$lib/managers/search-manager.svelte` — that is upstream's dormant manager.
 import {
   AssetVisibility,
   getAlbumInfo,
