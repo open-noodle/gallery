@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:immich_mobile/extensions/translate_extensions.dart';
 import 'package:immich_mobile/presentation/widgets/games/guess_map.widget.dart';
+import 'package:immich_mobile/presentation/widgets/games/round_photo_placeholder.widget.dart';
 import 'package:immich_mobile/presentation/widgets/games/round_progress_hud.widget.dart';
 import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
 import 'package:immich_mobile/utils/game_format.dart';
@@ -56,6 +57,7 @@ class LocationRoundState extends State<LocationRound> {
               Image(
                 image: RemoteImageProvider(url: getGameRoundImageUrl(widget.challengeId, widget.index)),
                 fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => const RoundPhotoPlaceholder(),
               ),
               Positioned(
                 top: 8,
