@@ -215,8 +215,17 @@ describe('Route.search call sites', () => {
     return found;
   }
 
+  // Upstream's own search UI is carried dormant — present, byte-identical to upstream, and never
+  // mounted — so that upstream's search commits auto-merge instead of conflicting. See
+  // lib/components/shared-components/search-bar/DORMANT.md. Its `Route.search` calls are not
+  // in-app links, because nothing in the fork imports those files. They are excluded rather than
+  // allowlisted, so that a real new call site in live code still fails this guard.
+  const DORMANT = ['lib/components/shared-components/search-bar/', 'lib/managers/search-manager.svelte.ts'];
+
   it('are a subset of the allowlist', () => {
-    const unexpected = walk(SRC_ROOT).filter((file) => !ALLOWED.has(file));
+    const unexpected = walk(SRC_ROOT)
+      .filter((file) => DORMANT.every((prefix) => !file.startsWith(prefix)))
+      .filter((file) => !ALLOWED.has(file));
 
     expect(unexpected).toEqual([]);
   });
