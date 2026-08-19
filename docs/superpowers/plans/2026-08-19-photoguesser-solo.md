@@ -18,6 +18,19 @@
 - **`PhotoGuesser` is a proper noun and is never translated.** All nine locale files (`de`, `fr`, `it`, `nl`, `pl`, `es`, `ru`, `zh_Hans`, `zh_Hant`) carry the identical literal.
 - Every user-facing string change updates **all nine locales in the same commit**, alphabetically sorted, then `npx prettier --write i18n/*.json`.
 - **The visibility floor is non-negotiable:** `deletedAt IS NULL AND type = 'IMAGE' AND visibility = 'timeline'`, ANDed **outside** any read-arm OR, in both candidate selection and round-image resolution. Never inherited from `spaceVisibilityGate`, `checkPartnerAccess`, or `checkAlbumAccess` — each of those admits a class the game must exclude.
+
+- **Do not name a visibility helper in a comment near a space read.** The guard at
+  `server/src/utils/shared-space-album-scope.guard.spec.ts:428` tests `VIS_GATE_MARKER` (`:269`)
+  against **raw source lines** within a window of each space read, with no comment stripping. So a
+  comment containing `spaceVisibilityGate`, `AssetVisibility.Timeline`, `reviewableAssetVisibility`,
+  or any other alternative in that regex marks the read as "visibility covered" **even when the real
+  gate has been deleted**. The perf plan hit this for real: a suggested comment ending
+  "…`spaceVisibilityGate` explicitly admits it" kept the guard green through a mutation that removed
+  both visibility clauses. This plan adds `eligibleSoloAsset` — a new space-and-visibility read whose
+  explanatory comments sit right beside it — so the trap is live here. Describe the behaviour in
+  prose ("archived assets are admitted by the space helpers, so the floor is applied here") without
+  writing the identifier. Also register any new space-read helper in the guard's `SPACE_HELPER` list,
+  or the guard cannot see the read at all.
 - **Shared albums (`album_user`) are not a read arm.** Own, partner (`inTimeline = true`), and shared space only.
 - Sample size is **4,000** (`LOCATION_SAMPLE_SIZE`), measured. Do not change it.
 - Regenerate SQL with **`mise sql`**, which **requires a running database** — without one it deletes every file in `server/src/queries/`.

@@ -52,13 +52,28 @@
   the recipe Task 1 proved works:
 
   ```bash
-  docker compose -f e2e/docker-compose.yml build immich-server   # picks up current source
-  # run a sibling container on :2287 attached to the same compose network, then:
+  docker build -t immich-server:verify -f server/Dockerfile .   # picks up current source
+  # run a sibling container on :2287, attached to the immich-e2e_default network, with the same
+  # environment as the compose service PLUS these two:
+  #   IMMICH_PORT=2287
+  #   REDIS_DBINDEX=3     <-- see below, this one is not optional
   cd e2e && PLAYWRIGHT_BASE_URL=http://127.0.0.1:2287 pnpm test <path>
-  # finally: docker rm -f <sibling> && docker rmi <its tag>
+  # finally: docker rm -f <sibling> && docker rmi immich-server:verify
   ```
 
-  Never rebuild or restart `immich-e2e-server` / `immich-e2e-postgres` themselves.
+  **`REDIS_DBINDEX` is load-bearing.** Both servers share the Redis instance, and BullMQ queues are
+  keyed per database index — so the shared `immich-e2e-server` happily **steals jobs belonging to
+  your sibling** and fails them, because the uploaded files live in the sibling's volume and not
+  its own. The symptom is not an error but a timeout: `Timed out waiting for assetUpload`, with
+  `File not found` in the _shared_ container's logs. Task 4 lost a run to this (28 passed, 2 timed
+  out) before isolating onto db 3. Flush db 3 when done; never touch db 0.
+
+  If the sibling refuses to boot with `Detected an inconsistent media location`, truncate the tables
+  `utils.resetDatabase()` truncates via `docker exec immich-e2e-postgres psql` and recreate it —
+  that is the same reset every e2e spec's `beforeAll` already performs.
+
+  Never rebuild or restart `immich-e2e-server` / `immich-e2e-postgres` themselves. Confirm their
+  container id and created timestamp are unchanged when you finish.
 
 - Server unit tests: `cd server && pnpm test -- --run <path>`. **The `<path>` is required** — `pnpm test -- --run` alone silently runs the entire suite. Task 2 also observed this form _intermittently_ running the whole suite even with a path. If that happens, the run is still valid evidence (a green full suite contains your green file), but to scope reliably use vitest's filter directly: `cd server && npx vitest run <path>`. Always read the `Test Files` line to confirm what actually ran — a suite that collected nothing also exits 0.
 - E2E tests: `cd e2e && pnpm test <path>`. **Do not add `--run`** — the e2e `test` script already includes it and adding it again crashes.
