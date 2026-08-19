@@ -67,6 +67,7 @@ class _FakeMapStateNotifier extends MapStateNotifier {
 GameChallengeDetailResponseDto _challenge(GameRoundType type) => GameChallengeDetailResponseDto(
   id: 'c1',
   spaceId: 's1',
+  ownerId: null,
   name: 'Challenge 1',
   roundCount: 1,
   scaleKm: 1,
@@ -85,6 +86,7 @@ GameChallengeDetailResponseDto _challenge(GameRoundType type) => GameChallengeDe
 GameChallengeDetailResponseDto _finishedChallenge() => GameChallengeDetailResponseDto(
   id: 'c1',
   spaceId: 's1',
+  ownerId: null,
   name: 'Challenge 1',
   roundCount: 1,
   scaleKm: 1,
@@ -101,6 +103,7 @@ GameChallengeDetailResponseDto _finishedChallenge() => GameChallengeDetailRespon
 GameChallengeDetailResponseDto _dailyChallenge({required bool answered}) => GameChallengeDetailResponseDto(
   id: 'c1',
   spaceId: 's1',
+  ownerId: null,
   name: 'Daily',
   roundCount: 1,
   scaleKm: 1,

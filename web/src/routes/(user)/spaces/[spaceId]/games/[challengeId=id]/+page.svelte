@@ -200,14 +200,19 @@
      column non-null, so titling the page with it would show a raw "2026-08-16" in every language. -->
 <UserPageLayout title={challenge.dailyOn ? $t('game_daily_challenge') : challenge.name}>
   {#snippet leading()}
-    <IconButton
-      variant="ghost"
-      shape="round"
-      color="secondary"
-      aria-label={$t('back')}
-      onclick={() => void goto(Route.viewSpaceGames({ id: challenge.spaceId }))}
-      icon={mdiArrowLeft}
-    />
+    <!-- spaceId is null for a solo challenge, and viewSpaceGames only exists for a space one -
+         this route is space-only for now, so the guard is currently always true, but the type is
+         nullable and a future solo route must not inherit a broken back button by omission. -->
+    {#if challenge.spaceId}
+      <IconButton
+        variant="ghost"
+        shape="round"
+        color="secondary"
+        aria-label={$t('back')}
+        onclick={() => void goto(Route.viewSpaceGames({ id: challenge.spaceId! }))}
+        icon={mdiArrowLeft}
+      />
+    {/if}
   {/snippet}
 
   <div class="flex h-full flex-col">

@@ -55,6 +55,7 @@ UserDto _user(String id) => UserDto(id: id, email: '$id@example.com', name: id, 
 GameChallengeListItemResponseDto _challenge(String id) => GameChallengeListItemResponseDto(
   id: id,
   spaceId: 's1',
+  ownerId: null,
   name: id,
   roundCount: 5,
   locationRoundCount: 3,
@@ -172,6 +173,7 @@ void main() {
     final daily = GameChallengeListItemResponseDto(
       id: 'daily-1',
       spaceId: 's1',
+      ownerId: null,
       name: '2026-08-18',
       roundCount: 5,
       locationRoundCount: 3,
@@ -254,6 +256,7 @@ void main() {
         GameChallengeResponseDto(
           id: 'c9',
           spaceId: 's1',
+          ownerId: null,
           name: 'c9',
           roundCount: 5,
           scaleKm: 1,
@@ -337,6 +340,7 @@ void main() {
     final daily = GameChallengeListItemResponseDto(
       id: 'daily-1',
       spaceId: 's1',
+      ownerId: null,
       name: '2026-08-18',
       roundCount: 5,
       locationRoundCount: 3,
@@ -475,6 +479,7 @@ void main() {
     final daily = GameChallengeListItemResponseDto(
       id: 'daily-1',
       spaceId: 's1',
+      ownerId: null,
       name: '2026-08-18',
       roundCount: 5,
       locationRoundCount: 3,
