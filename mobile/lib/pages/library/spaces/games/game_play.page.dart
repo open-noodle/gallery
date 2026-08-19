@@ -5,6 +5,7 @@ import 'package:immich_mobile/extensions/translate_extensions.dart';
 import 'package:immich_mobile/presentation/widgets/games/date_round.widget.dart';
 import 'package:immich_mobile/presentation/widgets/games/location_round.widget.dart';
 import 'package:immich_mobile/presentation/widgets/games/round_reveal.widget.dart';
+import 'package:immich_mobile/providers/game/daily_reminder.provider.dart';
 import 'package:immich_mobile/providers/game/game_session.provider.dart';
 import 'package:immich_mobile/utils/debug_print.dart';
 import 'package:immich_mobile/widgets/common/immich_toast.dart';
@@ -39,6 +40,12 @@ class GamePlayPage extends ConsumerWidget {
         );
       }
     });
+
+    // The session owns the state machine; the reminder owns the schedule. This is the one line
+    // that connects them, and it fires only for a DAILY — a custom challenge never satisfies a
+    // reminder (see GameSessionController.onDailyCompleted's doc comment).
+    ref.read(gameSessionProvider(challengeId).notifier).onDailyCompleted = (dailyOn) =>
+        ref.read(dailyReminderProvider).recordDailyCompleted(dailyOn);
 
     final session = ref.watch(gameSessionProvider(challengeId));
 
