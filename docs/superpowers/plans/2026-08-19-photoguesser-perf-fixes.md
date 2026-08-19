@@ -27,6 +27,33 @@
 
 - The Bash working directory **persists between commands** in this harness. Every command in this
   plan assumes the worktree root; `cd` explicitly rather than relying on where the last one left you.
+
+- **The e2e stack does not run your source code.** `e2e/docker-compose.yml:14` gives
+  `immich-e2e-server` `image: immich-server:latest` with **no source volume mount**, so the running
+  container is a snapshot from whenever that image was last built. Running `cd e2e && pnpm test …`
+  after editing `server/src/` therefore tests the _image_, not your change — it will pass or fail
+  identically whether your edit is correct, wrong, or absent. That is a false green, and it is worse
+  than no test at all.
+
+  Consequently, **Tasks 2–4 do not use e2e as their per-task gate.** Their gate is the generated-SQL
+  shape guards plus unit tests, which _are_ source-derived: `mise sql` regenerates
+  `server/src/queries/game.repository.sql` from the live decorated methods, and the guards read that
+  file from disk. The behavioural e2e net runs **once**, in Task 4's final step, against an image
+  built from the post-change source.
+
+  To run e2e against current source without disturbing the shared stack (which other sessions use),
+  build a distinctly-tagged image and a sibling container on a spare port, then point the run at it —
+  the recipe Task 1 proved works:
+
+  ```bash
+  docker compose -f e2e/docker-compose.yml build immich-server   # picks up current source
+  # run a sibling container on :2287 attached to the same compose network, then:
+  cd e2e && PLAYWRIGHT_BASE_URL=http://127.0.0.1:2287 pnpm test <path>
+  # finally: docker rm -f <sibling> && docker rmi <its tag>
+  ```
+
+  Never rebuild or restart `immich-e2e-server` / `immich-e2e-postgres` themselves.
+
 - Server unit tests: `cd server && pnpm test -- --run <path>`. **The `<path>` is required** — `pnpm test -- --run` alone silently runs the entire suite.
 - E2E tests: `cd e2e && pnpm test <path>`. **Do not add `--run`** — the e2e `test` script already includes it and adding it again crashes.
 - Sample size is **4,000**, measured. Do not change it without re-running the sweep in §4.4 of the spec.
@@ -359,13 +386,15 @@ describe('face-area gate', () => {
 });
 ```
 
-- [ ] **Step 6: Run the new unit test and the e2e safety net**
+- [ ] **Step 6: Run the new unit test**
 
 Run: `cd server && pnpm test -- --run src/repositories/game-face-gate.spec.ts`
 Expected: PASS, 5 tests.
 
-Run: `cd e2e && pnpm test src/specs/server/api/game-visibility-negatives.e2e-spec.ts`
-Expected: PASS, 3 tests — the Task 1 net still holds after the rewrite.
+Do **not** run the e2e suite here. Per the Global Constraints, `immich-e2e-server` runs a prebuilt
+image with no source mount, so an e2e run at this point would pass regardless of whether this task's
+change is correct — a false green. The behavioural net runs once in Task 4, against a rebuilt image.
+This task's real gate is the generated-SQL guard in Step 4, which _is_ source-derived.
 
 - [ ] **Step 7: Commit**
 
@@ -511,10 +540,15 @@ Expected: PASS.
 
 If the `scopes every asset query to all four of a space's asset paths` test fails here, that is expected only if you moved `eligibleSpaceAsset` out of the CTE — it must stay inside stage 1. Put it back rather than weakening the guard.
 
-- [ ] **Step 5: Verify the safety net still holds**
+- [ ] **Step 5: Confirm the seeded tiebreak survived**
 
-Run: `cd e2e && pnpm test src/specs/server/api/game-visibility-negatives.e2e-spec.ts src/specs/server/api/game.e2e-spec.ts`
-Expected: PASS. The full game e2e is the behavioural check that sampling did not change observable generation semantics.
+Run: `cd server && pnpm test -- --run src/services/game.service.spec.ts`
+Expected: PASS. Generation determinism is the property most at risk from restructuring the query —
+the seeded `md5` tiebreak must still order the stage-2 result, or the same seed stops producing the
+same challenge.
+
+Do **not** run the e2e suite here — see the Global Constraints. It would test the prebuilt image
+rather than your change. The behavioural net runs once in Task 4.
 
 - [ ] **Step 6: Commit**
 
@@ -691,16 +725,44 @@ The union is built from `this.db`, the same way `access.repository.ts:296` build
 
 Apply the identical change to `getDateCandidates`. Leave `getEligibleRoundAsset` alone.
 
-- [ ] **Step 5: Regenerate and run everything**
+- [ ] **Step 5: Regenerate and run the source-derived gates**
 
-Run: `mise sql`
-Run: `cd server && pnpm test -- --run src/repositories/game.repository.spec.ts src/services/game.service.spec.ts`
+Run the pinned `mise sql` command from the Global Constraints (with the `DB_*` env prefix — never bare).
+Run: `cd server && pnpm test -- --run src/repositories/game.repository.spec.ts src/services/game.service.spec.ts src/repositories/game-face-gate.spec.ts`
 Expected: PASS.
 
-Run: `cd e2e && pnpm test src/specs/server/api/game-visibility-negatives.e2e-spec.ts src/specs/server/api/game.e2e-spec.ts`
-Expected: PASS. The visibility net is the check that matters most here — the union restructure is exactly the kind of change that could drop the timeline clause.
+- [ ] **Step 6: Run the behavioural net against an image built from the changed source**
 
-- [ ] **Step 6: Commit**
+This is the one e2e run in the plan, and it covers Tasks 2, 3 and 4 together. Until now every gate
+has been static analysis of generated SQL; this is the only step that proves the rewritten queries
+still behave correctly against a real database.
+
+Build a distinctly-tagged image from current source and run a sibling container on a spare port —
+**never** rebuild or restart the shared `immich-e2e-server` / `immich-e2e-postgres`, which other
+sessions depend on:
+
+```bash
+docker compose -f e2e/docker-compose.yml build immich-server
+# start a sibling container from the freshly built image on :2287, on the same compose network,
+# with the same environment as the compose service but IMMICH_PORT=2287
+cd e2e && PLAYWRIGHT_BASE_URL=http://127.0.0.1:2287 pnpm test \
+  src/specs/server/api/game-visibility-negatives.e2e-spec.ts \
+  src/specs/server/api/game.e2e-spec.ts
+```
+
+Expected: PASS — 3 visibility tests plus the full existing game suite.
+
+The visibility net is the check that matters most: the union restructure is exactly the kind of
+change that drops a `visibility = 'timeline'` clause silently. The full game suite is the check that
+sampling did not change observable generation semantics.
+
+Tear the sibling container and its image down afterwards, and confirm `immich-e2e-server`'s container
+id and created timestamp are unchanged.
+
+If the visibility tests fail here, **stop and fix before committing** — a green SQL guard with a red
+behavioural test means the guard is matching text that does not mean what it appears to.
+
+- [ ] **Step 7: Commit**
 
 ```bash
 git add server/src/utils/shared-space-album-scope.ts server/src/repositories/game.repository.ts \
