@@ -77,6 +77,7 @@ void main() {
     GameChallengeListItemResponseDto? daily,
     void Function(bool enabled)? onDecide,
     SharedSpaceResponseDto? space,
+    bool offerStandings = true,
   }) => tester.pumpConsumerWidget(
     DailySlot(
       spaceId: 's1',
@@ -84,7 +85,7 @@ void main() {
       canEdit: canEdit,
       onDecide: onDecide ?? (_) {},
       onPlay: () {},
-      onStandings: () {},
+      onStandings: offerStandings ? () {} : null,
     ),
     overrides: [
       gameDailyProvider('s1').overrideWith((ref) async => daily),
@@ -262,6 +263,24 @@ void main() {
 
     final title = tester.widget<Text>(find.text('Daily challenge'));
     expect(title.style?.fontWeight, FontWeight.w600);
+  });
+
+  /// A caller that already shows the standings passes no handler, and then the played card offers
+  /// no button: on the Challenges page the board sits directly beneath this card, so a
+  /// "Leaderboard" button there pointed at something already on screen.
+  testWidgets('a played daily offers no standings button when the caller has no route for it', (tester) async {
+    await pump(tester, enabled: true, canEdit: false, daily: _daily(answered: 5), offerStandings: false);
+
+    expect(find.byKey(const Key('daily-card')), findsOneWidget);
+    expect(find.byKey(const Key('daily-standings')), findsNothing);
+    // The card still says its piece — losing the button must not cost the countdown.
+    expect(find.textContaining(RegExp(r'\d+h \d+m')), findsOneWidget);
+  });
+
+  testWidgets('an unplayed daily still offers Play with no standings handler', (tester) async {
+    await pump(tester, enabled: true, canEdit: false, daily: _daily(), offerStandings: false);
+
+    expect(find.byKey(const Key('daily-play')), findsOneWidget);
   });
 
   /// The first attempt tinted the whole card toward the theme surface so theme ink stayed legible.

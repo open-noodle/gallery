@@ -58,7 +58,14 @@ class DailySlot extends ConsumerWidget {
   final bool canEdit;
   final void Function(bool enabled) onDecide;
   final VoidCallback onPlay;
-  final VoidCallback onStandings;
+
+  /// Where a played daily sends the reader for the board — or null when the caller has nowhere to
+  /// send them, in which case the played card carries no button at all.
+  ///
+  /// Null on the Challenges page: the standings sit directly beneath this card there, so the
+  /// button pointed at something already on screen. Non-null from the space timeline, where it is
+  /// the signposted route to that page.
+  final VoidCallback? onStandings;
 
   /// The height to reserve. Depends only on values the page already holds synchronously, never on
   /// the daily provider's async state.
@@ -211,12 +218,16 @@ class DailySlot extends ConsumerWidget {
                           ],
                         ),
                       ),
+                      // A played daily with nowhere to send the reader shows no button rather than
+                      // a dead one — the countdown beside it is then the card's whole job.
                       played
-                          ? FilledButton(
-                              key: const Key('daily-standings'),
-                              onPressed: onStandings,
-                              child: Text('game_leaderboard'.t(context: context)),
-                            )
+                          ? (onStandings == null
+                                ? const SizedBox.shrink()
+                                : FilledButton(
+                                    key: const Key('daily-standings'),
+                                    onPressed: onStandings,
+                                    child: Text('game_leaderboard'.t(context: context)),
+                                  ))
                           : FilledButton(
                               key: const Key('daily-play'),
                               onPressed: onPlay,
