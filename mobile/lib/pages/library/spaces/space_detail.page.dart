@@ -431,7 +431,11 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
       ref.invalidate(gameDailyProvider(widget.spaceId));
     } catch (e) {
       if (context.mounted) {
-        ImmichToast.show(context: context, msg: 'Failed to update daily challenge setting', toastType: ToastType.error);
+        ImmichToast.show(
+          context: context,
+          msg: 'game_daily_toggle_failed'.t(context: context),
+          toastType: ToastType.error,
+        );
       }
     }
   }
