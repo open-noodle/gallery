@@ -9,7 +9,7 @@ import { GameGuessTable } from 'src/schema/tables/game-guess.table';
 import { GameRoundTable } from 'src/schema/tables/game-round.table';
 import { asUuid, asVector } from 'src/utils/database';
 import { GameCandidate } from 'src/utils/game-scoring';
-import { spaceAssetPathBranches } from 'src/utils/shared-space-album-scope';
+import { spaceAssetIdUnion, spaceAssetPathBranches } from 'src/utils/shared-space-album-scope';
 
 export type GameChallengeRow = Selectable<GameChallengeTable>;
 export type GameRoundRow = Selectable<GameRoundTable>;
@@ -184,10 +184,16 @@ export const NOT_PLACE_PROMPT_EMBEDDING: number[] = [
 ];
 
 /**
- * "Is this asset one the space can legitimately show right now?" - the single definition of
- * challenge eligibility, deliberately shared between the two candidate queries and
- * `getEligibleRoundAsset`, so what a round is generated FROM and what it is later SERVED FROM
- * can never drift apart.
+ * "Is this ONE known asset one the space can legitimately show right now?" - the correlated,
+ * per-asset form of challenge eligibility, used only by `getEligibleRoundAsset`, which already
+ * has the asset id and needs a single index probe per arm.
+ *
+ * The candidate queries express the SAME set the other way round: `spaceAssetIdUnion` drives from
+ * the space's own membership rows plus the three visibility clauses below, because testing
+ * membership per asset row made their cost proportional to the whole asset table rather than to
+ * the space. Both forms must stay in step - what a round is generated FROM and what it is later
+ * SERVED FROM cannot be allowed to drift apart. The `all four paths` guard in
+ * game.repository.spec.ts pins both shapes.
  *
  * Two things it encodes:
  *
@@ -297,7 +303,21 @@ export class GameRepository {
           // Lives in stage 1, not stage 2: the eligibility scope (and the GPS presence check
           // below) is what the sample is drawn FROM, so it has to apply before the LIMIT, not
           // after.
-          .where((eb) => eligibleSpaceAsset(eb, spaceId))
+          //
+          // Driven FROM the space's membership rows, not tested per asset row: the correlated
+          // `eligibleSpaceAsset` form made this scan the whole asset table for every space,
+          // however small the space. The union is built off `this.db` (like the four-way union
+          // at access.repository.ts:284) and handed in as a prebuilt subquery - the CTE
+          // callback's QueryCreator and the join's ExpressionBuilder are different types and
+          // will not accept a `Kysely`-rooted `.union()`.
+          .innerJoin(spaceAssetIdUnion(this.db, spaceId).as('space_asset'), (join) =>
+            join.onRef('space_asset.assetId', '=', 'asset.id'),
+          )
+          .where('asset.deletedAt', 'is', null)
+          .where('asset.type', '=', AssetType.Image)
+          // The visibility floor stays here, ANDed outside the space union. None of the space
+          // helpers exclude archived on their own - the shared-space visibility set admits it.
+          .where('asset.visibility', '=', AssetVisibility.Timeline)
           .where('asset_exif.latitude', 'is not', null)
           .where('asset_exif.longitude', 'is not', null)
           .select([
@@ -379,7 +399,16 @@ export class GameRepository {
   async getDateCandidates(spaceId: string, limit: number, seed: string): Promise<GameCandidate[]> {
     const rows = await this.db
       .selectFrom('asset')
-      .where((eb) => eligibleSpaceAsset(eb, spaceId))
+      // Driven FROM the space's membership rows for the same reason as getLocationCandidates'
+      // stage 1 - see the comment there.
+      .innerJoin(spaceAssetIdUnion(this.db, spaceId).as('space_asset'), (join) =>
+        join.onRef('space_asset.assetId', '=', 'asset.id'),
+      )
+      .where('asset.deletedAt', 'is', null)
+      .where('asset.type', '=', AssetType.Image)
+      // The visibility floor stays here, ANDed outside the space union. None of the space
+      // helpers exclude archived on their own - the shared-space visibility set admits it.
+      .where('asset.visibility', '=', AssetVisibility.Timeline)
       .where('asset.localDateTime', 'is not', null)
       .select(['asset.id as assetId', 'asset.localDateTime as takenAt'])
       .orderBy(seededOrder(seed))

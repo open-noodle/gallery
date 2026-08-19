@@ -12,61 +12,48 @@ with
     from
       "asset"
       inner join "asset_exif" on "asset_exif"."assetId" = "asset"."id"
+      inner join (
+        select
+          "shared_space_asset"."assetId" as "assetId"
+        from
+          "shared_space_asset"
+        where
+          "shared_space_asset"."spaceId" = $1
+        union
+        select
+          "asset"."id" as "assetId"
+        from
+          "asset"
+          inner join "shared_space_library" on "shared_space_library"."libraryId" = "asset"."libraryId"
+          and "shared_space_library"."spaceId" = $2
+        union
+        select
+          "album_asset"."assetId" as "assetId"
+        from
+          "shared_space_album"
+          inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+          inner join "album" on "album"."id" = "shared_space_album"."albumId"
+          and "album"."deletedAt" is null
+        where
+          "shared_space_album"."spaceId" = $3
+          and "shared_space_album"."showInTimeline" = $4
+        union
+        select
+          "album_space_asset"."assetId" as "assetId"
+        from
+          "shared_space_album"
+          inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+          and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+          inner join "album" on "album"."id" = "shared_space_album"."albumId"
+          and "album"."deletedAt" is null
+        where
+          "shared_space_album"."spaceId" = $5
+          and "shared_space_album"."showInTimeline" = $6
+      ) as "space_asset" on "space_asset"."assetId" = "asset"."id"
     where
-      (
-        (
-          exists (
-            select
-              1 as "exists"
-            from
-              "shared_space_asset"
-            where
-              "shared_space_asset"."assetId" = "asset"."id"
-              and "shared_space_asset"."spaceId" = $1::uuid
-          )
-          or exists (
-            select
-              1 as "exists"
-            from
-              "shared_space_library"
-            where
-              "shared_space_library"."libraryId" = "asset"."libraryId"
-              and "shared_space_library"."spaceId" = $2::uuid
-          )
-          or (
-            exists (
-              select
-                1 as "exists"
-              from
-                "shared_space_album"
-                inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-                inner join "album" on "album"."id" = "shared_space_album"."albumId"
-                and "album"."deletedAt" is null
-              where
-                "album_asset"."assetId" = "asset"."id"
-                and "shared_space_album"."spaceId" = $3::uuid
-                and "shared_space_album"."showInTimeline" = $4
-            )
-            or exists (
-              select
-                1 as "exists"
-              from
-                "shared_space_album"
-                inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
-                and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
-                inner join "album" on "album"."id" = "shared_space_album"."albumId"
-                and "album"."deletedAt" is null
-              where
-                "album_space_asset"."assetId" = "asset"."id"
-                and "shared_space_album"."spaceId" = $5::uuid
-                and "shared_space_album"."showInTimeline" = $6
-            )
-          )
-        )
-        and "asset"."deletedAt" is null
-        and "asset"."type" = $7
-        and "asset"."visibility" = $8
-      )
+      "asset"."deletedAt" is null
+      and "asset"."type" = $7
+      and "asset"."visibility" = $8
       and "asset_exif"."latitude" is not null
       and "asset_exif"."longitude" is not null
     order by
@@ -111,61 +98,48 @@ select
   "asset"."localDateTime" as "takenAt"
 from
   "asset"
+  inner join (
+    select
+      "shared_space_asset"."assetId" as "assetId"
+    from
+      "shared_space_asset"
+    where
+      "shared_space_asset"."spaceId" = $1
+    union
+    select
+      "asset"."id" as "assetId"
+    from
+      "asset"
+      inner join "shared_space_library" on "shared_space_library"."libraryId" = "asset"."libraryId"
+      and "shared_space_library"."spaceId" = $2
+    union
+    select
+      "album_asset"."assetId" as "assetId"
+    from
+      "shared_space_album"
+      inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+      inner join "album" on "album"."id" = "shared_space_album"."albumId"
+      and "album"."deletedAt" is null
+    where
+      "shared_space_album"."spaceId" = $3
+      and "shared_space_album"."showInTimeline" = $4
+    union
+    select
+      "album_space_asset"."assetId" as "assetId"
+    from
+      "shared_space_album"
+      inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+      and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+      inner join "album" on "album"."id" = "shared_space_album"."albumId"
+      and "album"."deletedAt" is null
+    where
+      "shared_space_album"."spaceId" = $5
+      and "shared_space_album"."showInTimeline" = $6
+  ) as "space_asset" on "space_asset"."assetId" = "asset"."id"
 where
-  (
-    (
-      exists (
-        select
-          1 as "exists"
-        from
-          "shared_space_asset"
-        where
-          "shared_space_asset"."assetId" = "asset"."id"
-          and "shared_space_asset"."spaceId" = $1::uuid
-      )
-      or exists (
-        select
-          1 as "exists"
-        from
-          "shared_space_library"
-        where
-          "shared_space_library"."libraryId" = "asset"."libraryId"
-          and "shared_space_library"."spaceId" = $2::uuid
-      )
-      or (
-        exists (
-          select
-            1 as "exists"
-          from
-            "shared_space_album"
-            inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
-            inner join "album" on "album"."id" = "shared_space_album"."albumId"
-            and "album"."deletedAt" is null
-          where
-            "album_asset"."assetId" = "asset"."id"
-            and "shared_space_album"."spaceId" = $3::uuid
-            and "shared_space_album"."showInTimeline" = $4
-        )
-        or exists (
-          select
-            1 as "exists"
-          from
-            "shared_space_album"
-            inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
-            and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
-            inner join "album" on "album"."id" = "shared_space_album"."albumId"
-            and "album"."deletedAt" is null
-          where
-            "album_space_asset"."assetId" = "asset"."id"
-            and "shared_space_album"."spaceId" = $5::uuid
-            and "shared_space_album"."showInTimeline" = $6
-        )
-      )
-    )
-    and "asset"."deletedAt" is null
-    and "asset"."type" = $7
-    and "asset"."visibility" = $8
-  )
+  "asset"."deletedAt" is null
+  and "asset"."type" = $7
+  and "asset"."visibility" = $8
   and "asset"."localDateTime" is not null
 order by
   md5("asset"."id"::text || $9)

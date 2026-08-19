@@ -58,7 +58,7 @@ const EXTRA_FILES = ['src/utils/database.ts'];
 // encode the direct/library/album access path). Detected as bare identifiers so a
 // call, spread, or import all count.
 const SPACE_HELPER =
-  /\b(spaceAssetPathBranches|spaceAlbumAssetExists|spaceAlbumAssetExistsSql|spaceContributedAssetExists|spaceDirectAssetExists|spaceLibraryAssetExists|accessibleSpaces|accessibleSpaceAlbums|accessibleLibraries)\b/;
+  /\b(spaceAssetPathBranches|spaceAssetIdUnion|spaceAlbumAssetExists|spaceAlbumAssetExistsSql|spaceContributedAssetExists|spaceDirectAssetExists|spaceLibraryAssetExists|accessibleSpaces|accessibleSpaceAlbums|accessibleLibraries)\b/;
 
 // The raw join tables. A reference to any of these is also a space read.
 const SPACE_TABLE = /\bshared_space_(asset|library|album)\b/;
