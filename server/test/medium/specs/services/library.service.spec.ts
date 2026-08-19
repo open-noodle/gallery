@@ -12,6 +12,7 @@ import { EventRepository } from 'src/repositories/event.repository.js';
 import { JobRepository } from 'src/repositories/job.repository.js';
 import { LibraryRepository } from 'src/repositories/library.repository.js';
 import { LoggingRepository } from 'src/repositories/logging.repository.js';
+import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.js';
 import { StorageRepository } from 'src/repositories/storage.repository.js';
 import { DB } from 'src/schema/index.js';
 import { LibraryService } from 'src/services/library.service.js';
@@ -44,7 +45,18 @@ class LibraryTestContext extends MediumTestContext<typeof LibraryService> {
   constructor(database: Kysely<DB>) {
     super(LibraryService, {
       database,
-      real: [AssetRepository, AssetJobRepository, CryptoRepository, LibraryRepository, StorageRepository],
+      // SharedSpaceRepository is fork-only: handleSyncFiles queues SharedSpaceFaceMatch for any
+      // Space linked to the library. Upstream's DI list has no entry for it, so without this the
+      // repository is undefined and every sync-files scenario throws. Real, not mocked — an
+      // unlinked library is a genuine empty round trip against the test DB.
+      real: [
+        AssetRepository,
+        AssetJobRepository,
+        CryptoRepository,
+        LibraryRepository,
+        SharedSpaceRepository,
+        StorageRepository,
+      ],
       mock: [EventRepository, JobRepository, LoggingRepository],
     });
 
