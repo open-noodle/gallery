@@ -79,7 +79,7 @@
 
 - Produces: `game_challenge.ownerId: string | null`, `game_challenge.includePartners: boolean`, `game_challenge.includeSpaces: boolean`, and `game_challenge.spaceId: string | null`. Every later task depends on these names.
 
-- [ ] **Step 1: Write the failing medium test**
+- [x] **Step 1: Write the failing medium test**
 
 Create `server/test/medium/specs/migrations/game-challenge-scope.migration.spec.ts`. Medium tests run against a real Postgres via testcontainers — these constraints cannot be proven against a mock, and a nullable `spaceId` silently breaks the daily uniqueness rule, so a real database is the only honest check.
 
@@ -141,12 +141,12 @@ describe('game_challenge scope constraints', () => {
 
 Add a `seedSpaceAndUser` helper in the same file that inserts one `user` row and one `shared_space` row using `mediumFactory` from `server/test/medium.factory.ts`, following the pattern of the nearest existing medium spec.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd server && pnpm test:medium -- --run test/medium/specs/migrations/game-challenge-scope.migration.spec.ts`
 Expected: FAIL. The first two cases fail because no CHECK exists; the third fails because the second index does not exist and the insert succeeds.
 
-- [ ] **Step 3: Update the declarative table**
+- [x] **Step 3: Update the declarative table**
 
 In `server/src/schema/tables/game-challenge.table.ts`: make `spaceId` nullable, add `ownerId`, add the two boolean flags, add the `@Check`, and split the daily index in two.
 
@@ -199,7 +199,7 @@ export class GameChallengeTable {
   includeSpaces!: Generated<boolean>;
 ```
 
-- [ ] **Step 4: Write the migration**
+- [x] **Step 4: Write the migration**
 
 Create `server/src/schema/migrations-gallery/1794000000000-AddSoloGameChallenge.ts`:
 
@@ -270,18 +270,18 @@ export async function down(db: Kysely<any>): Promise<void> {
 }
 ```
 
-- [ ] **Step 5: Run the medium test to verify it passes**
+- [x] **Step 5: Run the medium test to verify it passes**
 
 Run: `cd server && pnpm test:medium -- --run test/medium/specs/migrations/game-challenge-scope.migration.spec.ts`
 Expected: PASS, 5 tests.
 
 If a failure set looks unrelated to your change, re-run the file alone and then the suite with `--no-file-parallelism` before believing it — medium runs shift their failure set under DB contention.
 
-- [ ] **Step 6: Verify no schema drift**
+- [x] **Step 6: Verify no schema drift**
 
 Start the server against a migrated database and confirm the boot log contains no schema-drift warning. A mismatch between the `CREATE UNIQUE INDEX` statements and the override payloads shows up here and nowhere else.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/src/schema/tables/game-challenge.table.ts \
