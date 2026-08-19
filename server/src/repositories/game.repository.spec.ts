@@ -16,6 +16,20 @@ const queryBlock = (sql: string, method: string): string => {
   return sql.slice(start, next === -1 ? undefined : next);
 };
 
+// ── the solo pool ──────────────────────────────────────────────────────────────────────────────
+//
+// Each solo query is generated TWICE, once per source combination, because the read arms are
+// conditional: `own library only` is what a default player gets, `all sources` is both toggles on.
+// A guard reading only one of them could not tell the difference between "the toggle gates the
+// arm" and "the arm is never there" / "the arm is always there".
+const SOLO_QUERIES = ['getSoloLocationCandidates', 'getSoloDateCandidates', 'getSoloEligibleRoundAsset'];
+
+const soloBlock = (method: string, variant: 'own library only' | 'all sources') =>
+  queryBlock(readGeneratedSql(), `${method} (${variant})`).replaceAll(/\s+/g, ' ');
+
+/** The `union` arm of a whitespace-collapsed pool subquery that reads `table`. */
+const armFor = (block: string, table: string) => block.split(' union ').find((arm) => arm.includes(`"${table}"`)) ?? '';
+
 describe('GameRepository', () => {
   it('is constructible and exposes the query surface the service depends on', () => {
     // A cheap guard on the registration trap: if the repository is not exported
@@ -27,6 +41,11 @@ describe('GameRepository', () => {
       'getDateCandidates',
       'getEligibleRoundAsset',
       'getRecentlyUsedAssetIds',
+      'getSoloLocationCandidates',
+      'getSoloDateCandidates',
+      'getSoloEligibleRoundAsset',
+      'getSoloRecentlyUsedAssetIds',
+      'getSoloChallengeCount',
       'createChallenge',
       'getChallenge',
       'getChallengesForSpace',
@@ -221,6 +240,126 @@ describe('GameRepository', () => {
         stageOne,
         'The stage-1 sample CTE references asset_face. The face gate belongs in stage 2, scoped\nto the sample.',
       ).not.toContain('asset_face');
+    });
+
+    it('keeps the solo pool behind the timeline visibility floor and off shared albums', () => {
+      for (const method of SOLO_QUERIES) {
+        for (const variant of ['own library only', 'all sources'] as const) {
+          const block = soloBlock(method, variant);
+
+          expect(
+            block,
+            `GameRepository.${method} (${variant}) lost the timeline visibility floor. That single\n` +
+              `clause is what excludes archived, hidden and LOCKED assets, and none of the read arms\n` +
+              `exclude them on their own: the space paths answer "is this reachable", not "is this\n` +
+              `showable", and the partner arm answers only "did they share with me".`,
+          ).toContain('"asset"."visibility" =');
+
+          expect(
+            block,
+            `GameRepository.${method} (${variant}) references album_user. Shared albums are\n` +
+              `deliberately NOT a read arm for the game pool - see design section 7.`,
+          ).not.toContain('album_user');
+        }
+      }
+    });
+
+    it('samples before ranking in the solo pool too', () => {
+      for (const variant of ['own library only', 'all sources'] as const) {
+        const block = soloBlock('getSoloLocationCandidates', variant);
+        const stageOne = block.slice(block.indexOf('with "sample"'), block.indexOf('from "sample"'));
+
+        expect(
+          block,
+          `getSoloLocationCandidates (${variant}) no longer has a "sample" CTE - the two-term CLIP\n` +
+            `expression is back to being evaluated over every eligible row. See the space guard\n` +
+            `above for the measurement.`,
+        ).toContain('with "sample"');
+
+        expect(
+          stageOne,
+          `getSoloLocationCandidates (${variant}) stage 1 references smart_search. Stage 1 exists\n` +
+            `precisely to avoid touching the vector column.`,
+        ).not.toContain('smart_search');
+
+        expect(
+          stageOne,
+          `getSoloLocationCandidates (${variant}) stage 1 references asset_face. The face gate\n` +
+            `belongs in stage 2, scoped to the sample.`,
+        ).not.toContain('asset_face');
+      }
+    });
+
+    it('reaches past the player only when the source toggles ask it to', () => {
+      for (const method of SOLO_QUERIES) {
+        const ownOnly = soloBlock(method, 'own library only');
+
+        expect(
+          ownOnly,
+          `GameRepository.${method} lost the player's own arm - with both toggles off there is\n` +
+            `nothing else left, so the pool is now either empty or unscoped.`,
+        ).toContain('"asset"."ownerId" =');
+
+        for (const widened of ['partner', 'shared_space']) {
+          expect(
+            ownOnly,
+            `GameRepository.${method} references ${widened} with BOTH source toggles off. The\n` +
+              `toggles are frozen onto the challenge row precisely so a player who never opted in\n` +
+              `is never shown someone else's photo - an arm that is emitted unconditionally makes\n` +
+              `the toggle decorative.`,
+          ).not.toContain(widened);
+        }
+
+        const allSources = soloBlock(method, 'all sources');
+        // The four space access paths, plus the partner arm. Losing one is a SAFE error direction
+        // (a strict subset) and therefore silent: the player just quietly stops seeing photos from
+        // that path, and nothing reports it.
+        for (const arm of [
+          '"partner"."inTimeline"',
+          'shared_space_asset',
+          'shared_space_library',
+          'album_asset',
+          'album_space_asset',
+        ]) {
+          expect(
+            allSources,
+            `GameRepository.${method} no longer covers ${arm} with both source toggles on. A\n` +
+              `player whose shared photos all arrive through that one path sees an empty pool and\n` +
+              `is told they have no usable photos.`,
+          ).toContain(arm);
+        }
+      }
+    });
+
+    it("scopes every solo space arm to the player's own membership", () => {
+      // The opposite failure direction to the arm-coverage guard above, and the dangerous one: an
+      // arm that survived but lost its membership predicate pours EVERY space's photos into one
+      // player's pool. Only the subset error is self-reporting, so this half has to be pinned
+      // separately.
+      for (const method of ['getSoloLocationCandidates', 'getSoloDateCandidates']) {
+        const block = soloBlock(method, 'all sources');
+        for (const table of ['shared_space_asset', 'shared_space_library', 'album_asset', 'album_space_asset']) {
+          expect(
+            armFor(block, table),
+            `GameRepository.${method}'s ${table} arm is not scoped to the player's membership.\n` +
+              `Without that predicate the arm returns every space's assets, to every player.`,
+          ).toContain('"shared_space_member"."userId" =');
+        }
+      }
+
+      // The correlated per-asset form has no unions to split on; every arm is an EXISTS, and they
+      // all carry the same membership join.
+      const roundAsset = soloBlock('getSoloEligibleRoundAsset', 'all sources');
+      expect(
+        roundAsset,
+        'getSoloEligibleRoundAsset resolves a round image with no membership predicate, so a\n' +
+          'frozen assetId would serve any space asset to any player.',
+      ).toContain('"shared_space_member"."userId" =');
+      expect(
+        roundAsset,
+        "getSoloEligibleRoundAsset lost the partner arm's inTimeline check. The access layer\n" +
+          'deliberately ignores that flag; the game does not.',
+      ).toContain('"partner"."inTimeline"');
     });
   });
 });

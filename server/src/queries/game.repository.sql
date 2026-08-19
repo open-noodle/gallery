@@ -234,6 +234,398 @@ where
   )
   and "game_round"."assetId" is not null
 
+-- GameRepository.getSoloLocationCandidates (own library only)
+with
+  "sample" as (
+    select
+      "asset"."id" as "assetId",
+      "asset_exif"."latitude" as "lat",
+      "asset_exif"."longitude" as "lon",
+      "asset"."localDateTime" as "takenAt",
+      "asset_exif"."country" as "country"
+    from
+      "asset"
+      inner join "asset_exif" on "asset_exif"."assetId" = "asset"."id"
+    where
+      "asset"."ownerId" = $1::uuid
+      and "asset"."deletedAt" is null
+      and "asset"."type" = $2
+      and "asset"."visibility" = $3
+      and "asset_exif"."latitude" is not null
+      and "asset_exif"."longitude" is not null
+    order by
+      md5("asset"."id"::text || $4)
+    limit
+      $5
+  )
+select
+  "sample".*
+from
+  "sample"
+  left join "smart_search" on "smart_search"."assetId" = "sample"."assetId"
+where
+  not exists (
+    select
+      1 as "one"
+    from
+      "asset_face" as "f"
+    where
+      "f"."assetId" = "sample"."assetId"
+      and "f"."deletedAt" is null
+      and "f"."isVisible" = $6
+    group by
+      "f"."assetId"
+    having
+      sum(
+        ("f"."boundingBoxX2" - "f"."boundingBoxX1") * ("f"."boundingBoxY2" - "f"."boundingBoxY1")
+      )::double precision / nullif(
+        max("f"."imageWidth")::double precision * max("f"."imageHeight"),
+        0
+      ) > $7
+  )
+order by
+  (smart_search.embedding <=> $8::vector) - (smart_search.embedding <=> $9::vector) desc nulls last,
+  md5("sample"."assetId"::text || $10)
+limit
+  $11
+
+-- GameRepository.getSoloLocationCandidates (all sources)
+with
+  "sample" as (
+    select
+      "asset"."id" as "assetId",
+      "asset_exif"."latitude" as "lat",
+      "asset_exif"."longitude" as "lon",
+      "asset"."localDateTime" as "takenAt",
+      "asset_exif"."country" as "country"
+    from
+      "asset"
+      inner join "asset_exif" on "asset_exif"."assetId" = "asset"."id"
+      inner join (
+        select
+          "asset"."id" as "assetId"
+        from
+          "asset"
+        where
+          "asset"."ownerId" = $1::uuid
+        union
+        select
+          "asset"."id" as "assetId"
+        from
+          "asset"
+          inner join "partner" on "partner"."sharedById" = "asset"."ownerId"
+          and "partner"."sharedWithId" = $2::uuid
+          and "partner"."inTimeline" = $3
+        union
+        select
+          "shared_space_asset"."assetId" as "assetId"
+        from
+          "shared_space_asset"
+          inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_asset"."spaceId"
+        where
+          "shared_space_member"."userId" = $4::uuid
+        union
+        select
+          "asset"."id" as "assetId"
+        from
+          "asset"
+          inner join "shared_space_library" on "shared_space_library"."libraryId" = "asset"."libraryId"
+          inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_library"."spaceId"
+        where
+          "shared_space_member"."userId" = $5::uuid
+        union
+        select
+          "album_asset"."assetId" as "assetId"
+        from
+          "shared_space_album"
+          inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+          inner join "album" on "album"."id" = "shared_space_album"."albumId"
+          and "album"."deletedAt" is null
+          inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_album"."spaceId"
+        where
+          "shared_space_member"."userId" = $6::uuid
+          and "shared_space_album"."showInTimeline" = $7
+        union
+        select
+          "album_space_asset"."assetId" as "assetId"
+        from
+          "shared_space_album"
+          inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+          and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+          inner join "album" on "album"."id" = "shared_space_album"."albumId"
+          and "album"."deletedAt" is null
+          inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_album"."spaceId"
+        where
+          "shared_space_member"."userId" = $8::uuid
+          and "shared_space_album"."showInTimeline" = $9
+      ) as "pool_asset" on "pool_asset"."assetId" = "asset"."id"
+    where
+      "asset"."deletedAt" is null
+      and "asset"."type" = $10
+      and "asset"."visibility" = $11
+      and "asset_exif"."latitude" is not null
+      and "asset_exif"."longitude" is not null
+    order by
+      md5("asset"."id"::text || $12)
+    limit
+      $13
+  )
+select
+  "sample".*
+from
+  "sample"
+  left join "smart_search" on "smart_search"."assetId" = "sample"."assetId"
+where
+  not exists (
+    select
+      1 as "one"
+    from
+      "asset_face" as "f"
+    where
+      "f"."assetId" = "sample"."assetId"
+      and "f"."deletedAt" is null
+      and "f"."isVisible" = $14
+    group by
+      "f"."assetId"
+    having
+      sum(
+        ("f"."boundingBoxX2" - "f"."boundingBoxX1") * ("f"."boundingBoxY2" - "f"."boundingBoxY1")
+      )::double precision / nullif(
+        max("f"."imageWidth")::double precision * max("f"."imageHeight"),
+        0
+      ) > $15
+  )
+order by
+  (smart_search.embedding <=> $16::vector) - (smart_search.embedding <=> $17::vector) desc nulls last,
+  md5("sample"."assetId"::text || $18)
+limit
+  $19
+
+-- GameRepository.getSoloDateCandidates (own library only)
+select
+  "asset"."id" as "assetId",
+  "asset"."localDateTime" as "takenAt"
+from
+  "asset"
+where
+  "asset"."ownerId" = $1::uuid
+  and "asset"."deletedAt" is null
+  and "asset"."type" = $2
+  and "asset"."visibility" = $3
+  and "asset"."localDateTime" is not null
+order by
+  md5("asset"."id"::text || $4)
+limit
+  $5
+
+-- GameRepository.getSoloDateCandidates (all sources)
+select
+  "asset"."id" as "assetId",
+  "asset"."localDateTime" as "takenAt"
+from
+  "asset"
+  inner join (
+    select
+      "asset"."id" as "assetId"
+    from
+      "asset"
+    where
+      "asset"."ownerId" = $1::uuid
+    union
+    select
+      "asset"."id" as "assetId"
+    from
+      "asset"
+      inner join "partner" on "partner"."sharedById" = "asset"."ownerId"
+      and "partner"."sharedWithId" = $2::uuid
+      and "partner"."inTimeline" = $3
+    union
+    select
+      "shared_space_asset"."assetId" as "assetId"
+    from
+      "shared_space_asset"
+      inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_asset"."spaceId"
+    where
+      "shared_space_member"."userId" = $4::uuid
+    union
+    select
+      "asset"."id" as "assetId"
+    from
+      "asset"
+      inner join "shared_space_library" on "shared_space_library"."libraryId" = "asset"."libraryId"
+      inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_library"."spaceId"
+    where
+      "shared_space_member"."userId" = $5::uuid
+    union
+    select
+      "album_asset"."assetId" as "assetId"
+    from
+      "shared_space_album"
+      inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+      inner join "album" on "album"."id" = "shared_space_album"."albumId"
+      and "album"."deletedAt" is null
+      inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_album"."spaceId"
+    where
+      "shared_space_member"."userId" = $6::uuid
+      and "shared_space_album"."showInTimeline" = $7
+    union
+    select
+      "album_space_asset"."assetId" as "assetId"
+    from
+      "shared_space_album"
+      inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+      and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+      inner join "album" on "album"."id" = "shared_space_album"."albumId"
+      and "album"."deletedAt" is null
+      inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_album"."spaceId"
+    where
+      "shared_space_member"."userId" = $8::uuid
+      and "shared_space_album"."showInTimeline" = $9
+  ) as "pool_asset" on "pool_asset"."assetId" = "asset"."id"
+where
+  "asset"."deletedAt" is null
+  and "asset"."type" = $10
+  and "asset"."visibility" = $11
+  and "asset"."localDateTime" is not null
+order by
+  md5("asset"."id"::text || $12)
+limit
+  $13
+
+-- GameRepository.getSoloEligibleRoundAsset (own library only)
+select
+  "asset_file"."path" as "previewPath"
+from
+  "asset"
+  inner join "asset_file" on "asset_file"."assetId" = "asset"."id"
+  and "asset_file"."type" = $1
+where
+  "asset"."id" = $2::uuid
+  and (
+    "asset"."deletedAt" is null
+    and "asset"."type" = $3
+    and "asset"."visibility" = $4
+    and "asset"."ownerId" = $5::uuid
+  )
+order by
+  "asset_file"."isEdited" asc
+limit
+  $6
+
+-- GameRepository.getSoloEligibleRoundAsset (all sources)
+select
+  "asset_file"."path" as "previewPath"
+from
+  "asset"
+  inner join "asset_file" on "asset_file"."assetId" = "asset"."id"
+  and "asset_file"."type" = $1
+where
+  "asset"."id" = $2::uuid
+  and (
+    "asset"."deletedAt" is null
+    and "asset"."type" = $3
+    and "asset"."visibility" = $4
+    and (
+      "asset"."ownerId" = $5::uuid
+      or exists (
+        select
+          1 as "one"
+        from
+          "partner"
+        where
+          "partner"."sharedById" = "asset"."ownerId"
+          and "partner"."sharedWithId" = $6::uuid
+          and "partner"."inTimeline" = $7
+      )
+      or (
+        exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_asset"
+            inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_asset"."spaceId"
+          where
+            "shared_space_member"."userId" = $8::uuid
+            and "shared_space_asset"."assetId" = "asset"."id"
+        )
+        or exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_library"
+            inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_library"."spaceId"
+          where
+            "shared_space_member"."userId" = $9::uuid
+            and "shared_space_library"."libraryId" = "asset"."libraryId"
+        )
+        or (
+          exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+              inner join "album" on "album"."id" = "shared_space_album"."albumId"
+              and "album"."deletedAt" is null
+              inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_album"."spaceId"
+            where
+              "shared_space_member"."userId" = $10::uuid
+              and "album_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."showInTimeline" = $11
+          )
+          or exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+              and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+              inner join "album" on "album"."id" = "shared_space_album"."albumId"
+              and "album"."deletedAt" is null
+              inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_album"."spaceId"
+            where
+              "shared_space_member"."userId" = $12::uuid
+              and "album_space_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."showInTimeline" = $13
+          )
+        )
+      )
+    )
+  )
+order by
+  "asset_file"."isEdited" asc
+limit
+  $14
+
+-- GameRepository.getSoloRecentlyUsedAssetIds
+select distinct
+  "game_round"."assetId" as "assetId"
+from
+  "game_round"
+where
+  "game_round"."challengeId" in (
+    select
+      "game_challenge"."id"
+    from
+      "game_challenge"
+    where
+      "game_challenge"."ownerId" = $1
+    order by
+      "game_challenge"."createdAt" desc
+    limit
+      $2
+  )
+  and "game_round"."assetId" is not null
+
+-- GameRepository.getSoloChallengeCount
+select
+  count(*) as "count"
+from
+  "game_challenge"
+where
+  "game_challenge"."ownerId" = $1
+  and "game_challenge"."dailyOn" is null
+
 -- GameRepository.createChallenge
 begin
 insert into
