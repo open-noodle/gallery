@@ -12,7 +12,9 @@ import 'package:immich_mobile/generated/codegen_loader.g.dart';
 import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/presentation/widgets/games/daily_challenge_card.widget.dart';
+import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
 import 'package:immich_mobile/providers/game/game.provider.dart';
+import 'package:immich_mobile/providers/shared_space.provider.dart';
 import 'package:openapi/api.dart';
 
 import '../../../test_utils.dart';
@@ -31,6 +33,18 @@ GameChallengeListItemResponseDto _daily({num answered = 0}) => GameChallengeList
   createdAt: DateTime.utc(2026, 8, 18),
   closedAt: null,
   dailyOn: DateTime.utc(2026, 8, 18),
+);
+
+/// A space fixture. [cover] omitted leaves `thumbnailAssetId` **absent** rather than null, which
+/// is the state that matters: it is `Optional<String?>`, so reading `.value` on it throws — the
+/// card must go through `.orElse(null)`.
+SharedSpaceResponseDto _space({String? cover}) => SharedSpaceResponseDto(
+  id: 's1',
+  name: 'All photos',
+  createdById: 'u1',
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
+  thumbnailAssetId: cover == null ? const Optional.absent() : Optional.present(cover),
 );
 
 void main() {
@@ -62,6 +76,7 @@ void main() {
     required bool canEdit,
     GameChallengeListItemResponseDto? daily,
     void Function(bool enabled)? onDecide,
+    SharedSpaceResponseDto? space,
   }) => tester.pumpConsumerWidget(
     DailySlot(
       spaceId: 's1',
@@ -71,7 +86,10 @@ void main() {
       onPlay: () {},
       onStandings: () {},
     ),
-    overrides: [gameDailyProvider('s1').overrideWith((ref) async => daily)],
+    overrides: [
+      gameDailyProvider('s1').overrideWith((ref) async => daily),
+      sharedSpaceProvider('s1').overrideWith((ref) async => space ?? _space()),
+    ],
   );
 
   testWidgets('an un-asked space prompts an editor', (tester) async {
@@ -199,6 +217,53 @@ void main() {
     expect(played, unplayed, reason: 'A height change would jitter the timeline scrubber offset');
   });
 
+  String? backdropUrl(WidgetTester tester) {
+    final images = tester.widgetList<Image>(find.byKey(const Key('daily-card-cover')));
+    if (images.isEmpty) return null;
+    return (images.first.image as RemoteImageProvider).url;
+  }
+
+  testWidgets('the backdrop is the space cover, not a round image', (tester) async {
+    await pump(
+      tester,
+      enabled: true,
+      canEdit: false,
+      daily: _daily(),
+      space: _space(cover: 'cover-asset-1'),
+    );
+
+    final url = backdropUrl(tester);
+    expect(url, isNotNull, reason: 'The opted-in card should paint a cover backdrop');
+    expect(url, contains('/assets/cover-asset-1/thumbnail'));
+    // The whole point of the change: a round image both looks wrong here and costs a full
+    // preview (measured 120-800KB) to decorate a 108px strip.
+    expect(url, isNot(contains('/games/')));
+  });
+
+  testWidgets('a space with no cover falls back to the space gradient, never a round image', (tester) async {
+    await pump(tester, enabled: true, canEdit: false, daily: _daily(), space: _space());
+
+    expect(find.byKey(const Key('daily-card-gradient')), findsOneWidget);
+    expect(backdropUrl(tester), isNull);
+    expect(find.byKey(const Key('daily-card')), findsOneWidget);
+    // `thumbnailAssetId` is Optional<String?>; reading `.value` while absent throws, so an
+    // exception here means the card reached for `.value` instead of `.orElse(null)`.
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the title is weighted, not the default body text', (tester) async {
+    await pump(
+      tester,
+      enabled: true,
+      canEdit: false,
+      daily: _daily(),
+      space: _space(cover: 'cover-asset-1'),
+    );
+
+    final title = tester.widget<Text>(find.text('Daily challenge'));
+    expect(title.style?.fontWeight, FontWeight.w600);
+  });
+
   // reservedHeight is what the page actually calls to reserve sliver space, synchronously and
   // before the daily provider resolves — build() reimplements the same branching for the widget
   // it actually renders. A plain by-inspection match between the two is how they'd silently drift;
@@ -271,7 +336,10 @@ void main() {
           useFallbackTranslations: true,
           assetLoader: const CodegenLoader(),
           child: ProviderScope(
-            overrides: [gameDailyProvider('s1').overrideWith((ref) async => daily)],
+            overrides: [
+              gameDailyProvider('s1').overrideWith((ref) async => daily),
+              sharedSpaceProvider('s1').overrideWith((ref) async => _space(cover: 'cover-asset-1')),
+            ],
             child: Builder(
               builder: (context) => MaterialApp(
                 debugShowCheckedModeBanner: false,
