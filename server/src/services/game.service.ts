@@ -430,6 +430,10 @@ export class GameService extends BaseService {
     return {
       id,
       spaceId,
+      // Always null here: this function only ever builds a space-scoped challenge (the `spaceId`
+      // param above is required, not optional) - a solo generator is a later task, not a
+      // behaviour this one adds.
+      ownerId: null,
       name: challenge.name,
       roundCount: challenge.roundCount,
       scaleKm: challenge.scaleKm,
@@ -477,6 +481,10 @@ export class GameService extends BaseService {
     return {
       id: challenge.id,
       spaceId: this.requireSpaceScope(challenge),
+      // requireSpaceScope above already guarantees this is a space row, so ownerId is always
+      // null here - read from the column rather than hardcoded, so the DTO stays a faithful
+      // mirror of the row instead of a second place that has to know that fact.
+      ownerId: challenge.ownerId,
       name: challenge.name,
       roundCount: challenge.roundCount,
       scaleKm: challenge.scaleKm,
@@ -582,6 +590,9 @@ export class GameService extends BaseService {
     return {
       id: challenge.id,
       spaceId,
+      // requireSpaceScope above already guarantees this is a space row, so ownerId is always
+      // null here - read from the column rather than hardcoded, same as toListItem.
+      ownerId: challenge.ownerId,
       name: challenge.name,
       dailyOn: asDateString(challenge.dailyOn),
       roundCount: challenge.roundCount,

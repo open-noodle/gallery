@@ -80,6 +80,7 @@ void main() {
       (_) async => GameChallengeResponseDto(
         id: 'c',
         spaceId: 'space-1',
+        ownerId: null,
         name: 'Challenge 1',
         roundCount: 5,
         dailyOn: null,

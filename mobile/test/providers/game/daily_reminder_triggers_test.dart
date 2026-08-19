@@ -22,6 +22,7 @@ void main() {
       return GameChallengeDetailResponseDto(
         id: 'c1',
         spaceId: 's1',
+        ownerId: null,
         name: 'daily',
         roundCount: 1,
         scaleKm: 1,

@@ -23,6 +23,7 @@ import '../../../widget_tester_extensions.dart';
 GameChallengeListItemResponseDto _daily({num answered = 0}) => GameChallengeListItemResponseDto(
   id: 'daily-1',
   spaceId: 's1',
+  ownerId: null,
   name: '2026-08-18',
   roundCount: 5,
   locationRoundCount: 3,

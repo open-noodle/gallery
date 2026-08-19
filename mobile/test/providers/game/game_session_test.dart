@@ -21,6 +21,7 @@ GameChallengeDetailResponseDto _challenge(List<GameRoundDetailResponseDto> round
     GameChallengeDetailResponseDto(
       id: 'challenge-1',
       spaceId: 'space-1',
+      ownerId: null,
       name: 'Challenge 1',
       roundCount: rounds.length,
       scaleKm: 100,

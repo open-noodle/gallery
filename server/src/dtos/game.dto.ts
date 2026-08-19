@@ -50,7 +50,12 @@ const GameGuessSchema = z
 const GameChallengeResponseSchema = z
   .object({
     id: z.string().describe('Challenge ID'),
-    spaceId: z.string().describe('Shared space ID'),
+    // Nullable because a challenge has exactly one scope: a space OR an owner, never both.
+    // Response DTOs are not validated on output, so leaving this non-nullable would not fail on
+    // the server - it would emit null against a schema promising a string, and break the
+    // GENERATED clients instead. The Dart model would throw at deserialisation.
+    spaceId: z.string().nullable().describe('Shared space ID, or null for a solo challenge'),
+    ownerId: z.string().nullable().describe('Owning user ID, or null for a shared-space challenge'),
     name: z.string().describe('Challenge name'),
     roundCount: z.number().describe('Number of rounds actually generated (may be less than requested)'),
     scaleKm: z.number().describe('Frozen distance scale used to score location rounds'),
