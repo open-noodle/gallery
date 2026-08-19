@@ -1,0 +1,58 @@
+/// How many days ahead the reminder schedules.
+///
+/// One-shots over a horizon rather than a repeating schedule: a repeating notification cannot skip a
+/// single occurrence, so it would remind a player about a daily they had already played — the usual
+/// reason notifications get switched off for good. The cost is that reminders lapse if the app is
+/// not opened for a week, which is accepted; a player who has been away that long is better left
+/// alone. It also keeps well clear of iOS's 64-pending-notification cap.
+const int kDailyReminderHorizonDays = 7;
+
+/// The `YYYY-MM-DD` UTC key for an instant — the same shape `SettingsKey.gameDailyLastPlayed` holds
+/// and the same day boundary the server's `dailyOn` uses.
+String dailyKeyFor(DateTime instant) {
+  final utc = instant.toUtc();
+  return '${utc.year.toString().padLeft(4, '0')}-'
+      '${utc.month.toString().padLeft(2, '0')}-'
+      '${utc.day.toString().padLeft(2, '0')}';
+}
+
+/// Which local instants the daily reminder should fire at.
+///
+/// Pure and total: every input is a local value and nothing here performs I/O. In particular this
+/// never asks the server whether a daily has been played, because `GET .../games/daily` GENERATES
+/// the daily as a side effect of the read.
+///
+/// [minuteOfDay] is minutes since local midnight. It is a local time on purpose: the daily resets at
+/// UTC midnight, which is 1-2 am across Europe. Any local time maps to some UTC instant, and
+/// whatever daily is current then is the one waiting — so there is no timezone trap, provided the
+/// copy never names a date.
+List<DateTime> dailyReminderOccurrences({
+  required DateTime now,
+  required int minuteOfDay,
+  required bool enabled,
+  required bool permissionGranted,
+  required bool hasOptedInSpace,
+  required String? lastPlayedDate,
+  int horizonDays = kDailyReminderHorizonDays,
+}) {
+  // Permission is checked here, not only where the toggle is set: it can be revoked in OS settings
+  // long after the toggle was switched on.
+  if (!enabled || !permissionGranted || !hasOptedInSpace || horizonDays <= 0) {
+    return const [];
+  }
+
+  final firstToday = DateTime(now.year, now.month, now.day).add(Duration(minutes: minuteOfDay));
+  final start = firstToday.isAfter(now) ? firstToday : firstToday.add(const Duration(days: 1));
+
+  final occurrences = <DateTime>[];
+  for (var day = 0; day < horizonDays; day++) {
+    final instant = start.add(Duration(days: day));
+    // The skip compares against the UTC day of THIS instant, not the local calendar day, so it is
+    // correct for a player whose evening falls on the following UTC date.
+    if (lastPlayedDate != null && lastPlayedDate == dailyKeyFor(instant)) {
+      continue;
+    }
+    occurrences.add(instant);
+  }
+  return occurrences;
+}
