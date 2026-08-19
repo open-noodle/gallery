@@ -36,7 +36,7 @@ export class GameController {
   }
 
   @Post('shared-spaces/:spaceId/games')
-  @Authenticated({ permission: Permission.SharedSpaceUpdate })
+  @Authenticated({ permission: Permission.GameCreate })
   @Endpoint({
     summary: 'Create a photo guessing challenge',
     description: "Generate and freeze a new challenge from a shared space's own photos.",
@@ -51,7 +51,7 @@ export class GameController {
   }
 
   @Get('shared-spaces/:spaceId/games')
-  @Authenticated({ permission: Permission.SharedSpaceRead })
+  @Authenticated({ permission: Permission.GameRead })
   @Endpoint({
     summary: 'List photo guessing challenges',
     description: "List a shared space's challenges along with the caller's progress on each.",
@@ -65,7 +65,7 @@ export class GameController {
   }
 
   @Get('shared-spaces/:spaceId/games/daily')
-  @Authenticated({ permission: Permission.SharedSpaceRead })
+  @Authenticated({ permission: Permission.GameRead })
   @Endpoint({
     summary: "Get the space's daily challenge",
     description:
@@ -77,7 +77,7 @@ export class GameController {
   }
 
   @Get('shared-spaces/:spaceId/games/standings')
-  @Authenticated({ permission: Permission.SharedSpaceRead })
+  @Authenticated({ permission: Permission.GameRead })
   @Endpoint({
     summary: "Get the space's monthly standings",
     description:
@@ -89,7 +89,7 @@ export class GameController {
   }
 
   @Get('games/:id')
-  @Authenticated({ permission: Permission.SharedSpaceRead })
+  @Authenticated({ permission: Permission.GameRead })
   @Endpoint({
     summary: 'Get a photo guessing challenge',
     description: 'Get challenge detail. Round answers are withheld until the caller has guessed that round.',
@@ -100,7 +100,7 @@ export class GameController {
   }
 
   @Post('games/:id/rounds/:index/guess')
-  @Authenticated({ permission: Permission.SharedSpaceRead })
+  @Authenticated({ permission: Permission.GameRead })
   @Endpoint({
     summary: 'Submit a round guess',
     description: 'Submit a guess for one round of a challenge and receive the score and the answer.',
@@ -116,7 +116,7 @@ export class GameController {
 
   @Get('games/:id/rounds/:index/image')
   @FileResponse()
-  @Authenticated({ permission: Permission.SharedSpaceRead })
+  @Authenticated({ permission: Permission.GameRead })
   @Endpoint({
     summary: 'Get a round image',
     description:
@@ -133,7 +133,7 @@ export class GameController {
   }
 
   @Get('games/:id/leaderboard')
-  @Authenticated({ permission: Permission.SharedSpaceRead })
+  @Authenticated({ permission: Permission.GameRead })
   @Endpoint({
     summary: 'Get a challenge leaderboard',
     description: 'Get per-player totals for a challenge.',
@@ -144,7 +144,7 @@ export class GameController {
   }
 
   @Delete('games/:id')
-  @Authenticated({ permission: Permission.SharedSpaceUpdate })
+  @Authenticated({ permission: Permission.GameDelete })
   @HttpCode(HttpStatus.NO_CONTENT)
   @Endpoint({
     summary: 'Delete a photo guessing challenge',
