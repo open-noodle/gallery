@@ -98,19 +98,40 @@ makes cost proportional to the space rather than to the library.
 
 ### 4.3 Measured results
 
-Warm timings, `jit = off`, on the reference instance.
+Warm timings, `jit = off`, on the reference instance. The **Measured after** column re-runs the
+`big space, two-stage + space-driven` row — the shipped, regenerated `getLocationCandidates` query
+in `server/src/queries/game.repository.sql` — against the same reference instance (Pierre's personal
+Gallery, k3s context `noodle`, namespace `personal`, pod `gallery-postgres-1`) and the same 56,569-asset
+space on **2026-08-19**, via `EXPLAIN (ANALYZE, BUFFERS, COSTS OFF)` with `jit = off` set explicitly for
+the session (the `gallery` role carries it by default; the check ran as `postgres`, which does not
+inherit it). The other rows are design-time estimates for configurations that are either superseded
+(the pre-change baseline) or not yet shipped (solo mode) and were not re-measured.
 
-| Query                                   | Data touched | Warm           | Cold         |
-| --------------------------------------- | ------------ | -------------- | ------------ |
-| current / big space (56.5k)             | 3.7 GB       | 490–532 ms     | 13.9 s       |
-| big space, two-stage only               | 2.4 GB       | 203–240 ms     | 513 ms       |
-| **big space, two-stage + space-driven** | **406 MB**   | **143–154 ms** | 169 ms       |
-| current / solo whole library            | 3.9 GB       | 482 ms         | 17–19 s      |
-| **solo whole library, two-stage**       | **400 MB**   | **117–154 ms** | ~3.6 s first |
-| current / small space (1.3k)            | —            | 240–263 ms     | 397 ms       |
+| Query                                   | Data touched | Warm           | Cold         | Measured after                                |
+| --------------------------------------- | ------------ | -------------- | ------------ | --------------------------------------------- |
+| current / big space (56.5k)             | 3.7 GB       | 490–532 ms     | 13.9 s       | — (superseded baseline, not re-measured)      |
+| big space, two-stage only               | 2.4 GB       | 203–240 ms     | 513 ms       | — (intermediate step, not shipped standalone) |
+| **big space, two-stage + space-driven** | **406 MB**   | **143–154 ms** | 169 ms       | **406 MB (51,966 buffers), 180–196 ms warm**  |
+| current / solo whole library            | 3.9 GB       | 482 ms         | 17–19 s      | — (solo mode not yet implemented)             |
+| **solo whole library, two-stage**       | **400 MB**   | **117–154 ms** | ~3.6 s first | — (solo mode not yet implemented)             |
+| current / small space (1.3k)            | —            | 240–263 ms     | 397 ms       | — (not re-measured)                           |
 
 The cold column matters more than the warm one: it is the first game of the day, and it is the
 experience users actually report.
+
+**After-figures detail (56.5k space, 2026-08-19):** four consecutive `EXPLAIN (ANALYZE, BUFFERS,
+COSTS OFF)` runs against the live query — real space id, two real 1152-dim `smart_search` embeddings
+(dimensionality is what affects cost, not the values), sample limit 4,000, outer limit 200 — all
+landed fully warm (`shared hit=51966`, `read=0` on the top-level `Limit` node, every run) at
+`Execution Time` 195.378 ms, 195.728 ms, 179.790 ms, 186.117 ms (mean ≈ 189 ms). 51,966 buffers ×
+8 KiB = 406.0 MB — matching the 406 MB prediction almost exactly and confirming buffers dropped
+**~9.2×** from the ~477,000-buffer pre-change baseline. Warm execution time landed at 180–196 ms,
+above the 143–154 ms design-time estimate but still 2.5–2.9× faster than the 490–532 ms pre-change
+warm baseline; the gap is attributed to instance load variance rather than a query-shape regression,
+since buffers — the cache-independent metric — matched the prediction almost exactly. Cold was not
+independently re-verified: evicting the production cache to reproduce a genuine cold run was out of
+scope for a read-only check against a live personal instance. Full plan and all four timings are in
+`.superpowers/sdd/2026-08-19-photoguesser-perf-fixes/task-5-report.md`.
 
 ### 4.4 Sample size
 
