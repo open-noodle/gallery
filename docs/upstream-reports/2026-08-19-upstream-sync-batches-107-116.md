@@ -12,7 +12,7 @@ branch level with `upstream/main`.
 - **Risk level**: MEDIUM — one broad mobile refactor (`@DriftAccessor`) touching 67 fork-only files, one
   sync-contract change (`#30764` backpressure), one lint major (unicorn v73) and one comment-style sweep
 - **Recommendation**: PROCEED (rolling branch stays off `main` — see "Landing" below)
-- **Branch state**: 0 commits behind the arc target `65b4b9b8fbe`, 1195 fork commits ahead, fork-synced
+- **Branch state**: 0 commits behind the arc target `65b4b9b8fbe`, ~1195 fork commits ahead, fork-synced
   through `#987`
 
 ## Incoming Upstream Changes
@@ -283,7 +283,8 @@ moving HEAD, so neither condition holds. Green + level + fork-synced is the expe
 
 ## Post-Rebase Verification
 
-- Fork commits ahead of upstream: 1195 (final tip `56757e77c22`)
+- Fork commits ahead of upstream: **1195 at the CI-validated tip `1ff89f57dee`** (the trailing
+  documentation commits below that tip each add one, so a live count will read slightly higher)
 - Commits behind upstream: 0 (at the arc's target `65b4b9b8fbe`)
 - Fork diff clean: YES
 
