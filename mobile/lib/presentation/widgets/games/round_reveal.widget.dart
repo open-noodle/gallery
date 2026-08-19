@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:immich_mobile/extensions/translate_extensions.dart';
 import 'package:immich_mobile/presentation/widgets/games/reveal_map.widget.dart';
+import 'package:immich_mobile/presentation/widgets/games/round_photo_placeholder.widget.dart';
 import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
 import 'package:immich_mobile/providers/game/game_session.provider.dart';
 import 'package:immich_mobile/utils/game_format.dart';
@@ -36,10 +37,12 @@ class RoundReveal extends StatelessWidget {
   }
 
   Widget _photo() => Image(
+    key: const Key('round-reveal-photo'),
     image: RemoteImageProvider(url: getGameRoundImageUrl(challengeId, index)),
     fit: BoxFit.cover,
     color: Colors.black54,
     colorBlendMode: BlendMode.darken,
+    errorBuilder: (_, _, _) => const RoundPhotoPlaceholder(),
   );
 
   // Null, not (0, 0): a failed post-guess refetch leaves `result.answer` null while `score`/`guess`

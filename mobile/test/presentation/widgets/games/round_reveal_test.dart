@@ -12,6 +12,7 @@ import 'package:immich_mobile/infrastructure/repositories/settings.repository.da
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/models/map/map_state.model.dart';
 import 'package:immich_mobile/presentation/widgets/games/reveal_map.widget.dart';
+import 'package:immich_mobile/presentation/widgets/games/round_photo_placeholder.widget.dart';
 import 'package:immich_mobile/presentation/widgets/games/round_reveal.widget.dart';
 import 'package:immich_mobile/providers/game/game_session.provider.dart';
 import 'package:immich_mobile/providers/locale_provider.dart';
@@ -181,6 +182,37 @@ void main() {
     final map = tester.widget<RevealMap>(find.byKey(const Key('round-reveal-map')));
     expect(map.answer, isNull);
     expect(map.guess, (lat: 48.85, lon: 2.35));
+  });
+
+  // The spec requires that a round whose asset was deleted server-side "renders without the photo
+  // rather than erroring". Without an errorBuilder the 404 throws into the framework and paints a
+  // blank/error area. The builder is invoked directly: RemoteImageProvider's load never resolves
+  // (or fails) deterministically inside a widget test, so driving a real 404 here would assert
+  // nothing reliable - invoking the callback proves both that it exists and what it paints.
+  testWidgets('the date reveal photo falls back to a neutral placeholder when the photo cannot be loaded', (
+    tester,
+  ) async {
+    await pump(
+      tester,
+      RoundResult(
+        type: GameRoundType.date,
+        score: 3640,
+        offsetDays: 150,
+        answer: GameRoundDetailResponseDtoAnswer(date: DateTime.utc(2019, 12, 1), lat: null, lon: null),
+      ),
+    );
+
+    final image = tester.widget<Image>(find.byKey(const Key('round-reveal-photo')));
+    expect(image.errorBuilder, isNotNull, reason: 'A deleted asset 404s and would otherwise throw into the framework');
+
+    await tester.pumpWidget(
+      MaterialApp(home: Builder(builder: (context) => image.errorBuilder!(context, Exception('404'), null))),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(RoundPhotoPlaceholder), findsOneWidget);
+    expect(find.byIcon(Icons.image_not_supported_outlined), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('Next fires once per tap', (tester) async {
