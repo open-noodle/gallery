@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/extensions/translate_extensions.dart';
 import 'package:immich_mobile/presentation/widgets/games/daily_challenge_prompt.widget.dart';
-import 'package:immich_mobile/presentation/widgets/games/round_photo_placeholder.widget.dart';
 import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
 import 'package:immich_mobile/providers/game/game.provider.dart';
+import 'package:immich_mobile/providers/shared_space.provider.dart';
 import 'package:immich_mobile/utils/game_format.dart';
 import 'package:immich_mobile/utils/image_url_builder.dart';
+import 'package:immich_mobile/widgets/spaces/space_collage.dart';
 
 /// Height reserved for the opted-in card (played or unplayed).
 ///
@@ -121,22 +122,45 @@ class DailySlot extends ConsumerWidget {
             );
           }
           final played = challenge.answered >= challenge.roundCount;
+          final theme = Theme.of(context);
+
+          // The space's own cover, not a round image. A round preview is the wrong picture for a
+          // space-level bar, and it costs a full preview (120-800KB measured) to decorate a
+          // 108px strip -- a cover thumbnail is ~20KB.
+          //
+          // Both fields are `Optional<...>`: reading `.value` while ABSENT throws, so these must
+          // stay `.orElse(null)`. Same trap as `dailyChallengeEnabled` on the Challenges page.
+          final space = ref.watch(sharedSpaceProvider(spaceId)).valueOrNull;
+          final coverAssetId = space?.thumbnailAssetId.orElse(null);
+          final gradient = spaceGradientColors(space?.color.orElse(null));
+
+          // A space with no cover (and a cover that fails to load) falls back to the space's own
+          // colour, matching SpaceCollage's empty state.
+          Widget gradientFill() => DecoratedBox(
+            key: const Key('daily-card-gradient'),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: gradient),
+            ),
+          );
+
           return Card(
             key: const Key('daily-card'),
             clipBehavior: Clip.antiAlias,
             child: Stack(
               children: [
-                // Round 0's image is already a generic, EXIF-free preview keyed by (challenge,
-                // index), so using it as a backdrop leaks nothing the player would not see on
-                // entering the round.
                 Positioned.fill(
-                  child: Image(
-                    image: RemoteImageProvider(url: getGameRoundImageUrl(challenge.id, 0)),
-                    fit: BoxFit.cover,
-                    opacity: const AlwaysStoppedAnimation(0.45),
-                    errorBuilder: (_, _, _) => const RoundPhotoPlaceholder(),
-                  ),
+                  child: coverAssetId == null
+                      ? gradientFill()
+                      : Image(
+                          key: const Key('daily-card-cover'),
+                          image: RemoteImageProvider(url: getThumbnailUrlForRemoteId(coverAssetId)),
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => gradientFill(),
+                        ),
                 ),
+                // Scrim tinted to the card surface rather than plain black: it keeps the theme's
+                // own text colours legible over any cover, in light and dark alike.
+                Positioned.fill(child: ColoredBox(color: theme.colorScheme.surface.withValues(alpha: 0.6))),
                 Padding(
                   padding: const EdgeInsets.all(12),
                   child: Row(
@@ -148,13 +172,21 @@ class DailySlot extends ConsumerWidget {
                           mainAxisAlignment: MainAxisAlignment.center,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text('game_daily_challenge'.t(context: context)),
+                            Text(
+                              'game_daily_challenge'.t(context: context),
+                              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                             if (played)
                               Text(
                                 'game_daily_next_in'.t(
                                   context: context,
                                   args: {'time': timeUntilNextDaily(DateTime.now().toUtc())},
                                 ),
+                                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                           ],
                         ),
