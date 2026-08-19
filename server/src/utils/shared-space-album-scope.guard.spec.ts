@@ -52,7 +52,11 @@ import { describe, expect, it } from 'vitest';
 const SERVER_ROOT = process.cwd();
 
 const REPO_DIR = 'src/repositories';
-const EXTRA_FILES = ['src/utils/database.ts'];
+// Non-repository files that carry space reads. `game-solo-eligibility.ts` calls both space helpers
+// and is where the solo game pool's visibility floor is written, so it belongs in the scan for
+// exactly the reason the derivation glob exists: a space read nobody scans is a space read nobody
+// notices losing its gate.
+const EXTRA_FILES = ['src/utils/database.ts', 'src/utils/game-solo-eligibility.ts'];
 
 // Fork-owned space-scope helpers. A call to any of these IS a space read (they
 // encode the direct/library/album access path). Detected as bare identifiers so a

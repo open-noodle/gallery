@@ -525,25 +525,38 @@ export class GameRepository {
   // ── the solo pool ─────────────────────────────────────────────────────────────────────────
   //
   // The same questions as the space pool, asked of one player's own scope. The three that read
-  // photos are each generated TWICE - see the names on the decorators - because their read arms
-  // are conditional on the player's frozen source toggles, and one generated variant would pin
-  // only one of the two shapes the server actually runs.
+  // photos are each generated THREE times - see the names on the decorators - because their read
+  // arms are conditional on the player's frozen source toggles, and one variant could not pin the
+  // toggles at all.
+  //
+  // The asymmetric `partners only` variant is the load-bearing one. With only (false,false) and
+  // (true,true) generated, an arm gated on the WRONG flag - the space arm reading withPartners, or
+  // a union that tests the wrong field - emits nothing under the first and everything under the
+  // second, exactly like correct code, while a player who enabled only partners silently receives
+  // shared-space photos. Only a variant where the two flags DIFFER can tell those apart.
 
   /**
    * Location-round candidates for a solo player: stage 1 only, ranked by the shared
    * `rankLocationSample` above.
    *
-   * Stage 1's driver is the only thing that differs from the space pool, and it is conditional.
-   * With both toggles off the pool is exactly `asset."ownerId" = me`: one indexed predicate, and
-   * the shape every performance figure in the design was measured against. Turning either toggle
-   * on switches the driver to `soloPoolAssetIdUnion` - see there for why the arms cannot simply
-   * be ORed onto this scan instead.
+   * Stage 1's driver is the only thing that differs from the space pool: `soloPoolAssetIdUnion`
+   * in place of `spaceAssetIdUnion`. See there for the measurements behind it being a union in
+   * every source combination, including the default one.
    */
   @GenerateSql(
     {
       name: 'own library only',
       params: [
         { userId: DummyValue.UUID, withPartners: false, withSpaces: false },
+        DummyValue.NUMBER,
+        DummyValue.STRING,
+        { place: PLACE_PROMPT_EMBEDDING, notPlace: NOT_PLACE_PROMPT_EMBEDDING },
+      ],
+    },
+    {
+      name: 'partners only',
+      params: [
+        { userId: DummyValue.UUID, withPartners: true, withSpaces: false },
         DummyValue.NUMBER,
         DummyValue.STRING,
         { place: PLACE_PROMPT_EMBEDDING, notPlace: NOT_PLACE_PROMPT_EMBEDDING },
@@ -572,13 +585,13 @@ export class GameRepository {
         db
           .selectFrom('asset')
           .innerJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
-          .$if(!poolIds, (qb) => qb.where('asset.ownerId', '=', asUuid(sources.userId)))
-          .$if(!!poolIds, (qb) =>
-            qb.innerJoin(poolIds!.as('pool_asset'), (join) => join.onRef('pool_asset.assetId', '=', 'asset.id')),
-          )
+          // Driven FROM the enabled id sources for the same reason the space pool drives from its
+          // own union - measured, see soloPoolAssetIdUnion. One shape for every source combination,
+          // so there is no branch here that can be restructured into scoping nothing at all.
+          .innerJoin(poolIds.as('pool_asset'), (join) => join.onRef('pool_asset.assetId', '=', 'asset.id'))
           .where('asset.deletedAt', 'is', null)
           .where('asset.type', '=', AssetType.Image)
-          // The floor stays here, ANDed outside whichever driver ran. The id sources answer only
+          // The floor stays here, ANDed outside the id-source union. Those sources answer only
           // "can this player reach the asset" - archived, hidden and locked photos are reachable
           // through them, and this is the one clause that keeps all three out of the pool.
           .where('asset.visibility', '=', AssetVisibility.Timeline)
@@ -612,6 +625,14 @@ export class GameRepository {
       ],
     },
     {
+      name: 'partners only',
+      params: [
+        { userId: DummyValue.UUID, withPartners: true, withSpaces: false },
+        DummyValue.NUMBER,
+        DummyValue.STRING,
+      ],
+    },
+    {
       name: 'all sources',
       params: [{ userId: DummyValue.UUID, withPartners: true, withSpaces: true }, DummyValue.NUMBER, DummyValue.STRING],
     },
@@ -621,13 +642,11 @@ export class GameRepository {
 
     const rows = await this.db
       .selectFrom('asset')
-      .$if(!poolIds, (qb) => qb.where('asset.ownerId', '=', asUuid(sources.userId)))
-      .$if(!!poolIds, (qb) =>
-        qb.innerJoin(poolIds!.as('pool_asset'), (join) => join.onRef('pool_asset.assetId', '=', 'asset.id')),
-      )
+      // Driven FROM the enabled id sources - see getSoloLocationCandidates' stage 1.
+      .innerJoin(poolIds.as('pool_asset'), (join) => join.onRef('pool_asset.assetId', '=', 'asset.id'))
       .where('asset.deletedAt', 'is', null)
       .where('asset.type', '=', AssetType.Image)
-      // The floor stays here, ANDed outside whichever driver ran - see getSoloLocationCandidates.
+      // The floor stays here, ANDed outside the id-source union - see getSoloLocationCandidates.
       .where('asset.visibility', '=', AssetVisibility.Timeline)
       .where('asset.localDateTime', 'is not', null)
       .select(['asset.id as assetId', 'asset.localDateTime as takenAt'])
@@ -657,6 +676,10 @@ export class GameRepository {
     {
       name: 'own library only',
       params: [{ userId: DummyValue.UUID, withPartners: false, withSpaces: false }, DummyValue.UUID],
+    },
+    {
+      name: 'partners only',
+      params: [{ userId: DummyValue.UUID, withPartners: true, withSpaces: false }, DummyValue.UUID],
     },
     {
       name: 'all sources',

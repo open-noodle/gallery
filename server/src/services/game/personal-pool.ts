@@ -34,7 +34,9 @@ export class PersonalPool implements ChallengePool {
     private userId: string,
     sources: { withPartners: boolean; withSpaces: boolean },
   ) {
-    this.sources = { userId, ...sources };
+    // Spread first, id last: the declared type cannot carry a userId, but if it ever grows one a
+    // caller-supplied field must not be able to win over the id this pool was constructed for.
+    this.sources = { ...sources, userId };
   }
 
   // Prefixed rather than the bare id: this string is half of the generation seed, and a bare uuid

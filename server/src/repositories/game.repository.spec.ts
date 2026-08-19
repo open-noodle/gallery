@@ -18,13 +18,16 @@ const queryBlock = (sql: string, method: string): string => {
 
 // ── the solo pool ──────────────────────────────────────────────────────────────────────────────
 //
-// Each solo query is generated TWICE, once per source combination, because the read arms are
-// conditional: `own library only` is what a default player gets, `all sources` is both toggles on.
-// A guard reading only one of them could not tell the difference between "the toggle gates the
-// arm" and "the arm is never there" / "the arm is always there".
+// Each solo query is generated THREE times, once per source combination, because the read arms are
+// conditional: `own library only` is what a default player gets, `all sources` is both toggles on,
+// and `partners only` is the asymmetric case. A guard reading only one could not tell the
+// difference between "the toggle gates the arm" and "the arm is never there" / "the arm is always
+// there"; a guard reading only the two symmetric ones could not tell either of those from an arm
+// gated on the WRONG toggle, which is the leak that matters (partners on, spaces off, shared-space
+// photos drawn anyway).
 const SOLO_QUERIES = ['getSoloLocationCandidates', 'getSoloDateCandidates', 'getSoloEligibleRoundAsset'];
 
-const soloBlock = (method: string, variant: 'own library only' | 'all sources') =>
+const soloBlock = (method: string, variant: 'own library only' | 'partners only' | 'all sources') =>
   queryBlock(readGeneratedSql(), `${method} (${variant})`).replaceAll(/\s+/g, ' ');
 
 /** The `union` arm of a whitespace-collapsed pool subquery that reads `table`. */
@@ -310,6 +313,25 @@ describe('GameRepository', () => {
           ).not.toContain(widened);
         }
 
+        // The asymmetric case: exactly one toggle on. Both symmetric variants above look identical
+        // whether each arm reads its OWN flag or the other one, so this is the only variant that
+        // can catch a cross-wired gate - and a cross-wired gate hands shared-space photos to a
+        // player who opted into partner photos alone.
+        const partnersOnly = soloBlock(method, 'partners only');
+
+        expect(
+          partnersOnly,
+          `GameRepository.${method} lost the partner arm with includePartners ON and\n` +
+            `includeSpaces off. Either the arm is gone, or it is gated on the WRONG toggle.`,
+        ).toContain('"partner"."inTimeline"');
+
+        expect(
+          partnersOnly,
+          `GameRepository.${method} reads shared_space with includeSpaces OFF. The space arm is\n` +
+            `gated on the wrong toggle: a player who opted into partner photos alone is being\n` +
+            `served photos from every space they belong to.`,
+        ).not.toContain('shared_space');
+
         const allSources = soloBlock(method, 'all sources');
         // The four space access paths, plus the partner arm. Losing one is a SAFE error direction
         // (a strict subset) and therefore silent: the player just quietly stops seeing photos from
@@ -344,6 +366,15 @@ describe('GameRepository', () => {
             `GameRepository.${method}'s ${table} arm is not scoped to the player's membership.\n` +
               `Without that predicate the arm returns every space's assets, to every player.`,
           ).toContain('"shared_space_member"."userId" =');
+
+          expect(
+            armFor(block, table),
+            `GameRepository.${method}'s ${table} arm lost the per-member showInTimeline gate, so a\n` +
+              `space the player has hidden from their own timeline feeds the game anyway. That gate\n` +
+              `is the per-space counterpart of partner.inTimeline: includeSpaces is a coarse global\n` +
+              `opt-in, this flag is the finer intent, and the finer one wins. This fork has already\n` +
+              `removed this same gate once (utils/database.ts) and had to restore it.`,
+          ).toContain('"shared_space_member"."showInTimeline" =');
         }
       }
 
@@ -355,6 +386,12 @@ describe('GameRepository', () => {
         'getSoloEligibleRoundAsset resolves a round image with no membership predicate, so a\n' +
           'frozen assetId would serve any space asset to any player.',
       ).toContain('"shared_space_member"."userId" =');
+      expect(
+        roundAsset,
+        'getSoloEligibleRoundAsset lost the per-member showInTimeline gate, so it would serve a\n' +
+          'round image from a space the candidate queries are no longer allowed to draw from - the\n' +
+          'two forms have to express the same set.',
+      ).toContain('"shared_space_member"."showInTimeline" =');
       expect(
         roundAsset,
         "getSoloEligibleRoundAsset lost the partner arm's inTimeline check. The access layer\n" +
