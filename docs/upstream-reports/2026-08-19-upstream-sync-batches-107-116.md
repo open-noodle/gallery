@@ -224,9 +224,55 @@ because it is unrelated to this arc and the file is unchanged since a 10/10-gree
 ## Remote CI Verification
 
 - **Test branch**: `rebase/upstream-rolling-v3.1.1`
-- **Commit validated**: _pending_
+- **Commits validated**: `ef73c1ba48d` (9 workflows) and `1ff89f57dee` (`test.yml`, after the prettier fix).
+  The two differ only by the report document and a whitespace reflow in one server file.
 
-_To be filled in after dispatch._
+| Workflow                              | Status | Commit        | Notes                                                       |
+| ------------------------------------- | ------ | ------------- | ----------------------------------------------------------- |
+| `test.yml`                            | GREEN  | `1ff89f57dee` | 21 jobs; red on the first pass — see the prettier gap below |
+| `docker.yml`                          | GREEN  | `ef73c1ba48d` | builds server/web/cli/ml images                             |
+| `static_analysis.yml`                 | GREEN  | `ef73c1ba48d` | Dart analyze + format + generated-code freshness            |
+| `gallery-build-mobile.yml`            | GREEN  | `ef73c1ba48d` | iOS + Android; green after an infra re-run                  |
+| `gallery-rebase-smoke.yml`            | GREEN  | `ef73c1ba48d` | green after an infra re-run                                 |
+| `storage-migration-tests.yml`         | GREEN  | `ef73c1ba48d` | —                                                           |
+| `storage-migration-e2e.yml`           | GREEN  | `ef73c1ba48d` | green after an infra re-run                                 |
+| `gallery-revert-to-immich-validation` | GREEN  | `ef73c1ba48d` | confirms the `#29303` migration coverage                    |
+| `gallery-ml-smoke.yml`                | GREEN  | `ef73c1ba48d` | —                                                           |
+| `gallery-mobile-smoke.yml`            | GREEN  | `ef73c1ba48d` | green after an infra re-run                                 |
+
+### The one real CI failure — `prettier` is a gate `pnpm lint` does not cover
+
+`Test & Lint Server` failed on `//server:format` (`prettier --check .`) for
+`server/src/services/sync.service.ts`. Propagating **#30764** prepended `await ` to the shared-space
+description send, pushing the call past the 120-char print width.
+
+**The local gate missed it because `pnpm lint` runs eslint only** — formatting is a _separate_ mise task.
+Running `cd server && pnpm lint` and calling the server clean is not sufficient; `npx prettier --check .`
+must be run per package. Verified afterwards across every package: `server`, `web`, `e2e`, `docs` and
+`packages/cli` are clean. `packages/sdk` and `packages/plugin-sdk` report warnings but are **not
+CI-gated** (no `mise.toml`, so no `format` task) and were deliberately left alone —
+`plugin-sdk/src/host-functions.ts` is byte-identical to upstream, and `sdk/src/fetch-client.ts` is the
+generated oazapfts client.
+
+### Infrastructure failures (all confirmed by re-run, none code-related)
+
+- **`extism-js: not found`** killed `gallery-rebase-smoke` and `storage-migration-e2e` on the first pass.
+  Root cause is in the log: `mise WARN Failed to resolve tool version list for github:extism/js-pdk:
+HTTP timed out after 3.00s for https://api.github.com/...`. mise **soft-failed with a WARN**, the build
+  continued without the tool, and died three steps later at a missing binary. `docker.yml` built the same
+  image through the same step successfully, which is what identifies this as transient.
+- **`apt-get install imagemagick` hung** in `Test Branding` — ~70 min on the first pass and ~21 min on the
+  second, green on the third. GitHub's status page reported Actions "operational", and the jobs were on
+  GitHub-hosted `ubuntu-latest` (not the self-hosted runner), so this is localised mirror trouble. While it
+  was blocked, the gate's actual content was verified locally instead of guessed at:
+  `./branding/scripts/gallery-branding-check.sh` exits 0 with no FAIL/ERROR lines (ImageMagick 7.1.2 via
+  Homebrew), so the branding surface was known-good before CI eventually confirmed it.
+- Likely aggravated by dispatching ten workflows at once, several of which build the server image
+  concurrently. The 12-second stagger spaced the _dispatches_, not the _builds_.
+
+**Follow-up worth taking (not done here — it is a fork workflow change, out of scope for a sync):** the
+`Install ImageMagick` step in `test.yml` has no `timeout-minutes`, so a hung apt holds a job slot for
+GitHub's 6-hour default rather than failing fast and becoming re-runnable.
 
 ## Landing
 
