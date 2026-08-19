@@ -74,7 +74,8 @@ void main() {
   group('the already-played skip', () {
     test('drops the nearest occurrence when its UTC day is already played', () {
       final utcDayOfFirst = DateTime(2026, 8, 18, 18).toUtc();
-      final key = '${utcDayOfFirst.year}-'
+      final key =
+          '${utcDayOfFirst.year}-'
           '${utcDayOfFirst.month.toString().padLeft(2, '0')}-'
           '${utcDayOfFirst.day.toString().padLeft(2, '0')}';
 

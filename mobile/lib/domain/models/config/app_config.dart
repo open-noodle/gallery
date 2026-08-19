@@ -7,6 +7,7 @@ import 'package:immich_mobile/domain/models/config/album_config.dart';
 import 'package:immich_mobile/domain/models/config/backup_config.dart';
 import 'package:immich_mobile/domain/models/config/cleanup_config.dart';
 import 'package:immich_mobile/domain/models/config/feature_message_config.dart';
+import 'package:immich_mobile/domain/models/config/games_config.dart';
 import 'package:immich_mobile/domain/models/config/image_config.dart';
 import 'package:immich_mobile/domain/models/config/map_config.dart';
 import 'package:immich_mobile/domain/models/config/nav_config.dart';
@@ -49,6 +50,7 @@ abstract class AppConfig with _$AppConfig {
     @Default(SpaceAlbumsConfig()) SpaceAlbumsConfig spaceAlbums,
     @Default(SpacesConfig()) SpacesConfig spaces,
     @Default(NavConfig()) NavConfig nav,
+    @Default(GamesConfig()) GamesConfig games,
     @Default(BackupConfig()) BackupConfig backup,
     @Default(NetworkConfig()) NetworkConfig network,
     @Default(ShareConfig()) ShareConfig share,
@@ -83,6 +85,9 @@ abstract class AppConfig with _$AppConfig {
             .spacesSortMode => spaces.sortMode,
             .spacesIsReverse => spaces.isReverse,
             .navShowSpaces => nav.showSpaces,
+            .gameDailyReminderEnabled => games.dailyReminderEnabled,
+            .gameDailyReminderMinuteOfDay => games.dailyReminderMinuteOfDay,
+            .gameDailyLastPlayed => games.dailyLastPlayed,
             .backupEnabled => backup.enabled,
             .backupUseCellularForVideos => backup.useCellularForVideos,
             .backupUseCellularForPhotos => backup.useCellularForPhotos,
@@ -146,6 +151,9 @@ abstract class AppConfig with _$AppConfig {
       .spacesSortMode => copyWith(spaces: spaces.copyWith(sortMode: value as SpaceSortMode)),
       .spacesIsReverse => copyWith(spaces: spaces.copyWith(isReverse: value as bool)),
       .navShowSpaces => copyWith(nav: nav.copyWith(showSpaces: value as bool)),
+      .gameDailyReminderEnabled => copyWith(games: games.copyWith(dailyReminderEnabled: value as bool)),
+      .gameDailyReminderMinuteOfDay => copyWith(games: games.copyWith(dailyReminderMinuteOfDay: value as int)),
+      .gameDailyLastPlayed => copyWith(games: games.copyWith(dailyLastPlayed: value as String?)),
       .backupEnabled => copyWith(backup: backup.copyWith(enabled: value as bool)),
       .backupUseCellularForVideos => copyWith(backup: backup.copyWith(useCellularForVideos: value as bool)),
       .backupUseCellularForPhotos => copyWith(backup: backup.copyWith(useCellularForPhotos: value as bool)),
