@@ -64,6 +64,7 @@
   "purchase_panel_info_2": "We're committed not to add paywalls. If you'd like to support Noodle Gallery's ongoing development, reach out to us on Discord.",
   "recently_added_description": "Browse your assets sorted by when they were uploaded to Noodle Gallery",
   "reset_sqlite_done": "App data has been cleared. Please restart Noodle Gallery and log in again.",
+  "search_type_description": "Choose how Noodle Gallery interprets your search: by visual content, file details, or embedded text.",
   "settings_require_restart": "Please restart Noodle Gallery to apply this setting",
   "support_third_party_description": "Your Noodle Gallery installation was packaged by a third-party. Issues you experience may be caused by that package, so please raise issues with them in the first instance using the links below.",
   "sync_upload_album_setting_subtitle": "Create and upload your photos and videos to the selected albums on Noodle Gallery",
