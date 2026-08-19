@@ -106,19 +106,8 @@ class SpaceGamesPage extends HookConsumerWidget {
     }
   }
 
-  /// Scrolls the standings section (whatever state it's currently in — loading, error, or the real
-  /// board) into view. Null-guarded: the key's context is only absent if the section isn't mounted
-  /// at all, which [showStandings] (see `build`) guarantees can't happen whenever `DailySlot` is
-  /// offering the button that calls this.
-  Future<void> _scrollToStandings(GlobalKey key) async {
-    final standingsContext = key.currentContext;
-    if (standingsContext == null) return;
-    await Scrollable.ensureVisible(standingsContext, duration: const Duration(milliseconds: 300));
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final standingsKey = useMemoized(() => GlobalKey());
     final scrollController = useScrollController();
     final creating = useState(false);
 
@@ -178,35 +167,29 @@ class SpaceGamesPage extends HookConsumerWidget {
               canEdit: canEdit,
               onDecide: (value) => _decideDaily(context, ref, value),
               onPlay: () => unawaited(play(dailyChallenge!.id)),
-              onStandings: () => _scrollToStandings(standingsKey),
+              // No route to offer: this page already shows the board, immediately below.
+              onStandings: null,
             ),
             const SizedBox(height: 16),
             if (showStandings) ...[
-              // Keyed on the wrapper, not on `StandingsSection` itself, so `standingsKey` resolves
-              // to a real context in every one of the three states below — a tap on
-              // `daily-standings` must have somewhere to scroll to even while standings are still
-              // loading or failed to load, not just once they resolve.
-              KeyedSubtree(
-                key: standingsKey,
-                child: standings.when(
-                  loading: () => const Padding(
-                    key: Key('standings-loading'),
-                    padding: EdgeInsets.symmetric(vertical: 24),
-                    child: Center(child: CircularProgressIndicator()),
+              standings.when(
+                loading: () => const Padding(
+                  key: Key('standings-loading'),
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+                error: (_, _) => Center(
+                  child: FilledButton(
+                    key: const Key('standings-retry'),
+                    onPressed: () => ref.invalidate(gameStandingsProvider(spaceId)),
+                    child: Text('retry'.t(context: context)),
                   ),
-                  error: (_, _) => Center(
-                    child: FilledButton(
-                      key: const Key('standings-retry'),
-                      onPressed: () => ref.invalidate(gameStandingsProvider(spaceId)),
-                      child: Text('retry'.t(context: context)),
-                    ),
-                  ),
-                  data: (month) => StandingsSection(
-                    today: todayBoard?.valueOrNull,
-                    todayRoundCount: dailyChallenge?.roundCount.toInt() ?? 0,
-                    month: month,
-                    currentUserId: currentUserId,
-                  ),
+                ),
+                data: (month) => StandingsSection(
+                  today: todayBoard?.valueOrNull,
+                  todayRoundCount: dailyChallenge?.roundCount.toInt() ?? 0,
+                  month: month,
+                  currentUserId: currentUserId,
                 ),
               ),
               const SizedBox(height: 16),
