@@ -94,6 +94,7 @@ void main() {
         score: 3640,
         offsetDays: 150,
         answer: GameRoundDetailResponseDtoAnswer(date: DateTime.utc(2019, 12, 1), lat: null, lon: null),
+        guessDate: DateTime.utc(2019, 7, 1),
       ),
     );
 
@@ -101,6 +102,48 @@ void main() {
     expect(find.byKey(const Key('round-reveal-map')), findsNothing);
     // Proves the {offset} placeholder actually resolved (pre-formatted "150 days").
     expect(find.textContaining('150 days'), findsOneWidget);
+  });
+
+  // The strip used to carry at most the offset and the answer month: the player's own guess was
+  // never plumbed onto RoundResult at all, so "150 days off" was a number with nothing to check
+  // it against. Both markers, both labelled.
+  testWidgets('a date reveal shows the guess and the answer, both labelled', (tester) async {
+    await pump(
+      tester,
+      RoundResult(
+        type: GameRoundType.date,
+        score: 3640,
+        offsetDays: 150,
+        answer: GameRoundDetailResponseDtoAnswer(date: DateTime.utc(2019, 12, 1), lat: null, lon: null),
+        guessDate: DateTime.utc(2019, 7, 1),
+      ),
+    );
+
+    expect(find.byKey(const Key('round-reveal-date-guess')), findsOneWidget);
+    expect(find.byKey(const Key('round-reveal-date-answer')), findsOneWidget);
+    expect(find.text('July 2019'), findsOneWidget, reason: 'The month the player picked');
+    expect(find.text('December 2019'), findsOneWidget, reason: 'The month the photo was actually taken');
+    // The labels come from the existing game_guess/game_actual keys web's reveal already uses;
+    // asserting the resolved text catches a raw key left on screen by a bad lookup.
+    expect(find.text('Guess'), findsOneWidget);
+    expect(find.text('Actual'), findsOneWidget);
+  });
+
+  testWidgets('a date reveal with no guess of ours still shows the answer', (tester) async {
+    // The 409 recovery path for a date round: that request never reached the server, so there is
+    // no guess to mark — the same asymmetry RevealMap handles for location rounds.
+    await pump(
+      tester,
+      RoundResult(
+        type: GameRoundType.date,
+        score: 900,
+        answer: GameRoundDetailResponseDtoAnswer(date: DateTime.utc(2019, 12, 1), lat: null, lon: null),
+      ),
+    );
+
+    expect(find.byKey(const Key('round-reveal-date-guess')), findsNothing);
+    expect(find.byKey(const Key('round-reveal-date-answer')), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('a 409 recovery renders with no guess pin and does not throw', (tester) async {
@@ -125,10 +168,7 @@ void main() {
     // refetch fails, so the round's answer never arrives). round_reveal.widget.dart must pass
     // that null straight through to RevealMap rather than substituting (0, 0) — substituting
     // would draw the "actual location" circle at Null Island as if it were the real answer.
-    await pump(
-      tester,
-      const RoundResult(type: GameRoundType.location, score: 2200, guess: (lat: 48.85, lon: 2.35)),
-    );
+    await pump(tester, const RoundResult(type: GameRoundType.location, score: 2200, guess: (lat: 48.85, lon: 2.35)));
 
     expect(find.byKey(const Key('round-reveal-score')), findsOneWidget);
     expect(tester.takeException(), isNull);
