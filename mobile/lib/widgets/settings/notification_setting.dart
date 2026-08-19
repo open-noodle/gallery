@@ -24,8 +24,21 @@ class NotificationSetting extends HookConsumerWidget {
     final permissionService = ref.watch(notificationPermissionProvider);
     final hasPermission = permissionService == PermissionStatus.granted;
 
-    final reminderEnabled = useValueNotifier(ref.read(appConfigProvider).read(SettingsKey.gameDailyReminderEnabled));
-    final reminderMinute = useValueNotifier(ref.read(appConfigProvider).read(SettingsKey.gameDailyReminderMinuteOfDay));
+    // Watched, not read, and re-seeded whenever the stored value changes (the `[value]` keys).
+    // `useValueNotifier` creates a notifier but does NOT subscribe the widget to it, so a notifier
+    // seeded once from `ref.read` paints the switch and the time row exactly once and never again:
+    // the tap would persist the change and reschedule while the row still showed the old value.
+    // Watching `appConfigProvider` is what rebuilds this widget — the same pattern
+    // `AssetListSettings` uses — and the keys make the rendered value follow what was actually
+    // persisted rather than a local copy that can drift from it.
+    final storedEnabled = ref.watch(
+      appConfigProvider.select((config) => config.read(SettingsKey.gameDailyReminderEnabled)),
+    );
+    final storedMinute = ref.watch(
+      appConfigProvider.select((config) => config.read(SettingsKey.gameDailyReminderMinuteOfDay)),
+    );
+    final reminderEnabled = useValueNotifier(storedEnabled, [storedEnabled]);
+    final reminderMinute = useValueNotifier(storedMinute, [storedMinute]);
 
     void openAppNotificationSettings(BuildContext ctx) {
       ctx.pop();
@@ -81,6 +94,9 @@ class NotificationSetting extends HookConsumerWidget {
         subtitle: 'game_daily_reminder_subtitle'.tr(),
         onChanged: (value) async {
           await ref.read(settingsProvider).write(SettingsKey.gameDailyReminderEnabled, value);
+          // The repository updates its in-memory snapshot synchronously on write, so invalidating
+          // is the deterministic repaint — it does not wait on the settings table's watch stream.
+          ref.invalidate(settingsProvider);
           await ref.read(dailyReminderProvider).refresh();
         },
       ),
@@ -96,6 +112,7 @@ class NotificationSetting extends HookConsumerWidget {
           if (picked == null) return;
           reminderMinute.value = picked.hour * 60 + picked.minute;
           await ref.read(settingsProvider).write(SettingsKey.gameDailyReminderMinuteOfDay, reminderMinute.value);
+          ref.invalidate(settingsProvider);
           await ref.read(dailyReminderProvider).refresh();
         },
       ),
