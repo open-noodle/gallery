@@ -215,6 +215,74 @@ void main() {
     expect(find.textContaining(RegExp(r'\d+h \d+m')), findsOneWidget);
   });
 
+  /// Creating runs the candidate queries and a CLIP encode server-side — measured at ~9.6s cold on
+  /// a real library — and until it returns the page showed nothing at all. These pin the wait being
+  /// visible, and the control being shut while it runs: without that, a second tap during those ten
+  /// silent seconds creates a second challenge.
+  ///
+  /// `pump()`, never `pumpAndSettle()`, while the spinner is up: it animates forever, so settling
+  /// would time out rather than fail on the assertion.
+  group('while a create is in flight', () {
+    Future<Completer<GameChallengeResponseDto>> startCreate(WidgetTester tester) async {
+      final completer = Completer<GameChallengeResponseDto>();
+      final repository = _MockGameApiRepository();
+      when(
+        () => repository.createChallenge(
+          any(),
+          roundCount: any(named: 'roundCount'),
+          type: any(named: 'type'),
+        ),
+      ).thenAnswer((_) => completer.future);
+
+      await pump(tester, canEdit: true, extraOverrides: [gameApiRepositoryProvider.overrideWithValue(repository)]);
+
+      await tester.tap(find.byKey(const Key('space-games-create')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('create-submit')));
+      await tester.pump();
+      return completer;
+    }
+
+    testWidgets('the wait is shown and the create control is disabled', (tester) async {
+      final completer = await startCreate(tester);
+
+      expect(find.byKey(const Key('space-games-creating')), findsOneWidget);
+      final button = tester.widget<IconButton>(find.byKey(const Key('space-games-create')));
+      expect(button.onPressed, isNull, reason: 'a second tap here would create a second challenge');
+
+      completer.complete(
+        GameChallengeResponseDto(
+          id: 'c9',
+          spaceId: 's1',
+          name: 'c9',
+          roundCount: 5,
+          scaleKm: 1,
+          scaleDays: 1,
+          createdAt: DateTime.utc(2026, 8, 19),
+          dailyOn: null,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('space-games-creating')), findsNothing);
+      expect(tester.widget<IconButton>(find.byKey(const Key('space-games-create'))).onPressed, isNotNull);
+    });
+
+    testWidgets('a failure clears the wait instead of leaving it spinning forever', (tester) async {
+      final completer = await startCreate(tester);
+
+      expect(find.byKey(const Key('space-games-creating')), findsOneWidget);
+
+      completer.completeError(Exception('offline'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('space-games-creating')), findsNothing);
+      expect(tester.widget<IconButton>(find.byKey(const Key('space-games-create'))).onPressed, isNotNull);
+
+      await settleToast(tester);
+    });
+  });
+
   testWidgets('a failed create surfaces a message rather than swallowing the error', (tester) async {
     final repository = _MockGameApiRepository();
     when(
