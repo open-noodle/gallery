@@ -7,11 +7,21 @@ import { beforeAll, describe, expect, it } from 'vitest';
 /**
  * The game pool must never surface an asset the owner has taken out of their timeline.
  *
- * These are characterization tests: they pass against the unmodified tree. Their job is to fail
- * when a future refactor drops the `visibility = 'timeline'` clause from eligibleSpaceAsset - the
- * clause is the ONLY thing excluding archived, hidden and locked assets, and none of the helpers
- * the predicate is built from exclude them on their own (spaceVisibilityGate admits archive,
- * checkPartnerAccess admits hidden, checkAlbumAccess gates on nothing).
+ * These are characterization tests: they pass against the unmodified tree. Every fixture asset in
+ * this file is a generated 1x1 PNG with no EXIF GPS, so `GameRepository.getLocationCandidates`'
+ * INNER JOIN on `asset_exif`'s lat/lon always excludes them, and every challenge this suite
+ * generates comes back as date rounds - meaning it only ever exercises
+ * `GameRepository.getDateCandidates`' visibility exclusion. `getLocationCandidates`' own sample
+ * stage and `getEligibleRoundAsset`'s correlated predicate carry two further, independent copies
+ * of that same exclusion that no fixture here can reach; those are pinned instead by the static
+ * guard in `game.repository.spec.ts` ("excludes archived, hidden and locked assets at all three
+ * independent sites").
+ *
+ * The exclusion does real work: the space-membership machinery these queries drive from - the
+ * directly-added-asset, linked-library and linked-album access paths - only answers "is this
+ * asset reachable through the space", never "is it currently showable". None of those paths
+ * filter on the asset's visibility at all, so it is carried entirely by one separate predicate on
+ * the asset's own visibility column, independently ANDed in on top.
  */
 describe('/games (visibility negatives)', () => {
   let owner: LoginResponseDto;
@@ -81,9 +91,10 @@ describe('/games (visibility negatives)', () => {
       // The generator could only fill one round, because the other photo is excluded.
       expect(
         challenge.roundCount,
-        `A ${visibility} asset was drawn into the pool. eligibleSpaceAsset lost its\n` +
-          `visibility = 'timeline' clause - that clause is the only thing excluding archived,\n` +
-          `hidden and locked assets from the game.`,
+        `A ${visibility} asset was drawn into the pool. GameRepository.getDateCandidates lost its\n` +
+          `visibility exclusion - the one of three independent copies of that exclusion this\n` +
+          `fixture-based test can reach, since it has no EXIF GPS and every generated round here\n` +
+          `is a date round. See game.repository.spec.ts for the other two.`,
       ).toBe(1);
 
       const assetIds = await revealedAssetIds(challenge.id);

@@ -9,11 +9,20 @@
 // `album.deletedAt IS NULL` guard ("A1 invariant") and, on timeline surfaces, the
 // `shared_space_album.showInTimeline = true` gate.
 //
-// This module encodes that album path — and the A1 invariant — exactly ONCE.
-// Every call site routes its album leg through `spaceAlbumAssetExists` (used
-// positively for read/scope, or negated via `eb.not(...)` for "no other space
-// path" face cleanup). Because the module is fork-only, an upstream rebase never
-// touches it; each upstream call site shrinks to a single, stable helper call.
+// This module encodes that album path — and the A1 invariant — in TWO places, not
+// one. `spaceAlbumAssetExists` is the EXISTS/per-row form nearly every call site
+// routes its album leg through (positively for read/scope, or negated via
+// `eb.not(...)` for "no other space path" face cleanup). `spaceAssetIdUnion` is a
+// second, hand-written encoding of the same path, used only when driving FROM the
+// space's membership rows instead of testing membership per candidate row (see its
+// own doc comment for why that split exists). Because the module is fork-only, an
+// upstream rebase never touches it; each upstream call site still shrinks to a
+// single, stable helper call — only `spaceAssetIdUnion`'s callers carry the second
+// copy. The two encodings are pinned separately, not against each other: the
+// static SQL-shape guard in game.repository.spec.ts pins `spaceAssetIdUnion`'s
+// emitted arms directly, and this file's own guard.spec.ts pins that a
+// `shared_space_library` reference in a scanned file always has album coverage
+// nearby, so a future call site can't lose the album leg silently.
 //
 // See docs / data/sa-abstraction-spec-t8/report.md for the full design + slices.
 import { Expression, ExpressionBuilder, Kysely, RawBuilder, ReferenceExpression, sql, SqlBool } from 'kysely';
@@ -425,19 +434,26 @@ export function spaceAssetPathBranches(
  *
  * `union` (not `union all`) because the paths overlap: an asset can be both directly added and
  * present through a linked album.
+ *
+ * `requireShowInTimeline` defaults to `true` here, unlike `spaceAssetPathBranches` (whose default
+ * is `false`) - both current callers (`GameRepository`'s candidate queries) are timeline surfaces,
+ * so this keeps their call sites unchanged. The two album arms below hardcode the flag onto their
+ * own `shared_space_album.showInTimeline` filter with no other escape hatch, so a non-timeline
+ * consumer MUST pass `requireShowInTimeline: false` explicitly rather than relying on the default.
  */
-export function spaceAssetIdUnion(db: Kysely<DB>, spaceId: string) {
+export function spaceAssetIdUnion(db: Kysely<DB>, spaceId: string, options: { requireShowInTimeline?: boolean } = {}) {
+  const requireShowInTimeline = options.requireShowInTimeline ?? true;
   return db
     .selectFrom('shared_space_asset')
     .select('shared_space_asset.assetId as assetId')
-    .where('shared_space_asset.spaceId', '=', spaceId)
+    .where('shared_space_asset.spaceId', '=', asUuid(spaceId))
     .union(
       db
         .selectFrom('asset')
         .innerJoin('shared_space_library', (join) =>
           join
             .onRef('shared_space_library.libraryId', '=', 'asset.libraryId')
-            .on('shared_space_library.spaceId', '=', spaceId),
+            .on('shared_space_library.spaceId', '=', asUuid(spaceId)),
         )
         .select('asset.id as assetId'),
     )
@@ -449,8 +465,8 @@ export function spaceAssetIdUnion(db: Kysely<DB>, spaceId: string) {
           join.onRef('album.id', '=', 'shared_space_album.albumId').on('album.deletedAt', 'is', null),
         )
         .select('album_asset.assetId as assetId')
-        .where('shared_space_album.spaceId', '=', spaceId)
-        .where('shared_space_album.showInTimeline', '=', true),
+        .where('shared_space_album.spaceId', '=', asUuid(spaceId))
+        .$if(requireShowInTimeline, (qb) => qb.where('shared_space_album.showInTimeline', '=', true)),
     )
     .union(
       db
@@ -464,8 +480,8 @@ export function spaceAssetIdUnion(db: Kysely<DB>, spaceId: string) {
           join.onRef('album.id', '=', 'shared_space_album.albumId').on('album.deletedAt', 'is', null),
         )
         .select('album_space_asset.assetId as assetId')
-        .where('shared_space_album.spaceId', '=', spaceId)
-        .where('shared_space_album.showInTimeline', '=', true),
+        .where('shared_space_album.spaceId', '=', asUuid(spaceId))
+        .$if(requireShowInTimeline, (qb) => qb.where('shared_space_album.showInTimeline', '=', true)),
     );
 }
 
