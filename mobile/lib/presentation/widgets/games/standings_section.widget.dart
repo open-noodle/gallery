@@ -42,20 +42,23 @@ class StandingsRow extends StatelessWidget {
 /// Neither board is sorted here. GameService already applies `compareStandings` before responding,
 /// and re-sorting by total would break the rule that a member who played and scored zero still
 /// outranks one who never turned up.
+///
+/// Every entry the server returned is rendered, with no cross-check against the space's member
+/// list. Web filters on membership only to resolve an avatar; [StandingsRow] shows a rank, the
+/// name the server already sent and a score — no avatar — so a lookup would buy nothing here
+/// except a silently empty board whenever the member list happened to be slow, stale or failed.
 class StandingsSection extends StatefulWidget {
   const StandingsSection({
     super.key,
     required this.today,
     required this.todayRoundCount,
     required this.month,
-    required this.members,
     required this.currentUserId,
   });
 
   final GameLeaderboardResponseDto? today;
   final int todayRoundCount;
   final GameStandingsResponseDto month;
-  final List<SharedSpaceMemberResponseDto> members;
   final String currentUserId;
 
   @override
@@ -71,40 +74,37 @@ class _StandingsSectionState extends State<StandingsSection> {
     // Falls back to the monthly board whenever there is no daily, so the section always shows the
     // thing the player can act on.
     final showToday = hasToday && _showToday;
-    final memberIds = {for (final member in widget.members) member.userId};
 
     final rows = showToday
         ? [
             for (final entry in widget.today!.entries)
-              if (memberIds.contains(entry.userId))
-                (
-                  userId: entry.userId,
-                  name: entry.name,
-                  total: entry.total,
-                  played: entry.answered,
-                  detail: entry.answered == 0
-                      ? 'game_not_played'.t(context: context)
-                      : 'game_rounds_answered'.t(
-                          context: context,
-                          args: {'answered': '${entry.answered}', 'total': '${widget.todayRoundCount}'},
-                        ),
-                ),
+              (
+                userId: entry.userId,
+                name: entry.name,
+                total: entry.total,
+                played: entry.answered,
+                detail: entry.answered == 0
+                    ? 'game_not_played'.t(context: context)
+                    : 'game_rounds_answered'.t(
+                        context: context,
+                        args: {'answered': '${entry.answered}', 'total': '${widget.todayRoundCount}'},
+                      ),
+              ),
           ]
         : [
             for (final entry in widget.month.entries)
-              if (memberIds.contains(entry.userId))
-                (
-                  userId: entry.userId,
-                  name: entry.name,
-                  total: entry.total,
-                  played: entry.daysPlayed,
-                  // `game_days_played` is an ICU plural keyed on `count`, so it takes a NUMBER
-                  // under `count` — not a pre-stringified `days`. A wrong arg name renders the raw
-                  // key, silently.
-                  detail: entry.daysPlayed == 0
-                      ? 'game_not_played'.t(context: context)
-                      : 'game_days_played'.t(context: context, args: {'count': entry.daysPlayed}),
-                ),
+              (
+                userId: entry.userId,
+                name: entry.name,
+                total: entry.total,
+                played: entry.daysPlayed,
+                // `game_days_played` is an ICU plural keyed on `count`, so it takes a NUMBER
+                // under `count` — not a pre-stringified `days`. A wrong arg name renders the raw
+                // key, silently.
+                detail: entry.daysPlayed == 0
+                    ? 'game_not_played'.t(context: context)
+                    : 'game_days_played'.t(context: context, args: {'count': entry.daysPlayed}),
+              ),
           ];
 
     final ranks = competitionRanks([for (final row in rows) row.total]);

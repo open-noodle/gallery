@@ -104,7 +104,6 @@ void main() {
       currentUserProvider.overrideWith((ref) => _StubCurrentUserNotifier(_user('u1'))),
       gameDailyProvider('s1').overrideWith((ref) async => null),
       gameStandingsProvider('s1').overrideWith((ref) async => GameStandingsResponseDto(month: '2026-08', entries: [])),
-      sharedSpaceMembersProvider('s1').overrideWith((ref) async => []),
       if (challengesError != null)
         gameChallengesProvider('s1').overrideWith((ref) async => throw challengesError)
       else
@@ -148,8 +147,8 @@ void main() {
 
   testWidgets('other provider failures degrade gracefully rather than crashing the page', (tester) async {
     // `gameChallengesProvider` — the only provider that gates the body — succeeds here, but the
-    // space, its members, the monthly standings and the daily all fail. None of those should throw
-    // past `.valueOrNull`/`.orElse(null)`, so the challenge list must still render untouched.
+    // space, the monthly standings and the daily all fail. None of those should throw past
+    // `.valueOrNull`/`.orElse(null)`, so the challenge list must still render untouched.
     await pump(
       tester,
       canEdit: false,
@@ -157,7 +156,6 @@ void main() {
       extraOverrides: [
         sharedSpaceProvider('s1').overrideWith((ref) async => throw Exception('offline')),
         gameStandingsProvider('s1').overrideWith((ref) async => throw Exception('offline')),
-        sharedSpaceMembersProvider('s1').overrideWith((ref) async => throw Exception('offline')),
         gameDailyProvider('s1').overrideWith((ref) async => throw Exception('offline')),
       ],
     );
@@ -202,19 +200,6 @@ void main() {
           (ref) async => GameLeaderboardResponseDto(
             entries: [GameLeaderboardResponseDtoEntriesInner(userId: 'u1', name: 'Alice', total: 4200, answered: 5)],
           ),
-        ),
-        sharedSpaceMembersProvider('s1').overrideWith(
-          (ref) async => [
-            SharedSpaceMemberResponseDto(
-              userId: 'u1',
-              name: 'Alice',
-              email: 'alice@example.com',
-              role: SharedSpaceRole.owner,
-              joinedAt: '2026-08-01T00:00:00Z',
-              sharePersonMetadata: true,
-              showInTimeline: true,
-            ),
-          ],
         ),
       ],
     );
@@ -314,7 +299,6 @@ void main() {
         ),
         gameDailyProvider('s1').overrideWith((ref) async => daily),
         gameLeaderboardProvider('daily-1').overrideWith((ref) async => GameLeaderboardResponseDto(entries: [])),
-        sharedSpaceMembersProvider('s1').overrideWith((ref) async => []),
         // Never resolves, on purpose: proves the section renders its OWN loading state instead of
         // vanishing from the tree while standings are still in flight.
         gameStandingsProvider('s1').overrideWith((ref) => Completer<GameStandingsResponseDto>().future),

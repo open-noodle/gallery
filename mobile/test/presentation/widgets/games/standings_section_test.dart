@@ -5,16 +5,6 @@ import 'package:openapi/api.dart';
 
 import '../../../widget_tester_extensions.dart';
 
-SharedSpaceMemberResponseDto _member(String id) => SharedSpaceMemberResponseDto(
-  userId: id,
-  name: id,
-  email: '$id@example.com',
-  role: SharedSpaceRole.viewer,
-  joinedAt: '2026-01-01T00:00:00Z',
-  sharePersonMetadata: true,
-  showInTimeline: true,
-);
-
 void main() {
   // Deliberately "wrongly sorted looking": a zero-score player ABOVE a never-played one. That is
   // exactly what the server sends, and any client-side re-sort by total would reorder these two.
@@ -28,15 +18,8 @@ void main() {
     ],
   );
 
-  Future<void> pump(WidgetTester tester, {GameLeaderboardResponseDto? today}) => tester.pumpConsumerWidget(
-    StandingsSection(
-      today: today,
-      todayRoundCount: 5,
-      month: month,
-      members: [_member('a'), _member('b'), _member('c'), _member('d')],
-      currentUserId: 'a',
-    ),
-  );
+  Future<void> pump(WidgetTester tester, {GameLeaderboardResponseDto? today}) =>
+      tester.pumpConsumerWidget(StandingsSection(today: today, todayRoundCount: 5, month: month, currentUserId: 'a'));
 
   // No `today` is passed, so there are no tabs and the monthly board renders directly. Tapping a
   // tab here would fail: the segmented button only exists when a daily exists.
@@ -168,13 +151,7 @@ void main() {
       );
 
       await tester.pumpConsumerWidget(
-        StandingsSection(
-          today: null,
-          todayRoundCount: 5,
-          month: nonMonotonic,
-          members: [_member('x'), _member('y')],
-          currentUserId: 'x',
-        ),
+        StandingsSection(today: null, todayRoundCount: 5, month: nonMonotonic, currentUserId: 'x'),
       );
 
       final rows = tester.widgetList(find.byType(StandingsRow)).cast<StandingsRow>().toList();
@@ -186,11 +163,20 @@ void main() {
     },
   );
 
-  testWidgets('an entry with no matching member is skipped rather than rendered nameless', (tester) async {
-    await tester.pumpConsumerWidget(
-      StandingsSection(today: null, todayRoundCount: 5, month: month, members: [_member('a')], currentUserId: 'a'),
-    );
+  // Replaces an assertion that the previous behaviour was correct: entries used to be dropped
+  // unless they matched the space's member list, which meant a slow, stale or failed
+  // `sharedSpaceMembersProvider` rendered the heading and tabs above an empty board — no error, no
+  // retry, no rows. The filter bought nothing on mobile: StandingsRow shows a rank, the name the
+  // server already sent and a score, and no avatar (the only thing web's member lookup resolves).
+  testWidgets('renders every entry the server returned, member list or not', (tester) async {
+    await pump(tester);
 
-    expect(find.byType(StandingsRow), findsNWidgets(1));
+    expect(
+      find.byType(StandingsRow),
+      findsNWidgets(4),
+      reason: 'A member-list cross-check would silently drop real players whenever that list did not load',
+    );
+    expect(find.text('Ana'), findsOneWidget);
+    expect(find.text('Di'), findsOneWidget);
   });
 }
