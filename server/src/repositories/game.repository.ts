@@ -236,8 +236,14 @@ const eligibleSpaceAsset = (eb: ExpressionBuilder<DB, keyof DB>, spaceId: string
  *
  * Never `random()`: Postgres re-evaluates it per query, so the same seed could draw from a
  * different candidate SET on every call and the service's seeded sampling would mean nothing.
+ *
+ * Takes the column reference rather than hardcoding one: `getLocationCandidates` hashes
+ * `"asset"."id"` in stage 1's sample CTE and `"sample"."assetId"` in stage 2's tiebreak, and both
+ * have to hash the SAME underlying id the same way for the no-`scenePrompts` path to be exactly
+ * the pre-two-stage query - a second hand-rolled copy of this expression is how the two could
+ * silently drift apart.
  */
-const seededOrder = (seed: string) => sql`md5("asset"."id"::text || ${seed})`;
+const seededOrder = (seed: string, ref: 'asset.id' | 'sample.assetId') => sql`md5(${sql.ref(ref)}::text || ${seed})`;
 
 @Injectable()
 export class GameRepository {
@@ -304,6 +310,13 @@ export class GameRepository {
           // below) is what the sample is drawn FROM, so it has to apply before the LIMIT, not
           // after.
           //
+          // The face gate deliberately does NOT live here - it runs in stage 2, against the
+          // sample only (see the NOT EXISTS block below for why). That means CANDIDATE_POOL_LIMIT
+          // (200, in game.service.ts) is the top of the GATED SUBSET of this LOCATION_SAMPLE_SIZE
+          // (4,000-row) sample, not of the full eligible set: in a space with more than 4,000 GPS
+          // photos and a low gate pass rate, this can return fewer than 200 candidates where the
+          // old exhaustive form always filled the pool.
+          //
           // Driven FROM the space's membership rows, not tested per asset row: the correlated
           // `eligibleSpaceAsset` form made this scan the whole asset table for every space,
           // however small the space. The union is built off `this.db` (like the four-way union
@@ -327,7 +340,7 @@ export class GameRepository {
             'asset.localDateTime as takenAt',
             'asset_exif.country as country',
           ])
-          .orderBy(seededOrder(seed))
+          .orderBy(seededOrder(seed, 'asset.id'))
           .limit(LOCATION_SAMPLE_SIZE),
       )
       // Stage 2: rank just the sample. The vector join and the face gate only ever touch these
@@ -380,8 +393,10 @@ export class GameRepository {
       // generation seed only controls which of these candidates get picked, not the SQL order
       // they arrive in - an unstable tie order would silently defeat that determinism. Seeded
       // rather than `asset.id asc` so the tie group (and the whole pool, when the CLIP ordering
-      // above is skipped) is not frozen to the same lowest-id prefix for every challenge.
-      .orderBy(sql`md5("sample"."assetId"::text || ${seed})`)
+      // above is skipped) is not frozen to the same lowest-id prefix for every challenge. Through
+      // seededOrder (not a second hand-rolled hash) so this can never drift from stage 1's - their
+      // being identical is what makes the no-scenePrompts path exactly the pre-two-stage query.
+      .orderBy(seededOrder(seed, 'sample.assetId'))
       .limit(limit)
       .execute();
 
@@ -411,7 +426,7 @@ export class GameRepository {
       .where('asset.visibility', '=', AssetVisibility.Timeline)
       .where('asset.localDateTime', 'is not', null)
       .select(['asset.id as assetId', 'asset.localDateTime as takenAt'])
-      .orderBy(seededOrder(seed))
+      .orderBy(seededOrder(seed, 'asset.id'))
       .limit(limit)
       .execute();
 
@@ -419,9 +434,11 @@ export class GameRepository {
   }
 
   /**
-   * The preview file of a round's asset, resolved through the SAME eligibility predicate the
-   * candidate queries use - not `AssetRepository.getById`, which applies no `deletedAt`, no
-   * visibility and no space predicate at all.
+   * The preview file of a round's asset, resolved through `eligibleSpaceAsset` - the correlated
+   * per-asset form of the same eligibility the candidate queries express as a space-driven union
+   * (equivalent, not literally the same query; see the two-forms note above `eligibleSpaceAsset`,
+   * ~line 186) - not `AssetRepository.getById`, which applies no `deletedAt`, no visibility and no
+   * space predicate at all.
    *
    * Rounds are frozen by design (§4.1), so a round's `assetId` is permanent; without this the
    * round-image route honoured that forever and kept serving a photo the owner had since

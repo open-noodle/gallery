@@ -120,9 +120,15 @@ const utcMonthBounds = (now: Date) => {
 
 /**
  * Candidates fetched per pool per generation - and, for the location pool, **the scene gate's
- * cutoff**: `getLocationCandidates` ranks by the CLIP place-minus-not-place score and truncates
- * exactly here, so this number is the boundary between "ranked into the pool" and "excluded by
- * the gate entirely".
+ * cutoff among the sampled rows**: `getLocationCandidates` ranks the rows stage 1 sampled by the
+ * CLIP place-minus-not-place score and truncates exactly here.
+ *
+ * It is no longer the whole boundary between "ranked into the pool" and "excluded by the gate
+ * entirely" - a row can now also be excluded for never having been in the LOCATION_SAMPLE_SIZE
+ * (4,000-row) sample stage 1 draws before this limit ever gets a look at it (see
+ * game.repository.ts). Read the two constants together: raising this one past
+ * LOCATION_SAMPLE_SIZE silently stops doing anything, because stage 1 can never hand stage 2 more
+ * rows than it sampled.
  *
  * It is NOT a variety knob, despite reading like one - that framing is what hid the fact that
  * the gate had no teeth at all while `selectLocationRounds` sampled the pool uniformly. What

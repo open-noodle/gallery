@@ -126,12 +126,11 @@ landed fully warm (`shared hit=51966`, `read=0` on the top-level `Limit` node, e
 `Execution Time` 195.378 ms, 195.728 ms, 179.790 ms, 186.117 ms (mean ≈ 189 ms). 51,966 buffers ×
 8 KiB = 406.0 MB — matching the 406 MB prediction almost exactly and confirming buffers dropped
 **~9.2×** from the ~477,000-buffer pre-change baseline. Warm execution time landed at 180–196 ms,
-above the 143–154 ms design-time estimate but still 2.5–2.9× faster than the 490–532 ms pre-change
+above the 143–154 ms design-time estimate but still 2.5–3.0× faster than the 490–532 ms pre-change
 warm baseline; the gap is attributed to instance load variance rather than a query-shape regression,
 since buffers — the cache-independent metric — matched the prediction almost exactly. Cold was not
 independently re-verified: evicting the production cache to reproduce a genuine cold run was out of
-scope for a read-only check against a live personal instance. Full plan and all four timings are in
-`.superpowers/sdd/2026-08-19-photoguesser-perf-fixes/task-5-report.md`.
+scope for a read-only check against a live personal instance.
 
 ### 4.4 Sample size
 
@@ -153,6 +152,15 @@ photos ranked in the top 37%.
 The trade is real and should be stated plainly: the pool is the top 200 of a random 4,000 rather than
 the global top 200, so it spans global ranks ~1–300 instead of ~1–200. It also _improves_
 cross-challenge variety, which §7.1 of the original design explicitly worried about.
+
+**Caveat on this table's own methodology:** the sweep drew its 4,000-row samples from the 27,227
+rows that had already passed the face gate. The shipped `getLocationCandidates` instead samples
+4,000 rows from the full pre-gate eligible set (all 30,212 GPS photos) and applies the face gate to
+just that sample afterward — see §4.1 ("Stage 2 applies the face gate … to the sample") and the
+stage-1 comment in `game.repository.ts`. So the two 4,000s are drawn from different pools: the
+shipped stage 1 can hand stage 2 fewer than 4,000 gate-surviving rows, which is what makes
+`CANDIDATE_POOL_LIMIT` (200) capable of coming up short of a full 200-candidate pool in a space with
+a low gate pass rate, a case this table cannot show.
 
 ## 5. Architecture
 
