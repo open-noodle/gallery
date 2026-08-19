@@ -1,0 +1,141 @@
+import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/domain/models/settings_key.dart';
+import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
+import 'package:immich_mobile/providers/shared_space.provider.dart';
+import 'package:immich_mobile/utils/daily_reminder_schedule.dart';
+import 'package:openapi/api.dart';
+import 'package:timezone/timezone.dart' as tz;
+
+/// Identifies a reminder tap so `main.dart` can route it without parsing anything.
+const String kDailyReminderPayload = 'game-daily-reminder';
+
+/// Notification ids are fixed and contiguous, so a cancel-then-schedule cycle cannot leave an
+/// orphan behind from a longer previous horizon.
+const int _kFirstNotificationId = 8100;
+
+/// The plugin boundary, behind an interface so the policy above it is testable without a platform
+/// channel.
+abstract class DailyReminderScheduler {
+  Future<void> cancelAll();
+  Future<bool> hasPermission();
+  Future<void> scheduleAt(
+    int id,
+    DateTime instant, {
+    required String title,
+    required String body,
+    required String payload,
+  });
+}
+
+class _PluginScheduler implements DailyReminderScheduler {
+  final FlutterLocalNotificationsPlugin _plugin = FlutterLocalNotificationsPlugin();
+
+  @override
+  Future<void> cancelAll() async {
+    for (var i = 0; i < kDailyReminderHorizonDays; i++) {
+      await _plugin.cancel(_kFirstNotificationId + i);
+    }
+  }
+
+  @override
+  Future<bool> hasPermission() async {
+    final android = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    if (android != null) {
+      return await android.areNotificationsEnabled() ?? false;
+    }
+    final ios = _plugin.resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
+    if (ios != null) {
+      return await ios.requestPermissions(alert: true, badge: false, sound: true) ?? false;
+    }
+    return false;
+  }
+
+  @override
+  Future<void> scheduleAt(
+    int id,
+    DateTime instant, {
+    required String title,
+    required String body,
+    required String payload,
+  }) {
+    return _plugin.zonedSchedule(
+      id,
+      title,
+      body,
+      tz.TZDateTime.from(instant, tz.local),
+      const NotificationDetails(
+        android: AndroidNotificationDetails('game_daily_reminder', 'Daily challenge'),
+        iOS: DarwinNotificationDetails(),
+      ),
+      // Only consulted on iOS versions older than 10, which have no timezone-aware scheduling API;
+      // the instant above is already an absolute TZDateTime everywhere else.
+      uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+      // Inexact on purpose: an exact alarm would need SCHEDULE_EXACT_ALARM on Android 12+, a
+      // manifest permission with Play Store policy attached, and a daily nudge does not need it.
+      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      payload: payload,
+    );
+  }
+}
+
+final dailyReminderSchedulerProvider = Provider<DailyReminderScheduler>((ref) => _PluginScheduler());
+
+final dailyReminderProvider = Provider<DailyReminderController>(DailyReminderController.new);
+
+class DailyReminderController {
+  DailyReminderController(this._ref);
+
+  final Ref _ref;
+
+  /// Recompute and re-apply the whole schedule.
+  ///
+  /// Called on cold start, on resume, and after a daily is finished. Reads no game endpoint: asking
+  /// the server whether today's daily is played would GENERATE it for every opted-in space.
+  Future<void> refresh({DateTime? now}) async {
+    final List<SharedSpaceResponseDto> spaces;
+    try {
+      spaces = await _ref.read(sharedSpacesProvider.future);
+    } catch (_) {
+      // Offline, or the request otherwise failed. Leave whatever is pending in place — cancelling
+      // would silence a reminder because of a transient network failure, for no gain.
+      return;
+    }
+
+    final scheduler = _ref.read(dailyReminderSchedulerProvider);
+    await scheduler.cancelAll();
+
+    final config = _ref.read(appConfigProvider);
+
+    // `dailyChallengeEnabled` is Optional<bool?> and `Absent.value` THROWS, so this must stay
+    // `.orElse(null)`. Absent and null both mean "not opted in".
+    final hasOptedInSpace = spaces.any((space) => space.dailyChallengeEnabled.orElse(null) == true);
+
+    final occurrences = dailyReminderOccurrences(
+      now: now ?? DateTime.now(),
+      minuteOfDay: config.read(SettingsKey.gameDailyReminderMinuteOfDay),
+      enabled: config.read(SettingsKey.gameDailyReminderEnabled),
+      permissionGranted: await scheduler.hasPermission(),
+      hasOptedInSpace: hasOptedInSpace,
+      lastPlayedDate: config.read(SettingsKey.gameDailyLastPlayed),
+    );
+
+    for (var i = 0; i < occurrences.length; i++) {
+      await scheduler.scheduleAt(
+        _kFirstNotificationId + i,
+        occurrences[i],
+        title: 'game_daily_reminder_notification_title'.tr(),
+        body: 'game_daily_reminder_notification_body'.tr(),
+        payload: kDailyReminderPayload,
+      );
+    }
+  }
+
+  /// Records that a daily was finished, then reschedules so today's occurrence drops immediately
+  /// rather than waiting for the next resume.
+  Future<void> recordDailyCompleted(DateTime dailyOn) async {
+    await _ref.read(settingsProvider).write(SettingsKey.gameDailyLastPlayed, dailyKeyFor(dailyOn));
+    await refresh();
+  }
+}
