@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -111,6 +113,15 @@ class SpaceGamesPage extends HookConsumerWidget {
     final daily = ref.watch(gameDailyProvider(spaceId));
     final currentUserId = ref.watch(currentUserProvider)?.id ?? '';
 
+    // Playing changes the daily's answered count, this list's progress and the month's standings,
+    // and the pop lands straight back on all three. They are cached FutureProviders, so without
+    // this refresh the page redraws the pre-play snapshot.
+    Future<void> play(String challengeId) async {
+      await context.pushRoute(GamePlayRoute(challengeId: challengeId));
+      if (!context.mounted) return;
+      invalidateSpaceGames(ref, spaceId);
+    }
+
     // `dailyChallengeEnabled` is `Optional<bool?>` and `Absent.value` THROWS — this must stay
     // `.orElse(null)`, never `.value`.
     final enabled = space.valueOrNull?.dailyChallengeEnabled.orElse(null);
@@ -151,7 +162,7 @@ class SpaceGamesPage extends HookConsumerWidget {
               dailyChallengeEnabled: enabled,
               canEdit: canEdit,
               onDecide: (value) => _decideDaily(context, ref, value),
-              onPlay: () => context.pushRoute(GamePlayRoute(challengeId: dailyChallenge!.id)),
+              onPlay: () => unawaited(play(dailyChallenge!.id)),
               onStandings: () => _scrollToStandings(standingsKey),
             ),
             const SizedBox(height: 16),
@@ -212,7 +223,7 @@ class SpaceGamesPage extends HookConsumerWidget {
                     child: ChallengeCard(
                       challenge: challenge,
                       canDelete: canEdit,
-                      onTap: () => context.pushRoute(GamePlayRoute(challengeId: challenge.id)),
+                      onTap: () => unawaited(play(challenge.id)),
                       onDelete: () => _delete(context, ref, challenge.id),
                     ),
                   ),
