@@ -71,10 +71,23 @@ class SpaceGamesPage extends HookConsumerWidget {
     }
   }
 
-  Future<void> _decideDaily(WidgetRef ref, bool enabled) async {
-    await ref.read(sharedSpaceApiRepositoryProvider).update(spaceId, dailyChallengeEnabled: enabled);
-    ref.invalidate(sharedSpaceProvider(spaceId));
-    ref.invalidate(gameDailyProvider(spaceId));
+  /// Same shape as [_create]/[_delete]: this is wired into `DailySlot.onDecide`, a
+  /// `void Function(bool)`, so the Future is dropped at the call site — without the catch a failed
+  /// PATCH would be an unhandled async error and the prompt would just sit there unchanged.
+  Future<void> _decideDaily(BuildContext context, WidgetRef ref, bool enabled) async {
+    try {
+      await ref.read(sharedSpaceApiRepositoryProvider).update(spaceId, dailyChallengeEnabled: enabled);
+      ref.invalidate(sharedSpaceProvider(spaceId));
+      ref.invalidate(gameDailyProvider(spaceId));
+    } catch (_) {
+      if (context.mounted) {
+        ImmichToast.show(
+          context: context,
+          msg: 'game_daily_toggle_failed'.t(context: context),
+          toastType: ToastType.error,
+        );
+      }
+    }
   }
 
   /// Scrolls the standings section (whatever state it's currently in — loading, error, or the real
@@ -137,7 +150,7 @@ class SpaceGamesPage extends HookConsumerWidget {
               spaceId: spaceId,
               dailyChallengeEnabled: enabled,
               canEdit: canEdit,
-              onDecide: (value) => _decideDaily(ref, value),
+              onDecide: (value) => _decideDaily(context, ref, value),
               onPlay: () => context.pushRoute(GamePlayRoute(challengeId: dailyChallenge!.id)),
               onStandings: () => _scrollToStandings(standingsKey),
             ),
