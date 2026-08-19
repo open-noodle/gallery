@@ -110,16 +110,31 @@ describe('GameRepository', () => {
       //
       // getLocationCandidates and getDateCandidates now DRIVE FROM the space tables (a union of
       // the four paths) rather than scanning asset and testing membership, so each arm is matched
-      // on its own source table plus the spaceId filter that scopes it - not on a correlation
+      // on its own source table AND the spaceId filter that scopes it - not on a correlation
       // predicate against "asset", which the union form no longer has.
+      //
+      // Both halves are load-bearing, and they fail in OPPOSITE directions. Losing the table half
+      // loses an access path: a strict subset, silent, "no photos usable for a challenge" on a
+      // space full of them. Losing the spaceId half WIDENS: an unscoped `shared_space_album` arm
+      // pours every space's linked-album assets into every other space's candidate pool, which is
+      // cross-space photo leakage. Only the subset error is self-reporting, so the guard has to
+      // carry the scoping half itself.
+      //
+      // The gap between the two halves is tempered with `(?:(?!union).)*?` rather than `.*?`
+      // because whitespace is collapsed and the arms sit end to end: a plain lazy gap on the
+      // linked-album arm runs straight through the `union` boundary and matches the CONTRIBUTION
+      // arm's spaceId filter, so deleting the linked-album scoping would still pass. `union` is
+      // the emitted arm separator, so refusing to cross it confines each match to its own arm.
       const drivenArms = {
         'directly added asset': /from "shared_space_asset" where "shared_space_asset"\."spaceId" =/,
         // The library arm drives from `asset` and joins the link table, so its scoping lives in
         // the ON clause rather than a WHERE: `on <libraryId match> and <spaceId filter>`.
         'linked library':
           /"shared_space_library"\."libraryId" = "asset"\."libraryId" and "shared_space_library"\."spaceId" =/,
-        'linked album': /"album_asset"\."albumId" = "shared_space_album"\."albumId"/,
-        'cross-owner album contribution': /"album_space_asset"\."albumId" = "shared_space_album"\."albumId"/,
+        'linked album':
+          /"album_asset"\."albumId" = "shared_space_album"\."albumId"(?:(?!union).)*?"shared_space_album"\."spaceId" =/,
+        'cross-owner album contribution':
+          /"album_space_asset"\."albumId" = "shared_space_album"\."albumId"(?:(?!union).)*?"shared_space_album"\."spaceId" =/,
       };
 
       for (const method of ['getLocationCandidates', 'getDateCandidates']) {
@@ -127,10 +142,13 @@ describe('GameRepository', () => {
         for (const [arm, pattern] of Object.entries(drivenArms)) {
           expect(
             block,
-            `GameRepository.${method} no longer covers the "${arm}" access path. A space populated\n` +
-              `only through that path becomes invisible to the game - zero candidates, and a\n` +
-              `"this space has no photos usable for a challenge" error on a space full of photos.\n` +
-              `Scope stage 1 with spaceAssetIdUnion and regenerate with \`mise sql\`.`,
+            `GameRepository.${method} no longer covers the "${arm}" access path AS SCOPED TO ONE\n` +
+              `SPACE. Either the arm is gone - a space populated only through that path becomes\n` +
+              `invisible to the game, zero candidates and a "this space has no photos usable for a\n` +
+              `challenge" error on a space full of photos - or the arm survived but lost its\n` +
+              `spaceId filter, which is worse: it pours every other space's photos into this\n` +
+              `space's candidate pool. Scope stage 1 with spaceAssetIdUnion and regenerate with\n` +
+              `\`mise sql\`.`,
           ).toMatch(pattern);
         }
       }
