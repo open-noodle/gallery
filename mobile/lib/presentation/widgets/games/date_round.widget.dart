@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:immich_mobile/extensions/translate_extensions.dart';
+import 'package:immich_mobile/presentation/widgets/games/round_progress_hud.widget.dart';
 import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
 import 'package:immich_mobile/utils/image_url_builder.dart';
 import 'package:intl/intl.dart';
@@ -61,6 +62,13 @@ class DateRoundState extends State<DateRound> {
         Image(
           image: RemoteImageProvider(url: getGameRoundImageUrl(widget.challengeId, widget.index)),
           fit: BoxFit.cover,
+        ),
+        // The same HUD LocationRound draws. Without it the progress indicator disappeared on every
+        // date round of a mixed challenge, even though both parameters were already required here.
+        Positioned(
+          top: 8,
+          right: 8,
+          child: RoundProgressHud(roundNumber: widget.roundNumber, roundCount: widget.roundCount),
         ),
         Positioned(
           left: 12,

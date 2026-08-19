@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:immich_mobile/extensions/translate_extensions.dart';
 import 'package:immich_mobile/presentation/widgets/games/guess_map.widget.dart';
+import 'package:immich_mobile/presentation/widgets/games/round_progress_hud.widget.dart';
 import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
 import 'package:immich_mobile/utils/game_format.dart';
 import 'package:immich_mobile/utils/image_url_builder.dart';
@@ -59,7 +60,7 @@ class LocationRoundState extends State<LocationRound> {
               Positioned(
                 top: 8,
                 right: 8,
-                child: _Hud(roundNumber: widget.roundNumber, roundCount: widget.roundCount),
+                child: RoundProgressHud(roundNumber: widget.roundNumber, roundCount: widget.roundCount),
               ),
             ],
           ),
@@ -110,27 +111,6 @@ class LocationRoundState extends State<LocationRound> {
             ),
           ),
       ],
-    );
-  }
-}
-
-class _Hud extends StatelessWidget {
-  const _Hud({required this.roundNumber, required this.roundCount});
-
-  final int roundNumber;
-  final int roundCount;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(8)),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        child: Text(
-          'game_round_progress'.t(context: context, args: {'current': '$roundNumber', 'total': '$roundCount'}),
-          style: const TextStyle(color: Colors.white),
-        ),
-      ),
     );
   }
 }
