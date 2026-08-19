@@ -163,6 +163,45 @@ void main() {
     },
   );
 
+  // The heading and the tabs share one unconstrained Row, so the pair has to fit the phone. The
+  // MONTH selection is the failing case, not Today: Material draws a leading check on the SELECTED
+  // segment, so selecting the longer label ("August 2026" vs "Today") adds the icon's width on top
+  // of the longer text. Reported as a 5.9px overflow on a 402dp iPhone; 360dp is the narrow-phone
+  // class the daily card is also pinned against.
+  group('narrow phone', () {
+    Future<void> pumpNarrow(WidgetTester tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 800);
+      addTearDown(tester.view.reset);
+
+      await tester.pumpConsumerWidget(
+        StandingsSection(
+          today: GameLeaderboardResponseDto(
+            entries: [GameLeaderboardResponseDtoEntriesInner(userId: 'a', name: 'Ana', total: 4000, answered: 5)],
+          ),
+          todayRoundCount: 5,
+          month: month,
+          currentUserId: 'a',
+        ),
+      );
+    }
+
+    testWidgets('the month tab selected does not overflow at 360dp', (tester) async {
+      await pumpNarrow(tester);
+
+      await tester.tap(find.byKey(const Key('standings-tab-month')));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('the Today tab selected does not overflow at 360dp either', (tester) async {
+      await pumpNarrow(tester);
+
+      expect(tester.takeException(), isNull);
+    });
+  });
+
   // Replaces an assertion that the previous behaviour was correct: entries used to be dropped
   // unless they matched the space's member list, which meant a slow, stale or failed
   // `sharedSpaceMembersProvider` rendered the heading and tabs above an empty board — no error, no
