@@ -18,7 +18,10 @@ class ChallengePip extends StatelessWidget {
       margin: const EdgeInsets.only(right: 4),
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: filled ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.surfaceContainerHighest,
+        // White, separated by opacity — not theme colours. These sit on the round photo, where
+        // `surfaceContainerHighest` is near-white and simply disappeared, and `primary` was muddy.
+        // The card's scrim is what makes white reliable here.
+        color: filled ? Colors.white : Colors.white.withValues(alpha: 0.45),
       ),
     );
   }
@@ -79,8 +82,23 @@ class ChallengeCard extends StatelessWidget {
             child: Image(
               image: RemoteImageProvider(url: getGameRoundImageUrl(challenge.id, 0)),
               fit: BoxFit.cover,
-              opacity: const AlwaysStoppedAnimation(0.5),
               errorBuilder: (_, _, _) => const RoundPhotoPlaceholder(),
+            ),
+          ),
+          // The card carries its own contrast instead of bleaching the photo to a flat grey. Dark
+          // at both ends, clear through the middle: the top backs the delete control, the bottom
+          // backs the name and pips, and the photo itself stays vivid. Same shape as the asset
+          // viewer's top bar scrim.
+          const Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Colors.black45, Colors.transparent, Colors.black54],
+                  stops: [0.0, 0.45, 1.0],
+                ),
+              ),
             ),
           ),
           Padding(
@@ -89,7 +107,14 @@ class ChallengeCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                Text(challenge.name),
+                Text(
+                  challenge.name,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(color: Colors.white, fontWeight: FontWeight.w600),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
                 Row(
                   children: [
                     for (var i = 0; i < total; i++)
@@ -105,7 +130,9 @@ class ChallengeCard extends StatelessWidget {
               right: 0,
               child: IconButton(
                 key: Key('challenge-card-delete-${challenge.id}'),
-                icon: const Icon(Icons.delete_outline),
+                // White, like the rest of the content over the photo — the top of the gradient
+                // above is what it reads against.
+                icon: const Icon(Icons.delete_outline, color: Colors.white),
                 onPressed: () => _confirmDelete(context),
               ),
             ),
