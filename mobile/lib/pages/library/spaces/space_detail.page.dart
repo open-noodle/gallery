@@ -417,6 +417,20 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
     context.pushRoute(SpaceGamesRoute(spaceId: widget.spaceId, canEdit: _canEdit));
   }
 
+  /// Plays today's daily, then refreshes what the pop lands back on.
+  ///
+  /// The refresh is the point: the daily is a plain FutureProvider whose cached value survives the
+  /// pop, so without it the card keeps its pre-play snapshot and a finished daily still reads
+  /// "Play" — which also hides the Leaderboard button that is the signposted route to the
+  /// month's standings.
+  Future<void> _playDaily() async {
+    final daily = ref.read(gameDailyProvider(widget.spaceId)).valueOrNull;
+    if (daily == null) return;
+    await context.pushRoute(GamePlayRoute(challengeId: daily.id));
+    if (!mounted) return;
+    invalidateSpaceGames(ref, widget.spaceId);
+  }
+
   // The tri-state itself lives on `_space`, refreshed like any other metadata change; the daily
   // provider is invalidated too so `DailySlot` (which reads it directly) picks up the new value
   // right away instead of waiting for its own next watch.
@@ -512,11 +526,7 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
           dailyChallengeEnabled: dailyChallengeEnabled,
           onDecideDaily: _decideDaily,
           // Today's daily challenge, once opted in and generated server-side.
-          onPlayDaily: () {
-            final daily = ref.read(gameDailyProvider(widget.spaceId)).valueOrNull;
-            if (daily == null) return;
-            context.pushRoute(GamePlayRoute(challengeId: daily.id));
-          },
+          onPlayDaily: () => unawaited(_playDaily()),
           // No standings section lives on the timeline itself — the Challenges page has the one
           // and only leaderboard, so route there.
           onDailyStandings: _navigateToChallenges,
