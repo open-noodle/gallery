@@ -13,7 +13,20 @@
 ## Global Constraints
 
 - These changes fold into **PR #1000, which has not merged**. Do not create a new migration; there is no schema change here at all.
-- Regenerate SQL with **`mise sql`** (from the repo root, or `mise //:sql` elsewhere). **A running database is required** — running it without one deletes every file in `server/src/queries/`. `make sql` is removed and errors out with this instruction.
+- Regenerate SQL with this **exact command**, from the worktree root:
+
+  ```bash
+  DB_HOSTNAME=localhost DB_PORT=5435 DB_USERNAME=postgres DB_PASSWORD=postgres DB_DATABASE_NAME=immich mise sql
+  ```
+
+  **Never run a bare `mise sql`.** Without the env prefix `DB_HOSTNAME` defaults to the
+  docker-internal host `database`, which is unreachable from the host — and a failed connection
+  deletes every file in `server/src/queries/`. The prefix above points it at the running e2e
+  Postgres and was verified before execution began: `Wrote 62 files / Generated 674 queries / Done`,
+  with `git status server/src/queries/` clean afterwards. `make sql` is removed and errors out.
+
+- The Bash working directory **persists between commands** in this harness. Every command in this
+  plan assumes the worktree root; `cd` explicitly rather than relying on where the last one left you.
 - Server unit tests: `cd server && pnpm test -- --run <path>`. **The `<path>` is required** — `pnpm test -- --run` alone silently runs the entire suite.
 - E2E tests: `cd e2e && pnpm test <path>`. **Do not add `--run`** — the e2e `test` script already includes it and adding it again crashes.
 - Sample size is **4,000**, measured. Do not change it without re-running the sweep in §4.4 of the spec.
