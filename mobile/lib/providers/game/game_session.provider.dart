@@ -11,6 +11,10 @@ enum GamePhase { guessing, revealing, finished }
 /// path, where that request never reached the server so there is no guess of ours to plot, and on
 /// every date round, where a guess has no lat/lon to plot in the first place. `guess == null` is
 /// therefore not, by itself, a signal that a 409 occurred.
+///
+/// [guessDate] is the date-round counterpart: the month the player picked, so the reveal can show
+/// their answer next to the real one rather than only the offset between them. Null on every
+/// location round, and on the 409 recovery path for the same reason [guess] is.
 class RoundResult {
   final GameRoundType type;
   final int score;
@@ -18,6 +22,7 @@ class RoundResult {
   final int? offsetDays;
   final GameRoundDetailResponseDtoAnswer? answer;
   final ({double lat, double lon})? guess;
+  final DateTime? guessDate;
 
   const RoundResult({
     required this.type,
@@ -26,6 +31,7 @@ class RoundResult {
     this.offsetDays,
     this.answer,
     this.guess,
+    this.guessDate,
   });
 }
 
@@ -131,8 +137,11 @@ class GameSessionController extends AutoDisposeFamilyAsyncNotifier<GameSessionSt
     guess: (lat: lat, lon: lon),
   );
 
+  /// The picked month is carried through to the reveal as [RoundResult.guessDate]. The server
+  /// echoes it back on [GameGuessResponseDto.guessDate], but the value we sent is what the player
+  /// actually chose and is known even when that echo is absent.
   Future<void> guessDate(DateTime utcMonthStart) =>
-      _submit((current) => _repository.guessDate(arg, current, utcMonthStart: utcMonthStart));
+      _submit((current) => _repository.guessDate(arg, current, utcMonthStart: utcMonthStart), guessDate: utcMonthStart);
 
   /// Never rethrows. The generated client wraps `SocketException`/`TlsException`/`IOException`/
   /// `ClientException` into `ApiException(400, ...)` (see `openapi/lib/api_client.dart`), so a real
@@ -143,6 +152,7 @@ class GameSessionController extends AutoDisposeFamilyAsyncNotifier<GameSessionSt
   Future<void> _submit(
     Future<GameGuessResponseDto> Function(int index) send, {
     ({double lat, double lon})? guess,
+    DateTime? guessDate,
   }) async {
     final current = state.valueOrNull;
     // A real guard, not styling: a double tap's second guess would 409 and overwrite a complete
@@ -160,6 +170,7 @@ class GameSessionController extends AutoDisposeFamilyAsyncNotifier<GameSessionSt
         distanceKm: response.distanceKm?.toDouble(),
         offsetDays: response.offsetDays?.toInt(),
         guess: guess,
+        guessDate: response.guessDate ?? guessDate,
       );
     } on ApiException catch (error) {
       if (error.code == 409) {
@@ -184,6 +195,7 @@ class GameSessionController extends AutoDisposeFamilyAsyncNotifier<GameSessionSt
     double? distanceKm,
     int? offsetDays,
     ({double lat, double lon})? guess,
+    DateTime? guessDate,
   }) async {
     final current = state.requireValue;
     GameChallengeDetailResponseDto challenge = current.challenge;
@@ -211,6 +223,7 @@ class GameSessionController extends AutoDisposeFamilyAsyncNotifier<GameSessionSt
           offsetDays: offsetDays,
           answer: round?.answer.orElse(null),
           guess: guess,
+          guessDate: guessDate,
         ),
       ),
     );

@@ -87,6 +87,9 @@ class RoundReveal extends StatelessWidget {
   }
 }
 
+/// The date round's answer to the location round's map: a tick strip carrying the player's own
+/// guess alongside the real date, each labelled, so the offset above it is something the player
+/// can actually check rather than a number with nothing to compare against.
 class _DateStrip extends StatelessWidget {
   const _DateStrip({required this.result});
 
@@ -95,6 +98,7 @@ class _DateStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final answerDate = result.answer?.date;
+    final guessDate = result.guessDate;
     // `game_you_were_off` takes a single PRE-FORMATTED {offset} with its unit included, mirroring
     // `game_you_were_away`. The day noun comes from the existing generic `cutoff_day` pluraliser
     // rather than a new key — exactly what web's round-result.svelte does.
@@ -106,8 +110,52 @@ class _DateStrip extends StatelessWidget {
       key: const Key('round-reveal-timeline'),
       children: [
         if (offsetLabel != null) Text('game_you_were_off'.t(context: context, args: {'offset': offsetLabel})),
-        if (answerDate != null)
-          Text(DateFormat.yMMMM().format(answerDate.toUtc()), style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 8),
+        const Divider(height: 1),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Both markers are optional for the same reasons the location map's pins are: a 409
+            // recovery has no guess of ours to show, and a failed post-guess refetch leaves the
+            // answer null. Whichever survives is still worth showing on its own.
+            if (guessDate != null)
+              _DateMarker(
+                key: const Key('round-reveal-date-guess'),
+                label: 'game_guess'.t(context: context),
+                date: guessDate,
+              ),
+            if (answerDate != null)
+              _DateMarker(
+                key: const Key('round-reveal-date-answer'),
+                label: 'game_actual'.t(context: context),
+                date: answerDate,
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// One labelled tick on the strip.
+///
+/// Formatted from the UTC date, not the local one: the server grades at month granularity, and
+/// formatting in the viewer's zone would show the previous month to anyone west of Greenwich.
+class _DateMarker extends StatelessWidget {
+  const _DateMarker({super.key, required this.label, required this.date});
+
+  final String label;
+  final DateTime date;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.arrow_drop_up, size: 20),
+        Text(label, style: Theme.of(context).textTheme.labelSmall),
+        Text(DateFormat.yMMMM().format(date.toUtc()), style: Theme.of(context).textTheme.titleMedium),
       ],
     );
   }

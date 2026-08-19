@@ -100,6 +100,40 @@ void main() {
     expect(state.leaderboard, isNotNull);
   });
 
+  test('a date guess carries the picked month through to the reveal', () async {
+    var fetches = 0;
+    when(() => repository.getChallenge('challenge-1')).thenAnswer((_) async {
+      fetches++;
+      return _challenge([
+        if (fetches == 1)
+          _round(0, type: GameRoundType.date)
+        else
+          GameRoundDetailResponseDto(
+            index: 0,
+            type: GameRoundType.date,
+            score: const Optional.present(3640),
+            answer: Optional.present(
+              GameRoundDetailResponseDtoAnswer(date: DateTime.utc(2019, 12, 1), lat: null, lon: null),
+            ),
+          ),
+      ]);
+    });
+    when(
+      () => repository.guessDate(any(), any(), utcMonthStart: any(named: 'utcMonthStart')),
+    ).thenAnswer((_) async => _guessResponse(score: 3640, offsetDays: 150));
+
+    final container = _container(repository);
+    await container.read(gameSessionProvider('challenge-1').future);
+
+    await container.read(gameSessionProvider('challenge-1').notifier).guessDate(DateTime.utc(2019, 7, 1));
+    final result = container.read(gameSessionProvider('challenge-1')).requireValue.result!;
+
+    // Without this the reveal has only the offset — a number with nothing to check it against.
+    expect(result.guessDate, DateTime.utc(2019, 7, 1));
+    expect(result.answer!.date, DateTime.utc(2019, 12, 1));
+    expect(result.offsetDays, 150);
+  });
+
   test('an empty round list is finished rather than out of range', () async {
     when(() => repository.getChallenge('challenge-1')).thenAnswer((_) async => _challenge([]));
 
