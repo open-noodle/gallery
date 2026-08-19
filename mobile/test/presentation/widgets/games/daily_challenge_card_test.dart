@@ -61,12 +61,13 @@ void main() {
     required bool? enabled,
     required bool canEdit,
     GameChallengeListItemResponseDto? daily,
+    void Function(bool enabled)? onDecide,
   }) => tester.pumpConsumerWidget(
     DailySlot(
       spaceId: 's1',
       dailyChallengeEnabled: enabled,
       canEdit: canEdit,
-      onDecide: (_) {},
+      onDecide: onDecide ?? (_) {},
       onPlay: () {},
       onStandings: () {},
     ),
@@ -78,6 +79,28 @@ void main() {
 
     expect(find.byKey(const Key('daily-prompt')), findsOneWidget);
     expect(find.byKey(const Key('daily-card')), findsNothing);
+  });
+
+  // Neither button was tapped by any test before this: swapping the two `onDecide` arguments in
+  // DailyChallengePrompt — turning "No thanks" into "Enable" — used to ship fully green.
+  testWidgets('tapping Enable decides true', (tester) async {
+    final decisions = <bool>[];
+    await pump(tester, enabled: null, canEdit: true, onDecide: decisions.add);
+
+    await tester.tap(find.byKey(const Key('daily-prompt-enable')));
+    await tester.pumpAndSettle();
+
+    expect(decisions, [true]);
+  });
+
+  testWidgets('tapping No thanks decides false', (tester) async {
+    final decisions = <bool>[];
+    await pump(tester, enabled: null, canEdit: true, onDecide: decisions.add);
+
+    await tester.tap(find.byKey(const Key('daily-prompt-decline')));
+    await tester.pumpAndSettle();
+
+    expect(decisions, [false]);
   });
 
   testWidgets('an un-asked space shows a viewer nothing at all', (tester) async {

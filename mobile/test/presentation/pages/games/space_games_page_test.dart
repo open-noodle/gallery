@@ -18,6 +18,7 @@ import 'package:immich_mobile/providers/game/game.provider.dart';
 import 'package:immich_mobile/providers/shared_space.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:immich_mobile/repositories/game_api.repository.dart';
+import 'package:immich_mobile/repositories/shared_space_api.repository.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:openapi/api.dart';
 
@@ -27,6 +28,8 @@ import '../../../widget_tester_extensions.dart';
 class _MockUserService extends Mock implements UserService {}
 
 class _MockGameApiRepository extends Mock implements GameApiRepository {}
+
+class _MockSharedSpaceApiRepository extends Mock implements SharedSpaceApiRepository {}
 
 /// Test-local stand-in for the real [CurrentUserProvider] (mirrors
 /// `shared_space_provider_test.dart`'s `MockCurrentUserProvider`): the real notifier's constructor
@@ -314,6 +317,84 @@ void main() {
     expect(find.byKey(const Key('daily-standings')), findsOneWidget);
     // ...and the section itself is already present to scroll to, mid-load.
     expect(find.byKey(const Key('standings-loading')), findsOneWidget);
+  });
+
+  group('the daily opt-in decision', () {
+    // An un-asked space (`dailyChallengeEnabled` absent) seen by an editor — the one state that
+    // puts DailyChallengePrompt's two buttons on screen.
+    SharedSpaceResponseDto unAskedSpace() => SharedSpaceResponseDto(
+      id: 's1',
+      name: 'Space',
+      createdAt: '2026-08-01T00:00:00Z',
+      updatedAt: '2026-08-01T00:00:00Z',
+      createdById: 'u1',
+      dailyChallengeEnabled: const Optional.absent(),
+    );
+
+    Future<_MockSharedSpaceApiRepository> pumpPrompt(WidgetTester tester, {Object? updateError}) async {
+      final spaces = _MockSharedSpaceApiRepository();
+      if (updateError != null) {
+        when(
+          () => spaces.update(any(), dailyChallengeEnabled: any(named: 'dailyChallengeEnabled')),
+        ).thenThrow(updateError);
+      } else {
+        when(
+          () => spaces.update(any(), dailyChallengeEnabled: any(named: 'dailyChallengeEnabled')),
+        ).thenAnswer((_) async => unAskedSpace());
+      }
+
+      await pump(
+        tester,
+        canEdit: true,
+        extraOverrides: [
+          sharedSpaceProvider('s1').overrideWith((ref) async => unAskedSpace()),
+          sharedSpaceApiRepositoryProvider.overrideWithValue(spaces),
+        ],
+      );
+      expect(find.byKey(const Key('daily-prompt')), findsOneWidget);
+      return spaces;
+    }
+
+    // Nothing used to tap either button, at any level: swapping the two `onDecide` arguments in
+    // DailyChallengePrompt — turning "No thanks" into "Enable" — shipped fully green.
+    testWidgets('Enable reaches the repository with dailyChallengeEnabled: true', (tester) async {
+      final spaces = await pumpPrompt(tester);
+
+      await tester.tap(find.byKey(const Key('daily-prompt-enable')));
+      await tester.pumpAndSettle();
+
+      verify(() => spaces.update('s1', dailyChallengeEnabled: true)).called(1);
+      verifyNever(() => spaces.update('s1', dailyChallengeEnabled: false));
+    });
+
+    testWidgets('No thanks reaches the repository with dailyChallengeEnabled: false', (tester) async {
+      final spaces = await pumpPrompt(tester);
+
+      await tester.tap(find.byKey(const Key('daily-prompt-decline')));
+      await tester.pumpAndSettle();
+
+      verify(() => spaces.update('s1', dailyChallengeEnabled: false)).called(1);
+      verifyNever(() => spaces.update('s1', dailyChallengeEnabled: true));
+    });
+
+    // `onDecide` is a `void Function(bool)`, so the Future was dropped: a failed PATCH used to be
+    // an unhandled async error with no feedback at all, unlike _create/_delete eight lines below
+    // it, which have caught and toasted since task 2.
+    testWidgets('a failed decision surfaces a message rather than an unhandled async error', (tester) async {
+      await pumpPrompt(tester, updateError: Exception('offline'));
+
+      await tester.tap(find.byKey(const Key('daily-prompt-enable')));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      // Proves the message came from 'game_daily_toggle_failed' resolving — an already-translated
+      // key that until now nothing referenced.
+      expect(find.text('Could not change the daily challenge setting'), findsOneWidget);
+      // The prompt is still there to try again with.
+      expect(find.byKey(const Key('daily-prompt')), findsOneWidget);
+
+      await settleToast(tester);
+    });
   });
 
   testWidgets('tapping the daily leaderboard button drives the scroll wiring without throwing', (tester) async {
