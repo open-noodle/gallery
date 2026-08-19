@@ -18,14 +18,14 @@ with
         from
           "shared_space_asset"
         where
-          "shared_space_asset"."spaceId" = $1
+          "shared_space_asset"."spaceId" = $1::uuid
         union
         select
           "asset"."id" as "assetId"
         from
           "asset"
           inner join "shared_space_library" on "shared_space_library"."libraryId" = "asset"."libraryId"
-          and "shared_space_library"."spaceId" = $2
+          and "shared_space_library"."spaceId" = $2::uuid
         union
         select
           "album_asset"."assetId" as "assetId"
@@ -35,7 +35,7 @@ with
           inner join "album" on "album"."id" = "shared_space_album"."albumId"
           and "album"."deletedAt" is null
         where
-          "shared_space_album"."spaceId" = $3
+          "shared_space_album"."spaceId" = $3::uuid
           and "shared_space_album"."showInTimeline" = $4
         union
         select
@@ -47,7 +47,7 @@ with
           inner join "album" on "album"."id" = "shared_space_album"."albumId"
           and "album"."deletedAt" is null
         where
-          "shared_space_album"."spaceId" = $5
+          "shared_space_album"."spaceId" = $5::uuid
           and "shared_space_album"."showInTimeline" = $6
       ) as "space_asset" on "space_asset"."assetId" = "asset"."id"
     where
@@ -104,14 +104,14 @@ from
     from
       "shared_space_asset"
     where
-      "shared_space_asset"."spaceId" = $1
+      "shared_space_asset"."spaceId" = $1::uuid
     union
     select
       "asset"."id" as "assetId"
     from
       "asset"
       inner join "shared_space_library" on "shared_space_library"."libraryId" = "asset"."libraryId"
-      and "shared_space_library"."spaceId" = $2
+      and "shared_space_library"."spaceId" = $2::uuid
     union
     select
       "album_asset"."assetId" as "assetId"
@@ -121,7 +121,7 @@ from
       inner join "album" on "album"."id" = "shared_space_album"."albumId"
       and "album"."deletedAt" is null
     where
-      "shared_space_album"."spaceId" = $3
+      "shared_space_album"."spaceId" = $3::uuid
       and "shared_space_album"."showInTimeline" = $4
     union
     select
@@ -133,7 +133,7 @@ from
       inner join "album" on "album"."id" = "shared_space_album"."albumId"
       and "album"."deletedAt" is null
     where
-      "shared_space_album"."spaceId" = $5
+      "shared_space_album"."spaceId" = $5::uuid
       and "shared_space_album"."showInTimeline" = $6
   ) as "space_asset" on "space_asset"."assetId" = "asset"."id"
 where

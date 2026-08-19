@@ -159,7 +159,7 @@ const key = (file: string, fn: string) => `${shortName(file)}::${fn}`;
 // ─────────────────────────────────────────────────────────────────────────────
 
 const ALBUM_MARKER =
-  /shared_space_album|spaceAlbumAssetExists|spaceAssetPathBranches|spaceAlbumAssetExistsSql|accessibleSpaceAlbums/;
+  /shared_space_album|spaceAlbumAssetExists|spaceAssetPathBranches|spaceAlbumAssetExistsSql|accessibleSpaceAlbums|spaceAssetIdUnion/;
 const LIBRARY_REF = /\bshared_space_library\b/;
 const WINDOW = 45;
 

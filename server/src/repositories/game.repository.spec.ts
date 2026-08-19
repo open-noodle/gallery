@@ -166,6 +166,34 @@ describe('GameRepository', () => {
       }
     });
 
+    it('excludes archived, hidden and locked assets at all three independent sites', () => {
+      // `visibility = 'timeline'` used to be written in exactly one place: eligibleSpaceAsset.
+      // Driving the candidate queries from the space tables split it into THREE independent
+      // copies - getLocationCandidates' stage-1 sample, getDateCandidates, and
+      // eligibleSpaceAsset (still used by getEligibleRoundAsset alone) - any one of which can be
+      // dropped without the other two noticing.
+      //
+      // The e2e characterization suite (game-visibility-negatives.e2e-spec.ts) cannot catch two
+      // of the three: every fixture asset it creates is a generated PNG with no EXIF GPS, so
+      // getLocationCandidates' INNER JOIN on asset_exif's lat/lon always empties its pool and
+      // every round that suite generates is a date round - it only ever exercises
+      // getDateCandidates. queryBlock() is used (not a raw string search) so a renamed method
+      // fails this loudly instead of silently matching nothing.
+      const sql = readGeneratedSql();
+      for (const method of ['getLocationCandidates', 'getDateCandidates', 'getEligibleRoundAsset']) {
+        const block = queryBlock(sql, method).replaceAll(/\s+/g, ' ');
+        expect(
+          block,
+          `GameRepository.${method} lost its "asset"."visibility" = $ clause. That clause is the\n` +
+            'ONLY thing excluding archived, hidden and locked assets from the game pool - losing it\n' +
+            'here silently widens the pool to include photos their owner deliberately took off the\n' +
+            'timeline, and (for getLocationCandidates / getEligibleRoundAsset in particular) the\n' +
+            'e2e visibility suite cannot catch it - see the comment above this test. Restore the\n' +
+            'clause and regenerate with `mise sql`.',
+        ).toContain('"asset"."visibility" = $');
+      }
+    });
+
     it('samples before ranking, so the CLIP score is never computed over the whole library', () => {
       const block = queryBlock(readGeneratedSql(), 'getLocationCandidates').replaceAll(/\s+/g, ' ');
 
