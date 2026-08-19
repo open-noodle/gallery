@@ -23,12 +23,15 @@ import 'package:immich_mobile/pages/common/splash_screen.page.dart';
 import 'package:immich_mobile/platform/background_worker_lock_api.g.dart';
 import 'package:immich_mobile/providers/app_life_cycle.provider.dart';
 import 'package:immich_mobile/providers/asset_viewer/share_intent_upload.provider.dart';
+import 'package:immich_mobile/providers/game/daily_reminder.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/db.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/platform.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
 import 'package:immich_mobile/providers/locale_provider.dart';
 import 'package:immich_mobile/providers/routes.provider.dart';
+import 'package:immich_mobile/providers/shared_space.provider.dart';
 import 'package:immich_mobile/providers/theme.provider.dart';
+import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:immich_mobile/providers/view_intent/view_intent_handler.provider.dart';
 import 'package:immich_mobile/routing/app_navigation_observer.dart';
 import 'package:immich_mobile/routing/router.dart';
@@ -40,10 +43,12 @@ import 'package:immich_mobile/utils/cache/widgets_binding.dart';
 import 'package:immich_mobile/utils/debug_print.dart';
 import 'package:immich_mobile/utils/licenses.dart';
 import 'package:immich_mobile/utils/migration.dart';
+import 'package:immich_mobile/utils/space_permissions.dart';
 import 'package:immich_mobile/wm_executor.dart';
 import 'package:immich_ui/immich_ui.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:logging/logging.dart';
+import 'package:openapi/api.dart';
 import 'package:timezone/data/latest.dart';
 
 void main() async {
@@ -129,6 +134,7 @@ class ImmichAppState extends ConsumerState<ImmichApp> with WidgetsBindingObserve
         dPrint(() => "[APP STATE] resumed");
         unawaited(ref.read(appStateProvider.notifier).handleAppResume());
         unawaited(ref.read(viewIntentHandlerProvider).onAppResumed());
+        unawaited(ref.read(dailyReminderProvider).refresh());
       case AppLifecycleState.inactive:
         dPrint(() => "[APP STATE] inactive");
         ref.read(appStateProvider.notifier).handleAppInactivity();
@@ -155,7 +161,43 @@ class ImmichAppState extends ConsumerState<ImmichApp> with WidgetsBindingObserve
         android: AndroidInitializationSettings('@drawable/notification_icon'),
         iOS: DarwinInitializationSettings(),
       ),
+      // A reminder that opens the timeline is a reminder about nothing. Route it to a space that
+      // actually has a daily; the spaces list is the honest fallback when none can be resolved.
+      onDidReceiveNotificationResponse: (response) {
+        if (response.payload != kDailyReminderPayload) return;
+        unawaited(_openDailyChallenge());
+      },
     );
+
+    // Cold start. AppLifeCycleEnum.resumed does NOT fire on a cold launch, so without this a
+    // fresh install (or a killed app) would have nothing scheduled until it was backgrounded once.
+    unawaited(ref.read(dailyReminderProvider).refresh());
+  }
+
+  /// Routes a tapped daily-reminder notification to the first opted-in space, in the spaces
+  /// list's own default order, falling back to the spaces list when none can be resolved (no
+  /// opted-in space, or the request failed — e.g. offline).
+  Future<void> _openDailyChallenge() async {
+    final router = ref.read(appRouterProvider);
+
+    var spaces = const <SharedSpaceResponseDto>[];
+    try {
+      spaces = await ref.read(sharedSpacesProvider.future);
+    } catch (_) {
+      // Offline, or the request otherwise failed — fall through to the spaces list below.
+    }
+
+    final currentUserId = ref.read(currentUserProvider)?.id;
+    for (final space in spaces) {
+      // `dailyChallengeEnabled` is Optional<bool?> and `Absent.value` THROWS, so this must stay
+      // `.orElse(null)`. Absent and null both mean "not opted in".
+      if (space.dailyChallengeEnabled.orElse(null) == true) {
+        await router.push(SpaceGamesRoute(spaceId: space.id, canEdit: spaceIsWritable(space, currentUserId)));
+        return;
+      }
+    }
+
+    await router.push(const SpacesRoute());
   }
 
   Future<void> _setNavigationBarColor() async {
