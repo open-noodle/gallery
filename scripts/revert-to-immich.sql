@@ -572,6 +572,7 @@ DELETE FROM "kysely_migrations"
   -- #763 per-user favorites. Renumbered off 1784000000000/1784100000000 during the v3.2.0 rebase:
   -- 1784000000000 was already taken by FixFaceRepairScanInFlightIndexOverride above.
   '1794000000000-AddAssetFavoriteTables',
+  '1794000000000-AddSoloGameChallenge',
   '1794100000000-DropAssetIsFavoriteColumn',
   '1796000000000-AddAssetFaceCreatedBy',
   '1797000000000-AddAssetLocalDateTimeIndex',
