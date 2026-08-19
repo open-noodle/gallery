@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/presentation/widgets/games/daily_challenge_card.widget.dart';
 import 'package:immich_mobile/presentation/widgets/spaces/space_albums_shelf.widget.dart';
 import 'package:immich_mobile/providers/infrastructure/space_album.provider.dart';
 import 'package:immich_mobile/widgets/spaces/sync_status_banner.dart';
 
-/// Combined top sliver: sync banner stacked above the Albums shelf.
+/// Combined top sliver: sync banner, the daily challenge slot, then the Albums shelf.
 ///
 /// Used as the single `topSliverWidget` passed to [Timeline] on
 /// [SpaceDetailPage], replacing the bare [SyncStatusBannerSliver].
@@ -19,6 +20,10 @@ class SpaceTopSliver extends StatelessWidget {
     required this.canEdit,
     required this.onLinkTap,
     required this.onAlbumTap,
+    required this.dailyChallengeEnabled,
+    required this.onPlayDaily,
+    required this.onDailyStandings,
+    required this.onDecideDaily,
     this.onSeeAll,
   });
 
@@ -26,6 +31,13 @@ class SpaceTopSliver extends StatelessWidget {
   final bool canEdit;
   final VoidCallback onLinkTap;
   final void Function(String albumId) onAlbumTap;
+
+  /// Tri-state daily opt-in, straight off `SharedSpaceResponseDto.dailyChallengeEnabled`. See
+  /// [DailySlot].
+  final bool? dailyChallengeEnabled;
+  final VoidCallback onPlayDaily;
+  final VoidCallback onDailyStandings;
+  final void Function(bool enabled) onDecideDaily;
 
   /// Invoked when the user taps "See all ▸" in the shelf header. The caller
   /// pushes [SpaceAlbumsRoute]. If null, the tap is a no-op.
@@ -38,6 +50,14 @@ class SpaceTopSliver extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           const SyncStatusBanner(),
+          DailySlot(
+            spaceId: spaceId,
+            dailyChallengeEnabled: dailyChallengeEnabled,
+            canEdit: canEdit,
+            onDecide: onDecideDaily,
+            onPlay: onPlayDaily,
+            onStandings: onDailyStandings,
+          ),
           SpaceAlbumsShelf(
             spaceId: spaceId,
             canEdit: canEdit,
@@ -78,8 +98,13 @@ double computeTopSliverHeight({
   required String spaceId,
   required bool canEdit,
   required bool isRemoteSyncing,
+  required bool? dailyChallengeEnabled,
 }) {
   final bannerHeight = isRemoteSyncing ? kSyncStatusBannerSliverHeight : 0.0;
+
+  // Depends only on values the page already holds synchronously, so unlike the shelf below it
+  // this reservation never jitters while data loads.
+  final dailyHeight = DailySlot.reservedHeight(dailyChallengeEnabled: dailyChallengeEnabled, canEdit: canEdit);
 
   // Resolve the shelf height synchronously from cached Riverpod state.
   final albumsAsync = ref.watch(spaceAlbumsProvider(spaceId));
@@ -89,5 +114,5 @@ double computeTopSliverHeight({
     data: (albums) => (albums.isNotEmpty || canEdit) ? kSpaceAlbumsShelfHeight : 0.0,
   );
 
-  return bannerHeight + shelfHeight;
+  return bannerHeight + dailyHeight + shelfHeight;
 }
