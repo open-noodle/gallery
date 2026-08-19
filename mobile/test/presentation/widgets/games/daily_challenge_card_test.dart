@@ -149,6 +149,46 @@ void main() {
     expect(find.textContaining(RegExp(r'\d+h \d+m')), findsOneWidget);
   });
 
+  // The other two surfaces that can fail on this page (the challenge list, the standings section)
+  // have offered a retry since they shipped; this one only ever printed the message. A null
+  // challenge is deliberately left without one -- the space genuinely has no daily to fetch.
+  testWidgets('a failed daily offers a retry that re-runs the fetch', (tester) async {
+    var attempts = 0;
+    await tester.pumpConsumerWidget(
+      DailySlot(
+        spaceId: 's1',
+        dailyChallengeEnabled: true,
+        canEdit: false,
+        onDecide: (_) {},
+        onPlay: () {},
+        onStandings: () {},
+      ),
+      overrides: [
+        gameDailyProvider('s1').overrideWith((ref) async {
+          attempts++;
+          throw Exception('offline');
+        }),
+      ],
+    );
+
+    expect(find.byKey(const Key('daily-card-error')), findsOneWidget);
+    expect(find.byKey(const Key('daily-retry')), findsOneWidget);
+    expect(attempts, 1);
+    expect(tester.takeException(), isNull, reason: 'The fixed-height slot must not overflow around the retry');
+
+    await tester.tap(find.byKey(const Key('daily-retry')));
+    await tester.pumpAndSettle();
+
+    expect(attempts, 2, reason: 'The retry must invalidate gameDailyProvider, not merely repaint');
+  });
+
+  testWidgets('a space with no daily today shows the message without a retry', (tester) async {
+    await pump(tester, enabled: true, canEdit: false);
+
+    expect(find.byKey(const Key('daily-retry')), findsNothing);
+    expect(find.textContaining('No daily challenge today'), findsOneWidget);
+  });
+
   testWidgets('the slot reserves the same height played or unplayed', (tester) async {
     await pump(tester, enabled: true, canEdit: false, daily: _daily());
     final unplayed = tester.getSize(find.byKey(const Key('daily-card'))).height;
