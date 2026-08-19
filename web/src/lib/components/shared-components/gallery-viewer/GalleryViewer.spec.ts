@@ -215,7 +215,6 @@ function trackScrolledElement() {
   // A prototype-method mock genuinely needs the receiver: scrollIntoView() is called
   // with options, not the element, so `this` is the only handle on the scrolled node.
   Element.prototype.scrollIntoView = vi.fn(function (this: Element) {
-    // eslint-disable-next-line unicorn/no-this-outside-of-class
     const selector = getScrolledElementSelector(this);
     scrolledElement = selector ? (document.querySelector(selector) ?? undefined) : undefined;
   });
