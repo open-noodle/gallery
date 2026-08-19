@@ -116,4 +116,50 @@ void main() {
 
     expect(find.byKey(const Key('challenge-card-delete-c1')), findsNothing);
   });
+
+  /// The label and the pips sit ON the round photo, so their contrast cannot be left to whatever
+  /// that photo happens to look like. These pin the card carrying its own contrast: a scrim plus
+  /// white content, rather than theme ink over a bleached image.
+  group('legibility over the photo', () {
+    testWidgets('the name is white and weighted, not default body ink', (tester) async {
+      await pump(tester, challenge: _challenge());
+
+      final name = tester.widget<Text>(find.text('Challenge 3'));
+      expect(name.style?.color, Colors.white);
+      expect(name.style?.fontWeight, FontWeight.w600);
+    });
+
+    testWidgets('both pip states are white-based and clearly distinct', (tester) async {
+      await pump(tester, challenge: _challenge(answered: 3));
+
+      Color pipColor(bool filled) {
+        final pip = tester
+            .widgetList(find.byType(ChallengePip))
+            .cast<ChallengePip>()
+            .firstWhere((candidate) => candidate.filled == filled);
+        final decorated = tester.widget<Container>(
+          find.descendant(of: find.byWidget(pip), matching: find.byType(Container)),
+        );
+        return ((decorated.decoration! as BoxDecoration).color)!;
+      }
+
+      // The unfilled pip was surfaceContainerHighest — near-white on a light theme, so it vanished
+      // against a photo. Both states must now be white, separated by opacity alone.
+      expect(pipColor(true), Colors.white);
+      expect(pipColor(false).r, Colors.white.r);
+      expect(pipColor(false).a, lessThan(1.0));
+      expect(pipColor(false).a, greaterThan(0.2), reason: 'an unfilled pip still has to be visible');
+    });
+
+    testWidgets('the photo is not bleached to carry the text', (tester) async {
+      await pump(tester, challenge: _challenge());
+
+      final image = tester.widget<Image>(find.byType(Image));
+      expect(
+        image.opacity?.value ?? 1.0,
+        1.0,
+        reason: 'contrast comes from the scrim now; dimming the photo made every card look grey',
+      );
+    });
+  });
 }
