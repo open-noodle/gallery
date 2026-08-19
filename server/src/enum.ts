@@ -224,6 +224,10 @@ export enum Permission {
 
   FolderRead = 'folder.read',
 
+  GameCreate = 'game.create',
+  GameRead = 'game.read',
+  GameDelete = 'game.delete',
+
   JobCreate = 'job.create',
   JobRead = 'job.read',
 
