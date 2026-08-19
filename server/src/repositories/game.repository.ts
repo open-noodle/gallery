@@ -31,6 +31,20 @@ export type ScenePromptEmbeddings = { place: number[]; notPlace: number[] };
 const MAX_FACE_AREA_RATIO = 0.05;
 
 /**
+ * How many eligible rows stage 1 samples before stage 2 ranks them.
+ *
+ * MEASURED, not guessed - see design §4.4. Against 27,227 gated candidates on the reference
+ * library, this retains 91% of the mean placeyness score of a full ranking, and the worst photo
+ * the downstream rank-biased draw can reach sits at global rank 302 (top 1.1%). Dropping to 2,000
+ * moves that to rank 692; raising to 8,000 buys rank 150 for 2.3x the time. 4,000 is the knee.
+ *
+ * The cost of getting this wrong is asymmetric: too small silently degrades round quality in a
+ * way no test catches, too large reintroduces the cold-cache cliff. Re-run the sweep before
+ * changing it.
+ */
+export const LOCATION_SAMPLE_SIZE = 4000;
+
+/**
  * CLIP text embedding for "an outdoor photo that shows where it was taken", encoded with
  * ViT-B-32__openai - the model Gallery's smart search uses. Paired with
  * NOT_PLACE_PROMPT_EMBEDDING below; see getLocationCandidates for why both are needed.
@@ -241,8 +255,13 @@ export class GameRepository {
    * `smart_search.embedding <=> x` is cosine DISTANCE (1 - cosine similarity), so
    * `cos_sim_pos - cos_sim_neg` reduces to `(embedding <=> neg) - (embedding <=> pos)`; higher
    * is better, hence ORDER BY ... DESC. This two-term expression cannot use the ivfflat/vchord
-   * index - acceptable here because the candidate set is already scoped to one space's assets
-   * via eligibleSpaceAsset, so the driving predicate is the space scope, not the vector order.
+   * index, so scoring every eligible row would be a full sequential scan over the vector column -
+   * 30,212 rows and 133 MB of TOAST reads on the reference library (measured: 482ms warm,
+   * 17-19s cold). That is why this runs as two stages instead of one query: stage 1 (the `sample`
+   * CTE) picks LOCATION_SAMPLE_SIZE rows using only narrow, indexable columns - no smart_search,
+   * no asset_face - ordered by the same seeded hash as the final tiebreak; stage 2 joins the
+   * vector column and the face gate onto just that sample and does the CLIP ranking there. The
+   * expensive work is bounded by the sample size, not the library size.
    *
    * Ranked, never thresholded: the measured cosine margin between positive and negative prompts
    * is thin, so an absolute cutoff would pass everything in one library and nothing in another.
@@ -268,15 +287,33 @@ export class GameRepository {
     scenePrompts?: ScenePromptEmbeddings,
   ): Promise<GameCandidate[]> {
     const rows = await this.db
-      .selectFrom('asset')
-      .innerJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
-      // Applied before the derived-table joins below purely for typing: once `face_area` is
-      // joined in, `eb` is no longer an ExpressionBuilder over the plain DB and cannot be handed
-      // to the shared helper. WHERE terms are ANDed, so the position carries no semantics.
-      .where((eb) => eligibleSpaceAsset(eb, spaceId))
-      .leftJoin('smart_search', 'smart_search.assetId', 'asset.id')
-      .where('asset_exif.latitude', 'is not', null)
-      .where('asset_exif.longitude', 'is not', null)
+      // Stage 1: a cheap seeded sample of eligible rows, narrow columns only - no smart_search,
+      // no asset_face. This is what keeps the expensive stage-2 work below bounded by
+      // LOCATION_SAMPLE_SIZE instead of the whole eligible library.
+      .with('sample', (db) =>
+        db
+          .selectFrom('asset')
+          .innerJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
+          // Lives in stage 1, not stage 2: the eligibility scope (and the GPS presence check
+          // below) is what the sample is drawn FROM, so it has to apply before the LIMIT, not
+          // after.
+          .where((eb) => eligibleSpaceAsset(eb, spaceId))
+          .where('asset_exif.latitude', 'is not', null)
+          .where('asset_exif.longitude', 'is not', null)
+          .select([
+            'asset.id as assetId',
+            'asset_exif.latitude as lat',
+            'asset_exif.longitude as lon',
+            'asset.localDateTime as takenAt',
+            'asset_exif.country as country',
+          ])
+          .orderBy(seededOrder(seed))
+          .limit(LOCATION_SAMPLE_SIZE),
+      )
+      // Stage 2: rank just the sample. The vector join and the face gate only ever touch these
+      // LOCATION_SAMPLE_SIZE rows, not the whole eligible set.
+      .selectFrom('sample')
+      .leftJoin('smart_search', 'smart_search.assetId', 'sample.assetId')
       // Correlated, not an uncorrelated LEFT JOIN to a grouped subquery: the latter aggregates
       // every visible face row in the database before joining, which is 58k rows on the
       // reference library to gate a few thousand candidates.
@@ -299,7 +336,7 @@ export class GameRepository {
             eb
               .selectFrom('asset_face as f')
               .select(sql`1`.as('one'))
-              .whereRef('f.assetId', '=', 'asset.id')
+              .whereRef('f.assetId', '=', 'sample.assetId')
               .where('f.deletedAt', 'is', null)
               .where('f.isVisible', '=', true)
               .groupBy('f.assetId')
@@ -311,13 +348,7 @@ export class GameRepository {
           ),
         ),
       )
-      .select([
-        'asset.id as assetId',
-        'asset_exif.latitude as lat',
-        'asset_exif.longitude as lon',
-        'asset.localDateTime as takenAt',
-        'asset_exif.country as country',
-      ])
+      .selectAll('sample')
       .$if(!!scenePrompts, (qb) =>
         qb.orderBy(
           sql<number>`(smart_search.embedding <=> ${asVector(scenePrompts!.notPlace)}) - (smart_search.embedding <=> ${asVector(scenePrompts!.place)})`,
@@ -330,7 +361,7 @@ export class GameRepository {
       // they arrive in - an unstable tie order would silently defeat that determinism. Seeded
       // rather than `asset.id asc` so the tie group (and the whole pool, when the CLIP ordering
       // above is skipped) is not frozen to the same lowest-id prefix for every challenge.
-      .orderBy(seededOrder(seed))
+      .orderBy(sql`md5("sample"."assetId"::text || ${seed})`)
       .limit(limit)
       .execute();
 
