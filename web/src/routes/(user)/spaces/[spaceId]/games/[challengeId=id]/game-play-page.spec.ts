@@ -60,6 +60,7 @@ function makeChallenge(overrides: Partial<GameChallengeDetailResponseDto> = {}):
   return {
     id: 'challenge-1',
     spaceId: 'space-1',
+    ownerId: null,
     name: 'Summer Trip',
     dailyOn: null,
     roundCount: 2,

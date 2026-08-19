@@ -32298,6 +32298,11 @@
             "description": "Challenge name",
             "type": "string"
           },
+          "ownerId": {
+            "description": "Owning user ID, or null for a shared-space challenge",
+            "nullable": true,
+            "type": "string"
+          },
           "roundCount": {
             "description": "Number of rounds actually generated (may be less than requested)",
             "type": "number"
@@ -32318,7 +32323,8 @@
             "type": "number"
           },
           "spaceId": {
-            "description": "Shared space ID",
+            "description": "Shared space ID, or null for a solo challenge",
+            "nullable": true,
             "type": "string"
           }
         },
@@ -32328,6 +32334,7 @@
           "dailyOn",
           "id",
           "name",
+          "ownerId",
           "roundCount",
           "rounds",
           "scaleDays",
@@ -32375,6 +32382,11 @@
             "description": "Challenge name",
             "type": "string"
           },
+          "ownerId": {
+            "description": "Owning user ID, or null for a shared-space challenge",
+            "nullable": true,
+            "type": "string"
+          },
           "roundCount": {
             "description": "Number of rounds actually generated (may be less than requested)",
             "type": "number"
@@ -32388,7 +32400,8 @@
             "type": "number"
           },
           "spaceId": {
-            "description": "Shared space ID",
+            "description": "Shared space ID, or null for a solo challenge",
+            "nullable": true,
             "type": "string"
           },
           "total": {
@@ -32404,6 +32417,7 @@
           "id",
           "locationRoundCount",
           "name",
+          "ownerId",
           "roundCount",
           "scaleDays",
           "scaleKm",
@@ -32435,6 +32449,11 @@
             "description": "Challenge name",
             "type": "string"
           },
+          "ownerId": {
+            "description": "Owning user ID, or null for a shared-space challenge",
+            "nullable": true,
+            "type": "string"
+          },
           "roundCount": {
             "description": "Number of rounds actually generated (may be less than requested)",
             "type": "number"
@@ -32448,7 +32467,8 @@
             "type": "number"
           },
           "spaceId": {
-            "description": "Shared space ID",
+            "description": "Shared space ID, or null for a solo challenge",
+            "nullable": true,
             "type": "string"
           }
         },
@@ -32457,6 +32477,7 @@
           "dailyOn",
           "id",
           "name",
+          "ownerId",
           "roundCount",
           "scaleDays",
           "scaleKm",
