@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/extensions/translate_extensions.dart';
 import 'package:immich_mobile/presentation/widgets/games/daily_challenge_prompt.widget.dart';
+import 'package:immich_mobile/presentation/widgets/games/round_photo_placeholder.widget.dart';
 import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
 import 'package:immich_mobile/providers/game/game.provider.dart';
 import 'package:immich_mobile/utils/game_format.dart';
@@ -107,6 +108,7 @@ class DailySlot extends ConsumerWidget {
                     image: RemoteImageProvider(url: getGameRoundImageUrl(challenge.id, 0)),
                     fit: BoxFit.cover,
                     opacity: const AlwaysStoppedAnimation(0.45),
+                    errorBuilder: (_, _, _) => const RoundPhotoPlaceholder(),
                   ),
                 ),
                 Padding(

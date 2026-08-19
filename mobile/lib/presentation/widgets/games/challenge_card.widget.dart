@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:immich_mobile/extensions/translate_extensions.dart';
+import 'package:immich_mobile/presentation/widgets/games/round_photo_placeholder.widget.dart';
 import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
 import 'package:immich_mobile/utils/image_url_builder.dart';
 import 'package:openapi/api.dart';
@@ -79,6 +80,7 @@ class ChallengeCard extends StatelessWidget {
               image: RemoteImageProvider(url: getGameRoundImageUrl(challenge.id, 0)),
               fit: BoxFit.cover,
               opacity: const AlwaysStoppedAnimation(0.5),
+              errorBuilder: (_, _, _) => const RoundPhotoPlaceholder(),
             ),
           ),
           Padding(
