@@ -264,6 +264,49 @@ void main() {
     expect(title.style?.fontWeight, FontWeight.w600);
   });
 
+  /// The first attempt tinted the whole card toward the theme surface so theme ink stayed legible.
+  /// That washed the cover out — the card read as faded rather than as a photo. Contrast now comes
+  /// from a scrim anchored where the text sits, leaving the rest of the cover alone, and the
+  /// content is white so it never depends on how bright the cover happens to be.
+  group('legibility over the cover', () {
+    testWidgets('the title and the subtitle are white, not theme ink', (tester) async {
+      // `answered: 5` so the played state renders the subtitle line as well as the title.
+      await pump(
+        tester,
+        enabled: true,
+        canEdit: false,
+        daily: _daily(answered: 5),
+        space: _space(cover: 'c1'),
+      );
+
+      expect(tester.widget<Text>(find.text('Daily challenge')).style?.color, Colors.white);
+
+      final subtitle = tester.widget<Text>(find.textContaining(RegExp(r'\d+h \d+m')));
+      expect(subtitle.style?.color?.r, Colors.white.r);
+      expect(subtitle.style?.color?.a, greaterThan(0.6), reason: 'it must stay readable, not ghost out');
+    });
+
+    testWidgets('the scrim runs left to right, dark where the text sits', (tester) async {
+      await pump(
+        tester,
+        enabled: true,
+        canEdit: false,
+        daily: _daily(),
+        space: _space(cover: 'c1'),
+      );
+
+      final scrim = tester.widget<DecoratedBox>(find.byKey(const Key('daily-card-scrim')));
+      final gradient = (scrim.decoration as BoxDecoration).gradient! as LinearGradient;
+
+      expect(gradient.begin, Alignment.centerLeft);
+      expect(gradient.end, Alignment.centerRight);
+      // Dark at the text end, clear at the far end — the reverse would darken empty cover and
+      // leave the title on whatever the photo happens to be.
+      expect(gradient.colors.first.a, greaterThan(0.4));
+      expect(gradient.colors.last.a, 0.0);
+    });
+  });
+
   // reservedHeight is what the page actually calls to reserve sliver space, synchronously and
   // before the daily provider resolves — build() reimplements the same branching for the widget
   // it actually renders. A plain by-inspection match between the two is how they'd silently drift;
