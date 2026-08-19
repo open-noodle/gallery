@@ -164,6 +164,8 @@ features:
     owned_paths:
       - web/src/lib/components/filter-panel/**
       - web/src/lib/components/global-search/**
+      # Fork-authored policy note living inside upstream's (dormant) search-bar directory.
+      - web/src/lib/components/shared-components/search-bar/DORMANT.md
       - web/src/lib/managers/global-search*.ts
       - web/src/lib/managers/command*.ts
       - web/src/lib/utils/typed-search/**
