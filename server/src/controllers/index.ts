@@ -27,6 +27,7 @@ import { FaceRepairAdminController } from 'src/controllers/face-repair-admin.con
 import { FaceSuggestionController } from 'src/controllers/face-suggestion.controller';
 import { FaceController } from 'src/controllers/face.controller';
 import { GalleryMapController } from 'src/controllers/gallery-map.controller';
+import { GameSoloController } from 'src/controllers/game-solo.controller';
 import { GameController } from 'src/controllers/game.controller';
 import { IntegrityAdminController } from 'src/controllers/integrity-admin.controller';
 import { JobController } from 'src/controllers/job.controller';
@@ -85,6 +86,7 @@ export const controllers = [
   FaceSuggestionController,
   GalleryMapController,
   GameController,
+  GameSoloController,
   IntegrityAdminController,
   JobController,
   LibraryManifestController,

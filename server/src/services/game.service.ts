@@ -20,6 +20,7 @@ import {
   GameGuessResponseDto,
   GameLeaderboardResponseDto,
   GameRoundDetailResponseDto,
+  GameSoloCreateDto,
   GameStandingsResponseDto,
 } from 'src/dtos/game.dto';
 import { CacheControl, SharedSpaceRole } from 'src/enum';
@@ -37,6 +38,7 @@ import { GameGuessTable } from 'src/schema/tables/game-guess.table';
 import { GameRoundTable, GameRoundType } from 'src/schema/tables/game-round.table';
 import { BaseService } from 'src/services/base.service';
 import { ChallengePool } from 'src/services/game/challenge-pool';
+import { PersonalPool } from 'src/services/game/personal-pool';
 import { SpacePool } from 'src/services/game/space-pool';
 import { asDateString } from 'src/utils/date';
 import { getFilenameExtension, ImmichMediaResponse } from 'src/utils/file';
@@ -78,8 +80,43 @@ const LOCATION_SHARE_BY_TYPE: Record<GameChallengeType, number> = {
 /** The daily is always this size; it is the same game for everyone, so it takes no parameters. */
 const DAILY_ROUND_COUNT = 5;
 
-/** Postgres constraint behind the lazy daily generation race - see the migration. */
-const DAILY_UNIQUE_CONSTRAINT = 'game_challenge_daily_uq';
+/** Postgres constraints behind the lazy daily generation race - see the migration. There are two
+ * because Postgres treats NULLs as distinct in a unique index, so one partial index over
+ * (spaceId, dailyOn) does not constrain solo rows at all. */
+const SPACE_DAILY_UNIQUE_CONSTRAINT = 'game_challenge_daily_uq';
+const SOLO_DAILY_UNIQUE_CONSTRAINT = 'game_challenge_owner_daily_uq';
+
+/** How many rounds a challenge has when the request does not say - both scopes, one number, so
+ * the two create panels cannot drift apart. Mirrors the zod `.default(5)` on the create DTOs,
+ * which cannot be relied on for the TS type - see `create`. */
+const DEFAULT_ROUND_COUNT = 5;
+
+/**
+ * Which libraries a solo challenge draws from when the request does not override them.
+ *
+ * Hardcoded rather than read from a setting only until the `preferences.photoGuesser` toggles
+ * exist; it is the DEFAULT that moves there, not the freezing. Own photos only is the safe
+ * starting point: partner and shared-space photos belong to other people, and a game must not be
+ * the surface that starts showing them without being asked.
+ */
+const DEFAULT_SOLO_SOURCES = { includePartners: false, includeSpaces: false };
+
+/** A challenge drawn from one shared space's photos. */
+type SpaceScope = { spaceId: string; ownerId: null };
+
+/**
+ * A challenge drawn from one player's own scope, carrying the source toggles FROZEN onto the row.
+ * They live here rather than on every scope because they only mean something for a solo
+ * challenge - a shared space has no sources to choose between.
+ */
+type SoloScope = { spaceId: null; ownerId: string; includePartners: boolean; includeSpaces: boolean };
+
+/**
+ * One challenge's scope: a shared space OR one user, never both and never neither -
+ * `game_challenge_scope_chk` expressed in the type system, so every branch that dispatches on
+ * scope gets a non-null id out of it rather than re-deriving one from two nullable columns.
+ */
+type ChallengeScope = SpaceScope | SoloScope;
 
 /**
  * Today's date as the UTC calendar day, `YYYY-MM-DD`.
@@ -129,7 +166,7 @@ const utcMonthBounds = (now: Date) => {
  */
 const CANDIDATE_POOL_LIMIT = 200;
 
-/** How many of the space's most recent challenges to avoid repeating assets from. */
+/** How many of the scope's most recent challenges to avoid repeating assets from. */
 const RECENT_CHALLENGE_LOOKBACK = 3;
 
 /**
@@ -282,11 +319,56 @@ export class GameService extends BaseService {
       // (the codebase's own convention, e.g. SharedSpaceMemberCreateDto.role) keeps the inferred TS
       // type `number | undefined` - the fallback still has to be applied here, same as dto.role ??
       // SharedSpaceRole.Viewer in shared-space.service.ts.
-      requestedRoundCount: dto.roundCount ?? 5,
+      requestedRoundCount: dto.roundCount ?? DEFAULT_ROUND_COUNT,
       type: dto.type ?? 'mixed',
       seed: `${await pool.seedKey()}:${challengeCount}`,
       dailyOn: null,
       name: dto.name?.trim() || `Challenge ${challengeCount + 1}`,
+    });
+  }
+
+  /**
+   * Free play: one challenge drawn from the player's own scope, with no space involved at all.
+   *
+   * `createdById` stays null - `ownerId` already carries the authorship, and setting both would
+   * point two different FK actions (CASCADE and SET NULL) at one row for one user-deletion event.
+   */
+  async createSolo(auth: AuthDto, dto: GameSoloCreateDto): Promise<GameChallengeResponseDto> {
+    // Field by field rather than a spread of `dto.sources`, so a partial override ("include my
+    // partners") keeps the default for the toggle it does not mention.
+    const scope: SoloScope = {
+      spaceId: null,
+      ownerId: auth.user.id,
+      includePartners: dto.sources?.includePartners ?? DEFAULT_SOLO_SOURCES.includePartners,
+      includeSpaces: dto.sources?.includeSpaces ?? DEFAULT_SOLO_SOURCES.includeSpaces,
+    };
+
+    const pool = this.personalPool(scope);
+    // Before the candidate queries, for the same reason `create` resolves it early: the count is
+    // half of the seed, and the seed decides which slice of a large library they return.
+    const challengeCount = await pool.challengeCount();
+
+    return this.generateChallenge({
+      pool,
+      scope,
+      createdById: null,
+      requestedRoundCount: dto.roundCount ?? DEFAULT_ROUND_COUNT,
+      type: dto.type ?? 'mixed',
+      seed: `${await pool.seedKey()}:${challengeCount}`,
+      dailyOn: null,
+      name: `Challenge ${challengeCount + 1}`,
+    });
+  }
+
+  /**
+   * The player's own pool, translated from the row's vocabulary (`includePartners`) into the
+   * pool's (`withPartners`). One conversion point, so a challenge being generated and the same
+   * challenge being served a round image later cannot disagree about what the toggles meant.
+   */
+  private personalPool(scope: SoloScope): PersonalPool {
+    return new PersonalPool(this.gameRepository, scope.ownerId, {
+      withPartners: scope.includePartners,
+      withSpaces: scope.includeSpaces,
     });
   }
 
@@ -308,9 +390,9 @@ export class GameService extends BaseService {
   }: {
     pool: ChallengePool;
     // The row's scope columns. A pool only queries within its scope, it does not know how to
-    // write it - `create`/`generateDaily` are the ones that know whether this challenge belongs
-    // to a space or (a later task) a user, so they build this alongside the pool.
-    scope: { spaceId: string | null; ownerId: string | null };
+    // write it - `create`/`createSolo`/`generateDaily` are the ones that know whether this
+    // challenge belongs to a space or to a user, so they build this alongside the pool.
+    scope: ChallengeScope;
     createdById: string | null;
     requestedRoundCount: number;
     type: GameChallengeType;
@@ -326,16 +408,17 @@ export class GameService extends BaseService {
       pool.recentlyUsedAssetIds(RECENT_CHALLENGE_LOOKBACK),
     ]);
 
-    // Prefer excluding assets used by recent challenges in this space, but never at the cost of
-    // being unable to fill the request. The decision is made per pool, and for the date pool
-    // against the round count the location pool actually delivered - a well-stocked pool keeps
+    // Prefer excluding assets used by recent challenges in this scope, but never at the cost of
+    // being unable to fill the request. The decision is made per candidate pool, and for the date
+    // pool against the round count the location pool actually delivered - a well-stocked pool keeps
     // its exclusion even when the other pool has to give it up to reach requestedRoundCount, and a
     // location shortfall doesn't wrongly count against the date pool's own supply.
     const recentlyUsed = new Set(recentlyUsedAssetIds);
-    const withoutRecent = (pool: GameCandidate[]) => pool.filter((candidate) => !recentlyUsed.has(candidate.assetId));
+    const withoutRecent = (candidates: GameCandidate[]) =>
+      candidates.filter((candidate) => !recentlyUsed.has(candidate.assetId));
 
-    // Seeded from the space and its existing challenge count, not wall-clock or Math.random, so
-    // generation is reproducible and successive challenges for the same space still differ.
+    // Seeded from the scope and its existing challenge count, not wall-clock or Math.random, so
+    // generation is reproducible and successive challenges for the same scope still differ.
     const random = mulberry32(hashSeed(seed));
 
     // Still floored, which is exact for the explicit types (a share of 1 or 0 cannot have a
@@ -346,7 +429,7 @@ export class GameService extends BaseService {
     const locationPool = filteredLocationPool.length >= locationNeeded ? filteredLocationPool : rawLocationPool;
 
     // Frozen here, once, from the location pool actually used to generate this challenge. Scoring
-    // divides by this later - recomputing it as the space gains photos would rewrite every score
+    // divides by this later - recomputing it as the scope gains photos would rewrite every score
     // already recorded against this challenge.
     const scaleKm = poolScaleKm(toPoints(locationPool), random);
 
@@ -355,13 +438,13 @@ export class GameService extends BaseService {
 
     const usedAssetIds = new Set(locationRounds.map((candidate) => candidate.assetId));
     // Only 'mixed' lets the date pool cover a location shortfall. For an explicit 'location'
-    // request the remainder must stay 0, or a GPS-poor space would answer a location game with
+    // request the remainder must stay 0, or a GPS-poor scope would answer a location game with
     // date rounds and look like the type picker did nothing.
     const dateRemaining = type === 'location' ? 0 : requestedRoundCount - locationRounds.length;
 
     const filteredDatePool = withoutRecent(rawDatePool);
-    const availableExcludingUsed = (pool: GameCandidate[]) =>
-      pool.filter((candidate) => !usedAssetIds.has(candidate.assetId)).length;
+    const availableExcludingUsed = (candidates: GameCandidate[]) =>
+      candidates.filter((candidate) => !usedAssetIds.has(candidate.assetId)).length;
     const dateNeeded = Math.min(dateRemaining, availableExcludingUsed(rawDatePool));
     const datePool = availableExcludingUsed(filteredDatePool) >= dateNeeded ? filteredDatePool : rawDatePool;
 
@@ -426,10 +509,14 @@ export class GameService extends BaseService {
 
     return {
       id,
-      // `scope`, not `challenge.spaceId`/`challenge.ownerId`: Insertable<GameChallengeTable> types
-      // nullable columns as `T | null | undefined` (undefined = "let the DB default apply"), but
-      // `scope` is the exact `string | null` this DTO field wants, and it's what we actually wrote.
-      ...scope,
+      // Field by field, never `...scope`: the scope also carries the frozen source toggles, which
+      // are columns on the row but NOT fields of this response, and a spread does not get an
+      // excess-property check - they would have shipped to every client silently. Reading from
+      // `scope` rather than `challenge` is still deliberate: Insertable<GameChallengeTable> types
+      // nullable columns as `T | null | undefined` (undefined = "let the DB default apply"), while
+      // `scope` is the exact `string | null` this DTO field wants, and is what we actually wrote.
+      spaceId: scope.spaceId,
+      ownerId: scope.ownerId,
       name: challenge.name,
       roundCount: challenge.roundCount,
       scaleKm: challenge.scaleKm,
@@ -476,10 +563,10 @@ export class GameService extends BaseService {
   ): GameChallengeListItemResponseDto {
     return {
       id: challenge.id,
-      spaceId: this.requireSpaceScope(challenge),
-      // requireSpaceScope above already guarantees this is a space row, so ownerId is always
-      // null here - read from the column rather than hardcoded, so the DTO stays a faithful
-      // mirror of the row instead of a second place that has to know that fact.
+      // Both read straight off the row, exactly one of them non-null: this shape serves the space
+      // list, the space daily and the personal daily, and it is the caller's gate - not this
+      // mapper - that decides who may see a given scope.
+      spaceId: challenge.spaceId,
       ownerId: challenge.ownerId,
       name: challenge.name,
       roundCount: challenge.roundCount,
@@ -514,9 +601,52 @@ export class GameService extends BaseService {
     }
 
     const dailyOn = utcDateKey(new Date());
-    const existing = await this.gameRepository.getDailyChallenge(spaceId, dailyOn);
-    const challenge = existing ?? (await this.generateDaily(spaceId, dailyOn));
+    const reread = () => this.gameRepository.getDailyChallenge(spaceId, dailyOn);
+    const existing = await reread();
+    const challenge =
+      existing ??
+      (await this.generateDaily({
+        pool: new SpacePool(this.gameRepository, spaceId),
+        scope: { spaceId, ownerId: null },
+        dailyOn,
+        uniqueConstraint: SPACE_DAILY_UNIQUE_CONSTRAINT,
+        reread,
+      }));
 
+    return this.toDailyResponse(auth, challenge);
+  }
+
+  /**
+   * The player's own daily for today, generated on first read.
+   *
+   * Lazy for the same reasons the space daily is - nothing to schedule for an account nobody
+   * opens, a missed day heals itself - and keyed to the UTC calendar day, the same boundary, so
+   * the two dailies roll over together rather than a player's "today" depending on which one they
+   * opened. Always available: there is no per-user opt-in, because unlike a space's daily this one
+   * is nobody else's business to enable.
+   */
+  async getSoloDaily(auth: AuthDto): Promise<GameDailyResponseDto> {
+    const dailyOn = utcDateKey(new Date());
+    // The toggles are read once, here, and frozen onto the row by generateChallenge - so flipping
+    // a source later in the day cannot make the daily already in flight unplayable.
+    const scope: SoloScope = { spaceId: null, ownerId: auth.user.id, ...DEFAULT_SOLO_SOURCES };
+    const reread = () => this.gameRepository.getSoloDailyChallenge(auth.user.id, dailyOn);
+    const existing = await reread();
+    const challenge =
+      existing ??
+      (await this.generateDaily({
+        pool: this.personalPool(scope),
+        scope,
+        dailyOn,
+        uniqueConstraint: SOLO_DAILY_UNIQUE_CONSTRAINT,
+        reread,
+      }));
+
+    return this.toDailyResponse(auth, challenge);
+  }
+
+  /** A daily, annotated with the caller's own progress - or the "no daily today" shape. */
+  private async toDailyResponse(auth: AuthDto, challenge: GameChallengeRow | undefined): Promise<GameDailyResponseDto> {
     if (!challenge) {
       return { challenge: null };
     }
@@ -532,32 +662,53 @@ export class GameService extends BaseService {
   }
 
   /**
-   * Generates today's daily, or returns undefined when the space has nothing playable.
+   * Generates today's daily for one scope, or returns undefined when that scope has nothing
+   * playable.
    *
-   * Two things are deliberate. A space with no usable photos yields `undefined` rather than the
-   * 400 `generateChallenge` throws: "no daily today" is an ordinary state of the page, not a failed
-   * request. And a lost race - two members generating at once, the partial unique index rejecting
-   * the second - is resolved by re-reading the winner, so both players get the SAME challenge
-   * instead of one of them seeing a 500.
+   * One generator for both scopes, so the seed shape and the race recovery cannot drift apart -
+   * they are exactly the two things nothing downstream would notice diverging.
+   *
+   * Two behaviours are deliberate. A scope with no usable photos yields `undefined` rather than
+   * the 400 `generateChallenge` throws: "no daily today" is an ordinary state of the page, not a
+   * failed request. And a lost race - two readers generating at once, the scope's partial unique
+   * index rejecting the second - is resolved by re-reading the winner, so both reads land on the
+   * SAME challenge instead of one of them seeing a 500.
    */
-  private async generateDaily(spaceId: string, dailyOn: string): Promise<GameChallengeRow | undefined> {
-    const pool = new SpacePool(this.gameRepository, spaceId);
+  private async generateDaily({
+    pool,
+    scope,
+    dailyOn,
+    uniqueConstraint,
+    reread,
+  }: {
+    pool: ChallengePool;
+    scope: ChallengeScope;
+    dailyOn: string;
+    /** The partial unique index this scope races on - the two scopes have one each. */
+    uniqueConstraint: string;
+    /** Reads back the row for this scope and date, whoever wrote it. */
+    reread: () => Promise<GameChallengeRow | undefined>;
+  }): Promise<GameChallengeRow | undefined> {
     try {
       await this.generateChallenge({
         pool,
-        scope: { spaceId, ownerId: null },
-        // No human author: the daily is the space's, not the first reader's.
+        scope,
+        // No human author: the daily is the scope's, not the first reader's - and for a solo
+        // challenge `ownerId` already carries who it belongs to.
         createdById: null,
         requestedRoundCount: DAILY_ROUND_COUNT,
         type: 'mixed',
-        // Keyed to the date, so every member generating "first" builds an identical challenge.
+        // Keyed to the date, so every "first" generation for this scope builds an identical
+        // challenge.
         seed: `${await pool.seedKey()}:daily:${dailyOn}`,
         dailyOn,
         name: dailyOn,
       });
     } catch (error) {
-      if ((error as PostgresError)?.constraint_name === DAILY_UNIQUE_CONSTRAINT) {
-        return this.gameRepository.getDailyChallenge(spaceId, dailyOn);
+      // postgres.js surfaces the violated constraint as `constraint_name`, the same pattern
+      // `guess` uses for the already-guessed conflict.
+      if ((error as PostgresError)?.constraint_name === uniqueConstraint) {
+        return reread();
       }
       if (error instanceof BadRequestException) {
         return undefined;
@@ -565,7 +716,7 @@ export class GameService extends BaseService {
       throw error;
     }
 
-    return this.gameRepository.getDailyChallenge(spaceId, dailyOn);
+    return reread();
   }
 
   /**
@@ -575,8 +726,7 @@ export class GameService extends BaseService {
    */
   async get(auth: AuthDto, challengeId: string): Promise<GameChallengeDetailResponseDto> {
     const challenge = await this.loadChallenge(challengeId);
-    const spaceId = this.requireSpaceScope(challenge);
-    await this.requireMember(spaceId, auth.user.id);
+    await this.requireChallengeAccess(auth, challenge);
 
     const [rounds, guesses] = await Promise.all([
       this.gameRepository.getRounds(challengeId),
@@ -587,9 +737,8 @@ export class GameService extends BaseService {
 
     return {
       id: challenge.id,
-      spaceId,
-      // requireSpaceScope above already guarantees this is a space row, so ownerId is always
-      // null here - read from the column rather than hardcoded, same as toListItem.
+      // Straight off the row, exactly one of them non-null - same reasoning as toListItem.
+      spaceId: challenge.spaceId,
       ownerId: challenge.ownerId,
       name: challenge.name,
       dailyOn: asDateString(challenge.dailyOn),
@@ -603,13 +752,14 @@ export class GameService extends BaseService {
   }
 
   /**
-   * Submits one round's guess. Membership only (any role) - unlike `create`/`delete`, playing a
-   * challenge is not an editor-only action. The score is computed here, once, from the
-   * challenge's frozen `scaleKm`/`scaleDays`, then persisted; it is never recomputed on read.
+   * Submits one round's guess. Membership (any role) for a space challenge, ownership for a solo
+   * one - unlike `create`/`delete`, playing a challenge is not an editor-only action. The score is
+   * computed here, once, from the challenge's frozen `scaleKm`/`scaleDays`, then persisted; it is
+   * never recomputed on read.
    */
   async guess(auth: AuthDto, challengeId: string, index: number, dto: GameGuessDto): Promise<GameGuessResponseDto> {
     const challenge = await this.loadChallenge(challengeId);
-    await this.requireMember(this.requireSpaceScope(challenge), auth.user.id);
+    await this.requireChallengeAccess(auth, challenge);
 
     const round = await this.gameRepository.getRound(challengeId, index);
     if (!round) {
@@ -647,13 +797,13 @@ export class GameService extends BaseService {
    * index)` - the asset id never appears in the request, so a client cannot pivot from a round
    * straight to `/api/assets/:id`. Serves the asset's existing **preview** derivative (already
    * re-encoded, EXIF-stripped by the thumbnail generator) under a generic `round-<index>`
-   * filename; the original file and the real filename are never touched here. Membership only
-   * (any role), like `get`/`guess`/`leaderboard` - a viewer can view every round's image.
+   * filename; the original file and the real filename are never touched here. Gated like
+   * `get`/`guess`/`leaderboard` - a space viewer can view every round's image, a solo owner their
+   * own.
    */
   async getRoundImage(auth: AuthDto, challengeId: string, index: number): Promise<ImmichMediaResponse> {
     const challenge = await this.loadChallenge(challengeId);
-    const spaceId = this.requireSpaceScope(challenge);
-    await this.requireMember(spaceId, auth.user.id);
+    const scope = await this.requireChallengeAccess(auth, challenge);
 
     const round = await this.gameRepository.getRound(challengeId, index);
     if (!round) {
@@ -666,17 +816,21 @@ export class GameService extends BaseService {
       throw new NotFoundException('Round image not available');
     }
 
-    // Space-scoped, and re-checked on EVERY request - deliberately not AssetRepository.getById,
-    // which applies no deletedAt, no visibility and no space predicate. Rounds are frozen by
+    // Scope-scoped, and re-checked on EVERY request - deliberately not AssetRepository.getById,
+    // which applies no deletedAt, no visibility and no scope predicate. Rounds are frozen by
     // design (§4.1) so this assetId is permanent; resolving it unscoped meant that once a photo
     // entered a challenge, removing it from the space, trashing it, or moving it to the locked
     // folder did not stop the game serving it to every member, forever. resolveRoundAsset
     // re-applies the exact predicate the candidate queries used, so eligibility to be served
     // and eligibility to be picked cannot diverge.
     //
+    // The solo pool is rebuilt from the toggles FROZEN on the row, not from the player's current
+    // preference: re-resolving them live would 404 every round image of a game in flight the
+    // moment they turned a source off.
+    //
     // A miss is a normal outcome, not corruption: the round remains scoreable from its
     // denormalised answer (§9), so this 404s the image and leaves the challenge intact.
-    const pool = new SpacePool(this.gameRepository, spaceId);
+    const pool = scope.spaceId === null ? this.personalPool(scope) : new SpacePool(this.gameRepository, scope.spaceId);
     const previewFile = await pool.resolveRoundAsset(round.assetId);
     if (!previewFile) {
       throw new NotFoundException('Round image not available');
@@ -715,7 +869,8 @@ export class GameService extends BaseService {
   }
 
   /**
-   * Today's-challenge board: one entry per CURRENT member, zero-filled.
+   * Today's-challenge board: one entry per CURRENT member, zero-filled - or, for a solo
+   * challenge, the one player it belongs to.
    *
    * Members who have not played are included rather than omitted, so this board and the monthly
    * standings show the same people - a member who is absent from one tab and present on the other
@@ -724,12 +879,30 @@ export class GameService extends BaseService {
    */
   async leaderboard(auth: AuthDto, challengeId: string): Promise<GameLeaderboardResponseDto> {
     const challenge = await this.loadChallenge(challengeId);
-    const spaceId = this.requireSpaceScope(challenge);
-    await this.requireMember(spaceId, auth.user.id);
+    const scope = await this.requireChallengeAccess(auth, challenge);
+
+    if (scope.spaceId === null) {
+      // A solo challenge has exactly one player, and the gate above has just proved it is this
+      // caller - so the board is their own row, zero-filled like every other member row here.
+      // Not an empty board: the client renders the same component either way, and "no entries"
+      // would read as "you have not played" once they have.
+      const rows = await this.gameRepository.getLeaderboard(challengeId);
+      const row = rows.find((entry) => entry.userId === scope.ownerId);
+      return {
+        entries: [
+          {
+            userId: scope.ownerId,
+            name: auth.user.name,
+            total: row?.total ?? 0,
+            answered: row?.answered ?? 0,
+          },
+        ],
+      };
+    }
 
     const [rows, members] = await Promise.all([
       this.gameRepository.getLeaderboard(challengeId),
-      this.sharedSpaceRepository.getMembers(spaceId),
+      this.sharedSpaceRepository.getMembers(scope.spaceId),
     ]);
 
     const rowByUserId = new Map(rows.map((row) => [row.userId, row]));
@@ -782,10 +955,13 @@ export class GameService extends BaseService {
 
   async delete(auth: AuthDto, challengeId: string): Promise<void> {
     const challenge = await this.loadChallenge(challengeId);
-    await this.requireEditor(this.requireSpaceScope(challenge), auth.user.id);
-    // The daily is shared state, not one member's row: deleting it would take away a game the rest
-    // of the space may already have played today, and it would simply regenerate on the next read
-    // anyway - with a different id, orphaning the leaderboard everyone was competing on.
+    await this.requireChallengeAccess(auth, challenge, { editor: true });
+    // Refused for both scopes, for two different reasons that land in the same place. A space
+    // daily is shared state, not one member's row: deleting it would take away a game the rest of
+    // the space may already have played today, and it would regenerate on the next read anyway -
+    // with a different id, orphaning the leaderboard everyone was competing on. A personal daily
+    // is one player's, but a deletable daily is a re-rollable one, which is exactly what a streak
+    // has to be safe from.
     if (challenge.dailyOn !== null) {
       throw new BadRequestException('The daily challenge cannot be deleted');
     }
@@ -793,18 +969,42 @@ export class GameService extends BaseService {
   }
 
   /**
-   * A challenge's space, for the paths that resolve authorization through space membership.
+   * The single gate on one challenge, and the single place that dispatches on its scope: a space
+   * challenge resolves through membership, a solo challenge through ownership. Returns the scope
+   * it resolved, so a caller that needs a non-null id (the round-image pool, the leaderboard's
+   * member list) gets it from the check rather than re-deriving it from two nullable columns.
    *
-   * `spaceId` is nullable - a challenge belongs to a space OR to a user - and a challenge with no
-   * space cannot be reached by a membership check at all. Missing rather than forbidden is the
-   * deliberate wording: a 403 would confirm the id exists, which is an enumeration leak these
-   * routes otherwise avoid.
+   * `editor` is the space side's write gate, for `delete`. There is no solo counterpart: an owner
+   * is an owner, and a solo challenge has no other role to hold.
+   *
+   * A solo challenge belonging to someone else is MISSING, not forbidden - a 403 would confirm the
+   * id exists, an enumeration leak the space routes avoid by gating on membership before they say
+   * anything at all.
    */
-  private requireSpaceScope(challenge: GameChallengeRow): string {
-    if (challenge.spaceId === null) {
+  private async requireChallengeAccess(
+    auth: AuthDto,
+    challenge: GameChallengeRow,
+    { editor = false }: { editor?: boolean } = {},
+  ): Promise<ChallengeScope> {
+    if (challenge.spaceId !== null) {
+      await (editor
+        ? this.requireEditor(challenge.spaceId, auth.user.id)
+        : this.requireMember(challenge.spaceId, auth.user.id));
+      return { spaceId: challenge.spaceId, ownerId: null };
+    }
+
+    // Covers a row with neither scope as well, which `game_challenge_scope_chk` forbids: it has
+    // no owner to match, so it is unreachable rather than a crash waiting to happen.
+    if (challenge.ownerId !== auth.user.id) {
       throw new NotFoundException('Challenge not found');
     }
-    return challenge.spaceId;
+
+    return {
+      spaceId: null,
+      ownerId: challenge.ownerId,
+      includePartners: challenge.includePartners,
+      includeSpaces: challenge.includeSpaces,
+    };
   }
 
   private async loadChallenge(challengeId: string): Promise<GameChallengeRow> {

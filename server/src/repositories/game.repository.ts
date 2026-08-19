@@ -845,6 +845,28 @@ export class GameRepository {
   }
 
   /**
+   * One player's own daily for a UTC calendar day.
+   *
+   * A second method rather than a nullable-scope parameter on `getDailyChallenge`: the two scopes
+   * are enforced by two different partial unique indexes (Postgres treats NULLs as distinct, so
+   * the space index does not constrain solo rows at all), and a single query taking both ids
+   * would be one `where` away from reading across scopes.
+   */
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.STRING] })
+  async getSoloDailyChallenge(ownerId: string, dailyOn: string): Promise<GameChallengeRow | undefined> {
+    return (
+      this.db
+        .selectFrom('game_challenge')
+        .selectAll()
+        .where('ownerId', '=', ownerId)
+        // Cast explicitly, for the same reason getDailyChallenge does: the column reads back as a
+        // Date while the caller holds the UTC calendar day as a string.
+        .where('dailyOn', '=', sql<Date>`${dailyOn}::date`)
+        .executeTakeFirst()
+    );
+  }
+
+  /**
    * How many location rounds each of a space's challenges has, as one aggregate rather than a
    * per-challenge round fetch - the list endpoint only needs the count, and loading whole rounds
    * would pull every answer coordinate into the service to throw away.

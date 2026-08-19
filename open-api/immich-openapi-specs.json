@@ -8181,6 +8181,108 @@
         "x-immich-state": "Beta"
       }
     },
+    "/games/solo": {
+      "post": {
+        "description": "Generate and freeze a new challenge from the caller's own photos, plus whichever of partner and shared-space photos they have asked for.",
+        "operationId": "createSoloChallenge",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GameSoloCreateDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameChallengeResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Start a solo photo guessing challenge",
+        "tags": [
+          "Games"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "game.create",
+        "x-immich-state": "Beta"
+      }
+    },
+    "/games/solo/daily": {
+      "get": {
+        "description": "Get today's personal daily challenge, generating it on first read. Returns a null challenge when the caller has no photos usable for one.",
+        "operationId": "getSoloDailyChallenge",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameDailyResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Get the caller's daily challenge",
+        "tags": [
+          "Games"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "game.read",
+        "x-immich-state": "Beta"
+      }
+    },
     "/games/{id}": {
       "delete": {
         "description": "Permanently delete a challenge, cascading its rounds and guesses.",
@@ -32710,6 +32812,40 @@
           "date"
         ],
         "type": "string"
+      },
+      "GameSoloCreateDto": {
+        "properties": {
+          "roundCount": {
+            "default": 5,
+            "description": "Number of rounds to generate",
+            "maximum": 20,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "sources": {
+            "$ref": "#/components/schemas/GameSoloSourcesDto",
+            "description": "Override the stored source toggles for this game"
+          },
+          "type": {
+            "$ref": "#/components/schemas/GameChallengeType",
+            "default": "mixed",
+            "description": "Which kinds of round to generate"
+          }
+        },
+        "type": "object"
+      },
+      "GameSoloSourcesDto": {
+        "properties": {
+          "includePartners": {
+            "description": "Also draw from partners' photos",
+            "type": "boolean"
+          },
+          "includeSpaces": {
+            "description": "Also draw from shared-space photos",
+            "type": "boolean"
+          }
+        },
+        "type": "object"
       },
       "GameStandingsResponseDto": {
         "properties": {

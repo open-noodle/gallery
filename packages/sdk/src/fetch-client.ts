@@ -2135,6 +2135,72 @@ export type FaceDto = {
     /** Face ID */
     id: string;
 };
+export type GameSoloSourcesDto = {
+    /** Also draw from partners' photos */
+    includePartners?: boolean;
+    /** Also draw from shared-space photos */
+    includeSpaces?: boolean;
+};
+export type GameSoloCreateDto = {
+    /** Number of rounds to generate */
+    roundCount?: number;
+    /** Override the stored source toggles for this game */
+    sources?: GameSoloSourcesDto;
+    /** Which kinds of round to generate */
+    "type"?: GameChallengeType;
+};
+export type GameChallengeResponseDto = {
+    /** Creation date */
+    createdAt: string;
+    /** The UTC date this is the space's daily challenge for, or null for a player-created one */
+    dailyOn: string | null;
+    /** Challenge ID */
+    id: string;
+    /** Challenge name */
+    name: string;
+    /** Owning user ID, or null for a shared-space challenge */
+    ownerId: string | null;
+    /** Number of rounds actually generated (may be less than requested) */
+    roundCount: number;
+    /** Frozen day scale used to score date rounds */
+    scaleDays: number;
+    /** Frozen distance scale used to score location rounds */
+    scaleKm: number;
+    /** Shared space ID, or null for a solo challenge */
+    spaceId: string | null;
+};
+export type GameChallengeListItemResponseDto = {
+    /** Number of rounds the caller has answered */
+    answered: number;
+    /** When this challenge was closed, if at all */
+    closedAt: string | null;
+    /** Creation date */
+    createdAt: string;
+    /** The UTC date this is the space's daily challenge for, or null for a player-created one */
+    dailyOn: string | null;
+    /** Challenge ID */
+    id: string;
+    /** How many of the rounds are location rounds */
+    locationRoundCount: number;
+    /** Challenge name */
+    name: string;
+    /** Owning user ID, or null for a shared-space challenge */
+    ownerId: string | null;
+    /** Number of rounds actually generated (may be less than requested) */
+    roundCount: number;
+    /** Frozen day scale used to score date rounds */
+    scaleDays: number;
+    /** Frozen distance scale used to score location rounds */
+    scaleKm: number;
+    /** Shared space ID, or null for a solo challenge */
+    spaceId: string | null;
+    /** The caller's total score across answered rounds */
+    total: number;
+};
+export type GameDailyResponseDto = {
+    /** Today's daily, if one could be generated */
+    challenge: (GameChallengeListItemResponseDto) | null;
+};
 export type GameRoundDetailResponseDto = {
     /** The round answer - present only once guessed */
     answer?: {
@@ -4097,34 +4163,6 @@ export type SpaceRepresentativeFaceUpdateDto = {
     /** Asset face ID used as the space representative face */
     assetFaceId: string | null;
 };
-export type GameChallengeListItemResponseDto = {
-    /** Number of rounds the caller has answered */
-    answered: number;
-    /** When this challenge was closed, if at all */
-    closedAt: string | null;
-    /** Creation date */
-    createdAt: string;
-    /** The UTC date this is the space's daily challenge for, or null for a player-created one */
-    dailyOn: string | null;
-    /** Challenge ID */
-    id: string;
-    /** How many of the rounds are location rounds */
-    locationRoundCount: number;
-    /** Challenge name */
-    name: string;
-    /** Owning user ID, or null for a shared-space challenge */
-    ownerId: string | null;
-    /** Number of rounds actually generated (may be less than requested) */
-    roundCount: number;
-    /** Frozen day scale used to score date rounds */
-    scaleDays: number;
-    /** Frozen distance scale used to score location rounds */
-    scaleKm: number;
-    /** Shared space ID, or null for a solo challenge */
-    spaceId: string | null;
-    /** The caller's total score across answered rounds */
-    total: number;
-};
 export type GameCreateDto = {
     /** Challenge name */
     name?: string;
@@ -4132,30 +4170,6 @@ export type GameCreateDto = {
     roundCount?: number;
     /** Which kinds of round to generate */
     "type"?: GameChallengeType;
-};
-export type GameChallengeResponseDto = {
-    /** Creation date */
-    createdAt: string;
-    /** The UTC date this is the space's daily challenge for, or null for a player-created one */
-    dailyOn: string | null;
-    /** Challenge ID */
-    id: string;
-    /** Challenge name */
-    name: string;
-    /** Owning user ID, or null for a shared-space challenge */
-    ownerId: string | null;
-    /** Number of rounds actually generated (may be less than requested) */
-    roundCount: number;
-    /** Frozen day scale used to score date rounds */
-    scaleDays: number;
-    /** Frozen distance scale used to score location rounds */
-    scaleKm: number;
-    /** Shared space ID, or null for a solo challenge */
-    spaceId: string | null;
-};
-export type GameDailyResponseDto = {
-    /** Today's daily, if one could be generated */
-    challenge: (GameChallengeListItemResponseDto) | null;
 };
 export type GameStandingsResponseDto = {
     /** Per-player totals, best first, non-players last */
@@ -7098,6 +7112,32 @@ export function getFilteredMapMarkers({ albumId, city, country, description, isF
         "type": $type,
         withSharedSpaces
     }))}`, {
+        ...opts
+    }));
+}
+/**
+ * Start a solo photo guessing challenge
+ */
+export function createSoloChallenge({ gameSoloCreateDto }: {
+    gameSoloCreateDto: GameSoloCreateDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 201;
+        data: GameChallengeResponseDto;
+    }>("/games/solo", oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: gameSoloCreateDto
+    })));
+}
+/**
+ * Get the caller's daily challenge
+ */
+export function getSoloDailyChallenge(opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: GameDailyResponseDto;
+    }>("/games/solo/daily", {
         ...opts
     }));
 }
@@ -11476,6 +11516,11 @@ export enum MapMediaType {
     Image = "IMAGE",
     Video = "VIDEO"
 }
+export enum GameChallengeType {
+    Mixed = "mixed",
+    Location = "location",
+    Date = "date"
+}
 export enum GameRoundType {
     Location = "location",
     Date = "date"
@@ -11694,11 +11739,6 @@ export enum SharedSpaceRole {
 export enum RepresentativeFaceSource {
     Auto = "auto",
     Manual = "manual"
-}
-export enum GameChallengeType {
-    Mixed = "mixed",
-    Location = "location",
-    Date = "date"
 }
 export enum StorageMigrationDirection {
     ToS3 = "toS3",
