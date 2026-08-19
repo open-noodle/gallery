@@ -107,16 +107,22 @@ class DailyReminderController {
     await scheduler.cancelAll();
 
     final config = _ref.read(appConfigProvider);
+    final enabled = config.read(SettingsKey.gameDailyReminderEnabled);
 
     // `dailyChallengeEnabled` is Optional<bool?> and `Absent.value` THROWS, so this must stay
     // `.orElse(null)`. Absent and null both mean "not opted in".
     final hasOptedInSpace = spaces.any((space) => space.dailyChallengeEnabled.orElse(null) == true);
 
+    // On iOS, hasPermission() can raise the system permission dialog. Only ask once the cheap
+    // local gates already pass — a user who never enabled the toggle or opted a space in should
+    // never see that prompt just from opening the app.
+    final permissionGranted = enabled && hasOptedInSpace ? await scheduler.hasPermission() : false;
+
     final occurrences = dailyReminderOccurrences(
       now: now ?? DateTime.now(),
       minuteOfDay: config.read(SettingsKey.gameDailyReminderMinuteOfDay),
-      enabled: config.read(SettingsKey.gameDailyReminderEnabled),
-      permissionGranted: await scheduler.hasPermission(),
+      enabled: enabled,
+      permissionGranted: permissionGranted,
       hasOptedInSpace: hasOptedInSpace,
       lastPlayedDate: config.read(SettingsKey.gameDailyLastPlayed),
     );

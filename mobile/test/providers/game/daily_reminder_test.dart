@@ -191,7 +191,42 @@ void main() {
     await c.read(dailyReminderProvider).refresh();
     await c.read(dailyReminderProvider).refresh();
 
-    verify(() => scheduler.cancelAll()).called(2);
+    // Deliberately not `verify(cancelAll).called(2)`: a bare count does not pin ORDER — a
+    // regression that moved cancelAll() to the end of the scheduling loop would still call it
+    // twice, wiping out every notification it had just scheduled, and a count-only assertion
+    // would still pass. verifyInOrder instead pins cancelAll before the first scheduleAt of each
+    // of the two refresh cycles below. (mocktail's verify()/verifyInOrder() consume the calls
+    // they match, so combining this with a separate called(2) on the same mock would double
+    // count and fail — this replaces that check rather than supplementing it.)
+    verifyInOrder([
+      () => scheduler.cancelAll(),
+      () => scheduler.scheduleAt(
+        any(),
+        any(),
+        title: any(named: 'title'),
+        body: any(named: 'body'),
+        payload: any(named: 'payload'),
+      ),
+      () => scheduler.cancelAll(),
+      () => scheduler.scheduleAt(
+        any(),
+        any(),
+        title: any(named: 'title'),
+        body: any(named: 'body'),
+        payload: any(named: 'payload'),
+      ),
+    ]);
+  });
+
+  test('hasPermission is not asked unless the local gates already pass', () async {
+    // Toggle left off (default). hasPermission() can raise the iOS system permission dialog, so a
+    // user who never opted into a space or enabled the toggle must never see it just from opening
+    // the app.
+    final c = container([_space('s1', dailyEnabled: true)]);
+
+    await c.read(dailyReminderProvider).refresh();
+
+    verifyNever(() => scheduler.hasPermission());
   });
 
   test('recording a completion stores the daily UTC date and reschedules', () async {
