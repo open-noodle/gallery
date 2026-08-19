@@ -24,6 +24,9 @@ const ADMIN_ROUTES = new Set([
   'GET queues/:name/jobs',
   'GET server/license',
   'GET server/statistics',
+  // fork-only: storage migration is an admin operation
+  'GET storage-migration/estimate',
+  'GET storage-migration/status',
   'GET system-config',
   'GET system-config/defaults',
   'GET system-config/storage-template-options',
@@ -31,10 +34,15 @@ const ADMIN_ROUTES = new Set([
   'GET system-metadata/reverse-geocoding-state',
   'GET system-metadata/version-check-state',
   'PATCH libraries/:id',
+  // fork-only: auto-classification rescan is an admin operation
+  'POST classification/scan',
   'POST jobs',
   'POST libraries',
   'POST libraries/:id/scan',
   'POST libraries/:id/validate',
+  // fork-only: storage migration is an admin operation
+  'POST storage-migration/rollback/:batchId',
+  'POST storage-migration/start',
   'POST system-metadata/admin-onboarding',
   'PUT jobs/:name',
   'PUT libraries/:id',
@@ -57,6 +65,8 @@ const SHARED_LINK_ROUTES = new Set([
   'GET assets/:id/video/stream/main.m3u8',
   'GET shared-links/me',
   'GET timeline/bucket',
+  // fork-only: same auth as its upstream siblings above (AssetRead + sharedLink)
+  'GET timeline/bucket-covers',
   'GET timeline/buckets',
   'POST assets',
   'POST download/archive',
