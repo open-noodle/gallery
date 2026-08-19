@@ -21,8 +21,8 @@ import 'package:immich_mobile/widgets/common/immich_toast.dart';
 ///
 /// [gameChallengesProvider] is the only provider that gates the body: the challenge list is this
 /// page's reason to exist, so a load failure there earns a dedicated retry control. Everything
-/// else this page reads — the space itself (for `dailyChallengeEnabled`), its members, the monthly
-/// standings and today's leaderboard — is read through `.valueOrNull`/`.orElse(null)` rather than
+/// else this page reads — the space itself (for `dailyChallengeEnabled`), the monthly standings
+/// and today's leaderboard — is read through `.valueOrNull`/`.orElse(null)` rather than
 /// `.requireValue`/`.when`, so a slow network or a transient failure on any one of them just hides
 /// that section instead of throwing and blanking the whole page.
 ///
@@ -95,7 +95,6 @@ class SpaceGamesPage extends HookConsumerWidget {
     final space = ref.watch(sharedSpaceProvider(spaceId));
     final challenges = ref.watch(gameChallengesProvider(spaceId));
     final standings = ref.watch(gameStandingsProvider(spaceId));
-    final members = ref.watch(sharedSpaceMembersProvider(spaceId));
     final daily = ref.watch(gameDailyProvider(spaceId));
     final currentUserId = ref.watch(currentUserProvider)?.id ?? '';
 
@@ -167,7 +166,6 @@ class SpaceGamesPage extends HookConsumerWidget {
                     today: todayBoard?.valueOrNull,
                     todayRoundCount: dailyChallenge?.roundCount.toInt() ?? 0,
                     month: month,
-                    members: members.valueOrNull ?? const [],
                     currentUserId: currentUserId,
                   ),
                 ),
