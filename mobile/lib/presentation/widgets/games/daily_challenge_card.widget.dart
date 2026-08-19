@@ -85,8 +85,34 @@ class DailySlot extends ConsumerWidget {
       height: kDailyCardHeight,
       child: daily.when(
         loading: () => const Card(child: Center(child: CircularProgressIndicator())),
+        // A failure earns a retry, like the challenge list's and the standings section's. Only
+        // this branch gets one: a null challenge below is not a failure — the space genuinely has
+        // no daily to fetch today — so re-fetching it would just fail the same way again.
+        // Structured like DailyChallengePrompt (capped lines, scrollable) so a long locale
+        // degrades instead of overflowing the fixed-height slot.
         error: (_, _) => Card(
-          child: Center(child: Text('game_daily_unavailable'.t(context: context))),
+          key: const Key('daily-card-error'),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'game_daily_unavailable'.t(context: context),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  TextButton(
+                    key: const Key('daily-retry'),
+                    onPressed: () => ref.invalidate(gameDailyProvider(spaceId)),
+                    child: Text('retry'.t(context: context)),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
         data: (challenge) {
           if (challenge == null) {

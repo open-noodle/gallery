@@ -135,7 +135,13 @@ class DateRoundState extends State<DateRound> {
   }
 }
 
-class _Wheel extends StatelessWidget {
+/// Stateful only to own its [FixedExtentScrollController].
+///
+/// Built inside `build`, the controller was reallocated on every frame the wheel scrolled through
+/// — roughly a dozen undisposed controllers per full month scroll, each holding a live scroll
+/// position. Created once and disposed here instead, which also stops the wheel snapping back to
+/// `initialItem` on every rebuild.
+class _Wheel extends StatefulWidget {
   const _Wheel({required this.itemCount, required this.initialItem, required this.labelAt, required this.onSelected});
 
   final int itemCount;
@@ -144,16 +150,29 @@ class _Wheel extends StatelessWidget {
   final void Function(int index) onSelected;
 
   @override
+  State<_Wheel> createState() => _WheelState();
+}
+
+class _WheelState extends State<_Wheel> {
+  late final FixedExtentScrollController _controller = FixedExtentScrollController(initialItem: widget.initialItem);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return ListWheelScrollView.useDelegate(
-      controller: FixedExtentScrollController(initialItem: initialItem),
+      controller: _controller,
       itemExtent: 30,
       physics: const FixedExtentScrollPhysics(),
-      onSelectedItemChanged: onSelected,
+      onSelectedItemChanged: widget.onSelected,
       childDelegate: ListWheelChildBuilderDelegate(
-        childCount: itemCount,
+        childCount: widget.itemCount,
         builder: (context, index) => Center(
-          child: Text(labelAt(index), style: const TextStyle(color: Colors.white)),
+          child: Text(widget.labelAt(index), style: const TextStyle(color: Colors.white)),
         ),
       ),
     );
