@@ -476,7 +476,7 @@ export class GameService extends BaseService {
   ): GameChallengeListItemResponseDto {
     return {
       id: challenge.id,
-      spaceId: challenge.spaceId,
+      spaceId: this.requireSpaceScope(challenge),
       name: challenge.name,
       roundCount: challenge.roundCount,
       scaleKm: challenge.scaleKm,
@@ -569,7 +569,8 @@ export class GameService extends BaseService {
    */
   async get(auth: AuthDto, challengeId: string): Promise<GameChallengeDetailResponseDto> {
     const challenge = await this.loadChallenge(challengeId);
-    await this.requireMember(challenge.spaceId, auth.user.id);
+    const spaceId = this.requireSpaceScope(challenge);
+    await this.requireMember(spaceId, auth.user.id);
 
     const [rounds, guesses] = await Promise.all([
       this.gameRepository.getRounds(challengeId),
@@ -580,7 +581,7 @@ export class GameService extends BaseService {
 
     return {
       id: challenge.id,
-      spaceId: challenge.spaceId,
+      spaceId,
       name: challenge.name,
       dailyOn: asDateString(challenge.dailyOn),
       roundCount: challenge.roundCount,
@@ -599,7 +600,7 @@ export class GameService extends BaseService {
    */
   async guess(auth: AuthDto, challengeId: string, index: number, dto: GameGuessDto): Promise<GameGuessResponseDto> {
     const challenge = await this.loadChallenge(challengeId);
-    await this.requireMember(challenge.spaceId, auth.user.id);
+    await this.requireMember(this.requireSpaceScope(challenge), auth.user.id);
 
     const round = await this.gameRepository.getRound(challengeId, index);
     if (!round) {
@@ -642,7 +643,8 @@ export class GameService extends BaseService {
    */
   async getRoundImage(auth: AuthDto, challengeId: string, index: number): Promise<ImmichMediaResponse> {
     const challenge = await this.loadChallenge(challengeId);
-    await this.requireMember(challenge.spaceId, auth.user.id);
+    const spaceId = this.requireSpaceScope(challenge);
+    await this.requireMember(spaceId, auth.user.id);
 
     const round = await this.gameRepository.getRound(challengeId, index);
     if (!round) {
@@ -665,7 +667,7 @@ export class GameService extends BaseService {
     //
     // A miss is a normal outcome, not corruption: the round remains scoreable from its
     // denormalised answer (§9), so this 404s the image and leaves the challenge intact.
-    const previewFile = await this.gameRepository.getEligibleRoundAsset(challenge.spaceId, round.assetId);
+    const previewFile = await this.gameRepository.getEligibleRoundAsset(spaceId, round.assetId);
     if (!previewFile) {
       throw new NotFoundException('Round image not available');
     }
@@ -712,11 +714,12 @@ export class GameService extends BaseService {
    */
   async leaderboard(auth: AuthDto, challengeId: string): Promise<GameLeaderboardResponseDto> {
     const challenge = await this.loadChallenge(challengeId);
-    await this.requireMember(challenge.spaceId, auth.user.id);
+    const spaceId = this.requireSpaceScope(challenge);
+    await this.requireMember(spaceId, auth.user.id);
 
     const [rows, members] = await Promise.all([
       this.gameRepository.getLeaderboard(challengeId),
-      this.sharedSpaceRepository.getMembers(challenge.spaceId),
+      this.sharedSpaceRepository.getMembers(spaceId),
     ]);
 
     const rowByUserId = new Map(rows.map((row) => [row.userId, row]));
@@ -769,7 +772,7 @@ export class GameService extends BaseService {
 
   async delete(auth: AuthDto, challengeId: string): Promise<void> {
     const challenge = await this.loadChallenge(challengeId);
-    await this.requireEditor(challenge.spaceId, auth.user.id);
+    await this.requireEditor(this.requireSpaceScope(challenge), auth.user.id);
     // The daily is shared state, not one member's row: deleting it would take away a game the rest
     // of the space may already have played today, and it would simply regenerate on the next read
     // anyway - with a different id, orphaning the leaderboard everyone was competing on.
@@ -777,6 +780,21 @@ export class GameService extends BaseService {
       throw new BadRequestException('The daily challenge cannot be deleted');
     }
     await this.gameRepository.deleteChallenge(challengeId);
+  }
+
+  /**
+   * A challenge's space, for the paths that resolve authorization through space membership.
+   *
+   * `spaceId` is nullable - a challenge belongs to a space OR to a user - and a challenge with no
+   * space cannot be reached by a membership check at all. Missing rather than forbidden is the
+   * deliberate wording: a 403 would confirm the id exists, which is an enumeration leak these
+   * routes otherwise avoid.
+   */
+  private requireSpaceScope(challenge: GameChallengeRow): string {
+    if (challenge.spaceId === null) {
+      throw new NotFoundException('Challenge not found');
+    }
+    return challenge.spaceId;
   }
 
   private async loadChallenge(challengeId: string): Promise<GameChallengeRow> {
