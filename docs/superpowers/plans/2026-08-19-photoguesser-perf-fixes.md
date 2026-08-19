@@ -13,11 +13,17 @@
 ## Global Constraints
 
 - These changes fold into **PR #1000, which has not merged**. Do not create a new migration; there is no schema change here at all.
-- Regenerate SQL with this **exact command**, from the worktree root:
+- Regenerate SQL with this **exact pair of commands**, from the worktree root:
 
   ```bash
+  cd server && pnpm build && cd ..
   DB_HOSTNAME=localhost DB_PORT=5435 DB_USERNAME=postgres DB_PASSWORD=postgres DB_DATABASE_NAME=immich mise sql
   ```
+
+  **The `pnpm build` is not optional.** `mise sql` runs `server/dist/bin/sync-sql.js` — compiled
+  output, not your source. Skipping the build regenerates from a stale `dist/` and **silently
+  produces a no-op**: the command reports success, `git status` shows nothing, and you conclude your
+  query change had no effect on the emitted SQL when in fact it was never compiled. Task 2 hit this.
 
   **Never run a bare `mise sql`.** Without the env prefix `DB_HOSTNAME` defaults to the
   docker-internal host `database`, which is unreachable from the host — and a failed connection
@@ -54,7 +60,7 @@
 
   Never rebuild or restart `immich-e2e-server` / `immich-e2e-postgres` themselves.
 
-- Server unit tests: `cd server && pnpm test -- --run <path>`. **The `<path>` is required** — `pnpm test -- --run` alone silently runs the entire suite.
+- Server unit tests: `cd server && pnpm test -- --run <path>`. **The `<path>` is required** — `pnpm test -- --run` alone silently runs the entire suite. Task 2 also observed this form _intermittently_ running the whole suite even with a path. If that happens, the run is still valid evidence (a green full suite contains your green file), but to scope reliably use vitest's filter directly: `cd server && npx vitest run <path>`. Always read the `Test Files` line to confirm what actually ran — a suite that collected nothing also exits 0.
 - E2E tests: `cd e2e && pnpm test <path>`. **Do not add `--run`** — the e2e `test` script already includes it and adding it again crashes.
 - Sample size is **4,000**, measured. Do not change it without re-running the sweep in §4.4 of the spec.
 - Face-area threshold stays **0.05**. Scene-gate prompts and `CANDIDATE_POOL_LIMIT = 200` are unchanged.
