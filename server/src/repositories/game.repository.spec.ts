@@ -134,5 +134,34 @@ describe('GameRepository', () => {
         }
       }
     });
+
+    it('samples before ranking, so the CLIP score is never computed over the whole library', () => {
+      const block = queryBlock(readGeneratedSql(), 'getLocationCandidates').replaceAll(/\s+/g, ' ');
+
+      // Stage 1 is a CTE that selects the candidate ids with NO vector column and NO face
+      // aggregate, ordered by the seeded hash and limited to the sample size. Sliced from the CTE
+      // opener to the outer query's FROM, which is where stage 2 begins.
+      const stageOne = block.slice(block.indexOf('with "sample"'), block.indexOf('from "sample"'));
+
+      expect(
+        block,
+        'getLocationCandidates no longer has a "sample" CTE. Without it the two-term CLIP\n' +
+          'expression is evaluated over EVERY eligible row (30,212 on the reference library,\n' +
+          '133 MB of vector reads) because it cannot use clip_index. That is the 17-second\n' +
+          'cold-cache path. Restore the two-stage shape and regenerate with `mise sql`.',
+      ).toContain('with "sample"');
+
+      expect(
+        stageOne,
+        'The stage-1 sample CTE references smart_search. Stage 1 exists precisely to avoid\n' +
+          'touching the vector column: it must select narrow columns only, so that the expensive\n' +
+          'stage-2 work is bounded by the sample size instead of the library size.',
+      ).not.toContain('smart_search');
+
+      expect(
+        stageOne,
+        'The stage-1 sample CTE references asset_face. The face gate belongs in stage 2, scoped\nto the sample.',
+      ).not.toContain('asset_face');
+    });
   });
 });
