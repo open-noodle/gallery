@@ -36,6 +36,8 @@ import { GameChallengeTable } from 'src/schema/tables/game-challenge.table';
 import { GameGuessTable } from 'src/schema/tables/game-guess.table';
 import { GameRoundTable, GameRoundType } from 'src/schema/tables/game-round.table';
 import { BaseService } from 'src/services/base.service';
+import { ChallengePool } from 'src/services/game/challenge-pool';
+import { SpacePool } from 'src/services/game/space-pool';
 import { asDateString } from 'src/utils/date';
 import { getFilenameExtension, ImmichMediaResponse } from 'src/utils/file';
 import {
@@ -71,17 +73,6 @@ const LOCATION_SHARE_BY_TYPE: Record<GameChallengeType, number> = {
   mixed: LOCATION_ROUND_SHARE,
   location: 1,
   date: 0,
-};
-
-/**
- * Why no rounds could be built, phrased per requested type. The remedy differs - a location game
- * needs GPS data specifically - so a single generic sentence would send half of these callers after
- * the wrong thing.
- */
-const NO_ROUNDS_MESSAGE: Record<GameChallengeType, string> = {
-  mixed: 'This space has no photos usable for a challenge - add photos with GPS data or capture dates to play',
-  location: 'This space has no photos with GPS data - a location game needs photos that know where they were taken',
-  date: 'This space has no photos with capture dates - a date game needs photos that know when they were taken',
 };
 
 /** The daily is always this size; it is the same game for everyone, so it takes no parameters. */
@@ -277,14 +268,15 @@ export class GameService extends BaseService {
   async create(auth: AuthDto, spaceId: string, dto: GameCreateDto): Promise<GameChallengeResponseDto> {
     await this.requireEditor(spaceId, auth.user.id);
 
+    const pool = new SpacePool(this.gameRepository, spaceId);
     // Resolved BEFORE the candidate queries, not alongside them: the challenge count is half of
     // the generation seed, and the seed now drives which slice of a large space the candidate
     // queries return (see GameRepository.seededOrder), not just which of them get picked.
-    const existingChallenges = await this.gameRepository.getChallengesForSpace(spaceId);
-    const challengeCount = existingChallenges?.length ?? 0;
+    const challengeCount = await pool.challengeCount();
 
     return this.generateChallenge({
-      spaceId,
+      pool,
+      scope: { spaceId, ownerId: null },
       createdById: auth.user.id,
       // GameCreateDto.roundCount has a zod .default(5), but chaining .optional() after .default()
       // (the codebase's own convention, e.g. SharedSpaceMemberCreateDto.role) keeps the inferred TS
@@ -292,7 +284,7 @@ export class GameService extends BaseService {
       // SharedSpaceRole.Viewer in shared-space.service.ts.
       requestedRoundCount: dto.roundCount ?? 5,
       type: dto.type ?? 'mixed',
-      seed: `${spaceId}:${challengeCount}`,
+      seed: `${await pool.seedKey()}:${challengeCount}`,
       dailyOn: null,
       name: dto.name?.trim() || `Challenge ${challengeCount + 1}`,
     });
@@ -305,7 +297,8 @@ export class GameService extends BaseService {
    * than a second, subtly different generator.
    */
   private async generateChallenge({
-    spaceId,
+    pool,
+    scope,
     createdById,
     requestedRoundCount,
     type,
@@ -313,7 +306,11 @@ export class GameService extends BaseService {
     dailyOn,
     name,
   }: {
-    spaceId: string;
+    pool: ChallengePool;
+    // The row's scope columns. A pool only queries within its scope, it does not know how to
+    // write it - `create`/`generateDaily` are the ones that know whether this challenge belongs
+    // to a space or (a later task) a user, so they build this alongside the pool.
+    scope: { spaceId: string | null; ownerId: string | null };
     createdById: string | null;
     requestedRoundCount: number;
     type: GameChallengeType;
@@ -324,9 +321,9 @@ export class GameService extends BaseService {
     const scenePrompts = await this.getScenePromptEmbeddings();
 
     const [rawLocationPool, rawDatePool, recentlyUsedAssetIds] = await Promise.all([
-      this.gameRepository.getLocationCandidates(spaceId, CANDIDATE_POOL_LIMIT, seed, scenePrompts),
-      this.gameRepository.getDateCandidates(spaceId, CANDIDATE_POOL_LIMIT, seed),
-      this.gameRepository.getRecentlyUsedAssetIds(spaceId, RECENT_CHALLENGE_LOOKBACK),
+      pool.locationCandidates(CANDIDATE_POOL_LIMIT, seed, scenePrompts),
+      pool.dateCandidates(CANDIDATE_POOL_LIMIT, seed),
+      pool.recentlyUsedAssetIds(RECENT_CHALLENGE_LOOKBACK),
     ]);
 
     // Prefer excluding assets used by recent challenges in this space, but never at the cost of
@@ -398,11 +395,11 @@ export class GameService extends BaseService {
       // Named by requested type, because the fix differs: a location game needs GPS data
       // specifically, and telling someone to "add photos with capture dates" when they asked for a
       // location game sends them after the wrong thing.
-      throw new BadRequestException(NO_ROUNDS_MESSAGE[type]);
+      throw new BadRequestException(pool.noRoundsMessage(type));
     }
 
     const challenge: Insertable<GameChallengeTable> = {
-      spaceId,
+      ...scope,
       createdById,
       dailyOn,
       name,
@@ -429,11 +426,10 @@ export class GameService extends BaseService {
 
     return {
       id,
-      spaceId,
-      // Always null here: this function only ever builds a space-scoped challenge (the `spaceId`
-      // param above is required, not optional) - a solo generator is a later task, not a
-      // behaviour this one adds.
-      ownerId: null,
+      // `scope`, not `challenge.spaceId`/`challenge.ownerId`: Insertable<GameChallengeTable> types
+      // nullable columns as `T | null | undefined` (undefined = "let the DB default apply"), but
+      // `scope` is the exact `string | null` this DTO field wants, and it's what we actually wrote.
+      ...scope,
       name: challenge.name,
       roundCount: challenge.roundCount,
       scaleKm: challenge.scaleKm,
@@ -545,15 +541,17 @@ export class GameService extends BaseService {
    * instead of one of them seeing a 500.
    */
   private async generateDaily(spaceId: string, dailyOn: string): Promise<GameChallengeRow | undefined> {
+    const pool = new SpacePool(this.gameRepository, spaceId);
     try {
       await this.generateChallenge({
-        spaceId,
+        pool,
+        scope: { spaceId, ownerId: null },
         // No human author: the daily is the space's, not the first reader's.
         createdById: null,
         requestedRoundCount: DAILY_ROUND_COUNT,
         type: 'mixed',
         // Keyed to the date, so every member generating "first" builds an identical challenge.
-        seed: `${spaceId}:daily:${dailyOn}`,
+        seed: `${await pool.seedKey()}:daily:${dailyOn}`,
         dailyOn,
         name: dailyOn,
       });
@@ -672,13 +670,14 @@ export class GameService extends BaseService {
     // which applies no deletedAt, no visibility and no space predicate. Rounds are frozen by
     // design (§4.1) so this assetId is permanent; resolving it unscoped meant that once a photo
     // entered a challenge, removing it from the space, trashing it, or moving it to the locked
-    // folder did not stop the game serving it to every member, forever. getEligibleRoundAsset
+    // folder did not stop the game serving it to every member, forever. resolveRoundAsset
     // re-applies the exact predicate the candidate queries used, so eligibility to be served
     // and eligibility to be picked cannot diverge.
     //
     // A miss is a normal outcome, not corruption: the round remains scoreable from its
     // denormalised answer (§9), so this 404s the image and leaves the challenge intact.
-    const previewFile = await this.gameRepository.getEligibleRoundAsset(spaceId, round.assetId);
+    const pool = new SpacePool(this.gameRepository, spaceId);
+    const previewFile = await pool.resolveRoundAsset(round.assetId);
     if (!previewFile) {
       throw new NotFoundException('Round image not available');
     }
