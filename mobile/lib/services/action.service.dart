@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/infrastructure/repositories/remote_album.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/remote_asset.repository.dart';
-import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/db.provider.dart';
 import 'package:immich_mobile/repositories/asset_api.repository.dart';
 import 'package:immich_mobile/repositories/drift_album_api_repository.dart';
