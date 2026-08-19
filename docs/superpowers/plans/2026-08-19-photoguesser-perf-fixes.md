@@ -255,9 +255,13 @@ In `server/src/repositories/game.repository.ts`, delete the `.leftJoin((eb) => e
       //   - ratio > 0.05    -> group survives HAVING           -> excluded
       // The zero-image-area branch has no rows in any library measured, so it is covered by
       // game-face-gate.spec.ts rather than by production data.
+      // NOTE the SHADOWED inner `eb` in the exists() callback. The outer builder is scoped to the
+      // outer query, so using outer `eb.ref('f.…')` here would resolve against the wrong context.
+      // The callback form is the codebase pattern - see database.ts:893 and
+      // asset.repository.ts:386.
       .where((eb) =>
         eb.not(
-          eb.exists(
+          eb.exists((eb) =>
             eb
               .selectFrom('asset_face as f')
               .select(sql`1`.as('one'))
@@ -266,7 +270,7 @@ In `server/src/repositories/game.repository.ts`, delete the `.leftJoin((eb) => e
               .where('f.isVisible', '=', true)
               .groupBy('f.assetId')
               .having(
-                sql<number>`sum((${eb.ref('f.boundingBoxX2')} - ${eb.ref('f.boundingBoxX1')}) * (${eb.ref('f.boundingBoxY2')} - ${eb.ref('f.boundingBoxY1')}))::double precision / nullif(max(${eb.ref('f.imageWidth')})::double precision * max(${eb.ref('f.imageHeight')}), 0)`,
+                sql<number>`sum(("f"."boundingBoxX2" - "f"."boundingBoxX1") * ("f"."boundingBoxY2" - "f"."boundingBoxY1"))::double precision / nullif(max("f"."imageWidth")::double precision * max("f"."imageHeight"), 0)`,
                 '>',
                 MAX_FACE_AREA_RATIO,
               ),
@@ -659,10 +663,11 @@ export function spaceAssetIdUnion(db: Kysely<DB>, spaceId: string) {
 
 In `getLocationCandidates`, replace the stage-1 `.where((eb) => eligibleSpaceAsset(eb, spaceId))` with a join to the union, keeping the three visibility/type/deleted clauses **outside** it:
 
+The union is built from `this.db`, the same way `access.repository.ts:296` builds its four-way union, and passed in as a prebuilt subquery — do **not** try to construct it from the CTE callback's `QueryCreator` or a join's `ExpressionBuilder`, which are different types and will not accept `.union()` of a `Kysely`-rooted builder.
+
 ```ts
-          .innerJoin(
-            (eb) => spaceAssetIdUnion(eb as unknown as Kysely<DB>, spaceId).as('space_asset'),
-            (join) => join.onRef('space_asset.assetId', '=', 'asset.id'),
+          .innerJoin(spaceAssetIdUnion(this.db, spaceId).as('space_asset'), (join) =>
+            join.onRef('space_asset.assetId', '=', 'asset.id'),
           )
           .where('asset.deletedAt', 'is', null)
           .where('asset.type', '=', AssetType.Image)
