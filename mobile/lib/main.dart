@@ -156,22 +156,35 @@ class ImmichAppState extends ConsumerState<ImmichApp> with WidgetsBindingObserve
     unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
     await _setNavigationBarColor();
 
-    await FlutterLocalNotificationsPlugin().initialize(
+    final notifications = FlutterLocalNotificationsPlugin();
+    await notifications.initialize(
       const InitializationSettings(
         android: AndroidInitializationSettings('@drawable/notification_icon'),
         iOS: DarwinInitializationSettings(),
       ),
-      // A reminder that opens the timeline is a reminder about nothing. Route it to a space that
-      // actually has a daily; the spaces list is the honest fallback when none can be resolved.
-      onDidReceiveNotificationResponse: (response) {
-        if (response.payload != kDailyReminderPayload) return;
-        unawaited(_openDailyChallenge());
-      },
+      onDidReceiveNotificationResponse: _onNotificationResponse,
     );
+
+    // `onDidReceiveNotificationResponse` above only fires while the app is already running. At
+    // 18:00 the app is almost always terminated — which is the entire point of a scheduled
+    // reminder — so the launched-by-notification case has to be read back explicitly, as
+    // flutter_local_notifications documents. Both paths route through the same handler.
+    final launchDetails = await notifications.getNotificationAppLaunchDetails();
+    if (launchDetails?.didNotificationLaunchApp ?? false) {
+      _onNotificationResponse(launchDetails?.notificationResponse);
+    }
 
     // Cold start. AppLifeCycleEnum.resumed does NOT fire on a cold launch, so without this a
     // fresh install (or a killed app) would have nothing scheduled until it was backgrounded once.
     unawaited(ref.read(dailyReminderProvider).refresh());
+  }
+
+  /// The single place a tapped notification is dispatched from, whether the tap arrived while the
+  /// app was running or launched it from cold. A reminder that opens the timeline is a reminder
+  /// about nothing, so only the daily-reminder payload is routed at all.
+  void _onNotificationResponse(NotificationResponse? response) {
+    if (response?.payload != kDailyReminderPayload) return;
+    unawaited(_openDailyChallenge());
   }
 
   /// Routes a tapped daily-reminder notification to the first opted-in space, in the spaces
