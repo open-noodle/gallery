@@ -184,6 +184,48 @@ finding naming `tscompat`** — those are artefacts of the override itself, not 
 Server unit tests were run with `--no-file-parallelism` from the outset, on the strength of the previous
 cycle's finding that parallel local runs produce a shifting failure set under contention.
 
+## Remote CI Verification
+
+- **Test branch**: `rebase/upstream-rolling-v3.1.1`
+- **Commit validated**: `441958a14d0`
+
+| Workflow                              | Status | Notes                                        |
+| ------------------------------------- | ------ | -------------------------------------------- |
+| `test.yml`                            | GREEN  | 21/21 jobs, 0 failed (after an infra re-run) |
+| `docker.yml`                          | GREEN  | first pass                                   |
+| `static_analysis.yml`                 | GREEN  | first pass                                   |
+| `gallery-build-mobile.yml`            | GREEN  | iOS + Android, first pass                    |
+| `gallery-mobile-smoke.yml`            | GREEN  | first pass                                   |
+| `gallery-ml-smoke.yml`                | GREEN  | first pass                                   |
+| `gallery-revert-to-immich-validation` | GREEN  | first pass — no migration coverage was owed  |
+| `gallery-rebase-smoke.yml`            | GREEN  | after an infra re-run                        |
+| `storage-migration-tests.yml`         | GREEN  | after an infra re-run                        |
+| `storage-migration-e2e.yml`           | GREEN  | after a re-dispatch at low concurrency       |
+
+### Two DISTINCT infrastructure failures — do not conflate them
+
+Four workflows failed on the first dispatch. They looked alike (all four build or pull the server image)
+but had **two different causes**, and they need different responses:
+
+1. **mise / api.github.com timeout** — `test.yml`, `gallery-rebase-smoke`, `storage-migration-tests`.
+   `mise WARN Failed to resolve tool version list for github:extism/js-pdk: HTTP timed out after 3.00s for
+https://api.github.com/repos/extism/js-pdk/releases`, then `extism-js: not found` three steps later.
+   mise **soft-fails with a WARN** and lets the build continue tool-less, so the failure surfaces far from
+   its cause. `docker.yml` built the same image through the same step successfully on the same dispatch —
+   that contrast is what identifies it as transient. **Response: plain re-run.**
+2. **Container-registry pull limit** — `storage-migration-e2e` only.
+   `error pulling image configuration: … toomanyrequests: retry-after: …, allowed: 4`. This is a _different_
+   limit and a plain re-run into the same concurrency just re-trips it. **Response: wait for the branch
+   queue to drain, then re-dispatch alone** — which is what took it green.
+
+This is the **second consecutive cycle** hit by cause (1), so it is a predictable recurring cost rather than
+bad luck. The remedy is named in the warning itself:
+
+> **Follow-up worth taking** (fork `server/Dockerfile`, out of scope for a sync): raise
+> `MISE_FETCH_REMOTE_VERSIONS_TIMEOUT` from its 3-second default, or pin/vendor `extism/js-pdk` so the image
+> build does not depend on an api.github.com round-trip at all — and make the step fail on the WARN instead
+> of continuing without the tool, so the error points at its own cause.
+
 ## Post-Rebase Verification
 
 - Commits behind upstream: **0**
