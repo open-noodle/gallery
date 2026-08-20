@@ -21,6 +21,9 @@ import {
   GameLeaderboardResponseDto,
   GameRoundDetailResponseDto,
   GameSoloCreateDto,
+  GameSoloHistoryQueryDto,
+  GameSoloHistoryResponseDto,
+  GameSoloStatsResponseDto,
   GameStandingsResponseDto,
 } from 'src/dtos/game.dto';
 import { CacheControl, SharedSpaceRole } from 'src/enum';
@@ -54,6 +57,7 @@ import {
   selectLocationRounds,
 } from 'src/utils/game-scoring';
 import { compareStandings } from 'src/utils/game-standings';
+import { computeStreak } from 'src/utils/game-streak';
 import { mimeTypes } from 'src/utils/mime-types';
 import { isSmartSearchEnabled } from 'src/utils/misc';
 import { hasSharedSpaceRole } from 'src/utils/shared-space-role';
@@ -601,17 +605,10 @@ export class GameService extends BaseService {
     }
 
     const dailyOn = utcDateKey(new Date());
-    const reread = () => this.gameRepository.getDailyChallenge(spaceId, dailyOn);
-    const existing = await reread();
+    const scope: SpaceScope = { spaceId, ownerId: null };
+    const existing = await this.readDaily(scope, dailyOn);
     const challenge =
-      existing ??
-      (await this.generateDaily({
-        pool: new SpacePool(this.gameRepository, spaceId),
-        scope: { spaceId, ownerId: null },
-        dailyOn,
-        uniqueConstraint: SPACE_DAILY_UNIQUE_CONSTRAINT,
-        reread,
-      }));
+      existing ?? (await this.generateDaily({ pool: new SpacePool(this.gameRepository, spaceId), scope, dailyOn }));
 
     return this.toDailyResponse(auth, challenge);
   }
@@ -630,17 +627,8 @@ export class GameService extends BaseService {
     // The toggles are read once, here, and frozen onto the row by generateChallenge - so flipping
     // a source later in the day cannot make the daily already in flight unplayable.
     const scope: SoloScope = { spaceId: null, ownerId: auth.user.id, ...DEFAULT_SOLO_SOURCES };
-    const reread = () => this.gameRepository.getSoloDailyChallenge(auth.user.id, dailyOn);
-    const existing = await reread();
-    const challenge =
-      existing ??
-      (await this.generateDaily({
-        pool: this.personalPool(scope),
-        scope,
-        dailyOn,
-        uniqueConstraint: SOLO_DAILY_UNIQUE_CONSTRAINT,
-        reread,
-      }));
+    const existing = await this.readDaily(scope, dailyOn);
+    const challenge = existing ?? (await this.generateDaily({ pool: this.personalPool(scope), scope, dailyOn }));
 
     return this.toDailyResponse(auth, challenge);
   }
@@ -673,22 +661,26 @@ export class GameService extends BaseService {
    * failed request. And a lost race - two readers generating at once, the scope's partial unique
    * index rejecting the second - is resolved by re-reading the winner, so both reads land on the
    * SAME challenge instead of one of them seeing a 500.
+   *
+   * The index to watch for and the row to re-read are DERIVED from the scope rather than passed
+   * in beside it. As parameters they were two more things a caller had to keep in agreement with
+   * the pool and the scope, and the wrong pairing compiles: watching for the space constraint on
+   * the solo path would turn a lost race into a 500 instead of a clean re-read - a failure that
+   * only appears under concurrency, which is exactly where nobody is watching.
    */
   private async generateDaily({
     pool,
     scope,
     dailyOn,
-    uniqueConstraint,
-    reread,
   }: {
     pool: ChallengePool;
     scope: ChallengeScope;
     dailyOn: string;
-    /** The partial unique index this scope races on - the two scopes have one each. */
-    uniqueConstraint: string;
-    /** Reads back the row for this scope and date, whoever wrote it. */
-    reread: () => Promise<GameChallengeRow | undefined>;
   }): Promise<GameChallengeRow | undefined> {
+    // The partial unique index this scope races on - the two scopes have one each, because Postgres
+    // treats NULLs as distinct and neither index constrains the other's rows.
+    const uniqueConstraint = scope.spaceId === null ? SOLO_DAILY_UNIQUE_CONSTRAINT : SPACE_DAILY_UNIQUE_CONSTRAINT;
+
     try {
       await this.generateChallenge({
         pool,
@@ -708,7 +700,7 @@ export class GameService extends BaseService {
       // postgres.js surfaces the violated constraint as `constraint_name`, the same pattern
       // `guess` uses for the already-guessed conflict.
       if ((error as PostgresError)?.constraint_name === uniqueConstraint) {
-        return reread();
+        return this.readDaily(scope, dailyOn);
       }
       if (error instanceof BadRequestException) {
         return undefined;
@@ -716,7 +708,20 @@ export class GameService extends BaseService {
       throw error;
     }
 
-    return reread();
+    return this.readDaily(scope, dailyOn);
+  }
+
+  /**
+   * Today's stored daily for one scope, whoever wrote it.
+   *
+   * Two repository methods rather than one taking both ids, for the reason
+   * `getSoloDailyChallenge` documents: the scopes are enforced by two different partial unique
+   * indexes, and a single query taking both would be one `where` away from reading across scopes.
+   */
+  private readDaily(scope: ChallengeScope, dailyOn: string): Promise<GameChallengeRow | undefined> {
+    return scope.spaceId === null
+      ? this.gameRepository.getSoloDailyChallenge(scope.ownerId, dailyOn)
+      : this.gameRepository.getDailyChallenge(scope.spaceId, dailyOn);
   }
 
   /**
@@ -726,7 +731,7 @@ export class GameService extends BaseService {
    */
   async get(auth: AuthDto, challengeId: string): Promise<GameChallengeDetailResponseDto> {
     const challenge = await this.loadChallenge(challengeId);
-    await this.requireChallengeAccess(auth, challenge);
+    await this.requireChallengeAccess(auth, challenge, { editor: false });
 
     const [rounds, guesses] = await Promise.all([
       this.gameRepository.getRounds(challengeId),
@@ -759,7 +764,7 @@ export class GameService extends BaseService {
    */
   async guess(auth: AuthDto, challengeId: string, index: number, dto: GameGuessDto): Promise<GameGuessResponseDto> {
     const challenge = await this.loadChallenge(challengeId);
-    await this.requireChallengeAccess(auth, challenge);
+    await this.requireChallengeAccess(auth, challenge, { editor: false });
 
     const round = await this.gameRepository.getRound(challengeId, index);
     if (!round) {
@@ -803,7 +808,7 @@ export class GameService extends BaseService {
    */
   async getRoundImage(auth: AuthDto, challengeId: string, index: number): Promise<ImmichMediaResponse> {
     const challenge = await this.loadChallenge(challengeId);
-    const scope = await this.requireChallengeAccess(auth, challenge);
+    const scope = await this.requireChallengeAccess(auth, challenge, { editor: false });
 
     const round = await this.gameRepository.getRound(challengeId, index);
     if (!round) {
@@ -879,7 +884,7 @@ export class GameService extends BaseService {
    */
   async leaderboard(auth: AuthDto, challengeId: string): Promise<GameLeaderboardResponseDto> {
     const challenge = await this.loadChallenge(challengeId);
-    const scope = await this.requireChallengeAccess(auth, challenge);
+    const scope = await this.requireChallengeAccess(auth, challenge, { editor: false });
 
     if (scope.spaceId === null) {
       // A solo challenge has exactly one player, and the gate above has just proved it is this
@@ -953,6 +958,78 @@ export class GameService extends BaseService {
     return { month: month.key, entries };
   }
 
+  /**
+   * Solo play's answer to the leaderboard and the standings: the player's own record.
+   *
+   * COMPUTED on every read, never stored, so no counter can drift away from the guesses it claims
+   * to summarise - a stored streak survives a deleted game, a corrected score, or a bug in the
+   * increment, and there would be nothing to reconcile it against. It is two queries per read of a
+   * page nobody refreshes in a loop, which is a cheap price for that.
+   *
+   * The streak counts only dailies, and only fully played ones (`getSoloCompletedDailyDates`);
+   * every other number counts every game with a guess in it, free play included. Those two answers
+   * can legitimately disagree - a half-played daily raises `gamesPlayed` and breaks the streak -
+   * and the client must not paper over that.
+   */
+  async soloStats(auth: AuthDto): Promise<GameSoloStatsResponseDto> {
+    const [completedDays, summary] = await Promise.all([
+      this.gameRepository.getSoloCompletedDailyDates(auth.user.id),
+      this.gameRepository.getSoloScoreSummary(auth.user.id),
+    ]);
+
+    // Measured against the UTC day, the same boundary `dailyOn` is stamped with - a local-day
+    // "today" would end a player's streak hours early or late depending on where they live.
+    const streak = computeStreak(completedDays, utcDateKey(new Date()));
+
+    return {
+      currentStreak: streak.current,
+      bestStreak: streak.best,
+      bestScore: summary.bestScore,
+      // Whole points, like every score the game shows: rounds are scored in integers, and rendering
+      // an average as 4212.3333333333335 would be the only fractional number on the panel.
+      averageScore: Math.round(summary.averageScore),
+      gamesPlayed: summary.gamesPlayed,
+    };
+  }
+
+  /**
+   * One page of the player's own finished games, newest first.
+   *
+   * Paged rather than complete because a daily a day accumulates forever, and offset paging rather
+   * than a cursor because this list is browsed from the top and appended to at the top - the drift
+   * a cursor protects against needs a page boundary to cross, which is not how anyone reads their
+   * own history.
+   *
+   * One row past the requested page is fetched to answer `hasNextPage` without a second count over
+   * every game the player has ever played (`person.service.ts` pages faces the same way).
+   */
+  async soloHistory(auth: AuthDto, dto: GameSoloHistoryQueryDto): Promise<GameSoloHistoryResponseDto> {
+    const take = dto.size;
+    const rows = await this.gameRepository.getSoloHistory(auth.user.id, {
+      skip: (dto.page - 1) * dto.size,
+      take: take + 1,
+    });
+
+    // Past the last page this is simply empty, which is the honest answer to "page 40 of 3" - the
+    // request is well formed, the player just has nothing there, and 404ing it would make a stale
+    // page number in a bookmark look like a broken endpoint.
+    return {
+      // Field by field rather than a spread of the row, the same rule `generateChallenge` follows:
+      // TypeScript's excess-property check does not fire on a spread, so a column added to the
+      // repository row later would ship to every client without anyone deciding it should.
+      items: rows.slice(0, take).map((row) => ({
+        id: row.id,
+        name: row.name,
+        dailyOn: row.dailyOn,
+        createdAt: row.createdAt,
+        roundCount: row.roundCount,
+        answered: row.answered,
+        total: row.total,
+      })),
+      hasNextPage: rows.length > take,
+    };
+  }
+
   async delete(auth: AuthDto, challengeId: string): Promise<void> {
     const challenge = await this.loadChallenge(challengeId);
     await this.requireChallengeAccess(auth, challenge, { editor: true });
@@ -975,16 +1052,23 @@ export class GameService extends BaseService {
    * member list) gets it from the check rather than re-deriving it from two nullable columns.
    *
    * `editor` is the space side's write gate, for `delete`. There is no solo counterpart: an owner
-   * is an owner, and a solo challenge has no other role to hold.
+   * is an owner, and a solo challenge has no other role to hold. It is REQUIRED, and deliberately
+   * has no default: the safe value and the common value are opposites here, so a default would be
+   * permissive, and a future mutating route that simply forgot the flag would silently settle for
+   * member-level access on the space arm. Stating it at every call site is the cost of that not
+   * being possible.
    *
-   * A solo challenge belonging to someone else is MISSING, not forbidden - a 403 would confirm the
-   * id exists, an enumeration leak the space routes avoid by gating on membership before they say
-   * anything at all.
+   * A solo challenge belonging to someone else is MISSING, not forbidden. Ownership has no "you
+   * are not a member of X" answer that is safe to give: there is no group to be outside of, so the
+   * only true 403 would be "this challenge exists and is somebody's", which tells a stranger
+   * exactly what they were probing for. (The space arm does answer 403 - `loadChallenge` 404s an
+   * unknown id before this gate runs, so a space challenge's existence is already distinguishable.
+   * That is deliberate and pinned by e2e; it is simply not a precedent the solo arm can borrow.)
    */
   private async requireChallengeAccess(
     auth: AuthDto,
     challenge: GameChallengeRow,
-    { editor = false }: { editor?: boolean } = {},
+    { editor }: { editor: boolean },
   ): Promise<ChallengeScope> {
     if (challenge.spaceId !== null) {
       await (editor

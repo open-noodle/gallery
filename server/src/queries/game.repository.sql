@@ -931,6 +931,68 @@ where
 group by
   "game_guess"."userId"
 
+-- GameRepository.getSoloCompletedDailyDates
+select
+  to_char("game_challenge"."dailyOn", 'YYYY-MM-DD') as "dailyOn"
+from
+  "game_challenge"
+  inner join "game_round" on "game_round"."challengeId" = "game_challenge"."id"
+  inner join "game_guess" on "game_guess"."roundId" = "game_round"."id"
+  and "game_guess"."userId" = $1
+where
+  "game_challenge"."ownerId" = $2
+  and "game_challenge"."dailyOn" is not null
+group by
+  "game_challenge"."id"
+having
+  count("game_guess"."id") = "game_challenge"."roundCount"
+
+-- GameRepository.getSoloScoreSummary
+select
+  count(*) as "gamesPlayed",
+  max("game_totals"."total") as "bestScore",
+  avg("game_totals"."total") as "averageScore"
+from
+  (
+    select
+      sum("game_guess"."score") as "total"
+    from
+      "game_challenge"
+      inner join "game_round" on "game_round"."challengeId" = "game_challenge"."id"
+      inner join "game_guess" on "game_guess"."roundId" = "game_round"."id"
+      and "game_guess"."userId" = $1
+    where
+      "game_challenge"."ownerId" = $2
+    group by
+      "game_challenge"."id"
+  ) as "game_totals"
+
+-- GameRepository.getSoloHistory
+select
+  "game_challenge"."id",
+  "game_challenge"."name",
+  "game_challenge"."roundCount",
+  "game_challenge"."createdAt",
+  to_char("game_challenge"."dailyOn", 'YYYY-MM-DD') as "dailyOn",
+  count("game_guess"."id") as "answered",
+  sum("game_guess"."score") as "total"
+from
+  "game_challenge"
+  inner join "game_round" on "game_round"."challengeId" = "game_challenge"."id"
+  inner join "game_guess" on "game_guess"."roundId" = "game_round"."id"
+  and "game_guess"."userId" = $1
+where
+  "game_challenge"."ownerId" = $2
+group by
+  "game_challenge"."id"
+order by
+  "game_challenge"."createdAt" desc,
+  "game_challenge"."id" desc
+limit
+  $3
+offset
+  $4
+
 -- GameRepository.deleteChallenge
 delete from "game_challenge"
 where

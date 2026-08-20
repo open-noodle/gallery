@@ -181,6 +181,60 @@ const GameStandingsResponseSchema = z
   })
   .meta({ id: 'GameStandingsResponseDto' });
 
+// Solo play's answer to the leaderboard: the player's own record, since there is nobody to rank
+// them against. Every field is a number and none of them is nullable - a player who has never
+// played gets zeroes, so the panel renders the same shape on day one as on day one hundred and has
+// no "no data yet" branch to get wrong. All five are COMPUTED from the games on every read, never
+// stored, so they cannot drift from the guesses they are derived from.
+const GameSoloStatsResponseSchema = z
+  .object({
+    currentStreak: z.number().describe('Consecutive UTC days of fully played dailies, ending today or yesterday'),
+    bestStreak: z.number().describe('The longest such run ever'),
+    bestScore: z.number().describe('The highest total scored in a single game'),
+    averageScore: z.number().describe('Mean total across games played, rounded to whole points'),
+    gamesPlayed: z.number().describe('How many games have at least one guess'),
+  })
+  .meta({ id: 'GameSoloStatsResponseDto' });
+
+const GameSoloHistoryQuerySchema = z
+  .object({
+    page: z.coerce.number().int().min(1).default(1).describe('Page number'),
+    size: z.coerce.number().int().min(1).max(100).default(20).describe('Number of games per page'),
+  })
+  .meta({ id: 'GameSoloHistoryQueryDto' });
+
+// A history row, not a challenge: no `spaceId`/`ownerId` (every row here is the caller's own solo
+// game) and no scale fields, which mean something to the scorer and nothing to a list.
+const GameSoloHistoryItemResponseSchema = z
+  .object({
+    id: z.string().describe('Challenge ID'),
+    name: z.string().describe('Challenge name'),
+    // A plain YYYY-MM-DD string, for the same reason GameChallengeResponseDto's is: the daily is
+    // keyed to a UTC calendar day, and parsing it into a Date reintroduces the timezone question
+    // the date column exists to settle.
+    dailyOn: z
+      .string()
+      .meta({ format: 'date' })
+      .nullable()
+      .describe('The UTC date this was the daily for, or null for a free-play game'),
+    createdAt: isoDatetimeToDate.describe('Creation date'),
+    roundCount: z.number().describe('Number of rounds in the challenge'),
+    answered: z.number().describe('Number of rounds the player answered'),
+    total: z.number().describe('Total score across the rounds they answered'),
+  })
+  .meta({ id: 'GameSoloHistoryItemResponseDto' });
+
+// `hasNextPage` rather than a total count: the client only needs to know whether to offer another
+// page, and a count would cost a second aggregate over every game the player has ever played.
+// Paging past the end is an empty page, not an error - it is what a client that keeps a stale page
+// number does, and there is nothing wrong with the request.
+const GameSoloHistoryResponseSchema = z
+  .object({
+    items: z.array(GameSoloHistoryItemResponseSchema).describe('Games played, newest first'),
+    hasNextPage: z.boolean().describe('Whether another page follows this one'),
+  })
+  .meta({ id: 'GameSoloHistoryResponseDto' });
+
 export class GameCreateDto extends createZodDto(GameCreateSchema) {}
 export class GameSoloCreateDto extends createZodDto(GameSoloCreateSchema) {}
 export class GameSpaceParamDto extends createZodDto(GameSpaceParamSchema) {}
@@ -194,3 +248,7 @@ export class GameChallengeDetailResponseDto extends createZodDto(GameChallengeDe
 export class GameGuessResponseDto extends createZodDto(GameGuessResponseSchema) {}
 export class GameLeaderboardResponseDto extends createZodDto(GameLeaderboardResponseSchema) {}
 export class GameStandingsResponseDto extends createZodDto(GameStandingsResponseSchema) {}
+export class GameSoloStatsResponseDto extends createZodDto(GameSoloStatsResponseSchema) {}
+export class GameSoloHistoryQueryDto extends createZodDto(GameSoloHistoryQuerySchema) {}
+export class GameSoloHistoryItemResponseDto extends createZodDto(GameSoloHistoryItemResponseSchema) {}
+export class GameSoloHistoryResponseDto extends createZodDto(GameSoloHistoryResponseSchema) {}
