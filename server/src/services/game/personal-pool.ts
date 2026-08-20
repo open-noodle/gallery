@@ -11,10 +11,10 @@ import { SoloPoolSources } from 'src/utils/game-solo-eligibility';
  */
 export const PERSONAL_NO_ROUNDS_MESSAGE: Record<GameChallengeType, string> = {
   mixed:
-    'None of your photos can be used for a challenge - add photos with GPS data or capture dates, or include partner and shared-space photos in your game settings',
+    'None of your photos can be used for a challenge - add photos with GPS data or capture dates, or include partner and shared-space photos when you start a game',
   location:
-    'None of your photos have GPS data - a location game needs photos that know where they were taken, or include partner and shared-space photos in your game settings',
-  date: 'None of your photos have capture dates - a date game needs photos that know when they were taken, or include partner and shared-space photos in your game settings',
+    'None of your photos have GPS data - a location game needs photos that know where they were taken, or include partner and shared-space photos when you start a game',
+  date: 'None of your photos have capture dates - a date game needs photos that know when they were taken, or include partner and shared-space photos when you start a game',
 };
 
 /**
