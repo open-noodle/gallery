@@ -128,7 +128,7 @@ describe('ClassificationSettings', () => {
 
     await waitFor(() => {
       expect(updateConfig).toHaveBeenCalledWith({
-        systemConfigDto: expect.objectContaining({
+        adminConfigDto: expect.objectContaining({
           classification: expect.objectContaining({
             categories: [
               expect.objectContaining({
@@ -227,7 +227,7 @@ describe('ClassificationSettings', () => {
 
     await waitFor(() => {
       expect(updateConfig).toHaveBeenCalledWith({
-        systemConfigDto: expect.objectContaining({
+        adminConfigDto: expect.objectContaining({
           classification: expect.objectContaining({
             categories: [expect.objectContaining({ similarity: 0.11 })],
           }),
@@ -250,7 +250,7 @@ describe('ClassificationSettings', () => {
 
     await waitFor(() => {
       expect(updateConfig).toHaveBeenCalledWith({
-        systemConfigDto: expect.objectContaining({
+        adminConfigDto: expect.objectContaining({
           classification: expect.objectContaining({
             categories: [expect.objectContaining({ similarity: 0.8 })],
           }),
@@ -350,7 +350,7 @@ describe('ClassificationSettings', () => {
 
     await waitFor(() => {
       expect(updateConfig).toHaveBeenCalledWith({
-        systemConfigDto: expect.objectContaining({
+        adminConfigDto: expect.objectContaining({
           classification: expect.objectContaining({
             categories: [
               expect.objectContaining({
@@ -454,7 +454,7 @@ describe('ClassificationSettings', () => {
 
     await waitFor(() => {
       expect(updateConfig).toHaveBeenCalledWith({
-        systemConfigDto: expect.objectContaining({
+        adminConfigDto: expect.objectContaining({
           classification: expect.objectContaining({
             categories: [expect.objectContaining({ name: 'Receipts' })],
           }),
