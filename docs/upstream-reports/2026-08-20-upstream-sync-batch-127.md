@@ -190,24 +190,42 @@ Proven empty rather than assumed:
 ## Remote CI Verification
 
 - **Test branch**: `rebase/upstream-batch-127`
-- **Commit validated**: `d6c22c81dce`
+- **Final commit**: `3a734f41d1f`
 
-**`docker.yml` is the load-bearing gate this cycle** — it is the only thing that exercises the
-reconciled Dockerfile, and a wrong resolution there ships a broken or empty-plugin server image rather
-than failing a unit test. `test.yml` covers the reworked e2e compose/caching path.
+**10 of 10 green.**
 
-| Workflow                                  | Status  | Notes                                   |
-| ----------------------------------------- | ------- | --------------------------------------- |
-| `test.yml`                                | PENDING |                                         |
-| `docker.yml`                              | PENDING | validates the Dockerfile reconciliation |
-| `static_analysis.yml`                     | PENDING |                                         |
-| `gallery-build-mobile.yml`                | PENDING |                                         |
-| `gallery-rebase-smoke.yml`                | PENDING |                                         |
-| `storage-migration-tests.yml`             | PENDING |                                         |
-| `storage-migration-e2e.yml`               | PENDING |                                         |
-| `gallery-revert-to-immich-validation.yml` | PENDING |                                         |
-| `gallery-ml-smoke.yml`                    | PENDING |                                         |
-| `gallery-mobile-smoke.yml`                | PENDING |                                         |
+**`docker.yml` was the load-bearing gate this cycle** — the only thing that exercises the reconciled
+Dockerfile, where a wrong resolution ships a broken or empty-plugin server image rather than failing a
+unit test. It passed **first try on `d6c22c81dce`**, which validates all three re-derived fork intents:
+the `patches/` COPY, the cold-SDK ordering in four stages, and the relocated plugins stage.
+
+| Workflow                                  | Status | Run         | Notes                                   |
+| ----------------------------------------- | ------ | ----------- | --------------------------------------- |
+| `docker.yml`                              | GREEN  | 32341724416 | validates the Dockerfile reconciliation |
+| `test.yml`                                | GREEN  | 32343572420 | after the two fixes below               |
+| `static_analysis.yml`                     | GREEN  | 32341726172 |                                         |
+| `gallery-build-mobile.yml`                | GREEN  | 32341738904 | iOS + Android                           |
+| `gallery-rebase-smoke.yml`                | GREEN  | 32341728001 |                                         |
+| `storage-migration-tests.yml`             | GREEN  | 32341729546 |                                         |
+| `storage-migration-e2e.yml`               | GREEN  | 32341736943 |                                         |
+| `gallery-revert-to-immich-validation.yml` | GREEN  | 32341731493 |                                         |
+| `gallery-ml-smoke.yml`                    | GREEN  | 32341733348 |                                         |
+| `gallery-mobile-smoke.yml`                | GREEN  | 32341734972 |                                         |
+
+The nine non-`test.yml` workflows were green on `d6c22c81dce`; the two later commits changed only
+`.github/workflows/test.yml` formatting and this report, neither of which those workflows consume.
+
+### What the first `test.yml` run caught
+
+- **`.github Files Formatting` — a real defect of mine.** The hand-resolved `test.yml` carried two
+  stray double blank lines. `.github/` has its **own** prettier config and package, and CI checks it as
+  a separate job — so neither `server prettier --check .` nor the web/e2e format gates would ever see
+  it. **Add `cd .github && npx prettier --check .` to the local gate list after any workflow edit.**
+- **`Medium Tests (Server)` — infrastructure.** testcontainers failed to pull
+  `ghcr.io/immich-app/postgres:14-vectorchord0.4.3@sha256:…` with `statusCode: 404, 'no such container'`.
+  Checked before classifying: the "Free disk space" step (with its `docker image prune --all --force`)
+  that this cycle reordered exists **only in the e2e jobs**, while Medium Tests runs just
+  `mise run //server:ci-medium` — so the reordering is not implicated. Green on re-dispatch.
 
 ## Post-Rebase Verification
 
@@ -225,5 +243,7 @@ than failing a unit test. `test.yml` covers the reworked e2e compose/caching pat
 
 1. **Remove the `as any` casts on the two `face-repair.service.spec.ts` `OutputInfo` literals** — they
    hid the sharp 0.35 drift that broke the checked sibling.
-2. **Consider a `timeout-minutes` on `apply-branding`'s dependency install** (carried from batch 124) —
+2. **Add `.github` to the local format gate.** `cd .github && npx prettier --check .` — it has its own
+   prettier config and its own CI job, so the server/web/e2e format gates cannot see workflow-file drift.
+3. **Consider a `timeout-minutes` on `apply-branding`'s dependency install** (carried from batch 124) —
    a stalled `apt-get` holds a job slot for the 6-hour default.
