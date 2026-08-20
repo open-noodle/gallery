@@ -17,20 +17,23 @@ GameRoundDetailResponseDto _round(int index, {GameRoundType type = GameRoundType
           : Optional.present(GameRoundDetailResponseDtoAnswer(date: null, lat: lat ?? 1, lon: 2)),
     );
 
-GameChallengeDetailResponseDto _challenge(List<GameRoundDetailResponseDto> rounds, {DateTime? dailyOn}) =>
-    GameChallengeDetailResponseDto(
-      id: 'challenge-1',
-      spaceId: 'space-1',
-      ownerId: null,
-      name: 'Challenge 1',
-      roundCount: rounds.length,
-      scaleKm: 100,
-      scaleDays: 100,
-      createdAt: DateTime.utc(2026, 8, 18),
-      closedAt: null,
-      dailyOn: dailyOn,
-      rounds: rounds,
-    );
+GameChallengeDetailResponseDto _challenge(
+  List<GameRoundDetailResponseDto> rounds, {
+  DateTime? dailyOn,
+  String? spaceId = 'space-1',
+}) => GameChallengeDetailResponseDto(
+  id: 'challenge-1',
+  spaceId: spaceId,
+  ownerId: null,
+  name: 'Challenge 1',
+  roundCount: rounds.length,
+  scaleKm: 100,
+  scaleDays: 100,
+  createdAt: DateTime.utc(2026, 8, 18),
+  closedAt: null,
+  dailyOn: dailyOn,
+  rounds: rounds,
+);
 
 // GameGuessResponseDto has several other required-but-nullable fields (guessDate, guessLat,
 // guessLon, offsetDays) that the individual tests below do not care about — this fills them with
@@ -395,8 +398,8 @@ void main() {
     verify(() => repository.getLeaderboard('challenge-1')).called(1);
   });
 
-  test('completing a daily reports its dailyOn date', () async {
-    final reported = <DateTime>[];
+  test('completing a daily reports its dailyOn date and that it was a SPACE daily', () async {
+    final reported = <(DateTime, bool)>[];
     var fetches = 0;
     when(() => repository.getChallenge('challenge-1')).thenAnswer((_) async {
       fetches++;
@@ -413,16 +416,51 @@ void main() {
 
     final container = _container(repository);
     await container.read(gameSessionProvider('challenge-1').future);
-    final controller = container.read(gameSessionProvider('challenge-1').notifier)..onDailyCompleted = reported.add;
+    final controller = container.read(gameSessionProvider('challenge-1').notifier)
+      ..onDailyCompleted = (dailyOn, {required isSolo}) => reported.add((dailyOn, isSolo));
     await controller.guessLocation(lat: 1, lon: 1);
     controller.next();
     await Future<void>.delayed(Duration.zero);
 
-    expect(reported, [DateTime.utc(2026, 8, 18)]);
+    expect(reported, [(DateTime.utc(2026, 8, 18), false)]);
+  });
+
+  // The solo counterpart of the test above: `spaceId: null` is what `_finish` reads to decide
+  // `isSolo`, and getting this wrong makes `recordDailyCompleted` write the OTHER daily's
+  // last-played key — silently suppressing the reminder for whichever one was actually unplayed.
+  test('completing a solo daily reports isSolo true', () async {
+    final reported = <(DateTime, bool)>[];
+    var fetches = 0;
+    when(() => repository.getChallenge('challenge-1')).thenAnswer((_) async {
+      fetches++;
+      return _challenge(
+        [if (fetches == 1) _round(0) else _round(0, score: 1)],
+        dailyOn: DateTime.utc(2026, 8, 18),
+        spaceId: null,
+      );
+    });
+    when(
+      () => repository.guessLocation(
+        any(),
+        any(),
+        lat: any(named: 'lat'),
+        lon: any(named: 'lon'),
+      ),
+    ).thenAnswer((_) async => _guessResponse(score: 1));
+
+    final container = _container(repository);
+    await container.read(gameSessionProvider('challenge-1').future);
+    final controller = container.read(gameSessionProvider('challenge-1').notifier)
+      ..onDailyCompleted = (dailyOn, {required isSolo}) => reported.add((dailyOn, isSolo));
+    await controller.guessLocation(lat: 1, lon: 1);
+    controller.next();
+    await Future<void>.delayed(Duration.zero);
+
+    expect(reported, [(DateTime.utc(2026, 8, 18), true)]);
   });
 
   test('completing a custom (non-daily) challenge reports nothing', () async {
-    final reported = <DateTime>[];
+    final reported = <(DateTime, bool)>[];
     var fetches = 0;
     when(() => repository.getChallenge('challenge-1')).thenAnswer((_) async {
       fetches++;
@@ -440,7 +478,8 @@ void main() {
 
     final container = _container(repository);
     await container.read(gameSessionProvider('challenge-1').future);
-    final controller = container.read(gameSessionProvider('challenge-1').notifier)..onDailyCompleted = reported.add;
+    final controller = container.read(gameSessionProvider('challenge-1').notifier)
+      ..onDailyCompleted = (dailyOn, {required isSolo}) => reported.add((dailyOn, isSolo));
     await controller.guessLocation(lat: 1, lon: 1);
     controller.next();
     await Future<void>.delayed(Duration.zero);

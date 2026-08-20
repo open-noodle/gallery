@@ -13,7 +13,7 @@ class _MockGameApiRepository extends Mock implements GameApiRepository {}
 void main() {
   test('finishing a daily reports its completion to the reminder', () async {
     final reminder = _MockController();
-    when(() => reminder.recordDailyCompleted(any())).thenAnswer((_) async {});
+    when(() => reminder.recordDailyCompleted(any(), isSolo: any(named: 'isSolo'))).thenAnswer((_) async {});
 
     final repository = _MockGameApiRepository();
     var fetches = 0;
@@ -70,11 +70,13 @@ void main() {
 
     await container.read(gameSessionProvider('c1').future);
     final controller = container.read(gameSessionProvider('c1').notifier)
-      ..onDailyCompleted = (dailyOn) => container.read(dailyReminderProvider).recordDailyCompleted(dailyOn);
+      ..onDailyCompleted = (dailyOn, {required isSolo}) =>
+          container.read(dailyReminderProvider).recordDailyCompleted(dailyOn, isSolo: isSolo);
     await controller.guessLocation(lat: 1, lon: 1);
     controller.next();
     await Future<void>.delayed(Duration.zero);
 
-    verify(() => reminder.recordDailyCompleted(DateTime.utc(2026, 8, 18))).called(1);
+    // spaceId: 's1' above makes this a SPACE daily, not solo.
+    verify(() => reminder.recordDailyCompleted(DateTime.utc(2026, 8, 18), isSolo: false)).called(1);
   });
 }

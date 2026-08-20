@@ -6,6 +6,7 @@ import 'package:immich_mobile/infrastructure/repositories/settings.repository.da
 import 'package:immich_mobile/providers/game/daily_reminder.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
 import 'package:immich_mobile/providers/shared_space.provider.dart';
+import 'package:immich_mobile/utils/daily_reminder_schedule.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:openapi/api.dart';
 
@@ -51,7 +52,8 @@ void main() {
     // (`write<T, U extends T>`), and mocktail matches on the call site's inferred type arguments
     // too — `any<String?>()` infers `U = String?` while the real call passes a non-null `String`
     // (`U = String`), so the stub silently would not match and the mock would return `null`.
-    when(() => settings.write(SettingsKey.gameDailyLastPlayed, '2026-08-18')).thenAnswer((_) async {});
+    when(() => settings.write(SettingsKey.gameSpaceDailyLastPlayed, '2026-08-18')).thenAnswer((_) async {});
+    when(() => settings.write(SettingsKey.gameSoloDailyLastPlayed, '2026-08-18')).thenAnswer((_) async {});
   });
 
   ProviderContainer container(
@@ -106,14 +108,26 @@ void main() {
     ).called(greaterThan(0));
   });
 
+  // These two used to assert `verifyNever(scheduleAt)`: with a single shared gate, no opted-in
+  // space meant nothing scheduled at all, full stop. Now that the solo daily un-gates the reminder
+  // (`hasOptedInSpace || soloDailyEnabled`, soloDailyEnabled unconditionally true), scheduleAt DOES
+  // fire regardless — so a bare called/not-called split can no longer tell "counted as opted in"
+  // apart from "did not". Both are rebuilt around the per-source SKIP instead: the solo daily is
+  // recorded played today and the space is left unplayed, so a CORRECTLY false hasOptedInSpace
+  // vacuously counts the space as played too (both sources played → today's occurrence skipped,
+  // 6 left), while a wrongly-true hasOptedInSpace would read the space as genuinely unplayed
+  // (neither source played → today kept, 7 left) — the count is what distinguishes them.
   test('an absent dailyChallengeEnabled does not count as opted in, and does not throw', () async {
-    // `Absent.value` THROWS — reading this field with `.value` would blow up here rather than
-    // returning false.
-    final c = container([_space('s1')], settingsValues: {SettingsKey.gameDailyReminderEnabled: true});
+    // `Absent.value` THROWS — reading this field with `.value` would blow up when `refresh()` is
+    // awaited below, rather than returning false.
+    final c = container(
+      [_space('s1')],
+      settingsValues: {SettingsKey.gameDailyReminderEnabled: true, SettingsKey.gameSoloDailyLastPlayed: '2026-08-18'},
+    );
 
-    await c.read(dailyReminderProvider).refresh();
+    await c.read(dailyReminderProvider).refresh(now: DateTime(2026, 8, 18, 9));
 
-    verifyNever(
+    verify(
       () => scheduler.scheduleAt(
         any(),
         any(),
@@ -121,18 +135,18 @@ void main() {
         body: any(named: 'body'),
         payload: any(named: 'payload'),
       ),
-    );
+    ).called(kDailyReminderHorizonDays - 1);
   });
 
   test('a declined space does not count as opted in', () async {
     final c = container(
       [_space('s1', dailyEnabled: false)],
-      settingsValues: {SettingsKey.gameDailyReminderEnabled: true},
+      settingsValues: {SettingsKey.gameDailyReminderEnabled: true, SettingsKey.gameSoloDailyLastPlayed: '2026-08-18'},
     );
 
-    await c.read(dailyReminderProvider).refresh();
+    await c.read(dailyReminderProvider).refresh(now: DateTime(2026, 8, 18, 9));
 
-    verifyNever(
+    verify(
       () => scheduler.scheduleAt(
         any(),
         any(),
@@ -140,7 +154,7 @@ void main() {
         body: any(named: 'body'),
         payload: any(named: 'payload'),
       ),
-    );
+    ).called(kDailyReminderHorizonDays - 1);
   });
 
   test('one opted-in space among several is enough', () async {
@@ -229,15 +243,30 @@ void main() {
     verifyNever(() => scheduler.hasPermission());
   });
 
-  test('recording a completion stores the daily UTC date and reschedules', () async {
+  test('recording a completed space daily stores the SPACE key and reschedules', () async {
     final c = container(
       [_space('s1', dailyEnabled: true)],
       settingsValues: {SettingsKey.gameDailyReminderEnabled: true},
     );
 
-    await c.read(dailyReminderProvider).recordDailyCompleted(DateTime.utc(2026, 8, 18));
+    await c.read(dailyReminderProvider).recordDailyCompleted(DateTime.utc(2026, 8, 18), isSolo: false);
 
-    verify(() => settings.write(SettingsKey.gameDailyLastPlayed, '2026-08-18')).called(1);
+    verify(() => settings.write(SettingsKey.gameSpaceDailyLastPlayed, '2026-08-18')).called(1);
+    verify(() => scheduler.cancelAll()).called(1);
+  });
+
+  // The solo counterpart of the test above — recording under the WRONG key would silently
+  // suppress the reminder for the other, unplayed daily, which is the exact bug this task fixes.
+  test('recording a completed solo daily stores the SOLO key, not the space one', () async {
+    final c = container(
+      [_space('s1', dailyEnabled: true)],
+      settingsValues: {SettingsKey.gameDailyReminderEnabled: true},
+    );
+
+    await c.read(dailyReminderProvider).recordDailyCompleted(DateTime.utc(2026, 8, 18), isSolo: true);
+
+    verify(() => settings.write(SettingsKey.gameSoloDailyLastPlayed, '2026-08-18')).called(1);
+    verifyNever(() => settings.write(SettingsKey.gameSpaceDailyLastPlayed, '2026-08-18'));
     verify(() => scheduler.cancelAll()).called(1);
   });
 
