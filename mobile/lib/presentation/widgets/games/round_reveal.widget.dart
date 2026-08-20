@@ -18,12 +18,19 @@ class RoundReveal extends StatelessWidget {
     required this.index,
     required this.result,
     required this.onNext,
+    this.reviewing = false,
   });
 
   final String challengeId;
   final int index;
   final RoundResult result;
   final VoidCallback onNext;
+
+  /// True when this reveal is a read-only re-render of an already-finished round
+  /// (`GameRoundReviewPage`), as opposed to the live play loop advancing to the next one. Swaps
+  /// the advance button's label and, via `onNext`, its behaviour — the live loop passes
+  /// `controller.next`, review passes a pop. Defaults false so the live loop is unaffected.
+  final bool reviewing;
 
   @override
   Widget build(BuildContext context) {
@@ -82,7 +89,7 @@ class RoundReveal extends StatelessWidget {
           FilledButton(
             key: const Key('round-reveal-next'),
             onPressed: onNext,
-            child: Text('game_next_round'.t(context: context)),
+            child: Text((reviewing ? 'done' : 'game_next_round').t(context: context)),
           ),
         ],
       ),
