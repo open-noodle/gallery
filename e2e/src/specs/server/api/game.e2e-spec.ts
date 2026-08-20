@@ -403,6 +403,47 @@ describe('/games', () => {
       expect(guessedRound?.assetId).toBeDefined();
       expect(guessedRound?.answer).toBeDefined();
       expect(assets.map((asset) => asset.id)).toContain(guessedRound?.assetId);
+
+      // The guess comes back too, and matches what was actually submitted. `firstRound` is a
+      // 'date' round here (per the guessPayloadFor comment above: this file's fixtures never
+      // carry GPS EXIF, so every generated round is 'date'), so the location half of the pair is
+      // null - offsetDays is left to `expect.any(Number)` since its exact value depends on how far
+      // the fixed guess date falls from the fixture photos' upload time.
+      expect(guessedRound?.guess).toEqual({
+        lat: null,
+        lon: null,
+        date: '2020-06-15T00:00:00.000Z',
+        distanceKm: null,
+        offsetDays: expect.any(Number),
+      });
+    });
+
+    it('never returns another player guess', async () => {
+      const { spaceId } = await freshSpaceWithPhotos('leakage-isolation', 4);
+      const challenge = await createChallenge(spaceId, 4);
+      const initialDetail = await getDetail(challenge.id, owner.accessToken);
+      const [round] = initialDetail.rounds;
+
+      // Two members of the same space guess round 0 differently. `round` is a 'date' round here
+      // (per the guessPayloadFor comment above: this file's fixtures never carry GPS EXIF), so the
+      // two guesses are distinguished by date rather than by coordinates.
+      for (const [player, date] of [
+        [owner, '2020-06-15T00:00:00.000Z'],
+        [editor, '2021-09-03T00:00:00.000Z'],
+      ] as const) {
+        const { status } = await request(app)
+          .post(`/games/${challenge.id}/rounds/0/guess`)
+          .set('Authorization', `Bearer ${player.accessToken}`)
+          .send(guessPayloadFor(round, date));
+        expect(status).toBe(201);
+      }
+
+      const asOwner = await getDetail(challenge.id, owner.accessToken);
+      const ownerRound = asOwner.rounds.find((r) => r.index === round.index);
+
+      expect(ownerRound?.guess?.date).toBe('2020-06-15T00:00:00.000Z');
+      // The editor's guess must appear nowhere in the owner's payload, under any key.
+      expect(JSON.stringify(asOwner)).not.toContain('2021-09-03');
     });
   });
 
