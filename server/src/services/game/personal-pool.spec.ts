@@ -29,7 +29,7 @@ describe(PersonalPool.name, () => {
     for (const type of ['mixed', 'location', 'date'] as const) {
       expect(pool.noRoundsMessage(type), 'the space wording leaked into the solo pool').not.toContain('This space');
       expect(pool.noRoundsMessage(type), 'the remedy the player actually has is not mentioned').toContain(
-        'game settings',
+        'when you start a game',
       );
     }
     expect(pool.noRoundsMessage('location')).toContain('GPS');
