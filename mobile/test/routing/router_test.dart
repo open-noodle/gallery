@@ -162,6 +162,18 @@ void main() {
       expect(guardsOf('GamePlayRoute').whereType<DuplicateGuard>(), isEmpty);
     });
 
+    // This assertion belongs HERE, against the real route table, and not only in the widget test
+    // that checks the row pushes something: a FakeStackRouter records pushes without running any
+    // guard, so the widget test passes whether or not the guard would have cancelled the push. That
+    // gap is exactly how the Play again regression reached a device with a fully green suite.
+    //
+    // The review route opens one round from a list that can itself sit on the reveal's own back
+    // stack, so a future iteration opening another round FROM the reveal is one step away — and at
+    // that point a name-based guard would cancel it silently.
+    test('GameRoundReviewRoute can push itself, for round-to-round review', () {
+      expect(guardsOf('GameRoundReviewRoute').whereType<DuplicateGuard>(), isEmpty);
+    });
+
     // The counterexample that keeps the two above honest: a route nothing
     // pushes from its own page still carries the guard.
     test('PhotoGuesserRoute is still guarded', () {

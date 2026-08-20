@@ -58,9 +58,22 @@ void main() {
     await db.close();
   });
 
-  Future<void> pump(WidgetTester tester, RoundResult result, {VoidCallback? onNext}) {
+  Future<void> pump(WidgetTester tester, {RoundResult? result, bool reviewing = false, VoidCallback? onNext}) {
     return tester.pumpConsumerWidget(
-      RoundReveal(challengeId: 'c1', index: 0, result: result, onNext: onNext ?? () {}),
+      RoundReveal(
+        challengeId: 'c1',
+        index: 0,
+        // Only the reviewing-mode test omits `result`; every other call still supplies its own.
+        result:
+            result ??
+            RoundResult(
+              type: GameRoundType.location,
+              score: 900,
+              answer: GameRoundDetailResponseDtoAnswer(date: null, lat: 10, lon: 20),
+            ),
+        reviewing: reviewing,
+        onNext: onNext ?? () {},
+      ),
       overrides: [
         mapStateNotifierProvider.overrideWith(_FakeMapStateNotifier.new),
         localeProvider.overrideWithValue(const Locale('en')),
@@ -71,7 +84,7 @@ void main() {
   testWidgets('a location reveal shows the map and the distance', (tester) async {
     await pump(
       tester,
-      RoundResult(
+      result: RoundResult(
         type: GameRoundType.location,
         score: 4182,
         distanceKm: 38,
@@ -90,7 +103,7 @@ void main() {
   testWidgets('a date reveal shows the timeline strip, not a map it has no use for', (tester) async {
     await pump(
       tester,
-      RoundResult(
+      result: RoundResult(
         type: GameRoundType.date,
         score: 3640,
         offsetDays: 150,
@@ -111,7 +124,7 @@ void main() {
   testWidgets('a date reveal shows the guess and the answer, both labelled', (tester) async {
     await pump(
       tester,
-      RoundResult(
+      result: RoundResult(
         type: GameRoundType.date,
         score: 3640,
         offsetDays: 150,
@@ -135,7 +148,7 @@ void main() {
     // no guess to mark — the same asymmetry RevealMap handles for location rounds.
     await pump(
       tester,
-      RoundResult(
+      result: RoundResult(
         type: GameRoundType.date,
         score: 900,
         answer: GameRoundDetailResponseDtoAnswer(date: DateTime.utc(2019, 12, 1), lat: null, lon: null),
@@ -150,7 +163,7 @@ void main() {
   testWidgets('a 409 recovery renders with no guess pin and does not throw', (tester) async {
     await pump(
       tester,
-      RoundResult(
+      result: RoundResult(
         type: GameRoundType.location,
         score: 900,
         answer: GameRoundDetailResponseDtoAnswer(date: null, lat: 10, lon: 20),
@@ -169,7 +182,10 @@ void main() {
     // refetch fails, so the round's answer never arrives). round_reveal.widget.dart must pass
     // that null straight through to RevealMap rather than substituting (0, 0) — substituting
     // would draw the "actual location" circle at Null Island as if it were the real answer.
-    await pump(tester, const RoundResult(type: GameRoundType.location, score: 2200, guess: (lat: 48.85, lon: 2.35)));
+    await pump(
+      tester,
+      result: const RoundResult(type: GameRoundType.location, score: 2200, guess: (lat: 48.85, lon: 2.35)),
+    );
 
     expect(find.byKey(const Key('round-reveal-score')), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -194,7 +210,7 @@ void main() {
   ) async {
     await pump(
       tester,
-      RoundResult(
+      result: RoundResult(
         type: GameRoundType.date,
         score: 3640,
         offsetDays: 150,
@@ -219,7 +235,7 @@ void main() {
     var taps = 0;
     await pump(
       tester,
-      RoundResult(
+      result: RoundResult(
         type: GameRoundType.location,
         score: 10,
         answer: GameRoundDetailResponseDtoAnswer(date: null, lat: 1, lon: 1),
@@ -231,5 +247,17 @@ void main() {
     await tester.pump();
 
     expect(taps, 1);
+  });
+
+  testWidgets('review mode offers Done instead of Next round', (tester) async {
+    var popped = 0;
+    await pump(tester, reviewing: true, onNext: () => popped++);
+
+    expect(find.text('Done'), findsOneWidget);
+    expect(find.text('Next round'), findsNothing);
+
+    await tester.tap(find.byKey(const Key('round-reveal-next')));
+    await tester.pumpAndSettle();
+    expect(popped, 1);
   });
 }

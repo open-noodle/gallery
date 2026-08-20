@@ -26,6 +26,7 @@ import 'package:immich_mobile/pages/common/settings.page.dart';
 import 'package:immich_mobile/pages/common/splash_screen.page.dart';
 import 'package:immich_mobile/pages/common/tab_shell.page.dart';
 import 'package:immich_mobile/pages/games/game_play.page.dart';
+import 'package:immich_mobile/pages/games/game_round_review.page.dart';
 import 'package:immich_mobile/pages/games/photo_guesser.page.dart';
 import 'package:immich_mobile/pages/library/folder/folder.page.dart';
 import 'package:immich_mobile/pages/library/locked/pin_auth.page.dart';
@@ -193,6 +194,9 @@ class AppRouter extends RootStackRouter {
     // it, and the guard compares route NAMES — a const string with no challenge id in it — so it
     // reads that as re-opening the page you are already on and cancels the push silently.
     AutoRoute(page: GamePlayRoute.page, guards: [_authGuard]),
+    // No _duplicateGuard, for the same reason GamePlayRoute and FolderRoute omit it: see the
+    // comment above.
+    AutoRoute(page: GameRoundReviewRoute.page, guards: [_authGuard]),
     AutoRoute(page: SpaceGamesRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: PhotoGuesserRoute.page, guards: [_authGuard, _duplicateGuard]),
     CustomRoute(
