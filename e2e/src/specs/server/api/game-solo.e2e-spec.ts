@@ -47,6 +47,19 @@ describe('/games/solo', () => {
   const readDaily = (player: LoginResponseDto) =>
     request(app).get('/games/solo/daily').set('Authorization', `Bearer ${player.accessToken}`);
 
+  const readStats = (player: LoginResponseDto) =>
+    request(app).get('/games/solo/stats').set('Authorization', `Bearer ${player.accessToken}`);
+
+  const readHistory = (player: LoginResponseDto, query: Record<string, number> = {}) =>
+    request(app).get('/games/solo/history').query(query).set('Authorization', `Bearer ${player.accessToken}`);
+
+  /** A date guess on one round. Every fixture asset is GPS-free, so every round is a date round. */
+  const guessRound = (player: LoginResponseDto, challengeId: string, index: number) =>
+    request(app)
+      .post(`/games/${challengeId}/rounds/${index}/guess`)
+      .set('Authorization', `Bearer ${player.accessToken}`)
+      .send({ date: new Date('2020-06-15T00:00:00.000Z').toISOString() });
+
   const getDetail = async (challengeId: string, player: LoginResponseDto): Promise<GameChallengeDetailResponseDto> => {
     const { status, body } = await request(app)
       .get(`/games/${challengeId}`)
@@ -247,6 +260,97 @@ describe('/games/solo', () => {
       expect(leaderboard.body.entries[0]).toEqual(
         expect.objectContaining({ userId: player.userId, answered: played.rounds.length }),
       );
+    });
+  });
+
+  describe('GET /games/solo/stats', () => {
+    // Zeroes rather than nulls, and the whole object rather than field-by-field: the stats panel
+    // renders the same shape on day one as on day one hundred, so a null - or a field quietly
+    // dropped from the response - would give it a state it has no branch for.
+    it('reports zeroes, never nulls, for a player who has never played', async () => {
+      const { player } = await freshPlayer('solo-stats-empty', 0);
+
+      const { status, body } = await readStats(player);
+
+      expect(status).toBe(200);
+      expect(body).toEqual({
+        currentStreak: 0,
+        bestStreak: 0,
+        bestScore: 0,
+        averageScore: 0,
+        gamesPlayed: 0,
+      });
+    });
+
+    // The deliberate asymmetry: history and the streak can legitimately disagree, because a daily
+    // extends the streak only when EVERY round has a guess. Playing one round of five is a real
+    // game with a real score - it counts as played and it is browsable - but it is not a day
+    // defended, and a client that treated "it is in my history" as "my streak is safe" would tell
+    // the player their streak was alive while it was already broken.
+    it('counts a partially played daily as a game, but not as a day of the streak', async () => {
+      const { player } = await freshPlayer('solo-stats-partial', 5);
+
+      const daily = await readDaily(player);
+      expect(daily.status).toBe(200);
+      expect(daily.body.challenge).not.toBeNull();
+      const challenge = daily.body.challenge;
+      // Otherwise a single guess would FINISH the daily and this test would prove the opposite of
+      // what it claims.
+      expect(challenge.roundCount).toBeGreaterThan(1);
+
+      const guess = await guessRound(player, challenge.id, 0);
+      expect(guess.status).toBe(201);
+
+      const stats = await readStats(player);
+      expect(stats.status).toBe(200);
+      expect(stats.body.currentStreak).toBe(0);
+      expect(stats.body.bestStreak).toBe(0);
+      expect(stats.body.gamesPlayed).toBe(1);
+
+      const history = await readHistory(player);
+      expect(history.status).toBe(200);
+      const item = history.body.items.find((entry: { id: string }) => entry.id === challenge.id);
+      expect(item, 'the partially played daily is missing from history').toBeDefined();
+      expect(item.answered).toBe(1);
+      expect(item.dailyOn).toBe(challenge.dailyOn);
+    });
+  });
+
+  describe('GET /games/solo/history', () => {
+    // A challenge that was generated and never touched is not a game the player remembers playing
+    // - it is what the nightly prune deletes - so history is the games they actually played.
+    it('leaves out a challenge the player never guessed on', async () => {
+      const { player } = await freshPlayer('solo-history-unplayed', 3);
+
+      const created = await createSolo(player, { roundCount: 3 });
+      expect(created.status).toBe(201);
+
+      const { status, body } = await readHistory(player);
+
+      expect(status).toBe(200);
+      expect(body).toEqual({ items: [], hasNextPage: false });
+    });
+
+    // A stale page number in a bookmark is a well-formed request with nothing behind it. The first
+    // page is asserted non-empty first, so "empty" past the end cannot pass because history is
+    // broken for this player entirely.
+    it('returns an empty page past the end rather than an error', async () => {
+      const { player } = await freshPlayer('solo-history-paging', 3);
+
+      const created = await createSolo(player, { roundCount: 3 });
+      expect(created.status).toBe(201);
+      const guess = await guessRound(player, created.body.id, 0);
+      expect(guess.status).toBe(201);
+
+      const first = await readHistory(player, { page: 1, size: 20 });
+      expect(first.status).toBe(200);
+      expect(first.body.items.map((entry: { id: string }) => entry.id)).toEqual([created.body.id]);
+      expect(first.body.hasNextPage).toBe(false);
+
+      const past = await readHistory(player, { page: 99, size: 20 });
+
+      expect(past.status).toBe(200);
+      expect(past.body).toEqual({ items: [], hasNextPage: false });
     });
   });
 

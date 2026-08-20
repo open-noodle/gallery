@@ -35,6 +35,19 @@ const stockSoloPools = (mocks: ServiceMocks) => {
   mocks.game.createChallenge.mockResolvedValue('solo-1');
 };
 
+/** One row as GameRepository.getSoloHistory returns it - the challenge, plus what the player
+ * scored on it. */
+const historyRow = (id: string, overrides: Record<string, unknown> = {}) => ({
+  id,
+  name: 'Challenge 1',
+  dailyOn: null,
+  createdAt: new Date('2026-08-19T10:00:00.000Z'),
+  roundCount: 5,
+  answered: 5,
+  total: 4000,
+  ...overrides,
+});
+
 /** The scene-prompt vectors handed to the location-candidate query on the call under test. */
 const scenePromptsUsed = (mocks: ServiceMocks) => mocks.game.getLocationCandidates.mock.calls[0][3];
 
@@ -1066,7 +1079,19 @@ describe(GameService.name, () => {
         await sut.getSoloDaily(soloAuth);
 
         expect(mocks.game.createChallenge).toHaveBeenCalledWith(
-          expect.objectContaining({ dailyOn: TODAY, spaceId: null, ownerId: 'user-1', createdById: null }),
+          // The source toggles are asserted here and not only in createSolo's tests: the daily
+          // takes no request body, so this row is the ONLY evidence of which sources today's game
+          // was frozen against. Own photos only, until a preference says otherwise - the daily is
+          // generated without anyone asking for it, so it must not be the surface that starts
+          // drawing on other people's libraries.
+          expect.objectContaining({
+            dailyOn: TODAY,
+            spaceId: null,
+            ownerId: 'user-1',
+            createdById: null,
+            includePartners: false,
+            includeSpaces: false,
+          }),
           expect.anything(),
         );
         // A space's daily lives under a different partial unique index and a different pool; the
@@ -1151,6 +1176,114 @@ describe(GameService.name, () => {
         mocks.game.getSoloRecentlyUsedAssetIds.mockResolvedValue([]);
 
         await expect(sut.getSoloDaily(soloAuth)).resolves.toEqual({ challenge: null });
+      });
+    });
+
+    describe('soloStats', () => {
+      // Restored here rather than at the end of the one test that fakes them: a failing assertion
+      // would skip an inline restore and leak frozen time into every test that follows.
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      // Which DAYS count towards a streak - only dailies with every round guessed - is the
+      // repository query's rule, and is covered by the e2e suite against a real database. What is
+      // testable here is the arithmetic's wiring: whose days are fetched, what "today" they are
+      // measured against, and that nothing on the way out can be null.
+      it('reports zeroes, never nulls, for a player who has never played', async () => {
+        mocks.game.getSoloCompletedDailyDates.mockResolvedValue([]);
+        mocks.game.getSoloScoreSummary.mockResolvedValue({ gamesPlayed: 0, bestScore: 0, averageScore: 0 });
+
+        await expect(sut.soloStats(soloAuth)).resolves.toEqual({
+          currentStreak: 0,
+          bestStreak: 0,
+          bestScore: 0,
+          averageScore: 0,
+          gamesPlayed: 0,
+        });
+      });
+
+      // The streak is measured against the UTC day, the same boundary dailyOn is stamped with -
+      // and it must survive a today that has not been played yet, or every player would watch
+      // their streak read 0 from midnight until they got round to playing.
+      it("counts the streak against the UTC day, and keeps it alive before today's daily is played", async () => {
+        vi.useFakeTimers();
+        // Late in the UTC day, like the daily's own tests: a local-day "today" would already be the
+        // 20th for anyone east of UTC and break the streak a day early.
+        vi.setSystemTime(new Date('2026-08-19T23:30:00.000Z'));
+        mocks.game.getSoloCompletedDailyDates.mockResolvedValue(['2026-08-17', '2026-08-18']);
+        mocks.game.getSoloScoreSummary.mockResolvedValue({ gamesPlayed: 2, bestScore: 4000, averageScore: 3500 });
+
+        const result = await sut.soloStats(soloAuth);
+
+        expect(result.currentStreak).toBe(2);
+        expect(result.bestStreak).toBe(2);
+        expect(mocks.game.getSoloCompletedDailyDates).toHaveBeenCalledWith('user-1');
+      });
+
+      // Rounds are scored in whole points, so an average is the only fractional number the panel
+      // could ever show - and it would show all seventeen digits of it.
+      it('rounds the average to whole points', async () => {
+        mocks.game.getSoloCompletedDailyDates.mockResolvedValue([]);
+        mocks.game.getSoloScoreSummary.mockResolvedValue({
+          gamesPlayed: 3,
+          bestScore: 4500,
+          // The repeating decimal a real average produces, computed rather than written out - the
+          // point is that it reaches the panel as whole points.
+          averageScore: 12_637 / 3,
+        });
+
+        await expect(sut.soloStats(soloAuth)).resolves.toEqual(
+          expect.objectContaining({ averageScore: 4212, bestScore: 4500, gamesPlayed: 3 }),
+        );
+      });
+    });
+
+    describe('soloHistory', () => {
+      // One row past the page is what answers hasNextPage; a client that trusted a full page as
+      // "there is more" would offer a next page that turns out to be empty, and one that trusted a
+      // short page would hide the last row of a page-sized history.
+      it('fetches one row past the page and reports whether another follows', async () => {
+        mocks.game.getSoloHistory.mockResolvedValue([
+          historyRow('game-3'),
+          historyRow('game-2'),
+          historyRow('game-1', { dailyOn: '2026-08-17', answered: 2, total: 900 }),
+        ] as any);
+
+        const result = await sut.soloHistory(soloAuth, { page: 2, size: 2 });
+
+        expect(mocks.game.getSoloHistory).toHaveBeenCalledWith('user-1', { skip: 2, take: 3 });
+        expect(result.items.map((item) => item.id)).toEqual(['game-3', 'game-2']);
+        expect(result.hasNextPage).toBe(true);
+        expect(result.items[0]).toEqual({
+          id: 'game-3',
+          name: 'Challenge 1',
+          dailyOn: null,
+          createdAt: new Date('2026-08-19T10:00:00.000Z'),
+          roundCount: 5,
+          answered: 5,
+          total: 4000,
+        });
+      });
+
+      it('reports no next page when the page is not full', async () => {
+        mocks.game.getSoloHistory.mockResolvedValue([historyRow('game-1')] as any);
+
+        const result = await sut.soloHistory(soloAuth, { page: 1, size: 2 });
+
+        expect(result.items).toHaveLength(1);
+        expect(result.hasNextPage).toBe(false);
+      });
+
+      // A stale page number in a bookmark is a well-formed request with nothing behind it, not a
+      // failure - 404ing it would make an ordinary end-of-list look like a broken endpoint.
+      it('returns an empty page past the end rather than an error', async () => {
+        mocks.game.getSoloHistory.mockResolvedValue([]);
+
+        await expect(sut.soloHistory(soloAuth, { page: 40, size: 20 })).resolves.toEqual({
+          items: [],
+          hasNextPage: false,
+        });
       });
     });
 

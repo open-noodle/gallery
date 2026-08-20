@@ -2201,6 +2201,40 @@ export type GameDailyResponseDto = {
     /** Today's daily, if one could be generated */
     challenge: (GameChallengeListItemResponseDto) | null;
 };
+export type GameSoloHistoryItemResponseDto = {
+    /** Number of rounds the player answered */
+    answered: number;
+    /** Creation date */
+    createdAt: string;
+    /** The UTC date this was the daily for, or null for a free-play game */
+    dailyOn: string | null;
+    /** Challenge ID */
+    id: string;
+    /** Challenge name */
+    name: string;
+    /** Number of rounds in the challenge */
+    roundCount: number;
+    /** Total score across the rounds they answered */
+    total: number;
+};
+export type GameSoloHistoryResponseDto = {
+    /** Whether another page follows this one */
+    hasNextPage: boolean;
+    /** Games played, newest first */
+    items: GameSoloHistoryItemResponseDto[];
+};
+export type GameSoloStatsResponseDto = {
+    /** Mean total across games played, rounded to whole points */
+    averageScore: number;
+    /** The highest total scored in a single game */
+    bestScore: number;
+    /** The longest such run ever */
+    bestStreak: number;
+    /** Consecutive UTC days of fully played dailies, ending today or yesterday */
+    currentStreak: number;
+    /** How many games have at least one guess */
+    gamesPlayed: number;
+};
 export type GameRoundDetailResponseDto = {
     /** The round answer - present only once guessed */
     answer?: {
@@ -7138,6 +7172,34 @@ export function getSoloDailyChallenge(opts?: Oazapfts.RequestOpts) {
         status: 200;
         data: GameDailyResponseDto;
     }>("/games/solo/daily", {
+        ...opts
+    }));
+}
+/**
+ * Get the caller's solo game history
+ */
+export function getSoloHistory({ page, size }: {
+    page?: number;
+    size?: number;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: GameSoloHistoryResponseDto;
+    }>(`/games/solo/history${QS.query(QS.explode({
+        page,
+        size
+    }))}`, {
+        ...opts
+    }));
+}
+/**
+ * Get the caller's solo statistics
+ */
+export function getSoloStats(opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: GameSoloStatsResponseDto;
+    }>("/games/solo/stats", {
         ...opts
     }));
 }

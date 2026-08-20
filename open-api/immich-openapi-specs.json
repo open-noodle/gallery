@@ -8283,6 +8283,123 @@
         "x-immich-state": "Beta"
       }
     },
+    "/games/solo/history": {
+      "get": {
+        "description": "One page of the games the caller has played, newest first. Paging past the last page returns an empty page rather than an error.",
+        "operationId": "getSoloHistory",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Page number",
+            "schema": {
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "default": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "size",
+            "required": false,
+            "in": "query",
+            "description": "Number of games per page",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameSoloHistoryResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Get the caller's solo game history",
+        "tags": [
+          "Games"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "game.read",
+        "x-immich-state": "Beta"
+      }
+    },
+    "/games/solo/stats": {
+      "get": {
+        "description": "Streak, best score, average and games played, computed from the games themselves on every read. A player who has never played gets zeroes, never nulls.",
+        "operationId": "getSoloStats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameSoloStatsResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Get the caller's solo statistics",
+        "tags": [
+          "Games"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "game.read",
+        "x-immich-state": "Beta"
+      }
+    },
     "/games/{id}": {
       "delete": {
         "description": "Permanently delete a challenge, cascading its rounds and guesses.",
@@ -32834,6 +32951,73 @@
         },
         "type": "object"
       },
+      "GameSoloHistoryItemResponseDto": {
+        "properties": {
+          "answered": {
+            "description": "Number of rounds the player answered",
+            "type": "number"
+          },
+          "createdAt": {
+            "description": "Creation date",
+            "example": "2024-01-01T00:00:00.000Z",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "type": "string"
+          },
+          "dailyOn": {
+            "description": "The UTC date this was the daily for, or null for a free-play game",
+            "format": "date",
+            "nullable": true,
+            "type": "string"
+          },
+          "id": {
+            "description": "Challenge ID",
+            "type": "string"
+          },
+          "name": {
+            "description": "Challenge name",
+            "type": "string"
+          },
+          "roundCount": {
+            "description": "Number of rounds in the challenge",
+            "type": "number"
+          },
+          "total": {
+            "description": "Total score across the rounds they answered",
+            "type": "number"
+          }
+        },
+        "required": [
+          "answered",
+          "createdAt",
+          "dailyOn",
+          "id",
+          "name",
+          "roundCount",
+          "total"
+        ],
+        "type": "object"
+      },
+      "GameSoloHistoryResponseDto": {
+        "properties": {
+          "hasNextPage": {
+            "description": "Whether another page follows this one",
+            "type": "boolean"
+          },
+          "items": {
+            "description": "Games played, newest first",
+            "items": {
+              "$ref": "#/components/schemas/GameSoloHistoryItemResponseDto"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "hasNextPage",
+          "items"
+        ],
+        "type": "object"
+      },
       "GameSoloSourcesDto": {
         "properties": {
           "includePartners": {
@@ -32845,6 +33029,38 @@
             "type": "boolean"
           }
         },
+        "type": "object"
+      },
+      "GameSoloStatsResponseDto": {
+        "properties": {
+          "averageScore": {
+            "description": "Mean total across games played, rounded to whole points",
+            "type": "number"
+          },
+          "bestScore": {
+            "description": "The highest total scored in a single game",
+            "type": "number"
+          },
+          "bestStreak": {
+            "description": "The longest such run ever",
+            "type": "number"
+          },
+          "currentStreak": {
+            "description": "Consecutive UTC days of fully played dailies, ending today or yesterday",
+            "type": "number"
+          },
+          "gamesPlayed": {
+            "description": "How many games have at least one guess",
+            "type": "number"
+          }
+        },
+        "required": [
+          "averageScore",
+          "bestScore",
+          "bestStreak",
+          "currentStreak",
+          "gamesPlayed"
+        ],
         "type": "object"
       },
       "GameStandingsResponseDto": {
