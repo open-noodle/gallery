@@ -122,6 +122,14 @@ const GameRoundAnswerSchema = z.object({
   date: isoDatetimeToDate.nullable().describe('Answer date, for a date round'),
 });
 
+const GameRoundGuessSchema = z.object({
+  lat: z.number().nullable().describe('Guessed latitude, for a location round'),
+  lon: z.number().nullable().describe('Guessed longitude, for a location round'),
+  date: isoDatetimeToDate.nullable().describe('Guessed date, for a date round'),
+  distanceKm: z.number().nullable().describe('Distance from the answer, in km'),
+  offsetDays: z.number().nullable().describe('Day offset from the answer'),
+});
+
 const GameRoundDetailResponseSchema = z
   .object({
     index: z.number().describe('Round index (0-based)'),
@@ -129,6 +137,7 @@ const GameRoundDetailResponseSchema = z
     assetId: z.string().optional().describe('Round photo asset ID - present only once the caller has guessed'),
     score: z.number().optional().describe("The caller's score for this round - present only once guessed"),
     answer: GameRoundAnswerSchema.optional().describe('The round answer - present only once guessed'),
+    guess: GameRoundGuessSchema.optional().describe("The caller's own guess - present only once guessed"),
   })
   .meta({ id: 'GameRoundDetailResponseDto' });
 

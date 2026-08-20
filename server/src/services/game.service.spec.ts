@@ -518,6 +518,132 @@ describe(GameService.name, () => {
       expect(result.rounds[1].answer).toBeUndefined();
       expect(JSON.stringify(result.rounds[1])).not.toContain('asset-2');
     });
+
+    it('returns the caller own guess for a guessed location round', async () => {
+      mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Viewer } as any);
+      mocks.game.getChallenge.mockResolvedValue({ id: 'challenge-1', spaceId: 'space-1', roundCount: 2 } as any);
+      mocks.game.getRounds.mockResolvedValue([
+        {
+          id: 'r0',
+          index: 0,
+          type: 'location',
+          answerLat: 52.5,
+          answerLon: 13.4,
+          answerDate: null,
+          assetId: 'asset-1',
+        },
+        {
+          id: 'r1',
+          index: 1,
+          type: 'date',
+          answerLat: null,
+          answerLon: null,
+          answerDate: new Date(),
+          assetId: 'asset-2',
+        },
+      ] as any);
+      mocks.game.getGuessesForUser.mockResolvedValue([
+        {
+          roundId: 'r0',
+          userId: 'user-1',
+          guessLat: 38.72,
+          guessLon: -9.14,
+          guessDate: null,
+          distanceKm: 412.3,
+          offsetDays: null,
+          score: 4000,
+        },
+      ] as any);
+
+      const result = await sut.get(authStub, 'challenge-1');
+
+      expect(result.rounds[0].guess).toEqual({
+        lat: 38.72,
+        lon: -9.14,
+        date: null,
+        distanceKm: 412.3,
+        offsetDays: null,
+      });
+    });
+
+    it('returns the caller own guess for a guessed date round', async () => {
+      mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Viewer } as any);
+      mocks.game.getChallenge.mockResolvedValue({ id: 'challenge-1', spaceId: 'space-1', roundCount: 2 } as any);
+      mocks.game.getRounds.mockResolvedValue([
+        {
+          id: 'r0',
+          index: 0,
+          type: 'date',
+          answerLat: null,
+          answerLon: null,
+          answerDate: new Date('2024-06-01T00:00:00.000Z'),
+          assetId: 'asset-1',
+        },
+        {
+          id: 'r1',
+          index: 1,
+          type: 'location',
+          answerLat: 52.5,
+          answerLon: 13.4,
+          answerDate: null,
+          assetId: 'asset-2',
+        },
+      ] as any);
+      mocks.game.getGuessesForUser.mockResolvedValue([
+        {
+          roundId: 'r0',
+          userId: 'user-1',
+          guessLat: null,
+          guessLon: null,
+          guessDate: new Date('2024-06-01T00:00:00.000Z'),
+          distanceKm: null,
+          offsetDays: 3,
+          score: 4500,
+        },
+      ] as any);
+
+      const result = await sut.get(authStub, 'challenge-1');
+
+      // The inverse column pair. A projection that copies lat/lon into a date round, or
+      // offsetDays into a location round, passes any test that only checks `guess` is set.
+      expect(result.rounds[0].guess).toEqual({
+        lat: null,
+        lon: null,
+        date: new Date('2024-06-01T00:00:00.000Z'),
+        distanceKm: null,
+        offsetDays: 3,
+      });
+    });
+
+    it('withholds the guess for a round the caller has not guessed', async () => {
+      mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Viewer } as any);
+      mocks.game.getChallenge.mockResolvedValue({ id: 'challenge-1', spaceId: 'space-1', roundCount: 2 } as any);
+      mocks.game.getRounds.mockResolvedValue([
+        {
+          id: 'r0',
+          index: 0,
+          type: 'location',
+          answerLat: 52.5,
+          answerLon: 13.4,
+          answerDate: null,
+          assetId: 'asset-1',
+        },
+        {
+          id: 'r1',
+          index: 1,
+          type: 'date',
+          answerLat: null,
+          answerLon: null,
+          answerDate: new Date(),
+          assetId: 'asset-2',
+        },
+      ] as any);
+      mocks.game.getGuessesForUser.mockResolvedValue([{ roundId: 'r0', score: 4000 }] as any);
+
+      const result = await sut.get(authStub, 'challenge-1');
+
+      expect(result.rounds[1].guess).toBeUndefined();
+    });
   });
 
   describe('getRoundImage', () => {
