@@ -15,7 +15,7 @@ test.describe('Person face suggestions (web)', () => {
     // open the read-gate: suggestions.maxDistance (0.8) > maxDistance (0.5)
     const config = await utils.getSystemConfig(admin.accessToken);
     config.machineLearning.facialRecognition.suggestions = { enabled: true, maxDistance: 0.8 };
-    await updateConfig({ systemConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
+    await updateConfig({ adminConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
 
     const person = await utils.createPerson(admin.accessToken, { name: 'E2E Suggest Target' });
     personId = person.id;
@@ -43,7 +43,7 @@ test.describe('Person face suggestions (web)', () => {
   test.afterAll(async () => {
     const cfg = await utils.getSystemConfig(admin.accessToken);
     cfg.machineLearning.facialRecognition.suggestions = { enabled: false, maxDistance: 0.7 };
-    await updateConfig({ systemConfigDto: cfg }, { headers: asBearerAuth(admin.accessToken) });
+    await updateConfig({ adminConfigDto: cfg }, { headers: asBearerAuth(admin.accessToken) });
   });
 
   test('banner shows the count and opens the review modal; Same person confirms', async ({ context, page }) => {
