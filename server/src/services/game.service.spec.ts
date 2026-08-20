@@ -1297,4 +1297,45 @@ describe(GameService.name, () => {
       });
     });
   });
+
+  // The space arm of requireChallengeAccess (game.service.ts) has no direct coverage above: every
+  // other test in this file that reaches it stubs sharedSpace.getMember with a role that already
+  // clears the gate, so a broken space branch would only be caught by the e2e suite, which does
+  // not run in this environment. get and delete are the cheapest of the five gated methods to
+  // prove the membership and editor checks with.
+  describe('space challenge authorization', () => {
+    const spaceChallenge = {
+      id: 'challenge-1',
+      spaceId: 'space-1',
+      ownerId: null,
+      name: 'Challenge 1',
+      roundCount: 1,
+      scaleKm: 1000,
+      scaleDays: 365,
+      dailyOn: null,
+      closedAt: null,
+      createdAt: new Date(),
+    } as any;
+
+    it('rejects a non-member reading a space challenge', async () => {
+      mocks.sharedSpace.getMember.mockResolvedValue(void 0);
+      mocks.game.getChallenge.mockResolvedValue(spaceChallenge);
+      // Stubbed to succeed, like the solo stranger cases above - so a gate that let the caller
+      // through would return a result instead of failing downstream for an unrelated reason.
+      mocks.game.getRounds.mockResolvedValue([]);
+      mocks.game.getGuessesForUser.mockResolvedValue([]);
+
+      await expect(sut.get(authStub, 'challenge-1')).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    // `editor` is the flag that separates read access from delete access on the space arm - a
+    // viewer can pass requireMember but must still fail requireEditor.
+    it('rejects a viewer deleting a space challenge, because delete requires the editor role', async () => {
+      mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Viewer } as any);
+      mocks.game.getChallenge.mockResolvedValue(spaceChallenge);
+
+      await expect(sut.delete(authStub, 'challenge-1')).rejects.toBeInstanceOf(ForbiddenException);
+      expect(mocks.game.deleteChallenge).not.toHaveBeenCalled();
+    });
+  });
 });
