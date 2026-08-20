@@ -7,14 +7,14 @@ enum GamePhase { guessing, revealing, finished }
 
 /// Everything the reveal needs, assembled from the guess response and the post-guess refetch.
 ///
-/// [guess] is null in two cases, neither of which means an error happened: on the 409 recovery
-/// path, where that request never reached the server so there is no guess of ours to plot, and on
-/// every date round, where a guess has no lat/lon to plot in the first place. `guess == null` is
-/// therefore not, by itself, a signal that a 409 occurred.
+/// On the 409 recovery path, our own guess never reached the server — but the refetched round now
+/// carries the guess the server already had on file, via [RoundResult.fromRound], so the reveal
+/// still plots it. [guess] is null only on a date round, which has no lat/lon to plot in the first
+/// place; `guess == null` is therefore not, by itself, a signal that a 409 occurred.
 ///
 /// [guessDate] is the date-round counterpart: the month the player picked, so the reveal can show
 /// their answer next to the real one rather than only the offset between them. Null on every
-/// location round, and on the 409 recovery path for the same reason [guess] is.
+/// location round; recovered from the refetch on the 409 path the same way [guess] is.
 class RoundResult {
   final GameRoundType type;
   final int score;
@@ -33,6 +33,27 @@ class RoundResult {
     this.guess,
     this.guessDate,
   });
+
+  /// The single mapping from a stored round onto the reveal's shape.
+  ///
+  /// Every field here is `Optional<T?>` on the wire and `.value` THROWS when absent, so each read
+  /// goes through `.orElse(null)`. An unguessed round yields a result with nulls throughout rather
+  /// than an exception, which is what lets a partially played challenge render at all.
+  factory RoundResult.fromRound(GameRoundDetailResponseDto round) {
+    final guess = round.guess.orElse(null);
+    final lat = guess?.lat;
+    final lon = guess?.lon;
+
+    return RoundResult(
+      type: round.type,
+      score: round.score.orElse(null)?.toInt() ?? 0,
+      distanceKm: guess?.distanceKm?.toDouble(),
+      offsetDays: guess?.offsetDays?.toInt(),
+      answer: round.answer.orElse(null),
+      guess: lat != null && lon != null ? (lat: lat.toDouble(), lon: lon.toDouble()) : null,
+      guessDate: guess?.date,
+    );
+  }
 }
 
 class GameSessionState {
@@ -216,17 +237,20 @@ class GameSessionController extends AutoDisposeFamilyAsyncNotifier<GameSessionSt
       leaderboard: current.leaderboard,
     );
     final round = refreshed.currentRound;
+    // Null when the challenge is finished, and all-nulls when the refetch above failed and left the
+    // pre-guess challenge in place. Both are why every field below still falls back.
+    final stored = round == null ? null : RoundResult.fromRound(round);
 
     state = AsyncData(
       refreshed.copyWith(
         result: RoundResult(
           type: type,
-          score: score ?? round?.score.orElse(null)?.toInt() ?? 0,
-          distanceKm: distanceKm,
-          offsetDays: offsetDays,
-          answer: round?.answer.orElse(null),
-          guess: guess,
-          guessDate: guessDate,
+          score: score ?? stored?.score ?? 0,
+          distanceKm: distanceKm ?? stored?.distanceKm,
+          offsetDays: offsetDays ?? stored?.offsetDays,
+          answer: stored?.answer,
+          guess: guess ?? stored?.guess,
+          guessDate: guessDate ?? stored?.guessDate,
         ),
       ),
     );
