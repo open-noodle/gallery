@@ -5,8 +5,7 @@ import path from 'node:path';
 import type { ArgOf } from 'src/repositories/event.repository.js';
 import type { JobOf, VideoInfo } from 'src/types.js';
 import { OnEvent, OnJob } from 'src/decorators.js';
-import { SystemConfig } from 'src/dtos/config.dto.js';
-import { CLIPConfig } from 'src/dtos/model-config.dto.js';
+import { MachineLearningConfig, SystemConfig } from 'src/dtos/config.dto.js';
 import { AssetType, AssetVisibility, DatabaseLock, ImmichWorker, JobName, JobStatus, QueueName } from 'src/enum.js';
 import { BaseService } from 'src/services/base.service.js';
 import { batched, getCLIPModelInfo, isSmartSearchEnabled } from 'src/utils/misc.js';
@@ -131,7 +130,10 @@ export class SmartInfoService extends BaseService {
     return JobStatus.Success;
   }
 
-  private async encodeVideoClip(originalPath: string, clipConfig: CLIPConfig): Promise<string | null> {
+  private async encodeVideoClip(
+    originalPath: string,
+    clipConfig: MachineLearningConfig['clip'],
+  ): Promise<string | null> {
     const { localPath, cleanup } = await this.ensureLocalFile(originalPath);
     try {
       let videoInfo: VideoInfo;
