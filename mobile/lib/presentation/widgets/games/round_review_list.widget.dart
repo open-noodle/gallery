@@ -59,9 +59,18 @@ class _ReviewRow extends StatelessWidget {
     final result = RoundResult.fromRound(round);
     final isLocation = result.type == GameRoundType.location;
 
+    // Null, not a fabricated zero: `distanceKm`/`offsetDays` are absent against a server older than
+    // this change (`guess` didn't exist yet) and after a failed post-guess refetch — see
+    // `RoundResult`'s doc comment. `?? 0` here would render "0 m off" / "0 days off", claiming a
+    // pinpoint hit that never happened. Same convention as `round_reveal.widget.dart`'s
+    // null-not-(0,0) rule and the leaderboard's dash-not-zero rule: render nothing rather than lie.
+    final distanceKm = result.distanceKm;
+    final offsetDays = result.offsetDays;
     final miss = isLocation
-        ? 'game_review_distance_off'.t(context: context, args: {'distance': formatDistanceKm(result.distanceKm ?? 0)})
-        : 'game_review_days_off'.t(context: context, args: {'count': '${result.offsetDays ?? 0}'});
+        ? (distanceKm == null
+              ? null
+              : 'game_review_distance_off'.t(context: context, args: {'distance': formatDistanceKm(distanceKm)}))
+        : (offsetDays == null ? null : 'game_review_days_off'.t(context: context, args: {'count': '$offsetDays'}));
 
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
@@ -86,11 +95,14 @@ class _ReviewRow extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      subtitle: Text(miss, maxLines: 1, overflow: TextOverflow.ellipsis),
+      subtitle: miss == null ? null : Text(miss, maxLines: 1, overflow: TextOverflow.ellipsis),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(formatGameScore(result.score), style: Theme.of(context).textTheme.labelLarge),
+          Text(
+            'game_points'.t(context: context, args: {'score': formatGameScore(result.score)}),
+            style: Theme.of(context).textTheme.labelLarge,
+          ),
           const Icon(Icons.chevron_right),
         ],
       ),
