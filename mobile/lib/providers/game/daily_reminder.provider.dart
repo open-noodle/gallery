@@ -158,7 +158,11 @@ class DailyReminderController {
   /// would silently suppress the reminder for whichever one was NOT actually finished.
   Future<void> recordDailyCompleted(DateTime dailyOn, {required bool isSolo}) async {
     final key = isSolo ? SettingsKey.gameSoloDailyLastPlayed : SettingsKey.gameSpaceDailyLastPlayed;
-    await _ref.read(settingsProvider).write(key, dailyKeyFor(dailyOn));
+    // `dailyKeyForDateOnly`, never `dailyKeyFor`: `dailyOn` is a date-only wire value and arrives
+    // as LOCAL midnight, so converting it would record the previous day east of Greenwich — a key
+    // `dailyReminderOccurrences` then never matches, leaving tonight's reminder to fire for the
+    // daily just finished.
+    await _ref.read(settingsProvider).write(key, dailyKeyForDateOnly(dailyOn));
     await refresh();
   }
 

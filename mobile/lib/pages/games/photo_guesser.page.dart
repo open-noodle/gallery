@@ -543,7 +543,11 @@ class _SoloHistory extends StatelessWidget {
               contentPadding: EdgeInsets.zero,
               title: Text(_title(context, item), maxLines: 1, overflow: TextOverflow.ellipsis),
               subtitle: Text(
-                '${formatGameDate(item.dailyOn ?? item.createdAt)} · '
+                // Two formatters, not one: `createdAt` is a UTC instant and `dailyOn` is a
+                // date-only value that arrives as LOCAL midnight, so converting the second
+                // one the way the first needs would date every daily a day early east of
+                // Greenwich. See formatDailyDate.
+                '${item.dailyOn == null ? formatGameDate(item.createdAt) : formatDailyDate(item.dailyOn!)} · '
                 '${'game_rounds_answered'.t(context: context, args: {'answered': '${item.answered}', 'total': '${item.roundCount}'})}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,

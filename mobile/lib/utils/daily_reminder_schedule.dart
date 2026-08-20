@@ -7,15 +7,33 @@
 /// alone. It also keeps well clear of iOS's 64-pending-notification cap.
 const int kDailyReminderHorizonDays = 7;
 
-/// The `YYYY-MM-DD` UTC key for an instant — the same shape `SettingsKey.gameSpaceDailyLastPlayed`
+/// The `YYYY-MM-DD` UTC key for an INSTANT — the same shape `SettingsKey.gameSpaceDailyLastPlayed`
 /// and `SettingsKey.gameSoloDailyLastPlayed` hold, and the same day boundary the server's
 /// `dailyOn` uses.
-String dailyKeyFor(DateTime instant) {
-  final utc = instant.toUtc();
-  return '${utc.year.toString().padLeft(4, '0')}-'
-      '${utc.month.toString().padLeft(2, '0')}-'
-      '${utc.day.toString().padLeft(2, '0')}';
-}
+///
+/// For a real point in time only: `DateTime.now()`, or one of the scheduled occurrence instants.
+/// A `dailyOn` off the wire is NOT one of those — use [dailyKeyForDateOnly].
+String dailyKeyFor(DateTime instant) => _dayKey(instant.toUtc());
+
+/// The `YYYY-MM-DD` key of a DATE-ONLY value, read off its own calendar fields with NO conversion.
+///
+/// This is the shape `challenge.dailyOn` arrives in: the server sends `YYYY-MM-DD` (no time, no
+/// offset), and the generated client parses it with `DateTime.tryParse`, which Dart resolves in the
+/// DEVICE's zone — so the value is LOCAL midnight of the named day, not an instant. Converting it
+/// with [dailyKeyFor] subtracts the device's offset and names the previous day east of Greenwich.
+///
+/// That matters more here than anywhere else on the screen, because this key is COMPARED, not
+/// displayed: `dailyReminderOccurrences` skips a day only when the recorded key equals
+/// `dailyKeyFor(<that day's reminder instant>)`. Compute the two sides differently and they never
+/// match, the skip never fires, and the player is reminded tonight about the daily they finished
+/// this morning — the usual reason notifications get switched off for good, which is the exact
+/// failure the one-shot horizon at the top of this file exists to prevent.
+String dailyKeyForDateOnly(DateTime dateOnly) => _dayKey(dateOnly);
+
+String _dayKey(DateTime date) =>
+    '${date.year.toString().padLeft(4, '0')}-'
+    '${date.month.toString().padLeft(2, '0')}-'
+    '${date.day.toString().padLeft(2, '0')}';
 
 /// Which local instants the daily reminder should fire at.
 ///

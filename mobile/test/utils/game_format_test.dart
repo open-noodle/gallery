@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/utils/game_format.dart';
 import 'package:openapi/api.dart';
 
+import '../test_helpers/wire_dates.dart';
+
 GameRoundDetailResponseDto _round(int index, {num? score}) => GameRoundDetailResponseDto(
   index: index,
   type: GameRoundType.location,
@@ -178,6 +180,31 @@ void main() {
       // day — the same limitation formatStandingsMonth's own timeZone handling has.
       expect(formatGameDate(DateTime.utc(2026, 8, 19, 23, 30), locale: 'en_US'), 'Aug 19, 2026');
       expect(formatGameDate(DateTime.utc(2026, 8, 19, 0, 30), locale: 'en_US'), 'Aug 19, 2026');
+    });
+  });
+
+  group('formatDailyDate', () {
+    test('renders the day the wire named, not a day derived from the device offset', () {
+      // The shape the generated client ACTUALLY produces for `dailyOn`: `mapDateTime` calls
+      // `DateTime.tryParse('2026-08-19')`, and Dart parses an offset-less string in the DEVICE's
+      // zone — so this is LOCAL midnight, a calendar day rather than an instant.
+      //
+      // The group above feeds `DateTime.utc(...)`, which is right for `createdAt` and is a shape
+      // the wire NEVER produces for `dailyOn`. That is the whole reason a `.toUtc()` on this value
+      // survived review: under TZ=UTC the two are indistinguishable, and only away from Greenwich
+      // does the conversion move the row to a different day than the streak counted it under.
+      // Run this file under `TZ=Europe/Berlin` (or `TZ=America/New_York`) to see it bite.
+      final dailyOn = wireDateOnly('2026-08-19');
+      expect(dailyOn.isUtc, isFalse, reason: 'the premise: an offset-less date parses in local time');
+
+      expect(formatDailyDate(dailyOn, locale: 'en_US'), 'Aug 19, 2026');
+    });
+
+    test('never converts, whichever flag the value happens to carry', () {
+      // Both directions of the same claim: the day this renders is the day the value names, so a
+      // UTC-flagged fixture and a local one agree. Anything that converts breaks one of them.
+      expect(formatDailyDate(DateTime.utc(2026, 8, 19), locale: 'en_US'), 'Aug 19, 2026');
+      expect(formatDailyDate(DateTime(2026, 8, 19), locale: 'en_US'), 'Aug 19, 2026');
     });
   });
 
