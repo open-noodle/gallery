@@ -1,4 +1,4 @@
-import { defaults, SystemConfig } from 'src/config';
+import { defaults, SystemConfig } from 'src/dtos/config.dto';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import {
   clamp,
