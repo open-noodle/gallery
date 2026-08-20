@@ -9,8 +9,10 @@ enum GamePhase { guessing, revealing, finished }
 ///
 /// On the 409 recovery path, our own guess never reached the server — but the refetched round now
 /// carries the guess the server already had on file, via [RoundResult.fromRound], so the reveal
-/// still plots it. [guess] is null only on a date round, which has no lat/lon to plot in the first
-/// place; `guess == null` is therefore not, by itself, a signal that a 409 occurred.
+/// still plots it. [guess] is null on a date round, which has no lat/lon to plot in the first place;
+/// it is also null against a server older than this change (no `guess` field on the wire at all) and
+/// after a failed post-guess refetch. `guess == null` is therefore not, by itself, a signal that a
+/// 409 occurred.
 ///
 /// [guessDate] is the date-round counterpart: the month the player picked, so the reveal can show
 /// their answer next to the real one rather than only the offset between them. Null on every
