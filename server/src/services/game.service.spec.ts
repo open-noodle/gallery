@@ -282,6 +282,27 @@ describe(GameService.name, () => {
     );
   });
 
+  describe('onGameChallengeCleanup', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    // Which challenges count as "unplayed" - zero game_guess rows, not "not finished" - is the
+    // repository query's rule, not this handler's: pruning a partially played challenge would
+    // silently rewrite a score already on the leaderboard and in history, so that distinction is
+    // proved against the generated SQL in game.repository.spec.ts (deleteUnplayedChallenges), the
+    // same way the other query-shape guards in that file work with no database. What is testable
+    // here is the wiring - the cutoff this handler computes and hands to the repository.
+    it('prunes challenges older than the retention window', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-08-19T12:00:00.000Z'));
+
+      await sut.onGameChallengeCleanup();
+
+      expect(mocks.game.deleteUnplayedChallenges).toHaveBeenCalledWith(new Date('2026-08-12T12:00:00.000Z'));
+    });
+  });
+
   describe('guess', () => {
     const challengeStub = {
       id: 'challenge-1',
@@ -1273,6 +1294,10 @@ describe(GameService.name, () => {
         expect(result.currentStreak).toBe(2);
         expect(result.bestStreak).toBe(2);
         expect(mocks.game.getSoloCompletedDailyDates).toHaveBeenCalledWith('user-1');
+        // The sibling call: soloStats reads two repository methods for the SAME caller, and only
+        // one of the two ids being pinned would let a wrong id on this call slip through unit
+        // tests entirely - it would surface only in e2e, which cannot run against this branch.
+        expect(mocks.game.getSoloScoreSummary).toHaveBeenCalledWith('user-1');
       });
 
       // Rounds are scored in whole points, so an average is the only fractional number the panel

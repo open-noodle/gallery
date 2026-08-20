@@ -34367,7 +34367,8 @@
           "SharedSpaceAlbumGrantReconcileSweep",
           "SharedSpaceIdentityReconciliationSweep",
           "AssetClassifyQueueAll",
-          "AssetClassify"
+          "AssetClassify",
+          "GameChallengeCleanup"
         ],
         "type": "string"
       },
