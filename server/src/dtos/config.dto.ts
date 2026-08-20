@@ -32,6 +32,19 @@ import {
   VideoContainer,
   VideoContainerSchema,
 } from 'src/enum.js';
+import {
+  GalleryClassificationSchema,
+  GalleryClipExtension,
+  GalleryFaceSuggestionSchema,
+  galleryJobDefaults,
+  galleryMachineLearningDefaults,
+  GalleryMemoriesSchema,
+  GalleryPetDetectionSchema,
+  galleryServerDefaults,
+  GalleryServerExtension,
+  GalleryStorageUsageSchema,
+  galleryTopLevelDefaults,
+} from 'src/gallery/config.dto.js';
 
 const { Admin, User, Public } = ConfigVisibility;
 
@@ -209,6 +222,9 @@ const AdminConfigSchemaWithVisibility = z
         workflow: AdminConfigJobSettingsSchema,
         editor: AdminConfigJobSettingsSchema,
         integrityCheck: AdminConfigJobSettingsSchema,
+        peopleBackfill: AdminConfigJobSettingsSchema,
+        petDetection: AdminConfigJobSettingsSchema,
+        classification: AdminConfigJobSettingsSchema,
       })
       .meta({ id: 'AdminConfigJobDto' }),
     logging: z
@@ -228,7 +244,8 @@ const AdminConfigSchemaWithVisibility = z
             interval: z.int(),
           })
           .meta({ id: 'AdminConfigMachineLearningAvailabilityChecksDto' }),
-        clip: AdminConfigMachineLearningModelSchema.meta({ id: 'AdminConfigClipDto' }),
+        clip: AdminConfigMachineLearningModelSchema.extend(GalleryClipExtension).meta({ id: 'AdminConfigClipDto' }),
+        petDetection: GalleryPetDetectionSchema,
         duplicateDetection: AdminConfigMachineLearningTaskSchema.extend({
           maxDistance: z
             .number()
@@ -255,6 +272,7 @@ const AdminConfigSchemaWithVisibility = z
             .min(1)
             .describe('Minimum number of faces required for recognition')
             .meta({ visibility: User }),
+          suggestions: GalleryFaceSuggestionSchema,
         }).meta({ id: 'AdminConfigFacialRecognitionDto' }),
         ocr: AdminConfigMachineLearningModelSchema.extend({
           maxResolution: z.int().min(1).describe('Maximum resolution for OCR processing'),
@@ -440,11 +458,15 @@ const AdminConfigSchemaWithVisibility = z
           .meta({ visibility: User }),
         loginPageMessage: z.string().describe('Login page message').meta({ visibility: Public }),
         publicUsers: configBool.describe('Public users').meta({ visibility: User }),
+        ...GalleryServerExtension,
       })
       .meta({ id: 'AdminConfigServerDto' }),
     user: z
       .object({ deleteDelay: z.int().min(1).describe('Delete delay').meta({ visibility: User }) })
       .meta({ id: 'AdminConfigUserDto' }),
+    classification: GalleryClassificationSchema,
+    memories: GalleryMemoriesSchema,
+    storageUsage: GalleryStorageUsageSchema,
   })
   .describe('Configuration properties that are visible to the admin')
   .meta({ id: 'AdminConfigDto' });
@@ -652,6 +674,7 @@ export const defaults = Object.freeze<SystemConfig>({
     workflow: { concurrency: 5 },
     editor: { concurrency: 2 },
     integrityCheck: { concurrency: 1 },
+    ...galleryJobDefaults,
   },
   logging: {
     enabled: true,
@@ -668,7 +691,9 @@ export const defaults = Object.freeze<SystemConfig>({
     clip: {
       enabled: true,
       modelName: 'ViT-B-32__openai',
+      maxDistance: galleryMachineLearningDefaults.clipMaxDistance,
     },
+    petDetection: galleryMachineLearningDefaults.petDetection,
     duplicateDetection: {
       enabled: true,
       maxDistance: 0.01,
@@ -679,6 +704,7 @@ export const defaults = Object.freeze<SystemConfig>({
       minScore: 0.7,
       maxDistance: 0.5,
       minFaces: 3,
+      suggestions: galleryMachineLearningDefaults.faceSuggestions,
     },
     ocr: {
       enabled: true,
@@ -690,8 +716,8 @@ export const defaults = Object.freeze<SystemConfig>({
   },
   map: {
     enabled: true,
-    lightStyle: 'https://tiles.immich.cloud/v1/style/light.json',
-    darkStyle: 'https://tiles.immich.cloud/v1/style/dark.json',
+    lightStyle: 'https://tiles.openfreemap.org/styles/positron',
+    darkStyle: 'https://tiles.openfreemap.org/styles/dark',
   },
   reverseGeocoding: {
     enabled: true,
@@ -792,6 +818,7 @@ export const defaults = Object.freeze<SystemConfig>({
     externalDomain: '',
     loginPageMessage: '',
     publicUsers: true,
+    ...galleryServerDefaults,
   },
   notifications: {
     smtp: {
@@ -818,4 +845,5 @@ export const defaults = Object.freeze<SystemConfig>({
   user: {
     deleteDelay: 7,
   },
+  ...galleryTopLevelDefaults,
 });
