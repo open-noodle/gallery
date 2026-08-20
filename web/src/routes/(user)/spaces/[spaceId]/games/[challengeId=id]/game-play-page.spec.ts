@@ -142,6 +142,19 @@ describe('Game play page', () => {
 
       expect(navigationMock.goto).toHaveBeenCalledWith('/spaces/space-1/games');
     });
+
+    // Carry-forward from task-2's review: the positive case above proves the back control appears
+    // for a space challenge, but nothing proved it stays gone for a solo one (spaceId: null) - a
+    // future solo challenge would otherwise inherit a back button wired to
+    // `Route.viewSpaceGames({ id: null })`. getByTestId on the wrapper (which always renders,
+    // content or not - see mock-user-page-layout.test-wrapper.svelte) so this can't pass vacuously;
+    // querySelector('button') is the absence check, returning null rather than throwing.
+    it('renders no back control for a challenge with no space', () => {
+      renderPage(makeChallenge({ spaceId: null }));
+
+      const leading = screen.getByTestId('layout-leading');
+      expect(leading.querySelector('button')).toBeNull();
+    });
   });
 
   describe('resuming', () => {
