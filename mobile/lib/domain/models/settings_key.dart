@@ -63,6 +63,12 @@ enum SettingsKey<T> {
   // so the worst case is a single redundant reminder before these two keys are written fresh.
   gameSpaceDailyLastPlayed<String?>(),
   gameSoloDailyLastPlayed<String?>(),
+  // The UTC day the solo daily was last CONFIRMED unavailable (the player's library could not
+  // fill one) — written from wherever the solo daily is actually fetched (see
+  // DailyReminderController.recordSoloDailyUnavailable's doc), never read here directly. Day-
+  // keyed, not a standing flag: a library that cannot fill a daily today may fill one tomorrow,
+  // and comparing against a specific day is what makes this re-evaluate rather than latch.
+  gameSoloDailyUnavailableOn<String?>(),
 
   // Backup
   backupEnabled<bool>(),

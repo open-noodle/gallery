@@ -9,6 +9,7 @@ import 'package:immich_mobile/presentation/widgets/games/challenge_card.widget.d
 import 'package:immich_mobile/presentation/widgets/games/challenge_create_sheet.widget.dart';
 import 'package:immich_mobile/presentation/widgets/games/round_photo_placeholder.widget.dart';
 import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
+import 'package:immich_mobile/providers/game/daily_reminder.provider.dart';
 import 'package:immich_mobile/providers/game/solo_game.provider.dart';
 import 'package:immich_mobile/repositories/solo_game_api.repository.dart';
 import 'package:immich_mobile/routing/router.dart';
@@ -49,6 +50,17 @@ class PhotoGuesserPage extends HookConsumerWidget {
     // truth — page 1's `hasNextPage` only ever described the end of page 1.
     final moreAfterExtras = useState<bool?>(null);
     final loadingMore = useState(false);
+
+    // The reminder needs to know when the solo daily is confirmed unavailable (the player's
+    // library cannot fill one today), and this is the ONLY place that reads it — reading it again
+    // just to check would be the exact GENERATING call the reminder file avoids everywhere else.
+    // `previous == null` on the FIRST resolution also reports, which is correct: a cold-started
+    // reminder schedule was built without knowing today's answer yet.
+    ref.listen(soloDailyProvider, (previous, next) {
+      if (next.hasValue && next.value == null) {
+        unawaited(ref.read(dailyReminderProvider).recordSoloDailyUnavailable());
+      }
+    });
 
     final daily = ref.watch(soloDailyProvider);
     final stats = ref.watch(soloStatsProvider);

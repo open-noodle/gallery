@@ -42,6 +42,20 @@ String dailyKeyFor(DateTime instant) {
 /// per-space opt-in to check: every account has a personal daily once the reminder is on, so the
 /// caller passes it in mainly so this stays a pure function of its arguments rather than a global
 /// assumption baked in here.
+///
+/// [soloUnavailableOn], separately, is NOT about opt-in — it is about whether the solo daily could
+/// even be generated. `soloDailyEnabled == true` asserts the feature exists for this player, not
+/// that today's instance does: the player's library can genuinely be too small to fill one (see
+/// `GameSoloDailyUnavailable` on the solo page), and on that day [soloLastPlayed] can never equal
+/// the day's key either, because there is nothing to have played. Without this, a player whose
+/// solo daily is unavailable today would either (a) if they also have an opted-in space, still get
+/// reminded tonight about a space daily they already finished — the exact "reminded about a daily I
+/// already played" failure the one-shot horizon exists to prevent — or (b) if they have no space at
+/// all, get reminded forever about a daily that will never exist. A day whose key matches
+/// [soloUnavailableOn] counts the solo side as satisfied for that day ONLY — it is keyed to the one
+/// day it was actually observed, not a standing "solo is off" flag, so a library that fills again
+/// tomorrow is not locked out by yesterday's finding, and it never widens to affect any other day in
+/// the horizon.
 List<DateTime> dailyReminderOccurrences({
   required DateTime now,
   required int minuteOfDay,
@@ -51,6 +65,7 @@ List<DateTime> dailyReminderOccurrences({
   required bool soloDailyEnabled,
   required String? spaceLastPlayed,
   required String? soloLastPlayed,
+  required String? soloUnavailableOn,
   int horizonDays = kDailyReminderHorizonDays,
 }) {
   // Permission is checked here, not only where the toggle is set: it can be revoked in OS settings
@@ -73,9 +88,11 @@ List<DateTime> dailyReminderOccurrences({
     // that is not enabled for them counts as vacuously played rather than as unplayed — otherwise
     // a spaceless player's permanently-null spaceLastPlayed would never equal any key and no day
     // would ever be skippable, and symmetrically a space-only player would be reminded forever
-    // about a solo daily they never opted into.
+    // about a solo daily they never opted into. A day CONFIRMED unavailable also counts the solo
+    // side as satisfied — see [soloUnavailableOn]'s doc above for why that is not the same claim
+    // as "played".
     final spacePlayed = !hasOptedInSpace || spaceLastPlayed == key;
-    final soloPlayed = !soloDailyEnabled || soloLastPlayed == key;
+    final soloPlayed = !soloDailyEnabled || soloLastPlayed == key || soloUnavailableOn == key;
     if (spacePlayed && soloPlayed) {
       continue;
     }

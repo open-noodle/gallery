@@ -136,6 +136,7 @@ class DailyReminderController {
       soloDailyEnabled: soloDailyEnabled,
       spaceLastPlayed: config.read(SettingsKey.gameSpaceDailyLastPlayed),
       soloLastPlayed: config.read(SettingsKey.gameSoloDailyLastPlayed),
+      soloUnavailableOn: config.read(SettingsKey.gameSoloDailyUnavailableOn),
     );
 
     for (var i = 0; i < occurrences.length; i++) {
@@ -159,5 +160,18 @@ class DailyReminderController {
     final key = isSolo ? SettingsKey.gameSoloDailyLastPlayed : SettingsKey.gameSpaceDailyLastPlayed;
     await _ref.read(settingsProvider).write(key, dailyKeyFor(dailyOn));
     await refresh();
+  }
+
+  /// Records that the solo daily could not be generated today — the player's library has nothing
+  /// to fill one with — then reschedules so tonight's occurrence drops immediately if the space
+  /// side is also already played, rather than waiting for the next resume.
+  ///
+  /// Called from wherever the solo daily is actually fetched (the PhotoGuesser page's own read of
+  /// it), never from here: reading it ourselves to find this out would be exactly the GENERATING
+  /// read `refresh()`'s doc says this whole file avoids. [now] defaults to the real clock and only
+  /// exists so callers (and their tests) can pin the day being recorded.
+  Future<void> recordSoloDailyUnavailable({DateTime? now}) async {
+    await _ref.read(settingsProvider).write(SettingsKey.gameSoloDailyUnavailableOn, dailyKeyFor(now ?? DateTime.now()));
+    await refresh(now: now);
   }
 }
