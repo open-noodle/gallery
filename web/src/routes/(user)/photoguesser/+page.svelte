@@ -91,8 +91,12 @@
     try {
       const challenge = await createSoloChallenge({ gameSoloCreateDto: { roundCount, type, sources } });
       if (challenge.roundCount < roundCount) {
+        // The solo sibling of game_rounds_fewer_than_requested, not that key itself: the space one
+        // reads "This space's photos filled…", and several of its translations hard-code the
+        // product noun (de "dieses Spaces", nl "deze Space", ru "этого Space"), so it would tell a
+        // solo player - who may belong to no space at all - about photos in one.
         toastManager.warning(
-          $t('game_rounds_fewer_than_requested', {
+          $t('game_solo_rounds_fewer_than_requested', {
             values: { actual: challenge.roundCount, requested: roundCount },
           }),
         );

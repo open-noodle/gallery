@@ -248,7 +248,13 @@ describe('PhotoGuesser landing page', () => {
       const panel = await startFreePlay();
       await fireEvent.click(within(panel).getByTestId('challenge-create-submit'));
 
-      await waitFor(() => expect(toastManagerMock.warning).toHaveBeenCalled());
+      // Worded for a solo player, not a space member: the space key this used to share says "This
+      // space's photos filled…", and several of its translations hard-code the product noun
+      // (de "dieses Spaces", nl "deze Space", ru "этого Space") - so a solo player who may belong
+      // to no space at all would be told about photos in one. The `space` absence check is what
+      // pins that, and it can only pass because the counts assertion above proves a real string.
+      await waitFor(() => expect(toastManagerMock.warning).toHaveBeenCalledWith('Your photos filled 3 of 5 rounds'));
+      expect(toastManagerMock.warning).not.toHaveBeenCalledWith(expect.stringContaining('space'));
       await waitFor(() => expect(goto).toHaveBeenCalledWith('/photoguesser/challenge-11'));
     });
   });
