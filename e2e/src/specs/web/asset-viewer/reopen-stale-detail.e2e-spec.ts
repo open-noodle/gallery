@@ -32,7 +32,7 @@ test.describe('asset viewer reopen', () => {
     // "new version available" dialog, which swallows clicks on the timeline. Turn it off.
     const config = await getConfig({ headers: asBearerAuth(admin.accessToken) });
     await updateConfig(
-      { systemConfigDto: { ...config, newVersionCheck: { ...config.newVersionCheck, enabled: false } } },
+      { adminConfigDto: { ...config, newVersionCheck: { ...config.newVersionCheck, enabled: false } } },
       { headers: asBearerAuth(admin.accessToken) },
     );
 
