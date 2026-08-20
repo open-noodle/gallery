@@ -543,15 +543,21 @@ export class GameRepository {
   // ── the solo pool ─────────────────────────────────────────────────────────────────────────
   //
   // The same questions as the space pool, asked of one player's own scope. The three that read
-  // photos are each generated THREE times - see the names on the decorators - because their read
+  // photos are each generated FOUR times - see the names on the decorators - because their read
   // arms are conditional on the player's frozen source toggles, and one variant could not pin the
   // toggles at all.
   //
-  // The asymmetric `partners only` variant is the load-bearing one. With only (false,false) and
-  // (true,true) generated, an arm gated on the WRONG flag - the space arm reading withPartners, or
-  // a union that tests the wrong field - emits nothing under the first and everything under the
-  // second, exactly like correct code, while a player who enabled only partners silently receives
-  // shared-space photos. Only a variant where the two flags DIFFER can tell those apart.
+  // The two asymmetric variants are the load-bearing ones. With only (false,false) and (true,true)
+  // generated, an arm gated on the WRONG flag - the space arm reading withPartners, or a union that
+  // tests the wrong field - emits nothing under the first and everything under the second, exactly
+  // like correct code, while a player who enabled only partners silently receives shared-space
+  // photos. Only a variant where the two flags DIFFER can tell those apart.
+  //
+  // Both asymmetric directions are generated, not just one: `partners only` catches a SPACE arm
+  // gated on withPartners, but a PARTNER arm cross-wired to withSpaces is invisible to it (that arm
+  // is legitimately absent there) and equally invisible to both symmetric variants - so it passed
+  // every guard until `spaces only` existed. The failure it hides is the same shape and the same
+  // severity: photos from someone the player never opted into.
 
   /**
    * Location-round candidates for a solo player: stage 1 only, ranked by the shared
@@ -575,6 +581,15 @@ export class GameRepository {
       name: 'partners only',
       params: [
         { userId: DummyValue.UUID, withPartners: true, withSpaces: false },
+        DummyValue.NUMBER,
+        DummyValue.STRING,
+        { place: PLACE_PROMPT_EMBEDDING, notPlace: NOT_PLACE_PROMPT_EMBEDDING },
+      ],
+    },
+    {
+      name: 'spaces only',
+      params: [
+        { userId: DummyValue.UUID, withPartners: false, withSpaces: true },
         DummyValue.NUMBER,
         DummyValue.STRING,
         { place: PLACE_PROMPT_EMBEDDING, notPlace: NOT_PLACE_PROMPT_EMBEDDING },
@@ -651,6 +666,14 @@ export class GameRepository {
       ],
     },
     {
+      name: 'spaces only',
+      params: [
+        { userId: DummyValue.UUID, withPartners: false, withSpaces: true },
+        DummyValue.NUMBER,
+        DummyValue.STRING,
+      ],
+    },
+    {
       name: 'all sources',
       params: [{ userId: DummyValue.UUID, withPartners: true, withSpaces: true }, DummyValue.NUMBER, DummyValue.STRING],
     },
@@ -698,6 +721,10 @@ export class GameRepository {
     {
       name: 'partners only',
       params: [{ userId: DummyValue.UUID, withPartners: true, withSpaces: false }, DummyValue.UUID],
+    },
+    {
+      name: 'spaces only',
+      params: [{ userId: DummyValue.UUID, withPartners: false, withSpaces: true }, DummyValue.UUID],
     },
     {
       name: 'all sources',
