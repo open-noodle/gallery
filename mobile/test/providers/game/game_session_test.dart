@@ -253,7 +253,13 @@ void main() {
     final state = container.read(gameSessionProvider('challenge-1')).requireValue;
     expect(state.phase, GamePhase.revealing);
     expect(state.result!.score, 900);
-    expect(state.result!.guess, isNull, reason: 'That request never reached the server');
+    expect(
+      state.result!.guess,
+      isNull,
+      reason: "The _round fixture has no way to attach a guess to the refetched round — the test below "
+          'proves a refetch CAN carry the guess the server already had on file, so this is not, by '
+          'itself, evidence the request never reached the server',
+    );
   });
 
   // A guess that was already recorded server-side (409) previously revealed with no pin, because
