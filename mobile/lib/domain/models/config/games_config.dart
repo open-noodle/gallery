@@ -19,11 +19,22 @@ class GamesConfig {
   /// null. The solo counterpart to [spaceDailyLastPlayed] — see its doc for why the two stay apart.
   final String? soloDailyLastPlayed;
 
+  /// The UTC `YYYY-MM-DD` the solo daily was last CONFIRMED unavailable — the player's library
+  /// could not fill one that day — or null.
+  ///
+  /// Without this, [soloDailyLastPlayed] can never equal that day's key either (nothing to have
+  /// played), so the reminder would treat the day as permanently unplayed and keep reminding about
+  /// a daily that does not exist. Day-keyed rather than a standing "solo is off" flag so a library
+  /// that fills again tomorrow is not locked out by yesterday's finding — see
+  /// `dailyReminderOccurrences`'s doc for how this is folded into the skip.
+  final String? soloDailyUnavailableOn;
+
   const GamesConfig({
     this.dailyReminderEnabled = false,
     this.dailyReminderMinuteOfDay = 18 * 60,
     this.spaceDailyLastPlayed,
     this.soloDailyLastPlayed,
+    this.soloDailyUnavailableOn,
   });
 
   GamesConfig copyWith({
@@ -31,11 +42,13 @@ class GamesConfig {
     int? dailyReminderMinuteOfDay,
     String? spaceDailyLastPlayed,
     String? soloDailyLastPlayed,
+    String? soloDailyUnavailableOn,
   }) => GamesConfig(
     dailyReminderEnabled: dailyReminderEnabled ?? this.dailyReminderEnabled,
     dailyReminderMinuteOfDay: dailyReminderMinuteOfDay ?? this.dailyReminderMinuteOfDay,
     spaceDailyLastPlayed: spaceDailyLastPlayed ?? this.spaceDailyLastPlayed,
     soloDailyLastPlayed: soloDailyLastPlayed ?? this.soloDailyLastPlayed,
+    soloDailyUnavailableOn: soloDailyUnavailableOn ?? this.soloDailyUnavailableOn,
   );
 
   @override
@@ -45,15 +58,21 @@ class GamesConfig {
           other.dailyReminderEnabled == dailyReminderEnabled &&
           other.dailyReminderMinuteOfDay == dailyReminderMinuteOfDay &&
           other.spaceDailyLastPlayed == spaceDailyLastPlayed &&
-          other.soloDailyLastPlayed == soloDailyLastPlayed);
+          other.soloDailyLastPlayed == soloDailyLastPlayed &&
+          other.soloDailyUnavailableOn == soloDailyUnavailableOn);
 
   @override
-  int get hashCode =>
-      Object.hash(dailyReminderEnabled, dailyReminderMinuteOfDay, spaceDailyLastPlayed, soloDailyLastPlayed);
+  int get hashCode => Object.hash(
+    dailyReminderEnabled,
+    dailyReminderMinuteOfDay,
+    spaceDailyLastPlayed,
+    soloDailyLastPlayed,
+    soloDailyUnavailableOn,
+  );
 
   @override
   String toString() =>
       'GamesConfig(dailyReminderEnabled: $dailyReminderEnabled, '
       'dailyReminderMinuteOfDay: $dailyReminderMinuteOfDay, spaceDailyLastPlayed: $spaceDailyLastPlayed, '
-      'soloDailyLastPlayed: $soloDailyLastPlayed)';
+      'soloDailyLastPlayed: $soloDailyLastPlayed, soloDailyUnavailableOn: $soloDailyUnavailableOn)';
 }

@@ -11,6 +11,7 @@ import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/pages/games/photo_guesser.page.dart';
+import 'package:immich_mobile/providers/game/daily_reminder.provider.dart';
 import 'package:immich_mobile/providers/game/solo_game.provider.dart';
 import 'package:immich_mobile/repositories/solo_game_api.repository.dart';
 import 'package:mocktail/mocktail.dart';
@@ -20,6 +21,8 @@ import '../test_utils.dart';
 import '../widget_tester_extensions.dart';
 
 class _MockSoloGameApiRepository extends Mock implements SoloGameApiRepository {}
+
+class _MockDailyReminderController extends Mock implements DailyReminderController {}
 
 /// A solo daily: `spaceId` null, owned by the player.
 GameChallengeListItemResponseDto _daily({required int answered, int roundCount = 5}) =>
@@ -100,6 +103,13 @@ void main() {
   /// Note what is NOT here: no space provider, no space id, no membership. That absence is the
   /// point — PhotoGuesser is the solo scope, and every test below therefore proves the surface
   /// stands up for a player who belongs to no shared space at all.
+  ///
+  /// `dailyReminderProvider` is always stubbed here, even though most tests never look at it: the
+  /// page listens for the solo daily resolving to null and reports it to the reminder (see
+  /// photo_guesser.page.dart), so any test that pumps with `daily: null` would otherwise reach the
+  /// REAL `DailyReminderController` and its settings/spaces dependencies, neither of which this
+  /// file sets up. A caller that wants to assert against the reminder passes its own mock via
+  /// `extraOverrides`, which — being later in the overrides list — wins over this default.
   Future<void> pump(
     WidgetTester tester, {
     GameChallengeListItemResponseDto? daily,
@@ -108,23 +118,29 @@ void main() {
     GameSoloHistoryResponseDto? history,
     Object? historyError,
     List<Override> extraOverrides = const [],
-  }) => tester.pumpConsumerWidget(
-    const PhotoGuesserPage(),
-    overrides: [
-      if (dailyError != null)
-        soloDailyProvider.overrideWith((ref) async => throw dailyError)
-      else
-        soloDailyProvider.overrideWith((ref) async => daily),
-      soloStatsProvider.overrideWith((ref) async => stats ?? _stats()),
-      if (historyError != null)
-        soloHistoryProvider.overrideWith((ref) async => throw historyError)
-      else
-        soloHistoryProvider.overrideWith(
-          (ref) async => history ?? GameSoloHistoryResponseDto(hasNextPage: false, items: []),
-        ),
-      ...extraOverrides,
-    ],
-  );
+  }) {
+    final defaultReminder = _MockDailyReminderController();
+    when(() => defaultReminder.recordSoloDailyUnavailable(now: any(named: 'now'))).thenAnswer((_) async {});
+
+    return tester.pumpConsumerWidget(
+      const PhotoGuesserPage(),
+      overrides: [
+        if (dailyError != null)
+          soloDailyProvider.overrideWith((ref) async => throw dailyError)
+        else
+          soloDailyProvider.overrideWith((ref) async => daily),
+        soloStatsProvider.overrideWith((ref) async => stats ?? _stats()),
+        if (historyError != null)
+          soloHistoryProvider.overrideWith((ref) async => throw historyError)
+        else
+          soloHistoryProvider.overrideWith(
+            (ref) async => history ?? GameSoloHistoryResponseDto(hasNextPage: false, items: []),
+          ),
+        dailyReminderProvider.overrideWithValue(defaultReminder),
+        ...extraOverrides,
+      ],
+    );
+  }
 
   /// `ImmichToast` schedules a 3s fluttertoast Timer outside the frame scheduler, so a plain
   /// `pumpAndSettle()` leaves it pending and teardown fails with "A Timer is still pending". Pump
@@ -205,6 +221,37 @@ void main() {
 
       expect(find.byKey(const Key('solo-daily-retry')), findsOneWidget);
       expect(find.byKey(const Key('solo-daily-unavailable')), findsNothing);
+    });
+
+    // The write side of the Critical reminder fix: without this, soloDailyEnabled being
+    // unconditionally true asserted a guarantee the product does not make, and a day the library
+    // genuinely could not fill would be permanently unskippable. This is the ONE place that
+    // discovers "unavailable" — reading the daily again just to check would be the exact
+    // GENERATING call the reminder file avoids everywhere else, so this must piggyback on the
+    // fetch the page already makes for its own reasons.
+    testWidgets('an unavailable daily reports it to the reminder', (tester) async {
+      final reminder = _MockDailyReminderController();
+      when(() => reminder.recordSoloDailyUnavailable(now: any(named: 'now'))).thenAnswer((_) async {});
+
+      await pump(tester, daily: null, extraOverrides: [dailyReminderProvider.overrideWithValue(reminder)]);
+
+      verify(() => reminder.recordSoloDailyUnavailable(now: any(named: 'now'))).called(1);
+    });
+
+    // The other side of the same wiring: a genuinely available daily — played or not — must NOT
+    // be reported as unavailable, or a library that CAN fill a daily would still have its
+    // reminder suppressed by a false "unavailable" write.
+    testWidgets('an available daily does not report unavailability to the reminder', (tester) async {
+      final reminder = _MockDailyReminderController();
+      when(() => reminder.recordSoloDailyUnavailable(now: any(named: 'now'))).thenAnswer((_) async {});
+
+      await pump(
+        tester,
+        daily: _daily(answered: 0),
+        extraOverrides: [dailyReminderProvider.overrideWithValue(reminder)],
+      );
+
+      verifyNever(() => reminder.recordSoloDailyUnavailable(now: any(named: 'now')));
     });
   });
 

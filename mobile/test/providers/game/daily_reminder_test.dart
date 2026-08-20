@@ -19,6 +19,14 @@ class _MockScheduler extends Mock implements DailyReminderScheduler {}
 // `.write()` calls, matching the pattern in map_bottom_sheet_timeline_test.dart.
 class _MockSettingsRepository extends Mock implements SettingsRepository {}
 
+/// The UTC day key of [instant], computed independently of `dailyKeyFor` — so a test comparing
+/// against this cannot pass merely because it makes the same mistake `dailyKeyFor` would. Mirrors
+/// daily_reminder_schedule_test.dart's `_utcKeyOf`.
+String _utcKeyOf(DateTime instant) {
+  final utc = instant.toUtc();
+  return '${utc.year}-${utc.month.toString().padLeft(2, '0')}-${utc.day.toString().padLeft(2, '0')}';
+}
+
 SharedSpaceResponseDto _space(String id, {bool? dailyEnabled}) => SharedSpaceResponseDto(
   id: id,
   name: id,
@@ -54,6 +62,7 @@ void main() {
     // (`U = String`), so the stub silently would not match and the mock would return `null`.
     when(() => settings.write(SettingsKey.gameSpaceDailyLastPlayed, '2026-08-18')).thenAnswer((_) async {});
     when(() => settings.write(SettingsKey.gameSoloDailyLastPlayed, '2026-08-18')).thenAnswer((_) async {});
+    when(() => settings.write(SettingsKey.gameSoloDailyUnavailableOn, '2026-08-18')).thenAnswer((_) async {});
   });
 
   ProviderContainer container(
@@ -120,9 +129,10 @@ void main() {
   test('an absent dailyChallengeEnabled does not count as opted in, and does not throw', () async {
     // `Absent.value` THROWS — reading this field with `.value` would blow up when `refresh()` is
     // awaited below, rather than returning false.
+    final todayKey = _utcKeyOf(DateTime(2026, 8, 18, 18));
     final c = container(
       [_space('s1')],
-      settingsValues: {SettingsKey.gameDailyReminderEnabled: true, SettingsKey.gameSoloDailyLastPlayed: '2026-08-18'},
+      settingsValues: {SettingsKey.gameDailyReminderEnabled: true, SettingsKey.gameSoloDailyLastPlayed: todayKey},
     );
 
     await c.read(dailyReminderProvider).refresh(now: DateTime(2026, 8, 18, 9));
@@ -139,9 +149,10 @@ void main() {
   });
 
   test('a declined space does not count as opted in', () async {
+    final todayKey = _utcKeyOf(DateTime(2026, 8, 18, 18));
     final c = container(
       [_space('s1', dailyEnabled: false)],
-      settingsValues: {SettingsKey.gameDailyReminderEnabled: true, SettingsKey.gameSoloDailyLastPlayed: '2026-08-18'},
+      settingsValues: {SettingsKey.gameDailyReminderEnabled: true, SettingsKey.gameSoloDailyLastPlayed: todayKey},
     );
 
     await c.read(dailyReminderProvider).refresh(now: DateTime(2026, 8, 18, 9));
@@ -234,8 +245,10 @@ void main() {
 
   test('hasPermission is not asked unless the local gates already pass', () async {
     // Toggle left off (default). hasPermission() can raise the iOS system permission dialog, so a
-    // user who never opted into a space or enabled the toggle must never see it just from opening
-    // the app.
+    // user who never enabled the toggle must never see it just from opening the app. The space
+    // half of the old comment here no longer holds: soloDailyEnabled is unconditionally true, so
+    // an opted-in space is not what is gating this — only `enabled` still is, which is why the
+    // toggle being left off (not the space) is what this test actually pins.
     final c = container([_space('s1', dailyEnabled: true)]);
 
     await c.read(dailyReminderProvider).refresh();
@@ -268,6 +281,38 @@ void main() {
     verify(() => settings.write(SettingsKey.gameSoloDailyLastPlayed, '2026-08-18')).called(1);
     verifyNever(() => settings.write(SettingsKey.gameSpaceDailyLastPlayed, '2026-08-18'));
     verify(() => scheduler.cancelAll()).called(1);
+  });
+
+  // The Critical fix: soloDailyEnabled being unconditionally true asserted a guarantee the
+  // product does not make — the player's library can genuinely be too small to fill a solo daily
+  // — which made a day whose solo daily was unavailable permanently unskippable. This is the write
+  // side of that fix: the PhotoGuesser page's own read of the solo daily (which already happens,
+  // and which this deliberately does NOT duplicate) is what discovers "unavailable" and reports it
+  // here.
+  test('recording the solo daily unavailable stores the day and reschedules', () async {
+    final c = container(
+      [_space('s1', dailyEnabled: true)],
+      settingsValues: {SettingsKey.gameDailyReminderEnabled: true},
+    );
+
+    await c.read(dailyReminderProvider).recordSoloDailyUnavailable(now: DateTime.utc(2026, 8, 18));
+
+    verify(() => settings.write(SettingsKey.gameSoloDailyUnavailableOn, '2026-08-18')).called(1);
+    verify(() => scheduler.cancelAll()).called(1);
+  });
+
+  test('recording the solo daily unavailable does not touch either last-played key', () async {
+    // "Unavailable" and "played" are different facts recorded under different keys — conflating
+    // them would make a genuinely unplayed daily read as finished, or vice versa.
+    final c = container(
+      [_space('s1', dailyEnabled: true)],
+      settingsValues: {SettingsKey.gameDailyReminderEnabled: true},
+    );
+
+    await c.read(dailyReminderProvider).recordSoloDailyUnavailable(now: DateTime.utc(2026, 8, 18));
+
+    verifyNever(() => settings.write(SettingsKey.gameSoloDailyLastPlayed, '2026-08-18'));
+    verifyNever(() => settings.write(SettingsKey.gameSpaceDailyLastPlayed, '2026-08-18'));
   });
 
   test('a spaces-list failure leaves pending notifications alone rather than cancelling them', () async {
