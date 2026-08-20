@@ -1167,6 +1167,13 @@ export class GameService extends BaseService {
       assetId: round.assetId ?? undefined,
       score: guess.score,
       answer: { lat: round.answerLat, lon: round.answerLon, date: round.answerDate },
+      guess: {
+        lat: guess.guessLat,
+        lon: guess.guessLon,
+        date: guess.guessDate,
+        distanceKm: guess.distanceKm,
+        offsetDays: guess.offsetDays,
+      },
     };
   }
 
