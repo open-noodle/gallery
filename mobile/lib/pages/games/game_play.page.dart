@@ -7,6 +7,7 @@ import 'package:immich_mobile/extensions/translate_extensions.dart';
 import 'package:immich_mobile/presentation/widgets/games/date_round.widget.dart';
 import 'package:immich_mobile/presentation/widgets/games/location_round.widget.dart';
 import 'package:immich_mobile/presentation/widgets/games/round_reveal.widget.dart';
+import 'package:immich_mobile/presentation/widgets/games/round_review_list.widget.dart';
 import 'package:immich_mobile/presentation/widgets/games/standings_section.widget.dart';
 import 'package:immich_mobile/providers/game/daily_reminder.provider.dart';
 import 'package:immich_mobile/providers/game/game_session.provider.dart';
@@ -100,6 +101,7 @@ class GamePlayPage extends ConsumerWidget {
         return _SoloCompleted(challenge: state.challenge);
       }
       return _Completed(
+        challenge: state.challenge,
         leaderboard: state.leaderboard,
         roundCount: state.challenge.rounds.length,
         currentUserId: ref.watch(currentUserProvider)?.id ?? '',
@@ -145,8 +147,14 @@ class GamePlayPage extends ConsumerWidget {
 /// nothing here except the chance to silently drop a real player whose membership row happened not
 /// to load. Same reasoning as `StandingsSection`.
 class _Completed extends StatelessWidget {
-  const _Completed({required this.leaderboard, required this.roundCount, required this.currentUserId});
+  const _Completed({
+    required this.challenge,
+    required this.leaderboard,
+    required this.roundCount,
+    required this.currentUserId,
+  });
 
+  final GameChallengeDetailResponseDto challenge;
   final GameLeaderboardResponseDto? leaderboard;
   final int roundCount;
   final String currentUserId;
@@ -187,6 +195,12 @@ class _Completed extends StatelessWidget {
               isMe: entries[i].userId == currentUserId,
             ),
         ],
+        RoundReviewList(
+          challengeId: challenge.id,
+          rounds: challenge.rounds,
+          onRoundTap: (index) =>
+              unawaited(context.pushRoute(GameRoundReviewRoute(challengeId: challenge.id, index: index))),
+        ),
       ],
     );
   }
@@ -277,6 +291,12 @@ class _SoloCompletedState extends ConsumerState<_SoloCompleted> {
                   child: CircularProgressIndicator.adaptive(strokeWidth: 2),
                 )
               : Text('game_solo_play_again'.t(context: context)),
+        ),
+        RoundReviewList(
+          challengeId: widget.challenge.id,
+          rounds: widget.challenge.rounds,
+          onRoundTap: (index) =>
+              unawaited(context.pushRoute(GameRoundReviewRoute(challengeId: widget.challenge.id, index: index))),
         ),
       ],
     );
