@@ -125,3 +125,32 @@ int? firstUnansweredIndex(List<GameRoundDetailResponseDto> rounds) {
   }
   return null;
 }
+
+/// A game's day — a daily's `dailyOn` or a free-play game's `createdAt` — as a readable date.
+///
+/// Formatted from the UTC instant for the same reason [formatStandingsMonth] is: every day this
+/// game keys on is a UTC calendar day, so rendering a row in the viewer's zone would date a daily
+/// to a different day than the streak that counted it.
+String formatGameDate(DateTime date, {String? locale}) => DateFormat.yMMMd(locale).format(date.toUtc());
+
+/// A score with digit grouping, e.g. `18,420`.
+///
+/// Grouped BEFORE interpolation, never after: `game_points` substitutes `{score}` verbatim, so
+/// handing it a raw number renders "18420 pts".
+String formatGameScore(num score, {String? locale}) => NumberFormat.decimalPattern(locale).format(score);
+
+/// The message key for a failed solo create.
+///
+/// Only a real 400 means "nothing in your library can fill a round of that kind" — the one failure
+/// `game_solo_no_photos` describes truthfully, and the one the player can act on. The generated
+/// client wraps `SocketException`/`TlsException`/`ClientException` into `ApiException(400, ...)`
+/// as well (see `openapi/lib/api_client.dart`), which is why the status alone is not enough: those
+/// carry an `innerException`, and blaming a dropped connection on the player's photos would send
+/// them off adding GPS data to fix their wifi.
+///
+/// The fallback is the app-wide generic rather than `game_create_failed`: that one reads "from
+/// this space's photos", and a solo player may be in no space at all.
+String soloCreateFailureKey(Object error) {
+  final isServerRejection = error is ApiException && error.code == 400 && error.innerException == null;
+  return isServerRejection ? 'game_solo_no_photos' : 'scaffold_body_error_occurred';
+}
