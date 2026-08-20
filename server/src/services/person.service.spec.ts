@@ -4,7 +4,7 @@ import { mapFaces, mapPerson } from 'src/dtos/person.dto.js';
 import { Reflector } from '@nestjs/core';
 import { writeFile } from 'node:fs/promises';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend.js';
-import type { SystemConfig } from 'src/config';
+import type { SystemConfig } from 'src/dtos/config.dto.js';
 import { QueueStatisticsDto } from 'src/dtos/queue.dto.js';
 import {
   AssetFileType,
