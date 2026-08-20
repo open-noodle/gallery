@@ -340,23 +340,23 @@ clean in the final tree.
 ## Remote CI Verification
 
 - **Test branch**: `rebase/upstream-batch-124`
-- **Final commit**: `e1033a09155`
+- **Final commit**: `d2d63c424f3`
 
-**9 of 10 green.** Two real defects were found by CI and fixed (breaks 5 and 6 below); the rest of the
-red was environmental.
+**10 of 10 green.** Two real defects were found by CI and fixed (breaks 5 and 6 below); the rest of the
+red was environmental and cleared on re-run.
 
-| Workflow                                  | Status                                  | Run         | Notes                                                                    |
-| ----------------------------------------- | --------------------------------------- | ----------- | ------------------------------------------------------------------------ |
-| `test.yml`                                | GREEN                                   | 32298195825 | 21 jobs; e2e re-run after the mise 403 flake                             |
-| `docker.yml`                              | GREEN                                   | 32294322127 | code-identical inputs                                                    |
-| `static_analysis.yml`                     | GREEN                                   | 32294324732 | code-identical inputs                                                    |
-| `gallery-rebase-smoke.yml`                | GREEN                                   | 32294327266 | code-identical inputs                                                    |
-| `storage-migration-tests.yml`             | GREEN                                   | 32294329317 | code-identical inputs                                                    |
-| `storage-migration-e2e.yml`               | GREEN                                   | 32294340991 | code-identical inputs                                                    |
-| `gallery-revert-to-immich-validation.yml` | GREEN                                   | 32294331728 | coverage grep + Docker boot                                              |
-| `gallery-ml-smoke.yml`                    | GREEN                                   | 32295645195 | green after the branding fix                                             |
-| `gallery-mobile-smoke.yml`                | GREEN                                   | 32301455737 | green after the branding fix; Android leg incl. codegen/analyze/test/APK |
-| `gallery-build-mobile.yml`                | iOS GREEN / Android **BLOCKED (infra)** | 32305277169 | see below                                                                |
+| Workflow                                  | Status                | Run         | Notes                                                                    |
+| ----------------------------------------- | --------------------- | ----------- | ------------------------------------------------------------------------ |
+| `test.yml`                                | GREEN                 | 32298195825 | 21 jobs; e2e re-run after the mise 403 flake                             |
+| `docker.yml`                              | GREEN                 | 32294322127 | code-identical inputs                                                    |
+| `static_analysis.yml`                     | GREEN                 | 32294324732 | code-identical inputs                                                    |
+| `gallery-rebase-smoke.yml`                | GREEN                 | 32294327266 | code-identical inputs                                                    |
+| `storage-migration-tests.yml`             | GREEN                 | 32294329317 | code-identical inputs                                                    |
+| `storage-migration-e2e.yml`               | GREEN                 | 32294340991 | code-identical inputs                                                    |
+| `gallery-revert-to-immich-validation.yml` | GREEN                 | 32294331728 | coverage grep + Docker boot                                              |
+| `gallery-ml-smoke.yml`                    | GREEN                 | 32295645195 | green after the branding fix                                             |
+| `gallery-mobile-smoke.yml`                | GREEN                 | 32301455737 | green after the branding fix; Android leg incl. codegen/analyze/test/APK |
+| `gallery-build-mobile.yml`                | GREEN (iOS + Android) | 32337246215 | green on `d2d63c424f3` once the runner stall cleared                     |
 
 The six workflows marked "code-identical inputs" were green on `a4ca7f94882`; the three later commits
 changed only `branding/i18n/overrides-en.json`, `e2e/src/responses.ts` and the report, none of which
@@ -378,16 +378,15 @@ there.
   → `packages/plugin-core build: Failed` → server image build failed. This is the documented
   mise/GitHub-API rate-limit flake (third cycle running, previously as a 3 s timeout). A plain
   `run rerun --failed` went green.
-- **`gallery-build-mobile` Android leg is BLOCKED on an infrastructure stall**, not on this batch.
-  It hangs in `./.github/actions/apply-branding`'s dependency-install step — before any Gallery code is
-  compiled — across **three** consecutive attempts (~26–42 min each, then cancelled). Evidence that it
-  is not a code regression: the same action on the same commit and the same `ubuntu-latest` image
-  completed in **5.5 min** in `gallery-mobile-smoke`; the **iOS leg of this very workflow passed twice**;
-  and the step took ~3 min on this same job earlier in the cycle. With `version` empty and
-  `environment=development` the store-upload steps are skipped, so the Android leg's remaining work
-  (branding → codegen → analyze → mobile tests → APK build) is exactly what `gallery-mobile-smoke`
-  already covers green on `e1033a09155`. **Re-dispatch when runners recover; do not treat as a batch
-  defect.**
+- **`gallery-build-mobile`'s Android leg stalled three times, then passed on the fourth — confirmed
+  infrastructure.** It hung in `./.github/actions/apply-branding`'s dependency-install step, before any
+  Gallery code is compiled, for ~26–42 min per attempt (three attempts, each cancelled). The diagnosis
+  was made from evidence rather than by re-running blind: the same action on the same commit and the
+  same `ubuntu-latest` image completed in **5.5 min** in `gallery-mobile-smoke`, and this workflow's
+  **iOS leg passed on every attempt**. The fourth dispatch (run `32337246215`, `d2d63c424f3`) then
+  cleared that step in **22 seconds** (05:52:45→05:53:07) and both legs went green — a ~70×
+  difference on identical inputs, which settles it. **Nothing in the batch was implicated; a plain
+  re-dispatch is the remedy.**
 
 ## Post-Rebase Verification
 
@@ -404,13 +403,14 @@ The branch stays off `main`, which is the expected steady state of this workflow
 
 ## Follow-up work
 
-1. **Re-dispatch `gallery-build-mobile.yml`** once GitHub's Ubuntu runners recover — its Android leg is
-   blocked by an infrastructure stall, not by this batch (evidence in Remote CI Verification).
-2. **Report the `Combobox` `hideLabel` a11y regression upstream** — it affects upstream's own
+1. **Report the `Combobox` `hideLabel` a11y regression upstream** — it affects upstream's own
    `SettingsLanguageSelector` and `SettingCombobox`.
-3. **Add two cheap Checkpoint-1 checks to the skill**, both of which would have saved a CI round this
-   cycle: grep new `i18n/en.json` values for the upstream name (break 5), and extend the deleted-export
-   detector to members of exported object literals, or just run `cd e2e && pnpm check` after any batch
-   touching `e2e/src/` (break 6).
-4. **Revisit the dormancy decision when upstream finishes V3** — the trigger is upstream wiring V3 to
+2. **Consider a `timeout-minutes` on `apply-branding`'s dependency install.** The step has no timeout, so
+   a stalled `apt-get` holds a job slot for the 6-hour default — it burned three dispatches this cycle,
+   and the same shape hit `test.yml`'s `Test Branding` on 2026-08-19 (arc B). A 10-minute cap would turn
+   a silent multi-hour hang into a fast, obviously-retryable failure.
+3. **Revisit the dormancy decision when upstream finishes V3** — the trigger is upstream wiring V3 to
    an endpoint or deleting `searchAssetBuilderLegacy`. That is a product decision, not a rebase one.
+
+(The two Checkpoint-1 detectors this cycle earned — the i18n branding-override scan and the
+object-literal blind spot in the deleted-export detector — were added to the skill during the cycle.)
