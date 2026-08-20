@@ -332,7 +332,7 @@ describe(SystemConfigService.name, () => {
       // default section, and must not be reported as an unknown key.
       mocks.systemMetadata.get.mockResolvedValue({ machineLearning: {} });
 
-      const result = await sut.getSystemConfig();
+      const result = await sut.getAdminConfig();
 
       expect(result.machineLearning).toEqual(defaults.machineLearning);
       expect(mocks.logger.warn).not.toHaveBeenCalled();
@@ -359,7 +359,7 @@ describe(SystemConfigService.name, () => {
     });
 
     it('should accept low classification similarity thresholds', () => {
-      const result = SystemConfigSchema.parse({
+      const result = AdminConfigDto.schema.parse({
         ...defaults,
         classification: {
           enabled: true,
@@ -458,7 +458,7 @@ describe(SystemConfigService.name, () => {
     it('should default generated memory settings', async () => {
       mocks.systemMetadata.get.mockResolvedValue({});
 
-      await expect(sut.getSystemConfig()).resolves.toMatchObject({
+      await expect(sut.getAdminConfig()).resolves.toMatchObject({
         memories: { retentionDays: 365, birthday: true, recentTrips: true },
       });
     });
@@ -466,7 +466,7 @@ describe(SystemConfigService.name, () => {
     it('should default the per-type memory availability map to empty', async () => {
       mocks.systemMetadata.get.mockResolvedValue({});
 
-      await expect(sut.getSystemConfig()).resolves.toMatchObject({
+      await expect(sut.getAdminConfig()).resolves.toMatchObject({
         memories: { types: {} },
       });
     });
@@ -474,7 +474,7 @@ describe(SystemConfigService.name, () => {
     it('should accept a per-type memory availability override', async () => {
       mocks.systemMetadata.get.mockResolvedValue({ memories: { types: { recent_trip: false } } });
 
-      const result = await sut.getSystemConfig();
+      const result = await sut.getAdminConfig();
 
       expect(result.memories.types).toEqual({ recent_trip: false });
     });
@@ -482,7 +482,7 @@ describe(SystemConfigService.name, () => {
     it('should not warn about unknown keys for the default per-type memory availability map', async () => {
       mocks.systemMetadata.get.mockResolvedValue({});
 
-      await sut.getSystemConfig();
+      await sut.getAdminConfig();
 
       expect(mocks.logger.warn).not.toHaveBeenCalled();
     });
@@ -491,7 +491,7 @@ describe(SystemConfigService.name, () => {
       mocks.config.getEnv.mockReturnValue(mockEnvData({ configFile: 'immich-config.json' }));
       mocks.systemMetadata.readFile.mockResolvedValue(JSON.stringify({ memories: { retentionDays: 0 } }));
 
-      await expect(sut.getSystemConfig()).resolves.toMatchObject({
+      await expect(sut.getAdminConfig()).resolves.toMatchObject({
         memories: { retentionDays: 0 },
       });
     });
@@ -502,7 +502,7 @@ describe(SystemConfigService.name, () => {
         JSON.stringify({ memories: { birthday: false, recentTrips: false } }),
       );
 
-      await expect(sut.getSystemConfig()).resolves.toMatchObject({
+      await expect(sut.getAdminConfig()).resolves.toMatchObject({
         memories: { birthday: false, recentTrips: false },
       });
     });
@@ -529,7 +529,7 @@ describe(SystemConfigService.name, () => {
         JSON.stringify({ library: { scan: { cronExpression: '0 */6 * * *' } } }),
       );
 
-      await expect(sut.getSystemConfig()).resolves.toMatchObject({
+      await expect(sut.getAdminConfig()).resolves.toMatchObject({
         library: {
           scan: {
             enabled: true,
@@ -611,7 +611,7 @@ describe(SystemConfigService.name, () => {
         }),
       );
 
-      const config = await sut.getSystemConfig();
+      const config = await sut.getAdminConfig();
       expect(config.ffmpeg.acceptedAudioCodecs).toContain(AudioCodec.Aac);
     });
 
@@ -728,7 +728,7 @@ describe(SystemConfigService.name, () => {
         .mockResolvedValueOnce({})
         .mockResolvedValueOnce({ memories: { birthday: false, recentTrips: false } });
 
-      await expect(sut.updateSystemConfig(config)).resolves.toMatchObject({
+      await expect(sut.updateAdminConfig(config)).resolves.toMatchObject({
         memories: { birthday: false, recentTrips: false },
       });
       expect(mocks.systemMetadata.set).toHaveBeenCalledWith(SystemMetadataKey.SystemConfig, {
@@ -743,7 +743,7 @@ describe(SystemConfigService.name, () => {
         .mockResolvedValueOnce({})
         .mockResolvedValueOnce({ memories: { types: { recent_trip: false } } });
 
-      await expect(sut.updateSystemConfig(config)).resolves.toMatchObject({
+      await expect(sut.updateAdminConfig(config)).resolves.toMatchObject({
         memories: { types: { recent_trip: false } },
       });
       expect(mocks.systemMetadata.set).toHaveBeenCalledWith(SystemMetadataKey.SystemConfig, {
@@ -891,7 +891,7 @@ describe(SystemConfigService.name, () => {
         return undefined as any;
       }) as any);
 
-      await expect(sut.updateSystemConfig(defaults)).rejects.toThrow(BadRequestException);
+      await expect(sut.updateAdminConfig(defaults)).rejects.toThrow(BadRequestException);
       expect(mocks.logger.warn).toHaveBeenCalled();
     });
 
@@ -904,7 +904,7 @@ describe(SystemConfigService.name, () => {
         return undefined as any;
       }) as any);
 
-      await expect(sut.updateSystemConfig(defaults)).rejects.toThrow(BadRequestException);
+      await expect(sut.updateAdminConfig(defaults)).rejects.toThrow(BadRequestException);
     });
   });
 
