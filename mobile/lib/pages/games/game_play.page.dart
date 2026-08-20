@@ -103,7 +103,6 @@ class GamePlayPage extends ConsumerWidget {
       return _Completed(
         challenge: state.challenge,
         leaderboard: state.leaderboard,
-        roundCount: state.challenge.rounds.length,
         currentUserId: ref.watch(currentUserProvider)?.id ?? '',
       );
     }
@@ -147,16 +146,10 @@ class GamePlayPage extends ConsumerWidget {
 /// nothing here except the chance to silently drop a real player whose membership row happened not
 /// to load. Same reasoning as `StandingsSection`.
 class _Completed extends StatelessWidget {
-  const _Completed({
-    required this.challenge,
-    required this.leaderboard,
-    required this.roundCount,
-    required this.currentUserId,
-  });
+  const _Completed({required this.challenge, required this.leaderboard, required this.currentUserId});
 
   final GameChallengeDetailResponseDto challenge;
   final GameLeaderboardResponseDto? leaderboard;
-  final int roundCount;
   final String currentUserId;
 
   @override
@@ -165,6 +158,7 @@ class _Completed extends StatelessWidget {
     // would break the rule that a player who scored zero still outranks one who never turned up.
     final entries = leaderboard?.entries ?? const <GameLeaderboardResponseDtoEntriesInner>[];
     final ranks = competitionRanks([for (final entry in entries) entry.total]);
+    final roundCount = challenge.rounds.length;
 
     return ListView(
       padding: const EdgeInsets.all(16),
