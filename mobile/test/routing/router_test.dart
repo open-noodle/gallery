@@ -52,6 +52,9 @@ void main() {
     return route.type ?? router.defaultRouteType;
   }
 
+  List<AutoRouteGuard> guardsOf(String routeName) =>
+      router.routes.firstWhere((route) => route.name == routeName).guards;
+
   group('AppRouter page transitions', () {
     // A CustomRouteType renders its own transitionsBuilder instead of
     // delegating to the platform PageTransitionsTheme, so iOS never wraps the
@@ -126,6 +129,43 @@ void main() {
     test('SpaceAlbumsRoute carries the args-aware duplicate guard instead of the plain one', () {
       expect(guardsOf('SpaceAlbumsRoute').whereType<SpaceAlbumsDuplicateGuard>(), hasLength(1));
       expect(guardsOf('SpaceAlbumsRoute').whereType<DuplicateGuard>(), isEmpty);
+    });
+  });
+
+  group('AppRouter duplicate guard', () {
+    List<AutoRouteGuard> guardsOf(String routeName) =>
+        router.routes.firstWhere((route) => route.name == routeName).guards;
+
+    // DuplicateGuard rejects any push whose route NAME matches the current top
+    // route's, and a generated route name is a const string — 'GamePlayRoute',
+    // with no trace of the challenge id in it. So on a route pushed from its
+    // OWN page, the guard cannot tell "open a different record" from "re-open
+    // the page you are already on", and cancels the push via
+    // `resolver.next(false)` — which completes the push future with null rather
+    // than throwing, leaving no error for the caller to surface.
+    //
+    // Two routes in the app are pushed from their own page and must therefore
+    // stay unguarded:
+    //
+    //   FolderRoute   folder -> subfolder
+    //   GamePlayRoute "Play again" on a finished solo game, which creates the
+    //                 next challenge server-side and then opens it
+    //
+    // Guarding GamePlayRoute made Play again a dead button that still spent a
+    // challenge per tap. The page's own widget test cannot catch that: it pumps
+    // under a FakeStackRouter, which records pushes without running any guard.
+    test('FolderRoute can push itself, for folder -> subfolder', () {
+      expect(guardsOf('FolderRoute').whereType<DuplicateGuard>(), isEmpty);
+    });
+
+    test('GamePlayRoute can push itself, for Play again', () {
+      expect(guardsOf('GamePlayRoute').whereType<DuplicateGuard>(), isEmpty);
+    });
+
+    // The counterexample that keeps the two above honest: a route nothing
+    // pushes from its own page still carries the guard.
+    test('PhotoGuesserRoute is still guarded', () {
+      expect(guardsOf('PhotoGuesserRoute').whereType<DuplicateGuard>(), isNotEmpty);
     });
   });
 }
