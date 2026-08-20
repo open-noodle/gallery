@@ -15,6 +15,7 @@ import 'package:immich_mobile/infrastructure/repositories/store.repository.dart'
 import 'package:immich_mobile/pages/library/spaces/games/space_games.page.dart';
 import 'package:immich_mobile/presentation/widgets/games/challenge_card.widget.dart';
 import 'package:immich_mobile/providers/game/game.provider.dart';
+import 'package:immich_mobile/providers/game/hidden_daily_banner.provider.dart';
 import 'package:immich_mobile/providers/shared_space.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:immich_mobile/repositories/game_api.repository.dart';
@@ -30,6 +31,19 @@ class _MockUserService extends Mock implements UserService {}
 class _MockGameApiRepository extends Mock implements GameApiRepository {}
 
 class _MockSharedSpaceApiRepository extends Mock implements SharedSpaceApiRepository {}
+
+class _FakeHiddenDailyBannerPrefs implements HiddenDailyBannerPrefs {
+  Set<String> stored;
+  Set<String>? lastSaved;
+  _FakeHiddenDailyBannerPrefs(this.stored);
+  @override
+  Set<String> loadHidden() => stored;
+  @override
+  Future<void> saveHidden(Set<String> spaceIds) async {
+    lastSaved = spaceIds;
+    stored = spaceIds;
+  }
+}
 
 /// Test-local stand-in for the real [CurrentUserProvider] (mirrors
 /// `shared_space_provider_test.dart`'s `MockCurrentUserProvider`): the real notifier's constructor
@@ -124,6 +138,102 @@ void main() {
     await tester.pump(const Duration(seconds: 4));
     await tester.pumpAndSettle();
   }
+
+  group("hiding this space's daily banner", () {
+    // The banner lives on the SPACE TIMELINE, not on this page — this page only carries the
+    // control. So these assert on what the control offers and what it writes, and
+    // space_detail_top_sliver_test.dart asserts that the written value removes the banner.
+    SharedSpaceResponseDto space({required bool? dailyChallengeEnabled}) => SharedSpaceResponseDto(
+      id: 's1',
+      name: 'Family Photos',
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+      createdById: 'u1',
+      dailyChallengeEnabled: dailyChallengeEnabled == null
+          ? const Optional.absent()
+          : Optional.present(dailyChallengeEnabled),
+    );
+
+    Future<void> pumpWithBanner(
+      WidgetTester tester, {
+      required _FakeHiddenDailyBannerPrefs prefs,
+      bool canEdit = true,
+      bool? dailyChallengeEnabled = true,
+    }) => pump(
+      tester,
+      canEdit: canEdit,
+      extraOverrides: [
+        sharedSpaceProvider('s1').overrideWith((ref) async => space(dailyChallengeEnabled: dailyChallengeEnabled)),
+        hiddenDailyBannerPrefsProvider.overrideWithValue(prefs),
+      ],
+    );
+
+    testWidgets('offers Hide while the banner shows, and persists this space on tap', (tester) async {
+      final prefs = _FakeHiddenDailyBannerPrefs({});
+      await pumpWithBanner(tester, prefs: prefs);
+
+      await tester.tap(find.byKey(const Key('space-games-daily-banner-menu')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('space-games-daily-banner-hide')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('space-games-daily-banner-hide')));
+      await tester.pumpAndSettle();
+
+      expect(prefs.lastSaved, {'s1'});
+    });
+
+    testWidgets('offers Show once hidden, and clears this space on tap', (tester) async {
+      final prefs = _FakeHiddenDailyBannerPrefs({'s1'});
+      await pumpWithBanner(tester, prefs: prefs);
+
+      await tester.tap(find.byKey(const Key('space-games-daily-banner-menu')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('space-games-daily-banner-show')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('space-games-daily-banner-show')));
+      await tester.pumpAndSettle();
+
+      expect(prefs.lastSaved, isEmpty);
+    });
+
+    // Personal display choice, not a space setting: a viewer cannot turn the space's daily off,
+    // but they can keep its banner off their own timeline.
+    testWidgets('a viewer gets the control too', (tester) async {
+      final prefs = _FakeHiddenDailyBannerPrefs({});
+      await pumpWithBanner(tester, prefs: prefs, canEdit: false);
+
+      expect(find.byKey(const Key('space-games-daily-banner-menu')), findsOneWidget);
+    });
+
+    // A space that has declined the daily renders no slot on its timeline at all, so offering to
+    // hide one would be a control that visibly does nothing.
+    testWidgets('no control when this space shows no banner to hide', (tester) async {
+      final prefs = _FakeHiddenDailyBannerPrefs({});
+      await pumpWithBanner(tester, prefs: prefs, dailyChallengeEnabled: false);
+
+      expect(find.byKey(const Key('space-games-daily-banner-menu')), findsNothing);
+    });
+
+    // ...and an un-asked space is the other half of that, for EITHER role. The opt-in prompt is a
+    // Challenges-page surface now, so nothing sits above anyone's photos until the space opts in —
+    // and offering to hide a banner that is not there would be a control that does nothing.
+    for (final canEdit in [true, false]) {
+      testWidgets('no control for a space that has never been asked (canEdit: $canEdit)', (tester) async {
+        final prefs = _FakeHiddenDailyBannerPrefs({});
+        await pumpWithBanner(tester, prefs: prefs, canEdit: canEdit, dailyChallengeEnabled: null);
+
+        expect(find.byKey(const Key('space-games-daily-banner-menu')), findsNothing);
+      });
+    }
+
+    // The prompt itself has NOT gone away — it just lives here now, and only here.
+    testWidgets('an un-asked space still prompts an editor on this page', (tester) async {
+      final prefs = _FakeHiddenDailyBannerPrefs({});
+      await pumpWithBanner(tester, prefs: prefs, canEdit: true, dailyChallengeEnabled: null);
+
+      expect(find.byKey(const Key('daily-prompt')), findsOneWidget);
+    });
+  });
 
   testWidgets('an editor is offered the create control', (tester) async {
     await pump(tester, canEdit: true);

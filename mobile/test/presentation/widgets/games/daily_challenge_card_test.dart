@@ -79,11 +79,15 @@ void main() {
     void Function(bool enabled)? onDecide,
     SharedSpaceResponseDto? space,
     bool offerStandings = true,
+    // These pump the CHALLENGES page's slot, the one surface that carries the opt-in prompt. The
+    // space timeline passes false; `the space timeline never prompts` below covers that side.
+    bool allowPrompt = true,
   }) => tester.pumpConsumerWidget(
     DailySlot(
       spaceId: 's1',
       dailyChallengeEnabled: enabled,
       canEdit: canEdit,
+      allowPrompt: allowPrompt,
       onDecide: onDecide ?? (_) {},
       onPlay: () {},
       onStandings: offerStandings ? () {} : null,
@@ -121,6 +125,22 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(decisions, [false]);
+  });
+
+  // The space timeline is not a place to be asked. An un-asked space shows nothing above its
+  // photos for anyone, editor included — the invitation lives on the Challenges page, reachable
+  // from the space's own overflow menu.
+  testWidgets('the space timeline never prompts, not even an editor', (tester) async {
+    await pump(tester, enabled: null, canEdit: true, allowPrompt: false);
+
+    expect(find.byKey(const Key('daily-prompt')), findsNothing);
+    expect(find.byKey(const Key('daily-card')), findsNothing);
+  });
+
+  testWidgets('the space timeline still shows the card for an opted-in space', (tester) async {
+    await pump(tester, enabled: true, canEdit: true, daily: _daily(), allowPrompt: false);
+
+    expect(find.byKey(const Key('daily-card')), findsOneWidget);
   });
 
   testWidgets('an un-asked space shows a viewer nothing at all', (tester) async {
@@ -327,41 +347,44 @@ void main() {
     });
   });
 
-  // reservedHeight is what the page actually calls to reserve sliver space, synchronously and
-  // before the daily provider resolves — build() reimplements the same branching for the widget
-  // it actually renders. A plain by-inspection match between the two is how they'd silently drift;
-  // this pins the exact numbers reservedHeight must return for every (state, canEdit) pair.
-  test('reservedHeight matches exactly, for every (dailyChallengeEnabled, canEdit) pair', () {
+  // reservedHeight is what the space timeline calls to reserve sliver space, synchronously and
+  // before the daily provider resolves — build() reimplements the same branching for the widget it
+  // actually renders. A plain by-inspection match between the two is how they'd silently drift;
+  // this pins the exact number for every state.
+  //
+  // No canEdit any more: the timeline shows a banner only for an opted-in space, and the opt-in
+  // prompt (the one branch that ever varied by role) now lives only on the Challenges page.
+  test('reservedHeight matches exactly, for every dailyChallengeEnabled', () {
     expect(
-      DailySlot.reservedHeight(dailyChallengeEnabled: null, canEdit: true),
-      kDailyPromptHeight,
-      reason: 'un-asked + editor → the prompt height',
-    );
-    expect(
-      DailySlot.reservedHeight(dailyChallengeEnabled: null, canEdit: false),
-      0,
-      reason: 'un-asked + viewer → nothing',
-    );
-    expect(
-      DailySlot.reservedHeight(dailyChallengeEnabled: true, canEdit: true),
+      DailySlot.reservedHeight(dailyChallengeEnabled: true),
       kDailyCardHeight,
-      reason: 'enabled + editor → the card height, same as a viewer',
+      reason: 'enabled -> the card height',
     );
     expect(
-      DailySlot.reservedHeight(dailyChallengeEnabled: true, canEdit: false),
-      kDailyCardHeight,
-      reason: 'enabled + viewer → the card height',
-    );
-    expect(
-      DailySlot.reservedHeight(dailyChallengeEnabled: false, canEdit: true),
+      DailySlot.reservedHeight(dailyChallengeEnabled: null),
       0,
-      reason: 'declined + editor → nothing',
+      reason: 'un-asked -> nothing on the timeline; the prompt belongs to the Challenges page',
     );
+    expect(DailySlot.reservedHeight(dailyChallengeEnabled: false), 0, reason: 'declined -> nothing');
     expect(
-      DailySlot.reservedHeight(dailyChallengeEnabled: false, canEdit: false),
+      DailySlot.reservedHeight(dailyChallengeEnabled: true, hidden: true),
       0,
-      reason: 'declined + viewer → nothing',
+      reason: 'hidden wins over an enabled daily',
     );
+  });
+
+  // The Challenges page offers "hide this space's banner" only when the timeline has one to hide,
+  // so it asks this same predicate. Deriving the height from it is the point: two hand-written
+  // copies would drift, and the failure would be a menu item that hides nothing (or a missing one
+  // on a space that does show a banner).
+  test('showsOnTimeline agrees with reservedHeight for every dailyChallengeEnabled', () {
+    for (final enabled in <bool?>[null, true, false]) {
+      expect(
+        DailySlot.showsOnTimeline(dailyChallengeEnabled: enabled),
+        DailySlot.reservedHeight(dailyChallengeEnabled: enabled) > 0,
+        reason: 'enabled: $enabled',
+      );
+    }
   });
 
   group('narrow phone / long translation', () {
@@ -384,6 +407,8 @@ void main() {
       required bool? enabled,
       required bool canEdit,
       GameChallengeListItemResponseDto? daily,
+      double textScale = 1.0,
+      bool allowPrompt = true,
     }) async {
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = const Size(360, 800);
@@ -409,14 +434,27 @@ void main() {
                 localizationsDelegates: context.localizationDelegates,
                 supportedLocales: context.supportedLocales,
                 locale: context.locale,
-                home: Material(
-                  child: DailySlot(
-                    spaceId: 's1',
-                    dailyChallengeEnabled: enabled,
-                    canEdit: canEdit,
-                    onDecide: (_) {},
-                    onPlay: () {},
-                    onStandings: () {},
+                home: MediaQuery(
+                  data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(textScale)),
+                  // Column, not a bare Material: `home:` passes TIGHT constraints, and a SizedBox
+                  // cannot shrink under those — the slot's fixed height was silently ignored here,
+                  // so every overflow test in this group was measuring an unconstrained prompt.
+                  // SpaceTopSliver puts DailySlot in a Column, which is what makes the height bind.
+                  child: Material(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        DailySlot(
+                          spaceId: 's1',
+                          dailyChallengeEnabled: enabled,
+                          canEdit: canEdit,
+                          allowPrompt: allowPrompt,
+                          onDecide: (_) {},
+                          onPlay: () {},
+                          onStandings: () {},
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -444,5 +482,30 @@ void main() {
       expect(find.byKey(const Key('daily-card')), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
+
+    // takeException() above cannot catch a clipped prompt. Its column sits in a
+    // SingleChildScrollView, so content taller than the slot SCROLLS rather than throwing — the
+    // buttons are cut off silently, with a clean test run. Measuring a button against the card is
+    // the only assertion that fails when that happens.
+    //
+    // On a 402dp device the prompt fits its old fixed slot with ~3dp to spare (129 of 132). At
+    // 360dp the OverflowBar stacks the two buttons instead of putting them in a row, which alone
+    // costs more than that margin — so the buttons were cut off on every narrow phone, at the
+    // DEFAULT text size. Text scaling then makes it worse, hence both cases below.
+    for (final scale in [1.0, 1.5]) {
+      testWidgets('both prompt buttons stay inside the card at 360dp, German, ${scale}x text', (tester) async {
+        await pumpNarrowGerman(tester, enabled: null, canEdit: true, textScale: scale);
+
+        final card = tester.getRect(find.byKey(const Key('daily-prompt')));
+        for (final key in [const Key('daily-prompt-decline'), const Key('daily-prompt-enable')]) {
+          final button = tester.getRect(find.byKey(key));
+          expect(
+            button.bottom,
+            lessThanOrEqualTo(card.bottom),
+            reason: '$key is cut off: the card ends at ${card.bottom}, the button at ${button.bottom}',
+          );
+        }
+      });
+    }
   });
 }

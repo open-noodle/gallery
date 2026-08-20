@@ -10,6 +10,7 @@ import 'package:immich_mobile/presentation/widgets/games/challenge_create_sheet.
 import 'package:immich_mobile/presentation/widgets/games/daily_challenge_card.widget.dart';
 import 'package:immich_mobile/presentation/widgets/games/standings_section.widget.dart';
 import 'package:immich_mobile/providers/game/game.provider.dart';
+import 'package:immich_mobile/providers/game/hidden_daily_banner.provider.dart';
 import 'package:immich_mobile/providers/shared_space.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:immich_mobile/repositories/game_api.repository.dart';
@@ -146,8 +147,36 @@ class SpaceGamesPage extends HookConsumerWidget {
       for (final entry in monthStandings?.entries ?? const []) entry.daysPlayed,
     ]);
 
+    // Offered to VIEWERS as well as editors, unlike every other control on this page: this is a
+    // personal display choice about one reader's own space timeline, not a change to the space.
+    // Only where there is a banner to act on, though — the timeline shows one solely for an
+    // opted-in space, so a declined or still-un-asked space would get an item that changes
+    // nothing visible. Same predicate the sliver gates on, so the two cannot disagree.
+    final bannerExists = DailySlot.showsOnTimeline(dailyChallengeEnabled: enabled);
+    final bannerHidden = ref.watch(hiddenDailyBannerProvider).contains(spaceId);
+
     return Scaffold(
-      appBar: AppBar(title: Text('game_challenges'.t(context: context))),
+      appBar: AppBar(
+        title: Text('game_challenges'.t(context: context)),
+        actions: [
+          if (bannerExists)
+            PopupMenuButton<void>(
+              key: const Key('space-games-daily-banner-menu'),
+              icon: const Icon(Icons.more_vert),
+              itemBuilder: (context) => [
+                PopupMenuItem<void>(
+                  // Keyed by what the tap will DO, not by the control, so a test reads the current
+                  // state without going through the translated label.
+                  key: Key(bannerHidden ? 'space-games-daily-banner-show' : 'space-games-daily-banner-hide'),
+                  onTap: () => ref.read(hiddenDailyBannerProvider.notifier).setHidden(spaceId, !bannerHidden),
+                  child: Text(
+                    (bannerHidden ? 'game_daily_show_in_space' : 'game_daily_hide_in_space').t(context: context),
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ),
       body: challenges.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, _) => Center(
@@ -165,6 +194,8 @@ class SpaceGamesPage extends HookConsumerWidget {
               spaceId: spaceId,
               dailyChallengeEnabled: enabled,
               canEdit: canEdit,
+              // The one surface that carries the opt-in prompt.
+              allowPrompt: true,
               onDecide: (value) => _decideDaily(context, ref, value),
               onPlay: () => unawaited(play(dailyChallenge!.id)),
               // No route to offer: this page already shows the board, immediately below.
