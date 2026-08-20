@@ -173,11 +173,15 @@ Two fork behaviours in this file must survive the port:
   `face-suggestion.service.ts` and `classification.service.ts` read fork config through
   `this.getConfig()` rather than importing the deleted modules. They need **no change** once the
   fields exist in the schema — but they are exactly what breaks if a field is silently dropped.
-- Five fork-owned web files name `SystemConfigDto` — `ClassificationSettings.svelte`,
-  `ClassificationSettings.spec.ts`, `MemoriesSettings.spec.ts`, `MachineLearningSettings.spec.ts`,
-  `NewVersionCheckSettings.spec.ts`. They keep compiling via the retained alias; renaming them is
-  **optional cleanup, out of scope**. (The other five files naming that type are upstream-owned and
-  upstream renames them itself.)
+- **CORRECTED during implementation — the client rename is REQUIRED, not optional.** This spec
+  originally claimed the fork's web files "keep compiling via the retained alias". That is true of
+  the **server source** (`export { AdminConfigDto as SystemConfigDto }`) but **not** of the generated
+  SDK: `@immich/sdk` is generated from the OpenAPI spec, whose schema ids contain only
+  `AdminConfigDto`, so the alias does not survive generation. In practice this meant renaming
+  `SystemConfigDto` → `AdminConfigDto` in **5 fork web files** and **3 fork e2e files**, plus the
+  request-param rename `systemConfigDto` → `adminConfigDto` in **9 fork e2e files** and
+  `ClassificationSettings.svelte`. Note `tsc` cannot see the `.svelte` occurrence — only
+  `pnpm check:svelte` catches it.
 
 ### Not in scope
 
