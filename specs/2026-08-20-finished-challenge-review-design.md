@@ -178,19 +178,23 @@ Reused as-is:
 | Round score                  | `game_points` |
 | Reveal button in review mode | `done`        |
 
-Five new keys, landing in all ten maintained locales in the same commit — `en` plus `de`, `fr`, `it`,
+Six new keys, landing in all ten maintained locales in the same commit — `en` plus `de`, `fr`, `it`,
 `nl`, `pl`, `es`, `ru`, `zh_Hans`, `zh_Hant` — each matching that file's existing register, then
 `npx prettier --write i18n/*.json`:
 
 | Key                        | English                                             |
 | -------------------------- | --------------------------------------------------- |
 | `game_review_your_rounds`  | Your rounds                                         |
+| `game_review_round`        | Round {index}                                       |
 | `game_review_type_place`   | Place                                               |
 | `game_review_type_date`    | Date                                                |
 | `game_review_distance_off` | {distance} off                                      |
 | `game_review_days_off`     | {count, plural, one {# day off} other {# days off}} |
 
-Two things about that set are deliberate.
+`game_review_round` is `Round {index}` rather than the existing `game_round_progress`
+(`Round {current} of {total}`), which would repeat "of 5" on every row of a five-round list.
+
+Two more things about that set are deliberate.
 
 `game_review_type_place` / `game_review_type_date` are **singular**, and separate from the existing
 `game_type_location` / `game_type_date`, which are "Places" / "Dates". Those label a challenge's
@@ -313,18 +317,18 @@ review test therefore runs under a non-UTC `TZ`.
 
 ### 10.4 Edge cases with no existing baseline
 
-| Case                                         | Why it is not hypothetical                                                                                                                                                                                     |
-| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Photo deleted after the round was played** | `game_round.assetId` is `ON DELETE SET NULL`, so a _guessed_ round can carry a null `assetId`. The row must render without a thumbnail rather than build an image URL from null. Nothing exercises this today. |
-| Challenge abandoned before any guess         | Produces an empty review; §7 says the section disappears, and that needs pinning.                                                                                                                              |
-| Every round guessed but the challenge open   | A challenge is not "closed" just because the caller finished it. The review must key off the caller's guesses, not `closedAt`.                                                                                 |
+| Case                                       | Why it is not hypothetical                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A round's photo no longer resolves**     | `getRoundImage` 404s when the asset was deleted (`assetId` is `ON DELETE SET NULL`) **and also when it still exists but is no longer eligible** — it re-applies the candidate predicate on every request, so trashing the photo, removing it from the space, or moving it to the locked folder all 404 too. The thumbnail URL is keyed by `(challengeId, index)` and is always well-formed, so this is a failed load, not a null URL: every row needs an error fallback, and a review of an older challenge is exactly where it will show up. |
+| Challenge abandoned before any guess       | Produces an empty review; §7 says the section disappears, and that needs pinning.                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Every round guessed but the challenge open | A challenge is not "closed" just because the caller finished it. The review must key off the caller's guesses, not `closedAt`.                                                                                                                                                                                                                                                                                                                                                                                                                |
 
 ### 10.5 Gates
 
 Server `pnpm test` and `pnpm test:medium`, `make check-server`, eslint and prettier. The game e2e
 specs. Mobile `flutter test`, `dart analyze --fatal-infos`, `dart format` over `lib`. `make check-web`
 — the SDK regen changes web's generated types even though no web code changes here, and that gate is
-the only thing that would catch a break. The five new i18n keys land in all ten locales with
+the only thing that would catch a break. The six new i18n keys land in all ten locales with
 `npx prettier --write i18n/*.json`.
 
 ## 11. Out of scope
