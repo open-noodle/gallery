@@ -18,17 +18,26 @@ const queryBlock = (sql: string, method: string): string => {
 
 // ── the solo pool ──────────────────────────────────────────────────────────────────────────────
 //
-// Each solo query is generated THREE times, once per source combination, because the read arms are
+// Each solo query is generated FOUR times, once per source combination, because the read arms are
 // conditional: `own library only` is what a default player gets, `all sources` is both toggles on,
-// and `partners only` is the asymmetric case. A guard reading only one could not tell the
-// difference between "the toggle gates the arm" and "the arm is never there" / "the arm is always
-// there"; a guard reading only the two symmetric ones could not tell either of those from an arm
-// gated on the WRONG toggle, which is the leak that matters (partners on, spaces off, shared-space
-// photos drawn anyway).
+// and `partners only` / `spaces only` are the two asymmetric cases. A guard reading only one could
+// not tell the difference between "the toggle gates the arm" and "the arm is never there" / "the
+// arm is always there"; a guard reading only the two symmetric ones could not tell either of those
+// from an arm gated on the WRONG toggle, which is the leak that matters (partners on, spaces off,
+// shared-space photos drawn anyway).
+//
+// BOTH asymmetric cases are generated because they catch opposite cross-wirings. `partners only`
+// catches a space arm gated on withPartners. It cannot catch a PARTNER arm gated on withSpaces -
+// under (true,false) that arm is legitimately absent, and both symmetric variants look identical
+// either way - so that direction needs `spaces only`, where a correct partner arm must be gone and
+// a cross-wired one shows up.
 const SOLO_QUERIES = ['getSoloLocationCandidates', 'getSoloDateCandidates', 'getSoloEligibleRoundAsset'];
 
-const soloBlock = (method: string, variant: 'own library only' | 'partners only' | 'all sources') =>
+const soloBlock = (method: string, variant: 'own library only' | 'partners only' | 'spaces only' | 'all sources') =>
   queryBlock(readGeneratedSql(), `${method} (${variant})`).replaceAll(/\s+/g, ' ');
+
+/** How many times `needle` occurs in `haystack`. Both are whitespace-collapsed SQL. */
+const countOf = (haystack: string, needle: string) => haystack.split(needle).length - 1;
 
 /** The `union` arm of a whitespace-collapsed pool subquery that reads `table`. */
 const armFor = (block: string, table: string) => block.split(' union ').find((arm) => arm.includes(`"${table}"`)) ?? '';
@@ -333,6 +342,25 @@ describe('GameRepository', () => {
             `served photos from every space they belong to.`,
         ).not.toContain('shared_space');
 
+        // The other asymmetric direction, and the one nothing above can see: a PARTNER arm gated
+        // on withSpaces is absent under `partners only` (correctly, from that variant's point of
+        // view) and present under both symmetric variants (also correctly), so it clears all three
+        // of the guards above while handing a spaces-only player their partner's photos.
+        const spacesOnly = soloBlock(method, 'spaces only');
+
+        expect(
+          spacesOnly,
+          `GameRepository.${method} lost the shared-space arm with includeSpaces ON and\n` +
+            `includePartners off. Either the arm is gone, or it is gated on the WRONG toggle.`,
+        ).toContain('shared_space');
+
+        expect(
+          spacesOnly,
+          `GameRepository.${method} reads partner with includePartners OFF. The partner arm is\n` +
+            `gated on the wrong toggle: a player who opted into shared-space photos alone is being\n` +
+            `served their partner's library.`,
+        ).not.toContain('"partner"."inTimeline"');
+
         const allSources = soloBlock(method, 'all sources');
         // The four space access paths, plus the partner arm. Losing one is a SAFE error direction
         // (a strict subset) and therefore silent: the player just quietly stops seeing photos from
@@ -381,18 +409,26 @@ describe('GameRepository', () => {
 
       // The correlated per-asset form has no unions to split on; every arm is an EXISTS, and they
       // all carry the same membership join.
+      //
+      // Counted, not merely `toContain`: there are FOUR space access paths (shared_space_asset,
+      // shared_space_library, album_asset, album_space_asset), each its own EXISTS, and a
+      // `toContain` is satisfied by the predicate surviving on ONE of them. Three unscoped arms
+      // would serve any space's asset to any player and read as perfectly healthy here. If a fifth
+      // access path is ever added, this number moves with it - deliberately, because adding a path
+      // without its membership join is precisely the change that must not pass silently.
       const roundAsset = soloBlock('getSoloEligibleRoundAsset', 'all sources');
       expect(
-        roundAsset,
-        'getSoloEligibleRoundAsset resolves a round image with no membership predicate, so a\n' +
-          'frozen assetId would serve any space asset to any player.',
-      ).toContain('"shared_space_member"."userId" =');
+        countOf(roundAsset, '"shared_space_member"."userId" ='),
+        'getSoloEligibleRoundAsset carries the membership predicate on only SOME of its four space\n' +
+          'arms. Every one of them needs it: an arm without it serves any space\'s asset to any\n' +
+          'player, and the arms that still have it are what makes that invisible to a `toContain`.',
+      ).toBe(4);
       expect(
-        roundAsset,
-        'getSoloEligibleRoundAsset lost the per-member showInTimeline gate, so it would serve a\n' +
-          'round image from a space the candidate queries are no longer allowed to draw from - the\n' +
-          'two forms have to express the same set.',
-      ).toContain('"shared_space_member"."showInTimeline" =');
+        countOf(roundAsset, '"shared_space_member"."showInTimeline" ='),
+        'getSoloEligibleRoundAsset lost the per-member showInTimeline gate on at least one arm, so\n' +
+          'it would serve a round image from a space the candidate queries are no longer allowed to\n' +
+          'draw from - the two forms have to express the same set.',
+      ).toBe(4);
       expect(
         roundAsset,
         "getSoloEligibleRoundAsset lost the partner arm's inTimeline check. The access layer\n" +
