@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { Settings } from 'luxon';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend';
 import { CacheControl, SharedSpaceRole, UserMetadataKey } from 'src/enum';
 import { NOT_PLACE_PROMPT_EMBEDDING, PLACE_PROMPT_EMBEDDING } from 'src/repositories/game.repository';
@@ -1548,6 +1549,100 @@ describe(GameService.name, () => {
 
       await expect(sut.delete(authStub, 'challenge-1')).rejects.toBeInstanceOf(ForbiddenException);
       expect(mocks.game.deleteChallenge).not.toHaveBeenCalled();
+    });
+  });
+
+  // `dailyOn` is the key the whole daily rests on: the streak counts off it, the two partial unique
+  // indexes dedupe on it, and both clients store it as "the daily I already played today". It is a
+  // `date` column, and the driver hands a `date` back as a Date at UTC MIDNIGHT (postgres.js parses
+  // '2026-08-16' with `new Date(x)`) - NOT as the plain string every other test in this file stubs,
+  // which is exactly why nothing here noticed that the encoder ran in the server's local zone.
+  //
+  // The zone is pinned through Luxon's own default rather than by poking `process.env.TZ`: that is
+  // the setting `asDateString` actually reads (`DateTime.fromJSDate(date).toFormat(...)`), and `TZ`
+  // is an admin-set, documented deployment option (docker/example.env), so "the server is not on
+  // UTC" is an ordinary configuration rather than an exotic one.
+  describe("the daily's day key on the wire", () => {
+    const DAILY_ON_FROM_DRIVER = new Date('2026-08-16T00:00:00.000Z');
+
+    beforeEach(() => {
+      // West of Greenwich: local midnight of the 16th is still the 15th here, which is the
+      // direction that costs a player their streak.
+      Settings.defaultZone = 'America/New_York';
+    });
+
+    afterEach(() => {
+      Settings.defaultZone = 'system';
+    });
+
+    it('reports a personal daily as its UTC day, not the server host zone’s day', async () => {
+      mocks.user.getMetadata.mockResolvedValue([]);
+      mocks.game.getSoloDailyChallenge.mockResolvedValue({
+        id: 'solo-daily-1',
+        spaceId: null,
+        ownerId: 'user-1',
+        name: '2026-08-16',
+        roundCount: 5,
+        scaleKm: 100,
+        scaleDays: 30,
+        dailyOn: DAILY_ON_FROM_DRIVER,
+        closedAt: null,
+        createdAt: new Date('2026-08-16T00:00:01.000Z'),
+      } as any);
+      mocks.game.getGuessesForUser.mockResolvedValue([]);
+      mocks.game.getRounds.mockResolvedValue([]);
+
+      const result = await sut.getSoloDaily({ user: { id: 'user-1' } } as any);
+
+      expect(result.challenge?.dailyOn).toBe('2026-08-16');
+    });
+
+    it('reports a space daily as its UTC day, not the server host zone’s day', async () => {
+      mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Viewer } as any);
+      mocks.sharedSpace.getById.mockResolvedValue({ dailyChallengeEnabled: true } as any);
+      mocks.game.getDailyChallenge.mockResolvedValue({
+        id: 'daily-1',
+        spaceId: 'space-1',
+        ownerId: null,
+        name: '2026-08-16',
+        roundCount: 5,
+        scaleKm: 100,
+        scaleDays: 30,
+        dailyOn: DAILY_ON_FROM_DRIVER,
+        closedAt: null,
+        createdAt: new Date('2026-08-16T00:00:01.000Z'),
+      } as any);
+      mocks.game.getGuessesForUser.mockResolvedValue([]);
+      mocks.game.getRounds.mockResolvedValue([]);
+
+      const result = await sut.getDaily(authStub, 'space-1');
+
+      expect(result.challenge?.dailyOn).toBe('2026-08-16');
+    });
+
+    // The detail route is the one the mobile client reads `dailyOn` off when it records "played
+    // today" - a day out here and the reminder fires for a daily that is already finished.
+    it('reports the challenge detail’s dailyOn as its UTC day too', async () => {
+      mocks.game.getChallenge.mockResolvedValue({
+        id: 'solo-daily-1',
+        spaceId: null,
+        ownerId: 'user-1',
+        name: '2026-08-16',
+        roundCount: 5,
+        scaleKm: 100,
+        scaleDays: 30,
+        dailyOn: DAILY_ON_FROM_DRIVER,
+        closedAt: null,
+        createdAt: new Date('2026-08-16T00:00:01.000Z'),
+        includePartners: false,
+        includeSpaces: false,
+      } as any);
+      mocks.game.getRounds.mockResolvedValue([]);
+      mocks.game.getGuessesForUser.mockResolvedValue([]);
+
+      const result = await sut.get({ user: { id: 'user-1' } } as any, 'solo-daily-1');
+
+      expect(result.dailyOn).toBe('2026-08-16');
     });
   });
 });
