@@ -7,7 +7,7 @@
     getConfig,
     scanClassification,
     updateConfig,
-    type SystemConfigDto,
+    type AdminConfigDto,
   } from '@immich/sdk';
   import { Button, IconButton, modalManager, Switch, Text, toastManager } from '@immich/ui';
   import { mdiContentSave, mdiDelete, mdiPencil, mdiPlus, mdiUndoVariant } from '@mdi/js';
@@ -15,12 +15,12 @@
   import { t } from 'svelte-i18n';
   import { get } from 'svelte/store';
 
-  type Category = SystemConfigDto['classification']['categories'][number];
+  type Category = AdminConfigDto['classification']['categories'][number];
   type FaceExclusion = NonNullable<Category['faceExclusion']>;
 
   const disabled = $derived(featureFlagsManager.value.configFile);
 
-  let config: SystemConfigDto | null = $state(null);
+  let config: AdminConfigDto | null = $state(null);
   let categories: Category[] = $state([]);
   let editingIndex: number | null = $state(null);
   let isCreating = $state(false);
@@ -105,7 +105,7 @@
       return;
     }
     await updateConfig({
-      systemConfigDto: { ...config, classification: { ...config.classification, categories: updatedCategories } },
+      adminConfigDto: { ...config, classification: { ...config.classification, categories: updatedCategories } },
     });
     await refreshConfig();
   };
