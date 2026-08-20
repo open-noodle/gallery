@@ -1071,6 +1071,12 @@ export type PeopleResponse = {
     sidebarWeb: boolean;
     updateStrategy: PersonUpdateStrategy;
 };
+export type PhotoGuesserResponse = {
+    /** Whether PhotoGuesser solo rounds include partner photos */
+    includePartners: boolean;
+    /** Whether PhotoGuesser solo rounds include shared-space photos */
+    includeSpaces: boolean;
+};
 export type PurchaseResponse = {
     /** Date until which to hide buy button */
     hideBuyButtonUntil: string;
@@ -1105,6 +1111,7 @@ export type UserPreferencesResponseDto = {
     folders: FoldersResponse;
     memories: MemoriesResponse;
     people: PeopleResponse;
+    photoGuesser: PhotoGuesserResponse;
     purchase: PurchaseResponse;
     ratings: RatingsResponse;
     recentlyAdded: RecentlyAddedResponse;
@@ -1162,6 +1169,12 @@ export type PeopleUpdate = {
     sidebarWeb?: boolean;
     updateStrategy?: PersonUpdateStrategy;
 };
+export type PhotoGuesserUpdate = {
+    /** Whether PhotoGuesser solo rounds include partner photos */
+    includePartners?: boolean;
+    /** Whether PhotoGuesser solo rounds include shared-space photos */
+    includeSpaces?: boolean;
+};
 export type PurchaseUpdate = {
     /** Date until which to hide buy button */
     hideBuyButtonUntil?: string;
@@ -1197,6 +1210,7 @@ export type UserPreferencesUpdateDto = {
     folders?: FoldersUpdate;
     memories?: MemoriesUpdate;
     people?: PeopleUpdate;
+    photoGuesser?: PhotoGuesserUpdate;
     purchase?: PurchaseUpdate;
     ratings?: RatingsUpdate;
     recentlyAdded?: RecentlyAddedUpdate;
