@@ -1141,4 +1141,32 @@ export class GameRepository {
   async deleteChallenge(id: string): Promise<void> {
     await this.db.deleteFrom('game_challenge').where('id', '=', id).execute();
   }
+
+  /**
+   * Deletes challenges nobody ever played: created before `olderThan`, with zero `game_guess`
+   * rows across every one of their rounds. No scope filter at all - a space daily nobody opened
+   * is exactly as much dead weight as a solo one, and this query does not distinguish them.
+   *
+   * Deliberately "zero guesses", not "not finished": `game_round.challengeId not in (... inner
+   * join game_guess ...)` excludes a challenge the moment ANY round has a guess, so a challenge
+   * with even one answered round - a real score already on the leaderboard and in history (see
+   * getSoloHistory / getSoloScoreSummary) - survives. Only a challenge with no `game_guess` row
+   * anywhere among its rounds is a candidate at all. Rounds and guesses cascade-delete via their
+   * FKs, same as deleteChallenge above.
+   */
+  @GenerateSql({ params: [DummyValue.DATE] })
+  async deleteUnplayedChallenges(olderThan: Date): Promise<void> {
+    await this.db
+      .deleteFrom('game_challenge')
+      .where('createdAt', '<', olderThan)
+      .where(
+        'id',
+        'not in',
+        this.db
+          .selectFrom('game_round')
+          .innerJoin('game_guess', 'game_guess.roundId', 'game_round.id')
+          .select('game_round.challengeId'),
+      )
+      .execute();
+  }
 }

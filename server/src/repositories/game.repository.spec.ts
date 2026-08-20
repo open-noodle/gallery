@@ -59,6 +59,7 @@ describe('GameRepository', () => {
       'getLeaderboard',
       'getMonthlyStandings',
       'deleteChallenge',
+      'deleteUnplayedChallenges',
     ]) {
       expect(typeof GameRepository.prototype[method as keyof GameRepository]).toBe('function');
     }
@@ -397,6 +398,30 @@ describe('GameRepository', () => {
         "getSoloEligibleRoundAsset lost the partner arm's inTimeline check. The access layer\n" +
           'deliberately ignores that flag; the game does not.',
       ).toContain('"partner"."inTimeline"');
+    });
+
+    it('prunes only unplayed challenges - a single guess anywhere in a challenge keeps it out of the delete set', () => {
+      const block = queryBlock(readGeneratedSql(), 'deleteUnplayedChallenges').replaceAll(/\s+/g, ' ');
+
+      expect(
+        block,
+        'GameRepository.deleteUnplayedChallenges lost its "createdAt" < $ clause - the retention\n' +
+          'window is the whole point of the nightly prune. Regenerate with `mise sql`.',
+      ).toContain('"createdAt" < $');
+
+      // "not in (select challengeId from game_round INNER JOIN game_guess ...)": the INNER join
+      // means a challenge's id only lands in that subquery once at least one of its rounds has a
+      // game_guess row, so a PARTIALLY played challenge (one guess, four rounds still unanswered)
+      // is excluded from the delete target exactly like a fully played one - this is the "zero
+      // guesses", not "not finished", rule the design calls for. Losing the join (or weakening it
+      // to a LEFT join) would silently let every challenge - including ones with a real score
+      // already on the leaderboard and in a player's history - back into the delete set.
+      expect(
+        block,
+        'GameRepository.deleteUnplayedChallenges no longer excludes a challenge with an INNER\n' +
+          'join to game_guess. A challenge someone has already scored on could now be pruned,\n' +
+          'silently rewriting history and stats they have already seen. Regenerate with `mise sql`.',
+      ).toMatch(/not in \( select "game_round"\."challengeId" from "game_round" inner join "game_guess"/);
     });
   });
 });

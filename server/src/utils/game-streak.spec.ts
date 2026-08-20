@@ -24,8 +24,16 @@ describe('computeStreak', () => {
     expect(computeStreak(['2026-07-31', '2026-08-01'], '2026-08-01').current).toBe(2);
   });
 
+  // The duplicate sits INTERIOR to the run, not at its start - a duplicate at the start still
+  // resets the counter to 1 whether or not it is deduplicated first, so that placement cannot
+  // tell a dedupe-then-count implementation from a plain count. An interior repeat can: without
+  // `[...new Set(...)]` in computeStreak, the extra 2026-08-18 breaks the day-over-day check on
+  // its own re-occurrence and the run count comes out short.
   it('is unaffected by a duplicate date', () => {
-    expect(computeStreak(['2026-08-18', '2026-08-18', '2026-08-19'], '2026-08-19').current).toBe(2);
+    expect(computeStreak(['2026-08-17', '2026-08-18', '2026-08-18', '2026-08-19'], '2026-08-19')).toEqual({
+      current: 3,
+      best: 3,
+    });
   });
 
   // The two days before yesterday: a streak whose last day is older than yesterday is over, and
@@ -43,5 +51,11 @@ describe('computeStreak', () => {
   // Crossing a leap day: 2028-02-29 exists, so the 28th, 29th and 1st of March are consecutive.
   it('crosses a leap day', () => {
     expect(computeStreak(['2028-02-28', '2028-02-29', '2028-03-01'], '2028-03-01')).toEqual({ current: 3, best: 3 });
+  });
+
+  // Crossing a year boundary: December 31st and January 1st are one day apart, not the start of
+  // two unrelated years.
+  it('crosses a year boundary', () => {
+    expect(computeStreak(['2026-12-31', '2027-01-01'], '2027-01-01')).toEqual({ current: 2, best: 2 });
   });
 });
