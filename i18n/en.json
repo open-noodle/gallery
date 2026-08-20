@@ -2018,6 +2018,7 @@
   "game_solo_include_spaces_description": "Also draw rounds from photos in your shared spaces.",
   "game_solo_no_games": "No games played yet",
   "game_solo_no_photos": "No photos available for PhotoGuesser - add photos with GPS data or capture dates, or include partner or shared-space photos when you start a game",
+  "game_solo_no_photos_in_library": "No photos available for PhotoGuesser - add photos with GPS data or capture dates to your library",
   "game_solo_play_again": "Play again",
   "game_solo_rounds_fewer_than_requested": "Your photos filled {actual} of {requested} rounds",
   "game_solo_start_free_play": "Start free play",

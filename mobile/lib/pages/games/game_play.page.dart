@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -9,6 +11,8 @@ import 'package:immich_mobile/presentation/widgets/games/standings_section.widge
 import 'package:immich_mobile/providers/game/daily_reminder.provider.dart';
 import 'package:immich_mobile/providers/game/game_session.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
+import 'package:immich_mobile/repositories/solo_game_api.repository.dart';
+import 'package:immich_mobile/routing/router.dart';
 import 'package:immich_mobile/utils/debug_print.dart';
 import 'package:immich_mobile/utils/game_format.dart';
 import 'package:immich_mobile/widgets/common/immich_toast.dart';
@@ -84,6 +88,17 @@ class GamePlayPage extends ConsumerWidget {
     // guards the `.type` dispatch below, which needs a non-null round anyway.
     final round = state.currentRound;
     if (round == null) {
+      // Two endings, chosen by scope — the same split web makes between its space route and its
+      // solo one. A solo challenge has nobody to rank against: the server's one-row leaderboard
+      // exists only so the 404-for-strangers rule is not vacuous, and design §11 explicitly does
+      // NOT reuse `game-leaderboard` for it. Rendering it anyway put the player on a podium of one,
+      // flagged as themselves, instead of the score and the way into the next game web gives them.
+      //
+      // `spaceId == null` is the scope discriminator on the row (game_challenge_scope_chk makes
+      // exactly one of the two ids non-null), the same test `_finish` uses to pick a streak.
+      if (state.challenge.spaceId == null) {
+        return _SoloCompleted(challenge: state.challenge);
+      }
       return _Completed(
         leaderboard: state.leaderboard,
         roundCount: state.challenge.rounds.length,
@@ -118,7 +133,8 @@ class GamePlayPage extends ConsumerWidget {
   }
 }
 
-/// The completion screen.
+/// The completion screen for a SPACE challenge — the one place a leaderboard belongs, because a
+/// space challenge really does have other players on it. See [_SoloCompleted] for the other scope.
 ///
 /// [GameSessionController] already fetches the challenge's leaderboard on finishing (and on
 /// resuming an already-finished challenge) — rendering it here is what makes that fetch worth
@@ -171,6 +187,97 @@ class _Completed extends StatelessWidget {
               isMe: entries[i].userId == currentUserId,
             ),
         ],
+      ],
+    );
+  }
+}
+
+/// The completion screen for a SOLO challenge: what you scored, and a way straight into the next
+/// game. Deliberately no leaderboard — see the branch in `_body` for why.
+///
+/// `ConsumerStatefulWidget` for one flag: creating runs the candidate queries and a CLIP encode
+/// server-side, measured at ~9.6s cold, and without shutting the button for that stretch a second
+/// tap buys a second game from one intent.
+class _SoloCompleted extends ConsumerStatefulWidget {
+  const _SoloCompleted({required this.challenge});
+
+  final GameChallengeDetailResponseDto challenge;
+
+  @override
+  ConsumerState<_SoloCompleted> createState() => _SoloCompletedState();
+}
+
+class _SoloCompletedState extends ConsumerState<_SoloCompleted> {
+  bool _startingAgain = false;
+
+  Future<void> _playAgain() async {
+    if (_startingAgain) return;
+    setState(() => _startingAgain = true);
+
+    String? nextId;
+    try {
+      // No `sources`: the finished challenge froze its own toggles onto its row and does not report
+      // them back, so the stored preference — the player's standing choice — is what a one-click
+      // rematch draws from. Mobile never sends an override at all (see SoloGameApiRepository).
+      final next = await ref
+          .read(soloGameApiRepositoryProvider)
+          .create(roundCount: widget.challenge.roundCount.toInt(), type: challengeTypeOf(widget.challenge.rounds));
+      nextId = next.id;
+    } catch (error) {
+      if (context.mounted) {
+        ImmichToast.show(
+          context: context,
+          msg: soloCreateFailureKey(error).t(context: context),
+          toastType: ToastType.error,
+        );
+      }
+    } finally {
+      // Cleared BEFORE the push, not after it: `pushRoute` does not complete until the pushed route
+      // POPS, so clearing it afterwards would leave this button disabled for the whole next game
+      // and dead on the way back. Same shape as PhotoGuesserPage's create.
+      if (mounted) setState(() => _startingAgain = false);
+    }
+
+    // Pushed rather than replaced, matching web's `goto`: PhotoGuesserPage awaits the FIRST push
+    // and refreshes its stats and history when it completes, so replacing this route would report
+    // that the game was over while the rematch was still being played.
+    if (nextId != null && context.mounted) await context.pushRoute(GamePlayRoute(challengeId: nextId));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Text(
+          'game_completed'.t(context: context),
+          textAlign: TextAlign.center,
+          style: theme.textTheme.headlineSmall,
+        ),
+        const SizedBox(height: 16),
+        Text(
+          // Grouped BEFORE interpolation: `game_points` substitutes {score} verbatim, so a raw
+          // number renders "18420 pts".
+          'game_points'.t(context: context, args: {'score': formatGameScore(soloTotal(widget.challenge.rounds))}),
+          key: const Key('solo-score-total'),
+          textAlign: TextAlign.center,
+          style: theme.textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 24),
+        FilledButton(
+          key: const Key('solo-play-again'),
+          onPressed: _startingAgain ? null : () => unawaited(_playAgain()),
+          child: _startingAgain
+              ? const SizedBox(
+                  key: Key('solo-play-again-waiting'),
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator.adaptive(strokeWidth: 2),
+                )
+              : Text('game_solo_play_again'.t(context: context)),
+        ),
       ],
     );
   }

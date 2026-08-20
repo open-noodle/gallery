@@ -22,14 +22,18 @@ import 'package:immich_mobile/providers/locale_provider.dart';
 import 'package:immich_mobile/providers/map/map_state.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:immich_mobile/repositories/game_api.repository.dart';
+import 'package:immich_mobile/repositories/solo_game_api.repository.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:openapi/api.dart';
 
+import '../../../test_helpers/fake_stack_router.dart';
 import '../../../test_helpers/wire_dates.dart';
 import '../../../test_utils.dart';
 import '../../../widget_tester_extensions.dart';
 
 class _MockGameApiRepository extends Mock implements GameApiRepository {}
+
+class _MockSoloGameApiRepository extends Mock implements SoloGameApiRepository {}
 
 class _MockDailyReminderController extends Mock implements DailyReminderController {}
 
@@ -98,6 +102,28 @@ GameChallengeDetailResponseDto _finishedChallenge() => GameChallengeDetailRespon
   rounds: [GameRoundDetailResponseDto(index: 0, type: GameRoundType.location, score: const Optional.present(100))],
 );
 
+// The solo twin of `_finishedChallenge`: `spaceId` null and `ownerId` set, which is the scope
+// discriminator the page branches its ending on (game_challenge_scope_chk keeps exactly one of the
+// two non-null). Two rounds, both scored, so the total is a sum rather than a single round's score
+// — a screen that rendered one round's points would pass on a one-round fixture.
+GameChallengeDetailResponseDto _finishedSoloChallenge({GameRoundType type = GameRoundType.location}) =>
+    GameChallengeDetailResponseDto(
+      id: 'c1',
+      spaceId: null,
+      ownerId: 'u1',
+      name: 'Mixed',
+      roundCount: 2,
+      scaleKm: 1,
+      scaleDays: 1,
+      createdAt: DateTime.utc(2026, 8, 18),
+      closedAt: null,
+      dailyOn: null,
+      rounds: [
+        GameRoundDetailResponseDto(index: 0, type: type, score: const Optional.present(4200)),
+        GameRoundDetailResponseDto(index: 1, type: type, score: const Optional.present(14220)),
+      ],
+    );
+
 // A DAILY challenge (non-null `dailyOn`), single round, so one guess reaches `finished`. The
 // `answered` flag models the pre- vs post-guess refetch inside `_reveal` — `getChallenge` is
 // called twice per guess, unanswered then answered, mirroring `daily_reminder_triggers_test.dart`.
@@ -132,6 +158,9 @@ void main() {
   setUpAll(() async {
     TestWidgetsFlutterBinding.ensureInitialized();
     TestUtils.init();
+    // mocktail needs a fallback instance for a non-primitive type before `any(named: 'type')` can
+    // stand in for it.
+    registerFallbackValue(GameChallengeType.mixed);
     db = Drift(drift.DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true));
     await StoreService.init(storeRepository: DriftStoreRepository(db), listenUpdates: false);
     await SettingsRepository.ensureInitialized(db);
@@ -158,9 +187,14 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  Future<void> pump(WidgetTester tester, {List<Override> extraOverrides = const []}) {
+  /// [router] is only needed by the solo-ending tests: "Play again" pushes the play route, and
+  /// without a router in the tree that push throws into the zone as an unhandled async error
+  /// rather than failing on an assertion.
+  Future<void> pump(WidgetTester tester, {List<Override> extraOverrides = const [], FakeStackRouter? router}) {
     return tester.pumpConsumerWidget(
-      const GamePlayPage(challengeId: 'c1'),
+      router == null
+          ? const GamePlayPage(challengeId: 'c1')
+          : withFakeRouter(router, const GamePlayPage(challengeId: 'c1')),
       overrides: [
         gameApiRepositoryProvider.overrideWithValue(repository),
         mapStateNotifierProvider.overrideWith(_FakeMapStateNotifier.new),
@@ -345,5 +379,121 @@ void main() {
 
     // _dailyChallenge above sets spaceId: 's1', so this is a SPACE daily, not solo.
     verify(() => reminder.recordDailyCompleted(wireDateOnly('2026-08-18'), isSolo: false)).called(1);
+  });
+
+  // Design §11 does not reuse `game-leaderboard` for solo, and the server's one-row solo board
+  // exists only so the "404 for strangers" rule is not vacuous — the recorded expectation was that
+  // no client would render it. Mobile did: "Completed", a Leaderboard heading, and a single row
+  // ranked 1 of 1 and flagged as the player themselves. Web gives the same player their total and
+  // a way into the next game, and that difference made the two clients different products.
+  group('the ending of a solo challenge', () {
+    testWidgets('is the score and a rematch, not a podium of one', (tester) async {
+      when(() => repository.getChallenge('c1')).thenAnswer((_) async => _finishedSoloChallenge());
+      // The board the session fetches anyway. Stubbed with the row the server really returns for a
+      // solo challenge — the owner alone — so this proves the screen DECLINES to render it rather
+      // than merely having nothing to render.
+      when(() => repository.getLeaderboard('c1')).thenAnswer(
+        (_) async => GameLeaderboardResponseDto(
+          entries: [GameLeaderboardResponseDtoEntriesInner(userId: 'u1', name: 'Alice', total: 18420, answered: 2)],
+        ),
+      );
+
+      await pump(tester);
+
+      expect(find.text('Completed'), findsOneWidget);
+      // 4200 + 14220, grouped: `game_points` interpolates {score} verbatim, so an ungrouped total
+      // would render "18420 pts" and a per-round figure would render one of the two scores.
+      expect(find.byKey(const Key('solo-score-total')), findsOneWidget);
+      expect(find.text('18,420 pts'), findsOneWidget);
+      expect(find.byKey(const Key('solo-play-again')), findsOneWidget);
+      expect(find.text('Play again'), findsOneWidget);
+
+      expect(find.byType(StandingsRow), findsNothing, reason: 'a solo game has nobody to rank against');
+      expect(find.text('Leaderboard'), findsNothing);
+    });
+
+    testWidgets('a space challenge keeps its leaderboard', (tester) async {
+      // The other half of the branch: the split is on scope, so this must not have been turned
+      // into "no client renders a leaderboard".
+      when(() => repository.getChallenge('c1')).thenAnswer((_) async => _finishedChallenge());
+      when(() => repository.getLeaderboard('c1')).thenAnswer(
+        (_) async => GameLeaderboardResponseDto(
+          entries: [GameLeaderboardResponseDtoEntriesInner(userId: 'u1', name: 'Alice', total: 4200, answered: 1)],
+        ),
+      );
+
+      await pump(tester);
+
+      expect(find.byType(StandingsRow), findsOneWidget);
+      expect(find.text('Leaderboard'), findsOneWidget);
+      expect(find.byKey(const Key('solo-play-again')), findsNothing);
+    });
+
+    testWidgets('Play again asks for another game of the same shape and opens it', (tester) async {
+      final router = FakeStackRouter();
+      final solo = _MockSoloGameApiRepository();
+      when(() => repository.getChallenge('c1')).thenAnswer((_) async => _finishedSoloChallenge());
+      when(() => repository.getLeaderboard('c1')).thenAnswer((_) async => GameLeaderboardResponseDto(entries: []));
+      when(
+        () => solo.create(
+          roundCount: any(named: 'roundCount'),
+          type: any(named: 'type'),
+        ),
+      ).thenAnswer(
+        (_) async => GameChallengeResponseDto(
+          id: 'c2',
+          spaceId: null,
+          ownerId: 'u1',
+          name: 'Mixed',
+          roundCount: 2,
+          scaleKm: 1,
+          scaleDays: 1,
+          createdAt: DateTime.utc(2026, 8, 18),
+          dailyOn: null,
+        ),
+      );
+
+      await pump(tester, extraOverrides: [soloGameApiRepositoryProvider.overrideWithValue(solo)], router: router);
+
+      await tester.tap(find.byKey(const Key('solo-play-again')));
+      await tester.pumpAndSettle();
+
+      // Same size, and the type the finished game's ROUNDS actually were — a mixed request that
+      // could only find location photos produced a places game, so "another one like that" is a
+      // places game. Mirrors web's `typeOf`.
+      verify(() => solo.create(roundCount: 2, type: GameChallengeType.location)).called(1);
+      expect(router.pushed, hasLength(1), reason: 'the rematch has to actually open');
+      expect(
+        tester.widget<FilledButton>(find.byKey(const Key('solo-play-again'))).onPressed,
+        isNotNull,
+        reason: 'the push does not complete until the rematch pops, so the button must be live again',
+      );
+    });
+
+    testWidgets('a rejected rematch says why and leaves the button usable', (tester) async {
+      final router = FakeStackRouter();
+      final solo = _MockSoloGameApiRepository();
+      when(() => repository.getChallenge('c1')).thenAnswer((_) async => _finishedSoloChallenge());
+      when(() => repository.getLeaderboard('c1')).thenAnswer((_) async => GameLeaderboardResponseDto(entries: []));
+      when(
+        () => solo.create(
+          roundCount: any(named: 'roundCount'),
+          type: any(named: 'type'),
+        ),
+      ).thenThrow(ApiException(400, '{"message":"no candidates"}'));
+
+      await pump(tester, extraOverrides: [soloGameApiRepositoryProvider.overrideWithValue(solo)], router: router);
+
+      await tester.tap(find.byKey(const Key('solo-play-again')));
+      await tester.pumpAndSettle();
+
+      // The mobile copy: no source toggles to offer on this client.
+      expect(find.textContaining('No photos available for PhotoGuesser'), findsOneWidget);
+      expect(find.textContaining('when you start a game'), findsNothing);
+      expect(router.pushed, isEmpty, reason: 'there is no game to open');
+      expect(tester.widget<FilledButton>(find.byKey(const Key('solo-play-again'))).onPressed, isNotNull);
+
+      await settleToast(tester);
+    });
   });
 }

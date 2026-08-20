@@ -1997,6 +1997,7 @@
   "game_solo_include_spaces_description": "同时使用您共享 Space 中的照片。",
   "game_solo_no_games": "暂无游戏记录",
   "game_solo_no_photos": "没有可用于 PhotoGuesser 的照片，请添加带 GPS 数据或拍摄日期的照片，或在开始游戏时加入协作者或 Space 照片",
+  "game_solo_no_photos_in_library": "没有可用于 PhotoGuesser 的照片，请向您的资源库添加带 GPS 数据或拍摄日期的照片",
   "game_solo_play_again": "再玩一次",
   "game_solo_rounds_fewer_than_requested": "您的照片只凑够了{actual}/{requested}轮",
   "game_solo_start_free_play": "开始自由模式",

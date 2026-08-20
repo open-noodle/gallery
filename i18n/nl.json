@@ -2014,6 +2014,7 @@
   "game_solo_include_spaces_description": "Gebruikt ook foto's uit je gedeelde Spaces.",
   "game_solo_no_games": "Nog geen spellen gespeeld",
   "game_solo_no_photos": "Geen foto's beschikbaar voor PhotoGuesser - voeg foto's met GPS-gegevens of opnamedatum toe, of neem partner- of Space-foto's mee bij het starten van een spel",
+  "game_solo_no_photos_in_library": "Geen foto's beschikbaar voor PhotoGuesser - voeg foto's met GPS-gegevens of opnamedatum toe aan je bibliotheek",
   "game_solo_play_again": "Opnieuw spelen",
   "game_solo_rounds_fewer_than_requested": "Je foto's vulden {actual} van {requested} rondes",
   "game_solo_start_free_play": "Vrij spel starten",

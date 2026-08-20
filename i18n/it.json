@@ -2014,6 +2014,7 @@
   "game_solo_include_spaces_description": "Include anche le foto dei tuoi Space condivisi.",
   "game_solo_no_games": "Ancora nessuna partita giocata",
   "game_solo_no_photos": "Nessuna foto disponibile per PhotoGuesser - aggiungi foto con dati GPS o data di scatto, oppure includi le foto dei compagni o degli Space quando avvii una partita",
+  "game_solo_no_photos_in_library": "Nessuna foto disponibile per PhotoGuesser - aggiungi alla tua libreria foto con dati GPS o data di scatto",
   "game_solo_play_again": "Gioca di nuovo",
   "game_solo_rounds_fewer_than_requested": "Le tue foto hanno riempito {actual} turni su {requested}",
   "game_solo_start_free_play": "Inizia una partita libera",

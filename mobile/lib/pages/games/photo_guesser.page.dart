@@ -106,6 +106,25 @@ class PhotoGuesserPage extends HookConsumerWidget {
             .read(soloGameApiRepositoryProvider)
             .create(roundCount: choice.roundCount, type: choice.type);
         challengeId = challenge.id;
+        // A thin pool builds a SHORTER game rather than failing, so a player who asked for 10
+        // rounds can silently get 3. Without this the only clue is the round counter on the first
+        // screen, which reads as a bug. Matches what web says on the same outcome.
+        //
+        // `game_solo_rounds_fewer_than_requested`, not the space key: that one reads "This space's
+        // photos filled…", and several of its translations hard-code the product noun, so it would
+        // tell a solo player — who may belong to no space at all — about photos in a space.
+        //
+        // Info rather than error: the game is playable and about to open, and the toast rides over
+        // it. Shown before `play()` pushes the route, since fluttertoast outlives the navigation.
+        if (challenge.roundCount < choice.roundCount && context.mounted) {
+          ImmichToast.show(
+            context: context,
+            msg: 'game_solo_rounds_fewer_than_requested'.t(
+              context: context,
+              args: {'actual': '${challenge.roundCount}', 'requested': '${choice.roundCount}'},
+            ),
+          );
+        }
       } catch (error) {
         if (context.mounted) {
           ImmichToast.show(

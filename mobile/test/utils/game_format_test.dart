@@ -12,6 +12,12 @@ GameRoundDetailResponseDto _round(int index, {num? score}) => GameRoundDetailRes
   score: score == null ? const Optional.absent() : Optional.present(score),
 );
 
+GameRoundDetailResponseDto _dateRound(int index, {num? score}) => GameRoundDetailResponseDto(
+  index: index,
+  type: GameRoundType.date,
+  score: score == null ? const Optional.absent() : Optional.present(score),
+);
+
 void main() {
   group('wrapLongitude', () {
     test('wraps values maplibre produces past the antimeridian', () {
@@ -208,6 +214,39 @@ void main() {
     });
   });
 
+  group('soloTotal', () {
+    test('sums the whole game, not one round', () {
+      expect(soloTotal([_round(0, score: 4200), _round(1, score: 14220)]), 18420);
+    });
+
+    test('counts an unanswered round as zero rather than skipping it', () {
+      // `score` is Optional<num?> and `Absent.value` THROWS, so this also pins the `.orElse(null)`.
+      // A game abandoned halfway is not worth more per round than one played out.
+      expect(soloTotal([_round(0, score: 4200), _round(1)]), 4200);
+    });
+
+    test('a zero-scored round is a real result, and a game of them totals zero', () {
+      expect(soloTotal([_round(0, score: 0), _round(1, score: 0)]), 0);
+    });
+  });
+
+  group('challengeTypeOf', () {
+    // Labelled from the rounds the challenge actually CONTAINS, not from what was requested: a
+    // mixed request that could only find location photos produced a places game, so "another one
+    // like that" is a places game. Mirrors web's `typeOf`.
+    test('all location rounds is a location game', () {
+      expect(challengeTypeOf([_round(0), _round(1)]), GameChallengeType.location);
+    });
+
+    test('all date rounds is a date game', () {
+      expect(challengeTypeOf([_dateRound(0), _dateRound(1)]), GameChallengeType.date);
+    });
+
+    test('one of each is mixed', () {
+      expect(challengeTypeOf([_round(0), _dateRound(1)]), GameChallengeType.mixed);
+    });
+  });
+
   group('formatGameScore', () {
     test('groups digits so game_points does not render 18420 pts', () {
       expect(formatGameScore(18420, locale: 'en_US'), '18,420');
@@ -217,7 +256,16 @@ void main() {
 
   group('soloCreateFailureKey', () {
     test('a server 400 is the one failure the player can act on', () {
-      expect(soloCreateFailureKey(ApiException(400, '{"message":"no candidates"}')), 'game_solo_no_photos');
+      // NOT `game_solo_no_photos`. That copy ends "…or include partner or shared-space photos when
+      // you start a game", and mobile's create sheet has no source toggles — deliberately, because
+      // this client cannot read the stored preference those would override. Half of the one message
+      // a stuck mobile player sees would point at a control that does not exist on their device,
+      // which is the same defect already ruled must-fix on the daily card (game_solo_daily_
+      // unavailable exists for exactly this reason).
+      expect(
+        soloCreateFailureKey(ApiException(400, '{"message":"no candidates"}')),
+        'game_solo_no_photos_in_library',
+      );
     });
 
     test('an offline 400 does not blame the library', () {
