@@ -1,4 +1,4 @@
-import type { SystemConfigDto } from '@immich/sdk';
+import type { AdminConfigDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
@@ -9,14 +9,14 @@ import MemoriesSettings from './MemoriesSettings.svelte';
 const makeConfig = (retentionDays = 365) =>
   ({
     memories: { retentionDays, birthday: true, recentTrips: true, types: {} },
-  }) as SystemConfigDto;
+  }) as AdminConfigDto;
 
 const mocks = vi.hoisted(() => ({
   featureFlags: { configFile: false },
-  systemConfig: { memories: { retentionDays: 365, birthday: true, recentTrips: true, types: {} } } as SystemConfigDto,
+  systemConfig: { memories: { retentionDays: 365, birthday: true, recentTrips: true, types: {} } } as AdminConfigDto,
   defaultSystemConfig: {
     memories: { retentionDays: 365, birthday: true, recentTrips: true, types: {} },
-  } as SystemConfigDto,
+  } as AdminConfigDto,
   cloneValue: vi.fn(),
   cloneDefaultValue: vi.fn(),
 }));
@@ -32,10 +32,10 @@ vi.mock(import('$lib/managers/feature-flags-manager.svelte'), () => ({
 vi.mock(import('$lib/managers/system-config-manager.svelte'), () => ({
   systemConfigManager: {
     get value() {
-      return mocks.systemConfig as SystemConfigDto;
+      return mocks.systemConfig as AdminConfigDto;
     },
     get defaultValue() {
-      return mocks.defaultSystemConfig as SystemConfigDto;
+      return mocks.defaultSystemConfig as AdminConfigDto;
     },
     cloneValue: mocks.cloneValue,
     cloneDefaultValue: mocks.cloneDefaultValue,

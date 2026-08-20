@@ -1,4 +1,4 @@
-import type { SystemConfigDto } from '@immich/sdk';
+import type { AdminConfigDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
@@ -6,12 +6,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import MachineLearningSettings from './MachineLearningSettings.svelte';
 
 type FacialRecognitionOverrides = Partial<
-  Omit<SystemConfigDto['machineLearning']['facialRecognition'], 'suggestions'> & {
-    suggestions: Partial<SystemConfigDto['machineLearning']['facialRecognition']['suggestions']>;
+  Omit<AdminConfigDto['machineLearning']['facialRecognition'], 'suggestions'> & {
+    suggestions: Partial<AdminConfigDto['machineLearning']['facialRecognition']['suggestions']>;
   }
 >;
 
-const makeMachineLearningConfig = (facialRecognitionOverrides: FacialRecognitionOverrides = {}): SystemConfigDto =>
+const makeMachineLearningConfig = (facialRecognitionOverrides: FacialRecognitionOverrides = {}): AdminConfigDto =>
   ({
     machineLearning: {
       enabled: true,
@@ -41,12 +41,12 @@ const makeMachineLearningConfig = (facialRecognitionOverrides: FacialRecognition
       },
       petDetection: { enabled: false, modelName: 'yolo11s', minScore: 0.7 },
     },
-  }) as unknown as SystemConfigDto;
+  }) as unknown as AdminConfigDto;
 
 const mocks = vi.hoisted(() => ({
   featureFlags: { configFile: false, duplicateDetection: true },
-  systemConfig: {} as SystemConfigDto,
-  defaultSystemConfig: {} as SystemConfigDto,
+  systemConfig: {} as AdminConfigDto,
+  defaultSystemConfig: {} as AdminConfigDto,
   cloneValue: vi.fn(),
   cloneDefaultValue: vi.fn(),
 }));
