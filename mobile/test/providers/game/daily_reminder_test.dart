@@ -10,6 +10,8 @@ import 'package:immich_mobile/utils/daily_reminder_schedule.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:openapi/api.dart';
 
+import '../../test_helpers/wire_dates.dart';
+
 class _MockScheduler extends Mock implements DailyReminderScheduler {}
 
 // `SettingsRepository` has no `get`/`set` — reads go through `AppConfig.read` (via
@@ -63,6 +65,14 @@ void main() {
     when(() => settings.write(SettingsKey.gameSpaceDailyLastPlayed, '2026-08-18')).thenAnswer((_) async {});
     when(() => settings.write(SettingsKey.gameSoloDailyLastPlayed, '2026-08-18')).thenAnswer((_) async {});
     when(() => settings.write(SettingsKey.gameSoloDailyUnavailableOn, '2026-08-18')).thenAnswer((_) async {});
+    // The neighbouring days are stubbed too, and must never be written. Without them a
+    // day-shifted key fails as an unstubbed-call TypeError inside the controller rather than on
+    // the verify below, which reads as a broken harness instead of as the wrong day recorded.
+    for (final day in ['2026-08-17', '2026-08-19']) {
+      when(() => settings.write(SettingsKey.gameSpaceDailyLastPlayed, day)).thenAnswer((_) async {});
+      when(() => settings.write(SettingsKey.gameSoloDailyLastPlayed, day)).thenAnswer((_) async {});
+      when(() => settings.write(SettingsKey.gameSoloDailyUnavailableOn, day)).thenAnswer((_) async {});
+    }
   });
 
   ProviderContainer container(
@@ -262,9 +272,13 @@ void main() {
       settingsValues: {SettingsKey.gameDailyReminderEnabled: true},
     );
 
-    await c.read(dailyReminderProvider).recordDailyCompleted(DateTime.utc(2026, 8, 18), isSolo: false);
+    await c.read(dailyReminderProvider).recordDailyCompleted(wireDateOnly('2026-08-18'), isSolo: false);
 
     verify(() => settings.write(SettingsKey.gameSpaceDailyLastPlayed, '2026-08-18')).called(1);
+    // `dailyOn` is a date-only value that arrives as LOCAL midnight, so converting it to a UTC
+    // key names the previous day east of Greenwich and the next one west of it.
+    verifyNever(() => settings.write(SettingsKey.gameSpaceDailyLastPlayed, '2026-08-17'));
+    verifyNever(() => settings.write(SettingsKey.gameSpaceDailyLastPlayed, '2026-08-19'));
     verify(() => scheduler.cancelAll()).called(1);
   });
 
@@ -276,10 +290,12 @@ void main() {
       settingsValues: {SettingsKey.gameDailyReminderEnabled: true},
     );
 
-    await c.read(dailyReminderProvider).recordDailyCompleted(DateTime.utc(2026, 8, 18), isSolo: true);
+    await c.read(dailyReminderProvider).recordDailyCompleted(wireDateOnly('2026-08-18'), isSolo: true);
 
     verify(() => settings.write(SettingsKey.gameSoloDailyLastPlayed, '2026-08-18')).called(1);
     verifyNever(() => settings.write(SettingsKey.gameSpaceDailyLastPlayed, '2026-08-18'));
+    verifyNever(() => settings.write(SettingsKey.gameSoloDailyLastPlayed, '2026-08-17'));
+    verifyNever(() => settings.write(SettingsKey.gameSoloDailyLastPlayed, '2026-08-19'));
     verify(() => scheduler.cancelAll()).called(1);
   });
 

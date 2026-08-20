@@ -25,6 +25,7 @@ import 'package:immich_mobile/repositories/game_api.repository.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:openapi/api.dart';
 
+import '../../../test_helpers/wire_dates.dart';
 import '../../../test_utils.dart';
 import '../../../widget_tester_extensions.dart';
 
@@ -110,7 +111,7 @@ GameChallengeDetailResponseDto _dailyChallenge({required bool answered}) => Game
   scaleDays: 1,
   createdAt: DateTime.utc(2026, 8, 18),
   closedAt: null,
-  dailyOn: DateTime.utc(2026, 8, 18),
+  dailyOn: wireDateOnly('2026-08-18'),
   rounds: [
     GameRoundDetailResponseDto(
       index: 0,
@@ -343,6 +344,6 @@ void main() {
     await tester.pumpAndSettle();
 
     // _dailyChallenge above sets spaceId: 's1', so this is a SPACE daily, not solo.
-    verify(() => reminder.recordDailyCompleted(DateTime.utc(2026, 8, 18), isSolo: false)).called(1);
+    verify(() => reminder.recordDailyCompleted(wireDateOnly('2026-08-18'), isSolo: false)).called(1);
   });
 }

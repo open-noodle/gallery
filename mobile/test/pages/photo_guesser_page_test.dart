@@ -17,6 +17,7 @@ import 'package:immich_mobile/repositories/solo_game_api.repository.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:openapi/api.dart';
 
+import '../test_helpers/wire_dates.dart';
 import '../test_utils.dart';
 import '../widget_tester_extensions.dart';
 
@@ -40,7 +41,7 @@ GameChallengeListItemResponseDto _daily({required int answered, int roundCount =
       scaleDays: 1,
       createdAt: DateTime.utc(2026, 8, 19),
       closedAt: null,
-      dailyOn: DateTime.utc(2026, 8, 19),
+      dailyOn: wireDateOnly('2026-08-19'),
     );
 
 GameSoloStatsResponseDto _stats({
@@ -341,7 +342,7 @@ void main() {
         history: GameSoloHistoryResponseDto(
           hasNextPage: false,
           items: [
-            _historyItem(id: 'g1', name: '2026-08-19', dailyOn: DateTime.utc(2026, 8, 19), total: 18420),
+            _historyItem(id: 'g1', name: '2026-08-19', dailyOn: wireDateOnly('2026-08-19'), total: 18420),
             _historyItem(id: 'g2', name: 'Mixed'),
           ],
         ),

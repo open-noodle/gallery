@@ -126,12 +126,34 @@ int? firstUnansweredIndex(List<GameRoundDetailResponseDto> rounds) {
   return null;
 }
 
-/// A game's day — a daily's `dailyOn` or a free-play game's `createdAt` — as a readable date.
+/// A free-play game's day, from the `createdAt` INSTANT the server sent.
 ///
-/// Formatted from the UTC instant for the same reason [formatStandingsMonth] is: every day this
-/// game keys on is a UTC calendar day, so rendering a row in the viewer's zone would date a daily
-/// to a different day than the streak that counted it.
-String formatGameDate(DateTime date, {String? locale}) => DateFormat.yMMMd(locale).format(date.toUtc());
+/// Converted to UTC for the same reason [formatStandingsMonth] is: every day this game keys on is
+/// a UTC calendar day, so rendering a row in the viewer's zone would date a game to a different day
+/// than the streak that counted it. `createdAt` really is an instant — it arrives as
+/// `…T12:34:56.000Z`, which `DateTime.tryParse` returns already UTC-flagged — so `.toUtc()` here is
+/// either a no-op or exactly the correction it looks like.
+///
+/// NOT for `dailyOn`. See [formatDailyDate] for why that one is a different function.
+String formatGameDate(DateTime instant, {String? locale}) => DateFormat.yMMMd(locale).format(instant.toUtc());
+
+/// A daily's day, from the DATE-ONLY `dailyOn` the server sent.
+///
+/// Formatted from the value's own calendar fields with NO conversion — the single difference from
+/// [formatGameDate], and the whole reason the two exist separately.
+///
+/// `dailyOn` is `YYYY-MM-DD` on the wire (the server's `to_char`: no time, no offset), and the
+/// generated client runs every date field through `mapDateTime`, which calls `DateTime.tryParse`.
+/// Dart parses an offset-less string in the DEVICE's zone, so this arrives as LOCAL midnight — it
+/// is a calendar day, not an instant. Calling `.toUtc()` on it subtracts the device's offset: at
+/// UTC+2, `2026-08-19` becomes `2026-08-18T22:00Z` and the row reads "Aug 18". That is a different
+/// day from the one the streak counted the game under, and a different day from what the same
+/// player sees in the browser (JS parses the date-only form as UTC, so web needs the opposite
+/// treatment — see web/src/lib/utils/game.ts).
+///
+/// Under `TZ=UTC` the two functions are indistinguishable, which is why fixtures built as
+/// `DateTime.utc(…)` — a shape the wire never produces for this field — cannot tell them apart.
+String formatDailyDate(DateTime dateOnly, {String? locale}) => DateFormat.yMMMd(locale).format(dateOnly);
 
 /// A score with digit grouping, e.g. `18,420`.
 ///
