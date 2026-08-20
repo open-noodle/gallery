@@ -6,8 +6,9 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Insertable } from 'kysely';
+import { DateTime } from 'luxon';
 import { PostgresError } from 'postgres';
-import { OnEvent } from 'src/decorators';
+import { OnEvent, OnJob } from 'src/decorators';
 import { AuthDto } from 'src/dtos/auth.dto';
 import {
   GameChallengeDetailResponseDto,
@@ -26,7 +27,7 @@ import {
   GameSoloStatsResponseDto,
   GameStandingsResponseDto,
 } from 'src/dtos/game.dto';
-import { CacheControl, SharedSpaceRole } from 'src/enum';
+import { CacheControl, JobName, QueueName, SharedSpaceRole } from 'src/enum';
 import { ArgOf } from 'src/repositories/event.repository';
 import {
   GameChallengeRow,
@@ -95,6 +96,12 @@ const SOLO_DAILY_UNIQUE_CONSTRAINT = 'game_challenge_owner_daily_uq';
  * the two create panels cannot drift apart. Mirrors the zod `.default(5)` on the create DTOs,
  * which cannot be relied on for the TS type - see `create`. */
 const DEFAULT_ROUND_COUNT = 5;
+
+/** How long an unplayed challenge survives before the nightly prune deletes it - see
+ * onGameChallengeCleanup. A solo game is ~11 rows and a daily a day accumulates forever once
+ * played, so games are kept indefinitely; this window only bounds the pile a challenge that
+ * nobody ever opened leaves behind. */
+const UNPLAYED_CHALLENGE_RETENTION_DAYS = 7;
 
 /** A challenge drawn from one shared space's photos. */
 type SpaceScope = { spaceId: string; ownerId: null };
@@ -295,6 +302,19 @@ export class GameService extends BaseService {
     }
     this.scenePromptCache.clear();
     this.scenePromptWarnings.clear();
+  }
+
+  /**
+   * Nightly prune of challenges nobody ever played - see `GameRepository.deleteUnplayedChallenges`
+   * for what "unplayed" means and why it is zero guesses rather than not finished. Queued from
+   * `QueueService.handleNightlyJobs` inside the `nightlyTasks.databaseCleanup` block, next to
+   * `MemoryCleanup` - the same admin opt-out that grouping is built on.
+   */
+  @OnJob({ name: JobName.GameChallengeCleanup, queue: QueueName.BackgroundTask })
+  async onGameChallengeCleanup() {
+    await this.gameRepository.deleteUnplayedChallenges(
+      DateTime.now().minus({ days: UNPLAYED_CHALLENGE_RETENTION_DAYS }).toJSDate(),
+    );
   }
 
   async create(auth: AuthDto, spaceId: string, dto: GameCreateDto): Promise<GameChallengeResponseDto> {
@@ -662,9 +682,11 @@ export class GameService extends BaseService {
    *
    * The index to watch for and the row to re-read are DERIVED from the scope rather than passed
    * in beside it. As parameters they were two more things a caller had to keep in agreement with
-   * the pool and the scope, and the wrong pairing compiles: watching for the space constraint on
-   * the solo path would turn a lost race into a 500 instead of a clean re-read - a failure that
-   * only appears under concurrency, which is exactly where nobody is watching.
+   * the scope, and the wrong pairing compiled silently: watching for the space constraint on the
+   * solo path would turn a lost race into a 500 instead of a clean re-read - a failure that only
+   * appears under concurrency, which is exactly where nobody is watching. That closes off one
+   * mismatch, not every one: `pool` is still passed independently, and a `SpacePool` paired with
+   * a solo `scope` still compiles.
    */
   private async generateDaily({
     pool,

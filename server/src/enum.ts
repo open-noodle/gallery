@@ -1066,6 +1066,9 @@ export enum JobName {
   // Classification
   AssetClassifyQueueAll = 'AssetClassifyQueueAll',
   AssetClassify = 'AssetClassify',
+
+  // Games
+  GameChallengeCleanup = 'GameChallengeCleanup',
 }
 
 export const JobNameSchema = z.enum(JobName).describe('Job name').meta({ id: 'JobName' });

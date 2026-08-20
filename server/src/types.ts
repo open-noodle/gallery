@@ -624,7 +624,10 @@ export type JobItem =
   | { name: JobName.AssetClassify; data: IEntityJob }
 
   // Face Repair
-  | { name: JobName.FaceRepairScan; data: IFaceRepairScanJob };
+  | { name: JobName.FaceRepairScan; data: IFaceRepairScanJob }
+
+  // Games
+  | { name: JobName.GameChallengeCleanup; data?: IBaseJob };
 
 export type VectorExtension = (typeof VECTOR_EXTENSIONS)[number];
 

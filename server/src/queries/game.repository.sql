@@ -997,3 +997,15 @@ offset
 delete from "game_challenge"
 where
   "id" = $1
+
+-- GameRepository.deleteUnplayedChallenges
+delete from "game_challenge"
+where
+  "createdAt" < $1
+  and "id" not in (
+    select
+      "game_round"."challengeId"
+    from
+      "game_round"
+      inner join "game_guess" on "game_guess"."roundId" = "game_round"."id"
+  )
