@@ -644,6 +644,64 @@ describe(GameService.name, () => {
 
       expect(result.rounds[1].guess).toBeUndefined();
     });
+
+    // The spec's §3.1 invariant: a player must never see another player's guess.
+    // `toRoundDetail` trusts every row `getGuessesForUser` hands it with no further per-guess
+    // ownership check, so the guard has to live at the call site - the query must be scoped to
+    // the caller's own id, never to some other player's. This mock stands in for the real
+    // repository's `WHERE game_guess.userId = userId` (which a mocked repository can't
+    // exercise): it hands back a different row depending on which userId the service actually
+    // asks for, so a service that drops or mistargets that filter surfaces the wrong guess here.
+    it('never returns a guess belonging to another player', async () => {
+      mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Viewer } as any);
+      mocks.game.getChallenge.mockResolvedValue({ id: 'challenge-1', spaceId: 'space-1', roundCount: 1 } as any);
+      mocks.game.getRounds.mockResolvedValue([
+        {
+          id: 'r0',
+          index: 0,
+          type: 'location',
+          answerLat: 52.5,
+          answerLon: 13.4,
+          answerDate: null,
+          assetId: 'asset-1',
+        },
+      ] as any);
+      const guessesFor = (userId: string) =>
+        userId === authStub.user.id
+          ? [
+              {
+                roundId: 'r0',
+                userId,
+                guessLat: 38.72,
+                guessLon: -9.14,
+                guessDate: null,
+                distanceKm: 412.3,
+                offsetDays: null,
+                score: 4000,
+              },
+            ]
+          : [
+              {
+                roundId: 'r0',
+                userId,
+                guessLat: 38.72,
+                guessLon: -0.13,
+                guessDate: null,
+                distanceKm: 200,
+                offsetDays: null,
+                score: 3000,
+              },
+            ];
+      mocks.game.getGuessesForUser.mockImplementation(((_challengeId: string, userId: string) =>
+        Promise.resolve(guessesFor(userId))) as any);
+
+      const result = await sut.get(authStub, 'challenge-1');
+
+      expect(result.rounds[0].guess?.lon).toBe(-9.14);
+      // The other player's guess must appear nowhere in the caller's payload, under any key.
+      expect(JSON.stringify(result)).not.toContain('-0.13');
+      expect(mocks.game.getGuessesForUser).toHaveBeenCalledWith('challenge-1', authStub.user.id);
+    });
   });
 
   describe('getRoundImage', () => {
