@@ -56,8 +56,20 @@ class PhotoGuesserPage extends HookConsumerWidget {
     // just to check would be the exact GENERATING call the reminder file avoids everywhere else.
     // `previous == null` on the FIRST resolution also reports, which is correct: a cold-started
     // reminder schedule was built without knowing today's answer yet.
+    //
+    // `next is AsyncData`, not `next.hasValue`: AsyncLoading and AsyncError both RETAIN the
+    // previous value, so once this has resolved null once, hasValue would stay true (with value
+    // still null) through a later failed refetch — offline, a server error — and a network blip
+    // would get recorded as a confirmed unavailability, costing the player that day's reminder for
+    // a reason that has nothing to do with their library.
+    //
+    // `!next.isLoading` on top of that: a REFRESH over existing data (invalidateSoloGames, or a
+    // manual retry) represents its in-flight phase as `AsyncData(isLoading: true, value: <the
+    // RETAINED previous value>)`, not as `AsyncLoading` — so `next is AsyncData` alone still
+    // matches while yesterday's null is only sitting there because nothing has come back yet. Only
+    // a SETTLED AsyncData (not mid-refresh) is a genuine resolution.
     ref.listen(soloDailyProvider, (previous, next) {
-      if (next.hasValue && next.value == null) {
+      if (next is AsyncData<GameChallengeListItemResponseDto?> && !next.isLoading && next.value == null) {
         unawaited(ref.read(dailyReminderProvider).recordSoloDailyUnavailable());
       }
     });
