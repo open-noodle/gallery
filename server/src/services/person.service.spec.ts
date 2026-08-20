@@ -1168,7 +1168,7 @@ describe(PersonService.name, () => {
       vi.spyOn(sut as any, 'ensureLocalFile').mockResolvedValue({ localPath: '/preview.jpg', cleanup });
       mocks.media.decodeImage.mockResolvedValue({
         data: Buffer.from('decoded-image'),
-        info: { width: 250, height: 250, channels: 3, format: 'jpeg', size: 0, premultiplied: false },
+        info: { width: 250, height: 250, channels: 3, format: 'jpeg', size: 0, premultiplied: false, hasAlpha: false },
       });
       mocks.media.generateThumbnail.mockImplementation(async (_input, _options, output) => {
         await writeFile(output, Buffer.from('cropped-face'));
