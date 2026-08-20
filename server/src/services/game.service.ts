@@ -44,7 +44,6 @@ import { BaseService } from 'src/services/base.service';
 import { ChallengePool } from 'src/services/game/challenge-pool';
 import { PersonalPool } from 'src/services/game/personal-pool';
 import { SpacePool } from 'src/services/game/space-pool';
-import { asDateString } from 'src/utils/date';
 import { getFilenameExtension, ImmichMediaResponse } from 'src/utils/file';
 import {
   GameCandidate,
@@ -128,6 +127,25 @@ type ChallengeScope = SpaceScope | SoloScope;
  * two people comparing scores on the same leaderboard while playing different challenges.
  */
 const utcDateKey = (now: Date): string => now.toISOString().slice(0, 10);
+
+/**
+ * A stored `dailyOn` as the `YYYY-MM-DD` string the API reports.
+ *
+ * Deliberately NOT the shared `asDateString`: that encodes through Luxon's DEFAULT zone
+ * (`DateTime.fromJSDate(date).toFormat('yyyy-MM-dd')`), which is the server's `TZ` - an admin-set,
+ * documented deployment option (docker/example.env). The driver hands a `date` column back as a
+ * Date at UTC MIDNIGHT (postgres.js parses '2026-08-19' with `new Date(x)`), so re-formatting it in
+ * a local zone reports the PREVIOUS day on any server west of Greenwich. Every day this game keys
+ * on is a UTC calendar day - `utcDateKey` stamps the row, the streak counts off it, the two partial
+ * unique indexes dedupe on it, and both clients key "already played today" on it - so the wire value
+ * has to be read off the UTC calendar fields, not reconstructed in whatever zone the host is set to.
+ *
+ * Kept local to this file rather than fixing `asDateString`: `person.birthDate` encodes through that
+ * same helper and is a different question (a birthday is a local-calendar fact, not a UTC instant),
+ * so widening the change would touch a contract this branch has no business moving.
+ */
+const asUtcDateString = (date: Date | string | null): string | null =>
+  date instanceof Date ? date.toISOString().slice(0, 10) : date;
 
 /**
  * The current UTC calendar month as `{ key: 'YYYY-MM', start: 'YYYY-MM-DD', endExclusive:
@@ -501,7 +519,17 @@ export class GameService extends BaseService {
     }
 
     const challenge: Insertable<GameChallengeTable> = {
-      ...scope,
+      // Field by field, never `...scope`, for the same reason the response below is built that way:
+      // TypeScript's excess-property check does not fire through a spread, so a third field added
+      // to the `photoGuesser` preference would ride `SoloScope` into this insert and reach Kysely as
+      // an unknown column - a runtime failure on every solo create, with nothing red at compile
+      // time. `createSolo` builds its scope the same way, for the same reason.
+      spaceId: scope.spaceId,
+      ownerId: scope.ownerId,
+      // A space challenge has no sources to choose between, so it freezes the column default the
+      // spread used to leave behind (`false`) rather than inventing a toggle for it.
+      includePartners: scope.ownerId === null ? false : scope.includePartners,
+      includeSpaces: scope.ownerId === null ? false : scope.includeSpaces,
       createdById,
       dailyOn,
       name,
@@ -593,7 +621,7 @@ export class GameService extends BaseService {
       scaleDays: challenge.scaleDays,
       createdAt: challenge.createdAt,
       closedAt: challenge.closedAt,
-      dailyOn: asDateString(challenge.dailyOn),
+      dailyOn: asUtcDateString(challenge.dailyOn),
       locationRoundCount,
       answered: guesses.length,
       total: guesses.reduce((sum, guess) => sum + guess.score, 0),
@@ -644,7 +672,15 @@ export class GameService extends BaseService {
     // flight unplayable, and there is no per-request override: the daily takes no request body, so
     // the preference is the only source of truth for what it draws from.
     const { photoGuesser } = getPreferences(await this.userRepository.getMetadata(auth.user.id));
-    const scope: SoloScope = { spaceId: null, ownerId: auth.user.id, ...photoGuesser };
+    // Field by field rather than `...photoGuesser`, matching `createSolo`: a spread gets no
+    // excess-property check, so a third field on the preference would ride this scope into the
+    // insert in `generateChallenge` and reach Kysely as an unknown column.
+    const scope: SoloScope = {
+      spaceId: null,
+      ownerId: auth.user.id,
+      includePartners: photoGuesser.includePartners,
+      includeSpaces: photoGuesser.includeSpaces,
+    };
     const existing = await this.readDaily(scope, dailyOn);
     const challenge = existing ?? (await this.generateDaily({ pool: this.personalPool(scope), scope, dailyOn }));
 
@@ -766,7 +802,7 @@ export class GameService extends BaseService {
       spaceId: challenge.spaceId,
       ownerId: challenge.ownerId,
       name: challenge.name,
-      dailyOn: asDateString(challenge.dailyOn),
+      dailyOn: asUtcDateString(challenge.dailyOn),
       roundCount: challenge.roundCount,
       scaleKm: challenge.scaleKm,
       scaleDays: challenge.scaleDays,
