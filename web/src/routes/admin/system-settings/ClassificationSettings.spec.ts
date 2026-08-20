@@ -4,7 +4,7 @@ import {
   getConfig,
   scanClassification,
   updateConfig,
-  type SystemConfigDto,
+  type AdminConfigDto,
 } from '@immich/sdk';
 import { modalManager, toastManager } from '@immich/ui';
 import '@testing-library/jest-dom';
@@ -49,14 +49,14 @@ vi.mock('@immich/ui', async (original) => {
   };
 });
 
-const makeConfig = (categories: SystemConfigDto['classification']['categories'] = []): SystemConfigDto =>
+const makeConfig = (categories: AdminConfigDto['classification']['categories'] = []): AdminConfigDto =>
   ({
     classification: { enabled: true, categories },
-  }) as unknown as SystemConfigDto;
+  }) as unknown as AdminConfigDto;
 
 const makeCategory = (
-  overrides: Partial<SystemConfigDto['classification']['categories'][number]> = {},
-): SystemConfigDto['classification']['categories'][number] => ({
+  overrides: Partial<AdminConfigDto['classification']['categories'][number]> = {},
+): AdminConfigDto['classification']['categories'][number] => ({
   name: 'Screenshots',
   prompts: ['a screenshot'],
   similarity: 0.28,
@@ -81,7 +81,7 @@ describe('ClassificationSettings', () => {
     vi.clearAllMocks();
     mockFeatureFlags.configFile = false;
     vi.mocked(getConfig).mockResolvedValue(makeConfig());
-    vi.mocked(updateConfig).mockResolvedValue(void 0 as unknown as SystemConfigDto);
+    vi.mocked(updateConfig).mockResolvedValue(void 0 as unknown as AdminConfigDto);
     // @ts-expect-error mock returns void but SDK type is string
     vi.mocked(scanClassification).mockResolvedValue(void 0);
   });
@@ -373,7 +373,7 @@ describe('ClassificationSettings', () => {
           similarity: 0.28,
           action: Action.Tag,
           enabled: true,
-        } as SystemConfigDto['classification']['categories'][number],
+        } as AdminConfigDto['classification']['categories'][number],
       ]),
     );
 

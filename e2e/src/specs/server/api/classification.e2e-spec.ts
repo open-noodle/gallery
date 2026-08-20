@@ -1,4 +1,4 @@
-import { LoginResponseDto, QueueCommand, getConfig, type SystemConfigDto } from '@immich/sdk';
+import { LoginResponseDto, QueueCommand, getConfig, type AdminConfigDto } from '@immich/sdk';
 import { createUserDto } from 'src/fixtures';
 import { errorDto } from 'src/responses';
 import { app, asBearerAuth, utils } from 'src/utils';
@@ -105,7 +105,7 @@ describe('/classification', () => {
   });
 
   // T29 — classification SystemConfig coverage. The classification config lives
-  // inside the global SystemConfigDto under `classification` (`server/src/dtos/
+  // inside the global AdminConfigDto under `classification` (`server/src/dtos/
   // system-config.dto.ts:770-780`). Tests cover DTO validation, round-trip
   // preservation, and the cross-worker "smart re-scan" side effect that fires
   // when categories are removed or their similarity threshold is bumped.
@@ -120,7 +120,7 @@ describe('/classification', () => {
   // calls removeAutoTagAssignments(name), deleting any tag_asset rows for
   // tags valued `Auto/${name}`.
   describe('classification config (PUT /system-config)', () => {
-    let baseConfig: SystemConfigDto;
+    let baseConfig: AdminConfigDto;
 
     beforeAll(async () => {
       baseConfig = await getConfig({ headers: asBearerAuth(admin.accessToken) });

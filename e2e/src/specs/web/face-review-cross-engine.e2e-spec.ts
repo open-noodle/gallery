@@ -57,13 +57,13 @@ test.describe.serial('Face review cross-engine', () => {
     const config = await utils.getSystemConfig(admin.accessToken);
     config.machineLearning.facialRecognition.maxDistance = 0.5;
     config.machineLearning.facialRecognition.suggestions = { enabled: true, maxDistance: 0.8 };
-    await updateConfig({ systemConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
+    await updateConfig({ adminConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
   });
 
   test.afterAll(async () => {
     const config = await utils.getSystemConfig(admin.accessToken);
     config.machineLearning.facialRecognition.suggestions = { enabled: false, maxDistance: 0.7 };
-    await updateConfig({ systemConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
+    await updateConfig({ adminConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
   });
 
   /**
