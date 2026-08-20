@@ -4,6 +4,15 @@ import { createUrl } from '$lib/utils';
 export const MAX_ROUND_SCORE = 5000;
 
 /**
+ * How many past games one page of solo history holds.
+ *
+ * Lives here rather than in the route's `+page.ts` because SvelteKit rejects any export from a
+ * `+page.ts` other than its own reserved ones, and both the loader's first page and the page's
+ * "load more" have to ask for the same size or the pages come back different lengths.
+ */
+export const SOLO_HISTORY_PAGE_SIZE = 10;
+
+/**
  * A round's photo, keyed by challenge + round index only - NEVER by asset id, so the client never
  * learns which asset a round shows until the player has guessed it. Kept in one place because that
  * shape is the security property: every caller must go through this rather than build the URL, or
@@ -87,6 +96,18 @@ export const formatStandingsMonth = (month: string, locale?: string): string => 
     new Date(Date.UTC(year, monthNumber - 1, 1)),
   );
 };
+
+/**
+ * A game's day - either a `YYYY-MM-DD` daily key or an ISO timestamp - as a readable date.
+ *
+ * Formatted in UTC for the same reason formatStandingsMonth is: every day this game keys on is a
+ * UTC calendar day (`dailyOn`, and the streak counted off it), so rendering history in the
+ * viewer's zone would date a daily to a different day than the streak that counted it. As with
+ * formatStandingsMonth, the `timeZone` option is enforced by inspection rather than test, because
+ * the web vitest suite pins TZ=UTC and so cannot distinguish the two code paths.
+ */
+export const formatGameDate = (date: string, locale?: string): string =>
+  new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(date));
 
 /**
  * Whether the monthly standings section belongs on the page.

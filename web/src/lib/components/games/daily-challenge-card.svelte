@@ -19,9 +19,13 @@
     href: string;
     /** Injected rather than read from the clock, so the countdown is testable at a fixed instant. */
     now: Date;
+    // Design §5.1 - failure phrasing is per-scope. The default tells the player to add photos "to
+    // this space", which is nonsense for a solo player who may be in no space at all and whose
+    // remedy includes the source toggles instead. Defaulted, so the space callers say nothing.
+    unavailableMessage?: string;
   };
 
-  let { challenge, href, now }: Props = $props();
+  let { challenge, href, now, unavailableMessage }: Props = $props();
 
   const finished = $derived(challenge !== null && challenge.answered >= challenge.roundCount);
 
@@ -76,7 +80,7 @@
 
     {#if !challenge}
       <p class="max-w-lg text-sm text-gray-300" data-testid="daily-challenge-unavailable">
-        {$t('game_daily_unavailable')}
+        {unavailableMessage ?? $t('game_daily_unavailable')}
       </p>
     {:else}
       <div class="flex items-center gap-3 text-sm text-gray-200">

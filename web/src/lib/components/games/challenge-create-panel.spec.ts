@@ -78,4 +78,49 @@ describe('ChallengeCreatePanel', () => {
 
     expect(screen.queryByTestId('loading-spinner')).not.toBeInTheDocument();
   });
+
+  // Solo only. game_solo_no_photos tells a player with no usable photos of their own to "include
+  // partner or shared-space photos when you start a game" - so the toggles have to be here, on the
+  // panel that starts one, and nowhere else for that copy to be true.
+  describe('solo source toggles', () => {
+    const sourceToggle = (source: 'partners' | 'spaces') => screen.getByTestId(`challenge-create-source-${source}`);
+
+    it('offers no source toggles for a space challenge, whose pool is the space itself', () => {
+      render(ChallengeCreatePanel, { ...base, onCreate: () => {} });
+
+      // Deliberate absence - the panel itself must still render, so this cannot pass vacuously.
+      expect(screen.getByTestId('challenge-create-panel')).toBeInTheDocument();
+      expect(screen.queryByTestId('challenge-create-source-partners')).toBeNull();
+      expect(screen.queryByTestId('challenge-create-source-spaces')).toBeNull();
+    });
+
+    it('seeds the toggles from the stored preference', () => {
+      render(ChallengeCreatePanel, {
+        ...base,
+        sources: { includePartners: true, includeSpaces: false },
+        onCreate: () => {},
+      });
+
+      expect(sourceToggle('partners')).toBeChecked();
+      expect(sourceToggle('spaces')).not.toBeChecked();
+    });
+
+    it('reports the chosen sources alongside the round count and type', async () => {
+      const onCreate = vi.fn();
+      render(ChallengeCreatePanel, {
+        ...base,
+        sources: { includePartners: false, includeSpaces: false },
+        onCreate,
+      });
+
+      await fireEvent.click(sourceToggle('spaces'));
+      await fireEvent.click(screen.getByTestId('challenge-create-submit'));
+
+      expect(onCreate).toHaveBeenCalledWith({
+        roundCount: 5,
+        type: 'mixed',
+        sources: { includePartners: false, includeSpaces: true },
+      });
+    });
+  });
 });
