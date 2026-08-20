@@ -189,26 +189,125 @@ reports kilometres is a place round — so the row shows the miss and omits the 
 
 ## 10. Testing
 
-Server:
+### 10.0 Test-driven, and what "red first" means here
 
-- `toRoundDetail` emits `guess` for a guessed round and omits it for an unguessed one.
-- Location rounds carry `lat`/`lon`/`distanceKm` with `date`/`offsetDays` null; date rounds the
-  inverse. The two round types genuinely populate different columns, and a projection that copies
-  the wrong pair is invisible to a test that only checks presence.
-- **The anti-leakage test (§3.1):** two players guess the same round differently; each one's detail
-  returns their own guess and never the other's. This is the test that must exist even though the
-  current query shape makes it pass trivially.
+Every piece below is written test-first: a failing test, the smallest change that passes it, then
+refactor. Two rules keep that honest rather than ceremonial.
 
-Mobile:
+**A test must be proven red before it is committed green.** For a new DTO field the easy "red" is a
+compile error — the Dart field does not exist yet — and that proves nothing about the assertion. So
+for each test, name the _assertion_ that fails and see it fail, not merely the build.
 
-- `RoundResult.fromRound` for both round types, and for an unguessed round.
-- `RoundReviewList`: renders one row per guessed round, skips unguessed ones, shows distance for a
-  location round and the day offset for a date round.
-- Tapping a row pushes `GameRoundReviewRoute` with that round's index — asserted against a real
-  route table, not only a `FakeStackRouter`, since a fake router cannot see a guard. (See
-  `mobile/test/routing/router_test.dart`.)
-- `RoundReveal` in review mode shows `done` and pops rather than advancing.
-- The 409 recovery reveal now plots a guess.
+**The invariant test comes before the feature.** Cross-user isolation (§3.1) is the property this
+change could plausibly break, so it is written first even though it starts green (§10.1).
+
+| Slice                        | First failing test                                                    | Red today?                  |
+| ---------------------------- | --------------------------------------------------------------------- | --------------------------- |
+| Cross-user isolation (§3.1)  | Two players guess one round; each detail carries only their own guess | **No — see §10.1**          |
+| Server projection (§3)       | A guessed location round returns `guess.lat/lon/distanceKm`           | Yes — field does not exist  |
+| `RoundResult.fromRound` (§5) | A guessed location round maps to a result with a non-null `guess`     | Yes                         |
+| `RoundReviewList` (§5)       | One row per guessed round, none for unguessed                         | Yes — widget does not exist |
+| Deleted asset (§10.4)        | A guessed round whose photo was deleted still renders its row         | Yes                         |
+| Review route (§5.1)          | `GameRoundReviewRoute` is registered without `DuplicateGuard`         | Yes — route does not exist  |
+| 409 recovery (§8)            | The recovery reveal plots a guess instead of nothing                  | Yes                         |
+
+### 10.1 The assertions that would pass either way
+
+Three of the tests here are at risk of proving nothing. Each needs deliberate handling.
+
+**Cross-user isolation starts green.** `getGuessesForUser(challengeId, auth.user.id)` is already
+user-scoped, so the test passes against the unmodified tree. It is a regression guard, not a red-first
+test, and it must still be shown capable of failing: widen that repository call to fetch every guess
+for the challenge, watch the test go red, revert. Do that once, before committing it.
+
+**Unguessed-round leakage is already covered — do not duplicate it.**
+`e2e/src/specs/server/api/game.e2e-spec.ts` asserts the exact key set of a withheld round:
+
+```ts
+expect(Object.keys(round).toSorted(...)).toEqual(['index', 'type']);
+```
+
+Attaching `guess` anywhere but inside the existing `if (!guess) return` turns that red on its own.
+Leave it exactly as it is; extend only the _positive control_ below it, which currently proves the
+answer appears once guessed, to prove `guess` appears too and matches what was submitted.
+
+**A thrown `Absent` is not a red.** Every optional field on this DTO generates as
+`Optional<T?>` in Dart, and `.value` **throws** when absent — `answer` and `score` already carry that
+warning at their call sites. A mobile assertion that reads the new field with `.value` will throw on
+an unguessed round rather than fail an assertion, which reads as an error, not as a meaningful
+failure. Every read goes through `.orElse(null)`, and §10.3 pins that directly.
+
+### 10.2 Server
+
+In `game.service.spec.ts`:
+
+- A guessed **location** round returns `guess` with `lat`, `lon`, `distanceKm`, and null
+  `date`/`offsetDays`. A guessed **date** round returns the inverse. Both cases are needed: the two
+  round types populate genuinely different columns, and a projection that copies the wrong pair
+  passes any test that only checks `guess` is present.
+- An unguessed round returns no `guess` key at all — asserted structurally, matching the existing
+  `toBeUndefined` style at `game.service.spec.ts:518`.
+- Cross-user isolation, per §10.1.
+
+In `e2e/src/specs/server/api/game.e2e-spec.ts`: extend the positive control as described above, and
+add the two-player isolation case at the API level, since that is where a future repository change
+would actually bite.
+
+No repository change means `game.repository.spec.ts` and the medium specs need no new cases. **Do not
+run `make sql`** — no decorated query changes, and running it without a live database deletes every
+generated query file.
+
+### 10.3 Mobile
+
+`RoundResult.fromRound`:
+
+- Both round types map to the right fields.
+- An unguessed round maps to a result with a null `guess` and does not throw. This is the
+  `Optional` trap from §10.1 — build the fixture with a genuinely **absent** field, not a null one,
+  because `Optional.absent()` and `Optional.present(null)` fail differently and only the former
+  reproduces the wire shape.
+- A round whose `answer` is absent tolerates it rather than throwing.
+
+`RoundReviewList`:
+
+- One row per guessed round; unguessed rounds produce no row.
+- A location round shows the distance, a date round the day offset.
+- A challenge with **no** guessed rounds renders no list section at all — not an empty heading over
+  nothing.
+- Tapping a row pushes `GameRoundReviewRoute` carrying that round's index.
+
+Routing, in `mobile/test/routing/router_test.dart`: the review route is registered without
+`DuplicateGuard`, asserted against the **real** route table. A `FakeStackRouter` records pushes
+without running guards, so a widget test alone cannot see this — that is exactly how the `Play again`
+regression reached a device with a green suite.
+
+`RoundReveal` in review mode shows `done` and pops rather than advancing.
+
+Both endings mount the list: `_SoloCompleted`, and `_Completed` with the list below the leaderboard.
+
+The 409 recovery reveal now plots a guess.
+
+**`guessDate` is an instant, not a calendar day.** It is `timestamp with time zone`, so it behaves
+like `createdAt` and must be converted, unlike `dailyOn`, which is date-only and must not be. That
+distinction has already produced two shipped bugs on this branch, and CI cannot catch a regression of
+either because the runner is UTC, where converting and not converting are identical. The date-round
+review test therefore runs under a non-UTC `TZ`.
+
+### 10.4 Edge cases with no existing baseline
+
+| Case                                         | Why it is not hypothetical                                                                                                                                                                                     |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Photo deleted after the round was played** | `game_round.assetId` is `ON DELETE SET NULL`, so a _guessed_ round can carry a null `assetId`. The row must render without a thumbnail rather than build an image URL from null. Nothing exercises this today. |
+| Challenge abandoned before any guess         | Produces an empty review; §7 says the section disappears, and that needs pinning.                                                                                                                              |
+| Every round guessed but the challenge open   | A challenge is not "closed" just because the caller finished it. The review must key off the caller's guesses, not `closedAt`.                                                                                 |
+
+### 10.5 Gates
+
+Server `pnpm test` and `pnpm test:medium`, `make check-server`, eslint and prettier. The game e2e
+specs. Mobile `flutter test`, `dart analyze --fatal-infos`, `dart format` over `lib`. `make check-web`
+— the SDK regen changes web's generated types even though no web code changes here, and that gate is
+the only thing that would catch a break. The one new i18n key lands in all ten locales with
+`npx prettier --write i18n/*.json`.
 
 ## 11. Out of scope
 
