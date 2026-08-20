@@ -420,7 +420,7 @@ describe('GameRepository', () => {
       expect(
         countOf(roundAsset, '"shared_space_member"."userId" ='),
         'getSoloEligibleRoundAsset carries the membership predicate on only SOME of its four space\n' +
-          'arms. Every one of them needs it: an arm without it serves any space\'s asset to any\n' +
+          "arms. Every one of them needs it: an arm without it serves any space's asset to any\n" +
           'player, and the arms that still have it are what makes that invisible to a `toContain`.',
       ).toBe(4);
       expect(

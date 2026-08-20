@@ -61,8 +61,10 @@ for (const file of migrationFiles) {
 // Every `DELETE FROM "migration_overrides" ...;` statement in the script, concatenated. Not just
 // the step-6 IN-list: a couple of overrides are cleaned up next to the schema change that owns
 // them (step 7's trigram index), and those count.
-const overrideDeleteStatements = [...sql.matchAll(/DELETE FROM "migration_overrides"[\S\s]*?;/g)]
+const overrideDeleteStatements = sql
+  .matchAll(/DELETE FROM "migration_overrides"[\S\s]*?;/g)
   .map((m) => m[0])
+  .toArray()
   .join('\n');
 
 describe('revert-to-immich.sql', () => {
