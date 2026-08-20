@@ -119,7 +119,7 @@ test.describe('Shared space person in the main People view', () => {
       const config = await utils.getSystemConfig(adminLogin.accessToken);
       config.machineLearning.facialRecognition.maxDistance = 0.5;
       config.machineLearning.facialRecognition.suggestions = { enabled: true, maxDistance: 0.8 };
-      await updateConfig({ systemConfigDto: config }, { headers: asBearerAuth(adminLogin.accessToken) });
+      await updateConfig({ adminConfigDto: config }, { headers: asBearerAuth(adminLogin.accessToken) });
 
       const representativeAsset = await utils.createAsset(adminLogin.accessToken);
       const candidateAsset = await utils.createAsset(adminLogin.accessToken);
@@ -163,7 +163,7 @@ test.describe('Shared space person in the main People view', () => {
     test.afterAll(async () => {
       const config = await utils.getSystemConfig(adminLogin.accessToken);
       config.machineLearning.facialRecognition.suggestions = { enabled: false, maxDistance: 0.7 };
-      await updateConfig({ systemConfigDto: config }, { headers: asBearerAuth(adminLogin.accessToken) });
+      await updateConfig({ adminConfigDto: config }, { headers: asBearerAuth(adminLogin.accessToken) });
     });
 
     test('a space editor sees the suggestion banner on the global person profile', async ({ context, page }) => {

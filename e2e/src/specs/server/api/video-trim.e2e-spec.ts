@@ -36,7 +36,7 @@ describe('/assets/:id/edits (video trim)', () => {
 
     const config = await utils.getSystemConfig(admin.accessToken);
     config.ffmpeg.transcode = TranscodePolicy.Disabled;
-    await updateConfig({ systemConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
+    await updateConfig({ adminConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
 
     [websocket, user1] = await Promise.all([
       utils.connectWebsocket(admin.accessToken),
@@ -264,7 +264,7 @@ describe('/assets/:id/edits (video trim)', () => {
     afterAll(async () => {
       const config = await utils.getSystemConfig(admin.accessToken);
       config.ffmpeg.transcode = TranscodePolicy.Disabled;
-      await updateConfig({ systemConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
+      await updateConfig({ adminConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
     });
 
     it('should trim from the already-transcoded EncodedVideo variant, not the raw upload', async () => {
@@ -273,7 +273,7 @@ describe('/assets/:id/edits (video trim)', () => {
       // videoConversion job produces a non-edited EncodedVideo file for this asset.
       const config = await utils.getSystemConfig(admin.accessToken);
       config.ffmpeg.transcode = TranscodePolicy.All;
-      await updateConfig({ systemConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
+      await updateConfig({ adminConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
 
       const videoId = await uploadVideo();
 

@@ -1,4 +1,4 @@
-import { LoginResponseDto, getConfig, type SystemConfigDto } from '@immich/sdk';
+import { LoginResponseDto, getConfig, type AdminConfigDto } from '@immich/sdk';
 import { authHeaders, type Actor } from 'src/actors.js';
 import { createUserDto } from 'src/fixtures.js';
 import { errorDto } from 'src/responses.js';
@@ -25,7 +25,7 @@ const getSystemConfig = (accessToken: string) => getConfig({ headers: asBearerAu
 describe('/system-config', () => {
   let admin: LoginResponseDto;
   let user: LoginResponseDto;
-  let baseConfig: SystemConfigDto;
+  let baseConfig: AdminConfigDto;
   const anonActor: Actor = { id: 'anon' };
 
   beforeAll(async () => {
