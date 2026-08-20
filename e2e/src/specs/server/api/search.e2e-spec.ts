@@ -25,7 +25,7 @@ const enableSmartSearch = async (adminToken: string) => {
   const config = await utils.getSystemConfig(adminToken);
   config.machineLearning.enabled = true;
   config.machineLearning.clip.enabled = true;
-  await updateConfig({ systemConfigDto: config }, { headers: asBearerAuth(adminToken) });
+  await updateConfig({ adminConfigDto: config }, { headers: asBearerAuth(adminToken) });
 };
 
 describe('/search', () => {
