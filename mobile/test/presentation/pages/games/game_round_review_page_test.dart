@@ -34,12 +34,17 @@ class _FakeMapStateNotifier extends MapStateNotifier {
   MapState build() => const MapState(themeMode: ThemeMode.light, lightStyleFetched: AsyncData('mock-style'));
 }
 
+// Two rounds, not one: with a single-round fixture, `pump(tester)` always asks for index 0 and
+// `rounds[index]` (positional) and a by-index lookup return the same round either way, so the test
+// couldn't tell them apart. A second, distinct round makes `index` a real discriminator — see
+// `game_round_review.page.dart`'s by-index lookup and `GameSessionState.currentRound`'s doc comment
+// for why position isn't trusted to line up with the round's own `index` field.
 GameChallengeDetailResponseDto _finishedChallenge() => GameChallengeDetailResponseDto(
   id: 'c1',
   spaceId: 's1',
   ownerId: null,
   name: 'Challenge 1',
-  roundCount: 1,
+  roundCount: 2,
   scaleKm: 1,
   scaleDays: 1,
   createdAt: DateTime.utc(2026, 8, 18),
@@ -54,6 +59,16 @@ GameChallengeDetailResponseDto _finishedChallenge() => GameChallengeDetailRespon
       answer: Optional.present(GameRoundDetailResponseDtoAnswer(date: null, lat: 41.15, lon: -8.61)),
       guess: Optional.present(
         GameRoundDetailResponseDtoGuess(lat: 38.72, lon: -9.14, date: null, distanceKm: 412.3, offsetDays: null),
+      ),
+    ),
+    GameRoundDetailResponseDto(
+      index: 1,
+      type: GameRoundType.date,
+      assetId: const Optional.present('asset-2'),
+      score: const Optional.present(3640),
+      answer: Optional.present(GameRoundDetailResponseDtoAnswer(date: DateTime.utc(2024, 6, 4), lat: null, lon: null)),
+      guess: Optional.present(
+        GameRoundDetailResponseDtoGuess(lat: null, lon: null, date: DateTime.utc(2024, 6, 1), distanceKm: null, offsetDays: 3),
       ),
     ),
   ],
@@ -101,13 +116,20 @@ void main() {
   testWidgets('a resolved session renders the reveal for the requested round', (tester) async {
     when(() => repository.getChallenge('c1')).thenAnswer((_) async => _finishedChallenge());
 
-    await pump(tester);
+    // Index 1, not 0: the fixture's round 1 is a distinct (date) round with its own score, so this
+    // proves the page looked the requested round UP rather than defaulting to (or always returning)
+    // whichever round happens to sit first in the list.
+    await pump(tester, index: 1);
 
     expect(find.byType(RoundReveal), findsOneWidget);
-    // Proves the round that was actually requested (index 0) is what got mapped through
+    // Proves the round that was actually requested (index 1) is what got mapped through
     // RoundResult.fromRound, not merely that SOME reveal rendered.
     expect(find.byKey(const Key('round-reveal-score')), findsOneWidget);
-    expect(find.text('4182 pts'), findsOneWidget);
+    expect(find.text('3640 pts'), findsOneWidget);
+    // Round 1 is a date round: the timeline strip, not round 0's map, is the other half of the proof
+    // that this is round 1's own reveal and not round 0's.
+    expect(find.byKey(const Key('round-reveal-timeline')), findsOneWidget);
+    expect(find.byKey(const Key('round-reveal-map')), findsNothing);
     expect(find.byKey(const Key('round-review-retry')), findsNothing);
   });
 

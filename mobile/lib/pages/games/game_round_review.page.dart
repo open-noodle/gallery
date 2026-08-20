@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:auto_route/auto_route.dart';
+import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/extensions/translate_extensions.dart';
@@ -21,8 +22,11 @@ class GameRoundReviewPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(gameSessionProvider(challengeId));
-    final rounds = session.valueOrNull?.challenge.rounds;
-    final round = rounds != null && index < rounds.length ? rounds[index] : null;
+    // By the round's own `index` field, not list position — the same reason
+    // `GameSessionState.currentRound` does (see its doc comment): correct either way only because
+    // the server orders rounds over a contiguous 0..N-1 set, and looking it up keeps that
+    // invariant local rather than leaning on it silently here too.
+    final round = session.valueOrNull?.challenge.rounds.firstWhereOrNull((r) => r.index.toInt() == index);
 
     // `hasError` is checked separately from `round == null`: a failed load would otherwise spin
     // forever, which is the same dead-end the play page gives a retry for.
