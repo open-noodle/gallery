@@ -99,9 +99,12 @@ final gameSessionProvider = AsyncNotifierProvider.autoDispose.family<GameSession
 );
 
 class GameSessionController extends AutoDisposeFamilyAsyncNotifier<GameSessionState, String> {
-  /// Called with the daily's `dailyOn` when a DAILY challenge is completed. The reminder wires this;
-  /// nothing sets it here, and a custom challenge never invokes it.
-  void Function(DateTime dailyOn)? onDailyCompleted;
+  /// Called with the daily's `dailyOn`, and whether it was the SOLO (personal) daily rather than a
+  /// space one, when a DAILY challenge is completed. The reminder wires this; nothing sets it here,
+  /// and a custom challenge never invokes it. [isSolo] is needed downstream because the space and
+  /// solo streaks are independent, computed server-side — recording completion under the wrong one
+  /// of the two `gameDaily*LastPlayed` keys would silently suppress the OTHER daily's reminder.
+  void Function(DateTime dailyOn, {required bool isSolo})? onDailyCompleted;
 
   GameApiRepository get _repository => ref.read(gameApiRepositoryProvider);
 
@@ -252,7 +255,10 @@ class GameSessionController extends AutoDisposeFamilyAsyncNotifier<GameSessionSt
   Future<void> _finish(GameChallengeDetailResponseDto challenge) async {
     final dailyOn = challenge.dailyOn;
     if (dailyOn != null) {
-      onDailyCompleted?.call(dailyOn);
+      // `spaceId` is null for a solo challenge (see GameChallengeDetailResponseDto.spaceId's doc)
+      // — reliable here because this branch is already gated on `dailyOn != null`, so a player-
+      // created solo game (spaceId null, dailyOn null) never reaches it.
+      onDailyCompleted?.call(dailyOn, isSolo: challenge.spaceId == null);
     }
     final leaderboard = await _safeLeaderboard(arg);
     final current = state.valueOrNull;

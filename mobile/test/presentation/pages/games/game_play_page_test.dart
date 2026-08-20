@@ -303,7 +303,7 @@ void main() {
   // proves the page's own wiring ran, not the controller's callback contract in isolation.
   testWidgets('finishing a daily reports its completion to the reminder', (tester) async {
     final reminder = _MockDailyReminderController();
-    when(() => reminder.recordDailyCompleted(any())).thenAnswer((_) async {});
+    when(() => reminder.recordDailyCompleted(any(), isSolo: any(named: 'isSolo'))).thenAnswer((_) async {});
 
     var fetches = 0;
     when(() => repository.getChallenge('c1')).thenAnswer((_) async {
@@ -342,6 +342,7 @@ void main() {
     await tester.tap(find.byKey(const Key('round-reveal-next')));
     await tester.pumpAndSettle();
 
-    verify(() => reminder.recordDailyCompleted(DateTime.utc(2026, 8, 18))).called(1);
+    // _dailyChallenge above sets spaceId: 's1', so this is a SPACE daily, not solo.
+    verify(() => reminder.recordDailyCompleted(DateTime.utc(2026, 8, 18), isSolo: false)).called(1);
   });
 }

@@ -113,10 +113,19 @@ class DailyReminderController {
     // `.orElse(null)`. Absent and null both mean "not opted in".
     final hasOptedInSpace = spaces.any((space) => space.dailyChallengeEnabled.orElse(null) == true);
 
+    // Unlike a space, the solo daily has no per-space-style opt-in to read: every account has one
+    // once the reminder toggle is on. Kept as its own named value, rather than inlined as `true`
+    // below, so both call sites read the same as `hasOptedInSpace` and stay easy to widen later if
+    // that ever needs to become conditional.
+    const soloDailyEnabled = true;
+
     // On iOS, hasPermission() can raise the system permission dialog. Only ask once the cheap
-    // local gates already pass — a user who never enabled the toggle or opted a space in should
-    // never see that prompt just from opening the app.
-    final permissionGranted = enabled && hasOptedInSpace ? await scheduler.hasPermission() : false;
+    // local gates already pass. Widened alongside the scheduling gate below: a solo-only user with
+    // no opted-in space now has something to be reminded about too, so `hasOptedInSpace` alone can
+    // no longer be the bar for asking.
+    final permissionGranted = enabled && (hasOptedInSpace || soloDailyEnabled)
+        ? await scheduler.hasPermission()
+        : false;
 
     final occurrences = dailyReminderOccurrences(
       now: now ?? DateTime.now(),
@@ -124,7 +133,9 @@ class DailyReminderController {
       enabled: enabled,
       permissionGranted: permissionGranted,
       hasOptedInSpace: hasOptedInSpace,
-      lastPlayedDate: config.read(SettingsKey.gameDailyLastPlayed),
+      soloDailyEnabled: soloDailyEnabled,
+      spaceLastPlayed: config.read(SettingsKey.gameSpaceDailyLastPlayed),
+      soloLastPlayed: config.read(SettingsKey.gameSoloDailyLastPlayed),
     );
 
     for (var i = 0; i < occurrences.length; i++) {
@@ -140,8 +151,13 @@ class DailyReminderController {
 
   /// Records that a daily was finished, then reschedules so today's occurrence drops immediately
   /// rather than waiting for the next resume.
-  Future<void> recordDailyCompleted(DateTime dailyOn) async {
-    await _ref.read(settingsProvider).write(SettingsKey.gameDailyLastPlayed, dailyKeyFor(dailyOn));
+  ///
+  /// [isSolo] picks which of the two `gameDaily*LastPlayed` keys to write: the space and solo
+  /// streaks are independent, computed server-side, so recording completion under the wrong key
+  /// would silently suppress the reminder for whichever one was NOT actually finished.
+  Future<void> recordDailyCompleted(DateTime dailyOn, {required bool isSolo}) async {
+    final key = isSolo ? SettingsKey.gameSoloDailyLastPlayed : SettingsKey.gameSpaceDailyLastPlayed;
+    await _ref.read(settingsProvider).write(key, dailyKeyFor(dailyOn));
     await refresh();
   }
 }

@@ -4,13 +4,21 @@ import 'package:immich_mobile/utils/daily_reminder_schedule.dart';
 /// 18:00 as minutes since local midnight.
 const int _sixPm = 18 * 60;
 
+// `soloDailyEnabled` defaults to false here, not true: most of the tests below exercise general
+// scheduling behaviour (gates, the horizon, the already-played skip) through the SPACE scope only,
+// and that default keeps every one of them exercising exactly the single-source behaviour they did
+// before the solo daily existed. Tests of the two-source interaction call
+// dailyReminderOccurrences directly instead of through this helper — see "two independent daily
+// sources" below — because the brief's exact three cases are the specification for that behaviour.
 List<DateTime> occurrences({
   required DateTime now,
   int minuteOfDay = _sixPm,
   bool enabled = true,
   bool permissionGranted = true,
   bool hasOptedInSpace = true,
-  String? lastPlayedDate,
+  bool soloDailyEnabled = false,
+  String? spaceLastPlayed,
+  String? soloLastPlayed,
   int horizonDays = kDailyReminderHorizonDays,
 }) => dailyReminderOccurrences(
   now: now,
@@ -18,7 +26,9 @@ List<DateTime> occurrences({
   enabled: enabled,
   permissionGranted: permissionGranted,
   hasOptedInSpace: hasOptedInSpace,
-  lastPlayedDate: lastPlayedDate,
+  soloDailyEnabled: soloDailyEnabled,
+  spaceLastPlayed: spaceLastPlayed,
+  soloLastPlayed: soloLastPlayed,
   horizonDays: horizonDays,
 );
 
@@ -31,8 +41,15 @@ void main() {
       expect(occurrences(now: morning, enabled: false), isEmpty);
     });
 
-    test('no opted-in space means nothing is scheduled', () {
-      expect(occurrences(now: morning, hasOptedInSpace: false), isEmpty);
+    test('no opted-in space and no solo daily means nothing is scheduled', () {
+      // Before the solo daily, hasOptedInSpace was the ONLY gate, so a spaceless player could
+      // never be reminded at all. The gate is now `hasOptedInSpace || soloDailyEnabled` — this
+      // case stays empty only because soloDailyEnabled is ALSO false here.
+      expect(occurrences(now: morning, hasOptedInSpace: false, soloDailyEnabled: false), isEmpty);
+    });
+
+    test('a solo daily alone is enough, even with no opted-in space', () {
+      expect(occurrences(now: morning, hasOptedInSpace: false, soloDailyEnabled: true), isNotEmpty);
     });
 
     test('a revoked OS permission means nothing is scheduled, whatever the toggle says', () {
@@ -79,29 +96,86 @@ void main() {
           '${utcDayOfFirst.month.toString().padLeft(2, '0')}-'
           '${utcDayOfFirst.day.toString().padLeft(2, '0')}';
 
-      final result = occurrences(now: morning, lastPlayedDate: key);
+      final result = occurrences(now: morning, spaceLastPlayed: key);
 
       expect(result.length, kDailyReminderHorizonDays - 1);
       expect(result.first, DateTime(2026, 8, 19, 18));
     });
 
     test('drops nothing when the last play was an earlier day', () {
-      expect(occurrences(now: morning, lastPlayedDate: '2026-08-01').length, kDailyReminderHorizonDays);
+      expect(occurrences(now: morning, spaceLastPlayed: '2026-08-01').length, kDailyReminderHorizonDays);
     });
 
     test('only the nearest occurrence can ever be dropped — future days cannot have been played', () {
-      final result = occurrences(now: morning, lastPlayedDate: '2026-08-01');
+      final result = occurrences(now: morning, spaceLastPlayed: '2026-08-01');
 
       expect(result.length, kDailyReminderHorizonDays);
     });
 
-    test('a future lastPlayedDate (clock skew) drops nothing rather than silencing the reminder', () {
-      expect(occurrences(now: morning, lastPlayedDate: '2027-01-01').length, kDailyReminderHorizonDays);
+    test('a future spaceLastPlayed (clock skew) drops nothing rather than silencing the reminder', () {
+      expect(occurrences(now: morning, spaceLastPlayed: '2027-01-01').length, kDailyReminderHorizonDays);
     });
 
-    test('an unparseable or empty lastPlayedDate is treated as never played', () {
-      expect(occurrences(now: morning, lastPlayedDate: '').length, kDailyReminderHorizonDays);
-      expect(occurrences(now: morning, lastPlayedDate: 'not-a-date').length, kDailyReminderHorizonDays);
+    test('an unparseable or empty spaceLastPlayed is treated as never played', () {
+      expect(occurrences(now: morning, spaceLastPlayed: '').length, kDailyReminderHorizonDays);
+      expect(occurrences(now: morning, spaceLastPlayed: 'not-a-date').length, kDailyReminderHorizonDays);
+    });
+  });
+
+  group('two independent daily sources', () {
+    // One shared `gameDailyLastPlayed` used to mean finishing EITHER daily silently suppressed the
+    // reminder for the OTHER, unplayed one. The streak for each is computed server-side PER SCOPE,
+    // so the player lost a streak they were never reminded to defend. These three are the exact
+    // cases the fix is specified against.
+    test('still reminds when the space daily is played but the solo daily is not', () {
+      final occurrences = dailyReminderOccurrences(
+        now: DateTime(2026, 8, 19, 9),
+        minuteOfDay: 18 * 60,
+        enabled: true,
+        permissionGranted: true,
+        hasOptedInSpace: true,
+        soloDailyEnabled: true,
+        spaceLastPlayed: '2026-08-19',
+        soloLastPlayed: null,
+      );
+      expect(occurrences.first.day, 19);
+    });
+
+    test('skips the day only when every enabled source is played', () {
+      final occurrences = dailyReminderOccurrences(
+        now: DateTime(2026, 8, 19, 9),
+        minuteOfDay: 18 * 60,
+        enabled: true,
+        permissionGranted: true,
+        hasOptedInSpace: true,
+        soloDailyEnabled: true,
+        spaceLastPlayed: '2026-08-19',
+        soloLastPlayed: '2026-08-19',
+      );
+      expect(occurrences.first.day, 20);
+    });
+
+    test('reminds a user with no spaces at all, when the solo daily is on', () {
+      // Today hasOptedInSpace gates everything, so these users can never be reminded.
+      final occurrences = dailyReminderOccurrences(
+        now: DateTime(2026, 8, 19, 9),
+        minuteOfDay: 18 * 60,
+        enabled: true,
+        permissionGranted: true,
+        hasOptedInSpace: false,
+        soloDailyEnabled: true,
+        spaceLastPlayed: null,
+        soloLastPlayed: null,
+      );
+      expect(occurrences, isNotEmpty);
+    });
+
+    test('a space-only player (solo not enabled) is unaffected by an unplayed solo daily', () {
+      // The mirror image of the first case: with soloDailyEnabled false, a null soloLastPlayed
+      // must not hold the space reminder hostage to a source this player was never offered.
+      final result = occurrences(now: morning, hasOptedInSpace: true, spaceLastPlayed: '2026-08-18');
+
+      expect(result.length, kDailyReminderHorizonDays - 1);
     });
   });
 

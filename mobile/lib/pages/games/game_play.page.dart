@@ -47,8 +47,8 @@ class GamePlayPage extends ConsumerWidget {
     // The session owns the state machine; the reminder owns the schedule. This is the one line
     // that connects them, and it fires only for a DAILY — a custom challenge never satisfies a
     // reminder (see GameSessionController.onDailyCompleted's doc comment).
-    ref.read(gameSessionProvider(challengeId).notifier).onDailyCompleted = (dailyOn) =>
-        ref.read(dailyReminderProvider).recordDailyCompleted(dailyOn);
+    ref.read(gameSessionProvider(challengeId).notifier).onDailyCompleted = (dailyOn, {required isSolo}) =>
+        ref.read(dailyReminderProvider).recordDailyCompleted(dailyOn, isSolo: isSolo);
 
     final session = ref.watch(gameSessionProvider(challengeId));
 
