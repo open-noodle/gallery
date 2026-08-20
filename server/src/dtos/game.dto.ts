@@ -115,7 +115,7 @@ const GameDailyResponseSchema = z
 
 // The withheld shape for a round the caller has not guessed yet carries only index/type - no
 // assetId, coordinates, date or filename. GameService.toRoundDetail() is the only place allowed to
-// populate assetId/score/answer, and only once a guess exists for the caller.
+// populate assetId/score/answer/guess, and only once a guess exists for the caller.
 const GameRoundAnswerSchema = z.object({
   lat: z.number().nullable().describe('Answer latitude, for a location round'),
   lon: z.number().nullable().describe('Answer longitude, for a location round'),
