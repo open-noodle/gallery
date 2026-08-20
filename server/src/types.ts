@@ -777,6 +777,14 @@ export type UserPreferences = {
     enabled: boolean;
     sidebarWeb: boolean;
   };
+  /** PhotoGuesser's solo pool: own library by default, widened only when a toggle is on. Server-side
+   * rather than per-device because the daily is generated lazily on first read - two devices with
+   * different local settings would race to generate different dailies for the same
+   * (ownerId, dailyOn). */
+  photoGuesser: {
+    includePartners: boolean;
+    includeSpaces: boolean;
+  };
   tags: {
     enabled: boolean;
     sidebarWeb: boolean;

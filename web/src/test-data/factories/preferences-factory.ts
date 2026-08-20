@@ -31,6 +31,10 @@ export const preferencesFactory = Sync.makeFactory<UserPreferencesResponseDto>({
     enabled: false,
     sidebarWeb: false,
   },
+  photoGuesser: {
+    includePartners: false,
+    includeSpaces: false,
+  },
   purchase: {
     hideBuyButtonUntil: '',
     showSupportBadge: false,
