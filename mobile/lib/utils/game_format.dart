@@ -155,6 +155,28 @@ String formatGameDate(DateTime instant, {String? locale}) => DateFormat.yMMMd(lo
 /// `DateTime.utc(…)` — a shape the wire never produces for this field — cannot tell them apart.
 String formatDailyDate(DateTime dateOnly, {String? locale}) => DateFormat.yMMMd(locale).format(dateOnly);
 
+/// What a player scored across a finished challenge.
+///
+/// `score` is `Optional<num?>` and `Absent.value` THROWS — this must stay `.orElse(null)`, same as
+/// [firstUnansweredIndex]. An unanswered round counts as zero rather than being skipped: the total
+/// is what the player earned from the whole game, and a game abandoned halfway is not worth more
+/// per round than one played out.
+num soloTotal(List<GameRoundDetailResponseDto> rounds) =>
+    rounds.fold<num>(0, (total, round) => total + (round.score.orElse(null) ?? 0));
+
+/// The type to label a finished challenge with — and to ask for when replaying it.
+///
+/// Derived from the rounds the challenge actually CONTAINS, not from whatever type was requested: a
+/// mixed request that could only find location photos produced a places game, so "another one like
+/// that" is a places game. Mirrors web's `typeOf` in the solo play route, which this feeds.
+GameChallengeType challengeTypeOf(List<GameRoundDetailResponseDto> rounds) {
+  final locationRounds = rounds.where((round) => round.type == GameRoundType.location).length;
+  if (locationRounds == rounds.length) {
+    return GameChallengeType.location;
+  }
+  return locationRounds == 0 ? GameChallengeType.date : GameChallengeType.mixed;
+}
+
 /// A score with digit grouping, e.g. `18,420`.
 ///
 /// Grouped BEFORE interpolation, never after: `game_points` substitutes `{score}` verbatim, so
@@ -164,15 +186,22 @@ String formatGameScore(num score, {String? locale}) => NumberFormat.decimalPatte
 /// The message key for a failed solo create.
 ///
 /// Only a real 400 means "nothing in your library can fill a round of that kind" — the one failure
-/// `game_solo_no_photos` describes truthfully, and the one the player can act on. The generated
-/// client wraps `SocketException`/`TlsException`/`ClientException` into `ApiException(400, ...)`
-/// as well (see `openapi/lib/api_client.dart`), which is why the status alone is not enough: those
-/// carry an `innerException`, and blaming a dropped connection on the player's photos would send
-/// them off adding GPS data to fix their wifi.
+/// the player can act on. The generated client wraps `SocketException`/`TlsException`/
+/// `ClientException` into `ApiException(400, ...)` as well (see `openapi/lib/api_client.dart`),
+/// which is why the status alone is not enough: those carry an `innerException`, and blaming a
+/// dropped connection on the player's photos would send them off adding GPS data to fix their wifi.
+///
+/// `game_solo_no_photos_in_library`, NOT web's `game_solo_no_photos`. That one ends "…or include
+/// partner or shared-space photos when you start a game", which is true on web, where the create
+/// panel carries source toggles. Mobile's create sheet deliberately has none — this client cannot
+/// read the stored preference those would override, so it never sends `sources` (see
+/// `SoloGameApiRepository.create`) — and half of the one message a stuck mobile player sees would
+/// point at a control that does not exist on their device. Same reasoning that produced
+/// `game_solo_daily_unavailable` for the daily card.
 ///
 /// The fallback is the app-wide generic rather than `game_create_failed`: that one reads "from
 /// this space's photos", and a solo player may be in no space at all.
 String soloCreateFailureKey(Object error) {
   final isServerRejection = error is ApiException && error.code == 400 && error.innerException == null;
-  return isServerRejection ? 'game_solo_no_photos' : 'scaffold_body_error_occurred';
+  return isServerRejection ? 'game_solo_no_photos_in_library' : 'scaffold_body_error_occurred';
 }

@@ -17,6 +17,7 @@ import 'package:immich_mobile/repositories/solo_game_api.repository.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:openapi/api.dart';
 
+import '../test_helpers/fake_stack_router.dart';
 import '../test_helpers/wire_dates.dart';
 import '../test_utils.dart';
 import '../widget_tester_extensions.dart';
@@ -43,6 +44,20 @@ GameChallengeListItemResponseDto _daily({required int answered, int roundCount =
       closedAt: null,
       dailyOn: wireDateOnly('2026-08-19'),
     );
+
+/// What `createSoloChallenge` returns. `roundCount` is the number of rounds ACTUALLY built, which
+/// can be fewer than requested: a thin pool builds a shorter game rather than failing.
+GameChallengeResponseDto _created({required num roundCount}) => GameChallengeResponseDto(
+  id: 'new-1',
+  spaceId: null,
+  ownerId: 'u1',
+  name: 'Mixed',
+  roundCount: roundCount,
+  scaleKm: 1,
+  scaleDays: 1,
+  createdAt: DateTime.utc(2026, 8, 19),
+  dailyOn: null,
+);
 
 GameSoloStatsResponseDto _stats({
   num currentStreak = 0,
@@ -111,6 +126,11 @@ void main() {
   /// REAL `DailyReminderController` and its settings/spaces dependencies, neither of which this
   /// file sets up. A caller that wants to assert against the reminder passes its own mock via
   /// `extraOverrides`, which — being later in the overrides list — wins over this default.
+  ///
+  /// [router] is only needed by the tests that let a create SUCCEED: the page then pushes the play
+  /// route, and without a router in the tree that push throws into the zone as an unhandled async
+  /// error rather than failing on an assertion. Left null everywhere else, so no other test starts
+  /// depending on a router it does not exercise.
   Future<void> pump(
     WidgetTester tester, {
     GameChallengeListItemResponseDto? daily,
@@ -119,12 +139,13 @@ void main() {
     GameSoloHistoryResponseDto? history,
     Object? historyError,
     List<Override> extraOverrides = const [],
+    FakeStackRouter? router,
   }) {
     final defaultReminder = _MockDailyReminderController();
     when(() => defaultReminder.recordSoloDailyUnavailable(now: any(named: 'now'))).thenAnswer((_) async {});
 
     return tester.pumpConsumerWidget(
-      const PhotoGuesserPage(),
+      router == null ? const PhotoGuesserPage() : withFakeRouter(router, const PhotoGuesserPage()),
       overrides: [
         if (dailyError != null)
           soloDailyProvider.overrideWith((ref) async => throw dailyError)
@@ -503,8 +524,90 @@ void main() {
       // Proves the localized key resolved rather than the raw key rendering, and that the create
       // path — not the daily card — is where this copy belongs.
       expect(find.textContaining('No photos available for PhotoGuesser'), findsOneWidget);
+      // ...and that it is the MOBILE copy. Web's `game_solo_no_photos` ends "…or include partner
+      // or shared-space photos when you start a game", offering the create panel's source toggles
+      // as the remedy. Mobile's create sheet has no toggles, so half of the one message a stuck
+      // player reads would point at a control that does not exist on their device.
+      expect(
+        find.textContaining('when you start a game'),
+        findsNothing,
+        reason: 'the mobile create sheet has no source toggles to offer',
+      );
       // The page is not left broken: the control is back for another attempt.
       expect(tester.widget<FilledButton>(find.byKey(const Key('solo-start-free-play'))).onPressed, isNotNull);
+
+      await settleToast(tester);
+    });
+
+    // The success half of the create path, which nothing here could reach before: it ends in
+    // `context.pushRoute`, and a widget test has no router to push into. `withFakeRouter` supplies
+    // one that records, so this covers what the page actually does on a successful create.
+    testWidgets('a short game says so instead of silently handing over fewer rounds', (tester) async {
+      final router = FakeStackRouter();
+      final repository = _MockSoloGameApiRepository();
+      // The player asked for 10; the pool could only fill 3. The server builds the shorter game
+      // rather than failing, so this is a SUCCESS the player has to be told about.
+      when(
+        () => repository.create(
+          roundCount: any(named: 'roundCount'),
+          type: any(named: 'type'),
+        ),
+      ).thenAnswer((_) async => _created(roundCount: 3));
+
+      await pump(
+        tester,
+        extraOverrides: [soloGameApiRepositoryProvider.overrideWithValue(repository)],
+        router: router,
+      );
+
+      await tester.tap(find.byKey(const Key('solo-start-free-play')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('create-round-count-10')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('create-submit')));
+      await tester.pumpAndSettle();
+
+      // Both placeholders resolved — `.t()` renders the raw key on a wrong arg NAME, so the
+      // numbers being right is what proves the args match the string.
+      expect(find.text('Your photos filled 3 of 10 rounds'), findsOneWidget);
+      // The solo wording, not the space one: several translations of the space key hard-code the
+      // product noun, and a solo player may belong to no space at all.
+      expect(find.textContaining("This space's photos"), findsNothing);
+      // ...and the game still opens. A warning that swallowed the navigation would be worse than
+      // no warning.
+      expect(router.pushed, hasLength(1));
+
+      await settleToast(tester);
+    });
+
+    testWidgets('a game that filled every round requested says nothing', (tester) async {
+      final router = FakeStackRouter();
+      final repository = _MockSoloGameApiRepository();
+      when(
+        () => repository.create(
+          roundCount: any(named: 'roundCount'),
+          type: any(named: 'type'),
+        ),
+      ).thenAnswer((_) async => _created(roundCount: 5));
+
+      await pump(
+        tester,
+        extraOverrides: [soloGameApiRepositoryProvider.overrideWithValue(repository)],
+        router: router,
+      );
+
+      await tester.tap(find.byKey(const Key('solo-start-free-play')));
+      await tester.pumpAndSettle();
+      // The sheet's default is 5, which is what the stub returns.
+      await tester.tap(find.byKey(const Key('create-submit')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('rounds'),
+        findsNothing,
+        reason: 'a game that got what it asked for must not be flagged as short',
+      );
+      expect(router.pushed, hasLength(1));
 
       await settleToast(tester);
     });
