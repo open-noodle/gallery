@@ -79,7 +79,7 @@ describe('/people/:id/face-suggestions', () => {
     // Enable suggestions: maxDistance (0.8) must be > recognition maxDistance (0.5)
     const config = await utils.getSystemConfig(admin.accessToken);
     config.machineLearning.facialRecognition.suggestions = { enabled: true, maxDistance: 0.8 };
-    await updateConfig({ systemConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
+    await updateConfig({ adminConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
 
     // Create persons owned by owner
     [namedPerson, hiddenPerson] = await Promise.all([
@@ -114,7 +114,7 @@ describe('/people/:id/face-suggestions', () => {
     // Restore system config to defaults so we don't leak state into other specs
     const defaults = await utils.getSystemConfig(admin.accessToken);
     defaults.machineLearning.facialRecognition.suggestions = { enabled: false, maxDistance: 0.7 };
-    await updateConfig({ systemConfigDto: defaults }, { headers: asBearerAuth(admin.accessToken) });
+    await updateConfig({ adminConfigDto: defaults }, { headers: asBearerAuth(admin.accessToken) });
   });
 
   // --------------------------------------------------------------------------
@@ -349,13 +349,13 @@ describe('GET /people/:id/face-suggestions — space-member read scope (D6)', ()
 
     const config = await utils.getSystemConfig(ctx.admin.token!);
     config.machineLearning.facialRecognition.suggestions = { enabled: true, maxDistance: 0.8 };
-    await updateConfig({ systemConfigDto: config }, { headers: asBearerAuth(ctx.admin.token!) });
+    await updateConfig({ adminConfigDto: config }, { headers: asBearerAuth(ctx.admin.token!) });
   });
 
   afterAll(async () => {
     const defaults = await utils.getSystemConfig(ctx.admin.token!);
     defaults.machineLearning.facialRecognition.suggestions = { enabled: false, maxDistance: 0.7 };
-    await updateConfig({ systemConfigDto: defaults }, { headers: asBearerAuth(ctx.admin.token!) });
+    await updateConfig({ adminConfigDto: defaults }, { headers: asBearerAuth(ctx.admin.token!) });
   });
 
   it('a space viewer and a space editor are refused (400); the owner is allowed (200)', async () => {
@@ -413,7 +413,7 @@ describe('GET /people/:id/face-suggestions — disabled toggle with a valid band
     // band short-circuit cannot catch this; it takes the service-level enabled guard.
     const config = await utils.getSystemConfig(admin.accessToken);
     config.machineLearning.facialRecognition.suggestions = { enabled: false, maxDistance: 0.8 };
-    await updateConfig({ systemConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
+    await updateConfig({ adminConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
 
     person = await utils.createPerson(owner.accessToken, { name: 'FaceSuggTest Disabled' });
     const asset = await utils.createAsset(owner.accessToken);
@@ -426,7 +426,7 @@ describe('GET /people/:id/face-suggestions — disabled toggle with a valid band
   afterAll(async () => {
     const defaults = await utils.getSystemConfig(admin.accessToken);
     defaults.machineLearning.facialRecognition.suggestions = { enabled: false, maxDistance: 0.7 };
-    await updateConfig({ systemConfigDto: defaults }, { headers: asBearerAuth(admin.accessToken) });
+    await updateConfig({ adminConfigDto: defaults }, { headers: asBearerAuth(admin.accessToken) });
   });
 
   it('returns { total: 0, items: [] } when disabled even though the band is valid', async () => {
@@ -474,7 +474,7 @@ describe('POST /people/:id/face-suggestions/:assetFaceId/reject and /ignore (F8)
 
     const config = await utils.getSystemConfig(admin.accessToken);
     config.machineLearning.facialRecognition.suggestions = { enabled: true, maxDistance: 0.8 };
-    await updateConfig({ systemConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
+    await updateConfig({ adminConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
 
     [ownerPerson, strangerPerson] = await Promise.all([
       utils.createPerson(owner.accessToken, { name: 'F8 Owner Person' }),
@@ -499,7 +499,7 @@ describe('POST /people/:id/face-suggestions/:assetFaceId/reject and /ignore (F8)
   afterAll(async () => {
     const defaults = await utils.getSystemConfig(admin.accessToken);
     defaults.machineLearning.facialRecognition.suggestions = { enabled: false, maxDistance: 0.7 };
-    await updateConfig({ systemConfigDto: defaults }, { headers: asBearerAuth(admin.accessToken) });
+    await updateConfig({ adminConfigDto: defaults }, { headers: asBearerAuth(admin.accessToken) });
   });
 
   it('S4.8: a second user naming their OWN person but a face they do not own gets 400; the face owner still sees it', async () => {
