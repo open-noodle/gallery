@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend';
-import { CacheControl, SharedSpaceRole } from 'src/enum';
+import { CacheControl, SharedSpaceRole, UserMetadataKey } from 'src/enum';
 import { NOT_PLACE_PROMPT_EMBEDDING, PLACE_PROMPT_EMBEDDING } from 'src/repositories/game.repository';
 import { GameService } from 'src/services/game.service';
 import { PERSONAL_NO_ROUNDS_MESSAGE } from 'src/services/game/personal-pool';
@@ -33,7 +33,14 @@ const stockSoloPools = (mocks: ServiceMocks) => {
   mocks.game.getSoloRecentlyUsedAssetIds.mockResolvedValue([]);
   mocks.game.getSoloChallengeCount.mockResolvedValue(0);
   mocks.game.createChallenge.mockResolvedValue('solo-1');
+  // No stored preference override - own photos only, the same default `getPreferences` falls back
+  // to for any user who has never touched the PhotoGuesser settings.
+  mocks.user.getMetadata.mockResolvedValue([]);
 };
+
+/** Stored PhotoGuesser source preference, in the shape UserRepository.getMetadata returns it. */
+const photoGuesserMetadata = (includePartners: boolean, includeSpaces: boolean) =>
+  [{ key: UserMetadataKey.Preferences, value: { photoGuesser: { includePartners, includeSpaces } } }] as any;
 
 /** One row as GameRepository.getSoloHistory returns it - the challenge, plus what the player
  * scored on it. */
@@ -1030,6 +1037,32 @@ describe(GameService.name, () => {
         );
       });
 
+      // The default a request falls back to is the stored preference, not the own-library-only
+      // constant free play used before Task 9 - proven with the toggles ON, so a leftover hardcoded
+      // default could not accidentally satisfy this assertion.
+      it("draws from the player's stored PhotoGuesser preference when the request does not override it", async () => {
+        stockSoloPools(mocks);
+        mocks.user.getMetadata.mockResolvedValue(photoGuesserMetadata(true, true));
+
+        await sut.createSolo(soloAuth, {});
+
+        expect(mocks.game.getSoloDateCandidates).toHaveBeenCalledWith(
+          { userId: 'user-1', withPartners: true, withSpaces: true },
+          expect.any(Number),
+          expect.any(String),
+        );
+      });
+
+      // A per-game override must never leak back into the stored preference - otherwise starting
+      // one wide game would silently widen every future daily too.
+      it('does not write a per-request source override back to the stored preference', async () => {
+        stockSoloPools(mocks);
+
+        await sut.createSolo(soloAuth, { sources: { includePartners: true, includeSpaces: true } });
+
+        expect(mocks.user.upsertMetadata).not.toHaveBeenCalled();
+      });
+
       // The row columns and the response schema are different shapes, and spreading one object
       // into both is how the toggles would reach a client that never declared them - TypeScript's
       // excess-property check does not fire on a spread.
@@ -1050,6 +1083,7 @@ describe(GameService.name, () => {
         mocks.game.getSoloLocationCandidates.mockResolvedValue([]);
         mocks.game.getSoloDateCandidates.mockResolvedValue([]);
         mocks.game.getSoloRecentlyUsedAssetIds.mockResolvedValue([]);
+        mocks.user.getMetadata.mockResolvedValue([]);
 
         await expect(sut.createSolo(soloAuth, {})).rejects.toThrow(PERSONAL_NO_ROUNDS_MESSAGE.mixed);
         expect(mocks.game.createChallenge).not.toHaveBeenCalled();
@@ -1097,6 +1131,25 @@ describe(GameService.name, () => {
         // A space's daily lives under a different partial unique index and a different pool; the
         // solo path must never read or write it.
         expect(mocks.game.getDailyChallenge).not.toHaveBeenCalled();
+      });
+
+      // The daily freezes whatever the stored preference says at generation time - proven with the
+      // toggles ON, so a leftover hardcoded `false` could not accidentally satisfy this assertion.
+      // There is no request body to override this with: the preference is the only source of truth
+      // for what the daily draws from.
+      it('freezes the stored PhotoGuesser preference onto the daily row', async () => {
+        stockSoloPools(mocks);
+        mocks.user.getMetadata.mockResolvedValue(photoGuesserMetadata(true, true));
+        mocks.game.getSoloDailyChallenge.mockResolvedValue(void 0);
+        mocks.game.getGuessesForUser.mockResolvedValue([]);
+        mocks.game.getRounds.mockResolvedValue([]);
+
+        await sut.getSoloDaily(soloAuth);
+
+        expect(mocks.game.createChallenge).toHaveBeenCalledWith(
+          expect.objectContaining({ includePartners: true, includeSpaces: true }),
+          expect.anything(),
+        );
       });
 
       // Pinned for the same reason the space daily's seed is: this string decides which photos the
@@ -1174,6 +1227,7 @@ describe(GameService.name, () => {
         mocks.game.getSoloLocationCandidates.mockResolvedValue([]);
         mocks.game.getSoloDateCandidates.mockResolvedValue([]);
         mocks.game.getSoloRecentlyUsedAssetIds.mockResolvedValue([]);
+        mocks.user.getMetadata.mockResolvedValue([]);
 
         await expect(sut.getSoloDaily(soloAuth)).resolves.toEqual({ challenge: null });
       });

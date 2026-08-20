@@ -60,6 +60,7 @@ import { compareStandings } from 'src/utils/game-standings';
 import { computeStreak } from 'src/utils/game-streak';
 import { mimeTypes } from 'src/utils/mime-types';
 import { isSmartSearchEnabled } from 'src/utils/misc';
+import { getPreferences } from 'src/utils/preferences';
 import { hasSharedSpaceRole } from 'src/utils/shared-space-role';
 
 /** Location rounds fill up to this fraction of the requested round count; the rest are date
@@ -94,16 +95,6 @@ const SOLO_DAILY_UNIQUE_CONSTRAINT = 'game_challenge_owner_daily_uq';
  * the two create panels cannot drift apart. Mirrors the zod `.default(5)` on the create DTOs,
  * which cannot be relied on for the TS type - see `create`. */
 const DEFAULT_ROUND_COUNT = 5;
-
-/**
- * Which libraries a solo challenge draws from when the request does not override them.
- *
- * Hardcoded rather than read from a setting only until the `preferences.photoGuesser` toggles
- * exist; it is the DEFAULT that moves there, not the freezing. Own photos only is the safe
- * starting point: partner and shared-space photos belong to other people, and a game must not be
- * the surface that starts showing them without being asked.
- */
-const DEFAULT_SOLO_SOURCES = { includePartners: false, includeSpaces: false };
 
 /** A challenge drawn from one shared space's photos. */
 type SpaceScope = { spaceId: string; ownerId: null };
@@ -338,13 +329,17 @@ export class GameService extends BaseService {
    * point two different FK actions (CASCADE and SET NULL) at one row for one user-deletion event.
    */
   async createSolo(auth: AuthDto, dto: GameSoloCreateDto): Promise<GameChallengeResponseDto> {
+    // The stored preference is the default a request falls back to, not a value this request
+    // writes back - overriding per-game here must never mutate the preference, or starting one
+    // wide game would silently widen every future daily too.
+    const { photoGuesser } = getPreferences(await this.userRepository.getMetadata(auth.user.id));
     // Field by field rather than a spread of `dto.sources`, so a partial override ("include my
     // partners") keeps the default for the toggle it does not mention.
     const scope: SoloScope = {
       spaceId: null,
       ownerId: auth.user.id,
-      includePartners: dto.sources?.includePartners ?? DEFAULT_SOLO_SOURCES.includePartners,
-      includeSpaces: dto.sources?.includeSpaces ?? DEFAULT_SOLO_SOURCES.includeSpaces,
+      includePartners: dto.sources?.includePartners ?? photoGuesser.includePartners,
+      includeSpaces: dto.sources?.includeSpaces ?? photoGuesser.includeSpaces,
     };
 
     const pool = this.personalPool(scope);
@@ -624,9 +619,12 @@ export class GameService extends BaseService {
    */
   async getSoloDaily(auth: AuthDto): Promise<GameDailyResponseDto> {
     const dailyOn = utcDateKey(new Date());
-    // The toggles are read once, here, and frozen onto the row by generateChallenge - so flipping
-    // a source later in the day cannot make the daily already in flight unplayable.
-    const scope: SoloScope = { spaceId: null, ownerId: auth.user.id, ...DEFAULT_SOLO_SOURCES };
+    // The toggles are read from the stored preference once, here, and frozen onto the row by
+    // generateChallenge - so flipping a source later in the day cannot make the daily already in
+    // flight unplayable, and there is no per-request override: the daily takes no request body, so
+    // the preference is the only source of truth for what it draws from.
+    const { photoGuesser } = getPreferences(await this.userRepository.getMetadata(auth.user.id));
+    const scope: SoloScope = { spaceId: null, ownerId: auth.user.id, ...photoGuesser };
     const existing = await this.readDaily(scope, dailyOn);
     const challenge = existing ?? (await this.generateDaily({ pool: this.personalPool(scope), scope, dailyOn }));
 
