@@ -13,7 +13,7 @@ import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/models/map/map_state.model.dart';
-import 'package:immich_mobile/pages/library/spaces/games/game_play.page.dart';
+import 'package:immich_mobile/pages/games/game_play.page.dart';
 import 'package:immich_mobile/presentation/widgets/games/date_round.widget.dart';
 import 'package:immich_mobile/presentation/widgets/games/location_round.widget.dart';
 import 'package:immich_mobile/presentation/widgets/games/standings_section.widget.dart';
