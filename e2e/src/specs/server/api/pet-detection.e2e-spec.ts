@@ -50,7 +50,7 @@ describe('/pet-detection', () => {
     it('should enable pet detection', async () => {
       const config = await getSystemConfig(admin.accessToken);
       config.machineLearning.petDetection.enabled = true;
-      const updated = await updateConfig({ systemConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
+      const updated = await updateConfig({ adminConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
 
       expect(updated.machineLearning.petDetection.enabled).toBe(true);
 
@@ -61,7 +61,7 @@ describe('/pet-detection', () => {
     it('should change model to yolo11n', async () => {
       const config = await getSystemConfig(admin.accessToken);
       config.machineLearning.petDetection.modelName = 'yolo11n';
-      await updateConfig({ systemConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
+      await updateConfig({ adminConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
 
       const refetched = await getSystemConfig(admin.accessToken);
       expect(refetched.machineLearning.petDetection.modelName).toBe('yolo11n');
@@ -70,7 +70,7 @@ describe('/pet-detection', () => {
     it('should change model to yolo11m', async () => {
       const config = await getSystemConfig(admin.accessToken);
       config.machineLearning.petDetection.modelName = 'yolo11m';
-      await updateConfig({ systemConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
+      await updateConfig({ adminConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
 
       const refetched = await getSystemConfig(admin.accessToken);
       expect(refetched.machineLearning.petDetection.modelName).toBe('yolo11m');
@@ -79,7 +79,7 @@ describe('/pet-detection', () => {
     it('should change minScore to 0.3', async () => {
       const config = await getSystemConfig(admin.accessToken);
       config.machineLearning.petDetection.minScore = 0.3;
-      await updateConfig({ systemConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
+      await updateConfig({ adminConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
 
       const refetched = await getSystemConfig(admin.accessToken);
       expect(refetched.machineLearning.petDetection.minScore).toBe(0.3);
@@ -169,7 +169,7 @@ describe('/pet-detection', () => {
       const config = await getSystemConfig(admin.accessToken);
       config.machineLearning.petDetection.enabled = true;
       config.machineLearning.enabled = true;
-      await updateConfig({ systemConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
+      await updateConfig({ adminConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
 
       const { status } = await request(app)
         .put('/jobs/petDetection')
@@ -211,7 +211,7 @@ describe('/pet-detection', () => {
       const config = await getSystemConfig(admin.accessToken);
       config.machineLearning.petDetection.enabled = true;
       config.machineLearning.enabled = true;
-      await updateConfig({ systemConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
+      await updateConfig({ adminConfigDto: config }, { headers: asBearerAuth(admin.accessToken) });
 
       const { status } = await request(app)
         .put('/jobs/petDetection')
