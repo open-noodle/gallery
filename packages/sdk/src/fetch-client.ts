@@ -54,6 +54,441 @@ export type ActivityStatisticsResponseDto = {
     /** Number of likes */
     likes: number;
 };
+export type AdminConfigDatabaseBackupDto = {
+    /** Cron expression */
+    cronExpression: string;
+    /** Enabled */
+    enabled: boolean;
+    /** Keep last amount */
+    keepLastAmount: number;
+};
+export type AdminConfigBackupsDto = {
+    database: AdminConfigDatabaseBackupDto;
+};
+export type AdminConfigClassificationCategoryDto = {
+    /** Action to take when an asset matches */
+    action: Action;
+    /** Whether this category is enabled */
+    enabled: boolean;
+    faceExclusion?: ClassificationFaceExclusion;
+    /** Category name */
+    name: string;
+    /** CLIP text prompts for this category */
+    prompts: string[];
+    /** Cosine similarity threshold for matching this category */
+    similarity: number;
+};
+export type AdminConfigClassificationDto = {
+    /** Classification categories */
+    categories: AdminConfigClassificationCategoryDto[];
+    /** Enable classification globally */
+    enabled: boolean;
+};
+export type AdminConfigFFmpegRealtimeDto = {
+    /** Enable real-time HLS transcoding (alpha) */
+    enabled: boolean;
+    /** Resolutions to use for real-time HLS transcoding */
+    resolutions: HlsVideoResolution[];
+    /** Video codecs to use for real-time HLS transcoding */
+    videoCodecs: VideoCodec[];
+};
+export type AdminConfigFFmpegDto = {
+    accel: TranscodeHWAccel;
+    /** Accelerated decode */
+    accelDecode: boolean;
+    /** Accepted audio codecs */
+    acceptedAudioCodecs: AudioCodec[];
+    /** Accepted containers */
+    acceptedContainers: VideoContainer[];
+    /** Accepted video codecs */
+    acceptedVideoCodecs: VideoCodec[];
+    /** B-frames */
+    bframes: number;
+    cqMode: CQMode;
+    /** CRF */
+    crf: number;
+    /** GOP size */
+    gopSize: number;
+    /** Max bitrate */
+    maxBitrate: string;
+    /** Preferred hardware device */
+    preferredHwDevice: string;
+    /** Preset */
+    preset: string;
+    realtime: AdminConfigFFmpegRealtimeDto;
+    /** References */
+    refs: number;
+    targetAudioCodec: AudioCodec;
+    /** Target resolution */
+    targetResolution: string;
+    targetVideoCodec: VideoCodec;
+    /** Temporal AQ */
+    temporalAQ: boolean;
+    /** Threads */
+    threads: number;
+    tonemap: ToneMapping;
+    transcode: TranscodePolicy;
+    /** Two pass */
+    twoPass: boolean;
+};
+export type AdminConfigGeneratedFullsizeImageDto = {
+    /** Enabled */
+    enabled: boolean;
+    format: ImageFormat;
+    /** Progressive */
+    progressive?: boolean;
+    /** Quality */
+    quality: number;
+};
+export type AdminConfigGeneratedImageDto = {
+    format: ImageFormat;
+    /** Progressive */
+    progressive?: boolean;
+    /** Quality */
+    quality: number;
+    /** Size */
+    size: number;
+};
+export type AdminConfigImageDto = {
+    colorspace: Colorspace;
+    /** Extract embedded */
+    extractEmbedded: boolean;
+    fullsize: AdminConfigGeneratedFullsizeImageDto;
+    preview: AdminConfigGeneratedImageDto;
+    thumbnail: AdminConfigGeneratedImageDto;
+};
+export type AdminConfigIntegrityChecksumJobDto = {
+    /** Cron expression for when the integrity check should run */
+    cronExpression: string;
+    /** Enabled */
+    enabled: boolean;
+    /** Percentage limit of the integrity checksum job */
+    percentageLimit: number;
+    /** How long the integrity checksum job may run for */
+    timeLimit: number;
+};
+export type AdminConfigIntegrityJobDto = {
+    /** Cron expression for when the integrity check should run */
+    cronExpression: string;
+    /** Enabled */
+    enabled: boolean;
+};
+export type AdminConfigIntegrityChecksDto = {
+    checksumFiles: AdminConfigIntegrityChecksumJobDto;
+    missingFiles: AdminConfigIntegrityJobDto;
+    untrackedFiles: AdminConfigIntegrityJobDto;
+};
+export type AdminConfigJobSettingsDto = {
+    /** Concurrency */
+    concurrency: number;
+};
+export type AdminConfigJobDto = {
+    backgroundTask: AdminConfigJobSettingsDto;
+    classification: AdminConfigJobSettingsDto;
+    editor: AdminConfigJobSettingsDto;
+    faceDetection: AdminConfigJobSettingsDto;
+    integrityCheck: AdminConfigJobSettingsDto;
+    library: AdminConfigJobSettingsDto;
+    metadataExtraction: AdminConfigJobSettingsDto;
+    migration: AdminConfigJobSettingsDto;
+    notifications: AdminConfigJobSettingsDto;
+    ocr: AdminConfigJobSettingsDto;
+    peopleBackfill: AdminConfigJobSettingsDto;
+    petDetection: AdminConfigJobSettingsDto;
+    search: AdminConfigJobSettingsDto;
+    sidecar: AdminConfigJobSettingsDto;
+    smartSearch: AdminConfigJobSettingsDto;
+    thumbnailGeneration: AdminConfigJobSettingsDto;
+    videoConversion: AdminConfigJobSettingsDto;
+    workflow: AdminConfigJobSettingsDto;
+};
+export type AdminConfigLibraryScanDto = {
+    /** Cron expression */
+    cronExpression: string;
+    /** Enabled */
+    enabled: boolean;
+};
+export type AdminConfigLibraryWatchDto = {
+    /** Enabled */
+    enabled: boolean;
+};
+export type AdminConfigLibraryDto = {
+    scan: AdminConfigLibraryScanDto;
+    watch: AdminConfigLibraryWatchDto;
+};
+export type AdminConfigLoggingDto = {
+    /** Enabled */
+    enabled: boolean;
+    level: LogLevel;
+};
+export type AdminConfigMachineLearningAvailabilityChecksDto = {
+    /** Enabled */
+    enabled: boolean;
+    interval: number;
+    timeout: number;
+};
+export type AdminConfigClipDto = {
+    /** Whether the task is enabled */
+    enabled: boolean;
+    /** Maximum cosine distance for smart search results. 0 = disabled. */
+    maxDistance: number;
+    /** Name of the model to use */
+    modelName: string;
+};
+export type AdminConfigDuplicateDetectionDto = {
+    /** Whether the task is enabled */
+    enabled: boolean;
+    /** Maximum distance threshold for duplicate detection */
+    maxDistance: number;
+};
+export type AdminConfigFaceSuggestionDto = {
+    /** Whether face suggestions are enabled */
+    enabled: boolean;
+    /** Maximum embedding distance for a face to be surfaced as a suggestion on a named person */
+    maxDistance: number;
+};
+export type AdminConfigFacialRecognitionDto = {
+    /** Whether the task is enabled */
+    enabled: boolean;
+    /** Maximum distance threshold for face recognition */
+    maxDistance: number;
+    /** Minimum number of faces required for recognition */
+    minFaces: number;
+    /** Minimum confidence score for face detection */
+    minScore: number;
+    /** Name of the model to use */
+    modelName: string;
+    suggestions: AdminConfigFaceSuggestionDto;
+};
+export type AdminConfigOcrDto = {
+    /** Whether the task is enabled */
+    enabled: boolean;
+    /** Maximum resolution for OCR processing */
+    maxResolution: number;
+    /** Minimum confidence score for text detection */
+    minDetectionScore: number;
+    /** Minimum confidence score for text recognition */
+    minRecognitionScore: number;
+    /** Name of the model to use */
+    modelName: string;
+};
+export type AdminConfigPetDetectionDto = {
+    /** Whether the task is enabled */
+    enabled: boolean;
+    /** Minimum confidence score for pet detection */
+    minScore: number;
+    /** Name of the model to use */
+    modelName: string;
+};
+export type AdminConfigMachineLearningDto = {
+    availabilityChecks: AdminConfigMachineLearningAvailabilityChecksDto;
+    clip: AdminConfigClipDto;
+    duplicateDetection: AdminConfigDuplicateDetectionDto;
+    /** Enabled */
+    enabled: boolean;
+    facialRecognition: AdminConfigFacialRecognitionDto;
+    ocr: AdminConfigOcrDto;
+    petDetection: AdminConfigPetDetectionDto;
+    /** ML service URLs */
+    urls: string[];
+};
+export type AdminConfigMapDto = {
+    /** Dark map style URL */
+    darkStyle: string;
+    /** Enabled */
+    enabled: boolean;
+    /** Light map style URL */
+    lightStyle: string;
+};
+export type AdminConfigMemoriesDto = {
+    /** Birthday memories */
+    birthday: boolean;
+    /** Recent trip memories */
+    recentTrips: boolean;
+    /** Retention days */
+    retentionDays: number;
+    /** Per-type memory availability overrides */
+    types?: {
+        [key: string]: boolean;
+    };
+};
+export type AdminConfigFacesDto = {
+    /** Import */
+    "import": boolean;
+};
+export type AdminConfigMetadataDto = {
+    faces: AdminConfigFacesDto;
+};
+export type AdminConfigNewVersionCheckDto = {
+    channel: ReleaseChannel;
+    /** Enabled */
+    enabled: boolean;
+};
+export type AdminConfigNightlyTasksDto = {
+    /** Cluster new faces */
+    clusterNewFaces: boolean;
+    /** Database cleanup */
+    databaseCleanup: boolean;
+    /** Generate memories */
+    generateMemories: boolean;
+    /** Missing thumbnails */
+    missingThumbnails: boolean;
+    /** Start time (HH:MM) */
+    startTime: string;
+    /** Sync quota usage */
+    syncQuotaUsage: boolean;
+};
+export type AdminConfigSmtpTransportDto = {
+    /** SMTP server hostname */
+    host: string;
+    /** Whether to ignore SSL certificate errors */
+    ignoreCert: boolean;
+    /** SMTP password */
+    password: string;
+    /** SMTP server port */
+    port: number;
+    /** Whether to use secure connection (TLS/SSL) */
+    secure: boolean;
+    /** SMTP username */
+    username: string;
+};
+export type AdminConfigSmtpDto = {
+    /** Whether SMTP email notifications are enabled */
+    enabled: boolean;
+    /** Email address to send from */
+    "from": string;
+    /** Email address for replies */
+    replyTo: string;
+    transport: AdminConfigSmtpTransportDto;
+};
+export type AdminConfigNotificationsDto = {
+    smtp: AdminConfigSmtpDto;
+};
+export type AdminConfigOAuthDto = {
+    /** Allow insecure requests */
+    allowInsecureRequests: boolean;
+    /** Auto launch */
+    autoLaunch: boolean;
+    /** Auto register */
+    autoRegister: boolean;
+    /** Button text */
+    buttonText: string;
+    /** Client ID */
+    clientId: string;
+    /** Client secret */
+    clientSecret: string;
+    /** Default storage quota */
+    defaultStorageQuota: number | null;
+    /** Enabled */
+    enabled: boolean;
+    /** End session endpoint */
+    endSessionEndpoint: string;
+    /** Issuer URL */
+    issuerUrl: string;
+    /** Mobile override enabled */
+    mobileOverrideEnabled: boolean;
+    /** Mobile redirect URI (set to empty string to disable) */
+    mobileRedirectUri: string;
+    /** Profile signing algorithm */
+    profileSigningAlgorithm: string;
+    /** OAuth prompt parameter (e.g. select_account, login, consent) */
+    prompt: string;
+    /** Role claim */
+    roleClaim: string;
+    /** Scope */
+    scope: string;
+    /** Signing algorithm */
+    signingAlgorithm: string;
+    /** Storage label claim */
+    storageLabelClaim: string;
+    /** Storage quota claim */
+    storageQuotaClaim: string;
+    /** Timeout */
+    timeout: number;
+    tokenEndpointAuthMethod: OAuthTokenEndpointAuthMethod;
+};
+export type AdminConfigPasswordLoginDto = {
+    /** Enabled */
+    enabled: boolean;
+};
+export type AdminConfigReverseGeocodingDto = {
+    /** Enabled */
+    enabled: boolean;
+};
+export type AdminConfigServerDto = {
+    /** External domain */
+    externalDomain: string;
+    /** Login page message */
+    loginPageMessage: string;
+    /** Allow a people merge to combine two of another user's people, or two people in a shared space the actor cannot edit, into one (a destructive collapse). Re-points that only move a single person to another identity are always allowed. When off, such combining merges are blocked; when on, each still requires an explicit confirmation. */
+    mergePeopleAcrossOwners: boolean;
+    /** Public users */
+    publicUsers: boolean;
+};
+export type AdminConfigStorageTemplateDto = {
+    /** Enabled */
+    enabled: boolean;
+    /** Hash verification enabled */
+    hashVerificationEnabled: boolean;
+    /** Template */
+    template: string;
+};
+export type AdminConfigStorageUsageDto = {
+    /** Include thumbnails and transcoded videos in storage usage */
+    includeDerivatives: boolean;
+};
+export type AdminConfigTemplateEmailsDto = {
+    /** Album invite template */
+    albumInviteTemplate: string;
+    /** Album update template */
+    albumUpdateTemplate: string;
+    /** Welcome template */
+    welcomeTemplate: string;
+};
+export type AdminConfigTemplatesDto = {
+    email: AdminConfigTemplateEmailsDto;
+};
+export type AdminConfigThemeDto = {
+    /** Custom CSS for theming */
+    customCss: string;
+};
+export type AdminConfigTrashDto = {
+    /** Days */
+    days: number;
+    /** Enabled */
+    enabled: boolean;
+};
+export type AdminConfigUserDto = {
+    /** Delete delay */
+    deleteDelay: number;
+};
+export type AdminConfigDto = {
+    backup: AdminConfigBackupsDto;
+    classification: AdminConfigClassificationDto;
+    ffmpeg: AdminConfigFFmpegDto;
+    image: AdminConfigImageDto;
+    integrityChecks: AdminConfigIntegrityChecksDto;
+    job: AdminConfigJobDto;
+    library: AdminConfigLibraryDto;
+    logging: AdminConfigLoggingDto;
+    machineLearning: AdminConfigMachineLearningDto;
+    map: AdminConfigMapDto;
+    memories: AdminConfigMemoriesDto;
+    metadata: AdminConfigMetadataDto;
+    newVersionCheck: AdminConfigNewVersionCheckDto;
+    nightlyTasks: AdminConfigNightlyTasksDto;
+    notifications: AdminConfigNotificationsDto;
+    oauth: AdminConfigOAuthDto;
+    passwordLogin: AdminConfigPasswordLoginDto;
+    reverseGeocoding: AdminConfigReverseGeocodingDto;
+    server: AdminConfigServerDto;
+    storageTemplate: AdminConfigStorageTemplateDto;
+    storageUsage: AdminConfigStorageUsageDto;
+    templates: AdminConfigTemplatesDto;
+    theme: AdminConfigThemeDto;
+    trash: AdminConfigTrashDto;
+    user: AdminConfigUserDto;
+};
 export type DatabaseBackupDeleteDto = {
     /** Backup filenames to delete */
     backups: string[];
@@ -359,29 +794,6 @@ export type TemplateResponseDto = {
     html: string;
     /** Template name */
     name: string;
-};
-export type SystemConfigSmtpTransportDto = {
-    /** SMTP server hostname */
-    host: string;
-    /** Whether to ignore SSL certificate errors */
-    ignoreCert: boolean;
-    /** SMTP password */
-    password: string;
-    /** SMTP server port */
-    port: number;
-    /** Whether to use secure connection (TLS/SSL) */
-    secure: boolean;
-    /** SMTP username */
-    username: string;
-};
-export type SystemConfigSmtpDto = {
-    /** Whether SMTP email notifications are enabled */
-    enabled: boolean;
-    /** Email address to send from */
-    "from": string;
-    /** Email address for replies */
-    replyTo: string;
-    transport: SystemConfigSmtpTransportDto;
 };
 export type TestEmailResponseDto = {
     /** Email message ID */
@@ -1437,6 +1849,115 @@ export type ValidateAccessTokenResponseDto = {
     /** Authentication status */
     authStatus: boolean;
 };
+export type UserConfigFFmpegRealtimeDto = {
+    /** Enable real-time HLS transcoding (alpha) */
+    enabled: boolean;
+    /** Resolutions to use for real-time HLS transcoding */
+    resolutions: HlsVideoResolution[];
+    /** Video codecs to use for real-time HLS transcoding */
+    videoCodecs: VideoCodec[];
+};
+export type UserConfigFFmpegDto = {
+    realtime: UserConfigFFmpegRealtimeDto;
+};
+export type UserConfigGeneratedFullsizeImageDto = {
+    /** Enabled */
+    enabled: boolean;
+};
+export type UserConfigGeneratedImageDto = {
+    /** Size */
+    size: number;
+};
+export type UserConfigImageDto = {
+    fullsize: UserConfigGeneratedFullsizeImageDto;
+    preview: UserConfigGeneratedImageDto;
+    thumbnail: UserConfigGeneratedImageDto;
+};
+export type UserConfigClipDto = {
+    /** Whether the task is enabled */
+    enabled: boolean;
+};
+export type UserConfigDuplicateDetectionDto = {
+    /** Whether the task is enabled */
+    enabled: boolean;
+};
+export type UserConfigFacialRecognitionDto = {
+    /** Whether the task is enabled */
+    enabled: boolean;
+    /** Minimum number of faces required for recognition */
+    minFaces: number;
+};
+export type UserConfigOcrDto = {
+    /** Whether the task is enabled */
+    enabled: boolean;
+};
+export type UserConfigMachineLearningDto = {
+    clip: UserConfigClipDto;
+    duplicateDetection: UserConfigDuplicateDetectionDto;
+    /** Enabled */
+    enabled: boolean;
+    facialRecognition: UserConfigFacialRecognitionDto;
+    ocr: UserConfigOcrDto;
+};
+export type UserConfigMapDto = {
+    /** Dark map style URL */
+    darkStyle: string;
+    /** Enabled */
+    enabled: boolean;
+    /** Light map style URL */
+    lightStyle: string;
+};
+export type UserConfigOAuthDto = {
+    /** Auto launch */
+    autoLaunch: boolean;
+    /** Button text */
+    buttonText: string;
+    /** Enabled */
+    enabled: boolean;
+};
+export type UserConfigPasswordLoginDto = {
+    /** Enabled */
+    enabled: boolean;
+};
+export type UserConfigReverseGeocodingDto = {
+    /** Enabled */
+    enabled: boolean;
+};
+export type UserConfigServerDto = {
+    /** External domain */
+    externalDomain: string;
+    /** Login page message */
+    loginPageMessage: string;
+    /** Public users */
+    publicUsers: boolean;
+};
+export type UserConfigThemeDto = {
+    /** Custom CSS for theming */
+    customCss: string;
+};
+export type UserConfigTrashDto = {
+    /** Days */
+    days: number;
+    /** Enabled */
+    enabled: boolean;
+};
+export type UserConfigUserDto = {
+    /** Delete delay */
+    deleteDelay: number;
+};
+export type UserConfigDto = {
+    ffmpeg: UserConfigFFmpegDto;
+    image: UserConfigImageDto;
+    machineLearning: UserConfigMachineLearningDto;
+    map: UserConfigMapDto;
+    oauth: UserConfigOAuthDto;
+    passwordLogin: UserConfigPasswordLoginDto;
+    reverseGeocoding: UserConfigReverseGeocodingDto;
+    server: UserConfigServerDto;
+    theme: UserConfigThemeDto;
+    trash: UserConfigTrashDto;
+    user: UserConfigUserDto;
+};
 export type DownloadArchiveDto = {
     /** Asset IDs */
     assetIds: string[];
@@ -2023,6 +2544,32 @@ export type PluginTemplateResponseDto = {
     trigger: WorkflowTrigger;
     /** Ui hints, for example "smart-album" */
     uiHints: string[];
+};
+export type PublicConfigOAuthDto = {
+    /** Auto launch */
+    autoLaunch: boolean;
+    /** Button text */
+    buttonText: string;
+    /** Enabled */
+    enabled: boolean;
+};
+export type PublicConfigPasswordLoginDto = {
+    /** Enabled */
+    enabled: boolean;
+};
+export type PublicConfigServerDto = {
+    /** Login page message */
+    loginPageMessage: string;
+};
+export type PublicConfigThemeDto = {
+    /** Custom CSS for theming */
+    customCss: string;
+};
+export type PublicConfigDto = {
+    oauth: PublicConfigOAuthDto;
+    passwordLogin: PublicConfigPasswordLoginDto;
+    server: PublicConfigServerDto;
+    theme: PublicConfigThemeDto;
 };
 export type QueueJobTypeCountsDto = {
     /** Number of sampled active jobs with this name */
@@ -3379,418 +3926,6 @@ export type SyncStreamDto = {
     /** Sync request types */
     types: SyncRequestType[];
 };
-export type DatabaseBackupConfig = {
-    /** Cron expression */
-    cronExpression: string;
-    /** Enabled */
-    enabled: boolean;
-    /** Keep last amount */
-    keepLastAmount: number;
-};
-export type SystemConfigBackupsDto = {
-    database: DatabaseBackupConfig;
-};
-export type SystemConfigClassificationCategoryDto = {
-    /** Action to take when an asset matches */
-    action: Action;
-    /** Whether this category is enabled */
-    enabled: boolean;
-    faceExclusion?: ClassificationFaceExclusion;
-    /** Category name */
-    name: string;
-    /** CLIP text prompts for this category */
-    prompts: string[];
-    /** Cosine similarity threshold for matching this category */
-    similarity: number;
-};
-export type SystemConfigClassificationDto = {
-    /** Classification categories */
-    categories: SystemConfigClassificationCategoryDto[];
-    /** Enable classification globally */
-    enabled: boolean;
-};
-export type SystemConfigFFmpegRealtimeDto = {
-    /** Enable real-time HLS transcoding (alpha) */
-    enabled: boolean;
-    /** Resolutions to use for real-time HLS transcoding */
-    resolutions: HlsVideoResolution[];
-    /** Video codecs to use for real-time HLS transcoding */
-    videoCodecs: VideoCodec[];
-};
-export type SystemConfigFFmpegDto = {
-    accel: TranscodeHWAccel;
-    /** Accelerated decode */
-    accelDecode: boolean;
-    /** Accepted audio codecs */
-    acceptedAudioCodecs: AudioCodec[];
-    /** Accepted containers */
-    acceptedContainers: VideoContainer[];
-    /** Accepted video codecs */
-    acceptedVideoCodecs: VideoCodec[];
-    /** B-frames */
-    bframes: number;
-    cqMode: CQMode;
-    /** CRF */
-    crf: number;
-    /** GOP size */
-    gopSize: number;
-    /** Max bitrate */
-    maxBitrate: string;
-    /** Preferred hardware device */
-    preferredHwDevice: string;
-    /** Preset */
-    preset: string;
-    realtime: SystemConfigFFmpegRealtimeDto;
-    /** References */
-    refs: number;
-    targetAudioCodec: AudioCodec;
-    /** Target resolution */
-    targetResolution: string;
-    targetVideoCodec: VideoCodec;
-    /** Temporal AQ */
-    temporalAQ: boolean;
-    /** Threads */
-    threads: number;
-    tonemap: ToneMapping;
-    transcode: TranscodePolicy;
-    /** Two pass */
-    twoPass: boolean;
-};
-export type SystemConfigGeneratedFullsizeImageDto = {
-    /** Enabled */
-    enabled: boolean;
-    format: ImageFormat;
-    /** Progressive */
-    progressive?: boolean;
-    /** Quality */
-    quality: number;
-};
-export type SystemConfigGeneratedImageDto = {
-    format: ImageFormat;
-    /** Progressive */
-    progressive?: boolean;
-    /** Quality */
-    quality: number;
-    /** Size */
-    size: number;
-};
-export type SystemConfigImageDto = {
-    colorspace: Colorspace;
-    /** Extract embedded */
-    extractEmbedded: boolean;
-    fullsize: SystemConfigGeneratedFullsizeImageDto;
-    preview: SystemConfigGeneratedImageDto;
-    thumbnail: SystemConfigGeneratedImageDto;
-};
-export type SystemConfigIntegrityChecksumJob = {
-    /** Cron expression for when the integrity check should run */
-    cronExpression: string;
-    /** Enabled */
-    enabled: boolean;
-    /** Percentage limit of the integrity checksum job */
-    percentageLimit: number;
-    /** How long the integrity checksum job may run for */
-    timeLimit: number;
-};
-export type SystemConfigIntegrityJob = {
-    /** Cron expression for when the integrity check should run */
-    cronExpression: string;
-    /** Enabled */
-    enabled: boolean;
-};
-export type SystemConfigIntegrityChecks = {
-    checksumFiles: SystemConfigIntegrityChecksumJob;
-    missingFiles: SystemConfigIntegrityJob;
-    untrackedFiles: SystemConfigIntegrityJob;
-};
-export type JobSettingsDto = {
-    /** Concurrency */
-    concurrency: number;
-};
-export type SystemConfigJobDto = {
-    backgroundTask: JobSettingsDto;
-    classification: JobSettingsDto;
-    editor: JobSettingsDto;
-    faceDetection: JobSettingsDto;
-    integrityCheck: JobSettingsDto;
-    library: JobSettingsDto;
-    metadataExtraction: JobSettingsDto;
-    migration: JobSettingsDto;
-    notifications: JobSettingsDto;
-    ocr: JobSettingsDto;
-    peopleBackfill: JobSettingsDto;
-    petDetection: JobSettingsDto;
-    search: JobSettingsDto;
-    sidecar: JobSettingsDto;
-    smartSearch: JobSettingsDto;
-    thumbnailGeneration: JobSettingsDto;
-    videoConversion: JobSettingsDto;
-    workflow: JobSettingsDto;
-};
-export type SystemConfigLibraryScanDto = {
-    /** Cron expression */
-    cronExpression: string;
-    /** Enabled */
-    enabled: boolean;
-};
-export type SystemConfigLibraryWatchDto = {
-    /** Enabled */
-    enabled: boolean;
-};
-export type SystemConfigLibraryDto = {
-    scan: SystemConfigLibraryScanDto;
-    watch: SystemConfigLibraryWatchDto;
-};
-export type SystemConfigLoggingDto = {
-    /** Enabled */
-    enabled: boolean;
-    level: LogLevel;
-};
-export type MachineLearningAvailabilityChecksDto = {
-    /** Enabled */
-    enabled: boolean;
-    interval: number;
-    timeout: number;
-};
-export type ClipConfig = {
-    /** Whether the task is enabled */
-    enabled: boolean;
-    /** Maximum cosine distance for smart search results. 0 = disabled. */
-    maxDistance: number;
-    /** Name of the model to use */
-    modelName: string;
-};
-export type DuplicateDetectionConfig = {
-    /** Whether the task is enabled */
-    enabled: boolean;
-    /** Maximum distance threshold for duplicate detection */
-    maxDistance: number;
-};
-export type FaceSuggestionConfig = {
-    /** Whether face suggestions are enabled */
-    enabled: boolean;
-    /** Maximum embedding distance for a face to be surfaced as a suggestion on a named person */
-    maxDistance: number;
-};
-export type FacialRecognitionConfig = {
-    /** Whether the task is enabled */
-    enabled: boolean;
-    /** Maximum distance threshold for face recognition */
-    maxDistance: number;
-    /** Minimum number of faces required for recognition */
-    minFaces: number;
-    /** Minimum confidence score for face detection */
-    minScore: number;
-    /** Name of the model to use */
-    modelName: string;
-    suggestions: FaceSuggestionConfig;
-};
-export type OcrConfig = {
-    /** Whether the task is enabled */
-    enabled: boolean;
-    /** Maximum resolution for OCR processing */
-    maxResolution: number;
-    /** Minimum confidence score for text detection */
-    minDetectionScore: number;
-    /** Minimum confidence score for text recognition */
-    minRecognitionScore: number;
-    /** Name of the model to use */
-    modelName: string;
-};
-export type PetDetectionConfig = {
-    /** Whether the task is enabled */
-    enabled: boolean;
-    /** Minimum confidence score for pet detection */
-    minScore: number;
-    /** Name of the model to use */
-    modelName: string;
-};
-export type SystemConfigMachineLearningDto = {
-    availabilityChecks: MachineLearningAvailabilityChecksDto;
-    clip: ClipConfig;
-    duplicateDetection: DuplicateDetectionConfig;
-    /** Enabled */
-    enabled: boolean;
-    facialRecognition: FacialRecognitionConfig;
-    ocr: OcrConfig;
-    petDetection: PetDetectionConfig;
-    /** ML service URLs */
-    urls: string[];
-};
-export type SystemConfigMapDto = {
-    /** Dark map style URL */
-    darkStyle: string;
-    /** Enabled */
-    enabled: boolean;
-    /** Light map style URL */
-    lightStyle: string;
-};
-export type SystemConfigMemoriesDto = {
-    /** Birthday memories */
-    birthday: boolean;
-    /** Recent trip memories */
-    recentTrips: boolean;
-    /** Retention days */
-    retentionDays: number;
-    /** Per-type memory availability overrides */
-    types?: {
-        [key: string]: boolean;
-    };
-};
-export type SystemConfigFacesDto = {
-    /** Import */
-    "import": boolean;
-};
-export type SystemConfigMetadataDto = {
-    faces: SystemConfigFacesDto;
-};
-export type SystemConfigNewVersionCheckDto = {
-    channel: ReleaseChannel;
-    /** Enabled */
-    enabled: boolean;
-};
-export type SystemConfigNightlyTasksDto = {
-    /** Cluster new faces */
-    clusterNewFaces: boolean;
-    /** Database cleanup */
-    databaseCleanup: boolean;
-    /** Generate memories */
-    generateMemories: boolean;
-    /** Missing thumbnails */
-    missingThumbnails: boolean;
-    /** Start time (HH:MM) */
-    startTime: string;
-    /** Sync quota usage */
-    syncQuotaUsage: boolean;
-};
-export type SystemConfigNotificationsDto = {
-    smtp: SystemConfigSmtpDto;
-};
-export type SystemConfigOAuthDto = {
-    /** Allow insecure requests */
-    allowInsecureRequests: boolean;
-    /** Auto launch */
-    autoLaunch: boolean;
-    /** Auto register */
-    autoRegister: boolean;
-    /** Button text */
-    buttonText: string;
-    /** Client ID */
-    clientId: string;
-    /** Client secret */
-    clientSecret: string;
-    /** Default storage quota */
-    defaultStorageQuota: number | null;
-    /** Enabled */
-    enabled: boolean;
-    /** End session endpoint */
-    endSessionEndpoint: string;
-    /** Issuer URL */
-    issuerUrl: string;
-    /** Mobile override enabled */
-    mobileOverrideEnabled: boolean;
-    /** Mobile redirect URI (set to empty string to disable) */
-    mobileRedirectUri: string;
-    /** Profile signing algorithm */
-    profileSigningAlgorithm: string;
-    /** OAuth prompt parameter (e.g. select_account, login, consent) */
-    prompt: string;
-    /** Role claim */
-    roleClaim: string;
-    /** Scope */
-    scope: string;
-    /** Signing algorithm */
-    signingAlgorithm: string;
-    /** Storage label claim */
-    storageLabelClaim: string;
-    /** Storage quota claim */
-    storageQuotaClaim: string;
-    /** Timeout */
-    timeout: number;
-    tokenEndpointAuthMethod: OAuthTokenEndpointAuthMethod;
-};
-export type SystemConfigPasswordLoginDto = {
-    /** Enabled */
-    enabled: boolean;
-};
-export type SystemConfigReverseGeocodingDto = {
-    /** Enabled */
-    enabled: boolean;
-};
-export type SystemConfigServerDto = {
-    /** External domain */
-    externalDomain: string;
-    /** Login page message */
-    loginPageMessage: string;
-    /** Allow a people merge to combine two of another user's people, or two people in a shared space the actor cannot edit, into one (a destructive collapse). Re-points that only move a single person to another identity are always allowed. When off, such combining merges are blocked; when on, each still requires an explicit confirmation. */
-    mergePeopleAcrossOwners: boolean;
-    /** Public users */
-    publicUsers: boolean;
-};
-export type SystemConfigStorageTemplateDto = {
-    /** Enabled */
-    enabled: boolean;
-    /** Hash verification enabled */
-    hashVerificationEnabled: boolean;
-    /** Template */
-    template: string;
-};
-export type SystemConfigStorageUsageDto = {
-    /** Include thumbnails and transcoded videos in storage usage */
-    includeDerivatives: boolean;
-};
-export type SystemConfigTemplateEmailsDto = {
-    /** Album invite template */
-    albumInviteTemplate: string;
-    /** Album update template */
-    albumUpdateTemplate: string;
-    /** Welcome template */
-    welcomeTemplate: string;
-};
-export type SystemConfigTemplatesDto = {
-    email: SystemConfigTemplateEmailsDto;
-};
-export type SystemConfigThemeDto = {
-    /** Custom CSS for theming */
-    customCss: string;
-};
-export type SystemConfigTrashDto = {
-    /** Days */
-    days: number;
-    /** Enabled */
-    enabled: boolean;
-};
-export type SystemConfigUserDto = {
-    /** Delete delay */
-    deleteDelay: number;
-};
-export type SystemConfigDto = {
-    backup: SystemConfigBackupsDto;
-    classification: SystemConfigClassificationDto;
-    ffmpeg: SystemConfigFFmpegDto;
-    image: SystemConfigImageDto;
-    integrityChecks: SystemConfigIntegrityChecks;
-    job: SystemConfigJobDto;
-    library: SystemConfigLibraryDto;
-    logging: SystemConfigLoggingDto;
-    machineLearning: SystemConfigMachineLearningDto;
-    map: SystemConfigMapDto;
-    memories: SystemConfigMemoriesDto;
-    metadata: SystemConfigMetadataDto;
-    newVersionCheck: SystemConfigNewVersionCheckDto;
-    nightlyTasks: SystemConfigNightlyTasksDto;
-    notifications: SystemConfigNotificationsDto;
-    oauth: SystemConfigOAuthDto;
-    passwordLogin: SystemConfigPasswordLoginDto;
-    reverseGeocoding: SystemConfigReverseGeocodingDto;
-    server: SystemConfigServerDto;
-    storageTemplate: SystemConfigStorageTemplateDto;
-    storageUsage: SystemConfigStorageUsageDto;
-    templates: SystemConfigTemplatesDto;
-    theme: SystemConfigThemeDto;
-    trash: SystemConfigTrashDto;
-    user: SystemConfigUserDto;
-};
 export type SystemConfigTemplateStorageOptionDto = {
     /** Available day format options for storage template */
     dayOptions: string[];
@@ -4760,6 +4895,43 @@ export function unlinkAllOAuthAccountsAdmin(opts?: Oazapfts.RequestOpts) {
     }));
 }
 /**
+ * Get the admin configuration
+ */
+export function getAdminConfig(opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: AdminConfigDto;
+    }>("/admin/config", {
+        ...opts
+    }));
+}
+/**
+ * Update the system configuration
+ */
+export function updateAdminConfig({ adminConfigDto }: {
+    adminConfigDto: AdminConfigDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: AdminConfigDto;
+    }>("/admin/config", oazapfts.json({
+        ...opts,
+        method: "PUT",
+        body: adminConfigDto
+    })));
+}
+/**
+ * Get the system configuration defaults
+ */
+export function getAdminConfigDefaults(opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: AdminConfigDto;
+    }>("/admin/config/defaults", {
+        ...opts
+    }));
+}
+/**
  * Delete database backup
  */
 export function deleteDatabaseBackup({ databaseBackupDeleteDto }: {
@@ -5210,8 +5382,8 @@ export function getNotificationTemplateAdmin({ name, templateDto }: {
 /**
  * Send test email
  */
-export function sendTestEmailAdmin({ systemConfigSmtpDto }: {
-    systemConfigSmtpDto: SystemConfigSmtpDto;
+export function sendTestEmailAdmin({ adminConfigSmtpDto }: {
+    adminConfigSmtpDto: AdminConfigSmtpDto;
 }, opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchJson<{
         status: 200;
@@ -5219,7 +5391,7 @@ export function sendTestEmailAdmin({ systemConfigSmtpDto }: {
     }>("/admin/notifications/test-email", oazapfts.json({
         ...opts,
         method: "POST",
-        body: systemConfigSmtpDto
+        body: adminConfigSmtpDto
     })));
 }
 /**
@@ -6344,6 +6516,28 @@ export function scanClassification(opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchText("/classification/scan", {
         ...opts,
         method: "POST"
+    }));
+}
+/**
+ * Get the configuration with user visibility
+ */
+export function getUserConfig(opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: UserConfigDto;
+    }>("/config", {
+        ...opts
+    }));
+}
+/**
+ * Get the default configuration with user visibility
+ */
+export function getUserConfigDefaults(opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: UserConfigDto;
+    }>("/config/defaults", {
+        ...opts
     }));
 }
 /**
@@ -7561,6 +7755,28 @@ export function getPlugin({ id }: {
         status: 200;
         data: PluginResponseDto;
     }>(`/plugins/${encodeURIComponent(id)}`, {
+        ...opts
+    }));
+}
+/**
+ * Get the public configuration
+ */
+export function getPublicConfig(opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: PublicConfigDto;
+    }>("/public/config", {
+        ...opts
+    }));
+}
+/**
+ * Get the public configuration defaults
+ */
+export function getPublicConfigDefaults(opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: PublicConfigDto;
+    }>("/public/config/defaults", {
         ...opts
     }));
 }
@@ -9256,7 +9472,7 @@ export function getSyncStream({ syncStreamDto }: {
 export function getConfig(opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchJson<{
         status: 200;
-        data: SystemConfigDto;
+        data: AdminConfigDto;
     }>("/system-config", {
         ...opts
     }));
@@ -9264,16 +9480,16 @@ export function getConfig(opts?: Oazapfts.RequestOpts) {
 /**
  * Update system configuration
  */
-export function updateConfig({ systemConfigDto }: {
-    systemConfigDto: SystemConfigDto;
+export function updateConfig({ adminConfigDto }: {
+    adminConfigDto: AdminConfigDto;
 }, opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchJson<{
         status: 200;
-        data: SystemConfigDto;
+        data: AdminConfigDto;
     }>("/system-config", oazapfts.json({
         ...opts,
         method: "PUT",
-        body: systemConfigDto
+        body: adminConfigDto
     })));
 }
 /**
@@ -9282,7 +9498,7 @@ export function updateConfig({ systemConfigDto }: {
 export function getConfigDefaults(opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchJson<{
         status: 200;
-        data: SystemConfigDto;
+        data: AdminConfigDto;
     }>("/system-config/defaults", {
         ...opts
     }));
@@ -10235,6 +10451,90 @@ export enum UserAvatarColor {
     Gray = "gray",
     Amber = "amber"
 }
+export enum Action {
+    Tag = "tag",
+    TagAndArchive = "tag_and_archive"
+}
+export enum ClassificationFaceExclusion {
+    Off = "off",
+    AnyAssignedFace = "any_assigned_face",
+    NamedPeople = "named_people",
+    NamedVisiblePeople = "named_visible_people"
+}
+export enum TranscodeHWAccel {
+    Nvenc = "nvenc",
+    Qsv = "qsv",
+    Vaapi = "vaapi",
+    Rkmpp = "rkmpp",
+    Disabled = "disabled"
+}
+export enum AudioCodec {
+    Mp3 = "mp3",
+    Aac = "aac",
+    Opus = "opus",
+    PcmS16Le = "pcm_s16le"
+}
+export enum VideoContainer {
+    Mov = "mov",
+    Mp4 = "mp4",
+    Ogg = "ogg",
+    Webm = "webm"
+}
+export enum VideoCodec {
+    H264 = "h264",
+    Hevc = "hevc",
+    Vp9 = "vp9",
+    Av1 = "av1"
+}
+export enum CQMode {
+    Auto = "auto",
+    Cqp = "cqp",
+    Icq = "icq"
+}
+export enum HlsVideoResolution {
+    $480 = 480,
+    $720 = 720,
+    $1080 = 1080,
+    $1440 = 1440,
+    $2160 = 2160
+}
+export enum ToneMapping {
+    Hable = "hable",
+    Mobius = "mobius",
+    Reinhard = "reinhard",
+    Disabled = "disabled"
+}
+export enum TranscodePolicy {
+    All = "all",
+    Optimal = "optimal",
+    Bitrate = "bitrate",
+    Required = "required",
+    Disabled = "disabled"
+}
+export enum Colorspace {
+    Srgb = "srgb",
+    P3 = "p3"
+}
+export enum ImageFormat {
+    Jpeg = "jpeg",
+    Webp = "webp"
+}
+export enum LogLevel {
+    Verbose = "verbose",
+    Debug = "debug",
+    Log = "log",
+    Warn = "warn",
+    Error = "error",
+    Fatal = "fatal"
+}
+export enum ReleaseChannel {
+    Stable = "stable",
+    ReleaseCandidate = "releaseCandidate"
+}
+export enum OAuthTokenEndpointAuthMethod {
+    ClientSecretPost = "client_secret_post",
+    ClientSecretBasic = "client_secret_basic"
+}
 export enum IntegrityReport {
     UntrackedFile = "untracked_file",
     MissingFile = "missing_file",
@@ -10356,6 +10656,9 @@ export enum Permission {
     BackupDownload = "backup.download",
     BackupUpload = "backup.upload",
     BackupDelete = "backup.delete",
+    AdminConfigRead = "adminConfig.read",
+    AdminConfigUpdate = "adminConfig.update",
+    UserConfigRead = "userConfig.read",
     DuplicateRead = "duplicate.read",
     DuplicateDelete = "duplicate.delete",
     FaceCreate = "face.create",
@@ -10901,90 +11204,6 @@ export enum SyncRequestType {
     SharedSpaceAlbumToAssetsV1 = "SharedSpaceAlbumToAssetsV1",
     SharedSpaceAlbumAssetsV1 = "SharedSpaceAlbumAssetsV1",
     SharedSpaceAlbumAssetExifsV1 = "SharedSpaceAlbumAssetExifsV1"
-}
-export enum Action {
-    Tag = "tag",
-    TagAndArchive = "tag_and_archive"
-}
-export enum ClassificationFaceExclusion {
-    Off = "off",
-    AnyAssignedFace = "any_assigned_face",
-    NamedPeople = "named_people",
-    NamedVisiblePeople = "named_visible_people"
-}
-export enum TranscodeHWAccel {
-    Nvenc = "nvenc",
-    Qsv = "qsv",
-    Vaapi = "vaapi",
-    Rkmpp = "rkmpp",
-    Disabled = "disabled"
-}
-export enum AudioCodec {
-    Mp3 = "mp3",
-    Aac = "aac",
-    Opus = "opus",
-    PcmS16Le = "pcm_s16le"
-}
-export enum VideoContainer {
-    Mov = "mov",
-    Mp4 = "mp4",
-    Ogg = "ogg",
-    Webm = "webm"
-}
-export enum VideoCodec {
-    H264 = "h264",
-    Hevc = "hevc",
-    Vp9 = "vp9",
-    Av1 = "av1"
-}
-export enum CQMode {
-    Auto = "auto",
-    Cqp = "cqp",
-    Icq = "icq"
-}
-export enum HlsVideoResolution {
-    $480 = 480,
-    $720 = 720,
-    $1080 = 1080,
-    $1440 = 1440,
-    $2160 = 2160
-}
-export enum ToneMapping {
-    Hable = "hable",
-    Mobius = "mobius",
-    Reinhard = "reinhard",
-    Disabled = "disabled"
-}
-export enum TranscodePolicy {
-    All = "all",
-    Optimal = "optimal",
-    Bitrate = "bitrate",
-    Required = "required",
-    Disabled = "disabled"
-}
-export enum Colorspace {
-    Srgb = "srgb",
-    P3 = "p3"
-}
-export enum ImageFormat {
-    Jpeg = "jpeg",
-    Webp = "webp"
-}
-export enum LogLevel {
-    Verbose = "verbose",
-    Debug = "debug",
-    Log = "log",
-    Warn = "warn",
-    Error = "error",
-    Fatal = "fatal"
-}
-export enum ReleaseChannel {
-    Stable = "stable",
-    ReleaseCandidate = "releaseCandidate"
-}
-export enum OAuthTokenEndpointAuthMethod {
-    ClientSecretPost = "client_secret_post",
-    ClientSecretBasic = "client_secret_basic"
 }
 export enum TimeBucketSize {
     Year = "year",
