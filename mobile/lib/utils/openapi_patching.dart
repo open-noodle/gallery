@@ -27,6 +27,10 @@ final Map<String, Map<String, Object?>> openApiPatches = {
     'cast': CastResponse(gCastEnabled: false).toJson(),
     'albums': {'defaultAssetOrder': 'desc'},
     'recentlyAdded': RecentlyAddedResponse(sidebarWeb: false).toJson(),
+    // Both false, matching the server's own default: an older server that has never heard of
+    // PhotoGuesser must read as feature-off, not as one that quietly widened the pool to a
+    // player's partners and shared spaces.
+    'photoGuesser': PhotoGuesserResponse(includePartners: false, includeSpaces: false).toJson(),
   },
   'ServerConfigDto': {
     'mapLightStyleUrl': 'https://tiles.openfreemap.org/styles/positron',

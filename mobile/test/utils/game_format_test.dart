@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/utils/game_format.dart';
 import 'package:openapi/api.dart';
@@ -163,6 +165,48 @@ void main() {
 
     test('is null for an empty round list', () {
       expect(firstUnansweredIndex(const []), isNull);
+    });
+  });
+
+  group('formatGameDate', () {
+    test('renders the UTC day, not the local one', () {
+      // Both ends of the UTC day, because one alone only bites in half the world: 23:30 UTC is
+      // already tomorrow east of Greenwich, 00:30 UTC is still yesterday west of it. The streak
+      // counts both of these games against the 19th, so both rows have to say the 19th.
+      //
+      // Neither can bite in a UTC-pinned environment, where the two code paths produce the same
+      // day — the same limitation formatStandingsMonth's own timeZone handling has.
+      expect(formatGameDate(DateTime.utc(2026, 8, 19, 23, 30), locale: 'en_US'), 'Aug 19, 2026');
+      expect(formatGameDate(DateTime.utc(2026, 8, 19, 0, 30), locale: 'en_US'), 'Aug 19, 2026');
+    });
+  });
+
+  group('formatGameScore', () {
+    test('groups digits so game_points does not render 18420 pts', () {
+      expect(formatGameScore(18420, locale: 'en_US'), '18,420');
+      expect(formatGameScore(0, locale: 'en_US'), '0');
+    });
+  });
+
+  group('soloCreateFailureKey', () {
+    test('a server 400 is the one failure the player can act on', () {
+      expect(soloCreateFailureKey(ApiException(400, '{"message":"no candidates"}')), 'game_solo_no_photos');
+    });
+
+    test('an offline 400 does not blame the library', () {
+      // The generated client wraps SocketException/TlsException/ClientException into
+      // ApiException(400, ...) with an innerException — telling that player to add GPS data would
+      // send them off fixing the wrong thing.
+      final offline = ApiException.withInner(400, 'connection failed', const SocketException('no route'), null);
+
+      expect(soloCreateFailureKey(offline), 'scaffold_body_error_occurred');
+    });
+
+    test('any other failure falls back to the scope-neutral generic', () {
+      // NOT game_create_failed: that one reads "from this space's photos", and a solo player may
+      // be in no space at all.
+      expect(soloCreateFailureKey(ApiException(500, 'boom')), 'scaffold_body_error_occurred');
+      expect(soloCreateFailureKey(Exception('boom')), 'scaffold_body_error_occurred');
     });
   });
 }
