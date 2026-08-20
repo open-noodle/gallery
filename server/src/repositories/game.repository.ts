@@ -17,6 +17,24 @@ export type GameRoundRow = Selectable<GameRoundTable>;
 export type GameGuessRow = Selectable<GameGuessTable>;
 
 /**
+ * One row of a player's own game history: the challenge, plus what they scored on it.
+ *
+ * Not a `GameChallengeRow` with extras - a history row carries neither scope column (it is the
+ * caller's own, by construction) nor the frozen source toggles, which are generation inputs rather
+ * than anything a player browses.
+ */
+export type GameSoloHistoryRow = {
+  id: string;
+  name: string;
+  /** The UTC calendar day this was the daily for, or null for a free-play game. */
+  dailyOn: string | null;
+  createdAt: Date;
+  roundCount: number;
+  answered: number;
+  total: number;
+};
+
+/**
  * The two CLIP text vectors the scene gate ranks against. Supplied by the caller rather than
  * read from the constants below, because `machineLearning.clip.modelName` is admin-configurable
  * and `DatabaseRepository.setDimensionSize` re-types `smart_search.embedding` when it changes -
@@ -992,6 +1010,128 @@ export class GameRepository {
       userId: row.userId,
       total: Number(row.total),
       daysPlayed: Number(row.daysPlayed),
+    }));
+  }
+
+  /**
+   * The UTC calendar days this player FINISHED their own daily on - every round guessed.
+   *
+   * The `having` is the whole point, and it is why this is not a `distinct dailyOn` over played
+   * dailies: a partially played daily scores, and appears in history, but does not extend the
+   * streak. Expressing that here rather than in the caller is deliberate - the rule is a property
+   * of "which days count", and a client-side version of it would be one refactor away from
+   * counting a single guess as a day.
+   *
+   * One row per completed daily is one row per DAY without a `distinct`: a second daily for the
+   * same owner and date cannot exist, `game_challenge_owner_daily_uq` forbids it. `computeStreak`
+   * deduplicates anyway, so the two of them do not have to agree about that.
+   *
+   * The days come back as `YYYY-MM-DD` strings straight from Postgres rather than as Dates: the
+   * driver turns a `date` column into UTC midnight and `asDateString` formats it in the SERVER's
+   * zone, so on any instance west of UTC every day would be renamed to the one before it - and the
+   * streak compares these against a UTC "today".
+   */
+  @GenerateSql({ params: [DummyValue.UUID] })
+  async getSoloCompletedDailyDates(ownerId: string): Promise<string[]> {
+    const rows = await this.db
+      .selectFrom('game_challenge')
+      .innerJoin('game_round', 'game_round.challengeId', 'game_challenge.id')
+      // A solo challenge has exactly one player - its owner - so this is the same set of rows the
+      // owner filter below already implies, and it says so rather than trusting the gate.
+      .innerJoin('game_guess', (join) =>
+        join.onRef('game_guess.roundId', '=', 'game_round.id').on('game_guess.userId', '=', ownerId),
+      )
+      .where('game_challenge.ownerId', '=', ownerId)
+      .where('game_challenge.dailyOn', 'is not', null)
+      .groupBy('game_challenge.id')
+      .having((eb) => eb(eb.fn.count('game_guess.id'), '=', eb.ref('game_challenge.roundCount')))
+      .select(sql<string>`to_char(${sql.ref('game_challenge.dailyOn')}, 'YYYY-MM-DD')`.as('dailyOn'))
+      .execute();
+
+    return rows.map((row) => row.dailyOn);
+  }
+
+  /**
+   * One player's score record across their solo games - dailies and free play alike.
+   *
+   * Aggregated over per-game totals (the inner group-by), not over raw guesses: "best score" means
+   * the best GAME, and a max over individual guesses would report a single lucky round instead.
+   *
+   * Zeroes rather than nulls for a player who has never played, so the stats panel has nothing to
+   * special-case - `max`/`avg` of no rows are NULL, and that NULL is coalesced here rather than
+   * being left for each caller to remember.
+   */
+  @GenerateSql({ params: [DummyValue.UUID] })
+  async getSoloScoreSummary(
+    ownerId: string,
+  ): Promise<{ gamesPlayed: number; bestScore: number; averageScore: number }> {
+    const row = await this.db
+      .selectFrom((eb) =>
+        eb
+          .selectFrom('game_challenge')
+          .innerJoin('game_round', 'game_round.challengeId', 'game_challenge.id')
+          .innerJoin('game_guess', (join) =>
+            join.onRef('game_guess.roundId', '=', 'game_round.id').on('game_guess.userId', '=', ownerId),
+          )
+          .where('game_challenge.ownerId', '=', ownerId)
+          .groupBy('game_challenge.id')
+          .select((inner) => inner.fn.sum<string>('game_guess.score').as('total'))
+          .as('game_totals'),
+      )
+      // The inner join above already excludes games with no guesses, so this counts games PLAYED -
+      // the same set history lists, and the set the average has to divide by.
+      .select((eb) => eb.fn.countAll<string>().as('gamesPlayed'))
+      .select((eb) => eb.fn.max<string | null>('game_totals.total').as('bestScore'))
+      .select((eb) => eb.fn.avg<string | null>('game_totals.total').as('averageScore'))
+      .executeTakeFirstOrThrow();
+
+    return {
+      gamesPlayed: Number(row.gamesPlayed),
+      bestScore: Number(row.bestScore ?? 0),
+      averageScore: Number(row.averageScore ?? 0),
+    };
+  }
+
+  /**
+   * One page of the player's own games, newest first, each with what they scored on it.
+   *
+   * Games they actually PLAYED: the inner join to their guesses is what excludes a challenge that
+   * was generated and never touched - one the nightly prune deletes anyway, and which the player
+   * has no memory of to browse. A partially played one is a real game with a real score and stays.
+   *
+   * Ordered by `createdAt` with the id as the tie-break, so a page boundary cannot show or skip a
+   * game because two of them share a timestamp; challenge ids are uuidv7, hence time-ordered.
+   */
+  @GenerateSql({ params: [DummyValue.UUID, { skip: 0, take: 20 }] })
+  async getSoloHistory(ownerId: string, { skip, take }: { skip: number; take: number }): Promise<GameSoloHistoryRow[]> {
+    const rows = await this.db
+      .selectFrom('game_challenge')
+      .innerJoin('game_round', 'game_round.challengeId', 'game_challenge.id')
+      .innerJoin('game_guess', (join) =>
+        join.onRef('game_guess.roundId', '=', 'game_round.id').on('game_guess.userId', '=', ownerId),
+      )
+      .where('game_challenge.ownerId', '=', ownerId)
+      .groupBy('game_challenge.id')
+      .select(['game_challenge.id', 'game_challenge.name', 'game_challenge.roundCount', 'game_challenge.createdAt'])
+      // As a string, for the same reason getSoloCompletedDailyDates does it: history and the streak
+      // must name the same day, and a Date round-trip renames it on a server west of UTC.
+      .select(sql<string | null>`to_char(${sql.ref('game_challenge.dailyOn')}, 'YYYY-MM-DD')`.as('dailyOn'))
+      .select((eb) => eb.fn.count<string>('game_guess.id').as('answered'))
+      .select((eb) => eb.fn.sum<string>('game_guess.score').as('total'))
+      .orderBy('game_challenge.createdAt', 'desc')
+      .orderBy('game_challenge.id', 'desc')
+      .limit(take)
+      .offset(skip)
+      .execute();
+
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      dailyOn: row.dailyOn,
+      createdAt: row.createdAt,
+      roundCount: row.roundCount,
+      answered: Number(row.answered),
+      total: Number(row.total),
     }));
   }
 

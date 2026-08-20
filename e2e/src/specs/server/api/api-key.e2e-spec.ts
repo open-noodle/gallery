@@ -189,5 +189,16 @@ describe('/api-keys', () => {
 
       expect(status, 'a game-scoped key must not need sharedSpace.read').toBe(200);
     });
+
+    // The solo half of the same rule, and the one the permission exists for: this route takes no
+    // space at all, so a key that could read it only by also carrying sharedSpace.read would be
+    // demanding scope over a feature the player may never have used.
+    it('lets a game-scoped API key read solo stats, with no shared space anywhere', async () => {
+      const key = await utils.createApiKey(user.accessToken, [Permission.GameRead]);
+
+      const { status } = await request(app).get('/games/solo/stats').set('x-api-key', key.secret);
+
+      expect(status, 'a solo game must not need sharedSpace.read').toBe(200);
+    });
   });
 });
