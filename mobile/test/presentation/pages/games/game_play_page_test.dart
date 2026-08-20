@@ -444,10 +444,15 @@ void main() {
 
       await pump(tester, router: router);
 
-      await tester.tap(find.byKey(const Key('round-review-row-0')));
+      // Tap round 1, not round 0: `_finishedSoloChallenge` has two rounds, and this is the one
+      // tap that can tell "the tapped row's own index" apart from "always index 0" or "loop
+      // position" — a hardcoded or off-by-one `onRoundTap` would still pass a round-0 assertion.
+      await tester.tap(find.byKey(const Key('round-review-row-1')));
       await tester.pumpAndSettle();
 
-      expect(router.pushed.single, isA<GameRoundReviewRoute>());
+      final args = (router.pushed.single as GameRoundReviewRoute).args!;
+      expect(args.challengeId, 'c1');
+      expect(args.index, 1);
     });
 
     testWidgets('a space challenge keeps its leaderboard', (tester) async {
