@@ -249,4 +249,48 @@ describe('/games/solo', () => {
       );
     });
   });
+
+  describe('solo challenge authorization', () => {
+    it("404s a stranger on every route of someone else's solo challenge", async () => {
+      const { player: alice } = await freshPlayer('solo-auth-alice', 4);
+      const { player: bob } = await freshPlayer('solo-auth-bob', 0);
+
+      const created = await createSolo(alice, { roundCount: 4 });
+      // Asserted before the stranger touches it: a create that silently failed would make every
+      // 404 below true for the wrong reason (id never existed at all, rather than access refused).
+      expect(created.status).toBe(201);
+      const challenge = created.body as GameChallengeResponseDto;
+
+      for (const call of [
+        request(app).get(`/games/${challenge.id}`),
+        request(app).post(`/games/${challenge.id}/rounds/0/guess`).send({ date: new Date().toISOString() }),
+        request(app).get(`/games/${challenge.id}/rounds/0/image`),
+        request(app).get(`/games/${challenge.id}/leaderboard`),
+        request(app).delete(`/games/${challenge.id}`),
+      ]) {
+        const { status } = await call.set('Authorization', `Bearer ${bob.accessToken}`);
+        // 404 and not 403: a 403 confirms the id exists, which is an enumeration leak the space
+        // routes already avoid.
+        expect(status).toBe(404);
+      }
+    });
+
+    // Scope-blind by construction (game.service.ts delete refuses both a space daily and a solo
+    // one) - this is the solo half of that refusal, so a re-roll of the streak cannot be forced
+    // through the owner's own DELETE.
+    it('refuses to delete a solo daily, so the streak cannot be re-rolled', async () => {
+      const { player: alice } = await freshPlayer('solo-auth-daily', 4);
+
+      const daily = await readDaily(alice);
+      // Asserted before deleting it: the refusal below is meaningless if the daily this test
+      // depends on was never generated.
+      expect(daily.status).toBe(200);
+      expect(daily.body.challenge).not.toBeNull();
+
+      const { status } = await request(app)
+        .delete(`/games/${daily.body.challenge.id}`)
+        .set('Authorization', `Bearer ${alice.accessToken}`);
+      expect(status).toBe(400);
+    });
+  });
 });
