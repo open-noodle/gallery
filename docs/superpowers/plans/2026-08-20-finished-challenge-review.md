@@ -21,6 +21,7 @@
 
   Do **not** use `mise run` or `mise exec` from this worktree: both resolve against the outermost repo root, so they run the _main_ checkout's tasks and toolchain.
 
+- **`make check-server` / `make check-web` / `make open-api` no longer exist.** The Makefile keeps only dev/prod/upstream targets; everything else moved to mise tasks (`mise //server:check`, `mise //web:check`, `mise open-api`). `CLAUDE.md` still documents the `make` forms and is stale — follow this plan, not it.
 - **Never run `make sql` / `mise sql` in this plan.** No decorated repository query changes. Running it without a reachable database **deletes every file in `server/src/queries/`**.
 - **i18n: six new keys, ten locales, same commit.** `en` plus `de`, `fr`, `it`, `nl`, `pl`, `es`, `ru`, `zh_Hans`, `zh_Hant`. German/Italian/Spanish address the user informally (`du`/`tu`/`tú`); French and Russian formally (`vous`/`вы`). Every locale except `fr` leaves "Space" untranslated; `fr` uses "espace". Keys are alphabetically sorted — insert in place, then `npx prettier --write i18n/*.json`.
 - **Exact user-facing copy** (English), fixed by an approved mockup — do not paraphrase:
@@ -58,9 +59,9 @@ In `server/src/services/game.service.spec.ts`, alongside the existing `withholds
 
 ```ts
 it('returns the caller own guess for a guessed location round', async () => {
-  // Arrange exactly as the neighbouring getChallengeDetail tests do, with a location
+  // Arrange as the neighbouring `sut.get` tests in this file do, with a location
   // round the caller has guessed.
-  const result = await sut.getChallengeDetail(auth, challenge.id);
+  const result = await sut.get(auth, challenge.id);
 
   expect(result.rounds[0].guess).toEqual({
     lat: 38.72,
@@ -72,7 +73,7 @@ it('returns the caller own guess for a guessed location round', async () => {
 });
 
 it('returns the caller own guess for a guessed date round', async () => {
-  const result = await sut.getChallengeDetail(auth, challenge.id);
+  const result = await sut.get(auth, challenge.id);
 
   // The inverse column pair. A projection that copies lat/lon into a date round, or
   // offsetDays into a location round, passes any test that only checks `guess` is set.
@@ -86,7 +87,7 @@ it('returns the caller own guess for a guessed date round', async () => {
 });
 
 it('withholds the guess for a round the caller has not guessed', async () => {
-  const result = await sut.getChallengeDetail(auth, challenge.id);
+  const result = await sut.get(auth, challenge.id);
 
   expect(result.rounds[1].guess).toBeUndefined();
 });
@@ -140,8 +141,10 @@ Expected: PASS, whole file.
 
 - [ ] **Step 6: Type-check and lint**
 
-Run: `make check-server`, then `cd server && pnpm lint && npx prettier --check .`
-Expected: clean. `pnpm lint` is eslint only — the prettier check is separate and has been missed before.
+Run: `mise //server:check`, then `mise //server:lint` and `cd server && npx prettier --check . && cd ..`
+Expected: clean. `lint` is eslint only — the prettier check is separate and has been missed before.
+
+**Not `make check-server`.** The Makefile no longer has any `check-*`, `lint-*` or `build-*` target; they moved to mise tasks. `CLAUDE.md` still documents the `make` forms and is stale on this point.
 
 - [ ] **Step 7: Commit**
 
@@ -193,32 +196,40 @@ That exact-key check already fails if `guess` is ever attached outside the early
 
 In the same e2e file, a space challenge with two members who guess the same round differently:
 
+The file already has `owner` / `editor` / `viewer` / `nonMember` logins from `beforeAll`, and a
+`getDetail(challengeId, accessToken)` helper — use those rather than inlining new users:
+
 ```ts
 it('never returns another player guess', async () => {
-  // Both members guess round 0 with different coordinates.
-  await request(app)
-    .post(`/games/${challenge.id}/rounds/0/guess`)
-    .set('Authorization', `Bearer ${alice.accessToken}`)
-    .send({ lat: 38.72, lon: -9.14 });
-  await request(app)
-    .post(`/games/${challenge.id}/rounds/0/guess`)
-    .set('Authorization', `Bearer ${bob.accessToken}`)
-    .send({ lat: 51.51, lon: -0.13 });
+  // Two members of the same space guess round 0 differently.
+  for (const [player, lon] of [
+    [owner, -9.14],
+    [editor, -0.13],
+  ] as const) {
+    const { status } = await request(app)
+      .post(`/games/${challenge.id}/rounds/0/guess`)
+      .set('Authorization', `Bearer ${player.accessToken}`)
+      .send({ lat: 38.72, lon });
+    expect(status).toBe(201);
+  }
 
-  const asAlice = await request(app).get(`/games/${challenge.id}`).set('Authorization', `Bearer ${alice.accessToken}`);
+  const asOwner = await getDetail(challenge.id, owner.accessToken);
 
-  expect(asAlice.body.rounds[0].guess.lat).toBe(38.72);
-  // Bob's guess must appear nowhere in Alice's payload, under any key.
-  expect(JSON.stringify(asAlice.body)).not.toContain('51.51');
+  expect(asOwner.rounds[0].guess?.lon).toBe(-9.14);
+  // The editor's guess must appear nowhere in the owner's payload, under any key.
+  expect(JSON.stringify(asOwner)).not.toContain('-0.13');
 });
 ```
 
+Check the expected status against a neighbouring guess call in the file before writing `201` — the
+existing helpers assert their own, and a wrong literal fails for the wrong reason.
+
 - [ ] **Step 3: Run them**
 
-Run: `cd e2e && pnpm test -- src/specs/server/api/game.e2e-spec.ts`
+Run: `cd e2e && pnpm test src/specs/server/api/game.e2e-spec.ts`
 Expected: PASS. The isolation test passes against the unmodified tree because `getGuessesForUser(challengeId, auth.user.id)` is already user-scoped. That is expected — Step 4 is what makes it trustworthy.
 
-Note: `e2e`'s test script already includes `--run`; adding another `--run` crashes it.
+Note: `e2e`'s test script is already `vitest --run`; adding another `--run` crashes it. This is why the form differs from the server's `pnpm test -- --run <file>`, whose script has no `--run`.
 
 - [ ] **Step 4: Prove the isolation test can fail**
 
@@ -236,6 +247,8 @@ Then **revert the edit** with `git checkout -- server/src/services/game.service.
 
 A guard that has never been observed failing is not a guard. Do this once, here.
 
+**No new cases anywhere else.** There is no repository change, so `server/src/repositories/game.repository.spec.ts` and `server/test/medium/specs/repositories/game.repository*.spec.ts` need nothing — and **do not run `make sql` / `mise sql`** to "refresh" them, which without a reachable database deletes every file in `server/src/queries/`.
+
 - [ ] **Step 5: Commit**
 
 ```bash
@@ -249,7 +262,7 @@ git commit -m "test(game): pin that a round detail carries only the caller's own
 
 **Files:**
 
-- Modify: `open-api/immich-openapi-specs.json`, `open-api/typescript-sdk/src/fetch-client.ts`, `mobile/openapi/**`
+- Modify: `open-api/immich-openapi-specs.json`, `packages/sdk/src/fetch-client.ts`, `mobile/openapi/**`
 
 **Interfaces:**
 
@@ -258,12 +271,20 @@ git commit -m "test(game): pin that a round detail carries only the caller's own
 - [ ] **Step 1: Regenerate**
 
 ```bash
-cd server && pnpm build && cd ..
-cd server && pnpm sync:open-api && cd ..
-make open-api
+mise open-api
 ```
 
+That single task chains `plugins → //server:install → //server:build → //server:sync-open-api → open-api-typescript → open-api-dart`, so the three-command sequence in `CLAUDE.md` is both stale and redundant — **`make open-api` has been removed** and now exits with an error telling you to use mise.
+
 Java is required for the Dart generator.
+
+**Worktree check before running it.** mise loads the _main_ checkout's `mise.toml` as a parent config from inside this worktree, and the task body uses `//`-prefixed references. Confirm `//` resolves here, not to `~/dev/gallery`, or you will regenerate the wrong tree:
+
+```bash
+mise tasks info open-api | head -3
+```
+
+Expected `Source:` is this worktree's `mise.toml`.
 
 - [ ] **Step 2: Verify the generated Dart shape**
 
@@ -274,13 +295,13 @@ If it generated as a plain nullable instead, stop — the rest of the plan assum
 
 - [ ] **Step 3: Check the web gate**
 
-Run: `make check-web`
-Expected: clean. No web source changes here, but the SDK regen rewrites web's generated types and this is the only gate that would catch a break.
+Run: `mise //web:check`
+Expected: clean. No web source changes here, but the SDK regen rewrites web's generated types and this is the only gate that would catch a break. (`mise //web:check` runs both `check-typescript` and `check-svelte`.)
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add open-api mobile/openapi
+git add open-api packages/sdk mobile/openapi
 git commit -m "chore(open-api): regenerate for the round-detail guess field"
 ```
 
@@ -381,8 +402,9 @@ group('RoundResult.fromRound', () {
   // reproduces the wire shape of an unguessed round. A factory that reads `.value`
   // errors here instead of failing an assertion.
   test('tolerates an unguessed round, whose fields are absent', () {
+    // NOT `const`: the generated constructor is not a const constructor.
     final result = RoundResult.fromRound(
-      const GameRoundDetailResponseDto(index: 2, type: GameRoundType.location),
+      GameRoundDetailResponseDto(index: 2, type: GameRoundType.location),
     );
 
     expect(result.score, 0);
@@ -432,17 +454,36 @@ Run the same command. Expected: PASS.
 
 The inline `RoundResult(...)` at ~line 222 builds the same struct from the guess response plus a refetch. Keep the guess-response values (they are authoritative for the round just played) but take everything else from the factory, so there is one mapping rather than two that can drift:
 
+`_reveal` merges two sources, and it has to keep doing so: on a **failed refetch** it deliberately
+keeps the _stale_ challenge (`catch (_) {}` leaves `challenge = current.challenge`), so the round it
+reads carries no guess at all and the guess-response arguments are the only real values. On the happy
+path the refetched round now carries everything.
+
+So the guess-response arguments win where present, and the stored round fills in behind them:
+
 ```dart
-        result: RoundResult.fromRound(round!).copyWithGuess(
-          score: score,
-          distanceKm: distanceKm,
-          offsetDays: offsetDays,
-          guess: guess,
-          guessDate: guessDate,
+    final round = refreshed.currentRound;
+    // Null when the challenge is finished, and all-nulls when the refetch above failed and left the
+    // pre-guess challenge in place. Both are why every field below still falls back.
+    final stored = round == null ? null : RoundResult.fromRound(round);
+
+    state = AsyncData(
+      refreshed.copyWith(
+        result: RoundResult(
+          type: type,
+          score: score ?? stored?.score ?? 0,
+          distanceKm: distanceKm ?? stored?.distanceKm,
+          offsetDays: offsetDays ?? stored?.offsetDays,
+          answer: stored?.answer,
+          guess: guess ?? stored?.guess,
+          guessDate: guessDate ?? stored?.guessDate,
         ),
+      ),
+    );
 ```
 
-Add the matching `copyWithGuess` to `RoundResult`, taking each field as nullable and falling back to the existing value. Keep the existing null-round fallback (`round?.score...`) behaviour: if `round` is null, construct as before.
+No `copyWith` variant is needed, and Task 9 falls straight out of this: on the 409 path every
+argument is null, so the stored round supplies the guess.
 
 - [ ] **Step 6: Run the full session tests**
 
@@ -561,6 +602,22 @@ testWidgets('a challenge with nothing guessed renders no section at all', (teste
   await pump(tester, rounds: [_unguessed(0), _unguessed(1)]);
 
   expect(find.byKey(const Key('round-review-list')), findsNothing);
+});
+
+// A round scored 0 IS played — the filter tests `score != null`, not truthiness. Getting that
+// wrong drops the worst round of every game, which is the one people most want to look at.
+testWidgets('includes a round that scored zero', (tester) async {
+  await pump(tester, rounds: [_guessedLocation(0, score: 0)]);
+
+  expect(find.byKey(const Key('round-review-row-0')), findsOneWidget);
+});
+
+// A perfect date guess is 0 days off, and the ICU `other` branch renders "0 days off". Pinned so a
+// later copy change has to decide deliberately rather than discover it.
+testWidgets('renders a same-day date guess without crashing', (tester) async {
+  await pump(tester, rounds: [_guessedDate(0, offsetDays: 0)]);
+
+  expect(find.text('0 days off'), findsOneWidget);
 });
 
 // A space challenge stays open while other members are still playing, so `closedAt` says nothing
@@ -744,9 +801,14 @@ git commit -m "feat(mobile): list the rounds of a finished challenge"
 In `mobile/test/routing/router_test.dart`, in the existing `AppRouter duplicate guard` group:
 
 ```dart
+// This assertion belongs HERE, against the real route table, and not only in the widget test
+// that checks the row pushes something: a FakeStackRouter records pushes without running any
+// guard, so the widget test passes whether or not the guard would have cancelled the push. That
+// gap is exactly how the Play again regression reached a device with a fully green suite.
+//
 // The review route opens one round from a list that can itself sit on the reveal's own back
 // stack, so a future iteration opening another round FROM the reveal is one step away — and at
-// that point a name-based guard would cancel it silently, exactly as it did for Play again.
+// that point a name-based guard would cancel it silently.
 test('GameRoundReviewRoute can push itself, for round-to-round review', () {
   expect(guardsOf('GameRoundReviewRoute').whereType<DuplicateGuard>(), isEmpty);
 });
@@ -803,6 +865,21 @@ class GameRoundReviewPage extends ConsumerWidget {
     final rounds = session.valueOrNull?.challenge.rounds;
     final round = rounds != null && index < rounds.length ? rounds[index] : null;
 
+    // `hasError` is checked separately from `round == null`: a failed load would otherwise spin
+    // forever, which is the same dead-end the play page gives a retry for.
+    if (session.hasError && round == null) {
+      return Scaffold(
+        appBar: AppBar(title: Text('game_play'.t(context: context))),
+        body: Center(
+          child: FilledButton(
+            key: const Key('round-review-retry'),
+            onPressed: () => ref.invalidate(gameSessionProvider(challengeId)),
+            child: Text('retry'.t(context: context)),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(title: Text('game_play'.t(context: context))),
       body: round == null
@@ -812,7 +889,7 @@ class GameRoundReviewPage extends ConsumerWidget {
               index: index,
               result: RoundResult.fromRound(round),
               reviewing: true,
-              onNext: () => unawaited(context.router.maybePop()),
+              onNext: () => unawaited(context.maybePop()),
             ),
     );
   }
@@ -969,9 +1046,10 @@ git commit -m "fix(mobile): plot the guess on a 409 recovery reveal"
 
 ```bash
 cd server && pnpm test -- --run && cd ..
-make check-server
-cd server && pnpm lint && npx prettier --check . && cd ..
-cd e2e && pnpm test -- src/specs/server/api/game.e2e-spec.ts && cd ..
+mise //server:check
+mise //server:lint
+cd server && npx prettier --check . && cd ..
+cd e2e && pnpm test src/specs/server/api/game.e2e-spec.ts && cd ..
 ```
 
 - [ ] **Step 2: Mobile**
@@ -996,7 +1074,7 @@ TZ=Pacific/Auckland ~/.local/share/mise/installs/aqua-flutter-flutter/3.44.8/flu
 - [ ] **Step 3: Web and i18n**
 
 ```bash
-make check-web
+mise //web:check
 npx prettier --check "i18n/*.json"
 ```
 

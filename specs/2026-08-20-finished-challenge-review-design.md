@@ -26,7 +26,7 @@ challenge-detail endpoint loads the caller's guesses and then throws most of the
 `assetId`, `score`, `answer`. It does **not** return the caller's own guess. Those fields reach a
 client exactly once — in the response to the guess that created them — and are then unrecoverable.
 
-`GameService.getChallengeDetail` already fetches them:
+`GameService.get` (the challenge-detail endpoint) already fetches them:
 
 ```ts
 const [rounds, guesses] = await Promise.all([
@@ -77,8 +77,12 @@ kind of implicit guarantee a later refactor breaks silently.
 
 ### 3.2 Regeneration
 
-`cd server && pnpm build`, then `pnpm sync:open-api`, then `make open-api` for the TypeScript SDK
-and the Dart client. Java is required for the Dart generator.
+`mise open-api` — one task, which chains the server build, the spec sync, the TypeScript SDK and
+the Dart client. Java is required for the Dart generator.
+
+Not `make open-api`: that target has been removed and now exits with an error pointing at mise. The
+same applies to the checks below — `make check-server` / `make check-web` no longer exist either.
+`CLAUDE.md` still documents all three and is stale.
 
 ## 4. Mobile: what the player sees
 
@@ -325,8 +329,8 @@ review test therefore runs under a non-UTC `TZ`.
 
 ### 10.5 Gates
 
-Server `pnpm test` and `pnpm test:medium`, `make check-server`, eslint and prettier. The game e2e
-specs. Mobile `flutter test`, `dart analyze --fatal-infos`, `dart format` over `lib`. `make check-web`
+Server `pnpm test` and `pnpm test:medium`, `mise //server:check`, eslint and prettier. The game e2e
+specs. Mobile `flutter test`, `dart analyze --fatal-infos`, `dart format` over `lib`. `mise //web:check`
 — the SDK regen changes web's generated types even though no web code changes here, and that gate is
 the only thing that would catch a break. The six new i18n keys land in all ten locales with
 `npx prettier --write i18n/*.json`.
