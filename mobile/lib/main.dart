@@ -14,6 +14,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/constants/constants.dart';
 import 'package:immich_mobile/constants/locales.dart';
+import 'package:immich_mobile/domain/models/settings_key.dart';
 import 'package:immich_mobile/domain/services/background_worker.service.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/generated/codegen_loader.g.dart';
@@ -40,10 +41,11 @@ import 'package:immich_mobile/theme/dynamic_theme.dart';
 import 'package:immich_mobile/theme/theme_data.dart';
 import 'package:immich_mobile/utils/bootstrap.dart';
 import 'package:immich_mobile/utils/cache/widgets_binding.dart';
+import 'package:immich_mobile/utils/daily_reminder_routing.dart';
+import 'package:immich_mobile/utils/daily_reminder_schedule.dart';
 import 'package:immich_mobile/utils/debug_print.dart';
 import 'package:immich_mobile/utils/licenses.dart';
 import 'package:immich_mobile/utils/migration.dart';
-import 'package:immich_mobile/utils/space_permissions.dart';
 import 'package:immich_mobile/wm_executor.dart';
 import 'package:immich_ui/immich_ui.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -187,15 +189,10 @@ class ImmichAppState extends ConsumerState<ImmichApp> with WidgetsBindingObserve
     unawaited(_openDailyChallenge());
   }
 
-  /// Routes a tapped daily-reminder notification to the first opted-in space, in the spaces
-  /// list's own default order, falling back to the personal daily when none can be resolved (no
-  /// opted-in space, or the request failed — e.g. offline).
-  ///
-  /// The fallback lands on the solo daily rather than a bare spaces list: unlike a space, which
-  /// needs an editor to switch `dailyChallengeEnabled` on before it has anything to remind about,
-  /// every account has a personal daily the moment the reminder toggle is on (see
-  /// DailyReminderController.refresh's `soloDailyEnabled`), so this always has somewhere useful to
-  /// send a player who is in no opted-in space instead of dead-ending on a generic spaces list.
+  /// Routes a tapped daily-reminder notification. The decision itself is pure — see
+  /// `resolveDailyReminderDestination`'s doc for the full policy, including the one case where a
+  /// finished space daily is skipped in favour of an unplayed solo one; this just gathers the
+  /// inputs (the spaces list, and today's play state for each scope) and dispatches the result.
   Future<void> _openDailyChallenge() async {
     final router = ref.read(appRouterProvider);
 
@@ -206,17 +203,21 @@ class ImmichAppState extends ConsumerState<ImmichApp> with WidgetsBindingObserve
       // Offline, or the request otherwise failed — fall through to the personal daily below.
     }
 
-    final currentUserId = ref.read(currentUserProvider)?.id;
-    for (final space in spaces) {
-      // `dailyChallengeEnabled` is Optional<bool?> and `Absent.value` THROWS, so this must stay
-      // `.orElse(null)`. Absent and null both mean "not opted in".
-      if (space.dailyChallengeEnabled.orElse(null) == true) {
-        await router.push(SpaceGamesRoute(spaceId: space.id, canEdit: spaceIsWritable(space, currentUserId)));
-        return;
-      }
-    }
+    final config = ref.read(appConfigProvider);
+    final today = dailyKeyFor(DateTime.now());
+    final destination = resolveDailyReminderDestination(
+      spaces: spaces,
+      currentUserId: ref.read(currentUserProvider)?.id,
+      spacePlayedToday: config.read(SettingsKey.gameSpaceDailyLastPlayed) == today,
+      soloPlayedToday: config.read(SettingsKey.gameSoloDailyLastPlayed) == today,
+    );
 
-    await router.push(const PhotoGuesserRoute());
+    switch (destination) {
+      case SpaceDailyDestination(:final spaceId, :final canEdit):
+        await router.push(SpaceGamesRoute(spaceId: spaceId, canEdit: canEdit));
+      case SoloDailyDestination():
+        await router.push(const PhotoGuesserRoute());
+    }
   }
 
   Future<void> _setNavigationBarColor() async {

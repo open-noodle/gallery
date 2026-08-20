@@ -85,6 +85,7 @@ void main() {
       expect(defaultConfig.read(SettingsKey.gameDailyReminderMinuteOfDay), 18 * 60);
       expect(defaultConfig.read(SettingsKey.gameSpaceDailyLastPlayed), isNull);
       expect(defaultConfig.read(SettingsKey.gameSoloDailyLastPlayed), isNull);
+      expect(defaultConfig.read(SettingsKey.gameSoloDailyUnavailableOn), isNull);
     });
 
     test('each games key round-trips through write then read', () {
@@ -110,6 +111,12 @@ void main() {
             .read(SettingsKey.gameSoloDailyLastPlayed),
         '2026-08-18',
       );
+      expect(
+        defaultConfig
+            .write(SettingsKey.gameSoloDailyUnavailableOn, '2026-08-18')
+            .read(SettingsKey.gameSoloDailyUnavailableOn),
+        '2026-08-18',
+      );
     });
 
     // The two last-played keys are independent state, not aliases of one another: finishing a
@@ -124,12 +131,24 @@ void main() {
       expect(soloWritten.read(SettingsKey.gameSpaceDailyLastPlayed), isNull);
     });
 
+    // "Played" and "confirmed unavailable" are different facts about the solo daily, recorded
+    // under different keys — collapsing them would make an unplayed daily read as finished, or
+    // suppress the reminder for a daily that was never actually checked.
+    test('writing the solo last-played key leaves the solo unavailable key alone, and vice versa', () {
+      final played = defaultConfig.write(SettingsKey.gameSoloDailyLastPlayed, '2026-08-18');
+      expect(played.read(SettingsKey.gameSoloDailyUnavailableOn), isNull);
+
+      final unavailable = defaultConfig.write(SettingsKey.gameSoloDailyUnavailableOn, '2026-08-18');
+      expect(unavailable.read(SettingsKey.gameSoloDailyLastPlayed), isNull);
+    });
+
     test('writing one games key leaves the others alone', () {
       final config = defaultConfig.write(SettingsKey.gameDailyReminderEnabled, true);
 
       expect(config.read(SettingsKey.gameDailyReminderMinuteOfDay), 18 * 60);
       expect(config.read(SettingsKey.gameSpaceDailyLastPlayed), isNull);
       expect(config.read(SettingsKey.gameSoloDailyLastPlayed), isNull);
+      expect(config.read(SettingsKey.gameSoloDailyUnavailableOn), isNull);
     });
   });
 }

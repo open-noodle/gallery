@@ -7,9 +7,11 @@ const int _sixPm = 18 * 60;
 // `soloDailyEnabled` defaults to false here, not true: most of the tests below exercise general
 // scheduling behaviour (gates, the horizon, the already-played skip) through the SPACE scope only,
 // and that default keeps every one of them exercising exactly the single-source behaviour they did
-// before the solo daily existed. Tests of the two-source interaction call
-// dailyReminderOccurrences directly instead of through this helper — see "two independent daily
-// sources" below — because the brief's exact three cases are the specification for that behaviour.
+// before the solo daily existed. `soloUnavailableOn` defaults to null (never confirmed unavailable)
+// for the same reason. Tests of the two-source interaction call dailyReminderOccurrences directly
+// instead of through this helper — see "two independent daily sources" below — because the brief's
+// exact three cases, plus the availability cases added alongside them, are the specification for
+// that behaviour.
 List<DateTime> occurrences({
   required DateTime now,
   int minuteOfDay = _sixPm,
@@ -19,6 +21,7 @@ List<DateTime> occurrences({
   bool soloDailyEnabled = false,
   String? spaceLastPlayed,
   String? soloLastPlayed,
+  String? soloUnavailableOn,
   int horizonDays = kDailyReminderHorizonDays,
 }) => dailyReminderOccurrences(
   now: now,
@@ -29,8 +32,17 @@ List<DateTime> occurrences({
   soloDailyEnabled: soloDailyEnabled,
   spaceLastPlayed: spaceLastPlayed,
   soloLastPlayed: soloLastPlayed,
+  soloUnavailableOn: soloUnavailableOn,
   horizonDays: horizonDays,
 );
+
+/// The UTC day key of [instant], computed independently of `dailyKeyFor` — matching the
+/// already-played skip tests below, so a test comparing against this cannot pass merely because it
+/// makes the same mistake `dailyKeyFor` would.
+String _utcKeyOf(DateTime instant) {
+  final utc = instant.toUtc();
+  return '${utc.year}-${utc.month.toString().padLeft(2, '0')}-${utc.day.toString().padLeft(2, '0')}';
+}
 
 void main() {
   // 09:00 local on 18 Aug 2026 — before the 18:00 reminder time.
@@ -90,11 +102,7 @@ void main() {
 
   group('the already-played skip', () {
     test('drops the nearest occurrence when its UTC day is already played', () {
-      final utcDayOfFirst = DateTime(2026, 8, 18, 18).toUtc();
-      final key =
-          '${utcDayOfFirst.year}-'
-          '${utcDayOfFirst.month.toString().padLeft(2, '0')}-'
-          '${utcDayOfFirst.day.toString().padLeft(2, '0')}';
+      final key = _utcKeyOf(DateTime(2026, 8, 18, 18));
 
       final result = occurrences(now: morning, spaceLastPlayed: key);
 
@@ -123,42 +131,52 @@ void main() {
   });
 
   group('two independent daily sources', () {
+    // now = 09:00 local on 19 Aug 2026 throughout, before the 18:00 reminder time, so the nearest
+    // occurrence in every case below is local 18:00 on the 19th. `todayKey` is that occurrence's
+    // UTC day, derived the same way the already-played skip tests above derive theirs — not
+    // hardcoded as '2026-08-19' — so none of this flips on a runner west of UTC-6, where that
+    // offset lands local 18:00 on the FOLLOWING UTC date instead.
+    final now = DateTime(2026, 8, 19, 9);
+    final todayKey = _utcKeyOf(DateTime(2026, 8, 19, 18));
+
     // One shared `gameDailyLastPlayed` used to mean finishing EITHER daily silently suppressed the
     // reminder for the OTHER, unplayed one. The streak for each is computed server-side PER SCOPE,
     // so the player lost a streak they were never reminded to defend. These three are the exact
     // cases the fix is specified against.
     test('still reminds when the space daily is played but the solo daily is not', () {
-      final occurrences = dailyReminderOccurrences(
-        now: DateTime(2026, 8, 19, 9),
+      final result = dailyReminderOccurrences(
+        now: now,
         minuteOfDay: 18 * 60,
         enabled: true,
         permissionGranted: true,
         hasOptedInSpace: true,
         soloDailyEnabled: true,
-        spaceLastPlayed: '2026-08-19',
+        spaceLastPlayed: todayKey,
         soloLastPlayed: null,
+        soloUnavailableOn: null,
       );
-      expect(occurrences.first.day, 19);
+      expect(result.first.day, 19);
     });
 
     test('skips the day only when every enabled source is played', () {
-      final occurrences = dailyReminderOccurrences(
-        now: DateTime(2026, 8, 19, 9),
+      final result = dailyReminderOccurrences(
+        now: now,
         minuteOfDay: 18 * 60,
         enabled: true,
         permissionGranted: true,
         hasOptedInSpace: true,
         soloDailyEnabled: true,
-        spaceLastPlayed: '2026-08-19',
-        soloLastPlayed: '2026-08-19',
+        spaceLastPlayed: todayKey,
+        soloLastPlayed: todayKey,
+        soloUnavailableOn: null,
       );
-      expect(occurrences.first.day, 20);
+      expect(result.first.day, 20);
     });
 
     test('reminds a user with no spaces at all, when the solo daily is on', () {
       // Today hasOptedInSpace gates everything, so these users can never be reminded.
-      final occurrences = dailyReminderOccurrences(
-        now: DateTime(2026, 8, 19, 9),
+      final result = dailyReminderOccurrences(
+        now: now,
         minuteOfDay: 18 * 60,
         enabled: true,
         permissionGranted: true,
@@ -166,8 +184,9 @@ void main() {
         soloDailyEnabled: true,
         spaceLastPlayed: null,
         soloLastPlayed: null,
+        soloUnavailableOn: null,
       );
-      expect(occurrences, isNotEmpty);
+      expect(result, isNotEmpty);
     });
 
     test('a space-only player (solo not enabled) is unaffected by an unplayed solo daily', () {
@@ -176,6 +195,66 @@ void main() {
       final result = occurrences(now: morning, hasOptedInSpace: true, spaceLastPlayed: '2026-08-18');
 
       expect(result.length, kDailyReminderHorizonDays - 1);
+    });
+
+    // A day whose solo daily is CONFIRMED unavailable counts the solo side as satisfied for that
+    // day, exactly like "played". Without this, a space player who finished today's space daily
+    // but whose library cannot fill a solo one would still get reminded tonight about a daily that
+    // has already been dealt with in every sense that matters — precisely the "reminded about
+    // something already handled" failure the one-shot horizon exists to prevent (see its doc).
+    test('a space player who finished today gets no reminder when the solo daily is unavailable', () {
+      final result = dailyReminderOccurrences(
+        now: now,
+        minuteOfDay: 18 * 60,
+        enabled: true,
+        permissionGranted: true,
+        hasOptedInSpace: true,
+        soloDailyEnabled: true,
+        spaceLastPlayed: todayKey,
+        soloLastPlayed: null,
+        soloUnavailableOn: todayKey,
+      );
+      expect(result.first.day, 20);
+    });
+
+    // The other cohort the fix names: a spaceless player whose solo daily is ALSO unavailable
+    // today must not be reminded about it forever — only the one day it was actually observed
+    // unavailable is allowed to drop.
+    test('a spaceless player gets no reminder today when the solo daily is unavailable', () {
+      final result = dailyReminderOccurrences(
+        now: now,
+        minuteOfDay: 18 * 60,
+        enabled: true,
+        permissionGranted: true,
+        hasOptedInSpace: false,
+        soloDailyEnabled: true,
+        spaceLastPlayed: null,
+        soloLastPlayed: null,
+        soloUnavailableOn: todayKey,
+      );
+      expect(result.length, kDailyReminderHorizonDays - 1);
+      expect(result.first.day, 20);
+    });
+
+    // The re-evaluate-per-day requirement: an "unavailable" finding from a PREVIOUS day must not
+    // suppress today's occurrence — a library that could not fill a daily yesterday may well fill
+    // one today. This is what proves the flag is keyed to the specific day it was observed, not a
+    // standing "solo is off" switch.
+    test('a stale soloUnavailableOn from a previous day does not suppress today', () {
+      final yesterdayKey = _utcKeyOf(DateTime(2026, 8, 18, 18));
+
+      final result = dailyReminderOccurrences(
+        now: now,
+        minuteOfDay: 18 * 60,
+        enabled: true,
+        permissionGranted: true,
+        hasOptedInSpace: false,
+        soloDailyEnabled: true,
+        spaceLastPlayed: null,
+        soloLastPlayed: null,
+        soloUnavailableOn: yesterdayKey,
+      );
+      expect(result.length, kDailyReminderHorizonDays);
     });
   });
 
