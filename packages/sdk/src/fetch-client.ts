@@ -2261,6 +2261,19 @@ export type GameRoundDetailResponseDto = {
     };
     /** Round photo asset ID - present only once the caller has guessed */
     assetId?: string;
+    /** The caller's own guess - present only once guessed */
+    guess?: {
+        /** Guessed date, for a date round */
+        date: string | null;
+        /** Distance from the answer, in km */
+        distanceKm: number | null;
+        /** Guessed latitude, for a location round */
+        lat: number | null;
+        /** Guessed longitude, for a location round */
+        lon: number | null;
+        /** Day offset from the answer */
+        offsetDays: number | null;
+    };
     /** Round index (0-based) */
     index: number;
     /** The caller's score for this round - present only once guessed */
