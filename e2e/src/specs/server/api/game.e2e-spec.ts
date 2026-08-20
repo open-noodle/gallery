@@ -376,8 +376,8 @@ describe('/games', () => {
       expect(unguessedRounds).toHaveLength(detail.rounds.length);
 
       // Structural check: a withheld round carries only index/type. GameService.toRoundDetail is
-      // the sole place allowed to attach assetId/score/answer, and only once a guess exists for
-      // this caller - this catches an unexpected extra field a substring search could miss.
+      // the sole place allowed to attach assetId/score/answer/guess, and only once a guess exists
+      // for this caller - this catches an unexpected extra field a substring search could miss.
       for (const round of unguessedRounds) {
         expect(Object.keys(round).toSorted((a, b) => a.localeCompare(b))).toEqual(['index', 'type']);
       }

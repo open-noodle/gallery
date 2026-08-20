@@ -1155,7 +1155,7 @@ export class GameService extends BaseService {
     return challenge;
   }
 
-  // The only place allowed to attach `answer`/`score`/`assetId` to a round - and only once a
+  // The only place allowed to attach `answer`/`score`/`assetId`/`guess` to a round - and only once a
   // `game_guess` row for this caller proves they already played it.
   private toRoundDetail(round: GameRoundRow, guess: GameGuessRow | undefined): GameRoundDetailResponseDto {
     if (!guess) {
