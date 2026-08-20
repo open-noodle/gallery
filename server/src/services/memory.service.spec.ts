@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { DateTime } from 'luxon';
-import { defaults } from 'src/config';
+import { defaults } from 'src/dtos/config.dto';
 import { MemoryType, SystemMetadataKey, UserMetadataKey } from 'src/enum';
 import { MemoryService } from 'src/services/memory.service';
 import { OnThisDayData, RuleMemoryData } from 'src/types';
