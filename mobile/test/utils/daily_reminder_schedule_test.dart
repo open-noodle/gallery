@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/utils/daily_reminder_schedule.dart';
 
+import '../test_helpers/wire_dates.dart';
+
 /// 18:00 as minutes since local midnight.
 const int _sixPm = 18 * 60;
 
@@ -286,6 +288,45 @@ void main() {
       // machine this fails immediately if the implementation ever reads local calendar fields
       // instead of the instant itself — free insurance where most of us actually work.
       expect(dailyKeyFor(instant), dailyKeyFor(instant.toLocal()));
+    });
+
+    test('dailyKeyForDateOnly keys a date-only wire value by the day it names', () {
+      // `challenge.dailyOn` is `YYYY-MM-DD` on the wire and the generated client parses it with
+      // `DateTime.tryParse`, which Dart resolves in the DEVICE's zone — so it arrives as LOCAL
+      // midnight, not as an instant. `dailyKeyFor` would convert it and name the previous day east
+      // of Greenwich. Run this file under `TZ=Europe/Berlin` to see that; under Etc/UTC (what CI
+      // runs) the two are indistinguishable, the same limitation the note above records.
+      final dailyOn = wireDateOnly('2026-08-19');
+      expect(dailyOn.isUtc, isFalse, reason: 'the premise: an offset-less date parses in local time');
+
+      expect(dailyKeyForDateOnly(dailyOn), '2026-08-19');
+      expect(dailyKeyForDateOnly(wireDateOnly('2026-03-05')), '2026-03-05', reason: 'still zero-padded');
+    });
+
+    // The two halves of the suppression the whole one-shot horizon rests on, checked against each
+    // other rather than one at a time: `DailyReminderController.recordDailyCompleted` stores
+    // `dailyKeyForDateOnly(challenge.dailyOn)` — computed from a DATE-ONLY value — and the skip
+    // below compares it against `dailyKeyFor(<that day's reminder instant>)` — computed from a real
+    // INSTANT. Two shapes, two functions, and if they disagree the day is never skipped: the player
+    // finishes today's daily and is reminded about it tonight anyway.
+    test('a day is skipped when its daily was recorded from the date-only value the server sent', () {
+      final tonight = DateTime(2026, 8, 18, 18);
+      // What the server names as the daily current at that instant, and what it puts on the wire.
+      final recorded = dailyKeyForDateOnly(wireDateOnly(dailyKeyFor(tonight)));
+
+      final result = occurrences(
+        now: DateTime(2026, 8, 18, 9),
+        hasOptedInSpace: false,
+        soloDailyEnabled: true,
+        soloLastPlayed: recorded,
+      );
+
+      expect(
+        result,
+        isNot(contains(tonight)),
+        reason: 'the daily played this morning must not be advertised again tonight',
+      );
+      expect(result.length, kDailyReminderHorizonDays - 1, reason: 'exactly one day dropped, not the whole horizon');
     });
   });
 }
