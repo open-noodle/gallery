@@ -188,8 +188,14 @@ class ImmichAppState extends ConsumerState<ImmichApp> with WidgetsBindingObserve
   }
 
   /// Routes a tapped daily-reminder notification to the first opted-in space, in the spaces
-  /// list's own default order, falling back to the spaces list when none can be resolved (no
+  /// list's own default order, falling back to the personal daily when none can be resolved (no
   /// opted-in space, or the request failed — e.g. offline).
+  ///
+  /// The fallback lands on the solo daily rather than a bare spaces list: unlike a space, which
+  /// needs an editor to switch `dailyChallengeEnabled` on before it has anything to remind about,
+  /// every account has a personal daily the moment the reminder toggle is on (see
+  /// DailyReminderController.refresh's `soloDailyEnabled`), so this always has somewhere useful to
+  /// send a player who is in no opted-in space instead of dead-ending on a generic spaces list.
   Future<void> _openDailyChallenge() async {
     final router = ref.read(appRouterProvider);
 
@@ -197,7 +203,7 @@ class ImmichAppState extends ConsumerState<ImmichApp> with WidgetsBindingObserve
     try {
       spaces = await ref.read(sharedSpacesProvider.future);
     } catch (_) {
-      // Offline, or the request otherwise failed — fall through to the spaces list below.
+      // Offline, or the request otherwise failed — fall through to the personal daily below.
     }
 
     final currentUserId = ref.read(currentUserProvider)?.id;
@@ -210,7 +216,7 @@ class ImmichAppState extends ConsumerState<ImmichApp> with WidgetsBindingObserve
       }
     }
 
-    await router.push(const SpacesRoute());
+    await router.push(const PhotoGuesserRoute());
   }
 
   Future<void> _setNavigationBarColor() async {

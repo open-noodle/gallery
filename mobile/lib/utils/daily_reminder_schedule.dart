@@ -7,8 +7,9 @@
 /// alone. It also keeps well clear of iOS's 64-pending-notification cap.
 const int kDailyReminderHorizonDays = 7;
 
-/// The `YYYY-MM-DD` UTC key for an instant — the same shape `SettingsKey.gameDailyLastPlayed` holds
-/// and the same day boundary the server's `dailyOn` uses.
+/// The `YYYY-MM-DD` UTC key for an instant — the same shape `SettingsKey.gameSpaceDailyLastPlayed`
+/// and `SettingsKey.gameSoloDailyLastPlayed` hold, and the same day boundary the server's
+/// `dailyOn` uses.
 String dailyKeyFor(DateTime instant) {
   final utc = instant.toUtc();
   return '${utc.year.toString().padLeft(4, '0')}-'
@@ -26,18 +27,36 @@ String dailyKeyFor(DateTime instant) {
 /// UTC midnight, which is 1-2 am across Europe. Any local time maps to some UTC instant, and
 /// whatever daily is current then is the one waiting — so there is no timezone trap, provided the
 /// copy never names a date.
+///
+/// There are two independent daily sources, a space's and the player's own solo one, each with its
+/// own streak computed server-side. [hasOptedInSpace] / [spaceLastPlayed] and [soloDailyEnabled] /
+/// [soloLastPlayed] carry one source each rather than collapsing back into a single flag and a
+/// single date: a single `gameDailyLastPlayed` used to mean finishing EITHER daily silently
+/// suppressed the reminder for the OTHER, unplayed one, costing the player a streak they were
+/// never reminded to defend. Still not a per-space map on the space side, though — see
+/// [hasOptedInSpace]'s doc.
+///
+/// [hasOptedInSpace] is whether ANY of the player's spaces has switched its daily on, not which —
+/// reading a specific space's daily GENERATES it as a side effect, so resolving one would create a
+/// daily nobody asked for just to decide whether to remind. [soloDailyEnabled] has no comparable
+/// per-space opt-in to check: every account has a personal daily once the reminder is on, so the
+/// caller passes it in mainly so this stays a pure function of its arguments rather than a global
+/// assumption baked in here.
 List<DateTime> dailyReminderOccurrences({
   required DateTime now,
   required int minuteOfDay,
   required bool enabled,
   required bool permissionGranted,
   required bool hasOptedInSpace,
-  required String? lastPlayedDate,
+  required bool soloDailyEnabled,
+  required String? spaceLastPlayed,
+  required String? soloLastPlayed,
   int horizonDays = kDailyReminderHorizonDays,
 }) {
   // Permission is checked here, not only where the toggle is set: it can be revoked in OS settings
-  // long after the toggle was switched on.
-  if (!enabled || !permissionGranted || !hasOptedInSpace || horizonDays <= 0) {
+  // long after the toggle was switched on. The scope gate is OR, not AND: before the solo daily, a
+  // player with no opted-in space could never be reminded at all, even once they had one.
+  if (!enabled || !permissionGranted || !(hasOptedInSpace || soloDailyEnabled) || horizonDays <= 0) {
     return const [];
   }
 
@@ -49,7 +68,15 @@ List<DateTime> dailyReminderOccurrences({
     final instant = start.add(Duration(days: day));
     // The skip compares against the UTC day of THIS instant, not the local calendar day, so it is
     // correct for a player whose evening falls on the following UTC date.
-    if (lastPlayedDate != null && lastPlayedDate == dailyKeyFor(instant)) {
+    final key = dailyKeyFor(instant);
+    // A day is skipped only when EVERY source the player actually has is played for it. A source
+    // that is not enabled for them counts as vacuously played rather than as unplayed — otherwise
+    // a spaceless player's permanently-null spaceLastPlayed would never equal any key and no day
+    // would ever be skippable, and symmetrically a space-only player would be reminded forever
+    // about a solo daily they never opted into.
+    final spacePlayed = !hasOptedInSpace || spaceLastPlayed == key;
+    final soloPlayed = !soloDailyEnabled || soloLastPlayed == key;
+    if (spacePlayed && soloPlayed) {
       continue;
     }
     occurrences.add(instant);

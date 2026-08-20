@@ -56,7 +56,13 @@ enum SettingsKey<T> {
   // Games
   gameDailyReminderEnabled<bool>(),
   gameDailyReminderMinuteOfDay<int>(),
-  gameDailyLastPlayed<String?>(),
+  // Split from a single gameDailyLastPlayed: a space daily and the solo daily are separate streaks
+  // computed server-side, so finishing one must not be recorded as if it satisfied the other — see
+  // dailyReminderOccurrences's doc for what that used to cost the player. The old key's value is
+  // abandoned, not migrated, on upgrade: it is at most one day's worth of "already played" state,
+  // so the worst case is a single redundant reminder before these two keys are written fresh.
+  gameSpaceDailyLastPlayed<String?>(),
+  gameSoloDailyLastPlayed<String?>(),
 
   // Backup
   backupEnabled<bool>(),

@@ -80,10 +80,11 @@ void main() {
   });
 
   group('games config', () {
-    test('the reminder defaults to off at 18:00 with no daily recorded', () {
+    test('the reminder defaults to off at 18:00 with no daily recorded, for either scope', () {
       expect(defaultConfig.read(SettingsKey.gameDailyReminderEnabled), isFalse);
       expect(defaultConfig.read(SettingsKey.gameDailyReminderMinuteOfDay), 18 * 60);
-      expect(defaultConfig.read(SettingsKey.gameDailyLastPlayed), isNull);
+      expect(defaultConfig.read(SettingsKey.gameSpaceDailyLastPlayed), isNull);
+      expect(defaultConfig.read(SettingsKey.gameSoloDailyLastPlayed), isNull);
     });
 
     test('each games key round-trips through write then read', () {
@@ -98,16 +99,37 @@ void main() {
         9 * 60,
       );
       expect(
-        defaultConfig.write(SettingsKey.gameDailyLastPlayed, '2026-08-18').read(SettingsKey.gameDailyLastPlayed),
+        defaultConfig
+            .write(SettingsKey.gameSpaceDailyLastPlayed, '2026-08-18')
+            .read(SettingsKey.gameSpaceDailyLastPlayed),
         '2026-08-18',
       );
+      expect(
+        defaultConfig
+            .write(SettingsKey.gameSoloDailyLastPlayed, '2026-08-18')
+            .read(SettingsKey.gameSoloDailyLastPlayed),
+        '2026-08-18',
+      );
+    });
+
+    // The two last-played keys are independent state, not aliases of one another: finishing a
+    // space daily must not read back as if the solo daily had been played too, or vice versa —
+    // that collapse is exactly the bug dailyReminderOccurrences's "two independent daily sources"
+    // tests are written against.
+    test('writing the space key leaves the solo key alone, and vice versa', () {
+      final spaceWritten = defaultConfig.write(SettingsKey.gameSpaceDailyLastPlayed, '2026-08-18');
+      expect(spaceWritten.read(SettingsKey.gameSoloDailyLastPlayed), isNull);
+
+      final soloWritten = defaultConfig.write(SettingsKey.gameSoloDailyLastPlayed, '2026-08-18');
+      expect(soloWritten.read(SettingsKey.gameSpaceDailyLastPlayed), isNull);
     });
 
     test('writing one games key leaves the others alone', () {
       final config = defaultConfig.write(SettingsKey.gameDailyReminderEnabled, true);
 
       expect(config.read(SettingsKey.gameDailyReminderMinuteOfDay), 18 * 60);
-      expect(config.read(SettingsKey.gameDailyLastPlayed), isNull);
+      expect(config.read(SettingsKey.gameSpaceDailyLastPlayed), isNull);
+      expect(config.read(SettingsKey.gameSoloDailyLastPlayed), isNull);
     });
   });
 }
