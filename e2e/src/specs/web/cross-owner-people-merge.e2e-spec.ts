@@ -1,4 +1,4 @@
-import type { LoginResponseDto, SystemConfigDto } from '@immich/sdk';
+import type { AdminConfigDto, LoginResponseDto } from '@immich/sdk';
 import { expect, test } from '@playwright/test';
 import { asBearerAuth, utils } from 'src/utils';
 
@@ -19,7 +19,7 @@ test.describe('Cross-owner people merge', () => {
   let admin: LoginResponseDto;
   let actor: LoginResponseDto;
   let targetPersonId: string;
-  let baseConfig: SystemConfigDto;
+  let baseConfig: AdminConfigDto;
 
   test.beforeAll(async () => {
     utils.initSdk();
