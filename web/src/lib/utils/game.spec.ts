@@ -1,6 +1,7 @@
 import {
   competitionRanks,
   formatDistanceKm,
+  formatGameDate,
   formatStandingsMonth,
   MAX_ROUND_SCORE,
   scorePercent,
@@ -124,6 +125,30 @@ describe('formatStandingsMonth', () => {
   it('renders in the given locale', () => {
     expect(formatStandingsMonth('2026-08', 'de-DE')).toBe('August 2026');
     expect(formatStandingsMonth('2026-12', 'fr-FR')).toBe('décembre 2026');
+  });
+});
+
+describe('formatGameDate', () => {
+  it('renders a YYYY-MM-DD daily key as a readable date', () => {
+    expect(formatGameDate('2026-08-19', 'en-GB')).toBe('19 Aug 2026');
+  });
+
+  it('renders in the given locale', () => {
+    expect(formatGameDate('2026-08-19', 'de-DE')).toBe('19.08.2026');
+  });
+
+  // A free-play game has no dailyOn, so history dates it from its ISO createdAt instead - the same
+  // helper has to take both.
+  it('renders an ISO timestamp as the same shape of date', () => {
+    expect(formatGameDate('2026-08-19T09:00:00.000Z', 'en-GB')).toBe('19 Aug 2026');
+  });
+
+  // The game keys every day it cares about - dailyOn, and the streak counted off it - in UTC. A
+  // late-evening UTC timestamp must not slide onto the next day, or history would disagree with
+  // the streak that counted it. (The suite pins TZ=UTC, so this pins the intent, not the
+  // behaviour under a different zone - the timeZone option is what enforces it.)
+  it('dates a game by its UTC day rather than the viewer zone', () => {
+    expect(formatGameDate('2026-08-19T23:30:00.000Z', 'en-GB')).toBe('19 Aug 2026');
   });
 });
 

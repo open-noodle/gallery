@@ -64,4 +64,25 @@ describe('DailyChallengeCard', () => {
     expect(screen.getByTestId('daily-challenge-unavailable')).toBeInTheDocument();
     expect(screen.queryByTestId('daily-challenge-play')).not.toBeInTheDocument();
   });
+
+  // Design §5.1 - failure phrasing is per-scope. The default wording tells the player to add photos
+  // "to this space", which is nonsense for a solo player who may not be in one, so the caller
+  // supplies the remedy that actually applies to it.
+  it('lets the caller phrase the unavailable message for its own scope', () => {
+    render(DailyChallengeCard, {
+      challenge: null,
+      href,
+      now: new Date('2026-08-16T12:00:00.000Z'),
+      unavailableMessage: 'Nothing to play on your own yet',
+    });
+
+    expect(screen.getByTestId('daily-challenge-unavailable')).toHaveTextContent('Nothing to play on your own yet');
+  });
+
+  // $t() returns the raw key in this environment, so the key name is what the default renders as.
+  it('keeps the space wording when the caller supplies no message', () => {
+    render(DailyChallengeCard, { challenge: null, href, now: new Date('2026-08-16T12:00:00.000Z') });
+
+    expect(screen.getByTestId('daily-challenge-unavailable')).toHaveTextContent('game_daily_unavailable');
+  });
 });
