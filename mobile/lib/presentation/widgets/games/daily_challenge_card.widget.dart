@@ -21,27 +21,25 @@ import 'package:immich_mobile/widgets/spaces/space_collage.dart';
 /// [kDailyPromptHeight] and `DailyChallengePrompt`.
 const double kDailyCardHeight = 108;
 
-/// Height reserved for the opt-in prompt shown to editors of an un-asked space.
-///
-/// Deliberately a *different* constant from [kDailyCardHeight]: the prompt carries a full
-/// localised sentence (`game_daily_enable_description`) whose length varies a lot by locale — the
-/// same "no overflow, ever" requirement as the card, but the card's fixed-length labels can share
-/// one height while this can't safely share it with them. This value is sized generously enough
-/// for every locale measured against a 360dp phone (see the widget test's narrow-phone/German
-/// group), but it is not itself what makes overflow impossible — `DailyChallengePrompt` caps the
-/// title and description to `maxLines` + ellipsis, wraps its whole column in a
-/// `SingleChildScrollView`, and lays the decline/enable buttons out in an `OverflowBar` (which
-/// stacks them instead of overflowing horizontally when they don't fit — the failure this height
-/// alone cannot prevent, since it's a width problem). A future locale longer than any of these
-/// degrades or scrolls; it does not throw.
-const double kDailyPromptHeight = 132;
-
 /// The tri-state daily slot.
 ///
 /// | dailyChallengeEnabled | editor  | viewer  |
 /// | null                  | prompt  | nothing |
 /// | true                  | card    | card    |
 /// | false                 | nothing | nothing |
+///
+/// …but only where [allowPrompt] is set. The space TIMELINE passes false, so the prompt row of
+/// that table collapses to "nothing" there: an un-asked space shows no banner above its photos at
+/// all, and the invitation to turn the daily on lives solely on the Challenges page.
+///
+/// That split is also what let the prompt stop being fixed-height. It used to be wrapped in a
+/// `SizedBox(height: 132)` because the timeline's scrubber needs the sliver's height synchronously
+/// — but the prompt carries a full localised sentence and a button pair, and at 360dp the
+/// `OverflowBar` stacks those buttons, which alone overran the 132 by 44dp and cut them off. (A
+/// 402dp screen fit in 129, which is why this survived review.) Nothing catches it either:
+/// `SingleChildScrollView` scrolls the overflow away instead of throwing. Now that the prompt only
+/// ever renders in the Challenges page's plain `ListView`, it can size to its content and the
+/// whole failure mode is gone rather than re-tuned.
 class DailySlot extends ConsumerWidget {
   const DailySlot({
     super.key,
@@ -51,6 +49,7 @@ class DailySlot extends ConsumerWidget {
     required this.onDecide,
     required this.onPlay,
     required this.onStandings,
+    this.allowPrompt = false,
   });
 
   final String spaceId;
@@ -67,22 +66,38 @@ class DailySlot extends ConsumerWidget {
   /// the signposted route to that page.
   final VoidCallback? onStandings;
 
-  /// The height to reserve. Depends only on values the page already holds synchronously, never on
-  /// the daily provider's async state.
-  static double reservedHeight({required bool? dailyChallengeEnabled, required bool canEdit}) {
-    if (dailyChallengeEnabled == null) return canEdit ? kDailyPromptHeight : 0;
-    return dailyChallengeEnabled ? kDailyCardHeight : 0;
+  /// Whether an un-asked space may show the editor opt-in prompt here.
+  ///
+  /// Only the Challenges page sets it. Defaults to false so the timid choice is the default one:
+  /// a new caller shows the card or nothing, never a prompt on a surface that shouldn't carry it.
+  final bool allowPrompt;
+
+  /// Whether the SPACE TIMELINE shows a banner at all — which only an opted-in space does.
+  ///
+  /// Independent of the viewer's role, unlike the Challenges page: the editor opt-in prompt is
+  /// deliberately not a timeline surface, so `null` means nothing here for editors and viewers
+  /// alike. Two callers besides the sliver need this exact answer — [reservedHeight], and the
+  /// Challenges page's "hide the banner in this space" item, which must offer itself only where
+  /// there is a banner to hide. Naming it once keeps those three from drifting apart.
+  static bool showsOnTimeline({required bool? dailyChallengeEnabled}) => dailyChallengeEnabled == true;
+
+  /// The height the space timeline reserves for this slot, consumed synchronously by the scrubber
+  /// before the daily provider resolves.
+  ///
+  /// [hidden] is the per-device "hide this space's banner" choice and wins over everything else:
+  /// the caller drops the slot entirely, so reserving anything would leave a band of empty space
+  /// and shift every scrubber offset below it.
+  static double reservedHeight({required bool? dailyChallengeEnabled, bool hidden = false}) {
+    if (hidden || !showsOnTimeline(dailyChallengeEnabled: dailyChallengeEnabled)) return 0;
+    return kDailyCardHeight;
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (dailyChallengeEnabled == null) {
-      return canEdit
-          ? SizedBox(
-              height: kDailyPromptHeight,
-              child: DailyChallengePrompt(onDecide: onDecide),
-            )
-          : const SizedBox.shrink();
+      // No fixed height: the only caller that allows the prompt lays it out in a plain ListView,
+      // so it sizes to its content in every locale and at every text scale. See the class doc.
+      return allowPrompt && canEdit ? DailyChallengePrompt(onDecide: onDecide) : const SizedBox.shrink();
     }
     if (!dailyChallengeEnabled!) return const SizedBox.shrink();
 
