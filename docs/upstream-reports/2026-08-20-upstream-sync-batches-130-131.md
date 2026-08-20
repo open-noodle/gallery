@@ -94,12 +94,59 @@ unknown keys, so a fork field missing from it would vanish at runtime with no er
 `classification.service.spec.ts` and the fork's admin-settings web specs pass **unmodified**, which is
 the design's check that the port did not alter behaviour.
 
-## Remote CI
+## Remote CI — 10/10 green
 
 - **Test branch**: `rebase/upstream-batch-131`
-- **Commit**: `26068cc4e40`
+- **Commits validated**: `26068cc4e40` (nine workflows) and `d315fe77070` (`test.yml`, after the fix below)
 
-_(filled in when the dispatched suite completes)_
+| Workflow                                  | Result                                                   |
+| ----------------------------------------- | -------------------------------------------------------- |
+| `test.yml`                                | GREEN on `d315fe77070` — red on the first run, see below |
+| `docker.yml`                              | GREEN                                                    |
+| `static_analysis.yml`                     | GREEN                                                    |
+| `gallery-build-mobile.yml`                | GREEN                                                    |
+| `gallery-mobile-smoke.yml`                | GREEN                                                    |
+| `gallery-ml-smoke.yml`                    | GREEN                                                    |
+| `gallery-rebase-smoke.yml`                | GREEN                                                    |
+| `gallery-revert-to-immich-validation.yml` | GREEN                                                    |
+| `storage-migration-tests.yml`             | GREEN on re-run — confirmed environmental, see below     |
+| `storage-migration-e2e.yml`               | GREEN                                                    |
+
+### One real failure — a stale local test run
+
+`Test Web` failed on five `ClassificationSettings.spec.ts` assertions. **Cause: a local verification
+gap, not the port.** The web suite was run and reported green, and only _afterwards_ was
+`ClassificationSettings.svelte` edited to rename `systemConfigDto` → `adminConfigDto` (fixing what
+`check:svelte` caught). The suite was never re-run, so five assertions still expected the old param
+name.
+
+Fixed in `d315fe77070`; the full web suite re-verified at 363 files / 5694 tests, and a tree-wide
+sweep confirmed no other `systemConfigDto` mismatch survives (remaining hits are upstream's own alias
+export and comments).
+
+**Process lesson: re-run the affected suite after any post-test edit.** A green run is only evidence
+about the tree that produced it.
+
+### One confirmed flake — `storage-migration-tests`
+
+The `delete-source-false` phase died at "Verifying API access works (admin)" with
+`SocketError: other side closed` on `/assets/{id}/original`. Judged environmental on four
+independent pieces of evidence, not on a re-run alone:
+
+- it passed on re-run;
+- the failing test file is **unchanged** by the port (`git diff` vs the pre-port backup is empty);
+- the server logged a clean boot and normal migration work, then **no error whatsoever** at the moment
+  the socket closed — no exception, no crash, no restart;
+- the sibling `storage-migration-e2e.yml` passed the same S3 serving path on the same commit.
+
+This workflow had passed 8 of its previous 8 runs, so the failure was investigated as a suspected
+regression before being classified.
+
+### Tooling note
+
+`npx prettier --check` must be run **from inside the package** — from the repo root the
+`@trivago/prettier-plugin-sort-imports` plugin fails to resolve and the command errors in a way that
+can be mistaken for a different problem.
 
 ## Backup
 
