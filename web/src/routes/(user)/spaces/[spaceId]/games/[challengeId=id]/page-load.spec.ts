@@ -78,6 +78,28 @@ describe('game play page load', () => {
     await expect(load(makeEvent() as never)).rejects.toThrow(error);
   });
 
+  // Design §11: a solo challenge id under a space route resolves to a challenge this route cannot
+  // render - it has no space, so no leaderboard and no members to score against. 404 rather than
+  // redirect, so a wrong link is visible instead of being papered over. The play route on the
+  // other side of the fence refuses a space id in exactly the same way.
+  it('404s a solo challenge id rather than redirecting', async () => {
+    sdkMock.getChallenge.mockResolvedValue({ ...challenge, spaceId: null, ownerId: 'current-user-id' } as never);
+
+    // The message comes from the i18n catalog, not a hardcoded English literal - $t() returns the
+    // raw key in this environment, which is what makes that visible here.
+    await expect(load(makeEvent() as never)).rejects.toMatchObject({
+      status: 404,
+      body: { message: 'game_challenge_load_failed' },
+    });
+  });
+
+  // Same fence, one space over: the id is a real space challenge, just not this space's.
+  it('404s a challenge belonging to a different space', async () => {
+    sdkMock.getChallenge.mockResolvedValue({ ...challenge, spaceId: 'space-2' } as never);
+
+    await expect(load(makeEvent() as never)).rejects.toMatchObject({ status: 404 });
+  });
+
   // Realistic in a shared space: an editor deletes the challenge while another member still has it
   // open. Same precedent as the [spaceId] layout's own space-gone handling.
   it.each([403, 404])(
