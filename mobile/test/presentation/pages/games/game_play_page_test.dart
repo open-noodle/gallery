@@ -23,6 +23,7 @@ import 'package:immich_mobile/providers/map/map_state.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:immich_mobile/repositories/game_api.repository.dart';
 import 'package:immich_mobile/repositories/solo_game_api.repository.dart';
+import 'package:immich_mobile/routing/router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:openapi/api.dart';
 
@@ -278,6 +279,20 @@ void main() {
     expect(find.text('1 of 1 rounds answered'), findsNWidgets(2));
   });
 
+  testWidgets('a finished space game lists its rounds under the leaderboard', (tester) async {
+    when(() => repository.getChallenge('c1')).thenAnswer((_) async => _finishedChallenge());
+    when(() => repository.getLeaderboard('c1')).thenAnswer(
+      (_) async => GameLeaderboardResponseDto(
+        entries: [GameLeaderboardResponseDtoEntriesInner(userId: 'u1', name: 'Alice', total: 100, answered: 1)],
+      ),
+    );
+
+    await pump(tester);
+
+    expect(find.byKey(const Key('game-leaderboard-row-u1')), findsOneWidget);
+    expect(find.byKey(const Key('round-review-list')), findsOneWidget);
+  });
+
   testWidgets('a completion with no leaderboard still shows the completion line', (tester) async {
     when(() => repository.getChallenge('c1')).thenAnswer((_) async => _finishedChallenge());
     // `_safeLeaderboard` swallows the failure, leaving `leaderboard` null: the completion screen
@@ -410,6 +425,29 @@ void main() {
 
       expect(find.byType(StandingsRow), findsNothing, reason: 'a solo game has nobody to rank against');
       expect(find.text('Leaderboard'), findsNothing);
+    });
+
+    testWidgets('a finished solo game lists its rounds under the score', (tester) async {
+      when(() => repository.getChallenge('c1')).thenAnswer((_) async => _finishedSoloChallenge());
+      when(() => repository.getLeaderboard('c1')).thenAnswer((_) async => GameLeaderboardResponseDto(entries: []));
+
+      await pump(tester);
+
+      expect(find.byKey(const Key('solo-score-total')), findsOneWidget);
+      expect(find.byKey(const Key('round-review-list')), findsOneWidget);
+    });
+
+    testWidgets('tapping a round opens its review', (tester) async {
+      final router = FakeStackRouter();
+      when(() => repository.getChallenge('c1')).thenAnswer((_) async => _finishedSoloChallenge());
+      when(() => repository.getLeaderboard('c1')).thenAnswer((_) async => GameLeaderboardResponseDto(entries: []));
+
+      await pump(tester, router: router);
+
+      await tester.tap(find.byKey(const Key('round-review-row-0')));
+      await tester.pumpAndSettle();
+
+      expect(router.pushed.single, isA<GameRoundReviewRoute>());
     });
 
     testWidgets('a space challenge keeps its leaderboard', (tester) async {
