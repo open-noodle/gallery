@@ -192,7 +192,11 @@ void main() {
     test('a space-only player (solo not enabled) is unaffected by an unplayed solo daily', () {
       // The mirror image of the first case: with soloDailyEnabled false, a null soloLastPlayed
       // must not hold the space reminder hostage to a source this player was never offered.
-      final result = occurrences(now: morning, hasOptedInSpace: true, spaceLastPlayed: '2026-08-18');
+      final result = occurrences(
+        now: morning,
+        hasOptedInSpace: true,
+        spaceLastPlayed: _utcKeyOf(DateTime(2026, 8, 18, 18)),
+      );
 
       expect(result.length, kDailyReminderHorizonDays - 1);
     });

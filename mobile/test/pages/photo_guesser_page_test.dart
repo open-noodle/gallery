@@ -253,6 +253,40 @@ void main() {
 
       verifyNever(() => reminder.recordSoloDailyUnavailable(now: any(named: 'now')));
     });
+
+    // AsyncLoading and AsyncError both RETAIN the previous value in Riverpod, so once this has
+    // resolved null once, a later refetch that FAILS (offline, a server error) still carries
+    // `value == null` — a naive `hasValue && value == null` check would read that as a second
+    // confirmed unavailability, when it is really a network blip that says nothing about the
+    // library. Only a genuine AsyncData resolution may report unavailability.
+    testWidgets('a failed refetch after a genuine unavailable resolution is not re-reported', (tester) async {
+      final reminder = _MockDailyReminderController();
+      when(() => reminder.recordSoloDailyUnavailable(now: any(named: 'now'))).thenAnswer((_) async {});
+
+      var fetches = 0;
+      await tester.pumpConsumerWidget(
+        const PhotoGuesserPage(),
+        overrides: [
+          soloDailyProvider.overrideWith((ref) async {
+            fetches++;
+            if (fetches == 1) return null;
+            throw Exception('offline');
+          }),
+          soloStatsProvider.overrideWith((ref) async => _stats()),
+          soloHistoryProvider.overrideWith((ref) async => GameSoloHistoryResponseDto(hasNextPage: false, items: [])),
+          dailyReminderProvider.overrideWithValue(reminder),
+        ],
+      );
+
+      final context = tester.element(find.byType(PhotoGuesserPage));
+      ProviderScope.containerOf(context, listen: false).invalidate(soloDailyProvider);
+      await tester.pumpAndSettle();
+
+      // Two fetches happened (the genuine resolution, then the failed refetch), but only the FIRST
+      // was a real resolution.
+      expect(fetches, 2);
+      verify(() => reminder.recordSoloDailyUnavailable(now: any(named: 'now'))).called(1);
+    });
   });
 
   group('stats', () {
