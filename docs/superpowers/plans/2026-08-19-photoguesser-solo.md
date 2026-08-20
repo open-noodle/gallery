@@ -1,6 +1,6 @@
 # PhotoGuesser Solo Play Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Let a user play the photo guessing game alone — a personal daily plus unlimited free play — from a top-level entry on web and mobile, without belonging to any shared space.
 
@@ -316,7 +316,7 @@ same day. Proven by a medium test, because a mock cannot show this."
 - Consumes: `ownerId` from Task 1.
 - Produces: `GameChallengeResponseDto.spaceId: string | null` and `GameChallengeResponseDto.ownerId: string | null`. Every client task depends on these being nullable.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `e2e/src/specs/server/api/game.e2e-spec.ts`:
 
@@ -354,12 +354,12 @@ describe('game challenge scope contract', () => {
 
 If the emitted shape turns out to be `anyOf: [{type: 'string'}, {type: 'null'}]` rather than a type array, adjust the assertion to match what `pnpm sync:open-api` actually produces — but assert on nullability either way, never delete the test.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd server && pnpm test -- --run src/dtos/game-scope-contract.spec.ts`
 Expected: FAIL — `spaceId.type` is `"string"`, not `["string","null"]`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 In `server/src/dtos/game.dto.ts`, inside `GameChallengeResponseSchema`:
 
@@ -372,14 +372,14 @@ In `server/src/dtos/game.dto.ts`, inside `GameChallengeResponseSchema`:
     ownerId: z.string().nullable().describe('Owning user ID, or null for a shared-space challenge'),
 ```
 
-- [ ] **Step 4: Regenerate the clients**
+- [x] **Step 4: Regenerate the clients**
 
 ```bash
 cd server && pnpm build && pnpm sync:open-api
 cd .. && make open-api
 ```
 
-- [ ] **Step 5: Fix every call site the change breaks**
+- [x] **Step 5: Fix every call site the change breaks**
 
 TypeScript surfaces the web ones. `web/src/routes/(user)/spaces/[spaceId]/games/[challengeId=id]/+page.svelte:208` calls `Route.viewSpaceGames({ id: challenge.spaceId })` on the back button — that route only exists for a space challenge:
 
@@ -399,7 +399,7 @@ grep -rn "\.spaceId" mobile/lib/pages/library/spaces/games/ mobile/lib/providers
 
 Resolve each hit to handle a null.
 
-- [ ] **Step 6: Run the checks**
+- [x] **Step 6: Run the checks**
 
 Run: `cd server && pnpm test -- --run src/dtos/game-scope-contract.spec.ts`
 Run: `cd e2e && pnpm test src/specs/server/api/game.e2e-spec.ts`
@@ -407,7 +407,7 @@ Run: `make check-web`
 Run: `cd mobile && dart analyze --fatal-infos`
 Expected: all PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/src/dtos/game.dto.ts server/src/dtos/game-scope-contract.spec.ts open-api/ \
@@ -454,7 +454,7 @@ export interface ChallengePool {
 
 Task 4 implements the same interface as `PersonalPool`. Task 6 consumes `GameService.generateChallenge(pool, …)`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `server/src/services/game/space-pool.spec.ts`:
 
@@ -505,12 +505,12 @@ describe(SpacePool.name, () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd server && pnpm test -- --run src/services/game/space-pool.spec.ts`
 Expected: FAIL — `Cannot find module 'src/services/game/space-pool'`.
 
-- [ ] **Step 3: Write the interface and `SpacePool`**
+- [x] **Step 3: Write the interface and `SpacePool`**
 
 Create `server/src/services/game/challenge-pool.ts` with the interface above plus re-exports of `GameCandidate` and `ScenePromptEmbeddings`.
 
@@ -551,19 +551,19 @@ export class SpacePool implements ChallengePool {
 
 Move the existing `NO_ROUNDS_MESSAGE` map from `game.service.ts` into this file as `SPACE_NO_ROUNDS_MESSAGE`, unchanged.
 
-- [ ] **Step 4: Rewire `GameService` to take a pool**
+- [x] **Step 4: Rewire `GameService` to take a pool**
 
 Change `generateChallenge` to accept `pool: ChallengePool` instead of `spaceId: string`, replacing each `this.gameRepository.getXxx(spaceId, …)` with `pool.xxx(…)`. `GameService.create` builds `new SpacePool(this.gameRepository, spaceId)` and composes the seed as `` `${await pool.seedKey()}:${count}` ``. `getRoundImage` uses `pool.resolveRoundAsset`.
 
 Do not change generation logic, ordering, or constants.
 
-- [ ] **Step 5: Run the full game suite to verify no behaviour changed**
+- [x] **Step 5: Run the full game suite to verify no behaviour changed**
 
 Run: `cd server && pnpm test -- --run src/services/game/space-pool.spec.ts src/services/game.service.spec.ts src/repositories/game.repository.spec.ts`
 Run: `cd e2e && pnpm test src/specs/server/api/game.e2e-spec.ts src/specs/server/api/game-visibility-negatives.e2e-spec.ts`
 Expected: all PASS with **no test edits**. Needing to change an existing assertion means the refactor changed behaviour — investigate rather than update the test.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/services/game/ server/src/services/game.service.ts
@@ -591,7 +591,7 @@ Pure refactor: the whole game suite passes unedited."
 - Consumes: `ChallengePool` (Task 3), `LOCATION_SAMPLE_SIZE` and `spaceAssetIdUnion` (perf-fixes plan).
 - Produces: `eligibleSoloAsset(eb, { userId, withPartners, withSpaces })` and `PersonalPool`.
 
-- [ ] **Step 1: Write the failing e2e tests**
+- [x] **Step 1: Write the failing e2e tests**
 
 Add to `e2e/src/specs/server/api/game-visibility-negatives.e2e-spec.ts` a `describe('solo pool')` block covering the read arms. These are the cases where an upstream helper would admit the asset on its own:
 
@@ -739,12 +739,12 @@ import {
 import { app, asBearerAuth, utils } from 'src/utils';
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd e2e && pnpm test src/specs/server/api/game-visibility-negatives.e2e-spec.ts`
 Expected: FAIL — `POST /games/solo` does not exist yet, so every case 404s. That is a legitimate red; the cases go green once Task 6 wires the route, and they are written here so the predicate is developed against them.
 
-- [ ] **Step 3: Write the eligibility predicate**
+- [x] **Step 3: Write the eligibility predicate**
 
 Create `server/src/utils/game-solo-eligibility.ts`:
 
@@ -806,11 +806,11 @@ export const eligibleSoloAsset = (
 };
 ```
 
-- [ ] **Step 4: Add the solo repository queries**
+- [x] **Step 4: Add the solo repository queries**
 
 Add `getSoloLocationCandidates`, `getSoloDateCandidates`, `getSoloEligibleRoundAsset` and `getSoloRecentlyUsedAssetIds` to `GameRepository`, mirroring the two-stage shape from the perf-fixes plan with `eligibleSoloAsset` in place of the space union. Decorate each with `@GenerateSql` so it lands in the generated file and the shape guards can see it.
 
-- [ ] **Step 5: Extend the SQL shape guards**
+- [x] **Step 5: Extend the SQL shape guards**
 
 Add to `describe('generated query shape')` in `server/src/repositories/game.repository.spec.ts`:
 
@@ -844,17 +844,17 @@ it('samples before ranking in the solo pool too', () => {
 });
 ```
 
-- [ ] **Step 6: Write `PersonalPool`**
+- [x] **Step 6: Write `PersonalPool`**
 
 Create `server/src/services/game/personal-pool.ts` implementing `ChallengePool` against those four queries, with `seedKey = async () => \`user:${this.userId}\``and solo-phrased`noRoundsMessage` that mentions the source toggles as a remedy.
 
-- [ ] **Step 7: Regenerate and run**
+- [x] **Step 7: Regenerate and run**
 
 Run: `mise sql`
 Run: `cd server && pnpm test -- --run src/repositories/game.repository.spec.ts src/services/game/`
 Expected: PASS. The e2e cases from Step 1 stay red until Task 6.
 
-- [ ] **Step 8: Measure the toggles-on case — spec open question 1**
+- [x] **Step 8: Measure the toggles-on case — spec open question 1**
 
 Every performance figure in the spec is **own-library-only**, where `asset.ownerId` is indexed and stage 1 is a cheap index scan. With `withPartners` or `withSpaces` on, the arms become an `OR` that defeats that index, and stage 1 may regress to a full scan — the exact failure `SpacePool` already had to solve with `spaceAssetIdUnion`. The spec flags this as unmeasured; measure it here rather than shipping on an assumption.
 
@@ -871,7 +871,7 @@ Baseline to beat: the own-only case measured at ~51,000 buffers and 117–154 ms
 
 If any combination shows a `Seq Scan on asset` feeding the sample CTE, or buffers climbing into the hundreds of thousands, restructure stage 1 as a `UNION` of the three id sources — own, partner, space — exactly as `spaceAssetIdUnion` does for a space, and re-measure. Record the final numbers in spec §4.3 and resolve open question 1.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add server/src/utils/game-solo-eligibility.ts server/src/services/game/personal-pool.ts \
@@ -902,7 +902,7 @@ checkAlbumAccess gates on nothing at all."
 
 - Produces: `Permission.GameRead`, `Permission.GameCreate`, `Permission.GameDelete`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 it('lets a game-scoped API key play without shared-space permissions', async () => {
@@ -912,12 +912,12 @@ it('lets a game-scoped API key play without shared-space permissions', async () 
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `cd e2e && pnpm test src/specs/server/api/api-key.e2e-spec.ts`
 Expected: FAIL — `Permission.GameRead` does not exist.
 
-- [ ] **Step 3: Add the permissions and apply them**
+- [x] **Step 3: Add the permissions and apply them**
 
 In `server/src/enum.ts`, after the `Faces` group and before `Integrity`, keeping alphabetical order:
 
@@ -929,7 +929,7 @@ In `server/src/enum.ts`, after the `Faces` group and before `Integrity`, keeping
 
 Swap every `@Authenticated({ permission: Permission.SharedSpaceRead })` in `game.controller.ts` for `Permission.GameRead`, and `SharedSpaceUpdate` for `GameCreate` / `GameDelete` as appropriate. The membership and ownership checks stay in the service — the API-key scope and the ACL are different layers, and conflating them is what made a solo route need a shared-space permission.
 
-- [ ] **Step 4: Run and commit**
+- [x] **Step 4: Run and commit**
 
 Run: `cd e2e && pnpm test src/specs/server/api/api-key.e2e-spec.ts src/specs/server/api/game.e2e-spec.ts`
 
@@ -956,7 +956,7 @@ Membership and ownership checks are unaffected - they live in the service."
 - Consumes: `PersonalPool` (Task 4), `Permission.Game*` (Task 5).
 - Produces: `POST /games/solo`, `GET /games/solo/daily`, and `GameSoloCreateDto { roundCount?, type?, sources? }`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `e2e/src/specs/server/api/game-solo.e2e-spec.ts` covering, at minimum:
 
@@ -967,18 +967,18 @@ Create `e2e/src/specs/server/api/game-solo.e2e-spec.ts` covering, at minimum:
 - `roundCount` larger than the available pool yields a shorter challenge, and the response reports the real count;
 - an unguessed round leaks no coordinates, date, assetId, or filename.
 
-- [ ] **Step 2: Run to verify they fail**
+- [x] **Step 2: Run to verify they fail**
 
 Run: `cd e2e && pnpm test src/specs/server/api/game-solo.e2e-spec.ts`
 Expected: FAIL, 404 on every route.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Add `GameService.createSolo(auth, dto)` and `getSoloDaily(auth)` building a `PersonalPool` from the user's stored preference (Task 9; until then default both toggles to `false`), freezing `includePartners` / `includeSpaces` onto the row, and reusing `generateChallenge` unchanged. Catch the unique-violation on `game_challenge_owner_daily_uq` and re-read, exactly as the space daily already does for its own constraint.
 
 Create the controller with `Permission.GameCreate` / `GameRead`.
 
-- [ ] **Step 4: Run and commit**
+- [x] **Step 4: Run and commit**
 
 Run: `cd e2e && pnpm test src/specs/server/api/game-solo.e2e-spec.ts src/specs/server/api/game-visibility-negatives.e2e-spec.ts`
 Expected: PASS — including the solo read-arm cases written red back in Task 4.
@@ -999,7 +999,7 @@ git commit -m "feat(game): add solo free play and the personal daily"
 - Modify: `server/src/services/game.service.ts` (`get`, `guess`, `getRoundImage`, `leaderboard`, `delete`)
 - Test: `e2e/src/specs/server/api/game-solo.e2e-spec.ts`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 describe('solo challenge authorization', () => {
@@ -1030,15 +1030,15 @@ describe('solo challenge authorization', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Expected: FAIL — the routes currently resolve authorization through space membership only, so a solo challenge with a NULL `spaceId` takes an unintended branch.
 
-- [ ] **Step 3: Implement the branch**
+- [x] **Step 3: Implement the branch**
 
 Add a private `requireChallengeAccess(auth, challenge)` to `GameService` that dispatches on scope: `spaceId` present → the existing membership check; `ownerId` present → `ownerId === auth.user.id` or `NotFoundException`. Route all five methods through it. Keep the existing daily-deletion refusal and apply it to both scopes.
 
-- [ ] **Step 4: Run and commit**
+- [x] **Step 4: Run and commit**
 
 Run: `cd e2e && pnpm test src/specs/server/api/game-solo.e2e-spec.ts src/specs/server/api/game.e2e-spec.ts`
 
@@ -1063,7 +1063,7 @@ stranger gets 404 rather than 403 - a 403 would confirm the id exists."
 
 - Produces: `GET /games/solo/stats` → `{ currentStreak, bestStreak, bestScore, averageScore, gamesPlayed }`; `GET /games/solo/history?page=&size=` → paged finished challenges.
 
-- [ ] **Step 1: Write the failing streak unit test**
+- [x] **Step 1: Write the failing streak unit test**
 
 Streak arithmetic is pure and full of off-by-one traps, so it gets a unit test independent of the database. Create `server/src/utils/game-streak.spec.ts`:
 
@@ -1098,20 +1098,20 @@ describe('computeStreak', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `cd server && pnpm test -- --run src/utils/game-streak.spec.ts`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Implement `computeStreak` and the repository query**
+- [x] **Step 3: Implement `computeStreak` and the repository query**
 
 The repository returns the **distinct `dailyOn` dates of fully completed solo dailies** — every round guessed. A partially played daily scores and appears in history but does not extend the streak; that asymmetry is deliberate and must be expressed in the SQL (`having count(guess) = challenge."roundCount"`), not in the client.
 
-- [ ] **Step 4: Add the e2e coverage**
+- [x] **Step 4: Add the e2e coverage**
 
 Cover: zero games returns zeroes rather than nulls; a partially played daily appears in history but does not extend the streak; history paging past the end returns an empty page rather than an error.
 
-- [ ] **Step 5: Run and commit**
+- [x] **Step 5: Run and commit**
 
 ```bash
 git add server/src/utils/game-streak.ts server/src/utils/game-streak.spec.ts \
@@ -1138,7 +1138,7 @@ can legitimately disagree."
 
 - Produces: `preferences.photoGuesser.includePartners` and `.includeSpaces`, both defaulting to `false`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 it('defaults PhotoGuesser sources to own photos only', () => {
@@ -1149,19 +1149,19 @@ it('defaults PhotoGuesser sources to own photos only', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `cd server && pnpm test -- --run src/utils/preferences.spec.ts`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Add the block to `getPreferences` in `preferences.ts` (alongside `sharedLinks`), the `photoGuesser` shape to `UserPreferences` in `types.ts`, and `PhotoGuesserUpdateSchema` / `PhotoGuesserResponseSchema` to `user-preferences.dto.ts` following the `SharedLinks` pair exactly.
 
-- [ ] **Step 4: Regenerate the API and wire `GameService`**
+- [x] **Step 4: Regenerate the API and wire `GameService`**
 
 Run `cd server && pnpm build && pnpm sync:open-api && cd .. && make open-api`, then have `createSolo` and `getSoloDaily` read the preference instead of the hardcoded `false` from Task 6.
 
-- [ ] **Step 5: Run and commit**
+- [x] **Step 5: Run and commit**
 
 ```bash
 git add server/src/dtos/user-preferences.dto.ts server/src/utils/preferences.ts server/src/types.ts \
@@ -1182,7 +1182,7 @@ different dailies."
 - Modify: `server/src/enum.ts` (`JobName`), `server/src/services/queue.service.ts:299-314`, `server/src/services/game.service.ts`
 - Test: `server/src/services/game.service.spec.ts`, `server/src/services/queue.service.spec.ts`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 it('queues the game cleanup with the other database-cleanup jobs', async () => {
@@ -1200,15 +1200,15 @@ it('does not queue the game cleanup when database cleanup is disabled', async ()
 
 Plus, in `game.service.spec.ts`, that the handler deletes only challenges with **zero guesses** older than 7 days — a partially played challenge must survive, because pruning it would silently rewrite history and stats the player has already seen.
 
-- [ ] **Step 2: Run to verify they fail**
+- [x] **Step 2: Run to verify they fail**
 
 Run: `cd server && pnpm test -- --run src/services/queue.service.spec.ts src/services/game.service.spec.ts`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Add `JobName.GameChallengeCleanup`, push it into the `config.nightlyTasks.databaseCleanup` block in `handleNightlyJobs` next to `MemoryCleanup`, and add an `@OnJob({ name: JobName.GameChallengeCleanup, queue: QueueName.BackgroundTask })` handler following `memory.service.ts:196`. The prune covers **both** scopes — an unopened space daily is as much dead weight as a solo one.
 
-- [ ] **Step 4: Run and commit**
+- [x] **Step 4: Run and commit**
 
 ```bash
 git add server/src/enum.ts server/src/services/queue.service.ts server/src/services/game.service.ts \
@@ -1225,17 +1225,17 @@ finished': a partially played game still contributes to history and stats."
 
 **Files:** `i18n/en.json` plus `de`, `fr`, `it`, `nl`, `pl`, `es`, `ru`, `zh_Hans`, `zh_Hant`.
 
-- [ ] **Step 1: Add the English keys**
+- [x] **Step 1: Add the English keys**
 
 Keys for: stats labels (current streak, best streak, best score, average, games played), history, the two source toggles and their descriptions, free play, start game, play again, and the empty states.
 
 **`photoguesser` as a name is never translated** — where a string embeds the product name, the name stays `PhotoGuesser` in every file.
 
-- [ ] **Step 2: Translate into the other eight**
+- [x] **Step 2: Translate into the other eight**
 
 Match each file's existing register: `de` / `it` / `es` address the user informally (`du` / `tu` / `tú`), `fr` / `ru` formally (`vous` / `вы`). Reuse the word each file already uses for a concept rather than inventing a synonym — look up the nearest existing key first.
 
-- [ ] **Step 3: Format and verify**
+- [x] **Step 3: Format and verify**
 
 ```bash
 npx prettier --write i18n/*.json
@@ -1244,7 +1244,7 @@ git diff --stat i18n/
 
 Expected: exactly ten files changed, with the same number of added keys in each.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add i18n/
@@ -1266,16 +1266,16 @@ A pure refactor of the space play page, done before the solo page exists so drif
 - Modify: `web/src/routes/(user)/spaces/[spaceId]/games/[challengeId=id]/+page.svelte`
 - Test: existing `game-play-page.spec.ts` must pass **unedited**
 
-- [ ] **Step 1: Extract, keeping the space page's behaviour identical**
+- [x] **Step 1: Extract, keeping the space page's behaviour identical**
 
 `game-play.svelte` owns round rendering, guess submission, and progress; the end-of-game panel is a snippet prop so the space route passes a leaderboard and the solo route (Task 13) passes a score summary.
 
-- [ ] **Step 2: Run the existing suite**
+- [x] **Step 2: Run the existing suite**
 
 Run: `cd web && pnpm test -- --run spaces/.*games`
 Expected: PASS with no test edits. Needing an edit means behaviour changed.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add web/src/lib/components/games/game-play.svelte "web/src/routes/(user)/spaces"
@@ -1295,21 +1295,21 @@ where the space passes a leaderboard. Existing tests pass unedited."
 - Modify: `web/src/lib/route.ts`, `web/src/lib/components/shared-components/side-bar/UserSidebar.svelte`
 - Test: co-located `.spec.ts` for each new component and page load
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Cover: the sidebar row renders between Map and People and links to `/photoguesser`; the landing page shows the daily card, a start-free-play control, stats, and history; stats renders zeroes rather than blanks for a new user; **the play route 404s a space challenge id** and vice versa.
 
 Use `getBy*` for presence — `queryBy*` passes whether or not the element exists, which makes the assertion untestable. This suite does **not** clear mocks between tests, so reset any shared mock inside each test that depends on call counts.
 
-- [ ] **Step 2: Run to verify they fail**
+- [x] **Step 2: Run to verify they fail**
 
 Run: `cd web && pnpm test -- --run photoguesser`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Add `Route.photoGuesser()` and `Route.viewPhotoGuesserGame({ challengeId })`; add the `SidebarNavItem` after Map using `mdiMapMarkerQuestionOutline` / `mdiMapMarkerQuestion`; build the landing and play routes on `game-play.svelte`.
 
-- [ ] **Step 4: Run the checks and commit**
+- [x] **Step 4: Run the checks and commit**
 
 Run: `cd web && pnpm test -- --run photoguesser games/`
 Run: `make check-web`
@@ -1334,7 +1334,7 @@ challenge id 404s rather than silently redirecting."
 - Modify: `mobile/lib/routing/router.dart`, `mobile/lib/presentation/pages/drift_library.page.dart`
 - Test: `mobile/test/pages/photo_guesser_page_test.dart`
 
-- [ ] **Step 1: Generate the prerequisites**
+- [x] **Step 1: Generate the prerequisites**
 
 ```bash
 cd mobile
@@ -1344,15 +1344,15 @@ dart run easy_localization:generate -S ../i18n && dart run bin/generate_keys.dar
 
 Use the Flutter version pinned in `mobile/mise.toml`. `dart analyze` is **not** a substitute for `flutter test` — generated-code compile errors only surface when a test actually compiles.
 
-- [ ] **Step 2: Write the failing widget test**
+- [x] **Step 2: Write the failing widget test**
 
 Cover: the Library page shows a PhotoGuesser card that routes to the new page; the landing page shows the daily and a free-play control; a user with no spaces still sees the full surface. Prove each red by flipping the condition under test before implementing.
 
-- [ ] **Step 3: Run, implement, re-run**
+- [x] **Step 3: Run, implement, re-run**
 
 Run: `flutter test test/pages/photo_guesser_page_test.dart`
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add mobile/lib mobile/test
@@ -1373,7 +1373,7 @@ space-only."
 - Modify: `mobile/lib/utils/daily_reminder_schedule.dart`, `mobile/lib/providers/game/daily_reminder.provider.dart`, `mobile/lib/domain/models/config/games_config.dart`, `mobile/lib/domain/models/settings_key.dart`
 - Test: `mobile/test/utils/daily_reminder_schedule_test.dart`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```dart
 test('still reminds when the space daily is played but the solo daily is not', () {
@@ -1422,18 +1422,18 @@ test('reminds a user with no spaces at all, when the solo daily is on', () {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `cd mobile && flutter test test/utils/daily_reminder_schedule_test.dart`
 Expected: FAIL — the function takes `hasOptedInSpace` and a single `lastPlayedDate`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Split `lastPlayedDate` into `spaceLastPlayed` and `soloLastPlayed`, split `SettingsKey.gameDailyLastPlayed` into two keys, gate on `hasOptedInSpace || soloDailyEnabled`, and skip a day only when every enabled source is played for it. Keep the existing per-space behaviour on the space side: still not a per-space map, because reading a space daily generates it as a side effect.
 
 Update the existing tests in the file that pass `hasOptedInSpace` / `lastPlayedDate`, and route a tapped notification to the solo daily when enabled.
 
-- [ ] **Step 4: Run and commit**
+- [x] **Step 4: Run and commit**
 
 Run: `cd mobile && flutter test test/utils/ test/providers/game/`
 Run: `cd mobile && dart analyze --fatal-infos && dart format --set-exit-if-changed .`
@@ -1454,11 +1454,11 @@ who could never receive one before."
 
 **Files:** `e2e/src/specs/server/api/game-solo.e2e-spec.ts`
 
-- [ ] **Step 1: Write the walkthrough**
+- [x] **Step 1: Write the walkthrough**
 
 Extend `e2e/src/specs/server/api/game-solo.e2e-spec.ts` with `start -> detail -> round image -> guess every round -> stats -> history`, asserting the daily appears in history, the streak reaches 1, and the round image serves without disclosing the asset id or filename.
 
-- [ ] **Step 2: Cover the edge cases no earlier task claimed**
+- [x] **Step 2: Cover the edge cases no earlier task claimed**
 
 Spec §14.3 lists fifteen cases. Eleven are covered by Tasks 1, 4, 6, 7 and 8. These five have no home yet, and each is a real behaviour someone will hit:
 
@@ -1559,7 +1559,7 @@ it('404s a space challenge id on a solo route and vice versa', async () => {
 });
 ```
 
-- [ ] **Step 3: Run the whole game surface**
+- [x] **Step 3: Run the whole game surface**
 
 ```bash
 cd e2e && pnpm test src/specs/server/api/game.e2e-spec.ts \
@@ -1567,7 +1567,7 @@ cd e2e && pnpm test src/specs/server/api/game.e2e-spec.ts \
                     src/specs/server/api/game-visibility-negatives.e2e-spec.ts
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add e2e/src/specs/server/api/game-solo.e2e-spec.ts
@@ -1578,15 +1578,15 @@ git commit -m "test(game): cover a full solo playthrough end to end"
 
 ## Done when
 
-- [ ] `cd server && pnpm test -- --run src/services/game src/repositories/game.repository.spec.ts src/utils/game-streak.spec.ts src/utils/preferences.spec.ts` passes
-- [ ] `cd server && pnpm test:medium -- --run test/medium/specs/migrations/game-challenge-scope.migration.spec.ts` passes
-- [ ] `cd e2e && pnpm test src/specs/server/api/game.e2e-spec.ts src/specs/server/api/game-solo.e2e-spec.ts src/specs/server/api/game-visibility-negatives.e2e-spec.ts` passes
-- [ ] `cd web && pnpm test -- --run photoguesser games/` passes
-- [ ] `cd mobile && flutter test` passes, and `dart analyze --fatal-infos` and `dart format --set-exit-if-changed .` are clean
-- [ ] `make check-all` and `make lint-all` pass
-- [ ] Ten i18n files changed with matching key counts
-- [ ] The server boots against a migrated database with no schema-drift warning
-- [ ] A user in **no** shared space can reach PhotoGuesser, play the daily, and see a streak of 1 — on both web and mobile
+- [x] `cd server && pnpm test -- --run src/services/game src/repositories/game.repository.spec.ts src/utils/game-streak.spec.ts src/utils/preferences.spec.ts` passes
+- [x] `cd server && pnpm test:medium -- --run test/medium/specs/migrations/game-challenge-scope.migration.spec.ts` passes
+- [x] `cd e2e && pnpm test src/specs/server/api/game.e2e-spec.ts src/specs/server/api/game-solo.e2e-spec.ts src/specs/server/api/game-visibility-negatives.e2e-spec.ts` passes
+- [x] `cd web && pnpm test -- --run photoguesser games/` passes
+- [x] `cd mobile && flutter test` passes, and `dart analyze --fatal-infos` and `dart format --set-exit-if-changed .` are clean
+- [x] `make check-all` and `make lint-all` pass
+- [x] Ten i18n files changed with matching key counts
+- [x] The server boots against a migrated database with no schema-drift warning
+- [x] A user in **no** shared space can reach PhotoGuesser, play the daily, and see a streak of 1 — on both web and mobile
 
 ## Follow-up, not in this plan
 
