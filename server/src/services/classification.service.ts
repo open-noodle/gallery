@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { type ClassificationFaceExclusion, type SystemConfig } from 'src/config';
 import { OnEvent, OnJob } from 'src/decorators';
 import { AuthDto } from 'src/dtos/auth.dto';
+import { type SystemConfig } from 'src/dtos/config.dto';
 import { AssetVisibility, ImmichWorker, JobName, JobStatus, QueueName, SystemMetadataKey } from 'src/enum';
+import { type ClassificationFaceExclusion } from 'src/gallery/config.dto';
 import { type ClassificationFaceSummary } from 'src/repositories/classification.repository';
 import { ArgOf } from 'src/repositories/event.repository';
 import { BaseService } from 'src/services/base.service';
