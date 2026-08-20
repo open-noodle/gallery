@@ -89,8 +89,8 @@ Each row carries:
 
 - the round's photo, via the existing `getGameRoundImageUrl` (the round-scoped endpoint, not the
   asset one)
-- `Round {current} of {total}`
-- how close it was: `You were 412 km away` / `You were 3 days off`
+- `Round 1 · Place` / `Round 2 · Date`
+- how close it was: `412 km off` / `3 days off`
 - the round's score
 - a chevron, because the row opens something
 
@@ -167,25 +167,43 @@ scope here rather than a follow-up — but it is a distinct behaviour with its o
 
 ## 9. i18n
 
-Almost nothing is new, because the reveal already says these things:
+The list gets its own copy rather than borrowing the reveal's. The reveal's strings are full
+sentences written for a screen with room — `You were 412 km away` — and they read badly in a 46dp
+list row next to a thumbnail and a score. They stay exactly as they are, in the reveal.
 
-| Need                   | Key                                                  |
-| ---------------------- | ---------------------------------------------------- |
-| Row title              | `game_round_progress` — `Round {current} of {total}` |
-| Distance miss          | `game_you_were_away` — `You were {distance} away`    |
-| Date miss              | `game_you_were_off` — `You were {offset} off`        |
-| Round score            | `game_points`                                        |
-| Reveal button (review) | `done`                                               |
+Reused as-is:
 
-One new key: a heading for the list, `game_review_your_rounds` ("Your rounds"). Per `CLAUDE.md` it
-lands in all ten maintained locales in the same commit — `en` plus `de`, `fr`, `it`, `nl`, `pl`,
-`es`, `ru`, `zh_Hans`, `zh_Hant` — matching each file's existing register and its own word for a
-space, then `npx prettier --write i18n/*.json`.
+| Need                         | Key           |
+| ---------------------------- | ------------- |
+| Round score                  | `game_points` |
+| Reveal button in review mode | `done`        |
 
-The round's **type** deliberately gets no new string. `game_type_location` / `game_type_date` are
-"Places" / "Dates", plural because they label a challenge type rather than one round; putting
-"Places" on a single row reads oddly. The distance line already implies the type — a round that
-reports kilometres is a place round — so the row shows the miss and omits the type entirely.
+Five new keys, landing in all ten maintained locales in the same commit — `en` plus `de`, `fr`, `it`,
+`nl`, `pl`, `es`, `ru`, `zh_Hans`, `zh_Hant` — each matching that file's existing register, then
+`npx prettier --write i18n/*.json`:
+
+| Key                        | English                                             |
+| -------------------------- | --------------------------------------------------- |
+| `game_review_your_rounds`  | Your rounds                                         |
+| `game_review_type_place`   | Place                                               |
+| `game_review_type_date`    | Date                                                |
+| `game_review_distance_off` | {distance} off                                      |
+| `game_review_days_off`     | {count, plural, one {# day off} other {# days off}} |
+
+Two things about that set are deliberate.
+
+`game_review_type_place` / `game_review_type_date` are **singular**, and separate from the existing
+`game_type_location` / `game_type_date`, which are "Places" / "Dates". Those label a challenge's
+type; reusing them would put "Places" on a single round.
+
+`game_review_distance_off` interpolates an **already-formatted** distance from `formatDistanceKm`,
+which picks metres or kilometres and the decimal precision. The key receives a rendered string, not a
+number — the same contract `game_you_were_away` already uses, so translators see a consistent shape.
+`game_review_days_off` is ICU-plural instead, matching `game_days_played`, because the day count is a
+real number and Polish and Russian need more than a two-form rule.
+
+There is no "tap to revisit" hint. The chevron carries that, and the earlier mockup's version of the
+heading was decoration the row does not need.
 
 ## 10. Testing
 
@@ -306,7 +324,7 @@ review test therefore runs under a non-UTC `TZ`.
 Server `pnpm test` and `pnpm test:medium`, `make check-server`, eslint and prettier. The game e2e
 specs. Mobile `flutter test`, `dart analyze --fatal-infos`, `dart format` over `lib`. `make check-web`
 — the SDK regen changes web's generated types even though no web code changes here, and that gate is
-the only thing that would catch a break. The one new i18n key lands in all ten locales with
+the only thing that would catch a break. The five new i18n keys land in all ten locales with
 `npx prettier --write i18n/*.json`.
 
 ## 11. Out of scope
