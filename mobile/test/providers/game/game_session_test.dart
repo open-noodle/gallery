@@ -256,6 +256,54 @@ void main() {
     expect(state.result!.guess, isNull, reason: 'That request never reached the server');
   });
 
+  // A guess that was already recorded server-side (409) previously revealed with no pin, because
+  // the client could not recover its own guess. The refetched detail now carries it.
+  test('the 409 recovery reveal plots the guess the server already had', () async {
+    var fetches = 0;
+    when(() => repository.getChallenge('challenge-1')).thenAnswer((_) async {
+      fetches++;
+      return _challenge([
+        if (fetches == 1)
+          _round(0)
+        else
+          GameRoundDetailResponseDto(
+            index: 0,
+            type: GameRoundType.location,
+            score: const Optional.present(900),
+            answer: Optional.present(GameRoundDetailResponseDtoAnswer(date: null, lat: 10, lon: 2)),
+            guess: Optional.present(
+              GameRoundDetailResponseDtoGuess(
+                lat: 38.72,
+                lon: -9.14,
+                date: null,
+                distanceKm: 412.3,
+                offsetDays: null,
+              ),
+            ),
+          ),
+        _round(1),
+      ]);
+    });
+    when(
+      () => repository.guessLocation(
+        any(),
+        any(),
+        lat: any(named: 'lat'),
+        lon: any(named: 'lon'),
+      ),
+    ).thenThrow(ApiException(409, 'Already guessed'));
+
+    final container = _container(repository);
+    await container.read(gameSessionProvider('challenge-1').future);
+    final controller = container.read(gameSessionProvider('challenge-1').notifier);
+
+    await controller.guessLocation(lat: 38.72, lon: -9.14);
+
+    final result = container.read(gameSessionProvider('challenge-1')).valueOrNull?.result;
+    expect(result?.guess?.lat, 38.72);
+    expect(result?.distanceKm, 412.3);
+  });
+
   test('an offline guess, wrapped by the client as ApiException(400), leaves the round guessable '
       'again', () async {
     // The generated client wraps SocketException/TlsException/IOException/ClientException into
@@ -485,6 +533,97 @@ void main() {
     await Future<void>.delayed(Duration.zero);
 
     expect(reported, isEmpty);
+  });
+
+  group('RoundResult.fromRound', () {
+    test('maps a guessed location round', () {
+      final result = RoundResult.fromRound(
+        GameRoundDetailResponseDto(
+          index: 0,
+          type: GameRoundType.location,
+          assetId: const Optional.present('asset-1'),
+          score: const Optional.present(1842),
+          answer: Optional.present(GameRoundDetailResponseDtoAnswer(lat: 41.15, lon: -8.61, date: null)),
+          guess: Optional.present(
+            GameRoundDetailResponseDtoGuess(lat: 38.72, lon: -9.14, date: null, distanceKm: 412.3, offsetDays: null),
+          ),
+        ),
+      );
+
+      expect(result.type, GameRoundType.location);
+      expect(result.score, 1842);
+      expect(result.guess?.lat, 38.72);
+      expect(result.distanceKm, 412.3);
+      expect(result.guessDate, isNull);
+    });
+
+    test('maps a guessed date round', () {
+      final result = RoundResult.fromRound(
+        GameRoundDetailResponseDto(
+          index: 1,
+          type: GameRoundType.date,
+          assetId: const Optional.present('asset-2'),
+          score: const Optional.present(2410),
+          answer: Optional.present(
+            GameRoundDetailResponseDtoAnswer(lat: null, lon: null, date: DateTime.utc(2024, 6, 4)),
+          ),
+          guess: Optional.present(
+            GameRoundDetailResponseDtoGuess(
+              lat: null,
+              lon: null,
+              date: DateTime.utc(2024, 6, 1),
+              distanceKm: null,
+              offsetDays: 3,
+            ),
+          ),
+        ),
+      );
+
+      expect(result.guess, isNull);
+      expect(result.guessDate, DateTime.utc(2024, 6, 1));
+      expect(result.offsetDays, 3);
+    });
+
+    // guessDate is `timestamp with time zone` and arrives as a full ISO instant, so it must survive
+    // as one — unlike `dailyOn`, which is date-only and must NOT be converted. Getting those two
+    // confused has already shipped twice on this branch. The assertion is on `isUtc` rather than on
+    // a rendered string because CI runs UTC, where a wrong conversion is invisible; Task 10 runs the
+    // game tests once under a non-UTC TZ to cover the rendering side.
+    test('keeps the guessed date as the instant it arrived as', () {
+      final result = RoundResult.fromRound(
+        GameRoundDetailResponseDto(
+          index: 1,
+          type: GameRoundType.date,
+          score: const Optional.present(2410),
+          guess: Optional.present(
+            GameRoundDetailResponseDtoGuess(
+              lat: null,
+              lon: null,
+              date: DateTime.utc(2024, 6, 1, 12, 30),
+              distanceKm: null,
+              offsetDays: 3,
+            ),
+          ),
+        ),
+      );
+
+      expect(result.guessDate!.isUtc, isTrue);
+      expect(result.guessDate, DateTime.utc(2024, 6, 1, 12, 30));
+    });
+
+    // Absent, NOT present(null): `.value` on an Absent THROWS, and only the absent form
+    // reproduces the wire shape of an unguessed round. A factory that reads `.value`
+    // errors here instead of failing an assertion.
+    test('tolerates an unguessed round, whose fields are absent', () {
+      // NOT `const`: the generated constructor is not a const constructor.
+      final result = RoundResult.fromRound(
+        GameRoundDetailResponseDto(index: 2, type: GameRoundType.location),
+      );
+
+      expect(result.score, 0);
+      expect(result.guess, isNull);
+      expect(result.answer, isNull);
+    });
   });
 
   test('a failed post-guess refetch still shows the score rather than sticking in guessing', () async {
