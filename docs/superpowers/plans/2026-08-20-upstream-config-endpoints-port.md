@@ -767,11 +767,28 @@ Do **not** judge this by `git status` alone after redirecting output — run it 
 
 - [ ] **Step 2: Confirm no visibility metadata leaked into the spec**
 
+**CORRECTED during implementation:** a bare `grep -c '"visibility"'` does NOT work — Immich has a legitimate `visibility` _asset property_ (`AssetVisibility`), which produces ~21 hits with zero leakage. Distinguish the metadata key from the property name:
+
 ```bash
-grep -c '"visibility"' open-api/immich-openapi-specs.json
+python3 - <<'EOF'
+import json
+s = json.load(open('open-api/immich-openapi-specs.json'))
+leaks = []
+def walk(node, path):
+    if isinstance(node, dict):
+        for k, v in node.items():
+            if k == 'visibility' and isinstance(v, str) and v in ('Admin', 'User', 'Public'):
+                leaks.append('.'.join(path))
+            walk(v, path + [k])
+    elif isinstance(node, list):
+        for i, v in enumerate(node):
+            walk(v, path + [str(i)])
+walk(s, [])
+print('visibility-metadata leaks:', len(leaks))
+EOF
 ```
 
-Expected: `0`. `stripVisibilityMetadata` handles this for upstream fields; fork fragments carry no visibility at all, so a non-zero count means a fragment picked up an annotation.
+Expected: `0`. `stripVisibilityMetadata` handles upstream fields; fork fragments carry no visibility at all, so a non-zero count means a fragment picked one up.
 
 - [ ] **Step 3: Run the local gate**
 
