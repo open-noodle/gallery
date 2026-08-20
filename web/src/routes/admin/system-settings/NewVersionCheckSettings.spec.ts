@@ -1,4 +1,4 @@
-import type { SystemConfigDto } from '@immich/sdk';
+import type { AdminConfigDto } from '@immich/sdk';
 import { ReleaseChannel } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/svelte';
@@ -10,7 +10,7 @@ import NewVersionCheckSettings from './NewVersionCheckSettings.svelte';
 const makeConfig = (enabled = true, channel = ReleaseChannel.Stable) =>
   ({
     newVersionCheck: { enabled, channel },
-  }) as SystemConfigDto;
+  }) as AdminConfigDto;
 
 const mocks = vi.hoisted(() => ({
   featureFlags: { configFile: false },
@@ -31,10 +31,10 @@ vi.mock(import('$lib/managers/feature-flags-manager.svelte'), () => ({
 vi.mock(import('$lib/managers/system-config-manager.svelte'), () => ({
   systemConfigManager: {
     get value() {
-      return mocks.systemConfig as SystemConfigDto;
+      return mocks.systemConfig as AdminConfigDto;
     },
     get defaultValue() {
-      return mocks.defaultSystemConfig as SystemConfigDto;
+      return mocks.defaultSystemConfig as AdminConfigDto;
     },
     cloneValue: mocks.cloneValue,
     cloneDefaultValue: mocks.cloneDefaultValue,
