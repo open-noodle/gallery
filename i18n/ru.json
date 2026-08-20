@@ -2017,6 +2017,7 @@
   "game_solo_no_games": "Пока нет сыгранных игр",
   "game_solo_no_photos": "Нет фото для PhotoGuesser - добавьте фото с данными GPS или датой съёмки, либо включите фото партнёров или Space при запуске игры",
   "game_solo_play_again": "Играть снова",
+  "game_solo_rounds_fewer_than_requested": "Ваши фото заполнили {actual} из {requested} раундов",
   "game_solo_start_free_play": "Начать свободную игру",
   "game_standings_month": "В этом месяце",
   "game_standings_today": "Сегодня",

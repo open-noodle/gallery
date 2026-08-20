@@ -2033,6 +2033,7 @@
   "game_solo_no_games": "Jeszcze brak rozegranych gier",
   "game_solo_no_photos": "Brak zdjęć dla PhotoGuesser - dodaj zdjęcia z danymi GPS lub datą wykonania albo włącz zdjęcia partnerów lub ze Space podczas rozpoczynania gry",
   "game_solo_play_again": "Zagraj ponownie",
+  "game_solo_rounds_fewer_than_requested": "Twoje zdjęcia wypełniły {actual} z {requested} rund",
   "game_solo_start_free_play": "Rozpocznij grę swobodną",
   "game_standings_month": "W tym miesiącu",
   "game_standings_today": "Dzisiaj",

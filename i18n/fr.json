@@ -2011,6 +2011,7 @@
   "game_solo_no_games": "Aucune partie jouée pour le moment",
   "game_solo_no_photos": "Aucune photo disponible pour PhotoGuesser - ajoutez des photos avec données GPS ou date de prise de vue, ou incluez les photos des partenaires ou des espaces au moment de démarrer une partie",
   "game_solo_play_again": "Rejouer",
+  "game_solo_rounds_fewer_than_requested": "Vos photos ont rempli {actual} manches sur {requested}",
   "game_solo_start_free_play": "Commencer une partie libre",
   "game_standings_month": "Ce mois-ci",
   "game_standings_today": "Aujourd'hui",
