@@ -207,9 +207,28 @@ not `$?` after a pipeline.
 ## Remote CI Verification
 
 - **Test branch**: `rebase/upstream-batch-129`
-- **Commit validated**: see below
+- **Commit validated**: `cdaa5065684`
 
-_(filled in after dispatch)_
+**10/10 green.** All ten workflows dispatched and all concluded `success`:
+
+| Workflow                                  | Status |
+| ----------------------------------------- | ------ |
+| `test.yml`                                | GREEN  |
+| `docker.yml`                              | GREEN  |
+| `static_analysis.yml`                     | GREEN  |
+| `gallery-build-mobile.yml`                | GREEN  |
+| `gallery-mobile-smoke.yml`                | GREEN  |
+| `gallery-ml-smoke.yml`                    | GREEN  |
+| `gallery-rebase-smoke.yml`                | GREEN  |
+| `gallery-revert-to-immich-validation.yml` | GREEN  |
+| `storage-migration-tests.yml`             | GREEN  |
+| `storage-migration-e2e.yml`               | GREEN  |
+
+- **Failures fixed**: none — no workflow failed, so no re-dispatch was needed.
+- **Confirmed flakes**: none.
+
+Commits added to the branch after this SHA are documentation only (this report and the
+`#30881` port design spec) and do not affect the validated build.
 
 ## Post-Rebase Verification
 
