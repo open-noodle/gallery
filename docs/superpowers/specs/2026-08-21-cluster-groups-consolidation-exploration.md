@@ -1,7 +1,12 @@
 # Cluster Groups Consolidation — Exploration
 
 **Date:** 2026-08-21
-**Status:** Exploration. No decision taken, nothing implemented, nothing rebased.
+**Status:** **SUPERSEDED — a decision was taken after this document was written.** Gallery does not
+adopt cluster groups as a feature; it takes **option M** (inert adoption). Every ranking below,
+including "Revised ranking: K > J″ > D > J′", predates that decision and is kept only as the record of
+how it was reached. Read
+[`2026-08-21-cluster-groups-m-landing-plan.md`](./2026-08-21-cluster-groups-m-landing-plan.md) for
+what is actually being built.
 **Trigger:** Upstream Immich `11b1aa5ecf7` — `feat: cluster groups (#30739)`, landing in Immich v3.2.0.
 
 ## Why this document exists
@@ -129,6 +134,35 @@ distinction.
 Source: `server/src/repositories/face-identity.repository.ts`,
 `server/src/services/face-suggestion.service.ts`, `server/src/services/face-repair.service.ts`.
 
+### 4. Upstream decides "same identity" two ways, and neither is a bulk reconciliation on join
+
+**Automatic, at facial-recognition job time** (`handleRecognizeFaces`): only runs for a currently
+**unassigned** face. It runs an embedding-similarity search — `searchFaces({ clusterGroupId,
+embedding, ... })` — scoped to the candidate pool defined by the face's `clusterGroupId`, and if a
+match is found, the new face's `asset_face.personGroupId` is set to the matched group's id. This
+never touches already-assigned faces and never reconciles two pre-existing `person_group`s — it only
+extends the candidate pool for faces detected _after_ the fact.
+
+**Manual, user-triggered** (`mergePerson`): an explicit "these are the same person" action, gated by
+the `PersonMerge` permission, that reassigns every `asset_face` row from a losing `person_group` to a
+winning one (`reassignFaces`). It does cross owners — it fetches each owner's own `person` profile for
+the target group and merges name/birthDate onto the primary.
+
+**The consequence that matters for consolidation:** `reassignCluster` (called when a user accepts a
+cluster-group invite) never merges any `person_group`s together — it only moves the joining user's own
+groups into the new `cluster_group`, splitting off a fresh group per identity that's already shared
+with someone else. So when Anna and Ben join the same cluster group, their _historical_ Grandma faces
+stay in two separate `person_group`s until either a new unassigned face happens to get re-matched, or a
+human manually merges the two via `mergePerson`. There is no bulk reconciliation on join.
+
+This resolves the "discovery vs. bookkeeping" gap the J″ spike found underspecified: a fork-owned
+aggregate for J″ or K should mirror both of these mechanisms (scoped-candidate-pool matching for new
+faces, permission-gated manual merge for existing ones) rather than inventing a separate evidence
+pipeline from scratch.
+
+Source: `server/src/services/person.service.ts` (`handleRecognizeFaces` ~L468-545, `mergePerson`
+~L573+), `server/src/repositories/person.repository.ts` (`reassignCluster` ~L492-570).
+
 ## The hard constraint
 
 An earlier draft of this document stated the constraint too broadly — that a single identity column
@@ -222,18 +256,18 @@ Not a rebase resolution:
 
 ## Options considered
 
-| #   | Option                               | Summary                                                                                   | Verdict                                                                        |
-| --- | ------------------------------------ | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| A   | Full convergence                     | Adopt the spine _and_ ship cluster groups as a feature                                    | Only if we want the feature                                                    |
-| B   | Bridge / dual spine                  | Keep `face_identity` authoritative, maintain `person_group` as a derived shadow           | Cheapest now, ages worst — two sources of truth                                |
-| C   | Diverge                              | Revert the `personId` → `personGroupId` rename on every rebase                            | Toll grows monotonically as upstream builds on it                              |
-| D   | Adopt the spine, ignore the grouping | Take `person_group`; never create cluster groups; space membership keeps deciding         | Leading candidate                                                              |
-| E   | Contribute upstream                  | Propose the spine be scope-pluggable                                                      | Worth running in parallel; unblocks nothing today                              |
-| F   | Hold                                 | Quarantine indefinitely                                                                   | Total upstream freeze; only for a bounded window                               |
-| G   | Name propagation                     | Keep per-user `person` rows; propagate names across space members in the service layer    | Zero schema divergence; eventual-consistency and conflict semantics unresolved |
-| J′  | Orthogonal, pure upstream            | Adopt 100%; space people are listed but dedupe only when members share a cluster group    | Zero divergence; bounded but real feature loss                                 |
-| J″  | Upstream plus a fork-owned aggregate | Adopt 100%; a space person aggregates several `person_group`s via a fork-owned link table | Restores per-space dedupe at zero upstream cost                                |
-| K   | Zero upstream-table divergence       | Adopt upstream tables byte-identical; every fork addition in fork-owned tables            | Same principle as J″, applied globally rather than per-space                   |
+| #   | Option                               | Summary                                                                                   | Verdict                                                                               |
+| --- | ------------------------------------ | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| A   | Full convergence                     | Adopt the spine _and_ ship cluster groups as a feature                                    | Only if we want the feature                                                           |
+| B   | Bridge / dual spine                  | Keep `face_identity` authoritative, maintain `person_group` as a derived shadow           | Cheapest now, ages worst — two sources of truth                                       |
+| C   | Diverge                              | Revert the `personId` → `personGroupId` rename on every rebase                            | Toll grows monotonically as upstream builds on it                                     |
+| D   | Adopt the spine, ignore the grouping | Take `person_group`; never create cluster groups; space membership keeps deciding         | Spiked — small divergence confirmed, but merges are bulk and effectively irreversible |
+| E   | Contribute upstream                  | Propose the spine be scope-pluggable                                                      | Worth running in parallel; unblocks nothing today                                     |
+| F   | Hold                                 | Quarantine indefinitely                                                                   | Total upstream freeze; only for a bounded window                                      |
+| G   | Name propagation                     | Keep per-user `person` rows; propagate names across space members in the service layer    | Zero schema divergence; eventual-consistency and conflict semantics unresolved        |
+| J′  | Orthogonal, pure upstream            | Adopt 100%; space people are listed but dedupe only when members share a cluster group    | Zero divergence; bounded but real feature loss                                        |
+| J″  | Upstream plus a fork-owned aggregate | Adopt 100%; a space person aggregates several `person_group`s via a fork-owned link table | Spiked — viable, but dedupe is per-space only                                         |
+| K   | Zero upstream-table divergence       | Adopt upstream tables byte-identical; every fork addition in fork-owned tables            | Spiked — viable, global reach, weeks not months, **leading candidate**                |
 
 ### The ranking principle
 
@@ -243,7 +277,20 @@ So "as close to upstream as possible" is best read as _minimise rebase friction_
 schema difference_ — which means the goal is to touch **zero upstream tables**, not to delete fork
 features.
 
-Under that reading the ranking is **J″ > K > D > J′**, with J″ giving up essentially nothing.
+Under that reading the original ranking was **J″ > K > D > J′**, on the theory that K's extra
+indirection layer wasn't worth paying for global reach. The 2026-08-21 spikes (below) change this in
+two ways: K's actual cost came back "weeks not months," with risk concentrated in one service
+(`identity-merge-propagation`) rather than smeared across the fork — closing most of the gap the
+original ranking was based on, while still giving global cross-space dedup that J″ structurally
+cannot. And D's cost turned out to be exactly the small column count the doc predicted, but its
+_mechanism_ — a bulk, group-wide merge — trades away today's fine-grained, single-row undo, a
+regression the doc never scoped as part of D's cost.
+
+**Revised ranking: K > J″ > D > J′.** K matches J″'s zero-upstream-divergence property while
+covering the case J″ can't (two contributors who don't share a space), for a bounded, now-measured
+cost. J″ remains the fallback if K's merge-propagation work turns out to be harder than the spike's
+single-function sample suggests. D's small schema footprint doesn't offset an irreversible-merge
+regression the other two don't have.
 
 ## Option K — zero upstream-table divergence
 
@@ -253,15 +300,42 @@ byte-identical to upstream, and place every fork addition in a fork-owned table:
 | Fork concern                   | Home                                                                             |
 | ------------------------------ | -------------------------------------------------------------------------------- |
 | Cross-cluster identity linkage | `face_identity` demoted to grouping `person_group`s, via a fork-owned link table |
-| Per-space profile              | `shared_space_person.personGroupId` (fork table, repointed)                      |
+| Per-space profile              | `shared_space_person.identityId` — **unchanged**, see stage-3 correction below   |
 | Evidence / proposals           | `face_identity_face` repointed to `personGroupId`                                |
 | `type: person \| pet`          | fork-owned side table                                                            |
 | `representativeFaceId`         | fork-owned side table, or dropped in favour of profile thumbnails                |
 | `clusterGroupId NOT NULL`      | always assign the owner's group — never diverge on nullability                   |
 
-The open question against K is whether the extra indirection layer pays for itself, versus J″ which
+The open question against K was whether the extra indirection layer pays for itself, versus J″ which
 applies the same trick only inside a space, or versus D which accepts three small column
-divergences for a flatter model.
+divergences for a flatter model. **Resolved by the spikes below**: it does — see "The ranking
+principle" above.
+
+> [!WARNING]
+> **Read before trusting any error-count or LOC number in the K, J″, D or D+ sections below.** All
+> four spikes share one foundation commit (`1be40e6dced`, "merge upstream/main taking upstream's side
+> wholesale"). That merge strategy resolves every conflicted file to upstream's side outright, with no
+> attempt at line-level reconciliation — and a diagnostic run after the fact
+> (`comm -12` on files both the fork and upstream changed since the shared base, filtered to ones now
+> byte-identical to `upstream/main`) found **14 files, >13,500 lines of unrelated fork functionality
+> silently discarded**: S3-compatible storage streaming (`download.service.ts`), video-trim
+> serialization (`media.service.ts`), memory/timeline queries and search facets
+> (`asset.repository.ts`, `search.repository.ts`, `search.service.ts`), space RBAC logic, pet
+> identification (`person.type`/`species`), and nearly the entire fork test suite for people/search/
+> timeline. It all compiles cleanly and type-checks green — that's the trap: **a clean `tsc --noEmit`
+> is exactly what silently-deleted-but-compiling fork code looks like.** `asset.service.ts` lost 100%
+> of its fork content this way (the merge commit shows zero combined-diff hunks for it — a full
+> override, not a partial loss).
+>
+> None of this is specific to cluster groups — it's collateral damage from the wholesale-merge
+> shortcut all four spikes used to reach a workable base quickly, and it would need a proper 3-way
+> `git merge-file` reconciliation (the approach the sibling "option M" spike used from the start,
+> see `2026-08-21-cluster-groups-m-spike-handoff.md`) regardless of which option — K, J″, D, or M — is
+> chosen. The **relative** comparisons between options below (divergence surface, hop count,
+> reversibility, mechanical-vs-semantic split) are likely still informative, since all three suffer
+> this defect identically. The **absolute** numbers (error counts, "weeks not months," LOC deltas) are
+> not trustworthy as stated — they were measured against a tree with a large, option-independent hole
+> in it, and none of the four spikes has yet re-measured against a properly-reconciled base.
 
 ## Spike results — option K, 2026-08-21
 
@@ -399,6 +473,275 @@ Half the fork production errors sit in three files: `face-identity.repository.ts
 ~23 fork production files, ~350 mechanical substitutions, the bounded re-graft list above, plus
 genuine design work in merge propagation and the migration. **Weeks, not months**, with the risk
 concentrated in one service rather than smeared across the fork.
+
+### Stage 3 — write path (merge propagation), 2026-08-21
+
+The single biggest open risk from stages 1-2 — "writes are untested, above all
+`identity-merge-propagation.service.ts`, which under K must reason across two levels" — was spiked
+directly, on top of the stage-2 commit. Same worktree and branch, still type-check only, still nothing
+executed against a database.
+
+**The core question — can upstream's native `mergePerson` (direct `person_group` reassignment,
+no knowledge `face_identity` exists) and the fork's own `IdentityMergePropagationService` coexist
+without the two drifting out of sync — is answered: yes, but not for free.** Left unfixed, upstream's
+merge doesn't error or orphan anything — `face_identity_person_group` cascade-deletes cleanly — it
+just goes silently stale: a `person_group`'s evidence moves elsewhere while its identity link still
+claims the old grouping. The fix is a **fork hook below the upstream call site** in
+`PersonService.mergePerson`, the same pattern the fork already uses elsewhere (upstream and fork logic
+share one file, no runtime subclass indirection): snapshot both sides' `face_identity_person_group`
+links before upstream's reassignment runs, fold them together inside a transaction taking the _same_
+advisory lock (`pg_advisory_xact_lock(hashtext('identity-merge-propagation'))`) the fork's own merge
+service already uses, so the two mechanisms can't race. ~40 lines total (a 25-line hook, a 15-line
+repository method) — a real, committed code change, not a documented gap.
+
+**Correction to the table above**: `shared_space_person` needs **no schema change** under K. It's
+100% fork-owned, so its `identityId` FK to `face_identity` stays exactly as it is today — stage 2's
+`getPersonalThumbnailForSpacePerson` already relied on this, adapting only the `person` side of the
+join. The "(fork table, repointed)" note earlier in this section was a misreading of the design; K
+never touches this table at all.
+
+**Mechanical vs. semantic split was closer to 55/45 than stage 1-2's near-total mechanical estimate.**
+The one insight that matters most: **a `person` profile's true key under K is `(ownerId,
+personGroupId)`, never `personGroupId` alone** (cluster-group sharing means a `personGroupId` is not
+owner-unique) — get this wrong and it's a silently-wrong-owner bug, not a compile error, since both
+are typed `string`. Every repository method the merge service depends on
+(`ensurePersonIdentity`, `getMergePropagationProfiles`, `mergePersonProfile`, `lockPeopleForMerge`) had
+to be re-derived around it. `mergeIdentitiesAfterProfileResolution` — replacing a `person.identityId`
+column update with a bulk repoint of `face_identity_person_group` rows — was the actual crux; done
+wrong, it would have broken the two-mechanism story this stage exists to resolve, not just added bugs
+elsewhere.
+
+**Estimate: unchanged, trending toward the lower end.** The flagged risk came back tractable in one
+focused session — the service + its 3 declared repo dependencies (~400 changed lines total) plus the
+~40-line hook, not an architectural rework. Error count went 2,302 → 2,261 (server-wide), confirmed via
+full diff to introduce zero new errors outside the four files touched
+(`face-identity.repository.ts`, `person.repository.ts`, `identity-merge-propagation.service.ts`,
+`person.service.ts`).
+
+**New open item, not spiked**: `face_person_verdict.personId` / `face_repair_decline.personId` (the
+two fork-owned tables from finding #6's list not touched by stage 2's repoint) still key off a bare
+single-column person id shaped for pre-K `person.id`. They currently compile only because Kysely
+doesn't enforce FK types at the column level — a real composite-key repoint is still owed.
+
+## Spike results — option J″, 2026-08-21
+
+A throwaway spike ran on branch `spike/cluster-groups-j2` in `.worktrees/spike-cluster-groups-j2`,
+branched from the same wholesale-merge base as the K spike (`1be40e6dced`). Scope was narrower than
+K's: schema and migration only, verified by type-checking the changed files — it did **not** attempt
+the registry/factory union-restoration or chase the wider error count down, so its numbers are not
+directly comparable to K's error-reduction progression above. Nothing merges; the rolling branch and
+`rolling-state.json` were never touched.
+
+**Verdict: J″ is viable at the schema level and achieves genuinely zero upstream-table divergence —
+but it surfaced a real gap the doc's prose didn't anticipate, and the same gap likely applies to K's
+`face_identity_person_group` link table.**
+
+### What was built
+
+- New fork-owned table `shared_space_person_group` (junction, composite PK `(personId,
+personGroupId)`, ~158 LOC total including migration) aggregating one-or-more `person_group`s under
+  one `shared_space_person`.
+- `shared_space_person.identityId` was **kept**, narrowed to pets only via a new CHECK constraint —
+  the K table above says this column is "repointed" but doesn't say what happens to it under J″.
+  Dropping it would leave pets with no per-space aggregation at all, since `person_group` is
+  upstream's people-only spine.
+- Migration `1791000000000-AddSharedSpacePersonGroup.ts`: a plain `CREATE TABLE` + index + one
+  `ALTER TABLE ... ADD CONSTRAINT CHECK`, following the existing `AddAlbumSpaceAssetTable` style — no
+  `migration_overrides` needed, nothing here is a partial/expression index.
+- The dedupe query (`shared_space_person` → `shared_space_person_group` → `person_group` →
+  `asset_face`) type-checks and reuses an existing index
+  (`asset_face_personGroupId_assetId_notDeleted_isVisible_idx`) — zero new indexes needed on
+  upstream tables.
+
+### Divergence surface
+
+Zero upstream-owned files modified. All changes are new or edited fork-owned files
+(`shared-space-person-group.table.ts` new; `shared-space-person.table.ts`, `face-identity.table.ts`,
+`face-identity-face.table.ts` edited — the latter two only for header-comment narrowing, no
+structural change).
+
+### The gap: discovery vs. bookkeeping
+
+The doc frames "aggregate person_groups under one shared_space_person" as pure bookkeeping — a place
+to record confirmed pairs. It doesn't say what **decides** two person_groups are the same human in
+the first place. Upstream's own mechanism for that (a shared `cluster_group`) is exactly what these
+contributors, by construction, don't share. The spike's resolution: keep `face_identity_face`'s
+evidence pipeline (ML / backfill / shared-space-evidence / manual sources) as the discovery engine,
+with a confirmed proposal landing as a `shared_space_person_group` row. This is a real design
+decision the doc left implicit, and it applies equally to K's `face_identity_person_group` link
+table — K's spike proved the read chain type-checks but didn't test how a row gets created in the
+first place.
+
+### Other gaps found
+
+- **Pets are not addressed by `person_group` at all** (people-only upstream spine) — under J″ (and
+  presumably K), pet identity keeps routing entirely through the existing `face_identity` machinery,
+  unchanged. Not new, but worth flagging as a permanent split, not a spike artifact.
+- **No DB-level uniqueness invariant** stops the same `person_group` from being attached to two
+  different `shared_space_person` rows within the same space, which would silently split one
+  identity's evidence. Would need a denormalized `spaceId` on the junction table plus app-level or
+  trigger sync — judged out of scope for the spike.
+- **Real backfill complexity, deliberately left unresolved**: the pet-only CHECK on `identityId`
+  would break on any existing `type='person'` row that still carries an `identityId` — there is no
+  mechanical mapping from "faces linked to this identity" to "which `person_group`s those faces'
+  `asset_face` rows carry," since a face's `personGroupId` reflects the owner's own (possibly
+  unconfirmed) clustering. Flagged in the migration comment rather than solved.
+
+### What the spike did NOT prove
+
+Same caveats as K, at a narrower scope:
+
+- Only the read query — no write/creation path for `shared_space_person_group` rows.
+- No registry/factory reconciliation attempted — the wider fork (services, repositories, specs) was
+  left exactly as the wholesale merge landed it (19,335 pre-existing errors, confirmed via an A/B
+  diff to have zero delta from this spike's own files).
+- No migration dry-run against a real database.
+- Web, mobile and e2e untouched.
+
+## Spike results — option D, 2026-08-21
+
+A throwaway spike ran on branch `spike/cluster-groups-d` in `.worktrees/spike-cluster-groups-d`,
+branched from the same wholesale-merge base as K and J″ (`1be40e6dced`). Schema and migration scope,
+same depth as J″. Nothing merges; the rolling branch and `rolling-state.json` were never touched.
+
+**Verdict: D is viable and its divergence surface is exactly as small as the doc predicted — but the
+merge-based mechanism it relies on has a real feature-completeness gap the doc didn't anticipate:
+merges are bulk and effectively irreversible, unlike today's single-row `face_identity_face` undo.**
+
+### What was built
+
+`person_group` fully replaces `face_identity` as the spine — not kept alongside it. `face_identity`
+and `face_identity_face` are **deleted**; `shared_space_person.identityId` and
+`face_person_verdict`'s identity FK are retargeted straight at `person_group.id`; the evidence table
+is renamed `person_group_face` (for consistency with the fork's existing `shared_space_person_face`
+naming). A new `person_group_merge_audit` table and an (unwired) `person-group-merge.repository.ts`
+stub implement the merge operation the doc's option-D row implied but didn't specify.
+
+### Divergence surface
+
+Exactly one upstream-owned table touched, as predicted: `person-group.table.ts` gets **+2 columns**
+(`type: 'person' | 'pet'` default `'person'`; `representativeFaceId` FK→`asset_face`, nullable),
+**+1 check constraint**, **+1 partial index**. `clusterGroupId` is untouched — see judgment call
+below. Zero changes to `cluster_group`, `cluster_group_request`, `person`, `person_group_audit`, or
+any upstream column on `asset_face`. (`schema/index.ts` also gets new table registrations, but that's
+the same one-line-per-table plumbing every existing fork table already requires, not new-in-kind
+divergence.)
+
+### Implementation weight
+
+~618 insertions / 109 deletions across 10 files. The 301-line migration is mostly mechanical
+rename/retarget SQL plus backfills — it's the fork's **first** migration that `ALTER TABLE`s an
+already-upstream-migrated table, confirmed via `migrations-gallery/` grep to have no precedent; it
+turned out to need only a plain `ALTER TABLE ... ADD COLUMN`, no `migration_overrides`, except for
+the partial `representativeFaceId` index (same split upstream's own `AddFaceIdentities.ts` uses). The
+merge-groups repository stub (129 lines) was 90% simple bulk `UPDATE ... WHERE personGroupId =
+loser` — `asset_face`, `person_group_face`, `face_person_verdict` are all 1:1 keyed by `assetFaceId`
+— and 10% genuinely hairy: `person`'s composite PK `(ownerId, personGroupId)` can collide on merge
+via a "diamond" topology (the same user already has independent `person` rows under both groups
+being merged), left as a documented TODO rather than inventing a second merge-conflict policy.
+
+**Backfill is lossy, and flagged rather than glossed over**: `face_identity` and upstream's
+`asset_face.personGroupId` were two independent parallel spines, so there's no natural mapping from
+an old `face_identity` grouping to a `person_group`. The migration backfills each evidence/verdict
+row's group from its own face's _current_ `personGroupId` — any cross-user grouping `face_identity`
+used to encode is silently discarded unless a real deployment runs the merge operation once per
+pre-existing grouping as a follow-up job.
+
+### Feature completeness
+
+New matches going forward are reproduced faithfully — the confirmed link is a real column
+reassignment, no indirection. What's **not** preserved is undo parity: unlinking one evidence row
+today via `face_identity_face` is a precise, single-row, side-effect-free operation. A `person_group`
+merge is bulk and group-wide; reversing a wrong one needs to know exactly which `asset_face` rows
+moved, and neither upstream's `person_group_audit` (records only "a group was deleted + its cluster
+group") nor the new `person_group_merge_audit` (summary counts + winner/loser ids, not a per-row
+snapshot) captures that. `person_group_merge_audit` gives auditability, not reversibility — a true
+undo would need a per-row snapshot table, which is materially more weight than "three small
+divergences" scoped this option to. **Closed by a follow-up spike, "D+" — see below.**
+
+### Judgment calls / things the doc underspecified
+
+1. **`clusterGroupId` nullability** (the doc's third listed divergence): resolved to **no schema
+   change** — left `NOT NULL`, untouched. Every `person_group` already gets a singleton via
+   upstream's own migration-time backfill, and this option never creates or surfaces additional
+   cluster groups, so there's nothing to diverge on. The doc listed this as an open question; D
+   resolves it to zero-touch.
+2. **The wholesale-merge worktree's pre-existing breakage is option-independent.** `schema/index.ts`'s
+   `DB` interface is missing nearly every fork table regardless of cluster-groups (confirmed via
+   signature-diffed `tsc` runs: this spike's changes add zero new errors anywhere, only shift error
+   counts inside already-fully-broken repository files). This will need fixing under D, J″ or K alike
+   and isn't a cost specific to any one option.
+3. **Table rename**: `face_identity_face` → `person_group_face`, matching the fork's existing
+   `shared_space_person_face` naming convention for the same kind of evidence/join table.
+
+## Spike results — option D+, 2026-08-21
+
+A follow-up spike closed D's one real gap: reversibility. Ran on the same branch
+(`spike/cluster-groups-d`), on top of the option-D spike, commit `0367d8388d7`. Same depth as the
+original D spike — schema + repository-level logic, type-check only.
+
+**Verdict: undo works, and D's flat-read property is unaffected — the fix costs comparable weight to
+the original spike (~551 insertions vs. ~618), paid entirely at merge/undo time.**
+
+### What was built
+
+Four new fork-owned tables capture everything a merge needs to be undone:
+
+- `person_group_merge_snapshot` — every moved `asset_face` id + its pre-merge `personGroupId`.
+- `person_group_merge_verdict_snapshot` — every moved `face_person_verdict` row's own id, not just its
+  `assetFaceId`: a face can carry up to two verdict rows (one per `personId` target, one per
+  `spacePersonId` target), so `assetFaceId` alone isn't a precise enough key to avoid sweeping up a
+  verdict row created after the merge.
+- `person_group_merge_group_snapshot` — the losing `person_group`'s full row, to recreate it under its
+  original id.
+- `person_group_merge_person_snapshot` — any `person` rows the PK-collision branch deleted.
+
+`person_group_face` gets no sibling snapshot table: its primary key **is** `assetFaceId`, so it's
+exactly reconstructable from the `asset_face` snapshot alone — one less table than a naive "snapshot
+every affected table" approach would need. `person_group_merge_audit` gains a nullable `reversedAt`,
+set (not deleted) by undo, so "merged then later reversed" stays visible in review history.
+
+`undoPersonGroupMerge(db, mergeId)` walks all of this in one transaction: refuses to run twice
+(`reversedAt IS NOT NULL` guard), re-inserts the losing `person_group` and any deleted `person` rows,
+moves the snapshotted `asset_face` ids back (guarded by `personGroupId = winner`, so a face moved again
+by a _later_, independent merge is never clobbered), reconstructs `person_group_face` from the same id
+set, moves `face_person_verdict` rows back by their own captured row id, then deletes the four snapshot
+rows and stamps `reversedAt`.
+
+### Confirmed: the read path stays flat
+
+Every read still goes through `asset_face.personGroupId` (or `person_group_face`'s /
+`face_person_verdict`'s own `personGroupId` column) with zero joins. Nothing outside
+`undoPersonGroupMerge` itself ever queries the four new snapshot tables — this is the crux of why D+
+is worth it over J″/K, and it holds. The only added cost is 1-4 extra `INSERT`s per merge inside the
+existing transaction, proportional to the losing group's face count, paid once — the same trade D
+always made, not a new one.
+
+### Storage and retention
+
+Storage is directly proportional to the losing group's face count: a merge of 10k faces (a popular
+identity with thousands of photos) is a few MB; a small merge is negligible. Recommended, not built:
+treat snapshot rows as TTL'd (a cleanup job deleting snapshot rows — **not** audit rows — for merges
+older than a 30-90 day "someone reports a bad merge" window) while `person_group_merge_audit` itself
+is kept forever. Already-reversed merges need no separate cleanup — `undoPersonGroupMerge` deletes
+their snapshots immediately.
+
+### What's still a known gap, not fixed by D+
+
+- **Merge ordering**: undoing an older merge is safe against a face moved again by a later, independent
+  merge (the `personGroupId = winner` guard prevents clobbering), but it does not retroactively repair
+  that later merge's own now-partially-stale snapshot. Documented, not solved.
+- **`shared_space_person.personGroupId`** is not touched by `mergePersonGroups` at all — this is a
+  pre-existing gap in the original D stub, not introduced by D+. Postgres silently `SET NULL`s it when
+  the losing `person_group` is deleted (an `ON DELETE SET NULL` FK), and undo cannot restore what was
+  never captured. Worth folding into whichever spike next touches D's merge trigger/discovery path.
+
+### Cost picture
+
+~551 insertions across 7 files — comparable weight to the original D spike's ~618, confirming
+reversibility is a bounded add-on rather than a rethink of the option. Zero new `tsc` errors beyond the
+pre-existing wholesale-merge baseline (same order of magnitude as the original D spike's 19,331,
+confirmed via before/after diff).
 
 ## Open questions
 
