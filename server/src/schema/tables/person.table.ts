@@ -38,6 +38,20 @@ import { UserTable } from 'src/schema/tables/user.table';
   where: '"identityId" IS NOT NULL',
 })
 @Index({ name: 'person_identityId_idx', columns: ['identityId'], where: '"identityId" IS NOT NULL' })
+// Option M: Gallery does not adopt upstream's cluster-groups FEATURE — cross-user recognition is
+// answered by shared spaces + `face_identity` instead. That decision means a person_group never
+// holds more than one `person` row, which is what lets the fork keep addressing a person by
+// `personGroupId` alone (see PersonRepository.getByGroupIdOnly / withPersonAnyOwner) even though
+// upstream's primary key is the composite (ownerId, personGroupId).
+//
+// This index makes that a database-enforced fact rather than a convention. Every person-insert path
+// creates exactly one row per group today; if a future rebase ever pulls in an upstream path that
+// adds a second owner's row to an existing group, this fails loudly at write time instead of
+// silently making every `personGroupId`-keyed lookup ambiguous.
+//
+// Dropping this index is the first step of ever turning cluster groups ON — do not remove it
+// casually.
+@Index({ name: 'person_personGroupId_key', columns: ['personGroupId'], unique: true })
 export class PersonTable {
   @ForeignKeyColumn(() => UserTable, {
     onDelete: 'CASCADE',
