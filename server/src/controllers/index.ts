@@ -8,7 +8,15 @@ import { AssetController } from 'src/controllers/asset.controller';
 import { AuthAdminController } from 'src/controllers/auth-admin.controller';
 import { AuthController } from 'src/controllers/auth.controller';
 import { ClassificationController } from 'src/controllers/classification.controller';
-import { ClusterGroupController } from 'src/controllers/cluster-group.controller';
+// Option M: Gallery does not adopt upstream's cluster-groups FEATURE — cross-user recognition is
+// answered by shared spaces + `face_identity`, and the fork relies on a person_group holding exactly
+// one person (enforced by the unique index `person_personGroupId_key`). ClusterGroupController's
+// request/accept flow is the ONLY way two users end up sharing a cluster group, so mounting it would
+// be a runtime violation of that invariant waiting to happen. The controller and its service are
+// carried verbatim but deliberately NOT registered.
+//
+// To reverse: restore the import and the array entry below, and drop `person_personGroupId_key`.
+// import { ClusterGroupController } from 'src/controllers/cluster-group.controller';
 import { ConfigAdminController } from 'src/controllers/config-admin.controller';
 import { ConfigPublicController } from 'src/controllers/config-public.controller';
 import { ConfigUserController } from 'src/controllers/config-user.controller';
@@ -63,7 +71,7 @@ export const controllers = [
   AssetMediaController,
   AuthController,
   AuthAdminController,
-  ClusterGroupController,
+  // ClusterGroupController — see the note at the top of this file; intentionally not mounted.
   ClassificationController,
   ConfigUserController,
   ConfigAdminController,
