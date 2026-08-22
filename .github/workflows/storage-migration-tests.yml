@@ -19,6 +19,11 @@ jobs:
         working-directory: ./e2e
     env:
       COMPOSE_FILE: docker-compose.yml:docker-compose.storage-migration.yml
+      # e2e/docker-compose.yml declares a `github_token` build secret sourced from this variable, so it
+      # must be set for every `docker compose` invocation here — an unresolvable secret makes compose
+      # fail the service recreate mid-run. It also authenticates the plugins stage's js-pdk fetch, the
+      # same reason test.yml sets it.
+      GITHUB_TOKEN: ${{ github.token }}
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
