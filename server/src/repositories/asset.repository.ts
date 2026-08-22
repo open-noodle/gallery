@@ -1452,7 +1452,19 @@ export class AssetRepository {
           qb
             .selectFrom('asset')
             .select('asset.id')
-            .where(truncatedDate(options.orderBy, bucketSize), '=', timeBucket.replace(/^[+-]/, '')),
+            .$if(options.orderBy === AssetOrderBy.CreatedAt, (qb) =>
+              qb
+                .where('asset.createdAt', '>=', sql<Date>`${bucket}::timestamp AT TIME ZONE 'UTC'`)
+                .where(
+                  'asset.createdAt',
+                  '<',
+                  // the bucket's own size (year / month / day), not upstream's fixed month (#625 grouping)
+                  sql<Date>`(${bucket}::timestamp + ${sql.lit(`1 ${dateTruncUnitForTimeBucketSize(bucketSize)}`)}::interval) AT TIME ZONE 'UTC'`,
+                ),
+            )
+            .$if(options.orderBy !== AssetOrderBy.CreatedAt, (qb) =>
+              qb.where(truncatedDate(options.orderBy, bucketSize), '=', bucket),
+            ),
           options,
         ),
       )
@@ -1493,110 +1505,6 @@ export class AssetRepository {
           ])
           .$if(!isMetadataHidden(auth), (qb) => qb.select(['asset_exif.city', 'asset_exif.country']))
           .$if(!!options.withCoordinates, (qb) => qb.select(['asset_exif.latitude', 'asset_exif.longitude']))
-          .$if(!!options.forceEmptyResult, (qb) => qb.where(sql<SqlBool>`false`))
-          .where('asset.deletedAt', options.isTrashed ? 'is not' : 'is', null)
-          .$if(options.visibility === undefined, withDefaultVisibility)
-          .$if(!!options.visibility, (qb) => qb.where('asset.visibility', '=', options.visibility!))
-          .$if(!!options.bbox, (qb) => {
-            const bbox = options.bbox!;
-            const circle = getBoundingCircle(bbox);
-
-            const withBoundingCircle = qb.where(
-              sql`earth_box(ll_to_earth_public(${circle.centerLatitude}, ${circle.centerLongitude}), ${circle.radius})`,
-              '@>',
-              sql`ll_to_earth_public(asset_exif.latitude, asset_exif.longitude)`,
-            );
-
-            return withBoundingBox(withBoundingCircle, bbox);
-          })
-          .$if(options.orderBy === AssetOrderBy.CreatedAt, (qb) =>
-            qb
-              .where('asset.createdAt', '>=', sql<Date>`${bucket}::timestamp AT TIME ZONE 'UTC'`)
-              .where(
-                'asset.createdAt',
-                '<',
-                // the bucket's own size (year / month / day), not upstream's fixed month (#625 grouping)
-                sql<Date>`(${bucket}::timestamp + ${sql.lit(`1 ${dateTruncUnitForTimeBucketSize(bucketSize)}`)}::interval) AT TIME ZONE 'UTC'`,
-              ),
-          )
-          .$if(options.orderBy !== AssetOrderBy.CreatedAt, (qb) =>
-            qb.where(truncatedDate(options.orderBy, bucketSize), '=', bucket),
-          )
-          .$if(!!options.albumId, (qb) =>
-            qb.where((eb) =>
-              eb.exists(
-                eb
-                  .selectFrom('album_asset')
-                  .whereRef('album_asset.assetId', '=', 'asset.id')
-                  .where('album_asset.albumId', '=', asUuid(options.albumId!)),
-              ),
-            ),
-          )
-          .$if(!!options.isNotInAlbum && !options.albumId, (qb) =>
-            qb.where((eb) =>
-              eb.not(eb.exists((eb) => eb.selectFrom('album_asset').whereRef('album_asset.assetId', '=', 'asset.id'))),
-            ),
-          )
-          .$if(!!options.isInAlbum && !options.albumId, (qb) =>
-            qb.where((eb) =>
-              eb.exists((eb) => eb.selectFrom('album_asset').whereRef('album_asset.assetId', '=', 'asset.id')),
-            ),
-          )
-          .$if(!!options.spaceId, (qb) =>
-            qb.where((eb) =>
-              eb.or([
-                eb.exists(
-                  eb
-                    .selectFrom('shared_space_asset')
-                    .whereRef('shared_space_asset.assetId', '=', 'asset.id')
-                    .where('shared_space_asset.spaceId', '=', asUuid(options.spaceId!)),
-                ),
-                eb.exists(
-                  eb
-                    .selectFrom('shared_space_library')
-                    .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
-                    .where('shared_space_library.spaceId', '=', asUuid(options.spaceId!)),
-                ),
-              ]),
-            ),
-          )
-          .$if(!!options.personIds?.length, (qb) => hasPeople(qb, options.personIds!))
-          .$if(!!options.spacePersonIds?.length, (qb) => hasSpacePeople(qb, options.spacePersonIds!))
-          .$if(!!options.identityIds?.length, (qb) => hasFaceIdentities(qb, options.identityIds!))
-          .$if(!!options.city, (qb) => qb.where('asset_exif.city', '=', options.city!))
-          .$if(!!options.country, (qb) => qb.where('asset_exif.country', '=', options.country!))
-          .$if(!!options.make, (qb) => qb.where('asset_exif.make', '=', options.make!))
-          .$if(!!options.model, (qb) => qb.where('asset_exif.model', '=', options.model!))
-          .$if(options.rating !== undefined, (qb) => qb.where('asset_exif.rating', '>=', options.rating!))
-          .$if(!!options.userIds && !options.timelineSpaceIds, (qb) =>
-            qb.where((eb) =>
-              options.personId
-                ? eb.or([eb('asset.ownerId', '=', anyUuid(options.userIds!)), inSharedAlbum(auth.user.id, 'asset.id')])
-                : eb('asset.ownerId', '=', anyUuid(options.userIds!)),
-            ),
-          )
-          .$if(!!options.userIds && !!options.timelineSpaceIds, (qb) =>
-            qb.where((eb) =>
-              eb.or([
-                options.personId
-                  ? eb.or([eb('asset.ownerId', '=', anyUuid(options.userIds!)), inSharedAlbum(auth.user.id, 'asset.id')])
-                  : eb('asset.ownerId', '=', anyUuid(options.userIds!)),
-                eb.exists(
-                  eb
-                    .selectFrom('shared_space_asset')
-                    .whereRef('shared_space_asset.assetId', '=', 'asset.id')
-                    .where('shared_space_asset.spaceId', '=', anyUuid(options.timelineSpaceIds!)),
-                ),
-                eb.exists(
-                  eb
-                    .selectFrom('shared_space_library')
-                    .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
-                    .where('shared_space_library.spaceId', '=', anyUuid(options.timelineSpaceIds!)),
-                ),
-              ]),
-            ),
-          )
-          .$if(options.isFavorite !== undefined, (qb) => qb.where('asset.isFavorite', '=', options.isFavorite!))
           // withStacked collapses a stack to its primary asset (filtered in Stage 1)
           // and projects the [stackId, count] array for the columnar output.
           .$if(!!options.withStacked, (qb) =>
