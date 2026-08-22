@@ -17,7 +17,12 @@ type PersonalMergePersonRow = {
   identityId: string | null;
 };
 
-type PersonalMergeFaceRow = { id: string; personGroupId: string | null; deletedAt?: string | null; isVisible?: boolean };
+type PersonalMergeFaceRow = {
+  id: string;
+  personGroupId: string | null;
+  deletedAt?: string | null;
+  isVisible?: boolean;
+};
 
 class PersonalMergeDb {
   constructor(
@@ -98,7 +103,9 @@ class PersonalMergeSelectBuilder {
       return [];
     }
 
-    return this.idFilter ? this.db.people.filter((person) => this.idFilter?.includes(person.personGroupId)) : this.db.people;
+    return this.idFilter
+      ? this.db.people.filter((person) => this.idFilter?.includes(person.personGroupId))
+      : this.db.people;
   }
 
   executeTakeFirst() {
@@ -485,7 +492,7 @@ const makeService = (profiles: MergeProfile[], options: { unrepairableSpaceIds?:
     lockPeopleForMerge: vi.fn().mockResolvedValue(void 0),
     mergePersonProfile: vi.fn().mockResolvedValue({ deletedThumbnailPath: null, targetNeedsFeatureFaceRepair: false }),
     getRandomFace: vi.fn().mockResolvedValue(null),
-    getByGroupIdOnly: vi.fn(async (personGroupId: string) => ({ personGroupId, ownerId: 'owner-1' })),
+    getByGroupIdOnly: vi.fn((personGroupId: string) => ({ personGroupId, ownerId: 'owner-1' })),
     update: vi.fn().mockResolvedValue(void 0),
     updatePersonIdentity: vi.fn().mockResolvedValue(void 0),
   };
@@ -785,7 +792,9 @@ describe(PersonRepository.name, () => {
       expect(db.people).toEqual([
         expect.objectContaining({ personGroupId: 'target-person', faceAssetId: 'missing-feature-face' }),
       ]);
-      expect(db.faces).toEqual([{ id: 'source-face', personGroupId: 'target-person', deletedAt: null, isVisible: true }]);
+      expect(db.faces).toEqual([
+        { id: 'source-face', personGroupId: 'target-person', deletedAt: null, isVisible: true },
+      ]);
     });
   });
 });

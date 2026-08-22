@@ -1,4 +1,3 @@
-import { IPersonJob } from 'src/types';
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { Kysely, sql, Transaction } from 'kysely';
 import { BulkIdResponseDto } from 'src/dtos/asset-ids.response.dto';
@@ -12,6 +11,7 @@ import { LoggingRepository } from 'src/repositories/logging.repository';
 import { PersonRepository } from 'src/repositories/person.repository';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
 import { DB } from 'src/schema';
+import { IPersonJob } from 'src/types';
 import { MERGE_ERROR_CODE } from 'src/utils/merge-error-code';
 
 export type MergeProfileKind = 'person' | 'space-person';

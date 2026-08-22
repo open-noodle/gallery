@@ -2213,8 +2213,13 @@ describe(MediaService.name, () => {
         metadata: { faces: { import: false } },
       });
 
-      await expect(sut.handleGeneratePersonThumbnail({ ownerId: 'owner-id', personGroupId: 'person-1' })).resolves.toBe(JobStatus.Failed);
-      expect(mocks.person.getDataForThumbnailGenerationJob).toHaveBeenCalledWith({ ownerId: 'owner-id', personGroupId: 'person-1' });
+      await expect(sut.handleGeneratePersonThumbnail({ ownerId: 'owner-id', personGroupId: 'person-1' })).resolves.toBe(
+        JobStatus.Failed,
+      );
+      expect(mocks.person.getDataForThumbnailGenerationJob).toHaveBeenCalledWith({
+        ownerId: 'owner-id',
+        personGroupId: 'person-1',
+      });
     });
 
     it('should skip a person not found', async () => {
@@ -2602,7 +2607,9 @@ describe(MediaService.name, () => {
         info: { width: 2160, height: 3840 } as OutputInfo,
       });
 
-      await expect(sut.handleGeneratePersonThumbnail({ ownerId: person.ownerId, personGroupId: person.personGroupId })).resolves.toBe(JobStatus.Success);
+      await expect(
+        sut.handleGeneratePersonThumbnail({ ownerId: person.ownerId, personGroupId: person.personGroupId }),
+      ).resolves.toBe(JobStatus.Success);
 
       expect(mocks.media.probe).not.toHaveBeenCalled();
       expect(mocks.media.extractFrame).not.toHaveBeenCalled();
@@ -2637,7 +2644,9 @@ describe(MediaService.name, () => {
         info: { width: 2160, height: 3840 } as OutputInfo,
       });
 
-      await expect(sut.handleGeneratePersonThumbnail({ ownerId: person.ownerId, personGroupId: person.personGroupId })).resolves.toBe(JobStatus.Success);
+      await expect(
+        sut.handleGeneratePersonThumbnail({ ownerId: person.ownerId, personGroupId: person.personGroupId }),
+      ).resolves.toBe(JobStatus.Success);
 
       expect(ensureLocalFile).toHaveBeenCalledWith(data.originalPath);
       expect(mocks.media.probe).not.toHaveBeenCalled();
@@ -5413,7 +5422,9 @@ describe(MediaService.name, () => {
         previewPath: null,
       });
 
-      await expect(sut.handleGeneratePersonThumbnail({ ownerId: 'owner-id', personGroupId: 'person-1' })).resolves.toBe(JobStatus.Failed);
+      await expect(sut.handleGeneratePersonThumbnail({ ownerId: 'owner-id', personGroupId: 'person-1' })).resolves.toBe(
+        JobStatus.Failed,
+      );
     });
   });
 

@@ -115,7 +115,11 @@ const seedOverCapPerson = async (ctx: Ctx, ownerId: string, opts: { leakedCount:
 
 const seedEligibleFace = async (ctx: Ctx, userId: string, personId: string): Promise<string> => {
   const { asset } = await ctx.newAsset({ ownerId: userId });
-  const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: personId, sourceType: SourceType.MachineLearning });
+  const { assetFace } = await ctx.newAssetFace({
+    assetId: asset.id,
+    personGroupId: personId,
+    sourceType: SourceType.MachineLearning,
+  });
   await db.insertInto('face_search').values({ faceId: assetFace.id, embedding: EMBEDDING }).execute();
   return assetFace.id;
 };
@@ -183,7 +187,9 @@ describe('FaceRepairService.getPersonFlaggedFaces (scan-backed)', () => {
     ]);
 
     // A face-level "keep here" is now a shared verdict, visible to both face engines.
-    await ctx.get(FacePersonVerdictRepository).markRejected(owner.personGroupId, f1, { source: 'cleanup', actorId: user.id });
+    await ctx
+      .get(FacePersonVerdictRepository)
+      .markRejected(owner.personGroupId, f1, { source: 'cleanup', actorId: user.id });
 
     const result = await sut.getPersonFlaggedFaces(person.personGroupId);
     expect(result.flaggedFaces.map((f) => f.assetFaceId)).toEqual([f2]);
