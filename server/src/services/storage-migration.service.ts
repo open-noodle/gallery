@@ -210,7 +210,7 @@ export class StorageMigrationService extends BaseService {
       for await (const row of this.storageMigrationRepository.streamPersonThumbnails(direction)) {
         await enqueue({
           entityType: 'person',
-          entityId: row.id,
+          entityId: row.personGroupId,
           fileType: null,
           sourcePath: row.thumbnailPath,
           batchId,

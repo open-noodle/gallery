@@ -101,9 +101,9 @@ export class FaceRepairDeclineRepository {
     ];
     const people =
       ids.length > 0
-        ? await this.db.selectFrom('person').select(['id', 'name', 'faceAssetId']).where('id', 'in', ids).execute()
+        ? await this.db.selectFrom('person').select(['personGroupId', 'name', 'faceAssetId']).where('personGroupId', 'in', ids).execute()
         : [];
-    const byId = new Map(people.map((p) => [p.id, p]));
+    const byId = new Map(people.map((p) => [p.personGroupId, p]));
     const nameOf = (id: string | null) => (id && byId.get(id)?.name ? byId.get(id)!.name! : null);
     const thumbOf = (id: string | null) => (id ? (byId.get(id)?.faceAssetId ?? null) : null);
     return rows.map((r) => ({
