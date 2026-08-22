@@ -3,10 +3,11 @@ import { isAbsolute, parse } from 'node:path';
 import { Readable } from 'node:stream';
 import sanitize from 'sanitize-filename';
 import { StorageCore } from 'src/cores/storage.core.js';
-import { AuthDto } from 'src/dtos/auth.dto.js';
+import type { AuthDto } from 'src/dtos/auth.dto.js';
 import { DownloadArchiveDto, DownloadArchiveInfo, DownloadInfoDto, DownloadResponseDto } from 'src/dtos/download.dto.js';
 import { Permission } from 'src/enum.js';
 import { StorageBackend } from 'src/interfaces/storage-backend.interface.js';
+import type { ImmichReadStream } from 'src/repositories/storage.repository.js';
 import { BaseService } from 'src/services/base.service.js';
 import { HumanReadableSize } from 'src/utils/bytes.js';
 import { getPreferences } from 'src/utils/preferences.js';
@@ -142,7 +143,7 @@ export class DownloadService extends BaseService {
     return { totalSize, archives };
   }
 
-  async downloadArchive(auth: AuthDto, dto: DownloadArchiveDto): Promise<{ stream: Readable; abort: () => void }> {
+  async downloadArchive(auth: AuthDto, dto: DownloadArchiveDto): Promise<ImmichReadStream & { abort: () => void }> {
     await this.requireAccess({ auth, permission: Permission.AssetDownload, ids: dto.assetIds });
 
     const zip = this.storageRepository.createZipStream();
