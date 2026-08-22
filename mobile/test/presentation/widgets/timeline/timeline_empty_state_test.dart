@@ -69,7 +69,7 @@ void main() {
 
   Widget withFakeAssets(Widget child) => DefaultAssetBundle(bundle: _FakeAssetBundle(), child: child);
 
-  SearchFilter activeFilter() => SearchFilter.empty().copyWith()..context = 'beach';
+  SearchFilter activeFilter() => SearchFilter.empty().copyWith(context: 'beach');
 
   /// Overrides the filter-driven search with one whose page-1 request answers
   /// with [page1]. Pass a never-completing future to hold it in flight.
