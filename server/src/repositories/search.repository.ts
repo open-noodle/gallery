@@ -1833,7 +1833,7 @@ export class SearchRepository {
       profiles AS (
         SELECT
           'user-person'::text AS "profileType",
-          person.id AS "profileId",
+          person."personGroupId" AS "profileId",
           NULL::uuid AS "spaceId",
           person."identityId",
           person.name,
