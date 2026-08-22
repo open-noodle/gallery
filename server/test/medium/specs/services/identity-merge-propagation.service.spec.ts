@@ -223,7 +223,7 @@ describe('IdentityMergePropagationService medium tests', () => {
 
     const people = await getPeople(ctx.database, [target.personGroupId, source.personGroupId]);
     expect(people).toHaveLength(1);
-    expect(people[0].id).toBe(target.personGroupId);
+    expect(people[0].personGroupId).toBe(target.personGroupId);
     expect(people[0].identityId).not.toBeNull();
   });
 
