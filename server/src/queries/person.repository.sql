@@ -158,15 +158,21 @@ select
           "person"
         where
           "person"."personGroupId" = "asset_face"."personGroupId"
-          and "person"."ownerId" = $1
+        order by
+          case
+            when "person"."ownerId" = $1 then 0
+            else 1
+          end
+        limit
+          $2
       ) as obj
   ) as "person"
 from
   "asset_face"
 where
-  "asset_face"."assetId" = $2
+  "asset_face"."assetId" = $3
   and "asset_face"."deletedAt" is null
-  and "asset_face"."isVisible" = $3
+  and "asset_face"."isVisible" = $4
 order by
   "asset_face"."boundingBoxX1" asc
 
@@ -184,13 +190,19 @@ select
           "person"
         where
           "person"."personGroupId" = "asset_face"."personGroupId"
-          and "person"."ownerId" = $1
+        order by
+          case
+            when "person"."ownerId" = $1 then 0
+            else 1
+          end
+        limit
+          $2
       ) as obj
   ) as "person"
 from
   "asset_face"
 where
-  "asset_face"."id" = $2
+  "asset_face"."id" = $3
   and "asset_face"."deletedAt" is null
 
 -- PersonRepository.getFaceByIdIncludingTombstoned
@@ -508,19 +520,14 @@ where
       where
         "album_asset"."assetId" = "asset"."id"
     )
-  )
-  and "asset_face"."deletedAt" is null
-  and "asset_face"."isVisible" is true
-  and "asset_face"."personGroupId" = $4
-  and (
-    exists (
+    or exists (
       select
         1 as "exists"
       from
         "shared_space_asset"
         inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_asset"."spaceId"
       where
-        "shared_space_member"."userId" = $5::uuid
+        "shared_space_member"."userId" = $4::uuid
         and "shared_space_asset"."assetId" = "asset"."id"
     )
     or exists (
@@ -530,7 +537,7 @@ where
         "shared_space_library"
         inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_library"."spaceId"
       where
-        "shared_space_member"."userId" = $6::uuid
+        "shared_space_member"."userId" = $5::uuid
         and "shared_space_library"."libraryId" = "asset"."libraryId"
     )
     or (
@@ -544,7 +551,7 @@ where
           and "album"."deletedAt" is null
           inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_album"."spaceId"
         where
-          "shared_space_member"."userId" = $7::uuid
+          "shared_space_member"."userId" = $6::uuid
           and "album_asset"."assetId" = "asset"."id"
       )
       or exists (
@@ -558,11 +565,14 @@ where
           and "album"."deletedAt" is null
           inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_album"."spaceId"
         where
-          "shared_space_member"."userId" = $8::uuid
+          "shared_space_member"."userId" = $7::uuid
           and "album_space_asset"."assetId" = "asset"."id"
       )
     )
   )
+  and "asset_face"."deletedAt" is null
+  and "asset_face"."isVisible" is true
+  and "asset_face"."personGroupId" = $8
 
 -- PersonRepository.getNumberOfPeople
 WITH
@@ -580,7 +590,9 @@ WITH
       AND "asset"."deletedAt" IS NULL
       AND "asset_face"."deletedAt" IS NULL
       AND "asset_face"."isVisible" = true
+      -- see getPeopleOverviewStatistics: group by the composite PRIMARY KEY, not the unique index
     GROUP BY
+      "person"."ownerId",
       "person"."personGroupId"
     HAVING
       NULLIF(BTRIM("person"."name"), '') IS NOT NULL
@@ -621,22 +633,26 @@ WITH
       INNER JOIN "eligible_faces" ON "eligible_faces"."personGroupId" = "person"."personGroupId"
     WHERE
       "person"."ownerId" = $4
+      -- group by the table's PRIMARY KEY, which #30739 made composite. Postgres only infers
+      -- functional dependency from a primary key, never from a unique index, so grouping by
+      -- "personGroupId" alone leaves "isHidden" and "name" ungrouped and the query fails to plan.
     GROUP BY
+      "person"."ownerId",
       "person"."personGroupId"
     HAVING
       NULLIF(BTRIM("person"."name"), '') IS NOT NULL
       OR COUNT(DISTINCT "eligible_faces"."assetFaceId") >= $5
   )
 SELECT
-  COUNT(DISTINCT "eligible_people"."id")::int AS "total",
-  COUNT(DISTINCT "eligible_people"."id") FILTER (
+  COUNT(DISTINCT "eligible_people"."personGroupId")::int AS "total",
+  COUNT(DISTINCT "eligible_people"."personGroupId") FILTER (
     WHERE
       "eligible_people"."isHidden" = true
   )::int AS "hidden",
   COUNT(DISTINCT "eligible_faces"."assetFaceId")::int AS "detectedFaceCount"
 FROM
   "eligible_faces"
-  LEFT JOIN "eligible_people" ON "eligible_people"."id" = "eligible_faces"."personGroupId"
+  LEFT JOIN "eligible_people" ON "eligible_people"."personGroupId" = "eligible_faces"."personGroupId"
 
 -- PersonRepository.getPeopleFaceStatistics
 WITH
@@ -894,14 +910,20 @@ select
           "person"
         where
           "person"."personGroupId" = "asset_face"."personGroupId"
-          and "person"."ownerId" = $1
+        order by
+          case
+            when "person"."ownerId" = $1 then 0
+            else 1
+          end
+        limit
+          $2
       ) as obj
   ) as "person"
 from
   "asset_face"
 where
-  "asset_face"."assetId" in ($2)
-  and "asset_face"."personGroupId" in ($3)
+  "asset_face"."assetId" in ($3)
+  and "asset_face"."personGroupId" in ($4)
   and "asset_face"."deletedAt" is null
 
 -- PersonRepository.getAssignedFaceEmbeddings
