@@ -60,7 +60,7 @@ describe('face_person_verdict migration', () => {
         'distance',
         'id',
         'identityId',
-        'personId',
+        'personGroupId',
         'source',
         'spacePersonId',
         'status',
@@ -74,10 +74,10 @@ describe('face_person_verdict migration', () => {
     const columns = await sql<{ column_name: string; is_nullable: string }>`
       SELECT column_name, is_nullable FROM information_schema.columns
       WHERE table_name = 'face_person_verdict'
-        AND column_name IN ('personId', 'spacePersonId', 'identityId', 'assetFaceId', 'distance')
+        AND column_name IN ('personGroupId', 'spacePersonId', 'identityId', 'assetFaceId', 'distance')
     `.execute(db);
     expect(Object.fromEntries(columns.rows.map((row) => [row.column_name, row.is_nullable]))).toEqual({
-      personId: 'YES',
+      personGroupId: 'YES',
       spacePersonId: 'YES',
       identityId: 'YES',
       distance: 'YES',
@@ -124,9 +124,9 @@ describe('face_person_verdict migration', () => {
     `.execute(db);
     const defs = Object.fromEntries(indexes.rows.map((row) => [row.indexname, row.indexdef]));
 
-    expect(defs.face_person_verdict_personId_assetFaceId_uq).toContain('UNIQUE INDEX');
-    expect(defs.face_person_verdict_personId_assetFaceId_uq).toContain('("personId", "assetFaceId")');
-    expect(defs.face_person_verdict_personId_assetFaceId_uq).toContain('WHERE ("personId" IS NOT NULL)');
+    expect(defs.face_person_verdict_personGroupId_assetFaceId_uq).toContain('UNIQUE INDEX');
+    expect(defs.face_person_verdict_personGroupId_assetFaceId_uq).toContain('("personGroupId", "assetFaceId")');
+    expect(defs.face_person_verdict_personGroupId_assetFaceId_uq).toContain('WHERE ("personGroupId" IS NOT NULL)');
 
     expect(defs.face_person_verdict_spacePersonId_assetFaceId_uq).toContain('UNIQUE INDEX');
     expect(defs.face_person_verdict_spacePersonId_assetFaceId_uq).toContain('("spacePersonId", "assetFaceId")');
@@ -136,7 +136,7 @@ describe('face_person_verdict migration', () => {
     expect(defs.face_person_verdict_identityId_assetFaceId_idx).toContain('("identityId", "assetFaceId")');
     expect(defs.face_person_verdict_identityId_assetFaceId_idx).toContain('WHERE ("identityId" IS NOT NULL)');
 
-    expect(defs.face_person_verdict_personId_status_distance_idx).toContain('("personId", status, distance)');
+    expect(defs.face_person_verdict_personGroupId_status_distance_idx).toContain('("personGroupId", status, distance)');
     expect(defs.face_person_verdict_assetFaceId_idx).toBeDefined();
     expect(defs.face_person_verdict_updateId_idx).toBeDefined();
   });
@@ -149,7 +149,7 @@ describe('face_person_verdict migration', () => {
     `.execute(db);
     const byName = Object.fromEntries(fks.rows.map((r) => [r.conname, r.def]));
 
-    expect(byName['face_person_verdict_personId_fkey']).toContain('ON DELETE SET NULL');
+    expect(byName['face_person_verdict_personGroupId_fkey']).toContain('ON DELETE SET NULL');
     expect(byName['face_person_verdict_spacePersonId_fkey']).toContain('ON DELETE SET NULL');
     expect(byName['face_person_verdict_actorId_fkey']).toContain('ON DELETE SET NULL');
     // D1: identity is SET NULL (not CASCADE) — merges re-key it onto the survivor, and this is the
@@ -161,6 +161,11 @@ describe('face_person_verdict migration', () => {
   it('lets a person be deleted even when the verdict has no identity to fall back on', async () => {
     // The regression a `num_nonnulls(...) >= 1` check would cause: SET NULL would violate it and the
     // person DELETE would fail outright.
+    //
+    // #30739 moved this FK from person.id onto person_group.id, so the SET NULL now fires when the
+    // GROUP goes, not the person row. That is the same moment in practice: under Option M the two are
+    // 1:1, and PersonService.removeAllPersonGroups deletes the person and then sweeps the group it
+    // emptied. Both steps are exercised here so the test still covers the real deletion path.
     const { ctx, sut } = setup();
     const { user } = await ctx.newUser();
     const { asset } = await ctx.newAsset({ ownerId: user.id });
@@ -169,7 +174,12 @@ describe('face_person_verdict migration', () => {
 
     await sut.markRejected(person.personGroupId, assetFace.id);
 
-    await expect(db.deleteFrom('person').where('personGroupId', '=', person.personGroupId).execute()).resolves.toBeDefined();
+    await expect(
+      db.deleteFrom('person').where('personGroupId', '=', person.personGroupId).execute(),
+    ).resolves.toBeDefined();
+    await expect(
+      db.deleteFrom('person_group').where('id', '=', person.personGroupId).execute(),
+    ).resolves.toBeDefined();
 
     const row = await db
       .selectFrom('face_person_verdict')
@@ -221,11 +231,14 @@ async function setIdentityFkCascade() {
   `.execute(db);
 }
 
+const PERSON_GROUP_OVERRIDE = 'index_face_person_verdict_personGroupId_assetFaceId_uq';
+const OBSOLETE_PERSON_ID_OVERRIDE = 'index_face_person_verdict_personId_assetFaceId_uq';
+
 async function getOverrideValues() {
   const rows = await sql<{ name: string; value: unknown }>`
     SELECT name, value FROM migration_overrides
     WHERE name IN (
-      'index_face_person_verdict_personId_assetFaceId_uq',
+      'index_face_person_verdict_personGroupId_assetFaceId_uq',
       'index_face_person_verdict_spacePersonId_assetFaceId_uq',
       'index_face_person_verdict_spacePersonId_status_distance_idx',
       'index_face_person_verdict_identityId_assetFaceId_idx'
@@ -236,12 +249,9 @@ async function getOverrideValues() {
 }
 
 // Undoes 4a64b158139, simulating an RC/staging database that ran 1787 before that commit landed.
+// Only the three rows 1788 still owns: 1791 re-keyed the fourth (the personGroupId uniqueness
+// index) onto person_group and rewrote its payload itself, so 1788 no longer touches it.
 async function setOverridesUnparenthesized() {
-  await sql`
-    UPDATE "migration_overrides" SET "value" =
-      '{"type":"index","name":"face_person_verdict_personId_assetFaceId_uq","sql":"CREATE UNIQUE INDEX \\"face_person_verdict_personId_assetFaceId_uq\\" ON \\"face_person_verdict\\" (\\"personId\\", \\"assetFaceId\\") WHERE \\"personId\\" IS NOT NULL;"}'::jsonb
-    WHERE "name" = 'index_face_person_verdict_personId_assetFaceId_uq'
-  `.execute(db);
   await sql`
     UPDATE "migration_overrides" SET "value" =
       '{"type":"index","name":"face_person_verdict_spacePersonId_assetFaceId_uq","sql":"CREATE UNIQUE INDEX \\"face_person_verdict_spacePersonId_assetFaceId_uq\\" ON \\"face_person_verdict\\" (\\"spacePersonId\\", \\"assetFaceId\\") WHERE \\"spacePersonId\\" IS NOT NULL;"}'::jsonb
@@ -324,7 +334,7 @@ describe('1788000000000-ReconcileFacePersonVerdictConstraints', () => {
 
   it('S13.3 repairs unparenthesized override payloads and clears schema drift', async () => {
     await setOverridesUnparenthesized();
-    const broken = await getOverrideValues();
+    const broken = (await getOverrideValues()).filter((row) => row.name !== PERSON_GROUP_OVERRIDE);
     expect(broken.every((row) => !JSON.stringify(row.value).includes('IS NOT NULL)'))).toBe(true); // control.
 
     const driftBefore = await computeDriftForThisDb();
@@ -334,6 +344,11 @@ describe('1788000000000-ReconcileFacePersonVerdictConstraints', () => {
 
     const repaired = await getOverrideValues();
     expect(repaired.every((row) => JSON.stringify(row.value).includes('IS NOT NULL)'))).toBe(true);
+
+    // Running 1788 here is out of order — 1791 already deleted the override row 1788 writes under the
+    // pre-rename `personId` name, and re-running 1788 resurrects it. Drop it again so the drift check
+    // measures the repair rather than this test's own time travel.
+    await sql`DELETE FROM "migration_overrides" WHERE "name" = ${OBSOLETE_PERSON_ID_OVERRIDE}`.execute(db);
 
     const driftAfter = await computeDriftForThisDb();
     expect(driftAfter.asHuman()).toEqual([]);
@@ -400,8 +415,9 @@ describe('1788000000000-ReconcileFacePersonVerdictConstraints', () => {
     await down(db);
 
     expect(await getIdentityFkDeleteType()).toBe('c');
-    const overrides = await getOverrideValues();
-    expect(overrides).toHaveLength(4);
+    // The personGroupId row belongs to 1791, so 1788's down() correctly leaves it parenthesized.
+    const overrides = (await getOverrideValues()).filter((row) => row.name !== PERSON_GROUP_OVERRIDE);
+    expect(overrides).toHaveLength(3);
     for (const row of overrides) {
       const text = JSON.stringify(row.value);
       expect(text).toContain('IS NOT NULL;');

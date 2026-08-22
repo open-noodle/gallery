@@ -62,7 +62,8 @@ export class FaceRepairRepository {
       )
       .select(['person.personGroupId as id', 'person.name as name', 'person.faceAssetId as thumbnailFaceId'])
       .select((eb) => eb.fn.count('asset_face.id').as('faceCount'))
-      .groupBy(['person.personGroupId'])
+      // grouped by the composite PRIMARY KEY — see face-repair-scan.repository.ts
+      .groupBy(['person.ownerId', 'person.personGroupId'])
       .orderBy(sql`NULLIF(BTRIM(person.name), '') is null`, 'asc')
       .orderBy('person.name', 'asc')
       .orderBy('person.personGroupId', 'asc')
@@ -103,7 +104,8 @@ export class FaceRepairRepository {
       ])
       .select((eb) => eb.fn.count('asset_face.id').as('faceCount'))
       .where('person.personGroupId', '=', personGroupId)
-      .groupBy(['person.personGroupId'])
+      // grouped by the composite PRIMARY KEY — see face-repair-scan.repository.ts
+      .groupBy(['person.ownerId', 'person.personGroupId'])
       .executeTakeFirst();
 
     return row && { ...row, faceCount: Number(row.faceCount) };
