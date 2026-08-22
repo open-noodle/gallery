@@ -61,7 +61,7 @@ describe(FaceIdentityRepository.name, () => {
       const { db, queries } = makeDb({
         person: [
           {
-            id: 'person-1',
+            personGroupId: 'person-1',
             ownerId: 'owner-1',
             identityId: 'identity-1',
             type: 'person',
@@ -69,7 +69,7 @@ describe(FaceIdentityRepository.name, () => {
             faceCount: '4',
           },
           {
-            id: 'person-2',
+            personGroupId: 'person-2',
             ownerId: 'owner-2',
             identityId: 'identity-2',
             type: 'pet',
@@ -93,14 +93,14 @@ describe(FaceIdentityRepository.name, () => {
           faceCount: 4,
         },
       ]);
-      expect(queries).toMatchObject([{ table: 'person', where: ['person.id', 'in', ['person-1']] }]);
+      expect(queries).toMatchObject([{ table: 'person', where: ['person.personGroupId', 'in', ['person-1']] }]);
     });
 
     it('returns personal and shared-space profiles in identity mode', async () => {
       const { db, queries } = makeDb({
         person: [
           {
-            id: 'person-1',
+            personGroupId: 'person-1',
             ownerId: 'owner-1',
             identityId: 'identity-1',
             type: 'person',
@@ -108,7 +108,7 @@ describe(FaceIdentityRepository.name, () => {
             faceCount: 3,
           },
           {
-            id: 'person-2',
+            personGroupId: 'person-2',
             ownerId: 'owner-2',
             identityId: 'identity-2',
             type: 'person',
