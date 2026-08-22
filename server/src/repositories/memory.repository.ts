@@ -194,7 +194,7 @@ export class MemoryRepository implements IBulkAsset {
                 eb.exists(
                   eb
                     .selectFrom('asset_face')
-                    .innerJoin('person', 'person.id', 'asset_face.personId')
+                    .innerJoin('person', 'person.personGroupId', 'asset_face.personGroupId')
                     .select((eb) => eb.val(1).as('one'))
                     .whereRef('asset_face.assetId', '=', 'asset.id')
                     .where('person.isHidden', '=', true),

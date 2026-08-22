@@ -203,7 +203,7 @@ export class FacePersonVerdictRepository {
           .selectFrom('face_person_verdict as fpv')
           .innerJoin('asset_face as af', 'af.id', 'fpv.assetFaceId')
           .innerJoin('asset', 'asset.id', 'af.assetId')
-          .leftJoin('person', 'person.id', 'fpv.personId')
+          .leftJoin('person', 'person.personGroupId', 'fpv.personId')
           .select('fpv.id as id')
           .where('fpv.personId', '=', personId)
           .where('fpv.assetFaceId', '=', assetFaceId)
@@ -452,7 +452,7 @@ export class FacePersonVerdictRepository {
     const totalRow = await base.select((eb) => eb.fn.countAll<string>().as('total')).executeTakeFirstOrThrow();
 
     const rows = await base
-      .leftJoin('person', 'person.id', 'fpv.personId')
+      .leftJoin('person', 'person.personGroupId', 'fpv.personId')
       .leftJoin('shared_space_person as ssp', 'ssp.id', 'fpv.spacePersonId')
       .leftJoin('shared_space', 'shared_space.id', 'ssp.spaceId')
       .leftJoin('user as actor', 'actor.id', 'fpv.actorId')
@@ -647,8 +647,8 @@ export class FacePersonVerdictRepository {
     // here for the negative-verdict anti-join below, rather than a correlated subquery per row.
     const scannable = await this.db
       .selectFrom('person')
-      .select(['person.id', 'person.identityId'])
-      .where('person.id', '=', personId)
+      .select(['person.personGroupId', 'person.identityId'])
+      .where('person.personGroupId', '=', personId)
       .where('person.name', '!=', '')
       .where('person.isHidden', '=', false)
       .where('person.type', '=', 'person')
