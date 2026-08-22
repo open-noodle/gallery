@@ -20,6 +20,7 @@ import { DB } from 'src/schema';
 import { BaseService } from 'src/services/base.service';
 import { newMediumService } from 'test/medium.factory';
 import { getKyselyDB } from 'test/utils';
+import { factory } from 'test/small.factory';
 
 let defaultDatabase: Kysely<DB>;
 
@@ -54,7 +55,7 @@ const yearBucketCount = async (asset: AssetRepository, spaceId: string): Promise
     spaceId,
     visibility: AssetVisibility.Timeline,
     bucketSize: TimeBucketSize.Year,
-  });
+  }, factory.auth());
   return buckets.reduce((sum, b) => sum + Number(b.count), 0);
 };
 
