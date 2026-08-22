@@ -391,8 +391,8 @@ export class StorageCore {
     );
   }
 
-  static getRelativePersonThumbnailPath(person: ThumbnailPathEntity): string {
-    return StorageCore.getRelativeNestedPath(StorageFolder.Thumbnails, person.ownerId, `${person.id}.jpeg`);
+  static getRelativePersonThumbnailPath(person: PersonThumbnailPathEntity): string {
+    return StorageCore.getRelativeNestedPath(StorageFolder.Thumbnails, person.ownerId, `${person.personGroupId}.jpeg`);
   }
 
   static getRelativeProfileImagePath(userId: string, filename: string): string {
