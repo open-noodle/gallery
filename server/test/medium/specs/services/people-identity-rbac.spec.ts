@@ -191,7 +191,7 @@ const setupPeopleIdentityMatrix = async () => {
     birthDate: new Date('1990-01-01'),
     thumbnailPath: '/private/alice-thumbnail.jpg',
   });
-  const aliceIdentity = await faceIdentityRepository.ensurePersonIdentity(alicePerson.id);
+  const aliceIdentity = await faceIdentityRepository.ensurePersonIdentity(alicePerson.personGroupId);
 
   const makeSharedFace = async (input: { spaceId: string; personName: string; ownerId?: string; city?: string }) => {
     const { asset } = await ctx.newAsset({
@@ -202,7 +202,7 @@ const setupPeopleIdentityMatrix = async () => {
       await ctx.newExif({ assetId: asset.id, city: input.city, country: 'Germany' });
     }
     await ctx.newSharedSpaceAsset({ spaceId: input.spaceId, assetId: asset.id, addedById: input.ownerId ?? source.id });
-    const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personId: alicePerson.id });
+    const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: alicePerson.personGroupId });
     await faceIdentityRepository.linkFace({
       assetFaceId: faceId,
       identityId: aliceIdentity.id,
@@ -258,7 +258,7 @@ const setupRepairFixture = async (role: SharedSpaceRole = SharedSpaceRole.Editor
   const { space } = await ctx.newSharedSpace({ createdById: otherUser.id });
   await ctx.newSharedSpaceMember({ spaceId: space.id, userId: actor.id, role });
   const { person: actorPerson } = await ctx.newPerson({ ownerId: actor.id, name: 'Actor Alice' });
-  const targetIdentity = await faceIdentityRepository.ensurePersonIdentity(actorPerson.id);
+  const targetIdentity = await faceIdentityRepository.ensurePersonIdentity(actorPerson.personGroupId);
   const spacePerson = await ctx.database
     .insertInto('shared_space_person')
     .values({ spaceId: space.id, name: 'Space Alice', type: 'person' })
@@ -304,9 +304,9 @@ const createIdentityBackedFace = async (
       addedById: input.assetAdderId ?? input.ownerId,
     });
   }
-  const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+  const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
   await ctx.database.insertInto('face_search').values({ faceId, embedding: newEmbedding() }).execute();
-  const identity = await faceIdentityRepository.ensurePersonIdentity(person.id);
+  const identity = await faceIdentityRepository.ensurePersonIdentity(person.personGroupId);
   await faceIdentityRepository.linkFace({ assetFaceId: faceId, identityId: identity.id, source: 'owner-person' });
   return { asset, faceId, identity, person };
 };
@@ -371,10 +371,10 @@ const addMatchingMemberPerson = async (
   input: { memberId: string; name: string; embedding: string; photoCount: number },
 ) => {
   const { result: person } = await fx.ctx.newPerson({ ownerId: input.memberId, name: input.name });
-  const identity = await fx.faceIdentityRepository.ensurePersonIdentity(person.id);
+  const identity = await fx.faceIdentityRepository.ensurePersonIdentity(person.personGroupId);
   for (let i = 0; i < input.photoCount; i++) {
     const { asset } = await fx.ctx.newAsset({ ownerId: input.memberId, visibility: AssetVisibility.Timeline });
-    const { result: face } = await fx.ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+    const { result: face } = await fx.ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
     await fx.ctx.database.insertInto('face_search').values({ faceId: face, embedding: input.embedding }).execute();
     await fx.faceIdentityRepository.linkFace({ assetFaceId: face, identityId: identity.id, source: 'owner-person' });
   }
@@ -419,9 +419,9 @@ const setupJoinAfterDuplicatesFixture = async (
 
   const { result: ownerPerson } = await ctx.newPerson({ ownerId: owner.id, name: 'Owner Shared Name' });
   const { asset: spaceAsset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
-  const { result: ownerFace } = await ctx.newAssetFace({ assetId: spaceAsset.id, personId: ownerPerson.id });
+  const { result: ownerFace } = await ctx.newAssetFace({ assetId: spaceAsset.id, personGroupId: ownerPerson.personGroupId });
   await ctx.database.insertInto('face_search').values({ faceId: ownerFace, embedding }).execute();
-  const ownerIdentity = await faceIdentityRepository.ensurePersonIdentity(ownerPerson.id);
+  const ownerIdentity = await faceIdentityRepository.ensurePersonIdentity(ownerPerson.personGroupId);
   await faceIdentityRepository.linkFace({
     assetFaceId: ownerFace,
     identityId: ownerIdentity.id,
@@ -430,9 +430,9 @@ const setupJoinAfterDuplicatesFixture = async (
 
   const { result: memberPerson } = await ctx.newPerson({ ownerId: member.id, name: 'Member Private Name' });
   const { asset: memberAsset } = await ctx.newAsset({ ownerId: member.id, visibility: AssetVisibility.Timeline });
-  const { result: memberFace } = await ctx.newAssetFace({ assetId: memberAsset.id, personId: memberPerson.id });
+  const { result: memberFace } = await ctx.newAssetFace({ assetId: memberAsset.id, personGroupId: memberPerson.personGroupId });
   await ctx.database.insertInto('face_search').values({ faceId: memberFace, embedding }).execute();
-  const memberIdentity = await faceIdentityRepository.ensurePersonIdentity(memberPerson.id);
+  const memberIdentity = await faceIdentityRepository.ensurePersonIdentity(memberPerson.personGroupId);
   await faceIdentityRepository.linkFace({
     assetFaceId: memberFace,
     identityId: memberIdentity.id,
@@ -709,11 +709,11 @@ describe('People identity RBAC projection', () => {
 
     const uploadedPerson = await fx.ctx.database
       .selectFrom('asset_face')
-      .innerJoin('person', 'person.id', 'asset_face.personId')
+      .innerJoin('person', 'person.personGroupId', 'asset_face.personId')
       .select(['person.id', 'person.identityId'])
       .where('asset_face.id', '=', uploadedFaceId)
       .executeTakeFirstOrThrow();
-    const targetIdentity = await fx.faceIdentityRepository.ensurePersonIdentity(fx.face.person.id);
+    const targetIdentity = await fx.faceIdentityRepository.ensurePersonIdentity(fx.face.person.personGroupId);
     const withSpace = await fx.personService.getAll(authFor(fx.member), {
       withHidden: false,
       withSharedSpaces: true,
@@ -758,13 +758,13 @@ describe('People identity RBAC projection', () => {
       .select('embedding')
       .where('faceId', '=', fx.face.faceId)
       .executeTakeFirstOrThrow();
-    const targetIdentity = await fx.faceIdentityRepository.ensurePersonIdentity(fx.face.person.id);
+    const targetIdentity = await fx.faceIdentityRepository.ensurePersonIdentity(fx.face.person.personGroupId);
 
     const { result: memberConflictPerson } = await fx.ctx.newPerson({
       ownerId: fx.member.id,
       name: 'Member Existing Profile',
     });
-    const memberConflictIdentity = await fx.faceIdentityRepository.ensurePersonIdentity(memberConflictPerson.id);
+    const memberConflictIdentity = await fx.faceIdentityRepository.ensurePersonIdentity(memberConflictPerson.personGroupId);
     await fx.faceIdentityRepository.mergeIdentities({
       targetIdentityId: targetIdentity.id,
       sourceIdentityIds: [memberConflictIdentity.id],
@@ -782,7 +782,7 @@ describe('People identity RBAC projection', () => {
 
     const uploadedPerson = await fx.ctx.database
       .selectFrom('asset_face')
-      .innerJoin('person', 'person.id', 'asset_face.personId')
+      .innerJoin('person', 'person.personGroupId', 'asset_face.personId')
       .select(['person.id', 'person.identityId'])
       .where('asset_face.id', '=', uploadedFaceId)
       .executeTakeFirstOrThrow();
@@ -798,14 +798,14 @@ describe('People identity RBAC projection', () => {
       .orderBy('id')
       .execute();
 
-    expect(uploadedPerson.id).not.toBe(memberConflictPerson.id);
+    expect(uploadedPerson.id).not.toBe(memberConflictPerson.personGroupId);
     expect(uploadedPerson.identityId).not.toBe(targetIdentity.id);
     expect(uploadedLinks).toEqual([
       { assetFaceId: uploadedFaceId, identityId: uploadedPerson.identityId, source: 'owner-person' },
     ]);
     expect(targetProfiles).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ id: memberConflictPerson.id, ownerId: fx.member.id, identityId: targetIdentity.id }),
+        expect.objectContaining({ id: memberConflictPerson.personGroupId, ownerId: fx.member.id, identityId: targetIdentity.id }),
       ]),
     );
     expect(targetProfiles.map((profile) => profile.id)).not.toContain(uploadedPerson.id);
@@ -829,7 +829,7 @@ describe('People identity RBAC projection', () => {
     const readState = async () => {
       const assignedPerson = await fx.ctx.database
         .selectFrom('asset_face')
-        .innerJoin('person', 'person.id', 'asset_face.personId')
+        .innerJoin('person', 'person.personGroupId', 'asset_face.personId')
         .select(['person.id as personId', 'person.identityId as identityId'])
         .where('asset_face.id', '=', uploadedFaceId)
         .executeTakeFirstOrThrow();
@@ -884,12 +884,12 @@ describe('People identity RBAC projection', () => {
       ownerId: fx.member.id,
       visibility: AssetVisibility.Timeline,
     });
-    const { result: memberFace } = await fx.ctx.newAssetFace({ assetId: memberAsset.id, personId: memberPerson.id });
+    const { result: memberFace } = await fx.ctx.newAssetFace({ assetId: memberAsset.id, personGroupId: memberPerson.personGroupId });
     await fx.ctx.database
       .insertInto('face_search')
       .values({ faceId: memberFace, embedding: embeddingRow.embedding })
       .execute();
-    const memberIdentity = await fx.faceIdentityRepository.ensurePersonIdentity(memberPerson.id);
+    const memberIdentity = await fx.faceIdentityRepository.ensurePersonIdentity(memberPerson.personGroupId);
     await fx.faceIdentityRepository.linkFace({
       assetFaceId: memberFace,
       identityId: memberIdentity.id,
@@ -914,7 +914,7 @@ describe('People identity RBAC projection', () => {
 
     expect(result.people).toEqual([
       expect.objectContaining({
-        primaryProfile: { type: 'user-person', id: memberPerson.id },
+        primaryProfile: { type: 'user-person', id: memberPerson.personGroupId },
         numberOfAssets: 2,
       }),
     ]);
@@ -953,7 +953,7 @@ describe('People identity RBAC projection', () => {
       } as any);
       expect(result.people).toEqual([
         expect.objectContaining({
-          primaryProfile: { type: 'user-person', id: memberPerson.id },
+          primaryProfile: { type: 'user-person', id: memberPerson.personGroupId },
           numberOfAssets: photoCount + 1,
         }),
       ]);
@@ -978,11 +978,11 @@ describe('People identity RBAC projection', () => {
     const rows = await fx.ctx.database
       .selectFrom('person')
       .select(['id', 'identityId'])
-      .where('id', 'in', [a.person.id, b.person.id])
+      .where('personGroupId', 'in', [a.person.personGroupId, b.person.personGroupId])
       .execute();
     const byId = new Map(rows.map((r) => [r.id, r.identityId]));
-    expect(byId.get(a.person.id)).toBe(a.identityId);
-    expect(byId.get(b.person.id)).toBe(b.identityId);
+    expect(byId.get(a.person.personGroupId)).toBe(a.identityId);
+    expect(byId.get(b.person.personGroupId)).toBe(b.identityId);
   });
 
   // End-to-end self-heal: the nightly sweep queues space-level reconciliation (no per-user
@@ -1014,7 +1014,7 @@ describe('People identity RBAC projection', () => {
     } as any);
     expect(result.people).toEqual([
       expect.objectContaining({
-        primaryProfile: { type: 'user-person', id: memberPerson.id },
+        primaryProfile: { type: 'user-person', id: memberPerson.personGroupId },
         numberOfAssets: 3,
       }),
     ]);
@@ -1184,9 +1184,9 @@ describe('People identity RBAC projection', () => {
     const { user: owner } = await ctx.newUser();
     const { result: person } = await ctx.newPerson({ ownerId: owner.id, name: 'Ten Space Source' });
     const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
-    const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+    const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
     await ctx.database.insertInto('face_search').values({ faceId, embedding: newEmbedding() }).execute();
-    const identity = await faceIdentityRepository.ensurePersonIdentity(person.id);
+    const identity = await faceIdentityRepository.ensurePersonIdentity(person.personGroupId);
     await faceIdentityRepository.linkFace({ assetFaceId: faceId, identityId: identity.id, source: 'owner-person' });
     const staleIdentity = await ctx.database
       .insertInto('face_identity')
@@ -1196,7 +1196,7 @@ describe('People identity RBAC projection', () => {
     await ctx.database
       .updateTable('person')
       .set({ identityId: staleIdentity.id })
-      .where('id', '=', person.id)
+      .where('personGroupId', '=', person.personGroupId)
       .execute();
 
     const spaces = [];
@@ -1267,7 +1267,7 @@ describe('People identity RBAC projection', () => {
       }),
     ]);
 
-    await sut.update(factory.auth({ user: owner }), face.person.id, { name: 'Renamed Source Person' });
+    await sut.update(factory.auth({ user: owner }), face.person.personGroupId, { name: 'Renamed Source Person' });
     await sharedSpaceService.backfillSpacePersonMetadata({ identityId: face.identity.id, limit: 1000 });
 
     const afterRename = await sut.getAll(factory.auth({ user: invitee }), {
@@ -1310,9 +1310,9 @@ describe('People identity RBAC projection', () => {
     } as any);
     expect(beforeInvite.people).toEqual([
       expect.objectContaining({
-        id: inviteeFace.person.id,
+        id: inviteeFace.person.personGroupId,
         name: 'Invitee Private Name',
-        primaryProfile: { type: 'user-person', id: inviteeFace.person.id },
+        primaryProfile: { type: 'user-person', id: inviteeFace.person.personGroupId },
       }),
     ]);
     expect(JSON.stringify(beforeInvite)).not.toContain('Owner Name');
@@ -1329,9 +1329,9 @@ describe('People identity RBAC projection', () => {
     expect(afterInvite.people).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          id: inviteeFace.person.id,
+          id: inviteeFace.person.personGroupId,
           name: 'Invitee Private Name',
-          primaryProfile: { type: 'user-person', id: inviteeFace.person.id },
+          primaryProfile: { type: 'user-person', id: inviteeFace.person.personGroupId },
         }),
         expect.objectContaining({
           name: 'Owner Name',
@@ -1358,7 +1358,7 @@ describe('People identity RBAC projection', () => {
     expect(people.people.filter((person) => person.type === 'person')).toHaveLength(1);
     expect(people.people[0]).toEqual(
       expect.objectContaining({
-        primaryProfile: { type: 'user-person', id: fixture.memberPerson.id },
+        primaryProfile: { type: 'user-person', id: fixture.memberPerson.personGroupId },
         numberOfAssets: 2,
       }),
     );
@@ -1423,7 +1423,7 @@ describe('People identity RBAC projection', () => {
 
     const uploadedPerson = await ctx.database
       .selectFrom('asset_face')
-      .innerJoin('person', 'person.id', 'asset_face.personId')
+      .innerJoin('person', 'person.personGroupId', 'asset_face.personId')
       .select(['person.id', 'person.identityId'])
       .where('asset_face.id', '=', uploadedFaceId)
       .executeTakeFirstOrThrow();
@@ -1445,7 +1445,7 @@ describe('People identity RBAC projection', () => {
       page: 1,
       size: 50,
     } as any);
-    const targetIdentity = await faceIdentityRepository.ensurePersonIdentity(fixture.ownerPerson.id);
+    const targetIdentity = await faceIdentityRepository.ensurePersonIdentity(fixture.ownerPerson.personGroupId);
 
     expect(uploaderPeople.people).toHaveLength(1);
     expect(uploaderPeople.people[0]).toEqual(
@@ -1455,10 +1455,10 @@ describe('People identity RBAC projection', () => {
       }),
     );
     expect(ownerPeople.people).toEqual([
-      expect.objectContaining({ primaryProfile: { type: 'user-person', id: fixture.ownerPerson.id } }),
+      expect.objectContaining({ primaryProfile: { type: 'user-person', id: fixture.ownerPerson.personGroupId } }),
     ]);
     expect(memberPeople.people).toEqual([
-      expect.objectContaining({ primaryProfile: { type: 'user-person', id: fixture.memberPerson.id } }),
+      expect.objectContaining({ primaryProfile: { type: 'user-person', id: fixture.memberPerson.personGroupId } }),
     ]);
     expect(uploadedPerson.identityId).toBe(targetIdentity.id);
   });
@@ -1513,9 +1513,9 @@ describe('People identity RBAC projection', () => {
 
     const { result: ownerPerson } = await ctx.newPerson({ ownerId: owner.id, name: 'Owner Shared Name' });
     const { asset: spaceAsset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
-    const { result: ownerFace } = await ctx.newAssetFace({ assetId: spaceAsset.id, personId: ownerPerson.id });
+    const { result: ownerFace } = await ctx.newAssetFace({ assetId: spaceAsset.id, personGroupId: ownerPerson.personGroupId });
     await ctx.database.insertInto('face_search').values({ faceId: ownerFace, embedding }).execute();
-    const ownerIdentity = await faceIdentityRepository.ensurePersonIdentity(ownerPerson.id);
+    const ownerIdentity = await faceIdentityRepository.ensurePersonIdentity(ownerPerson.personGroupId);
     await faceIdentityRepository.linkFace({
       assetFaceId: ownerFace,
       identityId: ownerIdentity.id,
@@ -1532,10 +1532,10 @@ describe('People identity RBAC projection', () => {
     });
     const { result: existingMemberFace } = await ctx.newAssetFace({
       assetId: existingMemberAsset.id,
-      personId: existingMemberPerson.id,
+      personGroupId: existingMemberPerson.personGroupId,
     });
     await ctx.database.insertInto('face_search').values({ faceId: existingMemberFace, embedding }).execute();
-    const existingMemberIdentity = await faceIdentityRepository.ensurePersonIdentity(existingMemberPerson.id);
+    const existingMemberIdentity = await faceIdentityRepository.ensurePersonIdentity(existingMemberPerson.personGroupId);
     await faceIdentityRepository.linkFace({
       assetFaceId: existingMemberFace,
       identityId: existingMemberIdentity.id,
@@ -1557,10 +1557,10 @@ describe('People identity RBAC projection', () => {
     });
     const { result: lateMemberFace } = await ctx.newAssetFace({
       assetId: lateMemberAsset.id,
-      personId: lateMemberPerson.id,
+      personGroupId: lateMemberPerson.personGroupId,
     });
     await ctx.database.insertInto('face_search').values({ faceId: lateMemberFace, embedding }).execute();
-    const lateMemberIdentity = await faceIdentityRepository.ensurePersonIdentity(lateMemberPerson.id);
+    const lateMemberIdentity = await faceIdentityRepository.ensurePersonIdentity(lateMemberPerson.personGroupId);
     await faceIdentityRepository.linkFace({
       assetFaceId: lateMemberFace,
       identityId: lateMemberIdentity.id,
@@ -1590,7 +1590,7 @@ describe('People identity RBAC projection', () => {
       expect.objectContaining({
         people: [
           expect.objectContaining({
-            primaryProfile: { type: 'user-person', id: ownerPerson.id },
+            primaryProfile: { type: 'user-person', id: ownerPerson.personGroupId },
           }),
         ],
       }),
@@ -1606,7 +1606,7 @@ describe('People identity RBAC projection', () => {
       expect.objectContaining({
         people: [
           expect.objectContaining({
-            primaryProfile: { type: 'user-person', id: existingMemberPerson.id },
+            primaryProfile: { type: 'user-person', id: existingMemberPerson.personGroupId },
           }),
         ],
       }),
@@ -1645,19 +1645,19 @@ describe('People identity RBAC projection', () => {
 
     expect(ownerPeople.people).toEqual([
       expect.objectContaining({
-        primaryProfile: { type: 'user-person', id: ownerPerson.id },
+        primaryProfile: { type: 'user-person', id: ownerPerson.personGroupId },
         numberOfAssets: 1,
       }),
     ]);
     expect(existingMemberPeople.people).toEqual([
       expect.objectContaining({
-        primaryProfile: { type: 'user-person', id: existingMemberPerson.id },
+        primaryProfile: { type: 'user-person', id: existingMemberPerson.personGroupId },
         numberOfAssets: 2,
       }),
     ]);
     expect(lateMemberPeople.people).toEqual([
       expect.objectContaining({
-        primaryProfile: { type: 'user-person', id: lateMemberPerson.id },
+        primaryProfile: { type: 'user-person', id: lateMemberPerson.personGroupId },
         numberOfAssets: 2,
       }),
     ]);
@@ -1680,7 +1680,7 @@ describe('People identity RBAC projection', () => {
     expect(people.people.filter((person) => person.type === 'person')).toHaveLength(1);
     expect(people.people[0]).toEqual(
       expect.objectContaining({
-        primaryProfile: { type: 'user-person', id: fixture.memberPerson.id },
+        primaryProfile: { type: 'user-person', id: fixture.memberPerson.personGroupId },
         numberOfAssets: 2,
       }),
     );
@@ -1707,7 +1707,7 @@ describe('People identity RBAC projection', () => {
     } as any);
     expect(result.people).toEqual([
       expect.objectContaining({
-        primaryProfile: { type: 'user-person', id: fixture.memberPerson.id },
+        primaryProfile: { type: 'user-person', id: fixture.memberPerson.personGroupId },
         numberOfAssets: 1,
       }),
     ]);
@@ -1738,7 +1738,7 @@ describe('People identity RBAC projection', () => {
     expect(people.people.filter((person) => person.type === 'person')).toHaveLength(1);
     expect(people.people[0]).toEqual(
       expect.objectContaining({
-        primaryProfile: { type: 'user-person', id: fixture.memberPerson.id },
+        primaryProfile: { type: 'user-person', id: fixture.memberPerson.personGroupId },
         numberOfAssets: 2,
       }),
     );
@@ -1784,7 +1784,7 @@ describe('People identity RBAC projection', () => {
 
     expect(result.people).toEqual([
       expect.objectContaining({
-        primaryProfile: { type: 'user-person', id: fixture.memberPerson.id },
+        primaryProfile: { type: 'user-person', id: fixture.memberPerson.personGroupId },
         numberOfAssets: 1,
       }),
     ]);
@@ -1818,7 +1818,7 @@ describe('People identity RBAC projection', () => {
     expect(result.people.filter((person) => person.type === 'person')).toHaveLength(1);
     expect(result.people[0]).toEqual(
       expect.objectContaining({
-        primaryProfile: { type: 'user-person', id: fixture.memberPerson.id },
+        primaryProfile: { type: 'user-person', id: fixture.memberPerson.personGroupId },
         numberOfAssets: 2,
       }),
     );
@@ -1846,7 +1846,7 @@ describe('People identity RBAC projection', () => {
     expect(result.people.filter((person) => person.type === 'person')).toHaveLength(1);
     expect(result.people[0]).toEqual(
       expect.objectContaining({
-        primaryProfile: { type: 'user-person', id: fixture.memberPerson.id },
+        primaryProfile: { type: 'user-person', id: fixture.memberPerson.personGroupId },
         numberOfAssets: 2,
       }),
     );
@@ -1881,7 +1881,7 @@ describe('People identity RBAC projection', () => {
     expect(repaired.representativeFaceId).toBe(fixture.spacePerson.representativeFaceId);
     expect(result.people).toEqual([
       expect.objectContaining({
-        primaryProfile: { type: 'user-person', id: fixture.memberPerson.id },
+        primaryProfile: { type: 'user-person', id: fixture.memberPerson.personGroupId },
         numberOfAssets: 2,
       }),
     ]);
@@ -1898,7 +1898,7 @@ describe('People identity RBAC projection', () => {
     const { user: member } = await ctx.newUser();
     try {
       const { result: ownerPerson } = await ctx.newPerson({ ownerId: owner.id, name: 'Alejandra' });
-      const ownerIdentity = await faceIdentityRepository.ensurePersonIdentity(ownerPerson.id);
+      const ownerIdentity = await faceIdentityRepository.ensurePersonIdentity(ownerPerson.personGroupId);
 
       const { space } = await ctx.newSharedSpace({ createdById: owner.id, faceRecognitionEnabled: true });
       await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: SharedSpaceRole.Owner });
@@ -1910,7 +1910,7 @@ describe('People identity RBAC projection', () => {
       for (let index = 0; index < 3; index++) {
         const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
         await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
-        const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personId: ownerPerson.id });
+        const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: ownerPerson.personGroupId });
         await ctx.database
           .insertInto('face_search')
           .values({ faceId, embedding: axisEmbedding('first') })
@@ -1925,7 +1925,7 @@ describe('People identity RBAC projection', () => {
       // The contaminated representative face: axis-B.
       const { asset: repAsset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: repAsset.id, addedById: owner.id });
-      const { result: repFaceId } = await ctx.newAssetFace({ assetId: repAsset.id, personId: ownerPerson.id });
+      const { result: repFaceId } = await ctx.newAssetFace({ assetId: repAsset.id, personGroupId: ownerPerson.personGroupId });
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: repFaceId, embedding: axisEmbedding('second') })
@@ -1956,9 +1956,9 @@ describe('People identity RBAC projection', () => {
 
       // The member's local identity is a DIFFERENT person whose face sits on axis-B (matching the rep).
       const { result: memberPerson } = await ctx.newPerson({ ownerId: member.id, name: 'Karina' });
-      const memberIdentity = await faceIdentityRepository.ensurePersonIdentity(memberPerson.id);
+      const memberIdentity = await faceIdentityRepository.ensurePersonIdentity(memberPerson.personGroupId);
       const { asset: memberAsset } = await ctx.newAsset({ ownerId: member.id, visibility: AssetVisibility.Timeline });
-      const { result: memberFaceId } = await ctx.newAssetFace({ assetId: memberAsset.id, personId: memberPerson.id });
+      const { result: memberFaceId } = await ctx.newAssetFace({ assetId: memberAsset.id, personGroupId: memberPerson.personGroupId });
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: memberFaceId, embedding: axisEmbedding('second') })
@@ -1979,7 +1979,7 @@ describe('People identity RBAC projection', () => {
       const memberPersonRow = await ctx.database
         .selectFrom('person')
         .select('identityId')
-        .where('id', '=', memberPerson.id)
+        .where('personGroupId', '=', memberPerson.personGroupId)
         .executeTakeFirstOrThrow();
 
       // The member's face and person stay on their own identity — no cross-person fusion.
@@ -1997,10 +1997,10 @@ describe('People identity RBAC projection', () => {
     try {
       // Person A: a clean axis-A cluster.
       const { person: personA } = await ctx.newPerson({ ownerId: user.id });
-      const identityA = await faceIdentityRepository.ensurePersonIdentity(personA.id);
+      const identityA = await faceIdentityRepository.ensurePersonIdentity(personA.personGroupId);
       for (let index = 0; index < 3; index++) {
         const { asset } = await ctx.newAsset({ ownerId: user.id });
-        const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personId: personA.id });
+        const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: personA.personGroupId });
         await ctx.database
           .insertInto('face_search')
           .values({ faceId, embedding: axisEmbedding('first') })
@@ -2013,9 +2013,9 @@ describe('People identity RBAC projection', () => {
       }
       // Person B owns an axis-B face corruptly linked to A's identity — the repair guard will refuse it.
       const { person: personB } = await ctx.newPerson({ ownerId: user.id });
-      await faceIdentityRepository.ensurePersonIdentity(personB.id);
+      await faceIdentityRepository.ensurePersonIdentity(personB.personGroupId);
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { result: corruptFaceId } = await ctx.newAssetFace({ assetId: asset.id, personId: personB.id });
+      const { result: corruptFaceId } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: personB.personGroupId });
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: corruptFaceId, embedding: axisEmbedding('second') })
@@ -2061,7 +2061,7 @@ describe('People identity RBAC projection', () => {
     expect(result.people.filter((person) => person.type === 'person')).toHaveLength(1);
     expect(result.people[0]).toEqual(
       expect.objectContaining({
-        primaryProfile: { type: 'user-person', id: fixture.memberPerson.id },
+        primaryProfile: { type: 'user-person', id: fixture.memberPerson.personGroupId },
         numberOfAssets: 1,
       }),
     );
@@ -2136,10 +2136,10 @@ describe('People identity RBAC projection', () => {
 
     expect(result.people).toEqual([
       expect.objectContaining({
-        id: inviteeFace.person.id,
+        id: inviteeFace.person.personGroupId,
         name: 'Invitee Private Name',
-        primaryProfile: { type: 'user-person', id: inviteeFace.person.id },
-        filterId: `person:${inviteeFace.person.id}`,
+        primaryProfile: { type: 'user-person', id: inviteeFace.person.personGroupId },
+        filterId: `person:${inviteeFace.person.personGroupId}`,
       }),
     ]);
   });
@@ -2175,8 +2175,8 @@ describe('People identity RBAC projection', () => {
     const { person } = await ctx.newPerson({ ownerId: user.id, name: '' });
     const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
     await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
-    const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
-    const identity = await faceIdentityRepository.ensurePersonIdentity(person.id);
+    const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+    const identity = await faceIdentityRepository.ensurePersonIdentity(person.personGroupId);
     await faceIdentityRepository.linkFace({ assetFaceId: faceId, identityId: identity.id, source: 'owner-person' });
     const spacePerson = await ctx.database
       .insertInto('shared_space_person')
@@ -2199,9 +2199,9 @@ describe('People identity RBAC projection', () => {
 
       expect(result.people).toEqual([
         {
-          id: `person:${person.id}`,
+          id: `person:${person.personGroupId}`,
           name: 'Shared Name',
-          primaryProfile: { type: 'user-person', id: person.id },
+          primaryProfile: { type: 'user-person', id: person.personGroupId },
         },
       ]);
     } finally {
@@ -2227,8 +2227,8 @@ describe('People identity RBAC projection', () => {
     await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
     const { album } = await ctx.newAlbum({ ownerId: member.id });
     await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
-    const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
-    const identity = await faceIdentityRepository.ensurePersonIdentity(person.id);
+    const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+    const identity = await faceIdentityRepository.ensurePersonIdentity(person.personGroupId);
     await faceIdentityRepository.linkFace({ assetFaceId: faceId, identityId: identity.id, source: 'owner-person' });
     const spacePerson = await ctx.database
       .insertInto('shared_space_person')
@@ -2302,7 +2302,7 @@ describe('People identity RBAC projection', () => {
     await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
     const { album } = await ctx.newAlbum({ ownerId: member.id });
     await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
-    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
     const spacePerson = await ctx.database
       .insertInto('shared_space_person')
       .values({
@@ -2432,7 +2432,7 @@ describe('People identity RBAC projection', () => {
       .execute();
     const { album } = await ctx.newAlbum({ ownerId: member.id });
     await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
-    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
     const spacePerson = await ctx.database
       .insertInto('shared_space_person')
       .values({
@@ -2554,7 +2554,7 @@ describe('People identity RBAC projection', () => {
       await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: SharedSpaceRole.Viewer });
       const { person } = await ctx.newPerson({ ownerId: owner.id, identityId: null, name: 'Legacy Alice' });
       const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
 
       await expect(faceIdentityRepository.hasBackfillWork()).resolves.toBe(true);
@@ -2583,7 +2583,7 @@ describe('People identity RBAC projection', () => {
       const updatedPerson = await ctx.database
         .selectFrom('person')
         .select('identityId')
-        .where('id', '=', person.id)
+        .where('personGroupId', '=', person.personGroupId)
         .executeTakeFirstOrThrow();
 
       expect(selectedFaces).toEqual([
@@ -2607,7 +2607,7 @@ describe('People identity RBAC projection', () => {
     try {
       const { person } = await ctx.newPerson({ ownerId: owner.id, identityId: null, name: 'Shared Alice' });
       const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
       const enabledSpaces = [];
       for (let index = 0; index < 10; index++) {
         const { space } = await ctx.newSharedSpace({ createdById: owner.id, faceRecognitionEnabled: true });
@@ -2668,10 +2668,10 @@ describe('People identity RBAC projection', () => {
       const second = await ctx.newPerson({ ownerId: owner.id, identityId: null, name: 'Page Two Alice' });
       const { asset: firstAsset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
       const { asset: secondAsset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
-      const { assetFace: firstFace } = await ctx.newAssetFace({ assetId: firstAsset.id, personId: first.person.id });
+      const { assetFace: firstFace } = await ctx.newAssetFace({ assetId: firstAsset.id, personGroupId: first.person.personGroupId });
       const { assetFace: secondFace } = await ctx.newAssetFace({
         assetId: secondAsset.id,
-        personId: second.person.id,
+        personGroupId: second.person.personGroupId,
       });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: firstAsset.id, addedById: owner.id });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: secondAsset.id, addedById: owner.id });
@@ -2734,7 +2734,7 @@ describe('People identity RBAC projection', () => {
         libraryId: library.id,
         visibility: AssetVisibility.Timeline,
       });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
       await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id, addedById: owner.id });
 
@@ -2831,7 +2831,7 @@ describe('People identity RBAC projection', () => {
       const { person } = await ctx.newPerson({ ownerId: owner.id, identityId: null, name: 'Imported Alice' });
       const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
-      await ctx.newAssetFace({ assetId: asset.id, personId: person.id, sourceType: SourceType.Exif });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId, sourceType: SourceType.Exif });
 
       await sut.handleFaceIdentityBackfill({ stage: 'person' });
 
@@ -2860,11 +2860,11 @@ describe('People identity RBAC projection', () => {
       const { space } = await ctx.newSharedSpace({ createdById: owner.id, faceRecognitionEnabled: true });
       await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: SharedSpaceRole.Owner });
       const { person } = await ctx.newPerson({ ownerId: owner.id, name: 'EXIF Alice' });
-      const identity = await faceIdentityRepository.ensurePersonIdentity(person.id);
+      const identity = await faceIdentityRepository.ensurePersonIdentity(person.personGroupId);
       const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
       const { assetFace } = await ctx.newAssetFace({
         assetId: asset.id,
-        personId: person.id,
+        personGroupId: person.personGroupId,
         sourceType: SourceType.Exif,
       });
       await faceIdentityRepository.linkFace({
@@ -2933,9 +2933,9 @@ describe('People identity RBAC projection', () => {
         .where('userId', '=', source.id)
         .execute();
       const { person: sourcePerson } = await ctx.newPerson({ ownerId: source.id, name: 'Source Alice' });
-      const identity = await faceIdentityRepository.ensurePersonIdentity(sourcePerson.id);
+      const identity = await faceIdentityRepository.ensurePersonIdentity(sourcePerson.personGroupId);
       const { asset } = await ctx.newAsset({ ownerId: source.id, visibility: AssetVisibility.Timeline });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: sourcePerson.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: sourcePerson.personGroupId });
       await faceIdentityRepository.linkFace({
         assetFaceId: assetFace.id,
         identityId: identity.id,
@@ -2950,7 +2950,7 @@ describe('People identity RBAC projection', () => {
           name: 'Source Alice',
           nameSource: 'inherited',
           nameSourceProfileType: 'user-person',
-          nameSourceProfileId: sourcePerson.id,
+          nameSourceProfileId: sourcePerson.personGroupId,
           representativeFaceId: assetFace.id,
           type: 'person',
         })
@@ -3001,7 +3001,7 @@ describe('People identity RBAC projection', () => {
     const { user: viewer } = await ctx.newUser();
     try {
       const { person: personalPerson } = await ctx.newPerson({ ownerId: owner.id, name: 'Owner Alice' });
-      const identity = await faceIdentityRepository.ensurePersonIdentity(personalPerson.id);
+      const identity = await faceIdentityRepository.ensurePersonIdentity(personalPerson.personGroupId);
       const { space: sourceSpace } = await ctx.newSharedSpace({ createdById: owner.id, faceRecognitionEnabled: true });
       const { space: targetSpace } = await ctx.newSharedSpace({ createdById: owner.id, faceRecognitionEnabled: true });
       await ctx.newSharedSpaceMember({ spaceId: sourceSpace.id, userId: owner.id, role: SharedSpaceRole.Owner });
@@ -3020,7 +3020,7 @@ describe('People identity RBAC projection', () => {
       });
       const { assetFace: targetFace } = await ctx.newAssetFace({
         assetId: targetAsset.id,
-        personId: personalPerson.id,
+        personGroupId: personalPerson.personGroupId,
       });
       await faceIdentityRepository.linkFace({
         assetFaceId: targetFace.id,
@@ -3092,8 +3092,8 @@ describe('People identity RBAC projection', () => {
     await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
     const { album } = await ctx.newAlbum({ ownerId: member.id });
     await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
-    const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
-    const identity = await faceIdentityRepository.ensurePersonIdentity(person.id);
+    const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+    const identity = await faceIdentityRepository.ensurePersonIdentity(person.personGroupId);
     await faceIdentityRepository.linkFace({ assetFaceId: faceId, identityId: identity.id, source: 'owner-person' });
     const spacePerson = await ctx.database
       .insertInto('shared_space_person')
@@ -3235,8 +3235,8 @@ describe('People identity RBAC projection', () => {
     await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
     const { album } = await ctx.newAlbum({ ownerId: member.id });
     await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
-    const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
-    const identity = await faceIdentityRepository.ensurePersonIdentity(person.id);
+    const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+    const identity = await faceIdentityRepository.ensurePersonIdentity(person.personGroupId);
     await faceIdentityRepository.linkFace({ assetFaceId: faceId, identityId: identity.id, source: 'owner-person' });
     const spacePerson = await ctx.database
       .insertInto('shared_space_person')
@@ -3285,8 +3285,8 @@ describe('People identity RBAC projection', () => {
     const { album } = await ctx.newAlbum({ ownerId: spaceMember.id });
     await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
     await ctx.newAlbumUser({ albumId: album.id, userId: albumViewer.id });
-    const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
-    const identity = await faceIdentityRepository.ensurePersonIdentity(person.id);
+    const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+    const identity = await faceIdentityRepository.ensurePersonIdentity(person.personGroupId);
     await faceIdentityRepository.linkFace({ assetFaceId: faceId, identityId: identity.id, source: 'owner-person' });
     const spacePerson = await ctx.database
       .insertInto('shared_space_person')
@@ -3353,8 +3353,8 @@ describe('People identity RBAC projection', () => {
     const { result: person } = await ctx.newPerson({ ownerId: owner.id, name: 'Viewer Scoped Name' });
     const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
     await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
-    const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
-    const identity = await faceIdentityRepository.ensurePersonIdentity(person.id);
+    const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+    const identity = await faceIdentityRepository.ensurePersonIdentity(person.personGroupId);
     await faceIdentityRepository.linkFace({ assetFaceId: faceId, identityId: identity.id, source: 'owner-person' });
     const spacePerson = await ctx.database
       .insertInto('shared_space_person')
@@ -3409,7 +3409,7 @@ describe('People identity RBAC projection', () => {
 
     const filtered = await searchService.searchMetadata(auth, {
       withSharedSpaces: true,
-      personIds: [`person:${memberFace.person.id}`],
+      personIds: [`person:${memberFace.person.personGroupId}`],
     });
 
     expect(filtered.assets.items).toEqual([expect.objectContaining({ id: memberFace.asset.id })]);
@@ -3474,7 +3474,7 @@ describe('People identity RBAC projection', () => {
 
       await expect(
         fx.sut.mergeScopedPeople(factory.auth({ user: fx.actor }), {
-          target: { type: 'person', id: fx.actorPerson.id },
+          target: { type: 'person', id: fx.actorPerson.personGroupId },
           sources: [{ type: 'space-person', id: fx.spacePerson.id, spaceId: fx.space.id }],
         }),
       ).rejects.toBeInstanceOf(BadRequestException);
@@ -3486,7 +3486,7 @@ describe('People identity RBAC projection', () => {
         const fx = await setupRepairFixture(role);
 
         await fx.sut.mergeScopedPeople(factory.auth({ user: fx.actor }), {
-          target: { type: 'person', id: fx.actorPerson.id },
+          target: { type: 'person', id: fx.actorPerson.personGroupId },
           sources: [{ type: 'space-person', id: fx.spacePerson.id, spaceId: fx.space.id }],
         });
 
@@ -3504,7 +3504,7 @@ describe('People identity RBAC projection', () => {
       await fx.ctx.database
         .updateTable('person')
         .set({ name: 'Actor Alice', birthDate: '1990-01-01' })
-        .where('id', '=', fx.actorPerson.id)
+        .where('personGroupId', '=', fx.actorPerson.personGroupId)
         .execute();
       await fx.ctx.database
         .updateTable('shared_space_person')
@@ -3522,7 +3522,7 @@ describe('People identity RBAC projection', () => {
         .execute();
 
       await fx.sut.mergeScopedPeople(factory.auth({ user: fx.actor }), {
-        target: { type: 'person', id: fx.actorPerson.id },
+        target: { type: 'person', id: fx.actorPerson.personGroupId },
         sources: [{ type: 'space-person', id: fx.spacePerson.id, spaceId: fx.space.id }],
       });
 
@@ -3560,10 +3560,10 @@ describe('People identity RBAC projection', () => {
           name: 'Actor Alice',
           nameSource: 'inherited',
           nameSourceProfileType: 'user-person',
-          nameSourceProfileId: fx.actorPerson.id,
+          nameSourceProfileId: fx.actorPerson.personGroupId,
           birthDateSource: 'inherited',
           birthDateSourceProfileType: 'user-person',
-          birthDateSourceProfileId: fx.actorPerson.id,
+          birthDateSourceProfileId: fx.actorPerson.personGroupId,
         }),
       );
       expect(updatedSpacePerson.nameSourceProfileId).not.toBe(fx.spacePerson.id);
@@ -3577,7 +3577,7 @@ describe('People identity RBAC projection', () => {
       await fx.ctx.database
         .updateTable('person')
         .set({ name: 'Actor Alice', birthDate: '1990-01-01' })
-        .where('id', '=', fx.actorPerson.id)
+        .where('personGroupId', '=', fx.actorPerson.personGroupId)
         .execute();
       await fx.ctx.database
         .updateTable('shared_space_person')
@@ -3585,11 +3585,11 @@ describe('People identity RBAC projection', () => {
           name: 'Old Actor Alice',
           nameSource: 'inherited',
           nameSourceProfileType: 'user-person',
-          nameSourceProfileId: fx.actorPerson.id,
+          nameSourceProfileId: fx.actorPerson.personGroupId,
           birthDate: '1990-01-01',
           birthDateSource: 'inherited',
           birthDateSourceProfileType: 'user-person',
-          birthDateSourceProfileId: fx.actorPerson.id,
+          birthDateSourceProfileId: fx.actorPerson.personGroupId,
         })
         .where('id', '=', fx.spacePerson.id)
         .execute();
@@ -3618,7 +3618,7 @@ describe('People identity RBAC projection', () => {
       const targetPerson = await fx.ctx.database
         .selectFrom('person')
         .select('identityId')
-        .where('id', '=', fx.actorPerson.id)
+        .where('personGroupId', '=', fx.actorPerson.personGroupId)
         .executeTakeFirstOrThrow();
 
       expect(detached.identityId).toBe(newIdentityId);
@@ -3638,11 +3638,11 @@ describe('People identity RBAC projection', () => {
     it('user cannot repair a personal profile they do not own', async () => {
       const fx = await setupRepairFixture(SharedSpaceRole.Editor);
       const { person: otherPerson } = await fx.ctx.newPerson({ ownerId: fx.otherUser.id });
-      await fx.faceIdentityRepository.ensurePersonIdentity(otherPerson.id);
+      await fx.faceIdentityRepository.ensurePersonIdentity(otherPerson.personGroupId);
 
       await expect(
         fx.sut.mergeScopedPeople(factory.auth({ user: fx.actor }), {
-          target: { type: 'person', id: otherPerson.id },
+          target: { type: 'person', id: otherPerson.personGroupId },
           sources: [{ type: 'space-person', id: fx.spacePerson.id, spaceId: fx.space.id }],
         }),
       ).rejects.toBeInstanceOf(BadRequestException);
@@ -3654,7 +3654,7 @@ describe('People identity RBAC projection', () => {
 
       await expect(
         fx.sut.mergeScopedPeople(factory.auth({ user: admin }), {
-          target: { type: 'person', id: fx.actorPerson.id },
+          target: { type: 'person', id: fx.actorPerson.personGroupId },
           sources: [{ type: 'space-person', id: fx.spacePerson.id, spaceId: fx.space.id }],
         }),
       ).rejects.toBeInstanceOf(BadRequestException);
@@ -3683,7 +3683,7 @@ describe('People identity RBAC projection', () => {
 
       // Actor's own person -> target identity (resolvable).
       const { person: actorPerson } = await ctx.newPerson({ ownerId: actor.id, name: 'Actor Alice' });
-      const targetIdentity = await faceIdentityRepository.ensurePersonIdentity(actorPerson.id);
+      const targetIdentity = await faceIdentityRepository.ensurePersonIdentity(actorPerson.personGroupId);
 
       // A space the actor can repair (Editor) surfaces the source as a space-person the actor resolves.
       const { space: accessibleSpace } = await ctx.newSharedSpace({ createdById: stranger.id });
@@ -3711,11 +3711,11 @@ describe('People identity RBAC projection', () => {
       await ctx.database
         .updateTable('person')
         .set({ identityId: sourceIdentity.id })
-        .where('id', '=', otherOwnerPerson.id)
+        .where('personGroupId', '=', otherOwnerPerson.personGroupId)
         .execute();
 
       await sut.mergeScopedPeople(factory.auth({ user: actor }), {
-        target: { type: 'person', id: actorPerson.id },
+        target: { type: 'person', id: actorPerson.personGroupId },
         sources: [{ type: 'space-person', id: sourceSpacePerson.id, spaceId: accessibleSpace.id }],
       });
 
@@ -3725,7 +3725,7 @@ describe('People identity RBAC projection', () => {
       const otherOwnerPersonAfter = await ctx.database
         .selectFrom('person')
         .select('identityId')
-        .where('id', '=', otherOwnerPerson.id)
+        .where('personGroupId', '=', otherOwnerPerson.personGroupId)
         .executeTakeFirstOrThrow();
       expect(otherOwnerPersonAfter.identityId).toBe(targetIdentity.id);
 
@@ -3759,7 +3759,7 @@ describe('People identity RBAC projection', () => {
       const { user: stranger } = await ctx.newUser();
 
       const { person: actorPerson } = await ctx.newPerson({ ownerId: actor.id, name: 'Actor Alice' });
-      const targetIdentity = await faceIdentityRepository.ensurePersonIdentity(actorPerson.id);
+      const targetIdentity = await faceIdentityRepository.ensurePersonIdentity(actorPerson.personGroupId);
 
       // A space the actor edits surfaces the resolvable source.
       const { space: accessibleSpace } = await ctx.newSharedSpace({ createdById: stranger.id });
@@ -3795,7 +3795,7 @@ describe('People identity RBAC projection', () => {
       confirmCrossOwner?: boolean,
     ) =>
       fx.sut.mergeScopedPeople(factory.auth({ user: fx.actor }), {
-        target: { type: 'person', id: fx.actorPerson.id },
+        target: { type: 'person', id: fx.actorPerson.personGroupId },
         sources: [{ type: 'space-person', id: fx.sourceSpacePerson.id, spaceId: fx.accessibleSpace.id }],
         ...(confirmCrossOwner && { confirmCrossOwner: true }),
       });
@@ -3872,9 +3872,9 @@ describe('People identity RBAC projection', () => {
       const { user: actor } = await ctx.newUser();
       const { user: stranger } = await ctx.newUser();
       const { person: personA } = await ctx.newPerson({ ownerId: actor.id, name: 'A' });
-      const identityT = await faceIdentityRepository.ensurePersonIdentity(personA.id);
+      const identityT = await faceIdentityRepository.ensurePersonIdentity(personA.personGroupId);
       const { person: personB } = await ctx.newPerson({ ownerId: actor.id, name: 'B' });
-      const identityS = await faceIdentityRepository.ensurePersonIdentity(personB.id);
+      const identityS = await faceIdentityRepository.ensurePersonIdentity(personB.personGroupId);
 
       const { space: viewerSpace } = await ctx.newSharedSpace({ createdById: stranger.id });
       await ctx.newSharedSpaceMember({ spaceId: viewerSpace.id, userId: stranger.id, role: SharedSpaceRole.Owner });
@@ -3888,7 +3888,7 @@ describe('People identity RBAC projection', () => {
         .execute();
 
       await expect(
-        sut.mergePerson(factory.auth({ user: actor }), personA.id, { ids: [personB.id] }),
+        sut.mergePerson(factory.auth({ user: actor }), personA.personGroupId, { ids: [personB.personGroupId] }),
       ).rejects.toBeInstanceOf(ForbiddenException);
     });
 

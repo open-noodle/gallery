@@ -418,28 +418,28 @@ describe(JobService.name, () => {
       const personId = newUuid();
       const ownerId = newUuid();
       const person = factory.person({ id: personId, ownerId });
-      mocks.person.getById.mockResolvedValue(person);
+      mocks.person.getByGroupIdOnly.mockResolvedValue(person);
 
       await sut.onJobRun(QueueName.ThumbnailGeneration, {
         name: JobName.PersonGenerateThumbnail,
         data: { id: personId },
       });
 
-      expect(mocks.person.getById).toHaveBeenCalledWith(personId);
+      expect(mocks.person.getByGroupIdOnly).toHaveBeenCalledWith(personId);
       expect(mocks.websocket.clientSend).toHaveBeenCalledWith('on_person_thumbnail', ownerId, personId);
     });
 
     it('should not send websocket event when person is not found', async () => {
       mocks.job.run.mockResolvedValue(JobStatus.Success);
       const personId = newUuid();
-      mocks.person.getById.mockResolvedValue(undefined as any);
+      mocks.person.getByGroupIdOnly.mockResolvedValue(undefined as any);
 
       await sut.onJobRun(QueueName.ThumbnailGeneration, {
         name: JobName.PersonGenerateThumbnail,
         data: { id: personId },
       });
 
-      expect(mocks.person.getById).toHaveBeenCalledWith(personId);
+      expect(mocks.person.getByGroupIdOnly).toHaveBeenCalledWith(personId);
       expect(mocks.websocket.clientSend).not.toHaveBeenCalled();
     });
   });

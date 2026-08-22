@@ -62,7 +62,7 @@ const seedFacetAsset = async (ctx: SearchCtx, ownerId: string, marker: string) =
   const [tag] = await upsertTags(ctx.get(TagRepository), { userId: ownerId, tags: [`${marker}-Tag`] });
   await ctx.newTagAsset({ tagIds: [tag.id], assetIds: [asset.id] });
   const { person } = await ctx.newPerson({ ownerId, name: `${marker}-Person` });
-  await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+  await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
   return asset;
 };
 
@@ -131,7 +131,7 @@ const seedPersonWithFaceOn = async (
   const { person } = await ctx.newPerson({ ownerId, name });
   for (const visibility of visibilities) {
     const { asset } = await ctx.newAsset({ ownerId, visibility });
-    await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+    await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
   }
   return person;
 };
@@ -157,7 +157,7 @@ const seedSpaceAssetWithFacets = async (
   const [tag] = await upsertTags(ctx.get(TagRepository), { userId: ownerId, tags: [`${marker}-Tag`] });
   await ctx.newTagAsset({ tagIds: [tag.id], assetIds: [asset.id] });
   const { person } = await ctx.newPerson({ ownerId, name: `${marker}-Person` });
-  await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+  await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
   return asset;
 };
 
@@ -358,8 +358,8 @@ describe(SearchService.name, () => {
       const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Deleted Dana' });
       const { asset: lockedAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Locked });
       const { asset: timelineAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
-      await ctx.newAssetFace({ assetId: lockedAsset.id, personId: person.id });
-      await ctx.newAssetFace({ assetId: timelineAsset.id, personId: person.id, deletedAt: new Date() });
+      await ctx.newAssetFace({ assetId: lockedAsset.id, personGroupId: person.personGroupId });
+      await ctx.newAssetFace({ assetId: timelineAsset.id, personGroupId: person.personGroupId, deletedAt: new Date() });
 
       const result = await sut.searchPerson(factory.auth({ user: { id: user.id } }), { name: 'Dana' });
 
@@ -372,8 +372,8 @@ describe(SearchService.name, () => {
       const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Invisible Iris' });
       const { asset: lockedAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Locked });
       const { asset: timelineAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
-      await ctx.newAssetFace({ assetId: lockedAsset.id, personId: person.id });
-      await ctx.newAssetFace({ assetId: timelineAsset.id, personId: person.id, isVisible: false });
+      await ctx.newAssetFace({ assetId: lockedAsset.id, personGroupId: person.personGroupId });
+      await ctx.newAssetFace({ assetId: timelineAsset.id, personGroupId: person.personGroupId, isVisible: false });
 
       const result = await sut.searchPerson(factory.auth({ user: { id: user.id } }), { name: 'Iris' });
 
@@ -387,7 +387,7 @@ describe(SearchService.name, () => {
       const { user } = await ctx.newUser();
       const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Hidden Hana', isHidden: true });
       const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Locked });
-      await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
 
       const result = await sut.searchPerson(factory.auth({ user: { id: user.id } }), {
         name: 'Hana',
@@ -791,11 +791,11 @@ describe(SearchService.name, () => {
       // scope with the person scope must not open a bypass: the flat album gate still hides the Hidden
       // asset from the owner too (matches the album grid), while the Timeline asset comes through.
       const { person } = await ctx.newPerson({ ownerId: s.owner.id, name: 'ComboPerson' });
-      await ctx.newAssetFace({ assetId: s.timelineAsset.id, personId: person.id });
-      await ctx.newAssetFace({ assetId: s.hiddenAsset.id, personId: person.id });
+      await ctx.newAssetFace({ assetId: s.timelineAsset.id, personGroupId: person.personGroupId });
+      await ctx.newAssetFace({ assetId: s.hiddenAsset.id, personGroupId: person.personGroupId });
 
       const auth = factory.auth({ user: { id: s.owner.id } });
-      const response = await sut.searchMetadata(auth, { albumIds: [s.album.id], personIds: [person.id] });
+      const response = await sut.searchMetadata(auth, { albumIds: [s.album.id], personIds: [person.personGroupId] });
       const ids = itemIds(response);
 
       expect(ids).toContain(s.timelineAsset.id);
@@ -906,13 +906,13 @@ describe(SearchService.name, () => {
       // album scope with the person scope must not open a bypass: the trash gate still hides
       // the trashed asset even for the owner, while the live asset comes through.
       const { person } = await ctx.newPerson({ ownerId: s.owner.id, name: 'TrashComboPerson' });
-      await ctx.newAssetFace({ assetId: s.liveAsset.id, personId: person.id });
-      await ctx.newAssetFace({ assetId: s.trashedAsset.id, personId: person.id });
+      await ctx.newAssetFace({ assetId: s.liveAsset.id, personGroupId: person.personGroupId });
+      await ctx.newAssetFace({ assetId: s.trashedAsset.id, personGroupId: person.personGroupId });
 
       const auth = factory.auth({ user: { id: s.owner.id } });
       const response = await sut.searchMetadata(auth, {
         albumIds: [s.album.id],
-        personIds: [person.id],
+        personIds: [person.personGroupId],
         withDeleted: true,
       });
       const ids = itemIds(response);
@@ -1223,7 +1223,7 @@ describe(SearchService.name, () => {
 
       const { asset } = await ctx.newAsset({ ownerId: user.id });
       const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Alice' });
-      await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
 
       const auth = factory.auth({ user: { id: user.id } });
       const result = await sut.getFilterSuggestions(auth, {});
@@ -1237,7 +1237,7 @@ describe(SearchService.name, () => {
 
       const { asset } = await ctx.newAsset({ ownerId: user.id });
       const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Bob', thumbnailPath: '' });
-      await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
 
       const auth = factory.auth({ user: { id: user.id } });
       const result = await sut.getFilterSuggestions(auth, {});
@@ -1251,11 +1251,11 @@ describe(SearchService.name, () => {
 
       const { asset: favoriteAsset } = await ctx.newAsset({ ownerId: user.id });
       const { person: favoritePerson } = await ctx.newPerson({ ownerId: user.id, name: 'Zelda', isFavorite: true });
-      await ctx.newAssetFace({ assetId: favoriteAsset.id, personId: favoritePerson.id });
+      await ctx.newAssetFace({ assetId: favoriteAsset.id, personGroupId: favoritePerson.personGroupId });
 
       const { asset: nonFavoriteAsset } = await ctx.newAsset({ ownerId: user.id });
       const { person: nonFavoritePerson } = await ctx.newPerson({ ownerId: user.id, name: 'Alice', isFavorite: false });
-      await ctx.newAssetFace({ assetId: nonFavoriteAsset.id, personId: nonFavoritePerson.id });
+      await ctx.newAssetFace({ assetId: nonFavoriteAsset.id, personGroupId: nonFavoritePerson.personGroupId });
 
       const auth = factory.auth({ user: { id: user.id } });
       const result = await sut.getFilterSuggestions(auth, {});
@@ -1276,7 +1276,7 @@ describe(SearchService.name, () => {
       const { person: favoritePerson } = await ctx.newPerson({ ownerId: owner.id, name: 'Zelda', isFavorite: true });
       const { assetFace: favoriteFace } = await ctx.newAssetFace({
         assetId: favoriteAsset.id,
-        personId: favoritePerson.id,
+        personGroupId: favoritePerson.personGroupId,
       });
       const favoriteSpacePerson = await ctx.database
         .insertInto('shared_space_person')
@@ -1297,7 +1297,7 @@ describe(SearchService.name, () => {
       });
       const { assetFace: nonFavoriteFace } = await ctx.newAssetFace({
         assetId: nonFavoriteAsset.id,
-        personId: nonFavoritePerson.id,
+        personGroupId: nonFavoritePerson.personGroupId,
       });
       const nonFavoriteSpacePerson = await ctx.database
         .insertInto('shared_space_person')
@@ -1323,7 +1323,7 @@ describe(SearchService.name, () => {
       const { asset } = await ctx.newAsset({ ownerId: owner.id });
       await ctx.newExif({ assetId: asset.id, country: 'Germany', make: 'Sony' });
       const { person } = await ctx.newPerson({ ownerId: owner.id, name: 'Ada' });
-      await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
 
       const { album } = await ctx.newAlbum({ ownerId: owner.id }, [asset.id]);
       await ctx.newAlbumUser({ albumId: album.id, userId: viewer.id, role: AlbumUserRole.Viewer });
