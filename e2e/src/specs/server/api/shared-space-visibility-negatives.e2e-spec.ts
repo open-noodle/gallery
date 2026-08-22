@@ -685,6 +685,10 @@ describe('shared-space visibility negatives (Slice 11)', () => {
       const initial = await syncStream(member.accessToken, [SyncRequestType.SharedSpaceAlbumToAssetsV1]);
       await syncAckAll(member.accessToken, initial);
 
+      // The single PUT returns the asset it just wrote, and a non-elevated session cannot read a Locked
+      // asset — so without this the write lands but the response is a 400. See utils.elevateSession.
+      await utils.elevateSession(owner.accessToken);
+
       await updateAsset(
         { id: assetA.id, updateAssetDto: { visibility: AssetVisibility.Locked } },
         { headers: asBearerAuth(owner.accessToken) },
