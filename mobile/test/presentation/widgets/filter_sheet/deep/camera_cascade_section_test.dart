@@ -81,7 +81,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final container = ProviderScope.containerOf(tester.element(find.byType(CameraCascadeSection)));
-      container.read(photosFilterProvider.notifier).setCamera(SearchCameraFilter(make: 'Canon'));
+      container.read(photosFilterProvider.notifier).setCamera(const SearchCameraFilter(make: 'Canon'));
       await tester.pumpAndSettle();
 
       await tester.tap(find.byKey(const Key('camera-model-EOS R5')));
@@ -106,7 +106,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final container = ProviderScope.containerOf(tester.element(find.byType(CameraCascadeSection)));
-      container.read(photosFilterProvider.notifier).setCamera(SearchCameraFilter(make: 'Canon'));
+      container.read(photosFilterProvider.notifier).setCamera(const SearchCameraFilter(make: 'Canon'));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('camera-make-selected')), findsOneWidget);
 
