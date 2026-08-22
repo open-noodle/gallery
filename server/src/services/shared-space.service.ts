@@ -1655,7 +1655,7 @@ export class SharedSpaceService extends BaseService {
 
     let face: AssetFace;
     try {
-      face = await this.personRepository.getFaceById(person.representativeFaceId);
+      face = await this.personRepository.getFaceById(person.representativeFaceId, { viewingUserId: auth.user.id });
     } catch {
       throw new NotFoundException();
     }
@@ -2219,16 +2219,16 @@ export class SharedSpaceService extends BaseService {
     // identity — only a genuinely ambiguous match against two *distinct* local identities should bail.
     const candidateIdentityIds = new Set<string>();
     for (const match of matches) {
-      if (!match.personId) {
+      if (!match.personGroupId) {
         continue;
       }
 
-      const person = await this.personRepository.getById(match.personId);
+      const person = await this.personRepository.getByGroupIdOnly(match.personGroupId);
       if (!person || person.isHidden || person.type !== input.spacePerson.type) {
         continue;
       }
 
-      const identity = await this.faceIdentityRepository.ensurePersonIdentity(person.id);
+      const identity = await this.faceIdentityRepository.ensurePersonIdentity(person.personGroupId);
       if (identity.id === targetIdentityId) {
         return;
       }
@@ -3213,7 +3213,7 @@ export class SharedSpaceService extends BaseService {
       return input.fallbackFaceId;
     }
 
-    const person = await this.personRepository.getById(input.personalPersonId);
+    const person = await this.personRepository.getByGroupIdOnly(input.personalPersonId);
     if (!person?.thumbnailPath || !person.faceAssetId) {
       return input.fallbackFaceId;
     }
