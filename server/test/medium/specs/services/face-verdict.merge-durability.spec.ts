@@ -133,7 +133,7 @@ describe('face verdict merge durability (D1)', () => {
 
     const rows = await verdictRow(faceId);
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ status: 'rejected', personId: robert.personGroupId, identityId: robertIdentity.id });
+    expect(rows[0]).toMatchObject({ status: 'rejected', personGroupId: robert.personGroupId, identityId: robertIdentity.id });
     // honoured identity-first by the shared read
     const tokens = await facePersonVerdictRepository.getNegativeVerdictTokens([faceId]);
     expect([...(tokens.get(faceId) ?? [])]).toContain(`identity:${robertIdentity.id}`);
@@ -153,7 +153,7 @@ describe('face verdict merge durability (D1)', () => {
 
     const rows = await verdictRow(faceId);
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ status: 'rejected', personId: robert.personGroupId });
+    expect(rows[0]).toMatchObject({ status: 'rejected', personGroupId: robert.personGroupId });
   });
 
   it('identity-only merge re-keys the verdict instead of destroying it', async () => {
@@ -214,7 +214,7 @@ describe('face verdict merge durability (D1)', () => {
     const rows = await verdictRow(faceId);
     expect(rows).toHaveLength(1); // no unique-violation, source row dropped
     // Survivor's row kept untouched: it is Robert's REJECTED row, not Bob's ignored one.
-    expect(rows[0]).toMatchObject({ personId: robert.personGroupId, identityId: robertIdentity.id, status: 'rejected' });
+    expect(rows[0]).toMatchObject({ personGroupId: robert.personGroupId, identityId: robertIdentity.id, status: 'rejected' });
   });
 
   it('survivor wins on collision when the survivor holds the negative', async () => {
@@ -240,7 +240,7 @@ describe('face verdict merge durability (D1)', () => {
 
     const rows = await verdictRow(faceId);
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ personId: robert.personGroupId, identityId: robertIdentity.id, status: 'rejected' });
+    expect(rows[0]).toMatchObject({ personGroupId: robert.personGroupId, identityId: robertIdentity.id, status: 'rejected' });
   });
 
   // The dangerous inverse of the case above, and a live defect (Slice 6's red test — do not fix here): source
@@ -285,7 +285,7 @@ describe('face verdict merge durability (D1)', () => {
 
     const rows = await verdictRow(faceId);
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ personId: robert.personGroupId, status: 'rejected' });
+    expect(rows[0]).toMatchObject({ personGroupId: robert.personGroupId, status: 'rejected' });
 
     const pending = await facePersonVerdictRepository.getPendingForPerson(robert.personGroupId, PENDING_OPTS);
     const pendingFaceIds = pending.items.map((item) => item.assetFaceId);
@@ -316,7 +316,7 @@ describe('face verdict merge durability (D1)', () => {
     const rows = await verdictRow(faceId);
     expect(rows).toHaveLength(1); // S6.10: exactly one row, no partial-unique-index violation
     expect(rows[0]).toMatchObject({
-      personId: robert.personGroupId,
+      personGroupId: robert.personGroupId,
       status: 'rejected',
       source: 'cleanup',
       actorId: actor.id,
@@ -343,7 +343,7 @@ describe('face verdict merge durability (D1)', () => {
     const rows = await verdictRow(faceId);
     expect(rows).toHaveLength(1); // S6.10
     expect(rows[0]).toMatchObject({
-      personId: robert.personGroupId,
+      personGroupId: robert.personGroupId,
       identityId: robertIdentity.id,
       status: 'rejected',
       source: 'cleanup',
@@ -363,7 +363,7 @@ describe('face verdict merge durability (D1)', () => {
 
     const rows = await verdictRow(faceId);
     expect(rows).toHaveLength(1); // S6.10
-    expect(rows[0]).toMatchObject({ personId: robert.personGroupId, status: 'ignored' });
+    expect(rows[0]).toMatchObject({ personGroupId: robert.personGroupId, status: 'ignored' });
   });
 
   it('S6.5: negative-vs-negative is not a promotion — a survivor ignored row beats a source rejected row', async () => {
@@ -393,7 +393,7 @@ describe('face verdict merge durability (D1)', () => {
     const rows = await verdictRow(faceId);
     expect(rows).toHaveLength(1); // S6.10: no unique-violation, source row dropped
     expect(rows[0]).toMatchObject({
-      personId: robert.personGroupId,
+      personGroupId: robert.personGroupId,
       identityId: robertIdentity.id,
       status: 'ignored',
       source: 'suggestion',
@@ -418,7 +418,7 @@ describe('face verdict merge durability (D1)', () => {
     const rows = await verdictRow(faceId);
     expect(rows).toHaveLength(1); // S6.10
     expect(rows[0]).toMatchObject({
-      personId: robert.personGroupId,
+      personGroupId: robert.personGroupId,
       identityId: bobIdentity.id,
       status: 'rejected',
       source: 'cleanup',
@@ -447,7 +447,7 @@ describe('face verdict merge durability (D1)', () => {
 
     const rows = await verdictRow(faceId);
     expect(rows).toHaveLength(1); // S6.10
-    expect(rows[0]).toMatchObject({ personId: robert.personGroupId, status: 'rejected', identityId: robertIdentity.id });
+    expect(rows[0]).toMatchObject({ personGroupId: robert.personGroupId, status: 'rejected', identityId: robertIdentity.id });
   });
 
   it('S6.8: promotion adopts the source identity when the survivor pending row carries none', async () => {
@@ -469,7 +469,7 @@ describe('face verdict merge durability (D1)', () => {
 
     const rows = await verdictRow(faceId);
     expect(rows).toHaveLength(1); // S6.10
-    expect(rows[0]).toMatchObject({ personId: robert.personGroupId, status: 'rejected', identityId: bobIdentity.id });
+    expect(rows[0]).toMatchObject({ personGroupId: robert.personGroupId, status: 'rejected', identityId: bobIdentity.id });
   });
 
   it('S6.9: a three-way merge (two negative sources into one pending survivor) ends in exactly one negative row', async () => {
@@ -523,7 +523,7 @@ describe('face verdict merge durability (D1)', () => {
 
     const rows = await verdictRow(faceId);
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ personId: robert.personGroupId, status: 'rejected', identityId: robertIdentity.id });
+    expect(rows[0]).toMatchObject({ personGroupId: robert.personGroupId, status: 'rejected', identityId: robertIdentity.id });
   });
 
   it('GC (deleteUnreferencedIdentities) degrades an identity-only verdict to SET NULL, never deletes', async () => {
