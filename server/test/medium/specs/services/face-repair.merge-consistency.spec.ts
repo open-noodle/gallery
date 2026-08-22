@@ -84,7 +84,10 @@ describe('face verdicts survive person delete/merge without re-pointing', () => 
       actorId: user.id,
     });
 
+    // #30739 moved the verdict's person FK onto person_group.id, so the SET NULL fires when the group
+    // goes. `removeAllPersonGroups` sweeps the emptied group right after the delete; do both here.
     await personRepository.delete([owner.personGroupId]);
+    await personRepository.deleteEmptyGroups();
 
     const row = await verdictRowFor(faceId);
     expect(row).toBeDefined();
