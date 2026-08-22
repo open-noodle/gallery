@@ -401,10 +401,10 @@ describe(FaceSuggestionService.name, () => {
       ] as any);
       mocks.search.searchFaces
         .mockResolvedValueOnce([
-          { id: 'too-close', personId: null, distance: 0.5 },
+          { id: 'too-close', personGroupId: null, distance: 0.5 },
           { id: 'candidate', personId: null, distance: 0.7 },
         ] as FaceSearchResult[])
-        .mockResolvedValueOnce([{ id: 'candidate', personId: null, distance: 0.6 }] as FaceSearchResult[]);
+        .mockResolvedValueOnce([{ id: 'candidate', personGroupId: null, distance: 0.6 }] as FaceSearchResult[]);
 
       await expect(sut.handleSpacePersonSuggestionScan({ id: 'sp' })).resolves.toBe(JobStatus.Success);
 
@@ -433,7 +433,7 @@ describe(FaceSuggestionService.name, () => {
       mocks.sharedSpace.getById.mockResolvedValue({ id: 'space-1', faceRecognitionEnabled: true } as any);
       mocks.sharedSpace.getSpacePersonAssignedFaceEmbeddings.mockResolvedValue([{ embedding: 'e1' }] as any);
       mocks.search.searchFaces.mockResolvedValue([
-        { id: 'assigned-face', personId: null, distance: 0.6 },
+        { id: 'assigned-face', personGroupId: null, distance: 0.6 },
         { id: 'candidate', personId: null, distance: 0.7 },
       ] as FaceSearchResult[]);
       mocks.sharedSpace.getAssignedFaceIdsForSpace.mockResolvedValue([{ assetFaceId: 'assigned-face' }]);
@@ -462,7 +462,7 @@ describe(FaceSuggestionService.name, () => {
       mocks.sharedSpace.getById.mockResolvedValue({ id: 'space-1', faceRecognitionEnabled: true } as any);
       mocks.sharedSpace.getSpacePersonAssignedFaceEmbeddings.mockResolvedValue([{ embedding: 'e1' }] as any);
       mocks.search.searchFaces.mockResolvedValue([
-        { id: 'f-manual', personId: null, distance: 0.7 },
+        { id: 'f-manual', personGroupId: null, distance: 0.7 },
         { id: 'f-negative-space-person', personId: null, distance: 0.7 },
         { id: 'f-negative-identity', personId: null, distance: 0.7 },
         { id: 'f-kept', personId: null, distance: 0.7 },
