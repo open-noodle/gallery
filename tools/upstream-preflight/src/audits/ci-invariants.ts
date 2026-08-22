@@ -51,6 +51,32 @@ export function runCiInvariantAudits(
     : [];
 
   return (manifest.ci_invariants ?? []).map((invariant) =>
-    checkCiInvariantText(invariant, files),
+    checkCiInvariantText(invariant, [
+      ...files,
+      ...readInvariantSourceFiles(invariant, cwd),
+    ]),
   );
+}
+
+/**
+ * Invariants are not all about workflows. Some pin a source-level shape the fork must keep — e.g.
+ * the person joins that must NOT be filtered to `viewingUserId`, because under option M a
+ * person_group holds exactly one row (the owner's) and that filter silently nulls the person for
+ * every non-owner. Those invariants name concrete paths outside `.github/workflows`, so load them
+ * too; workflow globs still come from the directory scan above.
+ */
+function readInvariantSourceFiles(
+  invariant: CiInvariant,
+  cwd: string,
+): TextFile[] {
+  return invariant.paths
+    .filter((candidate) => !candidate.startsWith('.github/workflows'))
+    .filter((candidate) => !candidate.includes('*'))
+    .flatMap((candidate) => {
+      const absolute = path.join(cwd, candidate);
+      if (!fs.existsSync(absolute) || !fs.statSync(absolute).isFile()) {
+        return [];
+      }
+      return [{ path: candidate, text: fs.readFileSync(absolute, 'utf8') }];
+    });
 }
