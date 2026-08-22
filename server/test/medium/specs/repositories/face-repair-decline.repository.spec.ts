@@ -163,11 +163,15 @@ describe(FaceRepairDeclineRepository.name, () => {
     expect(mutes.has(other.personP)).toBe(false); // positive control: no mute recorded for this person
   });
 
-  it('cascades: deleting the person removes its cluster mute', async () => {
+  // #30739 moved this FK from person.id onto person_group.id, so the cascade fires when the GROUP goes.
+  // Under Option M the two are 1:1 and PersonService.removeAllPersonGroups deletes the person and then
+  // sweeps the group it emptied, so both steps are done here to mirror the real deletion path.
+  it('cascades: deleting the person and its emptied group removes the cluster mute', async () => {
     const { personP, personQ, declinedBy } = await seedFaceAndPersons(db);
     await sut.createClusterMutes({ persons: [{ personId: personP, suspectedOwnerIds: [personQ] }], declinedBy });
 
     await db.deleteFrom('person').where('personGroupId', '=', personP).execute();
+    await db.deleteFrom('person_group').where('id', '=', personP).execute();
 
     expect(await sut.listDeclines()).toEqual([]);
   });
