@@ -163,8 +163,8 @@ export class AssetService extends BaseService {
 
     const identityByPersonId = new Map<string, string>();
     for (const face of faces) {
-      if (face.person?.id && face.person.identityId) {
-        identityByPersonId.set(face.person.id, face.person.identityId);
+      if (face.person?.personGroupId && face.person.identityId) {
+        identityByPersonId.set(face.person.personGroupId, face.person.identityId);
       }
     }
 

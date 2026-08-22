@@ -92,7 +92,7 @@ export class PetDetectionService extends BaseService {
 
         const faceId = await this.personRepository.createAssetFace({
           assetId: id,
-          personId,
+          personGroupId: personId,
           imageHeight,
           imageWidth,
           boundingBoxX1: pet.boundingBox.x1,
