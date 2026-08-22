@@ -800,7 +800,7 @@ describe('FaceRepairService.executeRepair', () => {
     // The face that moved to Z since planning is left on Z — the write-time re-check (still-on-source) skips it.
     const movedRow = await ctx.database
       .selectFrom('asset_face')
-      .select('personId')
+      .select('personGroupId')
       .where('id', '=', movedFaceId)
       .executeTakeFirstOrThrow();
     expect(movedRow.personId).toBe(personZ.personGroupId);
@@ -1358,7 +1358,7 @@ describe('FaceRepairService decline filter', () => {
     // karina is not used by this test path but ensure she wasn't somehow affected
     const karinaFaces = await ctx.database
       .selectFrom('asset_face')
-      .select('personId')
+      .select('personGroupId')
       .where('personGroupId', '=', karina.personGroupId)
       .execute();
     expect(karinaFaces.length).toBe(10);
