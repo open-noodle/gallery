@@ -6,7 +6,7 @@ describe(BirthdayMemoryRule.name, () => {
     const personRepository = {
       getBirthdaysForDay: vi
         .fn()
-        .mockResolvedValue([{ id: 'person-1', name: 'Pierre', birthDate: new Date('1990-04-24T00:00:00Z') }]),
+        .mockResolvedValue([{ personGroupId: 'person-1', name: 'Pierre', birthDate: new Date('1990-04-24T00:00:00Z') }]),
     };
     const assetRepository = {
       getMemoryAssetsForPerson: vi.fn().mockResolvedValue([
@@ -38,7 +38,7 @@ describe(BirthdayMemoryRule.name, () => {
     const personRepository = {
       getBirthdaysForDay: vi
         .fn()
-        .mockResolvedValue([{ id: 'person-1', name: 'Pierre', birthDate: new Date('1990-04-24T00:00:00Z') }]),
+        .mockResolvedValue([{ personGroupId: 'person-1', name: 'Pierre', birthDate: new Date('1990-04-24T00:00:00Z') }]),
     };
     const assetRepository = {
       getMemoryAssetsForPerson: vi.fn().mockResolvedValue([
@@ -61,7 +61,7 @@ describe(BirthdayMemoryRule.name, () => {
     const personRepository = {
       getBirthdaysForDay: vi
         .fn()
-        .mockResolvedValue([{ id: 'person-1', name: 'Pierre', birthDate: new Date('1990-04-24T00:00:00Z') }]),
+        .mockResolvedValue([{ personGroupId: 'person-1', name: 'Pierre', birthDate: new Date('1990-04-24T00:00:00Z') }]),
     };
     const assetRepository = {
       getMemoryAssetsForPerson: vi.fn().mockResolvedValue([
@@ -90,7 +90,7 @@ describe(BirthdayMemoryRule.name, () => {
     const personRepository = {
       getBirthdaysForDay: vi
         .fn()
-        .mockResolvedValue([{ id: 'person-2', name: 'Alice', birthDate: new Date('1990-04-24T00:00:00Z') }]),
+        .mockResolvedValue([{ personGroupId: 'person-2', name: 'Alice', birthDate: new Date('1990-04-24T00:00:00Z') }]),
     };
     const assetRepository = {
       getMemoryAssetsForPerson: vi.fn().mockResolvedValue([

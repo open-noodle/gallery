@@ -377,7 +377,7 @@ describe(SearchRepository.name, () => {
       const innerSql = base.compile().sql;
 
       expect(countMatches(innerSql, /exists\s*\(select\b[\s\S]+?from\s+"asset_face"/gi)).toBe(1);
-      expect(innerSql).toMatch(/"asset_face"\."personId"\s*=\s*any\(\$[\d]+::uuid\[\]\)/i);
+      expect(innerSql).toMatch(/"asset_face"\."personGroupId"\s*=\s*any\(\$[\d]+::uuid\[\]\)/i);
     });
 
     it('identityIds path filters through face_identity_face with correlated EXISTS', () => {
@@ -466,7 +466,7 @@ describe(SearchRepository.name, () => {
         personIds: ['00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002'],
       });
       expect(sql).toContain('"has_people"');
-      expect(sql).toMatch(/having count\(distinct "personId"\) = \$\d+/i);
+      expect(sql).toMatch(/having count\(distinct "personGroupId"\) = \$\d+/i);
     });
 
     it('space person suggestion filters require every selected space person', () => {

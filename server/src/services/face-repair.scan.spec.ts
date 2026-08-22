@@ -84,7 +84,7 @@ describe(FaceRepairService.name, () => {
           totals: expect.any(Object),
           persons: expect.arrayContaining([
             expect.objectContaining({
-              personId: 'P',
+              personGroupId: 'P',
               recommendation: 'review-first',
               reviewReasons: expect.arrayContaining(['named']),
             }),
@@ -125,14 +125,14 @@ describe(FaceRepairService.name, () => {
         reviewOnlyFaces: [{ assetFaceId: 'face-2', currentPersonId: 'P', suspectedOwnerId: 'R', reason: 'over-cap' }],
         reviewOnlyPersonIds: [],
         unAttributableFaces: [],
-        perPerson: [{ personId: 'P', eligible: 5, flagged: 2, flaggedFraction: 0.4 }],
+        perPerson: [{ personGroupId: 'P', eligible: 5, flagged: 2, flaggedFraction: 0.4 }],
       } as any);
 
       await sut.runScan('scan-1');
 
       expect(mocks.faceRepairScan.replaceScanFlaggedFaces).toHaveBeenCalledWith('scan-1', [
-        { assetFaceId: 'face-1', personId: 'P', suspectedOwnerId: 'Q' },
-        { assetFaceId: 'face-2', personId: 'P', suspectedOwnerId: 'R' },
+        { assetFaceId: 'face-1', personGroupId: 'P', suspectedOwnerId: 'Q' },
+        { assetFaceId: 'face-2', personGroupId: 'P', suspectedOwnerId: 'R' },
       ]);
       // persisted before the scan is marked completed
       const persistOrder = mocks.faceRepairScan.replaceScanFlaggedFaces.mock.invocationCallOrder[0];
