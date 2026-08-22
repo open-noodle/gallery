@@ -523,6 +523,69 @@ two fork-owned tables from finding #6's list not touched by stage 2's repoint) s
 single-column person id shaped for pre-K `person.id`. They currently compile only because Kysely
 doesn't enforce FK types at the column level — a real composite-key repoint is still owed.
 
+### Stage 4 — full spike to near-M-parity, 2026-08-22
+
+**Context: this ran after the product decision (below, "Status" banner) — not to reopen it, but because
+Pierre asked for K's real cost as a data point before committing to M's full implementation.** Everything
+above this point predates the decision and was measured against the broken wholesale-merge base the
+warning at the top of this section flags. This stage re-measures K against a properly-fixed tree, driven
+all the way to the same bar the M spike proved: 0 type errors, migrations run clean against a real
+Postgres with zero drift, and both `pnpm test`/`pnpm test:medium` actually passing.
+
+Ran across ~25 sequential background-agent rounds and 90+ throwaway commits in a fresh worktree
+(`.worktrees/spike-cluster-groups-k2`, branch `spike/cluster-groups-k2`, branched from stage-3's tip so
+the two K worktrees could coexist). Nothing merges; still fully throwaway.
+
+**Result — K reached near-parity, but cost meaningfully more than M:**
+
+| Gate                    | K (final)                                                                                                                                                                                                                                          | M (reference, already proven) |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
+| `pnpm check`            | 134 errors, all confirmed out-of-scope (pre-existing `getTimeBuckets`/`auth`-arg and `duration`/`onAssetHide`/`onAssetShow` gaps — unrelated to cluster groups, present in the shared wholesale-merge base, and left unfixed by M's own spike too) | 0                             |
+| Migrations              | 157 apply clean, zero drift                                                                                                                                                                                                                        | 156 apply clean, zero drift   |
+| `pnpm test` (unit)      | ~5,410 / 5,566                                                                                                                                                                                                                                     | 5,648 / 5,767                 |
+| `pnpm test:medium`      | ~2,480 / 2,679                                                                                                                                                                                                                                     | 2,494 / 2,642                 |
+| Total throwaway commits | 90+ across 25 rounds                                                                                                                                                                                                                               | 50                            |
+
+**The composite-key finding this stage confirms and sharpens finding #6/Stage 3's open item**:
+`face_person_verdict`/`face_repair_decline` need a genuinely **composite** `(ownerId, personGroupId)` FK
+pair under K, not a single-column repoint — because K, unlike M, permits multiple owners per
+`person_group`, so `personGroupId` alone doesn't uniquely identify an owner. This is real, K-specific
+design weight M's simpler 1:1 invariant never has to pay, and it wasn't fully quantified until this stage.
+
+**Three production-functionality gaps found, characterized, and deliberately left open** (Pierre's call,
+2026-08-22 — explicitly declined both "port the missing functionality" and "skip silently"):
+
+1. `handleQueueRecognizeFaces`/`handleRecognizeFaces` — K's implementation is substantially
+   older/simpler than M's: missing shared-space-match suppression during force-reset,
+   ML-identity-unlink-on-reset, a `deleteUnreferencedIdentities` call, bounded backfill-wait logic, and a
+   terminal maintenance-completion marker. `JobName.FaceIdentityMaintenanceAfterRecognition` exists in
+   K's enum (a merge leftover) but nothing anywhere in K's services queues or handles it.
+2. `mergePerson`'s classic endpoint (a separate, older implementation from `mergeScopedPeople`, with its
+   own manual per-person loop and `mergeIdentitiesAfterProfileResolution` hook) never calls
+   `crossOwnerMergeAuthorizer` — that cross-owner gating only exists on `mergeScopedPeople`.
+3. `getById` doesn't implement the shared-space profile resolution M's test suite exercises.
+
+**Real bugs found and fixed along the way, unrelated to K vs M but required to actually reach parity** —
+all pre-existing wholesale-merge casualties, same "compiles clean, silently wrong" or "silently deleted"
+shape as finding #3 above, at larger scale than anticipated: a missing `#757` visibility-transition
+cascade + rbac-3 ownership guard + reverse-geocoding in `asset.service.ts`; `PersonRepository.
+createAssetFace` returning `void` instead of the new face's id (a one-line fix that closed 265 test
+errors); `GetAllFacesOptions.excludeManuallyPlaced` missing entirely (recognition could silently
+re-claim a manually-placed face); several raw-SQL blocks in `face-identity.repository.ts` still
+referencing the dropped `person.identityId`/`person.id` columns directly — invisible to `tsc`, and
+fixing them closed 108 medium-suite failures in one pass, the single biggest win of the whole stage;
+`PersonService`'s `face_identity_person_group` _creation_ path (not just merge-propagation, already
+closed in Stage 3) was missing outside `mergePerson` entirely; and `PersonService.getAll` was missing
+its whole `withSharedSpaces` branch even though the repository method it needed already existed and was
+already used elsewhere. Separately, whole test files (`person.service.spec.ts`, `search.service.spec.ts`,
+`timeline.service.spec.ts`, `utils/misc.spec.ts`) had 90%+ of their content silently dropped by the
+original wholesale merge — a file-level instance of the same defect, not specific to K.
+
+**Net read**: confirms this section's original K-vs-M cost ranking was directionally right even though
+its absolute numbers were explicitly untrustworthy — K is viable but costs more than M, and even driven
+this deep it still surfaces real behavioral gaps M's simpler invariant avoids by construction. Does not
+reopen the decision below. Full round-by-round record: memory `project_cluster_groups_k_full_spike_vs_m`.
+
 ## Spike results — option J″, 2026-08-21
 
 A throwaway spike ran on branch `spike/cluster-groups-j2` in `.worktrees/spike-cluster-groups-j2`,
