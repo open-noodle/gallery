@@ -795,7 +795,7 @@ describe('People identity RBAC projection', () => {
       .selectFrom('person')
       .select(['personGroupId', 'ownerId', 'identityId'])
       .where('identityId', '=', targetIdentity.id)
-      .orderBy('id')
+      .orderBy('personGroupId')
       .execute();
 
     expect(uploadedPerson.personGroupId).not.toBe(memberConflictPerson.personGroupId);
@@ -837,7 +837,7 @@ describe('People identity RBAC projection', () => {
         .selectFrom('person')
         .select(['personGroupId', 'identityId'])
         .where('ownerId', '=', fx.member.id)
-        .orderBy('id')
+        .orderBy('personGroupId')
         .execute();
       const faceLinks = await fx.ctx.database
         .selectFrom('face_identity_face')
@@ -1383,7 +1383,7 @@ describe('People identity RBAC projection', () => {
     } as any);
     const localRows = await ctx.database
       .selectFrom('person')
-      .select('id')
+      .select('personGroupId')
       .where('ownerId', '=', lateMember.id)
       .execute();
 
