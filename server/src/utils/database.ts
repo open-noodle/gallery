@@ -324,8 +324,17 @@ export function withFacesAndPeople({ viewingUserId, withHidden, withDeletedFace 
               .selectFrom('person')
               .selectAll('person')
               .whereRef('person.personGroupId', '=', 'asset_face.personGroupId')
-              .$if(!viewingUserId, (qb) => qb.whereRef('person.ownerId', '=', 'asset.ownerId'))
-              .$if(!!viewingUserId, (qb) => qb.where('person.ownerId', '=', viewingUserId!))
+              // Same reasoning as PersonRepository's `withPerson`: upstream hard-filters to the viewer's
+              // own row because every member of a cluster group has one. Under Option M the group holds a
+              // single row — the asset owner's — so filtering by viewer returns nothing for a shared-album
+              // recipient or Space member and the asset's people come back empty. Prefer the viewer's row,
+              // fall back to the owner's, and take one.
+              .orderBy(
+                viewingUserId
+                  ? sql`case when "person"."ownerId" = ${viewingUserId} then 0 when "person"."ownerId" = "asset"."ownerId" then 1 else 2 end`
+                  : sql`case when "person"."ownerId" = "asset"."ownerId" then 0 else 1 end`,
+              )
+              .limit(1)
               .as('person'),
           (join) => join.onTrue(),
         )
