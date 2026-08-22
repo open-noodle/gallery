@@ -29,7 +29,7 @@ const PERSON_SUGGESTION_NUM_RESULTS = 100;
 @Injectable()
 export class FaceSuggestionService extends BaseService {
   private async findOrFail(id: string) {
-    const person = await this.personRepository.getById(id);
+    const person = await this.personRepository.getByGroupIdOnly(id);
     if (!person) {
       throw new BadRequestException('Person not found');
     }
@@ -124,7 +124,7 @@ export class FaceSuggestionService extends BaseService {
     await this.requireAccess({ auth, permission: Permission.PersonCreate, ids: [assetFaceId] });
 
     const person = await this.findOrFail(personId);
-    const face = await this.personRepository.getFaceById(assetFaceId);
+    const face = await this.personRepository.getFaceById(assetFaceId, { viewingUserId: auth.user.id });
 
     // Claim the queue row first so a double-submit resolves exactly once. There is deliberately no
     // 'confirmed' status to write: the durable positive verdict is the face's manual identity link, written
@@ -177,10 +177,10 @@ export class FaceSuggestionService extends BaseService {
     // Feature-photo refresh is display-only (a job enqueue + a non-identity person column), so it stays
     // OUTSIDE the transaction — mirrors reassignFacesById's own placement of this step.
     if (person.faceAssetId === null) {
-      await this.createNewFeaturePhoto([person.id]);
+      await this.createNewFeaturePhoto([person.personGroupId]);
     }
     if (face.person && face.person.faceAssetId === face.id) {
-      await this.createNewFeaturePhoto([face.person.id]);
+      await this.createNewFeaturePhoto([face.person.personGroupId]);
     }
     return true;
   }
@@ -244,7 +244,7 @@ export class FaceSuggestionService extends BaseService {
     const { maxDistance, suggestions } = machineLearning.facialRecognition;
     const suggestionMaxDistance = suggestions.maxDistance;
 
-    const person = await this.personRepository.getById(id);
+    const person = await this.personRepository.getByGroupIdOnly(id);
     if (!person || person.name === '' || person.isHidden || person.type !== 'person') {
       return JobStatus.Skipped;
     }
@@ -303,7 +303,7 @@ export class FaceSuggestionService extends BaseService {
 
     let jobs: { name: JobName.PersonSuggestionScan; data: { id: string } }[] = [];
     for await (const person of this.personRepository.getScannablePeopleWithUnassignedFaces()) {
-      jobs.push({ name: JobName.PersonSuggestionScan, data: { id: person.id } });
+      jobs.push({ name: JobName.PersonSuggestionScan, data: { id: person.personGroupId } });
       if (jobs.length === JOBS_ASSET_PAGINATION_SIZE) {
         await this.jobRepository.queueAll(jobs);
         jobs = [];
