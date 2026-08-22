@@ -504,7 +504,7 @@ BEGIN
       AFTER DELETE ON "person"
       REFERENCING OLD TABLE AS "old"
       FOR EACH STATEMENT
-      WHEN (pg_trigger_depth() <= 1)
+      WHEN (pg_trigger_depth() = 0)
       EXECUTE FUNCTION person_delete_audit();
   END IF;
 END $$;
@@ -515,7 +515,7 @@ SET "value" = '{"type":"function","name":"person_delete_audit","sql":"CREATE OR 
 WHERE "name" = 'function_person_delete_audit';
 
 UPDATE "migration_overrides"
-SET "value" = '{"type":"trigger","name":"person_delete_audit","sql":"CREATE OR REPLACE TRIGGER \"person_delete_audit\"\n  AFTER DELETE ON \"person\"\n  REFERENCING OLD TABLE AS \"old\"\n  FOR EACH STATEMENT\n  WHEN (pg_trigger_depth() <= 1)\n  EXECUTE FUNCTION person_delete_audit();"}'::jsonb
+SET "value" = '{"type":"trigger","name":"person_delete_audit","sql":"CREATE OR REPLACE TRIGGER \"person_delete_audit\"\n  AFTER DELETE ON \"person\"\n  REFERENCING OLD TABLE AS \"old\"\n  FOR EACH STATEMENT\n  WHEN (pg_trigger_depth() = 0)\n  EXECUTE FUNCTION person_delete_audit();"}'::jsonb
 WHERE "name" = 'trigger_person_delete_audit';
 
 DELETE FROM "migration_overrides" WHERE "name" IN (
