@@ -278,18 +278,18 @@ const buildCluster = async (ctx: RepairCtx, ownerId: string, embedding: string, 
 const leakFacesInto = async (
   ctx: RepairCtx,
   ownerId: string,
-  person: { id: string; identityId?: string | null },
+  person: { personGroupId: string; identityId?: string | null },
   embedding: string,
   count: number,
 ) => {
   const faceIdentityRepo = ctx.get(FaceIdentityRepository);
-  const identity = await faceIdentityRepo.ensurePersonIdentity(person.id);
+  const identity = await faceIdentityRepo.ensurePersonIdentity(person.personGroupId);
   const faceIds: string[] = [];
   for (let index = 0; index < count; index++) {
     const { asset } = await ctx.newAsset({ ownerId, visibility: AssetVisibility.Timeline });
     const { assetFace } = await ctx.newAssetFace({
       assetId: asset.id,
-      personGroupId: person.id,
+      personGroupId: person.personGroupId,
       sourceType: SourceType.MachineLearning,
     });
     await ctx.database.insertInto('face_search').values({ faceId: assetFace.id, embedding }).execute();
@@ -443,7 +443,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
         .select('personGroupId')
         .where('id', '=', face.id)
         .executeTakeFirstOrThrow();
-      expect(faceAfter.personId).toBeNull();
+      expect(faceAfter.personGroupId).toBeNull();
     });
 
     it('S5.6 — a face carrying an ml/owner-person/backfill link is still queued by non-forced recognition (control for S5.1)', async () => {
@@ -561,7 +561,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
       .select('personGroupId')
       .where('id', '=', face.id)
       .executeTakeFirstOrThrow();
-    expect(assetFace.personId).toBe(anna.personGroupId);
+    expect(assetFace.personGroupId).toBe(anna.personGroupId);
     const link = await db
       .selectFrom('face_identity_face')
       .select('source')
@@ -611,7 +611,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
     // The admin scans and moves the leaked face to its true owner, Bob.
     await repair.runRepair({ ownerId: user.id, ...repairParams });
     const moved = await db.selectFrom('asset_face').select('personGroupId').where('id', '=', face).executeTakeFirstOrThrow();
-    expect(moved.personId).toBe(bob.personGroupId);
+    expect(moved.personGroupId).toBe(bob.personGroupId);
 
     // The stale pending suggestion is gone — drained at the write path, not merely hidden by a read filter.
     const rows = await db
@@ -1087,7 +1087,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
         .select('personGroupId')
         .where('id', '=', face.id)
         .executeTakeFirstOrThrow();
-      expect(faceAfterDelete.personId).toBeNull(); // sanity: the face is genuinely unassigned
+      expect(faceAfterDelete.personGroupId).toBeNull(); // sanity: the face is genuinely unassigned
 
       const q2 = await newSuggestionAnchoredPerson(ctx, user.id, 'Q');
       await ctx.database.updateTable('person').set({ identityId: q1Identity.id }).where('personGroupId', '=', q2.personGroupId).execute();
