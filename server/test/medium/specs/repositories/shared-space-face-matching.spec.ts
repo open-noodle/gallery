@@ -136,7 +136,7 @@ describe('SharedSpaceRepository - face matching pipeline', () => {
       for (const faceId of unrecognizedFaceIds) {
         await ctx.database
           .updateTable('asset_face')
-          .set({ personId: globalPerson.personGroupId })
+          .set({ personGroupId: globalPerson.personGroupId })
           .where('id', '=', faceId)
           .execute();
       }
@@ -190,7 +190,7 @@ describe('SharedSpaceRepository - face matching pipeline', () => {
 
       // Reassign faces to P2 (simulating re-recognition)
       for (const faceId of faceIds) {
-        await ctx.database.updateTable('asset_face').set({ personId: personP2.personGroupId }).where('id', '=', faceId).execute();
+        await ctx.database.updateTable('asset_face').set({ personGroupId: personP2.personGroupId }).where('id', '=', faceId).execute();
       }
 
       // Re-run processSpaceFaceMatch for P2
@@ -665,7 +665,7 @@ describe('SharedSpaceRepository - face matching pipeline', () => {
 
       // Delete the global person — face's personId becomes dangling
       // First null out the face's personId (FK constraint), then delete person
-      await ctx.database.updateTable('asset_face').set({ personId: null }).where('personGroupId', '=', person.personGroupId).execute();
+      await ctx.database.updateTable('asset_face').set({ personGroupId: null }).where('personGroupId', '=', person.personGroupId).execute();
       await ctx.database.deleteFrom('person').where('personGroupId', '=', person.personGroupId).execute();
 
       const result = await sut.getPersonsBySpaceId(space.id, {});
@@ -1358,7 +1358,7 @@ describe('SharedSpaceRepository - face matching pipeline', () => {
       await sut.addPersonFaces([{ personId: sp1.id, assetFaceId: face1 }]);
 
       // Change F1's personId to P2 (simulate re-recognition)
-      await ctx.database.updateTable('asset_face').set({ personId: personP2.personGroupId }).where('id', '=', face1).execute();
+      await ctx.database.updateTable('asset_face').set({ personGroupId: personP2.personGroupId }).where('id', '=', face1).execute();
 
       // Space assignment is unchanged
       expect(await sut.isPersonFaceAssigned(face1, space.id)).toBe(true);
