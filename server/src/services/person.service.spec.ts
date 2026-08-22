@@ -1712,7 +1712,7 @@ describe(PersonService.name, () => {
       const person = PersonFactory.create({ thumbnailPath: 'thumbs/user/ab/cd/person.jpeg' });
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
 
-      await expect(sut.handlePersonMigration({ id: person.personGroupId })).resolves.toBe(JobStatus.Skipped);
+      await expect(sut.handlePersonMigration({ personGroupId: person.personGroupId })).resolves.toBe(JobStatus.Skipped);
 
       expect(mocks.move.create).not.toHaveBeenCalled();
       expect(mocks.move.getByEntity).not.toHaveBeenCalled();
@@ -1723,7 +1723,7 @@ describe(PersonService.name, () => {
       const person = PersonFactory.create({ thumbnailPath: '' });
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
 
-      await expect(sut.handlePersonMigration({ id: person.personGroupId })).resolves.toBe(JobStatus.Skipped);
+      await expect(sut.handlePersonMigration({ personGroupId: person.personGroupId })).resolves.toBe(JobStatus.Skipped);
 
       expect(mocks.move.create).not.toHaveBeenCalled();
       expect(mocks.move.getByEntity).not.toHaveBeenCalled();
@@ -6005,7 +6005,7 @@ describe(PersonService.name, () => {
     it('should return Failed when person is not found', async () => {
       mocks.person.getByGroupIdOnly.mockResolvedValue(undefined);
 
-      await expect(sut.handlePersonMigration({ id: newUuid() })).resolves.toBe(JobStatus.Failed);
+      await expect(sut.handlePersonMigration({ personGroupId: newUuid() })).resolves.toBe(JobStatus.Failed);
     });
   });
 

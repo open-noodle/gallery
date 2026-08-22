@@ -205,7 +205,7 @@ describe('StorageCore', () => {
 
     describe('getRelativePersonThumbnailPath', () => {
       it('should return relative path for person thumbnail', () => {
-        const result = StorageCore.getRelativePersonThumbnailPath({ id: 'person-1', ownerId: 'user-1' });
+        const result = StorageCore.getRelativePersonThumbnailPath({ personGroupId: 'person-1', ownerId: 'user-1' });
         expect(result.startsWith('/')).toBe(false);
         expect(result).toContain('thumbs/');
         expect(result).toContain('person-1.jpeg');
@@ -232,7 +232,7 @@ describe('StorageCore', () => {
       });
 
       it('getPersonThumbnailPath should still return absolute path', () => {
-        const result = StorageCore.getPersonThumbnailPath({ id: 'person-1', ownerId: 'user-1' });
+        const result = StorageCore.getPersonThumbnailPath({ personGroupId: 'person-1', ownerId: 'user-1' });
         expect(result.startsWith('/data/')).toBe(true);
       });
     });
