@@ -1226,7 +1226,7 @@ describe('matrix: timeline (getTimeBuckets)', () => {
       visibility: AssetVisibility.Timeline,
       bucketSize: TimeBucketSize.Year,
     };
-    const buckets = await assetRepo.getTimeBuckets(opts);
+    const buckets = await assetRepo.getTimeBuckets(opts, factory.auth());
     const total = buckets.reduce((sum, b) => sum + Number(b.count), 0);
 
     // Timeline direct + Timeline album(shown) = 2 assets
@@ -1260,7 +1260,7 @@ describe('matrix: timeline (getTimeBuckets)', () => {
       visibility: AssetVisibility.Timeline,
       bucketSize: TimeBucketSize.Year,
     };
-    const before = await assetRepo.getTimeBuckets(opts);
+    const before = await assetRepo.getTimeBuckets(opts, factory.auth());
     const beforeCount = before.reduce((sum, b) => sum + Number(b.count), 0);
     expect(beforeCount).toBeGreaterThanOrEqual(1);
 
@@ -1270,7 +1270,7 @@ describe('matrix: timeline (getTimeBuckets)', () => {
       .where('id', '=', asset.id)
       .execute();
 
-    const after = await assetRepo.getTimeBuckets(opts);
+    const after = await assetRepo.getTimeBuckets(opts, factory.auth());
     const afterCount = after.reduce((sum, b) => sum + Number(b.count), 0);
     expect(afterCount).toBe(beforeCount - 1);
   });
@@ -1503,7 +1503,7 @@ describe('matrix: timeline explicit-visibility (spaceId + visibility=HIDDEN/LOCK
     };
 
     // No other-member Hidden assets surface
-    expect(countTimeBuckets(await assetRepo.getTimeBuckets(opts))).toBe(0);
+    expect(countTimeBuckets(await assetRepo.getTimeBuckets(opts, factory.auth()))).toBe(0);
 
     // getTimeBucketCovers likewise returns nothing
     const covers = await assetRepo.getTimeBucketCovers({ ...opts, timeBuckets: ['2024-01-01'] });
@@ -1526,7 +1526,7 @@ describe('matrix: timeline explicit-visibility (spaceId + visibility=HIDDEN/LOCK
       visibility: AssetVisibility.Locked,
       bucketSize: TimeBucketSize.Year,
     };
-    expect(countTimeBuckets(await assetRepo.getTimeBuckets(opts))).toBe(0);
+    expect(countTimeBuckets(await assetRepo.getTimeBuckets(opts, factory.auth()))).toBe(0);
   });
 
   it("OWN Hidden via timelineSpaceIds IS present (owner's own hidden must not be over-blocked)", async () => {
@@ -1544,7 +1544,7 @@ describe('matrix: timeline explicit-visibility (spaceId + visibility=HIDDEN/LOCK
       visibility: AssetVisibility.Hidden,
       bucketSize: TimeBucketSize.Year,
     };
-    expect(countTimeBuckets(await assetRepo.getTimeBuckets(opts))).toBe(1);
+    expect(countTimeBuckets(await assetRepo.getTimeBuckets(opts, factory.auth()))).toBe(1);
 
     const covers = await assetRepo.getTimeBucketCovers({ ...opts, timeBuckets: ['2024-01-01'] });
     const coverIds = new Set(covers.map((c) => c.representativeAssetId));
@@ -1570,7 +1570,7 @@ describe('matrix: timeline explicit-visibility (spaceId + visibility=HIDDEN/LOCK
       visibility: AssetVisibility.Hidden,
       bucketSize: TimeBucketSize.Year,
     };
-    expect(countTimeBuckets(await assetRepo.getTimeBuckets(opts))).toBe(0);
+    expect(countTimeBuckets(await assetRepo.getTimeBuckets(opts, factory.auth()))).toBe(0);
 
     const covers = await assetRepo.getTimeBucketCovers({ ...opts, timeBuckets: ['2024-01-01'] });
     expect(covers.map((c) => c.representativeAssetId)).not.toContain(hiAlbum);
@@ -1590,7 +1590,7 @@ describe('matrix: timeline explicit-visibility (spaceId + visibility=HIDDEN/LOCK
       visibility: AssetVisibility.Timeline,
       bucketSize: TimeBucketSize.Year,
     };
-    expect(countTimeBuckets(await assetRepo.getTimeBuckets(opts))).toBeGreaterThanOrEqual(1);
+    expect(countTimeBuckets(await assetRepo.getTimeBuckets(opts, factory.auth()))).toBeGreaterThanOrEqual(1);
   });
 });
 

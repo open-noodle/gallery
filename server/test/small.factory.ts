@@ -193,6 +193,7 @@ const userFactory = (user: Partial<User> = {}) => ({
 const userAdminFactory = (user: Partial<UserAdmin> = {}) => {
   const {
     id = newUuid(),
+    clusterGroupId = newUuid(),
     name = 'Test User',
     email = 'test@immich.cloud',
     profileImagePath = '',
@@ -212,6 +213,7 @@ const userAdminFactory = (user: Partial<UserAdmin> = {}) => {
   } = user;
   return {
     id,
+    clusterGroupId,
     name,
     email,
     profileImagePath,

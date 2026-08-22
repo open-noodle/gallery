@@ -59,7 +59,7 @@ const seedFace = async (ctx: Ctx, ownerId: string, personId: string): Promise<st
   const { asset } = await ctx.newAsset({ ownerId });
   const { assetFace } = await ctx.newAssetFace({
     assetId: asset.id,
-    personGroupId,
+    personGroupId: personId,
     sourceType: SourceType.MachineLearning,
   });
   await db.insertInto('face_search').values({ faceId: assetFace.id, embedding: EMBEDDING }).execute();
@@ -276,7 +276,7 @@ describe('FaceRepairService.resolveFaces: move-to-owner (M1, M3, E14)', () => {
     // A NAMED source is kept even though it's fully drained of eligible faces (unlike the unnamed case above).
     const sourceRow = await db
       .selectFrom('person')
-      .select(['id', 'name'])
+      .select(['personGroupId', 'name'])
       .where('personGroupId', '=', source.personGroupId)
       .executeTakeFirst();
     expect(sourceRow).toBeDefined();
@@ -835,7 +835,7 @@ describe('FaceRepairService.createOwnerPerson (M18, state 2)', () => {
 
     const row = await db
       .selectFrom('person')
-      .select(['id', 'ownerId', 'name'])
+      .select(['personGroupId', 'ownerId', 'name'])
       .where('personGroupId', '=', created.id)
       .executeTakeFirst();
     expect(row?.ownerId).toBe(user.id);
@@ -2324,7 +2324,7 @@ describe('FaceRepairService.resolveFaces: unknown person (state 6)', () => {
 
     const cluster = await db
       .selectFrom('person')
-      .select(['id', 'name', 'ownerId'])
+      .select(['personGroupId', 'name', 'ownerId'])
       .where('personGroupId', '=', byId[f1]!)
       .executeTakeFirstOrThrow();
     // Unnamed and owned by the LIBRARY's owner (never the reviewing admin), so it surfaces as an unnamed
@@ -2420,7 +2420,7 @@ describe('FaceRepairService.resolveFaces: unknown on a non-flagged face (E15 rel
 
     const cluster = await db
       .selectFrom('person')
-      .select(['id', 'name'])
+      .select(['personGroupId', 'name'])
       .where('personGroupId', '=', byId[notFlagged]!)
       .executeTakeFirstOrThrow();
     expect(cluster.name).toBe('');
@@ -2473,7 +2473,7 @@ describe('FaceRepairService.resolveFaces: unknown empties the source person (E15
 
     const sourceRow = await db
       .selectFrom('person')
-      .select(['id', 'name'])
+      .select(['personGroupId', 'name'])
       .where('personGroupId', '=', source.personGroupId)
       .executeTakeFirst();
     expect(sourceRow).toBeDefined();
