@@ -213,7 +213,10 @@ describe('SharedSpaceService shared-space person metadata RBAC', () => {
     });
     const { asset: secondAsset } = await ctx.newAsset({ ownerId: user.id });
     await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: secondAsset.id, addedById: user.id });
-    const { result: secondFaceId } = await ctx.newAssetFace({ assetId: secondAsset.id, personGroupId: first.person.personGroupId });
+    const { result: secondFaceId } = await ctx.newAssetFace({
+      assetId: secondAsset.id,
+      personGroupId: first.person.personGroupId,
+    });
     await ctx.database.insertInto('face_search').values({ faceId: secondFaceId, embedding: newEmbedding() }).execute();
     await faceIdentityRepository.replaceFaceIdentity({
       assetFaceId: secondFaceId,
