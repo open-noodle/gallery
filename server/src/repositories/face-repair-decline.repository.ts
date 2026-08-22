@@ -15,7 +15,9 @@ export interface DeclineListRow {
   suspectedOwnerId: string | null;
   suspectedOwnerName: string | null;
   suspectedOwnerThumbnailFaceId: string | null;
-  personGroupId: string | null;
+  // The DTO boundary name. Under option M this IS the person_group id; the column is `personGroupId`
+  // and is aliased on the way out, exactly as the sibling repositories do (`fpv.personGroupId as personId`).
+  personId: string | null;
   personName: string | null;
   personThumbnailFaceId: string | null;
   createdAt: string;
@@ -117,7 +119,7 @@ export class FaceRepairDeclineRepository {
       suspectedOwnerId: r.suspectedOwnerId,
       suspectedOwnerName: nameOf(r.suspectedOwnerId),
       suspectedOwnerThumbnailFaceId: thumbOf(r.suspectedOwnerId),
-      personGroupId: r.personGroupId,
+      personId: r.personGroupId,
       personName: nameOf(r.personGroupId),
       personThumbnailFaceId: thumbOf(r.personGroupId),
       createdAt: r.createdAt as unknown as string,
