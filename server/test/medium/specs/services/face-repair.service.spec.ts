@@ -803,7 +803,7 @@ describe('FaceRepairService.executeRepair', () => {
       .select('personGroupId')
       .where('id', '=', movedFaceId)
       .executeTakeFirstOrThrow();
-    expect(movedRow.personId).toBe(personZ.personGroupId);
+    expect(movedRow.personGroupId).toBe(personZ.personGroupId);
 
     // The two remaining leaked faces were re-attributed to the suspected owner Karina.
     const remainingRows = await ctx.database
