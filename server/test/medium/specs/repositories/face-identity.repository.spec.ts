@@ -250,7 +250,7 @@ const getPersonalIdentityMismatchRows = async (ctx: ReturnType<typeof setup>['ct
     .innerJoin('face_identity_face', 'face_identity_face.assetFaceId', 'asset_face.id')
     .select([
       'asset_face.id as assetFaceId',
-      'asset_face.personId',
+      'asset_face.personGroupId',
       'person.identityId as personIdentityId',
       'face_identity_face.identityId as faceIdentityId',
     ])
@@ -889,7 +889,7 @@ describe(FaceIdentityRepository.name, () => {
         .execute();
       await ctx.database
         .updateTable('asset_face')
-        .set({ personId: null })
+        .set({ personGroupId: null })
         .where('id', '=', unassignedFace.assetFace.id)
         .execute();
       await ctx.database
@@ -1397,13 +1397,13 @@ describe(FaceIdentityRepository.name, () => {
 
       const faces = await ctx.database
         .selectFrom('asset_face')
-        .select(['id', 'personId'])
+        .select(['id', 'personGroupId'])
         .where('id', 'in', [sourceLinkedFace.id, targetLinkedFace.id])
         .orderBy('id')
         .execute();
 
-      expect(faces.find((face) => face.id === sourceLinkedFace.id)?.personId).toBe(sourcePerson.personGroupId);
-      expect(faces.find((face) => face.id === targetLinkedFace.id)?.personId).toBe(targetPerson.personGroupId);
+      expect(faces.find((face) => face.id === sourceLinkedFace.id)?.personGroupId).toBe(sourcePerson.personGroupId);
+      expect(faces.find((face) => face.id === targetLinkedFace.id)?.personGroupId).toBe(targetPerson.personGroupId);
       expect(await getPersonalIdentityMismatchRows(ctx, [sourceLinkedFace.id, targetLinkedFace.id])).toEqual([]);
     } finally {
       await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
@@ -4370,7 +4370,7 @@ describe(FaceIdentityRepository.name, () => {
         .innerJoin('face_identity_face', 'face_identity_face.assetFaceId', 'asset_face.id')
         .select([
           'asset_face.id as assetFaceId',
-          'asset_face.personId',
+          'asset_face.personGroupId',
           'person.identityId as personIdentityId',
           'face_identity_face.identityId as faceIdentityId',
         ])
@@ -5206,7 +5206,7 @@ describe(FaceIdentityRepository.name, () => {
 
         const faces = await ctx.database
           .selectFrom('asset_face')
-          .select(['id', 'personId'])
+          .select(['id', 'personGroupId'])
           .where('id', 'in', [resemblingFaceId, distinctFaceId])
           .execute();
         const distinctLink = await ctx.database
@@ -5215,8 +5215,8 @@ describe(FaceIdentityRepository.name, () => {
           .where('assetFaceId', '=', distinctFaceId)
           .executeTakeFirstOrThrow();
 
-        expect(faces.find((face) => face.id === resemblingFaceId)?.personId).toBe(personA.person.personGroupId);
-        expect(faces.find((face) => face.id === distinctFaceId)?.personId).toBe(personB.personGroupId);
+        expect(faces.find((face) => face.id === resemblingFaceId)?.personGroupId).toBe(personA.person.personGroupId);
+        expect(faces.find((face) => face.id === distinctFaceId)?.personGroupId).toBe(personB.personGroupId);
         expect(distinctLink.identityId).toBe(identityB.id);
         const backfillWork = await sut.getBackfillWork();
         expect(backfillWork.hasPersonalIdentityWork).toBe(false);
@@ -5254,11 +5254,11 @@ describe(FaceIdentityRepository.name, () => {
 
         const faces = await ctx.database
           .selectFrom('asset_face')
-          .select(['id', 'personId'])
+          .select(['id', 'personGroupId'])
           .where('id', 'in', [insideFaceId, outsideFaceId])
           .execute();
-        expect(faces.find((face) => face.id === insideFaceId)?.personId).toBe(personA.person.personGroupId);
-        expect(faces.find((face) => face.id === outsideFaceId)?.personId).toBe(personB.personGroupId);
+        expect(faces.find((face) => face.id === insideFaceId)?.personGroupId).toBe(personA.person.personGroupId);
+        expect(faces.find((face) => face.id === outsideFaceId)?.personGroupId).toBe(personB.personGroupId);
       } finally {
         await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
       }
@@ -5361,7 +5361,7 @@ describe(FaceIdentityRepository.name, () => {
       // personQ before replaceFaceIdentities runs — the exact race the requirePersonId guard exists to catch.
       await ctx.database
         .updateTable('asset_face')
-        .set({ personId: personQ.personGroupId })
+        .set({ personGroupId: personQ.personGroupId })
         .where('id', '=', assetFace.id)
         .execute();
 
@@ -5429,7 +5429,7 @@ describe(FaceIdentityRepository.name, () => {
       // time replaceFaceIdentities runs.
       await ctx.database
         .updateTable('asset_face')
-        .set({ personId: destinationPerson.personGroupId })
+        .set({ personGroupId: destinationPerson.personGroupId })
         .where('id', '=', assetFace.id)
         .execute();
 
