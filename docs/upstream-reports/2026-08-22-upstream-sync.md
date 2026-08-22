@@ -6,8 +6,9 @@
 - **Batches**: 13 planned (133–145), run as 6 replays (see "Deviation from the batch plan")
 - **Conflicts resolved**: 21 by hand + 9 auto-resolved in proven-mechanical classes
 - **Fork-side reconciliation commits**: 5 (asset-file/download, branding + Drift steps, OpenAPI regen, mobile freezed, web lint debt)
-- **Option-M debt repaired**: 4 further commits — see "★ Option-M debt this cycle exposed"
+- **Option-M debt repaired**: 6 defects — 4 mechanical (see "★ Option-M debt this cycle exposed") + 2 DTO-boundary drops, one of them a live admin-console bug
 - **Upstream bug worked around**: 1 (single `PUT /assets/:id` locking an asset 400s on a non-elevated session)
+- **CI flake fixed rather than retried**: 1 (unauthenticated js-pdk fetch in the plugins stage)
 - **Risk level**: MEDIUM
 - **Recommendation**: PROCEED — level with `upstream/main` (0 behind), all audits and local gates green
 
@@ -95,6 +96,68 @@ clients never hit. New `utils.elevateSession` (idempotent; `setupPinCode` 400s i
 - **The e2e server suite is pre-job gated**, so it had not run on the rolling branch for many cycles
   (batch 131's run was CLI-only, 2 files / 20 tests). A gate that does not run is not a gate — this is
   the same lesson as the unwired `branding/scripts` regression tests.
+
+## ★★ The DTO-boundary class — two more option-M defects, one of them live
+
+The last web-e2e failure led to the most consequential finding of the cycle, and to an audit that found
+a second instance.
+
+**The defect.** Option M renamed the person key to `personGroupId` everywhere in storage, and the
+documented boundary is: _storage uses `personGroupId`; the DTO and the web read `personId`, which under
+M IS the person_group id; repositories alias back out_. Two places never got the alias:
+
+| Where                                             | Impact                                                                                                                                                                                                                |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `getLatestScanStatus` → `FaceRepairScanStatusDto` | **LIVE**: `GET /admin/face-repair/scan/latest` returned rows with no `personId`. The face-cleanup console rendered its header ("6 flagged faces across 1 people") but could not render or act on a single person row. |
+| `listDeclines` → `FaceRepairDeclineListDto`       | Latent: `GET /admin/face-repair/decline` has no consumer in web or e2e today. Fixed anyway so the endpoint matches its published contract.                                                                            |
+
+**Why `tsc` was blind — and this is the reusable part.** `face-repair-admin.controller.ts` returns
+**15 of its 17 endpoints through an `as` cast**:
+
+```ts
+return this.service.getLatestScanStatus() as Promise<FaceRepairScanStatusDto | null>;
+return this.service.listDeclines() as unknown as Promise<FaceRepairDeclineListDto>;
+```
+
+A cast asserts a shape nothing verifies, so a field can vanish across the boundary in total silence.
+This is `feedback_tsc_green_means_nothing_on_a_rekey` in its purest form: the whole M convergence
+type-checked clean _because_ these casts absorbed the mismatch.
+
+**The audit, and its bound.** The class is enumerable, so it was walked exhaustively rather than
+sampled. Casts by controller: `face-repair-admin` **15**, `asset` 1, `search` 1 — everywhere else tsc
+verifies the boundary, which is why nothing else in the M re-key drifted. Of the 8 DTOs declaring a
+`personId`, every response producer in the risky controller was checked:
+`getPersonFlaggedFaces` ✓, `listResolutions` ✓ (`fpv.personGroupId as personId`), `runRepair` /
+`summarizeRepairPlan` ✓, `getPersonMetadata` ✓, `searchOwnerPeople` ✓ (`person.personGroupId as id`),
+`createOwnerPerson` ✓, `getClusterFaces` ✓ (no person key). **Two defects, both now fixed.**
+
+**A test that asserted the implementation instead of the contract.** The declines medium spec asserted
+`row.personGroupId` — the internal name — so it passed happily while the DTO was wrong. Typing the row
+correctly made tsc flag all three assertion sites at once. That is the argument for typing the row
+rather than casting at the controller, and it generalises: **after a re-key, a test that reads the
+internal field name cannot detect a broken boundary.**
+
+The scan fix is pinned by a medium assertion **proved red against the unfixed service**
+(`expected undefined to be '4c5a…'`), so the next re-key cannot repeat it silently.
+
+Three e2e seeds that hand-write the `face_repair_scan.persons` JSONB were emitting the pre-M key too —
+a JSON blob is invisible to `tsc` and to the raw-SQL sweep alike, so it needs its own pass.
+
+## ★ One CI flake, fixed rather than retried
+
+`End-to-End Tests (Web)` failed its Docker build with `extism-js: not found`. The plugins stage fetches
+js-pdk from GitHub via `mise exec`; unauthenticated that is 60 requests/hour per runner IP, so it 403s,
+mise skips the install, and the build dies at the first `extism-js` call.
+
+Established as not-a-regression before touching it: the `mise exec` line and every compose field
+touching that fetch are byte-identical to the pre-cycle tip, the same Dockerfile built successfully in
+three earlier runs the same day, and `Docker` passed on the very same sha.
+
+The fix was available and unused: `test.yml` already exports `GITHUB_TOKEN` for that compose build (the
+line deliberately preserved during the batch-134 reconciliation), but **nothing consumed it** — the
+token was plumbed most of the way and dropped. The compose file now forwards it as a BuildKit secret and
+the plugins stage mounts it, optionally (`if [ -f /run/secrets/github_token ]`), verified by a
+`--no-cache` build with no token supplied.
 
 ## Incoming Upstream Changes
 
