@@ -220,7 +220,9 @@ export class FaceRepairScanRepository {
     if (persons.length === 0) {
       return scan;
     }
-    const ids = [...new Set(persons.flatMap((p) => [p.personGroupId, ...p.suspectedOwners.map((o) => o.ownerPersonId)]))];
+    const ids = [
+      ...new Set(persons.flatMap((p) => [p.personGroupId, ...p.suspectedOwners.map((o) => o.ownerPersonId)])),
+    ];
     // The join predicate must stay identical to FaceRepairRepository.getPersonMetadata and .searchOwnerPeople:
     // the review page renders this count next to the picker's, and a disagreement reads as a bug. It is covered
     // by the partial index asset_face_personId_assetId_notDeleted_isVisible_idx.
@@ -341,7 +343,11 @@ export class FaceRepairScanRepository {
         .innerJoin('asset_face', 'asset_face.id', 'ff.assetFaceId')
         .innerJoin('asset', 'asset.id', 'asset_face.assetId')
         .innerJoin('face_search', 'face_search.faceId', 'asset_face.id')
-        .select(['ff.assetFaceId as assetFaceId', 'ff.personGroupId as personGroupId', 'ff.suspectedOwnerId as suspectedOwnerId'])
+        .select([
+          'ff.assetFaceId as assetFaceId',
+          'ff.personGroupId as personGroupId',
+          'ff.suspectedOwnerId as suspectedOwnerId',
+        ])
         .where('ff.scanId', '=', scanId)
         .where('ff.personGroupId', 'in', personGroupIds)
         .whereRef('asset_face.personGroupId', '=', 'ff.personGroupId')

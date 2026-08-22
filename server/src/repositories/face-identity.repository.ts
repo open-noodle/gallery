@@ -2183,7 +2183,11 @@ export class FaceIdentityRepository {
         .returningAll()
         .executeTakeFirstOrThrow();
 
-      await runner.updateTable('person').set({ identityId: identity.id }).where('personGroupId', '=', person.personGroupId).execute();
+      await runner
+        .updateTable('person')
+        .set({ identityId: identity.id })
+        .where('personGroupId', '=', person.personGroupId)
+        .execute();
 
       return identity;
     };
@@ -2679,12 +2683,18 @@ export class FaceIdentityRepository {
         // faces. Trust the person they are already on and realign the link — otherwise
         // person.identityId stays DISTINCT FROM face_identity_face.identityId, getBackfillWork()
         // reports work forever, and handleFaceIdentityBackfill re-queues in a loop.
-        const strandedAssetFaceIds = await this.getPersonalBackfillAssetFaceIdsForIdentity(person.personGroupId, group.identityId);
+        const strandedAssetFaceIds = await this.getPersonalBackfillAssetFaceIdsForIdentity(
+          person.personGroupId,
+          group.identityId,
+        );
         await this.realignFacesToPersonIdentity(person.personGroupId, strandedAssetFaceIds);
         continue;
       }
 
-      const candidateAssetFaceIds = await this.getPersonalBackfillAssetFaceIdsForIdentity(person.personGroupId, group.identityId);
+      const candidateAssetFaceIds = await this.getPersonalBackfillAssetFaceIdsForIdentity(
+        person.personGroupId,
+        group.identityId,
+      );
       if (candidateAssetFaceIds.length === 0) {
         continue;
       }
