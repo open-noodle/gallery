@@ -532,6 +532,10 @@ describe('/gallery/map/markers', () => {
       // update strips Locked assets from every album (asset.service.ts updateAll), which would make
       // the locked case vacuous — this keeps the album_asset link and leaves the query itself as the
       // only thing standing between a locked asset and a pin.
+      // The single PUT returns the asset it just wrote, and a non-elevated session cannot read a Locked
+      // asset — so the Locked iteration would 400 despite the write landing. See utils.elevateSession.
+      await utils.elevateSession(owner.accessToken);
+
       for (const [id, visibility] of [
         [archivedAssetId, AssetVisibility.Archive],
         [hiddenAssetId, AssetVisibility.Hidden],
