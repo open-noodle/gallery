@@ -36,7 +36,7 @@ const collectFaceIds = async (stream: AsyncIterable<{ id: string }>) => {
 const linkManually = async (ctx: ReturnType<typeof setup>['ctx'], input: { ownerId: string; assetFaceId: string }) => {
   const faceIdentityRepository = ctx.get(FaceIdentityRepository);
   const { person } = await ctx.newPerson({ ownerId: input.ownerId });
-  const identity = await faceIdentityRepository.ensurePersonIdentity(person.id);
+  const identity = await faceIdentityRepository.ensurePersonIdentity(person.personGroupId);
   await faceIdentityRepository.replaceFaceIdentity({
     assetFaceId: input.assetFaceId,
     identityId: identity.id,
@@ -50,7 +50,7 @@ const linkManually = async (ctx: ReturnType<typeof setup>['ctx'], input: { owner
 // visible face with an embedding — mirrors getAssignedFaceEmbeddings) in addition to the owner
 // having a reviewable unassigned ML candidate somewhere. This gives a person that reference face.
 const giveOwnFace = async (ctx: ReturnType<typeof setup>['ctx'], assetId: string, personId: string) => {
-  const { result: faceId } = await ctx.newAssetFace({ assetId, personId });
+  const { result: faceId } = await ctx.newAssetFace({ assetId, personGroupId });
   await ctx.database.insertInto('face_search').values({ faceId, embedding: newEmbedding() }).execute();
   return faceId;
 };
@@ -219,7 +219,7 @@ describe(PersonRepository.name, () => {
 
       const result = await sut.getByName(user.id, 'Bob', { withHidden: false });
 
-      expect(result.map((person) => person.id)).toContain(person.id);
+      expect(result.map((person) => person.personGroupId)).toContain(person.personGroupId);
     });
   });
 
@@ -234,10 +234,10 @@ describe(PersonRepository.name, () => {
       const { person: hiddenPerson } = await ctx.newPerson({ ownerId: user.id, isHidden: true });
       const { person: otherPerson } = await ctx.newPerson({ ownerId: otherUser.id });
 
-      await ctx.newAssetFace({ assetId: asset.id, personId: visiblePerson.id });
-      await ctx.newAssetFace({ assetId: asset.id, personId: hiddenPerson.id });
-      await ctx.newAssetFace({ assetId: asset.id, personId: null });
-      await ctx.newAssetFace({ assetId: otherAsset.id, personId: otherPerson.id });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: visiblePerson.personGroupId });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: hiddenPerson.personGroupId });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
+      await ctx.newAssetFace({ assetId: otherAsset.id, personGroupId: otherPerson.personGroupId });
 
       await expect(sut.getPeopleOverviewStatistics(user.id)).resolves.toEqual({
         total: 2,
@@ -252,7 +252,7 @@ describe(PersonRepository.name, () => {
       const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
       const { person } = await ctx.newPerson({ ownerId: user.id, isHidden: true });
 
-      await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
 
       const result = await sut.getPeopleOverviewStatistics(user.id);
 
@@ -266,7 +266,7 @@ describe(PersonRepository.name, () => {
       const { asset: validAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
       const { person } = await ctx.newPerson({ ownerId: user.id, isHidden: false });
 
-      await ctx.newAssetFace({ assetId: validAsset.id, personId: person.id });
+      await ctx.newAssetFace({ assetId: validAsset.id, personGroupId: person.personGroupId });
 
       const { asset: deletedAsset } = await ctx.newAsset({
         ownerId: user.id,
@@ -281,12 +281,12 @@ describe(PersonRepository.name, () => {
       const { asset: lockedAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Locked });
       const { asset: archiveAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Archive });
 
-      await ctx.newAssetFace({ assetId: deletedAsset.id, personId: person.id });
-      await ctx.newAssetFace({ assetId: offlineAsset.id, personId: person.id });
-      await ctx.newAssetFace({ assetId: lockedAsset.id, personId: person.id });
-      await ctx.newAssetFace({ assetId: archiveAsset.id, personId: person.id });
-      await ctx.newAssetFace({ assetId: validAsset.id, personId: person.id, isVisible: false });
-      await ctx.newAssetFace({ assetId: validAsset.id, personId: person.id, deletedAt: new Date() });
+      await ctx.newAssetFace({ assetId: deletedAsset.id, personGroupId: person.personGroupId });
+      await ctx.newAssetFace({ assetId: offlineAsset.id, personGroupId: person.personGroupId });
+      await ctx.newAssetFace({ assetId: lockedAsset.id, personGroupId: person.personGroupId });
+      await ctx.newAssetFace({ assetId: archiveAsset.id, personGroupId: person.personGroupId });
+      await ctx.newAssetFace({ assetId: validAsset.id, personGroupId: person.personGroupId, isVisible: false });
+      await ctx.newAssetFace({ assetId: validAsset.id, personGroupId: person.personGroupId, deletedAt: new Date() });
 
       await expect(sut.getPeopleOverviewStatistics(user.id)).resolves.toEqual({
         total: 1,
@@ -313,9 +313,9 @@ describe(PersonRepository.name, () => {
       const { person: offlineOnlyPerson } = await ctx.newPerson({ ownerId: user.id, isHidden: true });
       const { person: otherOwnerAssetOnlyPerson } = await ctx.newPerson({ ownerId: user.id });
 
-      await ctx.newAssetFace({ assetId: validAsset.id, personId: validPerson.id });
-      await ctx.newAssetFace({ assetId: offlineAsset.id, personId: offlineOnlyPerson.id });
-      await ctx.newAssetFace({ assetId: otherOwnerAsset.id, personId: otherOwnerAssetOnlyPerson.id });
+      await ctx.newAssetFace({ assetId: validAsset.id, personGroupId: validPerson.personGroupId });
+      await ctx.newAssetFace({ assetId: offlineAsset.id, personGroupId: offlineOnlyPerson.personGroupId });
+      await ctx.newAssetFace({ assetId: otherOwnerAsset.id, personGroupId: otherOwnerAssetOnlyPerson.personGroupId });
 
       await expect(sut.getPeopleOverviewStatistics(user.id)).resolves.toEqual({
         total: 1,
@@ -343,13 +343,13 @@ describe(PersonRepository.name, () => {
       const { person: eligibleUnnamed } = await ctx.newPerson({ ownerId: user.id, name: '' });
       const { person: eligibleNamedHidden } = await ctx.newPerson({ ownerId: user.id, name: 'Hidden', isHidden: true });
 
-      await ctx.newAssetFace({ assetId: asset.id, personId: belowThreshold.id });
-      await ctx.newAssetFace({ assetId: asset.id, personId: belowThreshold.id });
-      await ctx.newAssetFace({ assetId: asset.id, personId: eligibleUnnamed.id });
-      await ctx.newAssetFace({ assetId: asset.id, personId: eligibleUnnamed.id });
-      await ctx.newAssetFace({ assetId: asset.id, personId: eligibleUnnamed.id });
-      await ctx.newAssetFace({ assetId: asset.id, personId: eligibleNamedHidden.id });
-      await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: belowThreshold.personGroupId });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: belowThreshold.personGroupId });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: eligibleUnnamed.personGroupId });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: eligibleUnnamed.personGroupId });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: eligibleUnnamed.personGroupId });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: eligibleNamedHidden.personGroupId });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
 
       await expect(sut.getNumberOfPeople(user.id, { minimumFaceCount: 3 })).resolves.toEqual({
         total: 2,
@@ -371,11 +371,11 @@ describe(PersonRepository.name, () => {
       const { person: visiblePerson } = await ctx.newPerson({ ownerId: user.id, isHidden: false });
       const { person: hiddenPerson } = await ctx.newPerson({ ownerId: user.id, isHidden: true });
 
-      await ctx.newAssetFace({ assetId: asset.id, personId: visiblePerson.id });
-      await ctx.newAssetFace({ assetId: asset.id, personId: visiblePerson.id });
-      await ctx.newAssetFace({ assetId: asset.id, personId: hiddenPerson.id });
-      await ctx.newAssetFace({ assetId: asset.id, personId: null });
-      await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: visiblePerson.personGroupId });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: visiblePerson.personGroupId });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: hiddenPerson.personGroupId });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
 
       const details = await sut.getPeopleFaceStatistics(user.id);
       const overview = await sut.getPeopleOverviewStatistics(user.id);
@@ -398,8 +398,8 @@ describe(PersonRepository.name, () => {
       const { user } = await ctx.newUser();
       const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
 
-      await ctx.newAssetFace({ assetId: asset.id, personId: null });
-      await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
 
       await expect(sut.getPeopleOverviewStatistics(user.id)).resolves.toEqual({
         total: 0,
@@ -451,13 +451,13 @@ describe(PersonRepository.name, () => {
       const { asset: lockedAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Locked });
       const { asset: archivedAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Archive });
 
-      await ctx.newAssetFace({ assetId: validAsset.id, personId: person.id });
-      await ctx.newAssetFace({ assetId: deletedAsset.id, personId: person.id });
-      await ctx.newAssetFace({ assetId: offlineAsset.id, personId: person.id });
-      await ctx.newAssetFace({ assetId: lockedAsset.id, personId: person.id });
-      await ctx.newAssetFace({ assetId: archivedAsset.id, personId: person.id });
-      await ctx.newAssetFace({ assetId: validAsset.id, personId: person.id, isVisible: false });
-      await ctx.newAssetFace({ assetId: validAsset.id, personId: person.id, deletedAt: new Date() });
+      await ctx.newAssetFace({ assetId: validAsset.id, personGroupId: person.personGroupId });
+      await ctx.newAssetFace({ assetId: deletedAsset.id, personGroupId: person.personGroupId });
+      await ctx.newAssetFace({ assetId: offlineAsset.id, personGroupId: person.personGroupId });
+      await ctx.newAssetFace({ assetId: lockedAsset.id, personGroupId: person.personGroupId });
+      await ctx.newAssetFace({ assetId: archivedAsset.id, personGroupId: person.personGroupId });
+      await ctx.newAssetFace({ assetId: validAsset.id, personGroupId: person.personGroupId, isVisible: false });
+      await ctx.newAssetFace({ assetId: validAsset.id, personGroupId: person.personGroupId, deletedAt: new Date() });
 
       await expect(sut.getPeopleFaceStatistics(user.id)).resolves.toEqual({
         detectedFaceCount: 2,
@@ -475,7 +475,7 @@ describe(PersonRepository.name, () => {
       const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
       const { person: otherPerson } = await ctx.newPerson({ ownerId: otherUser.id, isHidden: false });
 
-      await ctx.newAssetFace({ assetId: asset.id, personId: otherPerson.id });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: otherPerson.personGroupId });
 
       await expect(sut.getPeopleFaceStatistics(user.id)).resolves.toEqual({
         detectedFaceCount: 1,
@@ -509,14 +509,14 @@ describe(PersonRepository.name, () => {
       const { person: outOfScopeNamed } = await ctx.newPerson({ ownerId: user.id, name: 'Archived', isHidden: false });
       const { person: otherNamed } = await ctx.newPerson({ ownerId: otherUser.id, name: 'Other', isHidden: false });
 
-      await ctx.newAssetFace({ assetId: asset.id, personId: namedVisible.id });
-      await ctx.newAssetFace({ assetId: asset.id, personId: namedVisible.id });
-      await ctx.newAssetFace({ assetId: asset.id, personId: duplicateNamedVisible.id });
-      await ctx.newAssetFace({ assetId: asset.id, personId: hiddenNamed.id });
-      await ctx.newAssetFace({ assetId: asset.id, personId: unnamedVisible.id });
-      await ctx.newAssetFace({ assetId: asset.id, personId: whitespaceVisible.id });
-      await ctx.newAssetFace({ assetId: archivedAsset.id, personId: outOfScopeNamed.id });
-      await ctx.newAssetFace({ assetId: otherAsset.id, personId: otherNamed.id });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: namedVisible.personGroupId });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: namedVisible.personGroupId });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: duplicateNamedVisible.personGroupId });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: hiddenNamed.personGroupId });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: unnamedVisible.personGroupId });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: whitespaceVisible.personGroupId });
+      await ctx.newAssetFace({ assetId: archivedAsset.id, personGroupId: outOfScopeNamed.personGroupId });
+      await ctx.newAssetFace({ assetId: otherAsset.id, personGroupId: otherNamed.personGroupId });
 
       await expect(sut.getPeopleFaceStatistics(user.id)).resolves.toMatchObject({
         namedVisiblePersonCount: 3,
@@ -529,8 +529,8 @@ describe(PersonRepository.name, () => {
       const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
       const { person } = await ctx.newPerson({ ownerId: user.id, name: '', isHidden: false });
 
-      await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
-      await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
 
       await expect(sut.getPeopleFaceStatistics(user.id, { minimumFaceCount: 3 })).resolves.toEqual({
         detectedFaceCount: 2,
@@ -579,7 +579,7 @@ describe(PersonRepository.name, () => {
 
       expect(result).toEqual([
         expect.objectContaining({
-          id: matchingPerson.id,
+          id: matchingPerson.personGroupId,
           name: 'Alice',
           birthDate: new Date('1990-04-23T00:00:00Z'),
         }),
@@ -599,7 +599,7 @@ describe(PersonRepository.name, () => {
       // Person A: has a visible face → should NOT be returned.
       const { asset: assetA } = await ctx.newAsset({ ownerId: user.id });
       const { person: personA } = await ctx.newPerson({ ownerId: user.id, name: 'Alice' });
-      await ctx.newAssetFace({ assetId: assetA.id, personId: personA.id });
+      await ctx.newAssetFace({ assetId: assetA.id, personGroupId: personA.personGroupId });
 
       // Person B: named, zero asset_face rows → SHOULD be returned.
       const { person: personB } = await ctx.newPerson({ ownerId: user.id, name: 'Bob' });
@@ -608,11 +608,11 @@ describe(PersonRepository.name, () => {
       const { person: personC } = await ctx.newPerson({ ownerId: user.id });
 
       const result = await sut.getAllWithoutFaces();
-      const ids = result.map((p) => p.id);
+      const ids = result.map((p) => p.personGroupId);
 
-      expect(ids).not.toContain(personA.id);
-      expect(ids).toContain(personB.id);
-      expect(ids).toContain(personC.id);
+      expect(ids).not.toContain(personA.personGroupId);
+      expect(ids).toContain(personB.personGroupId);
+      expect(ids).toContain(personC.personGroupId);
     });
   });
 
@@ -673,12 +673,12 @@ describe(PersonRepository.name, () => {
       const { user } = await ctx.newUser();
       const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Alice' });
       const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
-      const { assetFace: firstFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
-      await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
-      await ctx.newAssetFace({ assetId: asset.id, personId: person.id, isVisible: false });
+      const { assetFace: firstFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId, isVisible: false });
 
-      await expect(sut.getStatistics(person.id)).resolves.toEqual({ assets: 1, faces: 2 });
-      expect(firstFace.personId).toBe(person.id);
+      await expect(sut.getStatistics(person.personGroupId)).resolves.toEqual({ assets: 1, faces: 2 });
+      expect(firstFace.personId).toBe(person.personGroupId);
     });
 
     it('returns zero asset and face counts for a personal person with no accessible faces', async () => {
@@ -686,7 +686,7 @@ describe(PersonRepository.name, () => {
       const { user } = await ctx.newUser();
       const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Empty' });
 
-      await expect(sut.getStatistics(person.id)).resolves.toEqual({ assets: 0, faces: 0 });
+      await expect(sut.getStatistics(person.personGroupId)).resolves.toEqual({ assets: 0, faces: 0 });
     });
 
     // L3: memberUserId scopes the count to what a space-only reader can actually reach, instead of
@@ -702,18 +702,18 @@ describe(PersonRepository.name, () => {
 
       // Asset shared into the space — reachable by `reader`, should count.
       const { asset: sharedAsset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
-      await ctx.newAssetFace({ assetId: sharedAsset.id, personId: person.id });
+      await ctx.newAssetFace({ assetId: sharedAsset.id, personGroupId: person.personGroupId });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: sharedAsset.id });
 
       // Asset NOT shared into any space `reader` belongs to — unreachable, must not count.
       const { asset: privateAsset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
-      await ctx.newAssetFace({ assetId: privateAsset.id, personId: person.id });
+      await ctx.newAssetFace({ assetId: privateAsset.id, personGroupId: person.personGroupId });
 
       // Unscoped (owner) count sees both assets.
-      await expect(sut.getStatistics(person.id)).resolves.toEqual({ assets: 2, faces: 2 });
+      await expect(sut.getStatistics(person.personGroupId)).resolves.toEqual({ assets: 2, faces: 2 });
 
       // memberUserId-scoped count only sees the space-reachable asset.
-      await expect(sut.getStatistics(person.id, { memberUserId: reader.id })).resolves.toEqual({
+      await expect(sut.getStatistics(person.personGroupId, { memberUserId: reader.id })).resolves.toEqual({
         assets: 1,
         faces: 1,
       });
@@ -733,18 +733,18 @@ describe(PersonRepository.name, () => {
 
       // Person A: 3 visible+embedded faces, 1 isVisible=false face, 1 deletedAt face
       const { person: personA } = await ctx.newPerson({ ownerId: user.id, name: 'Alice' });
-      personId = personA.id;
+      personId = personA.personGroupId;
 
       // 3 visible faces with embeddings
       for (let i = 0; i < 3; i++) {
-        const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personId: personA.id });
+        const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: personA.personGroupId });
         await ctx.database.insertInto('face_search').values({ faceId, embedding: newEmbedding() }).execute();
       }
 
       // 1 isVisible=false face with embedding (should be excluded)
       const { result: hiddenFaceId } = await ctx.newAssetFace({
         assetId: asset.id,
-        personId: personA.id,
+        personGroupId: personA.personGroupId,
         isVisible: false,
       });
       await ctx.database
@@ -755,7 +755,7 @@ describe(PersonRepository.name, () => {
       // 1 soft-deleted face with embedding (should be excluded)
       const { result: deletedFaceId } = await ctx.newAssetFace({
         assetId: asset.id,
-        personId: personA.id,
+        personGroupId: personA.personGroupId,
         deletedAt: new Date(),
       });
       await ctx.database
@@ -765,7 +765,7 @@ describe(PersonRepository.name, () => {
 
       // Person B: zero faces
       const { person: personB } = await ctx.newPerson({ ownerId: user.id, name: 'Bob' });
-      personWithNoFacesId = personB.id;
+      personWithNoFacesId = personB.personGroupId;
     });
 
     it('returns at most `limit` embeddings for visible, non-deleted faces', async () => {
@@ -783,13 +783,13 @@ describe(PersonRepository.name, () => {
       const faces: Array<{ id: string; embedding: string }> = [];
 
       for (let i = 0; i < 4; i++) {
-        const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+        const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
         const embedding = newEmbedding();
         faces.push({ id: faceId, embedding });
         await ctx.database.insertInto('face_search').values({ faceId, embedding }).execute();
       }
 
-      const rows = await sut.getAssignedFaceEmbeddings(person.id, 2);
+      const rows = await sut.getAssignedFaceEmbeddings(person.personGroupId, 2);
       const expected = await ctx.database
         .selectFrom('face_search')
         .select('embedding')
@@ -825,39 +825,39 @@ describe(PersonRepository.name, () => {
       const { user } = await ctx.newUser();
       const { person } = await ctx.newPerson({ ownerId: user.id });
       const { asset: validAsset } = await ctx.newAsset({ ownerId: user.id });
-      const { result: validFaceId } = await ctx.newAssetFace({ assetId: validAsset.id, personId: person.id });
+      const { result: validFaceId } = await ctx.newAssetFace({ assetId: validAsset.id, personGroupId: person.personGroupId });
       const { asset: offlineAsset } = await ctx.newAsset({ ownerId: user.id, isOffline: true });
-      const { result: offlineFaceId } = await ctx.newAssetFace({ assetId: offlineAsset.id, personId: person.id });
+      const { result: offlineFaceId } = await ctx.newAssetFace({ assetId: offlineAsset.id, personGroupId: person.personGroupId });
       const { asset: deletedAsset } = await ctx.newAsset({ ownerId: user.id, deletedAt: new Date() });
       const { result: deletedAssetFaceId } = await ctx.newAssetFace({
         assetId: deletedAsset.id,
-        personId: person.id,
+        personGroupId: person.personGroupId,
       });
       const { result: hiddenFaceId } = await ctx.newAssetFace({
         assetId: validAsset.id,
-        personId: person.id,
+        personGroupId: person.personGroupId,
         isVisible: false,
       });
       const { result: deletedFaceId } = await ctx.newAssetFace({
         assetId: validAsset.id,
-        personId: person.id,
+        personGroupId: person.personGroupId,
         deletedAt: new Date(),
       });
 
-      const faces = await sut.getRepresentativeFaces({ personId: person.id, take: 20, skip: 0 });
+      const faces = await sut.getRepresentativeFaces({ personId: person.personGroupId, take: 20, skip: 0 });
 
       expect(faces.map((face) => face.id)).toEqual([validFaceId]);
       await expect(
-        sut.getRepresentativeFaceForUpdate({ personId: person.id, assetFaceId: offlineFaceId }),
+        sut.getRepresentativeFaceForUpdate({ personId: person.personGroupId, assetFaceId: offlineFaceId }),
       ).resolves.toBeUndefined();
       await expect(
-        sut.getRepresentativeFaceForUpdate({ personId: person.id, assetFaceId: deletedAssetFaceId }),
+        sut.getRepresentativeFaceForUpdate({ personId: person.personGroupId, assetFaceId: deletedAssetFaceId }),
       ).resolves.toBeUndefined();
       await expect(
-        sut.getRepresentativeFaceForUpdate({ personId: person.id, assetFaceId: hiddenFaceId }),
+        sut.getRepresentativeFaceForUpdate({ personId: person.personGroupId, assetFaceId: hiddenFaceId }),
       ).resolves.toBeUndefined();
       await expect(
-        sut.getRepresentativeFaceForUpdate({ personId: person.id, assetFaceId: deletedFaceId }),
+        sut.getRepresentativeFaceForUpdate({ personId: person.personGroupId, assetFaceId: deletedFaceId }),
       ).resolves.toBeUndefined();
     });
 
@@ -868,19 +868,19 @@ describe(PersonRepository.name, () => {
       const { person: targetPerson } = await ctx.newPerson({ ownerId: user.id });
       const { person: otherPerson } = await ctx.newPerson({ ownerId: user.id });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personId: targetPerson.id });
-      const otherIdentity = await faceIdentityRepository.ensurePersonIdentity(otherPerson.id);
+      const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: targetPerson.personGroupId });
+      const otherIdentity = await faceIdentityRepository.ensurePersonIdentity(otherPerson.personGroupId);
       await faceIdentityRepository.replaceFaceIdentity({
         assetFaceId: faceId,
         identityId: otherIdentity.id,
         source: 'manual',
       });
 
-      const faces = await sut.getRepresentativeFaces({ personId: targetPerson.id, take: 20, skip: 0 });
+      const faces = await sut.getRepresentativeFaces({ personId: targetPerson.personGroupId, take: 20, skip: 0 });
 
       expect(faces.map((face) => face.id)).not.toContain(faceId);
       await expect(
-        sut.getRepresentativeFaceForUpdate({ personId: targetPerson.id, assetFaceId: faceId }),
+        sut.getRepresentativeFaceForUpdate({ personId: targetPerson.personGroupId, assetFaceId: faceId }),
       ).resolves.toBeUndefined();
     });
 
@@ -900,12 +900,12 @@ describe(PersonRepository.name, () => {
       // A1: Timeline, added to the space the viewer belongs to -> space-reachable + shareable.
       const { asset: spaceAsset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: spaceAsset.id, addedById: owner.id });
-      const { result: spaceFaceId } = await ctx.newAssetFace({ assetId: spaceAsset.id, personId: person.id });
+      const { result: spaceFaceId } = await ctx.newAssetFace({ assetId: spaceAsset.id, personGroupId: person.personGroupId });
 
       // A2: added to the SAME space (so it is space-reachable) but Hidden -> fails spaceVisibilityGate.
       const { asset: hiddenAsset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Hidden });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: hiddenAsset.id, addedById: owner.id });
-      const { result: hiddenFaceId } = await ctx.newAssetFace({ assetId: hiddenAsset.id, personId: person.id });
+      const { result: hiddenFaceId } = await ctx.newAssetFace({ assetId: hiddenAsset.id, personGroupId: person.personGroupId });
 
       // A3: Timeline (shareable visibility) but never added to any space -> not space-reachable.
       const { asset: neverSharedAsset } = await ctx.newAsset({
@@ -914,11 +914,11 @@ describe(PersonRepository.name, () => {
       });
       const { result: neverSharedFaceId } = await ctx.newAssetFace({
         assetId: neverSharedAsset.id,
-        personId: person.id,
+        personGroupId: person.personGroupId,
       });
 
       const scopedFaces = await sut.getRepresentativeFaces({
-        personId: person.id,
+        personId: person.personGroupId,
         take: 50,
         skip: 0,
         scope: { memberUserId: viewer.id },
@@ -928,7 +928,7 @@ describe(PersonRepository.name, () => {
       expect(scopedFaces.map((face) => face.id)).not.toContain(neverSharedFaceId);
 
       // Regression: the unscoped (owner) path is unchanged and still returns all three.
-      const ownerFaces = await sut.getRepresentativeFaces({ personId: person.id, take: 50, skip: 0 });
+      const ownerFaces = await sut.getRepresentativeFaces({ personId: person.personGroupId, take: 50, skip: 0 });
       expect(new Set(ownerFaces.map((face) => face.id))).toEqual(
         new Set([spaceFaceId, hiddenFaceId, neverSharedFaceId]),
       );
@@ -947,10 +947,10 @@ describe(PersonRepository.name, () => {
       await ctx.newSharedSpaceMember({ spaceId: space.id, userId: viewer.id, role: SharedSpaceRole.Viewer });
 
       // Give `person` a shared identity, with its own (space-reachable) face.
-      const identity = await faceIdentityRepository.ensurePersonIdentity(person.id);
+      const identity = await faceIdentityRepository.ensurePersonIdentity(person.personGroupId);
       const { asset: ownAsset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: ownAsset.id, addedById: owner.id });
-      const { assetFace: ownFace } = await ctx.newAssetFace({ assetId: ownAsset.id, personId: person.id });
+      const { assetFace: ownFace } = await ctx.newAssetFace({ assetId: ownAsset.id, personGroupId: person.personGroupId });
       await faceIdentityRepository.linkFace({ assetFaceId: ownFace.id, identityId: identity.id, source: 'manual' });
 
       // A DIFFERENT user's own person shares the same identity (e.g. a merged identity), with a face on
@@ -959,19 +959,19 @@ describe(PersonRepository.name, () => {
       await ctx.database
         .updateTable('person')
         .set({ identityId: identity.id })
-        .where('id', '=', otherPerson.id)
+        .where('personGroupId', '=', otherPerson.personGroupId)
         .execute();
       const { asset: otherAsset } = await ctx.newAsset({ ownerId: otherUser.id, visibility: AssetVisibility.Timeline });
-      const { assetFace: otherFace } = await ctx.newAssetFace({ assetId: otherAsset.id, personId: otherPerson.id });
+      const { assetFace: otherFace } = await ctx.newAssetFace({ assetId: otherAsset.id, personGroupId: otherPerson.personGroupId });
       await faceIdentityRepository.linkFace({ assetFaceId: otherFace.id, identityId: identity.id, source: 'manual' });
 
       // Owner (unscoped) sees both -- the identity fan-out is intentional for the owner's own picker.
-      const ownerFaces = await sut.getRepresentativeFaces({ personId: person.id, take: 50, skip: 0 });
+      const ownerFaces = await sut.getRepresentativeFaces({ personId: person.personGroupId, take: 50, skip: 0 });
       expect(new Set(ownerFaces.map((face) => face.id))).toEqual(new Set([ownFace.id, otherFace.id]));
 
       // The space viewer must NOT see the other user's face pulled in via the shared identity.
       const scopedFaces = await sut.getRepresentativeFaces({
-        personId: person.id,
+        personId: person.personGroupId,
         take: 50,
         skip: 0,
         scope: { memberUserId: viewer.id },
@@ -993,28 +993,28 @@ describe(PersonRepository.name, () => {
       const { person: exifPerson } = await ctx.newPerson({ ownerId: user.id, name: 'EXIF' });
       const { result: mlFaceId } = await ctx.newAssetFace({
         assetId: asset.id,
-        personId: mlPerson.id,
+        personGroupId: mlPerson.personGroupId,
         sourceType: SourceType.MachineLearning,
       });
       const { result: retainedMlFaceId } = await ctx.newAssetFace({
         assetId: asset.id,
-        personId: retainedMlPerson.id,
+        personGroupId: retainedMlPerson.personGroupId,
         sourceType: SourceType.MachineLearning,
       });
       const { result: manualFaceId } = await ctx.newAssetFace({
         assetId: asset.id,
-        personId: manualPerson.id,
+        personGroupId: manualPerson.personGroupId,
         sourceType: SourceType.Manual,
       });
       const { result: exifFaceId } = await ctx.newAssetFace({
         assetId: asset.id,
-        personId: exifPerson.id,
+        personGroupId: exifPerson.personGroupId,
         sourceType: SourceType.Exif,
       });
-      const mlIdentity = await faceIdentityRepository.ensurePersonIdentity(mlPerson.id);
-      const retainedMlIdentity = await faceIdentityRepository.ensurePersonIdentity(retainedMlPerson.id);
-      const manualIdentity = await faceIdentityRepository.ensurePersonIdentity(manualPerson.id);
-      const exifIdentity = await faceIdentityRepository.ensurePersonIdentity(exifPerson.id);
+      const mlIdentity = await faceIdentityRepository.ensurePersonIdentity(mlPerson.personGroupId);
+      const retainedMlIdentity = await faceIdentityRepository.ensurePersonIdentity(retainedMlPerson.personGroupId);
+      const manualIdentity = await faceIdentityRepository.ensurePersonIdentity(manualPerson.personGroupId);
+      const exifIdentity = await faceIdentityRepository.ensurePersonIdentity(exifPerson.personGroupId);
       await faceIdentityRepository.replaceFaceIdentity({
         assetFaceId: mlFaceId,
         identityId: mlIdentity.id,
@@ -1109,10 +1109,10 @@ describe(PersonRepository.name, () => {
       const { person } = await ctx.newPerson({ ownerId: user.id });
       const { result: manualFaceId } = await ctx.newAssetFace({
         assetId: asset.id,
-        personId: person.id,
+        personGroupId: person.personGroupId,
         sourceType: SourceType.Manual,
       });
-      const identity = await faceIdentityRepository.ensurePersonIdentity(person.id);
+      const identity = await faceIdentityRepository.ensurePersonIdentity(person.personGroupId);
       await faceIdentityRepository.replaceFaceIdentity({
         assetFaceId: manualFaceId,
         identityId: identity.id,
@@ -1159,11 +1159,11 @@ describe(PersonRepository.name, () => {
 
       // Pet detection result: a 'pet'-typed person with a detected face.
       const { person: pet } = await ctx.newPerson({ ownerId: user.id, name: 'dog', type: 'pet', species: 'dog' });
-      await ctx.newAssetFace({ assetId: asset.id, personId: pet.id });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: pet.personGroupId });
 
       // Human face/person from facial recognition — must survive a pet reset.
       const { person: human } = await ctx.newPerson({ ownerId: user.id, name: 'Alice' });
-      const { result: humanFaceId } = await ctx.newAssetFace({ assetId: asset.id, personId: human.id });
+      const { result: humanFaceId } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: human.personGroupId });
 
       await sut.deleteAllPets();
 
@@ -1178,8 +1178,8 @@ describe(PersonRepository.name, () => {
         .where('assetId', '=', asset.id)
         .execute();
 
-      expect(people).toEqual([expect.objectContaining({ id: human.id })]);
-      expect(faces).toEqual([expect.objectContaining({ id: humanFaceId, personId: human.id })]);
+      expect(people).toEqual([expect.objectContaining({ id: human.personGroupId })]);
+      expect(faces).toEqual([expect.objectContaining({ id: humanFaceId, personId: human.personGroupId })]);
     });
   });
 
@@ -1197,22 +1197,22 @@ describe(PersonRepository.name, () => {
 
       // user owns an unassigned ML face, and `named` has their own reference face → `named` is eligible
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      await giveOwnFace(ctx, asset.id, named.id);
-      await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      await giveOwnFace(ctx, asset.id, named.personGroupId);
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
       // otherUser has NO unassigned face → `otherOwner` excluded
       const { asset: a2 } = await ctx.newAsset({ ownerId: otherUser.id });
-      await ctx.newAssetFace({ assetId: a2.id, personId: otherOwner.id });
+      await ctx.newAssetFace({ assetId: a2.id, personGroupId: otherOwner.personGroupId });
 
       const ids: string[] = [];
       for await (const p of sut.getScannablePeopleWithUnassignedFaces()) {
-        ids.push(p.id);
+        ids.push(p.personGroupId);
       }
 
-      expect(ids).toContain(named.id);
-      expect(ids).not.toContain(unnamed.id);
-      expect(ids).not.toContain(hidden.id);
-      expect(ids).not.toContain(pet.id);
-      expect(ids).not.toContain(otherOwner.id);
+      expect(ids).toContain(named.personGroupId);
+      expect(ids).not.toContain(unnamed.personGroupId);
+      expect(ids).not.toContain(hidden.personGroupId);
+      expect(ids).not.toContain(pet.personGroupId);
+      expect(ids).not.toContain(otherOwner.personGroupId);
     });
 
     it('excludes a named person whose owner has only assigned/deleted/invisible faces', async () => {
@@ -1220,15 +1220,15 @@ describe(PersonRepository.name, () => {
       const { user } = await ctx.newUser();
       const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Carol', isHidden: false });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      await giveOwnFace(ctx, asset.id, person.id); // Carol has her own reference face (also the "assigned" face)
-      await ctx.newAssetFace({ assetId: asset.id, personId: null, deletedAt: new Date() }); // deleted
-      await ctx.newAssetFace({ assetId: asset.id, personId: null, isVisible: false }); // invisible
+      await giveOwnFace(ctx, asset.id, person.personGroupId); // Carol has her own reference face (also the "assigned" face)
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: null, deletedAt: new Date() }); // deleted
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: null, isVisible: false }); // invisible
 
       const ids: string[] = [];
       for await (const p of sut.getScannablePeopleWithUnassignedFaces()) {
-        ids.push(p.id);
+        ids.push(p.personGroupId);
       }
-      expect(ids).not.toContain(person.id);
+      expect(ids).not.toContain(person.personGroupId);
     });
 
     it('excludes a named person whose owner has only non-ML (manual) unassigned faces', async () => {
@@ -1236,15 +1236,15 @@ describe(PersonRepository.name, () => {
       const { user } = await ctx.newUser();
       const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Dave', isHidden: false });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      await giveOwnFace(ctx, asset.id, person.id);
+      await giveOwnFace(ctx, asset.id, person.personGroupId);
       // Create an unassigned face with non-ML sourceType
-      await ctx.newAssetFace({ assetId: asset.id, personId: null, sourceType: SourceType.Manual });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: null, sourceType: SourceType.Manual });
 
       const ids: string[] = [];
       for await (const p of sut.getScannablePeopleWithUnassignedFaces()) {
-        ids.push(p.id);
+        ids.push(p.personGroupId);
       }
-      expect(ids).not.toContain(person.id);
+      expect(ids).not.toContain(person.personGroupId);
     });
 
     // S9.1 (BDD) / S9.2 (red proof folded in once green — see slice 9 plan). Before this slice's
@@ -1260,22 +1260,22 @@ describe(PersonRepository.name, () => {
       const { person: carol } = await ctx.newPerson({ ownerId: user.id, name: 'Carol', isHidden: false });
 
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      await giveOwnFace(ctx, asset.id, alice.id); // only Alice has a reference face of her own
-      await ctx.newAssetFace({ assetId: asset.id, personId: null }); // owner has an unassigned ML candidate
+      await giveOwnFace(ctx, asset.id, alice.personGroupId); // only Alice has a reference face of her own
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: null }); // owner has an unassigned ML candidate
 
       // This suite's medium DB is not truncated between tests, so scope the equality check to just
       // this test's three people rather than asserting on the raw (file-wide) stream contents.
-      const relevantIds = new Set([alice.id, bob.id, carol.id]);
+      const relevantIds = new Set([alice.personGroupId, bob.personGroupId, carol.personGroupId]);
       const ids: string[] = [];
       for await (const p of sut.getScannablePeopleWithUnassignedFaces()) {
-        if (relevantIds.has(p.id)) {
-          ids.push(p.id);
+        if (relevantIds.has(p.personGroupId)) {
+          ids.push(p.personGroupId);
         }
       }
 
-      expect(ids).toEqual([alice.id]);
-      expect(ids).not.toContain(bob.id);
-      expect(ids).not.toContain(carol.id);
+      expect(ids).toEqual([alice.personGroupId]);
+      expect(ids).not.toContain(bob.personGroupId);
+      expect(ids).not.toContain(carol.personGroupId);
     });
 
     it('S9.3: a person whose only unassigned candidate is on a Locked asset is not yielded (Slice 1 composition)', async () => {
@@ -1291,8 +1291,8 @@ describe(PersonRepository.name, () => {
         ownerId: lockedOwner.id,
         visibility: AssetVisibility.Locked,
       });
-      await giveOwnFace(ctx, lockedAsset.id, locked.id);
-      await ctx.newAssetFace({ assetId: lockedAsset.id, personId: null }); // only candidate is on a Locked asset
+      await giveOwnFace(ctx, lockedAsset.id, locked.personGroupId);
+      await ctx.newAssetFace({ assetId: lockedAsset.id, personGroupId: null }); // only candidate is on a Locked asset
 
       // positive control: a person of a DIFFERENT owner with a reviewable (default timeline) candidate is yielded
       const { person: reviewable } = await ctx.newPerson({
@@ -1301,16 +1301,16 @@ describe(PersonRepository.name, () => {
         isHidden: false,
       });
       const { asset: timelineAsset } = await ctx.newAsset({ ownerId: reviewableOwner.id });
-      await giveOwnFace(ctx, timelineAsset.id, reviewable.id);
-      await ctx.newAssetFace({ assetId: timelineAsset.id, personId: null });
+      await giveOwnFace(ctx, timelineAsset.id, reviewable.personGroupId);
+      await ctx.newAssetFace({ assetId: timelineAsset.id, personGroupId: null });
 
       const ids: string[] = [];
       for await (const p of sut.getScannablePeopleWithUnassignedFaces()) {
-        ids.push(p.id);
+        ids.push(p.personGroupId);
       }
 
-      expect(ids).not.toContain(locked.id);
-      expect(ids).toContain(reviewable.id);
+      expect(ids).not.toContain(locked.personGroupId);
+      expect(ids).toContain(reviewable.personGroupId);
     });
 
     it.each([
@@ -1330,22 +1330,22 @@ describe(PersonRepository.name, () => {
         isHidden: false,
       });
       const { asset } = await ctx.newAsset({ ownerId: excludedOwner.id });
-      await giveOwnFace(ctx, asset.id, excluded.id);
-      await ctx.newAssetFace({ assetId: asset.id, personId: null, ...overrides });
+      await giveOwnFace(ctx, asset.id, excluded.personGroupId);
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: null, ...overrides });
 
       // positive control: a person of a DIFFERENT owner with a live, visible, ML unassigned candidate is yielded
       const { person: control } = await ctx.newPerson({ ownerId: controlOwner.id, name: 'Control', isHidden: false });
       const { asset: controlAsset } = await ctx.newAsset({ ownerId: controlOwner.id });
-      await giveOwnFace(ctx, controlAsset.id, control.id);
-      await ctx.newAssetFace({ assetId: controlAsset.id, personId: null });
+      await giveOwnFace(ctx, controlAsset.id, control.personGroupId);
+      await ctx.newAssetFace({ assetId: controlAsset.id, personGroupId: null });
 
       const ids: string[] = [];
       for await (const p of sut.getScannablePeopleWithUnassignedFaces()) {
-        ids.push(p.id);
+        ids.push(p.personGroupId);
       }
 
-      expect(ids).not.toContain(excluded.id);
-      expect(ids).toContain(control.id);
+      expect(ids).not.toContain(excluded.personGroupId);
+      expect(ids).toContain(control.personGroupId);
     });
 
     it('S9.5 (pin): hidden, unnamed, and pet people remain excluded even with their own reference face and an owner candidate', async () => {
@@ -1359,19 +1359,19 @@ describe(PersonRepository.name, () => {
 
       const { asset } = await ctx.newAsset({ ownerId: user.id });
       for (const person of [hidden, unnamed, pet, control]) {
-        await giveOwnFace(ctx, asset.id, person.id);
+        await giveOwnFace(ctx, asset.id, person.personGroupId);
       }
-      await ctx.newAssetFace({ assetId: asset.id, personId: null }); // shared unassigned candidate
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: null }); // shared unassigned candidate
 
       const ids: string[] = [];
       for await (const p of sut.getScannablePeopleWithUnassignedFaces()) {
-        ids.push(p.id);
+        ids.push(p.personGroupId);
       }
 
-      expect(ids).not.toContain(hidden.id);
-      expect(ids).not.toContain(unnamed.id);
-      expect(ids).not.toContain(pet.id);
-      expect(ids).toContain(control.id);
+      expect(ids).not.toContain(hidden.personGroupId);
+      expect(ids).not.toContain(unnamed.personGroupId);
+      expect(ids).not.toContain(pet.personGroupId);
+      expect(ids).toContain(control.personGroupId);
     });
 
     it('S9.6: owner A having an unassigned face does not make owner B people scannable', async () => {
@@ -1383,19 +1383,19 @@ describe(PersonRepository.name, () => {
       const { person: personB } = await ctx.newPerson({ ownerId: ownerB.id, name: 'Owner B Person', isHidden: false });
 
       const { asset: assetA } = await ctx.newAsset({ ownerId: ownerA.id });
-      await giveOwnFace(ctx, assetA.id, personA.id);
-      await ctx.newAssetFace({ assetId: assetA.id, personId: null }); // only owner A has an unassigned candidate
+      await giveOwnFace(ctx, assetA.id, personA.personGroupId);
+      await ctx.newAssetFace({ assetId: assetA.id, personGroupId: null }); // only owner A has an unassigned candidate
 
       const { asset: assetB } = await ctx.newAsset({ ownerId: ownerB.id });
-      await giveOwnFace(ctx, assetB.id, personB.id); // personB has their own reference face too, but no candidate
+      await giveOwnFace(ctx, assetB.id, personB.personGroupId); // personB has their own reference face too, but no candidate
 
       const ids: string[] = [];
       for await (const p of sut.getScannablePeopleWithUnassignedFaces()) {
-        ids.push(p.id);
+        ids.push(p.personGroupId);
       }
 
-      expect(ids).toContain(personA.id);
-      expect(ids).not.toContain(personB.id);
+      expect(ids).toContain(personA.personGroupId);
+      expect(ids).not.toContain(personB.personGroupId);
     });
   });
 
@@ -1407,10 +1407,10 @@ describe(PersonRepository.name, () => {
       const { user } = await ctx.newUser();
 
       const { asset: timelineAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
-      const { assetFace: timelineFace } = await ctx.newAssetFace({ assetId: timelineAsset.id, personId: null });
+      const { assetFace: timelineFace } = await ctx.newAssetFace({ assetId: timelineAsset.id, personGroupId: null });
 
       const { asset: lockedAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Locked });
-      const { assetFace: lockedFace } = await ctx.newAssetFace({ assetId: lockedAsset.id, personId: null });
+      const { assetFace: lockedFace } = await ctx.newAssetFace({ assetId: lockedAsset.id, personGroupId: null });
 
       await expect(sut.getFaceByIdIncludingTombstoned(timelineFace.id)).resolves.toMatchObject({
         id: timelineFace.id,
@@ -1423,7 +1423,7 @@ describe(PersonRepository.name, () => {
       const { user } = await ctx.newUser();
 
       const { asset: timelineAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
-      const { assetFace: tombstonedFace } = await ctx.newAssetFace({ assetId: timelineAsset.id, personId: null });
+      const { assetFace: tombstonedFace } = await ctx.newAssetFace({ assetId: timelineAsset.id, personGroupId: null });
       await ctx.database
         .updateTable('asset_face')
         .set({ deletedAt: new Date() })
@@ -1445,14 +1445,14 @@ describe(PersonRepository.name, () => {
       const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
       const { assetFace: manualFace } = await ctx.newAssetFace({
         assetId: asset.id,
-        personId: null,
+        personGroupId: null,
         sourceType: SourceType.MachineLearning,
       });
       await linkManually(ctx, { ownerId: user.id, assetFaceId: manualFace.id });
 
       const { assetFace: controlFace } = await ctx.newAssetFace({
         assetId: asset.id,
-        personId: null,
+        personGroupId: null,
         sourceType: SourceType.MachineLearning,
       });
 
@@ -1470,14 +1470,14 @@ describe(PersonRepository.name, () => {
       const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
       const { assetFace: manualFace } = await ctx.newAssetFace({
         assetId: asset.id,
-        personId: null,
+        personGroupId: null,
         sourceType: SourceType.MachineLearning,
       });
       await linkManually(ctx, { ownerId: user.id, assetFaceId: manualFace.id });
 
       const { assetFace: controlFace } = await ctx.newAssetFace({
         assetId: asset.id,
-        personId: null,
+        personGroupId: null,
         sourceType: SourceType.MachineLearning,
       });
 
@@ -1494,12 +1494,12 @@ describe(PersonRepository.name, () => {
       const { person } = await ctx.newPerson({ ownerId: user.id });
       const { assetFace: assignedFace } = await ctx.newAssetFace({
         assetId: asset.id,
-        personId: person.id,
+        personGroupId: person.personGroupId,
         sourceType: SourceType.MachineLearning,
       });
       const { assetFace: manualFace } = await ctx.newAssetFace({
         assetId: asset.id,
-        personId: null,
+        personGroupId: null,
         sourceType: SourceType.MachineLearning,
       });
       await linkManually(ctx, { ownerId: user.id, assetFaceId: manualFace.id });
@@ -1522,10 +1522,10 @@ describe(PersonRepository.name, () => {
       // Simulate a personal confirm: asset_face.personId IS set, and a manual link exists.
       const { assetFace: confirmedFace } = await ctx.newAssetFace({
         assetId: asset.id,
-        personId: person.id,
+        personGroupId: person.personGroupId,
         sourceType: SourceType.MachineLearning,
       });
-      const identity = await faceIdentityRepository.ensurePersonIdentity(person.id);
+      const identity = await faceIdentityRepository.ensurePersonIdentity(person.personGroupId);
       await faceIdentityRepository.replaceFaceIdentity({
         assetFaceId: confirmedFace.id,
         identityId: identity.id,
@@ -1534,7 +1534,7 @@ describe(PersonRepository.name, () => {
 
       const { assetFace: controlFace } = await ctx.newAssetFace({
         assetId: asset.id,
-        personId: null,
+        personGroupId: null,
         sourceType: SourceType.MachineLearning,
       });
 
