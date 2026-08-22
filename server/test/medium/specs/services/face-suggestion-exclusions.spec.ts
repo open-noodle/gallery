@@ -458,7 +458,7 @@ describe('reject/ignore face-level authorization (F8)', () => {
 
       const refreshed = await ctx.database
         .selectFrom('person')
-        .select(['id', 'identityId'])
+        .select(['personGroupId', 'identityId'])
         .where('personGroupId', 'in', [annaA.personGroupId, annaB.personGroupId])
         .execute();
       const refreshedAnnaA = refreshed.find((row) => row.id === annaA.personGroupId);
