@@ -1293,7 +1293,7 @@ describe(FaceIdentityRepository.name, () => {
       expect(secondPage.processed).toBe(1);
       expect(affectedTargets).toEqual([{ spaceId: space.id, assetId: asset.id }]);
       expect(people.every((person) => person.identityId)).toBe(true);
-      expect(people.find((person) => person.id === firstPerson.personGroupId)?.identityId).toBe(firstIdentity.identityId);
+      expect(people.find((person) => person.personGroupId === firstPerson.personGroupId)?.identityId).toBe(firstIdentity.identityId);
       expect(links).toHaveLength(2);
       expect(new Set(links.map((link) => link.identityId))).toEqual(new Set([firstIdentity.identityId]));
     } finally {

@@ -1917,7 +1917,7 @@ describe(MetadataService.name, () => {
       mocks.assetJob.getForMetadataExtraction.mockResolvedValue(asset as any);
       mocks.systemMetadata.get.mockResolvedValue({ metadata: { faces: { import: true } } });
       mockReadTags(makeFaceTags({ Name: person.name }));
-      mocks.person.getDistinctNames.mockResolvedValue([{ id: person.personGroupId, name: person.name }]);
+      mocks.person.getDistinctNames.mockResolvedValue([{ personGroupId: person.personGroupId, name: person.name }]);
       mocks.person.createAll.mockResolvedValue([]);
 
       await sut.handleMetadataExtraction({ id: asset.id });
