@@ -95,7 +95,7 @@ describe('FaceRepairScanRepository flagged faces', () => {
     ]);
 
     // simulate an apply: reassign `moved` to another person
-    await ctx.database.updateTable('asset_face').set({ personId: other.personGroupId }).where('id', '=', moved).execute();
+    await ctx.database.updateTable('asset_face').set({ personGroupId: other.personGroupId }).where('id', '=', moved).execute();
 
     const result = await sut.getScanFlaggedFaces(scan.id, person.personGroupId);
     expect(result.map((r) => r.assetFaceId)).toEqual([stay]);
