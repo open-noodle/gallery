@@ -1,5 +1,8 @@
+import path from 'node:path';
+import os from 'node:os';
+import fs from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { checkCiInvariantText } from './ci-invariants';
+import { checkCiInvariantText, runCiInvariantAudits } from './ci-invariants';
 
 describe('checkCiInvariantText', () => {
   it('flags forbidden patterns outside exceptions', () => {
@@ -45,6 +48,85 @@ describe('checkCiInvariantText', () => {
           text: 'PUSH_O_MATIC_APP_ID',
         },
       ],
+    );
+
+    expect(result.ok).toBe(true);
+  });
+});
+
+describe('runCiInvariantAudits — source-file invariants', () => {
+  it('reads concrete paths outside .github/workflows so source-shape invariants can be pinned', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'preflight-'));
+    fs.mkdirSync(path.join(dir, 'server/src/repositories'), {
+      recursive: true,
+    });
+    fs.writeFileSync(
+      path.join(dir, 'server/src/repositories/person.repository.ts'),
+      "qb.where('person.ownerId', '=', viewingUserId)",
+    );
+
+    const [result] = runCiInvariantAudits(
+      {
+        ci_invariants: [
+          {
+            id: 'person-join-not-viewer-filtered',
+            title: "Person joins prefer the viewer's row, never filter to it",
+            forbidden_patterns: ["'person.ownerId', '=', viewingUserId"],
+            paths: ['server/src/repositories/person.repository.ts'],
+            exceptions: [],
+          },
+        ],
+      } as never,
+      dir,
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.details.join(' ')).toContain('forbidden pattern');
+  });
+
+  it('passes when the source file keeps the viewer-preference form', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'preflight-'));
+    fs.mkdirSync(path.join(dir, 'server/src/repositories'), {
+      recursive: true,
+    });
+    fs.writeFileSync(
+      path.join(dir, 'server/src/repositories/person.repository.ts'),
+      'orderBy(sql`case when "person"."ownerId" = ${viewingUserId} then 0 else 1 end`).limit(1)',
+    );
+
+    const [result] = runCiInvariantAudits(
+      {
+        ci_invariants: [
+          {
+            id: 'person-join-not-viewer-filtered',
+            title: "Person joins prefer the viewer's row, never filter to it",
+            forbidden_patterns: ["'person.ownerId', '=', viewingUserId"],
+            paths: ['server/src/repositories/person.repository.ts'],
+            exceptions: [],
+          },
+        ],
+      } as never,
+      dir,
+    );
+
+    expect(result.ok).toBe(true);
+  });
+
+  it('tolerates a named path that does not exist', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'preflight-'));
+    const [result] = runCiInvariantAudits(
+      {
+        ci_invariants: [
+          {
+            id: 'missing-path',
+            title: 'Missing path',
+            forbidden_patterns: ['nope'],
+            paths: ['server/src/does-not-exist.ts'],
+            exceptions: [],
+          },
+        ],
+      } as never,
+      dir,
     );
 
     expect(result.ok).toBe(true);
