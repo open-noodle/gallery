@@ -244,7 +244,7 @@ const setupFaceRecognition = (db?: Kysely<DB>) => {
 const getAssetFaces = (ctx: ReturnType<typeof setupFaceDetection>['ctx'], assetId: string) =>
   ctx.database
     .selectFrom('asset_face')
-    .select(['id', 'assetId', 'personId', 'sourceType'])
+    .select(['id', 'assetId', 'personGroupId', 'sourceType'])
     .where('assetId', '=', assetId)
     .orderBy('id')
     .execute();
@@ -920,7 +920,7 @@ describe(PersonService.name, () => {
       });
       await ctx.database
         .updateTable('asset_face')
-        .set({ personId: target.personGroupId })
+        .set({ personGroupId: target.personGroupId })
         .where('id', '=', sourceFace.id)
         .execute();
       await ctx.database.deleteFrom('person').where('personGroupId', '=', source.personGroupId).execute();
