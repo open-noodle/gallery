@@ -41,12 +41,12 @@ export const summarizeRepairPlan = (plan: RepairPlan): RepairReport => {
   const persons: RepairReportPerson[] = plan.perPerson
     .filter((p) => p.flagged > 0)
     .map((p) => ({
-      personId: p.personId,
+      personId: p.personGroupId,
       eligible: p.eligible,
       flagged: p.flagged,
       flaggedFraction: p.flaggedFraction,
-      reviewOnly: reviewOnlyPersons.has(p.personId),
-      suspectedOwners: [...(ownersByPerson.get(p.personId) ?? new Map<string, number>())].map(
+      reviewOnly: reviewOnlyPersons.has(p.personGroupId),
+      suspectedOwners: [...(ownersByPerson.get(p.personGroupId) ?? new Map<string, number>())].map(
         ([ownerPersonId, count]) => ({ ownerPersonId, count }),
       ),
     }));

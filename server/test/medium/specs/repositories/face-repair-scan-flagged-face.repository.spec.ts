@@ -70,8 +70,8 @@ describe('FaceRepairScanRepository flagged faces', () => {
     const f2 = await seedEligibleFace(ctx, user.id, person.personGroupId);
 
     await sut.replaceScanFlaggedFaces(scan.id, [
-      { assetFaceId: f1, personId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
-      { assetFaceId: f2, personId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
+      { assetFaceId: f1, personGroupId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
+      { assetFaceId: f2, personGroupId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
     ]);
 
     const result = await sut.getScanFlaggedFaces(scan.id, person.personGroupId);
@@ -90,8 +90,8 @@ describe('FaceRepairScanRepository flagged faces', () => {
     const moved = await seedEligibleFace(ctx, user.id, person.personGroupId);
     const stay = await seedEligibleFace(ctx, user.id, person.personGroupId);
     await sut.replaceScanFlaggedFaces(scan.id, [
-      { assetFaceId: moved, personId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
-      { assetFaceId: stay, personId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
+      { assetFaceId: moved, personGroupId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
+      { assetFaceId: stay, personGroupId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
     ]);
 
     // simulate an apply: reassign `moved` to another person
@@ -143,10 +143,10 @@ describe('FaceRepairScanRepository flagged faces', () => {
     });
 
     await sut.replaceScanFlaggedFaces(scan.id, [
-      { assetFaceId: ok, personId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
-      { assetFaceId: notVisible.id, personId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
-      { assetFaceId: deletedFace.id, personId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
-      { assetFaceId: noEmbedding.id, personId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
+      { assetFaceId: ok, personGroupId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
+      { assetFaceId: notVisible.id, personGroupId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
+      { assetFaceId: deletedFace.id, personGroupId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
+      { assetFaceId: noEmbedding.id, personGroupId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
     ]);
 
     const result = await sut.getScanFlaggedFaces(scan.id, person.personGroupId);
@@ -164,8 +164,8 @@ describe('FaceRepairScanRepository flagged faces', () => {
     const f1 = await seedEligibleFace(ctx, user.id, p1.personGroupId);
     const f2 = await seedEligibleFace(ctx, user.id, p2.personGroupId);
     await sut.replaceScanFlaggedFaces(scan.id, [
-      { assetFaceId: f1, personId: p1.personGroupId, suspectedOwnerId: owner.personGroupId },
-      { assetFaceId: f2, personId: p2.personGroupId, suspectedOwnerId: owner.personGroupId },
+      { assetFaceId: f1, personGroupId: p1.personGroupId, suspectedOwnerId: owner.personGroupId },
+      { assetFaceId: f2, personGroupId: p2.personGroupId, suspectedOwnerId: owner.personGroupId },
     ]);
 
     const p1Rows = await sut.getScanFlaggedFaces(scan.id, p1.personGroupId);
@@ -182,7 +182,7 @@ describe('FaceRepairScanRepository flagged faces', () => {
 
     const scanA = await sut.createScan({ requestedBy: null, params: PARAMS });
     const fa = await seedEligibleFace(ctx, user.id, person.personGroupId);
-    await sut.replaceScanFlaggedFaces(scanA.id, [{ assetFaceId: fa, personId: person.personGroupId, suspectedOwnerId: owner.personGroupId }]);
+    await sut.replaceScanFlaggedFaces(scanA.id, [{ assetFaceId: fa, personGroupId: person.personGroupId, suspectedOwnerId: owner.personGroupId }]);
 
     // cascade: deleting the scan row removes its flagged rows
     await ctx.database.deleteFrom('face_repair_scan').where('id', '=', scanA.id).execute();
@@ -196,7 +196,7 @@ describe('FaceRepairScanRepository flagged faces', () => {
     // a fresh scan reads only its own rows
     const scanB = await sut.createScan({ requestedBy: null, params: PARAMS });
     const fb = await seedEligibleFace(ctx, user.id, person.personGroupId);
-    await sut.replaceScanFlaggedFaces(scanB.id, [{ assetFaceId: fb, personId: person.personGroupId, suspectedOwnerId: owner.personGroupId }]);
+    await sut.replaceScanFlaggedFaces(scanB.id, [{ assetFaceId: fb, personGroupId: person.personGroupId, suspectedOwnerId: owner.personGroupId }]);
     const scanBRows = await sut.getScanFlaggedFaces(scanB.id, person.personGroupId);
     expect(scanBRows.map((r) => r.assetFaceId)).toEqual([fb]);
   });
@@ -210,8 +210,8 @@ describe('FaceRepairScanRepository flagged faces', () => {
 
     const f1 = await seedEligibleFace(ctx, user.id, person.personGroupId);
     const f2 = await seedEligibleFace(ctx, user.id, person.personGroupId);
-    await sut.replaceScanFlaggedFaces(scan.id, [{ assetFaceId: f1, personId: person.personGroupId, suspectedOwnerId: owner.personGroupId }]);
-    await sut.replaceScanFlaggedFaces(scan.id, [{ assetFaceId: f2, personId: person.personGroupId, suspectedOwnerId: owner.personGroupId }]);
+    await sut.replaceScanFlaggedFaces(scan.id, [{ assetFaceId: f1, personGroupId: person.personGroupId, suspectedOwnerId: owner.personGroupId }]);
+    await sut.replaceScanFlaggedFaces(scan.id, [{ assetFaceId: f2, personGroupId: person.personGroupId, suspectedOwnerId: owner.personGroupId }]);
 
     const rows = await sut.getScanFlaggedFaces(scan.id, person.personGroupId);
     expect(rows.map((r) => r.assetFaceId)).toEqual([f2]);
@@ -231,8 +231,8 @@ describe('FaceRepairScanRepository flagged faces', () => {
     const control = await seedEligibleFace(ctx, user.id, person.personGroupId);
     const lockedLater = await seedEligibleFace(ctx, user.id, person.personGroupId);
     await sut.replaceScanFlaggedFaces(scan.id, [
-      { assetFaceId: control, personId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
-      { assetFaceId: lockedLater, personId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
+      { assetFaceId: control, personGroupId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
+      { assetFaceId: lockedLater, personGroupId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
     ]);
 
     // Both are flagged while both assets are ordinary — the positive control for the exclusion below.
