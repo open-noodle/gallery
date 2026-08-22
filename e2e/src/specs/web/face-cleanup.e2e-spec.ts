@@ -247,7 +247,7 @@ test.describe.serial('Face Cleanup', () => {
    * getEligibleFaceIdsForPerson (the `lock` bulk action's eligibility check) inner-join it, so a face with no
    * embedding row would silently vanish from the review grid and 400 out of "lock" as ineligible.
    */
-  const seedMlClusterFace = async (db: PgClient, args: { assetId: string; personId: string }): Promise<string> => {
+  const seedMlClusterFace = async (db: PgClient, args: { assetId: string; personGroupId: string }): Promise<string> => {
     const faceId = await utils.createFace(args);
     await seedFaceSearch(db, faceId);
     await db.query(`UPDATE "face_identity_face" SET "source" = 'ml' WHERE "assetFaceId" = $1`, [faceId]);
@@ -329,7 +329,7 @@ test.describe.serial('Face Cleanup', () => {
     const source = await utils.createPerson(admin.accessToken, { name: sourceName });
     const owner = await utils.createPerson(admin.accessToken, { name: 'Verdict Owner Person' });
     const asset = await utils.createAsset(admin.accessToken);
-    const faceId = await utils.createFace({ assetId: asset.id, personId: source.id });
+    const faceId = await utils.createFace({ assetId: asset.id, personGroupId: source.id });
 
     await seedFlaggedScan(db, {
       ownerUserId: admin.userId,
@@ -402,12 +402,12 @@ test.describe.serial('Face Cleanup', () => {
     const other = await utils.createPerson(admin.accessToken, { name: otherName });
 
     const asset = await utils.createAsset(admin.accessToken);
-    const faceOwner = await utils.createFace({ assetId: asset.id, personId: source.id });
-    const faceStay = await utils.createFace({ assetId: asset.id, personId: source.id });
-    const faceLock = await utils.createFace({ assetId: asset.id, personId: source.id });
-    const faceOther = await utils.createFace({ assetId: asset.id, personId: source.id });
-    const faceUnknown = await utils.createFace({ assetId: asset.id, personId: source.id });
-    const faceDetach = await utils.createFace({ assetId: asset.id, personId: source.id });
+    const faceOwner = await utils.createFace({ assetId: asset.id, personGroupId: source.id });
+    const faceStay = await utils.createFace({ assetId: asset.id, personGroupId: source.id });
+    const faceLock = await utils.createFace({ assetId: asset.id, personGroupId: source.id });
+    const faceOther = await utils.createFace({ assetId: asset.id, personGroupId: source.id });
+    const faceUnknown = await utils.createFace({ assetId: asset.id, personGroupId: source.id });
+    const faceDetach = await utils.createFace({ assetId: asset.id, personGroupId: source.id });
 
     await seedFlaggedScan(db, {
       ownerUserId: admin.userId,
@@ -518,7 +518,7 @@ test.describe.serial('Face Cleanup', () => {
     const source = await utils.createPerson(admin.accessToken, { name: 'Dock Short Person' });
     const owner = await utils.createPerson(admin.accessToken, { name: 'Dock Owner Person' });
     const asset = await utils.createAsset(admin.accessToken);
-    const face = await utils.createFace({ assetId: asset.id, personId: source.id });
+    const face = await utils.createFace({ assetId: asset.id, personGroupId: source.id });
 
     // ONE flagged face: nowhere near enough content to fill the page, which is precisely the case that floated.
     await seedFlaggedScan(db, {
@@ -588,7 +588,7 @@ test.describe.serial('Face Cleanup', () => {
     const source = await utils.createPerson(admin.accessToken, { name: 'X2 Confirmed Person' });
     const owner = await utils.createPerson(admin.accessToken, { name: 'X2 Owner Person' });
     const asset = await utils.createAsset(admin.accessToken);
-    const faceId = await utils.createFace({ assetId: asset.id, personId: source.id });
+    const faceId = await utils.createFace({ assetId: asset.id, personGroupId: source.id });
 
     await seedFlaggedScan(db, {
       ownerUserId: admin.userId,
@@ -650,7 +650,7 @@ test.describe.serial('Face Cleanup', () => {
     const other = await utils.createPerson(admin.accessToken, { name: otherName });
 
     const asset = await utils.createAsset(admin.accessToken);
-    const faceId = await utils.createFace({ assetId: asset.id, personId: source.id });
+    const faceId = await utils.createFace({ assetId: asset.id, personGroupId: source.id });
 
     await seedFlaggedScan(db, {
       ownerUserId: admin.userId,
@@ -738,7 +738,7 @@ test.describe.serial('Face Cleanup', () => {
     const owner = await utils.createPerson(admin.accessToken, { name: ownerName });
     const mergeTarget = await utils.createPerson(admin.accessToken, { name: targetName });
     const asset = await utils.createAsset(admin.accessToken);
-    const faceId = await utils.createFace({ assetId: asset.id, personId: source.id });
+    const faceId = await utils.createFace({ assetId: asset.id, personGroupId: source.id });
 
     await seedFlaggedScan(db, {
       ownerUserId: admin.userId,
@@ -819,8 +819,8 @@ test.describe.serial('Face Cleanup', () => {
     const source = await utils.createPerson(secondUser.accessToken, { name: 'Second User Flagged Person' });
     const owner = await utils.createPerson(secondUser.accessToken, { name: 'Second User Owner Person' });
     const asset = await utils.createAsset(secondUser.accessToken);
-    const faceCrop = await utils.createFace({ assetId: asset.id, personId: source.id });
-    const faceStay = await utils.createFace({ assetId: asset.id, personId: source.id });
+    const faceCrop = await utils.createFace({ assetId: asset.id, personGroupId: source.id });
+    const faceStay = await utils.createFace({ assetId: asset.id, personGroupId: source.id });
 
     await seedFlaggedScan(db, {
       ownerUserId: secondUser.userId,
@@ -898,10 +898,10 @@ test.describe.serial('Face Cleanup', () => {
     const destination = await utils.createPerson(admin.accessToken, { name: destinationName });
     const asset = await utils.createAsset(admin.accessToken);
 
-    const faceMove = await seedMlClusterFace(db, { assetId: asset.id, personId: source.id });
-    const faceLock = await seedMlClusterFace(db, { assetId: asset.id, personId: source.id });
-    const faceDetach = await seedMlClusterFace(db, { assetId: asset.id, personId: source.id });
-    const faceKeep = await seedMlClusterFace(db, { assetId: asset.id, personId: source.id });
+    const faceMove = await seedMlClusterFace(db, { assetId: asset.id, personGroupId: source.id });
+    const faceLock = await seedMlClusterFace(db, { assetId: asset.id, personGroupId: source.id });
+    const faceDetach = await seedMlClusterFace(db, { assetId: asset.id, personGroupId: source.id });
+    const faceKeep = await seedMlClusterFace(db, { assetId: asset.id, personGroupId: source.id });
 
     // 1. Chooser: manual mode is reachable even though this person — and, by this point in the suite, most
     // others too — has never been scanned. The manual card's CTA must be a genuine link (an `href`), not the
