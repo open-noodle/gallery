@@ -54,7 +54,7 @@ const seedFace = async (ctx: Ctx, ownerId: string, personId: string): Promise<st
   const { asset } = await ctx.newAsset({ ownerId });
   const { assetFace } = await ctx.newAssetFace({
     assetId: asset.id,
-    personGroupId,
+    personGroupId: personId,
     sourceType: SourceType.MachineLearning,
   });
   return assetFace.id;
