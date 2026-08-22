@@ -55,7 +55,7 @@ describe('person search + reassign', () => {
 
     // Seed a face row for userA's asset assigned to Alice. createFace inserts
     // directly into asset_face.
-    aliceFaceId = await utils.createFace({ assetId: userAAssetId, personId: alicePersonId });
+    aliceFaceId = await utils.createFace({ assetId: userAAssetId, personGroupId: alicePersonId });
     expect(aliceFaceId).toBeDefined();
   });
 
