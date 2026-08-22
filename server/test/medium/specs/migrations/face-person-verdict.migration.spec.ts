@@ -334,7 +334,8 @@ describe('1788000000000-ReconcileFacePersonVerdictConstraints', () => {
 
   it('S13.3 repairs unparenthesized override payloads and clears schema drift', async () => {
     await setOverridesUnparenthesized();
-    const broken = (await getOverrideValues()).filter((row) => row.name !== PERSON_GROUP_OVERRIDE);
+    const allOverrides = await getOverrideValues();
+    const broken = allOverrides.filter((row) => row.name !== PERSON_GROUP_OVERRIDE);
     expect(broken.every((row) => !JSON.stringify(row.value).includes('IS NOT NULL)'))).toBe(true); // control.
 
     const driftBefore = await computeDriftForThisDb();
@@ -416,7 +417,8 @@ describe('1788000000000-ReconcileFacePersonVerdictConstraints', () => {
 
     expect(await getIdentityFkDeleteType()).toBe('c');
     // The personGroupId row belongs to 1791, so 1788's down() correctly leaves it parenthesized.
-    const overrides = (await getOverrideValues()).filter((row) => row.name !== PERSON_GROUP_OVERRIDE);
+    const allAfterDown = await getOverrideValues();
+    const overrides = allAfterDown.filter((row) => row.name !== PERSON_GROUP_OVERRIDE);
     expect(overrides).toHaveLength(3);
     for (const row of overrides) {
       const text = JSON.stringify(row.value);

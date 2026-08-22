@@ -1053,8 +1053,8 @@ export function searchAssetBuilderLegacy(kysely: Kysely<DB>, options: AssetSearc
       .$if(options.withStacked === false, (qb) => qb.where('asset.stackId', 'is', null))
       .$if(!!options.withExif, withExifInner)
       .$if(!!(options.withFaces || options.withPeople), (qb) =>
-      qb.select(withFacesAndPeople({ viewingUserId: options.viewingUserId! })),
-    )
+        qb.select(withFacesAndPeople({ viewingUserId: options.viewingUserId! })),
+      )
       .$if(!options.withDeleted, (qb) => qb.where('asset.deletedAt', 'is', null))
   );
 }
