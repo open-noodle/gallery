@@ -43,6 +43,12 @@ beforeAll(async () => {
 });
 
 describe(ClusterGroupService.name, () => {
+    // Option M: Gallery does not adopt upstream's cluster-groups FEATURE, so a person_group never
+    // holds more than one person row — the unique index `person_personGroupId_key` enforces it. The
+    // test(s) removed here deliberately put a second owner's person into an existing group, which is
+    // exactly the state Gallery declines to support. Restoring them is part of turning cluster
+    // groups on; see docs/superpowers/specs/2026-08-21-cluster-groups-m-landing-plan.md.
+
   describe('createRequest', () => {
     it('should create a request for another user', async () => {
       const { sut, ctx } = setup();
@@ -302,126 +308,6 @@ describe(ClusterGroupService.name, () => {
   });
 
   describe('leaving a shared cluster group', () => {
-    it('should recreate the shared groups and take the rest of its own along', async () => {
-      const { sut, ctx } = setup(await getKyselyDB());
-      const personRepo = ctx.get(PersonRepository);
-      const { user: user1 } = await ctx.newUser();
-      const { user: user2 } = await ctx.newUser();
-      const clusterGroupId = await getClusterGroupId(ctx, user1.id);
-
-      const { value: request } = await sut.createRequest(factory.auth({ user: user1 }), clusterGroupId, {
-        userId: user2.id,
-      });
-      await sut.acceptRequest(factory.auth({ user: user2 }), request.id);
-
-      // a group both of them have a person in
-      const { person: shared1 } = await ctx.newPerson({ ownerId: user1.id });
-      await ctx.newPerson({ ownerId: user2.id, personGroupId: shared1.personGroupId });
-      // a group only the leaving user has a person in
-      const { person: only2 } = await ctx.newPerson({ ownerId: user2.id });
-      // a group only the remaining user has a person in
-      const { person: only1 } = await ctx.newPerson({ ownerId: user1.id });
-
-      const { asset: asset2 } = await ctx.newAsset({ ownerId: user2.id });
-      const { assetFace: sharedFace2 } = await ctx.newAssetFace({
-        assetId: asset2.id,
-        personGroupId: shared1.personGroupId,
-      });
-      const { asset: asset1 } = await ctx.newAsset({ ownerId: user1.id });
-      const { assetFace: sharedFace1 } = await ctx.newAssetFace({
-        assetId: asset1.id,
-        personGroupId: shared1.personGroupId,
-      });
-
-      await sut.leave(factory.auth({ user: user2 }), clusterGroupId);
-
-      const newClusterGroupId = await getClusterGroupId(ctx, user2.id);
-      expect(newClusterGroupId).not.toBe(clusterGroupId);
-
-      // the shared group is recreated for the leaving user, the one only they had comes along as it is
-      const leaverPeople = await getPeople(ctx, user2.id);
-      const movedShared = leaverPeople.find(({ personGroupId }) => personGroupId !== only2.personGroupId);
-      expect(movedShared).toBeDefined();
-      expect(movedShared!.personGroupId).not.toBe(shared1.personGroupId);
-      await expect(personRepo.getByGroupId(only2)).resolves.toBeDefined();
-
-      // the remaining user is untouched
-      await expect(personRepo.getByGroupId(shared1)).resolves.toBeDefined();
-      await expect(personRepo.getByGroupId(only1)).resolves.toBeDefined();
-
-      const groups = await ctx.database
-        .selectFrom('person_group')
-        .select(['person_group.id', 'person_group.clusterGroupId'])
-        .execute();
-      expect(groups).toEqual(
-        expect.arrayContaining([
-          { id: shared1.personGroupId, clusterGroupId },
-          { id: only1.personGroupId, clusterGroupId },
-          { id: only2.personGroupId, clusterGroupId: newClusterGroupId },
-          { id: movedShared!.personGroupId, clusterGroupId: newClusterGroupId },
-        ]),
-      );
-
-      // only the faces on the assets of the leaving user follow the recreated group
-      const faces = await ctx.database
-        .selectFrom('asset_face')
-        .select(['asset_face.id', 'asset_face.personGroupId'])
-        .where('asset_face.id', 'in', [sharedFace1.id, sharedFace2.id])
-        .execute();
-      expect(faces).toEqual(
-        expect.arrayContaining([
-          { id: sharedFace1.id, personGroupId: shared1.personGroupId },
-          { id: sharedFace2.id, personGroupId: movedShared!.personGroupId },
-        ]),
-      );
-    });
-
-    it('should give each shared group its own new group when a user leaves the group', async () => {
-      const { sut, ctx } = setup(await getKyselyDB());
-      const { user: user1 } = await ctx.newUser();
-      const { user: user2 } = await ctx.newUser();
-      const clusterGroupId = await getClusterGroupId(ctx, user1.id);
-
-      const { value: request } = await sut.createRequest(factory.auth({ user: user1 }), clusterGroupId, {
-        userId: user2.id,
-      });
-      await sut.acceptRequest(factory.auth({ user: user2 }), request.id);
-
-      // two groups both users have a person in
-      const { person: sharedA } = await ctx.newPerson({ ownerId: user1.id });
-      const { person: sharedB } = await ctx.newPerson({ ownerId: user1.id });
-      await ctx.newPerson({ ownerId: user2.id, personGroupId: sharedA.personGroupId, name: 'Alice' });
-      await ctx.newPerson({ ownerId: user2.id, personGroupId: sharedB.personGroupId, name: 'Bob' });
-
-      const { asset } = await ctx.newAsset({ ownerId: user2.id });
-      const { assetFace: faceA } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: sharedA.personGroupId });
-      const { assetFace: faceB } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: sharedB.personGroupId });
-
-      await sut.leave(factory.auth({ user: user2 }), clusterGroupId);
-
-      const moved = await getPeople(ctx, user2.id);
-      const movedGroupIds = moved.map(({ personGroupId }) => personGroupId);
-      expect(movedGroupIds).toHaveLength(2);
-      expect(movedGroupIds).not.toContain(sharedA.personGroupId);
-      expect(movedGroupIds).not.toContain(sharedB.personGroupId);
-      expect(new Set(movedGroupIds).size).toBe(2);
-
-      // the group id changes on the way out, so the name is what identifies each person
-      const movedA = moved.find(({ name }) => name === 'Alice');
-      const movedB = moved.find(({ name }) => name === 'Bob');
-
-      const faces = await ctx.database
-        .selectFrom('asset_face')
-        .select(['asset_face.id', 'asset_face.personGroupId'])
-        .where('asset_face.id', 'in', [faceA.id, faceB.id])
-        .execute();
-      expect(faces).toEqual(
-        expect.arrayContaining([
-          { id: faceA.id, personGroupId: movedA!.personGroupId },
-          { id: faceB.id, personGroupId: movedB!.personGroupId },
-        ]),
-      );
-    });
   });
 
   describe('deleteRequest', () => {
