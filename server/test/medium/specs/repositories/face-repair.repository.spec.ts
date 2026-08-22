@@ -288,10 +288,10 @@ describe('FaceRepairRepository.reattributeFaces', () => {
 
     const rows = await ctx.database
       .selectFrom('asset_face')
-      .select(['id', 'personId'])
+      .select(['id', 'personGroupId'])
       .where('id', 'in', [faceA.id, faceB.id, faceC.id])
       .execute();
-    const byId = Object.fromEntries(rows.map((r) => [r.id, r.personId]));
+    const byId = Object.fromEntries(rows.map((r) => [r.id, r.personGroupId]));
     expect(byId[faceA.id]).toBe(owner.personGroupId);
     expect(byId[faceB.id]).toBe(owner.personGroupId);
     expect(byId[faceC.id]).toBe(person.personGroupId);
@@ -374,10 +374,10 @@ describe('FaceRepairRepository.detachFaces', () => {
 
     const rows = await ctx.database
       .selectFrom('asset_face')
-      .select(['id', 'personId'])
+      .select(['id', 'personGroupId'])
       .where('id', 'in', [faceA.id, faceB.id])
       .execute();
-    const byId = Object.fromEntries(rows.map((r) => [r.id, r.personId]));
+    const byId = Object.fromEntries(rows.map((r) => [r.id, r.personGroupId]));
     expect(byId[faceA.id]).toBeNull();
     expect(byId[faceB.id]).toBe(person.personGroupId); // untouched — not requested
 
@@ -464,7 +464,7 @@ describe('FaceRepairRepository.reconcileRepresentativeFaces', () => {
     await ctx.database.updateTable('person').set({ faceAssetId: faceA.id }).where('personGroupId', '=', person.personGroupId).execute();
 
     // Unassign faceA (simulating what unassignFacesFromPerson does)
-    await ctx.database.updateTable('asset_face').set({ personId: null }).where('id', '=', faceA.id).execute();
+    await ctx.database.updateTable('asset_face').set({ personGroupId: null }).where('id', '=', faceA.id).execute();
 
     await sut.reconcileRepresentativeFaces([person.personGroupId]);
 

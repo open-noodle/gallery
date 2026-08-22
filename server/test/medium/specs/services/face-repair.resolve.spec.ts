@@ -122,8 +122,8 @@ const seedFlaggedSnapshot = async (
 };
 
 const personIdsOf = async (faceIds: string[]): Promise<Record<string, string | null>> => {
-  const rows = await db.selectFrom('asset_face').select(['id', 'personId']).where('id', 'in', faceIds).execute();
-  return Object.fromEntries(rows.map((r) => [r.id, r.personId]));
+  const rows = await db.selectFrom('asset_face').select(['id', 'personGroupId']).where('id', 'in', faceIds).execute();
+  return Object.fromEntries(rows.map((r) => [r.id, r.personGroupId]));
 };
 
 // Bulk equivalent of seedFace, for tests that need enough faces to span more than one of
@@ -930,7 +930,7 @@ describe('FaceRepairService.resolveFaces: skip stale moves (M9, E1)', () => {
     ]);
 
     // f1 moved off `source` after the scan ran (e.g. a concurrent manual move) — no longer on-source at write time.
-    await db.updateTable('asset_face').set({ personId: elsewhere.personGroupId }).where('id', '=', f1).execute();
+    await db.updateTable('asset_face').set({ personGroupId: elsewhere.personGroupId }).where('id', '=', f1).execute();
 
     const result = await sut.resolveFaces(
       {
@@ -1521,7 +1521,7 @@ describe('FaceRepairService.resolveFaces: lock eligibility (manual review, E15 r
     await seedFlaggedSnapshot(scanRepo, user.id, source.personGroupId, [{ assetFaceId: f1, suspectedOwnerId: ownerA.personGroupId }]);
     // f1 moved to a different person after the scan flagged it — still in the raw flagged snapshot, but no
     // longer actually on `source`.
-    await db.updateTable('asset_face').set({ personId: other.personGroupId }).where('id', '=', f1).execute();
+    await db.updateTable('asset_face').set({ personGroupId: other.personGroupId }).where('id', '=', f1).execute();
 
     await expect(
       sut.resolveFaces(
@@ -1545,7 +1545,7 @@ describe('FaceRepairService.resolveFaces: lock eligibility (manual review, E15 r
     const { person: otherUsersPerson } = await ctx.newPerson({ ownerId: otherUser.id, name: '' });
     const f1 = await seedFace(ctx, user.id, source.personGroupId);
     await seedFlaggedSnapshot(scanRepo, user.id, source.personGroupId, [{ assetFaceId: f1, suspectedOwnerId: ownerA.personGroupId }]);
-    await db.updateTable('asset_face').set({ personId: otherUsersPerson.personGroupId }).where('id', '=', f1).execute();
+    await db.updateTable('asset_face').set({ personGroupId: otherUsersPerson.personGroupId }).where('id', '=', f1).execute();
 
     await expect(
       sut.resolveFaces(
@@ -1618,7 +1618,7 @@ describe('FaceRepairService.resolveFaces: lock eligibility (manual review, E15 r
 
     // Move the face onto `source` (outside resolveFaces, simulating the face currently sitting there) and
     // lock it there.
-    await db.updateTable('asset_face').set({ personId: source.personGroupId }).where('id', '=', f1).execute();
+    await db.updateTable('asset_face').set({ personGroupId: source.personGroupId }).where('id', '=', f1).execute();
     const result = await sut.resolveFaces(
       { personId: source.personGroupId, moveToPerson: [], stay: [], lock: [f1], detach: [], unknown: [] },
       user.id,
@@ -2073,7 +2073,7 @@ describe('FaceRepairService.resolveFaces: move-and-lock skips a face that moved 
 
     // fGone moved off `source` after the scan ran (e.g. a concurrent manual move) — no longer on-source at
     // write time, mirroring the plain stale-move case (M9) but with lock: true on the group.
-    await db.updateTable('asset_face').set({ personId: elsewhere.personGroupId }).where('id', '=', fGone).execute();
+    await db.updateTable('asset_face').set({ personGroupId: elsewhere.personGroupId }).where('id', '=', fGone).execute();
 
     const result = await sut.resolveFaces(
       {
@@ -2252,7 +2252,7 @@ const recognitionCandidates = async (ctx: Ctx): Promise<string[]> => {
   const ids: string[] = [];
   for await (const face of ctx
     .get(PersonRepository)
-    .getAllFaces({ personId: null, sourceType: SourceType.MachineLearning })) {
+    .getAllFaces({ personGroupId: null, sourceType: SourceType.MachineLearning })) {
     ids.push(face.id);
   }
   return ids;
@@ -2271,7 +2271,7 @@ describe('FaceRepairService.resolveFaces: detach is durable against re-recogniti
     // and why "unassign back to the unknown pool" boomerangs: the pool is the input queue of the very
     // clustering that mis-assigned the face.
     const unassigned = await seedFace(ctx, user.id, source.personGroupId);
-    await db.updateTable('asset_face').set({ personId: null }).where('id', '=', unassigned).execute();
+    await db.updateTable('asset_face').set({ personGroupId: null }).where('id', '=', unassigned).execute();
 
     await seedFlaggedSnapshot(scanRepo, user.id, source.personGroupId, [{ assetFaceId: f1, suspectedOwnerId: ownerA.personGroupId }]);
 
@@ -2283,10 +2283,10 @@ describe('FaceRepairService.resolveFaces: detach is durable against re-recogniti
 
     const row = await db
       .selectFrom('asset_face')
-      .select(['personId', 'deletedAt'])
+      .select(['personGroupId', 'deletedAt'])
       .where('id', '=', f1)
       .executeTakeFirstOrThrow();
-    expect(row.personId).toBeNull();
+    expect(row.personGroupId).toBeNull();
     expect(row.deletedAt).not.toBeNull();
 
     const candidates = await recognitionCandidates(ctx);
@@ -2367,7 +2367,7 @@ describe('FaceRepairService.resolveFaces: unknown person (state 6)', () => {
     // The face moved off `source` between the scan and this resolve. getScanFlaggedFacesForPersons only returns
     // faces STILL on the person, so f1 drops out of the flagged snapshot — but that snapshot is no longer a
     // gate for `unknown`.
-    await db.updateTable('asset_face').set({ personId: elsewhere.personGroupId }).where('id', '=', f1).execute();
+    await db.updateTable('asset_face').set({ personGroupId: elsewhere.personGroupId }).where('id', '=', f1).execute();
 
     const peopleBefore = await db
       .selectFrom('person')
