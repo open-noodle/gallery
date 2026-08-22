@@ -246,7 +246,7 @@ const newLibraryIdentityFace = async (
 const getPersonalIdentityMismatchRows = async (ctx: ReturnType<typeof setup>['ctx'], assetFaceIds: string[]) => {
   const rows = await ctx.database
     .selectFrom('asset_face')
-    .innerJoin('person', 'person.personGroupId', 'asset_face.personId')
+    .innerJoin('person', 'person.personGroupId', 'asset_face.personGroupId')
     .innerJoin('face_identity_face', 'face_identity_face.assetFaceId', 'asset_face.id')
     .select([
       'asset_face.id as assetFaceId',
@@ -1269,7 +1269,7 @@ describe(FaceIdentityRepository.name, () => {
 
       const people = await ctx.database
         .selectFrom('person')
-        .select(['id', 'identityId'])
+        .select(['personGroupId', 'identityId'])
         .where('personGroupId', 'in', [firstPerson.personGroupId, secondPerson.personGroupId])
         .orderBy('id')
         .execute();
@@ -4366,7 +4366,7 @@ describe(FaceIdentityRepository.name, () => {
 
       const faces = await ctx.database
         .selectFrom('asset_face')
-        .innerJoin('person', 'person.personGroupId', 'asset_face.personId')
+        .innerJoin('person', 'person.personGroupId', 'asset_face.personGroupId')
         .innerJoin('face_identity_face', 'face_identity_face.assetFaceId', 'asset_face.id')
         .select([
           'asset_face.id as assetFaceId',

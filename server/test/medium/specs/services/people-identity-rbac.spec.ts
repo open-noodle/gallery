@@ -709,8 +709,8 @@ describe('People identity RBAC projection', () => {
 
     const uploadedPerson = await fx.ctx.database
       .selectFrom('asset_face')
-      .innerJoin('person', 'person.personGroupId', 'asset_face.personId')
-      .select(['person.id', 'person.identityId'])
+      .innerJoin('person', 'person.personGroupId', 'asset_face.personGroupId')
+      .select(['person.personGroupId', 'person.identityId'])
       .where('asset_face.id', '=', uploadedFaceId)
       .executeTakeFirstOrThrow();
     const targetIdentity = await fx.faceIdentityRepository.ensurePersonIdentity(fx.face.person.personGroupId);
@@ -782,8 +782,8 @@ describe('People identity RBAC projection', () => {
 
     const uploadedPerson = await fx.ctx.database
       .selectFrom('asset_face')
-      .innerJoin('person', 'person.personGroupId', 'asset_face.personId')
-      .select(['person.id', 'person.identityId'])
+      .innerJoin('person', 'person.personGroupId', 'asset_face.personGroupId')
+      .select(['person.personGroupId', 'person.identityId'])
       .where('asset_face.id', '=', uploadedFaceId)
       .executeTakeFirstOrThrow();
     const uploadedLinks = await fx.ctx.database
@@ -793,7 +793,7 @@ describe('People identity RBAC projection', () => {
       .execute();
     const targetProfiles = await fx.ctx.database
       .selectFrom('person')
-      .select(['id', 'ownerId', 'identityId'])
+      .select(['personGroupId', 'ownerId', 'identityId'])
       .where('identityId', '=', targetIdentity.id)
       .orderBy('id')
       .execute();
@@ -829,13 +829,13 @@ describe('People identity RBAC projection', () => {
     const readState = async () => {
       const assignedPerson = await fx.ctx.database
         .selectFrom('asset_face')
-        .innerJoin('person', 'person.personGroupId', 'asset_face.personId')
-        .select(['person.id as personId', 'person.identityId as identityId'])
+        .innerJoin('person', 'person.personGroupId', 'asset_face.personGroupId')
+        .select(['person.personGroupId as personId', 'person.identityId as identityId'])
         .where('asset_face.id', '=', uploadedFaceId)
         .executeTakeFirstOrThrow();
       const memberPeople = await fx.ctx.database
         .selectFrom('person')
-        .select(['id', 'identityId'])
+        .select(['personGroupId', 'identityId'])
         .where('ownerId', '=', fx.member.id)
         .orderBy('id')
         .execute();
@@ -977,7 +977,7 @@ describe('People identity RBAC projection', () => {
     // Neither person was merged into the space identity — both keep their own identity untouched.
     const rows = await fx.ctx.database
       .selectFrom('person')
-      .select(['id', 'identityId'])
+      .select(['personGroupId', 'identityId'])
       .where('personGroupId', 'in', [a.person.personGroupId, b.person.personGroupId])
       .execute();
     const byId = new Map(rows.map((r) => [r.id, r.identityId]));
@@ -1423,8 +1423,8 @@ describe('People identity RBAC projection', () => {
 
     const uploadedPerson = await ctx.database
       .selectFrom('asset_face')
-      .innerJoin('person', 'person.personGroupId', 'asset_face.personId')
-      .select(['person.id', 'person.identityId'])
+      .innerJoin('person', 'person.personGroupId', 'asset_face.personGroupId')
+      .select(['person.personGroupId', 'person.identityId'])
       .where('asset_face.id', '=', uploadedFaceId)
       .executeTakeFirstOrThrow();
     const uploaderPeople = await personService.getAll(authFor(uploader), {

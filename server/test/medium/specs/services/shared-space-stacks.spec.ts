@@ -62,7 +62,7 @@ const spaceTimelineCount = async (
     visibility: AssetVisibility.Timeline,
     bucketSize: TimeBucketSize.Year,
     withStacked: true,
-  });
+  }, factory.auth());
   return buckets.reduce((total, bucket) => total + bucket.count, 0);
 };
 
