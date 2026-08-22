@@ -3946,7 +3946,13 @@ export class SharedSpaceRepository {
     return this.db
       .selectFrom('asset_face')
       .innerJoin('person', 'person.personGroupId', 'asset_face.personGroupId')
-      .select(['asset_face.id', 'asset_face.assetId', 'asset_face.personGroupId as personId', 'person.identityId', 'person.type'])
+      .select([
+        'asset_face.id',
+        'asset_face.assetId',
+        'asset_face.personGroupId as personId',
+        'person.identityId',
+        'person.type',
+      ])
       .where('asset_face.assetId', '=', assetId)
       .where('asset_face.deletedAt', 'is', null)
       .where('person.type', '=', 'pet')
