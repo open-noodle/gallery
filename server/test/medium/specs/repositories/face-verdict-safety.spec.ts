@@ -277,7 +277,11 @@ describe('S8.8 — a forced reset leaves no fully-orphaned verdict, and rows wit
     const { person: doomed } = await ctx.newPerson({ ownerId: user.id, name: 'Doomed' });
     const doomedIdentity = await faceIdentityRepository.ensurePersonIdentity(doomed.personGroupId);
     const { asset: doomedAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
-    await ctx.newAssetFace({ assetId: doomedAsset.id, personGroupId: doomed.personGroupId, sourceType: SourceType.MachineLearning });
+    await ctx.newAssetFace({
+      assetId: doomedAsset.id,
+      personGroupId: doomed.personGroupId,
+      sourceType: SourceType.MachineLearning,
+    });
 
     const { asset: personOnlyAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
     const { assetFace: personOnlyFace } = await ctx.newAssetFace({
@@ -337,7 +341,10 @@ describe('S8.8 — a forced reset leaves no fully-orphaned verdict, and rows wit
       personGroupId: null,
       sourceType: SourceType.MachineLearning,
     });
-    await verdictRepository.markRejected(live.personGroupId, liveTargetFace.id, { source: 'cleanup', actorId: user.id });
+    await verdictRepository.markRejected(live.personGroupId, liveTargetFace.id, {
+      source: 'cleanup',
+      actorId: user.id,
+    });
 
     // Positive controls: every one of the five rows exists before the run.
     for (const faceId of [
