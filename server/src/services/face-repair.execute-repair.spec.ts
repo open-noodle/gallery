@@ -113,7 +113,9 @@ describe(FaceRepairService.name, () => {
       await sut.executeRepair(plan([{ assetFaceId: 'f1', currentPersonId: 'p1', suspectedOwnerId: 'q' }]));
 
       // Without this the source person's card keeps showing the crop of the face that just moved away.
-      expect(mocks.job.queueAll).toHaveBeenCalledWith([{ name: JobName.PersonGenerateThumbnail, data: { ownerId: 'u1', personGroupId: 'p1' } }]);
+      expect(mocks.job.queueAll).toHaveBeenCalledWith([
+        { name: JobName.PersonGenerateThumbnail, data: { ownerId: 'u1', personGroupId: 'p1' } },
+      ]);
     });
 
     // S11 (slice 11e): C6 (defense-in-depth) — a route whose source and destination resolve to DIFFERENT
