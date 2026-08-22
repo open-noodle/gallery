@@ -461,8 +461,8 @@ describe('reject/ignore face-level authorization (F8)', () => {
         .select(['personGroupId', 'identityId'])
         .where('personGroupId', 'in', [annaA.personGroupId, annaB.personGroupId])
         .execute();
-      const refreshedAnnaA = refreshed.find((row) => row.id === annaA.personGroupId);
-      const refreshedAnnaB = refreshed.find((row) => row.id === annaB.personGroupId);
+      const refreshedAnnaA = refreshed.find((row) => row.personGroupId === annaA.personGroupId);
+      const refreshedAnnaB = refreshed.find((row) => row.personGroupId === annaB.personGroupId);
       // Positive control: the shared identity genuinely exists — otherwise the refusal below would be
       // trivially true for the wrong reason (different identities, not an ownership gap).
       expect(refreshedAnnaA?.identityId).not.toBeNull();
