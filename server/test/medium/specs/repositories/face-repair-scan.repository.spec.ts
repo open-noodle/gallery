@@ -7,7 +7,7 @@ import {
 } from 'src/repositories/face-repair-scan.repository';
 import { FaceRepairRepository } from 'src/repositories/face-repair.repository';
 import { DB } from 'src/schema';
-import { insertPersonGroup, mediumFactory } from 'test/medium.factory';
+import { insertClusterGroup, insertPersonGroup, mediumFactory } from 'test/medium.factory';
 import { getKyselyDB } from 'test/utils';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 
@@ -48,7 +48,7 @@ describe(FaceRepairScanRepository.name, () => {
     visible: number,
     extra: { deleted?: number; invisible?: number; name?: string } = {},
   ) => {
-    const person = mediumFactory.personInsert({ ownerId, name: extra.name ?? '' });
+    const person = mediumFactory.personInsert({ personGroupId: await insertPersonGroup(db, ownerId), ownerId, name: extra.name ?? '' });
     await db
       .insertInto('person')
       .values({ ...person, name: extra.name ?? '' })
@@ -327,7 +327,7 @@ describe(FaceRepairScanRepository.name, () => {
 
   describe('withCurrentNames', () => {
     it('overlays the live person + owner names; a cluster named since the scan is promoted to review-first', async () => {
-      const user = mediumFactory.userInsert({});
+      const user = mediumFactory.userInsert({ clusterGroupId: await insertClusterGroup(db) });
       await db.insertInto('user').values(user).execute();
       const cluster = mediumFactory.personInsert({ personGroupId: await insertPersonGroup(db, user.id), ownerId: user.id, name: '' });
       const owner = mediumFactory.personInsert({ personGroupId: await insertPersonGroup(db, user.id), ownerId: user.id, name: '' });
@@ -383,7 +383,7 @@ describe(FaceRepairScanRepository.name, () => {
     });
 
     it("reports a destination's live face count, not the number the scan recorded", async () => {
-      const user = mediumFactory.userInsert({});
+      const user = mediumFactory.userInsert({ clusterGroupId: await insertClusterGroup(db) });
       await db.insertInto('user').values(user).execute();
       const cluster = await insertPersonWithFaces(user.id, 1);
       const owner = await insertPersonWithFaces(user.id, 7);
@@ -396,7 +396,7 @@ describe(FaceRepairScanRepository.name, () => {
     });
 
     it('reports the count as a number, not the bigint string Postgres returns', async () => {
-      const user = mediumFactory.userInsert({});
+      const user = mediumFactory.userInsert({ clusterGroupId: await insertClusterGroup(db) });
       await db.insertInto('user').values(user).execute();
       const cluster = await insertPersonWithFaces(user.id, 1);
       const owner = await insertPersonWithFaces(user.id, 3);
@@ -408,7 +408,7 @@ describe(FaceRepairScanRepository.name, () => {
     });
 
     it('counts only visible, undeleted faces — agreeing with getPersonMetadata on the same person', async () => {
-      const user = mediumFactory.userInsert({});
+      const user = mediumFactory.userInsert({ clusterGroupId: await insertClusterGroup(db) });
       await db.insertInto('user').values(user).execute();
       const cluster = await insertPersonWithFaces(user.id, 1);
       const owner = await insertPersonWithFaces(user.id, 4, { deleted: 3, invisible: 2 });
@@ -426,7 +426,7 @@ describe(FaceRepairScanRepository.name, () => {
     // (getPersonMetadata, searchOwnerPeople, withCurrentNames) are identical today, so this is a pin against
     // future drift, not a live defect.
     it('agrees with searchOwnerPeople for the same person', async () => {
-      const user = mediumFactory.userInsert({});
+      const user = mediumFactory.userInsert({ clusterGroupId: await insertClusterGroup(db) });
       await db.insertInto('user').values(user).execute();
       const cluster = await insertPersonWithFaces(user.id, 1);
       const owner = await insertPersonWithFaces(user.id, 4, { deleted: 3, invisible: 2 });
@@ -440,7 +440,7 @@ describe(FaceRepairScanRepository.name, () => {
     });
 
     it('marks a suspected owner whose person row was deleted as missing, with a zero count', async () => {
-      const user = mediumFactory.userInsert({});
+      const user = mediumFactory.userInsert({ clusterGroupId: await insertClusterGroup(db) });
       await db.insertInto('user').values(user).execute();
       const cluster = await insertPersonWithFaces(user.id, 1);
       const owner = await insertPersonWithFaces(user.id, 5);
@@ -453,7 +453,7 @@ describe(FaceRepairScanRepository.name, () => {
     });
 
     it('reports zero for a destination with no faces rather than dropping it', async () => {
-      const user = mediumFactory.userInsert({});
+      const user = mediumFactory.userInsert({ clusterGroupId: await insertClusterGroup(db) });
       await db.insertInto('user').values(user).execute();
       const cluster = await insertPersonWithFaces(user.id, 1);
       const owner = await insertPersonWithFaces(user.id, 0);
@@ -466,7 +466,7 @@ describe(FaceRepairScanRepository.name, () => {
     });
 
     it("overlays the reviewed cluster's own face count live as well", async () => {
-      const user = mediumFactory.userInsert({});
+      const user = mediumFactory.userInsert({ clusterGroupId: await insertClusterGroup(db) });
       await db.insertInto('user').values(user).execute();
       const cluster = await insertPersonWithFaces(user.id, 6);
       const owner = await insertPersonWithFaces(user.id, 2);
@@ -477,7 +477,7 @@ describe(FaceRepairScanRepository.name, () => {
     });
 
     it('leaves eligible and the recorded flagged count at their scan-time values', async () => {
-      const user = mediumFactory.userInsert({});
+      const user = mediumFactory.userInsert({ clusterGroupId: await insertClusterGroup(db) });
       await db.insertInto('user').values(user).execute();
       const cluster = await insertPersonWithFaces(user.id, 6);
       const owner = await insertPersonWithFaces(user.id, 2);
@@ -489,7 +489,7 @@ describe(FaceRepairScanRepository.name, () => {
     });
 
     it('keeps the snapshot face count for a cluster whose own row was deleted', async () => {
-      const user = mediumFactory.userInsert({});
+      const user = mediumFactory.userInsert({ clusterGroupId: await insertClusterGroup(db) });
       await db.insertInto('user').values(user).execute();
       const cluster = await insertPersonWithFaces(user.id, 6);
       const owner = await insertPersonWithFaces(user.id, 2);
@@ -510,12 +510,12 @@ describe(FaceRepairScanRepository.name, () => {
 
     beforeAll(async () => {
       // Create owner user
-      const user = mediumFactory.userInsert({});
+      const user = mediumFactory.userInsert({ clusterGroupId: await insertClusterGroup(db) });
       await db.insertInto('user').values(user).execute();
       ownerId = user.id;
 
       // Person p: named 'Jula', will get a faceAssetId via asset_face
-      const pData = mediumFactory.personInsert({ ownerId, name: 'Jula' });
+      const pData = mediumFactory.personInsert({ personGroupId: await insertPersonGroup(db, ownerId), ownerId, name: 'Jula' });
       await db.insertInto('person').values(pData).execute();
 
       // Create an asset + asset_face for p, then link faceAssetId
@@ -527,7 +527,7 @@ describe(FaceRepairScanRepository.name, () => {
       p = { id: pData.personGroupId, faceAssetId: pFace.id, name: 'Jula' };
 
       // Person unnamed: name = '' (empty string → null after enrich)
-      const unnamedData = mediumFactory.personInsert({ ownerId, name: '' });
+      const unnamedData = mediumFactory.personInsert({ personGroupId: await insertPersonGroup(db, ownerId), ownerId, name: '' });
       // personInsert spreads `name: ''` last so it overrides the default 'Test Name'
       await db
         .insertInto('person')
@@ -536,7 +536,7 @@ describe(FaceRepairScanRepository.name, () => {
       unnamed = { id: unnamedData.personGroupId, faceAssetId: null, name: '' };
 
       // Person q: suspected owner, no faceAssetId
-      const qData = mediumFactory.personInsert({ ownerId });
+      const qData = mediumFactory.personInsert({ personGroupId: await insertPersonGroup(db, ownerId), ownerId });
       await db.insertInto('person').values(qData).execute();
       q = { id: qData.personGroupId, faceAssetId: null, name: qData.name };
     });
