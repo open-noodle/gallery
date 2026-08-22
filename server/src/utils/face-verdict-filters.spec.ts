@@ -11,12 +11,12 @@ const maps = (overrides: Partial<VerdictMaps> = {}): VerdictMaps => ({
 
 describe('targetTokens', () => {
   it.each([
-    [{ personId: 'P' }, ['person:P']],
-    [{ personId: 'P', identityId: 'I' }, ['identity:I', 'person:P']],
+    [{ personGroupId: 'P' }, ['person:P']],
+    [{ personGroupId: 'P', identityId: 'I' }, ['identity:I', 'person:P']],
     [{ spacePersonId: 'S', identityId: 'I' }, ['identity:I', 'space-person:S']],
     [{ identityId: 'I' }, ['identity:I']],
     [{}, []],
-    [{ personId: null, spacePersonId: null, identityId: null }, []],
+    [{ personGroupId: null, spacePersonId: null, identityId: null }, []],
   ])('%o -> %o', (target, expected) => {
     expect(targetTokens(target)).toEqual(expected);
   });

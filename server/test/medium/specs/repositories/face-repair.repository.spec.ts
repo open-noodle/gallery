@@ -169,14 +169,14 @@ describe('FaceRepairRepository.streamEligibleFaces', () => {
       .execute();
     await ctx.softDeleteAsset(deletedAsset.id);
 
-    const results: { assetFaceId: string; personId: string; ownerId: string; embedding: string }[] =
+    const results: { assetFaceId: string; personGroupId: string; ownerId: string; embedding: string }[] =
       await Array.fromAsync(sut.streamEligibleFaces({ ownerId: user.id }));
 
     const resultIds = results.map((r) => r.assetFaceId).toSorted();
     expect(resultIds).toEqual([face1.id, face2.id].toSorted());
 
     for (const row of results) {
-      expect(row.personId).toBe(person.personGroupId);
+      expect(row.personGroupId).toBe(person.personGroupId);
       expect(row.ownerId).toBe(user.id);
       expect(typeof row.embedding).toBe('string');
     }
@@ -206,7 +206,7 @@ describe('FaceRepairRepository.streamEligibleFaces', () => {
     await ctx.database.insertInto('face_search').values({ faceId: faceB.id, embedding }).execute();
 
     const results: string[] = [];
-    for await (const row of sut.streamEligibleFaces({ personId: personA.personGroupId })) {
+    for await (const row of sut.streamEligibleFaces({ personGroupId: personA.personGroupId })) {
       results.push(row.assetFaceId);
     }
 
@@ -257,7 +257,7 @@ describe('FaceRepairRepository.streamEligibleFaces', () => {
     const timelineFaceId = await seedEligibleFace(ctx, user.id, person.personGroupId);
 
     const results: string[] = [];
-    for await (const row of sut.streamEligibleFaces({ personId: person.personGroupId })) {
+    for await (const row of sut.streamEligibleFaces({ personGroupId: person.personGroupId })) {
       results.push(row.assetFaceId);
     }
 
@@ -733,12 +733,12 @@ describe('FaceRepairRepository.getEligibleFacePage / countEligibleFaces / countA
     });
     await ctx.database.insertInto('face_search').values({ faceId: lockedFace.id, embedding: EMBEDDING }).execute();
 
-    const page = await sut.getEligibleFacePage({ personId: person.personGroupId, limit: 50 });
+    const page = await sut.getEligibleFacePage({ personGroupId: person.personGroupId, limit: 50 });
     expect(page.map((row) => row.assetFaceId)).toContain(timelineFaceId); // positive control
     expect(page.map((row) => row.assetFaceId)).not.toContain(lockedFace.id);
     expect(page).toHaveLength(1);
 
-    await expect(sut.countEligibleFaces({ personId: person.personGroupId })).resolves.toBe(1);
+    await expect(sut.countEligibleFaces({ personGroupId: person.personGroupId })).resolves.toBe(1);
 
     // countAllFaces counts BOTH faces — this is the A2 guard, not a bug. It must not change with this slice.
     await expect(sut.countAllFaces(person.personGroupId)).resolves.toBe(2);

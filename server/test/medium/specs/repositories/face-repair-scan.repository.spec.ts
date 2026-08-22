@@ -82,7 +82,7 @@ describe(FaceRepairScanRepository.name, () => {
       totals: zeroTotals(),
       persons: [
         {
-          personId: clusterId,
+          personGroupId: clusterId,
           ownerId: 'ignored-at-read-time',
           personName: null,
           faceCount: snapshot.faceCount ?? 999,
@@ -293,7 +293,7 @@ describe(FaceRepairScanRepository.name, () => {
 
   it('removePersonsFromLatestScan drops the given persons and recomputes flaggedFaces/affectedPersons', async () => {
     const person = (id: string, flagged: number): RepairScanPerson => ({
-      personId: id,
+      personGroupId: id,
       ownerId: '00000000-0000-4000-8000-0000000000ff',
       personName: null,
       faceCount: flagged + 2,
@@ -314,7 +314,7 @@ describe(FaceRepairScanRepository.name, () => {
     await sut.removePersonsFromLatestScan(['p1', 'p3']);
 
     const row = await sut.getScanById(scan.id);
-    expect((row?.persons as unknown as RepairScanPerson[]).map((p) => p.personId)).toEqual(['p2']);
+    expect((row?.persons as unknown as RepairScanPerson[]).map((p) => p.personGroupId)).toEqual(['p2']);
     expect((row?.totals as unknown as { flaggedFaces: number }).flaggedFaces).toBe(4);
     expect((row?.totals as unknown as { affectedPersons: number }).affectedPersons).toBe(1);
   });
@@ -344,7 +344,7 @@ describe(FaceRepairScanRepository.name, () => {
         totals: zeroTotals(),
         persons: [
           {
-            personId: cluster.personGroupId,
+            personGroupId: cluster.personGroupId,
             ownerId: user.id,
             personName: null, // unnamed at scan time
             faceCount: 35,
@@ -547,11 +547,11 @@ describe(FaceRepairScanRepository.name, () => {
 
     it('enriches persons with names + thumbnails; null name and null thumbnail survive', async () => {
       const enriched = await sut.enrichReportPersons([
-        { personId: p.id, eligible: 10, flagged: 8, flaggedFraction: 0.8, suspectedOwnerIds: [q.id] },
-        { personId: unnamed.id, eligible: 4, flagged: 3, flaggedFraction: 0.75, suspectedOwnerIds: [] },
+        { personGroupId: p.id, eligible: 10, flagged: 8, flaggedFraction: 0.8, suspectedOwnerIds: [q.id] },
+        { personGroupId: unnamed.id, eligible: 4, flagged: 3, flaggedFraction: 0.75, suspectedOwnerIds: [] },
       ]);
 
-      const enrichedP = enriched.find((row) => row.personId === p.id)!;
+      const enrichedP = enriched.find((row) => row.personGroupId === p.id)!;
       expect(enrichedP.personName).toBe('Jula');
       expect(enrichedP.ownerId).toBe(ownerId);
       expect(enrichedP.thumbnailFaceId).toBe(p.faceAssetId);
@@ -559,13 +559,13 @@ describe(FaceRepairScanRepository.name, () => {
         { ownerPersonId: q.id, ownerName: q.name ?? null, thumbnailFaceId: null, count: 1 },
       ]);
 
-      const enrichedUnnamed = enriched.find((row) => row.personId === unnamed.id)!;
+      const enrichedUnnamed = enriched.find((row) => row.personGroupId === unnamed.id)!;
       expect(enrichedUnnamed.personName).toBeNull();
     });
 
     it('round-trips a 600+ person report through jsonb without loss', async () => {
       const persons: RepairScanPerson[] = Array.from({ length: 600 }, (_, i) => ({
-        personId: `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`,
+        personGroupId: `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`,
         ownerId,
         personName: i % 2 === 0 ? `P${i}` : null,
         faceCount: i,

@@ -12,7 +12,7 @@ import {
 import { PrimaryGeneratedUuidV7Column, UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators';
 import { AssetFaceTable } from 'src/schema/tables/asset-face.table';
 import { FaceIdentityTable } from 'src/schema/tables/face-identity.table';
-import { PersonTable } from 'src/schema/tables/person.table';
+import { PersonGroupTable } from 'src/schema/tables/person-group.table';
 import { SharedSpacePersonTable } from 'src/schema/tables/shared-space-person.table';
 import { UserTable } from 'src/schema/tables/user.table';
 
@@ -43,7 +43,7 @@ export type FacePersonVerdictSource = 'suggestion' | 'cleanup';
   name: 'face_person_verdict_source_chk',
   expression: `"source" IN ('suggestion', 'cleanup')`,
 })
-// Never both targets; MAY be neither. A lower bound (`>= 1`) would be wrong: `personId`/`spacePersonId` are
+// Never both targets; MAY be neither. A lower bound (`>= 1`) would be wrong: `personGroupId`/`spacePersonId` are
 // ON DELETE SET NULL so an identity-keyed verdict outlives the person row it was written against, and a
 // `>= 1` check would make that person's DELETE fail outright for any row with no identity. Rows that end up
 // fully orphaned (no target, no identity) are unreachable by every read predicate. They are collected
@@ -52,11 +52,11 @@ export type FacePersonVerdictSource = 'suggestion' | 'cleanup';
 // (Slice 8 / F16) — so a fully-orphaned row does not have to wait for its face to be hard-deleted.
 @Check({
   name: 'face_person_verdict_single_target_chk',
-  expression: `num_nonnulls("personId", "spacePersonId") <= 1`,
+  expression: `num_nonnulls("personGroupId", "spacePersonId") <= 1`,
 })
 @Index({
-  name: 'face_person_verdict_personId_status_distance_idx',
-  columns: ['personId', 'status', 'distance'],
+  name: 'face_person_verdict_personGroupId_status_distance_idx',
+  columns: ['personGroupId', 'status', 'distance'],
 })
 @Index({
   name: 'face_person_verdict_spacePersonId_status_distance_idx',
@@ -81,10 +81,10 @@ export type FacePersonVerdictSource = 'suggestion' | 'cleanup';
   columns: ['status', 'createdAt', 'id'],
 })
 @Index({
-  name: 'face_person_verdict_personId_assetFaceId_uq',
-  columns: ['personId', 'assetFaceId'],
+  name: 'face_person_verdict_personGroupId_assetFaceId_uq',
+  columns: ['personGroupId', 'assetFaceId'],
   unique: true,
-  where: '"personId" IS NOT NULL',
+  where: '"personGroupId" IS NOT NULL',
 })
 @Index({
   name: 'face_person_verdict_spacePersonId_assetFaceId_uq',
@@ -96,8 +96,11 @@ export class FacePersonVerdictTable {
   @PrimaryGeneratedUuidV7Column()
   id!: Generated<string>;
 
-  @ForeignKeyColumn(() => PersonTable, { onDelete: 'SET NULL', index: false, nullable: true })
-  personId!: string | null;
+  // Option M: `person.id` is gone (PK is now composite). Under M person_group is 1:1 with
+  // person, so the verdict target repoints at person_group.id — one column, still a real FK, no
+  // widening. NOTE: the 1:1 relation is a convention here, not a schema constraint.
+  @ForeignKeyColumn(() => PersonGroupTable, { onDelete: 'SET NULL', index: false, nullable: true })
+  personGroupId!: string | null;
 
   @ForeignKeyColumn(() => SharedSpacePersonTable, { onDelete: 'SET NULL', index: false, nullable: true })
   spacePersonId!: string | null;

@@ -46,7 +46,7 @@ export interface RepairPlan {
   reviewOnlyFaces: (FlaggedFace & { reason: ReviewOnlyReason })[];
   reviewOnlyPersonIds: string[];
   unAttributableFaces: { assetFaceId: string; currentPersonId: string }[];
-  perPerson: { personId: string; eligible: number; flagged: number; flaggedFraction: number }[];
+  perPerson: { personGroupId: string; eligible: number; flagged: number; flaggedFraction: number }[];
 }
 
 // Stable reason codes carried alongside a resolve's 400 message, for the failures an admin can genuinely hit
@@ -99,7 +99,7 @@ const STALE_SCAN_TIMEOUT_MS = 30 * 60 * 1000;
 export interface RunRepairOptions {
   dryRun?: boolean;
   ownerId?: string;
-  personId?: string;
+  personGroupId?: string;
   maxDistance?: number;
   minFaces?: number;
   voteWindow?: number;
@@ -135,17 +135,18 @@ export class FaceRepairService extends BaseService {
   // re-proposed to an admin, and vice versa. See FaceVerdictService.buildVerdictMaps for the implementation.
   private buildVerdictMaps(scope: {
     assetFaceIds: string[];
-    personIds: string[];
+    personGroupIds: string[];
     suspectedOwnerIds: string[];
   }): Promise<VerdictMaps> {
-    return this.faceVerdictService.buildVerdictMaps(scope);
+    const { personGroupIds, ...rest } = scope;
+    return this.faceVerdictService.buildVerdictMaps({ ...rest, personIds: personGroupIds });
   }
 
   async buildRepairPlan(
     options: {
       ownerId?: string;
-      personId?: string;
-      personIds?: string[];
+      personGroupId?: string;
+      personGroupIds?: string[];
       approvedPersonIds?: string[];
       maxDistance: number;
       voteWindow: number;
@@ -195,7 +196,7 @@ export class FaceRepairService extends BaseService {
     const flaggedPersonIds = flaggedByPerson.keys().toArray();
     const verdictMaps = await this.buildVerdictMaps({
       assetFaceIds: flaggedFaceIds,
-      personIds: flaggedPersonIds,
+      personGroupIds: flaggedPersonIds,
       suspectedOwnerIds: flaggedByPerson
         .values()
         .toArray()
@@ -205,24 +206,24 @@ export class FaceRepairService extends BaseService {
     applyVerdictFilters(flaggedByPerson, verdictMaps);
 
     const reviewOnlyPersonIds = new Set<string>();
-    for (const [personId, eligible] of eligibleByPerson) {
-      const flagged = flaggedByPerson.get(personId)?.length ?? 0;
+    for (const [personGroupId, eligible] of eligibleByPerson) {
+      const flagged = flaggedByPerson.get(personGroupId)?.length ?? 0;
       if (eligible > 0 && flagged / eligible > options.maxFlaggedFraction) {
-        reviewOnlyPersonIds.add(personId);
+        reviewOnlyPersonIds.add(personGroupId);
       }
     }
 
     const approved = new Set(options.approvedPersonIds);
     const toRepair: FlaggedFace[] = [];
     const reviewOnlyFaces: (FlaggedFace & { reason: ReviewOnlyReason })[] = [];
-    for (const [personId, faces] of flaggedByPerson) {
-      if (approved.has(personId)) {
+    for (const [personGroupId, faces] of flaggedByPerson) {
+      if (approved.has(personGroupId)) {
         for (const face of faces) {
           toRepair.push(face); // approved: exempt from over-cap AND bad-target
         }
         continue;
       }
-      if (reviewOnlyPersonIds.has(personId)) {
+      if (reviewOnlyPersonIds.has(personGroupId)) {
         for (const face of faces) {
           reviewOnlyFaces.push({ ...face, reason: 'over-cap' });
         }
@@ -237,9 +238,9 @@ export class FaceRepairService extends BaseService {
       }
     }
 
-    const perPerson = [...eligibleByPerson].map(([personId, eligible]) => {
-      const flagged = flaggedByPerson.get(personId)?.length ?? 0;
-      return { personId, eligible, flagged, flaggedFraction: eligible > 0 ? flagged / eligible : 0 };
+    const perPerson = [...eligibleByPerson].map(([personGroupId, eligible]) => {
+      const flagged = flaggedByPerson.get(personGroupId)?.length ?? 0;
+      return { personGroupId, eligible, flagged, flaggedFraction: eligible > 0 ? flagged / eligible : 0 };
     });
 
     return { toRepair, reviewOnlyFaces, reviewOnlyPersonIds: [...reviewOnlyPersonIds], unAttributableFaces, perPerson };
@@ -318,7 +319,7 @@ export class FaceRepairService extends BaseService {
           // durable rejected/ignored row for this SAME destination (e.g. an earlier decline against `to`,
           // now overridden by this move). Scoped to `to` only — see clearNegativeForTarget.
           await this.facePersonVerdictRepository.clearNegativeForTarget(
-            { personId: to, identityId: identity.id },
+            { personGroupId: to, identityId: identity.id },
             ids,
             trx,
           );
@@ -363,7 +364,7 @@ export class FaceRepairService extends BaseService {
 
     const planOptions = {
       ownerId: options.ownerId,
-      personId: options.personId,
+      personGroupId: options.personGroupId,
       maxDistance: options.maxDistance ?? recognition.maxDistance,
       minFaces: options.minFaces ?? recognition.minFaces,
       voteWindow: options.voteWindow ?? DEFAULT_VOTE_WINDOW,
@@ -387,8 +388,8 @@ export class FaceRepairService extends BaseService {
 
   async *findReattributionCandidates(options: {
     ownerId?: string;
-    personId?: string;
-    personIds?: string[];
+    personGroupId?: string;
+    personGroupIds?: string[];
     maxDistance: number;
     voteWindow: number;
   }): AsyncIterableIterator<ReattributionCandidate> {
@@ -399,8 +400,8 @@ export class FaceRepairService extends BaseService {
     for (;;) {
       const page = await this.faceRepairRepository.getEligibleFacePage({
         ownerId: options.ownerId,
-        personId: options.personId,
-        personIds: options.personIds,
+        personGroupId: options.personGroupId,
+        personGroupIds: options.personGroupIds,
         afterId,
         limit: SCAN_PAGE_SIZE,
       });
@@ -419,11 +420,11 @@ export class FaceRepairService extends BaseService {
         // searchFaces includes the query face itself — drop it by id.
         const neighbors = matches
           .filter((match) => match.id !== face.assetFaceId)
-          .map((match) => ({ assetFaceId: match.id, personId: match.personGroupId, distance: match.distance }));
+          .map((match) => ({ assetFaceId: match.id, personGroupId: match.personGroupId, distance: match.distance }));
         return {
           assetFaceId: face.assetFaceId,
-          currentPersonId: face.personId,
-          ...tallyReattribution(face.personId, neighbors),
+          currentPersonId: face.personGroupId,
+          ...tallyReattribution(face.personGroupId, neighbors),
         };
       });
       for (const candidate of candidates) {
@@ -515,11 +516,11 @@ export class FaceRepairService extends BaseService {
       const enrichInput = plan.perPerson
         .filter((p) => p.flagged > 0)
         .map((p) => ({
-          personId: p.personId,
+          personGroupId: p.personGroupId,
           eligible: p.eligible,
           flagged: p.flagged,
           flaggedFraction: p.flaggedFraction,
-          suspectedOwnerIds: suspectedOwnersByPerson.get(p.personId) ?? [],
+          suspectedOwnerIds: suspectedOwnersByPerson.get(p.personGroupId) ?? [],
         }));
 
       // Step 7: enrich with person metadata
@@ -529,7 +530,7 @@ export class FaceRepairService extends BaseService {
       for (const p of enriched) {
         const decision = classifyFlaggedPerson(
           {
-            personId: p.personId,
+            personGroupId: p.personGroupId,
             personName: p.personName,
             faceCount: p.faceCount,
             suspectedOwnerIds: p.suspectedOwners.map((o) => o.ownerPersonId),
@@ -548,7 +549,7 @@ export class FaceRepairService extends BaseService {
         scanId,
         allFlaggedFaces.map((f) => ({
           assetFaceId: f.assetFaceId,
-          personId: f.currentPersonId,
+          personGroupId: f.currentPersonId,
           suspectedOwnerId: f.suspectedOwnerId,
         })),
       );
@@ -642,19 +643,19 @@ export class FaceRepairService extends BaseService {
       return scan;
     }
 
-    const personIds = persons.map((p) => p.personId);
-    const stored = await this.faceRepairScanRepository.getScanFlaggedFacesForPersons(scan.id, personIds);
+    const personGroupIds = persons.map((p) => p.personGroupId);
+    const stored = await this.faceRepairScanRepository.getScanFlaggedFacesForPersons(scan.id, personGroupIds);
     const verdictMaps = await this.buildVerdictMaps({
-      personIds,
+      personGroupIds,
       assetFaceIds: stored.map((face) => face.assetFaceId),
       suspectedOwnerIds: stored.map((face) => face.suspectedOwnerId),
     });
 
-    const byPerson = new Map<string, FlaggedFace[]>(personIds.map((id) => [id, []]));
+    const byPerson = new Map<string, FlaggedFace[]>(personGroupIds.map((id) => [id, []]));
     for (const face of stored) {
-      byPerson.get(face.personId)?.push({
+      byPerson.get(face.personGroupId)?.push({
         assetFaceId: face.assetFaceId,
-        currentPersonId: face.personId,
+        currentPersonId: face.personGroupId,
         suspectedOwnerId: face.suspectedOwnerId,
       });
     }
@@ -662,7 +663,7 @@ export class FaceRepairService extends BaseService {
 
     const refreshed = persons
       .map((p) => {
-        const surviving = byPerson.get(p.personId) ?? [];
+        const surviving = byPerson.get(p.personGroupId) ?? [];
         const countByOwner = new Map<string, number>();
         for (const face of surviving) {
           countByOwner.set(face.suspectedOwnerId, (countByOwner.get(face.suspectedOwnerId) ?? 0) + 1);
@@ -686,10 +687,10 @@ export class FaceRepairService extends BaseService {
   }
 
   getClusterFaces(
-    personId: string,
+    personGroupId: string,
     options: { excludeFaceIds: string[]; page: number; size: number },
   ): Promise<{ faces: { assetFaceId: string }[]; total: number; hasMore: boolean }> {
-    return this.faceRepairRepository.getClusterFacePage(personId, {
+    return this.faceRepairRepository.getClusterFacePage(personGroupId, {
       excludeFaceIds: options.excludeFaceIds,
       limit: options.size,
       offset: options.page * options.size,
@@ -697,41 +698,41 @@ export class FaceRepairService extends BaseService {
   }
 
   async getPersonFlaggedFaces(
-    personId: string,
+    personGroupId: string,
   ): Promise<{ personId: string; flaggedFaces: { assetFaceId: string; suspectedOwnerId: string }[] }> {
     const latest = await this.faceRepairScanRepository.getLatestScan();
     if (!latest) {
-      return { personId, flaggedFaces: [] };
+      return { personId: personGroupId, flaggedFaces: [] };
     }
-    const stored = await this.faceRepairScanRepository.getScanFlaggedFaces(latest.id, personId);
+    const stored = await this.faceRepairScanRepository.getScanFlaggedFaces(latest.id, personGroupId);
     const verdictMaps = await this.buildVerdictMaps({
-      personIds: [personId],
+      personGroupIds: [personGroupId],
       assetFaceIds: stored.map((s) => s.assetFaceId),
       suspectedOwnerIds: stored.map((s) => s.suspectedOwnerId),
     });
     const byPerson = new Map([
       [
-        personId,
+        personGroupId,
         stored.map((s) => ({
           assetFaceId: s.assetFaceId,
-          currentPersonId: personId,
+          currentPersonId: personGroupId,
           suspectedOwnerId: s.suspectedOwnerId,
         })),
       ],
     ]);
     applyVerdictFilters(byPerson, verdictMaps);
-    const flaggedFaces = (byPerson.get(personId) ?? []).map((f) => ({
+    const flaggedFaces = (byPerson.get(personGroupId) ?? []).map((f) => ({
       assetFaceId: f.assetFaceId,
       suspectedOwnerId: f.suspectedOwnerId,
     }));
-    return { personId, flaggedFaces };
+    return { personId: personGroupId, flaggedFaces };
   }
 
   // Slice 3 (manual face review): the manual review page has no scan to derive personName/ownerId from, and
   // ownerId is what scopes the move-picker. Admin-gated at the controller; not owner-scoped here by design —
   // an admin must be able to look up any person, not just their own.
-  async getPersonMetadata(personId: string): Promise<PersonMetadataRow> {
-    const person = await this.faceRepairRepository.getPersonMetadata(personId);
+  async getPersonMetadata(personGroupId: string): Promise<PersonMetadataRow> {
+    const person = await this.faceRepairRepository.getPersonMetadata(personGroupId);
     if (!person) {
       throw new NotFoundException('Person not found');
     }
@@ -805,7 +806,7 @@ export class FaceRepairService extends BaseService {
   // on the same raw-snapshot membership check; Slice 6 wires `entireCluster` (server-enumerated whole-cluster
   // move, mutually exclusive with the per-face buckets) — the old `apply` endpoint has since been retired.
   async resolveFaces(input: FaceRepairResolveRequest, resolvedBy: string): Promise<FaceRepairResolveResponse> {
-    const { personId, moveToPerson, stay, lock, detach, unknown, entireCluster } = input;
+    const { personId: personGroupId, moveToPerson, stay, lock, detach, unknown, entireCluster } = input;
     const moveFaceIds = moveToPerson.flatMap((group) => group.faceIds);
 
     // E12/M13: entireCluster (server-enumerated whole-cluster move) is mutually exclusive with every per-face
@@ -865,7 +866,7 @@ export class FaceRepairService extends BaseService {
     // any client that bypasses the picker. Slice 6 (M13) extends the same guard to entireCluster's
     // destination — it is just another destination the reviewed cluster's faces get routed to.
     if (moveToPerson.length > 0 || entireCluster) {
-      const reviewedPerson = await this.personRepository.getByGroupIdOnly(personId);
+      const reviewedPerson = await this.personRepository.getByGroupIdOnly(personGroupId);
       if (!reviewedPerson) {
         throw new BadRequestException({
           message: 'Reviewed person not found',
@@ -893,7 +894,7 @@ export class FaceRepairService extends BaseService {
     // Read this person's stored flagged-face snapshot (per-face suspected owner) and apply the same
     // declined-since-scan filtering the review page uses (and the now-retired applyRepair used to).
     const stored = latest
-      ? await this.faceRepairScanRepository.getScanFlaggedFacesForPersons(latest.id, [personId])
+      ? await this.faceRepairScanRepository.getScanFlaggedFacesForPersons(latest.id, [personGroupId])
       : [];
     // Raw snapshot membership (E15/M14) — a face that was genuinely never flagged for this person has no
     // suspected owner and no keep/lock/detach meaning, and is rejected. This is intentionally NOT
@@ -903,22 +904,22 @@ export class FaceRepairService extends BaseService {
     const flaggedIds = new Set(stored.map((face) => face.assetFaceId));
     const snapshotOwnerByFace = new Map(stored.map((face) => [face.assetFaceId, face.suspectedOwnerId]));
     const verdictMaps = await this.buildVerdictMaps({
-      personIds: [personId],
+      personGroupIds: [personGroupId],
       assetFaceIds: stored.map((face) => face.assetFaceId),
       suspectedOwnerIds: stored.map((face) => face.suspectedOwnerId),
     });
     const byPerson = new Map<string, FlaggedFace[]>([
       [
-        personId,
+        personGroupId,
         stored.map((face) => ({
           assetFaceId: face.assetFaceId,
-          currentPersonId: face.personId,
+          currentPersonId: face.personGroupId,
           suspectedOwnerId: face.suspectedOwnerId,
         })),
       ],
     ]);
     applyVerdictFilters(byPerson, verdictMaps);
-    const resolvable = new Set((byPerson.get(personId) ?? []).map((face) => face.assetFaceId));
+    const resolvable = new Set((byPerson.get(personGroupId) ?? []).map((face) => face.assetFaceId));
 
     // E15: only `stay` is snapshot-gated. It writes a negative verdict against the face's SUSPECTED owner,
     // read from the snapshot via snapshotOwnerByFace.get(id)! — with no snapshot row there is no owner to
@@ -938,7 +939,7 @@ export class FaceRepairService extends BaseService {
     // with that gate lifted the check must be explicit, or a lock could re-point any face in the database
     // (including another user's) onto this person's identity.
     if (lock.length > 0) {
-      const eligible = await this.faceRepairRepository.getEligibleFaceIdsForPerson(personId, lock);
+      const eligible = await this.faceRepairRepository.getEligibleFaceIdsForPerson(personGroupId, lock);
       const ineligible = lock.filter((id) => !eligible.has(id));
       if (ineligible.length > 0) {
         throw new BadRequestException({
@@ -970,11 +971,11 @@ export class FaceRepairService extends BaseService {
           preSkipped++;
         } else {
           // Either an actionable flagged face, or a non-flagged rest-of-cluster face (§5.3: moveToPerson
-          // accepts any eligible face currently on personId). executeRepair's still-on-source re-check at
-          // write time skips anything not actually on personId, so no separate eligibility check is needed here.
+          // accepts any eligible face currently on personGroupId). executeRepair's still-on-source re-check at
+          // write time skips anything not actually on personGroupId, so no separate eligibility check is needed here.
           toRepair.push({
             assetFaceId,
-            currentPersonId: personId,
+            currentPersonId: personGroupId,
             suspectedOwnerId: group.destinationPersonId,
             lock: group.lock,
           });
@@ -982,17 +983,17 @@ export class FaceRepairService extends BaseService {
       }
     }
 
-    // entireCluster (Slice 6, M13/E12): enumerate every eligible face of `personId` server-side — no client
+    // entireCluster (Slice 6, M13/E12): enumerate every eligible face of `personGroupId` server-side — no client
     // paging — and route each to destinationPersonId. Not gated on the flagged snapshot/`resolvable` set above:
     // a whole-cluster move also drains rest-of-cluster faces the admin never had individually flagged. This is
     // exclusive with the per-face buckets (rejected above), so `toRepair` is still empty at this point.
     if (entireCluster) {
-      const clusterFaceIds = await this.collectClusterFaceIds(personId);
+      const clusterFaceIds = await this.collectClusterFaceIds(personGroupId);
       for (const assetFaceId of clusterFaceIds) {
         // `entireCluster` carries no lock field by design — PersonPicker hides the toggle for a whole-cluster
         // move "rather than showing a toggle its request cannot carry". Omitting `lock` falls through to the
         // durable default, preserving today's behaviour; only buckets whose caller expressed a preference change.
-        toRepair.push({ assetFaceId, currentPersonId: personId, suspectedOwnerId: entireCluster.destinationPersonId });
+        toRepair.push({ assetFaceId, currentPersonId: personGroupId, suspectedOwnerId: entireCluster.destinationPersonId });
       }
     }
 
@@ -1049,7 +1050,7 @@ export class FaceRepairService extends BaseService {
         // 25 000-face cap, and a per-face loop at that size is a request that times out rather than applies.
         declined = await this.facePersonVerdictRepository.markRejectedMany(
           declineFaces.map((face) => ({
-            personId: face.suspectedOwnerId,
+            personGroupId: face.suspectedOwnerId,
             assetFaceId: face.assetFaceId,
             identityId:
               ownerTokens
@@ -1075,7 +1076,7 @@ export class FaceRepairService extends BaseService {
     // is a silent no-op, never a unique-violation. Summed with `moveLocked` (temporal-consistency hardening,
     // Slice 3): a single resolve can both stand-alone-lock some faces AND move-and-lock others.
     // Confirm/lock (state 4): re-affirm the face's CURRENT placement as a human one. The face already sits on
-    // `personId`; marking its identity link `source='manual'` records that a human confirmed it there, which
+    // `personGroupId`; marking its identity link `source='manual'` records that a human confirmed it there, which
     // is exactly what stops every future scan from suspecting it toward any owner — the age-gap case. Same
     // record a move writes, so there is one notion of "settled", not two.
     // Slice 9 (D14): the identity relink and its pending-queue drain are wrapped in one transaction — this
@@ -1086,7 +1087,7 @@ export class FaceRepairService extends BaseService {
     let locked = moveLocked;
     if (lock.length > 0) {
       const lockedIds = await this.databaseRepository.transaction(async (trx) => {
-        const identity = await this.faceIdentityRepository.ensurePersonIdentity(personId, trx);
+        const identity = await this.faceIdentityRepository.ensurePersonIdentity(personGroupId, trx);
         // H5: `requirePersonId` re-checks placement INSIDE this transaction. getEligibleFaceIdsForPerson
         // ran outside it and calls itself advisory; without a write-time guard a concurrent reassign left
         // the face on the other person while its identity was re-pointed here — the exact torn state the
@@ -1096,7 +1097,7 @@ export class FaceRepairService extends BaseService {
             assetFaceIds: lock,
             identityId: identity.id,
             source: 'manual',
-            requirePersonId: personId,
+            requirePersonId: personGroupId,
           },
           trx,
         );
@@ -1106,7 +1107,7 @@ export class FaceRepairService extends BaseService {
         // Slice 8 (F15): the lock just re-affirmed a fact ("these faces ARE this reviewed person") that
         // contradicts any durable rejected/ignored row for this SAME person — see clearNegativeForTarget.
         await this.facePersonVerdictRepository.clearNegativeForTarget(
-          { personId, identityId: identity.id },
+          { personGroupId, identityId: identity.id },
           writtenIds,
           trx,
         );
@@ -1126,7 +1127,7 @@ export class FaceRepairService extends BaseService {
     const detachedIds =
       detach.length > 0
         ? await this.databaseRepository.transaction(async (trx) => {
-            const ids = await this.faceRepairRepository.detachFaces(personId, detach, trx);
+            const ids = await this.faceRepairRepository.detachFaces(personGroupId, detach, trx);
             if (ids.length > 0) {
               await this.facePersonVerdictRepository.drainPendingForFaces(ids, trx);
             }
@@ -1134,7 +1135,7 @@ export class FaceRepairService extends BaseService {
           })
         : [];
     if (detachedIds.length > 0) {
-      const repointedIds = await this.faceRepairRepository.reconcileRepresentativeFaces([personId]);
+      const repointedIds = await this.faceRepairRepository.reconcileRepresentativeFaces([personGroupId]);
       // E19/M21: regenerate the person's thumbnail if the detached crop was its representative face — mirrors
       // executeRepair's own representative-thumbnail regen for the move path, so a detached "not a face" crop
       // never lingers as the person's avatar.
@@ -1154,7 +1155,7 @@ export class FaceRepairService extends BaseService {
     //
     // Why a new person rather than simply unassigning the face back to the "unknown pool" the admin has in mind?
     // Because that pool is not a parking lot — it is the input queue of the very clustering that mis-assigned the
-    // face. PersonService.queueRecognizeFaces streams every `personId IS NULL` face back through
+    // face. PersonService.queueRecognizeFaces streams every `personGroupId IS NULL` face back through
     // FacialRecognition, which re-matches it by embedding and assigns it to its nearest neighbour that HAS a
     // person; for a face being pulled out of a mixed cluster, that neighbour is very often the cluster it just
     // left. A bare unassign would therefore boomerang. Giving the face a person of its own is what makes the
@@ -1168,7 +1169,7 @@ export class FaceRepairService extends BaseService {
     let unknownParked = 0;
     let unknownSkipped = 0;
     if (unknown.length > 0) {
-      const reviewedPerson = await this.personRepository.getByGroupIdOnly(personId);
+      const reviewedPerson = await this.personRepository.getByGroupIdOnly(personGroupId);
       if (!reviewedPerson) {
         throw new BadRequestException({
           message: 'Reviewed person not found',
@@ -1180,7 +1181,7 @@ export class FaceRepairService extends BaseService {
         const parked = await this.executeRepair({
           toRepair: unknown.map((assetFaceId) => ({
             assetFaceId,
-            currentPersonId: personId,
+            currentPersonId: personGroupId,
             suspectedOwnerId: cluster.personGroupId,
           })),
           reviewOnlyFaces: [],
@@ -1203,7 +1204,7 @@ export class FaceRepairService extends BaseService {
         // connection mid-reattribution, a lock insert that blows up) would otherwise strand a nameless, faceless
         // person on the owner's People page — permanently, since nothing else ever cleans it up.
         //
-        // Only remove it if it is genuinely EMPTY. `asset_face.personId` is ON DELETE SET NULL, so deleting a
+        // Only remove it if it is genuinely EMPTY. `asset_face.personGroupId` is ON DELETE SET NULL, so deleting a
         // cluster that did receive faces would unassign them — dumping them straight back into the recognition
         // pool this action exists to keep them out of. A partially-succeeded park leaves the faces safely on the
         // cluster and the error surfaces to the admin, who can retry.
@@ -1217,13 +1218,13 @@ export class FaceRepairService extends BaseService {
 
     // Empty-unnamed cleanup, reused from the now-retired applyRepair's manual-move cleanup (A2): only delete a
     // source with ZERO remaining faces of any kind, and only when it was never named.
-    const remaining = await this.faceRepairRepository.countEligibleFaces({ personId });
+    const remaining = await this.faceRepairRepository.countEligibleFaces({ personGroupId });
     if (remaining === 0) {
-      const source = await this.personRepository.getByGroupIdOnly(personId);
+      const source = await this.personRepository.getByGroupIdOnly(personGroupId);
       if (source && (!source.name || source.name.trim().length === 0)) {
-        const remainingAll = await this.faceRepairRepository.countAllFaces(personId);
+        const remainingAll = await this.faceRepairRepository.countAllFaces(personGroupId);
         if (remainingAll === 0) {
-          await this.personRepository.delete([personId]);
+          await this.personRepository.delete([personGroupId]);
         }
       }
     }
@@ -1252,7 +1253,7 @@ export class FaceRepairService extends BaseService {
     // strand a partially-resolved person in the console with a nonzero flagged count that can never clear.
     const settlesFlaggedSnapshot = [...resolvable].every((assetFaceId) => settledFaceIds.has(assetFaceId));
     if (entireCluster || settlesFlaggedSnapshot) {
-      await this.faceRepairScanRepository.removePersonsFromLatestScan([personId]);
+      await this.faceRepairScanRepository.removePersonsFromLatestScan([personGroupId]);
     }
 
     return {
@@ -1307,9 +1308,9 @@ export class FaceRepairService extends BaseService {
     return this.generateFaceThumbnailResponse(face, sourcePath);
   }
 
-  private async collectClusterFaceIds(personId: string): Promise<string[]> {
+  private async collectClusterFaceIds(personGroupId: string): Promise<string[]> {
     const ids: string[] = [];
-    for await (const row of this.faceRepairRepository.streamEligibleFaces({ personId })) {
+    for await (const row of this.faceRepairRepository.streamEligibleFaces({ personGroupId })) {
       ids.push(row.assetFaceId);
     }
     return ids;
