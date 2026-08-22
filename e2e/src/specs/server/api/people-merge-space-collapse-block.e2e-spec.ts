@@ -129,8 +129,8 @@ describe('merge un-editable-space collapse over HTTP (#733 follow-up, toggle-gov
       utils.createAsset(actor.accessToken),
     ]);
     await Promise.all([
-      utils.createFace({ assetId: assetA.id, personId: personA.id }),
-      utils.createFace({ assetId: assetB.id, personId: personB.id }),
+      utils.createFace({ assetId: assetA.id, personGroupId: personA.id }),
+      utils.createFace({ assetId: assetB.id, personGroupId: personB.id }),
     ]);
     const identityT = await personIdentity(db, personA.id);
     const identityS = await personIdentity(db, personB.id);
@@ -143,7 +143,7 @@ describe('merge un-editable-space collapse over HTTP (#733 follow-up, toggle-gov
   const setupScoped = async () => {
     const personA = await utils.createPerson(actor.accessToken, { name: 'Own A' });
     const assetA = await utils.createAsset(actor.accessToken);
-    await utils.createFace({ assetId: assetA.id, personId: personA.id });
+    await utils.createFace({ assetId: assetA.id, personGroupId: personA.id });
     const identityT = await personIdentity(db, personA.id);
 
     const editorSpace = await utils.createSpace(stranger.accessToken, { name: 'Editor Source Space' });
