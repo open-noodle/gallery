@@ -54,7 +54,7 @@ describe('/faces', () => {
       utils.createPerson(ctx.spaceNonMember.token!, { name: 'Bob' }),
     ]);
 
-    ownerFaceId = await utils.createFace({ assetId: ctx.ownerAssetId, personId: ownerPerson.id });
+    ownerFaceId = await utils.createFace({ assetId: ctx.ownerAssetId, personGroupId: ownerPerson.id });
   });
 
   describe('POST /faces', () => {
@@ -133,7 +133,7 @@ describe('/faces', () => {
       // spaceNonMember can't reach the target person → 400. anon → 401.
       const scratchFaceId = await utils.createFace({
         assetId: ctx.ownerAssetId,
-        personId: ownerPerson.id,
+        personGroupId: ownerPerson.id,
       });
 
       await forEachActor(
@@ -149,7 +149,7 @@ describe('/faces', () => {
       // spaceNonMember). The person-access check on the target rejects → 400.
       const scratchFaceId = await utils.createFace({
         assetId: ctx.ownerAssetId,
-        personId: ownerPerson.id,
+        personGroupId: ownerPerson.id,
       });
 
       const { status } = await request(app)
@@ -179,7 +179,7 @@ describe('/faces', () => {
       // After softDeleteAssetFaces sets deletedAt, the face vanishes from the listing
       // even though the row still exists.
       const sidePerson = await utils.createPerson(ctx.spaceOwner.token!, { name: 'Carol' });
-      const sideFaceId = await utils.createFace({ assetId: ctx.ownerAssetId, personId: sidePerson.id });
+      const sideFaceId = await utils.createFace({ assetId: ctx.ownerAssetId, personGroupId: sidePerson.id });
 
       // Pre-condition: face is in the listing.
       const before = await request(app).get(`/faces?id=${ctx.ownerAssetId}`).set(asBearerAuth(ctx.spaceOwner.token!));
@@ -196,7 +196,7 @@ describe('/faces', () => {
       // Same observable result, different mechanism: deleteAssetFace removes the row
       // entirely instead of setting deletedAt.
       const sidePerson = await utils.createPerson(ctx.spaceOwner.token!, { name: 'Dave' });
-      const sideFaceId = await utils.createFace({ assetId: ctx.ownerAssetId, personId: sidePerson.id });
+      const sideFaceId = await utils.createFace({ assetId: ctx.ownerAssetId, personGroupId: sidePerson.id });
 
       await request(app).delete(`/faces/${sideFaceId}`).set(asBearerAuth(ctx.spaceOwner.token!)).send({ force: true });
 
@@ -210,7 +210,7 @@ describe('/faces', () => {
       // shared-spaces UX where a member labels a person and the underlying person
       // row outlives any individual face attachment.
       const sidePerson = await utils.createPerson(ctx.spaceOwner.token!, { name: 'Eve' });
-      const sideFaceId = await utils.createFace({ assetId: ctx.ownerAssetId, personId: sidePerson.id });
+      const sideFaceId = await utils.createFace({ assetId: ctx.ownerAssetId, personGroupId: sidePerson.id });
 
       await request(app).delete(`/faces/${sideFaceId}`).set(asBearerAuth(ctx.spaceOwner.token!)).send({ force: false });
 
@@ -224,7 +224,7 @@ describe('/faces', () => {
       // through asset, with `asset_face.deletedAt IS NULL` AND `asset_face.isVisible IS true`.
       // Soft-delete sets deletedAt → the row drops out of the count.
       const sidePerson = await utils.createPerson(ctx.spaceOwner.token!, { name: 'Frank' });
-      const sideFaceId = await utils.createFace({ assetId: ctx.ownerAssetId, personId: sidePerson.id });
+      const sideFaceId = await utils.createFace({ assetId: ctx.ownerAssetId, personGroupId: sidePerson.id });
 
       const before = await request(app)
         .get(`/people/${sidePerson.id}/statistics`)
@@ -244,7 +244,7 @@ describe('/faces', () => {
     it("hard-deleting a face decreases the person's asset statistics", async () => {
       // Same denormalization, hard-delete path.
       const sidePerson = await utils.createPerson(ctx.spaceOwner.token!, { name: 'Grace' });
-      const sideFaceId = await utils.createFace({ assetId: ctx.ownerAssetId, personId: sidePerson.id });
+      const sideFaceId = await utils.createFace({ assetId: ctx.ownerAssetId, personGroupId: sidePerson.id });
 
       await request(app).delete(`/faces/${sideFaceId}`).set(asBearerAuth(ctx.spaceOwner.token!)).send({ force: true });
 
@@ -275,14 +275,14 @@ describe('/faces', () => {
       const secondAsset = await utils.createAsset(ctx.spaceOwner.token!);
 
       // First face on ownerAssetId; soft-delete it.
-      const firstFaceId = await utils.createFace({ assetId: ctx.ownerAssetId, personId: sidePerson.id });
+      const firstFaceId = await utils.createFace({ assetId: ctx.ownerAssetId, personGroupId: sidePerson.id });
       await request(app)
         .delete(`/faces/${firstFaceId}`)
         .set(asBearerAuth(ctx.spaceOwner.token!))
         .send({ force: false });
 
       // New face on the second asset.
-      const secondFaceId = await utils.createFace({ assetId: secondAsset.id, personId: sidePerson.id });
+      const secondFaceId = await utils.createFace({ assetId: secondAsset.id, personGroupId: sidePerson.id });
       expect(secondFaceId).not.toBe(firstFaceId);
 
       // Stats count only the new face → 1. If the deletedAt filter were broken,
@@ -294,7 +294,7 @@ describe('/faces', () => {
 
       // Bonus: re-attaching the same (assetId, personId) on ownerAssetId still works
       // even with the soft-deleted row in place — there's no UNIQUE constraint.
-      const reAttachId = await utils.createFace({ assetId: ctx.ownerAssetId, personId: sidePerson.id });
+      const reAttachId = await utils.createFace({ assetId: ctx.ownerAssetId, personGroupId: sidePerson.id });
       expect(reAttachId).not.toBe(firstFaceId);
       const stats2 = await request(app)
         .get(`/people/${sidePerson.id}/statistics`)
@@ -309,7 +309,7 @@ describe('/faces', () => {
     it('owner can soft-delete (force=false)', async () => {
       const scratchFaceId = await utils.createFace({
         assetId: ctx.ownerAssetId,
-        personId: ownerPerson.id,
+        personGroupId: ownerPerson.id,
       });
 
       const { status } = await request(app)
@@ -322,7 +322,7 @@ describe('/faces', () => {
     it('owner can force-delete (force=true)', async () => {
       const scratchFaceId = await utils.createFace({
         assetId: ctx.ownerAssetId,
-        personId: ownerPerson.id,
+        personGroupId: ownerPerson.id,
       });
 
       const { status } = await request(app)
@@ -342,7 +342,7 @@ describe('/faces', () => {
       ] as const) {
         const scratchFaceId = await utils.createFace({
           assetId: ctx.ownerAssetId,
-          personId: ownerPerson.id,
+          personGroupId: ownerPerson.id,
         });
 
         const { status } = await request(app)

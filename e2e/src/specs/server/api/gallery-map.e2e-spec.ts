@@ -992,9 +992,9 @@ describe('/gallery/map/markers', () => {
       alice = await utils.createPerson(andUser.accessToken, { name: 't23 Alice' });
       bob = await utils.createPerson(andUser.accessToken, { name: 't23 Bob' });
 
-      await utils.createFace({ assetId: assetWithBoth, personId: alice.id });
-      await utils.createFace({ assetId: assetWithBoth, personId: bob.id });
-      await utils.createFace({ assetId: assetWithAliceOnly, personId: alice.id });
+      await utils.createFace({ assetId: assetWithBoth, personGroupId: alice.id });
+      await utils.createFace({ assetId: assetWithBoth, personGroupId: bob.id });
+      await utils.createFace({ assetId: assetWithAliceOnly, personGroupId: alice.id });
 
       const tags = await utils.upsertTags(andUser.accessToken, ['t23-beach', 't23-sunset']);
       tagBeach = tags.find((tag) => tag.value === 't23-beach')!;

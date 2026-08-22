@@ -54,7 +54,7 @@ test.describe('asset viewer reopen', () => {
     await waitForThumbnail(assetWithLocation.id);
 
     const person = await utils.createPerson(admin.accessToken, { name: 'Stale Carryover Person' });
-    await utils.createFace({ assetId: assetWithPerson.id, personId: person.id });
+    await utils.createFace({ assetId: assetWithPerson.id, personGroupId: person.id });
 
     await updateAsset(
       { id: assetWithLocation.id, updateAssetDto: { latitude: 48.85341, longitude: 2.3488 } },
