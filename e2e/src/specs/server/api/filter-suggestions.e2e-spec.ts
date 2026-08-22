@@ -116,7 +116,7 @@ describe('/search/suggestions/filters', () => {
         [admin.userId, name],
       );
       const personId = personResult.rows[0].id as string;
-      await db.query(`INSERT INTO "asset_face" ("assetId", "personId") VALUES ($1, $2)`, [
+      await db.query(`INSERT INTO "asset_face" ("assetId", "personGroupId") VALUES ($1, $2)`, [
         assets[assetIndex].id,
         personId,
       ]);
@@ -415,10 +415,10 @@ describe('/search/suggestions/filters', () => {
     );
     const globalPersonId = personResult.rows[0].id as string;
 
-    const faceResult = await db.query(`INSERT INTO "asset_face" ("assetId", "personId") VALUES ($1, $2) RETURNING id`, [
-      assets[0].id,
-      globalPersonId,
-    ]);
+    const faceResult = await db.query(
+      `INSERT INTO "asset_face" ("assetId", "personGroupId") VALUES ($1, $2) RETURNING id`,
+      [assets[0].id, globalPersonId],
+    );
     const faceId = faceResult.rows[0].id as string;
 
     // addSpaceAssets (above) queues SharedSpaceFaceMatch jobs for each asset
@@ -514,10 +514,10 @@ describe('/search/suggestions/filters', () => {
     );
     const globalPersonId = personResult.rows[0].id as string;
 
-    const faceResult = await db.query(`INSERT INTO "asset_face" ("assetId", "personId") VALUES ($1, $2) RETURNING id`, [
-      assets[0].id,
-      globalPersonId,
-    ]);
+    const faceResult = await db.query(
+      `INSERT INTO "asset_face" ("assetId", "personGroupId") VALUES ($1, $2) RETURNING id`,
+      [assets[0].id, globalPersonId],
+    );
     const faceId = faceResult.rows[0].id as string;
 
     // Create a space person + link via shared_space_person_face
