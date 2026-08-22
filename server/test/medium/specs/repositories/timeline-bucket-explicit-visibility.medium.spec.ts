@@ -25,7 +25,7 @@ import { SharedSpaceRepository } from 'src/repositories/shared-space.repository'
 import { DB } from 'src/schema';
 import { BaseService } from 'src/services/base.service';
 import { newMediumService } from 'test/medium.factory';
-import { newEmbedding } from 'test/small.factory';
+import { factory, newEmbedding } from 'test/small.factory';
 import { getKyselyDB } from 'test/utils';
 
 let defaultDatabase: Kysely<DB>;
@@ -151,7 +151,7 @@ describe('timeline bucket explicit-visibility — spaceId browse (no userIds)', 
     };
 
     // getTimeBuckets — count must be 0 (no other-member Hidden leaks)
-    expect(countBuckets(await assetRepo.getTimeBuckets(opts))).toBe(0);
+    expect(countBuckets(await assetRepo.getTimeBuckets(opts, factory.auth()))).toBe(0);
 
     // getTimeBucket — none of the ids present
     const ids = await bucketAssetIds(assetRepo, BUCKET, opts, viewer.id);
@@ -181,7 +181,7 @@ describe('timeline bucket explicit-visibility — spaceId browse (no userIds)', 
       visibility: AssetVisibility.Locked,
       bucketSize: TimeBucketSize.Year,
     };
-    expect(countBuckets(await assetRepo.getTimeBuckets(opts))).toBe(0);
+    expect(countBuckets(await assetRepo.getTimeBuckets(opts, factory.auth()))).toBe(0);
   });
 
   it('regression: visibility=Timeline space assets are STILL present (no over-block)', async () => {
@@ -198,7 +198,7 @@ describe('timeline bucket explicit-visibility — spaceId browse (no userIds)', 
       visibility: AssetVisibility.Timeline,
       bucketSize: TimeBucketSize.Year,
     };
-    expect(countBuckets(await assetRepo.getTimeBuckets(opts))).toBe(1);
+    expect(countBuckets(await assetRepo.getTimeBuckets(opts, factory.auth()))).toBe(1);
     const ids = await bucketAssetIds(assetRepo, BUCKET, opts, owner.id);
     expect(ids.has(tl)).toBe(true);
   });
@@ -233,7 +233,7 @@ describe('timeline bucket explicit-visibility — withSharedSpaces (timelineSpac
       bucketSize: TimeBucketSize.Year,
     };
 
-    expect(countBuckets(await assetRepo.getTimeBuckets(opts))).toBe(0);
+    expect(countBuckets(await assetRepo.getTimeBuckets(opts, factory.auth()))).toBe(0);
 
     const ids = await bucketAssetIds(assetRepo, BUCKET, opts, viewer.id);
     expect(ids.has(hiDirect)).toBe(false);
@@ -261,7 +261,7 @@ describe('timeline bucket explicit-visibility — withSharedSpaces (timelineSpac
       visibility: AssetVisibility.Hidden,
       bucketSize: TimeBucketSize.Year,
     };
-    expect(countBuckets(await assetRepo.getTimeBuckets(opts))).toBe(1);
+    expect(countBuckets(await assetRepo.getTimeBuckets(opts, factory.auth()))).toBe(1);
     const ids = await bucketAssetIds(assetRepo, BUCKET, opts, owner.id);
     expect(ids.has(ownHidden)).toBe(true);
   });
@@ -316,7 +316,7 @@ describe('timeline bucket explicit-visibility — spacePersonIds path', () => {
       bucketSize: TimeBucketSize.Year,
     };
 
-    expect(countBuckets(await assetRepo.getTimeBuckets(opts))).toBe(0);
+    expect(countBuckets(await assetRepo.getTimeBuckets(opts, factory.auth()))).toBe(0);
     const ids = await bucketAssetIds(assetRepo, BUCKET, opts, viewer.id);
     expect(ids.has(hiAsset)).toBe(false);
   });
@@ -379,7 +379,7 @@ describe('timeline bucket explicit-visibility — albumId arm', () => {
       bucketSize: TimeBucketSize.Year,
     };
 
-    expect(countBuckets(await assetRepo.getTimeBuckets(opts))).toBe(0);
+    expect(countBuckets(await assetRepo.getTimeBuckets(opts, factory.auth()))).toBe(0);
 
     const asViewer = await bucketAssetIds(assetRepo, BUCKET, opts, s.viewer.id);
     expect(asViewer.has(s.hidden)).toBe(false);
@@ -399,7 +399,7 @@ describe('timeline bucket explicit-visibility — albumId arm', () => {
       bucketSize: TimeBucketSize.Year,
     };
 
-    expect(countBuckets(await assetRepo.getTimeBuckets(opts))).toBe(0);
+    expect(countBuckets(await assetRepo.getTimeBuckets(opts, factory.auth()))).toBe(0);
     const ids = await bucketAssetIds(assetRepo, BUCKET, opts, s.viewer.id);
     expect(ids.has(s.locked)).toBe(false);
   });
