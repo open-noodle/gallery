@@ -171,7 +171,10 @@ describe('FaceRepairService.listResolutions', () => {
     // independently degraded away too (identityId SET NULL) — the row is now "fully orphaned" (no target, no
     // identity), unreachable by every scan predicate (§ table comment), but the unscoped admin listing is
     // not target-filtered and must still surface it without breaking.
+    // #30739 moved the verdict's person FK onto person_group.id, so the SET NULL fires when the group
+    // goes; `removeAllPersonGroups` sweeps the emptied group right after the delete.
     await ctx.get(PersonRepository).delete([ownerA.personGroupId]);
+    await ctx.get(PersonRepository).deleteEmptyGroups();
     await db.deleteFrom('face_identity').where('id', '=', identity.id).execute();
 
     const { resolutions } = await sut.listResolutions({ page: 1, size: 50 });
