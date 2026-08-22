@@ -120,7 +120,7 @@ describe(ClassificationRepository.name, () => {
       const { user } = await ctx.newUser();
       const { asset } = await ctx.newAsset({ ownerId: user.id });
 
-      await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
 
       await expect(sut.getFaceSummary(asset.id)).resolves.toEqual({
         hasAssignedFace: false,
@@ -135,7 +135,7 @@ describe(ClassificationRepository.name, () => {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
       const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Alice', isHidden: false, type: 'person' });
 
-      await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
 
       await expect(sut.getFaceSummary(asset.id)).resolves.toEqual({
         hasAssignedFace: true,
@@ -150,7 +150,7 @@ describe(ClassificationRepository.name, () => {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
       const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Alice', isHidden: true, type: 'person' });
 
-      await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
 
       await expect(sut.getFaceSummary(asset.id)).resolves.toEqual({
         hasAssignedFace: true,
@@ -170,7 +170,7 @@ describe(ClassificationRepository.name, () => {
         type: 'person',
       });
 
-      await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
 
       await expect(sut.getFaceSummary(asset.id)).resolves.toEqual({
         hasAssignedFace: true,
@@ -186,9 +186,9 @@ describe(ClassificationRepository.name, () => {
       const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Alice', type: 'person' });
       const { person: pet } = await ctx.newPerson({ ownerId: user.id, name: 'Spot', type: 'pet', species: 'dog' });
 
-      await ctx.newAssetFace({ assetId: asset.id, personId: person.id, isVisible: false });
-      await ctx.newAssetFace({ assetId: asset.id, personId: person.id, deletedAt: new Date() });
-      await ctx.newAssetFace({ assetId: asset.id, personId: pet.id, sourceType: SourceType.MachineLearning });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId, isVisible: false });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId, deletedAt: new Date() });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: pet.personGroupId, sourceType: SourceType.MachineLearning });
 
       await expect(sut.getFaceSummary(asset.id)).resolves.toEqual({
         hasAssignedFace: false,
