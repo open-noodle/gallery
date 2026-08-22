@@ -159,6 +159,16 @@ export type WithPersonOptions = {
   viewingUserId: string;
 };
 
+/**
+ * Upstream filters this join to `person.ownerId = viewingUserId` — with cluster groups on, every member
+ * of a group has their own person row and the viewer wants theirs. Option M keeps groups 1:1, so the
+ * only row is the OWNER's, and that filter returns nothing for every non-owner: a shared-album
+ * recipient or Space member would see `person: null` on a face they are allowed to see, and a hidden
+ * person would stop being filtered out because there is no person row left to read `isHidden` from.
+ *
+ * So prefer the viewer's own row and fall back to the group's. Under M that always resolves to the
+ * owner's single row; if cluster groups are ever turned on it degrades back to upstream's behaviour.
+ */
 const withPerson = ({ viewingUserId }: WithPersonOptions) => {
   return (eb: ExpressionBuilder<DB, 'asset_face'>) =>
     jsonObjectFrom(
@@ -166,7 +176,8 @@ const withPerson = ({ viewingUserId }: WithPersonOptions) => {
         .selectFrom('person')
         .selectAll('person')
         .whereRef('person.personGroupId', '=', 'asset_face.personGroupId')
-        .where('person.ownerId', '=', viewingUserId),
+        .orderBy(sql`case when "person"."ownerId" = ${viewingUserId} then 0 else 1 end`)
+        .limit(1),
     ).as('person');
 };
 
