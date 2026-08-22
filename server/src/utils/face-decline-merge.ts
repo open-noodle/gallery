@@ -4,8 +4,8 @@ import { FaceRepairDeclineTable } from 'src/schema/tables/face-repair-decline.ta
 
 /**
  * Re-keys the source person's cluster mute onto the survivor before the merge deletes that person.
- * `face_repair_decline.personId` is ON DELETE CASCADE (verified against a live database) — unlike the
- * `face_person_verdict.personId` FK that {@link retargetVerdictPersonId} guards, which is SET NULL — so
+ * `face_repair_decline.personGroupId` is ON DELETE CASCADE (verified against a live database) — unlike the
+ * `face_person_verdict.personGroupId` FK that {@link retargetVerdictPersonId} guards, which is SET NULL — so
  * without this a merge silently destroys the admin's "stop showing me this cluster" decision and the
  * cluster resurfaces on the very next scan.
  *
@@ -35,19 +35,19 @@ export async function retargetDeclinePersonId(
 ): Promise<void> {
   const rows = await trx
     .selectFrom('face_repair_decline')
-    .select(['id', 'personId', 'suspectedOwnerIds'])
+    .select(['id', 'personGroupId', 'suspectedOwnerIds'])
     .where('type', '=', 'person')
-    .where('personId', 'in', [sourceId, survivorId])
+    .where('personGroupId', 'in', [sourceId, survivorId])
     .execute();
 
-  const source = rows.find((row) => row.personId === sourceId);
+  const source = rows.find((row) => row.personGroupId === sourceId);
   if (!source) {
     return;
   }
 
-  const survivor = rows.find((row) => row.personId === survivorId);
+  const survivor = rows.find((row) => row.personGroupId === survivorId);
   if (!survivor) {
-    await trx.updateTable('face_repair_decline').set({ personId: survivorId }).where('id', '=', source.id).execute();
+    await trx.updateTable('face_repair_decline').set({ personGroupId: survivorId }).where('id', '=', source.id).execute();
     return;
   }
 

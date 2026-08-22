@@ -185,7 +185,7 @@ describe('SharedSpaceService space face suggestions', () => {
     const { person } = await ctx.newPerson({ ownerId: fx.assetOwner.id, name: 'Personal Alice' });
     await ctx.database
       .insertInto('face_person_verdict')
-      .values({ personId: person.personGroupId, assetFaceId: fx.assetFace.id, distance: 0.61 })
+      .values({ personGroupId: person.personGroupId, assetFaceId: fx.assetFace.id, distance: 0.61 })
       .execute();
     const otherSpacePerson = await ctx.database
       .insertInto('shared_space_person')
@@ -204,7 +204,7 @@ describe('SharedSpaceService space face suggestions', () => {
     // link written on the space person's identity, not a status here.
     const rows = await ctx.database
       .selectFrom('face_person_verdict')
-      .select(['personId', 'spacePersonId', 'status'])
+      .select(['personGroupId', 'spacePersonId', 'status'])
       .where('assetFaceId', '=', fx.assetFace.id)
       .execute();
     expect(rows).toEqual([]);

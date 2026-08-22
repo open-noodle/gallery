@@ -13,10 +13,10 @@ const plan: RepairPlan = {
   reviewOnlyPersonIds: ['D'],
   unAttributableFaces: [{ assetFaceId: 'f5', currentPersonId: 'F' }],
   perPerson: [
-    { personId: 'A', eligible: 10, flagged: 2, flaggedFraction: 0.2 },
-    { personId: 'D', eligible: 4, flagged: 1, flaggedFraction: 0.25 },
-    { personId: 'E', eligible: 5, flagged: 1, flaggedFraction: 0.2 },
-    { personId: 'K', eligible: 50, flagged: 0, flaggedFraction: 0 },
+    { personGroupId: 'A', eligible: 10, flagged: 2, flaggedFraction: 0.2 },
+    { personGroupId: 'D', eligible: 4, flagged: 1, flaggedFraction: 0.25 },
+    { personGroupId: 'E', eligible: 5, flagged: 1, flaggedFraction: 0.2 },
+    { personGroupId: 'K', eligible: 50, flagged: 0, flaggedFraction: 0 },
   ],
 };
 
