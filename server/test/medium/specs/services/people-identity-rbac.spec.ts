@@ -419,7 +419,10 @@ const setupJoinAfterDuplicatesFixture = async (
 
   const { result: ownerPerson } = await ctx.newPerson({ ownerId: owner.id, name: 'Owner Shared Name' });
   const { asset: spaceAsset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
-  const { result: ownerFace } = await ctx.newAssetFace({ assetId: spaceAsset.id, personGroupId: ownerPerson.personGroupId });
+  const { result: ownerFace } = await ctx.newAssetFace({
+    assetId: spaceAsset.id,
+    personGroupId: ownerPerson.personGroupId,
+  });
   await ctx.database.insertInto('face_search').values({ faceId: ownerFace, embedding }).execute();
   const ownerIdentity = await faceIdentityRepository.ensurePersonIdentity(ownerPerson.personGroupId);
   await faceIdentityRepository.linkFace({
@@ -430,7 +433,10 @@ const setupJoinAfterDuplicatesFixture = async (
 
   const { result: memberPerson } = await ctx.newPerson({ ownerId: member.id, name: 'Member Private Name' });
   const { asset: memberAsset } = await ctx.newAsset({ ownerId: member.id, visibility: AssetVisibility.Timeline });
-  const { result: memberFace } = await ctx.newAssetFace({ assetId: memberAsset.id, personGroupId: memberPerson.personGroupId });
+  const { result: memberFace } = await ctx.newAssetFace({
+    assetId: memberAsset.id,
+    personGroupId: memberPerson.personGroupId,
+  });
   await ctx.database.insertInto('face_search').values({ faceId: memberFace, embedding }).execute();
   const memberIdentity = await faceIdentityRepository.ensurePersonIdentity(memberPerson.personGroupId);
   await faceIdentityRepository.linkFace({
@@ -764,7 +770,9 @@ describe('People identity RBAC projection', () => {
       ownerId: fx.member.id,
       name: 'Member Existing Profile',
     });
-    const memberConflictIdentity = await fx.faceIdentityRepository.ensurePersonIdentity(memberConflictPerson.personGroupId);
+    const memberConflictIdentity = await fx.faceIdentityRepository.ensurePersonIdentity(
+      memberConflictPerson.personGroupId,
+    );
     await fx.faceIdentityRepository.mergeIdentities({
       targetIdentityId: targetIdentity.id,
       sourceIdentityIds: [memberConflictIdentity.id],
@@ -805,7 +813,11 @@ describe('People identity RBAC projection', () => {
     ]);
     expect(targetProfiles).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ personGroupId: memberConflictPerson.personGroupId, ownerId: fx.member.id, identityId: targetIdentity.id }),
+        expect.objectContaining({
+          personGroupId: memberConflictPerson.personGroupId,
+          ownerId: fx.member.id,
+          identityId: targetIdentity.id,
+        }),
       ]),
     );
     expect(targetProfiles.map((profile) => profile.personGroupId)).not.toContain(uploadedPerson.personGroupId);
@@ -884,7 +896,10 @@ describe('People identity RBAC projection', () => {
       ownerId: fx.member.id,
       visibility: AssetVisibility.Timeline,
     });
-    const { result: memberFace } = await fx.ctx.newAssetFace({ assetId: memberAsset.id, personGroupId: memberPerson.personGroupId });
+    const { result: memberFace } = await fx.ctx.newAssetFace({
+      assetId: memberAsset.id,
+      personGroupId: memberPerson.personGroupId,
+    });
     await fx.ctx.database
       .insertInto('face_search')
       .values({ faceId: memberFace, embedding: embeddingRow.embedding })
@@ -1513,7 +1528,10 @@ describe('People identity RBAC projection', () => {
 
     const { result: ownerPerson } = await ctx.newPerson({ ownerId: owner.id, name: 'Owner Shared Name' });
     const { asset: spaceAsset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
-    const { result: ownerFace } = await ctx.newAssetFace({ assetId: spaceAsset.id, personGroupId: ownerPerson.personGroupId });
+    const { result: ownerFace } = await ctx.newAssetFace({
+      assetId: spaceAsset.id,
+      personGroupId: ownerPerson.personGroupId,
+    });
     await ctx.database.insertInto('face_search').values({ faceId: ownerFace, embedding }).execute();
     const ownerIdentity = await faceIdentityRepository.ensurePersonIdentity(ownerPerson.personGroupId);
     await faceIdentityRepository.linkFace({
@@ -1535,7 +1553,9 @@ describe('People identity RBAC projection', () => {
       personGroupId: existingMemberPerson.personGroupId,
     });
     await ctx.database.insertInto('face_search').values({ faceId: existingMemberFace, embedding }).execute();
-    const existingMemberIdentity = await faceIdentityRepository.ensurePersonIdentity(existingMemberPerson.personGroupId);
+    const existingMemberIdentity = await faceIdentityRepository.ensurePersonIdentity(
+      existingMemberPerson.personGroupId,
+    );
     await faceIdentityRepository.linkFace({
       assetFaceId: existingMemberFace,
       identityId: existingMemberIdentity.id,
@@ -1910,7 +1930,10 @@ describe('People identity RBAC projection', () => {
       for (let index = 0; index < 3; index++) {
         const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
         await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
-        const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: ownerPerson.personGroupId });
+        const { result: faceId } = await ctx.newAssetFace({
+          assetId: asset.id,
+          personGroupId: ownerPerson.personGroupId,
+        });
         await ctx.database
           .insertInto('face_search')
           .values({ faceId, embedding: axisEmbedding('first') })
@@ -1925,7 +1948,10 @@ describe('People identity RBAC projection', () => {
       // The contaminated representative face: axis-B.
       const { asset: repAsset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: repAsset.id, addedById: owner.id });
-      const { result: repFaceId } = await ctx.newAssetFace({ assetId: repAsset.id, personGroupId: ownerPerson.personGroupId });
+      const { result: repFaceId } = await ctx.newAssetFace({
+        assetId: repAsset.id,
+        personGroupId: ownerPerson.personGroupId,
+      });
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: repFaceId, embedding: axisEmbedding('second') })
@@ -1958,7 +1984,10 @@ describe('People identity RBAC projection', () => {
       const { result: memberPerson } = await ctx.newPerson({ ownerId: member.id, name: 'Karina' });
       const memberIdentity = await faceIdentityRepository.ensurePersonIdentity(memberPerson.personGroupId);
       const { asset: memberAsset } = await ctx.newAsset({ ownerId: member.id, visibility: AssetVisibility.Timeline });
-      const { result: memberFaceId } = await ctx.newAssetFace({ assetId: memberAsset.id, personGroupId: memberPerson.personGroupId });
+      const { result: memberFaceId } = await ctx.newAssetFace({
+        assetId: memberAsset.id,
+        personGroupId: memberPerson.personGroupId,
+      });
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: memberFaceId, embedding: axisEmbedding('second') })
@@ -2015,7 +2044,10 @@ describe('People identity RBAC projection', () => {
       const { person: personB } = await ctx.newPerson({ ownerId: user.id });
       await faceIdentityRepository.ensurePersonIdentity(personB.personGroupId);
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { result: corruptFaceId } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: personB.personGroupId });
+      const { result: corruptFaceId } = await ctx.newAssetFace({
+        assetId: asset.id,
+        personGroupId: personB.personGroupId,
+      });
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: corruptFaceId, embedding: axisEmbedding('second') })
@@ -2668,7 +2700,10 @@ describe('People identity RBAC projection', () => {
       const second = await ctx.newPerson({ ownerId: owner.id, identityId: null, name: 'Page Two Alice' });
       const { asset: firstAsset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
       const { asset: secondAsset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
-      const { assetFace: firstFace } = await ctx.newAssetFace({ assetId: firstAsset.id, personGroupId: first.person.personGroupId });
+      const { assetFace: firstFace } = await ctx.newAssetFace({
+        assetId: firstAsset.id,
+        personGroupId: first.person.personGroupId,
+      });
       const { assetFace: secondFace } = await ctx.newAssetFace({
         assetId: secondAsset.id,
         personGroupId: second.person.personGroupId,

@@ -42,7 +42,11 @@ beforeAll(async () => {
 
 const seedFace = async (ctx: Ctx, ownerId: string, personId: string): Promise<string> => {
   const { asset } = await ctx.newAsset({ ownerId });
-  const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: personId, sourceType: SourceType.MachineLearning });
+  const { assetFace } = await ctx.newAssetFace({
+    assetId: asset.id,
+    personGroupId: personId,
+    sourceType: SourceType.MachineLearning,
+  });
   return assetFace.id;
 };
 
@@ -287,7 +291,11 @@ describe('face_identity_face.source=manual durability (Slice 4 — D4a/b/c non-h
     await insertLinkRow(manualFaceId, staleIdentity.id, 'manual');
     await insertLinkRow(mlFaceId, staleIdentity.id, 'ml');
 
-    await faceIdentityRepository.linkPersonFaces({ personId: person.personGroupId, identityId: identity.id, source: 'backfill' });
+    await faceIdentityRepository.linkPersonFaces({
+      personId: person.personGroupId,
+      identityId: identity.id,
+      source: 'backfill',
+    });
 
     const manualRow = await linkRowFor(manualFaceId);
     const mlRow = await linkRowFor(mlFaceId);

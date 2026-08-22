@@ -509,7 +509,9 @@ describe(AssetService.name, () => {
       // the identity-wide resolution is overlaid here (mirroring PersonService.getById).
       const asset = AssetFactory.from({ ownerId: authStub.admin.user.id })
         .exif()
-        .face({}, (f) => f.person({ personGroupId: 'person-1', name: 'Raw Name', identityId: 'identity-1', birthDate: null }))
+        .face({}, (f) =>
+          f.person({ personGroupId: 'person-1', name: 'Raw Name', identityId: 'identity-1', birthDate: null }),
+        )
         .build();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
       mocks.asset.getById.mockResolvedValue(asset as any);
@@ -534,7 +536,9 @@ describe(AssetService.name, () => {
     it('should not resolve identity metadata for an owner person without an identity', async () => {
       const asset = AssetFactory.from({ ownerId: authStub.admin.user.id })
         .exif()
-        .face({}, (f) => f.person({ personGroupId: 'person-1', name: 'Test Person', identityId: null, birthDate: null }))
+        .face({}, (f) =>
+          f.person({ personGroupId: 'person-1', name: 'Test Person', identityId: null, birthDate: null }),
+        )
         .build();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
       mocks.asset.getById.mockResolvedValue(asset as any);

@@ -285,7 +285,11 @@ describe(PetDetectionService.name, () => {
           boundingBoxY2: 40,
         }),
       );
-      expect(mocks.person.update).toHaveBeenCalledWith({ ownerId: 'owner-id', personGroupId: 'person-id', faceAssetId: 'face-id' });
+      expect(mocks.person.update).toHaveBeenCalledWith({
+        ownerId: 'owner-id',
+        personGroupId: 'person-id',
+        faceAssetId: 'face-id',
+      });
       expect(mocks.job.queueAll).toHaveBeenCalledWith([
         { name: JobName.PersonGenerateThumbnail, data: { ownerId: 'owner-id', personGroupId: 'person-id' } },
       ]);
@@ -301,15 +305,23 @@ describe(PetDetectionService.name, () => {
         imageWidth: 200,
         pets: [{ boundingBox: { x1: 10, y1: 20, x2: 30, y2: 40 }, score: 0.9, label: 'cat' }],
       });
-      mocks.person.getByOwnerAndSpecies.mockResolvedValue(makePerson({ personGroupId: 'existing-cat', faceAssetId: 'old-face' }));
+      mocks.person.getByOwnerAndSpecies.mockResolvedValue(
+        makePerson({ personGroupId: 'existing-cat', faceAssetId: 'old-face' }),
+      );
       mocks.person.createAssetFace.mockResolvedValue('face-id');
-      mocks.person.getByGroupIdOnly.mockResolvedValue(makePerson({ personGroupId: 'existing-cat', faceAssetId: 'old-face' }));
-      mocks.person.getByGroupId.mockResolvedValue(makePerson({ personGroupId: 'existing-cat', faceAssetId: 'old-face' }));
+      mocks.person.getByGroupIdOnly.mockResolvedValue(
+        makePerson({ personGroupId: 'existing-cat', faceAssetId: 'old-face' }),
+      );
+      mocks.person.getByGroupId.mockResolvedValue(
+        makePerson({ personGroupId: 'existing-cat', faceAssetId: 'old-face' }),
+      );
 
       expect(await sut.handlePetDetection({ id: asset.id })).toEqual(JobStatus.Success);
 
       expect(mocks.person.createWithGroup).not.toHaveBeenCalled();
-      expect(mocks.person.createAssetFace).toHaveBeenCalledWith(expect.objectContaining({ personGroupId: 'existing-cat' }));
+      expect(mocks.person.createAssetFace).toHaveBeenCalledWith(
+        expect.objectContaining({ personGroupId: 'existing-cat' }),
+      );
       expect(mocks.person.update).not.toHaveBeenCalled();
       expect(mocks.job.queueAll).toHaveBeenCalledWith([]);
       expect(mocks.job.queueAll).toHaveBeenCalledTimes(1);
@@ -323,7 +335,9 @@ describe(PetDetectionService.name, () => {
         imageWidth: 200,
         pets: [{ boundingBox: { x1: 10, y1: 20, x2: 30, y2: 40 }, score: 0.9, label: 'cat' }],
       });
-      mocks.person.getByOwnerAndSpecies.mockResolvedValue(makePerson({ personGroupId: 'existing-cat', faceAssetId: null }));
+      mocks.person.getByOwnerAndSpecies.mockResolvedValue(
+        makePerson({ personGroupId: 'existing-cat', faceAssetId: null }),
+      );
       mocks.person.createAssetFace.mockResolvedValue('new-face-id');
       mocks.person.getByGroupIdOnly.mockResolvedValue(makePerson({ personGroupId: 'existing-cat', faceAssetId: null }));
       mocks.person.getByGroupId.mockResolvedValue(makePerson({ personGroupId: 'existing-cat', faceAssetId: null }));
@@ -332,8 +346,14 @@ describe(PetDetectionService.name, () => {
       expect(await sut.handlePetDetection({ id: asset.id })).toEqual(JobStatus.Success);
 
       expect(mocks.person.createWithGroup).not.toHaveBeenCalled();
-      expect(mocks.person.createAssetFace).toHaveBeenCalledWith(expect.objectContaining({ personGroupId: 'existing-cat' }));
-      expect(mocks.person.update).toHaveBeenCalledWith({ ownerId: 'owner-id', personGroupId: 'existing-cat', faceAssetId: 'new-face-id' });
+      expect(mocks.person.createAssetFace).toHaveBeenCalledWith(
+        expect.objectContaining({ personGroupId: 'existing-cat' }),
+      );
+      expect(mocks.person.update).toHaveBeenCalledWith({
+        ownerId: 'owner-id',
+        personGroupId: 'existing-cat',
+        faceAssetId: 'new-face-id',
+      });
       expect(mocks.job.queueAll).toHaveBeenCalledTimes(1);
       expect(mocks.job.queueAll).toHaveBeenCalledWith([
         { name: JobName.PersonGenerateThumbnail, data: { ownerId: 'owner-id', personGroupId: 'existing-cat' } },
@@ -403,7 +423,9 @@ describe(PetDetectionService.name, () => {
         pets: [{ boundingBox: { x1: 100, y1: 200, x2: 400, y2: 500 }, score: 0.95, label: 'cat' }],
       });
       mocks.person.getByOwnerAndSpecies.mockResolvedValue(void 0);
-      mocks.person.createWithGroup.mockResolvedValue(makePerson({ personGroupId: 'cat-person', name: 'cat', species: 'cat' }));
+      mocks.person.createWithGroup.mockResolvedValue(
+        makePerson({ personGroupId: 'cat-person', name: 'cat', species: 'cat' }),
+      );
       mocks.person.createAssetFace.mockResolvedValue('face-id');
       mocks.person.getByGroupIdOnly.mockResolvedValue(makePerson({ personGroupId: 'cat-person' }));
       mocks.person.getByGroupId.mockResolvedValue(makePerson({ personGroupId: 'cat-person' }));

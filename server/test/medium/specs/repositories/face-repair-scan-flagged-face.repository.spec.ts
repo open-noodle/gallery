@@ -95,7 +95,11 @@ describe('FaceRepairScanRepository flagged faces', () => {
     ]);
 
     // simulate an apply: reassign `moved` to another person
-    await ctx.database.updateTable('asset_face').set({ personGroupId: other.personGroupId }).where('id', '=', moved).execute();
+    await ctx.database
+      .updateTable('asset_face')
+      .set({ personGroupId: other.personGroupId })
+      .where('id', '=', moved)
+      .execute();
 
     const result = await sut.getScanFlaggedFaces(scan.id, person.personGroupId);
     expect(result.map((r) => r.assetFaceId)).toEqual([stay]);
@@ -182,7 +186,9 @@ describe('FaceRepairScanRepository flagged faces', () => {
 
     const scanA = await sut.createScan({ requestedBy: null, params: PARAMS });
     const fa = await seedEligibleFace(ctx, user.id, person.personGroupId);
-    await sut.replaceScanFlaggedFaces(scanA.id, [{ assetFaceId: fa, personGroupId: person.personGroupId, suspectedOwnerId: owner.personGroupId }]);
+    await sut.replaceScanFlaggedFaces(scanA.id, [
+      { assetFaceId: fa, personGroupId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
+    ]);
 
     // cascade: deleting the scan row removes its flagged rows
     await ctx.database.deleteFrom('face_repair_scan').where('id', '=', scanA.id).execute();
@@ -196,7 +202,9 @@ describe('FaceRepairScanRepository flagged faces', () => {
     // a fresh scan reads only its own rows
     const scanB = await sut.createScan({ requestedBy: null, params: PARAMS });
     const fb = await seedEligibleFace(ctx, user.id, person.personGroupId);
-    await sut.replaceScanFlaggedFaces(scanB.id, [{ assetFaceId: fb, personGroupId: person.personGroupId, suspectedOwnerId: owner.personGroupId }]);
+    await sut.replaceScanFlaggedFaces(scanB.id, [
+      { assetFaceId: fb, personGroupId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
+    ]);
     const scanBRows = await sut.getScanFlaggedFaces(scanB.id, person.personGroupId);
     expect(scanBRows.map((r) => r.assetFaceId)).toEqual([fb]);
   });
@@ -210,8 +218,12 @@ describe('FaceRepairScanRepository flagged faces', () => {
 
     const f1 = await seedEligibleFace(ctx, user.id, person.personGroupId);
     const f2 = await seedEligibleFace(ctx, user.id, person.personGroupId);
-    await sut.replaceScanFlaggedFaces(scan.id, [{ assetFaceId: f1, personGroupId: person.personGroupId, suspectedOwnerId: owner.personGroupId }]);
-    await sut.replaceScanFlaggedFaces(scan.id, [{ assetFaceId: f2, personGroupId: person.personGroupId, suspectedOwnerId: owner.personGroupId }]);
+    await sut.replaceScanFlaggedFaces(scan.id, [
+      { assetFaceId: f1, personGroupId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
+    ]);
+    await sut.replaceScanFlaggedFaces(scan.id, [
+      { assetFaceId: f2, personGroupId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
+    ]);
 
     const rows = await sut.getScanFlaggedFaces(scan.id, person.personGroupId);
     expect(rows.map((r) => r.assetFaceId)).toEqual([f2]);
