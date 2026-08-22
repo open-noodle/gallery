@@ -239,7 +239,7 @@ describe(StorageMigrationService.name, () => {
         ]),
       );
       mocks.storageMigration.streamPersonThumbnails.mockReturnValue(
-        makeStream([{ id: 'person-1', thumbnailPath: '/usr/src/app/upload/thumbs/user/ab/cd/person.jpeg' }]),
+        makeStream([{ ownerId: 'owner-1', personGroupId: 'person-1', thumbnailPath: '/usr/src/app/upload/thumbs/user/ab/cd/person.jpeg' }]),
       );
       mocks.storageMigration.streamProfileImages.mockReturnValue(
         makeStream([{ id: 'user-1', profileImagePath: '/usr/src/app/upload/profile/user/ab/cd/profile.jpg' }]),
