@@ -5,7 +5,7 @@ import { SharedSpaceRepository } from 'src/repositories/shared-space.repository'
 import { IdentityMergePropagationService, MergeProfile } from 'src/services/identity-merge-propagation.service';
 
 type PersonalMergePersonRow = {
-  id: string;
+  personGroupId: string;
   name: string;
   birthDate: string | null;
   thumbnailPath: string;
@@ -17,7 +17,7 @@ type PersonalMergePersonRow = {
   identityId: string | null;
 };
 
-type PersonalMergeFaceRow = { id: string; personId: string | null; deletedAt?: string | null; isVisible?: boolean };
+type PersonalMergeFaceRow = { id: string; personGroupId: string | null; deletedAt?: string | null; isVisible?: boolean };
 
 class PersonalMergeDb {
   constructor(
@@ -83,7 +83,7 @@ class PersonalMergeSelectBuilder {
   }
 
   where(column: string, operator: string, value: unknown) {
-    if (this.table === 'person' && column === 'id' && operator === 'in' && Array.isArray(value)) {
+    if (this.table === 'person' && column === 'personGroupId' && operator === 'in' && Array.isArray(value)) {
       this.idFilter = value;
     }
 
@@ -98,7 +98,7 @@ class PersonalMergeSelectBuilder {
       return [];
     }
 
-    return this.idFilter ? this.db.people.filter((person) => this.idFilter?.includes(person.id)) : this.db.people;
+    return this.idFilter ? this.db.people.filter((person) => this.idFilter?.includes(person.personGroupId)) : this.db.people;
   }
 
   executeTakeFirst() {
@@ -157,17 +157,17 @@ class PersonalMergeUpdateBuilder {
   }
 
   execute() {
-    if (this.table === 'person' && this.whereColumn === 'id') {
+    if (this.table === 'person' && this.whereColumn === 'personGroupId') {
       for (const person of this.db.people) {
-        if (person.id === this.whereValue) {
+        if (person.personGroupId === this.whereValue) {
           Object.assign(person, this.update);
         }
       }
     }
 
-    if (this.table === 'asset_face' && this.whereColumn === 'personId') {
+    if (this.table === 'asset_face' && this.whereColumn === 'personGroupId') {
       for (const face of this.db.faces) {
-        if (face.personId === this.whereValue) {
+        if (face.personGroupId === this.whereValue) {
           Object.assign(face, this.update);
         }
       }
@@ -193,9 +193,9 @@ class PersonalMergeDeleteBuilder {
   }
 
   execute() {
-    if (this.table === 'person' && this.whereColumn === 'id') {
+    if (this.table === 'person' && this.whereColumn === 'personGroupId') {
       const before = this.db.people.length;
-      this.db.people = this.db.people.filter((person) => person.id !== this.whereValue);
+      this.db.people = this.db.people.filter((person) => person.personGroupId !== this.whereValue);
       return [{ numDeletedRows: BigInt(before - this.db.people.length) }];
     }
 
@@ -485,6 +485,7 @@ const makeService = (profiles: MergeProfile[], options: { unrepairableSpaceIds?:
     lockPeopleForMerge: vi.fn().mockResolvedValue(void 0),
     mergePersonProfile: vi.fn().mockResolvedValue({ deletedThumbnailPath: null, targetNeedsFeatureFaceRepair: false }),
     getRandomFace: vi.fn().mockResolvedValue(null),
+    getByGroupIdOnly: vi.fn(async (personGroupId: string) => ({ personGroupId, ownerId: 'owner-1' })),
     update: vi.fn().mockResolvedValue(void 0),
     updatePersonIdentity: vi.fn().mockResolvedValue(void 0),
   };
@@ -631,7 +632,7 @@ describe(PersonRepository.name, () => {
       const db = new PersonalMergeDb(
         [
           {
-            id: 'target-person',
+            personGroupId: 'target-person',
             name: 'Target Name',
             birthDate: '1980-01-02',
             thumbnailPath: '/target-thumb.jpg',
@@ -643,7 +644,7 @@ describe(PersonRepository.name, () => {
             identityId: 'identity-target-old',
           },
           {
-            id: 'source-person',
+            personGroupId: 'source-person',
             name: 'Source Name',
             birthDate: '1990-03-04',
             thumbnailPath: '/source-thumb.jpg',
@@ -656,8 +657,8 @@ describe(PersonRepository.name, () => {
           },
         ],
         [
-          { id: 'target-feature-face', personId: 'target-person', deletedAt: null, isVisible: true },
-          { id: 'source-face', personId: 'source-person', deletedAt: null, isVisible: true },
+          { id: 'target-feature-face', personGroupId: 'target-person', deletedAt: null, isVisible: true },
+          { id: 'source-face', personGroupId: 'source-person', deletedAt: null, isVisible: true },
         ],
       );
       const sut = new PersonRepository(db as never);
@@ -675,7 +676,7 @@ describe(PersonRepository.name, () => {
       );
       expect(db.people).toHaveLength(1);
       expect(db.people[0]).toMatchObject({
-        id: 'target-person',
+        personGroupId: 'target-person',
         name: 'Target Name',
         birthDate: '1980-01-02',
         color: '#123456',
@@ -686,8 +687,8 @@ describe(PersonRepository.name, () => {
         identityId: 'identity-target',
       });
       expect(db.faces).toEqual([
-        { id: 'target-feature-face', personId: 'target-person', deletedAt: null, isVisible: true },
-        { id: 'source-face', personId: 'target-person', deletedAt: null, isVisible: true },
+        { id: 'target-feature-face', personGroupId: 'target-person', deletedAt: null, isVisible: true },
+        { id: 'source-face', personGroupId: 'target-person', deletedAt: null, isVisible: true },
       ]);
     });
 
@@ -695,7 +696,7 @@ describe(PersonRepository.name, () => {
       const db = new PersonalMergeDb(
         [
           {
-            id: 'target-person',
+            personGroupId: 'target-person',
             name: '',
             birthDate: null,
             thumbnailPath: '',
@@ -707,7 +708,7 @@ describe(PersonRepository.name, () => {
             identityId: 'identity-target-old',
           },
           {
-            id: 'source-person',
+            personGroupId: 'source-person',
             name: 'Source Name',
             birthDate: '1990-03-04',
             thumbnailPath: '',
@@ -730,7 +731,7 @@ describe(PersonRepository.name, () => {
 
       expect(db.people).toEqual([
         expect.objectContaining({
-          id: 'target-person',
+          personGroupId: 'target-person',
           name: 'Source Name',
           birthDate: '1990-03-04',
           color: '#abcdef',
@@ -747,7 +748,7 @@ describe(PersonRepository.name, () => {
       const db = new PersonalMergeDb(
         [
           {
-            id: 'target-person',
+            personGroupId: 'target-person',
             name: 'Target Name',
             birthDate: null,
             thumbnailPath: '',
@@ -759,7 +760,7 @@ describe(PersonRepository.name, () => {
             identityId: 'identity-target-old',
           },
           {
-            id: 'source-person',
+            personGroupId: 'source-person',
             name: 'Source Name',
             birthDate: null,
             thumbnailPath: '',
@@ -771,7 +772,7 @@ describe(PersonRepository.name, () => {
             identityId: 'identity-source',
           },
         ],
-        [{ id: 'source-face', personId: 'source-person', deletedAt: null, isVisible: true }],
+        [{ id: 'source-face', personGroupId: 'source-person', deletedAt: null, isVisible: true }],
       );
       const sut = new PersonRepository(db as never);
 
@@ -782,9 +783,9 @@ describe(PersonRepository.name, () => {
 
       expect(result.targetNeedsFeatureFaceRepair).toBe(true);
       expect(db.people).toEqual([
-        expect.objectContaining({ id: 'target-person', faceAssetId: 'missing-feature-face' }),
+        expect.objectContaining({ personGroupId: 'target-person', faceAssetId: 'missing-feature-face' }),
       ]);
-      expect(db.faces).toEqual([{ id: 'source-face', personId: 'target-person', deletedAt: null, isVisible: true }]);
+      expect(db.faces).toEqual([{ id: 'source-face', personGroupId: 'target-person', deletedAt: null, isVisible: true }]);
     });
   });
 });
@@ -1958,12 +1959,12 @@ describe('IdentityMergePropagationService', () => {
 
       expect(mocks.person.getRandomFace).toHaveBeenCalledWith('person-x', transaction);
       expect(mocks.person.update).toHaveBeenCalledWith(
-        { id: 'person-x', faceAssetId: 'replacement-face' },
+        { ownerId: 'owner-1', personGroupId: 'person-x', faceAssetId: 'replacement-face' },
         transaction,
       );
       expect(mocks.job.queue).toHaveBeenCalledWith({
         name: JobName.PersonGenerateThumbnail,
-        data: { id: 'person-x' },
+        data: { ownerId: 'owner-1', personGroupId: 'person-x' },
       });
     });
 
