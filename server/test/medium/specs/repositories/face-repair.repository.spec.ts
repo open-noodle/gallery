@@ -52,7 +52,7 @@ const seedEligibleFacesBulk = async (ctx: Ctx, ownerId: string, personId: string
       .execute();
   }
   const faces = assets.map((asset) =>
-    mediumFactory.assetFaceInsert({ assetId: asset.id, personId, sourceType: SourceType.MachineLearning }),
+    mediumFactory.assetFaceInsert({ assetId: asset.id, personGroupId, sourceType: SourceType.MachineLearning }),
   );
   for (let index = 0; index < faces.length; index += 1000) {
     await ctx.database

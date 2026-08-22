@@ -446,12 +446,12 @@ describe(JobService.name, () => {
       mocks.job.run.mockResolvedValue(JobStatus.Success);
       const personId = newUuid();
       const ownerId = newUuid();
-      const person = factory.person({ id: personId, ownerId });
+      const person = factory.person({ personGroupId: personId, ownerId });
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
 
       await sut.onJobRun(QueueName.ThumbnailGeneration, {
         name: JobName.PersonGenerateThumbnail,
-        data: { id: personId },
+        data: { personGroupId: personId },
       });
 
       expect(mocks.person.getByGroupIdOnly).toHaveBeenCalledWith(personId);
@@ -465,7 +465,7 @@ describe(JobService.name, () => {
 
       await sut.onJobRun(QueueName.ThumbnailGeneration, {
         name: JobName.PersonGenerateThumbnail,
-        data: { id: personId },
+        data: { personGroupId: personId },
       });
 
       expect(mocks.person.getByGroupIdOnly).toHaveBeenCalledWith(personId);
