@@ -993,7 +993,11 @@ export class FaceRepairService extends BaseService {
         // `entireCluster` carries no lock field by design — PersonPicker hides the toggle for a whole-cluster
         // move "rather than showing a toggle its request cannot carry". Omitting `lock` falls through to the
         // durable default, preserving today's behaviour; only buckets whose caller expressed a preference change.
-        toRepair.push({ assetFaceId, currentPersonId: personGroupId, suspectedOwnerId: entireCluster.destinationPersonId });
+        toRepair.push({
+          assetFaceId,
+          currentPersonId: personGroupId,
+          suspectedOwnerId: entireCluster.destinationPersonId,
+        });
       }
     }
 

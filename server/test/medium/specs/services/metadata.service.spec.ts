@@ -543,7 +543,11 @@ describe(MetadataService.name, () => {
         personGroupId: person.personGroupId,
         sourceType: SourceType.Exif,
       });
-      await ctx.database.updateTable('person').set({ faceAssetId: assetFace.id }).where('personGroupId', '=', person.personGroupId).execute();
+      await ctx.database
+        .updateTable('person')
+        .set({ faceAssetId: assetFace.id })
+        .where('personGroupId', '=', person.personGroupId)
+        .execute();
       const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
       await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
