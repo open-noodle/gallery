@@ -56,6 +56,7 @@ import type {
   SharedSpaceFaceMatchBackfillTarget,
 } from 'src/repositories/face-identity.repository.js';
 import { BoundingBox } from 'src/repositories/machine-learning.repository.js';
+import { PersonId } from 'src/repositories/person.repository.js';
 import { DB } from 'src/schema/index.js';
 import { AssetFaceTable } from 'src/schema/tables/asset-face.table.js';
 import { FaceSearchTable } from 'src/schema/tables/face-search.table.js';
@@ -64,7 +65,6 @@ import {
   buildAutomaticReconciliationClaim,
   chooseAutomaticTargetIdentity,
 } from 'src/services/accessible-identity-reconciliation.js';
-import { PersonId } from 'src/repositories/person.repository.js';
 import { BaseService } from 'src/services/base.service.js';
 import type { MergeAuthorizer } from 'src/services/identity-merge-propagation.service.js';
 import { getDimensions } from 'src/utils/asset.util.js';
@@ -341,7 +341,10 @@ export class PersonService extends BaseService {
         // Slice 8 (F15): the owner just stated a fact ("this face IS this person") that contradicts any
         // durable rejected/ignored row for this SAME target — the newer human decision wins. Scoped to
         // `personId` only: a negative recorded against a DIFFERENT person for this face must survive.
-        await this.facePersonVerdictRepository.clearNegativeForTarget({ personGroupId: person.personGroupId, identityId }, [face.id]);
+        await this.facePersonVerdictRepository.clearNegativeForTarget(
+          { personGroupId: person.personGroupId, identityId },
+          [face.id],
+        );
       }
 
       result.push(mapPerson(person));
@@ -363,7 +366,9 @@ export class PersonService extends BaseService {
     const identityId = await this.replaceFaceIdentity(person.personGroupId, face.id, 'manual');
     // Slice 8 (F15): same clearing as reassignFaces above — scoped to `personId`, so a negative recorded
     // against a DIFFERENT person for this face survives.
-    await this.facePersonVerdictRepository.clearNegativeForTarget({ personGroupId: person.personGroupId, identityId }, [face.id]);
+    await this.facePersonVerdictRepository.clearNegativeForTarget({ personGroupId: person.personGroupId, identityId }, [
+      face.id,
+    ]);
     if (person.faceAssetId === null) {
       await this.createNewFeaturePhoto([person]);
     }

@@ -52,7 +52,11 @@ const seedEligibleFacesBulk = async (ctx: Ctx, ownerId: string, personId: string
       .execute();
   }
   const faces = assets.map((asset) =>
-    mediumFactory.assetFaceInsert({ assetId: asset.id, personGroupId: personId, sourceType: SourceType.MachineLearning }),
+    mediumFactory.assetFaceInsert({
+      assetId: asset.id,
+      personGroupId: personId,
+      sourceType: SourceType.MachineLearning,
+    }),
   );
   for (let index = 0; index < faces.length; index += 1000) {
     await ctx.database
@@ -326,7 +330,10 @@ describe('FaceRepairRepository.reattributeFaces', () => {
     const { person: owner } = await ctx.newPerson({ ownerId: user.id });
 
     const { asset } = await ctx.newAsset({ ownerId: user.id });
-    const { assetFace: manualFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+    const { assetFace: manualFace } = await ctx.newAssetFace({
+      assetId: asset.id,
+      personGroupId: person.personGroupId,
+    });
     await ctx.database
       .updateTable('asset_face')
       .set({ sourceType: 'manual' as SourceType })
@@ -419,7 +426,10 @@ describe('FaceRepairRepository.detachFaces', () => {
     const { person } = await ctx.newPerson({ ownerId: user.id });
 
     const { asset } = await ctx.newAsset({ ownerId: user.id });
-    const { assetFace: manualFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+    const { assetFace: manualFace } = await ctx.newAssetFace({
+      assetId: asset.id,
+      personGroupId: person.personGroupId,
+    });
     await ctx.database
       .updateTable('asset_face')
       .set({ sourceType: 'manual' as SourceType })
@@ -461,7 +471,11 @@ describe('FaceRepairRepository.reconcileRepresentativeFaces', () => {
     const { assetFace: faceB } = await ctx.newAssetFace({ assetId: assetB.id, personGroupId: person.personGroupId });
 
     // Set faceA as rep
-    await ctx.database.updateTable('person').set({ faceAssetId: faceA.id }).where('personGroupId', '=', person.personGroupId).execute();
+    await ctx.database
+      .updateTable('person')
+      .set({ faceAssetId: faceA.id })
+      .where('personGroupId', '=', person.personGroupId)
+      .execute();
 
     // Unassign faceA (simulating what unassignFacesFromPerson does)
     await ctx.database.updateTable('asset_face').set({ personGroupId: null }).where('id', '=', faceA.id).execute();
@@ -485,7 +499,11 @@ describe('FaceRepairRepository.reconcileRepresentativeFaces', () => {
     const { asset: assetA } = await ctx.newAsset({ ownerId: user.id });
     const { assetFace: faceA } = await ctx.newAssetFace({ assetId: assetA.id, personGroupId: person.personGroupId });
 
-    await ctx.database.updateTable('person').set({ faceAssetId: faceA.id }).where('personGroupId', '=', person.personGroupId).execute();
+    await ctx.database
+      .updateTable('person')
+      .set({ faceAssetId: faceA.id })
+      .where('personGroupId', '=', person.personGroupId)
+      .execute();
 
     await sut.reconcileRepresentativeFaces([person.personGroupId]);
 
@@ -569,7 +587,11 @@ describe('FaceRepairRepository.getClusterFacePage', () => {
 
     // skip: face with NO face_search row (mirrors streamEligibleFaces' inner join)
     const { asset: anofs } = await ctx.newAsset({ ownerId: user.id });
-    await ctx.newAssetFace({ assetId: anofs.id, personGroupId: person.personGroupId, sourceType: SourceType.MachineLearning });
+    await ctx.newAssetFace({
+      assetId: anofs.id,
+      personGroupId: person.personGroupId,
+      sourceType: SourceType.MachineLearning,
+    });
 
     const page = await sut.getClusterFacePage(person.personGroupId, { excludeFaceIds, limit: 50, offset: 0 });
 

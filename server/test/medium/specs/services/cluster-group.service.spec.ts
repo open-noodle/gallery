@@ -35,9 +35,6 @@ const getClusterGroupId = async (ctx: ReturnType<typeof setup>['ctx'], userId: s
   return clusterGroupId;
 };
 
-const getPeople = (ctx: ReturnType<typeof setup>['ctx'], ownerId: string) =>
-  ctx.database.selectFrom('person').selectAll('person').where('person.ownerId', '=', ownerId).execute();
-
 beforeAll(async () => {
   defaultDatabase = await getKyselyDB();
 });

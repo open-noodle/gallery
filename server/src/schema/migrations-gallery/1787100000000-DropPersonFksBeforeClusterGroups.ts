@@ -28,9 +28,7 @@ export async function up(db: Kysely<any>): Promise<void> {
 
   await sql`ALTER TABLE "face_person_verdict" DROP CONSTRAINT "face_person_verdict_personId_fkey";`.execute(db);
   await sql`ALTER TABLE "face_repair_decline" DROP CONSTRAINT "face_repair_decline_personId_fkey";`.execute(db);
-  await sql`ALTER TABLE "face_repair_decline" DROP CONSTRAINT "face_repair_decline_suspectedOwnerId_fkey";`.execute(
-    db,
-  );
+  await sql`ALTER TABLE "face_repair_decline" DROP CONSTRAINT "face_repair_decline_suspectedOwnerId_fkey";`.execute(db);
 }
 
 export async function down(db: Kysely<any>): Promise<void> {

@@ -188,7 +188,11 @@ describe(ClassificationRepository.name, () => {
 
       await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId, isVisible: false });
       await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId, deletedAt: new Date() });
-      await ctx.newAssetFace({ assetId: asset.id, personGroupId: pet.personGroupId, sourceType: SourceType.MachineLearning });
+      await ctx.newAssetFace({
+        assetId: asset.id,
+        personGroupId: pet.personGroupId,
+        sourceType: SourceType.MachineLearning,
+      });
 
       await expect(sut.getFaceSummary(asset.id)).resolves.toEqual({
         hasAssignedFace: false,
