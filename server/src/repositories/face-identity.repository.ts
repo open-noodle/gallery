@@ -2706,7 +2706,7 @@ export class FaceIdentityRepository {
 
       await this.db
         .updateTable('asset_face')
-        .set({ personId: targetPerson.personGroupId })
+        .set({ personGroupId: targetPerson.personGroupId })
         .where('personGroupId', '=', person.id)
         .where('id', 'in', assetFaceIds)
         .execute();
