@@ -11,8 +11,20 @@ import { findOrFail } from 'src/utils/misc';
 export class AssetFileService extends BaseService {
   async search(auth: AuthDto, dto: AssetFileSearchDto): Promise<AssetFileResponseDto[]> {
     await this.requireAccess({ auth, permission: Permission.AssetRead, ids: [dto.assetId] });
+
+    // Gallery: AssetRead also admits shared-space members (as well as upstream's album participants and
+    // partners), while every per-file endpoint below is owner-only. Returning `path` unconditionally
+    // would hand every viewer of a shared asset the owner's storage paths / S3 keys for files they
+    // cannot fetch, so the path is projected out for non-owners.
+    const owned = await this.accessRepository.asset.checkOwnerAccess(
+      auth.user.id,
+      new Set([dto.assetId]),
+      auth.session?.hasElevatedPermission,
+    );
+    const includePath = owned.has(dto.assetId);
+
     const files = await this.assetFileRepository.search(dto);
-    return files.map((file) => mapAssetFile(file));
+    return files.map((file) => mapAssetFile(file, { includePath }));
   }
 
   async get(auth: AuthDto, id: string): Promise<AssetFileResponseDto> {
