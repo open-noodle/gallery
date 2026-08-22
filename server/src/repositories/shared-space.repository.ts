@@ -2285,7 +2285,7 @@ export class SharedSpaceRepository {
       .where('person.identityId', '=', input.identityId)
       .where('person.thumbnailPath', '!=', '')
       .orderBy('person.updatedAt', 'desc')
-      .orderBy('person.id')
+      .orderBy('person.personGroupId')
       .executeTakeFirst();
 
     if (ownThumbnail) {
@@ -2321,7 +2321,7 @@ export class SharedSpaceRepository {
         ]),
       )
       .orderBy('person.updatedAt', 'desc')
-      .orderBy('person.id')
+      .orderBy('person.personGroupId')
       .executeTakeFirst();
   }
 
@@ -2375,7 +2375,7 @@ export class SharedSpaceRepository {
       ])
       .where('person.identityId', '=', input.identityId)
       .groupBy([
-        'person.id',
+        'person.personGroupId',
         'person.ownerId',
         'shared_space_member.role',
         'person.name',
@@ -3624,7 +3624,7 @@ export class SharedSpaceRepository {
       .select([
         'asset_face.id',
         'asset_face.assetId',
-        'asset_face.personId',
+        'asset_face.personGroupId as personId',
         'face_identity_face.identityId',
         'person.type',
         'face_search.embedding',
@@ -3946,7 +3946,7 @@ export class SharedSpaceRepository {
     return this.db
       .selectFrom('asset_face')
       .innerJoin('person', 'person.personGroupId', 'asset_face.personGroupId')
-      .select(['asset_face.id', 'asset_face.assetId', 'asset_face.personId', 'person.identityId', 'person.type'])
+      .select(['asset_face.id', 'asset_face.assetId', 'asset_face.personGroupId as personId', 'person.identityId', 'person.type'])
       .where('asset_face.assetId', '=', assetId)
       .where('asset_face.deletedAt', 'is', null)
       .where('person.type', '=', 'pet')
@@ -3983,7 +3983,7 @@ export class SharedSpaceRepository {
         'shared_space_person.birthDate',
         'shared_space_person.updatedAt',
         'shared_space_person.type',
-        'asset_face.personId',
+        'asset_face.personGroupId as personId',
       ])
       .where('shared_space_person.spaceId', '=', spaceId)
       .where('asset_face.personGroupId', 'in', personIds)
@@ -3994,7 +3994,7 @@ export class SharedSpaceRepository {
         'shared_space_person.birthDate',
         'shared_space_person.updatedAt',
         'shared_space_person.type',
-        'asset_face.personId',
+        'asset_face.personGroupId',
       ])
       .execute();
 
