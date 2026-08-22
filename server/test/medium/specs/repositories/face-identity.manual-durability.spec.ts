@@ -42,7 +42,7 @@ beforeAll(async () => {
 
 const seedFace = async (ctx: Ctx, ownerId: string, personId: string): Promise<string> => {
   const { asset } = await ctx.newAsset({ ownerId });
-  const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId, sourceType: SourceType.MachineLearning });
+  const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: personId, sourceType: SourceType.MachineLearning });
   return assetFace.id;
 };
 
