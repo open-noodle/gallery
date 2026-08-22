@@ -228,13 +228,13 @@ export class FaceRepairScanRepository {
       .selectFrom('person')
       .leftJoin('asset_face', (join) =>
         join
-          .onRef('asset_face.personId', '=', 'person.id')
+          .onRef('asset_face.personGroupId', '=', 'person.personGroupId')
           .on('asset_face.deletedAt', 'is', null)
           .on('asset_face.isVisible', '=', true),
       )
-      .select(['person.id as id', 'person.name as name', 'person.faceAssetId as faceAssetId'])
+      .select(['person.personGroupId as id', 'person.name as name', 'person.faceAssetId as faceAssetId'])
       .select((eb) => eb.fn.count('asset_face.id').as('faceCount'))
-      .where('person.id', 'in', ids)
+      .where('person.personGroupId', 'in', ids)
       .groupBy(['person.id'])
       .execute();
     const byId = new Map(rows.map((r) => [r.id, r]));
@@ -304,7 +304,7 @@ export class FaceRepairScanRepository {
         .select(['ff.assetFaceId as assetFaceId', 'ff.suspectedOwnerId as suspectedOwnerId'])
         .where('ff.scanId', '=', scanId)
         .where('ff.personId', '=', personId)
-        .where('asset_face.personId', '=', personId)
+        .where('asset_face.personGroupId', '=', personId)
         .where('asset_face.sourceType', '=', sql.lit(SourceType.MachineLearning))
         .where('asset_face.deletedAt', 'is', null)
         .where('asset_face.isVisible', '=', true)
@@ -341,7 +341,7 @@ export class FaceRepairScanRepository {
         .select(['ff.assetFaceId as assetFaceId', 'ff.personId as personId', 'ff.suspectedOwnerId as suspectedOwnerId'])
         .where('ff.scanId', '=', scanId)
         .where('ff.personId', 'in', personIds)
-        .whereRef('asset_face.personId', '=', 'ff.personId')
+        .whereRef('asset_face.personGroupId', '=', 'ff.personId')
         .where('asset_face.sourceType', '=', sql.lit(SourceType.MachineLearning))
         .where('asset_face.deletedAt', 'is', null)
         .where('asset_face.isVisible', '=', true)
@@ -370,10 +370,10 @@ export class FaceRepairScanRepository {
     }
     const people = await this.db
       .selectFrom('person')
-      .select(['id', 'ownerId', 'name', 'faceAssetId'])
-      .where('id', 'in', personIds)
+      .select(['personGroupId', 'ownerId', 'name', 'faceAssetId'])
+      .where('personGroupId', 'in', personIds)
       .execute();
-    const byId = new Map(people.map((person) => [person.id, person]));
+    const byId = new Map(people.map((person) => [person.personGroupId, person]));
     const nameOf = (id: string) => (byId.get(id)?.name ? byId.get(id)!.name : null);
     const thumbOf = (id: string) => byId.get(id)?.faceAssetId ?? null;
 

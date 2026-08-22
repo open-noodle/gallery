@@ -851,7 +851,7 @@ export class AssetRepository {
       .innerJoin('asset_face', 'asset_face.assetId', 'asset.id')
       .innerJoin('asset_job_status', 'asset_job_status.assetId', 'asset.id')
       .where('asset.ownerId', '=', ownerId)
-      .where('asset_face.personId', '=', personId)
+      .where('asset_face.personGroupId', '=', personId)
       .where('asset_face.deletedAt', 'is', null)
       .where('asset_face.isVisible', 'is', true)
       .where('asset.visibility', '=', AssetVisibility.Timeline)
