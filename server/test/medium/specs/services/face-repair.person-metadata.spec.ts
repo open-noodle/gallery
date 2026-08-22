@@ -32,7 +32,11 @@ describe('FaceRepairService.getPersonMetadata', () => {
     const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Alice' });
     const { asset } = await ctx.newAsset({ ownerId: user.id });
     const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
-    await ctx.database.updateTable('person').set({ faceAssetId: assetFace.id }).where('personGroupId', '=', person.personGroupId).execute();
+    await ctx.database
+      .updateTable('person')
+      .set({ faceAssetId: assetFace.id })
+      .where('personGroupId', '=', person.personGroupId)
+      .execute();
 
     const result = await sut.getPersonMetadata(person.personGroupId);
 
@@ -90,7 +94,12 @@ describe('FaceRepairService.getPersonMetadata', () => {
     const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Carla' });
 
     const { asset: visibleAsset } = await ctx.newAsset({ ownerId: user.id });
-    await ctx.newAssetFace({ assetId: visibleAsset.id, personGroupId: person.personGroupId, isVisible: true, deletedAt: null });
+    await ctx.newAssetFace({
+      assetId: visibleAsset.id,
+      personGroupId: person.personGroupId,
+      isVisible: true,
+      deletedAt: null,
+    });
 
     const { asset: deletedAsset } = await ctx.newAsset({ ownerId: user.id });
     await ctx.newAssetFace({
@@ -101,7 +110,12 @@ describe('FaceRepairService.getPersonMetadata', () => {
     });
 
     const { asset: hiddenAsset } = await ctx.newAsset({ ownerId: user.id });
-    await ctx.newAssetFace({ assetId: hiddenAsset.id, personGroupId: person.personGroupId, isVisible: false, deletedAt: null });
+    await ctx.newAssetFace({
+      assetId: hiddenAsset.id,
+      personGroupId: person.personGroupId,
+      isVisible: false,
+      deletedAt: null,
+    });
 
     const result = await sut.getPersonMetadata(person.personGroupId);
 
