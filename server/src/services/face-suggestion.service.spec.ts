@@ -718,9 +718,9 @@ describe(FaceSuggestionService.name, () => {
       mocks.person.getFaceById.mockResolvedValue(getForAssetFace(face));
       mocks.facePersonVerdict.claimPending.mockResolvedValue(1);
 
-      await expect(sut.confirmFaceSuggestion(AuthFactory.create(), person.personGroupId, face.id)).rejects.toBeInstanceOf(
-        BadRequestException,
-      );
+      await expect(
+        sut.confirmFaceSuggestion(AuthFactory.create(), person.personGroupId, face.id),
+      ).rejects.toBeInstanceOf(BadRequestException);
       expect(mocks.facePersonVerdict.claimPending).not.toHaveBeenCalled();
       expect(mocks.person.reassignFace).not.toHaveBeenCalled();
     });
