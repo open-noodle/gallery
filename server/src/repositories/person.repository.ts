@@ -191,10 +191,7 @@ const withPerson = ({ viewingUserId }: WithPersonOptions) => {
  */
 const withPersonAnyOwner = (eb: ExpressionBuilder<DB, 'asset_face'>) =>
   jsonObjectFrom(
-    eb
-      .selectFrom('person')
-      .selectAll('person')
-      .whereRef('person.personGroupId', '=', 'asset_face.personGroupId'),
+    eb.selectFrom('person').selectAll('person').whereRef('person.personGroupId', '=', 'asset_face.personGroupId'),
   ).as('person');
 
 const withFaceSearch = (eb: ExpressionBuilder<DB, 'asset_face'>) => {
@@ -330,7 +327,11 @@ export class PersonRepository {
     },
     db: Kysely<DB> | Transaction<DB> = this.db,
   ): Promise<void> {
-    await db.updateTable('person').set({ identityId: input.identityId }).where('personGroupId', '=', input.personId).execute();
+    await db
+      .updateTable('person')
+      .set({ identityId: input.identityId })
+      .where('personGroupId', '=', input.personId)
+      .execute();
   }
 
   @GenerateSql({ params: [{ sourceType: SourceType.MachineLearning, clusterGroupId: DummyValue.UUID }] })
