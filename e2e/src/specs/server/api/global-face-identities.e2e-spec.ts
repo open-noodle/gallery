@@ -64,8 +64,8 @@ const setupGlobalFaceIdentityE2E = async (): Promise<GlobalFaceIdentityFixture> 
   ]);
 
   const [facesA, facesB] = await Promise.all([
-    Promise.all(assetsA.map((asset) => utils.createFace({ assetId: asset.id, personId: personA.id }))),
-    Promise.all(assetsB.map((asset) => utils.createFace({ assetId: asset.id, personId: personB.id }))),
+    Promise.all(assetsA.map((asset) => utils.createFace({ assetId: asset.id, personGroupId: personA.id }))),
+    Promise.all(assetsB.map((asset) => utils.createFace({ assetId: asset.id, personGroupId: personB.id }))),
   ]);
   const [faceA] = facesA;
   const [faceB] = facesB;

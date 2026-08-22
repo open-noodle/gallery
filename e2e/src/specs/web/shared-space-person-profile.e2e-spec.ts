@@ -48,7 +48,7 @@ test.describe('Shared space person in the main People view', () => {
     // createFace wires the face identity (face_identity + face_identity_face + person.identityId);
     // the shared_space_person must join the same identity for members to see it under /people.
     const person = await utils.createPerson(admin.accessToken, { name: 'Grandma' });
-    const faceId = await utils.createFace({ assetId: asset.id, personId: person.id });
+    const faceId = await utils.createFace({ assetId: asset.id, personGroupId: person.id });
     const identityResult = await db.query(`SELECT "identityId" FROM "person" WHERE id = $1`, [person.id]);
     const identityId = identityResult.rows[0].identityId as string;
 
@@ -127,7 +127,7 @@ test.describe('Shared space person in the main People view', () => {
       await utils.waitForQueueFinish(adminLogin.accessToken, 'thumbnailGeneration');
 
       const person = await utils.createPerson(adminLogin.accessToken, { name: 'Suggestion Target' });
-      const faceId = await utils.createFace({ assetId: representativeAsset.id, personId: person.id });
+      const faceId = await utils.createFace({ assetId: representativeAsset.id, personGroupId: person.id });
       const identityResult = await db.query(`SELECT "identityId" FROM "person" WHERE id = $1`, [person.id]);
       const identityId = identityResult.rows[0].identityId as string;
 
