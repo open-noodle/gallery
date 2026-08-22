@@ -381,7 +381,7 @@ const personFactory = (person?: Partial<Person>): Person => ({
   color: null,
   createdAt: newDate(),
   faceAssetId: null,
-  id: newUuid(),
+  personGroupId: newUuid(),
   identityId: null,
   isFavorite: false,
   isHidden: false,
