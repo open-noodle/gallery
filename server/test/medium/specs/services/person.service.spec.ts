@@ -412,12 +412,12 @@ describe(PersonService.name, () => {
         expect.arrayContaining([
           expect.objectContaining({
             id: exif.assetFace.id,
-            personId: exif.person.personGroupId,
+            personGroupId: exif.person.personGroupId,
             sourceType: SourceType.Exif,
           }),
           expect.objectContaining({
             id: manual.assetFace.id,
-            personId: manual.person.personGroupId,
+            personGroupId: manual.person.personGroupId,
             sourceType: SourceType.Manual,
           }),
         ]),
@@ -439,8 +439,8 @@ describe(PersonService.name, () => {
           .orderBy('name')
           .execute(),
       ).resolves.toEqual([
-        { id: exif.person.personGroupId, name: 'Exif' },
-        { id: manual.person.personGroupId, name: 'Manual' },
+        { personGroupId: exif.person.personGroupId, name: 'Exif' },
+        { personGroupId: manual.person.personGroupId, name: 'Manual' },
       ]);
       await expect(
         ctx.database
@@ -554,13 +554,13 @@ describe(PersonService.name, () => {
 
         await expect(getAssetFaces(ctx, asset.id)).resolves.toEqual(
           expect.arrayContaining([
-            expect.objectContaining({ id: ml.assetFace.id, personId: null, sourceType: SourceType.MachineLearning }),
+            expect.objectContaining({ id: ml.assetFace.id, personGroupId: null, sourceType: SourceType.MachineLearning }),
             expect.objectContaining({
               id: manual.assetFace.id,
-              personId: manual.person.personGroupId,
+              personGroupId: manual.person.personGroupId,
               sourceType: SourceType.Manual,
             }),
-            expect.objectContaining({ id: exif.assetFace.id, personId: exif.person.personGroupId, sourceType: SourceType.Exif }),
+            expect.objectContaining({ id: exif.assetFace.id, personGroupId: exif.person.personGroupId, sourceType: SourceType.Exif }),
           ]),
         );
         await expect(getIdentityLinks(ctx, [ml.assetFace.id, manual.assetFace.id, exif.assetFace.id])).resolves.toEqual(
@@ -571,8 +571,8 @@ describe(PersonService.name, () => {
         );
         await expect(getIdentityLinks(ctx, [ml.assetFace.id])).resolves.toEqual([]);
         await expect(getPeopleByIds(ctx, [ml.person.personGroupId, manual.person.personGroupId, exif.person.personGroupId])).resolves.toEqual([
-          { id: exif.person.personGroupId, name: 'Exif' },
-          { id: manual.person.personGroupId, name: 'Manual' },
+          { personGroupId: exif.person.personGroupId, name: 'Exif' },
+          { personGroupId: manual.person.personGroupId, name: 'Manual' },
         ]);
         await expect(getSpacePeople(ctx, [enabledSpace.id, disabledSpace.id])).resolves.toEqual([]);
 
@@ -660,13 +660,13 @@ describe(PersonService.name, () => {
 
         await expect(getAssetFaces(ctx, asset.id)).resolves.toEqual(
           expect.arrayContaining([
-            expect.objectContaining({ id: ml.assetFace.id, personId: null, sourceType: SourceType.MachineLearning }),
+            expect.objectContaining({ id: ml.assetFace.id, personGroupId: null, sourceType: SourceType.MachineLearning }),
             expect.objectContaining({
               id: manual.assetFace.id,
-              personId: manual.person.personGroupId,
+              personGroupId: manual.person.personGroupId,
               sourceType: SourceType.Manual,
             }),
-            expect.objectContaining({ id: exif.assetFace.id, personId: exif.person.personGroupId, sourceType: SourceType.Exif }),
+            expect.objectContaining({ id: exif.assetFace.id, personGroupId: exif.person.personGroupId, sourceType: SourceType.Exif }),
           ]),
         );
         await expect(getIdentityLinks(ctx, [ml.assetFace.id, manual.assetFace.id, exif.assetFace.id])).resolves.toEqual(
@@ -746,9 +746,9 @@ describe(PersonService.name, () => {
           .orderBy('name')
           .execute(),
       ).resolves.toEqual([
-        { id: exif.person.personGroupId, name: 'Exif' },
-        { id: ml.person.personGroupId, name: 'Machine' },
-        { id: manual.person.personGroupId, name: 'Manual' },
+        { personGroupId: exif.person.personGroupId, name: 'Exif' },
+        { personGroupId: ml.person.personGroupId, name: 'Machine' },
+        { personGroupId: manual.person.personGroupId, name: 'Manual' },
       ]);
       await expect(
         ctx.database
