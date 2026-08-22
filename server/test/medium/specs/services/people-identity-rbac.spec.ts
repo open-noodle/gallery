@@ -805,7 +805,7 @@ describe('People identity RBAC projection', () => {
     ]);
     expect(targetProfiles).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ id: memberConflictPerson.personGroupId, ownerId: fx.member.id, identityId: targetIdentity.id }),
+        expect.objectContaining({ personGroupId: memberConflictPerson.personGroupId, ownerId: fx.member.id, identityId: targetIdentity.id }),
       ]),
     );
     expect(targetProfiles.map((profile) => profile.personGroupId)).not.toContain(uploadedPerson.personGroupId);
