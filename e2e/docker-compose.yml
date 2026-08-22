@@ -24,6 +24,11 @@ services:
         - BUILD_IMAGE=e2e
         - BUILD_SOURCE_REF=e2e
         - BUILD_SOURCE_COMMIT=e2eeeeeeeeeeeeeeeeee
+      # Gallery: the plugins stage fetches js-pdk from GitHub. Unauthenticated that is 60 requests/hour
+      # per runner IP, which intermittently 403s and surfaces as `extism-js: not found`. test.yml already
+      # exports GITHUB_TOKEN for this build; forward it so the fetch is authenticated.
+      secrets:
+        - github_token
     environment:
       DB_HOSTNAME: database
       DB_USERNAME: postgres
@@ -67,3 +72,7 @@ services:
       timeout: 5s
       retries: 30
       start_period: 10s
+
+secrets:
+  github_token:
+    environment: GITHUB_TOKEN
