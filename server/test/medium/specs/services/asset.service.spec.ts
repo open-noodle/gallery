@@ -58,7 +58,7 @@ const albumSharedAsset = async (ctx: ReturnType<typeof setup>['ctx']) => {
   const { asset } = await ctx.newAsset({ ownerId: owner.id });
 
   const { person } = await ctx.newPerson({ ownerId: owner.id, name: 'Alice' });
-  await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+  await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
 
   const tag = await ctx.database
     .insertInto('tag')

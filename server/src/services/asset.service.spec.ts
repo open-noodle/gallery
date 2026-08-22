@@ -205,7 +205,7 @@ describe(AssetService.name, () => {
     it('should keep people for space member with spaceId', async () => {
       const asset = AssetFactory.from()
         .exif()
-        .face({}, (f) => f.person({ id: 'person-1', name: 'Test Person' }))
+        .face({}, (f) => f.person({ personGroupId: 'person-1', name: 'Test Person' }))
         .build();
       mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set([asset.id]));
       mocks.asset.getById.mockResolvedValue(asset as any);
@@ -227,7 +227,7 @@ describe(AssetService.name, () => {
         .exif()
         .face({}, (f) =>
           f.person({
-            id: 'person-1',
+            personGroupId: 'person-1',
             name: 'Global Person',
             thumbnailPath: '/global-person-thumb.jpg',
             birthDate: '1980-01-01' as any,
@@ -272,7 +272,7 @@ describe(AssetService.name, () => {
     it('should map spacePersonId for asset owner in shared space context', async () => {
       const asset = AssetFactory.from({ ownerId: authStub.user1.user.id })
         .exif()
-        .face({}, (f) => f.person({ id: 'person-1', name: 'Test Person' }))
+        .face({}, (f) => f.person({ personGroupId: 'person-1', name: 'Test Person' }))
         .build();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
       mocks.asset.getById.mockResolvedValue(getForAsset(asset));
@@ -292,7 +292,7 @@ describe(AssetService.name, () => {
     it('should reject asset owner with explicit spaceId when they are not a member', async () => {
       const asset = AssetFactory.from({ ownerId: authStub.user1.user.id })
         .exif()
-        .face({}, (f) => f.person({ id: 'person-1', name: 'Test Person' }))
+        .face({}, (f) => f.person({ personGroupId: 'person-1', name: 'Test Person' }))
         .build();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
       mocks.asset.getById.mockResolvedValue(getForAsset(asset));
@@ -304,7 +304,7 @@ describe(AssetService.name, () => {
     it('should strip people for asset owner when the asset is not in the specified space', async () => {
       const asset = AssetFactory.from({ ownerId: authStub.user1.user.id })
         .exif()
-        .face({}, (f) => f.person({ id: 'person-1', name: 'Test Person' }))
+        .face({}, (f) => f.person({ personGroupId: 'person-1', name: 'Test Person' }))
         .build();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
       mocks.asset.getById.mockResolvedValue(getForAsset(asset));
@@ -319,7 +319,7 @@ describe(AssetService.name, () => {
     it('should filter hidden space persons for asset owner with explicit spaceId', async () => {
       const asset = AssetFactory.from({ ownerId: authStub.user1.user.id })
         .exif()
-        .face({}, (f) => f.person({ id: 'person-1', name: 'Test Person' }))
+        .face({}, (f) => f.person({ personGroupId: 'person-1', name: 'Test Person' }))
         .build();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
       mocks.asset.getById.mockResolvedValue(getForAsset(asset));
@@ -337,7 +337,7 @@ describe(AssetService.name, () => {
     it('should filter unmapped people for asset owner with explicit spaceId', async () => {
       const asset = AssetFactory.from({ ownerId: authStub.user1.user.id })
         .exif()
-        .face({}, (f) => f.person({ id: 'person-1', name: 'Test Person' }))
+        .face({}, (f) => f.person({ personGroupId: 'person-1', name: 'Test Person' }))
         .build();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
       mocks.asset.getById.mockResolvedValue(getForAsset(asset));
@@ -368,7 +368,7 @@ describe(AssetService.name, () => {
     it('should expose people for space member without spaceId', async () => {
       const asset = AssetFactory.from()
         .exif()
-        .face({}, (f) => f.person({ id: 'person-1', name: 'Test Person' }))
+        .face({}, (f) => f.person({ personGroupId: 'person-1', name: 'Test Person' }))
         .build();
       mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set([asset.id]));
       mocks.asset.getById.mockResolvedValue(asset as any);
@@ -382,7 +382,7 @@ describe(AssetService.name, () => {
     it('should reject non-member spaceId', async () => {
       const asset = AssetFactory.from()
         .exif()
-        .face({}, (f) => f.person({ id: 'person-1', name: 'Test Person' }))
+        .face({}, (f) => f.person({ personGroupId: 'person-1', name: 'Test Person' }))
         .build();
       mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set([asset.id]));
       mocks.asset.getById.mockResolvedValue(asset as any);
@@ -394,7 +394,7 @@ describe(AssetService.name, () => {
     it('should filter hidden space persons', async () => {
       const asset = AssetFactory.from()
         .exif()
-        .face({}, (f) => f.person({ id: 'person-1', name: 'Test Person' }))
+        .face({}, (f) => f.person({ personGroupId: 'person-1', name: 'Test Person' }))
         .build();
       mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set([asset.id]));
       mocks.asset.getById.mockResolvedValue(asset as any);
@@ -412,7 +412,7 @@ describe(AssetService.name, () => {
     it('should filter persons without space person mapping', async () => {
       const asset = AssetFactory.from()
         .exif()
-        .face({}, (f) => f.person({ id: 'person-1', name: 'Test Person' }))
+        .face({}, (f) => f.person({ personGroupId: 'person-1', name: 'Test Person' }))
         .build();
       mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set([asset.id]));
       mocks.asset.getById.mockResolvedValue(asset as any);
@@ -433,7 +433,7 @@ describe(AssetService.name, () => {
     it('should expose people for partner access', async () => {
       const asset = AssetFactory.from()
         .exif()
-        .face({}, (f) => f.person({ id: 'person-1', name: 'Test Person' }))
+        .face({}, (f) => f.person({ personGroupId: 'person-1', name: 'Test Person' }))
         .build();
       mocks.access.asset.checkPartnerAccess.mockResolvedValue(new Set([asset.id]));
       mocks.asset.getById.mockResolvedValue(asset as any);
@@ -447,7 +447,7 @@ describe(AssetService.name, () => {
     it('should expose people for album access', async () => {
       const asset = AssetFactory.from()
         .exif()
-        .face({}, (f) => f.person({ id: 'person-1', name: 'Test Person' }))
+        .face({}, (f) => f.person({ personGroupId: 'person-1', name: 'Test Person' }))
         .build();
       mocks.access.asset.checkAlbumAccess.mockResolvedValue(new Set([asset.id]));
       mocks.asset.getById.mockResolvedValue(asset as any);
@@ -461,7 +461,7 @@ describe(AssetService.name, () => {
     it('should withhold hidden people for album access', async () => {
       const asset = AssetFactory.from()
         .exif()
-        .face({}, (f) => f.person({ id: 'person-1', name: 'Test Person', isHidden: true }))
+        .face({}, (f) => f.person({ personGroupId: 'person-1', name: 'Test Person', isHidden: true }))
         .build();
       mocks.access.asset.checkAlbumAccess.mockResolvedValue(new Set([asset.id]));
       mocks.asset.getById.mockResolvedValue(asset as any);
@@ -475,7 +475,7 @@ describe(AssetService.name, () => {
     it('should still strip people for shared link access', async () => {
       const asset = AssetFactory.from()
         .exif()
-        .face({}, (f) => f.person({ id: 'person-1', name: 'Test Person' }))
+        .face({}, (f) => f.person({ personGroupId: 'person-1', name: 'Test Person' }))
         .build();
       mocks.access.asset.checkSharedLinkAccess.mockResolvedValue(new Set([asset.id]));
       mocks.asset.getById.mockResolvedValue(asset as any);
@@ -491,7 +491,7 @@ describe(AssetService.name, () => {
     it('should preserve people for owner access', async () => {
       const asset = AssetFactory.from({ ownerId: authStub.admin.user.id })
         .exif()
-        .face({}, (f) => f.person({ id: 'person-1', name: 'Test Person' }))
+        .face({}, (f) => f.person({ personGroupId: 'person-1', name: 'Test Person' }))
         .build();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
       mocks.asset.getById.mockResolvedValue(asset as any);
@@ -509,7 +509,7 @@ describe(AssetService.name, () => {
       // the identity-wide resolution is overlaid here (mirroring PersonService.getById).
       const asset = AssetFactory.from({ ownerId: authStub.admin.user.id })
         .exif()
-        .face({}, (f) => f.person({ id: 'person-1', name: 'Raw Name', identityId: 'identity-1', birthDate: null }))
+        .face({}, (f) => f.person({ personGroupId: 'person-1', name: 'Raw Name', identityId: 'identity-1', birthDate: null }))
         .build();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
       mocks.asset.getById.mockResolvedValue(asset as any);
@@ -534,7 +534,7 @@ describe(AssetService.name, () => {
     it('should not resolve identity metadata for an owner person without an identity', async () => {
       const asset = AssetFactory.from({ ownerId: authStub.admin.user.id })
         .exif()
-        .face({}, (f) => f.person({ id: 'person-1', name: 'Test Person', identityId: null, birthDate: null }))
+        .face({}, (f) => f.person({ personGroupId: 'person-1', name: 'Test Person', identityId: null, birthDate: null }))
         .build();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
       mocks.asset.getById.mockResolvedValue(asset as any);
@@ -548,7 +548,7 @@ describe(AssetService.name, () => {
     it('should strip people when asset is not in the specified space', async () => {
       const asset = AssetFactory.from()
         .exif()
-        .face({}, (f) => f.person({ id: 'person-1', name: 'Test Person' }))
+        .face({}, (f) => f.person({ personGroupId: 'person-1', name: 'Test Person' }))
         .build();
       mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set([asset.id]));
       mocks.asset.getById.mockResolvedValue(asset as any);
@@ -563,7 +563,7 @@ describe(AssetService.name, () => {
     it('should keep people for space member without spaceId (fallback)', async () => {
       const asset = AssetFactory.from()
         .exif()
-        .face({}, (f) => f.person({ id: 'person-1', name: 'Test Person' }))
+        .face({}, (f) => f.person({ personGroupId: 'person-1', name: 'Test Person' }))
         .build();
       mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set([asset.id]));
       mocks.asset.getById.mockResolvedValue(asset as any);
@@ -583,7 +583,7 @@ describe(AssetService.name, () => {
     it('should expose people when fallback finds no space', async () => {
       const asset = AssetFactory.from()
         .exif()
-        .face({}, (f) => f.person({ id: 'person-1', name: 'Test Person' }))
+        .face({}, (f) => f.person({ personGroupId: 'person-1', name: 'Test Person' }))
         .build();
       mocks.access.asset.checkPartnerAccess.mockResolvedValue(new Set([asset.id]));
       mocks.asset.getById.mockResolvedValue(asset as any);
@@ -598,7 +598,7 @@ describe(AssetService.name, () => {
     it('should filter hidden persons in fallback path', async () => {
       const asset = AssetFactory.from()
         .exif()
-        .face({}, (f) => f.person({ id: 'person-1', name: 'Test Person' }))
+        .face({}, (f) => f.person({ personGroupId: 'person-1', name: 'Test Person' }))
         .build();
       mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set([asset.id]));
       mocks.asset.getById.mockResolvedValue(asset as any);

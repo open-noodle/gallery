@@ -483,7 +483,7 @@ describe(MemoryService.name, () => {
         await Promise.all([
           ctx.newExif({ assetId: asset.id, city: 'Berlin', country: 'Germany' }),
           ctx.newJobStatus({ assetId: asset.id }),
-          ctx.newAssetFace({ assetId: asset.id, personId: person.id }),
+          ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId }),
           assetRepo.upsertFiles([
             { assetId: asset.id, type: AssetFileType.Preview, path: `/preview-${asset.id}.jpg` },
             { assetId: asset.id, type: AssetFileType.Thumbnail, path: `/thumb-${asset.id}.jpg` },
@@ -533,7 +533,7 @@ describe(MemoryService.name, () => {
         await Promise.all([
           ctx.newExif({ assetId: asset.id, city: 'Berlin', country: 'Germany' }),
           ctx.newJobStatus({ assetId: asset.id }),
-          ctx.newAssetFace({ assetId: asset.id, personId: person.id }),
+          ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId }),
           assetRepo.upsertFiles([
             { assetId: asset.id, type: AssetFileType.Preview, path: `/preview-${asset.id}.jpg` },
             { assetId: asset.id, type: AssetFileType.Thumbnail, path: `/thumb-${asset.id}.jpg` },
