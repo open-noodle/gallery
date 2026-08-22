@@ -587,9 +587,14 @@ export const utils = {
     }
 
     const result = await client.query(
-      `INSERT INTO "person" ("ownerId", "type", "species", "name", "thumbnailPath")
-       VALUES ($1, 'pet', $2, $3, '/my/awesome/thumbnail.jpg')
-       RETURNING "id"`,
+      `WITH new_group AS (
+       INSERT INTO "person_group" ("clusterGroupId")
+       SELECT "clusterGroupId" FROM "user" WHERE "id" = $1
+       RETURNING id
+       )
+       INSERT INTO "person" ("ownerId", "personGroupId", "type", "species", "name", "thumbnailPath")
+       SELECT $1, new_group.id, 'pet', $2, $3, '/my/awesome/thumbnail.jpg' FROM new_group
+       RETURNING "personGroupId" AS id`,
       [ownerId, species, name ?? species],
     );
 
@@ -623,8 +628,14 @@ export const utils = {
       // `person.thumbnailPath IS NOT NULL AND != ''` (the fork's "minFaces gate"); without
       // a value here, every getPersonsBySpaceId call would return empty.
       const personResult = await client.query(
-        `INSERT INTO "person" ("ownerId", "name", "thumbnailPath")
-         VALUES ($1, $2, '/my/awesome/thumbnail.jpg') RETURNING id`,
+        `WITH new_group AS (
+           INSERT INTO "person_group" ("clusterGroupId")
+           SELECT "clusterGroupId" FROM "user" WHERE "id" = $1
+           RETURNING id
+         )
+         INSERT INTO "person" ("ownerId", "personGroupId", "name", "thumbnailPath")
+         SELECT $1, new_group.id, $2, '/my/awesome/thumbnail.jpg' FROM new_group
+         RETURNING "personGroupId" AS id`,
         [ownerId, name],
       );
       const globalPersonId = personResult.rows[0].id as string;
