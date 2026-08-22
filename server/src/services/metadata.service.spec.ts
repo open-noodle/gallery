@@ -1901,7 +1901,7 @@ describe(MetadataService.name, () => {
       mocks.systemMetadata.get.mockResolvedValue({ metadata: { faces: { import: true } } });
       mockReadTags(makeFaceTags({ Name: person.name }));
       mocks.person.getDistinctNames.mockResolvedValue([]);
-      mocks.person.createAll.mockResolvedValue([person.personGroupId]);
+      mocks.person.createAll.mockResolvedValue([person]);
       mocks.faceIdentity.ensurePersonIdentity.mockResolvedValue({ id: 'identity-1' } as any);
 
       await sut.handleMetadataExtraction({ id: asset.id });
@@ -1923,7 +1923,7 @@ describe(MetadataService.name, () => {
       mocks.systemMetadata.get.mockResolvedValue({ metadata: { faces: { import: true } } });
       mockReadTags(makeFaceTags({ Name: person.name }));
       mocks.person.getDistinctNames.mockResolvedValue([]);
-      mocks.person.createAll.mockResolvedValue([person.personGroupId]);
+      mocks.person.createAll.mockResolvedValue([person]);
       mocks.faceIdentity.ensurePersonIdentity.mockResolvedValue({ id: 'identity-1' } as any);
       mocks.sharedSpace.getSpaceIdsForAsset.mockResolvedValue([{ spaceId: 'space-1' }]);
 
@@ -1948,7 +1948,7 @@ describe(MetadataService.name, () => {
       mocks.systemMetadata.get.mockResolvedValue({ metadata: { faces: { import: true } } });
       mockReadTags(makeFaceTags({ Name: person.name }));
       mocks.person.getDistinctNames.mockResolvedValue([]);
-      mocks.person.createAll.mockResolvedValue([person.personGroupId]);
+      mocks.person.createAll.mockResolvedValue([person]);
       mocks.faceIdentity.ensurePersonIdentity.mockResolvedValue({ id: 'identity-1' } as any);
       mocks.sharedSpace.getSpaceIdsForAsset.mockResolvedValue([]);
 
@@ -1975,7 +1975,7 @@ describe(MetadataService.name, () => {
       mocks.systemMetadata.get.mockResolvedValue({ metadata: { faces: { import: true } } });
       mockReadTags(makeFaceTags({ Name: person.name }));
       mocks.person.getDistinctNames.mockResolvedValue([]);
-      mocks.person.createAll.mockResolvedValue([person.personGroupId]);
+      mocks.person.createAll.mockResolvedValue([person]);
       mocks.faceIdentity.ensurePersonIdentity.mockResolvedValue({ id: 'identity-1' } as any);
       mocks.sharedSpace.getSpaceIdsForAsset.mockResolvedValue([{ spaceId: 'space-1' }, { spaceId: 'space-2' }]);
 
