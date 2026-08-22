@@ -32,7 +32,7 @@ test.describe('Person face suggestions (web)', () => {
     };
     for (const distance of [0.55, 0.6, 0.65]) {
       const faceId = await mkFace();
-      await db.query(`INSERT INTO face_person_verdict ("personId", "assetFaceId", distance) VALUES ($1, $2, $3)`, [
+      await db.query(`INSERT INTO face_person_verdict ("personGroupId", "assetFaceId", distance) VALUES ($1, $2, $3)`, [
         personId,
         faceId,
         distance,
