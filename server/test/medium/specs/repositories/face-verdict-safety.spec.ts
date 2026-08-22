@@ -118,7 +118,7 @@ describe('unassignFaces clears human placements', () => {
     // The face is unassigned AND no longer carries a human-placement record.
     const face = await db
       .selectFrom('asset_face')
-      .select('personId')
+      .select('personGroupId')
       .where('id', '=', assetFace.id)
       .executeTakeFirstOrThrow();
     expect(face.personId).toBeNull();
@@ -176,7 +176,7 @@ describe('unassignFaces clears human placements', () => {
     // The ML face is unassigned and its human-placement record is gone.
     const mlAfter = await db
       .selectFrom('asset_face')
-      .select('personId')
+      .select('personGroupId')
       .where('id', '=', mlFace.id)
       .executeTakeFirstOrThrow();
     expect(mlAfter.personId).toBeNull();
@@ -186,7 +186,7 @@ describe('unassignFaces clears human placements', () => {
     // The non-ML (Manual) face is completely untouched — still assigned, link intact.
     const manualAfter = await db
       .selectFrom('asset_face')
-      .select('personId')
+      .select('personGroupId')
       .where('id', '=', manualFace.id)
       .executeTakeFirstOrThrow();
     expect(manualAfter.personId).toBe(manualPerson.personGroupId);
