@@ -678,7 +678,7 @@ describe(PersonRepository.name, () => {
       await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId, isVisible: false });
 
       await expect(sut.getStatistics(person.personGroupId)).resolves.toEqual({ assets: 1, faces: 2 });
-      expect(firstFace.personId).toBe(person.personGroupId);
+      expect(firstFace.personGroupId).toBe(person.personGroupId);
     });
 
     it('returns zero asset and face counts for a personal person with no accessible faces', async () => {

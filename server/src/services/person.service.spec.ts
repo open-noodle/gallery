@@ -1712,7 +1712,7 @@ describe(PersonService.name, () => {
       const person = PersonFactory.create({ thumbnailPath: 'thumbs/user/ab/cd/person.jpeg' });
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
 
-      await expect(sut.handlePersonMigration({ personGroupId: person.personGroupId })).resolves.toBe(JobStatus.Skipped);
+      await expect(sut.handlePersonMigration({ ownerId: person.ownerId, personGroupId: person.personGroupId })).resolves.toBe(JobStatus.Skipped);
 
       expect(mocks.move.create).not.toHaveBeenCalled();
       expect(mocks.move.getByEntity).not.toHaveBeenCalled();
@@ -1723,7 +1723,7 @@ describe(PersonService.name, () => {
       const person = PersonFactory.create({ thumbnailPath: '' });
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
 
-      await expect(sut.handlePersonMigration({ personGroupId: person.personGroupId })).resolves.toBe(JobStatus.Skipped);
+      await expect(sut.handlePersonMigration({ ownerId: person.ownerId, personGroupId: person.personGroupId })).resolves.toBe(JobStatus.Skipped);
 
       expect(mocks.move.create).not.toHaveBeenCalled();
       expect(mocks.move.getByEntity).not.toHaveBeenCalled();
@@ -4435,7 +4435,7 @@ describe(PersonService.name, () => {
 
       expect(await sut.handleRecognizeFaces({ id: face.id, skipSharedSpaceMatch: true })).toBe(JobStatus.Skipped);
 
-      expect(mocks.faceIdentity.ensurePersonIdentity).toHaveBeenCalledWith(face.personId);
+      expect(mocks.faceIdentity.ensurePersonIdentity).toHaveBeenCalledWith(face.personGroupId);
       expect(mocks.faceIdentity.replaceFaceIdentity).toHaveBeenCalledWith({
         assetFaceId: face.id,
         identityId: 'identity-1',
@@ -4467,7 +4467,7 @@ describe(PersonService.name, () => {
 
       expect(await sut.handleRecognizeFaces({ id: face.id })).toBe(JobStatus.Skipped);
 
-      expect(mocks.faceIdentity.ensurePersonIdentity).toHaveBeenCalledWith(face.personId);
+      expect(mocks.faceIdentity.ensurePersonIdentity).toHaveBeenCalledWith(face.personGroupId);
       expect(mocks.faceIdentity.replaceFaceIdentity).toHaveBeenCalledWith({
         assetFaceId: face.id,
         identityId: 'identity-1',
@@ -4780,9 +4780,9 @@ describe(PersonService.name, () => {
 
       expect(mocks.person.reassignFaces).toHaveBeenCalledWith({
         faceIds: [noPerson.id],
-        newPersonId: primaryFace.personId,
+        newPersonId: primaryFace.personGroupId,
       });
-      expect(mocks.faceIdentity.ensurePersonIdentity).toHaveBeenCalledWith(primaryFace.personId);
+      expect(mocks.faceIdentity.ensurePersonIdentity).toHaveBeenCalledWith(primaryFace.personGroupId);
       expect(mocks.faceIdentity.replaceFaceIdentity).toHaveBeenCalledWith({
         assetFaceId: noPerson.id,
         identityId: sourceIdentityId,
