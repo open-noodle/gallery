@@ -1958,7 +1958,7 @@ describe(MetadataService.name, () => {
       expect(mocks.job.queueAll).toHaveBeenCalledExactlyOnceWith([
         {
           name: JobName.PersonGenerateThumbnail,
-          data: { id: person.personGroupId },
+          data: { ownerId: asset.ownerId, personGroupId: 'random-uuid' },
         },
       ]);
       expect(mocks.job.queueAll).not.toHaveBeenCalledWith(
@@ -1984,7 +1984,7 @@ describe(MetadataService.name, () => {
       expect(mocks.job.queueAll).toHaveBeenNthCalledWith(1, [
         {
           name: JobName.PersonGenerateThumbnail,
-          data: { id: person.personGroupId },
+          data: { ownerId: asset.ownerId, personGroupId: 'random-uuid' },
         },
       ]);
       expect(mocks.job.queueAll).toHaveBeenNthCalledWith(2, [
