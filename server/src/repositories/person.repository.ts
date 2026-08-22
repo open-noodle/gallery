@@ -894,21 +894,25 @@ export class PersonRepository {
       .where('asset.visibility', '=', sql.lit(AssetVisibility.Timeline))
       .where('asset.deletedAt', 'is', null)
       .where('asset.isOffline', '=', false)
-      .where((eb) => eb.or([eb('asset.ownerId', '=', asUuid(userId)), inSharedAlbum(eb, userId)]))
+      // #30739 added the owner-or-shared-album reachability gate. It is one arm of a disjunction, not a
+      // filter to AND with the fork's: a Space reader owns none of these assets and need not share an
+      // album with the owner, so ANDing the two counts zero for exactly the caller L3 exists to serve.
+      .where((eb) =>
+        eb.or([
+          eb('asset.ownerId', '=', asUuid(userId)),
+          inSharedAlbum(eb, userId),
+          ...(options.memberUserId
+            ? spaceAssetPathBranches(eb, {
+                correlateAssetId: 'asset.id',
+                correlateLibraryId: 'asset.libraryId',
+                scope: { memberUserId: options.memberUserId },
+              })
+            : []),
+        ]),
+      )
       .where('asset_face.deletedAt', 'is', null)
       .where('asset_face.isVisible', 'is', true)
       .where('asset_face.personGroupId', '=', personGroupId)
-      .$if(!!options.memberUserId, (qb) =>
-        qb.where((eb) =>
-          eb.or(
-            spaceAssetPathBranches(eb, {
-              correlateAssetId: 'asset.id',
-              correlateLibraryId: 'asset.libraryId',
-              scope: { memberUserId: options.memberUserId! },
-            }),
-          ),
-        ),
-      )
       .executeTakeFirst();
 
     return {
@@ -933,7 +937,8 @@ export class PersonRepository {
           AND "asset"."deletedAt" IS NULL
           AND "asset_face"."deletedAt" IS NULL
           AND "asset_face"."isVisible" = true
-        GROUP BY "person"."personGroupId"
+        -- see getPeopleOverviewStatistics: group by the composite PRIMARY KEY, not the unique index
+        GROUP BY "person"."ownerId", "person"."personGroupId"
         HAVING NULLIF(BTRIM("person"."name"), '') IS NOT NULL
           OR COUNT("asset_face"."assetId") >= ${minimumFaceCount}
       )
@@ -977,16 +982,19 @@ export class PersonRepository {
         FROM "person"
         INNER JOIN "eligible_faces" ON "eligible_faces"."personGroupId" = "person"."personGroupId"
         WHERE "person"."ownerId" = ${userId}
-        GROUP BY "person"."personGroupId"
+        -- group by the table's PRIMARY KEY, which #30739 made composite. Postgres only infers
+        -- functional dependency from a primary key, never from a unique index, so grouping by
+        -- "personGroupId" alone leaves "isHidden" and "name" ungrouped and the query fails to plan.
+        GROUP BY "person"."ownerId", "person"."personGroupId"
         HAVING NULLIF(BTRIM("person"."name"), '') IS NOT NULL
           OR COUNT(DISTINCT "eligible_faces"."assetFaceId") >= ${minimumFaceCount}
       )
       SELECT
-        COUNT(DISTINCT "eligible_people"."id")::int AS "total",
-        COUNT(DISTINCT "eligible_people"."id") FILTER (WHERE "eligible_people"."isHidden" = true)::int AS "hidden",
+        COUNT(DISTINCT "eligible_people"."personGroupId")::int AS "total",
+        COUNT(DISTINCT "eligible_people"."personGroupId") FILTER (WHERE "eligible_people"."isHidden" = true)::int AS "hidden",
         COUNT(DISTINCT "eligible_faces"."assetFaceId")::int AS "detectedFaceCount"
       FROM "eligible_faces"
-      LEFT JOIN "eligible_people" ON "eligible_people"."id" = "eligible_faces"."personGroupId"
+      LEFT JOIN "eligible_people" ON "eligible_people"."personGroupId" = "eligible_faces"."personGroupId"
     `.execute(this.db);
 
     const row = result.rows[0];
