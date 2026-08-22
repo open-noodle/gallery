@@ -7,6 +7,7 @@
 - **Conflicts resolved**: 21 by hand + 9 auto-resolved in proven-mechanical classes
 - **Fork-side reconciliation commits**: 5 (asset-file/download, branding + Drift steps, OpenAPI regen, mobile freezed, web lint debt)
 - **Option-M debt repaired**: 4 further commits — see "★ Option-M debt this cycle exposed"
+- **Upstream bug worked around**: 1 (single `PUT /assets/:id` locking an asset 400s on a non-elevated session)
 - **Risk level**: MEDIUM
 - **Recommendation**: PROCEED — level with `upstream/main` (0 behind), all audits and local gates green
 
@@ -48,6 +49,52 @@ Fixes: `00d603ba78c` (re-key + revert script), `53048a92f21` (regenerated SQL do
 person_group seeding commit. `sync-sql` was re-run against a fresh migrated database as part of the
 repair: 157 migrations apply, `migrations:generate` reports no changes, all 680 decorated queries
 execute with no `column does not exist`.
+
+## ★ A fifth failure — and it is UPSTREAM's, not option M's
+
+Once the four above were fixed, one e2e failure remained (1 of 1275). It is worth its own section
+because the obvious inference — "more option-M debt" — was **wrong**, and only a local reproduction
+settled it.
+
+`PUT /assets/:id` with `{visibility: locked}` returns **400 while the write succeeds**:
+
+1. `AssetService.update` writes the visibility, then ends with `return this.get(auth, id)`.
+2. `get` calls `requireAccess(AssetRead)` → `AssetAccess.checkOwnerAccess`, which carries
+   `.$if(!hasElevatedPermission, eb => eb.where('asset.visibility', '!=', Locked))`.
+3. A non-elevated session therefore cannot read back the asset it just locked, and `requireAccess`
+   throws `BadRequestException` → 400.
+
+Confirmed by reproducing against a stack built from this branch and then observing the asset as
+`locked` in the database _after_ the failing call — the write landed, only the response failed.
+
+**It is upstream's code.** `git show upstream/main:server/src/services/asset.service.ts` ends `update`
+with the identical `return this.get(auth, id)`. It is invisible upstream because the **bulk** endpoint
+(`updateAll`) returns void and never reads back — which is also why every other fork spec that locks an
+asset passes: they all go through `updateAssets`. These two specs deliberately use the single endpoint
+(the bulk path strips Locked assets from every album, making the case vacuous), so they are the only
+callers in the tree that reach it.
+
+Fixed on the **test** side (`a2746608515`), not the product side: a real client must hold a
+PIN-verified session to use the locked folder at all, and the fork's own medium test already sets
+`hasElevatedPermission` for exactly this transition. Patching `update()` fork-side would be a
+behavioural divergence inside a file upstream owns — a guaranteed recurring conflict — for a case real
+clients never hit. New `utils.elevateSession` (idempotent; `setupPinCode` 400s if a PIN already exists).
+
+**Three process notes worth keeping:**
+
+- **Two cheap hypotheses were both wrong**, and each was disproved in seconds rather than assumed: the
+  DTO parses `{visibility:'locked'}` fine, and a medium test calling `sut.update(...)` with the full
+  album+space fixture passes. The medium repro only passed because I had written
+  `hasElevatedPermission: true` into the auth fixture — copying the existing spec's helper hid the very
+  thing being tested. **When a repro passes, check what the fixture is quietly granting.**
+- **A local full-suite run needs a control.** The first local run showed 53 failures against CI's 1,
+  which looks alarming. Re-running the same suite with the change stashed gave **55** failures across
+  **9** files versus **53** across **6** — so the change strictly improved things and the residual is
+  local-stack environmental (`cli/*`, `library`, `tag`, `trash`). Without the control run the honest
+  reading of "53 failures" is unavailable.
+- **The e2e server suite is pre-job gated**, so it had not run on the rolling branch for many cycles
+  (batch 131's run was CLI-only, 2 files / 20 tests). A gate that does not run is not a gate — this is
+  the same lesson as the unwired `branding/scripts` regression tests.
 
 ## Incoming Upstream Changes
 
