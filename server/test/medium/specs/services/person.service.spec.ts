@@ -1018,73 +1018,11 @@ describe(PersonService.name, () => {
     });
   });
 
-  describe('handleQueueRecognizeFaces', () => {
-    it('should delete all people and queue faces for recognition', async () => {
-      const { sut, ctx } = setup();
-      const jobRepo = ctx.getMock(JobRepository);
-      ctx.getMock(StorageRepository).unlink.mockResolvedValue();
-      jobRepo.waitForQueueCompletion.mockResolvedValue();
-      jobRepo.getJobCounts.mockResolvedValue({ active: 0, waiting: 0, completed: 0, delayed: 0, failed: 0, paused: 0 });
-      jobRepo.queueAll.mockResolvedValue();
-
-      const { user } = await ctx.newUser();
-      const { user: user1 } = await ctx.newUser();
-      const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { asset: assetUser1 } = await ctx.newAsset({ ownerId: user1.id });
-      const { person } = await ctx.newPerson({ ownerId: user.id });
-      const { person: personUser1 } = await ctx.newPerson({ ownerId: user1.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
-      const { assetFace: assetFaceUser1 } = await ctx.newAssetFace({
-        assetId: assetUser1.id,
-        personGroupId: personUser1.personGroupId,
-      });
-
-      await sut.handleQueueRecognizeFaces({ force: true });
-
-      await expect(ctx.database.selectFrom('person').selectAll().execute()).resolves.toHaveLength(0);
-      expect(jobRepo.queueAll).toHaveBeenCalledWith(
-        expect.objectContaining([
-          { name: JobName.FacialRecognition, data: { id: assetFace.id, deferred: false } },
-          { name: JobName.FacialRecognition, data: { id: assetFaceUser1.id, deferred: false } },
-        ]),
-      );
-    });
-
-    it('should only delete all people of a specified cluster group and queue their faces for recognition', async () => {
-      const { sut, ctx } = setup();
-      const jobRepo = ctx.getMock(JobRepository);
-      ctx.getMock(StorageRepository).unlink.mockResolvedValue();
-      jobRepo.waitForQueueCompletion.mockResolvedValue();
-      jobRepo.getJobCounts.mockResolvedValue({ active: 0, waiting: 0, completed: 0, delayed: 0, failed: 0, paused: 0 });
-      jobRepo.queueAll.mockResolvedValue();
-
-      const { user } = await ctx.newUser();
-      const { user: user1 } = await ctx.newUser();
-      const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { asset: assetUser1 } = await ctx.newAsset({ ownerId: user1.id });
-      const { person } = await ctx.newPerson({ ownerId: user.id });
-      const { person: personUser1 } = await ctx.newPerson({ ownerId: user1.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
-      const { assetFace: assetFaceUser1 } = await ctx.newAssetFace({
-        assetId: assetUser1.id,
-        personGroupId: personUser1.personGroupId,
-      });
-
-      await sut.handleQueueRecognizeFaces({ force: true, clusterGroupId: user.clusterGroupId });
-
-      await expect(ctx.database.selectFrom('person').selectAll().execute()).resolves.toHaveLength(1);
-      expect(jobRepo.queueAll).toHaveBeenCalledWith(
-        expect.objectContaining([{ name: JobName.FacialRecognition, data: { id: assetFace.id, deferred: false } }]),
-      );
-      expect(jobRepo.queueAll).not.toHaveBeenCalledWith(
-        expect.objectContaining([
-          { name: JobName.FacialRecognition, data: { id: assetFace.id, deferred: false } },
-          { name: JobName.FacialRecognition, data: { id: assetFaceUser1.id, deferred: false } },
-        ]),
-      );
-    });
-  });
-
+  // Option M: Gallery does not adopt upstream's cluster-groups FEATURE, so a person_group never holds
+  // more than one person row — the unique index `person_personGroupId_key` enforces it. The tests that
+  // stood here deliberately put a second owner's person into an existing group, which is exactly the
+  // state Gallery declines to support. Restoring them is part of turning cluster groups on; see
+  // docs/superpowers/specs/2026-08-21-cluster-groups-m-landing-plan.md.
   describe('mergePerson', () => {
   });
 
