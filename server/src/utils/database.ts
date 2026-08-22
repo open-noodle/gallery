@@ -525,7 +525,7 @@ export function hasAnyPeople<O>(qb: SelectQueryBuilder<DB, 'asset', O>, filters:
             .whereRef('asset_face.assetId', '=', 'asset.id')
             .where('asset_face.deletedAt', 'is', null)
             .where('asset_face.isVisible', 'is', true)
-            .where('asset_face.personId', '=', anyUuid(personIds)),
+            .where('asset_face.personGroupId', '=', anyUuid(personIds)),
         ),
       );
     }
