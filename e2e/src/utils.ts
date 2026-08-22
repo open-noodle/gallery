@@ -56,8 +56,10 @@ import {
   searchAssets,
   setBaseUrl,
   setMaintenanceMode,
+  setupPinCode,
   signUpAdmin,
   tagAssets,
+  unlockAuthSession,
   updateAdminOnboarding,
   updateAlbumUser,
   updateAssets,
@@ -355,6 +357,27 @@ export const utils = {
     return login({
       loginCredentialDto: { email: dto.email, password: dto.password },
     });
+  },
+
+  /**
+   * Give the session elevated (PIN-verified) permission.
+   *
+   * Required before a SINGLE `PUT /assets/:id` that sets `visibility: locked`. That endpoint writes the
+   * visibility and then returns `this.get(auth, id)`, and `AssetAccess.checkOwnerAccess` excludes Locked
+   * assets from a non-elevated session — so the write lands but the response is a 400. The bulk endpoint
+   * (`PUT /assets`) returns void and therefore never hits the read-back, which is why most specs get away
+   * with it. Upstream's AssetService.update has the identical shape, so this is the caller's job, not a
+   * fork patch.
+   */
+  elevateSession: async (accessToken: string, pinCode = '123456') => {
+    // Idempotent: setupPinCode 400s with 'User already has a PIN code', so a second call for the same
+    // user (another test in the same file, a retry) must not fail the suite.
+    try {
+      await setupPinCode({ pinCodeSetupDto: { pinCode } }, { headers: asBearerAuth(accessToken) });
+    } catch {
+      // already set — fall through to the unlock
+    }
+    await unlockAuthSession({ sessionUnlockDto: { pinCode } }, { headers: asBearerAuth(accessToken) });
   },
 
   createApiKey: (accessToken: string, permissions: Permission[]) => {
