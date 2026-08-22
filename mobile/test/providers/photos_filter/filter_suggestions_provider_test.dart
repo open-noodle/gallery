@@ -143,10 +143,10 @@ void main() {
       final after = DateTime.utc(2024, 1, 1);
       final before = DateTime.utc(2024, 12, 31);
       final filter = SearchFilter.empty().copyWith(
-        location: SearchLocationFilter(city: 'Paris', country: 'France'),
-        camera: SearchCameraFilter(make: 'Canon', model: 'EOS R5'),
+        location: const SearchLocationFilter(city: 'Paris', country: 'France'),
+        camera: const SearchCameraFilter(make: 'Canon', model: 'EOS R5'),
         date: SearchDateFilter(takenAfter: after, takenBefore: before),
-        rating: SearchRatingFilter(rating: const Option.some(4)),
+        rating: const SearchRatingFilter(rating: Option.some(4)),
         tagIds: ['tag-1', 'tag-2'],
         mediaType: AssetType.image,
       );
