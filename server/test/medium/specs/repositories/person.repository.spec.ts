@@ -111,42 +111,37 @@ describe(PersonRepository.name, () => {
       expect(owner.id).toBe(user.id);
     });
 
-    it('should put people created with the same group into that group', async () => {
+    // Upstream asserts here that two owners' people can share one group — the cluster-groups feature.
+    // Gallery declines it (Option M), so the assertion is inverted: the unique index must REJECT the
+    // second person. This test is the executable statement of M's 1:1 invariant; if it ever starts
+    // failing, the index is gone and every `getByGroupIdOnly` call site is unsound. See
+    // docs/superpowers/specs/2026-08-21-cluster-groups-m-landing-plan.md.
+    it('should refuse to put a second owner’s person into an existing group', async () => {
       const { ctx, sut } = setup(await getKyselyDB());
       const [{ user: user1 }, { user: user2 }] = [await ctx.newUser(), await ctx.newUser()];
 
       const group = await sut.createGroup(user1.id);
       const person1 = await sut.create({ ownerId: user1.id, name: 'Alice', personGroupId: group.id });
-      const person2 = await sut.create({ ownerId: user2.id, name: 'Alice', personGroupId: group.id });
-
       expect(person1.personGroupId).toBe(group.id);
-      expect(person2.personGroupId).toBe(group.id);
 
-      const groups = await ctx.database.selectFrom('person_group').select('person_group.id').execute();
-      expect(groups.map(({ id }) => id)).toEqual([group.id]);
+      await expect(sut.create({ ownerId: user2.id, name: 'Alice', personGroupId: group.id })).rejects.toThrow(
+        /person_personGroupId_key/,
+      );
+
+      const people = await ctx.database
+        .selectFrom('person')
+        .select('person.ownerId')
+        .where('person.personGroupId', '=', group.id)
+        .execute();
+      expect(people).toEqual([{ ownerId: user1.id }]);
     });
   });
 
   describe('getByGroupId', () => {
-    it('should not return a person owned by another user', async () => {
-      const { ctx, sut } = setup();
-      const [{ user: user1 }, { user: user2 }] = [await ctx.newUser(), await ctx.newUser()];
-      const group = await sut.createGroup(user1.id);
-
-      const person1 = await sut.create({ ownerId: user1.id, name: 'Alice', personGroupId: group.id });
-      const person2 = await ctx.database
-        .insertInto('person')
-        .values({ ownerId: user2.id, name: 'Alice', personGroupId: person1.personGroupId })
-        .returningAll()
-        .executeTakeFirstOrThrow();
-
-      await expect(sut.getByGroupId({ ownerId: user1.id, personGroupId: person1.personGroupId })).resolves.toEqual(
-        expect.objectContaining({ personGroupId: person1.personGroupId, ownerId: user1.id }),
-      );
-      await expect(sut.getByGroupId({ ownerId: user2.id, personGroupId: person1.personGroupId })).resolves.toEqual(
-        expect.objectContaining({ personGroupId: person2.personGroupId, ownerId: user2.id }),
-      );
-    });
+    // Upstream's "should not return a person owned by another user" seeded two owners' people into one
+    // group to prove the owner leg of the composite key. Gallery declines that state (Option M), so the
+    // setup is unreachable here; the sibling test below covers the same owner scoping from the only
+    // arrangement M permits.
 
     it('should return nothing when the group belongs to another user', async () => {
       const { ctx, sut } = setup();
@@ -579,7 +574,7 @@ describe(PersonRepository.name, () => {
 
       expect(result).toEqual([
         expect.objectContaining({
-          id: matchingPerson.personGroupId,
+          personGroupId: matchingPerson.personGroupId,
           name: 'Alice',
           birthDate: new Date('1990-04-23T00:00:00Z'),
         }),
@@ -1178,8 +1173,8 @@ describe(PersonRepository.name, () => {
         .where('assetId', '=', asset.id)
         .execute();
 
-      expect(people).toEqual([expect.objectContaining({ id: human.personGroupId })]);
-      expect(faces).toEqual([expect.objectContaining({ id: humanFaceId, personId: human.personGroupId })]);
+      expect(people).toEqual([expect.objectContaining({ personGroupId: human.personGroupId })]);
+      expect(faces).toEqual([expect.objectContaining({ id: humanFaceId, personGroupId: human.personGroupId })]);
     });
   });
 
