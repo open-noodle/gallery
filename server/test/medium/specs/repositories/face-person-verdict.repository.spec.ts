@@ -289,7 +289,7 @@ describe('FacePersonVerdictRepository', () => {
       const { assetFace: f6 } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
       f6Id = f6.id;
       await sut.upsertPending([{ personId: personPId, assetFaceId: f6Id, distance: 0.65 }]);
-      await defaultDatabase.updateTable('asset_face').set({ personId: personPId }).where('id', '=', f6Id).execute();
+      await defaultDatabase.updateTable('asset_face').set({ personGroupId: personPId }).where('id', '=', f6Id).execute();
 
       // Read-gate persons each get one in-band pending suggestion
       await sut.upsertPending([{ personId: unnamedPersonId, assetFaceId: fU.id, distance: 0.65 }]);
@@ -656,10 +656,10 @@ describe('FacePersonVerdictRepository', () => {
 
       const face = await defaultDatabase
         .selectFrom('asset_face')
-        .select(['personId'])
+        .select(['personGroupId'])
         .where('id', '=', assetFace.id)
         .executeTakeFirstOrThrow();
-      expect(face.personId).toBe(person.personGroupId); // reassigned
+      expect(face.personGroupId).toBe(person.personGroupId); // reassigned
 
       const verdictRow = await getRowOrUndefined(person.personGroupId, assetFace.id);
       expect(verdictRow).toBeUndefined(); // drained
@@ -823,7 +823,7 @@ describe('FacePersonVerdictRepository', () => {
         await sut.upsertPending([{ personId: person.personGroupId, assetFaceId: targetFace.id, distance: 0.6 }]);
         await defaultDatabase
           .updateTable('asset_face')
-          .set({ personId: otherPerson.personGroupId })
+          .set({ personGroupId: otherPerson.personGroupId })
           .where('id', '=', targetFace.id)
           .execute();
 
@@ -1269,7 +1269,7 @@ describe('FacePersonVerdictRepository', () => {
 
     afterEach(async () => {
       // Restore face to unassigned after each test
-      await defaultDatabase.updateTable('asset_face').set({ personId: null }).where('id', '=', assetFaceId).execute();
+      await defaultDatabase.updateTable('asset_face').set({ personGroupId: null }).where('id', '=', assetFaceId).execute();
       await defaultDatabase.deleteFrom('face_person_verdict').where('assetFaceId', '=', assetFaceId).execute();
     });
 
@@ -1277,7 +1277,7 @@ describe('FacePersonVerdictRepository', () => {
       const { sut } = setup();
       await sut.upsertPending([{ personId: p1Id, assetFaceId, distance: 0.6 }]);
       // Simulate: face assigned to someone (like what a merge does to its faces)
-      await defaultDatabase.updateTable('asset_face').set({ personId: p1Id }).where('id', '=', assetFaceId).execute();
+      await defaultDatabase.updateTable('asset_face').set({ personGroupId: p1Id }).where('id', '=', assetFaceId).execute();
 
       const res = await sut.getPendingForPerson(p1Id, {
         maxDistance: 0.5,
@@ -1720,7 +1720,7 @@ describe('FacePersonVerdictRepository', () => {
       const { person } = await ctx.newPerson({ ownerId: user.id });
       await ctx.database
         .updateTable('asset_face')
-        .set({ personId: person.personGroupId })
+        .set({ personGroupId: person.personGroupId })
         .where('id', '=', assignedFace.id)
         .execute();
       await ctx.database
@@ -1897,7 +1897,7 @@ describe('FacePersonVerdictRepository', () => {
         ]);
         await ctx.database
           .updateTable('asset_face')
-          .set({ personId: person.personGroupId })
+          .set({ personGroupId: person.personGroupId })
           .where('id', '=', assetFace.id)
           .execute();
 
