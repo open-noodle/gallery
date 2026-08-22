@@ -52,7 +52,7 @@ const seedEligibleFacesBulk = async (ctx: Ctx, ownerId: string, personId: string
       .execute();
   }
   const faces = assets.map((asset) =>
-    mediumFactory.assetFaceInsert({ assetId: asset.id, personGroupId, sourceType: SourceType.MachineLearning }),
+    mediumFactory.assetFaceInsert({ assetId: asset.id, personGroupId: personId, sourceType: SourceType.MachineLearning }),
   );
   for (let index = 0; index < faces.length; index += 1000) {
     await ctx.database
@@ -316,7 +316,7 @@ describe('FaceRepairRepository.reattributeFaces', () => {
       .select('personGroupId')
       .where('id', '=', faceX.id)
       .executeTakeFirstOrThrow();
-    expect(row.personId).toBe(personQ.personGroupId);
+    expect(row.personGroupId).toBe(personQ.personGroupId);
   });
 
   it('eligibility re-check: does not move manual-sourced faces', async () => {
@@ -341,7 +341,7 @@ describe('FaceRepairRepository.reattributeFaces', () => {
       .select('personGroupId')
       .where('id', '=', manualFace.id)
       .executeTakeFirstOrThrow();
-    expect(row.personId).toBe(person.personGroupId);
+    expect(row.personGroupId).toBe(person.personGroupId);
   });
 });
 
@@ -410,7 +410,7 @@ describe('FaceRepairRepository.detachFaces', () => {
       .select('personGroupId')
       .where('id', '=', face.id)
       .executeTakeFirstOrThrow();
-    expect(row.personId).toBe(personQ.personGroupId);
+    expect(row.personGroupId).toBe(personQ.personGroupId);
   });
 
   it('eligibility re-check: does not detach manual-sourced faces', async () => {
@@ -434,7 +434,7 @@ describe('FaceRepairRepository.detachFaces', () => {
       .select('personGroupId')
       .where('id', '=', manualFace.id)
       .executeTakeFirstOrThrow();
-    expect(row.personId).toBe(person.personGroupId);
+    expect(row.personGroupId).toBe(person.personGroupId);
   });
 
   it('returns an empty array and does nothing when assetFaceIds is empty', async () => {

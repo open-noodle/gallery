@@ -1365,7 +1365,7 @@ describe(FaceIdentityRepository.name, () => {
         assetId,
       }));
 
-      expect(updatedFace.personId).toBe(targetPerson.personGroupId);
+      expect(updatedFace.personGroupId).toBe(targetPerson.personGroupId);
       expect(sourceProfile.identityId).toBe(sourceIdentity.id);
       expect(await getPersonalIdentityMismatchRows(ctx, [assetFace.id])).toEqual([]);
       expect(result.affectedSpaceAssets).toEqual([{ spaceId: space.id, assetId: asset.id }]);
@@ -1435,7 +1435,7 @@ describe(FaceIdentityRepository.name, () => {
         .where('id', '=', assetFace.id)
         .executeTakeFirstOrThrow();
 
-      expect(updatedFace.personId).toBe(sourcePerson.personGroupId);
+      expect(updatedFace.personGroupId).toBe(sourcePerson.personGroupId);
       // The source owner has no person referencing the other owner's identity, so the face cannot
       // move anywhere. The mismatch must still be resolved — by realigning the link to the face's
       // current person — because leftover work makes handleFaceIdentityBackfill re-queue forever.
@@ -5073,7 +5073,7 @@ describe(FaceIdentityRepository.name, () => {
           .select('personGroupId')
           .where('id', '=', corruptFace.id)
           .executeTakeFirstOrThrow();
-        expect(row.personId).toBe(personB.personGroupId);
+        expect(row.personGroupId).toBe(personB.personGroupId);
 
         // The mismatch must be resolved by realigning the kept face's identity to its current person —
         // otherwise person.identityId stays DISTINCT FROM face_identity_face.identityId, getBackfillWork()
@@ -5123,7 +5123,7 @@ describe(FaceIdentityRepository.name, () => {
           .select('personGroupId')
           .where('id', '=', assetFace.id)
           .executeTakeFirstOrThrow();
-        expect(row.personId).toBe(person.personGroupId);
+        expect(row.personGroupId).toBe(person.personGroupId);
 
         const link = await ctx.database
           .selectFrom('face_identity_face')
@@ -5170,7 +5170,7 @@ describe(FaceIdentityRepository.name, () => {
           .select('personGroupId')
           .where('id', '=', resemblingFace.id)
           .executeTakeFirstOrThrow();
-        expect(row.personId).toBe(personA.person.personGroupId);
+        expect(row.personGroupId).toBe(personA.person.personGroupId);
       } finally {
         await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
       }
@@ -5303,7 +5303,7 @@ describe(FaceIdentityRepository.name, () => {
           .where('id', '=', bFace.id)
           .executeTakeFirstOrThrow();
         // Limitation: the guard is strongest at first contamination (clean target) and weaker mid-cascade.
-        expect(row.personId).toBe(personA.personGroupId);
+        expect(row.personGroupId).toBe(personA.personGroupId);
       } finally {
         await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
       }

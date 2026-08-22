@@ -121,7 +121,7 @@ describe('unassignFaces clears human placements', () => {
       .select('personGroupId')
       .where('id', '=', assetFace.id)
       .executeTakeFirstOrThrow();
-    expect(face.personId).toBeNull();
+    expect(face.personGroupId).toBeNull();
     const linkedAfter = await faceIdentityRepository.getManualLinkedFaceIds([assetFace.id]);
     expect(linkedAfter.has(assetFace.id)).toBe(false);
   });
@@ -179,7 +179,7 @@ describe('unassignFaces clears human placements', () => {
       .select('personGroupId')
       .where('id', '=', mlFace.id)
       .executeTakeFirstOrThrow();
-    expect(mlAfter.personId).toBeNull();
+    expect(mlAfter.personGroupId).toBeNull();
     const mlLinkedAfter = await faceIdentityRepository.getManualLinkedFaceIds([mlFace.id]);
     expect(mlLinkedAfter.has(mlFace.id)).toBe(false);
 
@@ -189,7 +189,7 @@ describe('unassignFaces clears human placements', () => {
       .select('personGroupId')
       .where('id', '=', manualFace.id)
       .executeTakeFirstOrThrow();
-    expect(manualAfter.personId).toBe(manualPerson.personGroupId);
+    expect(manualAfter.personGroupId).toBe(manualPerson.personGroupId);
     const manualLinkedAfter = await faceIdentityRepository.getManualLinkedFaceIds([manualFace.id]);
     expect(manualLinkedAfter.has(manualFace.id)).toBe(true);
   });

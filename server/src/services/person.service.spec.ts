@@ -4905,43 +4905,8 @@ describe(PersonService.name, () => {
       });
     });
 
-    it('should create a person in the matched group when the match belongs to another user', async () => {
-      const asset = AssetFactory.create();
-      const [noPerson, otherOwnerFace] = [
-        AssetFaceFactory.create({ assetId: asset.id }),
-        AssetFaceFactory.from().person().build(),
-      ];
-      const person = PersonFactory.create({
-        ownerId: asset.ownerId,
-        personGroupId: otherOwnerFace.person!.personGroupId,
-      });
-
-      const faces = [getForFaceSearch(noPerson, 0), getForFaceSearch(otherOwnerFace, 0.2)];
-
-      mocks.systemMetadata.get.mockResolvedValue({ machineLearning: { facialRecognition: { minFaces: 1 } } });
-      mocks.search.searchFaces.mockResolvedValue(faces);
-      mocks.person.getFaceForFacialRecognitionJob.mockResolvedValue(getForFacialRecognitionJob(noPerson, asset));
-      mocks.person.create.mockResolvedValue(person);
-
-      await sut.handleRecognizeFaces({ id: noPerson.id });
-
-      expect(mocks.person.createGroup).not.toHaveBeenCalled();
-      expect(mocks.person.create).toHaveBeenCalledWith({
-        ownerId: asset.ownerId,
-        faceAssetId: noPerson.id,
-        personGroupId: otherOwnerFace.person!.personGroupId,
-      });
-      expect(mocks.person.reassignFaces).toHaveBeenCalledWith({
-        faceIds: [noPerson.id],
-        newPersonGroupId: otherOwnerFace.person!.personGroupId,
-      });
-      expect(mocks.faceIdentity.ensurePersonIdentity).toHaveBeenCalledWith(person.personGroupId);
-      expect(mocks.faceIdentity.replaceFaceIdentity).toHaveBeenCalledWith({
-        assetFaceId: noPerson1.id,
-        identityId: sourceIdentityId,
-        source: 'owner-person',
-      });
-    });
+    // Option M: upstream's cross-user cluster-group test removed — a person_group never holds a
+    // second owner's person here (unique index person_personGroupId_key). See the landing plan.
 
     it('should merge a newly created person identity into an accessible shared identity match', async () => {
       const asset = AssetFactory.create();
@@ -5824,7 +5789,7 @@ describe(PersonService.name, () => {
       const person = PersonFactory.create({ identityId: null, ownerId: auth.user.id });
 
       mocks.person.getByGroupId.mockResolvedValue(person);
-      mocks.person.getStatistics.mockResolvedValue({ assets: 3 });
+      mocks.person.getStatistics.mockResolvedValue({ assets: 3, faces: 3 });
       mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
       await expect(sut.getStatistics(auth, person.personGroupId)).resolves.toEqual({ assets: 3 });
       expect(mocks.person.getStatistics).toHaveBeenCalledWith(person.personGroupId, auth.user.id);
@@ -5966,12 +5931,12 @@ describe(PersonService.name, () => {
       const person = PersonFactory.create();
 
       mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
-      mocks.person.getForPeopleDelete.mockResolvedValue([person]);
+      mocks.person.delete.mockResolvedValue([person]);
 
       await sut.delete(auth, person.personGroupId);
 
-      expect(mocks.person.getForPeopleDelete).toHaveBeenCalledWith([person.personGroupId]);
-      expect(mocks.person.delete).toHaveBeenCalledWith([person.personGroupId]);
+      expect(mocks.person.delete).toHaveBeenCalledWith([person.personGroupId], auth.user.id);
+      expect(mocks.person.deleteEmptyGroups).toHaveBeenCalledWith();
       expect(mocks.job.queue).toHaveBeenCalledWith({
         name: JobName.FileDelete,
         data: { files: [person.thumbnailPath] },
@@ -5985,11 +5950,14 @@ describe(PersonService.name, () => {
       const [person1, person2] = [PersonFactory.create(), PersonFactory.create()];
 
       mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person1.personGroupId, person2.personGroupId]));
-      mocks.person.getForPeopleDelete.mockResolvedValue([person1, person2]);
+      mocks.person.delete.mockResolvedValue([person1, person2]);
 
       await sut.deleteAll(auth, { ids: [person1.personGroupId, person2.personGroupId] });
 
-      expect(mocks.person.delete).toHaveBeenCalledWith([person1.personGroupId, person2.personGroupId]);
+      expect(mocks.person.delete).toHaveBeenCalledWith(
+        [person1.personGroupId, person2.personGroupId],
+        auth.user.id,
+      );
       expect(mocks.job.queue).toHaveBeenCalledWith({
         name: JobName.FileDelete,
         data: { files: [person1.thumbnailPath, person2.thumbnailPath] },
@@ -6005,7 +5973,9 @@ describe(PersonService.name, () => {
     it('should return Failed when person is not found', async () => {
       mocks.person.getByGroupIdOnly.mockResolvedValue(undefined);
 
-      await expect(sut.handlePersonMigration({ personGroupId: newUuid() })).resolves.toBe(JobStatus.Failed);
+      await expect(sut.handlePersonMigration({ ownerId: newUuid(), personGroupId: newUuid() })).resolves.toBe(
+        JobStatus.Failed,
+      );
     });
   });
 
@@ -6140,7 +6110,7 @@ describe(PersonService.name, () => {
 
       mocks.person.getRandomFace.mockResolvedValue(undefined);
 
-      await sut.createNewFeaturePhoto([person.personGroupId]);
+      await sut.createNewFeaturePhoto([person]);
 
       expect(mocks.person.update).not.toHaveBeenCalled();
       expect(mocks.job.queueAll).toHaveBeenCalledWith([]);
