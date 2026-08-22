@@ -6879,11 +6879,12 @@ describe(SharedSpaceService.name, () => {
         await writeFile(output, Buffer.from('cropped-face'));
       });
 
-      const result = await sut.getSpacePersonThumbnail(factory.auth(), spaceId, personId);
+      const auth = factory.auth();
+      const result = await sut.getSpacePersonThumbnail(auth, spaceId, personId);
 
       expect(result).toBeInstanceOf(ImmichStreamResponse);
       expect(mocks.sharedSpace.isFaceInSpace).toHaveBeenCalledWith(spaceId, faceId);
-      expect(mocks.person.getFaceById).toHaveBeenCalledWith(faceId);
+      expect(mocks.person.getFaceById).toHaveBeenCalledWith(faceId, { viewingUserId: auth.user.id });
       expect(mocks.asset.getForThumbnail).toHaveBeenCalledWith(assetId, AssetFileType.Preview, false);
       expect(mocks.media.generateThumbnail).toHaveBeenCalledWith(
         Buffer.from('decoded-image'),
