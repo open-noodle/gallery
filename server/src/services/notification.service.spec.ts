@@ -743,7 +743,7 @@ describe(NotificationService.name, () => {
 
       await sut.onAssetMetadataExtracted({ assetId: asset.id, userId: 'user-id', source: 'sidecar-write' });
 
-      expect(mocks.asset.getByIdsWithAllRelationsButStacks).toHaveBeenCalledWith([asset.id]);
+      expect(mocks.asset.getByIdsWithAllRelationsButStacks).toHaveBeenCalledWith([asset.id], 'user-id');
       expect(mocks.websocket.clientSend).toHaveBeenCalledWith('on_asset_update', 'user-id', expect.anything());
     });
 
@@ -752,7 +752,7 @@ describe(NotificationService.name, () => {
 
       await sut.onAssetMetadataExtracted({ assetId: 'missing-id', userId: 'user-id', source: 'sidecar-write' });
 
-      expect(mocks.asset.getByIdsWithAllRelationsButStacks).toHaveBeenCalledWith(['missing-id']);
+      expect(mocks.asset.getByIdsWithAllRelationsButStacks).toHaveBeenCalledWith(['missing-id'], 'user-id');
       expect(mocks.websocket.clientSend).not.toHaveBeenCalled();
     });
   });
