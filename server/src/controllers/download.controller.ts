@@ -7,6 +7,7 @@ import { DownloadArchiveDto, DownloadInfoDto, DownloadResponseDto } from 'src/dt
 import { ApiTag, Permission } from 'src/enum';
 import { Auth, Authenticated, FileResponse } from 'src/middleware/auth.guard';
 import { DownloadService } from 'src/services/download.service';
+import { asStreamableFile } from 'src/utils/file';
 
 @ApiTags(ApiTag.Download)
 @Controller('download')
@@ -40,8 +41,9 @@ export class DownloadController {
     @Body() dto: DownloadArchiveDto,
     @Req() req: Request,
   ): Promise<StreamableFile> {
-    const { stream, abort } = await this.service.downloadArchive(auth, dto);
+    const { abort, ...archive } = await this.service.downloadArchive(auth, dto);
+    // Gallery: the S3 archive path holds a lazy reader per asset; tear them down if the client hangs up.
     req.on('close', abort);
-    return new StreamableFile(stream);
+    return asStreamableFile(archive);
   }
 }
