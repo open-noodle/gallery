@@ -123,7 +123,7 @@ const seedEligibleFace = async (ctx: Ctx, userId: string, personId: string): Pro
 // Seed a completed scan listing `personId` plus its stored flagged rows (fast path for read-behaviour tests).
 const seedCompletedScanWithFlagged = async (
   scanRepo: ReturnType<typeof setup>['scanRepo'],
-  faces: { assetFaceId: string; personId: string; suspectedOwnerId: string }[],
+  faces: { assetFaceId: string; personGroupId: string; suspectedOwnerId: string }[],
 ) => {
   const scan = await scanRepo.createScan({ requestedBy: null, params: PARAMS });
   await scanRepo.completeScan(scan.id, { totals: zeroTotals(), persons: [] });
@@ -160,8 +160,8 @@ describe('FaceRepairService.getPersonFlaggedFaces (scan-backed)', () => {
     const f1 = await seedEligibleFace(ctx, user.id, person.personGroupId);
     const f2 = await seedEligibleFace(ctx, user.id, person.personGroupId);
     await seedCompletedScanWithFlagged(scanRepo, [
-      { assetFaceId: f1, personId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
-      { assetFaceId: f2, personId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
+      { assetFaceId: f1, personGroupId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
+      { assetFaceId: f2, personGroupId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
     ]);
 
     await db.updateTable('asset_face').set({ personGroupId: other.personGroupId }).where('id', '=', f1).execute();
@@ -178,8 +178,8 @@ describe('FaceRepairService.getPersonFlaggedFaces (scan-backed)', () => {
     const f1 = await seedEligibleFace(ctx, user.id, person.personGroupId);
     const f2 = await seedEligibleFace(ctx, user.id, person.personGroupId);
     await seedCompletedScanWithFlagged(scanRepo, [
-      { assetFaceId: f1, personId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
-      { assetFaceId: f2, personId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
+      { assetFaceId: f1, personGroupId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
+      { assetFaceId: f2, personGroupId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
     ]);
 
     // A face-level "keep here" is now a shared verdict, visible to both face engines.
@@ -196,7 +196,7 @@ describe('FaceRepairService.getPersonFlaggedFaces (scan-backed)', () => {
     const { person: owner } = await ctx.newPerson({ ownerId: user.id });
     const f1 = await seedEligibleFace(ctx, user.id, person.personGroupId);
     await seedCompletedScanWithFlagged(scanRepo, [
-      { assetFaceId: f1, personId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
+      { assetFaceId: f1, personGroupId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
     ]);
 
     await sut.createDeclines({
@@ -215,7 +215,7 @@ describe('FaceRepairService.getPersonFlaggedFaces (scan-backed)', () => {
     const { person: owner } = await ctx.newPerson({ ownerId: user.id });
     const f1 = await seedEligibleFace(ctx, user.id, person.personGroupId);
     await seedCompletedScanWithFlagged(scanRepo, [
-      { assetFaceId: f1, personId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
+      { assetFaceId: f1, personGroupId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
     ]);
 
     // Delete the suspected owner — a fresh recompute could no longer flag f1, but the read is a snapshot.
@@ -233,7 +233,7 @@ describe('FaceRepairService.getPersonFlaggedFaces (scan-backed)', () => {
     const faces = [];
     for (let i = 0; i < 150; i++) {
       const id = await seedEligibleFace(ctx, user.id, person.personGroupId);
-      faces.push({ assetFaceId: id, personId: person.personGroupId, suspectedOwnerId: owner.personGroupId });
+      faces.push({ assetFaceId: id, personGroupId: person.personGroupId, suspectedOwnerId: owner.personGroupId });
     }
     await seedCompletedScanWithFlagged(scanRepo, faces);
 
@@ -248,7 +248,7 @@ describe('FaceRepairService.getPersonFlaggedFaces (scan-backed)', () => {
     const { person: owner } = await ctx.newPerson({ ownerId: user.id });
     const f1 = await seedEligibleFace(ctx, user.id, person.personGroupId);
     await seedCompletedScanWithFlagged(scanRepo, [
-      { assetFaceId: f1, personId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
+      { assetFaceId: f1, personGroupId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
     ]);
 
     // A newer scan (no rows yet) becomes the latest.

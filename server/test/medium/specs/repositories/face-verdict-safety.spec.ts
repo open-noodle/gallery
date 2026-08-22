@@ -262,7 +262,7 @@ describe('S8.8 — a forced reset leaves no fully-orphaned verdict, and rows wit
       .insertInto('face_person_verdict')
       .values({
         assetFaceId: preOrphanFace.id,
-        personId: null,
+        personGroupId: null,
         spacePersonId: null,
         identityId: null,
         status: 'rejected',
@@ -301,7 +301,7 @@ describe('S8.8 — a forced reset leaves no fully-orphaned verdict, and rows wit
       .insertInto('face_person_verdict')
       .values({
         assetFaceId: identityOnlyFace.id,
-        personId: null,
+        personGroupId: null,
         spacePersonId: null,
         identityId: doomedIdentity.id,
         status: 'ignored',
