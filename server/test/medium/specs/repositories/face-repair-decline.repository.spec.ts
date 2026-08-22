@@ -25,15 +25,15 @@ async function seedFaceAndPersons(db: Kysely<DB>) {
   const { asset } = await ctx.newAsset({ ownerId: user.id });
   const { assetFace } = await ctx.newAssetFace({
     assetId: asset.id,
-    personId: personP.id,
+    personGroupId: personP.personGroupId,
     sourceType: SourceType.MachineLearning,
     isVisible: true,
   });
 
   return {
     faceId: assetFace.id,
-    personP: personP.id,
-    personQ: personQ.id,
+    personP: personP.personGroupId,
+    personQ: personQ.personGroupId,
     declinedBy: user.id,
   };
 }
@@ -167,7 +167,7 @@ describe(FaceRepairDeclineRepository.name, () => {
     const { personP, personQ, declinedBy } = await seedFaceAndPersons(db);
     await sut.createClusterMutes({ persons: [{ personId: personP, suspectedOwnerIds: [personQ] }], declinedBy });
 
-    await db.deleteFrom('person').where('id', '=', personP).execute();
+    await db.deleteFrom('person').where('personGroupId', '=', personP).execute();
 
     expect(await sut.listDeclines()).toEqual([]);
   });

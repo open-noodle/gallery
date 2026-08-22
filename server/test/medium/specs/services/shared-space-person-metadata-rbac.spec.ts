@@ -75,10 +75,10 @@ const createRecognizedFace = async (
     });
   }
 
-  const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+  const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
   await ctx.database.insertInto('face_search').values({ faceId, embedding: newEmbedding() }).execute();
 
-  const identity = await faceIdentityRepository.ensurePersonIdentity(person.id);
+  const identity = await faceIdentityRepository.ensurePersonIdentity(person.personGroupId);
   await faceIdentityRepository.linkFace({ assetFaceId: faceId, identityId: identity.id, source: 'owner-person' });
 
   if (input.sharePersonMetadata === false && input.spaceId) {
@@ -213,7 +213,7 @@ describe('SharedSpaceService shared-space person metadata RBAC', () => {
     });
     const { asset: secondAsset } = await ctx.newAsset({ ownerId: user.id });
     await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: secondAsset.id, addedById: user.id });
-    const { result: secondFaceId } = await ctx.newAssetFace({ assetId: secondAsset.id, personId: first.person.id });
+    const { result: secondFaceId } = await ctx.newAssetFace({ assetId: secondAsset.id, personGroupId: first.person.personGroupId });
     await ctx.database.insertInto('face_search').values({ faceId: secondFaceId, embedding: newEmbedding() }).execute();
     await faceIdentityRepository.replaceFaceIdentity({
       assetFaceId: secondFaceId,
@@ -634,7 +634,7 @@ describe('SharedSpaceService shared-space person metadata RBAC', () => {
     await ctx.database
       .updateTable('person')
       .set({ identityId: face.identity.id })
-      .where('id', '=', fallback.id)
+      .where('personGroupId', '=', fallback.personGroupId)
       .execute();
 
     await sut.remove(authFor(source), sourceSpace.id);
@@ -644,7 +644,7 @@ describe('SharedSpaceService shared-space person metadata RBAC', () => {
     expect(updated.name).toBe('Local John');
     expect(updated.nameSource).toBe('inherited');
     expect(updated.nameSourceProfileType).toBe('user-person');
-    expect(updated.nameSourceProfileId).toBe(fallback.id);
+    expect(updated.nameSourceProfileId).toBe(fallback.personGroupId);
   });
 
   it('keeps manual linked-library target-space metadata when the inherited source space is deleted', async () => {
@@ -837,7 +837,7 @@ describe('SharedSpaceService shared-space person metadata RBAC', () => {
     await ctx.database
       .updateTable('person')
       .set({ identityId: face.identity.id })
-      .where('id', '=', fallback.id)
+      .where('personGroupId', '=', fallback.personGroupId)
       .execute();
 
     await sut.remove(authFor(source), sourceSpace.id);
@@ -847,7 +847,7 @@ describe('SharedSpaceService shared-space person metadata RBAC', () => {
     expect(updated.name).toBe('Local John');
     expect(updated.nameSource).toBe('inherited');
     expect(updated.nameSourceProfileType).toBe('user-person');
-    expect(updated.nameSourceProfileId).toBe(fallback.id);
+    expect(updated.nameSourceProfileId).toBe(fallback.personGroupId);
   });
 
   it('keeps a manual target-space name when the inherited source space is deleted', async () => {
@@ -908,7 +908,7 @@ describe('SharedSpaceService shared-space person metadata RBAC', () => {
     const privateAfterDelete = await ctx.database
       .selectFrom('person')
       .selectAll()
-      .where('id', '=', face.person.id)
+      .where('personGroupId', '=', face.person.personGroupId)
       .executeTakeFirstOrThrow();
     const targetPeople = await ctx.database
       .selectFrom('shared_space_person')
@@ -1145,7 +1145,7 @@ describe('SharedSpaceService shared-space person metadata RBAC', () => {
     await ctx.database
       .updateTable('person')
       .set({ identityId: ownerFace.identity.id })
-      .where('id', '=', memberPerson.id)
+      .where('personGroupId', '=', memberPerson.personGroupId)
       .execute();
 
     await sut.handleSharedSpaceFaceMatch({ spaceId: space.id, assetId: ownerFace.asset.id });
@@ -1156,7 +1156,7 @@ describe('SharedSpaceService shared-space person metadata RBAC', () => {
       .where('spaceId', '=', space.id)
       .executeTakeFirstOrThrow();
     expect(spacePerson.name).toBe('Owner Candidate');
-    expect(spacePerson.nameSourceProfileId).toBe(ownerFace.person.id);
+    expect(spacePerson.nameSourceProfileId).toBe(ownerFace.person.personGroupId);
   });
 
   it('uses the asset adder when same-role contributors conflict', async () => {
@@ -1181,7 +1181,7 @@ describe('SharedSpaceService shared-space person metadata RBAC', () => {
     await ctx.database
       .updateTable('person')
       .set({ identityId: sourceFace.identity.id })
-      .where('id', '=', assetAdderPerson.id)
+      .where('personGroupId', '=', assetAdderPerson.personGroupId)
       .execute();
 
     await sut.handleSharedSpaceFaceMatch({ spaceId: space.id, assetId: sourceFace.asset.id });
@@ -1192,7 +1192,7 @@ describe('SharedSpaceService shared-space person metadata RBAC', () => {
       .where('spaceId', '=', space.id)
       .executeTakeFirstOrThrow();
     expect(spacePerson.name).toBe('Asset Adder Candidate');
-    expect(spacePerson.nameSourceProfileId).toBe(assetAdderPerson.id);
+    expect(spacePerson.nameSourceProfileId).toBe(assetAdderPerson.personGroupId);
   });
 
   it('does not inherit ambiguous same-rank conflicting member names', async () => {
@@ -1212,7 +1212,7 @@ describe('SharedSpaceService shared-space person metadata RBAC', () => {
     await ctx.database
       .updateTable('person')
       .set({ identityId: firstFace.identity.id })
-      .where('id', '=', secondPerson.id)
+      .where('personGroupId', '=', secondPerson.personGroupId)
       .execute();
     const spacePerson = await ctx.database
       .insertInto('shared_space_person')

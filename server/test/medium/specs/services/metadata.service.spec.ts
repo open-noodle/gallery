@@ -203,7 +203,7 @@ const getAssetFaceIdentityLinks = (db: Kysely<DB>, assetId: string) =>
   db
     .selectFrom('face_identity_face')
     .innerJoin('asset_face', 'asset_face.id', 'face_identity_face.assetFaceId')
-    .innerJoin('person', 'person.id', 'asset_face.personId')
+    .innerJoin('person', 'person.personGroupId', 'asset_face.personId')
     .select(['asset_face.id as assetFaceId', 'person.name', 'face_identity_face.source', 'asset_face.sourceType'])
     .where('asset_face.assetId', '=', assetId)
     .execute();
@@ -445,7 +445,7 @@ describe(MetadataService.name, () => {
       const [{ identityId }] = await ctx.database
         .selectFrom('person')
         .select('identityId')
-        .where('id', '=', person.id)
+        .where('personGroupId', '=', person.personGroupId)
         .execute();
       const { sut: personService } = setupPersonService(ctx.database);
       const people = await personService.getAll(factory.auth({ user }), {
@@ -463,7 +463,7 @@ describe(MetadataService.name, () => {
         expect.objectContaining({
           name: 'Existing Metadata',
           numberOfAssets: 1,
-          primaryProfile: expect.objectContaining({ id: person.id, type: 'user-person' }),
+          primaryProfile: expect.objectContaining({ id: person.personGroupId, type: 'user-person' }),
         }),
       );
     });
@@ -540,10 +540,10 @@ describe(MetadataService.name, () => {
       });
       const { assetFace } = await ctx.newAssetFace({
         assetId: asset.id,
-        personId: person.id,
+        personGroupId: person.personGroupId,
         sourceType: SourceType.Exif,
       });
-      await ctx.database.updateTable('person').set({ faceAssetId: assetFace.id }).where('id', '=', person.id).execute();
+      await ctx.database.updateTable('person').set({ faceAssetId: assetFace.id }).where('personGroupId', '=', person.personGroupId).execute();
       const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
       await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
