@@ -308,7 +308,7 @@ describe('/pet-detection', () => {
     });
 
     it('should link pet to asset via createFace', async () => {
-      await utils.createFace({ assetId: asset1Id, personId: petDogId });
+      await utils.createFace({ assetId: asset1Id, personGroupId: petDogId });
 
       const { body: stats } = await request(app)
         .get(`/people/${petDogId}/statistics`)
@@ -385,7 +385,7 @@ describe('/pet-detection', () => {
     });
 
     it('should return correct asset count for pet via statistics', async () => {
-      await utils.createFace({ assetId: asset2Id, personId: petCatId });
+      await utils.createFace({ assetId: asset2Id, personGroupId: petCatId });
 
       const { status, body } = await request(app)
         .get(`/people/${petCatId}/statistics`)
@@ -415,7 +415,7 @@ describe('/pet-detection', () => {
       const pet1 = await utils.createPet(admin.userId, 'bird', 'Tweety');
       const pet2 = await utils.createPet(admin.userId, 'bird', 'Birdie');
       const asset = await utils.createAsset(admin.accessToken);
-      await utils.createFace({ assetId: asset.id, personId: pet2 });
+      await utils.createFace({ assetId: asset.id, personGroupId: pet2 });
 
       const { status } = await request(app)
         .post(`/people/${pet1}/merge`)
@@ -480,8 +480,8 @@ describe('/pet-detection', () => {
       integrationPersonId = person.id;
 
       await Promise.all([
-        utils.createFace({ assetId: integrationAssetId, personId: integrationPetId }),
-        utils.createFace({ assetId: integrationAssetId, personId: integrationPersonId }),
+        utils.createFace({ assetId: integrationAssetId, personGroupId: integrationPetId }),
+        utils.createFace({ assetId: integrationAssetId, personGroupId: integrationPersonId }),
       ]);
     });
 
@@ -509,8 +509,8 @@ describe('/pet-detection', () => {
 
       const asset = await utils.createAsset(admin.accessToken);
       await Promise.all([
-        utils.createFace({ assetId: asset.id, personId: dogId }),
-        utils.createFace({ assetId: asset.id, personId: birdId }),
+        utils.createFace({ assetId: asset.id, personGroupId: dogId }),
+        utils.createFace({ assetId: asset.id, personGroupId: birdId }),
       ]);
 
       const [dogStats, birdStats] = await Promise.all([
@@ -554,8 +554,8 @@ describe('/pet-detection', () => {
         utils.createAsset(isoUser2.accessToken),
       ]);
       await Promise.all([
-        utils.createFace({ assetId: a1.id, personId: user1PetId }),
-        utils.createFace({ assetId: a2.id, personId: user2PetId }),
+        utils.createFace({ assetId: a1.id, personGroupId: user1PetId }),
+        utils.createFace({ assetId: a2.id, personGroupId: user2PetId }),
       ]);
     });
 
