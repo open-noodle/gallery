@@ -444,6 +444,7 @@ export class PersonService extends BaseService {
   }
 
   async getFacesForPicker(auth: AuthDto, id: string, dto: PersonFacePageQueryDto): Promise<PersonFacePageResponseDto> {
+    await this.requireAccess({ auth, permission: Permission.PersonRead, ids: [id] });
     const person = await this.findOrFail(auth, id);
     const take = dto.size;
     // Fork RBAC (Slice 2 / M1): PersonRead also admits non-owner space-granted callers. Scope those
@@ -1521,8 +1522,14 @@ export class PersonService extends BaseService {
     });
   }
 
-  private findOrFail(auth: AuthDto, personGroupId: string) {
-    return findOrFail(() => this.personRepository.getByGroupId({ ownerId: auth.user.id, personGroupId }), 'Person');
+  // Upstream looks the person up owner-scoped (`getByGroupId({ ownerId, personGroupId })`) because it has
+  // no concept of a person reachable by anyone but its owner. In the fork, `requireAccess` above each call
+  // site is the authorization gate, and several of those permissions (PersonRead in particular) admit
+  // non-owner space-granted callers — so owner-scoping the subsequent LOAD would 400 every shared-space
+  // reader on routes that are supposed to serve them. This is a plain row load, owner-agnostic exactly as
+  // the fork's pre-#30739 `getById(id)` was; `getByGroupIdOnly` is equivalent to it under M's 1:1 invariant.
+  private findOrFail(_auth: AuthDto, personGroupId: string) {
+    return findOrFail(() => this.personRepository.getByGroupIdOnly(personGroupId), 'Person');
   }
 
   // TODO return a asset face response
