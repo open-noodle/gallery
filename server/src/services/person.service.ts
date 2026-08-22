@@ -396,7 +396,7 @@ export class PersonService extends BaseService {
     const identityByPersonId = new Map<string, string>();
     for (const face of faces) {
       if (face.person?.ownerId === auth.user.id && face.person.identityId) {
-        identityByPersonId.set(face.person.id, face.person.identityId);
+        identityByPersonId.set(face.person.personGroupId, face.person.identityId);
       }
     }
     await applyResolvedIdentityMetadata({
@@ -458,7 +458,7 @@ export class PersonService extends BaseService {
   }
 
   async getFacesForPicker(auth: AuthDto, id: string, dto: PersonFacePageQueryDto): Promise<PersonFacePageResponseDto> {
-    const person = await this.findOrFail(id);
+    const person = await this.findOrFail(auth, id);
     const take = dto.size;
     // Fork RBAC (Slice 2 / M1): PersonRead also admits non-owner space-granted callers. Scope those
     // callers to space-reachable, shareable-visibility faces only — never the owner's Hidden/
@@ -518,7 +518,7 @@ export class PersonService extends BaseService {
     // can also do — so gate on person.read (owner | shared space) rather than owner-only
     // person.update. The chosen face is still gated on asset.read below.
     await this.requireAccess({ auth, permission: Permission.PersonRead, ids: [id] });
-    const current = await this.findOrFail(id);
+    const current = await this.findOrFail(auth, id);
 
     // Fork RBAC (Slice 3 / M2): PersonRead only proves reachability (viewers included). Mutating the
     // owner's GLOBAL representative face must be limited to the owner or an Editor/Owner of a space
@@ -1229,7 +1229,7 @@ export class PersonService extends BaseService {
 
     if (face.personGroupId) {
       this.logger.debug(`Face ${id} already has a person assigned`);
-      await this.replaceFaceIdentity(face.personId, face.id, 'owner-person');
+      await this.replaceFaceIdentity(face.personGroupId, face.id, 'owner-person');
 
       if (skipSharedSpaceMatch) {
         return JobStatus.Skipped;
@@ -1242,9 +1242,9 @@ export class PersonService extends BaseService {
       return JobStatus.Skipped;
     }
 
-    const { ownerId, clusterGroupId } = face.asset;
+    const { ownerId } = face.asset;
     const matches = await this.searchRepository.searchFaces({
-      clusterGroupId,
+      userIds: [ownerId],
       embedding: face.faceSearch.embedding,
       maxDistance: machineLearning.facialRecognition.maxDistance,
       numResults: machineLearning.facialRecognition.minFaces,
@@ -1293,7 +1293,7 @@ export class PersonService extends BaseService {
 
     if (!personGroupId) {
       const [matchWithPerson] = await this.searchRepository.searchFaces({
-        clusterGroupId,
+        userIds: [ownerId],
         embedding: face.faceSearch.embedding,
         maxDistance: machineLearning.facialRecognition.maxDistance,
         numResults: 1,
