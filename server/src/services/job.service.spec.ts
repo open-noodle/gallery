@@ -14,7 +14,7 @@ import {
 } from 'src/enum.js';
 import { JobService } from 'src/services/job.service.js';
 import { AssetFactory } from 'test/factories/asset.factory.js';
-import { factory, newUuid } from 'test/small.factory.js';
+import { newUuid } from 'test/small.factory.js';
 import { ServiceMocks, newTestService } from 'test/utils.js';
 
 describe(JobService.name, () => {

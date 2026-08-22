@@ -211,7 +211,10 @@ export class FacePersonVerdictRepository {
         opts,
       ),
       (inner) =>
-        inner.or([inner('neg.personGroupId', '=', personGroupId), inner('neg.identityId', '=', inner.ref('person.identityId'))]),
+        inner.or([
+          inner('neg.personGroupId', '=', personGroupId),
+          inner('neg.identityId', '=', inner.ref('person.identityId')),
+        ]),
     );
 
     const result = await db.deleteFrom('face_person_verdict').where('id', 'in', eligibleIds).executeTakeFirst();
@@ -328,7 +331,9 @@ export class FacePersonVerdictRepository {
     if (rows.length === 0) {
       return 0;
     }
-    const deduplicated = new Map(rows.map((row) => [`${row.personGroupId}|${row.assetFaceId}`, row])).values().toArray();
+    const deduplicated = new Map(rows.map((row) => [`${row.personGroupId}|${row.assetFaceId}`, row]))
+      .values()
+      .toArray();
     const source = opts?.source ?? 'suggestion';
     const actorId = opts?.actorId ?? null;
 
