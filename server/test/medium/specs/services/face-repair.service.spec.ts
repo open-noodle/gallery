@@ -574,11 +574,11 @@ describe('FaceRepairService.executeRepair', () => {
     // Leaked faces now belong to their suspected owner Karina (durable, not unassigned).
     const leakedRows = await ctx.database
       .selectFrom('asset_face')
-      .select(['id', 'personId'])
+      .select(['id', 'personGroupId'])
       .where('id', 'in', leakedFaceIds)
       .execute();
     for (const row of leakedRows) {
-      expect(row.personId).toBe(karina.personGroupId);
+      expect(row.personGroupId).toBe(karina.personGroupId);
     }
 
     // face_identity_face rows for leaked faces now point to Karina's identity, sourced 'manual'
@@ -597,21 +597,21 @@ describe('FaceRepairService.executeRepair', () => {
     // Genuine Alexia faces are untouched
     const alexiaRows = await ctx.database
       .selectFrom('asset_face')
-      .select(['id', 'personId'])
+      .select(['id', 'personGroupId'])
       .where('id', 'in', alexiaGenuineFaceIds)
       .execute();
     for (const row of alexiaRows) {
-      expect(row.personId).toBe(alexia.personGroupId);
+      expect(row.personGroupId).toBe(alexia.personGroupId);
     }
 
     // Karina's original faces are untouched
     const karinaRows = await ctx.database
       .selectFrom('asset_face')
-      .select(['id', 'personId'])
+      .select(['id', 'personGroupId'])
       .where('id', 'in', karinaFaceIds)
       .execute();
     for (const row of karinaRows) {
-      expect(row.personId).toBe(karina.personGroupId);
+      expect(row.personGroupId).toBe(karina.personGroupId);
     }
 
     // No-loop invariant: getBackfillWork().hasPersonalIdentityWork is false after repair
@@ -673,11 +673,11 @@ describe('FaceRepairService.executeRepair', () => {
     // All over-cap faces keep their personId
     const rows = await ctx.database
       .selectFrom('asset_face')
-      .select(['id', 'personId'])
+      .select(['id', 'personGroupId'])
       .where('id', 'in', overCapFaceIds)
       .execute();
     for (const row of rows) {
-      expect(row.personId).toBe(overCap.personGroupId);
+      expect(row.personGroupId).toBe(overCap.personGroupId);
     }
   });
 
@@ -793,7 +793,7 @@ describe('FaceRepairService.executeRepair', () => {
 
     // After building plan but before executing it, move one leaked face to person Z
     const movedFaceId = leakedFaceIds[0];
-    await ctx.database.updateTable('asset_face').set({ personId: personZ.personGroupId }).where('id', '=', movedFaceId).execute();
+    await ctx.database.updateTable('asset_face').set({ personGroupId: personZ.personGroupId }).where('id', '=', movedFaceId).execute();
 
     await sut.executeRepair(plan);
 
@@ -808,11 +808,11 @@ describe('FaceRepairService.executeRepair', () => {
     // The two remaining leaked faces were re-attributed to the suspected owner Karina.
     const remainingRows = await ctx.database
       .selectFrom('asset_face')
-      .select(['id', 'personId'])
+      .select(['id', 'personGroupId'])
       .where('id', 'in', leakedFaceIds.slice(1))
       .execute();
     for (const row of remainingRows) {
-      expect(row.personId).toBe(karina.personGroupId);
+      expect(row.personGroupId).toBe(karina.personGroupId);
     }
 
     // The apply never re-queues FacialRecognition.
@@ -911,11 +911,11 @@ describe('FaceRepairService.runRepair', () => {
     // Leaked faces must still have their original personId (nothing mutated)
     const rows = await ctx.database
       .selectFrom('asset_face')
-      .select(['id', 'personId'])
+      .select(['id', 'personGroupId'])
       .where('id', 'in', leakedFaceIds)
       .execute();
     for (const row of rows) {
-      expect(row.personId).toBe(alexia.personGroupId);
+      expect(row.personGroupId).toBe(alexia.personGroupId);
     }
 
     // queueAll must not have been called
@@ -970,11 +970,11 @@ describe('FaceRepairService.runRepair', () => {
 
     const rows = await ctx.database
       .selectFrom('asset_face')
-      .select(['id', 'personId'])
+      .select(['id', 'personGroupId'])
       .where('id', 'in', leakedFaceIds)
       .execute();
     for (const row of rows) {
-      expect(row.personId).toBe(karina.personGroupId);
+      expect(row.personGroupId).toBe(karina.personGroupId);
     }
 
     const queuedJobNames = jobMock.queueAll.mock.calls.flatMap(([items]) => items).map((item) => item.name);
@@ -1027,11 +1027,11 @@ describe('FaceRepairService.runRepair', () => {
     // Leaked faces still have their personId (nothing mutated)
     const rows = await ctx.database
       .selectFrom('asset_face')
-      .select(['id', 'personId'])
+      .select(['id', 'personGroupId'])
       .where('id', 'in', leakedFaceIds)
       .execute();
     for (const row of rows) {
-      expect(row.personId).toBe(alexia.personGroupId);
+      expect(row.personGroupId).toBe(alexia.personGroupId);
     }
 
     // dryRun=true (default) with isActive=true → succeeds (read-only)
@@ -1122,21 +1122,21 @@ describe('FaceRepairService.runRepair', () => {
     // OwnerA leaked faces are re-attributed to OwnerA's suspected owner
     const rowsA = await ctx.database
       .selectFrom('asset_face')
-      .select(['id', 'personId'])
+      .select(['id', 'personGroupId'])
       .where('id', 'in', leakedA)
       .execute();
     for (const row of rowsA) {
-      expect(row.personId).toBe(karinaA.personGroupId);
+      expect(row.personGroupId).toBe(karinaA.personGroupId);
     }
 
     // OwnerB leaked faces remain assigned
     const rowsB = await ctx.database
       .selectFrom('asset_face')
-      .select(['id', 'personId'])
+      .select(['id', 'personGroupId'])
       .where('id', 'in', leakedB)
       .execute();
     for (const row of rowsB) {
-      expect(row.personId).toBe(alexiaB.personGroupId);
+      expect(row.personGroupId).toBe(alexiaB.personGroupId);
     }
   });
 
@@ -1348,11 +1348,11 @@ describe('FaceRepairService decline filter', () => {
     // Faces still assigned to Alexia
     const rows = await ctx.database
       .selectFrom('asset_face')
-      .select(['id', 'personId'])
+      .select(['id', 'personGroupId'])
       .where('id', 'in', leakedFaceIds)
       .execute();
     for (const row of rows) {
-      expect(row.personId).toBe(alexia.personGroupId);
+      expect(row.personGroupId).toBe(alexia.personGroupId);
     }
 
     // karina is not used by this test path but ensure she wasn't somehow affected
