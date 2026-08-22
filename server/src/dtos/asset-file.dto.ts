@@ -21,7 +21,7 @@ const AssetFileResponseSchema = z
     createdAt: isoDatetimeToDate.describe('Creation date'),
     updatedAt: isoDatetimeToDate.describe('Update date'),
     type: AssetFileTypeSchema.describe('Type of file'),
-    path: z.string().describe('File path'),
+    path: z.string().optional().describe('File path. Only returned to the owner of the asset.'),
     isEdited: z.boolean().describe('The file was generated from an edit'),
     isProgressive: z.boolean().describe('The file is a progressively encoded JPEG'),
     isTransparent: z.boolean().describe('The file is transparent'),
@@ -31,13 +31,16 @@ const AssetFileResponseSchema = z
 export class AssetFileSearchDto extends createZodDto(AssetFileSearchSchema) {}
 export class AssetFileResponseDto extends createZodDto(AssetFileResponseSchema) {}
 
-export const mapAssetFile = (file: Selectable<AssetFileTable>): AssetFileResponseDto => {
+export const mapAssetFile = (
+  file: Selectable<AssetFileTable>,
+  { includePath = true }: { includePath?: boolean } = {},
+): AssetFileResponseDto => {
   return {
     id: file.id,
     createdAt: file.createdAt,
     updatedAt: file.updatedAt,
     type: file.type,
-    path: file.path,
+    ...(includePath && { path: file.path }),
     isEdited: file.isEdited,
     isProgressive: file.isProgressive,
     isTransparent: file.isTransparent,
