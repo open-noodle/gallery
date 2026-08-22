@@ -1130,8 +1130,8 @@ describe('FacePersonVerdictRepository', () => {
       // fA keeps its rejected verdict; fB's pending row is untouched.
       expect(rows).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({ assetFaceId: fA.id, personId: p2.personGroupId, status: 'rejected' }),
-          expect.objectContaining({ assetFaceId: fB.id, personId: p1.personGroupId, status: 'pending' }),
+          expect.objectContaining({ assetFaceId: fA.id, personGroupId: p2.personGroupId, status: 'rejected' }),
+          expect.objectContaining({ assetFaceId: fB.id, personGroupId: p1.personGroupId, status: 'pending' }),
         ]),
       );
       expect(rows.filter((r) => r.assetFaceId === fA.id && r.status === 'pending')).toEqual([]);
@@ -1304,8 +1304,11 @@ describe('FacePersonVerdictRepository', () => {
       const before = await getRow(tempPersonId, assetFaceId);
       expect(before).toBeTruthy();
 
-      // mergePerson → removeAllPeople([mergedAwayPerson]) deletes the person row
+      // mergePerson → removeAllPersonGroups([mergedAwayPerson]) deletes the person row and then sweeps the
+      // group it emptied. #30739 moved this FK onto person_group.id, so it is the second step that fires
+      // the SET NULL; both are done here so the test still mirrors the real merge path.
       await defaultDatabase.deleteFrom('person').where('personGroupId', '=', tempPersonId).execute();
+      await defaultDatabase.deleteFrom('person_group').where('id', '=', tempPersonId).execute();
 
       // personId is ON DELETE SET NULL (post-Slice-1 semantics), not CASCADE: the row survives the person
       // delete with personId nulled out. Querying by the row's own id — not by personId, which is now null —
@@ -2409,7 +2412,7 @@ describe('FacePersonVerdictRepository', () => {
 
       const rows = faceIds.map((assetFaceId) => ({
         assetFaceId,
-        personId: null,
+        personGroupId: null,
         spacePersonId: null,
         identityId: null,
         status: 'rejected' as const,
