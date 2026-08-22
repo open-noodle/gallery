@@ -175,8 +175,8 @@ describe('IdentityMergePropagationService medium tests', () => {
     const people = await getPeople(ctx.database, [myPerson.personGroupId, theirPerson.personGroupId]);
     expect(people).toEqual(
       expect.arrayContaining([
-        { id: myPerson.personGroupId, identityId: targetIdentity.id },
-        { id: theirPerson.personGroupId, identityId: targetIdentity.id },
+        { personGroupId: myPerson.personGroupId, identityId: targetIdentity.id },
+        { personGroupId: theirPerson.personGroupId, identityId: targetIdentity.id },
       ]),
     );
   });
@@ -204,7 +204,7 @@ describe('IdentityMergePropagationService medium tests', () => {
     ).rejects.toThrow('One or more people were not found or are not accessible');
 
     const people = await getPeople(ctx.database, [myPerson.personGroupId]);
-    expect(people).toEqual([{ id: myPerson.personGroupId, identityId: targetIdentity.id }]);
+    expect(people).toEqual([{ personGroupId: myPerson.personGroupId, identityId: targetIdentity.id }]);
     await expect(getIdentityIds(ctx.database, [sourceIdentity.id])).resolves.toEqual([{ id: sourceIdentity.id }]);
   });
 
@@ -245,9 +245,9 @@ describe('IdentityMergePropagationService medium tests', () => {
 
     await expect(getPeople(ctx.database, [target.personGroupId, sourceA.personGroupId, sourceB.personGroupId])).resolves.toEqual(
       expect.arrayContaining([
-        { id: target.personGroupId, identityId: null },
-        { id: sourceA.personGroupId, identityId: null },
-        { id: sourceB.personGroupId, identityId: null },
+        { personGroupId: target.personGroupId, identityId: null },
+        { personGroupId: sourceA.personGroupId, identityId: null },
+        { personGroupId: sourceB.personGroupId, identityId: null },
       ]),
     );
   });
@@ -265,7 +265,7 @@ describe('IdentityMergePropagationService medium tests', () => {
     ]);
 
     const people = await getPeople(ctx.database, [target.personGroupId, source.personGroupId]);
-    expect(people).toEqual([{ id: target.personGroupId, identityId: targetIdentity.id }]);
+    expect(people).toEqual([{ personGroupId: target.personGroupId, identityId: targetIdentity.id }]);
   });
 
   it('does not violate space identity uniqueness while collapsing shared-space duplicates', async () => {
@@ -429,9 +429,9 @@ describe('IdentityMergePropagationService medium tests', () => {
       getPeople(ctx.database, [actorTarget.personGroupId, actorSource.personGroupId, otherTarget.personGroupId, otherSource.personGroupId]),
     ).resolves.toEqual(
       [
-        { id: actorTarget.personGroupId, identityId: targetIdentity.id },
-        { id: otherTarget.personGroupId, identityId: targetIdentity.id },
-      ].toSorted((a, b) => a.id.localeCompare(b.id)),
+        { personGroupId: actorTarget.personGroupId, identityId: targetIdentity.id },
+        { personGroupId: otherTarget.personGroupId, identityId: targetIdentity.id },
+      ].toSorted((a, b) => a.personGroupId.localeCompare(b.personGroupId)),
     );
     await expect(
       getSpacePeople(ctx.database, [
@@ -550,9 +550,9 @@ describe('IdentityMergePropagationService medium tests', () => {
       getPeople(ctx.database, [otherOwnerTarget.personGroupId, otherOwnerSource.personGroupId, singletonOwnerSource.personGroupId]),
     ).resolves.toEqual(
       [
-        { id: otherOwnerTarget.personGroupId, identityId: targetIdentity.id },
-        { id: singletonOwnerSource.personGroupId, identityId: targetIdentity.id },
-      ].toSorted((a, b) => a.id.localeCompare(b.id)),
+        { personGroupId: otherOwnerTarget.personGroupId, identityId: targetIdentity.id },
+        { personGroupId: singletonOwnerSource.personGroupId, identityId: targetIdentity.id },
+      ].toSorted((a, b) => a.personGroupId.localeCompare(b.personGroupId)),
     );
     await expect(getIdentityIds(ctx.database, [targetIdentity.id, sourceIdentity.id])).resolves.toEqual([
       { id: targetIdentity.id },
@@ -607,7 +607,7 @@ describe('IdentityMergePropagationService medium tests', () => {
         reason: expect.any(Error),
       });
       await expect(getPeople(ctx.database, [target.personGroupId, source.personGroupId])).resolves.toEqual([
-        { id: target.personGroupId, identityId: targetIdentity.id },
+        { personGroupId: target.personGroupId, identityId: targetIdentity.id },
       ]);
     } finally {
       await db.destroy();
@@ -651,8 +651,8 @@ describe('IdentityMergePropagationService medium tests', () => {
       expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
       await expect(getPeople(ctx.database, [personA.personGroupId, personB.personGroupId, personC.personGroupId])).resolves.toEqual(
         expect.arrayContaining([
-          { id: personA.personGroupId, identityId: identityA.id },
-          { id: personC.personGroupId, identityId: identityC.id },
+          { personGroupId: personA.personGroupId, identityId: identityA.id },
+          { personGroupId: personC.personGroupId, identityId: identityC.id },
         ]),
       );
     } finally {
@@ -844,8 +844,8 @@ describe('IdentityMergePropagationService medium tests', () => {
 
     await expect(getPeople(ctx.database, [target.personGroupId, source.personGroupId])).resolves.toEqual(
       expect.arrayContaining([
-        { id: target.personGroupId, identityId: targetIdentity.id },
-        { id: source.personGroupId, identityId: sourceIdentity.id },
+        { personGroupId: target.personGroupId, identityId: targetIdentity.id },
+        { personGroupId: source.personGroupId, identityId: sourceIdentity.id },
       ]),
     );
     await expect(
@@ -1139,7 +1139,7 @@ describe('IdentityMergePropagationService medium tests', () => {
     ]);
 
     await expect(getPeople(ctx.database, [target.personGroupId, sourceA.personGroupId, sourceB.personGroupId, sourceC.personGroupId])).resolves.toEqual([
-      { id: target.personGroupId, identityId: targetIdentity.id },
+      { personGroupId: target.personGroupId, identityId: targetIdentity.id },
     ]);
     await expect(
       getIdentityIds(ctx.database, [sourceIdentityA.id, sourceIdentityB.id, sourceIdentityC.id]),
@@ -1172,7 +1172,7 @@ describe('IdentityMergePropagationService medium tests', () => {
       }),
     ).resolves.toBeUndefined();
 
-    await expect(getPeople(ctx.database, [target.personGroupId])).resolves.toEqual([{ id: target.personGroupId, identityId: identity.id }]);
+    await expect(getPeople(ctx.database, [target.personGroupId])).resolves.toEqual([{ personGroupId: target.personGroupId, identityId: identity.id }]);
     await expect(getSpacePeople(ctx.database, [alreadyFusedSpacePerson.id])).resolves.toEqual([
       { id: alreadyFusedSpacePerson.id, identityId: identity.id },
     ]);
@@ -1197,7 +1197,7 @@ describe('IdentityMergePropagationService medium tests', () => {
     ]);
 
     await expect(getPeople(ctx.database, [target.personGroupId, source.personGroupId])).resolves.toEqual([
-      { id: target.personGroupId, identityId: targetIdentity.id },
+      { personGroupId: target.personGroupId, identityId: targetIdentity.id },
     ]);
     await expect(getIdentityIds(ctx.database, [sourceIdentity.id])).resolves.toEqual([]);
   });
@@ -1229,7 +1229,7 @@ describe('IdentityMergePropagationService medium tests', () => {
     ).resolves.toEqual({ faceAssetId: sourceFace.id });
     expect(jobRepository.queue).toHaveBeenCalledWith({
       name: JobName.PersonGenerateThumbnail,
-      data: { id: target.personGroupId },
+      data: { ownerId: target.ownerId, personGroupId: target.personGroupId },
     });
   });
 });
