@@ -5,7 +5,7 @@ import { systemConfigStub } from 'test/fixtures/system-config.stub';
 import { makeStream, newTestService, ServiceMocks } from 'test/utils';
 
 const makePerson = (overrides: Record<string, unknown> = {}) => ({
-  id: 'person-id',
+  personGroupId: 'person-id',
   identityId: null,
   ownerId: 'owner-id',
   name: 'dog',
