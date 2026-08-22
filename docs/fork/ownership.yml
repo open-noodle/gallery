@@ -470,6 +470,20 @@ ci_invariants:
     forbidden_patterns: ['workflow_run:']
     paths: [.github/workflows/docs-deploy.yml]
     exceptions: []
+  # Option M: a person_group holds exactly one person row — the owner's. Upstream filters its person
+  # joins to the VIEWER's row, which is meaningful with cluster groups on and a silent nullifier here:
+  # every non-owner gets `person: null` on faces they may see, and hidden people stop being hidden.
+  # Both joins must prefer the viewer and fall back, never filter. See
+  # docs/superpowers/specs/2026-08-22-option-m-invariant-inventory.md §2.
+  - id: person-join-not-viewer-filtered
+    title: Person joins prefer the viewer's row, never filter to it
+    forbidden_patterns:
+      - "'person.ownerId', '=', viewingUserId"
+      - "'person.ownerId', '=', asUuid(viewingUserId)"
+    paths:
+      - server/src/repositories/person.repository.ts
+      - server/src/utils/database.ts
+    exceptions: []
 
 patches:
   - id: immich-ui-command-patch
