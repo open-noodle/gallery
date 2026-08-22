@@ -623,7 +623,21 @@ export class FaceRepairService extends BaseService {
     // whichever pass runs last — the spread, not the order, is the load-bearing piece). Pinned by
     // face-repair.scan.spec.ts ("carries the destination overlay through the live flagged-count recompute").
     const withNames = await this.faceRepairScanRepository.withCurrentNames(scan);
-    return this.withLiveFlaggedCounts(withNames);
+    const live = await this.withLiveFlaggedCounts(withNames);
+
+    // Option M renamed the persisted/internal person key to `personGroupId` (the storage-layer name), but the
+    // DTO — and the web console — read `personId`, which under M IS the person_group id. Alias it back out
+    // here, at the boundary, exactly as the repositories do for face rows. Without this the console receives
+    // rows with no `personId` and cannot render or act on them.
+    //
+    // `tsc` cannot catch this: the controller returns `... as Promise<FaceRepairScanStatusDto | null>`, so the
+    // cast asserts a shape nothing verifies. Only an e2e that reads the rendered console sees it.
+    const persons = ((live.persons ?? []) as unknown as RepairScanPerson[]).map((person) => ({
+      ...person,
+      personId: person.personGroupId,
+    }));
+
+    return { ...live, persons } as typeof live;
   }
 
   // D12 (Slice 9): the persisted scan report's flagged counts are a point-in-time snapshot. A verdict
