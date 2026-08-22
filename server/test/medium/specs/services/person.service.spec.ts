@@ -1118,6 +1118,11 @@ describe(PersonService.name, () => {
     });
   });
 
+  // Option M: Gallery does not adopt upstream's cluster-groups FEATURE, so a person_group never holds
+  // more than one person row — the unique index `person_personGroupId_key` enforces it. The tests that
+  // stood here deliberately put a second owner's person into an existing group, which is exactly the
+  // state Gallery declines to support. Restoring them is part of turning cluster groups on; see
+  // docs/superpowers/specs/2026-08-21-cluster-groups-m-landing-plan.md.
   describe('mergePeople', () => {
   });
 
