@@ -474,7 +474,7 @@ describe('face re-attribution repair: minFaces:3 + sub-minFaces stays unassigned
     // Assert: lone Bob face was NOT in toRepair (no confident Q with ≥3 neighbors) and stays unmodified.
     const loneRow = await ctx.database
       .selectFrom('asset_face')
-      .select('personId')
+      .select('personGroupId')
       .where('id', '=', loneFace.id)
       .executeTakeFirstOrThrow();
     // The lone face was never flagged → its personId is unchanged (still bob.id)
