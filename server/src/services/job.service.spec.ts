@@ -413,34 +413,20 @@ describe(JobService.name, () => {
   });
 
   describe('onDone - PersonGenerateThumbnail', () => {
-    it('should send websocket event when person is found', async () => {
+    // #30739 put the owner in the job payload, so the completion hook no longer reads the person back
+    // to find it. There is consequently no "person not found" branch left to cover here.
+    it('sends the websocket event straight from the job payload, without a person lookup', async () => {
       mocks.job.run.mockResolvedValue(JobStatus.Success);
-      const personId = newUuid();
+      const personGroupId = newUuid();
       const ownerId = newUuid();
-      const person = factory.person({ personGroupId: personId, ownerId });
-      mocks.person.getByGroupIdOnly.mockResolvedValue(person);
 
       await sut.onJobRun(QueueName.ThumbnailGeneration, {
         name: JobName.PersonGenerateThumbnail,
-        data: { ownerId: 'owner-id', personGroupId: personId },
+        data: { ownerId, personGroupId },
       });
 
-      expect(mocks.person.getByGroupIdOnly).toHaveBeenCalledWith(personId);
-      expect(mocks.websocket.clientSend).toHaveBeenCalledWith('on_person_thumbnail', ownerId, personId);
-    });
-
-    it('should not send websocket event when person is not found', async () => {
-      mocks.job.run.mockResolvedValue(JobStatus.Success);
-      const personId = newUuid();
-      mocks.person.getByGroupIdOnly.mockResolvedValue(undefined as any);
-
-      await sut.onJobRun(QueueName.ThumbnailGeneration, {
-        name: JobName.PersonGenerateThumbnail,
-        data: { ownerId: 'owner-id', personGroupId: personId },
-      });
-
-      expect(mocks.person.getByGroupIdOnly).toHaveBeenCalledWith(personId);
-      expect(mocks.websocket.clientSend).not.toHaveBeenCalled();
+      expect(mocks.person.getByGroupIdOnly).not.toHaveBeenCalled();
+      expect(mocks.websocket.clientSend).toHaveBeenCalledWith('on_person_thumbnail', ownerId, personGroupId);
     });
   });
 

@@ -126,12 +126,12 @@ describe(FaceSuggestionService.name, () => {
       mocks.person.getAssignedFaceEmbeddings.mockResolvedValue([{ embedding: 'e1' }, { embedding: 'e2' }] as any);
       mocks.search.searchFaces
         .mockResolvedValueOnce([
-          { id: 'f-low', personId: null, distance: 0.45 }, // <= maxDistance → excluded (auto-assign band)
-          { id: 'f-band', personId: null, distance: 0.7 }, // in band
-          { id: 'f-edge', personId: null, distance: 0.8 }, // == suggestionMaxDistance → kept (closed upper)
+          { id: 'f-low', personGroupId: null, distance: 0.45 }, // <= maxDistance → excluded (auto-assign band)
+          { id: 'f-band', personGroupId: null, distance: 0.7 }, // in band
+          { id: 'f-edge', personGroupId: null, distance: 0.8 }, // == suggestionMaxDistance → kept (closed upper)
         ] as any)
         .mockResolvedValueOnce([
-          { id: 'f-band', personId: null, distance: 0.6 }, // same face, smaller distance → min wins
+          { id: 'f-band', personGroupId: null, distance: 0.6 }, // same face, smaller distance → min wins
         ] as any);
 
       await expect(sut.handlePersonSuggestionScan({ id: 'p' })).resolves.toBe(JobStatus.Success);
@@ -151,8 +151,8 @@ describe(FaceSuggestionService.name, () => {
       const rows = mocks.facePersonVerdict.upsertPending.mock.calls[0][0];
       expect(rows).toEqual(
         expect.arrayContaining([
-          { personId: 'p', assetFaceId: 'f-band', distance: 0.6 },
-          { personId: 'p', assetFaceId: 'f-edge', distance: 0.8 },
+          { personGroupId: 'p', assetFaceId: 'f-band', distance: 0.6 },
+          { personGroupId: 'p', assetFaceId: 'f-edge', distance: 0.8 },
         ]),
       );
       expect(rows).toHaveLength(2); // f-low excluded
@@ -196,7 +196,7 @@ describe(FaceSuggestionService.name, () => {
         type: 'person',
       } as any);
       mocks.person.getAssignedFaceEmbeddings.mockResolvedValue([{ embedding: 'e' }] as any);
-      mocks.search.searchFaces.mockResolvedValue([{ id: 'f-dismissed', personId: null, distance: 0.7 }] as any);
+      mocks.search.searchFaces.mockResolvedValue([{ id: 'f-dismissed', personGroupId: null, distance: 0.7 }] as any);
 
       await sut.handlePersonSuggestionScan({ id: 'p' });
 
@@ -204,7 +204,7 @@ describe(FaceSuggestionService.name, () => {
       // guard in the repository is the single source of the never-resurrect guarantee.
       // The job must not pre-filter resolved rows — it delegates to upsertPending.
       expect(mocks.facePersonVerdict.upsertPending).toHaveBeenCalledWith([
-        { personId: 'p', assetFaceId: 'f-dismissed', distance: 0.7 },
+        { personGroupId: 'p', assetFaceId: 'f-dismissed', distance: 0.7 },
       ]);
     });
 
@@ -220,10 +220,10 @@ describe(FaceSuggestionService.name, () => {
       } as any);
       mocks.person.getAssignedFaceEmbeddings.mockResolvedValue([{ embedding: 'e' }] as any);
       mocks.search.searchFaces.mockResolvedValue([
-        { id: 'f-manual', personId: null, distance: 0.7 },
-        { id: 'f-negative-person', personId: null, distance: 0.7 },
-        { id: 'f-negative-identity', personId: null, distance: 0.7 },
-        { id: 'f-kept', personId: null, distance: 0.7 },
+        { id: 'f-manual', personGroupId: null, distance: 0.7 },
+        { id: 'f-negative-person', personGroupId: null, distance: 0.7 },
+        { id: 'f-negative-identity', personGroupId: null, distance: 0.7 },
+        { id: 'f-kept', personGroupId: null, distance: 0.7 },
       ] as any);
       mocks.faceIdentity.getManualLinkedFaceIds.mockResolvedValue(new Set(['f-manual']));
       mocks.facePersonVerdict.getNegativeVerdictTokens.mockResolvedValue(
@@ -239,7 +239,7 @@ describe(FaceSuggestionService.name, () => {
         expect.arrayContaining(['f-manual', 'f-negative-person', 'f-negative-identity', 'f-kept']),
       );
       expect(mocks.facePersonVerdict.upsertPending).toHaveBeenCalledWith([
-        { personId: 'p', assetFaceId: 'f-kept', distance: 0.7 },
+        { personGroupId: 'p', assetFaceId: 'f-kept', distance: 0.7 },
       ]);
     });
   });
@@ -284,8 +284,8 @@ describe(FaceSuggestionService.name, () => {
       mocks.systemMetadata.get.mockResolvedValue(enabled);
       (mocks.person as any).getScannablePeopleWithUnassignedFaces.mockReturnValue(
         makeStream([
-          { id: 'p1', ownerId: 'u' },
-          { id: 'p2', ownerId: 'u' },
+          { personGroupId: 'p1', ownerId: 'u' },
+          { personGroupId: 'p2', ownerId: 'u' },
         ]),
       );
 
@@ -402,7 +402,7 @@ describe(FaceSuggestionService.name, () => {
       mocks.search.searchFaces
         .mockResolvedValueOnce([
           { id: 'too-close', personGroupId: null, distance: 0.5 },
-          { id: 'candidate', personId: null, distance: 0.7 },
+          { id: 'candidate', personGroupId: null, distance: 0.7 },
         ] as FaceSearchResult[])
         .mockResolvedValueOnce([{ id: 'candidate', personGroupId: null, distance: 0.6 }] as FaceSearchResult[]);
 
@@ -434,7 +434,7 @@ describe(FaceSuggestionService.name, () => {
       mocks.sharedSpace.getSpacePersonAssignedFaceEmbeddings.mockResolvedValue([{ embedding: 'e1' }] as any);
       mocks.search.searchFaces.mockResolvedValue([
         { id: 'assigned-face', personGroupId: null, distance: 0.6 },
-        { id: 'candidate', personId: null, distance: 0.7 },
+        { id: 'candidate', personGroupId: null, distance: 0.7 },
       ] as FaceSearchResult[]);
       mocks.sharedSpace.getAssignedFaceIdsForSpace.mockResolvedValue([{ assetFaceId: 'assigned-face' }]);
 
@@ -463,9 +463,9 @@ describe(FaceSuggestionService.name, () => {
       mocks.sharedSpace.getSpacePersonAssignedFaceEmbeddings.mockResolvedValue([{ embedding: 'e1' }] as any);
       mocks.search.searchFaces.mockResolvedValue([
         { id: 'f-manual', personGroupId: null, distance: 0.7 },
-        { id: 'f-negative-space-person', personId: null, distance: 0.7 },
-        { id: 'f-negative-identity', personId: null, distance: 0.7 },
-        { id: 'f-kept', personId: null, distance: 0.7 },
+        { id: 'f-negative-space-person', personGroupId: null, distance: 0.7 },
+        { id: 'f-negative-identity', personGroupId: null, distance: 0.7 },
+        { id: 'f-kept', personGroupId: null, distance: 0.7 },
       ] as FaceSearchResult[]);
       mocks.faceIdentity.getManualLinkedFaceIds.mockResolvedValue(new Set(['f-manual']));
       mocks.facePersonVerdict.getNegativeVerdictTokens.mockResolvedValue(
@@ -762,12 +762,12 @@ describe(FaceSuggestionService.name, () => {
         mocks.database,
       );
       expect(mocks.person.update).toHaveBeenCalledWith(
-        expect.objectContaining({ id: person.personGroupId, faceAssetId: face.id }),
+        expect.objectContaining({ personGroupId: person.personGroupId, faceAssetId: face.id }),
       );
       expect(mocks.facePersonVerdict.resolveAssignedFace).toHaveBeenCalledWith(face.id, mocks.database);
       // S11 (slice 11d): defense-in-depth clear, scoped to this target's identity, inside the same trx.
       expect(mocks.facePersonVerdict.clearNegativeForTarget).toHaveBeenCalledWith(
-        { personId: person.personGroupId, identityId: 'identity-1' },
+        { personGroupId: person.personGroupId, identityId: 'identity-1' },
         [face.id],
         mocks.database,
       );

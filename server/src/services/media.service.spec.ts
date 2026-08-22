@@ -2170,7 +2170,7 @@ describe(MediaService.name, () => {
       });
 
       await expect(sut.handleGeneratePersonThumbnail({ ownerId: 'owner-id', personGroupId: 'person-1' })).resolves.toBe(JobStatus.Failed);
-      expect(mocks.person.getDataForThumbnailGenerationJob).toHaveBeenCalledWith('person-1');
+      expect(mocks.person.getDataForThumbnailGenerationJob).toHaveBeenCalledWith({ ownerId: 'owner-id', personGroupId: 'person-1' });
     });
 
     it('should skip a person not found', async () => {
