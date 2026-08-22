@@ -58,6 +58,12 @@ resolved per commit.
    stored in the fork's face-review tables stays valid.
 3. **`CREATE UNIQUE INDEX person_personGroupId_key ON person ("personGroupId")`** — this is what makes
    M safe. All six person-insert paths were enumerated and are 1:1 by construction.
+
+> **Update 2026-08-22:** the "three documented functions" framing below understates the exposure —
+> those primitives have 20 production call sites, and three further joins had to be converted from
+> upstream's multi-row semantics. See `2026-08-22-option-m-invariant-inventory.md` for the full list
+> and the standing rebase grep.
+
 4. **`PersonRepository.getByGroupIdOnly` / `createWithGroup` / `withPersonAnyOwner`** — the three
    places M's 1:1 invariant is load-bearing, named so the assumption lives in three documented
    functions instead of ~229 scattered call sites. **Keep the comments; they explain the bet.**
