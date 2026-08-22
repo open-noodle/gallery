@@ -111,7 +111,12 @@ const createIdentityLinkedFace = async (
 };
 
 const getPeople = (db: Kysely<DB>, ids: string[]) => {
-  return db.selectFrom('person').select(['personGroupId', 'identityId']).where('personGroupId', 'in', ids).orderBy('personGroupId').execute();
+  return db
+    .selectFrom('person')
+    .select(['personGroupId', 'identityId'])
+    .where('personGroupId', 'in', ids)
+    .orderBy('personGroupId')
+    .execute();
 };
 
 const getSpacePeople = (db: Kysely<DB>, ids: string[]) => {
@@ -239,11 +244,16 @@ describe('IdentityMergePropagationService medium tests', () => {
       .mockImplementationOnce((input, db) => originalMerge(input, db))
       .mockRejectedValueOnce(new Error('profile merge failed'));
 
-    await expect(sut.mergePersonalPeople(factory.auth({ user }), target.personGroupId, [sourceA.personGroupId, sourceB.personGroupId])).rejects.toThrow(
-      'profile merge failed',
-    );
+    await expect(
+      sut.mergePersonalPeople(factory.auth({ user }), target.personGroupId, [
+        sourceA.personGroupId,
+        sourceB.personGroupId,
+      ]),
+    ).rejects.toThrow('profile merge failed');
 
-    await expect(getPeople(ctx.database, [target.personGroupId, sourceA.personGroupId, sourceB.personGroupId])).resolves.toEqual(
+    await expect(
+      getPeople(ctx.database, [target.personGroupId, sourceA.personGroupId, sourceB.personGroupId]),
+    ).resolves.toEqual(
       expect.arrayContaining([
         { personGroupId: target.personGroupId, identityId: null },
         { personGroupId: sourceA.personGroupId, identityId: null },
@@ -260,9 +270,9 @@ describe('IdentityMergePropagationService medium tests', () => {
     const target = await createPersonProfile(ctx, { ownerId: user.id, identityId: targetIdentity.id, name: 'Target' });
     const source = await createPersonProfile(ctx, { ownerId: user.id, identityId: sourceIdentity.id, name: 'Source' });
 
-    await expect(sut.mergePersonalPeople(factory.auth({ user }), target.personGroupId, [source.personGroupId])).resolves.toEqual([
-      { id: source.personGroupId, success: true },
-    ]);
+    await expect(
+      sut.mergePersonalPeople(factory.auth({ user }), target.personGroupId, [source.personGroupId]),
+    ).resolves.toEqual([{ id: source.personGroupId, success: true }]);
 
     const people = await getPeople(ctx.database, [target.personGroupId, source.personGroupId]);
     expect(people).toEqual([{ personGroupId: target.personGroupId, identityId: targetIdentity.id }]);
@@ -422,11 +432,21 @@ describe('IdentityMergePropagationService medium tests', () => {
     });
 
     await expect(
-      sut.mergePersonalPeople(factory.auth({ user: actor }), actorTarget.personGroupId, [actorSource.personGroupId], ALLOW_MERGE),
+      sut.mergePersonalPeople(
+        factory.auth({ user: actor }),
+        actorTarget.personGroupId,
+        [actorSource.personGroupId],
+        ALLOW_MERGE,
+      ),
     ).resolves.toEqual([{ id: actorSource.personGroupId, success: true }]);
 
     await expect(
-      getPeople(ctx.database, [actorTarget.personGroupId, actorSource.personGroupId, otherTarget.personGroupId, otherSource.personGroupId]),
+      getPeople(ctx.database, [
+        actorTarget.personGroupId,
+        actorSource.personGroupId,
+        otherTarget.personGroupId,
+        otherSource.personGroupId,
+      ]),
     ).resolves.toEqual(
       [
         { personGroupId: actorTarget.personGroupId, identityId: targetIdentity.id },
@@ -547,7 +567,11 @@ describe('IdentityMergePropagationService medium tests', () => {
       ].toSorted((a, b) => a.id.localeCompare(b.id)),
     );
     await expect(
-      getPeople(ctx.database, [otherOwnerTarget.personGroupId, otherOwnerSource.personGroupId, singletonOwnerSource.personGroupId]),
+      getPeople(ctx.database, [
+        otherOwnerTarget.personGroupId,
+        otherOwnerSource.personGroupId,
+        singletonOwnerSource.personGroupId,
+      ]),
     ).resolves.toEqual(
       [
         { personGroupId: otherOwnerTarget.personGroupId, identityId: targetIdentity.id },
@@ -649,7 +673,9 @@ describe('IdentityMergePropagationService medium tests', () => {
 
       expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
       expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
-      await expect(getPeople(ctx.database, [personA.personGroupId, personB.personGroupId, personC.personGroupId])).resolves.toEqual(
+      await expect(
+        getPeople(ctx.database, [personA.personGroupId, personB.personGroupId, personC.personGroupId]),
+      ).resolves.toEqual(
         expect.arrayContaining([
           { personGroupId: personA.personGroupId, identityId: identityA.id },
           { personGroupId: personC.personGroupId, identityId: identityC.id },
@@ -838,9 +864,9 @@ describe('IdentityMergePropagationService medium tests', () => {
     const spaceSource = await createSpacePerson(ctx.database, { spaceId: space.id, identityId: sourceIdentity.id });
     vi.spyOn(sharedSpaceRepository, 'logActivity').mockRejectedValueOnce(new Error('activity failed'));
 
-    await expect(sut.mergePersonalPeople(factory.auth({ user }), target.personGroupId, [source.personGroupId], ALLOW_MERGE)).rejects.toThrow(
-      'activity failed',
-    );
+    await expect(
+      sut.mergePersonalPeople(factory.auth({ user }), target.personGroupId, [source.personGroupId], ALLOW_MERGE),
+    ).rejects.toThrow('activity failed');
 
     await expect(getPeople(ctx.database, [target.personGroupId, source.personGroupId])).resolves.toEqual(
       expect.arrayContaining([
@@ -1131,16 +1157,25 @@ describe('IdentityMergePropagationService medium tests', () => {
     });
 
     await expect(
-      sut.mergePersonalPeople(factory.auth({ user }), target.personGroupId, [sourceA.personGroupId, sourceB.personGroupId, sourceC.personGroupId]),
+      sut.mergePersonalPeople(factory.auth({ user }), target.personGroupId, [
+        sourceA.personGroupId,
+        sourceB.personGroupId,
+        sourceC.personGroupId,
+      ]),
     ).resolves.toEqual([
       { id: sourceA.personGroupId, success: true },
       { id: sourceB.personGroupId, success: true },
       { id: sourceC.personGroupId, success: true },
     ]);
 
-    await expect(getPeople(ctx.database, [target.personGroupId, sourceA.personGroupId, sourceB.personGroupId, sourceC.personGroupId])).resolves.toEqual([
-      { personGroupId: target.personGroupId, identityId: targetIdentity.id },
-    ]);
+    await expect(
+      getPeople(ctx.database, [
+        target.personGroupId,
+        sourceA.personGroupId,
+        sourceB.personGroupId,
+        sourceC.personGroupId,
+      ]),
+    ).resolves.toEqual([{ personGroupId: target.personGroupId, identityId: targetIdentity.id }]);
     await expect(
       getIdentityIds(ctx.database, [sourceIdentityA.id, sourceIdentityB.id, sourceIdentityC.id]),
     ).resolves.toEqual([]);
@@ -1172,7 +1207,9 @@ describe('IdentityMergePropagationService medium tests', () => {
       }),
     ).resolves.toBeUndefined();
 
-    await expect(getPeople(ctx.database, [target.personGroupId])).resolves.toEqual([{ personGroupId: target.personGroupId, identityId: identity.id }]);
+    await expect(getPeople(ctx.database, [target.personGroupId])).resolves.toEqual([
+      { personGroupId: target.personGroupId, identityId: identity.id },
+    ]);
     await expect(getSpacePeople(ctx.database, [alreadyFusedSpacePerson.id])).resolves.toEqual([
       { id: alreadyFusedSpacePerson.id, identityId: identity.id },
     ]);
@@ -1192,9 +1229,9 @@ describe('IdentityMergePropagationService medium tests', () => {
       name: 'Zero Face Source',
     });
 
-    await expect(sut.mergePersonalPeople(factory.auth({ user }), target.personGroupId, [source.personGroupId])).resolves.toEqual([
-      { id: source.personGroupId, success: true },
-    ]);
+    await expect(
+      sut.mergePersonalPeople(factory.auth({ user }), target.personGroupId, [source.personGroupId]),
+    ).resolves.toEqual([{ id: source.personGroupId, success: true }]);
 
     await expect(getPeople(ctx.database, [target.personGroupId, source.personGroupId])).resolves.toEqual([
       { personGroupId: target.personGroupId, identityId: targetIdentity.id },
@@ -1219,13 +1256,21 @@ describe('IdentityMergePropagationService medium tests', () => {
     });
 
     await expect(
-      ctx.database.selectFrom('person').select('faceAssetId').where('personGroupId', '=', target.personGroupId).executeTakeFirstOrThrow(),
+      ctx.database
+        .selectFrom('person')
+        .select('faceAssetId')
+        .where('personGroupId', '=', target.personGroupId)
+        .executeTakeFirstOrThrow(),
     ).resolves.toEqual({ faceAssetId: null });
 
     await sut.mergePersonalPeople(factory.auth({ user }), target.personGroupId, [source.personGroupId]);
 
     await expect(
-      ctx.database.selectFrom('person').select('faceAssetId').where('personGroupId', '=', target.personGroupId).executeTakeFirstOrThrow(),
+      ctx.database
+        .selectFrom('person')
+        .select('faceAssetId')
+        .where('personGroupId', '=', target.personGroupId)
+        .executeTakeFirstOrThrow(),
     ).resolves.toEqual({ faceAssetId: sourceFace.id });
     expect(jobRepository.queue).toHaveBeenCalledWith({
       name: JobName.PersonGenerateThumbnail,

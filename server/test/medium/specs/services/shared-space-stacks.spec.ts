@@ -57,12 +57,15 @@ const spaceTimelineCount = async (
   assetRepo: ReturnType<typeof setup>['assetRepo'],
   spaceId: string,
 ): Promise<number> => {
-  const buckets = await assetRepo.getTimeBuckets({
-    spaceId,
-    visibility: AssetVisibility.Timeline,
-    bucketSize: TimeBucketSize.Year,
-    withStacked: true,
-  }, factory.auth());
+  const buckets = await assetRepo.getTimeBuckets(
+    {
+      spaceId,
+      visibility: AssetVisibility.Timeline,
+      bucketSize: TimeBucketSize.Year,
+      withStacked: true,
+    },
+    factory.auth(),
+  );
   return buckets.reduce((total, bucket) => total + bucket.count, 0);
 };
 
