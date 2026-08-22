@@ -1091,7 +1091,9 @@ export class MetadataService extends BaseService {
       await this.personRepository.createGroups(
         missing.map((item) => ({ id: item.personGroupId, clusterGroupId: asset.clusterGroupId })),
       );
-      await this.personRepository.createAll(missing);
+      // `clusterGroupId` belongs to person_group (created just above), not to person — passing the same
+      // objects straight through would put an unknown column in the person insert.
+      await this.personRepository.createAll(missing.map(({ clusterGroupId: _, ...person }) => person));
 
       const jobs = missing.map(
         ({ personGroupId, ownerId }) =>
