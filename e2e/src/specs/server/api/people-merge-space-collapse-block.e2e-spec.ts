@@ -79,7 +79,7 @@ const createSpaceProfile = async (db: Db, spaceId: string, name: string, identit
 };
 
 const personIdentity = async (db: Db, personId: string): Promise<string> => {
-  const { rows } = await db.query(`SELECT "identityId" FROM "person" WHERE id = $1`, [personId]);
+  const { rows } = await db.query(`SELECT "identityId" FROM "person" WHERE "personGroupId" = $1`, [personId]);
   return rows[0].identityId as string;
 };
 
