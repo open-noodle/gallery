@@ -58,7 +58,7 @@ export class StorageMigrationRepository {
   streamPersonThumbnails(direction: StorageMigrationDirection) {
     return this.db
       .selectFrom('person')
-      .select(['id', 'thumbnailPath'])
+      .select(['personGroupId', 'thumbnailPath'])
       .where('thumbnailPath', '!=', '')
       .$if(direction === 'toS3', (qb) => qb.where('thumbnailPath', 'like', '/%'))
       .$if(direction === 'toDisk', (qb) => qb.where('thumbnailPath', 'not like', '/%'))
@@ -185,7 +185,7 @@ export class StorageMigrationRepository {
     const result = await this.db
       .updateTable('person')
       .set({ thumbnailPath: newPath })
-      .where('id', '=', personId)
+      .where('personGroupId', '=', personId)
       .where('thumbnailPath', '=', oldPath)
       .executeTakeFirst();
 

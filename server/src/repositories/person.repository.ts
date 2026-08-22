@@ -89,7 +89,7 @@ const visibleFaceOnAsset = (eb: ExpressionBuilder<DB, 'person'>, { locked }: { l
     .selectFrom('asset_face')
     .innerJoin('asset', 'asset.id', 'asset_face.assetId')
     .select('asset_face.id')
-    .whereRef('asset_face.personId', '=', 'person.id')
+    .whereRef('asset_face.personGroupId', '=', 'person.personGroupId')
     .where('asset_face.deletedAt', 'is', null)
     .where('asset_face.isVisible', 'is', true)
     .where('asset.visibility', locked ? '=' : '!=', AssetVisibility.Locked);
@@ -207,11 +207,11 @@ export class PersonRepository {
   ): Promise<{ deletedThumbnailPath: string | null; targetNeedsFeatureFaceRepair: boolean }> {
     const people = await db
       .selectFrom('person')
-      .select(['id', 'name', 'birthDate', 'thumbnailPath', 'color', 'species', 'faceAssetId'])
-      .where('id', 'in', [input.sourcePersonId, input.targetPersonId])
+      .select(['personGroupId', 'name', 'birthDate', 'thumbnailPath', 'color', 'species', 'faceAssetId'])
+      .where('personGroupId', 'in', [input.sourcePersonId, input.targetPersonId])
       .execute();
-    const target = people.find((person) => person.id === input.targetPersonId);
-    const source = people.find((person) => person.id === input.sourcePersonId);
+    const target = people.find((person) => person.personGroupId === input.targetPersonId);
+    const source = people.find((person) => person.personGroupId === input.sourcePersonId);
     if (!target || !source) {
       throw new Error('Person profile not found');
     }
@@ -233,11 +233,11 @@ export class PersonRepository {
       update.species = source.species;
     }
 
-    await db.updateTable('person').set(update).where('id', '=', input.targetPersonId).execute();
+    await db.updateTable('person').set(update).where('personGroupId', '=', input.targetPersonId).execute();
     await db
       .updateTable('asset_face')
       .set({ personId: input.targetPersonId })
-      .where('personId', '=', input.sourcePersonId)
+      .where('personGroupId', '=', input.sourcePersonId)
       .execute();
 
     // Human placements live in `face_identity_face.source='manual'` (identity-keyed); negative/keep-here
@@ -256,7 +256,7 @@ export class PersonRepository {
 
     const targetNeedsFeatureFaceRepair =
       !target.faceAssetId || !(await this.isFeatureFaceValid(input.targetPersonId, target.faceAssetId, db));
-    const [deleteResult] = await db.deleteFrom('person').where('id', '=', input.sourcePersonId).execute();
+    const [deleteResult] = await db.deleteFrom('person').where('personGroupId', '=', input.sourcePersonId).execute();
     if (Number(deleteResult.numDeletedRows ?? 0) === 0) {
       throw new Error('Person profile not found');
     }
@@ -272,7 +272,7 @@ export class PersonRepository {
     const rows = await db
       .selectFrom('person')
       .select('id')
-      .where('id', 'in', [...new Set(personIds)].toSorted())
+      .where('personGroupId', 'in', [...new Set(personIds)].toSorted())
       .orderBy('id')
       .forUpdate()
       .execute();
@@ -290,7 +290,7 @@ export class PersonRepository {
       .selectFrom('asset_face')
       .select('asset_face.id')
       .where('asset_face.id', '=', faceAssetId)
-      .where('asset_face.personId', '=', personId)
+      .where('asset_face.personGroupId', '=', personId)
       .where('asset_face.deletedAt', 'is', null)
       .where('asset_face.isVisible', 'is', true)
       .executeTakeFirst();
@@ -305,7 +305,7 @@ export class PersonRepository {
     },
     db: Kysely<DB> | Transaction<DB> = this.db,
   ): Promise<void> {
-    await db.updateTable('person').set({ identityId: input.identityId }).where('id', '=', input.personId).execute();
+    await db.updateTable('person').set({ identityId: input.identityId }).where('personGroupId', '=', input.personId).execute();
   }
 
   @GenerateSql({ params: [{ sourceType: SourceType.MachineLearning, clusterGroupId: DummyValue.UUID }] })
@@ -397,7 +397,7 @@ export class PersonRepository {
       // ON DELETE SET NULL, so removing the people first would orphan (not delete) the faces.
       await trx
         .deleteFrom('asset_face')
-        .where('asset_face.personId', 'in', (eb) =>
+        .where('asset_face.personGroupId', 'in', (eb) =>
           eb.selectFrom('person').select('person.id').where('person.type', '=', 'pet'),
         )
         .execute();
@@ -458,7 +458,7 @@ export class PersonRepository {
   getBirthdaysForDay(ownerId: string, { month, day }: { month: number; day: number }) {
     return this.db
       .selectFrom('person')
-      .select(['id', 'name', 'birthDate'])
+      .select(['personGroupId', 'name', 'birthDate'])
       .where('ownerId', '=', ownerId)
       .where('isHidden', '=', false)
       .where('type', '=', 'person')
@@ -623,7 +623,7 @@ export class PersonRepository {
       .innerJoin('asset_face', (join) =>
         join.on((eb) =>
           eb.or([
-            eb('asset_face.personId', '=', eb.ref('person.id')),
+            eb('asset_face.personGroupId', '=', eb.ref('person.personGroupId')),
             eb.exists(
               eb
                 .selectFrom('face_identity_face')
@@ -637,7 +637,7 @@ export class PersonRepository {
       .innerJoin('asset', 'asset.id', 'asset_face.assetId')
       .selectAll('asset_face')
       .select(['asset.fileCreatedAt', 'person.faceAssetId as representativeFaceId'])
-      .where('person.id', '=', options.personId)
+      .where('person.personGroupId', '=', options.personId)
       .where('asset_face.deletedAt', 'is', null)
       .where('asset_face.isVisible', '=', true)
       .where('asset.deletedAt', 'is', null)
@@ -686,7 +686,7 @@ export class PersonRepository {
       .innerJoin('asset_face', (join) =>
         join.on((eb) =>
           eb.or([
-            eb('asset_face.personId', '=', eb.ref('person.id')),
+            eb('asset_face.personGroupId', '=', eb.ref('person.personGroupId')),
             eb.exists(
               eb
                 .selectFrom('face_identity_face')
@@ -699,7 +699,7 @@ export class PersonRepository {
       )
       .innerJoin('asset', 'asset.id', 'asset_face.assetId')
       .selectAll('asset_face')
-      .where('person.id', '=', options.personId)
+      .where('person.personGroupId', '=', options.personId)
       .where('asset_face.id', '=', options.assetFaceId)
       .where('asset_face.deletedAt', 'is', null)
       .where('asset_face.isVisible', '=', true)
@@ -1268,7 +1268,7 @@ export class PersonRepository {
       .selectFrom('asset_face')
       .innerJoin('face_search', 'face_search.faceId', 'asset_face.id')
       .select('face_search.embedding')
-      .where('asset_face.personId', '=', personId)
+      .where('asset_face.personGroupId', '=', personId)
       .where('asset_face.deletedAt', 'is', null)
       .where('asset_face.isVisible', 'is', true)
       .orderBy('asset_face.id', 'asc')
@@ -1298,7 +1298,7 @@ export class PersonRepository {
   getScannablePeopleWithUnassignedFaces() {
     return this.db
       .selectFrom('person')
-      .select(['person.id', 'person.ownerId'])
+      .select(['person.personGroupId', 'person.ownerId'])
       .where('person.name', '!=', '')
       .where('person.isHidden', '=', false)
       .where('person.type', '=', 'person')
@@ -1308,7 +1308,7 @@ export class PersonRepository {
             .selectFrom('asset_face')
             .innerJoin('face_search', 'face_search.faceId', 'asset_face.id')
             .select('asset_face.id')
-            .whereRef('asset_face.personId', '=', 'person.id')
+            .whereRef('asset_face.personGroupId', '=', 'person.personGroupId')
             .where('asset_face.deletedAt', 'is', null)
             .where('asset_face.isVisible', 'is', true),
         ),
@@ -1321,7 +1321,7 @@ export class PersonRepository {
             .select('asset_face.id')
             .whereRef('asset.ownerId', '=', 'person.ownerId')
             .where('asset.deletedAt', 'is', null)
-            .where('asset_face.personId', 'is', null)
+            .where('asset_face.personGroupId', 'is', null)
             .where('asset_face.deletedAt', 'is', null)
             .where('asset_face.isVisible', 'is', true)
             .where('asset_face.sourceType', '=', SourceType.MachineLearning)
