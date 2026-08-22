@@ -13,7 +13,7 @@ const plan = (toRepair: { assetFaceId: string; currentPersonId: string; suspecte
 
 // Both people share owner u1, so executeRepair's cross-owner guard (C6) never fires and the move proceeds.
 function arrangeSameOwnerMove(mocks: ServiceMocks) {
-  mocks.person.getById.mockImplementation((id: string) => Promise.resolve({ id, ownerId: 'u1' } as any));
+  mocks.person.getByGroupIdOnly.mockImplementation((id: string) => Promise.resolve({ id, ownerId: 'u1' } as any));
   mocks.faceRepair.reconcileRepresentativeFaces.mockResolvedValue([]);
   mocks.faceIdentity.ensurePersonIdentity.mockResolvedValue({ id: 'identQ' } as any);
 }
@@ -22,7 +22,7 @@ function arrangeSameOwnerMove(mocks: ServiceMocks) {
 // Every existing test in this file uses arrangeSameOwnerMove (or an equivalent single-value mock), which
 // makes fromOwner === toOwner unconditionally — the guard can never fire under any of them.
 function arrangeDifferentOwnerMove(mocks: ServiceMocks) {
-  mocks.person.getById.mockImplementation((id: string) =>
+  mocks.person.getByGroupIdOnly.mockImplementation((id: string) =>
     Promise.resolve({ id, ownerId: id === 'p1' ? 'u1' : 'u2' } as any),
   );
   mocks.faceRepair.reconcileRepresentativeFaces.mockResolvedValue([]);
@@ -44,7 +44,7 @@ describe(FaceRepairService.name, () => {
     it('direct-assigns each flagged face to its suspected owner with a manual identity link', async () => {
       // executeRepair now also compares the source and destination owners (C6): both p1 and q share owner u1,
       // so the cross-owner guard never fires and the move proceeds.
-      mocks.person.getById.mockResolvedValue({ id: 'q', ownerId: 'u1' } as any);
+      mocks.person.getByGroupIdOnly.mockResolvedValue({ id: 'q', ownerId: 'u1' } as any);
       mocks.faceRepair.reattributeFaces.mockResolvedValue(['f1', 'f2']);
       mocks.faceRepair.reconcileRepresentativeFaces.mockResolvedValue([]);
       mocks.faceIdentity.ensurePersonIdentity.mockResolvedValue({ id: 'identQ' } as any);
@@ -80,7 +80,7 @@ describe(FaceRepairService.name, () => {
     });
 
     it('skips faces whose suspected owner no longer exists (deleted/merged since the scan)', async () => {
-      mocks.person.getById.mockResolvedValue(undefined);
+      mocks.person.getByGroupIdOnly.mockResolvedValue(undefined);
 
       const r = await sut.executeRepair(plan([{ assetFaceId: 'f1', currentPersonId: 'p1', suspectedOwnerId: 'gone' }]));
 
@@ -91,7 +91,7 @@ describe(FaceRepairService.name, () => {
     it('reconciles representative faces for both the source and the destination person', async () => {
       // executeRepair now also compares the source and destination owners (C6): both p1 and q share owner u1,
       // so the cross-owner guard never fires and the move proceeds.
-      mocks.person.getById.mockResolvedValue({ id: 'q', ownerId: 'u1' } as any);
+      mocks.person.getByGroupIdOnly.mockResolvedValue({ id: 'q', ownerId: 'u1' } as any);
       mocks.faceRepair.reattributeFaces.mockResolvedValue(['f1']);
       mocks.faceRepair.reconcileRepresentativeFaces.mockResolvedValue([]);
       mocks.faceIdentity.ensurePersonIdentity.mockResolvedValue({ id: 'identQ' } as any);
@@ -105,7 +105,7 @@ describe(FaceRepairService.name, () => {
     it('queues a thumbnail regen for every person whose representative face was repointed', async () => {
       // executeRepair now also compares the source and destination owners (C6): both p1 and q share owner u1,
       // so the cross-owner guard never fires and the move proceeds.
-      mocks.person.getById.mockResolvedValue({ id: 'q', ownerId: 'u1' } as any);
+      mocks.person.getByGroupIdOnly.mockResolvedValue({ id: 'q', ownerId: 'u1' } as any);
       mocks.faceRepair.reattributeFaces.mockResolvedValue(['f1']);
       mocks.faceRepair.reconcileRepresentativeFaces.mockResolvedValue(['p1']);
       mocks.faceIdentity.ensurePersonIdentity.mockResolvedValue({ id: 'identQ' } as any);

@@ -111,7 +111,7 @@ describe(SearchRepository.name, () => {
       await ctx.newTagAsset({ tagIds: [travel.id], assetIds: [january.id, february.id] });
 
       const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Ada' });
-      await ctx.newAssetFace({ assetId: january.id, personId: person.id });
+      await ctx.newAssetFace({ assetId: january.id, personGroupId: person.personGroupId });
 
       const result = await sut.getSmartSearchFacets({
         embedding: matchingEmbedding,
@@ -130,7 +130,7 @@ describe(SearchRepository.name, () => {
       expect(result.cameraModels).toEqual(['A7', 'R5']);
       expect(result.tags).toEqual([{ id: travel.id, value: 'Travel' }]);
       expect(result.people).toEqual([
-        { id: person.id, name: 'Ada', primaryProfile: { type: 'user-person', id: person.id } },
+        { id: person.personGroupId, name: 'Ada', primaryProfile: { type: 'user-person', id: person.personGroupId } },
       ]);
       expect(result.ratings).toEqual([4, 5]);
       expect(result.mediaTypes).toEqual(['IMAGE', 'VIDEO']);
@@ -357,16 +357,16 @@ describe(SearchRepository.name, () => {
         name: 'Temporary',
         isHidden: true,
       });
-      await ctx.database.updateTable('person').set({ name: '' }).where('id', '=', hiddenUnnamedPerson.id).execute();
+      await ctx.database.updateTable('person').set({ name: '' }).where('personGroupId', '=', hiddenUnnamedPerson.personGroupId).execute();
 
-      await ctx.newAssetFace({ assetId: visibleAsset.id, personId: visiblePerson.id });
-      await ctx.newAssetFace({ assetId: hiddenFaceAsset.id, personId: hiddenFacePerson.id, isVisible: false });
+      await ctx.newAssetFace({ assetId: visibleAsset.id, personGroupId: visiblePerson.personGroupId });
+      await ctx.newAssetFace({ assetId: hiddenFaceAsset.id, personGroupId: hiddenFacePerson.personGroupId, isVisible: false });
       await ctx.newAssetFace({
         assetId: deletedFaceAsset.id,
-        personId: deletedFacePerson.id,
+        personGroupId: deletedFacePerson.personGroupId,
         deletedAt: new Date('2024-01-01T00:00:00.000Z'),
       });
-      await ctx.newAssetFace({ assetId: hiddenUnnamedAsset.id, personId: hiddenUnnamedPerson.id });
+      await ctx.newAssetFace({ assetId: hiddenUnnamedAsset.id, personGroupId: hiddenUnnamedPerson.personGroupId });
 
       const result = await sut.getSmartSearchFacets({
         embedding: matchingEmbedding,
@@ -375,7 +375,7 @@ describe(SearchRepository.name, () => {
       });
 
       expect(result.people).toEqual([
-        { id: visiblePerson.id, name: 'Visible Ada', primaryProfile: { type: 'user-person', id: visiblePerson.id } },
+        { id: visiblePerson.personGroupId, name: 'Visible Ada', primaryProfile: { type: 'user-person', id: visiblePerson.personGroupId } },
       ]);
       expect(result.hasUnnamedPeople).toBe(false);
     });
@@ -393,7 +393,7 @@ describe(SearchRepository.name, () => {
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
 
       const { person } = await ctx.newPerson({ ownerId: owner.id, name: 'Personal Ada' });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
       const sharedPerson = await ctx.database
         .insertInto('shared_space_person')
         .values({
@@ -485,7 +485,7 @@ describe(SearchRepository.name, () => {
       await ctx.newTagAsset({ tagIds: [travel.id], assetIds: [asset.id] });
 
       const { person } = await ctx.newPerson({ ownerId: owner.id, name: 'Ada' });
-      await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
 
       const { album } = await ctx.newAlbum({ ownerId: owner.id }, [asset.id]);
       await ctx.newAlbumUser({ albumId: album.id, userId: viewer.id, role: AlbumUserRole.Viewer });
@@ -590,9 +590,9 @@ describe(SearchRepository.name, () => {
       const { user } = await ctx.newUser();
       const { r5 } = await newCanonPair(ctx, user.id);
       const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Ada' });
-      await ctx.newAssetFace({ assetId: r5.id, personId: person.id });
+      await ctx.newAssetFace({ assetId: r5.id, personGroupId: person.personGroupId });
 
-      const models = await sut.getCameraModels([user.id], { make: 'Canon', personIds: [person.id] });
+      const models = await sut.getCameraModels([user.id], { make: 'Canon', personIds: [person.personGroupId] });
 
       expect(models).toEqual(['Canon EOS R5']);
     });
@@ -739,7 +739,7 @@ describe(SearchRepository.name, () => {
       const { r5 } = await newCanonPair(ctx, user.id);
 
       const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Ada' });
-      const { assetFace } = await ctx.newAssetFace({ assetId: r5.id, personId: person.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: r5.id, personGroupId: person.personGroupId });
       const identity = await ctx.database
         .insertInto('face_identity')
         .values({ type: 'person' })
@@ -1243,8 +1243,8 @@ describe(SearchRepository.name, () => {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
       const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Ada' });
 
-      const { assetFace: assignedFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
-      const { assetFace: unassignedFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const { assetFace: assignedFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+      const { assetFace: unassignedFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
 
       assignedFaceId = assignedFace.id;
       unassignedFaceId = unassignedFace.id;
@@ -1272,7 +1272,7 @@ describe(SearchRepository.name, () => {
       const ids = result.map((r) => r.id);
       expect(ids).toContain(unassignedFaceId);
       expect(ids).not.toContain(assignedFaceId);
-      expect(result.every((r) => r.personId === null)).toBe(true);
+      expect(result.every((r) => r.personGroupId === null)).toBe(true);
     });
 
     it('hasPerson:true returns only assigned faces (regression)', async () => {
@@ -1287,7 +1287,7 @@ describe(SearchRepository.name, () => {
       const ids = result.map((r) => r.id);
       expect(ids).toContain(assignedFaceId);
       expect(ids).not.toContain(unassignedFaceId);
-      expect(result.every((r) => r.personId !== null)).toBe(true);
+      expect(result.every((r) => r.personGroupId !== null)).toBe(true);
     });
 
     it('hasPerson omitted returns both assigned and unassigned', async () => {
@@ -1319,9 +1319,9 @@ describe(SearchRepository.name, () => {
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: directAsset.id });
       await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id });
 
-      const { assetFace: directFace } = await ctx.newAssetFace({ assetId: directAsset.id, personId: null });
-      const { assetFace: libraryFace } = await ctx.newAssetFace({ assetId: libraryAsset.id, personId: null });
-      const { assetFace: outsideFace } = await ctx.newAssetFace({ assetId: outsideAsset.id, personId: null });
+      const { assetFace: directFace } = await ctx.newAssetFace({ assetId: directAsset.id, personGroupId: null });
+      const { assetFace: libraryFace } = await ctx.newAssetFace({ assetId: libraryAsset.id, personGroupId: null });
+      const { assetFace: outsideFace } = await ctx.newAssetFace({ assetId: outsideAsset.id, personGroupId: null });
 
       const embedding = newEmbedding();
       await ctx.database
@@ -1354,8 +1354,8 @@ describe(SearchRepository.name, () => {
       const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Grace' });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
 
-      const { assetFace: assignedFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
-      const { assetFace: unassignedFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const { assetFace: assignedFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+      const { assetFace: unassignedFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
 
       const embedding = newEmbedding();
       await ctx.database
@@ -1377,7 +1377,7 @@ describe(SearchRepository.name, () => {
       const ids = result.map((face) => face.id);
       expect(ids).toContain(unassignedFace.id);
       expect(ids).not.toContain(assignedFace.id);
-      expect(result.every((face) => face.personId === null)).toBe(true);
+      expect(result.every((face) => face.personGroupId === null)).toBe(true);
     });
 
     it('rejects mixed spaceId and userIds scopes', async () => {
@@ -1406,8 +1406,8 @@ describe(SearchRepository.name, () => {
       const { asset: timelineAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
 
       const embedding = newEmbedding();
-      const { assetFace: lockedFace } = await ctx.newAssetFace({ assetId: lockedAsset.id, personId: null });
-      const { assetFace: timelineFace } = await ctx.newAssetFace({ assetId: timelineAsset.id, personId: null });
+      const { assetFace: lockedFace } = await ctx.newAssetFace({ assetId: lockedAsset.id, personGroupId: null });
+      const { assetFace: timelineFace } = await ctx.newAssetFace({ assetId: timelineAsset.id, personGroupId: null });
       await ctx.database
         .insertInto('face_search')
         .values([
@@ -1436,8 +1436,8 @@ describe(SearchRepository.name, () => {
       const { asset: timelineAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
 
       const embedding = newEmbedding();
-      const { assetFace: lockedFace } = await ctx.newAssetFace({ assetId: lockedAsset.id, personId: null });
-      const { assetFace: timelineFace } = await ctx.newAssetFace({ assetId: timelineAsset.id, personId: null });
+      const { assetFace: lockedFace } = await ctx.newAssetFace({ assetId: lockedAsset.id, personGroupId: null });
+      const { assetFace: timelineFace } = await ctx.newAssetFace({ assetId: timelineAsset.id, personGroupId: null });
       await ctx.database
         .insertInto('face_search')
         .values([
@@ -1468,8 +1468,8 @@ describe(SearchRepository.name, () => {
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: timelineAsset.id, addedById: user.id });
 
       const embedding = newEmbedding();
-      const { assetFace: lockedFace } = await ctx.newAssetFace({ assetId: lockedAsset.id, personId: null });
-      const { assetFace: timelineFace } = await ctx.newAssetFace({ assetId: timelineAsset.id, personId: null });
+      const { assetFace: lockedFace } = await ctx.newAssetFace({ assetId: lockedAsset.id, personGroupId: null });
+      const { assetFace: timelineFace } = await ctx.newAssetFace({ assetId: timelineAsset.id, personGroupId: null });
       await ctx.database
         .insertInto('face_search')
         .values([
