@@ -50,7 +50,7 @@ const createTimelineAssetWithPeople = async (
   });
   await ctx.newExif({ assetId: asset.id, timeZone: 'UTC' });
   for (const personId of personIds) {
-    await ctx.newAssetFace({ assetId: asset.id, personId, isVisible: true });
+    await ctx.newAssetFace({ assetId: asset.id, personGroupId, isVisible: true });
   }
   return asset;
 };
@@ -418,13 +418,13 @@ describe(AssetRepository.name, () => {
       const spacePersonAsset = await createTimelineAsset(ctx, user.id, new Date('2024-11-01T12:00:00.000Z'));
       await createTimelineAsset(ctx, user.id, new Date('2024-12-01T12:00:00.000Z'));
 
-      await ctx.newAssetFace({ assetId: personAsset.id, personId: person.id, isVisible: true });
+      await ctx.newAssetFace({ assetId: personAsset.id, personGroupId: person.personGroupId, isVisible: true });
       const { assetFace: identityFace } = await ctx.newAssetFace({
         assetId: identityAsset.id,
-        personId: person.id,
+        personGroupId: person.personGroupId,
         isVisible: true,
       });
-      const identity = await faceIdentityRepository.ensurePersonIdentity(person.id);
+      const identity = await faceIdentityRepository.ensurePersonIdentity(person.personGroupId);
       await faceIdentityRepository.linkFace({
         assetFaceId: identityFace.id,
         identityId: identity.id,
@@ -447,7 +447,7 @@ describe(AssetRepository.name, () => {
           userIds: [user.id],
           visibility: AssetVisibility.Timeline,
           bucketSize: TimeBucketSize.Year,
-          personIds: [person.id],
+          personIds: [person.personGroupId],
         }),
       ).resolves.toEqual([expect.objectContaining({ count: 2 })]);
 
@@ -878,15 +878,15 @@ describe(AssetRepository.name, () => {
         }),
         ctx.newAssetFile({ assetId: hiddenFaceAsset.id, type: AssetFileType.Preview, path: 'hidden-preview.jpg' }),
         ctx.newAssetFile({ assetId: afterCutoffAsset.id, type: AssetFileType.Preview, path: 'after-preview.jpg' }),
-        ctx.newAssetFace({ assetId: matchingAsset.id, personId: person.id, isVisible: true }),
-        ctx.newAssetFace({ assetId: duplicateFaceAsset.id, personId: person.id, isVisible: true }),
-        ctx.newAssetFace({ assetId: duplicateFaceAsset.id, personId: person.id, isVisible: true }),
-        ctx.newAssetFace({ assetId: hiddenFaceAsset.id, personId: person.id, isVisible: false }),
-        ctx.newAssetFace({ assetId: missingPreviewAsset.id, personId: person.id, isVisible: true }),
-        ctx.newAssetFace({ assetId: afterCutoffAsset.id, personId: person.id, isVisible: true }),
+        ctx.newAssetFace({ assetId: matchingAsset.id, personGroupId: person.personGroupId, isVisible: true }),
+        ctx.newAssetFace({ assetId: duplicateFaceAsset.id, personGroupId: person.personGroupId, isVisible: true }),
+        ctx.newAssetFace({ assetId: duplicateFaceAsset.id, personGroupId: person.personGroupId, isVisible: true }),
+        ctx.newAssetFace({ assetId: hiddenFaceAsset.id, personGroupId: person.personGroupId, isVisible: false }),
+        ctx.newAssetFace({ assetId: missingPreviewAsset.id, personGroupId: person.personGroupId, isVisible: true }),
+        ctx.newAssetFace({ assetId: afterCutoffAsset.id, personGroupId: person.personGroupId, isVisible: true }),
       ]);
 
-      const result = await sut.getMemoryAssetsForPerson(user.id, person.id, cutoff);
+      const result = await sut.getMemoryAssetsForPerson(user.id, person.personGroupId, cutoff);
 
       expect(result.map(({ id }) => id).toSorted()).toEqual([duplicateFaceAsset.id, matchingAsset.id].toSorted());
       expect(result).toEqual(
@@ -1553,15 +1553,15 @@ describe(AssetRepository.name, () => {
       const { person: alice } = await ctx.newPerson({ ownerId: user.id, name: 'Alice' });
       const { person: bob } = await ctx.newPerson({ ownerId: user.id, name: 'Bob' });
 
-      await createTimelineAssetWithPeople(ctx, user.id, [alice.id]);
-      await createTimelineAssetWithPeople(ctx, user.id, [bob.id]);
-      const both = await createTimelineAssetWithPeople(ctx, user.id, [alice.id, bob.id]);
+      await createTimelineAssetWithPeople(ctx, user.id, [alice.personGroupId]);
+      await createTimelineAssetWithPeople(ctx, user.id, [bob.personGroupId]);
+      const both = await createTimelineAssetWithPeople(ctx, user.id, [alice.personGroupId, bob.personGroupId]);
 
       const bucket = await sut.getTimeBucket(
         '2026-03-01',
         {
           userIds: [user.id],
-          personIds: [alice.id, bob.id],
+          personIds: [alice.personGroupId, bob.personGroupId],
           visibility: AssetVisibility.Timeline,
         },
         auth,
@@ -1576,13 +1576,13 @@ describe(AssetRepository.name, () => {
       const { user } = await ctx.newUser();
       const auth = factory.auth({ user: { id: user.id } });
       const { person: alice } = await ctx.newPerson({ ownerId: user.id, name: 'Alice' });
-      const asset = await createTimelineAssetWithPeople(ctx, user.id, [alice.id]);
+      const asset = await createTimelineAssetWithPeople(ctx, user.id, [alice.personGroupId]);
 
       const bucket = await sut.getTimeBucket(
         '2026-03-01',
         {
           userIds: [user.id],
-          personIds: [alice.id, alice.id],
+          personIds: [alice.personGroupId, alice.personGroupId],
           visibility: AssetVisibility.Timeline,
         },
         auth,
@@ -1682,17 +1682,17 @@ describe(AssetRepository.name, () => {
       const auth = factory.auth({ user: { id: user.id } });
       const { person: alice } = await ctx.newPerson({ ownerId: user.id, name: 'Alice' });
       const { person: bob } = await ctx.newPerson({ ownerId: user.id, name: 'Bob' });
-      const aliceIdentity = await faceIdentityRepository.ensurePersonIdentity(alice.id);
-      const bobIdentity = await faceIdentityRepository.ensurePersonIdentity(bob.id);
+      const aliceIdentity = await faceIdentityRepository.ensurePersonIdentity(alice.personGroupId);
+      const bobIdentity = await faceIdentityRepository.ensurePersonIdentity(bob.personGroupId);
 
       const aliceOnly = await createTimelineAssetWithPeople(ctx, user.id, [], new Date('2026-03-15T12:00:00.000Z'));
       const bobOnly = await createTimelineAssetWithPeople(ctx, user.id, [], new Date('2026-03-15T12:00:00.000Z'));
       const both = await createTimelineAssetWithPeople(ctx, user.id, [], new Date('2026-03-15T12:00:00.000Z'));
 
-      const { assetFace: aliceOnlyFace } = await ctx.newAssetFace({ assetId: aliceOnly.id, personId: alice.id });
-      const { assetFace: bobOnlyFace } = await ctx.newAssetFace({ assetId: bobOnly.id, personId: bob.id });
-      const { assetFace: bothAliceFace } = await ctx.newAssetFace({ assetId: both.id, personId: alice.id });
-      const { assetFace: bothBobFace } = await ctx.newAssetFace({ assetId: both.id, personId: bob.id });
+      const { assetFace: aliceOnlyFace } = await ctx.newAssetFace({ assetId: aliceOnly.id, personGroupId: alice.personGroupId });
+      const { assetFace: bobOnlyFace } = await ctx.newAssetFace({ assetId: bobOnly.id, personGroupId: bob.personGroupId });
+      const { assetFace: bothAliceFace } = await ctx.newAssetFace({ assetId: both.id, personGroupId: alice.personGroupId });
+      const { assetFace: bothBobFace } = await ctx.newAssetFace({ assetId: both.id, personGroupId: bob.personGroupId });
 
       await faceIdentityRepository.linkFace({
         assetFaceId: aliceOnlyFace.id,
@@ -1735,9 +1735,9 @@ describe(AssetRepository.name, () => {
       const { user } = await ctx.newUser();
       const auth = factory.auth({ user: { id: user.id } });
       const { person: alice } = await ctx.newPerson({ ownerId: user.id, name: 'Alice' });
-      const identity = await faceIdentityRepository.ensurePersonIdentity(alice.id);
+      const identity = await faceIdentityRepository.ensurePersonIdentity(alice.personGroupId);
       const asset = await createTimelineAssetWithPeople(ctx, user.id, []);
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: alice.id, isVisible: true });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: alice.personGroupId, isVisible: true });
       await faceIdentityRepository.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'manual' });
 
       const bucket = await sut.getTimeBucket(
@@ -1760,13 +1760,13 @@ describe(AssetRepository.name, () => {
       const auth = factory.auth({ user: { id: user.id } });
       const { person: alice } = await ctx.newPerson({ ownerId: user.id, name: 'Alice' });
       const { person: bob } = await ctx.newPerson({ ownerId: user.id, name: 'Bob' });
-      const asset = await createTimelineAssetWithPeople(ctx, user.id, [alice.id, alice.id, bob.id]);
+      const asset = await createTimelineAssetWithPeople(ctx, user.id, [alice.personGroupId, alice.personGroupId, bob.personGroupId]);
 
       const bucket = await sut.getTimeBucket(
         '2026-03-01',
         {
           userIds: [user.id],
-          personIds: [alice.id, bob.id],
+          personIds: [alice.personGroupId, bob.personGroupId],
           visibility: AssetVisibility.Timeline,
         },
         auth,
@@ -1782,14 +1782,14 @@ describe(AssetRepository.name, () => {
       const { person: alice } = await ctx.newPerson({ ownerId: user.id, name: 'Alice' });
       const { person: bob } = await ctx.newPerson({ ownerId: user.id, name: 'Bob' });
 
-      await createTimelineAssetWithPeople(ctx, user.id, [alice.id]);
-      await createTimelineAssetWithPeople(ctx, user.id, [bob.id]);
-      await createTimelineAssetWithPeople(ctx, user.id, [alice.id, bob.id]);
+      await createTimelineAssetWithPeople(ctx, user.id, [alice.personGroupId]);
+      await createTimelineAssetWithPeople(ctx, user.id, [bob.personGroupId]);
+      await createTimelineAssetWithPeople(ctx, user.id, [alice.personGroupId, bob.personGroupId]);
 
       await expect(
         sut.getTimeBuckets({
           userIds: [user.id],
-          personIds: [alice.id, bob.id],
+          personIds: [alice.personGroupId, bob.personGroupId],
           visibility: AssetVisibility.Timeline,
         }),
       ).resolves.toEqual([expect.objectContaining({ count: 1, timeBucket: '2026-03-01' })]);
@@ -2053,8 +2053,8 @@ describe(AssetRepository.name, () => {
       ]);
 
       const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Alice' });
-      const { assetFace } = await ctx.newAssetFace({ assetId: matchingAsset.id, personId: person.id, isVisible: true });
-      const identity = await faceIdentityRepository.ensurePersonIdentity(person.id);
+      const { assetFace } = await ctx.newAssetFace({ assetId: matchingAsset.id, personGroupId: person.personGroupId, isVisible: true });
+      const identity = await faceIdentityRepository.ensurePersonIdentity(person.personGroupId);
       await faceIdentityRepository.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'manual' });
 
       const bucket = await sut.getTimeBucket(

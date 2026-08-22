@@ -107,7 +107,7 @@ describe(MemoryService.name, () => {
       mocks.systemMetadata.get.mockResolvedValue(null);
       mocks.asset.getByDayOfYear.mockResolvedValue([]);
       mocks.person.getBirthdaysForDay.mockResolvedValue([
-        { id: 'person-1', name: 'Alice', birthDate: new Date('1990-04-23T00:00:00Z') },
+        { personGroupId: 'person-1', name: 'Alice', birthDate: new Date('1990-04-23T00:00:00Z') },
       ]);
       mocks.asset.getMemoryAssetsForPerson.mockResolvedValue([
         { id: 'a-2025-1', localDateTime: new Date('2025-04-01T12:00:00Z') },
