@@ -80,7 +80,7 @@ test.describe('Spaces — SelectionToolbar space-person control bar (Slice 5)', 
     // create a real person + face identity for the asset, then project it into the space as a
     // shared_space_person joined on that identity.
     const person = await utils.createPerson(owner.accessToken, { name: 'STTP-8 Person' });
-    const faceId = await utils.createFace({ assetId: asset.id, personId: person.id });
+    const faceId = await utils.createFace({ assetId: asset.id, personGroupId: person.id });
     const identityResult = await db.query(`SELECT "identityId" FROM "person" WHERE id = $1`, [person.id]);
     const identityId = identityResult.rows[0].identityId as string;
 

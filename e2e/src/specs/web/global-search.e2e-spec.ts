@@ -14,7 +14,7 @@ async function openGlobalSearchDropdown(page: Page) {
 async function createSearchablePerson(accessToken: string, name: string) {
   const asset = await utils.createAsset(accessToken);
   const person = await utils.createPerson(accessToken, { name });
-  await utils.createFace({ assetId: asset.id, personId: person.id });
+  await utils.createFace({ assetId: asset.id, personGroupId: person.id });
   return person;
 }
 
@@ -664,8 +664,8 @@ test.describe('global search palette', () => {
       const baseAsset = await utils.createAsset(admin.accessToken);
       const zoe = await utils.createPerson(admin.accessToken, { name: 'Zoe Scope' });
       const avery = await utils.createPerson(admin.accessToken, { name: 'Avery Scope' });
-      await utils.createFace({ assetId: baseAsset.id, personId: zoe.id });
-      await utils.createFace({ assetId: baseAsset.id, personId: avery.id });
+      await utils.createFace({ assetId: baseAsset.id, personGroupId: zoe.id });
+      await utils.createFace({ assetId: baseAsset.id, personGroupId: avery.id });
 
       // Count getAllPeople dispatches. URL is `/api/people?<query>` — the `?` character
       // in the glob is a glob wildcard for a single char; use `/api/people?*` to match
