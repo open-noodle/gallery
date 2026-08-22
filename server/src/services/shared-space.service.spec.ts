@@ -139,7 +139,7 @@ const setupStrictReconciliationFixture = (
   mocks.search.searchFaces.mockResolvedValue([{ id: 'local-face-1', personGroupId: 'local-person-1', distance: 0.2 }]);
   mocks.person.getByGroupIdOnly.mockResolvedValue(
     factory.person({
-      id: 'local-person-1',
+      personGroupId: 'local-person-1',
       ownerId: 'member-1',
       type: 'person',
       isHidden: false,
@@ -3640,7 +3640,7 @@ describe(SharedSpaceService.name, () => {
       ]);
       mocks.search.searchFaces.mockResolvedValue([{ id: 'local-face-1', personGroupId: 'local-person-1', distance: 0.2 }]);
       mocks.person.getByGroupIdOnly.mockResolvedValue(
-        factory.person({ id: 'local-person-1', ownerId: 'member-1', type: 'person', isHidden: false }),
+        factory.person({ personGroupId: 'local-person-1', ownerId: 'member-1', type: 'person', isHidden: false }),
       );
       mocks.faceIdentity.ensurePersonIdentity.mockResolvedValue({ id: 'local-identity', type: 'person' } as any);
       mocks.faceIdentity.getMergeConflicts.mockResolvedValue({
@@ -3699,8 +3699,8 @@ describe(SharedSpaceService.name, () => {
         { id: 'local-face-2', personGroupId: 'local-person-2', distance: 0.21 },
       ]);
       mocks.person.getByGroupIdOnly
-        .mockResolvedValueOnce(factory.person({ id: 'local-person-1', ownerId: 'member-1', type: 'person' }))
-        .mockResolvedValueOnce(factory.person({ id: 'local-person-2', ownerId: 'member-1', type: 'person' }));
+        .mockResolvedValueOnce(factory.person({ personGroupId: 'local-person-1', ownerId: 'member-1', type: 'person' }))
+        .mockResolvedValueOnce(factory.person({ personGroupId: 'local-person-2', ownerId: 'member-1', type: 'person' }));
       mocks.faceIdentity.ensurePersonIdentity
         .mockResolvedValueOnce({ id: 'local-identity-1', type: 'person' } as any)
         .mockResolvedValueOnce({ id: 'local-identity-2', type: 'person' } as any);
@@ -4163,7 +4163,7 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.findClosestSpacePerson.mockResolvedValue([]);
       mocks.person.getByGroupIdOnly.mockResolvedValue(
         factory.person({
-          id: personalPersonId,
+          personGroupId: personalPersonId,
           faceAssetId: personalRepresentativeFaceId,
           thumbnailPath: '/personal-thumbnail.jpg',
         }),
@@ -4867,7 +4867,7 @@ describe(SharedSpaceService.name, () => {
       const personalPersonId2 = newUuid();
       const space = factory.sharedSpace({ id: spaceId, faceRecognitionEnabled: true });
       const newPerson = factory.sharedSpacePerson({ id: newPersonId, spaceId });
-      const personalPerson = factory.person({ id: personalPersonId1, name: '' });
+      const personalPerson = factory.person({ personGroupId: personalPersonId1, name: '' });
 
       mocks.sharedSpace.getById.mockResolvedValue(space);
       mocks.sharedSpace.getAssetFacesForMatching.mockResolvedValue([
@@ -4911,7 +4911,7 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.createPerson.mockResolvedValue(newPerson);
       mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
       mocks.person.getByGroupIdOnly.mockResolvedValue(
-        factory.person({ id: personalPersonId, name: 'Private Name', faceAssetId: null }),
+        factory.person({ personGroupId: personalPersonId, name: 'Private Name', faceAssetId: null }),
       );
       mocks.sharedSpace.getPetFacesForAsset.mockResolvedValue([]);
 
@@ -10681,7 +10681,7 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.findSpacePersonByLinkedPersonId.mockResolvedValue(void 0 as any);
       mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
       mocks.sharedSpace.createPerson.mockResolvedValue(factory.sharedSpacePerson({ spaceId }));
-      mocks.person.getByGroupIdOnly.mockResolvedValue(factory.person({ id: personalPersonId }));
+      mocks.person.getByGroupIdOnly.mockResolvedValue(factory.person({ personGroupId: personalPersonId }));
       mocks.sharedSpace.getPetFacesForAsset.mockResolvedValue([]);
 
       const result = await sut.handleSharedSpaceLibraryFaceSync({ spaceId, libraryId });
@@ -10711,7 +10711,7 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.findSpacePersonByLinkedPersonId.mockResolvedValue(void 0 as any);
       mocks.sharedSpace.createPerson.mockResolvedValue(factory.sharedSpacePerson({ spaceId }));
       mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
-      mocks.person.getByGroupIdOnly.mockResolvedValue(factory.person({ id: personalPersonId }));
+      mocks.person.getByGroupIdOnly.mockResolvedValue(factory.person({ personGroupId: personalPersonId }));
       mocks.sharedSpace.getPetFacesForAsset.mockResolvedValue([]);
 
       await sut.handleSharedSpaceLibraryFaceSync({ spaceId, libraryId });

@@ -138,7 +138,7 @@ const seedFacesBulk = async (ctx: Ctx, ownerId: string, personId: string, count:
       .execute();
   }
   const faces = assets.map((asset) =>
-    mediumFactory.assetFaceInsert({ assetId: asset.id, personId, sourceType: SourceType.MachineLearning }),
+    mediumFactory.assetFaceInsert({ assetId: asset.id, personGroupId, sourceType: SourceType.MachineLearning }),
   );
   for (let index = 0; index < faces.length; index += 1000) {
     await db
@@ -2335,7 +2335,7 @@ describe('FaceRepairService.resolveFaces: unknown person (state 6)', () => {
     // Locked to the new cluster, so the next scan never re-flags them...
     const locks = await manualLinkFor(f1);
     expect(locks).toHaveLength(1);
-    const expectedIdentity_locks = await ctx.get(FaceIdentityRepository).ensurePersonIdentity(cluster.id);
+    const expectedIdentity_locks = await ctx.get(FaceIdentityRepository).ensurePersonIdentity(cluster.personGroupId);
     expect(locks[0].identityId).toBe(expectedIdentity_locks.id);
 
     // ...and never a recognition candidate, because the face now HAS a person (handleRecognizeFaces
