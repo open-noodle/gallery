@@ -108,7 +108,8 @@ describe(FaceRepairDeclineRepository.name, () => {
 
     const listed = await sut.listDeclines();
     expect(listed).toHaveLength(1);
-    expect(listed[0].personGroupId).toBe(personP);
+    // `personId` is the DTO-boundary name; under option M it IS the person_group id.
+    expect(listed[0].personId).toBe(personP);
 
     expect(await sut.removeClusterMutes({ ids: [listed[0].id] })).toBe(1);
     expect(await sut.listDeclines()).toEqual([]);
@@ -133,8 +134,8 @@ describe(FaceRepairDeclineRepository.name, () => {
     });
 
     const listed = await sut.listDeclines();
-    const rowP = listed.find((r) => r.personGroupId === personP)!;
-    const rowOther = listed.find((r) => r.personGroupId === other.personP)!;
+    const rowP = listed.find((r) => r.personId === personP)!;
+    const rowOther = listed.find((r) => r.personId === other.personP)!;
 
     const filler = Array.from({ length: 70_000 }, () => randomUUID());
     const removed = await sut.removeClusterMutes({ ids: [rowP.id, ...filler] });
