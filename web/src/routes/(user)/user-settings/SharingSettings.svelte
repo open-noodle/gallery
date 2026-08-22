@@ -8,21 +8,18 @@
 <script lang="ts">
   import SettingSwitch from '$lib/components/shared-components/settings/SettingSwitch.svelte';
   import UserAvatar from '$lib/components/shared-components/UserAvatar.svelte';
-  import { authManager } from '$lib/managers/auth-manager.svelte';
   import PartnerSelectionModal from '$lib/modals/PartnerSelectionModal.svelte';
   import { handleError } from '$lib/utils/handle-error';
   import {
     createPartner,
-    getMyUser,
     getPartners,
     PartnerDirection,
     removePartner,
-    searchUsers,
     updatePartner,
     type PartnerResponseDto,
     type UserResponseDto,
   } from '@immich/sdk';
-  import { Button, Card, CardBody, HStack, Icon, IconButton, modalManager, Text } from '@immich/ui';
+  import { Button, Icon, IconButton, modalManager, Text } from '@immich/ui';
   import { mdiCheck, mdiClose } from '@mdi/js';
   import { onMount } from 'svelte';
   import { t } from 'svelte-i18n';
