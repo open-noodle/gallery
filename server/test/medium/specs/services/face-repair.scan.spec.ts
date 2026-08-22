@@ -137,7 +137,7 @@ describe('FaceRepairService.handleFaceRepairScan', () => {
     expect(latest!.persons.length).toBeGreaterThan(0);
 
     // Alexia is a named person with flagged faces → review-first with 'named' reason
-    const alexiaPerson = latest!.persons.find((p) => p.personId === alexiaData.personGroupId);
+    const alexiaPerson = latest!.persons.find((p) => p.personGroupId === alexiaData.personGroupId);
     expect(alexiaPerson).toBeDefined();
     expect(alexiaPerson!.recommendation).toBe('review-first');
     expect(alexiaPerson!.reviewReasons).toContain('named');
@@ -190,7 +190,7 @@ describe('FaceRepairService.handleFaceRepairScan', () => {
     await sut.handleFaceRepairScan({ scanId: scan.id });
 
     const before = await sut.getLatestScanStatus();
-    const alexiaBefore = before!.persons.find((p) => p.personId === alexiaData.personGroupId);
+    const alexiaBefore = before!.persons.find((p) => p.personGroupId === alexiaData.personGroupId);
     expect(alexiaBefore).toBeDefined();
     expect(alexiaBefore!.flagged).toBe(3);
     const karinaOwnerBefore = alexiaBefore!.suspectedOwners.find((o) => o.ownerPersonId === karinaData.personGroupId);
@@ -210,7 +210,7 @@ describe('FaceRepairService.handleFaceRepairScan', () => {
     });
 
     const after = await sut.getLatestScanStatus();
-    const alexiaAfter = after!.persons.find((p) => p.personId === alexiaData.personGroupId);
+    const alexiaAfter = after!.persons.find((p) => p.personGroupId === alexiaData.personGroupId);
     expect(alexiaAfter).toBeDefined();
     expect(alexiaAfter!.flagged).toBe(2);
     expect(alexiaAfter!.flaggedFraction).toBeCloseTo(2 / alexiaAfter!.eligible, 5);
@@ -327,7 +327,7 @@ describe('FaceRepairService.handleFaceRepairScan', () => {
     await sut.handleFaceRepairScan({ scanId: scan.id });
 
     const latest = await sut.getLatestScanStatus();
-    const alexia = latest!.persons.find((p) => p.personId === alexiaData.personGroupId)!;
+    const alexia = latest!.persons.find((p) => p.personGroupId === alexiaData.personGroupId)!;
     const destination = alexia.suspectedOwners.find((o) => o.ownerPersonId === karinaData.personGroupId)!;
 
     // Karina has 10 real faces; the routing share is the 3 leaked onto Alexia. Two different numbers, and

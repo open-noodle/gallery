@@ -22,7 +22,7 @@ export async function rekeyVerdictIdentity(
 }
 
 /**
- * Survivor-wins re-target of a personal verdict onto the merge survivor. `(personId, assetFaceId)` is
+ * Survivor-wins re-target of a personal verdict onto the merge survivor. `(personGroupId, assetFaceId)` is
  * unique-partial, so first drop source rows that would collide with an existing survivor row, then move
  * the rest. Must run BEFORE the source person is deleted (its FK is SET NULL, so a delete would orphan
  * the verdict rather than move it).
@@ -49,26 +49,26 @@ export async function retargetVerdictPersonId(
     })
     .from('face_person_verdict as src')
     .whereRef('src.assetFaceId', '=', 'survivor.assetFaceId')
-    .where('survivor.personId', '=', targetPersonId)
+    .where('survivor.personGroupId', '=', targetPersonId)
     .where('survivor.status', '=', 'pending')
-    .where('src.personId', '=', sourcePersonId)
+    .where('src.personGroupId', '=', sourcePersonId)
     .where('src.status', 'in', ['rejected', 'ignored'])
     .execute();
 
   await db
     .deleteFrom('face_person_verdict')
-    .where('personId', '=', sourcePersonId)
+    .where('personGroupId', '=', sourcePersonId)
     .where('assetFaceId', 'in', (eb) =>
       eb
         .selectFrom('face_person_verdict as survivor')
         .select('survivor.assetFaceId')
-        .where('survivor.personId', '=', targetPersonId),
+        .where('survivor.personGroupId', '=', targetPersonId),
     )
     .execute();
   await db
     .updateTable('face_person_verdict')
-    .set({ personId: targetPersonId })
-    .where('personId', '=', sourcePersonId)
+    .set({ personGroupId: targetPersonId })
+    .where('personGroupId', '=', sourcePersonId)
     .execute();
 }
 
