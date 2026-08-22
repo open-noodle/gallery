@@ -134,7 +134,7 @@ type AccessiblePeopleSearchOptions = {
 
 type ProfileKind = 'person' | 'space-person';
 type PersonalBackfillRow = {
-  id: string;
+  personGroupId: string;
   ownerId: string;
   identityId: string | null;
 };
@@ -2623,7 +2623,7 @@ export class FaceIdentityRepository {
       .selectFrom('person')
       .select(['personGroupId', 'ownerId', 'identityId'])
       .$if(!!input.cursor, (qb) => qb.where('personGroupId', '>', input.cursor!))
-      .orderBy('id')
+      .orderBy('personGroupId')
       .limit(input.limit + 1)
       .execute();
 
@@ -2673,18 +2673,18 @@ export class FaceIdentityRepository {
     const affectedAssetFaceIds = new Set<string>();
 
     for (const group of groups) {
-      const targetPerson = await this.getPersonByIdentity(person.ownerId, group.identityId, person.id);
+      const targetPerson = await this.getPersonByIdentity(person.ownerId, group.identityId, person.personGroupId);
       if (!targetPerson) {
         // No person of this owner references the linked identity, so there is nowhere to move the
         // faces. Trust the person they are already on and realign the link — otherwise
         // person.identityId stays DISTINCT FROM face_identity_face.identityId, getBackfillWork()
         // reports work forever, and handleFaceIdentityBackfill re-queues in a loop.
-        const strandedAssetFaceIds = await this.getPersonalBackfillAssetFaceIdsForIdentity(person.id, group.identityId);
-        await this.realignFacesToPersonIdentity(person.id, strandedAssetFaceIds);
+        const strandedAssetFaceIds = await this.getPersonalBackfillAssetFaceIdsForIdentity(person.personGroupId, group.identityId);
+        await this.realignFacesToPersonIdentity(person.personGroupId, strandedAssetFaceIds);
         continue;
       }
 
-      const candidateAssetFaceIds = await this.getPersonalBackfillAssetFaceIdsForIdentity(person.id, group.identityId);
+      const candidateAssetFaceIds = await this.getPersonalBackfillAssetFaceIdsForIdentity(person.personGroupId, group.identityId);
       if (candidateAssetFaceIds.length === 0) {
         continue;
       }
@@ -2698,7 +2698,7 @@ export class FaceIdentityRepository {
       // identity, getBackfillWork() reports work forever, and handleFaceIdentityBackfill re-queues in a loop.
       const resembling = new Set(assetFaceIds);
       const blockedAssetFaceIds = candidateAssetFaceIds.filter((id) => !resembling.has(id));
-      await this.realignFacesToPersonIdentity(person.id, blockedAssetFaceIds);
+      await this.realignFacesToPersonIdentity(person.personGroupId, blockedAssetFaceIds);
 
       if (assetFaceIds.length === 0) {
         continue;
@@ -2707,7 +2707,7 @@ export class FaceIdentityRepository {
       await this.db
         .updateTable('asset_face')
         .set({ personGroupId: targetPerson.personGroupId })
-        .where('personGroupId', '=', person.id)
+        .where('personGroupId', '=', person.personGroupId)
         .where('id', 'in', assetFaceIds)
         .execute();
 
@@ -2726,13 +2726,13 @@ export class FaceIdentityRepository {
       return [];
     }
 
-    const assetFaceIds = await this.getPersonalBackfillAssetFaceIdsForMismatch(person.id, person.identityId);
+    const assetFaceIds = await this.getPersonalBackfillAssetFaceIdsForMismatch(person.personGroupId, person.identityId);
     if (assetFaceIds.length === 0) {
       return [];
     }
 
     const affectedSpaceAssets = await this.addPendingSharedSpaceFaceMatchBackfillTargetsForAssetFaces(assetFaceIds);
-    await this.linkPersonFaces({ personId: person.id, identityId: person.identityId, source: 'backfill' });
+    await this.linkPersonFaces({ personId: person.personGroupId, identityId: person.identityId, source: 'backfill' });
     return affectedSpaceAssets;
   }
 
@@ -2742,7 +2742,7 @@ export class FaceIdentityRepository {
       .innerJoin('asset', 'asset.id', 'asset_face.assetId')
       .innerJoin('face_identity_face', 'face_identity_face.assetFaceId', 'asset_face.id')
       .select('face_identity_face.identityId')
-      .where('asset_face.personGroupId', '=', person.id)
+      .where('asset_face.personGroupId', '=', person.personGroupId)
       .where('asset_face.deletedAt', 'is', null)
       .where('asset_face.isVisible', '=', true)
       .where('asset.deletedAt', 'is', null)
@@ -3490,7 +3490,7 @@ export class FaceIdentityRepository {
             .onRef('target_person.ownerId', '=', 'source_person.ownerId')
             .on('target_person.identityId', '=', input.targetIdentityId),
         )
-        .select('source_person.id')
+        .select('source_person.personGroupId')
         .where('source_person.identityId', 'in', sourceIdentityIds)
         .execute(),
       db
