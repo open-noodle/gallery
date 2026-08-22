@@ -1,4 +1,5 @@
 import { Kysely, sql } from 'kysely';
+import { clusterGroupsApplied } from 'src/utils/cluster-groups-order';
 
 export async function up(db: Kysely<any>): Promise<void> {
   await sql`DROP INDEX "face_identity_representativeFaceId_idx";`.execute(db);
@@ -13,10 +14,15 @@ export async function up(db: Kysely<any>): Promise<void> {
   await sql`CREATE UNIQUE INDEX "person_ownerId_identityId_key" ON "person" ("ownerId", "identityId") WHERE ("identityId" IS NOT NULL);`.execute(
     db,
   );
-  await sql`DROP INDEX "asset_face_personId_idx";`.execute(db);
-  await sql`CREATE INDEX "asset_face_personId_idx" ON "asset_face" ("personId") WHERE ("personId" IS NOT NULL);`.execute(
-    db,
-  );
+  // On an Immich-to-Gallery switch 1778400000000 never created this index (the column is already
+  // `personGroupId` there and 1791 drops the fork's index anyway) — see src/utils/cluster-groups-order.ts.
+  const hasForkAssetFaceIndex = !(await clusterGroupsApplied(db));
+  if (hasForkAssetFaceIndex) {
+    await sql`DROP INDEX "asset_face_personId_idx";`.execute(db);
+    await sql`CREATE INDEX "asset_face_personId_idx" ON "asset_face" ("personId") WHERE ("personId" IS NOT NULL);`.execute(
+      db,
+    );
+  }
   await sql`DROP INDEX "shared_space_person_identityId_spaceId_idx";`.execute(db);
   await sql`CREATE INDEX "shared_space_person_identityId_spaceId_idx" ON "shared_space_person" ("identityId", "spaceId") WHERE ("identityId" IS NOT NULL);`.execute(
     db,
@@ -34,9 +40,11 @@ export async function up(db: Kysely<any>): Promise<void> {
   await sql`UPDATE "migration_overrides" SET "value" = '{"type":"index","name":"person_ownerId_identityId_key","sql":"CREATE UNIQUE INDEX \\"person_ownerId_identityId_key\\" ON \\"person\\" (\\"ownerId\\", \\"identityId\\") WHERE (\\"identityId\\" IS NOT NULL);"}'::jsonb WHERE "name" = 'index_person_ownerId_identityId_key';`.execute(
     db,
   );
-  await sql`UPDATE "migration_overrides" SET "value" = '{"type":"index","name":"asset_face_personId_idx","sql":"CREATE INDEX \\"asset_face_personId_idx\\" ON \\"asset_face\\" (\\"personId\\") WHERE (\\"personId\\" IS NOT NULL);"}'::jsonb WHERE "name" = 'index_asset_face_personId_idx';`.execute(
-    db,
-  );
+  if (hasForkAssetFaceIndex) {
+    await sql`UPDATE "migration_overrides" SET "value" = '{"type":"index","name":"asset_face_personId_idx","sql":"CREATE INDEX \\"asset_face_personId_idx\\" ON \\"asset_face\\" (\\"personId\\") WHERE (\\"personId\\" IS NOT NULL);"}'::jsonb WHERE "name" = 'index_asset_face_personId_idx';`.execute(
+      db,
+    );
+  }
   await sql`UPDATE "migration_overrides" SET "value" = '{"type":"index","name":"shared_space_person_identityId_spaceId_idx","sql":"CREATE INDEX \\"shared_space_person_identityId_spaceId_idx\\" ON \\"shared_space_person\\" (\\"identityId\\", \\"spaceId\\") WHERE (\\"identityId\\" IS NOT NULL);"}'::jsonb WHERE "name" = 'index_shared_space_person_identityId_spaceId_idx';`.execute(
     db,
   );
