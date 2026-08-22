@@ -2012,7 +2012,7 @@ describe('/shared-spaces', () => {
           try {
             await dbClient.query(
               `UPDATE person SET "thumbnailPath" = $1
-               WHERE id = (SELECT "personId" FROM asset_face WHERE id =
+               WHERE "personGroupId" = (SELECT "personGroupId" FROM asset_face WHERE id =
                  (SELECT "representativeFaceId" FROM shared_space_person WHERE id = $2))`,
               ['', namedPersonId],
             );
@@ -2026,7 +2026,7 @@ describe('/shared-spaces', () => {
           } finally {
             await dbClient.query(
               `UPDATE person SET "thumbnailPath" = $1
-               WHERE id = (SELECT "personId" FROM asset_face WHERE id =
+               WHERE "personGroupId" = (SELECT "personGroupId" FROM asset_face WHERE id =
                  (SELECT "representativeFaceId" FROM shared_space_person WHERE id = $2))`,
               ['/my/awesome/thumbnail.jpg', namedPersonId],
             );
@@ -2211,7 +2211,10 @@ describe('/shared-spaces', () => {
 
           // Verify the global person exists before
           const dbClient = await utils.connectDatabase();
-          const beforeRes = await dbClient.query('SELECT id FROM person WHERE id = $1', [scratch.globalPersonId]);
+          const beforeRes = await dbClient.query(
+            'SELECT "personGroupId" AS id FROM person WHERE "personGroupId" = $1',
+            [scratch.globalPersonId],
+          );
           expect(beforeRes.rowCount).toBe(1);
 
           await request(app)
@@ -2219,7 +2222,9 @@ describe('/shared-spaces', () => {
             .set('Authorization', `Bearer ${owner.accessToken}`);
 
           // Global person row still exists after the space person is deleted
-          const afterRes = await dbClient.query('SELECT id FROM person WHERE id = $1', [scratch.globalPersonId]);
+          const afterRes = await dbClient.query('SELECT "personGroupId" AS id FROM person WHERE "personGroupId" = $1', [
+            scratch.globalPersonId,
+          ]);
           expect(afterRes.rowCount).toBe(1);
 
           // The space-person side IS gone
@@ -2454,7 +2459,9 @@ describe('/shared-spaces', () => {
           .send({ alias: 'AliasName' });
 
         const dbClient = await utils.connectDatabase();
-        const personRow = await dbClient.query('SELECT name FROM person WHERE id = $1', [scratch.globalPersonId]);
+        const personRow = await dbClient.query('SELECT name FROM person WHERE "personGroupId" = $1', [
+          scratch.globalPersonId,
+        ]);
         expect(personRow.rowCount).toBe(1);
         expect(personRow.rows[0].name).toBe('OriginalName');
       });
@@ -3037,7 +3044,10 @@ describe('/shared-spaces', () => {
       // state — the space person has its own representativeFaceId for display.
       const dbClient = await utils.connectDatabase();
       try {
-        await dbClient.query('UPDATE person SET "thumbnailPath" = $1 WHERE id = $2', ['', zeroThumbGlobalId]);
+        await dbClient.query('UPDATE person SET "thumbnailPath" = $1 WHERE "personGroupId" = $2', [
+          '',
+          zeroThumbGlobalId,
+        ]);
         const { status, body } = await request(app)
           .get(`/shared-spaces/${spaceId}/people`)
           .set('Authorization', `Bearer ${owner.accessToken}`);
@@ -3045,7 +3055,7 @@ describe('/shared-spaces', () => {
         const ids = (body as Array<{ id: string }>).map((p) => p.id);
         expect(ids).toContain(zeroThumbPersonId);
       } finally {
-        await dbClient.query('UPDATE person SET "thumbnailPath" = $1 WHERE id = $2', [
+        await dbClient.query('UPDATE person SET "thumbnailPath" = $1 WHERE "personGroupId" = $2', [
           '/my/awesome/thumbnail.jpg',
           zeroThumbGlobalId,
         ]);
