@@ -2,12 +2,12 @@
 
 -- FacePersonVerdictRepository.upsertPending
 insert into
-  "face_person_verdict" ("personId", "assetFaceId", "distance")
+  "face_person_verdict" ("personGroupId", "assetFaceId", "distance")
 values
   ($1, $2, $3)
-on conflict ("personId", "assetFaceId")
+on conflict ("personGroupId", "assetFaceId")
 where
-  "personId" is not null do update
+  "personGroupId" is not null do update
 set
   "distance" = "excluded"."distance",
   "updatedAt" = now()
@@ -50,14 +50,14 @@ where
       "face_person_verdict" as "fpv"
       inner join "asset_face" as "af" on "af"."id" = "fpv"."assetFaceId"
       inner join "asset" on "asset"."id" = "af"."assetId"
-      left join "person" on "person"."id" = "fpv"."personId"
+      left join "person" on "person"."personGroupId" = "fpv"."personGroupId"
     where
-      "fpv"."personId" = $1
+      "fpv"."personGroupId" = $1
       and "fpv"."assetFaceId" = $2
       and "fpv"."status" = $3
       and "fpv"."distance" > $4
       and "fpv"."distance" <= $5
-      and "af"."personId" is null
+      and "af"."personGroupId" is null
       and "af"."deletedAt" is null
       and "af"."isVisible" is true
       and "asset"."deletedAt" is null
@@ -79,7 +79,7 @@ where
           "neg"."assetFaceId" = "fpv"."assetFaceId"
           and "neg"."status" in ($9, $10)
           and (
-            "neg"."personId" = $11
+            "neg"."personGroupId" = $11
             or "neg"."identityId" = "person"."identityId"
           )
       )
@@ -102,7 +102,7 @@ where
       and "fpv"."status" = $3
       and "fpv"."distance" > $4
       and "fpv"."distance" <= $5
-      and "af"."personId" is null
+      and "af"."personGroupId" is null
       and "af"."deletedAt" is null
       and "af"."isVisible" is true
       and "asset"."deletedAt" is null
@@ -133,7 +133,7 @@ where
 -- FacePersonVerdictRepository.markRejected
 insert into
   "face_person_verdict" (
-    "personId",
+    "personGroupId",
     "assetFaceId",
     "identityId",
     "status",
@@ -143,9 +143,9 @@ insert into
   )
 values
   ($1, $2, $3, $4, $5, $6, $7)
-on conflict ("personId", "assetFaceId")
+on conflict ("personGroupId", "assetFaceId")
 where
-  "personId" is not null do update
+  "personGroupId" is not null do update
 set
   "status" = $8,
   "identityId" = coalesce(
@@ -159,7 +159,7 @@ set
 -- FacePersonVerdictRepository.markRejectedMany
 insert into
   "face_person_verdict" (
-    "personId",
+    "personGroupId",
     "assetFaceId",
     "identityId",
     "status",
@@ -169,9 +169,9 @@ insert into
   )
 values
   ($1, $2, $3, $4, $5, $6, $7)
-on conflict ("personId", "assetFaceId")
+on conflict ("personGroupId", "assetFaceId")
 where
-  "personId" is not null do update
+  "personGroupId" is not null do update
 set
   "status" = $8,
   "identityId" = coalesce(
@@ -185,7 +185,7 @@ set
 -- FacePersonVerdictRepository.markIgnored
 insert into
   "face_person_verdict" (
-    "personId",
+    "personGroupId",
     "assetFaceId",
     "identityId",
     "status",
@@ -195,9 +195,9 @@ insert into
   )
 values
   ($1, $2, $3, $4, $5, $6, $7)
-on conflict ("personId", "assetFaceId")
+on conflict ("personGroupId", "assetFaceId")
 where
-  "personId" is not null do update
+  "personGroupId" is not null do update
 set
   "status" = $8,
   "identityId" = coalesce(
@@ -273,7 +273,7 @@ select
   "fpv"."status" as "status",
   "fpv"."source" as "source",
   "fpv"."createdAt" as "createdAt",
-  "fpv"."personId" as "personId",
+  "fpv"."personGroupId" as "personId",
   "person"."name" as "personName",
   "person"."faceAssetId" as "personThumbnailFaceId",
   "fpv"."spacePersonId" as "spacePersonId",
@@ -284,7 +284,7 @@ select
   "actor"."name" as "actorName"
 from
   "face_person_verdict" as "fpv"
-  left join "person" on "person"."id" = "fpv"."personId"
+  left join "person" on "person"."personGroupId" = "fpv"."personGroupId"
   left join "shared_space_person" as "ssp" on "ssp"."id" = "fpv"."spacePersonId"
   left join "shared_space" on "shared_space"."id" = "ssp"."spaceId"
   left join "user" as "actor" on "actor"."id" = "fpv"."actorId"
@@ -303,7 +303,7 @@ delete from "face_person_verdict"
 where
   "assetFaceId" in ($1)
   and "status" in ($2, $3)
-  and "face_person_verdict"."personId" = $4
+  and "face_person_verdict"."personGroupId" = $4
 
 -- FacePersonVerdictRepository.deleteOrphanedVerdicts
 delete from "face_person_verdict"
@@ -314,7 +314,7 @@ where
     from
       "face_person_verdict"
     where
-      "personId" is null
+      "personGroupId" is null
       and "spacePersonId" is null
       and "identityId" is null
     limit
@@ -334,7 +334,7 @@ returning
 -- FacePersonVerdictRepository.getNegativeVerdictTokens
 select
   "assetFaceId",
-  "personId",
+  "personGroupId",
   "spacePersonId",
   "identityId"
 from
@@ -345,12 +345,12 @@ where
 
 -- FacePersonVerdictRepository.getPendingForPerson
 select
-  "person"."id",
+  "person"."personGroupId",
   "person"."identityId"
 from
   "person"
 where
-  "person"."id" = $1
+  "person"."personGroupId" = $1
   and "person"."name" != $2
   and "person"."isHidden" = $3
   and "person"."type" = $4
@@ -437,7 +437,7 @@ where
   )
   and "fpv"."distance" > $11
   and "fpv"."distance" <= $12
-  and "af"."personId" is null
+  and "af"."personGroupId" is null
   and "af"."deletedAt" is null
   and "af"."isVisible" is true
   and "asset"."deletedAt" is null

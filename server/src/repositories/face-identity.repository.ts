@@ -485,7 +485,7 @@ export class FaceIdentityRepository {
             FROM asset_face
             INNER JOIN asset ON asset.id = asset_face."assetId"
             LEFT JOIN face_identity_face ON face_identity_face."assetFaceId" = asset_face.id
-            WHERE asset_face."personId" IS NOT NULL
+            WHERE asset_face."personGroupId" IS NOT NULL
               AND asset_face."deletedAt" IS NULL
               AND asset_face."isVisible" = true
               AND asset."deletedAt" IS NULL
@@ -495,9 +495,9 @@ export class FaceIdentityRepository {
             SELECT 1
             FROM asset_face
             INNER JOIN asset ON asset.id = asset_face."assetId"
-            INNER JOIN person ON person.id = asset_face."personId"
+            INNER JOIN person ON person."personGroupId" = asset_face."personGroupId"
             INNER JOIN face_identity_face ON face_identity_face."assetFaceId" = asset_face.id
-            WHERE asset_face."personId" IS NOT NULL
+            WHERE asset_face."personGroupId" IS NOT NULL
               AND asset_face."deletedAt" IS NULL
               AND asset_face."isVisible" = true
               AND asset."deletedAt" IS NULL
@@ -563,12 +563,12 @@ export class FaceIdentityRepository {
         INNER JOIN asset ON asset.id = shared_space_asset."assetId"
         INNER JOIN asset_face ON asset_face."assetId" = asset.id
         INNER JOIN face_identity_face ON face_identity_face."assetFaceId" = asset_face.id
-        LEFT JOIN person ON person.id = asset_face."personId"
+        LEFT JOIN person ON person."personGroupId" = asset_face."personGroupId"
         WHERE shared_space."faceRecognitionEnabled" = true
           AND asset."deletedAt" IS NULL
           AND asset."isOffline" = false
           AND asset.visibility IN (${sql.join(peopleAssetVisibilities)})
-          AND asset_face."personId" IS NOT NULL
+          AND asset_face."personGroupId" IS NOT NULL
           AND asset_face."deletedAt" IS NULL
           AND asset_face."isVisible" = true
           ${assetFaceFilter}
@@ -586,12 +586,12 @@ export class FaceIdentityRepository {
         INNER JOIN asset ON asset."libraryId" = shared_space_library."libraryId"
         INNER JOIN asset_face ON asset_face."assetId" = asset.id
         INNER JOIN face_identity_face ON face_identity_face."assetFaceId" = asset_face.id
-        LEFT JOIN person ON person.id = asset_face."personId"
+        LEFT JOIN person ON person."personGroupId" = asset_face."personGroupId"
         WHERE shared_space."faceRecognitionEnabled" = true
           AND asset."deletedAt" IS NULL
           AND asset."isOffline" = false
           AND asset.visibility IN (${sql.join(peopleAssetVisibilities)})
-          AND asset_face."personId" IS NOT NULL
+          AND asset_face."personGroupId" IS NOT NULL
           AND asset_face."deletedAt" IS NULL
           AND asset_face."isVisible" = true
           ${assetFaceFilter}
@@ -611,12 +611,12 @@ export class FaceIdentityRepository {
         INNER JOIN asset ON asset.id = album_asset."assetId"
         INNER JOIN asset_face ON asset_face."assetId" = asset.id
         INNER JOIN face_identity_face ON face_identity_face."assetFaceId" = asset_face.id
-        LEFT JOIN person ON person.id = asset_face."personId"
+        LEFT JOIN person ON person."personGroupId" = asset_face."personGroupId"
         WHERE shared_space."faceRecognitionEnabled" = true
           AND asset."deletedAt" IS NULL
           AND asset."isOffline" = false
           AND asset.visibility IN (${sql.join(peopleAssetVisibilities)})
-          AND asset_face."personId" IS NOT NULL
+          AND asset_face."personGroupId" IS NOT NULL
           AND asset_face."deletedAt" IS NULL
           AND asset_face."isVisible" = true
           ${assetFaceFilter}
@@ -638,12 +638,12 @@ export class FaceIdentityRepository {
         INNER JOIN asset ON asset.id = album_space_asset."assetId"
         INNER JOIN asset_face ON asset_face."assetId" = asset.id
         INNER JOIN face_identity_face ON face_identity_face."assetFaceId" = asset_face.id
-        LEFT JOIN person ON person.id = asset_face."personId"
+        LEFT JOIN person ON person."personGroupId" = asset_face."personGroupId"
         WHERE shared_space."faceRecognitionEnabled" = true
           AND asset."deletedAt" IS NULL
           AND asset."isOffline" = false
           AND asset.visibility IN (${sql.join(peopleAssetVisibilities)})
-          AND asset_face."personId" IS NOT NULL
+          AND asset_face."personGroupId" IS NOT NULL
           AND asset_face."deletedAt" IS NULL
           AND asset_face."isVisible" = true
           ${assetFaceFilter}
@@ -713,7 +713,7 @@ export class FaceIdentityRepository {
           AND asset."isOffline" = false
           AND asset.visibility IN (${sql.join(peopleAssetVisibilities)})
           AND asset_face.id = ${anyUuid(uniqueAssetFaceIds)}
-          AND asset_face."personId" IS NOT NULL
+          AND asset_face."personGroupId" IS NOT NULL
           AND asset_face."deletedAt" IS NULL
           AND asset_face."isVisible" = true
           AND NOT EXISTS (
@@ -739,7 +739,7 @@ export class FaceIdentityRepository {
           AND asset."isOffline" = false
           AND asset.visibility IN (${sql.join(peopleAssetVisibilities)})
           AND asset_face.id = ${anyUuid(uniqueAssetFaceIds)}
-          AND asset_face."personId" IS NOT NULL
+          AND asset_face."personGroupId" IS NOT NULL
           AND asset_face."deletedAt" IS NULL
           AND asset_face."isVisible" = true
           AND NOT EXISTS (
@@ -767,7 +767,7 @@ export class FaceIdentityRepository {
           AND asset."isOffline" = false
           AND asset.visibility IN (${sql.join(peopleAssetVisibilities)})
           AND asset_face.id = ${anyUuid(uniqueAssetFaceIds)}
-          AND asset_face."personId" IS NOT NULL
+          AND asset_face."personGroupId" IS NOT NULL
           AND asset_face."deletedAt" IS NULL
           AND asset_face."isVisible" = true
           AND NOT EXISTS (
@@ -797,7 +797,7 @@ export class FaceIdentityRepository {
           AND asset."isOffline" = false
           AND asset.visibility IN (${sql.join(peopleAssetVisibilities)})
           AND asset_face.id = ${anyUuid(uniqueAssetFaceIds)}
-          AND asset_face."personId" IS NOT NULL
+          AND asset_face."personGroupId" IS NOT NULL
           AND asset_face."deletedAt" IS NULL
           AND asset_face."isVisible" = true
           AND NOT EXISTS (
@@ -1782,7 +1782,7 @@ export class FaceIdentityRepository {
           person."isHidden",
           person."isFavorite",
           person."updatedAt",
-          person.id AS "profileId",
+          person."personGroupId" AS "profileId",
           0 AS "profileRank"
         FROM person
         WHERE person."ownerId" = ${input.userId}
@@ -2008,7 +2008,7 @@ export class FaceIdentityRepository {
       profiles AS (
         SELECT
           'user-person'::text AS "profileType",
-          person.id AS "profileId",
+          person."personGroupId" AS "profileId",
           NULL::uuid AS "spaceId",
           person."identityId",
           person.name,
@@ -2801,7 +2801,7 @@ export class FaceIdentityRepository {
       FROM (
         SELECT asset_face.id
         FROM asset_face
-        WHERE asset_face."personId" = ${targetPersonId}
+        WHERE asset_face."personGroupId" = ${targetPersonId}
           AND asset_face."deletedAt" IS NULL
           AND asset_face."isVisible" = true
         LIMIT ${sql.lit(MERGE_IDENTITY_CENTROID_SAMPLE_SIZE)}
