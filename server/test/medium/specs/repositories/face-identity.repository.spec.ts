@@ -1271,7 +1271,7 @@ describe(FaceIdentityRepository.name, () => {
         .selectFrom('person')
         .select(['personGroupId', 'identityId'])
         .where('personGroupId', 'in', [firstPerson.personGroupId, secondPerson.personGroupId])
-        .orderBy('id')
+        .orderBy('personGroupId')
         .execute();
       const links = await ctx.database
         .selectFrom('face_identity_face')
@@ -1351,7 +1351,7 @@ describe(FaceIdentityRepository.name, () => {
 
       const updatedFace = await ctx.database
         .selectFrom('asset_face')
-        .select('personId')
+        .select('personGroupId')
         .where('id', '=', assetFace.id)
         .executeTakeFirstOrThrow();
       const sourceProfile = await ctx.database
@@ -1431,7 +1431,7 @@ describe(FaceIdentityRepository.name, () => {
 
       const updatedFace = await ctx.database
         .selectFrom('asset_face')
-        .select('personId')
+        .select('personGroupId')
         .where('id', '=', assetFace.id)
         .executeTakeFirstOrThrow();
 
@@ -5070,7 +5070,7 @@ describe(FaceIdentityRepository.name, () => {
 
         const row = await ctx.database
           .selectFrom('asset_face')
-          .select('personId')
+          .select('personGroupId')
           .where('id', '=', corruptFace.id)
           .executeTakeFirstOrThrow();
         expect(row.personId).toBe(personB.personGroupId);
@@ -5120,7 +5120,7 @@ describe(FaceIdentityRepository.name, () => {
 
         const row = await ctx.database
           .selectFrom('asset_face')
-          .select('personId')
+          .select('personGroupId')
           .where('id', '=', assetFace.id)
           .executeTakeFirstOrThrow();
         expect(row.personId).toBe(person.personGroupId);
@@ -5167,7 +5167,7 @@ describe(FaceIdentityRepository.name, () => {
 
         const row = await ctx.database
           .selectFrom('asset_face')
-          .select('personId')
+          .select('personGroupId')
           .where('id', '=', resemblingFace.id)
           .executeTakeFirstOrThrow();
         expect(row.personId).toBe(personA.person.personGroupId);
@@ -5299,7 +5299,7 @@ describe(FaceIdentityRepository.name, () => {
 
         const row = await ctx.database
           .selectFrom('asset_face')
-          .select('personId')
+          .select('personGroupId')
           .where('id', '=', bFace.id)
           .executeTakeFirstOrThrow();
         // Limitation: the guard is strongest at first contamination (clean target) and weaker mid-cascade.
