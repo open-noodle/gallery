@@ -655,6 +655,7 @@ describe(AssetService.name, () => {
     it('should update the asset', async () => {
       const asset = AssetFactory.create();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue(void 0 as any);
       mocks.asset.getById.mockResolvedValue(getForAsset(asset));
       mocks.asset.update.mockResolvedValue(getForAsset(asset));
 
@@ -671,6 +672,7 @@ describe(AssetService.name, () => {
     it('should update the exif description', async () => {
       const asset = AssetFactory.create();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue(void 0 as any);
       mocks.asset.getById.mockResolvedValue(getForAsset(asset));
       mocks.asset.update.mockResolvedValue(getForAsset(asset));
 
@@ -687,6 +689,7 @@ describe(AssetService.name, () => {
     it('should update the exif rating', async () => {
       const asset = AssetFactory.create();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue(void 0 as any);
       mocks.asset.getById.mockResolvedValueOnce(getForAsset(asset));
       mocks.asset.update.mockResolvedValueOnce(getForAsset(asset));
 
@@ -710,6 +713,8 @@ describe(AssetService.name, () => {
       const auth = AuthFactory.create();
       const asset = AssetFactory.create();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue(void 0 as any);
+      mocks.asset.getById.mockResolvedValue(getForAsset(asset));
 
       await expect(
         sut.update(auth, asset.id, {
@@ -736,6 +741,7 @@ describe(AssetService.name, () => {
       const motionAsset = AssetFactory.from().owner(auth.user).build();
       const asset = AssetFactory.create();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue(void 0 as any);
       mocks.asset.getById.mockResolvedValue(getForAsset(asset));
 
       await expect(
@@ -763,6 +769,7 @@ describe(AssetService.name, () => {
       const motionAsset = AssetFactory.create({ type: AssetType.Video });
       const asset = AssetFactory.create();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue(void 0 as any);
       mocks.asset.getById.mockResolvedValue(getForAsset(motionAsset));
 
       await expect(
@@ -789,6 +796,7 @@ describe(AssetService.name, () => {
       const motionAsset = AssetFactory.create({ type: AssetType.Video, visibility: AssetVisibility.Timeline });
       const stillAsset = AssetFactory.create();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([stillAsset.id]));
+      mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue(void 0 as any);
       mocks.asset.getById.mockResolvedValueOnce(getForAsset(motionAsset));
       mocks.asset.getById.mockResolvedValueOnce(getForAsset(stillAsset));
       mocks.asset.update.mockResolvedValue(getForAsset(stillAsset));
@@ -803,6 +811,7 @@ describe(AssetService.name, () => {
 
     it('should throw an error if asset could not be found after update', async () => {
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set(['asset-1']));
+      mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue(void 0 as any);
       await expect(sut.update(AuthFactory.create(), 'asset-1', { isFavorite: true })).rejects.toBeInstanceOf(
         BadRequestException,
       );
@@ -816,6 +825,7 @@ describe(AssetService.name, () => {
       const asset = AssetFactory.create({ livePhotoVideoId: motionAsset.id });
       const unlinkedAsset = AssetFactory.create();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue(void 0 as any);
       mocks.asset.getById.mockResolvedValueOnce(getForAsset(asset));
       mocks.asset.getById.mockResolvedValueOnce(getForAsset(motionAsset));
       mocks.asset.getById.mockResolvedValueOnce(getForAsset(unlinkedAsset));
@@ -840,6 +850,7 @@ describe(AssetService.name, () => {
     it('should fail unlinking a live video if the asset could not be found', async () => {
       const asset = AssetFactory.create();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue(void 0 as any);
       mocks.asset.getById.mockResolvedValueOnce(void 0);
 
       await expect(sut.update(authStub.admin, asset.id, { livePhotoVideoId: null })).rejects.toBeInstanceOf(
@@ -854,7 +865,8 @@ describe(AssetService.name, () => {
       const auth = AuthFactory.create();
       const asset = AssetFactory.create({ livePhotoVideoId: null });
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
-      mocks.asset.getById.mockResolvedValueOnce(asset as any);
+      mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue(void 0 as any);
+      mocks.asset.getById.mockResolvedValue(asset as any);
       mocks.asset.update.mockResolvedValueOnce(asset as any);
 
       await sut.update(auth, asset.id, { livePhotoVideoId: null });
@@ -865,6 +877,8 @@ describe(AssetService.name, () => {
     it('should update latitude and longitude', async () => {
       const asset = AssetFactory.create();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue(void 0 as any);
+      mocks.asset.getById.mockResolvedValue(getForAsset(asset));
       mocks.asset.update.mockResolvedValue(asset as any);
       mocks.map.reverseGeocode.mockResolvedValue({ country: null, state: null, city: null });
 
@@ -887,6 +901,8 @@ describe(AssetService.name, () => {
     it('should reverse-geocode and persist country/state/city when latitude and longitude are updated', async () => {
       const asset = AssetFactory.create();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue(void 0 as any);
+      mocks.asset.getById.mockResolvedValue(getForAsset(asset));
       mocks.asset.update.mockResolvedValue(asset as any);
       mocks.map.reverseGeocode.mockResolvedValue({ country: 'Germany', state: 'Berlin', city: 'Berlin' });
 
@@ -912,6 +928,8 @@ describe(AssetService.name, () => {
     it('should not call reverse geocoding when latitude and longitude are not updated', async () => {
       const asset = AssetFactory.create();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue(void 0 as any);
+      mocks.asset.getById.mockResolvedValue(getForAsset(asset));
       mocks.asset.update.mockResolvedValue(asset as any);
 
       await sut.update(authStub.admin, asset.id, { description: 'New description' });
@@ -922,6 +940,7 @@ describe(AssetService.name, () => {
     it('purges direct/album/library space paths when a single PUT sets visibility Hidden (security-4)', async () => {
       const asset = AssetFactory.create({ visibility: AssetVisibility.Timeline });
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue(void 0 as any);
       mocks.asset.getById.mockResolvedValue(getForAsset(asset));
       mocks.asset.update.mockResolvedValue({ ...getForAsset(asset), visibility: AssetVisibility.Hidden });
 
@@ -936,6 +955,7 @@ describe(AssetService.name, () => {
     it('removes from all albums AND purges when a single PUT sets visibility Locked (security-4)', async () => {
       const asset = AssetFactory.create({ visibility: AssetVisibility.Timeline });
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue(void 0 as any);
       mocks.asset.getById.mockResolvedValue(getForAsset(asset));
       mocks.asset.update.mockResolvedValue({ ...getForAsset(asset), visibility: AssetVisibility.Locked });
 
@@ -950,6 +970,7 @@ describe(AssetService.name, () => {
     it('restores direct/album space paths when a single PUT sets visibility Timeline (security-4)', async () => {
       const asset = AssetFactory.create({ visibility: AssetVisibility.Hidden });
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue(void 0 as any);
       mocks.asset.getById.mockResolvedValue(getForAsset(asset));
       mocks.asset.update.mockResolvedValue({ ...getForAsset(asset), visibility: AssetVisibility.Timeline });
 
@@ -963,6 +984,7 @@ describe(AssetService.name, () => {
     it('does not run any visibility transition when a single PUT omits visibility (security-4)', async () => {
       const asset = AssetFactory.create();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue(void 0 as any);
       mocks.asset.getById.mockResolvedValue(getForAsset(asset));
       mocks.asset.update.mockResolvedValue({ ...getForAsset(asset), isFavorite: true });
 
@@ -978,6 +1000,7 @@ describe(AssetService.name, () => {
       const asset = AssetFactory.create({ visibility: AssetVisibility.Timeline });
       // Caller does not own the asset but has space-edit rights → AssetUpdate gate passes.
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue(void 0 as any);
       mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set([asset.id]));
       mocks.asset.getById.mockResolvedValue(getForAsset(asset));
       mocks.asset.update.mockResolvedValue({ ...getForAsset(asset), visibility: AssetVisibility.Locked });
@@ -996,6 +1019,8 @@ describe(AssetService.name, () => {
       const asset = AssetFactory.create();
       const motionId = newUuid();
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue(void 0 as any);
+      mocks.asset.getById.mockResolvedValue(getForAsset(asset));
       mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set([asset.id]));
 
       await expect(sut.update(auth, asset.id, { livePhotoVideoId: motionId })).rejects.toBeInstanceOf(
@@ -1009,6 +1034,7 @@ describe(AssetService.name, () => {
     it('allows changing visibility on an asset the caller owns even as a space editor (rbac-3)', async () => {
       const asset = AssetFactory.create({ visibility: AssetVisibility.Timeline });
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue(void 0 as any);
       mocks.asset.getById.mockResolvedValue(getForAsset(asset));
       mocks.asset.update.mockResolvedValue({ ...getForAsset(asset), visibility: AssetVisibility.Archive });
 
