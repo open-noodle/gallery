@@ -107,7 +107,7 @@ describe(FaceRepairService.name, () => {
       // so the cross-owner guard never fires and the move proceeds.
       mocks.person.getByGroupIdOnly.mockResolvedValue({ id: 'q', ownerId: 'u1' } as any);
       mocks.faceRepair.reattributeFaces.mockResolvedValue(['f1']);
-      mocks.faceRepair.reconcileRepresentativeFaces.mockResolvedValue(['p1']);
+      mocks.faceRepair.reconcileRepresentativeFaces.mockResolvedValue([{ ownerId: 'u1', personGroupId: 'p1' }]);
       mocks.faceIdentity.ensurePersonIdentity.mockResolvedValue({ id: 'identQ' } as any);
 
       await sut.executeRepair(plan([{ assetFaceId: 'f1', currentPersonId: 'p1', suspectedOwnerId: 'q' }]));

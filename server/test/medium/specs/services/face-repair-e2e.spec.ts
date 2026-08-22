@@ -478,7 +478,7 @@ describe('face re-attribution repair: minFaces:3 + sub-minFaces stays unassigned
       .where('id', '=', loneFace.id)
       .executeTakeFirstOrThrow();
     // The lone face was never flagged → its personId is unchanged (still bob.id)
-    expect(loneRow.personId).toBe(bob.personGroupId);
+    expect(loneRow.personGroupId).toBe(bob.personGroupId);
 
     // Assert: no backfill work after repair + recognition.
     const afterWork = await faceIdentityRepository.getBackfillWork();
