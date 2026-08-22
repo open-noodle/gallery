@@ -170,6 +170,22 @@ const withPerson = ({ viewingUserId }: WithPersonOptions) => {
     ).as('person');
 };
 
+/**
+ * Option M: owner-agnostic variant of `withPerson`.
+ *
+ * `withPerson` selects the viewer's OWN person row in the face's group — correct for user-facing
+ * reads. The face-repair admin console reads faces belonging to people the admin does not own and
+ * has no viewer to key on, so this resolves the single person row in the group instead. Sound only
+ * under M's 1:1 person_group-to-person invariant; see `getByGroupIdOnly`.
+ */
+const withPersonAnyOwner = (eb: ExpressionBuilder<DB, 'asset_face'>) =>
+  jsonObjectFrom(
+    eb
+      .selectFrom('person')
+      .selectAll('person')
+      .whereRef('person.personGroupId', '=', 'asset_face.personGroupId'),
+  ).as('person');
+
 const withFaceSearch = (eb: ExpressionBuilder<DB, 'asset_face'>) => {
   return jsonObjectFrom(
     eb.selectFrom('face_search').selectAll('face_search').whereRef('face_search.faceId', '=', 'asset_face.id'),
@@ -236,7 +252,7 @@ export class PersonRepository {
     await db.updateTable('person').set(update).where('personGroupId', '=', input.targetPersonId).execute();
     await db
       .updateTable('asset_face')
-      .set({ personId: input.targetPersonId })
+      .set({ personGroupId: input.targetPersonId })
       .where('personGroupId', '=', input.sourcePersonId)
       .execute();
 
@@ -1053,6 +1069,19 @@ export class PersonRepository {
 
   create(person: Insertable<PersonTable>) {
     return this.db.insertInto('person').values(person).returningAll().executeTakeFirstOrThrow();
+  }
+
+  /**
+   * Option M: create a person together with its own person_group.
+   *
+   * Under M a person is never shared across users, so every new person gets a fresh 1:1 group. This
+   * is the fork's replacement for the old `create({ ownerId, ... })` — which worked when `person.id`
+   * was a standalone primary key — and it is the only sanctioned way to mint a person, so the 1:1
+   * invariant cannot be broken by accident at a call site.
+   */
+  async createWithGroup(person: Omit<Insertable<PersonTable>, 'personGroupId'>) {
+    const group = await this.createGroup(person.ownerId);
+    return this.create({ ...person, personGroupId: group.id });
   }
 
   async createAll(people: Insertable<PersonTable>[]) {
