@@ -440,7 +440,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
       // F itself was never touched by recognition at all.
       const faceAfter = await ctx.database
         .selectFrom('asset_face')
-        .select('personId')
+        .select('personGroupId')
         .where('id', '=', face.id)
         .executeTakeFirstOrThrow();
       expect(faceAfter.personId).toBeNull();
@@ -558,7 +558,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
     // it, and the pending suggestion row is drained.
     const assetFace = await db
       .selectFrom('asset_face')
-      .select('personId')
+      .select('personGroupId')
       .where('id', '=', face.id)
       .executeTakeFirstOrThrow();
     expect(assetFace.personId).toBe(anna.personGroupId);
@@ -610,7 +610,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
 
     // The admin scans and moves the leaked face to its true owner, Bob.
     await repair.runRepair({ ownerId: user.id, ...repairParams });
-    const moved = await db.selectFrom('asset_face').select('personId').where('id', '=', face).executeTakeFirstOrThrow();
+    const moved = await db.selectFrom('asset_face').select('personGroupId').where('id', '=', face).executeTakeFirstOrThrow();
     expect(moved.personId).toBe(bob.personGroupId);
 
     // The stale pending suggestion is gone — drained at the write path, not merely hidden by a read filter.
@@ -1084,7 +1084,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
       await ctx.database.deleteFrom('person').where('personGroupId', '=', q1.personGroupId).execute();
       const faceAfterDelete = await ctx.database
         .selectFrom('asset_face')
-        .select('personId')
+        .select('personGroupId')
         .where('id', '=', face.id)
         .executeTakeFirstOrThrow();
       expect(faceAfterDelete.personId).toBeNull(); // sanity: the face is genuinely unassigned

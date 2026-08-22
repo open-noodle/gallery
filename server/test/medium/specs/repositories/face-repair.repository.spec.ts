@@ -313,7 +313,7 @@ describe('FaceRepairRepository.reattributeFaces', () => {
     expect(moved).toHaveLength(0);
     const row = await ctx.database
       .selectFrom('asset_face')
-      .select('personId')
+      .select('personGroupId')
       .where('id', '=', faceX.id)
       .executeTakeFirstOrThrow();
     expect(row.personId).toBe(personQ.personGroupId);
@@ -338,7 +338,7 @@ describe('FaceRepairRepository.reattributeFaces', () => {
     expect(moved).toHaveLength(0);
     const row = await ctx.database
       .selectFrom('asset_face')
-      .select('personId')
+      .select('personGroupId')
       .where('id', '=', manualFace.id)
       .executeTakeFirstOrThrow();
     expect(row.personId).toBe(person.personGroupId);
@@ -407,7 +407,7 @@ describe('FaceRepairRepository.detachFaces', () => {
     expect(detached).toHaveLength(0);
     const row = await ctx.database
       .selectFrom('asset_face')
-      .select('personId')
+      .select('personGroupId')
       .where('id', '=', face.id)
       .executeTakeFirstOrThrow();
     expect(row.personId).toBe(personQ.personGroupId);
@@ -431,7 +431,7 @@ describe('FaceRepairRepository.detachFaces', () => {
     expect(detached).toHaveLength(0);
     const row = await ctx.database
       .selectFrom('asset_face')
-      .select('personId')
+      .select('personGroupId')
       .where('id', '=', manualFace.id)
       .executeTakeFirstOrThrow();
     expect(row.personId).toBe(person.personGroupId);
