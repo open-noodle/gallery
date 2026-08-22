@@ -1,6 +1,7 @@
 import { Kysely, sql, Transaction } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { SourceType } from 'src/enum';
+import { PersonId } from 'src/repositories/person.repository';
 import { DB } from 'src/schema';
 import { reviewableAssetVisibility } from 'src/utils/face-review';
 
@@ -65,7 +66,7 @@ export class FaceRepairRepository {
       .groupBy(['person.personGroupId'])
       .orderBy(sql`NULLIF(BTRIM(person.name), '') is null`, 'asc')
       .orderBy('person.name', 'asc')
-      .orderBy('person.id', 'asc')
+      .orderBy('person.personGroupId', 'asc')
       .limit(options.size + 1)
       .offset(options.page * options.size)
       .execute();
@@ -118,7 +119,7 @@ export class FaceRepairRepository {
       .innerJoin('face_search', 'face_search.faceId', 'asset_face.id')
       .select([
         'asset_face.id as assetFaceId',
-        'asset_face.personId as personId',
+        'asset_face.personGroupId as personId',
         'asset.ownerId as ownerId',
         sql<string>`face_search.embedding`.as('embedding'),
       ])
@@ -155,7 +156,7 @@ export class FaceRepairRepository {
       .innerJoin('face_search', 'face_search.faceId', 'asset_face.id')
       .select([
         'asset_face.id as assetFaceId',
-        'asset_face.personId as personId',
+        'asset_face.personGroupId as personId',
         'asset.ownerId as ownerId',
         sql<string>`face_search.embedding`.as('embedding'),
       ])
@@ -362,7 +363,7 @@ export class FaceRepairRepository {
   // persons whose representative face actually changed so callers can regenerate their thumbnails — a fully
   // drained person whose faceAssetId was already NULL is excluded (the SET yields NULL again: a no-op that would
   // otherwise queue a wasted thumbnail regen for a faceless person — A3).
-  async reconcileRepresentativeFaces(personIds: string[]): Promise<string[]> {
+  async reconcileRepresentativeFaces(personIds: string[]): Promise<PersonId[]> {
     if (personIds.length === 0) {
       return [];
     }
@@ -412,8 +413,8 @@ export class FaceRepairRepository {
           ),
         ]),
       )
-      .returning('person.personGroupId')
+      .returning(['person.ownerId', 'person.personGroupId'])
       .execute();
-    return updated.map((row) => row.id);
+    return updated.map(({ ownerId, personGroupId }) => ({ ownerId, personGroupId }));
   }
 }
