@@ -18,7 +18,7 @@ export class BirthdayMemoryRule implements MemoryRule {
     for (const person of people) {
       const assets = await this.assetRepository.getMemoryAssetsForPerson(
         ownerId,
-        person.id,
+        person.personGroupId,
         target.endOf('day').toJSDate(),
       );
       const byYear = new Map<number, string[]>();
@@ -42,13 +42,13 @@ export class BirthdayMemoryRule implements MemoryRule {
       if (assetIds.length >= 6 && byYear.size >= 2) {
         candidates.push({
           ruleId: this.id,
-          dedupeKey: `birthday:${person.id}:${target.toFormat('yyyy-MM-dd')}`,
+          dedupeKey: `birthday:${person.personGroupId}:${target.toFormat('yyyy-MM-dd')}`,
           title: `Happy birthday, ${person.name}`,
           subtitle: 'Photos from different years',
           score: 300 + byYear.size * 10 + assetIds.length,
           assetIds,
           memoryAt: target,
-          context: { personId: person.id, distinctYears: byYear.size },
+          context: { personId: person.personGroupId, distinctYears: byYear.size },
         });
 
         continue;
@@ -65,13 +65,13 @@ export class BirthdayMemoryRule implements MemoryRule {
 
       candidates.push({
         ruleId: this.id,
-        dedupeKey: `birthday:${person.id}:${target.toFormat('yyyy-MM-dd')}`,
+        dedupeKey: `birthday:${person.personGroupId}:${target.toFormat('yyyy-MM-dd')}`,
         title: `Happy birthday, ${person.name}`,
         subtitle: `Recent photos of ${person.name}`,
         score: 250 + fallbackAssetIds.length,
         assetIds: fallbackAssetIds,
         memoryAt: target,
-        context: { personId: person.id, distinctYears: byYear.size },
+        context: { personId: person.personGroupId, distinctYears: byYear.size },
       });
     }
 

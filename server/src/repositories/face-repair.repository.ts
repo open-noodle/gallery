@@ -56,11 +56,11 @@ export class FaceRepairRepository {
     const rows = await base
       .leftJoin('asset_face', (join) =>
         join
-          .onRef('asset_face.personId', '=', 'person.id')
+          .onRef('asset_face.personGroupId', '=', 'person.personGroupId')
           .on('asset_face.deletedAt', 'is', null)
           .on('asset_face.isVisible', '=', true),
       )
-      .select(['person.id as id', 'person.name as name', 'person.faceAssetId as thumbnailFaceId'])
+      .select(['person.personGroupId as id', 'person.name as name', 'person.faceAssetId as thumbnailFaceId'])
       .select((eb) => eb.fn.count('asset_face.id').as('faceCount'))
       .groupBy(['person.id'])
       .orderBy(sql`NULLIF(BTRIM(person.name), '') is null`, 'asc')
@@ -91,18 +91,18 @@ export class FaceRepairRepository {
       .selectFrom('person')
       .leftJoin('asset_face', (join) =>
         join
-          .onRef('asset_face.personId', '=', 'person.id')
+          .onRef('asset_face.personGroupId', '=', 'person.personGroupId')
           .on('asset_face.deletedAt', 'is', null)
           .on('asset_face.isVisible', '=', true),
       )
       .select([
-        'person.id as id',
+        'person.personGroupId as id',
         'person.name as name',
         'person.ownerId as ownerId',
         'person.faceAssetId as thumbnailFaceId',
       ])
       .select((eb) => eb.fn.count('asset_face.id').as('faceCount'))
-      .where('person.id', '=', personId)
+      .where('person.personGroupId', '=', personId)
       .groupBy(['person.id'])
       .executeTakeFirst();
 
@@ -122,16 +122,16 @@ export class FaceRepairRepository {
         'asset.ownerId as ownerId',
         sql<string>`face_search.embedding`.as('embedding'),
       ])
-      .where('asset_face.personId', 'is not', null)
+      .where('asset_face.personGroupId', 'is not', null)
       .where('asset_face.sourceType', '=', sql.lit(SourceType.MachineLearning))
       .where('asset_face.deletedAt', 'is', null)
       .where('asset_face.isVisible', '=', true)
       .where('asset.deletedAt', 'is', null)
       .where((eb) => reviewableAssetVisibility(eb))
       .$if(!!options.ownerId, (qb) => qb.where('asset.ownerId', '=', options.ownerId!))
-      .$if(!!options.personId, (qb) => qb.where('asset_face.personId', '=', options.personId!))
+      .$if(!!options.personId, (qb) => qb.where('asset_face.personGroupId', '=', options.personId!))
       .$if(!!options.personIds && options.personIds.length > 0, (qb) =>
-        qb.where('asset_face.personId', 'in', options.personIds!),
+        qb.where('asset_face.personGroupId', 'in', options.personIds!),
       )
       .$narrowType<{ personId: string }>()
       .stream();
@@ -159,16 +159,16 @@ export class FaceRepairRepository {
         'asset.ownerId as ownerId',
         sql<string>`face_search.embedding`.as('embedding'),
       ])
-      .where('asset_face.personId', 'is not', null)
+      .where('asset_face.personGroupId', 'is not', null)
       .where('asset_face.sourceType', '=', sql.lit(SourceType.MachineLearning))
       .where('asset_face.deletedAt', 'is', null)
       .where('asset_face.isVisible', '=', true)
       .where('asset.deletedAt', 'is', null)
       .where((eb) => reviewableAssetVisibility(eb))
       .$if(!!options.ownerId, (qb) => qb.where('asset.ownerId', '=', options.ownerId!))
-      .$if(!!options.personId, (qb) => qb.where('asset_face.personId', '=', options.personId!))
+      .$if(!!options.personId, (qb) => qb.where('asset_face.personGroupId', '=', options.personId!))
       .$if(!!options.personIds && options.personIds.length > 0, (qb) =>
-        qb.where('asset_face.personId', 'in', options.personIds!),
+        qb.where('asset_face.personGroupId', 'in', options.personIds!),
       )
       .$if(!!options.afterId, (qb) => qb.where('asset_face.id', '>', options.afterId!))
       .orderBy('asset_face.id')
@@ -183,14 +183,14 @@ export class FaceRepairRepository {
       .innerJoin('asset', 'asset.id', 'asset_face.assetId')
       .innerJoin('face_search', 'face_search.faceId', 'asset_face.id')
       .select((eb) => eb.fn.countAll().as('count'))
-      .where('asset_face.personId', 'is not', null)
+      .where('asset_face.personGroupId', 'is not', null)
       .where('asset_face.sourceType', '=', sql.lit(SourceType.MachineLearning))
       .where('asset_face.deletedAt', 'is', null)
       .where('asset_face.isVisible', '=', true)
       .where('asset.deletedAt', 'is', null)
       .where((eb) => reviewableAssetVisibility(eb))
       .$if(!!options.ownerId, (qb) => qb.where('asset.ownerId', '=', options.ownerId!))
-      .$if(!!options.personId, (qb) => qb.where('asset_face.personId', '=', options.personId!))
+      .$if(!!options.personId, (qb) => qb.where('asset_face.personGroupId', '=', options.personId!))
       .executeTakeFirstOrThrow();
     return Number(count);
   }
@@ -204,7 +204,7 @@ export class FaceRepairRepository {
     const { count } = await this.db
       .selectFrom('asset_face')
       .select((eb) => eb.fn.countAll().as('count'))
-      .where('personId', '=', personId)
+      .where('personGroupId', '=', personId)
       .where('deletedAt', 'is', null)
       .executeTakeFirstOrThrow();
     return Number(count);
@@ -222,7 +222,7 @@ export class FaceRepairRepository {
       .selectFrom('asset_face')
       .innerJoin('asset', 'asset.id', 'asset_face.assetId')
       .innerJoin('face_search', 'face_search.faceId', 'asset_face.id')
-      .where('asset_face.personId', '=', personId)
+      .where('asset_face.personGroupId', '=', personId)
       .where('asset_face.sourceType', '=', sql.lit(SourceType.MachineLearning))
       .where('asset_face.deletedAt', 'is', null)
       .where('asset_face.isVisible', '=', true)
@@ -262,7 +262,7 @@ export class FaceRepairRepository {
       .innerJoin('face_search', 'face_search.faceId', 'asset_face.id')
       .select(['asset_face.id as assetFaceId'])
       .where('asset_face.id', 'in', faceIds)
-      .where('asset_face.personId', '=', personId)
+      .where('asset_face.personGroupId', '=', personId)
       .where('asset_face.sourceType', '=', sql.lit(SourceType.MachineLearning))
       .where('asset_face.deletedAt', 'is', null)
       .where('asset_face.isVisible', '=', true)
@@ -295,7 +295,7 @@ export class FaceRepairRepository {
         .updateTable('asset_face')
         .set({ personId: toPersonId })
         .where('id', 'in', chunk)
-        .where('personId', '=', fromPersonId)
+        .where('personGroupId', '=', fromPersonId)
         .where('sourceType', '=', sql.lit(SourceType.MachineLearning))
         .where('deletedAt', 'is', null)
         .where('isVisible', '=', true)
@@ -342,7 +342,7 @@ export class FaceRepairRepository {
         .updateTable('asset_face')
         .set({ personId: null, deletedAt: new Date() })
         .where('id', 'in', chunk)
-        .where('personId', '=', personId)
+        .where('personGroupId', '=', personId)
         .where('sourceType', '=', sql.lit(SourceType.MachineLearning))
         .where('deletedAt', 'is', null)
         .where('isVisible', '=', true)
@@ -379,7 +379,7 @@ export class FaceRepairRepository {
           .where('asset.deletedAt', 'is', null)
           .limit(1),
       }))
-      .where('person.id', 'in', personIds)
+      .where('person.personGroupId', 'in', personIds)
       .where((eb) =>
         eb.or([
           eb('person.faceAssetId', 'is', null),
