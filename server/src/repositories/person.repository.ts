@@ -190,110 +190,16 @@ export type WithPersonOptions = {
   viewingUserId: string;
 };
 
-const withOwnedPerson = (userId: string) => {
-  return (eb: ExpressionBuilder<DB, 'person_group'>) =>
-    jsonObjectFrom(
-      eb
-        .selectFrom('person')
-        .selectAll('person')
-        .whereRef('person.personGroupId', '=', 'person_group.id')
-        .where('person.ownerId', '=', userId),
-    )
-      .$notNull()
-      .as('ownedPerson');
-};
-
-const withOtherPeopleFor = (userId: string, personGroupId: Expression<string>) =>
-  jsonArrayFrom(
-    expressionBuilder<DB>()
-      .selectFrom('person as other')
-      .innerJoin('person_user', (join) =>
-        join
-          .onRef('person_user.personGroupId', '=', 'other.personGroupId')
-          .onRef('person_user.sharedById', '=', 'other.ownerId')
-          .on('person_user.sharedWithId', '=', userId),
-      )
-      .select(['person_user.sharedById', 'person_user.role', 'other.name', 'other.birthDate'])
-      .where('other.personGroupId', '=', personGroupId)
-      .where((eb) => eb.or([eb('other.birthDate', 'is not', null), eb('other.name', '!=', '')])),
-  ).as('otherPeople');
-
-const withPersonUsersFor = (userId: string, personGroupId: Expression<string>, direction: SharingDirection) => {
-  const [userColumn, viewerColumn] =
-    direction === SharingDirection.SharedBy
-      ? (['person_user.sharedById', 'person_user.sharedWithId'] as const)
-      : (['person_user.sharedWithId', 'person_user.sharedById'] as const);
-
-  return jsonArrayFrom(
-    expressionBuilder<DB>()
-      .selectFrom('person_user')
-      .innerJoin('user', (join) => join.onRef('user.id', '=', userColumn).on('user.deletedAt', 'is', null))
-      .select(columns.user)
-      .select('person_user.role')
-      .where('person_user.personGroupId', '=', personGroupId)
-      .where(viewerColumn, '=', userId)
-      .orderBy('user.name'),
-  )
-    .$castTo<PersonUser[]>()
-    .as(direction === SharingDirection.SharedBy ? 'sharedBy' : 'sharedWith');
-};
-
-const withSharing = (userId: string, personGroupId: Expression<string>) => [
-  withOtherPeopleFor(userId, personGroupId),
-  withPersonUsersFor(userId, personGroupId, SharingDirection.SharedBy),
-  withPersonUsersFor(userId, personGroupId, SharingDirection.SharedWith),
-];
-
-const withOtherPeople = (userId: string) => {
-  return (eb: ExpressionBuilder<DB, 'person_group'>) => withSharing(userId, eb.ref('person_group.id'));
-};
-
-const withOtherPeopleForPerson = (userId: string) => {
-  return (eb: ExpressionBuilder<DB, 'person'>) => withSharing(userId, eb.ref('person.personGroupId'));
-};
-
-const withFilters = (userId: string, options: PersonFilterOptions = {}) => {
-  const { sharedById, sharedWithId, isFavorite, isHidden } = options;
-  return (eb: ExpressionBuilder<DB & { owned: DB['person'] }, 'person_group' | 'owned'>) => {
-    const filters: Expression<SqlBool>[] = [];
-
-    if (sharedById || sharedWithId) {
-      filters.push(
-        eb.exists(
-          eb
-            .selectFrom('person_user')
-            .whereRef('person_user.personGroupId', '=', 'person_group.id')
-            // only consider shares that involve the current user
-            .where((eb) =>
-              eb.or([eb('person_user.sharedById', '=', userId), eb('person_user.sharedWithId', '=', userId)]),
-            )
-            .$if(!!sharedById, (qb) => qb.where('person_user.sharedById', '=', sharedById!))
-            .$if(!!sharedWithId, (qb) => qb.where('person_user.sharedWithId', '=', sharedWithId!)),
-        ),
-      );
-    }
-
-    if (isFavorite !== undefined) {
-      filters.push(eb('owned.isFavorite', '=', isFavorite));
-    }
-
-    if (isHidden !== undefined) {
-      filters.push(eb('owned.isHidden', '=', isHidden));
-    }
-
-    return eb.and(filters);
-  };
-};
-
-const asPerson = ({ ownedPerson, otherPeople, sharedBy, sharedWith }: PersonGroupRow) => ({
-  ...ownedPerson,
-  otherPeople,
-  sharedBy,
-  sharedWith,
-});
-
-const faceCount = (eb: ExpressionBuilder<DB, 'asset'>) => eb.fn.count('asset.id');
-
+/**
+ * Upstream filters this join to `person.ownerId = viewingUserId` — with cluster groups on, every member
+ * of a group has their own person row and the viewer wants theirs. Option M keeps groups 1:1, so the
+ * only row is the OWNER's, and that filter returns nothing for every non-owner: a shared-album
+ * recipient or Space member would see `person: null` on a face they are allowed to see, and a hidden
+ * person would stop being filtered out because there is no person row left to read `isHidden` from.
+ *
+ * So prefer the viewer's own row and fall back to the group's. Under M that always resolves to the
+ * owner's single row; if cluster groups are ever turned on it degrades back to upstream's behaviour.
+ */
 const withPerson = ({ viewingUserId }: WithPersonOptions) => {
   return (eb: ExpressionBuilder<DB, 'asset_face'>) =>
     jsonObjectFrom(
@@ -302,7 +208,8 @@ const withPerson = ({ viewingUserId }: WithPersonOptions) => {
         .selectAll('person')
         .select(withOtherPeopleForPerson(viewingUserId))
         .whereRef('person.personGroupId', '=', 'asset_face.personGroupId')
-        .where('person.ownerId', '=', viewingUserId),
+        .orderBy(sql`case when "person"."ownerId" = ${viewingUserId} then 0 else 1 end`)
+        .limit(1),
     ).as('person');
 };
 
