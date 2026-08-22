@@ -175,7 +175,7 @@ const seedSuggestionFace = async (
   const { asset } = await ctx.newAsset({ ownerId: input.ownerId, visibility: AssetVisibility.Timeline });
   const { assetFace } = await ctx.newAssetFace({
     assetId: asset.id,
-    personId: input.personId ?? null,
+    personGroupId: input.personId ?? null,
     sourceType: SourceType.MachineLearning,
   });
   await ctx.database.insertInto('face_search').values({ faceId: assetFace.id, embedding: input.embedding }).execute();
@@ -184,7 +184,7 @@ const seedSuggestionFace = async (
 
 const newSuggestionAnchoredPerson = async (ctx: MediumTestContext, ownerId: string, name: string) => {
   const { person } = await ctx.newPerson({ ownerId, name });
-  await seedSuggestionFace(ctx, { ownerId, personId: person.id, embedding: SUGGESTION_ANCHOR });
+  await seedSuggestionFace(ctx, { ownerId, personId: person.personGroupId, embedding: SUGGESTION_ANCHOR });
   return person;
 };
 
@@ -257,13 +257,13 @@ type RepairCtx = ReturnType<typeof setupRepair>['ctx'];
 const buildCluster = async (ctx: RepairCtx, ownerId: string, embedding: string, faceCount: number, name: string) => {
   const faceIdentityRepo = ctx.get(FaceIdentityRepository);
   const { person } = await ctx.newPerson({ ownerId, name });
-  const identity = await faceIdentityRepo.ensurePersonIdentity(person.id);
+  const identity = await faceIdentityRepo.ensurePersonIdentity(person.personGroupId);
   const faceIds: string[] = [];
   for (let index = 0; index < faceCount; index++) {
     const { asset } = await ctx.newAsset({ ownerId, visibility: AssetVisibility.Timeline });
     const { assetFace } = await ctx.newAssetFace({
       assetId: asset.id,
-      personId: person.id,
+      personGroupId: person.personGroupId,
       sourceType: SourceType.MachineLearning,
     });
     await ctx.database.insertInto('face_search').values({ faceId: assetFace.id, embedding }).execute();
@@ -289,7 +289,7 @@ const leakFacesInto = async (
     const { asset } = await ctx.newAsset({ ownerId, visibility: AssetVisibility.Timeline });
     const { assetFace } = await ctx.newAssetFace({
       assetId: asset.id,
-      personId: person.id,
+      personGroupId: person.id,
       sourceType: SourceType.MachineLearning,
     });
     await ctx.database.insertInto('face_search').values({ faceId: assetFace.id, embedding }).execute();
@@ -457,11 +457,11 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
       for (const source of ['ml', 'owner-person', 'backfill'] as const) {
         const { assetFace } = await ctx.newAssetFace({
           assetId: asset.id,
-          personId: null,
+          personGroupId: null,
           sourceType: SourceType.MachineLearning,
         });
         const { person } = await ctx.newPerson({ ownerId: user.id });
-        const identity = await faceIdentityRepo.ensurePersonIdentity(person.id);
+        const identity = await faceIdentityRepo.ensurePersonIdentity(person.personGroupId);
         await faceIdentityRepo.replaceFaceIdentity({ assetFaceId: assetFace.id, identityId: identity.id, source });
         linkedFaceIds.push(assetFace.id);
       }
@@ -469,11 +469,11 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
       // Absence control, same call: a genuinely manual-linked face IS excluded — only 'manual' is special.
       const { assetFace: manualFace } = await ctx.newAssetFace({
         assetId: asset.id,
-        personId: null,
+        personGroupId: null,
         sourceType: SourceType.MachineLearning,
       });
       const { person: manualPerson } = await ctx.newPerson({ ownerId: user.id });
-      const manualIdentity = await faceIdentityRepo.ensurePersonIdentity(manualPerson.id);
+      const manualIdentity = await faceIdentityRepo.ensurePersonIdentity(manualPerson.personGroupId);
       await faceIdentityRepo.replaceFaceIdentity({
         assetFaceId: manualFace.id,
         identityId: manualIdentity.id,
@@ -515,7 +515,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
     // the applicable human-placement path is reassignFacesById — the suggestion-confirm path requires an
     // UNASSIGNED face and is exercised separately in leak 1b below. Asserting asset_face.personId === anna.id
     // here would prove nothing: the fixture already put it there before this call ran.
-    await person.reassignFacesById(auth, anna.id, { id: leaked[0] });
+    await person.reassignFacesById(auth, anna.personGroupId, { id: leaked[0] });
 
     // The reassignment left a manual identity link for the face — the durable record a re-scan must respect.
     const link = await db
@@ -548,11 +548,11 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
     // Seed a genuine PENDING suggestion row inside the open band (maxDistance, suggestions.maxDistance] =
     // (0.5, 0.8] — the real precondition a confirm click drains. Positive control: assert it exists before
     // confirming, so the drain assertion below actually means something.
-    await verdictRepo.upsertPending([{ personId: anna.id, assetFaceId: face.id, distance: 0.6 }]);
-    expect(await pendingFor(ctx, 'personId', anna.id, face.id)).toBe(true);
+    await verdictRepo.upsertPending([{ personId: anna.personGroupId, assetFaceId: face.id, distance: 0.6 }]);
+    expect(await pendingFor(ctx, 'personId', anna.personGroupId, face.id)).toBe(true);
 
     // Nothing but the real confirm path.
-    await faceSuggestion.confirmFaceSuggestion(auth, anna.id, face.id);
+    await faceSuggestion.confirmFaceSuggestion(auth, anna.personGroupId, face.id);
 
     // All three post-conditions of a real confirm: the face is reassigned, a manual identity link exists for
     // it, and the pending suggestion row is drained.
@@ -561,14 +561,14 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
       .select('personId')
       .where('id', '=', face.id)
       .executeTakeFirstOrThrow();
-    expect(assetFace.personId).toBe(anna.id);
+    expect(assetFace.personId).toBe(anna.personGroupId);
     const link = await db
       .selectFrom('face_identity_face')
       .select('source')
       .where('assetFaceId', '=', face.id)
       .executeTakeFirst();
     expect(link?.source).toBe('manual');
-    expect(await pendingFor(ctx, 'personId', anna.id, face.id)).toBe(false);
+    expect(await pendingFor(ctx, 'personId', anna.personGroupId, face.id)).toBe(false);
   });
 
   it("leak 4/5 — a user's rejection suppresses a later cleanup flag toward that same person", async () => {
@@ -588,7 +588,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
 
     // The user, reviewing Bob's suggestions, says "no, that face is NOT Bob". Recorded as a shared negative
     // verdict against Bob (with his identity).
-    await faceSuggestion.rejectFaceSuggestion(auth, bob.id, face);
+    await faceSuggestion.rejectFaceSuggestion(auth, bob.personGroupId, face);
 
     // Re-scan: cleanup no longer flags the face toward Bob — the two engines now agree it is not his.
     const flaggedAfter = await flaggedFaceIds(repair, user.id);
@@ -606,12 +606,12 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
 
     // A pending suggestion for this face exists for a THIRD person (Carol), left over from an earlier scan.
     const { person: carol } = await ctx.newPerson({ ownerId: user.id, name: 'Carol' });
-    await verdictRepo.upsertPending([{ personId: carol.id, assetFaceId: face, distance: 0.62 }]);
+    await verdictRepo.upsertPending([{ personId: carol.personGroupId, assetFaceId: face, distance: 0.62 }]);
 
     // The admin scans and moves the leaked face to its true owner, Bob.
     await repair.runRepair({ ownerId: user.id, ...repairParams });
     const moved = await db.selectFrom('asset_face').select('personId').where('id', '=', face).executeTakeFirstOrThrow();
-    expect(moved.personId).toBe(bob.id);
+    expect(moved.personId).toBe(bob.personGroupId);
 
     // The stale pending suggestion is gone — drained at the write path, not merely hidden by a read filter.
     const rows = await db
@@ -645,7 +645,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
       },
     });
     await scanRepo.replaceScanFlaggedFaces(scan.id, [
-      { assetFaceId: face, personId: anna.id, suspectedOwnerId: anna.id },
+      { assetFaceId: face, personId: anna.personGroupId, suspectedOwnerId: anna.personGroupId },
     ]);
     await scanRepo.completeScan(scan.id, {
       totals: {
@@ -659,7 +659,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
       },
       persons: [
         {
-          personId: anna.id,
+          personId: anna.personGroupId,
           ownerId: user.id,
           personName: 'Anna',
           faceCount: 1,
@@ -674,7 +674,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
       ],
     });
     await repair.resolveFaces(
-      { personId: anna.id, moveToPerson: [], stay: [], lock: [], detach: [face], unknown: [] },
+      { personId: anna.personGroupId, moveToPerson: [], stay: [], lock: [], detach: [face], unknown: [] },
       user.id,
     );
 
@@ -699,7 +699,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
     const auth = factory.auth({ user });
 
     const anna = await newSuggestionAnchoredPerson(ctx, user.id, 'Anna');
-    const identity = await ctx.get(FaceIdentityRepository).ensurePersonIdentity(anna.id);
+    const identity = await ctx.get(FaceIdentityRepository).ensurePersonIdentity(anna.personGroupId);
     const s = await newSuggestionSpace(ctx, user.id);
     const spaceAnna = await newSuggestionAnchoredSpacePerson(ctx, {
       spaceId: s.id,
@@ -716,7 +716,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
     await ctx.newSharedSpaceAsset({ spaceId: s.id, assetId: faceOne.assetId, addedById: user.id });
     const { assetFace: faceOneControl } = await newSuggestionCandidateFace(ctx, user.id);
     await ctx.newSharedSpaceAsset({ spaceId: s.id, assetId: faceOneControl.assetId, addedById: user.id });
-    await faceSuggestion.rejectFaceSuggestion(auth, anna.id, faceOne.id);
+    await faceSuggestion.rejectFaceSuggestion(auth, anna.personGroupId, faceOne.id);
     await expect(faceSuggestion.handleSpacePersonSuggestionScan({ id: spaceAnna.id })).resolves.toBe(JobStatus.Success);
     expect(await pendingFor(ctx, 'spacePersonId', spaceAnna.id, faceOne.id)).toBe(false);
     expect(await pendingFor(ctx, 'spacePersonId', spaceAnna.id, faceOneControl.id)).toBe(true);
@@ -727,9 +727,9 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
     const { assetFace: faceTwoControl } = await newSuggestionCandidateFace(ctx, user.id);
     await ctx.newSharedSpaceAsset({ spaceId: s.id, assetId: faceTwoControl.assetId, addedById: user.id });
     await space.rejectSpacePersonFaceSuggestion(auth, s.id, spaceAnna.id, faceTwo.id);
-    await expect(faceSuggestion.handlePersonSuggestionScan({ id: anna.id })).resolves.toBe(JobStatus.Success);
-    expect(await pendingFor(ctx, 'personId', anna.id, faceTwo.id)).toBe(false);
-    expect(await pendingFor(ctx, 'personId', anna.id, faceTwoControl.id)).toBe(true);
+    await expect(faceSuggestion.handlePersonSuggestionScan({ id: anna.personGroupId })).resolves.toBe(JobStatus.Success);
+    expect(await pendingFor(ctx, 'personId', anna.personGroupId, faceTwo.id)).toBe(false);
+    expect(await pendingFor(ctx, 'personId', anna.personGroupId, faceTwoControl.id)).toBe(true);
   });
 
   it('keep-here suppresses a later suggestion', async () => {
@@ -741,7 +741,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
     // O's identity must exist BEFORE the keep-here write below — resolveFaces's stay bucket only reads an
     // owner's identity token, it never creates one, so the negative verdict would carry a null identityId
     // (personId-only) if O had never been identity-linked yet.
-    const oIdentity = await ctx.get(FaceIdentityRepository).ensurePersonIdentity(o.id);
+    const oIdentity = await ctx.get(FaceIdentityRepository).ensurePersonIdentity(o.personGroupId);
     const s = await newSuggestionSpace(ctx, user.id);
     const spaceO = await newSuggestionAnchoredSpacePerson(ctx, {
       spaceId: s.id,
@@ -755,7 +755,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
     const { person: anna } = await ctx.newPerson({ ownerId: user.id, name: 'Anna' });
     const { assetFace: face } = await seedSuggestionFace(ctx, {
       ownerId: user.id,
-      personId: anna.id,
+      personId: anna.personGroupId,
       embedding: SUGGESTION_CANDIDATE,
     });
 
@@ -773,7 +773,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
       },
     });
     await scanRepo.replaceScanFlaggedFaces(scan.id, [
-      { assetFaceId: face.id, personId: anna.id, suspectedOwnerId: o.id },
+      { assetFaceId: face.id, personId: anna.personGroupId, suspectedOwnerId: o.personGroupId },
     ]);
     await scanRepo.completeScan(scan.id, {
       totals: {
@@ -787,7 +787,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
       },
       persons: [
         {
-          personId: anna.id,
+          personId: anna.personGroupId,
           ownerId: user.id,
           personName: 'Anna',
           faceCount: 1,
@@ -804,7 +804,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
 
     // The admin says "keep it here" — F stays on Anna, but a durable decline is recorded against O.
     await repair.resolveFaces(
-      { personId: anna.id, moveToPerson: [], stay: [face.id], lock: [], detach: [], unknown: [] },
+      { personId: anna.personGroupId, moveToPerson: [], stay: [face.id], lock: [], detach: [], unknown: [] },
       user.id,
     );
 
@@ -813,7 +813,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
     const stayedVerdict = await ctx.database
       .selectFrom('face_person_verdict')
       .select(['status'])
-      .where('personId', '=', o.id)
+      .where('personId', '=', o.personGroupId)
       .where('assetFaceId', '=', face.id)
       .executeTakeFirst();
     expect(stayedVerdict?.status).toBe('rejected');
@@ -832,9 +832,9 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
     });
     await ctx.newSharedSpaceAsset({ spaceId: s.id, assetId: control.assetId, addedById: user.id });
 
-    await expect(faceSuggestion.handlePersonSuggestionScan({ id: o.id })).resolves.toBe(JobStatus.Success);
-    expect(await pendingFor(ctx, 'personId', o.id, face.id)).toBe(false);
-    expect(await pendingFor(ctx, 'personId', o.id, control.id)).toBe(true);
+    await expect(faceSuggestion.handlePersonSuggestionScan({ id: o.personGroupId })).resolves.toBe(JobStatus.Success);
+    expect(await pendingFor(ctx, 'personId', o.personGroupId, face.id)).toBe(false);
+    expect(await pendingFor(ctx, 'personId', o.personGroupId, control.id)).toBe(true);
 
     // The same keep-here decision, honoured in a DIFFERENT scope that shares O's identity — a space person
     // is a distinct (spacePersonId, assetFaceId) row from O's own, so this is not covered by the
@@ -856,12 +856,12 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
 
       const { person: holder } = await ctx.newPerson({ ownerId: user.id, name: 'Holder' });
       const { person: q } = await ctx.newPerson({ ownerId: user.id, name: 'Q' });
-      const qIdentity = await faceIdentityRepo.ensurePersonIdentity(q.id);
+      const qIdentity = await faceIdentityRepo.ensurePersonIdentity(q.personGroupId);
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace: face } = await ctx.newAssetFace({ assetId: asset.id, personId: holder.id });
+      const { assetFace: face } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: holder.personGroupId });
 
       // Given: an admin kept F away from Q — the stay bucket's write shape, a durable rejected verdict.
-      await verdictRepo.markRejected(q.id, face.id, {
+      await verdictRepo.markRejected(q.personGroupId, face.id, {
         identityId: qIdentity.id,
         source: 'cleanup',
         actorId: user.id,
@@ -869,14 +869,14 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
 
       // Positive control: the resolutions page DOES list "F is not Q" before the placement.
       const before = await verdictRepo.listNegativeVerdicts({ page: 1, size: 50 });
-      expect(before.items.some((r) => r.assetFaceId === face.id && r.personId === q.id)).toBe(true);
+      expect(before.items.some((r) => r.assetFaceId === face.id && r.personId === q.personGroupId)).toBe(true);
 
       // When: the owner later places F on Q through the face editor.
-      await person.reassignFacesById(auth, q.id, { id: face.id });
+      await person.reassignFacesById(auth, q.personGroupId, { id: face.id });
 
       // Then: the resolutions page no longer lists it.
       const after = await verdictRepo.listNegativeVerdicts({ page: 1, size: 50 });
-      expect(after.items.some((r) => r.assetFaceId === face.id && r.personId === q.id)).toBe(false);
+      expect(after.items.some((r) => r.assetFaceId === face.id && r.personId === q.personGroupId)).toBe(false);
     });
 
     it('S8.2 — the same placement leaves a rejected verdict against a DIFFERENT person untouched (scoping control)', async () => {
@@ -889,28 +889,28 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
       const { person: holder } = await ctx.newPerson({ ownerId: user.id, name: 'Holder' });
       const { person: q } = await ctx.newPerson({ ownerId: user.id, name: 'Q' });
       const { person: r } = await ctx.newPerson({ ownerId: user.id, name: 'R' });
-      const qIdentity = await faceIdentityRepo.ensurePersonIdentity(q.id);
-      const rIdentity = await faceIdentityRepo.ensurePersonIdentity(r.id);
+      const qIdentity = await faceIdentityRepo.ensurePersonIdentity(q.personGroupId);
+      const rIdentity = await faceIdentityRepo.ensurePersonIdentity(r.personGroupId);
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace: face } = await ctx.newAssetFace({ assetId: asset.id, personId: holder.id });
+      const { assetFace: face } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: holder.personGroupId });
 
-      await verdictRepo.markRejected(q.id, face.id, {
+      await verdictRepo.markRejected(q.personGroupId, face.id, {
         identityId: qIdentity.id,
         source: 'cleanup',
         actorId: user.id,
       });
-      await verdictRepo.markRejected(r.id, face.id, {
+      await verdictRepo.markRejected(r.personGroupId, face.id, {
         identityId: rIdentity.id,
         source: 'cleanup',
         actorId: user.id,
       });
-      expect(await negativeExists(ctx, 'personId', q.id, face.id)).toBe(true); // positive control
-      expect(await negativeExists(ctx, 'personId', r.id, face.id)).toBe(true); // positive control
+      expect(await negativeExists(ctx, 'personId', q.personGroupId, face.id)).toBe(true); // positive control
+      expect(await negativeExists(ctx, 'personId', r.personGroupId, face.id)).toBe(true); // positive control
 
-      await person.reassignFacesById(auth, q.id, { id: face.id });
+      await person.reassignFacesById(auth, q.personGroupId, { id: face.id });
 
-      expect(await negativeExists(ctx, 'personId', q.id, face.id)).toBe(false); // cleared: same target
-      expect(await negativeExists(ctx, 'personId', r.id, face.id)).toBe(true); // scoping: different target survives
+      expect(await negativeExists(ctx, 'personId', q.personGroupId, face.id)).toBe(false); // cleared: same target
+      expect(await negativeExists(ctx, 'personId', r.personGroupId, face.id)).toBe(true); // scoping: different target survives
     });
 
     it('S8.3 — identity-keyed clearing: a NULL-personId verdict against the target identity is cleared', async () => {
@@ -921,9 +921,9 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
 
       const { person: holder } = await ctx.newPerson({ ownerId: user.id, name: 'Holder' });
       const { person: q } = await ctx.newPerson({ ownerId: user.id, name: 'Q' });
-      const qIdentity = await faceIdentityRepo.ensurePersonIdentity(q.id);
+      const qIdentity = await faceIdentityRepo.ensurePersonIdentity(q.personGroupId);
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace: face } = await ctx.newAssetFace({ assetId: asset.id, personId: holder.id });
+      const { assetFace: face } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: holder.personGroupId });
 
       // A verdict recorded with only the identity (personId NULL) — the shape a decline against a
       // since-deleted-and-recreated suspected owner leaves behind.
@@ -940,7 +940,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
         .execute();
       expect(await negativeExists(ctx, 'identityId', qIdentity.id, face.id)).toBe(true); // positive control
 
-      await person.reassignFacesById(auth, q.id, { id: face.id });
+      await person.reassignFacesById(auth, q.personGroupId, { id: face.id });
 
       expect(await negativeExists(ctx, 'identityId', qIdentity.id, face.id)).toBe(false);
     });
@@ -1003,51 +1003,51 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
       // move (an earlier decline against Q, now contradicted by it).
       const { person: holder } = await ctx.newPerson({ ownerId: user.id, name: 'Holder' });
       const { person: q } = await ctx.newPerson({ ownerId: user.id, name: 'Q' });
-      const qIdentity = await faceIdentityRepo.ensurePersonIdentity(q.id);
+      const qIdentity = await faceIdentityRepo.ensurePersonIdentity(q.personGroupId);
       const { assetFace: moveFace } = await seedSuggestionFace(ctx, {
         ownerId: user.id,
-        personId: holder.id,
+        personId: holder.personGroupId,
         embedding: SUGGESTION_CANDIDATE,
       });
-      await verdictRepo.markRejected(q.id, moveFace.id, {
+      await verdictRepo.markRejected(q.personGroupId, moveFace.id, {
         identityId: qIdentity.id,
         source: 'cleanup',
         actorId: user.id,
       });
-      expect(await negativeExists(ctx, 'personId', q.id, moveFace.id)).toBe(true); // positive control
+      expect(await negativeExists(ctx, 'personId', q.personGroupId, moveFace.id)).toBe(true); // positive control
 
       await repair.executeRepair({
-        toRepair: [{ assetFaceId: moveFace.id, currentPersonId: holder.id, suspectedOwnerId: q.id }],
+        toRepair: [{ assetFaceId: moveFace.id, currentPersonId: holder.personGroupId, suspectedOwnerId: q.personGroupId }],
         reviewOnlyFaces: [],
         reviewOnlyPersonIds: [],
         unAttributableFaces: [],
         perPerson: [],
       });
 
-      expect(await negativeExists(ctx, 'personId', q.id, moveFace.id)).toBe(false); // cleared by the move
+      expect(await negativeExists(ctx, 'personId', q.personGroupId, moveFace.id)).toBe(false); // cleared by the move
 
       // Lock half: F2 sits on `reviewed`; a rejected verdict directly keyed to (reviewed, F2) predates the
       // lock.
       const { person: reviewed } = await ctx.newPerson({ ownerId: user.id, name: 'Reviewed' });
-      const reviewedIdentity = await faceIdentityRepo.ensurePersonIdentity(reviewed.id);
+      const reviewedIdentity = await faceIdentityRepo.ensurePersonIdentity(reviewed.personGroupId);
       const { assetFace: lockFace } = await seedSuggestionFace(ctx, {
         ownerId: user.id,
-        personId: reviewed.id,
+        personId: reviewed.personGroupId,
         embedding: SUGGESTION_CANDIDATE,
       });
-      await verdictRepo.markRejected(reviewed.id, lockFace.id, {
+      await verdictRepo.markRejected(reviewed.personGroupId, lockFace.id, {
         identityId: reviewedIdentity.id,
         source: 'cleanup',
         actorId: user.id,
       });
-      expect(await negativeExists(ctx, 'personId', reviewed.id, lockFace.id)).toBe(true); // positive control
+      expect(await negativeExists(ctx, 'personId', reviewed.personGroupId, lockFace.id)).toBe(true); // positive control
 
       await repair.resolveFaces(
-        { personId: reviewed.id, moveToPerson: [], stay: [], lock: [lockFace.id], detach: [], unknown: [] },
+        { personId: reviewed.personGroupId, moveToPerson: [], stay: [], lock: [lockFace.id], detach: [], unknown: [] },
         user.id,
       );
 
-      expect(await negativeExists(ctx, 'personId', reviewed.id, lockFace.id)).toBe(false); // cleared by the lock
+      expect(await negativeExists(ctx, 'personId', reviewed.personGroupId, lockFace.id)).toBe(false); // cleared by the lock
     });
 
     it('S8.6 — after Q is deleted and re-created sharing the same identity, a later scan offers F again', async () => {
@@ -1060,19 +1060,19 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
       // Given: the S8.1 sequence — admin declines F toward Q1, the owner then places F on Q1 (cleared).
       const { person: holder } = await ctx.newPerson({ ownerId: user.id, name: 'Holder' });
       const q1 = await newSuggestionAnchoredPerson(ctx, user.id, 'Q');
-      const q1Identity = await faceIdentityRepo.ensurePersonIdentity(q1.id);
+      const q1Identity = await faceIdentityRepo.ensurePersonIdentity(q1.personGroupId);
       const { assetFace: face } = await seedSuggestionFace(ctx, {
         ownerId: user.id,
-        personId: holder.id,
+        personId: holder.personGroupId,
         embedding: SUGGESTION_CANDIDATE,
       });
-      await verdictRepo.markRejected(q1.id, face.id, {
+      await verdictRepo.markRejected(q1.personGroupId, face.id, {
         identityId: q1Identity.id,
         source: 'cleanup',
         actorId: user.id,
       });
-      await person.reassignFacesById(auth, q1.id, { id: face.id });
-      expect(await negativeExists(ctx, 'personId', q1.id, face.id)).toBe(false); // sanity: S8.1's fix ran
+      await person.reassignFacesById(auth, q1.personGroupId, { id: face.id });
+      expect(await negativeExists(ctx, 'personId', q1.personGroupId, face.id)).toBe(false); // sanity: S8.1's fix ran
 
       // When: a reset unassigns F (strips its manual identity link and its personId — scoped to just this
       // one face here, mirroring unassignFaces's two effects without perturbing sibling fixtures in this
@@ -1081,7 +1081,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
       await faceIdentityRepo.unlinkFaces([face.id]);
       await ctx.database.updateTable('asset_face').set({ personId: null }).where('id', '=', face.id).execute();
 
-      await ctx.database.deleteFrom('person').where('id', '=', q1.id).execute();
+      await ctx.database.deleteFrom('person').where('personGroupId', '=', q1.personGroupId).execute();
       const faceAfterDelete = await ctx.database
         .selectFrom('asset_face')
         .select('personId')
@@ -1090,11 +1090,11 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
       expect(faceAfterDelete.personId).toBeNull(); // sanity: the face is genuinely unassigned
 
       const q2 = await newSuggestionAnchoredPerson(ctx, user.id, 'Q');
-      await ctx.database.updateTable('person').set({ identityId: q1Identity.id }).where('id', '=', q2.id).execute();
+      await ctx.database.updateTable('person').set({ identityId: q1Identity.id }).where('personGroupId', '=', q2.personGroupId).execute();
 
       // Then: a suggestion scan offers F again — it was permanently suppressed before this slice.
-      await expect(faceSuggestion.handlePersonSuggestionScan({ id: q2.id })).resolves.toBe(JobStatus.Success);
-      expect(await pendingFor(ctx, 'personId', q2.id, face.id)).toBe(true);
+      await expect(faceSuggestion.handlePersonSuggestionScan({ id: q2.personGroupId })).resolves.toBe(JobStatus.Success);
+      expect(await pendingFor(ctx, 'personId', q2.personGroupId, face.id)).toBe(true);
     });
 
     it('S8.9 — the reaper runs after the identity GC, so a row whose only remaining key is a GC-removed identity is collected', async () => {
@@ -1122,9 +1122,9 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
       // A person P with exactly ONE ML face: unassignFaces empties it, so handlePersonCleanup deletes P as
       // faceless, and its identity — referenced by nothing else — becomes GC-eligible in the SAME run.
       const { person: p } = await ctx.newPerson({ ownerId: user.id, name: 'P' });
-      const pIdentity = await faceIdentityRepo.ensurePersonIdentity(p.id);
+      const pIdentity = await faceIdentityRepo.ensurePersonIdentity(p.personGroupId);
       const { asset: pAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
-      await ctx.newAssetFace({ assetId: pAsset.id, personId: p.id, sourceType: SourceType.MachineLearning });
+      await ctx.newAssetFace({ assetId: pAsset.id, personGroupId: p.personGroupId, sourceType: SourceType.MachineLearning });
 
       // The row under test: identityId-only (personId/spacePersonId already NULL), against a face unrelated
       // to P's own — its ONLY remaining key is P's identity, which only becomes NULL once the identity GC
@@ -1132,7 +1132,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
       const { asset: targetAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
       const { assetFace: targetFace } = await ctx.newAssetFace({
         assetId: targetAsset.id,
-        personId: null,
+        personGroupId: null,
         sourceType: SourceType.MachineLearning,
       });
       await ctx.database
@@ -1153,13 +1153,13 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
       // handlePersonCleanup call, making this control vacuous.
       const { person: live } = await ctx.newPerson({ ownerId: user.id, name: 'Live' });
       const { asset: liveAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
-      await ctx.newAssetFace({ assetId: liveAsset.id, personId: live.id, sourceType: SourceType.Manual });
+      await ctx.newAssetFace({ assetId: liveAsset.id, personGroupId: live.personGroupId, sourceType: SourceType.Manual });
       const { assetFace: liveFace } = await ctx.newAssetFace({
         assetId: liveAsset.id,
-        personId: null,
+        personGroupId: null,
         sourceType: SourceType.MachineLearning,
       });
-      await verdictRepo.markRejected(live.id, liveFace.id, { source: 'cleanup', actorId: user.id });
+      await verdictRepo.markRejected(live.personGroupId, liveFace.id, { source: 'cleanup', actorId: user.id });
 
       // Row-existence by assetFaceId alone, NOT by identityId=pIdentity.id: the identity GC's ON DELETE SET
       // NULL degrades that column to NULL as a SEPARATE effect from the reaper actually deleting the row —
@@ -1181,7 +1181,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
       await expect(person.handleQueueRecognizeFaces({ force: true })).resolves.toBe(JobStatus.Success);
 
       expect(await anyVerdictRowFor(targetFace.id)).toBe(false); // collected — the row itself is gone
-      expect(await negativeExists(ctx, 'personId', live.id, liveFace.id)).toBe(true); // live target kept
+      expect(await negativeExists(ctx, 'personId', live.personGroupId, liveFace.id)).toBe(true); // live target kept
     });
   });
 });

@@ -352,11 +352,11 @@ describe('AccessRepository.person.checkSharedSpaceAccess — album leg', () => {
     const { asset } = await ctx.newAsset({ ownerId: owner.id });
     await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
     const { person } = await ctx.newPerson({ ownerId: owner.id, name: 'AlbumFacePerson' });
-    await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+    await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
 
-    const result = await accessRepo.person.checkSharedSpaceAccess(member.id, new Set([person.id]));
+    const result = await accessRepo.person.checkSharedSpaceAccess(member.id, new Set([person.personGroupId]));
 
-    expect(result.has(person.id)).toBe(true);
+    expect(result.has(person.personGroupId)).toBe(true);
   });
 
   it('DENY — non-member gets empty set for person accessible only via linked album', async () => {
@@ -369,11 +369,11 @@ describe('AccessRepository.person.checkSharedSpaceAccess — album leg', () => {
     const { asset } = await ctx.newAsset({ ownerId: owner.id });
     await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
     const { person } = await ctx.newPerson({ ownerId: owner.id, name: 'DenyAlbumPerson' });
-    await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+    await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
 
-    const result = await accessRepo.person.checkSharedSpaceAccess(nonMember.id, new Set([person.id]));
+    const result = await accessRepo.person.checkSharedSpaceAccess(nonMember.id, new Set([person.personGroupId]));
 
-    expect(result.has(person.id)).toBe(false);
+    expect(result.has(person.personGroupId)).toBe(false);
   });
 });
 
@@ -389,7 +389,7 @@ const seedPersonOnSpaceLinkedAlbum = async (ctx: ReturnType<typeof setup>['ctx']
   const { asset } = await ctx.newAsset({ ownerId: owner.id });
   await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
   const { person } = await ctx.newPerson({ ownerId: owner.id, name: 'EditAlbumPerson' });
-  await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+  await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
   return { editor, viewer, person };
 };
 
@@ -401,20 +401,20 @@ describe('AccessRepository.person.checkSharedSpaceEditAccess — album leg (M2)'
     const { ctx, accessRepo } = setupRead();
     const { editor, person } = await seedPersonOnSpaceLinkedAlbum(ctx);
 
-    const result = await accessRepo.person.checkSharedSpaceEditAccess(editor.id, new Set([person.id]));
+    const result = await accessRepo.person.checkSharedSpaceEditAccess(editor.id, new Set([person.personGroupId]));
 
-    expect(result.has(person.id)).toBe(true);
+    expect(result.has(person.personGroupId)).toBe(true);
   });
 
   it('DENY — a Viewer of the same space gets an empty set even though read access is granted', async () => {
     const { ctx, accessRepo } = setupRead();
     const { viewer, person } = await seedPersonOnSpaceLinkedAlbum(ctx);
 
-    const readResult = await accessRepo.person.checkSharedSpaceAccess(viewer.id, new Set([person.id]));
-    expect(readResult.has(person.id)).toBe(true); // sanity: viewer DOES have read access
+    const readResult = await accessRepo.person.checkSharedSpaceAccess(viewer.id, new Set([person.personGroupId]));
+    expect(readResult.has(person.personGroupId)).toBe(true); // sanity: viewer DOES have read access
 
-    const editResult = await accessRepo.person.checkSharedSpaceEditAccess(viewer.id, new Set([person.id]));
-    expect(editResult.has(person.id)).toBe(false);
+    const editResult = await accessRepo.person.checkSharedSpaceEditAccess(viewer.id, new Set([person.personGroupId]));
+    expect(editResult.has(person.personGroupId)).toBe(false);
   });
 });
 

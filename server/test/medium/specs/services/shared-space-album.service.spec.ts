@@ -431,12 +431,12 @@ describe('SharedSpaceService — handleSharedSpaceAlbumFaceSync', () => {
 
     // Create a person + identity for Layer 1 matching
     const { result: person } = await ctx.newPerson({ ownerId: user.id, name: 'AlbumPerson' });
-    const identity = await faceIdentityRepository.ensurePersonIdentity(person.id);
+    const identity = await faceIdentityRepository.ensurePersonIdentity(person.personGroupId);
 
     // Create asset, add to album, seed face + identity link
     const { asset } = await ctx.newAsset({ ownerId: user.id });
     await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
-    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
     await ctx.database.insertInto('face_search').values({ faceId: assetFace.id, embedding: newEmbedding() }).execute();
     await faceIdentityRepository.linkFace({
       assetFaceId: assetFace.id,
@@ -898,11 +898,11 @@ describe('onAlbumAssetsAdd (medium)', () => {
     const { result: album } = await ctx.newAlbum({ ownerId: user.id, albumName: 'AddSyncAlbum' });
 
     const { result: person } = await ctx.newPerson({ ownerId: user.id, name: 'AddedPerson' });
-    const identity = await faceIdentityRepository.ensurePersonIdentity(person.id);
+    const identity = await faceIdentityRepository.ensurePersonIdentity(person.personGroupId);
 
     const { asset } = await ctx.newAsset({ ownerId: user.id });
     await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
-    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
     await ctx.database.insertInto('face_search').values({ faceId: assetFace.id, embedding: newEmbedding() }).execute();
     await faceIdentityRepository.linkFace({
       assetFaceId: assetFace.id,

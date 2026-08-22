@@ -49,10 +49,10 @@ const seedCharacterisationIdentity = async (
     name: input.name,
     isHidden: input.isHidden ?? false,
   });
-  const identity = await sut.ensurePersonIdentity(person.id);
+  const identity = await sut.ensurePersonIdentity(person.personGroupId);
   for (let index = 0; index < input.assets; index++) {
     const { asset } = await ctx.newAsset({ ownerId: input.userId, visibility: AssetVisibility.Timeline });
-    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
     await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
   }
   return { person, identity };
@@ -93,10 +93,10 @@ const createAccessibleSpaceIdentity = async (
     .where('userId', '=', input.memberUserId)
     .execute();
   const { person } = await ctx.newPerson({ ownerId: input.ownerUserId });
-  const identity = await sut.ensurePersonIdentity(person.id);
+  const identity = await sut.ensurePersonIdentity(person.personGroupId);
   const { asset } = await ctx.newAsset({ ownerId: input.ownerUserId, visibility: AssetVisibility.Timeline });
   await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: input.ownerUserId });
-  const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+  const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
   await ctx.database.insertInto('face_search').values({ faceId: assetFace.id, embedding: input.embedding }).execute();
   await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
   const spacePerson = await ctx.database
@@ -128,8 +128,8 @@ const seedBirthdayPermissionWorld = async (ctx: ReturnType<typeof setup>['ctx'],
   // Alice owns the global person + asset; this face anchors the shared identity.
   const { person: alicePerson } = await ctx.newPerson({ ownerId: alice.id, name: 'Ina' });
   const { asset: aliceAsset } = await ctx.newAsset({ ownerId: alice.id, visibility: AssetVisibility.Timeline });
-  const { assetFace: aliceFace } = await ctx.newAssetFace({ assetId: aliceAsset.id, personId: alicePerson.id });
-  const identity = await sut.ensurePersonIdentity(alicePerson.id);
+  const { assetFace: aliceFace } = await ctx.newAssetFace({ assetId: aliceAsset.id, personGroupId: alicePerson.personGroupId });
+  const identity = await sut.ensurePersonIdentity(alicePerson.personGroupId);
   await sut.linkFace({ assetFaceId: aliceFace.id, identityId: identity.id, source: 'owner-person' });
 
   // Space S: Alice (owner) + Bob (viewer, timeline on). The birthday is set here.
@@ -156,9 +156,9 @@ const seedBirthdayPermissionWorld = async (ctx: ReturnType<typeof setup>['ctx'],
   // Dave has the SAME person in his own library (same identity) via his own asset, but is not a
   // member of space S and never set a birthday — he must never inherit Bob's space-set birthday.
   const { person: davePerson } = await ctx.newPerson({ ownerId: dave.id, name: 'Ina' });
-  await ctx.database.updateTable('person').set({ identityId: identity.id }).where('id', '=', davePerson.id).execute();
+  await ctx.database.updateTable('person').set({ identityId: identity.id }).where('personGroupId', '=', davePerson.personGroupId).execute();
   const { asset: daveAsset } = await ctx.newAsset({ ownerId: dave.id, visibility: AssetVisibility.Timeline });
-  const { assetFace: daveFace } = await ctx.newAssetFace({ assetId: daveAsset.id, personId: davePerson.id });
+  const { assetFace: daveFace } = await ctx.newAssetFace({ assetId: daveAsset.id, personGroupId: davePerson.personGroupId });
   await sut.linkFace({ assetFaceId: daveFace.id, identityId: identity.id, source: 'owner-person' });
 
   // Carol is a registered user with no person, asset, or space membership touching this identity.
@@ -199,8 +199,8 @@ const newIdentityFace = async (
     deletedAt: input.deletedAt ?? null,
     visibility: input.visibility ?? AssetVisibility.Timeline,
   });
-  const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
-  const identity = await sut.ensurePersonIdentity(person.id);
+  const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+  const identity = await sut.ensurePersonIdentity(person.personGroupId);
   await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'backfill' });
 
   return { person, asset, assetFace, identity };
@@ -223,20 +223,20 @@ const newLibraryIdentityFace = async (
         person: await ctx.database
           .selectFrom('person')
           .selectAll()
-          .where('id', '=', input.personId)
+          .where('personGroupId', '=', input.personId)
           .executeTakeFirstOrThrow(),
       }
     : await ctx.newPerson({ ownerId: input.ownerId, name: input.name ?? '' });
   const identity =
     input.identityId === undefined
-      ? await sut.ensurePersonIdentity(person.id)
+      ? await sut.ensurePersonIdentity(person.personGroupId)
       : { id: input.identityId, type: 'person' };
   const { asset } = await ctx.newAsset({
     ownerId: input.ownerId,
     libraryId: input.libraryId,
     visibility: input.visibility ?? AssetVisibility.Timeline,
   });
-  const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+  const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
   await ctx.database.insertInto('face_search').values({ faceId: assetFace.id, embedding: newEmbedding() }).execute();
   await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
 
@@ -246,7 +246,7 @@ const newLibraryIdentityFace = async (
 const getPersonalIdentityMismatchRows = async (ctx: ReturnType<typeof setup>['ctx'], assetFaceIds: string[]) => {
   const rows = await ctx.database
     .selectFrom('asset_face')
-    .innerJoin('person', 'person.id', 'asset_face.personId')
+    .innerJoin('person', 'person.personGroupId', 'asset_face.personId')
     .innerJoin('face_identity_face', 'face_identity_face.assetFaceId', 'asset_face.id')
     .select([
       'asset_face.id as assetFaceId',
@@ -295,11 +295,11 @@ const newPersonalIdentityCluster = async (
   input: { ownerId: string; embedding: string; faceCount: number },
 ) => {
   const { person } = await ctx.newPerson({ ownerId: input.ownerId });
-  const identity = await sut.ensurePersonIdentity(person.id);
+  const identity = await sut.ensurePersonIdentity(person.personGroupId);
   const assetFaceIds: string[] = [];
   for (let index = 0; index < input.faceCount; index++) {
     const { asset } = await ctx.newAsset({ ownerId: input.ownerId });
-    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
     await ctx.database.insertInto('face_search').values({ faceId: assetFace.id, embedding: input.embedding }).execute();
     await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
     assetFaceIds.push(assetFace.id);
@@ -367,7 +367,7 @@ describe(FaceIdentityRepository.name, () => {
     await ctx.database
       .updateTable('person')
       .set({ identityId: targetIdentity.id, type: 'person' })
-      .where('id', '=', targetPerson.id)
+      .where('personGroupId', '=', targetPerson.personGroupId)
       .execute();
 
     // Source: a pet-typed identity that ANOTHER owner holds a pet profile on, so the merge re-points it (survives).
@@ -380,7 +380,7 @@ describe(FaceIdentityRepository.name, () => {
     await ctx.database
       .updateTable('person')
       .set({ identityId: sourceIdentity.id, type: 'pet' })
-      .where('id', '=', petProfile.id)
+      .where('personGroupId', '=', petProfile.personGroupId)
       .execute();
 
     await sut.mergeIdentitiesAfterProfileResolution({
@@ -392,7 +392,7 @@ describe(FaceIdentityRepository.name, () => {
     const reconciled = await ctx.database
       .selectFrom('person')
       .select(['identityId', 'type'])
-      .where('id', '=', petProfile.id)
+      .where('personGroupId', '=', petProfile.personGroupId)
       .executeTakeFirstOrThrow();
     expect(reconciled.identityId).toBe(targetIdentity.id);
     expect(reconciled.type).toBe('person');
@@ -513,7 +513,7 @@ describe(FaceIdentityRepository.name, () => {
     try {
       const { person } = await ctx.newPerson({ ownerId: user.id });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
       const { space } = await ctx.newSharedSpace({ createdById: user.id });
       await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
       const spacePerson = await newSpacePerson(ctx, space.id);
@@ -549,7 +549,7 @@ describe(FaceIdentityRepository.name, () => {
 
       const { person } = await ctx.newPerson({ ownerId: user.id, identityId: null });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
       await sut.linkFace({ assetFaceId: assetFace.id, identityId: staleIdentity.id, source: 'backfill' });
 
       await expect(sut.getBackfillWork()).resolves.toMatchObject({ hasPersonalIdentityWork: true });
@@ -557,7 +557,7 @@ describe(FaceIdentityRepository.name, () => {
       await sut.backfillPersonalIdentities({ limit: 100 });
 
       const [updatedPerson, updatedFaceLink] = await Promise.all([
-        ctx.database.selectFrom('person').select(['identityId']).where('id', '=', person.id).executeTakeFirstOrThrow(),
+        ctx.database.selectFrom('person').select(['identityId']).where('personGroupId', '=', person.personGroupId).executeTakeFirstOrThrow(),
         ctx.database
           .selectFrom('face_identity_face')
           .select(['identityId'])
@@ -582,7 +582,7 @@ describe(FaceIdentityRepository.name, () => {
     try {
       const { person } = await ctx.newPerson({ ownerId: user.id, identityId: null });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
 
       await expect(sut.getBackfillWork()).resolves.toEqual({
         hasPersonalIdentityWork: true,
@@ -691,9 +691,9 @@ describe(FaceIdentityRepository.name, () => {
       const { person: secondPerson } = await ctx.newPerson({ ownerId: user.id });
       const { assetFace: secondFace } = await ctx.newAssetFace({
         assetId: first.asset.id,
-        personId: secondPerson.id,
+        personGroupId: secondPerson.personGroupId,
       });
-      const secondIdentity = await sut.ensurePersonIdentity(secondPerson.id);
+      const secondIdentity = await sut.ensurePersonIdentity(secondPerson.personGroupId);
       await sut.linkFace({ assetFaceId: secondFace.id, identityId: secondIdentity.id, source: 'backfill' });
       const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
       await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
@@ -714,7 +714,7 @@ describe(FaceIdentityRepository.name, () => {
     try {
       const { person } = await ctx.newPerson({ ownerId: user.id });
       const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
-      await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
       const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
       await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
@@ -928,20 +928,20 @@ describe(FaceIdentityRepository.name, () => {
       await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
       const { person: dominantPerson } = await ctx.newPerson({ ownerId: user.id });
       const { person: noisyPerson } = await ctx.newPerson({ ownerId: user.id });
-      const dominantIdentity = await sut.ensurePersonIdentity(dominantPerson.id);
-      const noisyIdentity = await sut.ensurePersonIdentity(noisyPerson.id);
+      const dominantIdentity = await sut.ensurePersonIdentity(dominantPerson.personGroupId);
+      const noisyIdentity = await sut.ensurePersonIdentity(noisyPerson.personGroupId);
       const spacePerson = await newSpacePerson(ctx, space.id);
 
       for (let index = 0; index < 20; index++) {
         const { asset } = await ctx.newAsset({ ownerId: user.id });
-        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: dominantPerson.id });
+        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: dominantPerson.personGroupId });
         await sut.linkFace({ assetFaceId: assetFace.id, identityId: dominantIdentity.id, source: 'backfill' });
         await linkSpaceFace(ctx, spacePerson.id, assetFace.id);
       }
 
       for (let index = 0; index < 2; index++) {
         const { asset } = await ctx.newAsset({ ownerId: user.id });
-        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: noisyPerson.id });
+        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: noisyPerson.personGroupId });
         await sut.linkFace({ assetFaceId: assetFace.id, identityId: noisyIdentity.id, source: 'backfill' });
         await linkSpaceFace(ctx, spacePerson.id, assetFace.id);
       }
@@ -967,8 +967,8 @@ describe(FaceIdentityRepository.name, () => {
       const { library } = await ctx.newLibrary({ ownerId: user.id });
       const { asset } = await ctx.newAsset({ ownerId: user.id, libraryId: library.id });
       const { person } = await ctx.newPerson({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
-      const identity = await sut.ensurePersonIdentity(person.id);
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+      const identity = await sut.ensurePersonIdentity(person.personGroupId);
       await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'backfill' });
       const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
       await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
@@ -998,14 +998,14 @@ describe(FaceIdentityRepository.name, () => {
 
       const { person: firstPerson } = await ctx.newPerson({ ownerId: user.id });
       const { asset: firstAsset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace: firstFace } = await ctx.newAssetFace({ assetId: firstAsset.id, personId: firstPerson.id });
-      const firstIdentity = await sut.ensurePersonIdentity(firstPerson.id);
+      const { assetFace: firstFace } = await ctx.newAssetFace({ assetId: firstAsset.id, personGroupId: firstPerson.personGroupId });
+      const firstIdentity = await sut.ensurePersonIdentity(firstPerson.personGroupId);
       await sut.linkFace({ assetFaceId: firstFace.id, identityId: firstIdentity.id, source: 'backfill' });
 
       const { person: secondPerson } = await ctx.newPerson({ ownerId: user.id });
       const { asset: secondAsset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace: secondFace } = await ctx.newAssetFace({ assetId: secondAsset.id, personId: secondPerson.id });
-      const secondIdentity = await sut.ensurePersonIdentity(secondPerson.id);
+      const { assetFace: secondFace } = await ctx.newAssetFace({ assetId: secondAsset.id, personGroupId: secondPerson.personGroupId });
+      const secondIdentity = await sut.ensurePersonIdentity(secondPerson.personGroupId);
       await sut.linkFace({ assetFaceId: secondFace.id, identityId: secondIdentity.id, source: 'backfill' });
 
       await newSpacePerson(ctx, space.id);
@@ -1040,12 +1040,12 @@ describe(FaceIdentityRepository.name, () => {
       await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
 
       const { person: personA } = await ctx.newPerson({ ownerId: user.id });
-      const identityA = await sut.ensurePersonIdentity(personA.id);
+      const identityA = await sut.ensurePersonIdentity(personA.personGroupId);
 
       const { person: personC } = await ctx.newPerson({ ownerId: user.id });
-      const identityC = await sut.ensurePersonIdentity(personC.id);
+      const identityC = await sut.ensurePersonIdentity(personC.personGroupId);
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: personC.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: personC.personGroupId });
       await sut.linkFace({ assetFaceId: assetFace.id, identityId: identityC.id, source: 'backfill' });
 
       // Space person carries identity A, but its only face belongs to identity C → repair splits it out.
@@ -1084,9 +1084,9 @@ describe(FaceIdentityRepository.name, () => {
       const { space } = await ctx.newSharedSpace({ createdById: user.id });
       await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
       const { person } = await ctx.newPerson({ ownerId: user.id });
-      const identity = await sut.ensurePersonIdentity(person.id);
+      const identity = await sut.ensurePersonIdentity(person.personGroupId);
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
       await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'backfill' });
       const spacePerson = await ctx.database
         .insertInto('shared_space_person')
@@ -1221,21 +1221,21 @@ describe(FaceIdentityRepository.name, () => {
     const { user } = await ctx.newUser();
     const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Alice' });
     const { asset } = await ctx.newAsset({ ownerId: user.id });
-    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
 
-    const identity = await sut.ensurePersonIdentity(person.id);
+    const identity = await sut.ensurePersonIdentity(person.personGroupId);
     const linked = await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
     const linkedAgain = await sut.linkFace({
       assetFaceId: assetFace.id,
       identityId: identity.id,
       source: 'owner-person',
     });
-    const secondIdentity = await sut.ensurePersonIdentity(person.id);
+    const secondIdentity = await sut.ensurePersonIdentity(person.personGroupId);
 
     const updatedPerson = await ctx.database
       .selectFrom('person')
       .select(['identityId'])
-      .where('id', '=', person.id)
+      .where('personGroupId', '=', person.personGroupId)
       .executeTakeFirstOrThrow();
 
     expect(secondIdentity.id).toBe(identity.id);
@@ -1251,8 +1251,8 @@ describe(FaceIdentityRepository.name, () => {
       const { person: firstPerson } = await ctx.newPerson({ ownerId: user.id });
       const { person: secondPerson } = await ctx.newPerson({ ownerId: user.id });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace: firstFace } = await ctx.newAssetFace({ assetId: asset.id, personId: firstPerson.id });
-      const { assetFace: secondFace } = await ctx.newAssetFace({ assetId: asset.id, personId: firstPerson.id });
+      const { assetFace: firstFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: firstPerson.personGroupId });
+      const { assetFace: secondFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: firstPerson.personGroupId });
       const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
       await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
@@ -1263,14 +1263,14 @@ describe(FaceIdentityRepository.name, () => {
       const firstIdentity = await ctx.database
         .selectFrom('person')
         .select('identityId')
-        .where('id', '=', firstPerson.id)
+        .where('personGroupId', '=', firstPerson.personGroupId)
         .executeTakeFirstOrThrow();
       await sut.backfillPersonalIdentities({ limit: 100 });
 
       const people = await ctx.database
         .selectFrom('person')
         .select(['id', 'identityId'])
-        .where('id', 'in', [firstPerson.id, secondPerson.id])
+        .where('personGroupId', 'in', [firstPerson.personGroupId, secondPerson.personGroupId])
         .orderBy('id')
         .execute();
       const links = await ctx.database
@@ -1293,7 +1293,7 @@ describe(FaceIdentityRepository.name, () => {
       expect(secondPage.processed).toBe(1);
       expect(affectedTargets).toEqual([{ spaceId: space.id, assetId: asset.id }]);
       expect(people.every((person) => person.identityId)).toBe(true);
-      expect(people.find((person) => person.id === firstPerson.id)?.identityId).toBe(firstIdentity.identityId);
+      expect(people.find((person) => person.id === firstPerson.personGroupId)?.identityId).toBe(firstIdentity.identityId);
       expect(links).toHaveLength(2);
       expect(new Set(links.map((link) => link.identityId))).toEqual(new Set([firstIdentity.identityId]));
     } finally {
@@ -1308,9 +1308,9 @@ describe(FaceIdentityRepository.name, () => {
       const { person: targetPerson } = await ctx.newPerson({ ownerId: user.id });
       const { person: sourcePerson } = await ctx.newPerson({ ownerId: user.id });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: sourcePerson.id });
-      const targetIdentity = await sut.ensurePersonIdentity(targetPerson.id);
-      await sut.ensurePersonIdentity(sourcePerson.id);
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: sourcePerson.personGroupId });
+      const targetIdentity = await sut.ensurePersonIdentity(targetPerson.personGroupId);
+      await sut.ensurePersonIdentity(sourcePerson.personGroupId);
       await sut.linkFace({
         assetFaceId: assetFace.id,
         identityId: targetIdentity.id,
@@ -1335,12 +1335,12 @@ describe(FaceIdentityRepository.name, () => {
       const { person: targetPerson } = await ctx.newPerson({ ownerId: user.id });
       const { person: sourcePerson } = await ctx.newPerson({ ownerId: user.id });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: sourcePerson.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: sourcePerson.personGroupId });
       const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
       await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
-      const targetIdentity = await sut.ensurePersonIdentity(targetPerson.id);
-      const sourceIdentity = await sut.ensurePersonIdentity(sourcePerson.id);
+      const targetIdentity = await sut.ensurePersonIdentity(targetPerson.personGroupId);
+      const sourceIdentity = await sut.ensurePersonIdentity(sourcePerson.personGroupId);
       await sut.linkFace({
         assetFaceId: assetFace.id,
         identityId: targetIdentity.id,
@@ -1357,7 +1357,7 @@ describe(FaceIdentityRepository.name, () => {
       const sourceProfile = await ctx.database
         .selectFrom('person')
         .select('identityId')
-        .where('id', '=', sourcePerson.id)
+        .where('personGroupId', '=', sourcePerson.personGroupId)
         .executeTakeFirstOrThrow();
       const pendingTargetRows = await sut.getPendingSharedSpaceFaceMatchBackfillTargets();
       const pendingTargets = pendingTargetRows.map(({ spaceId, assetId }) => ({
@@ -1365,7 +1365,7 @@ describe(FaceIdentityRepository.name, () => {
         assetId,
       }));
 
-      expect(updatedFace.personId).toBe(targetPerson.id);
+      expect(updatedFace.personId).toBe(targetPerson.personGroupId);
       expect(sourceProfile.identityId).toBe(sourceIdentity.id);
       expect(await getPersonalIdentityMismatchRows(ctx, [assetFace.id])).toEqual([]);
       expect(result.affectedSpaceAssets).toEqual([{ spaceId: space.id, assetId: asset.id }]);
@@ -1382,10 +1382,10 @@ describe(FaceIdentityRepository.name, () => {
       const { person: targetPerson } = await ctx.newPerson({ ownerId: user.id });
       const { person: sourcePerson } = await ctx.newPerson({ ownerId: user.id });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace: sourceLinkedFace } = await ctx.newAssetFace({ assetId: asset.id, personId: sourcePerson.id });
-      const { assetFace: targetLinkedFace } = await ctx.newAssetFace({ assetId: asset.id, personId: sourcePerson.id });
-      const targetIdentity = await sut.ensurePersonIdentity(targetPerson.id);
-      const sourceIdentity = await sut.ensurePersonIdentity(sourcePerson.id);
+      const { assetFace: sourceLinkedFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: sourcePerson.personGroupId });
+      const { assetFace: targetLinkedFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: sourcePerson.personGroupId });
+      const targetIdentity = await sut.ensurePersonIdentity(targetPerson.personGroupId);
+      const sourceIdentity = await sut.ensurePersonIdentity(sourcePerson.personGroupId);
       await sut.linkFace({ assetFaceId: sourceLinkedFace.id, identityId: sourceIdentity.id, source: 'owner-person' });
       await sut.linkFace({
         assetFaceId: targetLinkedFace.id,
@@ -1402,8 +1402,8 @@ describe(FaceIdentityRepository.name, () => {
         .orderBy('id')
         .execute();
 
-      expect(faces.find((face) => face.id === sourceLinkedFace.id)?.personId).toBe(sourcePerson.id);
-      expect(faces.find((face) => face.id === targetLinkedFace.id)?.personId).toBe(targetPerson.id);
+      expect(faces.find((face) => face.id === sourceLinkedFace.id)?.personId).toBe(sourcePerson.personGroupId);
+      expect(faces.find((face) => face.id === targetLinkedFace.id)?.personId).toBe(targetPerson.personGroupId);
       expect(await getPersonalIdentityMismatchRows(ctx, [sourceLinkedFace.id, targetLinkedFace.id])).toEqual([]);
     } finally {
       await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
@@ -1418,9 +1418,9 @@ describe(FaceIdentityRepository.name, () => {
       const { person: sourcePerson } = await ctx.newPerson({ ownerId: sourceOwner.id });
       const { person: otherOwnerTargetPerson } = await ctx.newPerson({ ownerId: targetOwner.id });
       const { asset } = await ctx.newAsset({ ownerId: sourceOwner.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: sourcePerson.id });
-      const targetIdentity = await sut.ensurePersonIdentity(otherOwnerTargetPerson.id);
-      const sourceIdentity = await sut.ensurePersonIdentity(sourcePerson.id);
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: sourcePerson.personGroupId });
+      const targetIdentity = await sut.ensurePersonIdentity(otherOwnerTargetPerson.personGroupId);
+      const sourceIdentity = await sut.ensurePersonIdentity(sourcePerson.personGroupId);
       await sut.linkFace({
         assetFaceId: assetFace.id,
         identityId: targetIdentity.id,
@@ -1435,7 +1435,7 @@ describe(FaceIdentityRepository.name, () => {
         .where('id', '=', assetFace.id)
         .executeTakeFirstOrThrow();
 
-      expect(updatedFace.personId).toBe(sourcePerson.id);
+      expect(updatedFace.personId).toBe(sourcePerson.personGroupId);
       // The source owner has no person referencing the other owner's identity, so the face cannot
       // move anywhere. The mismatch must still be resolved — by realigning the link to the face's
       // current person — because leftover work makes handleFaceIdentityBackfill re-queue forever.
@@ -1463,9 +1463,9 @@ describe(FaceIdentityRepository.name, () => {
       const { library } = await ctx.newLibrary({ ownerId: user.id });
       const { person } = await ctx.newPerson({ ownerId: user.id });
       const { asset } = await ctx.newAsset({ ownerId: user.id, libraryId: library.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
       const { asset: offlineAsset } = await ctx.newAsset({ ownerId: user.id, isOffline: true });
-      await ctx.newAssetFace({ assetId: offlineAsset.id, personId: person.id });
+      await ctx.newAssetFace({ assetId: offlineAsset.id, personGroupId: person.personGroupId });
       const { space: directAndLinked } = await ctx.newSharedSpace({
         createdById: user.id,
         faceRecognitionEnabled: true,
@@ -1512,7 +1512,7 @@ describe(FaceIdentityRepository.name, () => {
       const { asset: missingAsset } = await ctx.newAsset({ ownerId: user.id });
       const { assetFace: missingAssetFace } = await ctx.newAssetFace({
         assetId: missingAsset.id,
-        personId: missingPerson.id,
+        personGroupId: missingPerson.personGroupId,
       });
       const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
       await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
@@ -1543,7 +1543,7 @@ describe(FaceIdentityRepository.name, () => {
     try {
       const { person } = await ctx.newPerson({ ownerId: user.id });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
       const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
       await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
@@ -1588,15 +1588,15 @@ describe(FaceIdentityRepository.name, () => {
     const { user } = await ctx.newUser();
     try {
       const { person } = await ctx.newPerson({ ownerId: user.id });
-      const identity = await sut.ensurePersonIdentity(person.id);
+      const identity = await sut.ensurePersonIdentity(person.personGroupId);
       const { asset: alreadyLinkedAsset } = await ctx.newAsset({ ownerId: user.id });
       const { assetFace: alreadyLinkedFace } = await ctx.newAssetFace({
         assetId: alreadyLinkedAsset.id,
-        personId: person.id,
+        personGroupId: person.personGroupId,
       });
       await sut.linkFace({ assetFaceId: alreadyLinkedFace.id, identityId: identity.id, source: 'backfill' });
       const { asset: missingAsset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace: missingAssetFace } = await ctx.newAssetFace({ assetId: missingAsset.id, personId: person.id });
+      const { assetFace: missingAssetFace } = await ctx.newAssetFace({ assetId: missingAsset.id, personGroupId: person.personGroupId });
       const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
       await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: alreadyLinkedAsset.id, addedById: user.id });
@@ -1626,7 +1626,7 @@ describe(FaceIdentityRepository.name, () => {
     try {
       const { person } = await ctx.newPerson({ ownerId: user.id });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
       const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
       await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
@@ -1656,7 +1656,7 @@ describe(FaceIdentityRepository.name, () => {
     try {
       const { person } = await ctx.newPerson({ ownerId: user.id });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
       const enabledSpaces = [];
       for (let index = 0; index < 10; index++) {
         const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
@@ -1691,7 +1691,7 @@ describe(FaceIdentityRepository.name, () => {
     try {
       const { person } = await ctx.newPerson({ ownerId: user.id });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
       const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
       await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
@@ -1745,7 +1745,7 @@ describe(FaceIdentityRepository.name, () => {
     try {
       const { person } = await ctx.newPerson({ ownerId: user.id, identityId: null });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+      await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
       const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
       await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
@@ -1756,7 +1756,7 @@ describe(FaceIdentityRepository.name, () => {
         { spaceId: space.id, assetId: asset.id },
       ]);
       await expect(
-        ctx.database.selectFrom('person').select('identityId').where('id', '=', person.id).executeTakeFirstOrThrow(),
+        ctx.database.selectFrom('person').select('identityId').where('personGroupId', '=', person.personGroupId).executeTakeFirstOrThrow(),
       ).resolves.toEqual({ identityId: null });
     } finally {
       ensureSpy.mockRestore();
@@ -1769,15 +1769,15 @@ describe(FaceIdentityRepository.name, () => {
     const { user } = await ctx.newUser();
     const { person } = await ctx.newPerson({ ownerId: user.id });
     const { asset } = await ctx.newAsset({ ownerId: user.id });
-    const { assetFace: visibleFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+    const { assetFace: visibleFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
     const { assetFace: hiddenFace } = await ctx.newAssetFace({
       assetId: asset.id,
-      personId: person.id,
+      personGroupId: person.personGroupId,
       isVisible: false,
     });
     const { assetFace: deletedFace } = await ctx.newAssetFace({
       assetId: asset.id,
-      personId: person.id,
+      personGroupId: person.personGroupId,
       deletedAt: new Date(),
     });
 
@@ -1803,8 +1803,8 @@ describe(FaceIdentityRepository.name, () => {
       birthDate: new Date('1988-02-03T00:00:00.000Z'),
     });
     const { asset } = await ctx.newAsset({ ownerId: user.id });
-    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
-    const identity = await sut.ensurePersonIdentity(person.id);
+    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+    const identity = await sut.ensurePersonIdentity(person.personGroupId);
     await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
     await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
     const spacePerson = await ctx.database
@@ -1828,11 +1828,11 @@ describe(FaceIdentityRepository.name, () => {
 
       expect(result.people).toEqual([
         expect.objectContaining({
-          id: person.id,
+          id: person.personGroupId,
           name: 'Shared Name',
           birthDate: '1988-02-03',
-          primaryProfile: { type: 'user-person', id: person.id },
-          filterId: `person:${person.id}`,
+          primaryProfile: { type: 'user-person', id: person.personGroupId },
+          filterId: `person:${person.personGroupId}`,
         }),
       ]);
     } finally {
@@ -1853,8 +1853,8 @@ describe(FaceIdentityRepository.name, () => {
     // Owner's library person: has the NAME, but no birthday.
     const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Ina' });
     const { asset } = await ctx.newAsset({ ownerId: user.id });
-    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
-    const identity = await sut.ensurePersonIdentity(person.id);
+    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+    const identity = await sut.ensurePersonIdentity(person.personGroupId);
     await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
     await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
     // Space profile (set by an editor): carries the manual birthday, no name.
@@ -1882,10 +1882,10 @@ describe(FaceIdentityRepository.name, () => {
 
       expect(result.people).toEqual([
         expect.objectContaining({
-          id: person.id,
+          id: person.personGroupId,
           name: 'Ina', // name still resolves from the owner profile
           birthDate: '2014-02-14', // birthday resolves from the sibling space profile
-          primaryProfile: { type: 'user-person', id: person.id },
+          primaryProfile: { type: 'user-person', id: person.personGroupId },
         }),
       ]);
     } finally {
@@ -1900,8 +1900,8 @@ describe(FaceIdentityRepository.name, () => {
     await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
     const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Ina' });
     const { asset } = await ctx.newAsset({ ownerId: user.id });
-    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
-    const identity = await sut.ensurePersonIdentity(person.id);
+    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+    const identity = await sut.ensurePersonIdentity(person.personGroupId);
     await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
     await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
     const spacePerson = await ctx.database
@@ -1926,7 +1926,7 @@ describe(FaceIdentityRepository.name, () => {
     try {
       const result = await sut.getAccessiblePersonByProfileId(user.id, spacePerson.id);
 
-      expect(result).toEqual(expect.objectContaining({ id: person.id, name: 'Ina', birthDate: '2014-02-14' }));
+      expect(result).toEqual(expect.objectContaining({ id: person.personGroupId, name: 'Ina', birthDate: '2014-02-14' }));
     } finally {
       await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
     }
@@ -1940,8 +1940,8 @@ describe(FaceIdentityRepository.name, () => {
     // Owner's library person: has the NAME, but no birthday — exactly the owner detail-view scenario.
     const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Ina' });
     const { asset } = await ctx.newAsset({ ownerId: user.id });
-    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
-    const identity = await sut.ensurePersonIdentity(person.id);
+    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+    const identity = await sut.ensurePersonIdentity(person.personGroupId);
     await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
     await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
     const spacePerson = await ctx.database
@@ -1966,7 +1966,7 @@ describe(FaceIdentityRepository.name, () => {
     try {
       const result = await sut.getResolvedPersonByIdentityId(user.id, identity.id);
 
-      expect(result).toEqual(expect.objectContaining({ id: person.id, name: 'Ina', birthDate: '2014-02-14' }));
+      expect(result).toEqual(expect.objectContaining({ id: person.personGroupId, name: 'Ina', birthDate: '2014-02-14' }));
     } finally {
       await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
     }
@@ -1983,8 +1983,8 @@ describe(FaceIdentityRepository.name, () => {
       birthDate: new Date('1990-01-01T00:00:00.000Z'),
     });
     const { asset } = await ctx.newAsset({ ownerId: user.id });
-    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
-    const identity = await sut.ensurePersonIdentity(person.id);
+    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+    const identity = await sut.ensurePersonIdentity(person.personGroupId);
     await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
     await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
     const spacePerson = await ctx.database
@@ -2009,7 +2009,7 @@ describe(FaceIdentityRepository.name, () => {
     try {
       const result = await sut.getAccessiblePeople(user.id, { withHidden: false, page: 1, size: 50 });
 
-      expect(result.people).toEqual([expect.objectContaining({ id: person.id, birthDate: '1990-01-01' })]);
+      expect(result.people).toEqual([expect.objectContaining({ id: person.personGroupId, birthDate: '1990-01-01' })]);
     } finally {
       await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
     }
@@ -2020,8 +2020,8 @@ describe(FaceIdentityRepository.name, () => {
     const { user } = await ctx.newUser();
     const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Ina' }); // owner: no birthday
     const { asset } = await ctx.newAsset({ ownerId: user.id });
-    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
-    const identity = await sut.ensurePersonIdentity(person.id);
+    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+    const identity = await sut.ensurePersonIdentity(person.personGroupId);
     await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
 
     const { space: spaceA } = await ctx.newSharedSpace({ createdById: user.id });
@@ -2072,7 +2072,7 @@ describe(FaceIdentityRepository.name, () => {
 
     try {
       const result = await sut.getAccessiblePeople(user.id, { withHidden: false, page: 1, size: 50 });
-      expect(result.people).toEqual([expect.objectContaining({ id: person.id, birthDate: '2014-02-14' })]);
+      expect(result.people).toEqual([expect.objectContaining({ id: person.personGroupId, birthDate: '2014-02-14' })]);
     } finally {
       await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
     }
@@ -2083,8 +2083,8 @@ describe(FaceIdentityRepository.name, () => {
     const { user } = await ctx.newUser();
     const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Ina' }); // owner: no birthday
     const { asset } = await ctx.newAsset({ ownerId: user.id });
-    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
-    const identity = await sut.ensurePersonIdentity(person.id);
+    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+    const identity = await sut.ensurePersonIdentity(person.personGroupId);
     await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
 
     const { space: spaceA } = await ctx.newSharedSpace({ createdById: user.id });
@@ -2134,7 +2134,7 @@ describe(FaceIdentityRepository.name, () => {
 
     try {
       const result = await sut.getAccessiblePeople(user.id, { withHidden: false, page: 1, size: 50 });
-      expect(result.people).toEqual([expect.objectContaining({ id: person.id, birthDate: '2014-02-14' })]);
+      expect(result.people).toEqual([expect.objectContaining({ id: person.personGroupId, birthDate: '2014-02-14' })]);
     } finally {
       await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
     }
@@ -2147,8 +2147,8 @@ describe(FaceIdentityRepository.name, () => {
     await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
     const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Ina' });
     const { asset } = await ctx.newAsset({ ownerId: user.id });
-    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
-    const identity = await sut.ensurePersonIdentity(person.id);
+    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+    const identity = await sut.ensurePersonIdentity(person.personGroupId);
     await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
     await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
     const spacePerson = await ctx.database
@@ -2169,7 +2169,7 @@ describe(FaceIdentityRepository.name, () => {
 
     try {
       const result = await sut.getAccessiblePeople(user.id, { withHidden: false, page: 1, size: 50 });
-      expect(result.people).toEqual([expect.objectContaining({ id: person.id, name: 'Ina', birthDate: null })]);
+      expect(result.people).toEqual([expect.objectContaining({ id: person.personGroupId, name: 'Ina', birthDate: null })]);
     } finally {
       await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
     }
@@ -2182,8 +2182,8 @@ describe(FaceIdentityRepository.name, () => {
     await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
     const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Ina' });
     const { asset } = await ctx.newAsset({ ownerId: user.id });
-    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
-    const identity = await sut.ensurePersonIdentity(person.id);
+    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+    const identity = await sut.ensurePersonIdentity(person.personGroupId);
     await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
     await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
     const spacePerson = await ctx.database
@@ -2208,10 +2208,10 @@ describe(FaceIdentityRepository.name, () => {
 
     try {
       const hiddenExcluded = await sut.getAccessiblePeople(user.id, { withHidden: false, page: 1, size: 50 });
-      expect(hiddenExcluded.people).toEqual([expect.objectContaining({ id: person.id, birthDate: null })]);
+      expect(hiddenExcluded.people).toEqual([expect.objectContaining({ id: person.personGroupId, birthDate: null })]);
 
       const hiddenIncluded = await sut.getAccessiblePeople(user.id, { withHidden: true, page: 1, size: 50 });
-      expect(hiddenIncluded.people).toEqual([expect.objectContaining({ id: person.id, birthDate: '2014-02-14' })]);
+      expect(hiddenIncluded.people).toEqual([expect.objectContaining({ id: person.personGroupId, birthDate: '2014-02-14' })]);
     } finally {
       await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
     }
@@ -2224,8 +2224,8 @@ describe(FaceIdentityRepository.name, () => {
     await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
     const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Ina' });
     const { asset } = await ctx.newAsset({ ownerId: user.id });
-    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
-    const identity = await sut.ensurePersonIdentity(person.id);
+    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+    const identity = await sut.ensurePersonIdentity(person.personGroupId);
     await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
     await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
     const spacePerson = await ctx.database
@@ -2251,7 +2251,7 @@ describe(FaceIdentityRepository.name, () => {
 
     try {
       const result = await sut.getAccessiblePeople(user.id, { withHidden: false, page: 1, size: 50 });
-      expect(result.people).toEqual([expect.objectContaining({ id: person.id, birthDate: null })]);
+      expect(result.people).toEqual([expect.objectContaining({ id: person.personGroupId, birthDate: null })]);
     } finally {
       await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
     }
@@ -2336,25 +2336,25 @@ describe(FaceIdentityRepository.name, () => {
       const { asset: singletonAsset } = await ctx.newAsset({ ownerId: user.id });
       const { assetFace: singletonFace } = await ctx.newAssetFace({
         assetId: singletonAsset.id,
-        personId: singletonPerson.id,
+        personGroupId: singletonPerson.personGroupId,
       });
-      const singletonIdentity = await sut.ensurePersonIdentity(singletonPerson.id);
+      const singletonIdentity = await sut.ensurePersonIdentity(singletonPerson.personGroupId);
       await sut.linkFace({ assetFaceId: singletonFace.id, identityId: singletonIdentity.id, source: 'owner-person' });
 
       const { person: namedSingletonPerson } = await ctx.newPerson({ ownerId: user.id, name: 'Named singleton' });
       const { asset: namedAsset } = await ctx.newAsset({ ownerId: user.id });
       const { assetFace: namedFace } = await ctx.newAssetFace({
         assetId: namedAsset.id,
-        personId: namedSingletonPerson.id,
+        personGroupId: namedSingletonPerson.personGroupId,
       });
-      const namedIdentity = await sut.ensurePersonIdentity(namedSingletonPerson.id);
+      const namedIdentity = await sut.ensurePersonIdentity(namedSingletonPerson.personGroupId);
       await sut.linkFace({ assetFaceId: namedFace.id, identityId: namedIdentity.id, source: 'owner-person' });
 
       const { person: eligiblePerson } = await ctx.newPerson({ ownerId: user.id, name: '' });
-      const eligibleIdentity = await sut.ensurePersonIdentity(eligiblePerson.id);
+      const eligibleIdentity = await sut.ensurePersonIdentity(eligiblePerson.personGroupId);
       for (let index = 0; index < 3; index++) {
         const { asset } = await ctx.newAsset({ ownerId: user.id });
-        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: eligiblePerson.id });
+        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: eligiblePerson.personGroupId });
         await sut.linkFace({ assetFaceId: assetFace.id, identityId: eligibleIdentity.id, source: 'owner-person' });
       }
 
@@ -2367,11 +2367,11 @@ describe(FaceIdentityRepository.name, () => {
 
       expect(result.total).toBe(2);
       expect(result.people.map((person) => person.id)).toEqual(
-        expect.arrayContaining([namedSingletonPerson.id, eligiblePerson.id]),
+        expect.arrayContaining([namedSingletonPerson.personGroupId, eligiblePerson.personGroupId]),
       );
-      expect(result.people.map((person) => person.id)).not.toContain(singletonPerson.id);
-      expect(result.people.find((person) => person.id === namedSingletonPerson.id)?.numberOfAssets).toBe(1);
-      expect(result.people.find((person) => person.id === eligiblePerson.id)?.numberOfAssets).toBe(3);
+      expect(result.people.map((person) => person.id)).not.toContain(singletonPerson.personGroupId);
+      expect(result.people.find((person) => person.id === namedSingletonPerson.personGroupId)?.numberOfAssets).toBe(1);
+      expect(result.people.find((person) => person.id === eligiblePerson.personGroupId)?.numberOfAssets).toBe(3);
     } finally {
       await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
     }
@@ -2389,10 +2389,10 @@ describe(FaceIdentityRepository.name, () => {
 
       try {
         const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Counted' });
-        const identity = await sut.ensurePersonIdentity(person.id);
+        const identity = await sut.ensurePersonIdentity(person.personGroupId);
         for (let index = 0; index < 3; index++) {
           const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
-          const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+          const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
           await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
         }
 
@@ -2433,10 +2433,10 @@ describe(FaceIdentityRepository.name, () => {
 
       try {
         const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Twice' });
-        const identity = await sut.ensurePersonIdentity(person.id);
+        const identity = await sut.ensurePersonIdentity(person.personGroupId);
         const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
         for (let index = 0; index < 2; index++) {
-          const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+          const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
           await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
         }
 
@@ -2476,9 +2476,9 @@ describe(FaceIdentityRepository.name, () => {
         const identityIds: string[] = [];
         for (const name of ['Anna', 'Bruno', 'Carla']) {
           const { person } = await ctx.newPerson({ ownerId: user.id, name });
-          const identity = await sut.ensurePersonIdentity(person.id);
+          const identity = await sut.ensurePersonIdentity(person.personGroupId);
           const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
-          const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+          const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
           await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
           identityIds.push(identity.id);
         }
@@ -2514,10 +2514,10 @@ describe(FaceIdentityRepository.name, () => {
 
       try {
         const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Unreachable' });
-        const identity = await sut.ensurePersonIdentity(person.id);
+        const identity = await sut.ensurePersonIdentity(person.personGroupId);
         // The only face lives on an asset owned by someone else and never shared.
         const { asset } = await ctx.newAsset({ ownerId: stranger.id, visibility: AssetVisibility.Timeline });
-        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
         await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
 
         const withoutCounts = await sut.hydrateAccessiblePeople({
@@ -2546,9 +2546,9 @@ describe(FaceIdentityRepository.name, () => {
 
       try {
         const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Present' });
-        const identity = await sut.ensurePersonIdentity(person.id);
+        const identity = await sut.ensurePersonIdentity(person.personGroupId);
         const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
-        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
         await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
 
         const withCounts = await sut.hydrateAccessiblePeople({
@@ -2632,9 +2632,9 @@ describe(FaceIdentityRepository.name, () => {
       try {
         const seed = async (name: string, isHidden: boolean) => {
           const { person } = await ctx.newPerson({ ownerId: user.id, name, isHidden });
-          const identity = await sut.ensurePersonIdentity(person.id);
+          const identity = await sut.ensurePersonIdentity(person.personGroupId);
           const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
-          const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+          const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
           await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
           return identity.id;
         };
@@ -2667,10 +2667,10 @@ describe(FaceIdentityRepository.name, () => {
 
       try {
         const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Endtoend' });
-        const identity = await sut.ensurePersonIdentity(person.id);
+        const identity = await sut.ensurePersonIdentity(person.personGroupId);
         for (let index = 0; index < 4; index++) {
           const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
-          const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+          const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
           await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
         }
 
@@ -2690,7 +2690,7 @@ describe(FaceIdentityRepository.name, () => {
 
         const expected = Number(pageRows.find((row) => row.identityId === identity.id)?.visibleAssetCount);
         expect(expected).toBe(4);
-        expect(result.people.find((candidate) => candidate.id === person.id)?.numberOfAssets).toBe(expected);
+        expect(result.people.find((candidate) => candidate.id === person.personGroupId)?.numberOfAssets).toBe(expected);
       } finally {
         await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
       }
@@ -2708,23 +2708,23 @@ describe(FaceIdentityRepository.name, () => {
 
       try {
         const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Solo' });
-        const identity = await sut.ensurePersonIdentity(person.id);
+        const identity = await sut.ensurePersonIdentity(person.personGroupId);
         for (let index = 0; index < 2; index++) {
           const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
-          const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+          const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
           await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
         }
 
         // A face belonging to someone else's library must stay invisible on the fast path.
         const { person: theirs } = await ctx.newPerson({ ownerId: stranger.id, name: 'Theirs' });
-        const strangerIdentity = await sut.ensurePersonIdentity(theirs.id);
+        const strangerIdentity = await sut.ensurePersonIdentity(theirs.personGroupId);
         const { asset: strangerAsset } = await ctx.newAsset({
           ownerId: stranger.id,
           visibility: AssetVisibility.Timeline,
         });
         const { assetFace: strangerFace } = await ctx.newAssetFace({
           assetId: strangerAsset.id,
-          personId: theirs.id,
+          personGroupId: theirs.personGroupId,
         });
         await sut.linkFace({
           assetFaceId: strangerFace.id,
@@ -2996,9 +2996,9 @@ describe(FaceIdentityRepository.name, () => {
         const { asset: visibleAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
         const { assetFace: visibleFace } = await ctx.newAssetFace({
           assetId: visibleAsset.id,
-          personId: visiblePerson.id,
+          personGroupId: visiblePerson.personGroupId,
         });
-        const visibleIdentity = await sut.ensurePersonIdentity(visiblePerson.id);
+        const visibleIdentity = await sut.ensurePersonIdentity(visiblePerson.personGroupId);
         await sut.linkFace({ assetFaceId: visibleFace.id, identityId: visibleIdentity.id, source: 'owner-person' });
 
         const { person: hiddenPerson } = await ctx.newPerson({
@@ -3009,9 +3009,9 @@ describe(FaceIdentityRepository.name, () => {
         const { asset: hiddenAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
         const { assetFace: hiddenFace } = await ctx.newAssetFace({
           assetId: hiddenAsset.id,
-          personId: hiddenPerson.id,
+          personGroupId: hiddenPerson.personGroupId,
         });
-        const hiddenIdentity = await sut.ensurePersonIdentity(hiddenPerson.id);
+        const hiddenIdentity = await sut.ensurePersonIdentity(hiddenPerson.personGroupId);
         await sut.linkFace({ assetFaceId: hiddenFace.id, identityId: hiddenIdentity.id, source: 'owner-person' });
 
         const { asset: unassignedAsset } = await ctx.newAsset({
@@ -3037,8 +3037,8 @@ describe(FaceIdentityRepository.name, () => {
       try {
         const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Archived Person' });
         const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Archive });
-        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
-        const identity = await sut.ensurePersonIdentity(person.id);
+        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+        const identity = await sut.ensurePersonIdentity(person.personGroupId);
         await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
 
         await expect(sut.getAccessiblePeopleStatistics(user.id, { minimumFaceCount: 1 })).resolves.toEqual({
@@ -3060,8 +3060,8 @@ describe(FaceIdentityRepository.name, () => {
         await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
         const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Shared Alice' });
         const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
-        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
-        const identity = await sut.ensurePersonIdentity(person.id);
+        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+        const identity = await sut.ensurePersonIdentity(person.personGroupId);
         await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
         const spacePerson = await ctx.database
           .insertInto('shared_space_person')
@@ -3096,8 +3096,8 @@ describe(FaceIdentityRepository.name, () => {
         const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Owned Shared' });
         const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
         await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
-        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
-        const identity = await sut.ensurePersonIdentity(person.id);
+        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+        const identity = await sut.ensurePersonIdentity(person.personGroupId);
         await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
 
         await expect(sut.getAccessiblePeopleStatistics(user.id, { minimumFaceCount: 1 })).resolves.toEqual({
@@ -3126,8 +3126,8 @@ describe(FaceIdentityRepository.name, () => {
           libraryId: library.id,
           visibility: AssetVisibility.Timeline,
         });
-        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
-        const identity = await sut.ensurePersonIdentity(person.id);
+        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+        const identity = await sut.ensurePersonIdentity(person.personGroupId);
         await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
         await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id, addedById: source.id });
         const spacePerson = await ctx.database
@@ -3174,8 +3174,8 @@ describe(FaceIdentityRepository.name, () => {
           libraryId: library.id,
           visibility: AssetVisibility.Timeline,
         });
-        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
-        const identity = await sut.ensurePersonIdentity(person.id);
+        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+        const identity = await sut.ensurePersonIdentity(person.personGroupId);
         await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
 
         for (let index = 0; index < 2; index++) {
@@ -3216,9 +3216,9 @@ describe(FaceIdentityRepository.name, () => {
         const { asset: visibleAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
         const { assetFace: visibleFace } = await ctx.newAssetFace({
           assetId: visibleAsset.id,
-          personId: visiblePerson.id,
+          personGroupId: visiblePerson.personGroupId,
         });
-        const visibleIdentity = await sut.ensurePersonIdentity(visiblePerson.id);
+        const visibleIdentity = await sut.ensurePersonIdentity(visiblePerson.personGroupId);
         await sut.linkFace({ assetFaceId: visibleFace.id, identityId: visibleIdentity.id, source: 'owner-person' });
 
         const { person: offlinePerson } = await ctx.newPerson({
@@ -3233,9 +3233,9 @@ describe(FaceIdentityRepository.name, () => {
         });
         const { assetFace: offlineFace } = await ctx.newAssetFace({
           assetId: offlineAsset.id,
-          personId: offlinePerson.id,
+          personGroupId: offlinePerson.personGroupId,
         });
-        const offlineIdentity = await sut.ensurePersonIdentity(offlinePerson.id);
+        const offlineIdentity = await sut.ensurePersonIdentity(offlinePerson.personGroupId);
         await sut.linkFace({ assetFaceId: offlineFace.id, identityId: offlineIdentity.id, source: 'owner-person' });
 
         await expect(
@@ -3248,7 +3248,7 @@ describe(FaceIdentityRepository.name, () => {
         ).resolves.toMatchObject({
           total: 1,
           hidden: 0,
-          people: [expect.objectContaining({ id: visiblePerson.id })],
+          people: [expect.objectContaining({ id: visiblePerson.personGroupId })],
         });
         await expect(sut.getAccessiblePeopleStatistics(user.id, { minimumFaceCount: 1 })).resolves.toEqual({
           total: 1,
@@ -3427,8 +3427,8 @@ describe(FaceIdentityRepository.name, () => {
           libraryId: library.id,
           visibility: AssetVisibility.Timeline,
         });
-        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
-        const identity = await sut.ensurePersonIdentity(person.id);
+        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+        const identity = await sut.ensurePersonIdentity(person.personGroupId);
         await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
         await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: source.id });
         await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id, addedById: source.id });
@@ -3488,7 +3488,7 @@ describe(FaceIdentityRepository.name, () => {
         const second = await newLibraryIdentityFace(ctx, sut, {
           ownerId: owner.id,
           libraryId: library2.id,
-          personId: first.person.id,
+          personId: first.person.personGroupId,
           identityId: first.identity.id,
         });
         const spacePerson = await ctx.database
@@ -3613,7 +3613,7 @@ describe(FaceIdentityRepository.name, () => {
         await newLibraryIdentityFace(ctx, sut, {
           ownerId: owner.id,
           libraryId: library2.id,
-          personId: first.person.id,
+          personId: first.person.personGroupId,
           identityId: first.identity.id,
         });
 
@@ -3655,7 +3655,7 @@ describe(FaceIdentityRepository.name, () => {
         const second = await newLibraryIdentityFace(ctx, sut, {
           ownerId: owner.id,
           libraryId: library2.id,
-          personId: first.person.id,
+          personId: first.person.personGroupId,
           identityId: first.identity.id,
         });
         const spacePerson = await ctx.database
@@ -3708,8 +3708,8 @@ describe(FaceIdentityRepository.name, () => {
           libraryId: library.id,
           visibility: AssetVisibility.Timeline,
         });
-        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
-        const identity = await sut.ensurePersonIdentity(person.id);
+        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+        const identity = await sut.ensurePersonIdentity(person.personGroupId);
         await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
         await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id, addedById: source.id });
         const spacePerson = await ctx.database
@@ -3759,7 +3759,7 @@ describe(FaceIdentityRepository.name, () => {
         const named = await newIdentityFace(ctx, sut, { ownerId: user.id, name: 'Alice' });
         const { assetFace: secondNamedFace } = await ctx.newAssetFace({
           assetId: named.asset.id,
-          personId: named.person.id,
+          personGroupId: named.person.personGroupId,
         });
         await sut.linkFace({
           assetFaceId: secondNamedFace.id,
@@ -3786,10 +3786,10 @@ describe(FaceIdentityRepository.name, () => {
       const { user: partner } = await ctx.newUser();
       try {
         const { person } = await ctx.newPerson({ ownerId: owner.id, name: 'Alice' });
-        const identity = await sut.ensurePersonIdentity(person.id);
+        const identity = await sut.ensurePersonIdentity(person.personGroupId);
 
         const { asset: ownedAsset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
-        const { assetFace: ownedFace } = await ctx.newAssetFace({ assetId: ownedAsset.id, personId: person.id });
+        const { assetFace: ownedFace } = await ctx.newAssetFace({ assetId: ownedAsset.id, personGroupId: person.personGroupId });
         await sut.linkFace({ assetFaceId: ownedFace.id, identityId: identity.id, source: 'owner-person' });
 
         const { space } = await ctx.newSharedSpace({ createdById: partner.id, faceRecognitionEnabled: true });
@@ -3820,7 +3820,7 @@ describe(FaceIdentityRepository.name, () => {
       try {
         const { library } = await ctx.newLibrary({ ownerId: source.id });
         const { person } = await ctx.newPerson({ ownerId: source.id, name: 'Library Person' });
-        const identity = await sut.ensurePersonIdentity(person.id);
+        const identity = await sut.ensurePersonIdentity(person.personGroupId);
         const { space } = await ctx.newSharedSpace({ createdById: source.id, faceRecognitionEnabled: true });
         await ctx.newSharedSpaceMember({ spaceId: space.id, userId: source.id, role: SharedSpaceRole.Owner });
         await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: SharedSpaceRole.Viewer });
@@ -3831,7 +3831,7 @@ describe(FaceIdentityRepository.name, () => {
           libraryId: library.id,
           visibility: AssetVisibility.Timeline,
         });
-        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
         await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
 
         await expect(sut.getAccessiblePersonStatistics(member.id, identity.id)).resolves.toEqual({
@@ -3856,10 +3856,10 @@ describe(FaceIdentityRepository.name, () => {
       const { user: partner } = await ctx.newUser();
       try {
         const { person } = await ctx.newPerson({ ownerId: owner.id, name: 'Alice' });
-        const identity = await sut.ensurePersonIdentity(person.id);
+        const identity = await sut.ensurePersonIdentity(person.personGroupId);
 
         const { asset: ownedAsset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
-        const { assetFace: ownedFace } = await ctx.newAssetFace({ assetId: ownedAsset.id, personId: person.id });
+        const { assetFace: ownedFace } = await ctx.newAssetFace({ assetId: ownedAsset.id, personGroupId: person.personGroupId });
         await sut.linkFace({ assetFaceId: ownedFace.id, identityId: identity.id, source: 'owner-person' });
 
         const { space } = await ctx.newSharedSpace({ createdById: partner.id, faceRecognitionEnabled: true });
@@ -3900,8 +3900,8 @@ describe(FaceIdentityRepository.name, () => {
       try {
         const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Backfilled Person' });
         const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
-        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
-        const identity = await sut.ensurePersonIdentity(person.id);
+        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+        const identity = await sut.ensurePersonIdentity(person.personGroupId);
         await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
 
         await expect(sut.getAccessiblePersonStatistics(user.id, identity.id)).resolves.toEqual({ assets: 1, faces: 1 });
@@ -3923,14 +3923,14 @@ describe(FaceIdentityRepository.name, () => {
       const { user: member } = await ctx.newUser();
       try {
         const { person } = await ctx.newPerson({ ownerId: source.id, name: 'Library Person' });
-        const identity = await sut.ensurePersonIdentity(person.id);
+        const identity = await sut.ensurePersonIdentity(person.personGroupId);
         const { space } = await ctx.newSharedSpace({ createdById: source.id, faceRecognitionEnabled: true });
         await ctx.newSharedSpaceMember({ spaceId: space.id, userId: source.id, role: SharedSpaceRole.Owner });
         await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: SharedSpaceRole.Viewer });
         await setMemberTimeline(ctx, { spaceId: space.id, userId: member.id, showInTimeline: true });
         const { asset } = await ctx.newAsset({ ownerId: source.id, visibility: AssetVisibility.Timeline });
         await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: source.id });
-        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
         const spacePerson = await ctx.database
           .insertInto('shared_space_person')
           .values({ spaceId: space.id, identityId: identity.id, name: 'Library Person', type: 'person' })
@@ -3954,7 +3954,7 @@ describe(FaceIdentityRepository.name, () => {
       const { user: member } = await ctx.newUser();
       try {
         const { person } = await ctx.newPerson({ ownerId: source.id, name: 'Library Person' });
-        const identity = await sut.ensurePersonIdentity(person.id);
+        const identity = await sut.ensurePersonIdentity(person.personGroupId);
         const { space } = await ctx.newSharedSpace({ createdById: source.id, faceRecognitionEnabled: true });
         await ctx.newSharedSpaceMember({ spaceId: space.id, userId: source.id, role: SharedSpaceRole.Owner });
         await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: SharedSpaceRole.Viewer });
@@ -3971,7 +3971,7 @@ describe(FaceIdentityRepository.name, () => {
         await linkSpaceFace(ctx, hiddenProfile.id, assetFace.id);
 
         const { person: facelessPerson } = await ctx.newPerson({ ownerId: source.id, name: 'Faceless Person' });
-        const facelessIdentity = await sut.ensurePersonIdentity(facelessPerson.id);
+        const facelessIdentity = await sut.ensurePersonIdentity(facelessPerson.personGroupId);
         const facelessProfile = await ctx.database
           .insertInto('shared_space_person')
           .values({
@@ -3999,10 +3999,10 @@ describe(FaceIdentityRepository.name, () => {
     const { person: alice } = await ctx.newPerson({ ownerId: user.id, name: 'Alice' });
     const { person: bob } = await ctx.newPerson({ ownerId: user.id, name: 'Bob' });
     const { asset } = await ctx.newAsset({ ownerId: user.id });
-    const { assetFace: aliceFace } = await ctx.newAssetFace({ assetId: asset.id, personId: alice.id });
-    const { assetFace: bobFace } = await ctx.newAssetFace({ assetId: asset.id, personId: bob.id });
-    const aliceIdentity = await sut.ensurePersonIdentity(alice.id);
-    const bobIdentity = await sut.ensurePersonIdentity(bob.id);
+    const { assetFace: aliceFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: alice.personGroupId });
+    const { assetFace: bobFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: bob.personGroupId });
+    const aliceIdentity = await sut.ensurePersonIdentity(alice.personGroupId);
+    const bobIdentity = await sut.ensurePersonIdentity(bob.personGroupId);
     await sut.linkFace({ assetFaceId: aliceFace.id, identityId: aliceIdentity.id, source: 'backfill' });
     await sut.linkFace({ assetFaceId: bobFace.id, identityId: bobIdentity.id, source: 'backfill' });
     const singleIdentityPerson = await newSpacePerson(ctx, space.id);
@@ -4037,10 +4037,10 @@ describe(FaceIdentityRepository.name, () => {
       const { person: bob } = await ctx.newPerson({ ownerId: user.id, name: 'Bob' });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
-      const { assetFace: aliceFace } = await ctx.newAssetFace({ assetId: asset.id, personId: alice.id });
-      const { assetFace: bobFace } = await ctx.newAssetFace({ assetId: asset.id, personId: bob.id });
-      const aliceIdentity = await sut.ensurePersonIdentity(alice.id);
-      const bobIdentity = await sut.ensurePersonIdentity(bob.id);
+      const { assetFace: aliceFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: alice.personGroupId });
+      const { assetFace: bobFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: bob.personGroupId });
+      const aliceIdentity = await sut.ensurePersonIdentity(alice.personGroupId);
+      const bobIdentity = await sut.ensurePersonIdentity(bob.personGroupId);
       await sut.linkFace({ assetFaceId: aliceFace.id, identityId: aliceIdentity.id, source: 'backfill' });
       await sut.linkFace({ assetFaceId: bobFace.id, identityId: bobIdentity.id, source: 'backfill' });
       const mixedSpacePerson = await newSpacePerson(ctx, space.id);
@@ -4086,8 +4086,8 @@ describe(FaceIdentityRepository.name, () => {
       const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Consistent' });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
-      const identity = await sut.ensurePersonIdentity(person.id);
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+      const identity = await sut.ensurePersonIdentity(person.personGroupId);
       await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'backfill' });
       const spacePerson = await ctx.database
         .insertInto('shared_space_person')
@@ -4120,13 +4120,13 @@ describe(FaceIdentityRepository.name, () => {
     const { user } = await ctx.newUser();
     const { space } = await ctx.newSharedSpace({ createdById: user.id });
     const { person: dominantPerson } = await ctx.newPerson({ ownerId: user.id, name: 'Dominant' });
-    const dominantIdentity = await sut.ensurePersonIdentity(dominantPerson.id);
+    const dominantIdentity = await sut.ensurePersonIdentity(dominantPerson.personGroupId);
     const noisyIdentities = [];
     const spacePerson = await newSpacePerson(ctx, space.id);
 
     for (let index = 0; index < 100; index++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: dominantPerson.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: dominantPerson.personGroupId });
       await sut.linkFace({ assetFaceId: assetFace.id, identityId: dominantIdentity.id, source: 'backfill' });
       await linkSpaceFace(ctx, spacePerson.id, assetFace.id);
     }
@@ -4134,8 +4134,8 @@ describe(FaceIdentityRepository.name, () => {
     for (let index = 0; index < 3; index++) {
       const { person: noisyPerson } = await ctx.newPerson({ ownerId: user.id });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: noisyPerson.id });
-      const noisyIdentity = await sut.ensurePersonIdentity(noisyPerson.id);
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: noisyPerson.personGroupId });
+      const noisyIdentity = await sut.ensurePersonIdentity(noisyPerson.personGroupId);
       noisyIdentities.push(noisyIdentity.id);
       await sut.linkFace({ assetFaceId: assetFace.id, identityId: noisyIdentity.id, source: 'backfill' });
       await linkSpaceFace(ctx, spacePerson.id, assetFace.id);
@@ -4158,23 +4158,23 @@ describe(FaceIdentityRepository.name, () => {
     const { user } = await ctx.newUser();
     const { space } = await ctx.newSharedSpace({ createdById: user.id });
     const { person: dominantPerson } = await ctx.newPerson({ ownerId: user.id, name: 'Dominant' });
-    const dominantIdentity = await sut.ensurePersonIdentity(dominantPerson.id);
+    const dominantIdentity = await sut.ensurePersonIdentity(dominantPerson.personGroupId);
     const spacePerson = await newSpacePerson(ctx, space.id);
 
     for (let index = 0; index < 73; index++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: dominantPerson.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: dominantPerson.personGroupId });
       await sut.linkFace({ assetFaceId: assetFace.id, identityId: dominantIdentity.id, source: 'backfill' });
       await linkSpaceFace(ctx, spacePerson.id, assetFace.id);
     }
 
     for (let personIndex = 0; personIndex < 2; personIndex++) {
       const { person: noisyPerson } = await ctx.newPerson({ ownerId: user.id });
-      const noisyIdentity = await sut.ensurePersonIdentity(noisyPerson.id);
+      const noisyIdentity = await sut.ensurePersonIdentity(noisyPerson.personGroupId);
 
       for (let faceIndex = 0; faceIndex < 2; faceIndex++) {
         const { asset } = await ctx.newAsset({ ownerId: user.id });
-        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: noisyPerson.id });
+        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: noisyPerson.personGroupId });
         await sut.linkFace({ assetFaceId: assetFace.id, identityId: noisyIdentity.id, source: 'backfill' });
         await linkSpaceFace(ctx, spacePerson.id, assetFace.id);
       }
@@ -4197,20 +4197,20 @@ describe(FaceIdentityRepository.name, () => {
     const { space } = await ctx.newSharedSpace({ createdById: user.id });
     const { person: dominantPerson } = await ctx.newPerson({ ownerId: user.id, name: 'Dominant' });
     const { person: noisyPerson } = await ctx.newPerson({ ownerId: user.id, name: 'Noisy' });
-    const dominantIdentity = await sut.ensurePersonIdentity(dominantPerson.id);
-    const noisyIdentity = await sut.ensurePersonIdentity(noisyPerson.id);
+    const dominantIdentity = await sut.ensurePersonIdentity(dominantPerson.personGroupId);
+    const noisyIdentity = await sut.ensurePersonIdentity(noisyPerson.personGroupId);
     const spacePerson = await newSpacePerson(ctx, space.id);
 
     for (let index = 0; index < 200; index++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: dominantPerson.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: dominantPerson.personGroupId });
       await sut.linkFace({ assetFaceId: assetFace.id, identityId: dominantIdentity.id, source: 'backfill' });
       await linkSpaceFace(ctx, spacePerson.id, assetFace.id);
     }
 
     for (let index = 0; index < 20; index++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: noisyPerson.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: noisyPerson.personGroupId });
       await sut.linkFace({ assetFaceId: assetFace.id, identityId: noisyIdentity.id, source: 'backfill' });
       await linkSpaceFace(ctx, spacePerson.id, assetFace.id);
     }
@@ -4232,20 +4232,20 @@ describe(FaceIdentityRepository.name, () => {
     const { space } = await ctx.newSharedSpace({ createdById: user.id });
     const { person: dominantPerson } = await ctx.newPerson({ ownerId: user.id, name: 'Dominant' });
     const { person: noisyPerson } = await ctx.newPerson({ ownerId: user.id, name: 'Noisy' });
-    const dominantIdentity = await sut.ensurePersonIdentity(dominantPerson.id);
-    const noisyIdentity = await sut.ensurePersonIdentity(noisyPerson.id);
+    const dominantIdentity = await sut.ensurePersonIdentity(dominantPerson.personGroupId);
+    const noisyIdentity = await sut.ensurePersonIdentity(noisyPerson.personGroupId);
     const spacePerson = await newSpacePerson(ctx, space.id);
 
     for (let index = 0; index < 73; index++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: dominantPerson.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: dominantPerson.personGroupId });
       await sut.linkFace({ assetFaceId: assetFace.id, identityId: dominantIdentity.id, source: 'backfill' });
       await linkSpaceFace(ctx, spacePerson.id, assetFace.id);
     }
 
     for (let index = 0; index < 9; index++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: noisyPerson.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: noisyPerson.personGroupId });
       await sut.linkFace({ assetFaceId: assetFace.id, identityId: noisyIdentity.id, source: 'backfill' });
       await linkSpaceFace(ctx, spacePerson.id, assetFace.id);
     }
@@ -4268,9 +4268,9 @@ describe(FaceIdentityRepository.name, () => {
     const { space } = await ctx.newSharedSpace({ createdById: user.id });
     const { person } = await ctx.newPerson({ ownerId: user.id });
     const { asset } = await ctx.newAsset({ ownerId: user.id });
-    const { assetFace: firstFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
-    const { assetFace: secondFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
-    const identity = await sut.ensurePersonIdentity(person.id);
+    const { assetFace: firstFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+    const { assetFace: secondFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+    const identity = await sut.ensurePersonIdentity(person.personGroupId);
     await sut.linkFace({ assetFaceId: firstFace.id, identityId: identity.id, source: 'backfill' });
     await sut.linkFace({ assetFaceId: secondFace.id, identityId: identity.id, source: 'backfill' });
     const firstSpacePerson = await newSpacePerson(ctx, space.id);
@@ -4298,10 +4298,10 @@ describe(FaceIdentityRepository.name, () => {
     const { person: targetPerson } = await ctx.newPerson({ ownerId: user.id });
     const { person: sourcePerson } = await ctx.newPerson({ ownerId: user.id });
     const { asset } = await ctx.newAsset({ ownerId: user.id });
-    const { assetFace: targetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: targetPerson.id });
-    const { assetFace: sourceFace } = await ctx.newAssetFace({ assetId: asset.id, personId: sourcePerson.id });
-    const targetIdentity = await sut.ensurePersonIdentity(targetPerson.id);
-    const sourceIdentity = await sut.ensurePersonIdentity(sourcePerson.id);
+    const { assetFace: targetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: targetPerson.personGroupId });
+    const { assetFace: sourceFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: sourcePerson.personGroupId });
+    const targetIdentity = await sut.ensurePersonIdentity(targetPerson.personGroupId);
+    const sourceIdentity = await sut.ensurePersonIdentity(sourcePerson.personGroupId);
     const sourceSpacePerson = await newSpacePerson(ctx, space.id);
     await ctx.database
       .updateTable('shared_space_person')
@@ -4326,7 +4326,7 @@ describe(FaceIdentityRepository.name, () => {
     const sourceProfile = await ctx.database
       .selectFrom('person')
       .select('identityId')
-      .where('id', '=', sourcePerson.id)
+      .where('personGroupId', '=', sourcePerson.personGroupId)
       .executeTakeFirstOrThrow();
     const sourceSpaceProfile = await ctx.database
       .selectFrom('shared_space_person')
@@ -4347,9 +4347,9 @@ describe(FaceIdentityRepository.name, () => {
       const { person: targetPerson } = await ctx.newPerson({ ownerId: user.id });
       const { person: sourcePerson } = await ctx.newPerson({ ownerId: user.id });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace: sourceFace } = await ctx.newAssetFace({ assetId: asset.id, personId: sourcePerson.id });
-      const targetIdentity = await sut.ensurePersonIdentity(targetPerson.id);
-      const sourceIdentity = await sut.ensurePersonIdentity(sourcePerson.id);
+      const { assetFace: sourceFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: sourcePerson.personGroupId });
+      const targetIdentity = await sut.ensurePersonIdentity(targetPerson.personGroupId);
+      const sourceIdentity = await sut.ensurePersonIdentity(sourcePerson.personGroupId);
       await sut.linkFace({
         assetFaceId: sourceFace.id,
         identityId: sourceIdentity.id,
@@ -4366,7 +4366,7 @@ describe(FaceIdentityRepository.name, () => {
 
       const faces = await ctx.database
         .selectFrom('asset_face')
-        .innerJoin('person', 'person.id', 'asset_face.personId')
+        .innerJoin('person', 'person.personGroupId', 'asset_face.personId')
         .innerJoin('face_identity_face', 'face_identity_face.assetFaceId', 'asset_face.id')
         .select([
           'asset_face.id as assetFaceId',
@@ -4435,8 +4435,8 @@ describe(FaceIdentityRepository.name, () => {
     try {
       const { person: targetPerson } = await ctx.newPerson({ ownerId: user.id });
       const { person: sourcePerson } = await ctx.newPerson({ ownerId: user.id });
-      const targetIdentity = await sut.ensurePersonIdentity(targetPerson.id);
-      const sourceIdentity = await sut.ensurePersonIdentity(sourcePerson.id);
+      const targetIdentity = await sut.ensurePersonIdentity(targetPerson.personGroupId);
+      const sourceIdentity = await sut.ensurePersonIdentity(sourcePerson.personGroupId);
 
       await expect(
         sut.getMergeConflicts({
@@ -4614,9 +4614,9 @@ describe(FaceIdentityRepository.name, () => {
       const { asset: personalAsset } = await ctx.newAsset({ ownerId: user.id });
       const { assetFace: personalFace } = await ctx.newAssetFace({
         assetId: personalAsset.id,
-        personId: personalPerson.id,
+        personGroupId: personalPerson.personGroupId,
       });
-      const personalIdentity = await sut.ensurePersonIdentity(personalPerson.id);
+      const personalIdentity = await sut.ensurePersonIdentity(personalPerson.personGroupId);
       await sut.linkFace({ assetFaceId: personalFace.id, identityId: personalIdentity.id, source: 'owner-person' });
 
       const { asset: spaceAsset } = await ctx.newAsset({ ownerId: user.id });
@@ -4650,7 +4650,7 @@ describe(FaceIdentityRepository.name, () => {
       const personalProfile = await ctx.database
         .selectFrom('person')
         .select(['name', 'birthDate', 'identityId'])
-        .where('id', '=', personalPerson.id)
+        .where('personGroupId', '=', personalPerson.personGroupId)
         .executeTakeFirstOrThrow();
       const spaceProfile = await ctx.database
         .selectFrom('shared_space_person')
@@ -4680,9 +4680,9 @@ describe(FaceIdentityRepository.name, () => {
       const { asset: personalAsset } = await ctx.newAsset({ ownerId: user.id });
       const { assetFace: personalFace } = await ctx.newAssetFace({
         assetId: personalAsset.id,
-        personId: personalPerson.id,
+        personGroupId: personalPerson.personGroupId,
       });
-      const originalIdentity = await sut.ensurePersonIdentity(personalPerson.id);
+      const originalIdentity = await sut.ensurePersonIdentity(personalPerson.personGroupId);
       await sut.linkFace({ assetFaceId: personalFace.id, identityId: originalIdentity.id, source: 'owner-person' });
 
       const { asset: spaceAsset } = await ctx.newAsset({ ownerId: user.id });
@@ -4719,7 +4719,7 @@ describe(FaceIdentityRepository.name, () => {
       const sourcePersonal = await ctx.database
         .selectFrom('person')
         .select('identityId')
-        .where('id', '=', personalPerson.id)
+        .where('personGroupId', '=', personalPerson.personGroupId)
         .executeTakeFirstOrThrow();
       const links = await ctx.database
         .selectFrom('face_identity_face')
@@ -4753,7 +4753,7 @@ describe(FaceIdentityRepository.name, () => {
       const { space } = await ctx.newSharedSpace({ createdById: user.id });
       await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
       const { person: personalPerson } = await ctx.newPerson({ ownerId: user.id, name: 'Alice' });
-      const originalIdentity = await sut.ensurePersonIdentity(personalPerson.id);
+      const originalIdentity = await sut.ensurePersonIdentity(personalPerson.personGroupId);
 
       // Two faces behind ONE space profile, reaching it by different routes: one placed by the machine, one
       // genuinely placed by a human. The detach must leave both labels exactly as it found them.
@@ -4817,8 +4817,8 @@ describe(FaceIdentityRepository.name, () => {
       await ctx.newSharedSpaceMember({ spaceId: space.id, userId: actor.id, role: SharedSpaceRole.Editor });
       const { person: sourcePerson } = await ctx.newPerson({ ownerId: sourceOwner.id });
       const { asset } = await ctx.newAsset({ ownerId: sourceOwner.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: sourcePerson.id });
-      const identity = await sut.ensurePersonIdentity(sourcePerson.id);
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: sourcePerson.personGroupId });
+      const identity = await sut.ensurePersonIdentity(sourcePerson.personGroupId);
       await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
       const spacePerson = await ctx.database
         .insertInto('shared_space_person')
@@ -5053,9 +5053,9 @@ describe(FaceIdentityRepository.name, () => {
         // Person B owns a single axis-B face that is (corruptly) linked to A's identity — the state a bad
         // automatic merge leaves behind. Repair would otherwise follow the identity link and move it to A.
         const { person: personB } = await ctx.newPerson({ ownerId: user.id });
-        const identityB = await sut.ensurePersonIdentity(personB.id);
+        const identityB = await sut.ensurePersonIdentity(personB.personGroupId);
         const { asset } = await ctx.newAsset({ ownerId: user.id });
-        const { assetFace: corruptFace } = await ctx.newAssetFace({ assetId: asset.id, personId: personB.id });
+        const { assetFace: corruptFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: personB.personGroupId });
         await ctx.database
           .insertInto('face_search')
           .values({ faceId: corruptFace.id, embedding: axisEmbedding('second') })
@@ -5073,7 +5073,7 @@ describe(FaceIdentityRepository.name, () => {
           .select('personId')
           .where('id', '=', corruptFace.id)
           .executeTakeFirstOrThrow();
-        expect(row.personId).toBe(personB.id);
+        expect(row.personId).toBe(personB.personGroupId);
 
         // The mismatch must be resolved by realigning the kept face's identity to its current person —
         // otherwise person.identityId stays DISTINCT FROM face_identity_face.identityId, getBackfillWork()
@@ -5102,14 +5102,14 @@ describe(FaceIdentityRepository.name, () => {
         // getBackfillWork() reports work forever and handleFaceIdentityBackfill re-queues in an
         // endless loop of full-table passes.
         const { person } = await ctx.newPerson({ ownerId: user.id });
-        const personIdentity = await sut.ensurePersonIdentity(person.id);
+        const personIdentity = await sut.ensurePersonIdentity(person.personGroupId);
         const foreignIdentity = await ctx.database
           .insertInto('face_identity')
           .values({ type: 'person' })
           .returningAll()
           .executeTakeFirstOrThrow();
         const { asset } = await ctx.newAsset({ ownerId: user.id });
-        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
         await sut.linkFace({
           assetFaceId: assetFace.id,
           identityId: foreignIdentity.id,
@@ -5123,7 +5123,7 @@ describe(FaceIdentityRepository.name, () => {
           .select('personId')
           .where('id', '=', assetFace.id)
           .executeTakeFirstOrThrow();
-        expect(row.personId).toBe(person.id);
+        expect(row.personId).toBe(person.personGroupId);
 
         const link = await ctx.database
           .selectFrom('face_identity_face')
@@ -5150,9 +5150,9 @@ describe(FaceIdentityRepository.name, () => {
         });
         // Person B owns an axis-A face linked to A's identity: a legitimate consolidation that must proceed.
         const { person: personB } = await ctx.newPerson({ ownerId: user.id });
-        await sut.ensurePersonIdentity(personB.id);
+        await sut.ensurePersonIdentity(personB.personGroupId);
         const { asset } = await ctx.newAsset({ ownerId: user.id });
-        const { assetFace: resemblingFace } = await ctx.newAssetFace({ assetId: asset.id, personId: personB.id });
+        const { assetFace: resemblingFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: personB.personGroupId });
         await ctx.database
           .insertInto('face_search')
           .values({ faceId: resemblingFace.id, embedding: axisEmbedding('first') })
@@ -5170,7 +5170,7 @@ describe(FaceIdentityRepository.name, () => {
           .select('personId')
           .where('id', '=', resemblingFace.id)
           .executeTakeFirstOrThrow();
-        expect(row.personId).toBe(personA.person.id);
+        expect(row.personId).toBe(personA.person.personGroupId);
       } finally {
         await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
       }
@@ -5186,11 +5186,11 @@ describe(FaceIdentityRepository.name, () => {
           faceCount: 3,
         });
         const { person: personB } = await ctx.newPerson({ ownerId: user.id });
-        const identityB = await sut.ensurePersonIdentity(personB.id);
+        const identityB = await sut.ensurePersonIdentity(personB.personGroupId);
         // Two faces on B, both linked to A's identity: one resembles A (axis-A), one does not (axis-B).
         const makeBFaceLinkedToA = async (embedding: string) => {
           const { asset } = await ctx.newAsset({ ownerId: user.id });
-          const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: personB.id });
+          const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: personB.personGroupId });
           await ctx.database.insertInto('face_search').values({ faceId: assetFace.id, embedding }).execute();
           await sut.linkFace({
             assetFaceId: assetFace.id,
@@ -5215,8 +5215,8 @@ describe(FaceIdentityRepository.name, () => {
           .where('assetFaceId', '=', distinctFaceId)
           .executeTakeFirstOrThrow();
 
-        expect(faces.find((face) => face.id === resemblingFaceId)?.personId).toBe(personA.person.id);
-        expect(faces.find((face) => face.id === distinctFaceId)?.personId).toBe(personB.id);
+        expect(faces.find((face) => face.id === resemblingFaceId)?.personId).toBe(personA.person.personGroupId);
+        expect(faces.find((face) => face.id === distinctFaceId)?.personId).toBe(personB.personGroupId);
         expect(distinctLink.identityId).toBe(identityB.id);
         const backfillWork = await sut.getBackfillWork();
         expect(backfillWork.hasPersonalIdentityWork).toBe(false);
@@ -5235,10 +5235,10 @@ describe(FaceIdentityRepository.name, () => {
           faceCount: 3,
         });
         const { person: personB } = await ctx.newPerson({ ownerId: user.id });
-        await sut.ensurePersonIdentity(personB.id);
+        await sut.ensurePersonIdentity(personB.personGroupId);
         const makeBFaceLinkedToA = async (embedding: string) => {
           const { asset } = await ctx.newAsset({ ownerId: user.id });
-          const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: personB.id });
+          const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: personB.personGroupId });
           await ctx.database.insertInto('face_search').values({ faceId: assetFace.id, embedding }).execute();
           await sut.linkFace({
             assetFaceId: assetFace.id,
@@ -5257,8 +5257,8 @@ describe(FaceIdentityRepository.name, () => {
           .select(['id', 'personId'])
           .where('id', 'in', [insideFaceId, outsideFaceId])
           .execute();
-        expect(faces.find((face) => face.id === insideFaceId)?.personId).toBe(personA.person.id);
-        expect(faces.find((face) => face.id === outsideFaceId)?.personId).toBe(personB.id);
+        expect(faces.find((face) => face.id === insideFaceId)?.personId).toBe(personA.person.personGroupId);
+        expect(faces.find((face) => face.id === outsideFaceId)?.personId).toBe(personB.personGroupId);
       } finally {
         await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
       }
@@ -5270,10 +5270,10 @@ describe(FaceIdentityRepository.name, () => {
       try {
         // Person A is already 50/50 contaminated: three axis-A faces and three axis-B faces, all on A.
         const { person: personA } = await ctx.newPerson({ ownerId: user.id });
-        const identityA = await sut.ensurePersonIdentity(personA.id);
+        const identityA = await sut.ensurePersonIdentity(personA.personGroupId);
         const addAFace = async (embedding: string) => {
           const { asset } = await ctx.newAsset({ ownerId: user.id });
-          const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: personA.id });
+          const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: personA.personGroupId });
           await ctx.database.insertInto('face_search').values({ faceId: assetFace.id, embedding }).execute();
           await sut.linkFace({ assetFaceId: assetFace.id, identityId: identityA.id, source: 'owner-person' });
         };
@@ -5286,9 +5286,9 @@ describe(FaceIdentityRepository.name, () => {
         // A new pure axis-B face. Against A's MIXED centroid it is only ~0.29 away (< 0.5), so the guard
         // does NOT block it — once a cluster spans two people its centroid no longer represents one person.
         const { person: personB } = await ctx.newPerson({ ownerId: user.id });
-        await sut.ensurePersonIdentity(personB.id);
+        await sut.ensurePersonIdentity(personB.personGroupId);
         const { asset } = await ctx.newAsset({ ownerId: user.id });
-        const { assetFace: bFace } = await ctx.newAssetFace({ assetId: asset.id, personId: personB.id });
+        const { assetFace: bFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: personB.personGroupId });
         await ctx.database
           .insertInto('face_search')
           .values({ faceId: bFace.id, embedding: axisEmbedding('second') })
@@ -5303,7 +5303,7 @@ describe(FaceIdentityRepository.name, () => {
           .where('id', '=', bFace.id)
           .executeTakeFirstOrThrow();
         // Limitation: the guard is strongest at first contamination (clean target) and weaker mid-cascade.
-        expect(row.personId).toBe(personA.id);
+        expect(row.personId).toBe(personA.personGroupId);
       } finally {
         await ctx.database.deleteFrom('user').where('id', '=', user.id).execute();
       }
@@ -5319,11 +5319,11 @@ describe(FaceIdentityRepository.name, () => {
       const { ctx, sut } = setup();
       const { user } = await ctx.newUser();
       const { person } = await ctx.newPerson({ ownerId: user.id });
-      const identity = await sut.ensurePersonIdentity(person.id);
+      const identity = await sut.ensurePersonIdentity(person.personGroupId);
       const { asset: assetA } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace: faceA } = await ctx.newAssetFace({ assetId: assetA.id, personId: person.id });
+      const { assetFace: faceA } = await ctx.newAssetFace({ assetId: assetA.id, personGroupId: person.personGroupId });
       const { asset: assetB } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace: faceB } = await ctx.newAssetFace({ assetId: assetB.id, personId: person.id });
+      const { assetFace: faceB } = await ctx.newAssetFace({ assetId: assetB.id, personGroupId: person.personGroupId });
 
       // Repeating faceA's id must not raise Postgres 21000.
       await sut.replaceFaceIdentities({
@@ -5352,16 +5352,16 @@ describe(FaceIdentityRepository.name, () => {
       const { user } = await ctx.newUser();
       const { person: personP } = await ctx.newPerson({ ownerId: user.id });
       const { person: personQ } = await ctx.newPerson({ ownerId: user.id });
-      const identityP = await sut.ensurePersonIdentity(personP.id);
+      const identityP = await sut.ensurePersonIdentity(personP.personGroupId);
       const { asset } = await ctx.newAsset({ ownerId: user.id });
       // GIVEN: an eligibility read taken before this call (e.g. getEligibleFaceIdsForPerson) observed this
       // face on personP — the face is created on P to model that stale snapshot.
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: personP.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: personP.personGroupId });
       // GIVEN: a concurrent reassignment lands between that read and this write, moving the face onto
       // personQ before replaceFaceIdentities runs — the exact race the requirePersonId guard exists to catch.
       await ctx.database
         .updateTable('asset_face')
-        .set({ personId: personQ.id })
+        .set({ personId: personQ.personGroupId })
         .where('id', '=', assetFace.id)
         .execute();
 
@@ -5370,7 +5370,7 @@ describe(FaceIdentityRepository.name, () => {
         assetFaceIds: [assetFace.id],
         identityId: identityP.id,
         source: 'manual',
-        requirePersonId: personP.id,
+        requirePersonId: personP.personGroupId,
       });
 
       // THEN: the raced face is neither returned nor linked to P's identity.
@@ -5390,17 +5390,17 @@ describe(FaceIdentityRepository.name, () => {
       const { ctx, sut } = setup();
       const { user } = await ctx.newUser();
       const { person } = await ctx.newPerson({ ownerId: user.id });
-      const identity = await sut.ensurePersonIdentity(person.id);
+      const identity = await sut.ensurePersonIdentity(person.personGroupId);
       const { asset } = await ctx.newAsset({ ownerId: user.id });
       // GIVEN: the face is still on `person` — no race occurred.
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
 
       // WHEN
       const written = await sut.replaceFaceIdentities({
         assetFaceIds: [assetFace.id],
         identityId: identity.id,
         source: 'manual',
-        requirePersonId: person.id,
+        requirePersonId: person.personGroupId,
       });
 
       // THEN
@@ -5422,14 +5422,14 @@ describe(FaceIdentityRepository.name, () => {
       const { user } = await ctx.newUser();
       const { person: originalPerson } = await ctx.newPerson({ ownerId: user.id });
       const { person: destinationPerson } = await ctx.newPerson({ ownerId: user.id });
-      const destinationIdentity = await sut.ensurePersonIdentity(destinationPerson.id);
+      const destinationIdentity = await sut.ensurePersonIdentity(destinationPerson.personGroupId);
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: originalPerson.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: originalPerson.personGroupId });
       // GIVEN: mirrors the move path — the face's personId has already moved to the destination by the
       // time replaceFaceIdentities runs.
       await ctx.database
         .updateTable('asset_face')
-        .set({ personId: destinationPerson.id })
+        .set({ personId: destinationPerson.personGroupId })
         .where('id', '=', assetFace.id)
         .execute();
 
@@ -5473,19 +5473,19 @@ describe(FaceIdentityRepository.name, () => {
       const { ctx, sut } = setup();
       const { user } = await ctx.newUser();
       const { person } = await ctx.newPerson({ ownerId: user.id });
-      const identity = await sut.ensurePersonIdentity(person.id);
+      const identity = await sut.ensurePersonIdentity(person.personGroupId);
 
       const { asset: assetA } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace: manualFaceA } = await ctx.newAssetFace({ assetId: assetA.id, personId: person.id });
+      const { assetFace: manualFaceA } = await ctx.newAssetFace({ assetId: assetA.id, personGroupId: person.personGroupId });
       await sut.linkFace({ assetFaceId: manualFaceA.id, identityId: identity.id, source: 'manual' });
 
       const { asset: assetB } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace: manualFaceB } = await ctx.newAssetFace({ assetId: assetB.id, personId: person.id });
+      const { assetFace: manualFaceB } = await ctx.newAssetFace({ assetId: assetB.id, personGroupId: person.personGroupId });
       await sut.linkFace({ assetFaceId: manualFaceB.id, identityId: identity.id, source: 'manual' });
 
       // Positive control: a manual link that is NOT in the request — must stay 'manual'.
       const { asset: assetC } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace: untouchedManualFace } = await ctx.newAssetFace({ assetId: assetC.id, personId: person.id });
+      const { assetFace: untouchedManualFace } = await ctx.newAssetFace({ assetId: assetC.id, personGroupId: person.personGroupId });
       await sut.linkFace({ assetFaceId: untouchedManualFace.id, identityId: identity.id, source: 'manual' });
 
       const filler = Array.from({ length: 70_000 }, () => randomUUID());
@@ -5513,13 +5513,13 @@ describe(FaceIdentityRepository.name, () => {
       const { ctx, sut } = setup();
       const { user } = await ctx.newUser();
       const { person } = await ctx.newPerson({ ownerId: user.id });
-      const identity = await sut.ensurePersonIdentity(person.id);
+      const identity = await sut.ensurePersonIdentity(person.personGroupId);
       const { asset: manualAsset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace: manualFace } = await ctx.newAssetFace({ assetId: manualAsset.id, personId: person.id });
+      const { assetFace: manualFace } = await ctx.newAssetFace({ assetId: manualAsset.id, personGroupId: person.personGroupId });
       await sut.linkFace({ assetFaceId: manualFace.id, identityId: identity.id, source: 'manual' });
 
       const { asset: mlAsset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace: mlFace } = await ctx.newAssetFace({ assetId: mlAsset.id, personId: person.id });
+      const { assetFace: mlFace } = await ctx.newAssetFace({ assetId: mlAsset.id, personGroupId: person.personGroupId });
       await sut.linkFace({ assetFaceId: mlFace.id, identityId: identity.id, source: 'ml' });
 
       const filler = Array.from({ length: 70_000 }, () => randomUUID());
@@ -5537,16 +5537,16 @@ describe(FaceIdentityRepository.name, () => {
       const { ctx, sut } = setup();
       const { user } = await ctx.newUser();
       const { person } = await ctx.newPerson({ ownerId: user.id });
-      const identity = await sut.ensurePersonIdentity(person.id);
+      const identity = await sut.ensurePersonIdentity(person.personGroupId);
       // Positive control: a person with no identity yet must still resolve to its bare person token,
       // proving the chunk isn't merely returning the FIRST id it sees.
       const { person: personWithoutIdentity } = await ctx.newPerson({ ownerId: user.id });
 
       const filler = Array.from({ length: 70_000 }, () => randomUUID());
-      const tokens = await sut.getPersonVerdictTokens([person.id, personWithoutIdentity.id, ...filler]);
+      const tokens = await sut.getPersonVerdictTokens([person.personGroupId, personWithoutIdentity.personGroupId, ...filler]);
 
-      expect(tokens.get(person.id)).toEqual([`identity:${identity.id}`, `person:${person.id}`]);
-      expect(tokens.get(personWithoutIdentity.id)).toEqual([`person:${personWithoutIdentity.id}`]);
+      expect(tokens.get(person.personGroupId)).toEqual([`identity:${identity.id}`, `person:${person.personGroupId}`]);
+      expect(tokens.get(personWithoutIdentity.personGroupId)).toEqual([`person:${personWithoutIdentity.personGroupId}`]);
     });
   });
 });
