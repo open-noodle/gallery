@@ -46,7 +46,7 @@ const seedPersonOnSpaceAsset = async (visibility: AssetVisibility) => {
   await ctx.newSharedSpaceMember({ spaceId: space.id, userId: viewer.id, role: 'viewer' });
   const { person } = await ctx.newPerson({ ownerId: owner.id });
   const { asset } = await ctx.newAsset({ ownerId: owner.id, visibility });
-  await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+  await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
   await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
   return { accessRepo, viewer, person };
 };
@@ -622,14 +622,14 @@ describe('checkSpaceEditAccess — visibility gate (Slice 10)', () => {
 describe('checkSharedSpaceAccess (PersonRead) — visibility widening (rbac-7)', () => {
   it('GRANTS PersonRead for a person whose only space face is on an Archived asset (was denied)', async () => {
     const { accessRepo, viewer, person } = await seedPersonOnSpaceAsset(AssetVisibility.Archive);
-    const result = await accessRepo.person.checkSharedSpaceAccess(viewer.id, new Set([person.id]));
-    expect(result.has(person.id)).toBe(true);
+    const result = await accessRepo.person.checkSharedSpaceAccess(viewer.id, new Set([person.personGroupId]));
+    expect(result.has(person.personGroupId)).toBe(true);
   });
 
   it('grants PersonRead on a Timeline asset (positive control, regression)', async () => {
     const { accessRepo, viewer, person } = await seedPersonOnSpaceAsset(AssetVisibility.Timeline);
-    const result = await accessRepo.person.checkSharedSpaceAccess(viewer.id, new Set([person.id]));
-    expect(result.has(person.id)).toBe(true);
+    const result = await accessRepo.person.checkSharedSpaceAccess(viewer.id, new Set([person.personGroupId]));
+    expect(result.has(person.personGroupId)).toBe(true);
   });
 
   it('never grants PersonRead when the person only appears on Hidden or Locked space assets', async () => {
@@ -637,14 +637,14 @@ describe('checkSharedSpaceAccess (PersonRead) — visibility widening (rbac-7)',
     const lockedCase = await seedPersonOnSpaceAsset(AssetVisibility.Locked);
     const hiddenResult = await hiddenCase.accessRepo.person.checkSharedSpaceAccess(
       hiddenCase.viewer.id,
-      new Set([hiddenCase.person.id]),
+      new Set([hiddenCase.person.personGroupId]),
     );
     const lockedResult = await lockedCase.accessRepo.person.checkSharedSpaceAccess(
       lockedCase.viewer.id,
-      new Set([lockedCase.person.id]),
+      new Set([lockedCase.person.personGroupId]),
     );
-    expect(hiddenResult.has(hiddenCase.person.id)).toBe(false);
-    expect(lockedResult.has(lockedCase.person.id)).toBe(false);
+    expect(hiddenResult.has(hiddenCase.person.personGroupId)).toBe(false);
+    expect(lockedResult.has(lockedCase.person.personGroupId)).toBe(false);
   });
 });
 

@@ -57,7 +57,7 @@ const seedSearchableFace = async (
   const { asset } = await ctx.newAsset({ ownerId: input.ownerId });
   const { assetFace } = await ctx.newAssetFace({
     assetId: asset.id,
-    personId: input.personId,
+    personGroupId: input.personId,
     sourceType: SourceType.MachineLearning,
   });
   await ctx.database.insertInto('face_search').values({ faceId: assetFace.id, embedding: input.embedding }).execute();
@@ -100,11 +100,11 @@ describe('unassignFaces clears human placements', () => {
     const { asset } = await ctx.newAsset({ ownerId: user.id });
     const { assetFace } = await ctx.newAssetFace({
       assetId: asset.id,
-      personId: person.id,
+      personGroupId: person.personGroupId,
       sourceType: SourceType.MachineLearning,
     });
 
-    const identity = await faceIdentityRepository.ensurePersonIdentity(person.id);
+    const identity = await faceIdentityRepository.ensurePersonIdentity(person.personGroupId);
     await faceIdentityRepository.replaceFaceIdentity({
       assetFaceId: assetFace.id,
       identityId: identity.id,
@@ -141,10 +141,10 @@ describe('unassignFaces clears human placements', () => {
     const { asset: mlAsset } = await ctx.newAsset({ ownerId: user.id });
     const { assetFace: mlFace } = await ctx.newAssetFace({
       assetId: mlAsset.id,
-      personId: mlPerson.id,
+      personGroupId: mlPerson.personGroupId,
       sourceType: SourceType.MachineLearning,
     });
-    const mlIdentity = await faceIdentityRepository.ensurePersonIdentity(mlPerson.id);
+    const mlIdentity = await faceIdentityRepository.ensurePersonIdentity(mlPerson.personGroupId);
     await faceIdentityRepository.replaceFaceIdentity({
       assetFaceId: mlFace.id,
       identityId: mlIdentity.id,
@@ -155,10 +155,10 @@ describe('unassignFaces clears human placements', () => {
     const { asset: manualAsset } = await ctx.newAsset({ ownerId: user.id });
     const { assetFace: manualFace } = await ctx.newAssetFace({
       assetId: manualAsset.id,
-      personId: manualPerson.id,
+      personGroupId: manualPerson.personGroupId,
       sourceType: SourceType.Manual,
     });
-    const manualIdentity = await faceIdentityRepository.ensurePersonIdentity(manualPerson.id);
+    const manualIdentity = await faceIdentityRepository.ensurePersonIdentity(manualPerson.personGroupId);
     await faceIdentityRepository.replaceFaceIdentity({
       assetFaceId: manualFace.id,
       identityId: manualIdentity.id,
@@ -189,7 +189,7 @@ describe('unassignFaces clears human placements', () => {
       .select('personId')
       .where('id', '=', manualFace.id)
       .executeTakeFirstOrThrow();
-    expect(manualAfter.personId).toBe(manualPerson.id);
+    expect(manualAfter.personId).toBe(manualPerson.personGroupId);
     const manualLinkedAfter = await faceIdentityRepository.getManualLinkedFaceIds([manualFace.id]);
     expect(manualLinkedAfter.has(manualFace.id)).toBe(true);
   });
@@ -255,7 +255,7 @@ describe('S8.8 — a forced reset leaves no fully-orphaned verdict, and rows wit
     const { asset: preOrphanAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
     const { assetFace: preOrphanFace } = await ctx.newAssetFace({
       assetId: preOrphanAsset.id,
-      personId: null,
+      personGroupId: null,
       sourceType: SourceType.MachineLearning,
     });
     await ctx.database
@@ -275,17 +275,17 @@ describe('S8.8 — a forced reset leaves no fully-orphaned verdict, and rows wit
     // Shape 2 is personId-keyed (against `doomed`), shape 3 is identityId-only, both riding the same identity
     // down to fully orphaned.
     const { person: doomed } = await ctx.newPerson({ ownerId: user.id, name: 'Doomed' });
-    const doomedIdentity = await faceIdentityRepository.ensurePersonIdentity(doomed.id);
+    const doomedIdentity = await faceIdentityRepository.ensurePersonIdentity(doomed.personGroupId);
     const { asset: doomedAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
-    await ctx.newAssetFace({ assetId: doomedAsset.id, personId: doomed.id, sourceType: SourceType.MachineLearning });
+    await ctx.newAssetFace({ assetId: doomedAsset.id, personGroupId: doomed.personGroupId, sourceType: SourceType.MachineLearning });
 
     const { asset: personOnlyAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
     const { assetFace: personOnlyFace } = await ctx.newAssetFace({
       assetId: personOnlyAsset.id,
-      personId: null,
+      personGroupId: null,
       sourceType: SourceType.MachineLearning,
     });
-    await verdictRepository.markRejected(doomed.id, personOnlyFace.id, {
+    await verdictRepository.markRejected(doomed.personGroupId, personOnlyFace.id, {
       identityId: doomedIdentity.id,
       source: 'cleanup',
       actorId: user.id,
@@ -294,7 +294,7 @@ describe('S8.8 — a forced reset leaves no fully-orphaned verdict, and rows wit
     const { asset: identityOnlyAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
     const { assetFace: identityOnlyFace } = await ctx.newAssetFace({
       assetId: identityOnlyAsset.id,
-      personId: null,
+      personGroupId: null,
       sourceType: SourceType.MachineLearning,
     });
     await ctx.database
@@ -321,7 +321,7 @@ describe('S8.8 — a forced reset leaves no fully-orphaned verdict, and rows wit
     const { asset: spaceOnlyAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
     const { assetFace: spaceOnlyFace } = await ctx.newAssetFace({
       assetId: spaceOnlyAsset.id,
-      personId: null,
+      personGroupId: null,
       sourceType: SourceType.MachineLearning,
     });
     await verdictRepository.markRejectedForSpacePerson(spacePerson.id, spaceOnlyFace.id);
@@ -331,13 +331,13 @@ describe('S8.8 — a forced reset leaves no fully-orphaned verdict, and rows wit
     // personId stays live through the whole run.
     const { person: live } = await ctx.newPerson({ ownerId: user.id, name: 'Live' });
     const { asset: liveAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
-    await ctx.newAssetFace({ assetId: liveAsset.id, personId: live.id, sourceType: SourceType.Manual });
+    await ctx.newAssetFace({ assetId: liveAsset.id, personGroupId: live.personGroupId, sourceType: SourceType.Manual });
     const { assetFace: liveTargetFace } = await ctx.newAssetFace({
       assetId: liveAsset.id,
-      personId: null,
+      personGroupId: null,
       sourceType: SourceType.MachineLearning,
     });
-    await verdictRepository.markRejected(live.id, liveTargetFace.id, { source: 'cleanup', actorId: user.id });
+    await verdictRepository.markRejected(live.personGroupId, liveTargetFace.id, { source: 'cleanup', actorId: user.id });
 
     // Positive controls: every one of the five rows exists before the run.
     for (const faceId of [
