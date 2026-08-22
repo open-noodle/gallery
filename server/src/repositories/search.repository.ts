@@ -906,7 +906,7 @@ export class SearchRepository {
 
     const peopleRows = await trx
       .selectFrom('person')
-      .select(['person.personGroupId', 'person.name'])
+      .select(['person.personGroupId as id', 'person.name'])
       .where('person.name', '!=', '')
       .where('person.isHidden', '=', false)
       .where((eb) =>
@@ -923,7 +923,7 @@ export class SearchRepository {
       .execute();
     const people = peopleRows.map((person) => ({
       ...person,
-      primaryProfile: { type: 'user-person' as const, id: person.personGroupId },
+      primaryProfile: { type: 'user-person' as const, id: person.id },
     }));
 
     const unnamed = await trx
@@ -1748,7 +1748,7 @@ export class SearchRepository {
     const peopleRows = await this.buildFilteredGlobalPeopleQuery(filteredIds).execute();
     const people = peopleRows.map((person) => ({
       ...person,
-      primaryProfile: { type: 'user-person' as const, id: person.personGroupId },
+      primaryProfile: { type: 'user-person' as const, id: person.id },
     }));
 
     const unnamed = await this.db
@@ -1793,7 +1793,7 @@ export class SearchRepository {
   private buildFilteredGlobalPeopleQuery(filteredIds: SelectQueryBuilder<DB, 'asset', { id: string }>) {
     return this.db
       .selectFrom('person')
-      .select(['person.personGroupId', 'person.name'])
+      .select(['person.personGroupId as id', 'person.name'])
       .where('person.name', '!=', '')
       .where('person.isHidden', '=', false)
       .where((eb) =>

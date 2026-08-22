@@ -341,7 +341,10 @@ export class FaceRepairService extends BaseService {
       // card keeps showing the crop of a face that just moved away (the very artifact this console fixes).
       if (repointedIds.length > 0) {
         await this.jobRepository.queueAll(
-          repointedIds.map((id) => ({ name: JobName.PersonGenerateThumbnail, data: { id } })),
+          repointedIds.map(({ ownerId, personGroupId }) => ({
+            name: JobName.PersonGenerateThumbnail,
+            data: { ownerId, personGroupId },
+          })),
         );
       }
     }
@@ -1137,7 +1140,10 @@ export class FaceRepairService extends BaseService {
       // never lingers as the person's avatar.
       if (repointedIds.length > 0) {
         await this.jobRepository.queueAll(
-          repointedIds.map((id) => ({ name: JobName.PersonGenerateThumbnail, data: { id } })),
+          repointedIds.map(({ ownerId, personGroupId }) => ({
+            name: JobName.PersonGenerateThumbnail,
+            data: { ownerId, personGroupId },
+          })),
         );
       }
     }
