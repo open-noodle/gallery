@@ -8,7 +8,8 @@
 - **Fork-side reconciliation commits**: 5 (asset-file/download, branding + Drift steps, OpenAPI regen, mobile freezed, web lint debt)
 - **Option-M debt repaired**: 6 defects — 4 mechanical (see "★ Option-M debt this cycle exposed") + 2 DTO-boundary drops, one of them a live admin-console bug
 - **Upstream bug worked around**: 1 (single `PUT /assets/:id` locking an asset 400s on a non-elevated session)
-- **CI flake fixed rather than retried**: 1 (unauthenticated js-pdk fetch in the plugins stage)
+- **CI fixes**: 2 — the unauthenticated js-pdk fetch, and the follow-on it caused in the storage-migration workflow
+- **Final CI**: **10/10 workflows green** on `09e611925cd` (Test 21/21 jobs)
 - **Risk level**: MEDIUM
 - **Recommendation**: PROCEED — level with `upstream/main` (0 behind), all audits and local gates green
 
@@ -158,6 +159,43 @@ line deliberately preserved during the batch-134 reconciliation), but **nothing 
 token was plumbed most of the way and dropped. The compose file now forwards it as a BuildKit secret and
 the plugins stage mounts it, optionally (`if [ -f /run/secrets/github_token ]`), verified by a
 `--no-cache` build with no token supplied.
+
+## ★★ A self-inflicted follow-on, and the control run that found it
+
+The js-pdk fix above broke `Storage Migration Tests`, and the way that was diagnosed is the most
+transferable thing in this report.
+
+`e2e/docker-compose.yml` gained a `github_token` build secret sourced from `$GITHUB_TOKEN`. **Exactly two
+workflows bring that compose file up**: `test.yml`, which exports the token, and
+`storage-migration-tests.yml`, which had zero references to it. That workflow runs
+`docker compose up --force-recreate immich-server` six times to flip `IMMICH_STORAGE_BACKEND`, and an
+unresolvable secret breaks the recreate mid-run — the server stops answering on :2285 and the phase dies
+with `SocketError`, immediately after the microservices worker logs "Queued 22 files for migration".
+
+Fixed by setting `GITHUB_TOKEN` at that job's level rather than reverting the secret: the secret exists
+because the plugins stage's js-pdk fetch is rate-limited unauthenticated, which is what broke the web e2e
+build in the first place. Reverting would have traded one failure for the other.
+
+**Two wrong calls preceded the right one, both from reasoning instead of measuring:**
+
+1. After the first failure it was called _transient_ — the signature (`mc … Object does not exist`,
+   `SocketError`) looks like infrastructure. It failed again.
+2. Then it was argued _not mine_, from a diff showing nothing storage-relevant: no `storage|minio|s3|backend`
+   match, `storage-migration.ts` untouched, the sibling Storage Migration E2E green on the same sha, and
+   the container logs showing a clean build and Healthy containers. Every one of those observations was
+   true, and the conclusion was still wrong.
+
+What settled it in two runs:
+
+- **Control**: re-run the same workflow on the last passing sha (`574e8bec241`, pushed to a scratch
+  branch). It passed ⇒ the failure is in the diff, regardless of how implausible that looked.
+- **Bisect**: current HEAD with _only_ the two build files reverted. It passed ⇒ the build files, not the
+  face-repair changes.
+
+**The rule**: when a CI job flips from pass to fail, a control run on the last passing commit is cheaper
+than any amount of diff reading, and it is the only thing that distinguishes "my change" from "the
+environment". Reach for it on the _first_ failure, not the third. Plausibility arguments about a diff are
+evidence about what you can imagine, not about what happened.
 
 ## Incoming Upstream Changes
 
