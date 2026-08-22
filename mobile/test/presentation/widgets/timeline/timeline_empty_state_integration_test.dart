@@ -184,7 +184,7 @@ Future<Completer<SearchResult?>> _pumpSearchingTimeline(WidgetTester tester, Dri
         infra.userServiceProvider.overrideWithValue(userService),
         currentUserProvider.overrideWith((ref) => _StubCurrentUserNotifier(userService, user)),
         timelineUsersProvider.overrideWith((_) => Stream<List<String>>.value([user.id])),
-        photosFilterProvider.overrideWith(() => _FixedFilter(SearchFilter.empty()..context = 'mountain')),
+        photosFilterProvider.overrideWith(() => _FixedFilter(SearchFilter.empty().copyWith(context: 'mountain'))),
       ],
       child: EasyLocalization(
         supportedLocales: const [Locale('en')],

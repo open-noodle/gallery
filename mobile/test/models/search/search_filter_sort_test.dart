@@ -13,8 +13,8 @@ void main() {
   });
 
   test('sort participates in equality and hashCode', () {
-    final a = SearchFilter.empty()..context = 'x';
-    final b = SearchFilter.empty()..context = 'x';
+    final a = SearchFilter.empty().copyWith(context: 'x');
+    final b = SearchFilter.empty().copyWith(context: 'x');
     expect(a, b);
     final c = b.copyWith(sort: SearchSortOrder.oldest);
     expect(a == c, isFalse);
