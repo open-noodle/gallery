@@ -1,3 +1,4 @@
+import { IPersonJob } from 'src/types';
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { Kysely, sql, Transaction } from 'kysely';
 import { BulkIdResponseDto } from 'src/dtos/asset-ids.response.dto';
@@ -71,7 +72,7 @@ export type MergePropagationActivityEvent = {
 export type MergePropagationFollowUpJob =
   | { name: JobName.SharedSpacePersonMetadataBackfill; data: { identityId: string } }
   | { name: JobName.SharedSpacePersonDedup; data: { spaceId: string } }
-  | { name: JobName.PersonGenerateThumbnail; data: { id: string } }
+  | { name: JobName.PersonGenerateThumbnail; data: IPersonJob }
   | { name: JobName.FileDelete; data: { files: string[] } };
 
 export type IdentityMergePropagationPlan = {
@@ -435,9 +436,20 @@ export class IdentityMergePropagationService {
       return null;
     }
 
-    await this.deps.personRepository.update({ id: personId, faceAssetId: assetFace.id }, db);
+    const person = await this.deps.personRepository.getByGroupIdOnly(personId);
+    if (!person) {
+      return null;
+    }
 
-    return { name: JobName.PersonGenerateThumbnail, data: { id: personId } };
+    await this.deps.personRepository.update(
+      { ownerId: person.ownerId, personGroupId: personId, faceAssetId: assetFace.id },
+      db,
+    );
+
+    return {
+      name: JobName.PersonGenerateThumbnail,
+      data: { ownerId: person.ownerId, personGroupId: personId },
+    };
   }
 
   /**

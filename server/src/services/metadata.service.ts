@@ -1036,7 +1036,7 @@ export class MetadataService extends BaseService {
       return;
     }
 
-    const facesToAdd: (Insertable<AssetFaceTable> & { id: string; assetId: string; personId: string })[] = [];
+    const facesToAdd: (Insertable<AssetFaceTable> & { id: string; assetId: string; personGroupId: string })[] = [];
     const existingNames = await this.personRepository.getDistinctNames(asset.ownerId, { withHidden: true });
     const existingNameMap = new Map(
       existingNames.map(({ personGroupId, name }) => [name.toLowerCase(), personGroupId]),
@@ -1121,7 +1121,7 @@ export class MetadataService extends BaseService {
 
     if (facesToAdd.length > 0) {
       for (const face of facesToAdd) {
-        const identity = await this.faceIdentityRepository.ensurePersonIdentity(face.personId);
+        const identity = await this.faceIdentityRepository.ensurePersonIdentity(face.personGroupId);
         await this.faceIdentityRepository.replaceFaceIdentity({
           assetFaceId: face.id,
           identityId: identity.id,
