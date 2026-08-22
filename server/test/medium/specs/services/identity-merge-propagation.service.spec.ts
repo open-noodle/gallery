@@ -111,7 +111,7 @@ const createIdentityLinkedFace = async (
 };
 
 const getPeople = (db: Kysely<DB>, ids: string[]) => {
-  return db.selectFrom('person').select(['personGroupId', 'identityId']).where('personGroupId', 'in', ids).orderBy('id').execute();
+  return db.selectFrom('person').select(['personGroupId', 'identityId']).where('personGroupId', 'in', ids).orderBy('personGroupId').execute();
 };
 
 const getSpacePeople = (db: Kysely<DB>, ids: string[]) => {
