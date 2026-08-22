@@ -724,7 +724,7 @@ describe('People identity RBAC projection', () => {
     expect(uploadedPerson.identityId).toBe(targetIdentity.id);
     expect(withSpace.people).toEqual([
       expect.objectContaining({
-        primaryProfile: { type: 'user-person', id: uploadedPerson.id },
+        primaryProfile: { type: 'user-person', id: uploadedPerson.personGroupId },
         numberOfAssets: 2,
       }),
     ]);
@@ -744,7 +744,7 @@ describe('People identity RBAC projection', () => {
 
     expect(afterLeave.people).toEqual([
       expect.objectContaining({
-        primaryProfile: { type: 'user-person', id: uploadedPerson.id },
+        primaryProfile: { type: 'user-person', id: uploadedPerson.personGroupId },
         numberOfAssets: 1,
       }),
     ]);
@@ -798,7 +798,7 @@ describe('People identity RBAC projection', () => {
       .orderBy('id')
       .execute();
 
-    expect(uploadedPerson.id).not.toBe(memberConflictPerson.personGroupId);
+    expect(uploadedPerson.personGroupId).not.toBe(memberConflictPerson.personGroupId);
     expect(uploadedPerson.identityId).not.toBe(targetIdentity.id);
     expect(uploadedLinks).toEqual([
       { assetFaceId: uploadedFaceId, identityId: uploadedPerson.identityId, source: 'owner-person' },
@@ -808,7 +808,7 @@ describe('People identity RBAC projection', () => {
         expect.objectContaining({ id: memberConflictPerson.personGroupId, ownerId: fx.member.id, identityId: targetIdentity.id }),
       ]),
     );
-    expect(targetProfiles.map((profile) => profile.id)).not.toContain(uploadedPerson.id);
+    expect(targetProfiles.map((profile) => profile.personGroupId)).not.toContain(uploadedPerson.personGroupId);
   });
 
   it('repeated recognition of an already assigned face preserves one person and one identity link', async () => {
@@ -980,7 +980,7 @@ describe('People identity RBAC projection', () => {
       .select(['personGroupId', 'identityId'])
       .where('personGroupId', 'in', [a.person.personGroupId, b.person.personGroupId])
       .execute();
-    const byId = new Map(rows.map((r) => [r.id, r.identityId]));
+    const byId = new Map(rows.map((r) => [r.personGroupId, r.identityId]));
     expect(byId.get(a.person.personGroupId)).toBe(a.identityId);
     expect(byId.get(b.person.personGroupId)).toBe(b.identityId);
   });
@@ -1450,7 +1450,7 @@ describe('People identity RBAC projection', () => {
     expect(uploaderPeople.people).toHaveLength(1);
     expect(uploaderPeople.people[0]).toEqual(
       expect.objectContaining({
-        primaryProfile: { type: 'user-person', id: uploadedPerson.id },
+        primaryProfile: { type: 'user-person', id: uploadedPerson.personGroupId },
         numberOfAssets: 2,
       }),
     );
