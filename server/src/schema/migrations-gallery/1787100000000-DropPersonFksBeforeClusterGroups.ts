@@ -1,4 +1,5 @@
 import { Kysely, sql } from 'kysely';
+import { clusterGroupsApplied } from 'src/utils/cluster-groups-order';
 
 /**
  * Runs immediately BEFORE upstream's `1787148183729-ClusterGroups`.
@@ -18,6 +19,13 @@ import { Kysely, sql } from 'kysely';
  * nothing runs in between except upstream's own schema work.
  */
 export async function up(db: Kysely<any>): Promise<void> {
+  // Nothing to clear on an Immich-to-Gallery switch: upstream's ClusterGroups ran before any fork
+  // migration, so 1781/1787000 already pointed these keys at `person_group` and no `person_pkey`
+  // dependency was ever created. See src/utils/cluster-groups-order.ts.
+  if (await clusterGroupsApplied(db)) {
+    return;
+  }
+
   await sql`ALTER TABLE "face_person_verdict" DROP CONSTRAINT "face_person_verdict_personId_fkey";`.execute(db);
   await sql`ALTER TABLE "face_repair_decline" DROP CONSTRAINT "face_repair_decline_personId_fkey";`.execute(db);
   await sql`ALTER TABLE "face_repair_decline" DROP CONSTRAINT "face_repair_decline_suspectedOwnerId_fkey";`.execute(
