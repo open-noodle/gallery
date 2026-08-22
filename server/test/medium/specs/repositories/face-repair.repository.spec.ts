@@ -33,7 +33,7 @@ const seedEligibleFace = async (ctx: Ctx, userId: string, personId: string): Pro
   const { asset } = await ctx.newAsset({ ownerId: userId });
   const { assetFace } = await ctx.newAssetFace({
     assetId: asset.id,
-    personGroupId,
+    personGroupId: personId,
     sourceType: SourceType.MachineLearning,
   });
   await ctx.database.insertInto('face_search').values({ faceId: assetFace.id, embedding: EMBEDDING }).execute();

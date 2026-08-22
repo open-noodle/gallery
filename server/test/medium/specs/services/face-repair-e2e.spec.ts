@@ -238,7 +238,7 @@ describe('face re-attribution repair: end-to-end re-home', () => {
     // Assert: Karina's name is preserved.
     const karinaRow = await ctx.database
       .selectFrom('person')
-      .select(['id', 'name'])
+      .select(['personGroupId', 'name'])
       .where('personGroupId', '=', karina.personGroupId)
       .executeTakeFirstOrThrow();
     expect(karinaRow.name).toBe('Karina');
