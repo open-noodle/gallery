@@ -115,7 +115,7 @@ const seedOverCapPerson = async (ctx: Ctx, ownerId: string, opts: { leakedCount:
 
 const seedEligibleFace = async (ctx: Ctx, userId: string, personId: string): Promise<string> => {
   const { asset } = await ctx.newAsset({ ownerId: userId });
-  const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId, sourceType: SourceType.MachineLearning });
+  const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: personId, sourceType: SourceType.MachineLearning });
   await db.insertInto('face_search').values({ faceId: assetFace.id, embedding: EMBEDDING }).execute();
   return assetFace.id;
 };
