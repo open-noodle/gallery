@@ -1174,7 +1174,7 @@ describe(PersonRepository.name, () => {
         .execute();
       const faces = await ctx.database
         .selectFrom('asset_face')
-        .select(['id', 'personId'])
+        .select(['id', 'personGroupId'])
         .where('assetId', '=', asset.id)
         .execute();
 
@@ -1457,7 +1457,7 @@ describe(PersonRepository.name, () => {
       });
 
       const ids = await collectFaceIds(
-        sut.getAllFaces({ personId: null, sourceType: SourceType.MachineLearning, excludeManuallyPlaced: true }),
+        sut.getAllFaces({ personGroupId: null, sourceType: SourceType.MachineLearning, excludeManuallyPlaced: true }),
       );
 
       expect(ids).not.toContain(manualFace.id);
@@ -1481,7 +1481,7 @@ describe(PersonRepository.name, () => {
         sourceType: SourceType.MachineLearning,
       });
 
-      const ids = await collectFaceIds(sut.getAllFaces({ personId: null, sourceType: SourceType.MachineLearning }));
+      const ids = await collectFaceIds(sut.getAllFaces({ personGroupId: null, sourceType: SourceType.MachineLearning }));
 
       expect(ids).toContain(manualFace.id); // pin: default-off, manual-linked face still returned
       expect(ids).toContain(controlFace.id); // positive control: the ordinary face is returned too
@@ -1541,7 +1541,7 @@ describe(PersonRepository.name, () => {
       // Deliberately WITHOUT excludeManuallyPlaced: isolates the claim to the pre-existing personId
       // filter alone — a discriminating mutation to that filter (not to excludeManuallyPlaced) must be
       // able to turn this red, otherwise this pin proves nothing about which filter is doing the work.
-      const ids = await collectFaceIds(sut.getAllFaces({ personId: null, sourceType: SourceType.MachineLearning }));
+      const ids = await collectFaceIds(sut.getAllFaces({ personGroupId: null, sourceType: SourceType.MachineLearning }));
 
       expect(ids).not.toContain(confirmedFace.id); // excluded by personId: null alone
       expect(ids).toContain(controlFace.id); // positive control
