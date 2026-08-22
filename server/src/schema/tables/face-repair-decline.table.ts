@@ -1,7 +1,7 @@
 import { Column, CreateDateColumn, ForeignKeyColumn, Generated, Index, Table, Timestamp } from '@immich/sql-tools';
 import { PrimaryGeneratedUuidV7Column } from 'src/decorators';
 import { AssetFaceTable } from 'src/schema/tables/asset-face.table';
-import { PersonTable } from 'src/schema/tables/person.table';
+import { PersonGroupTable } from 'src/schema/tables/person-group.table';
 import { UserTable } from 'src/schema/tables/user.table';
 
 // A persisted admin "leave it" decision for the Face Cleanup console. `type='face'` rows mute a single flagged
@@ -23,11 +23,12 @@ export class FaceRepairDeclineTable {
   @ForeignKeyColumn(() => AssetFaceTable, { onDelete: 'CASCADE', nullable: true, index: true })
   assetFaceId!: string | null;
 
-  @ForeignKeyColumn(() => PersonTable, { onDelete: 'CASCADE', nullable: true, index: false })
+  // Option M: repointed from the deleted person.id to person_group.id (1:1 under M).
+  @ForeignKeyColumn(() => PersonGroupTable, { onDelete: 'CASCADE', nullable: true, index: false })
   suspectedOwnerId!: string | null;
 
-  @ForeignKeyColumn(() => PersonTable, { onDelete: 'CASCADE', nullable: true, index: true })
-  personId!: string | null;
+  @ForeignKeyColumn(() => PersonGroupTable, { onDelete: 'CASCADE', nullable: true, index: true })
+  personGroupId!: string | null;
 
   @Column({ type: 'jsonb', nullable: true })
   suspectedOwnerIds!: string[] | null;

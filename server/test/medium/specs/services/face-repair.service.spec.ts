@@ -287,7 +287,7 @@ describe('FaceRepairService.buildRepairPlan', () => {
     const plan: RepairPlan = await sut.buildRepairPlan({ ownerId: user.id, ...planParams });
 
     // ── perPerson fractions ────────────────────────────────────────────────────
-    const pp = (id: string) => plan.perPerson.find((p) => p.personId === id)!;
+    const pp = (id: string) => plan.perPerson.find((p) => p.personGroupId === id)!;
 
     // Alexia: 3 flagged / 11 eligible ≈ 0.27
     expect(pp(alexia.personGroupId).eligible).toBe(11);

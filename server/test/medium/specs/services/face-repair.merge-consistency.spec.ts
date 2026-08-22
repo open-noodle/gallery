@@ -55,7 +55,7 @@ const seedFace = async (ctx: Ctx, ownerId: string, personId: string | null): Pro
 const verdictRowFor = (assetFaceId: string) =>
   db
     .selectFrom('face_person_verdict')
-    .select(['id', 'personId', 'identityId', 'status'])
+    .select(['id', 'personGroupId', 'identityId', 'status'])
     .where('assetFaceId', '=', assetFaceId)
     .executeTakeFirst();
 
@@ -90,7 +90,7 @@ describe('face verdicts survive person delete/merge without re-pointing', () => 
     expect(row).toBeDefined();
     expect(row?.status).toBe('rejected');
     // The person reference falls away; the identity key is what keeps the verdict usable.
-    expect(row?.personId).toBeNull();
+    expect(row?.personGroupId).toBeNull();
     expect(row?.identityId).toBe(identity.id);
 
     const tokens = await facePersonVerdictRepository.getNegativeVerdictTokens([faceId]);
@@ -214,7 +214,7 @@ describe('cluster mutes survive a person merge', () => {
       .selectFrom('face_repair_decline')
       .selectAll()
       .where('type', '=', 'person')
-      .where('personId', '=', survivor.personGroupId)
+      .where('personGroupId', '=', survivor.personGroupId)
       .execute();
     expect(rows).toHaveLength(1);
     expect(new Set(rows[0].suspectedOwnerIds as unknown as string[])).toEqual(new Set([ownerA.personGroupId, ownerB.personGroupId]));

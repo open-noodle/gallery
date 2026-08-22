@@ -14,7 +14,7 @@ import {
 
 const n = (personId: string | null, distance: number): ReattributionNeighbor => ({
   assetFaceId: `${personId}-${distance}`,
-  personId,
+  personGroupId: personId,
   distance,
 });
 
@@ -159,7 +159,7 @@ const ctx = (over: Partial<ClassifyContext> = {}): ClassifyContext => ({
 });
 
 const person = (over: Partial<ClassifyPersonInput> = {}): ClassifyPersonInput => ({
-  personId: 'person-1',
+  personGroupId: 'person-1',
   personName: null,
   faceCount: 10,
   suspectedOwnerIds: ['owner-1'],
