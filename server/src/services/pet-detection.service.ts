@@ -79,7 +79,7 @@ export class PetDetectionService extends BaseService {
           if (existing) {
             personId = existing.personGroupId;
           } else {
-            const person = await this.personRepository.create({
+            const person = await this.personRepository.createWithGroup({
               ownerId: asset.ownerId,
               name: pet.label,
               type: 'pet',
@@ -103,8 +103,11 @@ export class PetDetectionService extends BaseService {
 
         const person = await this.personRepository.getByGroupIdOnly(personId);
         if (person && !person.faceAssetId) {
-          await this.personRepository.update({ id: personId, faceAssetId: faceId });
-          thumbnailJobs.push({ name: JobName.PersonGenerateThumbnail, data: { id: personId } });
+          await this.personRepository.update({ ownerId: person.ownerId, personGroupId: personId, faceAssetId: faceId });
+          thumbnailJobs.push({
+            name: JobName.PersonGenerateThumbnail,
+            data: { ownerId: person.ownerId, personGroupId: personId },
+          });
         }
       }
 

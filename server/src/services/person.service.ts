@@ -527,7 +527,11 @@ export class PersonService extends BaseService {
     }
 
     await this.requireAccess({ auth, permission: Permission.AssetRead, ids: [face.assetId] });
-    const person = await this.personRepository.update({ id, faceAssetId: face.id });
+    const person = await this.personRepository.update({
+      ownerId: current.ownerId,
+      personGroupId: id,
+      faceAssetId: face.id,
+    });
     if (current.identityId) {
       await this.faceIdentityRepository.updateRepresentativeFace({
         identityId: current.identityId,
