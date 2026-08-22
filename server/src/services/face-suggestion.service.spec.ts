@@ -58,17 +58,17 @@ describe(FaceSuggestionService.name, () => {
       });
 
       await expect(sut.handlePersonSuggestionScan({ id: 'person-1' })).resolves.toBe(JobStatus.Skipped);
-      expect(mocks.person.getById).not.toHaveBeenCalled();
+      expect(mocks.person.getByGroupIdOnly).not.toHaveBeenCalled();
       expect(mocks.facePersonVerdict.upsertPending).not.toHaveBeenCalled();
     });
 
     it('skips an unnamed / hidden / pet / missing person (edge 5, 7, 16)', async () => {
       mocks.systemMetadata.get.mockResolvedValue(enabled);
 
-      mocks.person.getById.mockResolvedValueOnce(void 0);
+      mocks.person.getByGroupIdOnly.mockResolvedValueOnce(void 0);
       await expect(sut.handlePersonSuggestionScan({ id: 'gone' })).resolves.toBe(JobStatus.Skipped);
 
-      mocks.person.getById.mockResolvedValueOnce({
+      mocks.person.getByGroupIdOnly.mockResolvedValueOnce({
         id: 'p',
         ownerId: 'u',
         name: '',
@@ -77,7 +77,7 @@ describe(FaceSuggestionService.name, () => {
       } as any);
       await expect(sut.handlePersonSuggestionScan({ id: 'p' })).resolves.toBe(JobStatus.Skipped);
 
-      mocks.person.getById.mockResolvedValueOnce({
+      mocks.person.getByGroupIdOnly.mockResolvedValueOnce({
         id: 'p',
         ownerId: 'u',
         name: 'A',
@@ -86,7 +86,7 @@ describe(FaceSuggestionService.name, () => {
       } as any);
       await expect(sut.handlePersonSuggestionScan({ id: 'p' })).resolves.toBe(JobStatus.Skipped);
 
-      mocks.person.getById.mockResolvedValueOnce({
+      mocks.person.getByGroupIdOnly.mockResolvedValueOnce({
         id: 'p',
         ownerId: 'u',
         name: 'Rex',
@@ -100,7 +100,7 @@ describe(FaceSuggestionService.name, () => {
 
     it('no-ops when the person has zero assigned-face embeddings (edge 15)', async () => {
       mocks.systemMetadata.get.mockResolvedValue(enabled);
-      mocks.person.getById.mockResolvedValue({
+      mocks.person.getByGroupIdOnly.mockResolvedValue({
         id: 'p',
         ownerId: 'u',
         name: 'A',
@@ -116,7 +116,7 @@ describe(FaceSuggestionService.name, () => {
 
     it('keeps only the open band (maxDistance, suggestionMaxDistance], min distance per face, then upserts', async () => {
       mocks.systemMetadata.get.mockResolvedValue(enabled);
-      mocks.person.getById.mockResolvedValue({
+      mocks.person.getByGroupIdOnly.mockResolvedValue({
         id: 'p',
         ownerId: 'u',
         name: 'A',
@@ -160,7 +160,7 @@ describe(FaceSuggestionService.name, () => {
 
     it('caps embedding sample and candidate count (edge 14 — bounded work)', async () => {
       mocks.systemMetadata.get.mockResolvedValue(enabled);
-      mocks.person.getById.mockResolvedValue({
+      mocks.person.getByGroupIdOnly.mockResolvedValue({
         id: 'p',
         ownerId: 'u',
         name: 'A',
@@ -188,7 +188,7 @@ describe(FaceSuggestionService.name, () => {
           },
         },
       });
-      mocks.person.getById.mockResolvedValue({
+      mocks.person.getByGroupIdOnly.mockResolvedValue({
         id: 'p',
         ownerId: 'u',
         name: 'A',
@@ -210,7 +210,7 @@ describe(FaceSuggestionService.name, () => {
 
     it('drops a manually-linked or negatively-verdicted candidate before upserting (D3 write-time exclusion)', async () => {
       mocks.systemMetadata.get.mockResolvedValue(enabled);
-      mocks.person.getById.mockResolvedValue({
+      mocks.person.getByGroupIdOnly.mockResolvedValue({
         id: 'p',
         ownerId: 'u',
         name: 'A',
@@ -711,13 +711,13 @@ describe(FaceSuggestionService.name, () => {
     it('denies a face the caller does not own, even though the person is owned, with NO state change', async () => {
       const face = AssetFaceFactory.create();
       const person = PersonFactory.create();
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.id])); // person ownership OK
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId])); // person ownership OK
       mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set()); // face NOT owned by the caller
-      mocks.person.getById.mockResolvedValue(person);
+      mocks.person.getByGroupIdOnly.mockResolvedValue(person);
       mocks.person.getFaceById.mockResolvedValue(getForAssetFace(face));
       mocks.facePersonVerdict.claimPending.mockResolvedValue(1);
 
-      await expect(sut.confirmFaceSuggestion(AuthFactory.create(), person.id, face.id)).rejects.toBeInstanceOf(
+      await expect(sut.confirmFaceSuggestion(AuthFactory.create(), person.personGroupId, face.id)).rejects.toBeInstanceOf(
         BadRequestException,
       );
       expect(mocks.facePersonVerdict.claimPending).not.toHaveBeenCalled();
@@ -728,29 +728,29 @@ describe(FaceSuggestionService.name, () => {
       const face = AssetFaceFactory.create();
       const person = PersonFactory.create();
       person.faceAssetId = null; // no feature photo yet — triggers createNewFeaturePhoto
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.id]));
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
       mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set([face.id]));
       mocks.person.getFaceById.mockResolvedValue(getForAssetFace(face));
       mocks.person.reassignFace.mockResolvedValue(1);
-      mocks.person.getById.mockResolvedValue(person);
+      mocks.person.getByGroupIdOnly.mockResolvedValue(person);
       mocks.person.getRandomFace.mockResolvedValue(face); // drives createNewFeaturePhoto
       mocks.facePersonVerdict.claimPending.mockResolvedValue(1); // a pending row existed
 
       // S11.7: the caller (controller) needs to know whether this call actually did something — `true` here
       // is what the controller maps to 200. See the idempotent/disabled-feature cases below for the `false`
       // (204, no-op) side of the same signal.
-      await expect(sut.confirmFaceSuggestion(AuthFactory.create(), person.id, face.id)).resolves.toBe(true);
+      await expect(sut.confirmFaceSuggestion(AuthFactory.create(), person.personGroupId, face.id)).resolves.toBe(true);
 
       // Slice 9: every write in the chain now runs inside `databaseRepository.transaction`, so each call
       // carries a trailing trx arg — the test/utils.ts L318 passthrough default makes `trx === mocks.database`.
       // Slice 3 (S3.9): claimPending now also takes the eligibility band, read from the same config lookup.
       expect(mocks.facePersonVerdict.claimPending).toHaveBeenCalledWith(
-        person.id,
+        person.personGroupId,
         face.id,
         { maxDistance: 0.5, suggestionMaxDistance: 0.8 },
         mocks.database,
       );
-      expect(mocks.person.reassignFace).toHaveBeenCalledWith(face.id, person.id, mocks.database);
+      expect(mocks.person.reassignFace).toHaveBeenCalledWith(face.id, person.personGroupId, mocks.database);
       expect(mocks.faceIdentity.replaceFaceIdentity).toHaveBeenCalledWith(
         {
           assetFaceId: face.id,
@@ -760,12 +760,12 @@ describe(FaceSuggestionService.name, () => {
         mocks.database,
       );
       expect(mocks.person.update).toHaveBeenCalledWith(
-        expect.objectContaining({ id: person.id, faceAssetId: face.id }),
+        expect.objectContaining({ id: person.personGroupId, faceAssetId: face.id }),
       );
       expect(mocks.facePersonVerdict.resolveAssignedFace).toHaveBeenCalledWith(face.id, mocks.database);
       // S11 (slice 11d): defense-in-depth clear, scoped to this target's identity, inside the same trx.
       expect(mocks.facePersonVerdict.clearNegativeForTarget).toHaveBeenCalledWith(
-        { personId: person.id, identityId: 'identity-1' },
+        { personId: person.personGroupId, identityId: 'identity-1' },
         [face.id],
         mocks.database,
       );
@@ -774,17 +774,17 @@ describe(FaceSuggestionService.name, () => {
     it('is idempotent when the row is already confirmed/rejected/ignored but person+face still exist → 204 (false), no reassign', async () => {
       const face = AssetFaceFactory.create();
       const person = PersonFactory.create();
-      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.id]));
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId]));
       mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set([face.id]));
       // Slice 9: person/face are now read BEFORE the transaction opens (claimPending — and the rest of the
       // write chain — must run inside the trx, and these two lookups have no trx-aware repo method), so
       // they're fetched unconditionally even on the idempotent path.
-      mocks.person.getById.mockResolvedValue(person);
+      mocks.person.getByGroupIdOnly.mockResolvedValue(person);
       mocks.person.getFaceById.mockResolvedValue(getForAssetFace(face));
       mocks.facePersonVerdict.claimPending.mockResolvedValue(0); // already confirmed/rejected/ignored
 
       // S11.7: no-op (already resolved) -> false, the signal the controller maps to 204.
-      await expect(sut.confirmFaceSuggestion(AuthFactory.create(), person.id, face.id)).resolves.toBe(false);
+      await expect(sut.confirmFaceSuggestion(AuthFactory.create(), person.personGroupId, face.id)).resolves.toBe(false);
       expect(mocks.person.reassignFace).not.toHaveBeenCalled();
     });
 
@@ -815,7 +815,7 @@ describe(FaceSuggestionService.name, () => {
 
       expect(mocks.access.person.checkOwnerAccess).not.toHaveBeenCalled();
       expect(mocks.access.person.checkFaceOwnerAccess).not.toHaveBeenCalled();
-      expect(mocks.person.getById).not.toHaveBeenCalled();
+      expect(mocks.person.getByGroupIdOnly).not.toHaveBeenCalled();
       expect(mocks.person.getFaceById).not.toHaveBeenCalled();
       expect(mocks.facePersonVerdict.claimPending).not.toHaveBeenCalled();
 

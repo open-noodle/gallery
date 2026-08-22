@@ -31,13 +31,13 @@ describe('FaceRepairService.getPersonMetadata', () => {
     const { user } = await ctx.newUser();
     const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Alice' });
     const { asset } = await ctx.newAsset({ ownerId: user.id });
-    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
-    await ctx.database.updateTable('person').set({ faceAssetId: assetFace.id }).where('id', '=', person.id).execute();
+    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+    await ctx.database.updateTable('person').set({ faceAssetId: assetFace.id }).where('personGroupId', '=', person.personGroupId).execute();
 
-    const result = await sut.getPersonMetadata(person.id);
+    const result = await sut.getPersonMetadata(person.personGroupId);
 
     expect(result).toEqual({
-      id: person.id,
+      id: person.personGroupId,
       name: 'Alice',
       ownerId: user.id,
       faceCount: 1,
@@ -57,9 +57,9 @@ describe('FaceRepairService.getPersonMetadata', () => {
     await ctx.newUser();
     const { person } = await ctx.newPerson({ ownerId: owner.id, name: 'Bob' });
 
-    const result = await sut.getPersonMetadata(person.id);
+    const result = await sut.getPersonMetadata(person.personGroupId);
 
-    expect(result.id).toBe(person.id);
+    expect(result.id).toBe(person.personGroupId);
     expect(result.ownerId).toBe(owner.id);
   });
 
@@ -68,7 +68,7 @@ describe('FaceRepairService.getPersonMetadata', () => {
     const { user } = await ctx.newUser();
     const { person } = await ctx.newPerson({ ownerId: user.id, name: '' });
 
-    const result = await sut.getPersonMetadata(person.id);
+    const result = await sut.getPersonMetadata(person.personGroupId);
 
     expect(result.name).toBe('');
   });
@@ -78,7 +78,7 @@ describe('FaceRepairService.getPersonMetadata', () => {
     const { user } = await ctx.newUser();
     const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Nobody', faceAssetId: null });
 
-    const result = await sut.getPersonMetadata(person.id);
+    const result = await sut.getPersonMetadata(person.personGroupId);
 
     expect(result.faceCount).toBe(0);
     expect(result.thumbnailFaceId).toBeNull();
@@ -90,20 +90,20 @@ describe('FaceRepairService.getPersonMetadata', () => {
     const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Carla' });
 
     const { asset: visibleAsset } = await ctx.newAsset({ ownerId: user.id });
-    await ctx.newAssetFace({ assetId: visibleAsset.id, personId: person.id, isVisible: true, deletedAt: null });
+    await ctx.newAssetFace({ assetId: visibleAsset.id, personGroupId: person.personGroupId, isVisible: true, deletedAt: null });
 
     const { asset: deletedAsset } = await ctx.newAsset({ ownerId: user.id });
     await ctx.newAssetFace({
       assetId: deletedAsset.id,
-      personId: person.id,
+      personGroupId: person.personGroupId,
       isVisible: true,
       deletedAt: new Date(),
     });
 
     const { asset: hiddenAsset } = await ctx.newAsset({ ownerId: user.id });
-    await ctx.newAssetFace({ assetId: hiddenAsset.id, personId: person.id, isVisible: false, deletedAt: null });
+    await ctx.newAssetFace({ assetId: hiddenAsset.id, personGroupId: person.personGroupId, isVisible: false, deletedAt: null });
 
-    const result = await sut.getPersonMetadata(person.id);
+    const result = await sut.getPersonMetadata(person.personGroupId);
 
     expect(result.faceCount).toBe(1);
   });
