@@ -18,7 +18,7 @@ const getRowOrUndefined = (pId: string, afId: string) =>
   defaultDatabase
     .selectFrom('face_person_verdict')
     .selectAll()
-    .where('personId', '=', pId)
+    .where('personGroupId', '=', pId)
     .where('assetFaceId', '=', afId)
     .executeTakeFirst();
 
@@ -26,7 +26,7 @@ const getRow = (pId: string, afId: string) =>
   defaultDatabase
     .selectFrom('face_person_verdict')
     .selectAll()
-    .where('personId', '=', pId)
+    .where('personGroupId', '=', pId)
     .where('assetFaceId', '=', afId)
     .executeTakeFirstOrThrow();
 
@@ -133,7 +133,7 @@ describe('FacePersonVerdictRepository', () => {
       // Ensure each test starts with no existing suggestion row for this pair.
       await defaultDatabase
         .deleteFrom('face_person_verdict')
-        .where('personId', '=', personId)
+        .where('personGroupId', '=', personId)
         .where('assetFaceId', '=', assetFaceId)
         .execute();
     });
@@ -142,36 +142,36 @@ describe('FacePersonVerdictRepository', () => {
       // Clean up after each test.
       await defaultDatabase
         .deleteFrom('face_person_verdict')
-        .where('personId', '=', personId)
+        .where('personGroupId', '=', personId)
         .where('assetFaceId', '=', assetFaceId)
         .execute();
     });
 
     it('inserts a new pending row', async () => {
       const { sut } = setup();
-      await sut.upsertPending([{ personId, assetFaceId, distance: 0.6 }]);
+      await sut.upsertPending([{ personGroupId: personId, assetFaceId, distance: 0.6 }]);
       const row = await getRow(personId, assetFaceId);
       expect(row).toMatchObject({ status: 'pending', distance: 0.6 });
     });
 
     it('refreshes distance for a still-pending row', async () => {
       const { sut } = setup();
-      await sut.upsertPending([{ personId, assetFaceId, distance: 0.6 }]);
-      await sut.upsertPending([{ personId, assetFaceId, distance: 0.55 }]);
+      await sut.upsertPending([{ personGroupId: personId, assetFaceId, distance: 0.6 }]);
+      await sut.upsertPending([{ personGroupId: personId, assetFaceId, distance: 0.55 }]);
       const row = await getRow(personId, assetFaceId);
       expect(row).toMatchObject({ status: 'pending', distance: 0.55 });
     });
 
     it.each(['rejected', 'ignored'] as const)('NEVER resurrects a %s row', async (status) => {
       const { sut } = setup();
-      await sut.upsertPending([{ personId, assetFaceId, distance: 0.6 }]);
+      await sut.upsertPending([{ personGroupId: personId, assetFaceId, distance: 0.6 }]);
       await defaultDatabase
         .updateTable('face_person_verdict')
         .set({ status })
-        .where('personId', '=', personId)
+        .where('personGroupId', '=', personId)
         .where('assetFaceId', '=', assetFaceId)
         .execute();
-      await sut.upsertPending([{ personId, assetFaceId, distance: 0.4 }]);
+      await sut.upsertPending([{ personGroupId: personId, assetFaceId, distance: 0.4 }]);
       const row = await getRow(personId, assetFaceId);
       expect(row.status).toBe(status);
       expect(row.distance).toBe(0.6); // unchanged
@@ -183,7 +183,7 @@ describe('FacePersonVerdictRepository', () => {
       const { sut } = setup();
       await sut.markRejected(personId, assetFaceId, { source: 'cleanup' });
 
-      await sut.upsertPending([{ personId, assetFaceId, distance: 0.4 }]);
+      await sut.upsertPending([{ personGroupId: personId, assetFaceId, distance: 0.4 }]);
 
       const row = await getRow(personId, assetFaceId);
       expect(row.status).toBe('rejected');
@@ -265,36 +265,36 @@ describe('FacePersonVerdictRepository', () => {
       const { sut } = setup();
 
       // F1: distance 0.45 — at/below maxDistance (excluded by band lower bound)
-      await sut.upsertPending([{ personId: personPId, assetFaceId: f1.id, distance: 0.45 }]);
+      await sut.upsertPending([{ personGroupId: personPId, assetFaceId: f1.id, distance: 0.45 }]);
 
       // F2: insert at 0.62 then reject — excluded because status='rejected'
-      await sut.upsertPending([{ personId: personPId, assetFaceId: f2.id, distance: 0.62 }]);
+      await sut.upsertPending([{ personGroupId: personPId, assetFaceId: f2.id, distance: 0.62 }]);
       await defaultDatabase
         .updateTable('face_person_verdict')
         .set({ status: 'rejected' })
-        .where('personId', '=', personPId)
+        .where('personGroupId', '=', personPId)
         .where('assetFaceId', '=', f2.id)
         .execute();
 
       // F3: distance 0.60 — in band, pending (included)
-      await sut.upsertPending([{ personId: personPId, assetFaceId: f3.id, distance: 0.6 }]);
+      await sut.upsertPending([{ personGroupId: personPId, assetFaceId: f3.id, distance: 0.6 }]);
 
       // F4: distance 0.70 — in band, pending (included)
-      await sut.upsertPending([{ personId: personPId, assetFaceId: f4.id, distance: 0.7 }]);
+      await sut.upsertPending([{ personGroupId: personPId, assetFaceId: f4.id, distance: 0.7 }]);
 
       // F5: distance 0.90 — above suggestionMaxDistance (excluded by band upper bound)
-      await sut.upsertPending([{ personId: personPId, assetFaceId: f5.id, distance: 0.9 }]);
+      await sut.upsertPending([{ personGroupId: personPId, assetFaceId: f5.id, distance: 0.9 }]);
 
       // F6: in band (0.65) but face becomes assigned mid-review — excluded by af.personId IS NULL
       const { assetFace: f6 } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
       f6Id = f6.id;
-      await sut.upsertPending([{ personId: personPId, assetFaceId: f6Id, distance: 0.65 }]);
+      await sut.upsertPending([{ personGroupId: personPId, assetFaceId: f6Id, distance: 0.65 }]);
       await defaultDatabase.updateTable('asset_face').set({ personGroupId: personPId }).where('id', '=', f6Id).execute();
 
       // Read-gate persons each get one in-band pending suggestion
-      await sut.upsertPending([{ personId: unnamedPersonId, assetFaceId: fU.id, distance: 0.65 }]);
-      await sut.upsertPending([{ personId: hiddenPersonId, assetFaceId: fH.id, distance: 0.65 }]);
-      await sut.upsertPending([{ personId: petPersonId, assetFaceId: fX.id, distance: 0.65 }]);
+      await sut.upsertPending([{ personGroupId: unnamedPersonId, assetFaceId: fU.id, distance: 0.65 }]);
+      await sut.upsertPending([{ personGroupId: hiddenPersonId, assetFaceId: fH.id, distance: 0.65 }]);
+      await sut.upsertPending([{ personGroupId: petPersonId, assetFaceId: fX.id, distance: 0.65 }]);
     });
 
     it('returns only pending rows strictly inside the band (maxDistance, suggestionMaxDistance], ordered by distance, with total', async () => {
@@ -316,7 +316,7 @@ describe('FacePersonVerdictRepository', () => {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
       const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
 
-      await sut.upsertPending([{ personId: person.personGroupId, assetFaceId: assetFace.id, distance: opts.maxDistance }]);
+      await sut.upsertPending([{ personGroupId: person.personGroupId, assetFaceId: assetFace.id, distance: opts.maxDistance }]);
 
       const res = await sut.getPendingForPerson(person.personGroupId, opts);
       expect(res).toEqual({ total: 0, items: [] });
@@ -335,7 +335,7 @@ describe('FacePersonVerdictRepository', () => {
       const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
 
       await sut.upsertPending([
-        { personId: person.personGroupId, assetFaceId: assetFace.id, distance: opts.suggestionMaxDistance },
+        { personGroupId: person.personGroupId, assetFaceId: assetFace.id, distance: opts.suggestionMaxDistance },
       ]);
 
       const res = await sut.getPendingForPerson(person.personGroupId, opts);
@@ -419,12 +419,12 @@ describe('FacePersonVerdictRepository', () => {
         .execute();
 
       await sut.upsertPending([
-        { personId: person.personGroupId, assetFaceId: normalFace.id, distance: 0.6 },
-        { personId: person.personGroupId, assetFaceId: trashedFace.id, distance: 0.61 },
-        { personId: person.personGroupId, assetFaceId: hiddenFace.id, distance: 0.62 },
-        { personId: person.personGroupId, assetFaceId: lockedFace.id, distance: 0.63 },
-        { personId: person.personGroupId, assetFaceId: offlineFace.id, distance: 0.64 },
-        { personId: person.personGroupId, assetFaceId: invisibleFace.id, distance: 0.65 },
+        { personGroupId: person.personGroupId, assetFaceId: normalFace.id, distance: 0.6 },
+        { personGroupId: person.personGroupId, assetFaceId: trashedFace.id, distance: 0.61 },
+        { personGroupId: person.personGroupId, assetFaceId: hiddenFace.id, distance: 0.62 },
+        { personGroupId: person.personGroupId, assetFaceId: lockedFace.id, distance: 0.63 },
+        { personGroupId: person.personGroupId, assetFaceId: offlineFace.id, distance: 0.64 },
+        { personGroupId: person.personGroupId, assetFaceId: invisibleFace.id, distance: 0.65 },
       ]);
 
       const result = await sut.getPendingForPerson(person.personGroupId, opts);
@@ -470,7 +470,7 @@ describe('FacePersonVerdictRepository', () => {
       // Confirm has no status of its own — the durable positive verdict is the face's manual identity link.
       // All this layer does is drain the queue, exactly once, so a double-submit is a benign no-op.
       const { sut } = setup();
-      await sut.upsertPending([{ personId, assetFaceId, distance: 0.6 }]);
+      await sut.upsertPending([{ personGroupId: personId, assetFaceId, distance: 0.6 }]);
 
       expect(await sut.claimPending(personId, assetFaceId, opts)).toBe(1);
       expect(await getRowOrUndefined(personId, assetFaceId)).toBeUndefined();
@@ -483,7 +483,7 @@ describe('FacePersonVerdictRepository', () => {
       ['markIgnored', 'ignored'],
     ] as const)('%s records %s over a pending row and is idempotent', async (method, status) => {
       const { sut } = setup();
-      await sut.upsertPending([{ personId, assetFaceId, distance: 0.6 }]);
+      await sut.upsertPending([{ personGroupId: personId, assetFaceId, distance: 0.6 }]);
 
       expect(await sut[method](personId, assetFaceId)).toBe(1);
       let row = await getRow(personId, assetFaceId);
@@ -514,7 +514,7 @@ describe('FacePersonVerdictRepository', () => {
       ['markIgnored', 'ignored'],
     ] as const)('%s drains the queue row so claimPending can no longer claim it', async (method, status) => {
       const { sut } = setup();
-      await sut.upsertPending([{ personId, assetFaceId, distance: 0.6 }]);
+      await sut.upsertPending([{ personGroupId: personId, assetFaceId, distance: 0.6 }]);
 
       expect(await sut[method](personId, assetFaceId)).toBe(1);
 
@@ -529,7 +529,7 @@ describe('FacePersonVerdictRepository', () => {
       // SCAN cannot resurrect a resolved row — that is upsertPending's `WHERE status = 'pending'` guard,
       // covered above — not that a person is locked out of their own earlier answer.
       const { sut } = setup();
-      await sut.upsertPending([{ personId, assetFaceId, distance: 0.6 }]);
+      await sut.upsertPending([{ personGroupId: personId, assetFaceId, distance: 0.6 }]);
 
       await sut.markRejected(personId, assetFaceId);
       await sut.markIgnored(personId, assetFaceId);
@@ -540,14 +540,14 @@ describe('FacePersonVerdictRepository', () => {
 
     it('reject and ignore racing for the same row leave exactly one row', async () => {
       const { sut } = setup();
-      await sut.upsertPending([{ personId, assetFaceId, distance: 0.6 }]);
+      await sut.upsertPending([{ personGroupId: personId, assetFaceId, distance: 0.6 }]);
 
       await Promise.all([sut.markRejected(personId, assetFaceId), sut.markIgnored(personId, assetFaceId)]);
 
       const rows = await defaultDatabase
         .selectFrom('face_person_verdict')
         .selectAll()
-        .where('personId', '=', personId)
+        .where('personGroupId', '=', personId)
         .where('assetFaceId', '=', assetFaceId)
         .execute();
       expect(rows).toHaveLength(1);
@@ -566,8 +566,8 @@ describe('FacePersonVerdictRepository', () => {
         isHidden: false,
       });
       await sut.upsertPending([
-        { personId, assetFaceId, distance: 0.6 },
-        { personId: siblingPerson.personGroupId, assetFaceId, distance: 0.65 },
+        { personGroupId: personId, assetFaceId, distance: 0.6 },
+        { personGroupId: siblingPerson.personGroupId, assetFaceId, distance: 0.65 },
       ]);
 
       expect(await sut[method](personId, assetFaceId)).toBe(1);
@@ -636,7 +636,7 @@ describe('FacePersonVerdictRepository', () => {
       const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
       const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
 
-      await sut.upsertPending([{ personId: person.personGroupId, assetFaceId: assetFace.id, distance: 0.6 }]);
+      await sut.upsertPending([{ personGroupId: person.personGroupId, assetFaceId: assetFace.id, distance: 0.6 }]);
 
       // Confirm flow order: claim BEFORE reassign/resolve/relink (mirrors person.service.ts).
       const claimed = await sut.claimPending(person.personGroupId, assetFace.id, { maxDistance: 0.5, suggestionMaxDistance: 0.8 });
@@ -690,11 +690,11 @@ describe('FacePersonVerdictRepository', () => {
 
       const { asset: controlAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
       const { assetFace: controlFace } = await ctx.newAssetFace({ assetId: controlAsset.id, personGroupId: null });
-      await sut.upsertPending([{ personId: person.personGroupId, assetFaceId: controlFace.id, distance: 0.6 }]);
+      await sut.upsertPending([{ personGroupId: person.personGroupId, assetFaceId: controlFace.id, distance: 0.6 }]);
 
       const { asset: lockedAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
       const { assetFace: lockedFace } = await ctx.newAssetFace({ assetId: lockedAsset.id, personGroupId: null });
-      await sut.upsertPending([{ personId: person.personGroupId, assetFaceId: lockedFace.id, distance: 0.6 }]);
+      await sut.upsertPending([{ personGroupId: person.personGroupId, assetFaceId: lockedFace.id, distance: 0.6 }]);
       // The asset moves to the Locked folder AFTER the pending row was written — the queue read would no
       // longer show it, so the claim must refuse it too.
       await defaultDatabase
@@ -747,11 +747,11 @@ describe('FacePersonVerdictRepository', () => {
             visibility: AssetVisibility.Timeline,
           });
           const { assetFace: controlFace } = await ctx.newAssetFace({ assetId: controlAsset.id, personGroupId: null });
-          await sut.upsertPending([{ personId: person.personGroupId, assetFaceId: controlFace.id, distance: 0.6 }]);
+          await sut.upsertPending([{ personGroupId: person.personGroupId, assetFaceId: controlFace.id, distance: 0.6 }]);
 
           const { asset: targetAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
           const { assetFace: targetFace } = await ctx.newAssetFace({ assetId: targetAsset.id, personGroupId: null });
-          await sut.upsertPending([{ personId: person.personGroupId, assetFaceId: targetFace.id, distance: 0.6 }]);
+          await sut.upsertPending([{ personGroupId: person.personGroupId, assetFaceId: targetFace.id, distance: 0.6 }]);
           await mutateAsset(targetAsset.id);
 
           expect(await sut.claimPending(person.personGroupId, targetFace.id, opts)).toBe(0);
@@ -786,10 +786,10 @@ describe('FacePersonVerdictRepository', () => {
           const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
 
           const { assetFace: controlFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
-          await sut.upsertPending([{ personId: person.personGroupId, assetFaceId: controlFace.id, distance: 0.6 }]);
+          await sut.upsertPending([{ personGroupId: person.personGroupId, assetFaceId: controlFace.id, distance: 0.6 }]);
 
           const { assetFace: targetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
-          await sut.upsertPending([{ personId: person.personGroupId, assetFaceId: targetFace.id, distance: 0.6 }]);
+          await sut.upsertPending([{ personGroupId: person.personGroupId, assetFaceId: targetFace.id, distance: 0.6 }]);
           await mutateFace(targetFace.id);
 
           expect(await sut.claimPending(person.personGroupId, targetFace.id, opts)).toBe(0);
@@ -817,10 +817,10 @@ describe('FacePersonVerdictRepository', () => {
         const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
 
         const { assetFace: controlFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
-        await sut.upsertPending([{ personId: person.personGroupId, assetFaceId: controlFace.id, distance: 0.6 }]);
+        await sut.upsertPending([{ personGroupId: person.personGroupId, assetFaceId: controlFace.id, distance: 0.6 }]);
 
         const { assetFace: targetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
-        await sut.upsertPending([{ personId: person.personGroupId, assetFaceId: targetFace.id, distance: 0.6 }]);
+        await sut.upsertPending([{ personGroupId: person.personGroupId, assetFaceId: targetFace.id, distance: 0.6 }]);
         await defaultDatabase
           .updateTable('asset_face')
           .set({ personGroupId: otherPerson.personGroupId })
@@ -852,10 +852,10 @@ describe('FacePersonVerdictRepository', () => {
       const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
 
       const { assetFace: controlFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
-      await sut.upsertPending([{ personId: person.personGroupId, assetFaceId: controlFace.id, distance: 0.6 }]);
+      await sut.upsertPending([{ personGroupId: person.personGroupId, assetFaceId: controlFace.id, distance: 0.6 }]);
 
       const { assetFace: targetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
-      await sut.upsertPending([{ personId: person.personGroupId, assetFaceId: targetFace.id, distance: 0.6 }]);
+      await sut.upsertPending([{ personGroupId: person.personGroupId, assetFaceId: targetFace.id, distance: 0.6 }]);
 
       const faceIdentityRepository = ctx.get(FaceIdentityRepository);
       const otherIdentity = await faceIdentityRepository.ensurePersonIdentity(otherPerson.personGroupId);
@@ -889,10 +889,10 @@ describe('FacePersonVerdictRepository', () => {
         const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
 
         const { assetFace: controlFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
-        await sut.upsertPending([{ personId: person.personGroupId, assetFaceId: controlFace.id, distance: 0.6 }]);
+        await sut.upsertPending([{ personGroupId: person.personGroupId, assetFaceId: controlFace.id, distance: 0.6 }]);
 
         const { assetFace: targetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
-        await sut.upsertPending([{ personId: person.personGroupId, assetFaceId: targetFace.id, distance: 0.6 }]);
+        await sut.upsertPending([{ personGroupId: person.personGroupId, assetFaceId: targetFace.id, distance: 0.6 }]);
         await sut.markRejected(person.personGroupId, targetFace.id);
 
         expect(await sut.claimPending(person.personGroupId, targetFace.id, opts)).toBe(0);
@@ -922,10 +922,10 @@ describe('FacePersonVerdictRepository', () => {
         const identity = await faceIdentityRepository.ensurePersonIdentity(person.personGroupId);
 
         const { assetFace: controlFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
-        await sut.upsertPending([{ personId: person.personGroupId, assetFaceId: controlFace.id, distance: 0.6 }]);
+        await sut.upsertPending([{ personGroupId: person.personGroupId, assetFaceId: controlFace.id, distance: 0.6 }]);
 
         const { assetFace: targetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
-        await sut.upsertPending([{ personId: person.personGroupId, assetFaceId: targetFace.id, distance: 0.6 }]);
+        await sut.upsertPending([{ personGroupId: person.personGroupId, assetFaceId: targetFace.id, distance: 0.6 }]);
         // A DIFFERENT person, sharing `person`'s identity, has already said "not this" about the face.
         await sut.markRejected(otherPerson.personGroupId, targetFace.id, { identityId: identity.id });
 
@@ -948,13 +948,13 @@ describe('FacePersonVerdictRepository', () => {
       const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
 
       const { assetFace: controlFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
-      await sut.upsertPending([{ personId: person.personGroupId, assetFaceId: controlFace.id, distance: 0.6 }]);
+      await sut.upsertPending([{ personGroupId: person.personGroupId, assetFaceId: controlFace.id, distance: 0.6 }]);
 
       const { assetFace: lowBoundaryFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
-      await sut.upsertPending([{ personId: person.personGroupId, assetFaceId: lowBoundaryFace.id, distance: opts.maxDistance }]);
+      await sut.upsertPending([{ personGroupId: person.personGroupId, assetFaceId: lowBoundaryFace.id, distance: opts.maxDistance }]);
 
       const { assetFace: aboveUpperFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
-      await sut.upsertPending([{ personId: person.personGroupId, assetFaceId: aboveUpperFace.id, distance: 0.9 }]);
+      await sut.upsertPending([{ personGroupId: person.personGroupId, assetFaceId: aboveUpperFace.id, distance: 0.9 }]);
 
       expect(await sut.claimPending(person.personGroupId, lowBoundaryFace.id, opts)).toBe(0);
       expect(await getRowStatus(person.personGroupId, lowBoundaryFace.id)).toBe('pending');
@@ -977,7 +977,7 @@ describe('FacePersonVerdictRepository', () => {
       const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
       const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
 
-      await sut.upsertPending([{ personId: person.personGroupId, assetFaceId: assetFace.id, distance: 0.6 }]);
+      await sut.upsertPending([{ personGroupId: person.personGroupId, assetFaceId: assetFace.id, distance: 0.6 }]);
 
       await expect(
         defaultDatabase.transaction().execute(async (trx) => {
@@ -1009,8 +1009,8 @@ describe('FacePersonVerdictRepository', () => {
 
       const written = await sut.markRejectedMany(
         [
-          { personId: p1.personGroupId, assetFaceId: fA.id, identityId: identity.id },
-          { personId: p2.personGroupId, assetFaceId: fB.id },
+          { personGroupId: p1.personGroupId, assetFaceId: fA.id, identityId: identity.id },
+          { personGroupId: p2.personGroupId, assetFaceId: fB.id },
         ],
         { source: 'cleanup', actorId: admin.id },
       );
@@ -1037,8 +1037,8 @@ describe('FacePersonVerdictRepository', () => {
 
       const written = await sut.markRejectedMany(
         [
-          { personId: person.personGroupId, assetFaceId: assetFace.id },
-          { personId: person.personGroupId, assetFaceId: assetFace.id },
+          { personGroupId: person.personGroupId, assetFaceId: assetFace.id },
+          { personGroupId: person.personGroupId, assetFaceId: assetFace.id },
         ],
         { source: 'cleanup' },
       );
@@ -1055,17 +1055,17 @@ describe('FacePersonVerdictRepository', () => {
       const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
       const identity = await ctx.get(FaceIdentityRepository).ensurePersonIdentity(person.personGroupId);
 
-      await sut.upsertPending([{ personId: person.personGroupId, assetFaceId: assetFace.id, distance: 0.6 }]);
-      await sut.markRejectedMany([{ personId: person.personGroupId, assetFaceId: assetFace.id, identityId: identity.id }], {
+      await sut.upsertPending([{ personGroupId: person.personGroupId, assetFaceId: assetFace.id, distance: 0.6 }]);
+      await sut.markRejectedMany([{ personGroupId: person.personGroupId, assetFaceId: assetFace.id, identityId: identity.id }], {
         source: 'cleanup',
       });
       // A later batch WITHOUT an identity must not null the stronger existing key.
-      await sut.markRejectedMany([{ personId: person.personGroupId, assetFaceId: assetFace.id }], { source: 'cleanup' });
+      await sut.markRejectedMany([{ personGroupId: person.personGroupId, assetFaceId: assetFace.id }], { source: 'cleanup' });
 
       const rows = await defaultDatabase
         .selectFrom('face_person_verdict')
         .selectAll()
-        .where('personId', '=', person.personGroupId)
+        .where('personGroupId', '=', person.personGroupId)
         .where('assetFaceId', '=', assetFace.id)
         .execute();
       expect(rows).toHaveLength(1);
@@ -1091,7 +1091,7 @@ describe('FacePersonVerdictRepository', () => {
       }
 
       const written = await sut.markRejectedMany(
-        faces.map((assetFaceId) => ({ personId: person.personGroupId, assetFaceId })),
+        faces.map((assetFaceId) => ({ personGroupId: person.personGroupId, assetFaceId })),
         { source: 'cleanup' },
       );
 
@@ -1112,9 +1112,9 @@ describe('FacePersonVerdictRepository', () => {
       const { person: p2 } = await ctx.newPerson({ ownerId: user.id, name: 'P2' });
 
       await sut.upsertPending([
-        { personId: p1.personGroupId, assetFaceId: fA.id, distance: 0.6 },
-        { personId: p2.personGroupId, assetFaceId: fA.id, distance: 0.62 },
-        { personId: p1.personGroupId, assetFaceId: fB.id, distance: 0.63 },
+        { personGroupId: p1.personGroupId, assetFaceId: fA.id, distance: 0.6 },
+        { personGroupId: p2.personGroupId, assetFaceId: fA.id, distance: 0.62 },
+        { personGroupId: p1.personGroupId, assetFaceId: fB.id, distance: 0.63 },
       ]);
       // A durable negative verdict on fA must survive the drain.
       await sut.markRejected(p2.personGroupId, fA.id, { source: 'cleanup' });
@@ -1124,7 +1124,7 @@ describe('FacePersonVerdictRepository', () => {
 
       const rows = await defaultDatabase
         .selectFrom('face_person_verdict')
-        .select(['assetFaceId', 'personId', 'status'])
+        .select(['assetFaceId', 'personGroupId', 'status'])
         .orderBy('status')
         .execute();
       // fA keeps its rejected verdict; fB's pending row is untouched.
@@ -1164,24 +1164,24 @@ describe('FacePersonVerdictRepository', () => {
       const { sut } = setup();
 
       // faceX pending for P1 (distance 0.6) and P2 (distance 0.65)
-      await sut.upsertPending([{ personId: p1Id, assetFaceId: faceXId, distance: 0.6 }]);
-      await sut.upsertPending([{ personId: p2Id, assetFaceId: faceXId, distance: 0.65 }]);
+      await sut.upsertPending([{ personGroupId: p1Id, assetFaceId: faceXId, distance: 0.6 }]);
+      await sut.upsertPending([{ personGroupId: p2Id, assetFaceId: faceXId, distance: 0.65 }]);
 
       // faceX rejected for P3 — insert pending then set rejected via raw updateTable
-      await sut.upsertPending([{ personId: p3.personGroupId, assetFaceId: faceXId, distance: 0.7 }]);
+      await sut.upsertPending([{ personGroupId: p3.personGroupId, assetFaceId: faceXId, distance: 0.7 }]);
       await defaultDatabase
         .updateTable('face_person_verdict')
         .set({ status: 'rejected' })
-        .where('personId', '=', p3.personGroupId)
+        .where('personGroupId', '=', p3.personGroupId)
         .where('assetFaceId', '=', faceXId)
         .execute();
 
       // faceX ignored for P4 — insert pending then set ignored via raw updateTable
-      await sut.upsertPending([{ personId: p4.personGroupId, assetFaceId: faceXId, distance: 0.75 }]);
+      await sut.upsertPending([{ personGroupId: p4.personGroupId, assetFaceId: faceXId, distance: 0.75 }]);
       await defaultDatabase
         .updateTable('face_person_verdict')
         .set({ status: 'ignored' })
-        .where('personId', '=', p4.personGroupId)
+        .where('personGroupId', '=', p4.personGroupId)
         .where('assetFaceId', '=', faceXId)
         .execute();
 
@@ -1232,8 +1232,8 @@ describe('FacePersonVerdictRepository', () => {
       const { sut } = setup();
       // Seed pending rows for BOTH persons pointing at the same assetFaceId
       await sut.upsertPending([
-        { personId: p1Id, assetFaceId, distance: 0.6 },
-        { personId: p2Id, assetFaceId, distance: 0.65 },
+        { personGroupId: p1Id, assetFaceId, distance: 0.6 },
+        { personGroupId: p2Id, assetFaceId, distance: 0.65 },
       ]);
 
       // Confirm flow order: claimPending BEFORE resolveAssignedFace
@@ -1246,7 +1246,7 @@ describe('FacePersonVerdictRepository', () => {
       const p2Rows = await defaultDatabase
         .selectFrom('face_person_verdict')
         .selectAll()
-        .where('personId', '=', p2Id)
+        .where('personGroupId', '=', p2Id)
         .where('assetFaceId', '=', assetFaceId)
         .execute();
       expect(p2Rows).toEqual([]); // sibling pending row deleted
@@ -1275,7 +1275,7 @@ describe('FacePersonVerdictRepository', () => {
 
     it('half 1: assigning the face makes getPendingForPerson exclude it (pending row references unassigned face only)', async () => {
       const { sut } = setup();
-      await sut.upsertPending([{ personId: p1Id, assetFaceId, distance: 0.6 }]);
+      await sut.upsertPending([{ personGroupId: p1Id, assetFaceId, distance: 0.6 }]);
       // Simulate: face assigned to someone (like what a merge does to its faces)
       await defaultDatabase.updateTable('asset_face').set({ personGroupId: p1Id }).where('id', '=', assetFaceId).execute();
 
@@ -1300,7 +1300,7 @@ describe('FacePersonVerdictRepository', () => {
       const tempPersonId = tempPerson.personGroupId;
 
       const { sut } = setup();
-      await sut.upsertPending([{ personId: tempPersonId, assetFaceId, distance: 0.6 }]);
+      await sut.upsertPending([{ personGroupId: tempPersonId, assetFaceId, distance: 0.6 }]);
       const before = await getRow(tempPersonId, assetFaceId);
       expect(before).toBeTruthy();
 
@@ -1317,7 +1317,7 @@ describe('FacePersonVerdictRepository', () => {
         .where('id', '=', before.id)
         .executeTakeFirst();
       expect(survivor).toBeDefined();
-      expect(survivor!.personId).toBeNull();
+      expect(survivor!.personGroupId).toBeNull();
     });
   });
 
@@ -2034,7 +2034,7 @@ describe('FacePersonVerdictRepository', () => {
         .returningAll()
         .executeTakeFirstOrThrow();
 
-      await sut.upsertPending([{ personId: person.personGroupId, assetFaceId: assetFace.id, distance: 0.65 }]);
+      await sut.upsertPending([{ personGroupId: person.personGroupId, assetFaceId: assetFace.id, distance: 0.65 }]);
       await sut.upsertPendingForSpacePerson([
         { spacePersonId: spacePerson.id, assetFaceId: assetFace.id, distance: 0.7 },
       ]);
@@ -2219,7 +2219,7 @@ describe('FacePersonVerdictRepository', () => {
       expect(await getRowOrUndefined(q.personGroupId, face.id)).toBeDefined(); // positive control: exists before clearing
       expect(await getRowOrUndefined(r.personGroupId, face.id)).toBeDefined(); // positive control: exists before clearing
 
-      const cleared = await sut.clearNegativeForTarget({ personId: q.personGroupId }, [face.id]);
+      const cleared = await sut.clearNegativeForTarget({ personGroupId: q.personGroupId }, [face.id]);
 
       expect(cleared).toBe(1);
       expect(await getRowOrUndefined(q.personGroupId, face.id)).toBeUndefined(); // cleared: same target
@@ -2254,7 +2254,7 @@ describe('FacePersonVerdictRepository', () => {
         .insertInto('face_person_verdict')
         .values({
           assetFaceId: face.id,
-          personId: null,
+          personGroupId: null,
           spacePersonId: null,
           identityId: identity.id,
           status: 'rejected',
@@ -2286,10 +2286,10 @@ describe('FacePersonVerdictRepository', () => {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
       const { assetFace: face } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
 
-      await sut.upsertPending([{ personId: q.personGroupId, assetFaceId: face.id, distance: 0.6 }]);
+      await sut.upsertPending([{ personGroupId: q.personGroupId, assetFaceId: face.id, distance: 0.6 }]);
       expect(await getRowStatus(q.personGroupId, face.id)).toBe('pending'); // positive control
 
-      const cleared = await sut.clearNegativeForTarget({ personId: q.personGroupId }, [face.id]);
+      const cleared = await sut.clearNegativeForTarget({ personGroupId: q.personGroupId }, [face.id]);
 
       expect(cleared).toBe(0);
       expect(await getRowStatus(q.personGroupId, face.id)).toBe('pending');
@@ -2310,7 +2310,7 @@ describe('FacePersonVerdictRepository', () => {
       // Far larger than Postgres's 65 535 bind-parameter ceiling — mirrors the removeVerdicts (F20) test
       // above. Fake ids are cheap filler; the bind count is a function of list length, not of matches.
       const filler = Array.from({ length: 70_000 }, () => randomUUID());
-      const cleared = await sut.clearNegativeForTarget({ personId: q.personGroupId }, [faceA.id, faceB.id, ...filler]);
+      const cleared = await sut.clearNegativeForTarget({ personGroupId: q.personGroupId }, [faceA.id, faceB.id, ...filler]);
 
       expect(cleared).toBe(2);
       expect(await getRowOrUndefined(q.personGroupId, faceA.id)).toBeUndefined();
@@ -2347,7 +2347,7 @@ describe('FacePersonVerdictRepository', () => {
         .values([
           {
             assetFaceId: faceIdByShape.orphan,
-            personId: null,
+            personGroupId: null,
             spacePersonId: null,
             identityId: null,
             status: 'rejected',
@@ -2355,7 +2355,7 @@ describe('FacePersonVerdictRepository', () => {
           },
           {
             assetFaceId: faceIdByShape.personOnly,
-            personId: person.personGroupId,
+            personGroupId: person.personGroupId,
             spacePersonId: null,
             identityId: null,
             status: 'rejected',
@@ -2363,7 +2363,7 @@ describe('FacePersonVerdictRepository', () => {
           },
           {
             assetFaceId: faceIdByShape.spacePersonOnly,
-            personId: null,
+            personGroupId: null,
             spacePersonId: spacePerson.id,
             identityId: null,
             status: 'rejected',
@@ -2371,7 +2371,7 @@ describe('FacePersonVerdictRepository', () => {
           },
           {
             assetFaceId: faceIdByShape.identityOnly,
-            personId: null,
+            personGroupId: null,
             spacePersonId: null,
             identityId: identity.id,
             status: 'rejected',
@@ -2471,7 +2471,7 @@ describe('FacePersonVerdictRepository', () => {
         await defaultDatabase
           .insertInto('face_person_verdict')
           .values({
-            personId: person.personGroupId,
+            personGroupId: person.personGroupId,
             assetFaceId: row.assetFaceId,
             status: 'rejected',
             source: 'cleanup',

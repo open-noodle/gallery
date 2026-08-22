@@ -95,7 +95,7 @@ describe(FaceRepairDeclineRepository.name, () => {
     await sut.createClusterMutes({ persons: [{ personId: personP, suspectedOwnerIds: [personQ] }], declinedBy });
     await sut.createClusterMutes({ persons: [{ personId: personP, suspectedOwnerIds: [] }], declinedBy });
 
-    const rows = await db.selectFrom('face_repair_decline').selectAll().where('personId', '=', personP).execute();
+    const rows = await db.selectFrom('face_repair_decline').selectAll().where('personGroupId', '=', personP).execute();
     expect(rows).toHaveLength(1);
 
     const mutes = await sut.getClusterMuteMap([personP]);
@@ -108,7 +108,7 @@ describe(FaceRepairDeclineRepository.name, () => {
 
     const listed = await sut.listDeclines();
     expect(listed).toHaveLength(1);
-    expect(listed[0].personId).toBe(personP);
+    expect(listed[0].personGroupId).toBe(personP);
 
     expect(await sut.removeClusterMutes({ ids: [listed[0].id] })).toBe(1);
     expect(await sut.listDeclines()).toEqual([]);
@@ -133,8 +133,8 @@ describe(FaceRepairDeclineRepository.name, () => {
     });
 
     const listed = await sut.listDeclines();
-    const rowP = listed.find((r) => r.personId === personP)!;
-    const rowOther = listed.find((r) => r.personId === other.personP)!;
+    const rowP = listed.find((r) => r.personGroupId === personP)!;
+    const rowOther = listed.find((r) => r.personGroupId === other.personP)!;
 
     const filler = Array.from({ length: 70_000 }, () => randomUUID());
     const removed = await sut.removeClusterMutes({ ids: [rowP.id, ...filler] });
