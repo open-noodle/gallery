@@ -1,28 +1,24 @@
+<!--
+  Option M: Gallery does not ship upstream's cluster-groups feature — cross-user recognition is
+  answered by shared spaces + face_identity, and ClusterGroupController is deliberately not
+  mounted (see server/src/controllers/index.ts). Upstream's cluster-group half of this settings
+  page is therefore removed; what remains is the partner sharing that PartnerSettings.svelte used
+  to own before #30739 merged the two.
+-->
 <script lang="ts">
   import SettingSwitch from '$lib/components/shared-components/settings/SettingSwitch.svelte';
   import UserAvatar from '$lib/components/shared-components/UserAvatar.svelte';
   import { authManager } from '$lib/managers/auth-manager.svelte';
-  import ClusterGroupUserSelectionModal from '$lib/modals/ClusterGroupUserSelectionModal.svelte';
-  import ClusterGroupUsersModal from '$lib/modals/ClusterGroupUsersModal.svelte';
   import PartnerSelectionModal from '$lib/modals/PartnerSelectionModal.svelte';
   import { handleError } from '$lib/utils/handle-error';
   import {
-    acceptClusterGroupRequest,
-    clusterGroupRegeneratePeople,
-    createClusterGroupRequest,
     createPartner,
-    deleteClusterGroupRequest,
-    getClusterGroupRequests,
-    getClusterGroupRequestsForGroup,
-    getClusterGroupUsers,
     getMyUser,
     getPartners,
-    leaveClusterGroup,
     PartnerDirection,
     removePartner,
     searchUsers,
     updatePartner,
-    type ClusterGroupRequestResponseDto,
     type PartnerResponseDto,
     type UserResponseDto,
   } from '@immich/sdk';
@@ -38,105 +34,13 @@
     inTimeline: boolean;
   };
 
-  let clusterGroupId: string = $state('');
-  let users: UserResponseDto[] = $state([]);
-  let sentRequests: ClusterGroupRequestResponseDto[] = $state([]);
-  let receivedRequests: ClusterGroupRequestResponseDto[] = $state([]);
   // a request is sent to someone outside of the group, so they come from elsewhere
-  let candidates: Record<string, UserResponseDto> = $state({});
 
   let partners: Array<PartnerSharing> = $state([]);
 
-  const canLeave = $derived(users.length > 1);
-
   onMount(async () => {
-    await Promise.all([refresh(), refreshPartners()]);
+    await refreshPartners();
   });
-
-  const refresh = async () => {
-    try {
-      const { clusterGroupId: id } = await getMyUser();
-      clusterGroupId = id;
-
-      const [groupUsers, sent, received, allUsers] = await Promise.all([
-        getClusterGroupUsers({ id }),
-        getClusterGroupRequestsForGroup({ id }),
-        getClusterGroupRequests(),
-        searchUsers(),
-      ]);
-
-      users = groupUsers;
-      sentRequests = sent;
-      receivedRequests = received;
-      candidates = Object.fromEntries(allUsers.map((user) => [user.id, user]));
-    } catch (error) {
-      handleError(error, $t('errors.unable_to_load_cluster_group'));
-    }
-  };
-
-  const handleAddUsers = async () => {
-    const excludedUserIds = [...users.map(({ id }) => id), ...sentRequests.map(({ userId }) => userId)];
-    const selected = await modalManager.show(ClusterGroupUserSelectionModal, { excludedUserIds });
-
-    if (!selected) {
-      return;
-    }
-
-    try {
-      for (const user of selected) {
-        await createClusterGroupRequest({ id: clusterGroupId, clusterGroupRequestCreateDto: { userId: user.id } });
-      }
-
-      await refresh();
-    } catch (error) {
-      handleError(error, $t('errors.something_went_wrong'));
-    }
-  };
-
-  const handleViewGroup = async (request: ClusterGroupRequestResponseDto) => {
-    const result = await modalManager.show(ClusterGroupUsersModal, { clusterGroupId: request.clusterGroupId });
-    if (result === 'accept') {
-      await handleAcceptRequest(request);
-    } else if (result === 'decline') {
-      await handleDeleteRequest(request);
-    }
-  };
-
-  const handleAcceptRequest = async (request: ClusterGroupRequestResponseDto) => {
-    try {
-      await acceptClusterGroupRequest({ id: request.id });
-      await refresh();
-    } catch (error) {
-      handleError(error, $t('errors.something_went_wrong'));
-    }
-  };
-
-  const handleDeleteRequest = async (request: ClusterGroupRequestResponseDto) => {
-    try {
-      await deleteClusterGroupRequest({ id: request.id });
-      await refresh();
-    } catch (error) {
-      handleError(error, $t('errors.something_went_wrong'));
-    }
-  };
-
-  const handleLeave = async () => {
-    const isConfirmed = await modalManager.showDialog({
-      title: $t('leave_group'),
-      prompt: $t('leave_group_description'),
-    });
-
-    if (!isConfirmed) {
-      return;
-    }
-
-    try {
-      await leaveClusterGroup({ id: clusterGroupId });
-      await refresh();
-    } catch (error) {
-      handleError(error, $t('errors.unable_to_leave_cluster_group'));
-    }
-  };
 
   const refreshPartners = async () => {
     partners = [];
@@ -223,104 +127,7 @@
       handleError(error, $t('errors.unable_to_update_timeline_display_status'));
     }
   };
-
-  const handleRerunFacialRecognition = async () => {
-    const confirmed = await modalManager.showDialog({
-      title: $t('cluster_group_facial_recognition'),
-      prompt: $t('cluster_group_facial_recognition_prompt'),
-      size: 'medium',
-    });
-
-    if (!confirmed) {
-      return;
-    }
-
-    try {
-      await clusterGroupRegeneratePeople({ id: clusterGroupId });
-    } catch (error) {
-      handleError(error, $t('errors.something_went_wrong'));
-    }
-  };
 </script>
-
-<section class="my-4">
-  <Text size="large" fontWeight="medium">{$t('cluster_group')}</Text>
-  <Text size="small" color="muted">{$t('cluster_group_description')}</Text>
-
-  <Card class="mt-4">
-    <CardBody>
-      {#each users as user, index (user.id)}
-        <div class="flex items-center justify-between gap-4" class:mt-4={index > 0}>
-          <div class="flex items-center gap-4">
-            <UserAvatar {user} size="md" />
-            <div class="text-start">
-              <p class="text-immich-fg dark:text-immich-dark-fg">
-                {user.name}
-                {#if user.id === authManager.user.id}
-                  <span class="text-sm text-immich-fg/75 dark:text-immich-dark-fg/75">({$t('you')})</span>
-                {/if}
-              </p>
-              <p class="text-sm text-immich-fg/75 dark:text-immich-dark-fg/75">{user.email}</p>
-            </div>
-          </div>
-
-          {#if user.id === authManager.user.id && canLeave}
-            <Button shape="round" size="small" color="secondary" onclick={() => handleLeave()}>
-              {$t('leave')}
-            </Button>
-          {/if}
-        </div>
-      {/each}
-    </CardBody>
-  </Card>
-
-  {#if sentRequests.length > 0 || receivedRequests.length > 0}
-    <div class="mt-4">
-      <Text size="small" fontWeight="medium">{$t('pending')}</Text>
-    </div>
-
-    <Card color="secondary" class="mt-2">
-      <CardBody>
-        {#each receivedRequests as request, index (request.id)}
-          <div class="flex items-center justify-between gap-4" class:mt-4={index > 0}>
-            <Text size="small">{$t('request_received_description')}</Text>
-            <div class="flex gap-2">
-              <Button shape="round" size="small" color="secondary" onclick={() => handleViewGroup(request)}>
-                {$t('view_group')}
-              </Button>
-            </div>
-          </div>
-        {/each}
-
-        {#each sentRequests as request, index (request.id)}
-          {@const user = candidates[request.userId]}
-          <div class="flex items-center justify-between gap-4" class:mt-4={index > 0 || receivedRequests.length > 0}>
-            <div class="flex items-center gap-4">
-              {#if user}
-                <UserAvatar {user} size="md" />
-              {/if}
-              <div class="text-start">
-                <p class="text-immich-fg dark:text-immich-dark-fg">{user?.name ?? request.userId}</p>
-                <p class="text-sm text-immich-fg/75 dark:text-immich-dark-fg/75">{user?.email ?? ''}</p>
-              </div>
-            </div>
-
-            <Button shape="round" size="small" color="secondary" onclick={() => handleDeleteRequest(request)}>
-              {$t('cancel')}
-            </Button>
-          </div>
-        {/each}
-      </CardBody>
-    </Card>
-  {/if}
-
-  <HStack fullWidth class="mt-5 justify-end">
-    <Button shape="round" size="small" onclick={() => handleRerunFacialRecognition()}
-      >{$t('cluster_group_facial_recognition')}</Button
-    >
-    <Button shape="round" size="small" onclick={() => handleAddUsers()}>{$t('add_user')}</Button>
-  </HStack>
-</section>
 
 <section class="my-4">
   <Text size="large" fontWeight="medium">{$t('partners')}</Text>
