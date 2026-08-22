@@ -2,7 +2,7 @@
 // suspicion aimed at a person of that identity must match, which a bare id comparison cannot express — hence
 // tokens rather than ids. Keep the prefixes stable: they are compared across engines.
 export interface VerdictTarget {
-  personId?: string | null;
+  personGroupId?: string | null;
   spacePersonId?: string | null;
   identityId?: string | null;
 }
@@ -12,8 +12,8 @@ export function targetTokens(target: VerdictTarget): string[] {
   if (target.identityId) {
     tokens.push(`identity:${target.identityId}`);
   }
-  if (target.personId) {
-    tokens.push(`person:${target.personId}`);
+  if (target.personGroupId) {
+    tokens.push(`person:${target.personGroupId}`);
   }
   if (target.spacePersonId) {
     tokens.push(`space-person:${target.spacePersonId}`);
@@ -37,7 +37,7 @@ export interface VerdictMaps {
 
 export interface ReattributionNeighbor {
   assetFaceId: string;
-  personId: string | null;
+  personGroupId: string | null;
   distance: number;
 }
 
@@ -53,31 +53,31 @@ export interface ReattributionTally {
 export const tallyReattribution = (currentPersonId: string, neighbors: ReattributionNeighbor[]): ReattributionTally => {
   const byPerson = new Map<string, { count: number; nearest: number }>();
   for (const neighbor of neighbors) {
-    if (!neighbor.personId) {
+    if (!neighbor.personGroupId) {
       continue;
     }
-    const entry = byPerson.get(neighbor.personId);
+    const entry = byPerson.get(neighbor.personGroupId);
     if (entry) {
       entry.count += 1;
       entry.nearest = Math.min(entry.nearest, neighbor.distance);
     } else {
-      byPerson.set(neighbor.personId, { count: 1, nearest: neighbor.distance });
+      byPerson.set(neighbor.personGroupId, { count: 1, nearest: neighbor.distance });
     }
   }
 
   let topOtherPersonId: string | null = null;
   let topOtherCount = 0;
   let topOtherNearest: number | null = null;
-  for (const [personId, { count, nearest }] of byPerson) {
-    if (personId === currentPersonId) {
+  for (const [personGroupId, { count, nearest }] of byPerson) {
+    if (personGroupId === currentPersonId) {
       continue;
     }
     const wins =
       count > topOtherCount ||
       (count === topOtherCount && nearest < (topOtherNearest ?? Infinity)) ||
-      (count === topOtherCount && nearest === topOtherNearest && personId < topOtherPersonId!);
+      (count === topOtherCount && nearest === topOtherNearest && personGroupId < topOtherPersonId!);
     if (wins) {
-      topOtherPersonId = personId;
+      topOtherPersonId = personGroupId;
       topOtherCount = count;
       topOtherNearest = nearest;
     }
@@ -188,17 +188,17 @@ export function isSettledForOwner(
 // the whole person. Per-face filtering runs before the person-level mute so a face re-flagged toward a NEW
 // owner keeps its person surfaced.
 export function applyVerdictFilters<T extends FlaggedLike>(flaggedByPerson: Map<string, T[]>, maps: VerdictMaps): void {
-  for (const [personId, faces] of flaggedByPerson) {
+  for (const [personGroupId, faces] of flaggedByPerson) {
     const kept = faces.filter((face) => !isSettledForOwner(face, maps));
-    const fingerprint = maps.mutedPersons.get(personId);
+    const fingerprint = maps.mutedPersons.get(personGroupId);
     if (fingerprint && kept.length > 0) {
       const currentOwners = new Set(kept.map((face) => face.suspectedOwnerId));
       if (isSubset(currentOwners, fingerprint)) {
-        flaggedByPerson.set(personId, []);
+        flaggedByPerson.set(personGroupId, []);
         continue;
       }
     }
-    flaggedByPerson.set(personId, kept);
+    flaggedByPerson.set(personGroupId, kept);
   }
 }
 
@@ -206,7 +206,7 @@ export type ClassifyRecommendation = 'confident' | 'review-first';
 export type ClassifyReason = 'over-cap' | 'named' | 'large-cluster' | 'multiple-owners' | 'bad-target';
 
 export interface ClassifyPersonInput {
-  personId: string;
+  personGroupId: string;
   personName: string | null; // null or '' (whitespace-only) = unnamed
   faceCount: number;
   suspectedOwnerIds: string[]; // owner person ids for this person's flagged faces (may repeat)
@@ -229,7 +229,7 @@ export interface ClassifyDecision {
 export const classifyFlaggedPerson = (person: ClassifyPersonInput, ctx: ClassifyContext): ClassifyDecision => {
   const reviewReasons: ClassifyReason[] = [];
 
-  if (ctx.reviewOnlyPersonIds.has(person.personId)) {
+  if (ctx.reviewOnlyPersonIds.has(person.personGroupId)) {
     reviewReasons.push('over-cap');
   }
   if (person.personName !== null && person.personName.trim() !== '') {

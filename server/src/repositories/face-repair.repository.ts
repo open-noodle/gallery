@@ -1,13 +1,12 @@
 import { Kysely, sql, Transaction } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { SourceType } from 'src/enum';
-import { PersonId } from 'src/repositories/person.repository';
 import { DB } from 'src/schema';
 import { reviewableAssetVisibility } from 'src/utils/face-review';
 
 export interface EligibleFaceRow {
   assetFaceId: string;
-  personId: string;
+  personGroupId: string;
   ownerId: string;
   embedding: string;
 }
@@ -87,7 +86,7 @@ export class FaceRepairRepository {
   // searchOwnerPeople's exact join conditions (deletedAt is null, isVisible = true) so faceCount agrees between
   // the browser grid and this review-page header — a mismatch there would read as a bug. No `@GenerateSql`:
   // this repository has none.
-  async getPersonMetadata(personId: string): Promise<PersonMetadataRow | undefined> {
+  async getPersonMetadata(personGroupId: string): Promise<PersonMetadataRow | undefined> {
     const row = await this.db
       .selectFrom('person')
       .leftJoin('asset_face', (join) =>
@@ -103,7 +102,7 @@ export class FaceRepairRepository {
         'person.faceAssetId as thumbnailFaceId',
       ])
       .select((eb) => eb.fn.count('asset_face.id').as('faceCount'))
-      .where('person.personGroupId', '=', personId)
+      .where('person.personGroupId', '=', personGroupId)
       .groupBy(['person.personGroupId'])
       .executeTakeFirst();
 
@@ -112,14 +111,14 @@ export class FaceRepairRepository {
 
   // Non-Timeline faces (e.g. Archive) are intentionally eligible: they may be left unassigned
   // after repair if recognition cannot re-home them, which is the accepted outcome (blank > wrong).
-  streamEligibleFaces(options: { ownerId?: string; personId?: string; personIds?: string[] }) {
+  streamEligibleFaces(options: { ownerId?: string; personGroupId?: string; personGroupIds?: string[] }) {
     return this.db
       .selectFrom('asset_face')
       .innerJoin('asset', 'asset.id', 'asset_face.assetId')
       .innerJoin('face_search', 'face_search.faceId', 'asset_face.id')
       .select([
         'asset_face.id as assetFaceId',
-        'asset_face.personGroupId as personId',
+        'asset_face.personGroupId as personGroupId',
         'asset.ownerId as ownerId',
         sql<string>`face_search.embedding`.as('embedding'),
       ])
@@ -130,11 +129,11 @@ export class FaceRepairRepository {
       .where('asset.deletedAt', 'is', null)
       .where((eb) => reviewableAssetVisibility(eb))
       .$if(!!options.ownerId, (qb) => qb.where('asset.ownerId', '=', options.ownerId!))
-      .$if(!!options.personId, (qb) => qb.where('asset_face.personGroupId', '=', options.personId!))
-      .$if(!!options.personIds && options.personIds.length > 0, (qb) =>
-        qb.where('asset_face.personGroupId', 'in', options.personIds!),
+      .$if(!!options.personGroupId, (qb) => qb.where('asset_face.personGroupId', '=', options.personGroupId!))
+      .$if(!!options.personGroupIds && options.personGroupIds.length > 0, (qb) =>
+        qb.where('asset_face.personGroupId', 'in', options.personGroupIds!),
       )
-      .$narrowType<{ personId: string }>()
+      .$narrowType<{ personGroupId: string }>()
       .stream();
   }
 
@@ -145,8 +144,8 @@ export class FaceRepairRepository {
   // hottest tables). Mirrors streamEligibleFaces' eligibility filter exactly.
   getEligibleFacePage(options: {
     ownerId?: string;
-    personId?: string;
-    personIds?: string[];
+    personGroupId?: string;
+    personGroupIds?: string[];
     afterId?: string;
     limit: number;
   }): Promise<EligibleFaceRow[]> {
@@ -156,7 +155,7 @@ export class FaceRepairRepository {
       .innerJoin('face_search', 'face_search.faceId', 'asset_face.id')
       .select([
         'asset_face.id as assetFaceId',
-        'asset_face.personGroupId as personId',
+        'asset_face.personGroupId as personGroupId',
         'asset.ownerId as ownerId',
         sql<string>`face_search.embedding`.as('embedding'),
       ])
@@ -167,18 +166,18 @@ export class FaceRepairRepository {
       .where('asset.deletedAt', 'is', null)
       .where((eb) => reviewableAssetVisibility(eb))
       .$if(!!options.ownerId, (qb) => qb.where('asset.ownerId', '=', options.ownerId!))
-      .$if(!!options.personId, (qb) => qb.where('asset_face.personGroupId', '=', options.personId!))
-      .$if(!!options.personIds && options.personIds.length > 0, (qb) =>
-        qb.where('asset_face.personGroupId', 'in', options.personIds!),
+      .$if(!!options.personGroupId, (qb) => qb.where('asset_face.personGroupId', '=', options.personGroupId!))
+      .$if(!!options.personGroupIds && options.personGroupIds.length > 0, (qb) =>
+        qb.where('asset_face.personGroupId', 'in', options.personGroupIds!),
       )
       .$if(!!options.afterId, (qb) => qb.where('asset_face.id', '>', options.afterId!))
       .orderBy('asset_face.id')
       .limit(options.limit)
-      .$narrowType<{ personId: string }>()
+      .$narrowType<{ personGroupId: string }>()
       .execute();
   }
 
-  async countEligibleFaces(options: { ownerId?: string; personId?: string }): Promise<number> {
+  async countEligibleFaces(options: { ownerId?: string; personGroupId?: string }): Promise<number> {
     const { count } = await this.db
       .selectFrom('asset_face')
       .innerJoin('asset', 'asset.id', 'asset_face.assetId')
@@ -191,7 +190,7 @@ export class FaceRepairRepository {
       .where('asset.deletedAt', 'is', null)
       .where((eb) => reviewableAssetVisibility(eb))
       .$if(!!options.ownerId, (qb) => qb.where('asset.ownerId', '=', options.ownerId!))
-      .$if(!!options.personId, (qb) => qb.where('asset_face.personGroupId', '=', options.personId!))
+      .$if(!!options.personGroupId, (qb) => qb.where('asset_face.personGroupId', '=', options.personGroupId!))
       .executeTakeFirstOrThrow();
     return Number(count);
   }
@@ -199,13 +198,13 @@ export class FaceRepairRepository {
   // Count ALL of a person's still-present faces — any source type, visible or hidden — not just the
   // ML+visible "eligible" set. Used as the delete gate for an emptied manual-move source (A2): countEligibleFaces
   // can read 0 while the person still holds hidden or Manual-sourced faces, and deleting it then orphans those
-  // survivors (the FK's onDelete: SET NULL nulls their personId). Only a person with zero remaining faces is safe
+  // survivors (the FK's onDelete: SET NULL nulls their personGroupId). Only a person with zero remaining faces is safe
   // to delete.
-  async countAllFaces(personId: string): Promise<number> {
+  async countAllFaces(personGroupId: string): Promise<number> {
     const { count } = await this.db
       .selectFrom('asset_face')
       .select((eb) => eb.fn.countAll().as('count'))
-      .where('personGroupId', '=', personId)
+      .where('personGroupId', '=', personGroupId)
       .where('deletedAt', 'is', null)
       .executeTakeFirstOrThrow();
     return Number(count);
@@ -216,14 +215,14 @@ export class FaceRepairRepository {
   // and the returned page are precisely the set an entire-cluster move enumerates and moves. Ordered by
   // asset_face.id for a stable offset cursor.
   async getClusterFacePage(
-    personId: string,
+    personGroupId: string,
     options: { excludeFaceIds: string[]; limit: number; offset: number },
   ): Promise<{ faces: { assetFaceId: string }[]; total: number; hasMore: boolean }> {
     const base = this.db
       .selectFrom('asset_face')
       .innerJoin('asset', 'asset.id', 'asset_face.assetId')
       .innerJoin('face_search', 'face_search.faceId', 'asset_face.id')
-      .where('asset_face.personGroupId', '=', personId)
+      .where('asset_face.personGroupId', '=', personGroupId)
       .where('asset_face.sourceType', '=', sql.lit(SourceType.MachineLearning))
       .where('asset_face.deletedAt', 'is', null)
       .where('asset_face.isVisible', '=', true)
@@ -248,12 +247,12 @@ export class FaceRepairRepository {
     };
   }
 
-  // Which of `faceIds` are currently eligible ON `personId`. Mirrors getClusterFacePage's predicate so
+  // Which of `faceIds` are currently eligible ON `personGroupId`. Mirrors getClusterFacePage's predicate so
   // "lockable" is exactly "listed on the manual review page" — a third, subtly different eligibility
   // predicate would be a bug farm. Advisory only: the write-time guards in reattributeFaces/detachFaces
   // remain authoritative; this exists so a manual lock that cannot apply is an explicit 400 rather than
   // a silent no-op.
-  async getEligibleFaceIdsForPerson(personId: string, faceIds: string[]): Promise<Set<string>> {
+  async getEligibleFaceIdsForPerson(personGroupId: string, faceIds: string[]): Promise<Set<string>> {
     if (faceIds.length === 0) {
       return new Set();
     }
@@ -263,7 +262,7 @@ export class FaceRepairRepository {
       .innerJoin('face_search', 'face_search.faceId', 'asset_face.id')
       .select(['asset_face.id as assetFaceId'])
       .where('asset_face.id', 'in', faceIds)
-      .where('asset_face.personGroupId', '=', personId)
+      .where('asset_face.personGroupId', '=', personGroupId)
       .where('asset_face.sourceType', '=', sql.lit(SourceType.MachineLearning))
       .where('asset_face.deletedAt', 'is', null)
       .where('asset_face.isVisible', '=', true)
@@ -309,25 +308,25 @@ export class FaceRepairRepository {
     return movedIds;
   }
 
-  // Detach ("Not a face", Slice 5): retire the given faces from `personId` (same ML/visible/not-deleted
+  // Detach ("Not a face", Slice 5): retire the given faces from `personGroupId` (same ML/visible/not-deleted
   // eligibility re-check as reattributeFaces, and the same still-on-source guard) AND strip their identity
   // link in the SAME chunk/transaction — never via FaceIdentityRepository.unlinkFaces, whose own `this.db`
   // would run outside a caller-supplied `trx` and break the pair's atomicity (a crash between the two writes
-  // would leave a face still carrying `personId`'s identity, which a later FaceIdentityBackfill pass could
+  // would leave a face still carrying `personGroupId`'s identity, which a later FaceIdentityBackfill pass could
   // resolve right back onto it — the exact regression this pairing (E4) guards against). Returns the ids
   // actually detached, so the caller can regenerate the person's representative thumbnail for exactly those
   // (E19/M21).
   //
-  // The write is `personId = NULL` AND `deletedAt = now()` — soft-delete, the same primitive the face editor's
+  // The write is `personGroupId = NULL` AND `deletedAt = now()` — soft-delete, the same primitive the face editor's
   // own "delete face" uses (PersonRepository.softDeleteAssetFaces). Unassigning ALONE is not durable and was the
-  // bug: PersonService.queueRecognizeFaces streams every `personId IS NULL` visible ML face back into the
+  // bug: PersonService.queueRecognizeFaces streams every `personGroupId IS NULL` visible ML face back into the
   // FacialRecognition queue, which re-matches it by embedding and re-assigns it to whichever neighbour has a
   // person — for a crop that was mis-clustered INTO this person, that neighbour is very often this person again.
   // So a merely-unassigned "not a face" would silently boomerang back onto the cluster and re-flag on the next
   // scan, contradicting the console's own promise that a detached crop "stops being proposed for anyone".
   // `deletedAt` is what makes that promise true: every recognition-candidate query filters `deletedAt IS NULL`.
   async detachFaces(
-    personId: string,
+    personGroupId: string,
     assetFaceIds: string[],
     db: Kysely<DB> | Transaction<DB> = this.db,
   ): Promise<string[]> {
@@ -343,7 +342,7 @@ export class FaceRepairRepository {
         .updateTable('asset_face')
         .set({ personGroupId: null, deletedAt: new Date() })
         .where('id', 'in', chunk)
-        .where('personGroupId', '=', personId)
+        .where('personGroupId', '=', personGroupId)
         .where('sourceType', '=', sql.lit(SourceType.MachineLearning))
         .where('deletedAt', 'is', null)
         .where('isVisible', '=', true)
@@ -363,8 +362,10 @@ export class FaceRepairRepository {
   // persons whose representative face actually changed so callers can regenerate their thumbnails — a fully
   // drained person whose faceAssetId was already NULL is excluded (the SET yields NULL again: a no-op that would
   // otherwise queue a wasted thumbnail regen for a faceless person — A3).
-  async reconcileRepresentativeFaces(personIds: string[]): Promise<PersonId[]> {
-    if (personIds.length === 0) {
+  async reconcileRepresentativeFaces(
+    personGroupIds: string[],
+  ): Promise<Array<{ personGroupId: string; ownerId: string }>> {
+    if (personGroupIds.length === 0) {
       return [];
     }
     const updated = await this.db
@@ -380,7 +381,7 @@ export class FaceRepairRepository {
           .where('asset.deletedAt', 'is', null)
           .limit(1),
       }))
-      .where('person.personGroupId', 'in', personIds)
+      .where('person.personGroupId', 'in', personGroupIds)
       .where((eb) =>
         eb.or([
           eb('person.faceAssetId', 'is', null),
@@ -413,8 +414,8 @@ export class FaceRepairRepository {
           ),
         ]),
       )
-      .returning(['person.ownerId', 'person.personGroupId'])
+      .returning(['person.personGroupId as id', 'person.ownerId as ownerId'])
       .execute();
-    return updated.map(({ ownerId, personGroupId }) => ({ ownerId, personGroupId }));
+    return updated.map((row) => ({ personGroupId: row.id, ownerId: row.ownerId }));
   }
 }

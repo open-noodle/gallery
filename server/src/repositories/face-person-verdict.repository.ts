@@ -35,18 +35,18 @@ const BULK_CHUNK_SIZE = 1000;
 export class FacePersonVerdictRepository {
   constructor(@InjectKysely() private db: Kysely<DB>) {}
 
-  @GenerateSql({ params: [[{ personId: DummyValue.UUID, assetFaceId: DummyValue.UUID, distance: 0.6 }]] })
-  async upsertPending(rows: Array<{ personId: string; assetFaceId: string; distance: number }>): Promise<void> {
+  @GenerateSql({ params: [[{ personGroupId: DummyValue.UUID, assetFaceId: DummyValue.UUID, distance: 0.6 }]] })
+  async upsertPending(rows: Array<{ personGroupId: string; assetFaceId: string; distance: number }>): Promise<void> {
     if (rows.length === 0) {
       return;
     }
     await this.db
       .insertInto('face_person_verdict')
-      .values(rows.map((r) => ({ personId: r.personId, assetFaceId: r.assetFaceId, distance: r.distance })))
+      .values(rows.map((r) => ({ personGroupId: r.personGroupId, assetFaceId: r.assetFaceId, distance: r.distance })))
       .onConflict((oc) =>
         oc
-          .columns(['personId', 'assetFaceId'])
-          .where('personId', 'is not', null)
+          .columns(['personGroupId', 'assetFaceId'])
+          .where('personGroupId', 'is not', null)
           .doUpdateSet({
             distance: (eb) => eb.ref('excluded.distance'),
             updatedAt: sql`now()`,
@@ -67,7 +67,7 @@ export class FacePersonVerdictRepository {
 
   // Bulk drain of pending queue rows for a set of faces. The cleanup console calls this after a resolve so a
   // moved/detached/confirmed face leaves no stale suggestion behind — leak 3: without it the never-reappear
-  // guarantee was held only by the read path's `af.personId IS NULL` filter, and would break the moment such
+  // guarantee was held only by the read path's `af.personGroupId IS NULL` filter, and would break the moment such
   // a face was later unassigned (e.g. a reset). Negative-verdict rows are left intact.
   @GenerateSql({ params: [[DummyValue.UUID]] })
   async drainPendingForFaces(assetFaceIds: string[], db: Kysely<DB> | Transaction<DB> = this.db): Promise<number> {
@@ -133,7 +133,7 @@ export class FacePersonVerdictRepository {
       qb
         .where('fpv.distance', '>', opts.maxDistance)
         .where('fpv.distance', '<=', opts.suggestionMaxDistance)
-        .where('af.personId', 'is', null)
+        .where('af.personGroupId', 'is', null)
         .where('af.deletedAt', 'is', null)
         .where('af.isVisible', 'is', true)
         .where('asset.deletedAt', 'is', null)
@@ -156,7 +156,7 @@ export class FacePersonVerdictRepository {
 
   // The negative-verdict anti-join, target-specific (matched by the caller-supplied `matchTarget`) but
   // otherwise identical shape for every scope. `matchTarget` receives the negative-verdict subquery's own
-  // expression builder (already correlated to the outer `fpv` row) and returns the OR-list match — a personId
+  // expression builder (already correlated to the outer `fpv` row) and returns the OR-list match — a personGroupId
   // / spacePersonId equality plus an identityId equality (literal or column/subquery reference).
   // `matchTarget`'s `eb` is deliberately untyped (`any`): it is the exists-subquery's own expression builder,
   // correlated to `neg` plus every outer alias (fpv/af/asset and whatever the call site joined) — a shape
@@ -192,7 +192,7 @@ export class FacePersonVerdictRepository {
   // second round-trip.
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID, { maxDistance: 0.5, suggestionMaxDistance: 0.8 }] })
   async claimPending(
-    personId: string,
+    personGroupId: string,
     assetFaceId: string,
     opts: { maxDistance: number; suggestionMaxDistance: number },
     db: Kysely<DB> | Transaction<DB> = this.db,
@@ -203,15 +203,15 @@ export class FacePersonVerdictRepository {
           .selectFrom('face_person_verdict as fpv')
           .innerJoin('asset_face as af', 'af.id', 'fpv.assetFaceId')
           .innerJoin('asset', 'asset.id', 'af.assetId')
-          .leftJoin('person', 'person.personGroupId', 'fpv.personId')
+          .leftJoin('person', 'person.personGroupId', 'fpv.personGroupId')
           .select('fpv.id as id')
-          .where('fpv.personId', '=', personId)
+          .where('fpv.personGroupId', '=', personGroupId)
           .where('fpv.assetFaceId', '=', assetFaceId)
           .where('fpv.status', '=', 'pending'),
         opts,
       ),
       (inner) =>
-        inner.or([inner('neg.personId', '=', personId), inner('neg.identityId', '=', inner.ref('person.identityId'))]),
+        inner.or([inner('neg.personGroupId', '=', personGroupId), inner('neg.identityId', '=', inner.ref('person.identityId'))]),
     );
 
     const result = await db.deleteFrom('face_person_verdict').where('id', 'in', eligibleIds).executeTakeFirst();
@@ -260,7 +260,7 @@ export class FacePersonVerdictRepository {
   // row to update. `identityId` is resolved by the caller and stored alongside the target so one verdict
   // answers the question in personal scope and in every space.
   private async recordPersonalVerdict(input: {
-    personId: string;
+    personGroupId: string;
     assetFaceId: string;
     status: 'rejected' | 'ignored';
     identityId?: string | null;
@@ -270,7 +270,7 @@ export class FacePersonVerdictRepository {
     const result = await this.db
       .insertInto('face_person_verdict')
       .values({
-        personId: input.personId,
+        personGroupId: input.personGroupId,
         assetFaceId: input.assetFaceId,
         identityId: input.identityId ?? null,
         status: input.status,
@@ -280,8 +280,8 @@ export class FacePersonVerdictRepository {
       })
       .onConflict((oc) =>
         oc
-          .columns(['personId', 'assetFaceId'])
-          .where('personId', 'is not', null)
+          .columns(['personGroupId', 'assetFaceId'])
+          .where('personGroupId', 'is not', null)
           .doUpdateSet({
             status: input.status,
             // D10: never null a stronger existing key — keep the existing identity when the incoming write
@@ -298,37 +298,37 @@ export class FacePersonVerdictRepository {
 
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID, { source: 'cleanup' }] })
   async markRejected(
-    personId: string,
+    personGroupId: string,
     assetFaceId: string,
     opts?: { identityId?: string | null; source?: FacePersonVerdictSource; actorId?: string | null },
   ): Promise<number> {
-    return this.recordPersonalVerdict({ personId, assetFaceId, status: 'rejected', ...opts });
+    return this.recordPersonalVerdict({ personGroupId, assetFaceId, status: 'rejected', ...opts });
   }
 
   // Set-at-a-time form of markRejected, for the cleanup console's "keep here" bucket. That bucket used to loop
   // markRejected once per face — one round-trip each, which the 1000-face DTO cap kept merely slow and the
   // 25 000-face cap would turn into a timeout on the exact large cluster the raise exists to serve.
   //
-  // `status`, `source` and `actorId` are uniform per call (one admin, one action), so only `personId`,
+  // `status`, `source` and `actorId` are uniform per call (one admin, one action), so only `personGroupId`,
   // `assetFaceId` and `identityId` vary per row and the whole bucket collapses into chunked multi-row upserts.
-  // Rows are deduplicated on (personId, assetFaceId) FIRST: Postgres refuses an ON CONFLICT DO UPDATE that
+  // Rows are deduplicated on (personGroupId, assetFaceId) FIRST: Postgres refuses an ON CONFLICT DO UPDATE that
   // would touch the same row twice in one statement ("cannot affect row a second time"), and a client may
   // legitimately repeat a face — the per-face loop absorbed that silently, so this must too.
   @GenerateSql({
     params: [
-      [{ personId: DummyValue.UUID, assetFaceId: DummyValue.UUID, identityId: DummyValue.UUID }],
+      [{ personGroupId: DummyValue.UUID, assetFaceId: DummyValue.UUID, identityId: DummyValue.UUID }],
       { source: 'cleanup' },
     ],
   })
   async markRejectedMany(
-    rows: Array<{ personId: string; assetFaceId: string; identityId?: string | null }>,
+    rows: Array<{ personGroupId: string; assetFaceId: string; identityId?: string | null }>,
     opts?: { source?: FacePersonVerdictSource; actorId?: string | null },
     db: Kysely<DB> | Transaction<DB> = this.db,
   ): Promise<number> {
     if (rows.length === 0) {
       return 0;
     }
-    const deduplicated = new Map(rows.map((row) => [`${row.personId}|${row.assetFaceId}`, row])).values().toArray();
+    const deduplicated = new Map(rows.map((row) => [`${row.personGroupId}|${row.assetFaceId}`, row])).values().toArray();
     const source = opts?.source ?? 'suggestion';
     const actorId = opts?.actorId ?? null;
 
@@ -338,7 +338,7 @@ export class FacePersonVerdictRepository {
         .insertInto('face_person_verdict')
         .values(
           deduplicated.slice(index, index + BULK_CHUNK_SIZE).map((row) => ({
-            personId: row.personId,
+            personGroupId: row.personGroupId,
             assetFaceId: row.assetFaceId,
             identityId: row.identityId ?? null,
             status: 'rejected' as const,
@@ -349,8 +349,8 @@ export class FacePersonVerdictRepository {
         )
         .onConflict((oc) =>
           oc
-            .columns(['personId', 'assetFaceId'])
-            .where('personId', 'is not', null)
+            .columns(['personGroupId', 'assetFaceId'])
+            .where('personGroupId', 'is not', null)
             .doUpdateSet({
               status: 'rejected',
               // D10: never null a stronger existing key — same coalesce the single-row path uses.
@@ -368,11 +368,11 @@ export class FacePersonVerdictRepository {
 
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID, { source: 'suggestion' }] })
   async markIgnored(
-    personId: string,
+    personGroupId: string,
     assetFaceId: string,
     opts?: { identityId?: string | null; source?: FacePersonVerdictSource; actorId?: string | null },
   ): Promise<number> {
-    return this.recordPersonalVerdict({ personId, assetFaceId, status: 'ignored', ...opts });
+    return this.recordPersonalVerdict({ personGroupId, assetFaceId, status: 'ignored', ...opts });
   }
 
   private async recordSpacePersonVerdict(input: {
@@ -452,7 +452,7 @@ export class FacePersonVerdictRepository {
     const totalRow = await base.select((eb) => eb.fn.countAll<string>().as('total')).executeTakeFirstOrThrow();
 
     const rows = await base
-      .leftJoin('person', 'person.personGroupId', 'fpv.personId')
+      .leftJoin('person', 'person.personGroupId', 'fpv.personGroupId')
       .leftJoin('shared_space_person as ssp', 'ssp.id', 'fpv.spacePersonId')
       .leftJoin('shared_space', 'shared_space.id', 'ssp.spaceId')
       .leftJoin('user as actor', 'actor.id', 'fpv.actorId')
@@ -462,7 +462,7 @@ export class FacePersonVerdictRepository {
         'fpv.status as status',
         'fpv.source as source',
         'fpv.createdAt as createdAt',
-        'fpv.personId as personId',
+        'fpv.personGroupId as personId',
         'person.name as personName',
         'person.faceAssetId as personThumbnailFaceId',
         'fpv.spacePersonId as spacePersonId',
@@ -489,7 +489,7 @@ export class FacePersonVerdictRepository {
 
   // Slice 8 (F15): a human placing face F on target T states a fact that contradicts any durable
   // rejected/ignored row for that SAME (T, F) pairing — the newer human decision wins, so that row must go.
-  // Matched exactly like the read paths match a negative: by personId, by spacePersonId, OR by identityId
+  // Matched exactly like the read paths match a negative: by personGroupId, by spacePersonId, OR by identityId
   // when the target carries one (the D3 self-heal match `excludeNegativeVerdict` already applies) — never a
   // blanket match, or a verdict against a DIFFERENT target for the same face would be destroyed too, which
   // is the whole scoping point (S8.2).
@@ -497,9 +497,9 @@ export class FacePersonVerdictRepository {
   // Deliberately does NOT touch `status='pending'` rows — a pending row is drained by
   // resolveAssignedFace/drainPendingForFaces, not cleared here; this method's WHERE always includes
   // `status IN ('rejected','ignored')`.
-  @GenerateSql({ params: [{ personId: DummyValue.UUID }, [DummyValue.UUID]] })
+  @GenerateSql({ params: [{ personGroupId: DummyValue.UUID }, [DummyValue.UUID]] })
   async clearNegativeForTarget(
-    target: { personId?: string; spacePersonId?: string; identityId?: string | null },
+    target: { personGroupId?: string; spacePersonId?: string; identityId?: string | null },
     assetFaceIds: string[],
     db: Kysely<DB> | Transaction<DB> = this.db,
   ): Promise<number> {
@@ -507,8 +507,8 @@ export class FacePersonVerdictRepository {
       return 0;
     }
     const matchers: Array<(eb: ExpressionBuilder<DB, 'face_person_verdict'>) => Expression<SqlBool>> = [];
-    if (target.personId) {
-      matchers.push((eb) => eb('face_person_verdict.personId', '=', target.personId!));
+    if (target.personGroupId) {
+      matchers.push((eb) => eb('face_person_verdict.personGroupId', '=', target.personGroupId!));
     }
     if (target.spacePersonId) {
       matchers.push((eb) => eb('face_person_verdict.spacePersonId', '=', target.spacePersonId!));
@@ -536,10 +536,10 @@ export class FacePersonVerdictRepository {
     return cleared;
   }
 
-  // Slice 8 (F16): a row with `personId`, `spacePersonId` AND `identityId` all NULL is unreachable by every
+  // Slice 8 (F16): a row with `personGroupId`, `spacePersonId` AND `identityId` all NULL is unreachable by every
   // read predicate in this file (every read matches on at least one of those three) — a "reset all people"
   // (unassignFaces -> handlePersonCleanup -> deleteUnreferencedIdentities) degrades a row to exactly this
-  // shape: the person is gone (personId SET NULL), it was never space-scoped (spacePersonId already NULL),
+  // shape: the person is gone (personGroupId SET NULL), it was never space-scoped (spacePersonId already NULL),
   // and its identity became unreferenced and was GC'd (identityId SET NULL). Called from
   // PersonService.handleQueueRecognizeFaces, after deleteUnreferencedIdentities — the identity GC is what
   // nulls the row's last remaining key, so calling this any earlier in that flow would miss exactly the rows
@@ -559,7 +559,7 @@ export class FacePersonVerdictRepository {
           eb
             .selectFrom('face_person_verdict')
             .select('id')
-            .where('personId', 'is', null)
+            .where('personGroupId', 'is', null)
             .where('spacePersonId', 'is', null)
             .where('identityId', 'is', null)
             .limit(BULK_CHUNK_SIZE),
@@ -609,7 +609,7 @@ export class FacePersonVerdictRepository {
     for (let index = 0; index < assetFaceIds.length; index += BULK_CHUNK_SIZE) {
       const rows = await this.db
         .selectFrom('face_person_verdict')
-        .select(['assetFaceId', 'personId', 'spacePersonId', 'identityId'])
+        .select(['assetFaceId', 'personGroupId', 'spacePersonId', 'identityId'])
         .where('assetFaceId', 'in', assetFaceIds.slice(index, index + BULK_CHUNK_SIZE))
         .where('status', 'in', ['rejected', 'ignored'])
         .execute();
@@ -619,8 +619,8 @@ export class FacePersonVerdictRepository {
         if (row.identityId) {
           tokens.add(`identity:${row.identityId}`);
         }
-        if (row.personId) {
-          tokens.add(`person:${row.personId}`);
+        if (row.personGroupId) {
+          tokens.add(`person:${row.personGroupId}`);
         }
         if (row.spacePersonId) {
           tokens.add(`space-person:${row.spacePersonId}`);
@@ -635,7 +635,7 @@ export class FacePersonVerdictRepository {
     params: [DummyValue.UUID, { maxDistance: 0.5, suggestionMaxDistance: 0.8, page: 1, size: 10 }],
   })
   async getPendingForPerson(
-    personId: string,
+    personGroupId: string,
     opts: { maxDistance: number; suggestionMaxDistance: number; page: number; size: number },
   ) {
     // Read gate: feature disabled when suggestion band is empty
@@ -648,7 +648,7 @@ export class FacePersonVerdictRepository {
     const scannable = await this.db
       .selectFrom('person')
       .select(['person.personGroupId', 'person.identityId'])
-      .where('person.personGroupId', '=', personId)
+      .where('person.personGroupId', '=', personGroupId)
       .where('person.name', '!=', '')
       .where('person.isHidden', '=', false)
       .where('person.type', '=', 'person')
@@ -669,16 +669,16 @@ export class FacePersonVerdictRepository {
           .selectFrom('face_person_verdict as fpv')
           .innerJoin('asset_face as af', 'af.id', 'fpv.assetFaceId')
           .innerJoin('asset', 'asset.id', 'af.assetId')
-          .where('fpv.personId', '=', personId)
+          .where('fpv.personGroupId', '=', personGroupId)
           .where('fpv.status', '=', 'pending'),
         opts,
       ),
       // D3 self-heal: a face a human has already said "not this person" about — matched identity-first (so
       // a rejection recorded in another scope sharing this person's identity is honoured here too), with a
-      // personId fallback for verdicts recorded before an identity existed.
+      // personGroupId fallback for verdicts recorded before an identity existed.
       (inner) =>
         inner.or([
-          inner('neg.personId', '=', personId),
+          inner('neg.personGroupId', '=', personGroupId),
           ...(scannable.identityId ? [inner('neg.identityId', '=', scannable.identityId)] : []),
         ]),
     );
