@@ -434,7 +434,7 @@ describe(JobService.name, () => {
 
       await sut.onJobRun(QueueName.ThumbnailGeneration, {
         name: JobName.PersonGenerateThumbnail,
-        data: { personGroupId: personId },
+        data: { ownerId: 'owner-id', personGroupId: personId },
       });
 
       expect(mocks.person.getByGroupIdOnly).toHaveBeenCalledWith(personId);
@@ -448,7 +448,7 @@ describe(JobService.name, () => {
 
       await sut.onJobRun(QueueName.ThumbnailGeneration, {
         name: JobName.PersonGenerateThumbnail,
-        data: { personGroupId: personId },
+        data: { ownerId: 'owner-id', personGroupId: personId },
       });
 
       expect(mocks.person.getByGroupIdOnly).toHaveBeenCalledWith(personId);

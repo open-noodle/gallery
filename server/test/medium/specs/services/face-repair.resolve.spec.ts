@@ -138,7 +138,7 @@ const seedFacesBulk = async (ctx: Ctx, ownerId: string, personId: string, count:
       .execute();
   }
   const faces = assets.map((asset) =>
-    mediumFactory.assetFaceInsert({ assetId: asset.id, personGroupId, sourceType: SourceType.MachineLearning }),
+    mediumFactory.assetFaceInsert({ assetId: asset.id, personGroupId: personId, sourceType: SourceType.MachineLearning }),
   );
   for (let index = 0; index < faces.length; index += 1000) {
     await db
@@ -444,7 +444,7 @@ describe('FaceRepairService.resolveFaces: partial move leaves the surviving sour
 
     // Source survives (faces remain) → not deleted.
     const sourceRow = await db.selectFrom('person').select('personGroupId').where('personGroupId', '=', source.personGroupId).executeTakeFirst();
-    expect(sourceRow?.id).toBe(source.personGroupId);
+    expect(sourceRow?.personGroupId).toBe(source.personGroupId);
 
     // Picked faces are relinked to the destination. B2: this request sent lock:false, so the link is an
     // ordinary placement rather than the durable `manual` lock.
@@ -1328,7 +1328,7 @@ const buildRealVerdictMaps = async (ctx: Ctx) => {
   const faceRows = await db.selectFrom('asset_face').select('id').execute();
   const personRows = await db.selectFrom('person').select('personGroupId').execute();
   const faceIds = faceRows.map((r) => r.id);
-  const personIds = personRows.map((r) => r.id);
+  const personIds = personRows.map((r) => r.personGroupId);
   return {
     manualLinkedFaceIds: await identityRepo.getManualLinkedFaceIds(faceIds),
     negativeFaceTargets: await verdictRepo.getNegativeVerdictTokens(faceIds),
