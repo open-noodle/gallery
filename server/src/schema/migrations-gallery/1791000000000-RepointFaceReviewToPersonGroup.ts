@@ -55,6 +55,19 @@ export async function up(db: Kysely<any>): Promise<void> {
     db,
   );
 
+  // On an Immich-to-Gallery switch 1787100000000 had nothing to drop — 1781/1787000 already created
+  // these keys against `person_group`, under their original `_personId_fkey` names. Drop them so the
+  // constraint names match the renamed columns in both worlds; on a fresh install this is a no-op.
+  await sql`ALTER TABLE "face_person_verdict" DROP CONSTRAINT IF EXISTS "face_person_verdict_personId_fkey";`.execute(
+    db,
+  );
+  await sql`ALTER TABLE "face_repair_decline" DROP CONSTRAINT IF EXISTS "face_repair_decline_personId_fkey";`.execute(
+    db,
+  );
+  await sql`ALTER TABLE "face_repair_decline" DROP CONSTRAINT IF EXISTS "face_repair_decline_suspectedOwnerId_fkey";`.execute(
+    db,
+  );
+
   await sql`ALTER TABLE "face_person_verdict" ADD CONSTRAINT "face_person_verdict_personGroupId_fkey" FOREIGN KEY ("personGroupId") REFERENCES "person_group" ("id") ON DELETE SET NULL;`.execute(
     db,
   );
@@ -69,7 +82,8 @@ export async function up(db: Kysely<any>): Promise<void> {
 
   // The fork's partial index on the old asset_face.personId is redundant now: upstream ships
   // ("personGroupId","assetId") and ("assetId","personGroupId") on the same table.
-  await sql`DROP INDEX "asset_face_personId_idx";`.execute(db);
+  // IF EXISTS: on an Immich-to-Gallery switch 1778400000000 never created it.
+  await sql`DROP INDEX IF EXISTS "asset_face_personId_idx";`.execute(db);
 
   // Partial-index predicates live in migration_overrides (they do not round-trip through
   // pg_get_expr). Renaming the columns above invalidates the recorded payloads.
@@ -102,4 +116,21 @@ export async function down(db: Kysely<any>): Promise<void> {
   await sql`ALTER TABLE "face_repair_scan_flagged_face" RENAME COLUMN "personGroupId" TO "personId";`.execute(db);
   await sql`ALTER TABLE "face_repair_decline" RENAME COLUMN "personGroupId" TO "personId";`.execute(db);
   await sql`ALTER TABLE "face_person_verdict" RENAME COLUMN "personGroupId" TO "personId";`.execute(db);
+
+  // up() rewrote three `migration_overrides` rows; without undoing them a revert-then-rerun collides on
+  // `migration_overrides_pkey`, and the recorded predicates stop matching the indexes on disk.
+  await sql`DELETE FROM "migration_overrides" WHERE "name" = 'index_face_person_verdict_personGroupId_assetFaceId_uq';`.execute(
+    db,
+  );
+  await sql`INSERT INTO "migration_overrides" ("name", "value") VALUES ('index_face_person_verdict_personId_assetFaceId_uq', '{"type":"index","name":"face_person_verdict_personId_assetFaceId_uq","sql":"CREATE UNIQUE INDEX \\"face_person_verdict_personId_assetFaceId_uq\\" ON \\"face_person_verdict\\" (\\"personId\\", \\"assetFaceId\\") WHERE (\\"personId\\" IS NOT NULL);"}'::jsonb);`.execute(
+    db,
+  );
+  // Restored on `asset_face`'s CURRENT column: upstream's ClusterGroups renamed it before this migration
+  // ran, so the index up() dropped was already keyed on `personGroupId` under its original name.
+  await sql`CREATE INDEX IF NOT EXISTS "asset_face_personId_idx" ON "asset_face" ("personGroupId") WHERE ("personGroupId" IS NOT NULL);`.execute(
+    db,
+  );
+  await sql`INSERT INTO "migration_overrides" ("name", "value") VALUES ('index_asset_face_personId_idx', '{"type":"index","name":"asset_face_personId_idx","sql":"CREATE INDEX \\"asset_face_personId_idx\\" ON \\"asset_face\\" (\\"personGroupId\\") WHERE (\\"personGroupId\\" IS NOT NULL);"}'::jsonb) ON CONFLICT ("name") DO UPDATE SET "value" = EXCLUDED."value";`.execute(
+    db,
+  );
 }
