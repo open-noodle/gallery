@@ -568,7 +568,10 @@ export class PersonService extends BaseService {
       });
     }
 
-    await this.jobRepository.queue({ name: JobName.PersonGenerateThumbnail, data: { id } });
+    await this.jobRepository.queue({
+      name: JobName.PersonGenerateThumbnail,
+      data: { ownerId: current.ownerId, personGroupId: id },
+    });
     return mapPerson(person);
   }
 
@@ -702,7 +705,7 @@ export class PersonService extends BaseService {
     const featureEnabled = isFaceSuggestionEnabled(machineLearning);
     const nowScannable = person.name !== '' && !person.isHidden && person.type === 'person';
     if (featureEnabled && nowScannable && prior && prior.name !== person.name) {
-      await this.jobRepository.queue({ name: JobName.PersonSuggestionScan, data: { id } });
+      await this.jobRepository.queue({ name: JobName.PersonSuggestionScan, data: { id: personGroupId } });
     }
 
     return mapPerson(person);
@@ -1364,7 +1367,7 @@ export class PersonService extends BaseService {
       });
     }
 
-    if (!personId) {
+    if (!personGroupId) {
       this.logger.debug(`Face ${id} did not resolve to a person, skipping shared-space face matching`);
       return JobStatus.Skipped;
     }
@@ -1490,7 +1493,7 @@ export class PersonService extends BaseService {
 
     if (!person.thumbnailPath || !isAbsolute(person.thumbnailPath)) {
       // S3 thumbnails live under relative keys and are managed by the S3 backend, not fs.rename.
-      this.logger.debug(`Skipping person file migration for S3 person ${id}`);
+      this.logger.debug(`Skipping person file migration for S3 person ${personGroupId}`);
       return JobStatus.Skipped;
     }
 

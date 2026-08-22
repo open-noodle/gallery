@@ -902,13 +902,13 @@ class PersonAccess {
 
     return this.db
       .selectFrom('person')
-      .select('person.id')
+      .select('person.personGroupId')
       .leftJoin('asset_face', 'asset_face.id', 'person.faceAssetId')
       .leftJoin('asset', 'asset.id', 'asset_face.assetId')
       .where('person.personGroupId', 'in', [...personIds])
       .where((eb) => eb.or([eb('asset.visibility', 'is', null), eb('asset.visibility', '!=', AssetVisibility.Locked)]))
       .execute()
-      .then((persons) => new Set(persons.map((person) => person.id)));
+      .then((persons) => new Set(persons.map((person) => person.personGroupId)));
   }
 
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID_SET] })
@@ -920,7 +920,7 @@ class PersonAccess {
 
     return this.db
       .selectFrom('person')
-      .select('person.id')
+      .select('person.personGroupId')
       .where('person.personGroupId', 'in', [...personIds])
       .where((eb) =>
         eb.exists(
@@ -950,7 +950,7 @@ class PersonAccess {
         ),
       )
       .execute()
-      .then((persons) => new Set(persons.map((person) => person.id)));
+      .then((persons) => new Set(persons.map((person) => person.personGroupId)));
   }
 
   // Fork RBAC (Slice 3 / M2): checkSharedSpaceAccess above proves PersonRead reachability for ANY
@@ -966,7 +966,7 @@ class PersonAccess {
 
     return this.db
       .selectFrom('person')
-      .select('person.id')
+      .select('person.personGroupId')
       .where('person.personGroupId', 'in', [...personIds])
       .where((eb) =>
         eb.exists(
@@ -996,7 +996,7 @@ class PersonAccess {
         ),
       )
       .execute()
-      .then((persons) => new Set(persons.map((person) => person.id)));
+      .then((persons) => new Set(persons.map((person) => person.personGroupId)));
   }
 
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID_SET] })
