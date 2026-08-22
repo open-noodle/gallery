@@ -714,6 +714,7 @@ describe(FaceSuggestionService.name, () => {
       mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.personGroupId])); // person ownership OK
       mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set()); // face NOT owned by the caller
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
+      mocks.person.getByGroupId.mockResolvedValue(person);
       mocks.person.getFaceById.mockResolvedValue(getForAssetFace(face));
       mocks.facePersonVerdict.claimPending.mockResolvedValue(1);
 
@@ -733,6 +734,7 @@ describe(FaceSuggestionService.name, () => {
       mocks.person.getFaceById.mockResolvedValue(getForAssetFace(face));
       mocks.person.reassignFace.mockResolvedValue(1);
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
+      mocks.person.getByGroupId.mockResolvedValue(person);
       mocks.person.getRandomFace.mockResolvedValue(face); // drives createNewFeaturePhoto
       mocks.facePersonVerdict.claimPending.mockResolvedValue(1); // a pending row existed
 
@@ -780,6 +782,7 @@ describe(FaceSuggestionService.name, () => {
       // write chain — must run inside the trx, and these two lookups have no trx-aware repo method), so
       // they're fetched unconditionally even on the idempotent path.
       mocks.person.getByGroupIdOnly.mockResolvedValue(person);
+      mocks.person.getByGroupId.mockResolvedValue(person);
       mocks.person.getFaceById.mockResolvedValue(getForAssetFace(face));
       mocks.facePersonVerdict.claimPending.mockResolvedValue(0); // already confirmed/rejected/ignored
 
