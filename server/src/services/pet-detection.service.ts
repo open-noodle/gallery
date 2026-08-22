@@ -77,7 +77,7 @@ export class PetDetectionService extends BaseService {
         if (!personId) {
           const existing = await this.personRepository.getByOwnerAndSpecies(asset.ownerId, pet.label);
           if (existing) {
-            personId = existing.id;
+            personId = existing.personGroupId;
           } else {
             const person = await this.personRepository.create({
               ownerId: asset.ownerId,
@@ -85,7 +85,7 @@ export class PetDetectionService extends BaseService {
               type: 'pet',
               species: pet.label,
             });
-            personId = person.id;
+            personId = person.personGroupId;
           }
           speciesCache.set(pet.label, personId);
         }
@@ -101,7 +101,7 @@ export class PetDetectionService extends BaseService {
           boundingBoxY2: pet.boundingBox.y2,
         });
 
-        const person = await this.personRepository.getById(personId);
+        const person = await this.personRepository.getByGroupIdOnly(personId);
         if (person && !person.faceAssetId) {
           await this.personRepository.update({ id: personId, faceAssetId: faceId });
           thumbnailJobs.push({ name: JobName.PersonGenerateThumbnail, data: { id: personId } });
