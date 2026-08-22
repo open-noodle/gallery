@@ -15,7 +15,7 @@ export interface DeclineListRow {
   suspectedOwnerId: string | null;
   suspectedOwnerName: string | null;
   suspectedOwnerThumbnailFaceId: string | null;
-  personId: string | null;
+  personGroupId: string | null;
   personName: string | null;
   personThumbnailFaceId: string | null;
   createdAt: string;
@@ -33,7 +33,7 @@ export class FaceRepairDeclineRepository {
       type: 'person' as const,
       assetFaceId: null,
       suspectedOwnerId: null,
-      personId: p.personId,
+      personGroupId: p.personId,
       suspectedOwnerIds: p.suspectedOwnerIds as unknown as Insertable<FaceRepairDeclineTable>['suspectedOwnerIds'],
       declinedBy: input.declinedBy,
     }));
@@ -43,12 +43,12 @@ export class FaceRepairDeclineRepository {
     return this.db.transaction().execute(async (trx) => {
       let created = 0;
       if (personRows.length > 0) {
-        const personIds = (input.persons ?? []).map((p) => p.personId);
+        const personGroupIds = (input.persons ?? []).map((p) => p.personId);
         // last-write-wins: a re-dismiss replaces the person's stored suspected-owner fingerprint
         await trx
           .deleteFrom('face_repair_decline')
           .where('type', '=', 'person')
-          .where('personId', 'in', personIds)
+          .where('personGroupId', 'in', personGroupIds)
           .execute();
         const inserted = await trx.insertInto('face_repair_decline').values(personRows).returning('id').execute();
         created += inserted.length;
@@ -65,21 +65,21 @@ export class FaceRepairDeclineRepository {
   // suspected owner in a scan; minFaces is admin-settable, so a full-library scan can pass every flagged
   // face's suspected-owner person id — one id is one bind parameter, so an unchunked IN-list breaks at
   // Postgres's 65 535-parameter ceiling.
-  async getClusterMuteMap(personIds: string[]): Promise<Map<string, Set<string>>> {
+  async getClusterMuteMap(personGroupIds: string[]): Promise<Map<string, Set<string>>> {
     const mutedPersons = new Map<string, Set<string>>();
-    if (personIds.length === 0) {
+    if (personGroupIds.length === 0) {
       return mutedPersons;
     }
-    for (let index = 0; index < personIds.length; index += 1000) {
+    for (let index = 0; index < personGroupIds.length; index += 1000) {
       const rows = await this.db
         .selectFrom('face_repair_decline')
-        .select(['personId', 'suspectedOwnerIds'])
+        .select(['personGroupId', 'suspectedOwnerIds'])
         .where('type', '=', 'person')
-        .where('personId', 'in', personIds.slice(index, index + 1000))
+        .where('personGroupId', 'in', personGroupIds.slice(index, index + 1000))
         .execute();
       for (const row of rows) {
-        if (row.personId) {
-          mutedPersons.set(row.personId, new Set(row.suspectedOwnerIds as unknown as string[]));
+        if (row.personGroupId) {
+          mutedPersons.set(row.personGroupId, new Set(row.suspectedOwnerIds as unknown as string[]));
         }
       }
     }
@@ -89,7 +89,7 @@ export class FaceRepairDeclineRepository {
   async listDeclines(): Promise<DeclineListRow[]> {
     const rows = await this.db
       .selectFrom('face_repair_decline')
-      .select(['id', 'type', 'assetFaceId', 'suspectedOwnerId', 'personId', 'createdAt'])
+      .select(['id', 'type', 'assetFaceId', 'suspectedOwnerId', 'personGroupId', 'createdAt'])
       .where('type', '=', 'person')
       .orderBy('createdAt', 'desc')
       .execute();
@@ -97,13 +97,17 @@ export class FaceRepairDeclineRepository {
       return [];
     }
     const ids = [
-      ...new Set(rows.flatMap((r) => [r.personId, r.suspectedOwnerId].filter((x): x is string => x !== null))),
+      ...new Set(rows.flatMap((r) => [r.personGroupId, r.suspectedOwnerId].filter((x): x is string => x !== null))),
     ];
     const people =
       ids.length > 0
-        ? await this.db.selectFrom('person').select(['personGroupId', 'name', 'faceAssetId']).where('personGroupId', 'in', ids).execute()
+        ? await this.db
+            .selectFrom('person')
+            .select(['personGroupId as id', 'name', 'faceAssetId'])
+            .where('personGroupId', 'in', ids)
+            .execute()
         : [];
-    const byId = new Map(people.map((p) => [p.personGroupId, p]));
+    const byId = new Map(people.map((p) => [p.id, p]));
     const nameOf = (id: string | null) => (id && byId.get(id)?.name ? byId.get(id)!.name! : null);
     const thumbOf = (id: string | null) => (id ? (byId.get(id)?.faceAssetId ?? null) : null);
     return rows.map((r) => ({
@@ -113,9 +117,9 @@ export class FaceRepairDeclineRepository {
       suspectedOwnerId: r.suspectedOwnerId,
       suspectedOwnerName: nameOf(r.suspectedOwnerId),
       suspectedOwnerThumbnailFaceId: thumbOf(r.suspectedOwnerId),
-      personId: r.personId,
-      personName: nameOf(r.personId),
-      personThumbnailFaceId: thumbOf(r.personId),
+      personGroupId: r.personGroupId,
+      personName: nameOf(r.personGroupId),
+      personThumbnailFaceId: thumbOf(r.personGroupId),
       createdAt: r.createdAt as unknown as string,
     }));
   }

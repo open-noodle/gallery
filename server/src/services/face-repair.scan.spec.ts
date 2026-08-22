@@ -7,7 +7,7 @@ import { newTestService, ServiceMocks } from 'test/utils';
 
 /** A single eligible-face page for the progress test mock (keyset scan reads pages, not a cursor). */
 const singleFacePage = (): EligibleFaceRow[] => [
-  { assetFaceId: 'face-1', ownerId: 'user-1', personId: 'P', embedding: '[0.1,0.2,0.3]' },
+  { assetFaceId: 'face-1', ownerId: 'user-1', personGroupId: 'P', embedding: '[0.1,0.2,0.3]' },
 ];
 
 /** A minimal RepairPlan with one flagged person P → suspected owner Q */
@@ -17,8 +17,8 @@ const makePlan = (): RepairPlan => ({
   reviewOnlyPersonIds: [],
   unAttributableFaces: [],
   perPerson: [
-    { personId: 'P', eligible: 5, flagged: 1, flaggedFraction: 0.2 },
-    { personId: 'Q', eligible: 8, flagged: 0, flaggedFraction: 0 },
+    { personGroupId: 'P', eligible: 5, flagged: 1, flaggedFraction: 0.2 },
+    { personGroupId: 'Q', eligible: 8, flagged: 0, flaggedFraction: 0 },
   ],
 });
 
@@ -50,7 +50,7 @@ describe(FaceRepairService.name, () => {
     // Default enriched persons — recommendation placeholder will be OVERWRITTEN by classifier
     mocks.faceRepairScan.enrichReportPersons.mockResolvedValue([
       {
-        personId: 'P',
+        personGroupId: 'P',
         ownerId: 'user-1',
         personName: 'Jula',
         faceCount: 5,
