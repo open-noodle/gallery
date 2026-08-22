@@ -2157,7 +2157,7 @@ describe(MediaService.name, () => {
         metadata: { faces: { import: false } },
       });
 
-      await expect(sut.handleGeneratePersonThumbnail({ id: 'person-1' })).resolves.toBe(JobStatus.Failed);
+      await expect(sut.handleGeneratePersonThumbnail({ personGroupId: 'person-1' })).resolves.toBe(JobStatus.Failed);
       expect(mocks.person.getDataForThumbnailGenerationJob).toHaveBeenCalledWith('person-1');
     });
 
@@ -2539,7 +2539,7 @@ describe(MediaService.name, () => {
         info: { width: 2160, height: 3840 } as OutputInfo,
       });
 
-      await expect(sut.handleGeneratePersonThumbnail({ id: person.personGroupId })).resolves.toBe(JobStatus.Success);
+      await expect(sut.handleGeneratePersonThumbnail({ personGroupId: person.personGroupId })).resolves.toBe(JobStatus.Success);
 
       expect(mocks.media.probe).not.toHaveBeenCalled();
       expect(mocks.media.extractFrame).not.toHaveBeenCalled();
@@ -2574,7 +2574,7 @@ describe(MediaService.name, () => {
         info: { width: 2160, height: 3840 } as OutputInfo,
       });
 
-      await expect(sut.handleGeneratePersonThumbnail({ id: person.personGroupId })).resolves.toBe(JobStatus.Success);
+      await expect(sut.handleGeneratePersonThumbnail({ personGroupId: person.personGroupId })).resolves.toBe(JobStatus.Success);
 
       expect(ensureLocalFile).toHaveBeenCalledWith(data.originalPath);
       expect(mocks.media.probe).not.toHaveBeenCalled();
@@ -5350,7 +5350,7 @@ describe(MediaService.name, () => {
         previewPath: null,
       });
 
-      await expect(sut.handleGeneratePersonThumbnail({ id: 'person-1' })).resolves.toBe(JobStatus.Failed);
+      await expect(sut.handleGeneratePersonThumbnail({ personGroupId: 'person-1' })).resolves.toBe(JobStatus.Failed);
     });
   });
 

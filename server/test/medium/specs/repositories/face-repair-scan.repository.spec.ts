@@ -7,7 +7,7 @@ import {
 } from 'src/repositories/face-repair-scan.repository';
 import { FaceRepairRepository } from 'src/repositories/face-repair.repository';
 import { DB } from 'src/schema';
-import { mediumFactory } from 'test/medium.factory';
+import { insertPersonGroup, mediumFactory } from 'test/medium.factory';
 import { getKyselyDB } from 'test/utils';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 
@@ -57,13 +57,13 @@ describe(FaceRepairScanRepository.name, () => {
     await db.insertInto('asset').values(asset).execute();
     const rows = [
       ...Array.from({ length: visible }, () =>
-        mediumFactory.assetFaceInsert({ assetId: asset.id, personId: person.personGroupId }),
+        mediumFactory.assetFaceInsert({ assetId: asset.id, personGroupId: person.personGroupId }),
       ),
       ...Array.from({ length: extra.deleted ?? 0 }, () =>
-        mediumFactory.assetFaceInsert({ assetId: asset.id, personId: person.personGroupId, deletedAt: new Date() }),
+        mediumFactory.assetFaceInsert({ assetId: asset.id, personGroupId: person.personGroupId, deletedAt: new Date() }),
       ),
       ...Array.from({ length: extra.invisible ?? 0 }, () =>
-        mediumFactory.assetFaceInsert({ assetId: asset.id, personId: person.personGroupId, isVisible: false }),
+        mediumFactory.assetFaceInsert({ assetId: asset.id, personGroupId: person.personGroupId, isVisible: false }),
       ),
     ];
     if (rows.length > 0) {
@@ -329,8 +329,8 @@ describe(FaceRepairScanRepository.name, () => {
     it('overlays the live person + owner names; a cluster named since the scan is promoted to review-first', async () => {
       const user = mediumFactory.userInsert({});
       await db.insertInto('user').values(user).execute();
-      const cluster = mediumFactory.personInsert({ ownerId: user.id, name: '' });
-      const owner = mediumFactory.personInsert({ ownerId: user.id, name: '' });
+      const cluster = mediumFactory.personInsert({ personGroupId: await insertPersonGroup(db, user.id), ownerId: user.id, name: '' });
+      const owner = mediumFactory.personInsert({ personGroupId: await insertPersonGroup(db, user.id), ownerId: user.id, name: '' });
       await db
         .insertInto('person')
         .values([
@@ -521,7 +521,7 @@ describe(FaceRepairScanRepository.name, () => {
       // Create an asset + asset_face for p, then link faceAssetId
       const pAsset = mediumFactory.assetInsert({ ownerId });
       await db.insertInto('asset').values(pAsset).execute();
-      const pFace = mediumFactory.assetFaceInsert({ assetId: pAsset.id, personId: pData.personGroupId });
+      const pFace = mediumFactory.assetFaceInsert({ assetId: pAsset.id, personGroupId: pData.personGroupId });
       await db.insertInto('asset_face').values(pFace).execute();
       await db.updateTable('person').set({ faceAssetId: pFace.id }).where('personGroupId', '=', pData.personGroupId).execute();
       p = { id: pData.personGroupId, faceAssetId: pFace.id, name: 'Jula' };
