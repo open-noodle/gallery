@@ -27,6 +27,7 @@
   "control_bottom_app_bar_delete_from_immich": "Delete from Noodle Gallery",
   "delete_dialog_alert": "These items will be permanently deleted from Noodle Gallery and from your device",
   "delete_dialog_alert_local": "These items will be permanently removed from your device but still be available on the Noodle Gallery server",
+  "delete_dialog_alert_local_ios": "These items will be deleted from Photos, but will still be available on the Noodle Gallery server. They will be in Recently Deleted for 30 days.",
   "delete_dialog_alert_local_non_backed_up": "Some of the items aren't backed up to Noodle Gallery and will be permanently removed from your device",
   "delete_dialog_alert_remote": "These items will be permanently deleted from the Noodle Gallery server",
   "download_sucess_android": "The media has been downloaded to DCIM/NoodleGallery",
