@@ -50,7 +50,7 @@ const linkManually = async (ctx: ReturnType<typeof setup>['ctx'], input: { owner
 // visible face with an embedding — mirrors getAssignedFaceEmbeddings) in addition to the owner
 // having a reviewable unassigned ML candidate somewhere. This gives a person that reference face.
 const giveOwnFace = async (ctx: ReturnType<typeof setup>['ctx'], assetId: string, personId: string) => {
-  const { result: faceId } = await ctx.newAssetFace({ assetId, personGroupId });
+  const { result: faceId } = await ctx.newAssetFace({ assetId, personGroupId: personId });
   await ctx.database.insertInto('face_search').values({ faceId, embedding: newEmbedding() }).execute();
   return faceId;
 };
@@ -1169,7 +1169,7 @@ describe(PersonRepository.name, () => {
 
       const people = await ctx.database
         .selectFrom('person')
-        .select(['id', 'type'])
+        .select(['personGroupId', 'type'])
         .where('ownerId', '=', user.id)
         .execute();
       const faces = await ctx.database

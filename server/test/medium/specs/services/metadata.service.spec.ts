@@ -203,7 +203,7 @@ const getAssetFaceIdentityLinks = (db: Kysely<DB>, assetId: string) =>
   db
     .selectFrom('face_identity_face')
     .innerJoin('asset_face', 'asset_face.id', 'face_identity_face.assetFaceId')
-    .innerJoin('person', 'person.personGroupId', 'asset_face.personId')
+    .innerJoin('person', 'person.personGroupId', 'asset_face.personGroupId')
     .select(['asset_face.id as assetFaceId', 'person.name', 'face_identity_face.source', 'asset_face.sourceType'])
     .where('asset_face.assetId', '=', assetId)
     .execute();
