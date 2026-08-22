@@ -196,7 +196,7 @@ test.describe.serial('Face review cross-engine', () => {
       // go vacuous. Same downgrade the sibling suite performs — see face-cleanup.e2e-spec.ts.
       await db.query(`UPDATE "face_identity_face" SET "source" = 'ml' WHERE "assetFaceId" = $1`, [faceId]);
       await db.query(
-        `INSERT INTO "face_repair_scan_flagged_face" ("scanId", "assetFaceId", "personId", "suspectedOwnerId")
+        `INSERT INTO "face_repair_scan_flagged_face" ("scanId", "assetFaceId", "personGroupId", "suspectedOwnerId")
          VALUES ($1, $2, $3, $4)`,
         [scanId, faceId, cluster.id, suspected.id],
       );
@@ -228,7 +228,7 @@ test.describe.serial('Face review cross-engine', () => {
     const lockedCandidate = lockedRows[0].id;
 
     for (const faceId of [controlCandidate, lockedCandidate]) {
-      await db.query(`INSERT INTO face_person_verdict ("personId", "assetFaceId", distance) VALUES ($1, $2, $3)`, [
+      await db.query(`INSERT INTO face_person_verdict ("personGroupId", "assetFaceId", distance) VALUES ($1, $2, $3)`, [
         queueTarget.id,
         faceId,
         0.6,

@@ -74,8 +74,12 @@ const setup = async (): Promise<Fixture> => {
     utils.createFace({ assetId: otherAsset.id, personGroupId: otherOwnerPerson.id }),
   ]);
 
-  const targetIdentityRow = await db.query(`SELECT "identityId" FROM "person" WHERE id = $1`, [targetPerson.id]);
-  const sourceIdentityRow = await db.query(`SELECT "identityId" FROM "person" WHERE id = $1`, [otherOwnerPerson.id]);
+  const targetIdentityRow = await db.query(`SELECT "identityId" FROM "person" WHERE "personGroupId" = $1`, [
+    targetPerson.id,
+  ]);
+  const sourceIdentityRow = await db.query(`SELECT "identityId" FROM "person" WHERE "personGroupId" = $1`, [
+    otherOwnerPerson.id,
+  ]);
   const identityT = targetIdentityRow.rows[0].identityId as string;
   const identityS = sourceIdentityRow.rows[0].identityId as string;
 
@@ -128,7 +132,9 @@ describe('scoped people merge with a same-space profile conflict (#733 follow-up
 
   const otherOwnerIdentity = async () => {
     const db = await utils.connectDatabase();
-    const { rows } = await db.query(`SELECT "identityId" FROM "person" WHERE id = $1`, [fx.otherOwnerPersonId]);
+    const { rows } = await db.query(`SELECT "identityId" FROM "person" WHERE "personGroupId" = $1`, [
+      fx.otherOwnerPersonId,
+    ]);
     return rows[0].identityId as string;
   };
 
@@ -201,7 +207,7 @@ describe('cross-owner policy parity across the merge endpoints (#733)', () => {
     const asset = await utils.createAsset(fx.actor.accessToken);
     const person = await utils.createPerson(fx.actor.accessToken, { name: 'Ada Mine On S' });
     await utils.createFace({ assetId: asset.id, personGroupId: person.id });
-    await db.query(`UPDATE "person" SET "identityId" = $1 WHERE id = $2`, [fx.identityS, person.id]);
+    await db.query(`UPDATE "person" SET "identityId" = $1 WHERE "personGroupId" = $2`, [fx.identityS, person.id]);
     return person.id;
   };
 
@@ -211,7 +217,7 @@ describe('cross-owner policy parity across the merge endpoints (#733)', () => {
     const asset = await utils.createAsset(fx.otherOwner.accessToken);
     const person = await utils.createPerson(fx.otherOwner.accessToken, { name: 'Ada Theirs On T' });
     await utils.createFace({ assetId: asset.id, personGroupId: person.id });
-    await db.query(`UPDATE "person" SET "identityId" = $1 WHERE id = $2`, [fx.identityT, person.id]);
+    await db.query(`UPDATE "person" SET "identityId" = $1 WHERE "personGroupId" = $2`, [fx.identityT, person.id]);
     return person.id;
   };
 
@@ -234,7 +240,9 @@ describe('cross-owner policy parity across the merge endpoints (#733)', () => {
       .expect(200);
 
     const db = await utils.connectDatabase();
-    const { rows } = await db.query(`SELECT "identityId" FROM "person" WHERE id = $1`, [fx.otherOwnerPersonId]);
+    const { rows } = await db.query(`SELECT "identityId" FROM "person" WHERE "personGroupId" = $1`, [
+      fx.otherOwnerPersonId,
+    ]);
     expect(rows[0].identityId).toBe(fx.identityT);
   });
 
@@ -246,7 +254,9 @@ describe('cross-owner policy parity across the merge endpoints (#733)', () => {
       .expect(204);
 
     const db = await utils.connectDatabase();
-    const { rows } = await db.query(`SELECT "identityId" FROM "person" WHERE id = $1`, [fx.otherOwnerPersonId]);
+    const { rows } = await db.query(`SELECT "identityId" FROM "person" WHERE "personGroupId" = $1`, [
+      fx.otherOwnerPersonId,
+    ]);
     expect(rows[0].identityId).toBe(fx.identityT);
   });
 

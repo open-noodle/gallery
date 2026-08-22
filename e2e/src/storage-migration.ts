@@ -386,7 +386,7 @@ export async function captureState(): Promise<MigrationState> {
     queryDb<{ id: string; originalPath: string }>('SELECT id, "originalPath" FROM asset ORDER BY id'),
     queryDb<{ id: string; path: string; type: string }>('SELECT id, path, type FROM asset_file ORDER BY id'),
     queryDb<{ id: string; thumbnailPath: string }>(
-      'SELECT id, "thumbnailPath" FROM person WHERE "thumbnailPath" != \'\' ORDER BY id',
+      'SELECT "personGroupId" AS id, "thumbnailPath" FROM person WHERE "thumbnailPath" != \'\' ORDER BY "personGroupId"',
     ),
     queryDb<{ id: string; profileImagePath: string }>(
       'SELECT id, "profileImagePath" FROM "user" WHERE "profileImagePath" != \'\' ORDER BY id',
@@ -485,7 +485,7 @@ async function phaseSetup(): Promise<void> {
   dockerExec('immich-server', 'mkdir -p /usr/src/app/upload/thumbs');
   const pngBase64 = createPng().toString('base64');
   dockerExec('immich-server', `echo '${pngBase64}' | base64 -d > /usr/src/app/upload/thumbs/person-test.png`);
-  await queryDb('UPDATE person SET "thumbnailPath" = $1 WHERE id = $2', [
+  await queryDb('UPDATE person SET "thumbnailPath" = $1 WHERE "personGroupId" = $2', [
     '/usr/src/app/upload/thumbs/person-test.png',
     person.id,
   ]);
@@ -1738,7 +1738,7 @@ async function phaseTemplateS3QueueMigrationSkipped(): Promise<void> {
     `SELECT id, path FROM asset_file WHERE type = 'thumbnail'`,
   );
   const prePersons = await queryDb<{ id: string; thumbnailPath: string }>(
-    `SELECT id, "thumbnailPath" FROM person WHERE "thumbnailPath" != ''`,
+    `SELECT "personGroupId" AS id, "thumbnailPath" FROM person WHERE "thumbnailPath" != ''`,
   );
 
   try {
@@ -1766,7 +1766,7 @@ async function phaseTemplateS3QueueMigrationSkipped(): Promise<void> {
 
     // Person thumbnails unchanged
     const postPersons = await queryDb<{ id: string; thumbnailPath: string }>(
-      `SELECT id, "thumbnailPath" FROM person WHERE "thumbnailPath" != ''`,
+      `SELECT "personGroupId" AS id, "thumbnailPath" FROM person WHERE "thumbnailPath" != ''`,
     );
     for (const pre of prePersons) {
       const post = postPersons.find((r) => r.id === pre.id);
