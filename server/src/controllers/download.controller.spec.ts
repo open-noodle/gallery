@@ -22,7 +22,7 @@ describe(DownloadController.name, () => {
   describe('POST /download/archive', () => {
     it('should accept comma-separated assetIds string', async () => {
       const downloadArchiveSpy = vi.spyOn(service, 'downloadArchive');
-      service.downloadArchive.mockResolvedValue({ stream: Readable.from('') });
+      service.downloadArchive.mockResolvedValue({ stream: Readable.from(''), abort: vi.fn() });
 
       const ids = [factory.uuid(), factory.uuid()];
       const { status } = await request(ctx.getHttpServer())
@@ -35,7 +35,7 @@ describe(DownloadController.name, () => {
 
     it('should accept assetIds array', async () => {
       const downloadArchiveSpy = vi.spyOn(service, 'downloadArchive');
-      service.downloadArchive.mockResolvedValue({ stream: Readable.from('') });
+      service.downloadArchive.mockResolvedValue({ stream: Readable.from(''), abort: vi.fn() });
 
       const ids = [factory.uuid(), factory.uuid()];
       const { status } = await request(ctx.getHttpServer()).post(`/download/archive`).send({
