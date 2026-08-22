@@ -285,9 +285,9 @@ export class PersonRepository {
 
     const rows = await db
       .selectFrom('person')
-      .select('id')
+      .select('personGroupId')
       .where('personGroupId', 'in', [...new Set(personIds)].toSorted())
-      .orderBy('id')
+      .orderBy('personGroupId')
       .forUpdate()
       .execute();
     if (rows.length !== new Set(personIds).size) {
@@ -412,7 +412,7 @@ export class PersonRepository {
       await trx
         .deleteFrom('asset_face')
         .where('asset_face.personGroupId', 'in', (eb) =>
-          eb.selectFrom('person').select('person.id').where('person.type', '=', 'pet'),
+          eb.selectFrom('person').select('person.personGroupId').where('person.type', '=', 'pet'),
         )
         .execute();
 
@@ -552,7 +552,7 @@ export class PersonRepository {
           .orderBy(sql`CASE WHEN NULLIF(BTRIM(person.name), '') IS NULL THEN COUNT("asset_face"."assetId") END`, (om) =>
             om.desc().nullsLast(),
           )
-          .orderBy('person.id'),
+          .orderBy('person.personGroupId'),
       )
       .$if(!options?.withHidden, (qb) => qb.where('person.isHidden', '=', false))
       .offset(pagination.skip ?? 0)
@@ -624,7 +624,7 @@ export class PersonRepository {
       .selectFrom('asset_face')
       .innerJoin('asset', 'asset.id', 'asset_face.assetId')
       .selectAll('asset_face')
-      .select(withPerson)
+      .select(withPersonAnyOwner)
       .where('asset_face.id', '=', id)
       .where((eb) => reviewableAssetVisibility(eb))
       .executeTakeFirstOrThrow();
