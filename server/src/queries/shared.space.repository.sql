@@ -1613,9 +1613,9 @@ where
 
 -- SharedSpaceRepository.getMetadataInheritanceCandidates
 select
-  "person"."id" as "personId",
+  "person"."personGroupId" as "personId",
   'user-person' as "sourceProfileType",
-  "person"."id" as "sourceProfileId",
+  "person"."personGroupId" as "sourceProfileId",
   "person"."ownerId" as "userId",
   "shared_space_member"."role",
   "person"."name",
@@ -1630,7 +1630,7 @@ from
   inner join "shared_space_member" on "shared_space_member"."userId" = "person"."ownerId"
   and "shared_space_member"."spaceId" = $2
   and "shared_space_member"."sharePersonMetadata" = $3
-  left join "asset_face" on "asset_face"."personId" = "person"."id"
+  left join "asset_face" on "asset_face"."personGroupId" = "person"."personGroupId"
   and "asset_face"."deletedAt" is null
   and "asset_face"."isVisible" is true
   left join "shared_space_person_face" on "shared_space_person_face"."assetFaceId" = "asset_face"."id"
@@ -1639,7 +1639,7 @@ from
 where
   "person"."identityId" = $5
 group by
-  "person"."id",
+  "person"."personGroupId",
   "person"."ownerId",
   "shared_space_member"."role",
   "person"."name",
@@ -1776,7 +1776,7 @@ from
   "shared_space_person_face"
   inner join "asset_face" on "asset_face"."id" = "shared_space_person_face"."assetFaceId"
   inner join "asset" on "asset"."id" = "asset_face"."assetId"
-  inner join "person" on "person"."id" = "asset_face"."personId"
+  inner join "person" on "person"."personGroupId" = "asset_face"."personGroupId"
 where
   "shared_space_person_face"."personId" = $1
   and (
@@ -2574,14 +2574,14 @@ where
 select
   "asset_face"."id",
   "asset_face"."assetId",
-  "asset_face"."personId",
+  "asset_face"."personGroupId" as "personId",
   "face_identity_face"."identityId",
   "person"."type",
   "face_search"."embedding"
 from
   "asset_face"
   left join "face_search" on "face_search"."faceId" = "asset_face"."id"
-  left join "person" on "person"."id" = "asset_face"."personId"
+  left join "person" on "person"."personGroupId" = "asset_face"."personGroupId"
   left join "face_identity_face" on "face_identity_face"."assetFaceId" = "asset_face"."id"
 where
   "asset_face"."assetId" = $1
@@ -2909,12 +2909,12 @@ order by
 select
   "asset_face"."id",
   "asset_face"."assetId",
-  "asset_face"."personId",
+  "asset_face"."personGroupId" as "personId",
   "person"."identityId",
   "person"."type"
 from
   "asset_face"
-  inner join "person" on "person"."id" = "asset_face"."personId"
+  inner join "person" on "person"."personGroupId" = "asset_face"."personGroupId"
 where
   "asset_face"."assetId" = $1
   and "asset_face"."deletedAt" is null
@@ -2929,7 +2929,7 @@ from
   inner join "asset_face" on "asset_face"."id" = "shared_space_person_face"."assetFaceId"
 where
   "shared_space_person"."spaceId" = $1
-  and "asset_face"."personId" = $2
+  and "asset_face"."personGroupId" = $2
 limit
   $3
 
@@ -2941,14 +2941,14 @@ select
   "shared_space_person"."birthDate",
   "shared_space_person"."updatedAt",
   "shared_space_person"."type",
-  "asset_face"."personId"
+  "asset_face"."personGroupId" as "personId"
 from
   "shared_space_person"
   inner join "shared_space_person_face" on "shared_space_person_face"."personId" = "shared_space_person"."id"
   inner join "asset_face" on "asset_face"."id" = "shared_space_person_face"."assetFaceId"
 where
   "shared_space_person"."spaceId" = $1
-  and "asset_face"."personId" in ($2)
+  and "asset_face"."personGroupId" in ($2)
 group by
   "shared_space_person"."id",
   "shared_space_person"."name",
@@ -2956,7 +2956,7 @@ group by
   "shared_space_person"."birthDate",
   "shared_space_person"."updatedAt",
   "shared_space_person"."type",
-  "asset_face"."personId"
+  "asset_face"."personGroupId"
 
 -- SharedSpaceRepository.findSpaceForAssetAndUser
 select
