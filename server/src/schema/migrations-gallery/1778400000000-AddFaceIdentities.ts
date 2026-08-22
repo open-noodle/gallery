@@ -1,4 +1,5 @@
 import { Kysely, sql } from 'kysely';
+import { clusterGroupsApplied } from 'src/utils/cluster-groups-order';
 
 export async function up(db: Kysely<any>): Promise<void> {
   await sql`
@@ -75,12 +76,17 @@ export async function up(db: Kysely<any>): Promise<void> {
   await sql`INSERT INTO "migration_overrides" ("name", "value") VALUES ('index_person_ownerId_identityId_key', '{"type":"index","name":"person_ownerId_identityId_key","sql":"CREATE UNIQUE INDEX \\"person_ownerId_identityId_key\\" ON \\"person\\" (\\"ownerId\\", \\"identityId\\") WHERE \\"identityId\\" IS NOT NULL;"}'::jsonb)`.execute(
     db,
   );
-  await sql`CREATE INDEX IF NOT EXISTS "asset_face_personId_idx" ON "asset_face" ("personId") WHERE "personId" IS NOT NULL`.execute(
-    db,
-  );
-  await sql`INSERT INTO "migration_overrides" ("name", "value") VALUES ('index_asset_face_personId_idx', '{"type":"index","name":"asset_face_personId_idx","sql":"CREATE INDEX \\"asset_face_personId_idx\\" ON \\"asset_face\\" (\\"personId\\") WHERE \\"personId\\" IS NOT NULL;"}'::jsonb)`.execute(
-    db,
-  );
+  // Skipped on an Immich-to-Gallery switch: upstream's ClusterGroups has already renamed the column to
+  // `personGroupId` and ships its own index on it, and 1791 drops this one anyway. Creating it here
+  // would fail outright on that path — see src/utils/cluster-groups-order.ts.
+  if (!(await clusterGroupsApplied(db))) {
+    await sql`CREATE INDEX IF NOT EXISTS "asset_face_personId_idx" ON "asset_face" ("personId") WHERE "personId" IS NOT NULL`.execute(
+      db,
+    );
+    await sql`INSERT INTO "migration_overrides" ("name", "value") VALUES ('index_asset_face_personId_idx', '{"type":"index","name":"asset_face_personId_idx","sql":"CREATE INDEX \\"asset_face_personId_idx\\" ON \\"asset_face\\" (\\"personId\\") WHERE \\"personId\\" IS NOT NULL;"}'::jsonb)`.execute(
+      db,
+    );
+  }
 
   await sql`ALTER TABLE "shared_space_person" ADD COLUMN "identityId" uuid REFERENCES "face_identity" ("id") ON DELETE SET NULL`.execute(
     db,

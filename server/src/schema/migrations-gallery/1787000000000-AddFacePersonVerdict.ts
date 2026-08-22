@@ -1,10 +1,15 @@
 import { Kysely, sql } from 'kysely';
+import { personKeyTarget } from 'src/utils/cluster-groups-order';
 
 // Final-form migration for the shared face-review verdict layer. Replaces three earlier fork migrations
 // that were never deployed (AddPersonFaceSuggestion, AddSpacePersonFaceSuggestion,
 // AddFaceSuggestionIntentStatuses) — the unified branch ships both face features together, so the table is
 // authored once in its final shape rather than created and then altered.
 export async function up(db: Kysely<unknown>): Promise<void> {
+  // See 1781000000000-AddFaceRepairDecline: on an Immich-to-Gallery switch upstream's ClusterGroups has
+  // already dropped `person.id`, so this key must reference `person_group.id` from the start. 1791
+  // renames the column in both worlds.
+  const personTable = sql.table(await personKeyTarget(db));
   await sql`
     CREATE TABLE "face_person_verdict" (
       "id" uuid NOT NULL DEFAULT immich_uuid_v7(),
@@ -23,7 +28,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
       CONSTRAINT "face_person_verdict_status_chk" CHECK ("status" IN ('pending', 'rejected', 'ignored')),
       CONSTRAINT "face_person_verdict_source_chk" CHECK ("source" IN ('suggestion', 'cleanup')),
       CONSTRAINT "face_person_verdict_single_target_chk" CHECK (num_nonnulls("personId", "spacePersonId") <= 1),
-      CONSTRAINT "face_person_verdict_personId_fkey" FOREIGN KEY ("personId") REFERENCES "person" ("id") ON DELETE SET NULL,
+      CONSTRAINT "face_person_verdict_personId_fkey" FOREIGN KEY ("personId") REFERENCES ${personTable} ("id") ON DELETE SET NULL,
       CONSTRAINT "face_person_verdict_spacePersonId_fkey" FOREIGN KEY ("spacePersonId") REFERENCES "shared_space_person" ("id") ON DELETE SET NULL,
       CONSTRAINT "face_person_verdict_identityId_fkey" FOREIGN KEY ("identityId") REFERENCES "face_identity" ("id") ON DELETE SET NULL,
       CONSTRAINT "face_person_verdict_assetFaceId_fkey" FOREIGN KEY ("assetFaceId") REFERENCES "asset_face" ("id") ON DELETE CASCADE,
