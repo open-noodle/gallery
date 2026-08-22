@@ -567,7 +567,7 @@ export const utils = {
       throw new Error('Database client not connected');
     }
 
-    const result = await client.query(`SELECT "faceAssetId" FROM "person" WHERE id = $1`, [personId]);
+    const result = await client.query(`SELECT "faceAssetId" FROM "person" WHERE "personGroupId" = $1`, [personId]);
     return (result.rows[0]?.faceAssetId as string | undefined) ?? null;
   },
 
@@ -631,7 +631,7 @@ export const utils = {
 
       // 2. Create a face row linking the asset to the global person.
       const faceResult = await client.query(
-        `INSERT INTO "asset_face" ("assetId", "personId") VALUES ($1, $2) RETURNING id`,
+        `INSERT INTO "asset_face" ("assetId", "personGroupId") VALUES ($1, $2) RETURNING id`,
         [assetId, globalPersonId],
       );
       const faceId = faceResult.rows[0].id as string;

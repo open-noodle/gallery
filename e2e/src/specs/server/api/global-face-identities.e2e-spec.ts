@@ -77,7 +77,7 @@ const setupGlobalFaceIdentityE2E = async (): Promise<GlobalFaceIdentityFixture> 
       [faceA],
     );
     const faceIdentityId = identityResult.rows[0].id as string;
-    await db.query(`UPDATE "person" SET "identityId" = $1 WHERE id IN ($2, $3)`, [
+    await db.query(`UPDATE "person" SET "identityId" = $1 WHERE "personGroupId" IN ($2, $3)`, [
       faceIdentityId,
       personA.id,
       personB.id,
