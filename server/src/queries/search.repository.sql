@@ -777,7 +777,7 @@ WITH
   profiles AS (
     SELECT
       'user-person'::text AS "profileType",
-      person.id AS "profileId",
+      person."personGroupId" AS "profileId",
       NULL::uuid AS "spaceId",
       person."identityId",
       person.name,
@@ -1004,15 +1004,9 @@ with
       "asset_face"
       inner join "asset" on "asset"."id" = "asset_face"."assetId"
       inner join "face_search" on "face_search"."faceId" = "asset_face"."id"
+      left join "person" on "person"."personGroupId" = "asset_face"."personGroupId"
     where
-      "asset"."ownerId" in (
-        select
-          "user"."id"
-        from
-          "user"
-        where
-          "user"."clusterGroupId" = $2
-      )
+      "asset"."ownerId" = any ($2::uuid[])
       and "asset"."deletedAt" is null
       and "asset_face"."deletedAt" is null
     order by
@@ -1026,7 +1020,7 @@ from
   "cte"
 where
   "cte"."distance" <= $4
-rollback
+commit
 
 -- SearchRepository.searchFaces (space)
 begin
@@ -1036,13 +1030,13 @@ with
   "cte" as (
     select
       "asset_face"."id",
-      "asset_face"."personId",
+      "asset_face"."personGroupId",
       face_search.embedding <=> $1 as "distance"
     from
       "asset_face"
       inner join "asset" on "asset"."id" = "asset_face"."assetId"
       inner join "face_search" on "face_search"."faceId" = "asset_face"."id"
-      left join "person" on "person"."id" = "asset_face"."personId"
+      left join "person" on "person"."personGroupId" = "asset_face"."personGroupId"
     where
       (
         exists (
@@ -1094,7 +1088,7 @@ with
       and "asset"."visibility" in ($6, $7)
       and "asset"."deletedAt" is null
       and "asset_face"."deletedAt" is null
-      and "asset_face"."personId" is null
+      and "asset_face"."personGroupId" is null
     order by
       "distance"
     limit
@@ -1116,13 +1110,13 @@ with
   "cte" as (
     select
       "asset_face"."id",
-      "asset_face"."personId",
+      "asset_face"."personGroupId",
       face_search.embedding <=> $1 as "distance"
     from
       "asset_face"
       inner join "asset" on "asset"."id" = "asset_face"."assetId"
       inner join "face_search" on "face_search"."faceId" = "asset_face"."id"
-      left join "person" on "person"."id" = "asset_face"."personId"
+      left join "person" on "person"."personGroupId" = "asset_face"."personGroupId"
     where
       "asset"."ownerId" = any ($2::uuid[])
       and "asset"."deletedAt" is null
@@ -3320,7 +3314,7 @@ WITH
   profiles AS (
     SELECT
       'user-person'::text AS "profileType",
-      person.id AS "profileId",
+      person."personGroupId" AS "profileId",
       NULL::uuid AS "spaceId",
       person."identityId",
       person.name,
