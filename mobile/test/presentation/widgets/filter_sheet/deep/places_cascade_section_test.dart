@@ -81,7 +81,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final container = ProviderScope.containerOf(tester.element(find.byType(PlacesCascadeSection)));
-      container.read(photosFilterProvider.notifier).setLocation(SearchLocationFilter(country: 'France'));
+      container.read(photosFilterProvider.notifier).setLocation(const SearchLocationFilter(country: 'France'));
       await tester.pumpAndSettle();
 
       await tester.tap(find.byKey(const Key('places-city-Paris')));
@@ -106,7 +106,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final container = ProviderScope.containerOf(tester.element(find.byType(PlacesCascadeSection)));
-      container.read(photosFilterProvider.notifier).setLocation(SearchLocationFilter(country: 'France'));
+      container.read(photosFilterProvider.notifier).setLocation(const SearchLocationFilter(country: 'France'));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('places-country-selected')), findsOneWidget);
 
@@ -145,7 +145,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final container = ProviderScope.containerOf(tester.element(find.byType(PlacesCascadeSection)));
-      container.read(photosFilterProvider.notifier).setLocation(SearchLocationFilter(country: 'France'));
+      container.read(photosFilterProvider.notifier).setLocation(const SearchLocationFilter(country: 'France'));
       await tester.pumpAndSettle();
 
       // The selected-country chip should render — we assert existence + delete icon visible.
@@ -216,7 +216,7 @@ void main() {
 
       final container = ProviderScope.containerOf(tester.element(find.byType(PlacesCascadeSection)));
       // C11 is the 12th country (index 11) — beyond the 10-item cap.
-      container.read(photosFilterProvider.notifier).setLocation(SearchLocationFilter(country: 'C11'));
+      container.read(photosFilterProvider.notifier).setLocation(const SearchLocationFilter(country: 'C11'));
       await tester.pumpAndSettle();
 
       // Selecting a country swaps the wrap for the city cascade, so the
