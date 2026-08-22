@@ -668,7 +668,10 @@ describe(PersonRepository.name, () => {
       const { user } = await ctx.newUser();
       const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Alice' });
       const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
-      const { assetFace: firstFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+      const { assetFace: firstFace } = await ctx.newAssetFace({
+        assetId: asset.id,
+        personGroupId: person.personGroupId,
+      });
       await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
       await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId, isVisible: false });
 
@@ -820,9 +823,15 @@ describe(PersonRepository.name, () => {
       const { user } = await ctx.newUser();
       const { person } = await ctx.newPerson({ ownerId: user.id });
       const { asset: validAsset } = await ctx.newAsset({ ownerId: user.id });
-      const { result: validFaceId } = await ctx.newAssetFace({ assetId: validAsset.id, personGroupId: person.personGroupId });
+      const { result: validFaceId } = await ctx.newAssetFace({
+        assetId: validAsset.id,
+        personGroupId: person.personGroupId,
+      });
       const { asset: offlineAsset } = await ctx.newAsset({ ownerId: user.id, isOffline: true });
-      const { result: offlineFaceId } = await ctx.newAssetFace({ assetId: offlineAsset.id, personGroupId: person.personGroupId });
+      const { result: offlineFaceId } = await ctx.newAssetFace({
+        assetId: offlineAsset.id,
+        personGroupId: person.personGroupId,
+      });
       const { asset: deletedAsset } = await ctx.newAsset({ ownerId: user.id, deletedAt: new Date() });
       const { result: deletedAssetFaceId } = await ctx.newAssetFace({
         assetId: deletedAsset.id,
@@ -863,7 +872,10 @@ describe(PersonRepository.name, () => {
       const { person: targetPerson } = await ctx.newPerson({ ownerId: user.id });
       const { person: otherPerson } = await ctx.newPerson({ ownerId: user.id });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: targetPerson.personGroupId });
+      const { result: faceId } = await ctx.newAssetFace({
+        assetId: asset.id,
+        personGroupId: targetPerson.personGroupId,
+      });
       const otherIdentity = await faceIdentityRepository.ensurePersonIdentity(otherPerson.personGroupId);
       await faceIdentityRepository.replaceFaceIdentity({
         assetFaceId: faceId,
@@ -895,12 +907,18 @@ describe(PersonRepository.name, () => {
       // A1: Timeline, added to the space the viewer belongs to -> space-reachable + shareable.
       const { asset: spaceAsset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: spaceAsset.id, addedById: owner.id });
-      const { result: spaceFaceId } = await ctx.newAssetFace({ assetId: spaceAsset.id, personGroupId: person.personGroupId });
+      const { result: spaceFaceId } = await ctx.newAssetFace({
+        assetId: spaceAsset.id,
+        personGroupId: person.personGroupId,
+      });
 
       // A2: added to the SAME space (so it is space-reachable) but Hidden -> fails spaceVisibilityGate.
       const { asset: hiddenAsset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Hidden });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: hiddenAsset.id, addedById: owner.id });
-      const { result: hiddenFaceId } = await ctx.newAssetFace({ assetId: hiddenAsset.id, personGroupId: person.personGroupId });
+      const { result: hiddenFaceId } = await ctx.newAssetFace({
+        assetId: hiddenAsset.id,
+        personGroupId: person.personGroupId,
+      });
 
       // A3: Timeline (shareable visibility) but never added to any space -> not space-reachable.
       const { asset: neverSharedAsset } = await ctx.newAsset({
@@ -945,7 +963,10 @@ describe(PersonRepository.name, () => {
       const identity = await faceIdentityRepository.ensurePersonIdentity(person.personGroupId);
       const { asset: ownAsset } = await ctx.newAsset({ ownerId: owner.id, visibility: AssetVisibility.Timeline });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: ownAsset.id, addedById: owner.id });
-      const { assetFace: ownFace } = await ctx.newAssetFace({ assetId: ownAsset.id, personGroupId: person.personGroupId });
+      const { assetFace: ownFace } = await ctx.newAssetFace({
+        assetId: ownAsset.id,
+        personGroupId: person.personGroupId,
+      });
       await faceIdentityRepository.linkFace({ assetFaceId: ownFace.id, identityId: identity.id, source: 'manual' });
 
       // A DIFFERENT user's own person shares the same identity (e.g. a merged identity), with a face on
@@ -957,7 +978,10 @@ describe(PersonRepository.name, () => {
         .where('personGroupId', '=', otherPerson.personGroupId)
         .execute();
       const { asset: otherAsset } = await ctx.newAsset({ ownerId: otherUser.id, visibility: AssetVisibility.Timeline });
-      const { assetFace: otherFace } = await ctx.newAssetFace({ assetId: otherAsset.id, personGroupId: otherPerson.personGroupId });
+      const { assetFace: otherFace } = await ctx.newAssetFace({
+        assetId: otherAsset.id,
+        personGroupId: otherPerson.personGroupId,
+      });
       await faceIdentityRepository.linkFace({ assetFaceId: otherFace.id, identityId: identity.id, source: 'manual' });
 
       // Owner (unscoped) sees both -- the identity fan-out is intentional for the owner's own picker.
@@ -1476,7 +1500,9 @@ describe(PersonRepository.name, () => {
         sourceType: SourceType.MachineLearning,
       });
 
-      const ids = await collectFaceIds(sut.getAllFaces({ personGroupId: null, sourceType: SourceType.MachineLearning }));
+      const ids = await collectFaceIds(
+        sut.getAllFaces({ personGroupId: null, sourceType: SourceType.MachineLearning }),
+      );
 
       expect(ids).toContain(manualFace.id); // pin: default-off, manual-linked face still returned
       expect(ids).toContain(controlFace.id); // positive control: the ordinary face is returned too
@@ -1536,7 +1562,9 @@ describe(PersonRepository.name, () => {
       // Deliberately WITHOUT excludeManuallyPlaced: isolates the claim to the pre-existing personId
       // filter alone — a discriminating mutation to that filter (not to excludeManuallyPlaced) must be
       // able to turn this red, otherwise this pin proves nothing about which filter is doing the work.
-      const ids = await collectFaceIds(sut.getAllFaces({ personGroupId: null, sourceType: SourceType.MachineLearning }));
+      const ids = await collectFaceIds(
+        sut.getAllFaces({ personGroupId: null, sourceType: SourceType.MachineLearning }),
+      );
 
       expect(ids).not.toContain(confirmedFace.id); // excluded by personId: null alone
       expect(ids).toContain(controlFace.id); // positive control

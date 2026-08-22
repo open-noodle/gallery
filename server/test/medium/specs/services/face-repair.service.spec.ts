@@ -375,7 +375,10 @@ describe('FaceRepairService.buildRepairPlan', () => {
     // but topOtherCount=2 < minFaces=3 → NOT flagged → should land in unAttributableFaces
     const { person: suspect } = await ctx.newPerson({ ownerId: user.id });
     const { asset: suspectAsset } = await ctx.newAsset({ ownerId: user.id });
-    const { assetFace: suspectFace } = await ctx.newAssetFace({ assetId: suspectAsset.id, personGroupId: suspect.personGroupId });
+    const { assetFace: suspectFace } = await ctx.newAssetFace({
+      assetId: suspectAsset.id,
+      personGroupId: suspect.personGroupId,
+    });
     await ctx.database
       .insertInto('face_search')
       .values({ faceId: suspectFace.id, embedding: axisEmbedding('first') })
@@ -384,7 +387,10 @@ describe('FaceRepairService.buildRepairPlan', () => {
     // isolated: 1 face on a completely separate axis — no neighbors within maxDistance=0.6 → NOT unAttributable
     const { person: isolated } = await ctx.newPerson({ ownerId: user.id });
     const { asset: isolatedAsset } = await ctx.newAsset({ ownerId: user.id });
-    const { assetFace: isolatedFace } = await ctx.newAssetFace({ assetId: isolatedAsset.id, personGroupId: isolated.personGroupId });
+    const { assetFace: isolatedFace } = await ctx.newAssetFace({
+      assetId: isolatedAsset.id,
+      personGroupId: isolated.personGroupId,
+    });
     await ctx.database
       .insertInto('face_search')
       .values({ faceId: isolatedFace.id, embedding: axisEmbedding('second') })
@@ -793,7 +799,11 @@ describe('FaceRepairService.executeRepair', () => {
 
     // After building plan but before executing it, move one leaked face to person Z
     const movedFaceId = leakedFaceIds[0];
-    await ctx.database.updateTable('asset_face').set({ personGroupId: personZ.personGroupId }).where('id', '=', movedFaceId).execute();
+    await ctx.database
+      .updateTable('asset_face')
+      .set({ personGroupId: personZ.personGroupId })
+      .where('id', '=', movedFaceId)
+      .execute();
 
     await sut.executeRepair(plan);
 

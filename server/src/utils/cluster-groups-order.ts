@@ -20,7 +20,8 @@ import { Kysely, sql } from 'kysely';
  * `test/medium/specs/services/database-migration.service.spec.ts`.
  */
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// Migrations are typed `Kysely<any>` — they run against schemas older than the current one, so the
+// generated DB interface does not describe them.
 type AnyDb = Kysely<any>;
 
 const columnExists = async (db: AnyDb, table: string, column: string): Promise<boolean> => {
@@ -30,7 +31,7 @@ const columnExists = async (db: AnyDb, table: string, column: string): Promise<b
       WHERE table_schema = current_schema() AND table_name = ${table} AND column_name = ${column}
     ) AS "exists"
   `.execute(db);
-  return result.rows[0]?.exists === true;
+  return result.rows[0]?.exists ?? false;
 };
 
 /**
