@@ -1836,7 +1836,9 @@ describe('FaceRepairService.resolveFaces: detach regenerates the representative 
 
     const queuedJobs = jobMock.queueAll.mock.calls.flatMap(([items]) => items);
     expect(queuedJobs).toEqual(
-      expect.arrayContaining([{ name: JobName.PersonGenerateThumbnail, data: { id: source.personGroupId } }]),
+      expect.arrayContaining([
+        { name: JobName.PersonGenerateThumbnail, data: { ownerId: user.id, personGroupId: source.personGroupId } },
+      ]),
     );
   });
 
@@ -2561,7 +2563,9 @@ describe('FaceRepairService.resolveFaces: the unknown cluster is usable on the P
 
     const queuedJobs = jobMock.queueAll.mock.calls.flatMap(([items]) => items);
     expect(queuedJobs).toEqual(
-      expect.arrayContaining([{ name: JobName.PersonGenerateThumbnail, data: { id: clusterId } }]),
+      expect.arrayContaining([
+        { name: JobName.PersonGenerateThumbnail, data: { ownerId: user.id, personGroupId: clusterId } },
+      ]),
     );
   });
 });
