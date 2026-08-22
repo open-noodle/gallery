@@ -151,6 +151,12 @@ describe('FaceRepairService.handleFaceRepairScan', () => {
     expect(alexiaPerson!.reviewReasons).toContain('named');
     expect(alexiaPerson!.flagged).toBeGreaterThan(0);
     expect(alexiaPerson!.suspectedOwners.length).toBeGreaterThan(0);
+
+    // Option M's naming boundary: storage uses `personGroupId`, the DTO (and the web console) read
+    // `personId`. getLatestScanStatus must alias it back out. The controller casts its return with `as`,
+    // so tsc cannot see this field go missing — without this assertion the console silently receives rows
+    // it cannot render or act on, and only a browser-level e2e notices.
+    expect((alexiaPerson as unknown as { personId?: string }).personId).toBe(alexiaData.personGroupId);
   });
 
   // D12: the persisted scan report is a point-in-time snapshot. When the suggestion engine (or an admin,
