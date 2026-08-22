@@ -62,7 +62,7 @@ export class FaceRepairRepository {
       )
       .select(['person.personGroupId as id', 'person.name as name', 'person.faceAssetId as thumbnailFaceId'])
       .select((eb) => eb.fn.count('asset_face.id').as('faceCount'))
-      .groupBy(['person.id'])
+      .groupBy(['person.personGroupId'])
       .orderBy(sql`NULLIF(BTRIM(person.name), '') is null`, 'asc')
       .orderBy('person.name', 'asc')
       .orderBy('person.id', 'asc')
@@ -103,7 +103,7 @@ export class FaceRepairRepository {
       ])
       .select((eb) => eb.fn.count('asset_face.id').as('faceCount'))
       .where('person.personGroupId', '=', personId)
-      .groupBy(['person.id'])
+      .groupBy(['person.personGroupId'])
       .executeTakeFirst();
 
     return row && { ...row, faceCount: Number(row.faceCount) };
@@ -293,7 +293,7 @@ export class FaceRepairRepository {
       const chunk = assetFaceIds.slice(index, index + 1000);
       const rows = await db
         .updateTable('asset_face')
-        .set({ personId: toPersonId })
+        .set({ personGroupId: toPersonId })
         .where('id', 'in', chunk)
         .where('personGroupId', '=', fromPersonId)
         .where('sourceType', '=', sql.lit(SourceType.MachineLearning))
@@ -340,7 +340,7 @@ export class FaceRepairRepository {
       const chunk = assetFaceIds.slice(index, index + 1000);
       const rows = await db
         .updateTable('asset_face')
-        .set({ personId: null, deletedAt: new Date() })
+        .set({ personGroupId: null, deletedAt: new Date() })
         .where('id', 'in', chunk)
         .where('personGroupId', '=', personId)
         .where('sourceType', '=', sql.lit(SourceType.MachineLearning))
@@ -373,7 +373,7 @@ export class FaceRepairRepository {
           .selectFrom('asset_face as remaining')
           .innerJoin('asset', 'asset.id', 'remaining.assetId')
           .select('remaining.id')
-          .whereRef('remaining.personId', '=', 'person.id')
+          .whereRef('remaining.personGroupId', '=', 'person.personGroupId')
           .where('remaining.deletedAt', 'is', null)
           .where('remaining.isVisible', '=', true)
           .where('asset.deletedAt', 'is', null)
@@ -389,7 +389,7 @@ export class FaceRepairRepository {
                 .selectFrom('asset_face as current')
                 .select(sql`1`.as('one'))
                 .whereRef('current.id', '=', 'person.faceAssetId')
-                .whereRef('current.personId', '=', 'person.id'),
+                .whereRef('current.personGroupId', '=', 'person.personGroupId'),
             ),
           ),
         ]),
@@ -405,14 +405,14 @@ export class FaceRepairRepository {
               .selectFrom('asset_face as candidate')
               .innerJoin('asset', 'asset.id', 'candidate.assetId')
               .select(sql`1`.as('one'))
-              .whereRef('candidate.personId', '=', 'person.id')
+              .whereRef('candidate.personGroupId', '=', 'person.personGroupId')
               .where('candidate.deletedAt', 'is', null)
               .where('candidate.isVisible', '=', true)
               .where('asset.deletedAt', 'is', null),
           ),
         ]),
       )
-      .returning('person.id')
+      .returning('person.personGroupId')
       .execute();
     return updated.map((row) => row.id);
   }
