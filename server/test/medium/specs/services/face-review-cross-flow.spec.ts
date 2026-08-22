@@ -482,7 +482,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
 
       const ids: string[] = [];
       for await (const face of personRepo.getAllFaces({
-        personId: null,
+        personGroupId: null,
         sourceType: SourceType.MachineLearning,
         excludeManuallyPlaced: true,
       })) {
@@ -819,7 +819,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
     expect(stayedVerdict?.status).toBe('rejected');
 
     // Later, the kept face is unassigned (e.g. a reset) — the exact shape a suggestion-scan candidate has.
-    await ctx.database.updateTable('asset_face').set({ personId: null }).where('id', '=', face.id).execute();
+    await ctx.database.updateTable('asset_face').set({ personGroupId: null }).where('id', '=', face.id).execute();
     await ctx.newSharedSpaceAsset({ spaceId: s.id, assetId: face.assetId, addedById: user.id });
 
     // A CONTROL face, seeded identically (same embedding, same space) but never kept-here, is the positive
@@ -1079,7 +1079,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
       // shared-DB file) and Q is deleted and re-created, sharing the same identity (an
       // identity-reconciliation re-link, not a fresh identity).
       await faceIdentityRepo.unlinkFaces([face.id]);
-      await ctx.database.updateTable('asset_face').set({ personId: null }).where('id', '=', face.id).execute();
+      await ctx.database.updateTable('asset_face').set({ personGroupId: null }).where('id', '=', face.id).execute();
 
       await ctx.database.deleteFrom('person').where('personGroupId', '=', q1.personGroupId).execute();
       const faceAfterDelete = await ctx.database
