@@ -24,6 +24,7 @@ describe(TimelineService.name, () => {
           bucketSize: TimeBucketSize.Month,
           userIds: [authStub.admin.user.id],
         }),
+        authStub.admin,
       );
     });
 
@@ -34,6 +35,7 @@ describe(TimelineService.name, () => {
 
       expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
         expect.objectContaining({ bucketSize: TimeBucketSize.Year }),
+        authStub.admin,
       );
     });
 
@@ -44,6 +46,7 @@ describe(TimelineService.name, () => {
 
       expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
         expect.objectContaining({ bucketSize: TimeBucketSize.Month }),
+        authStub.admin,
       );
     });
 
@@ -60,14 +63,12 @@ describe(TimelineService.name, () => {
       });
 
       expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
-        {
+        expect.objectContaining({
           userIds: [authStub.admin.user.id],
           bbox: { west: -70, south: -30, east: 120, north: 55 },
-        },
-        authStub.admin,
-        expect.objectContaining({
           bucketSize: TimeBucketSize.Month,
         }),
+        authStub.admin,
       );
     });
 
@@ -86,6 +87,7 @@ describe(TimelineService.name, () => {
           description: 'birthday',
           ocr: 'invoice',
         }),
+        authStub.admin,
       );
     });
 
@@ -108,7 +110,10 @@ describe(TimelineService.name, () => {
 
         await sut.getTimeBuckets(authStub.admin, { spaceId: 'space-id' });
 
-        expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(expect.objectContaining({ spaceId: 'space-id' }));
+        expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
+          expect.objectContaining({ spaceId: 'space-id' }),
+          authStub.admin,
+        );
         const calledWith = mocks.asset.getTimeBuckets.mock.calls[0][0];
         expect(calledWith.userIds).toBeUndefined();
       });
@@ -158,7 +163,10 @@ describe(TimelineService.name, () => {
 
         await sut.getTimeBuckets(authStub.admin, { spaceId: 'space-id' });
 
-        expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(expect.objectContaining({ spaceId: 'space-id' }));
+        expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
+          expect.objectContaining({ spaceId: 'space-id' }),
+          authStub.admin,
+        );
       });
 
       it('should not check timeline read access when spaceId is provided', async () => {
@@ -217,6 +225,7 @@ describe(TimelineService.name, () => {
 
         expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
           expect.objectContaining({ spaceId: 'space-id', withStacked: true }),
+          authStub.admin,
         );
       });
 
@@ -247,6 +256,7 @@ describe(TimelineService.name, () => {
             userIds: [authStub.admin.user.id],
             timelineSpaceIds: ['space-1', 'space-2'],
           }),
+          authStub.admin,
         );
       });
 
@@ -316,6 +326,7 @@ describe(TimelineService.name, () => {
             withStacked: true,
             timelineSpaceIds: ['space-1'],
           }),
+          authStub.admin,
         );
       });
 
@@ -346,6 +357,7 @@ describe(TimelineService.name, () => {
             personIds: ['person-1'],
             spacePersonIds: ['space-person-1'],
           }),
+          authStub.admin,
         );
       });
     });
@@ -727,6 +739,7 @@ describe(TimelineService.name, () => {
 
       expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
         expect.objectContaining({ spaceId: 'space-id', spacePersonIds: ['person-id'] }),
+        authStub.admin,
       );
     });
 
@@ -753,19 +766,25 @@ describe(TimelineService.name, () => {
     it('should pass city filter to time bucket options', async () => {
       mocks.asset.getTimeBuckets.mockResolvedValue([]);
       await sut.getTimeBuckets(authStub.admin, { city: 'Munich' });
-      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(expect.objectContaining({ city: 'Munich' }));
+      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
+        expect.objectContaining({ city: 'Munich' }),
+        authStub.admin,
+      );
     });
 
     it('should pass rating filter to time bucket options', async () => {
       mocks.asset.getTimeBuckets.mockResolvedValue([]);
       await sut.getTimeBuckets(authStub.admin, { rating: 3 });
-      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(expect.objectContaining({ rating: 3 }));
+      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(expect.objectContaining({ rating: 3 }), authStub.admin);
     });
 
     it('should accept deprecated personId and normalize to personIds', async () => {
       mocks.asset.getTimeBuckets.mockResolvedValue([]);
       await sut.getTimeBuckets(authStub.admin, { personId: 'person-1' });
-      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(expect.objectContaining({ personIds: ['person-1'] }));
+      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
+        expect.objectContaining({ personIds: ['person-1'] }),
+        authStub.admin,
+      );
     });
 
     it('should pass personIds array to time bucket options', async () => {
@@ -773,13 +792,17 @@ describe(TimelineService.name, () => {
       await sut.getTimeBuckets(authStub.admin, { personIds: ['person-1', 'person-2'] });
       expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
         expect.objectContaining({ personIds: ['person-1', 'person-2'] }),
+        authStub.admin,
       );
     });
 
     it('should pass type as assetType to time bucket options', async () => {
       mocks.asset.getTimeBuckets.mockResolvedValue([]);
       await sut.getTimeBuckets(authStub.admin, { type: AssetType.Image });
-      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(expect.objectContaining({ assetType: AssetType.Image }));
+      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
+        expect.objectContaining({ assetType: AssetType.Image }),
+        authStub.admin,
+      );
     });
 
     it('should pass spacePersonIds array through to asset repository for getTimeBuckets', async () => {
@@ -788,31 +811,44 @@ describe(TimelineService.name, () => {
       await sut.getTimeBuckets(authStub.admin, { spaceId: 'space-id', spacePersonIds: ['sp-1', 'sp-2'] });
       expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
         expect.objectContaining({ spacePersonIds: ['sp-1', 'sp-2'] }),
+        authStub.admin,
       );
     });
 
     it('should pass tagIds array through to asset repository for getTimeBuckets', async () => {
       mocks.asset.getTimeBuckets.mockResolvedValue([]);
       await sut.getTimeBuckets(authStub.admin, { tagIds: ['tag-1', 'tag-2'] });
-      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(expect.objectContaining({ tagIds: ['tag-1', 'tag-2'] }));
+      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
+        expect.objectContaining({ tagIds: ['tag-1', 'tag-2'] }),
+        authStub.admin,
+      );
     });
 
     it('should pass has-no-album through to asset repository for getTimeBuckets', async () => {
       mocks.asset.getTimeBuckets.mockResolvedValue([]);
       await sut.getTimeBuckets(authStub.admin, { isNotInAlbum: true });
-      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(expect.objectContaining({ isNotInAlbum: true }));
+      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
+        expect.objectContaining({ isNotInAlbum: true }),
+        authStub.admin,
+      );
     });
 
     it('should pass false has-no-album through for getTimeBuckets without enabling the filter', async () => {
       mocks.asset.getTimeBuckets.mockResolvedValue([]);
       await sut.getTimeBuckets(authStub.admin, { isNotInAlbum: false });
-      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(expect.objectContaining({ isNotInAlbum: false }));
+      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
+        expect.objectContaining({ isNotInAlbum: false }),
+        authStub.admin,
+      );
     });
 
     it('should pass has-album through to asset repository for getTimeBuckets', async () => {
       mocks.asset.getTimeBuckets.mockResolvedValue([]);
       await sut.getTimeBuckets(authStub.admin, { isInAlbum: true });
-      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(expect.objectContaining({ isInAlbum: true }));
+      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
+        expect.objectContaining({ isInAlbum: true }),
+        authStub.admin,
+      );
     });
 
     it('should not require tag ownership to filter by tagIds', async () => {
@@ -837,13 +873,19 @@ describe(TimelineService.name, () => {
       mocks.access.sharedSpace.checkMemberAccess.mockResolvedValue(new Set(['space-id']));
       mocks.asset.getTimeBuckets.mockResolvedValue([]);
       await sut.getTimeBuckets(authStub.admin, { spaceId: 'space-id', spacePersonId: 'sp-1' });
-      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(expect.objectContaining({ spacePersonIds: ['sp-1'] }));
+      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
+        expect.objectContaining({ spacePersonIds: ['sp-1'] }),
+        authStub.admin,
+      );
     });
 
     it('should accept deprecated tagId and normalize to tagIds', async () => {
       mocks.asset.getTimeBuckets.mockResolvedValue([]);
       await sut.getTimeBuckets(authStub.admin, { tagId: 'tag-1' });
-      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(expect.objectContaining({ tagIds: ['tag-1'] }));
+      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
+        expect.objectContaining({ tagIds: ['tag-1'] }),
+        authStub.admin,
+      );
     });
   });
 
@@ -857,7 +899,10 @@ describe(TimelineService.name, () => {
 
       expect(mocks.access.album.checkOwnerAccess).toHaveBeenCalledWith(authStub.admin.user.id, new Set(['album-id']));
       expect(mocks.access.sharedSpace.checkMemberAccess).not.toHaveBeenCalled();
-      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(expect.objectContaining({ albumId: 'album-id' }));
+      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
+        expect.objectContaining({ albumId: 'album-id' }),
+        authStub.admin,
+      );
     });
 
     it('should use default userId when neither albumId nor spaceId is provided', async () => {
@@ -872,6 +917,7 @@ describe(TimelineService.name, () => {
           bucketSize: TimeBucketSize.Month,
           userIds: [authStub.admin.user.id],
         }),
+        authStub.admin,
       );
     });
 
@@ -971,7 +1017,10 @@ describe(TimelineService.name, () => {
         sut.getTimeBuckets(authStub.admin, { albumId: 'album-id', visibility: AssetVisibility.Archive }),
       ).resolves.toEqual([{ timeBucket: '2024-01-01', count: 1 }]);
 
-      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(expect.objectContaining({ albumId: 'album-id' }));
+      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
+        expect.objectContaining({ albumId: 'album-id' }),
+        authStub.admin,
+      );
     });
 
     it('allows default (undefined) visibility on an albumId browse', async () => {
@@ -983,7 +1032,10 @@ describe(TimelineService.name, () => {
         { timeBucket: '2024-01-01', count: 1 },
       ]);
 
-      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(expect.objectContaining({ albumId: 'album-id' }));
+      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
+        expect.objectContaining({ albumId: 'album-id' }),
+        authStub.admin,
+      );
     });
   });
 
@@ -1037,7 +1089,10 @@ describe(TimelineService.name, () => {
         { timeBucket: '2024-01-01', count: 1 },
       ]);
 
-      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(expect.objectContaining({ albumId: 'album-id' }));
+      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
+        expect.objectContaining({ albumId: 'album-id' }),
+        authStub.admin,
+      );
     });
 
     it('allows default (undefined) isTrashed on an albumId browse (no over-block)', async () => {
@@ -1049,7 +1104,10 @@ describe(TimelineService.name, () => {
         { timeBucket: '2024-01-01', count: 1 },
       ]);
 
-      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(expect.objectContaining({ albumId: 'album-id' }));
+      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
+        expect.objectContaining({ albumId: 'album-id' }),
+        authStub.admin,
+      );
     });
 
     it('still allows isTrashed=true on a plain per-user timeline browse (untouched)', async () => {
@@ -1059,7 +1117,10 @@ describe(TimelineService.name, () => {
         { timeBucket: '2024-01-01', count: 1 },
       ]);
 
-      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(expect.objectContaining({ isTrashed: true }));
+      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
+        expect.objectContaining({ isTrashed: true }),
+        authStub.admin,
+      );
     });
   });
 
@@ -1089,6 +1150,7 @@ describe(TimelineService.name, () => {
       await sut.getTimeBuckets(authStub.admin, { takenAfter: '2023-01-01T00:00:00.000Z' });
       expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
         expect.objectContaining({ takenAfter: '2023-01-01T00:00:00.000Z' }),
+        authStub.admin,
       );
     });
 
@@ -1097,6 +1159,7 @@ describe(TimelineService.name, () => {
       await sut.getTimeBuckets(authStub.admin, { takenBefore: '2023-12-31T23:59:59.999Z' });
       expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
         expect.objectContaining({ takenBefore: '2023-12-31T23:59:59.999Z' }),
+        authStub.admin,
       );
     });
 
@@ -1111,6 +1174,7 @@ describe(TimelineService.name, () => {
           takenAfter: '2023-08-01T00:00:00.000Z',
           takenBefore: '2023-08-31T23:59:59.999Z',
         }),
+        authStub.admin,
       );
     });
 
