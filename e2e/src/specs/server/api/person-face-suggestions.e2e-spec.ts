@@ -363,7 +363,7 @@ describe('GET /people/:id/face-suggestions — space-member read scope (D6)', ()
     // The person's face on the space-shared asset is what makes the person space-reachable via
     // PersonRead (own ∪ shared-space member) — the exact condition the D6 fix closes off for
     // this owner-only read.
-    await utils.createFace({ assetId: ctx.spaceAssetId, personId: person.id });
+    await utils.createFace({ assetId: ctx.spaceAssetId, personGroupId: person.id });
 
     const db = await utils.connectDatabase();
     const unassignedFace = await insertUnassignedFace(db, ctx.spaceAssetId);
