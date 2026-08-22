@@ -52,11 +52,13 @@ void main() {
     });
 
     test('non-time filters survive temporal scope composition', () {
-      final filter = SearchFilter.empty().copyWith(
-        tagIds: ['tag-1'],
-        rating: SearchRatingFilter(rating: const Option.some(4)),
-        mediaType: AssetType.image,
-      )..context = 'mountains';
+      final filter = SearchFilter.empty()
+          .copyWith(
+            tagIds: ['tag-1'],
+            rating: const SearchRatingFilter(rating: Option.some(4)),
+            mediaType: AssetType.image,
+          )
+          .copyWith(context: 'mountains');
 
       final result = applyTimelineTemporalScope(filter, const TimelineTemporalScope.year(2025));
 
