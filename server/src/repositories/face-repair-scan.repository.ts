@@ -235,7 +235,7 @@ export class FaceRepairScanRepository {
       .select(['person.personGroupId as id', 'person.name as name', 'person.faceAssetId as faceAssetId'])
       .select((eb) => eb.fn.count('asset_face.id').as('faceCount'))
       .where('person.personGroupId', 'in', ids)
-      .groupBy(['person.id'])
+      .groupBy(['person.personGroupId'])
       .execute();
     const byId = new Map(rows.map((r) => [r.id, r]));
     const nameOf = (id: string) => (byId.get(id)?.name ? byId.get(id)!.name : null);
