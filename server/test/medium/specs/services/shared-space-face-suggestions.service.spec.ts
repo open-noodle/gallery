@@ -172,10 +172,10 @@ describe('SharedSpaceService space face suggestions', () => {
     const face = await ctx.database
       .selectFrom('asset_face')
       .innerJoin('asset', 'asset.id', 'asset_face.assetId')
-      .select(['asset_face.personId', 'asset.ownerId'])
+      .select(['asset_face.personGroupId', 'asset.ownerId'])
       .where('asset_face.id', '=', fx.assetFace.id)
       .executeTakeFirstOrThrow();
-    expect(face.personId).toBeNull();
+    expect(face.personGroupId).toBeNull();
     expect(face.ownerId).toBe(fx.assetOwner.id);
   });
 

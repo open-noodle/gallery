@@ -214,11 +214,11 @@ describe('face re-attribution repair: end-to-end re-home', () => {
     // Assert: each leaked face is already re-homed to Karina.
     const reassignedRows = await ctx.database
       .selectFrom('asset_face')
-      .select(['id', 'personId'])
+      .select(['id', 'personGroupId'])
       .where('id', 'in', leakedFaceIds)
       .execute();
     for (const row of reassignedRows) {
-      expect(row.personId).toBe(karina.personGroupId);
+      expect(row.personGroupId).toBe(karina.personGroupId);
     }
 
     // Durability / boomerang regression: a subsequent recognition pass over the moved faces must leave them
@@ -228,11 +228,11 @@ describe('face re-attribution repair: end-to-end re-home', () => {
     }
     const afterRecognition = await ctx.database
       .selectFrom('asset_face')
-      .select(['id', 'personId'])
+      .select(['id', 'personGroupId'])
       .where('id', 'in', leakedFaceIds)
       .execute();
     for (const row of afterRecognition) {
-      expect(row.personId).toBe(karina.personGroupId);
+      expect(row.personGroupId).toBe(karina.personGroupId);
     }
 
     // Assert: Karina's name is preserved.
@@ -246,7 +246,7 @@ describe('face re-attribution repair: end-to-end re-home', () => {
     // Assert: Alexia still exists with exactly her 5 genuine faces.
     const alexiaFaceRows = await ctx.database
       .selectFrom('asset_face')
-      .select(['id', 'personId'])
+      .select(['id', 'personGroupId'])
       .where('personGroupId', '=', alexia.personGroupId)
       .execute();
     expect(alexiaFaceRows).toHaveLength(5);
@@ -344,21 +344,21 @@ describe('face re-attribution repair: multi-owner contamination split', () => {
     // Assert: Karina-leaks re-homed to Karina.
     const karinaLeakRows = await ctx.database
       .selectFrom('asset_face')
-      .select(['id', 'personId'])
+      .select(['id', 'personGroupId'])
       .where('id', 'in', leakedKarinaFaceIds)
       .execute();
     for (const row of karinaLeakRows) {
-      expect(row.personId).toBe(karina.personGroupId);
+      expect(row.personGroupId).toBe(karina.personGroupId);
     }
 
     // Assert: Bob-leaks re-homed to Bob.
     const bobLeakRows = await ctx.database
       .selectFrom('asset_face')
-      .select(['id', 'personId'])
+      .select(['id', 'personGroupId'])
       .where('id', 'in', leakedBobFaceIds)
       .execute();
     for (const row of bobLeakRows) {
-      expect(row.personId).toBe(bob.personGroupId);
+      expect(row.personGroupId).toBe(bob.personGroupId);
     }
 
     // Assert: no backfill work after the split — no infinite loop.
@@ -464,11 +464,11 @@ describe('face re-attribution repair: minFaces:3 + sub-minFaces stays unassigned
     // Assert: leaked faces re-homed to Karina.
     const reassignedRows = await ctx.database
       .selectFrom('asset_face')
-      .select(['id', 'personId'])
+      .select(['id', 'personGroupId'])
       .where('id', 'in', leakedFaceIds)
       .execute();
     for (const row of reassignedRows) {
-      expect(row.personId).toBe(karina.personGroupId);
+      expect(row.personGroupId).toBe(karina.personGroupId);
     }
 
     // Assert: lone Bob face was NOT in toRepair (no confident Q with ≥3 neighbors) and stays unmodified.
