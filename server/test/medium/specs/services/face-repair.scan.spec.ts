@@ -94,7 +94,11 @@ describe('FaceRepairService.handleFaceRepairScan', () => {
     const { user } = await ctx.newUser();
 
     // Karina-main: 10 first-axis faces (the reference cluster)
-    const karinaData = mediumFactory.personInsert({ personGroupId: await insertPersonGroup(db, user.id), ownerId: user.id, name: 'Karina' });
+    const karinaData = mediumFactory.personInsert({
+      personGroupId: await insertPersonGroup(db, user.id),
+      ownerId: user.id,
+      name: 'Karina',
+    });
     await db.insertInto('person').values(karinaData).execute();
     for (let i = 0; i < 10; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
@@ -107,7 +111,11 @@ describe('FaceRepairService.handleFaceRepairScan', () => {
 
     // Alexia: 3 leaked first-axis faces + 8 genuine second-axis → under cap → toRepair
     // Named person → should get recommendation='review-first' with reason 'named'
-    const alexiaData = mediumFactory.personInsert({ personGroupId: await insertPersonGroup(db, user.id), ownerId: user.id, name: 'Alexia' });
+    const alexiaData = mediumFactory.personInsert({
+      personGroupId: await insertPersonGroup(db, user.id),
+      ownerId: user.id,
+      name: 'Alexia',
+    });
     await db.insertInto('person').values(alexiaData).execute();
     for (let i = 0; i < 3; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
@@ -155,7 +163,11 @@ describe('FaceRepairService.handleFaceRepairScan', () => {
     const { user } = await ctx.newUser();
 
     // Karina-main: 10 first-axis faces (the reference cluster / suspected owner).
-    const karinaData = mediumFactory.personInsert({ personGroupId: await insertPersonGroup(db, user.id), ownerId: user.id, name: 'Karina' });
+    const karinaData = mediumFactory.personInsert({
+      personGroupId: await insertPersonGroup(db, user.id),
+      ownerId: user.id,
+      name: 'Karina',
+    });
     await db.insertInto('person').values(karinaData).execute();
     for (let i = 0; i < 10; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
@@ -167,7 +179,11 @@ describe('FaceRepairService.handleFaceRepairScan', () => {
     }
 
     // Alexia: 3 leaked first-axis faces (flagged toward Karina) + 8 genuine second-axis.
-    const alexiaData = mediumFactory.personInsert({ personGroupId: await insertPersonGroup(db, user.id), ownerId: user.id, name: 'Alexia' });
+    const alexiaData = mediumFactory.personInsert({
+      personGroupId: await insertPersonGroup(db, user.id),
+      ownerId: user.id,
+      name: 'Alexia',
+    });
     await db.insertInto('person').values(alexiaData).execute();
     for (let i = 0; i < 3; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
@@ -231,7 +247,11 @@ describe('FaceRepairService.handleFaceRepairScan', () => {
     const { user } = await ctx.newUser();
 
     // Reference owner Karina: 10 first-axis faces, so the leaked faces have a clean cluster to vote toward.
-    const karina = mediumFactory.personInsert({ personGroupId: await insertPersonGroup(db, user.id), ownerId: user.id, name: 'Karina' });
+    const karina = mediumFactory.personInsert({
+      personGroupId: await insertPersonGroup(db, user.id),
+      ownerId: user.id,
+      name: 'Karina',
+    });
     await db.insertInto('person').values(karina).execute();
     for (let i = 0; i < 10; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
@@ -243,7 +263,11 @@ describe('FaceRepairService.handleFaceRepairScan', () => {
     }
 
     // Unnamed cluster: 3 leaked first-axis + 8 genuine second-axis → 3/11 ≈ 27% flagged.
-    const cluster = mediumFactory.personInsert({ personGroupId: await insertPersonGroup(db, user.id), ownerId: user.id, name: '' });
+    const cluster = mediumFactory.personInsert({
+      personGroupId: await insertPersonGroup(db, user.id),
+      ownerId: user.id,
+      name: '',
+    });
     await db.insertInto('person').values(cluster).execute();
     for (let i = 0; i < 3; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
@@ -293,7 +317,11 @@ describe('FaceRepairService.handleFaceRepairScan', () => {
     const scanRepo = ctx.get(FaceRepairScanRepository);
     const { user } = await ctx.newUser();
 
-    const karinaData = mediumFactory.personInsert({ personGroupId: await insertPersonGroup(db, user.id), ownerId: user.id, name: 'Karina' });
+    const karinaData = mediumFactory.personInsert({
+      personGroupId: await insertPersonGroup(db, user.id),
+      ownerId: user.id,
+      name: 'Karina',
+    });
     await db.insertInto('person').values(karinaData).execute();
     for (let i = 0; i < 10; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
@@ -304,7 +332,11 @@ describe('FaceRepairService.handleFaceRepairScan', () => {
         .execute();
     }
 
-    const alexiaData = mediumFactory.personInsert({ personGroupId: await insertPersonGroup(db, user.id), ownerId: user.id, name: 'Alexia' });
+    const alexiaData = mediumFactory.personInsert({
+      personGroupId: await insertPersonGroup(db, user.id),
+      ownerId: user.id,
+      name: 'Alexia',
+    });
     await db.insertInto('person').values(alexiaData).execute();
     for (let i = 0; i < 3; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
@@ -346,7 +378,11 @@ describe('FaceRepairService.handleFaceRepairScan', () => {
     const { user } = await ctx.newUser();
 
     // Karina-main: 10 first-axis faces (the reference cluster).
-    const karinaData = mediumFactory.personInsert({ personGroupId: await insertPersonGroup(db, user.id), ownerId: user.id, name: 'Karina' });
+    const karinaData = mediumFactory.personInsert({
+      personGroupId: await insertPersonGroup(db, user.id),
+      ownerId: user.id,
+      name: 'Karina',
+    });
     await db.insertInto('person').values(karinaData).execute();
     for (let i = 0; i < 10; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
@@ -358,7 +394,11 @@ describe('FaceRepairService.handleFaceRepairScan', () => {
     }
 
     // Alexia: 8 genuine second-axis faces + 2 leaked first-axis faces (one timeline, one locked).
-    const alexiaData = mediumFactory.personInsert({ personGroupId: await insertPersonGroup(db, user.id), ownerId: user.id, name: 'Alexia' });
+    const alexiaData = mediumFactory.personInsert({
+      personGroupId: await insertPersonGroup(db, user.id),
+      ownerId: user.id,
+      name: 'Alexia',
+    });
     await db.insertInto('person').values(alexiaData).execute();
     for (let i = 0; i < 8; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });

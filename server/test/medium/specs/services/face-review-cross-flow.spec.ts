@@ -610,7 +610,11 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
 
     // The admin scans and moves the leaked face to its true owner, Bob.
     await repair.runRepair({ ownerId: user.id, ...repairParams });
-    const moved = await db.selectFrom('asset_face').select('personGroupId').where('id', '=', face).executeTakeFirstOrThrow();
+    const moved = await db
+      .selectFrom('asset_face')
+      .select('personGroupId')
+      .where('id', '=', face)
+      .executeTakeFirstOrThrow();
     expect(moved.personGroupId).toBe(bob.personGroupId);
 
     // The stale pending suggestion is gone — drained at the write path, not merely hidden by a read filter.
@@ -727,7 +731,9 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
     const { assetFace: faceTwoControl } = await newSuggestionCandidateFace(ctx, user.id);
     await ctx.newSharedSpaceAsset({ spaceId: s.id, assetId: faceTwoControl.assetId, addedById: user.id });
     await space.rejectSpacePersonFaceSuggestion(auth, s.id, spaceAnna.id, faceTwo.id);
-    await expect(faceSuggestion.handlePersonSuggestionScan({ id: anna.personGroupId })).resolves.toBe(JobStatus.Success);
+    await expect(faceSuggestion.handlePersonSuggestionScan({ id: anna.personGroupId })).resolves.toBe(
+      JobStatus.Success,
+    );
     expect(await pendingFor(ctx, 'personGroupId', anna.personGroupId, faceTwo.id)).toBe(false);
     expect(await pendingFor(ctx, 'personGroupId', anna.personGroupId, faceTwoControl.id)).toBe(true);
   });
@@ -1017,7 +1023,9 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
       expect(await negativeExists(ctx, 'personGroupId', q.personGroupId, moveFace.id)).toBe(true); // positive control
 
       await repair.executeRepair({
-        toRepair: [{ assetFaceId: moveFace.id, currentPersonId: holder.personGroupId, suspectedOwnerId: q.personGroupId }],
+        toRepair: [
+          { assetFaceId: moveFace.id, currentPersonId: holder.personGroupId, suspectedOwnerId: q.personGroupId },
+        ],
         reviewOnlyFaces: [],
         reviewOnlyPersonIds: [],
         unAttributableFaces: [],
@@ -1090,10 +1098,16 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
       expect(faceAfterDelete.personGroupId).toBeNull(); // sanity: the face is genuinely unassigned
 
       const q2 = await newSuggestionAnchoredPerson(ctx, user.id, 'Q');
-      await ctx.database.updateTable('person').set({ identityId: q1Identity.id }).where('personGroupId', '=', q2.personGroupId).execute();
+      await ctx.database
+        .updateTable('person')
+        .set({ identityId: q1Identity.id })
+        .where('personGroupId', '=', q2.personGroupId)
+        .execute();
 
       // Then: a suggestion scan offers F again — it was permanently suppressed before this slice.
-      await expect(faceSuggestion.handlePersonSuggestionScan({ id: q2.personGroupId })).resolves.toBe(JobStatus.Success);
+      await expect(faceSuggestion.handlePersonSuggestionScan({ id: q2.personGroupId })).resolves.toBe(
+        JobStatus.Success,
+      );
       expect(await pendingFor(ctx, 'personGroupId', q2.personGroupId, face.id)).toBe(true);
     });
 
@@ -1124,7 +1138,11 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
       const { person: p } = await ctx.newPerson({ ownerId: user.id, name: 'P' });
       const pIdentity = await faceIdentityRepo.ensurePersonIdentity(p.personGroupId);
       const { asset: pAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
-      await ctx.newAssetFace({ assetId: pAsset.id, personGroupId: p.personGroupId, sourceType: SourceType.MachineLearning });
+      await ctx.newAssetFace({
+        assetId: pAsset.id,
+        personGroupId: p.personGroupId,
+        sourceType: SourceType.MachineLearning,
+      });
 
       // The row under test: identityId-only (personId/spacePersonId already NULL), against a face unrelated
       // to P's own — its ONLY remaining key is P's identity, which only becomes NULL once the identity GC
@@ -1153,7 +1171,11 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
       // handlePersonCleanup call, making this control vacuous.
       const { person: live } = await ctx.newPerson({ ownerId: user.id, name: 'Live' });
       const { asset: liveAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
-      await ctx.newAssetFace({ assetId: liveAsset.id, personGroupId: live.personGroupId, sourceType: SourceType.Manual });
+      await ctx.newAssetFace({
+        assetId: liveAsset.id,
+        personGroupId: live.personGroupId,
+        sourceType: SourceType.Manual,
+      });
       const { assetFace: liveFace } = await ctx.newAssetFace({
         assetId: liveAsset.id,
         personGroupId: null,

@@ -1,6 +1,5 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Kysely } from 'kysely';
-import { DateTime } from 'luxon';
 import { AssetEditAction, MirrorAxis } from 'src/dtos/editing.dto';
 import { AssetFaceCreateDto } from 'src/dtos/person.dto';
 import {
@@ -258,7 +257,12 @@ const getIdentityLinks = (ctx: ReturnType<typeof setupFaceDetection>['ctx'], fac
     .execute();
 
 const getPeopleByIds = (ctx: ReturnType<typeof setupFaceRecognition>['ctx'], ids: string[]) =>
-  ctx.database.selectFrom('person').select(['personGroupId', 'name']).where('personGroupId', 'in', ids).orderBy('name').execute();
+  ctx.database
+    .selectFrom('person')
+    .select(['personGroupId', 'name'])
+    .where('personGroupId', 'in', ids)
+    .orderBy('name')
+    .execute();
 
 const getSpacePeople = (ctx: ReturnType<typeof setupFaceRecognition>['ctx'], spaceIds: string[]) =>
   ctx.database
@@ -346,11 +350,11 @@ const albumSharedAsset = async (ctx: ReturnType<typeof setup>['ctx']) => {
 };
 
 describe(PersonService.name, () => {
-    // Option M: Gallery does not adopt upstream's cluster-groups FEATURE, so a person_group never
-    // holds more than one person row — the unique index `person_personGroupId_key` enforces it. The
-    // test(s) removed here deliberately put a second owner's person into an existing group, which is
-    // exactly the state Gallery declines to support. Restoring them is part of turning cluster
-    // groups on; see docs/superpowers/specs/2026-08-21-cluster-groups-m-landing-plan.md.
+  // Option M: Gallery does not adopt upstream's cluster-groups FEATURE, so a person_group never
+  // holds more than one person row — the unique index `person_personGroupId_key` enforces it. The
+  // test(s) removed here deliberately put a second owner's person into an existing group, which is
+  // exactly the state Gallery declines to support. Restoring them is part of turning cluster
+  // groups on; see docs/superpowers/specs/2026-08-21-cluster-groups-m-landing-plan.md.
 
   describe('handleQueueDetectFaces safety', () => {
     it('preserves manual and EXIF roots while force face detection removes stale machine-learning state', async () => {
@@ -434,7 +438,11 @@ describe(PersonService.name, () => {
         ctx.database
           .selectFrom('person')
           .select(['personGroupId', 'name'])
-          .where('personGroupId', 'in', [ml.person.personGroupId, manual.person.personGroupId, exif.person.personGroupId])
+          .where('personGroupId', 'in', [
+            ml.person.personGroupId,
+            manual.person.personGroupId,
+            exif.person.personGroupId,
+          ])
           .orderBy('name')
           .execute(),
       ).resolves.toEqual([
@@ -553,13 +561,21 @@ describe(PersonService.name, () => {
 
         await expect(getAssetFaces(ctx, asset.id)).resolves.toEqual(
           expect.arrayContaining([
-            expect.objectContaining({ id: ml.assetFace.id, personGroupId: null, sourceType: SourceType.MachineLearning }),
+            expect.objectContaining({
+              id: ml.assetFace.id,
+              personGroupId: null,
+              sourceType: SourceType.MachineLearning,
+            }),
             expect.objectContaining({
               id: manual.assetFace.id,
               personGroupId: manual.person.personGroupId,
               sourceType: SourceType.Manual,
             }),
-            expect.objectContaining({ id: exif.assetFace.id, personGroupId: exif.person.personGroupId, sourceType: SourceType.Exif }),
+            expect.objectContaining({
+              id: exif.assetFace.id,
+              personGroupId: exif.person.personGroupId,
+              sourceType: SourceType.Exif,
+            }),
           ]),
         );
         await expect(getIdentityLinks(ctx, [ml.assetFace.id, manual.assetFace.id, exif.assetFace.id])).resolves.toEqual(
@@ -569,7 +585,9 @@ describe(PersonService.name, () => {
           ]),
         );
         await expect(getIdentityLinks(ctx, [ml.assetFace.id])).resolves.toEqual([]);
-        await expect(getPeopleByIds(ctx, [ml.person.personGroupId, manual.person.personGroupId, exif.person.personGroupId])).resolves.toEqual([
+        await expect(
+          getPeopleByIds(ctx, [ml.person.personGroupId, manual.person.personGroupId, exif.person.personGroupId]),
+        ).resolves.toEqual([
           { personGroupId: exif.person.personGroupId, name: 'Exif' },
           { personGroupId: manual.person.personGroupId, name: 'Manual' },
         ]);
@@ -659,13 +677,21 @@ describe(PersonService.name, () => {
 
         await expect(getAssetFaces(ctx, asset.id)).resolves.toEqual(
           expect.arrayContaining([
-            expect.objectContaining({ id: ml.assetFace.id, personGroupId: null, sourceType: SourceType.MachineLearning }),
+            expect.objectContaining({
+              id: ml.assetFace.id,
+              personGroupId: null,
+              sourceType: SourceType.MachineLearning,
+            }),
             expect.objectContaining({
               id: manual.assetFace.id,
               personGroupId: manual.person.personGroupId,
               sourceType: SourceType.Manual,
             }),
-            expect.objectContaining({ id: exif.assetFace.id, personGroupId: exif.person.personGroupId, sourceType: SourceType.Exif }),
+            expect.objectContaining({
+              id: exif.assetFace.id,
+              personGroupId: exif.person.personGroupId,
+              sourceType: SourceType.Exif,
+            }),
           ]),
         );
         await expect(getIdentityLinks(ctx, [ml.assetFace.id, manual.assetFace.id, exif.assetFace.id])).resolves.toEqual(
@@ -741,7 +767,11 @@ describe(PersonService.name, () => {
         ctx.database
           .selectFrom('person')
           .select(['personGroupId', 'name'])
-          .where('personGroupId', 'in', [ml.person.personGroupId, manual.person.personGroupId, exif.person.personGroupId])
+          .where('personGroupId', 'in', [
+            ml.person.personGroupId,
+            manual.person.personGroupId,
+            exif.person.personGroupId,
+          ])
           .orderBy('name')
           .execute(),
       ).resolves.toEqual([
@@ -865,8 +895,14 @@ describe(PersonService.name, () => {
       const { person: source } = await ctx.newPerson({ ownerId: user.id, name: 'Source' });
       const { asset: targetAsset } = await ctx.newAsset({ ownerId: user.id });
       const { asset: sourceAsset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace: targetFace } = await ctx.newAssetFace({ assetId: targetAsset.id, personGroupId: target.personGroupId });
-      const { assetFace: sourceFace } = await ctx.newAssetFace({ assetId: sourceAsset.id, personGroupId: source.personGroupId });
+      const { assetFace: targetFace } = await ctx.newAssetFace({
+        assetId: targetAsset.id,
+        personGroupId: target.personGroupId,
+      });
+      const { assetFace: sourceFace } = await ctx.newAssetFace({
+        assetId: sourceAsset.id,
+        personGroupId: source.personGroupId,
+      });
       const existingTargetIdentity = await faceIdentityRepo.ensurePersonIdentity(target.personGroupId);
       await faceIdentityRepo.replaceFaceIdentity({
         assetFaceId: targetFace.id,
@@ -897,11 +933,14 @@ describe(PersonService.name, () => {
         ]),
       );
 
-      const buckets = await assetRepo.getTimeBuckets({
-        identityIds: [targetIdentity.identityId!],
-        userIds: [user.id],
-        visibility: AssetVisibility.Timeline,
-      }, factory.auth({ user: { id: user.id } }));
+      const buckets = await assetRepo.getTimeBuckets(
+        {
+          identityIds: [targetIdentity.identityId!],
+          userIds: [user.id],
+          visibility: AssetVisibility.Timeline,
+        },
+        factory.auth({ user: { id: user.id } }),
+      );
 
       expect(buckets.reduce((total, bucket) => total + Number(bucket.count), 0)).toBe(2);
     });
@@ -916,8 +955,14 @@ describe(PersonService.name, () => {
       const { person: source } = await ctx.newPerson({ ownerId: user.id, name: 'Source' });
       const { asset: targetAsset } = await ctx.newAsset({ ownerId: user.id });
       const { asset: sourceAsset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace: targetFace } = await ctx.newAssetFace({ assetId: targetAsset.id, personGroupId: target.personGroupId });
-      const { assetFace: sourceFace } = await ctx.newAssetFace({ assetId: sourceAsset.id, personGroupId: source.personGroupId });
+      const { assetFace: targetFace } = await ctx.newAssetFace({
+        assetId: targetAsset.id,
+        personGroupId: target.personGroupId,
+      });
+      const { assetFace: sourceFace } = await ctx.newAssetFace({
+        assetId: sourceAsset.id,
+        personGroupId: source.personGroupId,
+      });
       const targetIdentity = await faceIdentityRepo.ensurePersonIdentity(target.personGroupId);
       await faceIdentityRepo.replaceFaceIdentity({
         assetFaceId: targetFace.id,
@@ -931,11 +976,14 @@ describe(PersonService.name, () => {
         .execute();
       await ctx.database.deleteFrom('person').where('personGroupId', '=', source.personGroupId).execute();
 
-      const bucketsBeforeRepair = await assetRepo.getTimeBuckets({
-        identityIds: [targetIdentity.id],
-        userIds: [user.id],
-        visibility: AssetVisibility.Timeline,
-      }, factory.auth({ user: { id: user.id } }));
+      const bucketsBeforeRepair = await assetRepo.getTimeBuckets(
+        {
+          identityIds: [targetIdentity.id],
+          userIds: [user.id],
+          visibility: AssetVisibility.Timeline,
+        },
+        factory.auth({ user: { id: user.id } }),
+      );
       expect(bucketsBeforeRepair.reduce((total, bucket) => total + Number(bucket.count), 0)).toBe(1);
 
       jobMock.queue.mockResolvedValue();
@@ -948,11 +996,14 @@ describe(PersonService.name, () => {
         .executeTakeFirstOrThrow();
       expect(sourceLink).toEqual({ identityId: targetIdentity.id, source: 'backfill' });
 
-      const bucketsAfterRepair = await assetRepo.getTimeBuckets({
-        identityIds: [targetIdentity.id],
-        userIds: [user.id],
-        visibility: AssetVisibility.Timeline,
-      }, factory.auth({ user: { id: user.id } }));
+      const bucketsAfterRepair = await assetRepo.getTimeBuckets(
+        {
+          identityIds: [targetIdentity.id],
+          userIds: [user.id],
+          visibility: AssetVisibility.Timeline,
+        },
+        factory.auth({ user: { id: user.id } }),
+      );
       expect(bucketsAfterRepair.reduce((total, bucket) => total + Number(bucket.count), 0)).toBe(2);
     });
   });
@@ -1748,7 +1799,11 @@ describe(PersonService.name, () => {
     it('hides a hidden person from a non-owner', async () => {
       const { sut, ctx } = setup();
       const { viewer, asset, person } = await albumSharedAsset(ctx);
-      await ctx.database.updateTable('person').set({ isHidden: true }).where('personGroupId', '=', person.personGroupId).execute();
+      await ctx.database
+        .updateTable('person')
+        .set({ isHidden: true })
+        .where('personGroupId', '=', person.personGroupId)
+        .execute();
 
       const faces = await sut.getFacesById(factory.auth({ user: viewer }), { id: asset.id });
 
@@ -1760,7 +1815,11 @@ describe(PersonService.name, () => {
     it('still returns a hidden person to the owner', async () => {
       const { sut, ctx } = setup();
       const { owner, asset, person } = await albumSharedAsset(ctx);
-      await ctx.database.updateTable('person').set({ isHidden: true }).where('personGroupId', '=', person.personGroupId).execute();
+      await ctx.database
+        .updateTable('person')
+        .set({ isHidden: true })
+        .where('personGroupId', '=', person.personGroupId)
+        .execute();
 
       const faces = await sut.getFacesById(factory.auth({ user: owner }), { id: asset.id });
 
@@ -1876,9 +1935,9 @@ describe(PersonService.name, () => {
         'upload/thumbs/vera.jpeg',
       );
 
-      await expect(sut.getThumbnail(factory.auth({ user: { id: user.id } }), person.personGroupId)).rejects.toBeInstanceOf(
-        BadRequestException,
-      );
+      await expect(
+        sut.getThumbnail(factory.auth({ user: { id: user.id } }), person.personGroupId),
+      ).rejects.toBeInstanceOf(BadRequestException);
     });
 
     it('lets an elevated owner past the gate for a locked-asset thumbnail', async () => {
@@ -1896,9 +1955,9 @@ describe(PersonService.name, () => {
       const { user } = await ctx.newUser();
       const { person } = await seedPersonWithRepresentativeFace(ctx, user.id, AssetVisibility.Timeline, '');
 
-      await expect(sut.getThumbnail(factory.auth({ user: { id: user.id } }), person.personGroupId)).rejects.toBeInstanceOf(
-        NotFoundException,
-      );
+      await expect(
+        sut.getThumbnail(factory.auth({ user: { id: user.id } }), person.personGroupId),
+      ).rejects.toBeInstanceOf(NotFoundException);
     });
 
     // `person.faceAssetId` is `ON DELETE SET NULL`, so a person can keep a thumbnail after losing its
@@ -1909,9 +1968,9 @@ describe(PersonService.name, () => {
       const { user } = await ctx.newUser();
       const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Faceless Fay', thumbnailPath: '' });
 
-      await expect(sut.getThumbnail(factory.auth({ user: { id: user.id } }), person.personGroupId)).rejects.toBeInstanceOf(
-        NotFoundException,
-      );
+      await expect(
+        sut.getThumbnail(factory.auth({ user: { id: user.id } }), person.personGroupId),
+      ).rejects.toBeInstanceOf(NotFoundException);
     });
 
     // Regression guard: the locked check runs on the shared-space arm too, so prove the ordinary viewer
@@ -1927,9 +1986,9 @@ describe(PersonService.name, () => {
       await ctx.newSharedSpaceMember({ spaceId: space.id, userId: viewer.id, role: SharedSpaceRole.Viewer });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
 
-      await expect(sut.getThumbnail(factory.auth({ user: { id: viewer.id } }), person.personGroupId)).rejects.toBeInstanceOf(
-        NotFoundException,
-      );
+      await expect(
+        sut.getThumbnail(factory.auth({ user: { id: viewer.id } }), person.personGroupId),
+      ).rejects.toBeInstanceOf(NotFoundException);
     });
 
     // The shared-space arm grants person.read off ANY space-visible face, but the thumbnail is a crop of
@@ -2014,7 +2073,9 @@ describe(PersonService.name, () => {
       // The LAST write in the chain fails.
       vi.spyOn(faceIdentityRepo, 'replaceFaceIdentity').mockRejectedValueOnce(new Error('relink failed'));
 
-      await expect(faceSuggestion.confirmFaceSuggestion(auth, p.personGroupId, face.id)).rejects.toThrow('relink failed');
+      await expect(faceSuggestion.confirmFaceSuggestion(auth, p.personGroupId, face.id)).rejects.toThrow(
+        'relink failed',
+      );
 
       // The reassign must have rolled back — the face is still unassigned.
       const reloadedFace = await ctx.database
