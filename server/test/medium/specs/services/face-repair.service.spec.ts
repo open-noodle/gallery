@@ -59,7 +59,7 @@ const buildCluster = async (
   const faceIds: string[] = [];
   for (let index = 0; index < faceCount; index++) {
     const { asset } = await ctx.newAsset({ ownerId });
-    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
     await ctx.database.insertInto('face_search').values({ faceId: assetFace.id, embedding }).execute();
     faceIds.push(assetFace.id);
   }
@@ -79,7 +79,7 @@ describe('FaceRepairService.findReattributionCandidates', () => {
     const leakedFaceIds: string[] = [];
     for (let index = 0; index < 3; index++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: alexia.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: alexia.personGroupId });
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('first') })
@@ -95,8 +95,8 @@ describe('FaceRepairService.findReattributionCandidates', () => {
     for (const leakedId of leakedFaceIds) {
       const candidate = candidates.find((c) => c.assetFaceId === leakedId);
       expect(candidate).toBeDefined();
-      expect(candidate!.currentPersonId).toBe(alexia.id);
-      expect(candidate!.topOtherPersonId).toBe(karina.id);
+      expect(candidate!.currentPersonId).toBe(alexia.personGroupId);
+      expect(candidate!.topOtherPersonId).toBe(karina.personGroupId);
       expect(candidate!.topOtherCount).toBeGreaterThan(0);
     }
 
@@ -114,7 +114,7 @@ describe('FaceRepairService.findReattributionCandidates', () => {
     // A single isolated face on 'second' axis — no neighbors in range
     const { person: isolated } = await ctx.newPerson({ ownerId: user.id });
     const { asset } = await ctx.newAsset({ ownerId: user.id });
-    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: isolated.id });
+    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: isolated.personGroupId });
     await ctx.database
       .insertInto('face_search')
       .values({ faceId: assetFace.id, embedding: axisEmbedding('second') })
@@ -139,7 +139,7 @@ describe('FaceRepairService.findReattributionCandidates', () => {
     // Owner A has one face on 'first' axis
     const { person: personA } = await ctx.newPerson({ ownerId: ownerA.id });
     const { asset: assetA } = await ctx.newAsset({ ownerId: ownerA.id });
-    const { assetFace: faceA } = await ctx.newAssetFace({ assetId: assetA.id, personId: personA.id });
+    const { assetFace: faceA } = await ctx.newAssetFace({ assetId: assetA.id, personGroupId: personA.personGroupId });
     await ctx.database
       .insertInto('face_search')
       .values({ faceId: faceA.id, embedding: axisEmbedding('first') })
@@ -194,7 +194,7 @@ describe('FaceRepairService.buildRepairPlan', () => {
     const alexiaLeakedFaceIds: string[] = [];
     for (let i = 0; i < 3; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: alexia.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: alexia.personGroupId });
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('first') })
@@ -203,7 +203,7 @@ describe('FaceRepairService.buildRepairPlan', () => {
     }
     for (let i = 0; i < 8; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: alexia.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: alexia.personGroupId });
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('second') })
@@ -216,7 +216,7 @@ describe('FaceRepairService.buildRepairPlan', () => {
     const dupFlaggedFaceIds: string[] = [];
     for (let i = 0; i < 6; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: dup.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: dup.personGroupId });
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('first') })
@@ -226,7 +226,7 @@ describe('FaceRepairService.buildRepairPlan', () => {
     // 4 genuine faces on mixedAxis slot 0 (isolated, no other person on this axis)
     for (let i = 0; i < 4; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: dup.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: dup.personGroupId });
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: mixedAxisEmbedding(0) })
@@ -239,7 +239,7 @@ describe('FaceRepairService.buildRepairPlan', () => {
     const siblingFlaggedFaceIds: string[] = [];
     for (let i = 0; i < 5; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: sibling.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: sibling.personGroupId });
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('first') })
@@ -248,7 +248,7 @@ describe('FaceRepairService.buildRepairPlan', () => {
     }
     for (let i = 0; i < 5; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: sibling.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: sibling.personGroupId });
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: mixedAxisEmbedding(1) })
@@ -264,7 +264,7 @@ describe('FaceRepairService.buildRepairPlan', () => {
     const victimAFlaggedFaceIds: string[] = [];
     for (let i = 0; i < 3; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: victimA.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: victimA.personGroupId });
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: mixedAxisEmbedding(0) })
@@ -273,7 +273,7 @@ describe('FaceRepairService.buildRepairPlan', () => {
     }
     for (let i = 0; i < 4; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: victimA.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: victimA.personGroupId });
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: mixedAxisEmbedding(2) })
@@ -290,42 +290,42 @@ describe('FaceRepairService.buildRepairPlan', () => {
     const pp = (id: string) => plan.perPerson.find((p) => p.personId === id)!;
 
     // Alexia: 3 flagged / 11 eligible ≈ 0.27
-    expect(pp(alexia.id).eligible).toBe(11);
-    expect(pp(alexia.id).flagged).toBe(3);
-    expect(pp(alexia.id).flaggedFraction).toBeCloseTo(3 / 11);
+    expect(pp(alexia.personGroupId).eligible).toBe(11);
+    expect(pp(alexia.personGroupId).flagged).toBe(3);
+    expect(pp(alexia.personGroupId).flaggedFraction).toBeCloseTo(3 / 11);
 
     // dup: 6 flagged / 10 eligible = 0.6 (over-cap)
-    expect(pp(dup.id).eligible).toBe(10);
-    expect(pp(dup.id).flagged).toBe(6);
-    expect(pp(dup.id).flaggedFraction).toBeCloseTo(0.6);
+    expect(pp(dup.personGroupId).eligible).toBe(10);
+    expect(pp(dup.personGroupId).flagged).toBe(6);
+    expect(pp(dup.personGroupId).flaggedFraction).toBeCloseTo(0.6);
 
     // sibling: 5 flagged / 10 eligible = 0.5 (boundary, NOT over-cap)
-    expect(pp(sibling.id).eligible).toBe(10);
-    expect(pp(sibling.id).flagged).toBe(5);
-    expect(pp(sibling.id).flaggedFraction).toBeCloseTo(0.5);
+    expect(pp(sibling.personGroupId).eligible).toBe(10);
+    expect(pp(sibling.personGroupId).flagged).toBe(5);
+    expect(pp(sibling.personGroupId).flaggedFraction).toBeCloseTo(0.5);
 
     // victimA: 3 flagged / 7 eligible ≈ 0.43 (under-cap)
-    expect(pp(victimA.id).eligible).toBe(7);
-    expect(pp(victimA.id).flagged).toBe(3);
-    expect(pp(victimA.id).flaggedFraction).toBeCloseTo(3 / 7);
+    expect(pp(victimA.personGroupId).eligible).toBe(7);
+    expect(pp(victimA.personGroupId).flagged).toBe(3);
+    expect(pp(victimA.personGroupId).flaggedFraction).toBeCloseTo(3 / 7);
 
     // solo: 0 flagged / 4 eligible
-    expect(pp(solo.id).eligible).toBe(4);
-    expect(pp(solo.id).flagged).toBe(0);
+    expect(pp(solo.personGroupId).eligible).toBe(4);
+    expect(pp(solo.personGroupId).flagged).toBe(0);
 
     // ── reviewOnlyPersonIds ────────────────────────────────────────────────────
-    expect(plan.reviewOnlyPersonIds).toContain(dup.id);
-    expect(plan.reviewOnlyPersonIds).not.toContain(alexia.id);
-    expect(plan.reviewOnlyPersonIds).not.toContain(sibling.id);
-    expect(plan.reviewOnlyPersonIds).not.toContain(victimA.id);
-    expect(plan.reviewOnlyPersonIds).not.toContain(karina.id);
+    expect(plan.reviewOnlyPersonIds).toContain(dup.personGroupId);
+    expect(plan.reviewOnlyPersonIds).not.toContain(alexia.personGroupId);
+    expect(plan.reviewOnlyPersonIds).not.toContain(sibling.personGroupId);
+    expect(plan.reviewOnlyPersonIds).not.toContain(victimA.personGroupId);
+    expect(plan.reviewOnlyPersonIds).not.toContain(karina.personGroupId);
 
     // ── toRepair ───────────────────────────────────────────────────────────────
     // Alexia's 3 leaked faces → toRepair (suspectedOwner = karina)
     for (const faceId of alexiaLeakedFaceIds) {
       const repaired = plan.toRepair.find((f) => f.assetFaceId === faceId);
       expect(repaired).toBeDefined();
-      expect(repaired!.suspectedOwnerId).toBe(karina.id);
+      expect(repaired!.suspectedOwnerId).toBe(karina.personGroupId);
     }
     // sibling's 5 first-axis faces → toRepair (boundary: fraction=0.5 NOT > cap)
     for (const faceId of siblingFlaggedFaceIds) {
@@ -375,7 +375,7 @@ describe('FaceRepairService.buildRepairPlan', () => {
     // but topOtherCount=2 < minFaces=3 → NOT flagged → should land in unAttributableFaces
     const { person: suspect } = await ctx.newPerson({ ownerId: user.id });
     const { asset: suspectAsset } = await ctx.newAsset({ ownerId: user.id });
-    const { assetFace: suspectFace } = await ctx.newAssetFace({ assetId: suspectAsset.id, personId: suspect.id });
+    const { assetFace: suspectFace } = await ctx.newAssetFace({ assetId: suspectAsset.id, personGroupId: suspect.personGroupId });
     await ctx.database
       .insertInto('face_search')
       .values({ faceId: suspectFace.id, embedding: axisEmbedding('first') })
@@ -384,7 +384,7 @@ describe('FaceRepairService.buildRepairPlan', () => {
     // isolated: 1 face on a completely separate axis — no neighbors within maxDistance=0.6 → NOT unAttributable
     const { person: isolated } = await ctx.newPerson({ ownerId: user.id });
     const { asset: isolatedAsset } = await ctx.newAsset({ ownerId: user.id });
-    const { assetFace: isolatedFace } = await ctx.newAssetFace({ assetId: isolatedAsset.id, personId: isolated.id });
+    const { assetFace: isolatedFace } = await ctx.newAssetFace({ assetId: isolatedAsset.id, personGroupId: isolated.personGroupId });
     await ctx.database
       .insertInto('face_search')
       .values({ faceId: isolatedFace.id, embedding: axisEmbedding('second') })
@@ -395,7 +395,7 @@ describe('FaceRepairService.buildRepairPlan', () => {
     // suspect face: in unAttributableFaces, NOT in toRepair
     const unAttr = plan.unAttributableFaces.find((f) => f.assetFaceId === suspectFace.id);
     expect(unAttr).toBeDefined();
-    expect(unAttr!.currentPersonId).toBe(suspect.id);
+    expect(unAttr!.currentPersonId).toBe(suspect.personGroupId);
     expect(plan.toRepair.find((f) => f.assetFaceId === suspectFace.id)).toBeUndefined();
 
     // isolated face: NOT in unAttributableFaces (no close other owner)
@@ -423,7 +423,7 @@ describe('FaceRepairService.buildRepairPlan', () => {
     const leakedFaceIds: string[] = [];
     for (let i = 0; i < 3; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: alexia.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: alexia.personGroupId });
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('first') })
@@ -432,7 +432,7 @@ describe('FaceRepairService.buildRepairPlan', () => {
     }
     for (let i = 0; i < 4; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: alexia.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: alexia.personGroupId });
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('second') })
@@ -450,7 +450,7 @@ describe('FaceRepairService.buildRepairPlan', () => {
     for (const faceId of leakedFaceIds) {
       const repaired = plan.toRepair.find((f) => f.assetFaceId === faceId);
       expect(repaired).toBeDefined();
-      expect(repaired!.suspectedOwnerId).toBe(karina.id);
+      expect(repaired!.suspectedOwnerId).toBe(karina.personGroupId);
     }
   });
 });
@@ -485,11 +485,11 @@ const buildLinkedCluster = async (
 ) => {
   const faceIdentityRepo = ctx.get(FaceIdentityRepository);
   const { person } = await ctx.newPerson({ ownerId });
-  const identity = await faceIdentityRepo.ensurePersonIdentity(person.id);
+  const identity = await faceIdentityRepo.ensurePersonIdentity(person.personGroupId);
   const faceIds: string[] = [];
   for (let index = 0; index < faceCount; index++) {
     const { asset } = await ctx.newAsset({ ownerId });
-    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
     await ctx.database.insertInto('face_search').values({ faceId: assetFace.id, embedding }).execute();
     await faceIdentityRepo.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
     faceIds.push(assetFace.id);
@@ -525,16 +525,16 @@ describe('FaceRepairService.executeRepair', () => {
       axisEmbedding('first'),
       10,
     );
-    const karinaIdentity = await faceIdentityRepo.ensurePersonIdentity(karina.id);
+    const karinaIdentity = await faceIdentityRepo.ensurePersonIdentity(karina.personGroupId);
 
     // Alexia: 8 genuine second-axis + 3 leaked first-axis faces
     const faceIdentityRepoReal = ctx.get(FaceIdentityRepository);
     const { person: alexia } = await ctx.newPerson({ ownerId: user.id });
-    const alexiaIdentity = await faceIdentityRepoReal.ensurePersonIdentity(alexia.id);
+    const alexiaIdentity = await faceIdentityRepoReal.ensurePersonIdentity(alexia.personGroupId);
     const leakedFaceIds: string[] = [];
     for (let i = 0; i < 3; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: alexia.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: alexia.personGroupId });
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('first') })
@@ -549,7 +549,7 @@ describe('FaceRepairService.executeRepair', () => {
     const alexiaGenuineFaceIds: string[] = [];
     for (let i = 0; i < 8; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: alexia.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: alexia.personGroupId });
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('second') })
@@ -578,7 +578,7 @@ describe('FaceRepairService.executeRepair', () => {
       .where('id', 'in', leakedFaceIds)
       .execute();
     for (const row of leakedRows) {
-      expect(row.personId).toBe(karina.id);
+      expect(row.personId).toBe(karina.personGroupId);
     }
 
     // face_identity_face rows for leaked faces now point to Karina's identity, sourced 'manual'
@@ -601,7 +601,7 @@ describe('FaceRepairService.executeRepair', () => {
       .where('id', 'in', alexiaGenuineFaceIds)
       .execute();
     for (const row of alexiaRows) {
-      expect(row.personId).toBe(alexia.id);
+      expect(row.personId).toBe(alexia.personGroupId);
     }
 
     // Karina's original faces are untouched
@@ -611,7 +611,7 @@ describe('FaceRepairService.executeRepair', () => {
       .where('id', 'in', karinaFaceIds)
       .execute();
     for (const row of karinaRows) {
-      expect(row.personId).toBe(karina.id);
+      expect(row.personId).toBe(karina.personGroupId);
     }
 
     // No-loop invariant: getBackfillWork().hasPersonalIdentityWork is false after repair
@@ -633,11 +633,11 @@ describe('FaceRepairService.executeRepair', () => {
 
     // Over-cap person: 6 leaked first-axis + 4 genuine mixed — flaggedFraction=0.6 > 0.5 → reviewOnly
     const { person: overCap } = await ctx.newPerson({ ownerId: user.id });
-    const overCapIdentity = await faceIdentityRepo.ensurePersonIdentity(overCap.id);
+    const overCapIdentity = await faceIdentityRepo.ensurePersonIdentity(overCap.personGroupId);
     const overCapFaceIds: string[] = [];
     for (let i = 0; i < 6; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: overCap.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: overCap.personGroupId });
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('first') })
@@ -651,7 +651,7 @@ describe('FaceRepairService.executeRepair', () => {
     }
     for (let i = 0; i < 4; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: overCap.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: overCap.personGroupId });
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('second') })
@@ -665,7 +665,7 @@ describe('FaceRepairService.executeRepair', () => {
 
     const plan = await sut.buildRepairPlan({ ownerId: user.id, ...execPlanParams });
     // The over-cap person should be review-only
-    expect(plan.reviewOnlyPersonIds).toContain(overCap.id);
+    expect(plan.reviewOnlyPersonIds).toContain(overCap.personGroupId);
     expect(plan.toRepair.some((f) => overCapFaceIds.includes(f.assetFaceId))).toBe(false);
 
     await sut.executeRepair(plan);
@@ -677,7 +677,7 @@ describe('FaceRepairService.executeRepair', () => {
       .where('id', 'in', overCapFaceIds)
       .execute();
     for (const row of rows) {
-      expect(row.personId).toBe(overCap.id);
+      expect(row.personId).toBe(overCap.personGroupId);
     }
   });
 
@@ -693,11 +693,11 @@ describe('FaceRepairService.executeRepair', () => {
 
     // Alexia: 8 genuine + 3 leaked; set faceAssetId to first leaked face
     const { person: alexia } = await ctx.newPerson({ ownerId: user.id });
-    const alexiaIdentity = await faceIdentityRepo.ensurePersonIdentity(alexia.id);
+    const alexiaIdentity = await faceIdentityRepo.ensurePersonIdentity(alexia.personGroupId);
     const leakedFaceIds: string[] = [];
     for (let i = 0; i < 3; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: alexia.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: alexia.personGroupId });
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('first') })
@@ -711,7 +711,7 @@ describe('FaceRepairService.executeRepair', () => {
     }
     for (let i = 0; i < 8; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: alexia.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: alexia.personGroupId });
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('second') })
@@ -726,7 +726,7 @@ describe('FaceRepairService.executeRepair', () => {
     await ctx.database
       .updateTable('person')
       .set({ faceAssetId: leakedFaceIds[0] })
-      .where('id', '=', alexia.id)
+      .where('personGroupId', '=', alexia.personGroupId)
       .execute();
 
     const plan = await sut.buildRepairPlan({ ownerId: user.id, ...execPlanParams });
@@ -735,7 +735,7 @@ describe('FaceRepairService.executeRepair', () => {
     const updated = await ctx.database
       .selectFrom('person')
       .select('faceAssetId')
-      .where('id', '=', alexia.id)
+      .where('personGroupId', '=', alexia.personGroupId)
       .executeTakeFirstOrThrow();
     // faceAssetId must not be any of the leaked (now-re-attributed) faces
     expect(leakedFaceIds).not.toContain(updated.faceAssetId);
@@ -753,11 +753,11 @@ describe('FaceRepairService.executeRepair', () => {
 
     // Alexia: 8 genuine + 3 leaked — only 2 will remain in plan after one is moved
     const { person: alexia } = await ctx.newPerson({ ownerId: user.id });
-    const alexiaIdentity = await faceIdentityRepo.ensurePersonIdentity(alexia.id);
+    const alexiaIdentity = await faceIdentityRepo.ensurePersonIdentity(alexia.personGroupId);
     const leakedFaceIds: string[] = [];
     for (let i = 0; i < 3; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: alexia.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: alexia.personGroupId });
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('first') })
@@ -771,7 +771,7 @@ describe('FaceRepairService.executeRepair', () => {
     }
     for (let i = 0; i < 8; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: alexia.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: alexia.personGroupId });
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('second') })
@@ -785,7 +785,7 @@ describe('FaceRepairService.executeRepair', () => {
 
     // Third person Z
     const { person: personZ } = await ctx.newPerson({ ownerId: user.id });
-    await faceIdentityRepo.ensurePersonIdentity(personZ.id);
+    await faceIdentityRepo.ensurePersonIdentity(personZ.personGroupId);
 
     jobMock.queueAll.mockResolvedValue();
 
@@ -793,7 +793,7 @@ describe('FaceRepairService.executeRepair', () => {
 
     // After building plan but before executing it, move one leaked face to person Z
     const movedFaceId = leakedFaceIds[0];
-    await ctx.database.updateTable('asset_face').set({ personId: personZ.id }).where('id', '=', movedFaceId).execute();
+    await ctx.database.updateTable('asset_face').set({ personId: personZ.personGroupId }).where('id', '=', movedFaceId).execute();
 
     await sut.executeRepair(plan);
 
@@ -803,7 +803,7 @@ describe('FaceRepairService.executeRepair', () => {
       .select('personId')
       .where('id', '=', movedFaceId)
       .executeTakeFirstOrThrow();
-    expect(movedRow.personId).toBe(personZ.id);
+    expect(movedRow.personId).toBe(personZ.personGroupId);
 
     // The two remaining leaked faces were re-attributed to the suspected owner Karina.
     const remainingRows = await ctx.database
@@ -812,7 +812,7 @@ describe('FaceRepairService.executeRepair', () => {
       .where('id', 'in', leakedFaceIds.slice(1))
       .execute();
     for (const row of remainingRows) {
-      expect(row.personId).toBe(karina.id);
+      expect(row.personId).toBe(karina.personGroupId);
     }
 
     // The apply never re-queues FacialRecognition.
@@ -872,11 +872,11 @@ describe('FaceRepairService.runRepair', () => {
 
     // Alexia: 8 genuine + 3 leaked first-axis
     const { person: alexia } = await ctx.newPerson({ ownerId: user.id });
-    const alexiaIdentity = await faceIdentityRepo.ensurePersonIdentity(alexia.id);
+    const alexiaIdentity = await faceIdentityRepo.ensurePersonIdentity(alexia.personGroupId);
     const leakedFaceIds: string[] = [];
     for (let i = 0; i < 3; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: alexia.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: alexia.personGroupId });
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('first') })
@@ -890,7 +890,7 @@ describe('FaceRepairService.runRepair', () => {
     }
     for (let i = 0; i < 8; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: alexia.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: alexia.personGroupId });
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('second') })
@@ -915,7 +915,7 @@ describe('FaceRepairService.runRepair', () => {
       .where('id', 'in', leakedFaceIds)
       .execute();
     for (const row of rows) {
-      expect(row.personId).toBe(alexia.id);
+      expect(row.personId).toBe(alexia.personGroupId);
     }
 
     // queueAll must not have been called
@@ -933,11 +933,11 @@ describe('FaceRepairService.runRepair', () => {
     const { person: karina } = await buildLinkedCluster(ctx as any, user.id, axisEmbedding('first'), 10);
 
     const { person: alexia } = await ctx.newPerson({ ownerId: user.id });
-    const alexiaIdentity = await faceIdentityRepo.ensurePersonIdentity(alexia.id);
+    const alexiaIdentity = await faceIdentityRepo.ensurePersonIdentity(alexia.personGroupId);
     const leakedFaceIds: string[] = [];
     for (let i = 0; i < 3; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: alexia.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: alexia.personGroupId });
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('first') })
@@ -951,7 +951,7 @@ describe('FaceRepairService.runRepair', () => {
     }
     for (let i = 0; i < 8; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: alexia.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: alexia.personGroupId });
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('second') })
@@ -974,7 +974,7 @@ describe('FaceRepairService.runRepair', () => {
       .where('id', 'in', leakedFaceIds)
       .execute();
     for (const row of rows) {
-      expect(row.personId).toBe(karina.id);
+      expect(row.personId).toBe(karina.personGroupId);
     }
 
     const queuedJobNames = jobMock.queueAll.mock.calls.flatMap(([items]) => items).map((item) => item.name);
@@ -991,11 +991,11 @@ describe('FaceRepairService.runRepair', () => {
     await buildLinkedCluster(ctx as any, user.id, axisEmbedding('first'), 10);
 
     const { person: alexia } = await ctx.newPerson({ ownerId: user.id });
-    const alexiaIdentity = await faceIdentityRepo.ensurePersonIdentity(alexia.id);
+    const alexiaIdentity = await faceIdentityRepo.ensurePersonIdentity(alexia.personGroupId);
     const leakedFaceIds: string[] = [];
     for (let i = 0; i < 3; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: alexia.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: alexia.personGroupId });
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('first') })
@@ -1009,7 +1009,7 @@ describe('FaceRepairService.runRepair', () => {
     }
     for (let i = 0; i < 8; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: alexia.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: alexia.personGroupId });
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('second') })
@@ -1031,7 +1031,7 @@ describe('FaceRepairService.runRepair', () => {
       .where('id', 'in', leakedFaceIds)
       .execute();
     for (const row of rows) {
-      expect(row.personId).toBe(alexia.id);
+      expect(row.personId).toBe(alexia.personGroupId);
     }
 
     // dryRun=true (default) with isActive=true → succeeds (read-only)
@@ -1054,11 +1054,11 @@ describe('FaceRepairService.runRepair', () => {
     // Owner A: karina-main + alexia with leaked faces
     const { person: karinaA } = await buildLinkedCluster(ctx as any, ownerA.id, axisEmbedding('first'), 10);
     const { person: alexiaA } = await ctx.newPerson({ ownerId: ownerA.id });
-    const alexiaAIdentity = await faceIdentityRepoA.ensurePersonIdentity(alexiaA.id);
+    const alexiaAIdentity = await faceIdentityRepoA.ensurePersonIdentity(alexiaA.personGroupId);
     const leakedA: string[] = [];
     for (let i = 0; i < 3; i++) {
       const { asset } = await ctx.newAsset({ ownerId: ownerA.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: alexiaA.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: alexiaA.personGroupId });
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('first') })
@@ -1072,7 +1072,7 @@ describe('FaceRepairService.runRepair', () => {
     }
     for (let i = 0; i < 8; i++) {
       const { asset } = await ctx.newAsset({ ownerId: ownerA.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: alexiaA.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: alexiaA.personGroupId });
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('second') })
@@ -1087,11 +1087,11 @@ describe('FaceRepairService.runRepair', () => {
     // Owner B: mirrored setup
     await buildLinkedCluster(ctx as any, ownerB.id, axisEmbedding('first'), 10);
     const { person: alexiaB } = await ctx.newPerson({ ownerId: ownerB.id });
-    const alexiaBIdentity = await faceIdentityRepoA.ensurePersonIdentity(alexiaB.id);
+    const alexiaBIdentity = await faceIdentityRepoA.ensurePersonIdentity(alexiaB.personGroupId);
     const leakedB: string[] = [];
     for (let i = 0; i < 3; i++) {
       const { asset } = await ctx.newAsset({ ownerId: ownerB.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: alexiaB.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: alexiaB.personGroupId });
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('first') })
@@ -1105,7 +1105,7 @@ describe('FaceRepairService.runRepair', () => {
     }
     for (let i = 0; i < 8; i++) {
       const { asset } = await ctx.newAsset({ ownerId: ownerB.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: alexiaB.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: alexiaB.personGroupId });
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('second') })
@@ -1126,7 +1126,7 @@ describe('FaceRepairService.runRepair', () => {
       .where('id', 'in', leakedA)
       .execute();
     for (const row of rowsA) {
-      expect(row.personId).toBe(karinaA.id);
+      expect(row.personId).toBe(karinaA.personGroupId);
     }
 
     // OwnerB leaked faces remain assigned
@@ -1136,7 +1136,7 @@ describe('FaceRepairService.runRepair', () => {
       .where('id', 'in', leakedB)
       .execute();
     for (const row of rowsB) {
-      expect(row.personId).toBe(alexiaB.id);
+      expect(row.personId).toBe(alexiaB.personGroupId);
     }
   });
 
@@ -1151,10 +1151,10 @@ describe('FaceRepairService.runRepair', () => {
     await buildLinkedCluster(ctx as any, user.id, axisEmbedding('first'), 10);
 
     const { person: alexia } = await ctx.newPerson({ ownerId: user.id });
-    const alexiaIdentity = await faceIdentityRepo.ensurePersonIdentity(alexia.id);
+    const alexiaIdentity = await faceIdentityRepo.ensurePersonIdentity(alexia.personGroupId);
     for (let i = 0; i < 3; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: alexia.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: alexia.personGroupId });
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('first') })
@@ -1167,7 +1167,7 @@ describe('FaceRepairService.runRepair', () => {
     }
     for (let i = 0; i < 8; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: alexia.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: alexia.personGroupId });
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('second') })
@@ -1242,7 +1242,7 @@ describe('FaceRepairService decline filter', () => {
     const leakedFaceIds: string[] = [];
     for (let i = 0; i < 3; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: alexia.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: alexia.personGroupId });
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('first') })
@@ -1251,7 +1251,7 @@ describe('FaceRepairService decline filter', () => {
     }
     for (let i = 0; i < 8; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: alexia.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: alexia.personGroupId });
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('second') })
@@ -1261,7 +1261,7 @@ describe('FaceRepairService decline filter', () => {
     // Decline face[0] toward its suspected owner (Karina)
     const plan0 = await sut.buildRepairPlan({ ownerId: user.id, ...planParams });
     const declinedFace = plan0.toRepair.find(
-      (f) => f.currentPersonId === alexia.id && leakedFaceIds.includes(f.assetFaceId),
+      (f) => f.currentPersonId === alexia.personGroupId && leakedFaceIds.includes(f.assetFaceId),
     )!;
     expect(declinedFace).toBeDefined();
     await verdictRepo.markRejected(declinedFace.suspectedOwnerId, declinedFace.assetFaceId, {
@@ -1296,7 +1296,7 @@ describe('FaceRepairService decline filter', () => {
     const leakedFaceIds: string[] = [];
     for (let i = 0; i < 3; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: alexia.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: alexia.personGroupId });
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('first') })
@@ -1305,7 +1305,7 @@ describe('FaceRepairService decline filter', () => {
     }
     for (let i = 0; i < 8; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: alexia.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: alexia.personGroupId });
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('second') })
@@ -1320,7 +1320,7 @@ describe('FaceRepairService decline filter', () => {
     // Find the suspected owner for all leaked faces, then decline all of them POST-scan
     const plan0 = await sut.buildRepairPlan({ ownerId: user.id, ...planParams });
     const leakedToRepair = plan0.toRepair.filter(
-      (f) => f.currentPersonId === alexia.id && leakedFaceIds.includes(f.assetFaceId),
+      (f) => f.currentPersonId === alexia.personGroupId && leakedFaceIds.includes(f.assetFaceId),
     );
     expect(leakedToRepair.length).toBeGreaterThan(0);
     for (const face of leakedToRepair) {
@@ -1331,9 +1331,9 @@ describe('FaceRepairService decline filter', () => {
     // pre-decline flagged snapshot — the post-scan declines must be filtered from the snapshot, moving 0.
     const result = await sut.resolveFaces(
       {
-        personId: alexia.id,
+        personId: alexia.personGroupId,
         moveToPerson: [
-          { destinationPersonId: karina.id, faceIds: leakedToRepair.map((f) => f.assetFaceId), lock: false },
+          { destinationPersonId: karina.personGroupId, faceIds: leakedToRepair.map((f) => f.assetFaceId), lock: false },
         ],
         stay: [],
         lock: [],
@@ -1352,14 +1352,14 @@ describe('FaceRepairService decline filter', () => {
       .where('id', 'in', leakedFaceIds)
       .execute();
     for (const row of rows) {
-      expect(row.personId).toBe(alexia.id);
+      expect(row.personId).toBe(alexia.personGroupId);
     }
 
     // karina is not used by this test path but ensure she wasn't somehow affected
     const karinaFaces = await ctx.database
       .selectFrom('asset_face')
       .select('personId')
-      .where('personId', '=', karina.id)
+      .where('personGroupId', '=', karina.personGroupId)
       .execute();
     expect(karinaFaces.length).toBe(10);
   });
@@ -1377,7 +1377,7 @@ describe('FaceRepairService decline filter', () => {
     const leakedFaceIds: string[] = [];
     for (let i = 0; i < 3; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: alexia.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: alexia.personGroupId });
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('first') })
@@ -1386,7 +1386,7 @@ describe('FaceRepairService decline filter', () => {
     }
     for (let i = 0; i < 8; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: alexia.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: alexia.personGroupId });
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('second') })
@@ -1395,12 +1395,12 @@ describe('FaceRepairService decline filter', () => {
 
     // Dismiss Alexia with Karina as the fingerprint
     await declineRepo.createClusterMutes({
-      persons: [{ personId: alexia.id, suspectedOwnerIds: [karina.id] }],
+      persons: [{ personId: alexia.personGroupId, suspectedOwnerIds: [karina.personGroupId] }],
       declinedBy: null,
     });
 
     // getPersonFlaggedFaces must return empty for alexia (dismissed, same set of suspected owners)
-    const { flaggedFaces } = await sut.getPersonFlaggedFaces(alexia.id);
+    const { flaggedFaces } = await sut.getPersonFlaggedFaces(alexia.personGroupId);
     expect(flaggedFaces.length).toBe(0);
   });
 
@@ -1428,7 +1428,7 @@ describe('FaceRepairService decline filter', () => {
       const leakedFaceIds: string[] = [];
       for (let i = 0; i < 3; i++) {
         const { asset } = await ctx.newAsset({ ownerId: user.id });
-        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: alexia.id });
+        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: alexia.personGroupId });
         await ctx.database
           .insertInto('face_search')
           .values({ faceId: assetFace.id, embedding: axisEmbedding('first') })
@@ -1437,7 +1437,7 @@ describe('FaceRepairService decline filter', () => {
       }
       for (let i = 0; i < 8; i++) {
         const { asset } = await ctx.newAsset({ ownerId: user.id });
-        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: alexia.id });
+        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: alexia.personGroupId });
         await ctx.database
           .insertInto('face_search')
           .values({ faceId: assetFace.id, embedding: axisEmbedding('second') })
@@ -1446,7 +1446,7 @@ describe('FaceRepairService decline filter', () => {
 
       const baseline = await sut.buildRepairPlan({ ownerId: user.id, ...planParams });
       const leaked = baseline.toRepair.filter(
-        (f) => f.currentPersonId === alexia.id && leakedFaceIds.includes(f.assetFaceId),
+        (f) => f.currentPersonId === alexia.personGroupId && leakedFaceIds.includes(f.assetFaceId),
       );
       expect(leaked).toHaveLength(3);
       const [declinedFace, lockedFace, untouchedFace] = leaked;
@@ -1456,20 +1456,20 @@ describe('FaceRepairService decline filter', () => {
         source: 'cleanup',
         actorId: null,
       });
-      const alexiaIdentity = await ctx.get(FaceIdentityRepository).ensurePersonIdentity(alexia.id);
+      const alexiaIdentity = await ctx.get(FaceIdentityRepository).ensurePersonIdentity(alexia.personGroupId);
       await ctx
         .get(FaceIdentityRepository)
         .replaceFaceIdentity({ assetFaceId: lockedFace.assetFaceId, identityId: alexiaIdentity.id, source: 'manual' });
 
       // OUTSIDE the flagged set entirely: a lock on one of karina's OWN faces (never a candidate — her faces
       // always vote for herself) and a person-level dismiss for a brand-new person with no faces at all.
-      const karinaIdentity = await ctx.get(FaceIdentityRepository).ensurePersonIdentity(karina.id);
+      const karinaIdentity = await ctx.get(FaceIdentityRepository).ensurePersonIdentity(karina.personGroupId);
       await ctx
         .get(FaceIdentityRepository)
         .replaceFaceIdentity({ assetFaceId: karinaFaceIds[0], identityId: karinaIdentity.id, source: 'manual' });
       const { person: unrelated } = await ctx.newPerson({ ownerId: user.id });
       await declineRepo.createClusterMutes({
-        persons: [{ personId: unrelated.id, suspectedOwnerIds: [karina.id] }],
+        persons: [{ personId: unrelated.personGroupId, suspectedOwnerIds: [karina.personGroupId] }],
         declinedBy: null,
       });
 

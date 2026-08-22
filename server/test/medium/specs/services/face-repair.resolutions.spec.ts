@@ -54,7 +54,7 @@ const seedFace = async (ctx: Ctx, ownerId: string, personId: string): Promise<st
   const { asset } = await ctx.newAsset({ ownerId });
   const { assetFace } = await ctx.newAssetFace({
     assetId: asset.id,
-    personId,
+    personGroupId,
     sourceType: SourceType.MachineLearning,
   });
   return assetFace.id;
@@ -86,11 +86,11 @@ describe('FaceRepairService.listResolutions', () => {
     const { person: ownerA } = await ctx.newPerson({ ownerId: user.id, name: 'Alice' });
     const { person: ownerB } = await ctx.newPerson({ ownerId: user.id, name: 'Bob' });
     const { person: source } = await ctx.newPerson({ ownerId: user.id, name: 'Jane' });
-    const fromCleanup = await seedFace(ctx, user.id, source.id);
-    const fromSuggestion = await seedFace(ctx, user.id, source.id);
+    const fromCleanup = await seedFace(ctx, user.id, source.personGroupId);
+    const fromSuggestion = await seedFace(ctx, user.id, source.personGroupId);
 
-    await verdictRepo.markRejected(ownerA.id, fromCleanup, { source: 'cleanup', actorId: user.id });
-    await verdictRepo.markIgnored(ownerB.id, fromSuggestion, { source: 'suggestion', actorId: user.id });
+    await verdictRepo.markRejected(ownerA.personGroupId, fromCleanup, { source: 'cleanup', actorId: user.id });
+    await verdictRepo.markIgnored(ownerB.personGroupId, fromSuggestion, { source: 'suggestion', actorId: user.id });
 
     const { resolutions } = await sut.listResolutions({ page: 1, size: 50 });
     expect(resolutions).toHaveLength(2);
@@ -102,7 +102,7 @@ describe('FaceRepairService.listResolutions', () => {
       assetFaceId: fromCleanup,
       status: 'rejected',
       source: 'cleanup',
-      personId: ownerA.id,
+      personId: ownerA.personGroupId,
       personName: 'Alice',
       actorId: user.id,
     });
@@ -113,7 +113,7 @@ describe('FaceRepairService.listResolutions', () => {
       assetFaceId: fromSuggestion,
       status: 'ignored',
       source: 'suggestion',
-      personId: ownerB.id,
+      personId: ownerB.personGroupId,
       personName: 'Bob',
     });
   });
@@ -123,8 +123,8 @@ describe('FaceRepairService.listResolutions', () => {
     const { user } = await ctx.newUser();
     const { space } = await ctx.newSharedSpace({ createdById: user.id, name: 'Family Trip' });
     const { person: source } = await ctx.newPerson({ ownerId: user.id, name: 'Jane' });
-    const faceId = await seedFace(ctx, user.id, source.id);
-    const reprFaceId = await seedFace(ctx, user.id, source.id);
+    const faceId = await seedFace(ctx, user.id, source.personGroupId);
+    const reprFaceId = await seedFace(ctx, user.id, source.personGroupId);
 
     const spacePerson = await db
       .insertInto('shared_space_person')
@@ -158,10 +158,10 @@ describe('FaceRepairService.listResolutions', () => {
     const { user } = await ctx.newUser();
     const { person: ownerA } = await ctx.newPerson({ ownerId: user.id, name: 'Alice' });
     const { person: source } = await ctx.newPerson({ ownerId: user.id, name: 'Jane' });
-    const faceId = await seedFace(ctx, user.id, source.id);
+    const faceId = await seedFace(ctx, user.id, source.personGroupId);
 
-    const identity = await ctx.get(FaceIdentityRepository).ensurePersonIdentity(ownerA.id);
-    await verdictRepo.markRejected(ownerA.id, faceId, {
+    const identity = await ctx.get(FaceIdentityRepository).ensurePersonIdentity(ownerA.personGroupId);
+    await verdictRepo.markRejected(ownerA.personGroupId, faceId, {
       identityId: identity.id,
       source: 'cleanup',
       actorId: user.id,
@@ -171,7 +171,7 @@ describe('FaceRepairService.listResolutions', () => {
     // independently degraded away too (identityId SET NULL) — the row is now "fully orphaned" (no target, no
     // identity), unreachable by every scan predicate (§ table comment), but the unscoped admin listing is
     // not target-filtered and must still surface it without breaking.
-    await ctx.get(PersonRepository).delete([ownerA.id]);
+    await ctx.get(PersonRepository).delete([ownerA.personGroupId]);
     await db.deleteFrom('face_identity').where('id', '=', identity.id).execute();
 
     const { resolutions } = await sut.listResolutions({ page: 1, size: 50 });
@@ -190,9 +190,9 @@ describe('FaceRepairService.listResolutions', () => {
     const { sut, ctx } = setup();
     const { user } = await ctx.newUser();
     const { person: source } = await ctx.newPerson({ ownerId: user.id, name: 'Jane' });
-    const faceId = await seedFace(ctx, user.id, source.id);
+    const faceId = await seedFace(ctx, user.id, source.personGroupId);
 
-    const identity = await ctx.get(FaceIdentityRepository).ensurePersonIdentity(source.id);
+    const identity = await ctx.get(FaceIdentityRepository).ensurePersonIdentity(source.personGroupId);
     await ctx
       .get(FaceIdentityRepository)
       .replaceFaceIdentity({ assetFaceId: faceId, identityId: identity.id, source: 'manual' });
@@ -215,8 +215,8 @@ describe('FaceRepairService.listResolutions', () => {
     const { person: ownerA } = await ctx.newPerson({ ownerId: user.id, name: 'Alice' });
     const { person: source } = await ctx.newPerson({ ownerId: user.id, name: 'Jane' });
     for (let index = 0; index < 3; index++) {
-      const faceId = await seedFace(ctx, user.id, source.id);
-      await verdictRepo.markRejected(ownerA.id, faceId, { source: 'cleanup', actorId: user.id });
+      const faceId = await seedFace(ctx, user.id, source.personGroupId);
+      await verdictRepo.markRejected(ownerA.personGroupId, faceId, { source: 'cleanup', actorId: user.id });
     }
 
     const page1 = await sut.listResolutions({ page: 1, size: 2 });
@@ -235,14 +235,14 @@ describe('FaceRepairService.removeResolutions', () => {
     const { user } = await ctx.newUser();
     const { person: ownerA } = await ctx.newPerson({ ownerId: user.id, name: '' });
     const { person: source } = await ctx.newPerson({ ownerId: user.id, name: '' });
-    const f1 = await seedFace(ctx, user.id, source.id);
-    await verdictRepo.markRejected(ownerA.id, f1, { source: 'cleanup', actorId: user.id });
+    const f1 = await seedFace(ctx, user.id, source.personGroupId);
+    await verdictRepo.markRejected(ownerA.personGroupId, f1, { source: 'cleanup', actorId: user.id });
 
     const [row] = await sut.listResolutions({ page: 1, size: 50 }).then((r) => r.resolutions);
     expect(row.id).toMatch(UUID_V7_RE);
 
     const before = await verdictRepo.getNegativeVerdictTokens([f1]);
-    expect(before.get(f1)).toContain(`person:${ownerA.id}`);
+    expect(before.get(f1)).toContain(`person:${ownerA.personGroupId}`);
 
     expect(await sut.removeResolutions({ verdictIds: [row.id] })).toEqual({ removed: 1 });
 
@@ -257,7 +257,7 @@ describe('FaceRepairService.removeResolutions', () => {
     const { person: ownerA } = await ctx.newPerson({ ownerId: user.id, name: '' });
     const { person: source } = await ctx.newPerson({ ownerId: user.id, name: '' });
     await declineRepo.createClusterMutes({
-      persons: [{ personId: source.id, suspectedOwnerIds: [ownerA.id] }],
+      persons: [{ personId: source.personGroupId, suspectedOwnerIds: [ownerA.personGroupId] }],
       declinedBy: user.id,
     });
 
@@ -271,10 +271,10 @@ describe('FaceRepairService.removeResolutions', () => {
     const { user } = await ctx.newUser();
     const { person: ownerA } = await ctx.newPerson({ ownerId: user.id, name: '' });
     const { person: source } = await ctx.newPerson({ ownerId: user.id, name: '' });
-    const f1 = await seedFace(ctx, user.id, source.id);
-    await verdictRepo.markRejected(ownerA.id, f1, { source: 'cleanup', actorId: user.id });
+    const f1 = await seedFace(ctx, user.id, source.personGroupId);
+    await verdictRepo.markRejected(ownerA.personGroupId, f1, { source: 'cleanup', actorId: user.id });
     await declineRepo.createClusterMutes({
-      persons: [{ personId: source.id, suspectedOwnerIds: [ownerA.id] }],
+      persons: [{ personId: source.personGroupId, suspectedOwnerIds: [ownerA.personGroupId] }],
       declinedBy: user.id,
     });
 
@@ -299,10 +299,10 @@ describe('FaceRepairService.unconfirmFaces', () => {
     const { sut, ctx } = setup();
     const { user } = await ctx.newUser();
     const { person: source } = await ctx.newPerson({ ownerId: user.id, name: 'Jane' });
-    const faceId = await seedFace(ctx, user.id, source.id);
+    const faceId = await seedFace(ctx, user.id, source.personGroupId);
     const identityRepo = ctx.get(FaceIdentityRepository);
 
-    const identity = await identityRepo.ensurePersonIdentity(source.id);
+    const identity = await identityRepo.ensurePersonIdentity(source.personGroupId);
     await identityRepo.replaceFaceIdentity({ assetFaceId: faceId, identityId: identity.id, source: 'manual' });
     const linkedBefore = await identityRepo.getManualLinkedFaceIds([faceId]);
     expect(linkedBefore.has(faceId)).toBe(true);
@@ -326,7 +326,7 @@ describe('FaceRepairService.unconfirmFaces', () => {
     const { sut, ctx } = setup();
     const { user } = await ctx.newUser();
     const { person: source } = await ctx.newPerson({ ownerId: user.id, name: 'Jane' });
-    const faceId = await seedFace(ctx, user.id, source.id);
+    const faceId = await seedFace(ctx, user.id, source.personGroupId);
 
     expect(await sut.unconfirmFaces([])).toEqual({ removed: 0 });
     expect(await sut.unconfirmFaces([faceId])).toEqual({ removed: 0 });

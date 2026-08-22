@@ -98,7 +98,7 @@ describe('FaceRepairService.handleFaceRepairScan', () => {
     await db.insertInto('person').values(karinaData).execute();
     for (let i = 0; i < 10; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: karinaData.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: karinaData.personGroupId });
       await db
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('first') })
@@ -111,7 +111,7 @@ describe('FaceRepairService.handleFaceRepairScan', () => {
     await db.insertInto('person').values(alexiaData).execute();
     for (let i = 0; i < 3; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: alexiaData.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: alexiaData.personGroupId });
       await db
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('first') })
@@ -119,7 +119,7 @@ describe('FaceRepairService.handleFaceRepairScan', () => {
     }
     for (let i = 0; i < 8; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: alexiaData.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: alexiaData.personGroupId });
       await db
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('second') })
@@ -137,7 +137,7 @@ describe('FaceRepairService.handleFaceRepairScan', () => {
     expect(latest!.persons.length).toBeGreaterThan(0);
 
     // Alexia is a named person with flagged faces → review-first with 'named' reason
-    const alexiaPerson = latest!.persons.find((p) => p.personId === alexiaData.id);
+    const alexiaPerson = latest!.persons.find((p) => p.personId === alexiaData.personGroupId);
     expect(alexiaPerson).toBeDefined();
     expect(alexiaPerson!.recommendation).toBe('review-first');
     expect(alexiaPerson!.reviewReasons).toContain('named');
@@ -159,7 +159,7 @@ describe('FaceRepairService.handleFaceRepairScan', () => {
     await db.insertInto('person').values(karinaData).execute();
     for (let i = 0; i < 10; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: karinaData.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: karinaData.personGroupId });
       await db
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('first') })
@@ -171,7 +171,7 @@ describe('FaceRepairService.handleFaceRepairScan', () => {
     await db.insertInto('person').values(alexiaData).execute();
     for (let i = 0; i < 3; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: alexiaData.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: alexiaData.personGroupId });
       await db
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('first') })
@@ -179,7 +179,7 @@ describe('FaceRepairService.handleFaceRepairScan', () => {
     }
     for (let i = 0; i < 8; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: alexiaData.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: alexiaData.personGroupId });
       await db
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('second') })
@@ -190,19 +190,19 @@ describe('FaceRepairService.handleFaceRepairScan', () => {
     await sut.handleFaceRepairScan({ scanId: scan.id });
 
     const before = await sut.getLatestScanStatus();
-    const alexiaBefore = before!.persons.find((p) => p.personId === alexiaData.id);
+    const alexiaBefore = before!.persons.find((p) => p.personId === alexiaData.personGroupId);
     expect(alexiaBefore).toBeDefined();
     expect(alexiaBefore!.flagged).toBe(3);
-    const karinaOwnerBefore = alexiaBefore!.suspectedOwners.find((o) => o.ownerPersonId === karinaData.id);
+    const karinaOwnerBefore = alexiaBefore!.suspectedOwners.find((o) => o.ownerPersonId === karinaData.personGroupId);
     expect(karinaOwnerBefore).toBeDefined();
     expect(karinaOwnerBefore!.count).toBe(3);
 
     // Settle ONE of the flagged faces with a human placement — the exact durable record a suggestion-side
     // confirm (or a cleanup "keep here"/lock) writes. This never touches the scan row itself.
-    const flaggedFaces = await scanRepo.getScanFlaggedFaces(scan.id, alexiaData.id);
+    const flaggedFaces = await scanRepo.getScanFlaggedFaces(scan.id, alexiaData.personGroupId);
     expect(flaggedFaces.length).toBe(3);
     const settledFaceId = flaggedFaces[0].assetFaceId;
-    const alexiaIdentity = await faceIdentityRepo.ensurePersonIdentity(alexiaData.id);
+    const alexiaIdentity = await faceIdentityRepo.ensurePersonIdentity(alexiaData.personGroupId);
     await faceIdentityRepo.replaceFaceIdentity({
       assetFaceId: settledFaceId,
       identityId: alexiaIdentity.id,
@@ -210,11 +210,11 @@ describe('FaceRepairService.handleFaceRepairScan', () => {
     });
 
     const after = await sut.getLatestScanStatus();
-    const alexiaAfter = after!.persons.find((p) => p.personId === alexiaData.id);
+    const alexiaAfter = after!.persons.find((p) => p.personId === alexiaData.personGroupId);
     expect(alexiaAfter).toBeDefined();
     expect(alexiaAfter!.flagged).toBe(2);
     expect(alexiaAfter!.flaggedFraction).toBeCloseTo(2 / alexiaAfter!.eligible, 5);
-    const karinaOwnerAfter = alexiaAfter!.suspectedOwners.find((o) => o.ownerPersonId === karinaData.id);
+    const karinaOwnerAfter = alexiaAfter!.suspectedOwners.find((o) => o.ownerPersonId === karinaData.personGroupId);
     expect(karinaOwnerAfter).toBeDefined();
     expect(karinaOwnerAfter!.count).toBe(2);
 
@@ -235,7 +235,7 @@ describe('FaceRepairService.handleFaceRepairScan', () => {
     await db.insertInto('person').values(karina).execute();
     for (let i = 0; i < 10; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: karina.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: karina.personGroupId });
       await db
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('first') })
@@ -247,7 +247,7 @@ describe('FaceRepairService.handleFaceRepairScan', () => {
     await db.insertInto('person').values(cluster).execute();
     for (let i = 0; i < 3; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: cluster.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: cluster.personGroupId });
       await db
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('first') })
@@ -255,7 +255,7 @@ describe('FaceRepairService.handleFaceRepairScan', () => {
     }
     for (let i = 0; i < 8; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: cluster.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: cluster.personGroupId });
       await db
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('second') })
@@ -297,7 +297,7 @@ describe('FaceRepairService.handleFaceRepairScan', () => {
     await db.insertInto('person').values(karinaData).execute();
     for (let i = 0; i < 10; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: karinaData.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: karinaData.personGroupId });
       await db
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('first') })
@@ -308,7 +308,7 @@ describe('FaceRepairService.handleFaceRepairScan', () => {
     await db.insertInto('person').values(alexiaData).execute();
     for (let i = 0; i < 3; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: alexiaData.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: alexiaData.personGroupId });
       await db
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('first') })
@@ -316,7 +316,7 @@ describe('FaceRepairService.handleFaceRepairScan', () => {
     }
     for (let i = 0; i < 8; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: alexiaData.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: alexiaData.personGroupId });
       await db
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('second') })
@@ -327,8 +327,8 @@ describe('FaceRepairService.handleFaceRepairScan', () => {
     await sut.handleFaceRepairScan({ scanId: scan.id });
 
     const latest = await sut.getLatestScanStatus();
-    const alexia = latest!.persons.find((p) => p.personId === alexiaData.id)!;
-    const destination = alexia.suspectedOwners.find((o) => o.ownerPersonId === karinaData.id)!;
+    const alexia = latest!.persons.find((p) => p.personId === alexiaData.personGroupId)!;
+    const destination = alexia.suspectedOwners.find((o) => o.ownerPersonId === karinaData.personGroupId)!;
 
     // Karina has 10 real faces; the routing share is the 3 leaked onto Alexia. Two different numbers, and
     // both must survive the recompute.
@@ -350,7 +350,7 @@ describe('FaceRepairService.handleFaceRepairScan', () => {
     await db.insertInto('person').values(karinaData).execute();
     for (let i = 0; i < 10; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: karinaData.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: karinaData.personGroupId });
       await db
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('first') })
@@ -362,7 +362,7 @@ describe('FaceRepairService.handleFaceRepairScan', () => {
     await db.insertInto('person').values(alexiaData).execute();
     for (let i = 0; i < 8; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: alexiaData.id });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: alexiaData.personGroupId });
       await db
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: axisEmbedding('second') })
@@ -371,7 +371,7 @@ describe('FaceRepairService.handleFaceRepairScan', () => {
     const { asset: timelineAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
     const { assetFace: timelineLeakedFace } = await ctx.newAssetFace({
       assetId: timelineAsset.id,
-      personId: alexiaData.id,
+      personGroupId: alexiaData.personGroupId,
     });
     await db
       .insertInto('face_search')
@@ -381,7 +381,7 @@ describe('FaceRepairService.handleFaceRepairScan', () => {
     const { asset: lockedAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Locked });
     const { assetFace: lockedLeakedFace } = await ctx.newAssetFace({
       assetId: lockedAsset.id,
-      personId: alexiaData.id,
+      personGroupId: alexiaData.personGroupId,
     });
     await db
       .insertInto('face_search')
@@ -391,7 +391,7 @@ describe('FaceRepairService.handleFaceRepairScan', () => {
     const scan = await scanRepo.createScan({ requestedBy: null, params: PARAMS });
     await sut.handleFaceRepairScan({ scanId: scan.id });
 
-    const flaggedFaces = await scanRepo.getScanFlaggedFaces(scan.id, alexiaData.id);
+    const flaggedFaces = await scanRepo.getScanFlaggedFaces(scan.id, alexiaData.personGroupId);
     const flaggedIds = flaggedFaces.map((f) => f.assetFaceId);
 
     expect(flaggedIds).toContain(timelineLeakedFace.id); // positive control

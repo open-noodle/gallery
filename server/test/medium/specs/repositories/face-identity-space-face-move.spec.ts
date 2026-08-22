@@ -68,7 +68,7 @@ describe(`${FaceIdentityRepository.name} space face move (#864)`, () => {
       .executeTakeFirstOrThrow();
     const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Alice' });
     const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
-    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
     await database.insertInto('face_search').values({ faceId: assetFace.id, embedding: newEmbedding() }).execute();
     await database
       .insertInto('face_identity_face')

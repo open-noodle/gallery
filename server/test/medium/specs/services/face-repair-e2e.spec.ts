@@ -113,13 +113,13 @@ const buildLinkedCluster = async (
 ) => {
   const faceIdentityRepo = ctx.get(FaceIdentityRepository);
   const { person } = await ctx.newPerson({ ownerId, name: name ?? '' });
-  const identity = await faceIdentityRepo.ensurePersonIdentity(person.id);
+  const identity = await faceIdentityRepo.ensurePersonIdentity(person.personGroupId);
   const faceIds: string[] = [];
   for (let index = 0; index < faceCount; index++) {
     const { asset } = await ctx.newAsset({ ownerId, visibility: AssetVisibility.Timeline });
     const { assetFace } = await ctx.newAssetFace({
       assetId: asset.id,
-      personId: person.id,
+      personGroupId: person.personGroupId,
       sourceType: SourceType.MachineLearning,
     });
     await ctx.database.insertInto('face_search').values({ faceId: assetFace.id, embedding }).execute();
@@ -159,14 +159,14 @@ describe('face re-attribution repair: end-to-end re-home', () => {
     // Alexia: 5 genuine second-axis faces + 3 leaked first-axis faces (contamination).
     const faceIdentityRepo = ctx.get(FaceIdentityRepository);
     const { person: alexia } = await ctx.newPerson({ ownerId: user.id, name: 'Alexia' });
-    const alexiaIdentity = await faceIdentityRepo.ensurePersonIdentity(alexia.id);
+    const alexiaIdentity = await faceIdentityRepo.ensurePersonIdentity(alexia.personGroupId);
 
     const leakedFaceIds: string[] = [];
     for (let i = 0; i < 3; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
       const { assetFace } = await ctx.newAssetFace({
         assetId: asset.id,
-        personId: alexia.id,
+        personGroupId: alexia.personGroupId,
         sourceType: SourceType.MachineLearning,
       });
       await ctx.database
@@ -184,7 +184,7 @@ describe('face re-attribution repair: end-to-end re-home', () => {
       const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
       const { assetFace } = await ctx.newAssetFace({
         assetId: asset.id,
-        personId: alexia.id,
+        personGroupId: alexia.personGroupId,
         sourceType: SourceType.MachineLearning,
       });
       await ctx.database
@@ -218,7 +218,7 @@ describe('face re-attribution repair: end-to-end re-home', () => {
       .where('id', 'in', leakedFaceIds)
       .execute();
     for (const row of reassignedRows) {
-      expect(row.personId).toBe(karina.id);
+      expect(row.personId).toBe(karina.personGroupId);
     }
 
     // Durability / boomerang regression: a subsequent recognition pass over the moved faces must leave them
@@ -232,14 +232,14 @@ describe('face re-attribution repair: end-to-end re-home', () => {
       .where('id', 'in', leakedFaceIds)
       .execute();
     for (const row of afterRecognition) {
-      expect(row.personId).toBe(karina.id);
+      expect(row.personId).toBe(karina.personGroupId);
     }
 
     // Assert: Karina's name is preserved.
     const karinaRow = await ctx.database
       .selectFrom('person')
       .select(['id', 'name'])
-      .where('id', '=', karina.id)
+      .where('personGroupId', '=', karina.personGroupId)
       .executeTakeFirstOrThrow();
     expect(karinaRow.name).toBe('Karina');
 
@@ -247,7 +247,7 @@ describe('face re-attribution repair: end-to-end re-home', () => {
     const alexiaFaceRows = await ctx.database
       .selectFrom('asset_face')
       .select(['id', 'personId'])
-      .where('personId', '=', alexia.id)
+      .where('personGroupId', '=', alexia.personGroupId)
       .execute();
     expect(alexiaFaceRows).toHaveLength(5);
 
@@ -273,14 +273,14 @@ describe('face re-attribution repair: multi-owner contamination split', () => {
     // Alexia: 5 genuine second-axis faces + 2 leaked first-axis (Karina) + 2 leaked slot-0 (Bob).
     const faceIdentityRepo = ctx.get(FaceIdentityRepository);
     const { person: alexia } = await ctx.newPerson({ ownerId: user.id, name: 'Alexia' });
-    const alexiaIdentity = await faceIdentityRepo.ensurePersonIdentity(alexia.id);
+    const alexiaIdentity = await faceIdentityRepo.ensurePersonIdentity(alexia.personGroupId);
 
     const leakedKarinaFaceIds: string[] = [];
     for (let i = 0; i < 2; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
       const { assetFace } = await ctx.newAssetFace({
         assetId: asset.id,
-        personId: alexia.id,
+        personGroupId: alexia.personGroupId,
         sourceType: SourceType.MachineLearning,
       });
       await ctx.database
@@ -300,7 +300,7 @@ describe('face re-attribution repair: multi-owner contamination split', () => {
       const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
       const { assetFace } = await ctx.newAssetFace({
         assetId: asset.id,
-        personId: alexia.id,
+        personGroupId: alexia.personGroupId,
         sourceType: SourceType.MachineLearning,
       });
       await ctx.database
@@ -319,7 +319,7 @@ describe('face re-attribution repair: multi-owner contamination split', () => {
       const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
       const { assetFace } = await ctx.newAssetFace({
         assetId: asset.id,
-        personId: alexia.id,
+        personGroupId: alexia.personGroupId,
         sourceType: SourceType.MachineLearning,
       });
       await ctx.database
@@ -348,7 +348,7 @@ describe('face re-attribution repair: multi-owner contamination split', () => {
       .where('id', 'in', leakedKarinaFaceIds)
       .execute();
     for (const row of karinaLeakRows) {
-      expect(row.personId).toBe(karina.id);
+      expect(row.personId).toBe(karina.personGroupId);
     }
 
     // Assert: Bob-leaks re-homed to Bob.
@@ -358,7 +358,7 @@ describe('face re-attribution repair: multi-owner contamination split', () => {
       .where('id', 'in', leakedBobFaceIds)
       .execute();
     for (const row of bobLeakRows) {
-      expect(row.personId).toBe(bob.id);
+      expect(row.personId).toBe(bob.personGroupId);
     }
 
     // Assert: no backfill work after the split — no infinite loop.
@@ -380,14 +380,14 @@ describe('face re-attribution repair: minFaces:3 + sub-minFaces stays unassigned
     // Alexia: 3 genuine second-axis faces + 3 leaked first-axis faces (≥ minFaces=3 → should re-home).
     const faceIdentityRepo = ctx.get(FaceIdentityRepository);
     const { person: alexia } = await ctx.newPerson({ ownerId: user.id, name: 'Alexia' });
-    const alexiaIdentity = await faceIdentityRepo.ensurePersonIdentity(alexia.id);
+    const alexiaIdentity = await faceIdentityRepo.ensurePersonIdentity(alexia.personGroupId);
 
     const leakedFaceIds: string[] = [];
     for (let i = 0; i < 3; i++) {
       const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
       const { assetFace } = await ctx.newAssetFace({
         assetId: asset.id,
-        personId: alexia.id,
+        personGroupId: alexia.personGroupId,
         sourceType: SourceType.MachineLearning,
       });
       await ctx.database
@@ -405,7 +405,7 @@ describe('face re-attribution repair: minFaces:3 + sub-minFaces stays unassigned
       const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
       const { assetFace } = await ctx.newAssetFace({
         assetId: asset.id,
-        personId: alexia.id,
+        personGroupId: alexia.personGroupId,
         sourceType: SourceType.MachineLearning,
       });
       await ctx.database
@@ -422,11 +422,11 @@ describe('face re-attribution repair: minFaces:3 + sub-minFaces stays unassigned
     // Bob: one lone face on mixedAxisEmbedding(1) — completely isolated, <3 same-axis neighbors.
     // After repair + recognition this face should remain personId=NULL (sub-minFaces → blank).
     const { person: bob } = await ctx.newPerson({ ownerId: user.id, name: 'Bob' });
-    const bobIdentity = await faceIdentityRepo.ensurePersonIdentity(bob.id);
+    const bobIdentity = await faceIdentityRepo.ensurePersonIdentity(bob.personGroupId);
     const { asset: loneAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
     const { assetFace: loneFace } = await ctx.newAssetFace({
       assetId: loneAsset.id,
-      personId: bob.id,
+      personGroupId: bob.personGroupId,
       sourceType: SourceType.MachineLearning,
     });
     await ctx.database
@@ -468,7 +468,7 @@ describe('face re-attribution repair: minFaces:3 + sub-minFaces stays unassigned
       .where('id', 'in', leakedFaceIds)
       .execute();
     for (const row of reassignedRows) {
-      expect(row.personId).toBe(karina.id);
+      expect(row.personId).toBe(karina.personGroupId);
     }
 
     // Assert: lone Bob face was NOT in toRepair (no confident Q with ≥3 neighbors) and stays unmodified.
@@ -478,7 +478,7 @@ describe('face re-attribution repair: minFaces:3 + sub-minFaces stays unassigned
       .where('id', '=', loneFace.id)
       .executeTakeFirstOrThrow();
     // The lone face was never flagged → its personId is unchanged (still bob.id)
-    expect(loneRow.personId).toBe(bob.id);
+    expect(loneRow.personId).toBe(bob.personGroupId);
 
     // Assert: no backfill work after repair + recognition.
     const afterWork = await faceIdentityRepository.getBackfillWork();

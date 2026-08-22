@@ -72,7 +72,7 @@ const createSuggestionFixture = async (
   });
   const { asset } = await ctx.newAsset({ ownerId: assetOwner.id, visibility: AssetVisibility.Timeline });
   await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
-  const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+  const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
   const spacePerson = await ctx.database
     .insertInto('shared_space_person')
     .values({ spaceId: space.id, name: 'Alice', type: 'person', isHidden: false, identityId: null })
@@ -185,7 +185,7 @@ describe('SharedSpaceService space face suggestions', () => {
     const { person } = await ctx.newPerson({ ownerId: fx.assetOwner.id, name: 'Personal Alice' });
     await ctx.database
       .insertInto('face_person_verdict')
-      .values({ personId: person.id, assetFaceId: fx.assetFace.id, distance: 0.61 })
+      .values({ personId: person.personGroupId, assetFaceId: fx.assetFace.id, distance: 0.61 })
       .execute();
     const otherSpacePerson = await ctx.database
       .insertInto('shared_space_person')
@@ -228,7 +228,7 @@ describe('SharedSpaceService space face suggestions', () => {
     const faceIdentityRepository = ctx.get(FaceIdentityRepository);
     const fx = await createSuggestionFixture(ctx);
     const { person: oldPerson } = await ctx.newPerson({ ownerId: fx.assetOwner.id, name: 'Old' });
-    const oldIdentity = await faceIdentityRepository.ensurePersonIdentity(oldPerson.id);
+    const oldIdentity = await faceIdentityRepository.ensurePersonIdentity(oldPerson.personGroupId);
     await faceIdentityRepository.replaceFaceIdentity({
       assetFaceId: fx.assetFace.id,
       identityId: oldIdentity.id,
@@ -261,7 +261,7 @@ describe('SharedSpaceService space face suggestions', () => {
 
     // Positive control, same fixture: a DIFFERENT, not-yet-linked face on the same space person confirms
     // normally — the no-op above is specific to the pre-existing manual link, not a broken confirm path.
-    const { assetFace: freshFace } = await ctx.newAssetFace({ assetId: fx.asset.id, personId: null });
+    const { assetFace: freshFace } = await ctx.newAssetFace({ assetId: fx.asset.id, personGroupId: null });
     await ctx.database
       .insertInto('face_person_verdict')
       .values({ spacePersonId: fx.spacePerson.id, assetFaceId: freshFace.id, distance: 0.6 })
