@@ -2,13 +2,13 @@
 
 -- FaceIdentityRepository.resolveScopedPersonTokens
 select
-  "id",
+  "personGroupId",
   "identityId"
 from
   "person"
 where
   "ownerId" = $1
-  and "id" in ($2)
+  and "personGroupId" in ($2)
 select
   "shared_space_person"."id",
   "shared_space_person"."identityId",
@@ -140,7 +140,7 @@ WITH
       person."isHidden",
       person."isFavorite",
       person."updatedAt",
-      person.id AS "profileId",
+      person."personGroupId" AS "profileId",
       0 AS "profileRank"
     FROM
       person
@@ -339,7 +339,7 @@ WITH
       person."isHidden",
       person."isFavorite",
       person."updatedAt",
-      person.id AS "profileId",
+      person."personGroupId" AS "profileId",
       0 AS "profileRank"
     FROM
       person
@@ -1000,7 +1000,7 @@ WITH
       person."isHidden",
       person."isFavorite",
       person."updatedAt",
-      person.id AS "profileId",
+      person."personGroupId" AS "profileId",
       0 AS "profileRank"
     FROM
       person
@@ -1239,7 +1239,7 @@ WITH
       person."isHidden",
       person."isFavorite",
       person."updatedAt",
-      person.id AS "profileId",
+      person."personGroupId" AS "profileId",
       0 AS "profileRank"
     FROM
       person
@@ -1526,7 +1526,7 @@ WITH
   profiles AS (
     SELECT
       'user-person'::text AS "profileType",
-      person.id AS "profileId",
+      person."personGroupId" AS "profileId",
       NULL::uuid AS "spaceId",
       person."identityId",
       person.name,
@@ -1693,14 +1693,14 @@ ORDER BY
 -- FaceIdentityRepository.ensurePersonIdentity
 begin
 select
-  "id",
+  "personGroupId",
   "identityId",
   "type",
   "faceAssetId"
 from
   "person"
 where
-  "id" = $1
+  "personGroupId" = $1
 rollback
 
 -- FaceIdentityRepository.ensureSpacePersonIdentity
@@ -1748,12 +1748,12 @@ where
 
 -- FaceIdentityRepository.getPersonVerdictTokens
 select
-  "id",
+  "personGroupId",
   "identityId"
 from
   "person"
 where
-  "id" in ($1)
+  "personGroupId" in ($1)
 
 -- FaceIdentityRepository.demoteManualFaceLinks
 update "face_identity_face"
@@ -1804,7 +1804,7 @@ from
   inner join "asset" on "asset"."id" = "asset_face"."assetId"
   left join "face_identity_face" on "face_identity_face"."assetFaceId" = "asset_face"."id"
 where
-  "asset_face"."personId" = $4
+  "asset_face"."personGroupId" = $4
   and "asset_face"."deletedAt" is null
   and "asset_face"."isVisible" = $5
   and "asset"."deletedAt" is null
