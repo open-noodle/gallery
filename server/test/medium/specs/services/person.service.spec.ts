@@ -125,7 +125,7 @@ const seedPersonWithRepresentativeFace = async (
   const { asset } = await ctx.newAsset({ ownerId, visibility });
   const { person } = await ctx.newPerson({ ownerId, name: 'Vaulted Vera', thumbnailPath });
   const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
-  await ctx.get(PersonRepository).update({ personGroupId: person.personGroupId, faceAssetId: faceId });
+  await ctx.get(PersonRepository).update({ ownerId, personGroupId: person.personGroupId, faceAssetId: faceId });
   return { asset, person };
 };
 
@@ -2084,7 +2084,7 @@ describe(PersonService.name, () => {
         .select('personGroupId')
         .where('id', '=', face.id)
         .executeTakeFirstOrThrow();
-      expect(reloadedFace.personId).toBeNull();
+      expect(reloadedFace.personGroupId).toBeNull();
 
       // No manual identity link was left dangling on the face.
       const identityLink = await ctx.database
@@ -2141,7 +2141,7 @@ describe(PersonService.name, () => {
         .select('personGroupId')
         .where('id', '=', queryFace.id)
         .executeTakeFirstOrThrow();
-      expect(row.personId).toBe(person.personGroupId);
+      expect(row.personGroupId).toBe(person.personGroupId);
     });
   });
 });
