@@ -84,8 +84,8 @@ const setupCrossOwnerMerge = async (options: { withCollapse: boolean }): Promise
   // createFace mints a face_identity for each person and points person.identityId at it:
   //   targetPerson -> identity T, otherOwnerPerson -> identity S.
   const [, otherFace] = await Promise.all([
-    utils.createFace({ assetId: actorAsset.id, personId: targetPerson.id }),
-    utils.createFace({ assetId: otherAsset.id, personId: otherOwnerPerson.id }),
+    utils.createFace({ assetId: actorAsset.id, personGroupId: targetPerson.id }),
+    utils.createFace({ assetId: otherAsset.id, personGroupId: otherOwnerPerson.id }),
   ]);
 
   const targetIdentityRow = await db.query(`SELECT "identityId" FROM "person" WHERE id = $1`, [targetPerson.id]);
@@ -114,7 +114,7 @@ const setupCrossOwnerMerge = async (options: { withCollapse: boolean }): Promise
     // Merging S into T therefore has to merge userB's two people into one: the destructive case.
     const secondPerson = await utils.createPerson(otherOwner.accessToken, { name: 'Ada Other Owner (dupe)' });
     const secondAsset = await utils.createAsset(otherOwner.accessToken);
-    await utils.createFace({ assetId: secondAsset.id, personId: secondPerson.id });
+    await utils.createFace({ assetId: secondAsset.id, personGroupId: secondPerson.id });
     await db.query(`UPDATE "person" SET "identityId" = $1 WHERE id = $2`, [identityT, secondPerson.id]);
     otherOwnerSecondPersonId = secondPerson.id;
   }

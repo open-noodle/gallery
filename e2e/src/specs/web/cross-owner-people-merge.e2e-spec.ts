@@ -64,8 +64,8 @@ test.describe('Cross-owner people merge', () => {
     const otherAsset = await utils.createAsset(otherOwner.accessToken);
 
     // Mint identities: targetPerson -> T, otherOwnerPerson -> S.
-    await utils.createFace({ assetId: actorAsset.id, personId: targetPerson.id });
-    const otherFace = await utils.createFace({ assetId: otherAsset.id, personId: otherOwnerPerson.id });
+    await utils.createFace({ assetId: actorAsset.id, personGroupId: targetPerson.id });
+    const otherFace = await utils.createFace({ assetId: otherAsset.id, personGroupId: otherOwnerPerson.id });
     const otherOwnerRow = await db.query(`SELECT "identityId" FROM "person" WHERE id = $1`, [otherOwnerPerson.id]);
     const identityS = otherOwnerRow.rows[0].identityId as string;
     const targetRow = await db.query(`SELECT "identityId" FROM "person" WHERE id = $1`, [targetPerson.id]);
@@ -76,7 +76,7 @@ test.describe('Cross-owner people merge', () => {
     // their single person is now allowed with no toggle at all, so a one-person fixture would just commit.)
     const otherOwnerDupe = await utils.createPerson(otherOwner.accessToken, { name: 'Ada Other Owner (dupe)' });
     const otherDupeAsset = await utils.createAsset(otherOwner.accessToken);
-    await utils.createFace({ assetId: otherDupeAsset.id, personId: otherOwnerDupe.id });
+    await utils.createFace({ assetId: otherDupeAsset.id, personGroupId: otherOwnerDupe.id });
     await db.query(`UPDATE "person" SET "identityId" = $1 WHERE id = $2`, [identityT, otherOwnerDupe.id]);
 
     // A space-person in the actor's space carries identity S — repairable by the actor, but S also

@@ -35,9 +35,9 @@ describe('PUT /people/:id/representative-face — write scope (Slice 3 / M2)', (
     const person = await utils.createPerson(ctx.spaceOwner.token!, { name: 'M2 RepFace Person' });
     // The first face becomes the representative face automatically (person.faceAssetId is null at
     // creation, and createFace COALESCEs it in).
-    const originalFaceId = await utils.createFace({ assetId: ctx.spaceAssetId, personId: person.id });
+    const originalFaceId = await utils.createFace({ assetId: ctx.spaceAssetId, personGroupId: person.id });
     // The second face is the target the disputed actor tries to switch the cover to.
-    const targetFaceId = await utils.createFace({ assetId: ctx.spaceAssetId, personId: person.id });
+    const targetFaceId = await utils.createFace({ assetId: ctx.spaceAssetId, personGroupId: person.id });
     return { personId: person.id, originalFaceId, targetFaceId };
   };
 

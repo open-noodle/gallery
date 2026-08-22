@@ -481,7 +481,7 @@ describe('/timeline', () => {
       // restrict the result set to assets in the space.
       const decoy = await utils.createPerson(ctx.spaceOwner.token!, { name: 'Decoy Bob' });
       decoyGlobalPersonId = decoy.id;
-      await utils.createFace({ assetId: ctx.ownerAssetId, personId: decoyGlobalPersonId });
+      await utils.createFace({ assetId: ctx.ownerAssetId, personGroupId: decoyGlobalPersonId });
 
       // 3. Create a tag owned by spaceOwner and apply it to spaceAssetId only. The tag is
       // owned globally — there's no "space tag" concept — so the timeline join goes

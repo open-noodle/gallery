@@ -156,8 +156,8 @@ test.describe.serial('Face review cross-engine', () => {
     await db.query(`UPDATE asset SET visibility = 'locked' WHERE id = $1`, [lockedAsset.id]);
 
     // ---- cleanup console half ----
-    const controlFlagged = await utils.createFace({ assetId: openAsset.id, personId: cluster.id });
-    const lockedFlagged = await utils.createFace({ assetId: lockedAsset.id, personId: cluster.id });
+    const controlFlagged = await utils.createFace({ assetId: openAsset.id, personGroupId: cluster.id });
+    const lockedFlagged = await utils.createFace({ assetId: lockedAsset.id, personGroupId: cluster.id });
 
     const { rows: scanRows } = await db.query<{ id: string }>(
       `INSERT INTO "face_repair_scan" ("status", "requestedBy", "totals", "persons", "startedAt", "finishedAt")
