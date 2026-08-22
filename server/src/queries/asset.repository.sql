@@ -312,7 +312,13 @@ select
               "person"
             where
               "person"."personGroupId" = "asset_face"."personGroupId"
-              and "person"."ownerId" = "asset"."ownerId"
+            order by
+              case
+                when "person"."ownerId" = "asset"."ownerId" then 0
+                else 1
+              end
+            limit
+              $1
           ) as "person" on true
         where
           "asset_face"."assetId" = "asset"."id"
@@ -344,7 +350,7 @@ from
   "asset"
   left join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
 where
-  "asset"."id" = any ($1::uuid[])
+  "asset"."id" = any ($2::uuid[])
 
 -- AssetRepository.deleteAll
 delete from "asset"
@@ -712,10 +718,6 @@ with
         group by
           "stacked"."stackId"
       ) as "stacked_assets" on true
-    where
-      "asset"."deletedAt" is null
-      and "asset"."visibility" in ('archive', 'timeline')
-      and date_trunc('MONTH', "localDateTime" AT TIME ZONE 'UTC') AT TIME ZONE 'UTC' = $4
     order by
       (asset."localDateTime" AT TIME ZONE 'UTC')::date desc,
       "asset"."fileCreatedAt" desc,
@@ -801,10 +803,6 @@ with
       "filtered"
       inner join "asset" on "asset"."id" = "filtered"."id"
       inner join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
-    where
-      "asset"."deletedAt" is null
-      and "asset"."visibility" in ('archive', 'timeline')
-      and date_trunc('YEAR', "localDateTime" AT TIME ZONE 'UTC') AT TIME ZONE 'UTC' = $3
     order by
       (asset."localDateTime" AT TIME ZONE 'UTC')::date desc,
       "asset"."fileCreatedAt" desc
@@ -888,10 +886,6 @@ with
       "filtered"
       inner join "asset" on "asset"."id" = "filtered"."id"
       inner join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
-    where
-      "asset"."deletedAt" is null
-      and "asset"."visibility" in ('archive', 'timeline')
-      and date_trunc('DAY', "localDateTime" AT TIME ZONE 'UTC') AT TIME ZONE 'UTC' = $3
     order by
       (asset."localDateTime" AT TIME ZONE 'UTC')::date desc,
       "asset"."fileCreatedAt" desc
