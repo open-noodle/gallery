@@ -39,7 +39,7 @@ async function insertSuggestion(
   assetFaceId: string,
   distance: number,
 ) {
-  await db.query(`INSERT INTO face_person_verdict ("personId", "assetFaceId", distance) VALUES ($1, $2, $3)`, [
+  await db.query(`INSERT INTO face_person_verdict ("personGroupId", "assetFaceId", distance) VALUES ($1, $2, $3)`, [
     personId,
     assetFaceId,
     distance,
@@ -285,9 +285,10 @@ describe('/people/:id/face-suggestions', () => {
 
       // Positive control: before confirming, the face is genuinely unassigned and carries no manual
       // identity link — otherwise the post-condition assertions below would prove nothing.
-      const before = await db.query<{ personId: string | null }>(`SELECT "personId" FROM asset_face WHERE id = $1`, [
-        faceForConfirm,
-      ]);
+      const before = await db.query<{ personId: string | null }>(
+        `SELECT "personGroupId" AS "personId" FROM asset_face WHERE id = $1`,
+        [faceForConfirm],
+      );
       expect(before.rows[0].personId).toBeNull();
       const linkBefore = await db.query(`SELECT source FROM face_identity_face WHERE "assetFaceId" = $1`, [
         faceForConfirm,
@@ -300,9 +301,10 @@ describe('/people/:id/face-suggestions', () => {
       expect(status).toBe(200);
 
       // Post-conditions: the face actually moved and got a durable manual identity link, not just a 200.
-      const after = await db.query<{ personId: string | null }>(`SELECT "personId" FROM asset_face WHERE id = $1`, [
-        faceForConfirm,
-      ]);
+      const after = await db.query<{ personId: string | null }>(
+        `SELECT "personGroupId" AS "personId" FROM asset_face WHERE id = $1`,
+        [faceForConfirm],
+      );
       expect(after.rows[0].personId).toBe(namedPerson.id);
       const linkAfter = await db.query<{ source: string }>(
         `SELECT source FROM face_identity_face WHERE "assetFaceId" = $1`,
