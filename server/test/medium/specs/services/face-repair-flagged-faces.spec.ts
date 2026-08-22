@@ -164,7 +164,7 @@ describe('FaceRepairService.getPersonFlaggedFaces (scan-backed)', () => {
       { assetFaceId: f2, personId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
     ]);
 
-    await db.updateTable('asset_face').set({ personId: other.personGroupId }).where('id', '=', f1).execute();
+    await db.updateTable('asset_face').set({ personGroupId: other.personGroupId }).where('id', '=', f1).execute();
 
     const result = await sut.getPersonFlaggedFaces(person.personGroupId);
     expect(result.flaggedFaces.map((f) => f.assetFaceId)).toEqual([f2]);
