@@ -248,7 +248,7 @@ describe('FaceRepairService.resolveFaces: move-to-owner (M1, M3, E14)', () => {
       user.id,
     );
 
-    const sourceRow = await db.selectFrom('person').select('id').where('personGroupId', '=', source.personGroupId).executeTakeFirst();
+    const sourceRow = await db.selectFrom('person').select('personGroupId').where('personGroupId', '=', source.personGroupId).executeTakeFirst();
     expect(sourceRow).toBeUndefined();
   });
 
@@ -443,7 +443,7 @@ describe('FaceRepairService.resolveFaces: partial move leaves the surviving sour
     }
 
     // Source survives (faces remain) → not deleted.
-    const sourceRow = await db.selectFrom('person').select('id').where('personGroupId', '=', source.personGroupId).executeTakeFirst();
+    const sourceRow = await db.selectFrom('person').select('personGroupId').where('personGroupId', '=', source.personGroupId).executeTakeFirst();
     expect(sourceRow?.id).toBe(source.personGroupId);
 
     // Picked faces are relinked to the destination. B2: this request sent lock:false, so the link is an
@@ -631,7 +631,7 @@ describe('FaceRepairService.resolveFaces: entireCluster (M13, E12)', () => {
     expect(snapshotPersonIds).not.toContain(source.personGroupId);
 
     // ...and the now-fully-drained UNNAMED source is auto-deleted (same cleanup the retired applyRepair's manual move used).
-    const sourceRow = await db.selectFrom('person').select('id').where('personGroupId', '=', source.personGroupId).executeTakeFirst();
+    const sourceRow = await db.selectFrom('person').select('personGroupId').where('personGroupId', '=', source.personGroupId).executeTakeFirst();
     expect(sourceRow).toBeUndefined();
   });
 
@@ -902,7 +902,7 @@ describe('FaceRepairService.resolveFaces: zero-override all-to-owner (M15, E10)'
     expect(byId[f3]).toBe(owner.personGroupId);
 
     // Unnamed source has zero remaining faces of any kind → auto-deleted (E6), and drained from the scan.
-    const sourceRow = await db.selectFrom('person').select('id').where('personGroupId', '=', source.personGroupId).executeTakeFirst();
+    const sourceRow = await db.selectFrom('person').select('personGroupId').where('personGroupId', '=', source.personGroupId).executeTakeFirst();
     expect(sourceRow).toBeUndefined();
 
     const latest = await scanRepo.getLatestScan();
@@ -1049,7 +1049,7 @@ describe('FaceRepairService.resolveFaces: empty resolve is rejected (M19, E16)',
     const snapshotPersonIds = ((latest!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personId);
     expect(snapshotPersonIds).toContain(source.personGroupId);
 
-    const sourceRow = await db.selectFrom('person').select('id').where('personGroupId', '=', source.personGroupId).executeTakeFirst();
+    const sourceRow = await db.selectFrom('person').select('personGroupId').where('personGroupId', '=', source.personGroupId).executeTakeFirst();
     expect(sourceRow).toBeDefined();
   });
 });
@@ -1193,7 +1193,7 @@ describe('FaceRepairService.resolveFaces: stay-only drains the person (M11, E13)
 
     // The (unnamed) source is not auto-deleted — the face is still there, just no longer flagged (E13 is
     // about draining from the CONSOLE, not deleting the person).
-    const sourceRow = await db.selectFrom('person').select('id').where('personGroupId', '=', source.personGroupId).executeTakeFirst();
+    const sourceRow = await db.selectFrom('person').select('personGroupId').where('personGroupId', '=', source.personGroupId).executeTakeFirst();
     expect(sourceRow).toBeDefined();
   });
 });
@@ -1326,7 +1326,7 @@ const buildRealVerdictMaps = async (ctx: Ctx) => {
   const verdictRepo = ctx.get(FacePersonVerdictRepository);
   const declineRepo = ctx.get(FaceRepairDeclineRepository);
   const faceRows = await db.selectFrom('asset_face').select('id').execute();
-  const personRows = await db.selectFrom('person').select('id').execute();
+  const personRows = await db.selectFrom('person').select('personGroupId').execute();
   const faceIds = faceRows.map((r) => r.id);
   const personIds = personRows.map((r) => r.id);
   return {
@@ -2451,7 +2451,7 @@ describe('FaceRepairService.resolveFaces: unknown empties the source person (E15
     );
     expect(result.unknown).toBe(2);
 
-    const sourceRow = await db.selectFrom('person').select('id').where('personGroupId', '=', source.personGroupId).executeTakeFirst();
+    const sourceRow = await db.selectFrom('person').select('personGroupId').where('personGroupId', '=', source.personGroupId).executeTakeFirst();
     expect(sourceRow).toBeUndefined();
   });
 
