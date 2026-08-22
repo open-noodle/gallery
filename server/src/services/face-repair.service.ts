@@ -1169,7 +1169,7 @@ export class FaceRepairService extends BaseService {
           code: FaceRepairResolveErrorCode.PersonNotFound,
         });
       }
-      const cluster = await this.personRepository.create({ ownerId: reviewedPerson.ownerId });
+      const cluster = await this.personRepository.createWithGroup({ ownerId: reviewedPerson.ownerId });
       try {
         const parked = await this.executeRepair({
           toRepair: unknown.map((assetFaceId) => ({
@@ -1277,7 +1277,7 @@ export class FaceRepairService extends BaseService {
   // (Slice 4, M18). The returned id is immediately usable as a `moveToPerson[].destinationPersonId` for a
   // face owned by the same user — it passes the cross-owner guard above by construction.
   async createOwnerPerson(ownerId: string, name: string): Promise<{ id: string }> {
-    const person = await this.personRepository.create({ ownerId, name });
+    const person = await this.personRepository.createWithGroup({ ownerId, name });
     return { id: person.personGroupId };
   }
 
