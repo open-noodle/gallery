@@ -65,7 +65,7 @@ const seedFace = async (ctx: Awaited<ReturnType<typeof setup>>['ctx'], ownerId: 
   const { asset } = await ctx.newAsset({ ownerId });
   const { assetFace } = await ctx.newAssetFace({
     assetId: asset.id,
-    personId: null,
+    personGroupId: null,
     sourceType: SourceType.MachineLearning,
   });
   return assetFace.id;
@@ -105,7 +105,7 @@ const seedSpaceMergeFixture = async (ctx: Awaited<ReturnType<typeof setup>>['ctx
   await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
   const { assetFace } = await ctx.newAssetFace({
     assetId: asset.id,
-    personId: null,
+    personGroupId: null,
     sourceType: SourceType.MachineLearning,
   });
   const bob = await newSpacePerson(space.id, 'Bob');
@@ -120,20 +120,20 @@ describe('face verdict merge durability (D1)', () => {
     const { person: bob } = await ctx.newPerson({ ownerId: user.id, name: 'Bob' });
     const { person: robert } = await ctx.newPerson({ ownerId: user.id, name: 'Robert' });
     const faceId = await seedFace(ctx, user.id);
-    const bobIdentity = await faceIdentityRepository.ensurePersonIdentity(bob.id);
-    const robertIdentity = await faceIdentityRepository.ensurePersonIdentity(robert.id);
+    const bobIdentity = await faceIdentityRepository.ensurePersonIdentity(bob.personGroupId);
+    const robertIdentity = await faceIdentityRepository.ensurePersonIdentity(robert.personGroupId);
     // cleanup keep-here: (F, Bob, I(Bob), rejected, cleanup)
-    await facePersonVerdictRepository.markRejected(bob.id, faceId, {
+    await facePersonVerdictRepository.markRejected(bob.personGroupId, faceId, {
       identityId: bobIdentity.id,
       source: 'cleanup',
       actorId: user.id,
     });
 
-    await sut.mergePersonalPeople(factory.auth({ user }), robert.id, [bob.id]);
+    await sut.mergePersonalPeople(factory.auth({ user }), robert.personGroupId, [bob.personGroupId]);
 
     const rows = await verdictRow(faceId);
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ status: 'rejected', personId: robert.id, identityId: robertIdentity.id });
+    expect(rows[0]).toMatchObject({ status: 'rejected', personId: robert.personGroupId, identityId: robertIdentity.id });
     // honoured identity-first by the shared read
     const tokens = await facePersonVerdictRepository.getNegativeVerdictTokens([faceId]);
     expect([...(tokens.get(faceId) ?? [])]).toContain(`identity:${robertIdentity.id}`);
@@ -145,15 +145,15 @@ describe('face verdict merge durability (D1)', () => {
     const { person: bob } = await ctx.newPerson({ ownerId: user.id, name: 'Bob' });
     const { person: robert } = await ctx.newPerson({ ownerId: user.id, name: 'Robert' });
     const faceId = await seedFace(ctx, user.id);
-    await faceIdentityRepository.ensurePersonIdentity(robert.id);
+    await faceIdentityRepository.ensurePersonIdentity(robert.personGroupId);
     // suggestion reject as it is written TODAY (pre-Slice-2): no identity, personId only.
-    await facePersonVerdictRepository.markRejected(bob.id, faceId);
+    await facePersonVerdictRepository.markRejected(bob.personGroupId, faceId);
 
-    await sut.mergePersonalPeople(factory.auth({ user }), robert.id, [bob.id]);
+    await sut.mergePersonalPeople(factory.auth({ user }), robert.personGroupId, [bob.personGroupId]);
 
     const rows = await verdictRow(faceId);
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ status: 'rejected', personId: robert.id });
+    expect(rows[0]).toMatchObject({ status: 'rejected', personId: robert.personGroupId });
   });
 
   it('identity-only merge re-keys the verdict instead of destroying it', async () => {
@@ -161,13 +161,13 @@ describe('face verdict merge durability (D1)', () => {
     const { user } = await ctx.newUser();
     const { person: bob } = await ctx.newPerson({ ownerId: user.id, name: 'Bob' });
     const faceId = await seedFace(ctx, user.id);
-    const bobIdentity = await faceIdentityRepository.ensurePersonIdentity(bob.id);
+    const bobIdentity = await faceIdentityRepository.ensurePersonIdentity(bob.personGroupId);
     const target = await defaultDatabase
       .insertInto('face_identity')
       .values({ type: 'person' })
       .returningAll()
       .executeTakeFirstOrThrow();
-    await facePersonVerdictRepository.markRejected(bob.id, faceId, {
+    await facePersonVerdictRepository.markRejected(bob.personGroupId, faceId, {
       identityId: bobIdentity.id,
       source: 'cleanup',
       actorId: user.id,
@@ -195,26 +195,26 @@ describe('face verdict merge durability (D1)', () => {
     const { person: bob } = await ctx.newPerson({ ownerId: user.id, name: 'Bob' });
     const { person: robert } = await ctx.newPerson({ ownerId: user.id, name: 'Robert' });
     const faceId = await seedFace(ctx, user.id);
-    const bobIdentity = await faceIdentityRepository.ensurePersonIdentity(bob.id);
-    const robertIdentity = await faceIdentityRepository.ensurePersonIdentity(robert.id);
+    const bobIdentity = await faceIdentityRepository.ensurePersonIdentity(bob.personGroupId);
+    const robertIdentity = await faceIdentityRepository.ensurePersonIdentity(robert.personGroupId);
     // Bob IGNORED F, Robert (survivor) REJECTED F. Distinct statuses prove which row survives.
-    await facePersonVerdictRepository.markIgnored(bob.id, faceId, {
+    await facePersonVerdictRepository.markIgnored(bob.personGroupId, faceId, {
       identityId: bobIdentity.id,
       source: 'suggestion',
       actorId: user.id,
     });
-    await facePersonVerdictRepository.markRejected(robert.id, faceId, {
+    await facePersonVerdictRepository.markRejected(robert.personGroupId, faceId, {
       identityId: robertIdentity.id,
       source: 'cleanup',
       actorId: user.id,
     });
 
-    await sut.mergePersonalPeople(factory.auth({ user }), robert.id, [bob.id]);
+    await sut.mergePersonalPeople(factory.auth({ user }), robert.personGroupId, [bob.personGroupId]);
 
     const rows = await verdictRow(faceId);
     expect(rows).toHaveLength(1); // no unique-violation, source row dropped
     // Survivor's row kept untouched: it is Robert's REJECTED row, not Bob's ignored one.
-    expect(rows[0]).toMatchObject({ personId: robert.id, identityId: robertIdentity.id, status: 'rejected' });
+    expect(rows[0]).toMatchObject({ personId: robert.personGroupId, identityId: robertIdentity.id, status: 'rejected' });
   });
 
   it('survivor wins on collision when the survivor holds the negative', async () => {
@@ -223,24 +223,24 @@ describe('face verdict merge durability (D1)', () => {
     const { person: bob } = await ctx.newPerson({ ownerId: user.id, name: 'Bob' });
     const { person: robert } = await ctx.newPerson({ ownerId: user.id, name: 'Robert' });
     const faceId = await seedFace(ctx, user.id);
-    const bobIdentity = await faceIdentityRepository.ensurePersonIdentity(bob.id);
-    const robertIdentity = await faceIdentityRepository.ensurePersonIdentity(robert.id);
+    const bobIdentity = await faceIdentityRepository.ensurePersonIdentity(bob.personGroupId);
+    const robertIdentity = await faceIdentityRepository.ensurePersonIdentity(robert.personGroupId);
     // Source (Bob) pending suggestion, survivor (Robert) already rejected — survivor's row wins regardless of status.
     await defaultDatabase
       .insertInto('face_person_verdict')
-      .values({ personId: bob.id, assetFaceId: faceId, identityId: bobIdentity.id, status: 'pending', distance: 0.4 })
+      .values({ personId: bob.personGroupId, assetFaceId: faceId, identityId: bobIdentity.id, status: 'pending', distance: 0.4 })
       .execute();
-    await facePersonVerdictRepository.markRejected(robert.id, faceId, {
+    await facePersonVerdictRepository.markRejected(robert.personGroupId, faceId, {
       identityId: robertIdentity.id,
       source: 'cleanup',
       actorId: user.id,
     });
 
-    await sut.mergePersonalPeople(factory.auth({ user }), robert.id, [bob.id]);
+    await sut.mergePersonalPeople(factory.auth({ user }), robert.personGroupId, [bob.personGroupId]);
 
     const rows = await verdictRow(faceId);
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ personId: robert.id, identityId: robertIdentity.id, status: 'rejected' });
+    expect(rows[0]).toMatchObject({ personId: robert.personGroupId, identityId: robertIdentity.id, status: 'rejected' });
   });
 
   // The dangerous inverse of the case above, and a live defect (Slice 6's red test — do not fix here): source
@@ -255,10 +255,10 @@ describe('face verdict merge durability (D1)', () => {
     const { person: bob } = await ctx.newPerson({ ownerId: user.id, name: 'Bob' });
     const { person: robert } = await ctx.newPerson({ ownerId: user.id, name: 'Robert' });
     const faceId = await seedFace(ctx, user.id);
-    const bobIdentity = await faceIdentityRepository.ensurePersonIdentity(bob.id);
-    const robertIdentity = await faceIdentityRepository.ensurePersonIdentity(robert.id);
+    const bobIdentity = await faceIdentityRepository.ensurePersonIdentity(bob.personGroupId);
+    const robertIdentity = await faceIdentityRepository.ensurePersonIdentity(robert.personGroupId);
     // Source (Bob) REJECTED F — a human decision. Survivor (Robert) only has a PENDING suggestion.
-    await facePersonVerdictRepository.markRejected(bob.id, faceId, {
+    await facePersonVerdictRepository.markRejected(bob.personGroupId, faceId, {
       identityId: bobIdentity.id,
       source: 'cleanup',
       actorId: user.id,
@@ -266,7 +266,7 @@ describe('face verdict merge durability (D1)', () => {
     await defaultDatabase
       .insertInto('face_person_verdict')
       .values({
-        personId: robert.id,
+        personId: robert.personGroupId,
         assetFaceId: faceId,
         identityId: robertIdentity.id,
         status: 'pending',
@@ -278,16 +278,16 @@ describe('face verdict merge durability (D1)', () => {
     // promotion logic under test, this assertion is what would catch it.
     const controlFaceId = await seedFace(ctx, user.id);
     await facePersonVerdictRepository.upsertPending([
-      { personId: robert.id, assetFaceId: controlFaceId, distance: 0.4 },
+      { personId: robert.personGroupId, assetFaceId: controlFaceId, distance: 0.4 },
     ]);
 
-    await sut.mergePersonalPeople(factory.auth({ user }), robert.id, [bob.id]);
+    await sut.mergePersonalPeople(factory.auth({ user }), robert.personGroupId, [bob.personGroupId]);
 
     const rows = await verdictRow(faceId);
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ personId: robert.id, status: 'rejected' });
+    expect(rows[0]).toMatchObject({ personId: robert.personGroupId, status: 'rejected' });
 
-    const pending = await facePersonVerdictRepository.getPendingForPerson(robert.id, PENDING_OPTS);
+    const pending = await facePersonVerdictRepository.getPendingForPerson(robert.personGroupId, PENDING_OPTS);
     const pendingFaceIds = pending.items.map((item) => item.assetFaceId);
     expect(pendingFaceIds).not.toContain(faceId); // F is not re-proposed to the human who rejected it
     expect(pendingFaceIds).toContain(controlFaceId); // control: an unrelated pending suggestion still surfaces
@@ -308,15 +308,15 @@ describe('face verdict merge durability (D1)', () => {
     const faceId = await seedFace(ctx, user.id);
     // Source (Bob) rejected with a distinctive source/actor. Survivor (Robert) is a plain pending suggestion
     // (upsertPending's real shape: source='suggestion', actorId=null, distance set).
-    await facePersonVerdictRepository.markRejected(bob.id, faceId, { source: 'cleanup', actorId: actor.id });
-    await facePersonVerdictRepository.upsertPending([{ personId: robert.id, assetFaceId: faceId, distance: 0.4 }]);
+    await facePersonVerdictRepository.markRejected(bob.personGroupId, faceId, { source: 'cleanup', actorId: actor.id });
+    await facePersonVerdictRepository.upsertPending([{ personId: robert.personGroupId, assetFaceId: faceId, distance: 0.4 }]);
 
-    await retargetVerdictPersonId(defaultDatabase, bob.id, robert.id);
+    await retargetVerdictPersonId(defaultDatabase, bob.personGroupId, robert.personGroupId);
 
     const rows = await verdictRow(faceId);
     expect(rows).toHaveLength(1); // S6.10: exactly one row, no partial-unique-index violation
     expect(rows[0]).toMatchObject({
-      personId: robert.id,
+      personId: robert.personGroupId,
       status: 'rejected',
       source: 'cleanup',
       actorId: actor.id,
@@ -330,20 +330,20 @@ describe('face verdict merge durability (D1)', () => {
     const { person: bob } = await ctx.newPerson({ ownerId: user.id, name: 'Bob' });
     const { person: robert } = await ctx.newPerson({ ownerId: user.id, name: 'Robert' });
     const faceId = await seedFace(ctx, user.id);
-    const robertIdentity = await faceIdentityRepository.ensurePersonIdentity(robert.id);
-    await facePersonVerdictRepository.upsertPending([{ personId: bob.id, assetFaceId: faceId, distance: 0.4 }]);
-    await facePersonVerdictRepository.markRejected(robert.id, faceId, {
+    const robertIdentity = await faceIdentityRepository.ensurePersonIdentity(robert.personGroupId);
+    await facePersonVerdictRepository.upsertPending([{ personId: bob.personGroupId, assetFaceId: faceId, distance: 0.4 }]);
+    await facePersonVerdictRepository.markRejected(robert.personGroupId, faceId, {
       identityId: robertIdentity.id,
       source: 'cleanup',
       actorId: user.id,
     });
 
-    await retargetVerdictPersonId(defaultDatabase, bob.id, robert.id);
+    await retargetVerdictPersonId(defaultDatabase, bob.personGroupId, robert.personGroupId);
 
     const rows = await verdictRow(faceId);
     expect(rows).toHaveLength(1); // S6.10
     expect(rows[0]).toMatchObject({
-      personId: robert.id,
+      personId: robert.personGroupId,
       identityId: robertIdentity.id,
       status: 'rejected',
       source: 'cleanup',
@@ -356,14 +356,14 @@ describe('face verdict merge durability (D1)', () => {
     const { person: bob } = await ctx.newPerson({ ownerId: user.id, name: 'Bob' });
     const { person: robert } = await ctx.newPerson({ ownerId: user.id, name: 'Robert' });
     const faceId = await seedFace(ctx, user.id);
-    await facePersonVerdictRepository.markIgnored(bob.id, faceId, { source: 'suggestion', actorId: user.id });
-    await facePersonVerdictRepository.upsertPending([{ personId: robert.id, assetFaceId: faceId, distance: 0.4 }]);
+    await facePersonVerdictRepository.markIgnored(bob.personGroupId, faceId, { source: 'suggestion', actorId: user.id });
+    await facePersonVerdictRepository.upsertPending([{ personId: robert.personGroupId, assetFaceId: faceId, distance: 0.4 }]);
 
-    await retargetVerdictPersonId(defaultDatabase, bob.id, robert.id);
+    await retargetVerdictPersonId(defaultDatabase, bob.personGroupId, robert.personGroupId);
 
     const rows = await verdictRow(faceId);
     expect(rows).toHaveLength(1); // S6.10
-    expect(rows[0]).toMatchObject({ personId: robert.id, status: 'ignored' });
+    expect(rows[0]).toMatchObject({ personId: robert.personGroupId, status: 'ignored' });
   });
 
   it('S6.5: negative-vs-negative is not a promotion — a survivor ignored row beats a source rejected row', async () => {
@@ -372,28 +372,28 @@ describe('face verdict merge durability (D1)', () => {
     const { person: bob } = await ctx.newPerson({ ownerId: user.id, name: 'Bob' });
     const { person: robert } = await ctx.newPerson({ ownerId: user.id, name: 'Robert' });
     const faceId = await seedFace(ctx, user.id);
-    const bobIdentity = await faceIdentityRepository.ensurePersonIdentity(bob.id);
-    const robertIdentity = await faceIdentityRepository.ensurePersonIdentity(robert.id);
+    const bobIdentity = await faceIdentityRepository.ensurePersonIdentity(bob.personGroupId);
+    const robertIdentity = await faceIdentityRepository.ensurePersonIdentity(robert.personGroupId);
     // Source (Bob) REJECTED, survivor (Robert) IGNORED — the mirror of the existing "ignored source, rejected
     // survivor" collision test. The promotion predicate only fires when the survivor is `pending`, so this
     // must leave the survivor's ignored row untouched regardless of which side holds which negative status.
-    await facePersonVerdictRepository.markRejected(bob.id, faceId, {
+    await facePersonVerdictRepository.markRejected(bob.personGroupId, faceId, {
       identityId: bobIdentity.id,
       source: 'cleanup',
       actorId: user.id,
     });
-    await facePersonVerdictRepository.markIgnored(robert.id, faceId, {
+    await facePersonVerdictRepository.markIgnored(robert.personGroupId, faceId, {
       identityId: robertIdentity.id,
       source: 'suggestion',
       actorId: user.id,
     });
 
-    await retargetVerdictPersonId(defaultDatabase, bob.id, robert.id);
+    await retargetVerdictPersonId(defaultDatabase, bob.personGroupId, robert.personGroupId);
 
     const rows = await verdictRow(faceId);
     expect(rows).toHaveLength(1); // S6.10: no unique-violation, source row dropped
     expect(rows[0]).toMatchObject({
-      personId: robert.id,
+      personId: robert.personGroupId,
       identityId: robertIdentity.id,
       status: 'ignored',
       source: 'suggestion',
@@ -406,19 +406,19 @@ describe('face verdict merge durability (D1)', () => {
     const { person: bob } = await ctx.newPerson({ ownerId: user.id, name: 'Bob' });
     const { person: robert } = await ctx.newPerson({ ownerId: user.id, name: 'Robert' });
     const faceId = await seedFace(ctx, user.id);
-    const bobIdentity = await faceIdentityRepository.ensurePersonIdentity(bob.id);
-    await facePersonVerdictRepository.markRejected(bob.id, faceId, {
+    const bobIdentity = await faceIdentityRepository.ensurePersonIdentity(bob.personGroupId);
+    await facePersonVerdictRepository.markRejected(bob.personGroupId, faceId, {
       identityId: bobIdentity.id,
       source: 'cleanup',
       actorId: user.id,
     });
 
-    await retargetVerdictPersonId(defaultDatabase, bob.id, robert.id);
+    await retargetVerdictPersonId(defaultDatabase, bob.personGroupId, robert.personGroupId);
 
     const rows = await verdictRow(faceId);
     expect(rows).toHaveLength(1); // S6.10
     expect(rows[0]).toMatchObject({
-      personId: robert.id,
+      personId: robert.personGroupId,
       identityId: bobIdentity.id,
       status: 'rejected',
       source: 'cleanup',
@@ -431,23 +431,23 @@ describe('face verdict merge durability (D1)', () => {
     const { person: bob } = await ctx.newPerson({ ownerId: user.id, name: 'Bob' });
     const { person: robert } = await ctx.newPerson({ ownerId: user.id, name: 'Robert' });
     const faceId = await seedFace(ctx, user.id);
-    const robertIdentity = await faceIdentityRepository.ensurePersonIdentity(robert.id);
+    const robertIdentity = await faceIdentityRepository.ensurePersonIdentity(robert.personGroupId);
     // Source verdict written with no identity at all (bob has none), like a pre-identity suggestion reject.
-    await facePersonVerdictRepository.markRejected(bob.id, faceId, { source: 'cleanup', actorId: user.id });
+    await facePersonVerdictRepository.markRejected(bob.personGroupId, faceId, { source: 'cleanup', actorId: user.id });
     // Survivor's pending row DOES carry an identity (mirrors a keep-here cleanup-sourced pending row).
-    await facePersonVerdictRepository.upsertPending([{ personId: robert.id, assetFaceId: faceId, distance: 0.4 }]);
+    await facePersonVerdictRepository.upsertPending([{ personId: robert.personGroupId, assetFaceId: faceId, distance: 0.4 }]);
     await defaultDatabase
       .updateTable('face_person_verdict')
       .set({ identityId: robertIdentity.id })
-      .where('personId', '=', robert.id)
+      .where('personId', '=', robert.personGroupId)
       .where('assetFaceId', '=', faceId)
       .execute();
 
-    await retargetVerdictPersonId(defaultDatabase, bob.id, robert.id);
+    await retargetVerdictPersonId(defaultDatabase, bob.personGroupId, robert.personGroupId);
 
     const rows = await verdictRow(faceId);
     expect(rows).toHaveLength(1); // S6.10
-    expect(rows[0]).toMatchObject({ personId: robert.id, status: 'rejected', identityId: robertIdentity.id });
+    expect(rows[0]).toMatchObject({ personId: robert.personGroupId, status: 'rejected', identityId: robertIdentity.id });
   });
 
   it('S6.8: promotion adopts the source identity when the survivor pending row carries none', async () => {
@@ -456,20 +456,20 @@ describe('face verdict merge durability (D1)', () => {
     const { person: bob } = await ctx.newPerson({ ownerId: user.id, name: 'Bob' });
     const { person: robert } = await ctx.newPerson({ ownerId: user.id, name: 'Robert' });
     const faceId = await seedFace(ctx, user.id);
-    const bobIdentity = await faceIdentityRepository.ensurePersonIdentity(bob.id);
-    await facePersonVerdictRepository.markRejected(bob.id, faceId, {
+    const bobIdentity = await faceIdentityRepository.ensurePersonIdentity(bob.personGroupId);
+    await facePersonVerdictRepository.markRejected(bob.personGroupId, faceId, {
       identityId: bobIdentity.id,
       source: 'cleanup',
       actorId: user.id,
     });
     // Survivor's pending row carries no identity — upsertPending's real production shape.
-    await facePersonVerdictRepository.upsertPending([{ personId: robert.id, assetFaceId: faceId, distance: 0.4 }]);
+    await facePersonVerdictRepository.upsertPending([{ personId: robert.personGroupId, assetFaceId: faceId, distance: 0.4 }]);
 
-    await retargetVerdictPersonId(defaultDatabase, bob.id, robert.id);
+    await retargetVerdictPersonId(defaultDatabase, bob.personGroupId, robert.personGroupId);
 
     const rows = await verdictRow(faceId);
     expect(rows).toHaveLength(1); // S6.10
-    expect(rows[0]).toMatchObject({ personId: robert.id, status: 'rejected', identityId: bobIdentity.id });
+    expect(rows[0]).toMatchObject({ personId: robert.personGroupId, status: 'rejected', identityId: bobIdentity.id });
   });
 
   it('S6.9: a three-way merge (two negative sources into one pending survivor) ends in exactly one negative row', async () => {
@@ -479,18 +479,18 @@ describe('face verdict merge durability (D1)', () => {
     const { person: carol } = await ctx.newPerson({ ownerId: user.id, name: 'Carol' });
     const { person: robert } = await ctx.newPerson({ ownerId: user.id, name: 'Robert' });
     const faceId = await seedFace(ctx, user.id);
-    await facePersonVerdictRepository.markRejected(bob.id, faceId, { source: 'cleanup', actorId: user.id });
-    await facePersonVerdictRepository.markIgnored(carol.id, faceId, { source: 'suggestion', actorId: user.id });
-    await facePersonVerdictRepository.upsertPending([{ personId: robert.id, assetFaceId: faceId, distance: 0.4 }]);
+    await facePersonVerdictRepository.markRejected(bob.personGroupId, faceId, { source: 'cleanup', actorId: user.id });
+    await facePersonVerdictRepository.markIgnored(carol.personGroupId, faceId, { source: 'suggestion', actorId: user.id });
+    await facePersonVerdictRepository.upsertPending([{ personId: robert.personGroupId, assetFaceId: faceId, distance: 0.4 }]);
 
     // Mirrors the production loop: person.repository.ts's mergePersonProfile — and therefore
     // retargetVerdictPersonId — runs once per source, sequentially, inside the same merge transaction.
-    await retargetVerdictPersonId(defaultDatabase, bob.id, robert.id);
-    await retargetVerdictPersonId(defaultDatabase, carol.id, robert.id);
+    await retargetVerdictPersonId(defaultDatabase, bob.personGroupId, robert.personGroupId);
+    await retargetVerdictPersonId(defaultDatabase, carol.personGroupId, robert.personGroupId);
 
     const rows = await verdictRow(faceId);
     expect(rows).toHaveLength(1); // S6.10: no unique-index violation across two sequential retargets
-    expect(rows[0].personId).toBe(robert.id);
+    expect(rows[0].personId).toBe(robert.personGroupId);
     expect(['rejected', 'ignored']).toContain(rows[0].status);
   });
 
@@ -500,18 +500,18 @@ describe('face verdict merge durability (D1)', () => {
     const { person: bob } = await ctx.newPerson({ ownerId: user.id, name: 'Bob' });
     const { person: robert } = await ctx.newPerson({ ownerId: user.id, name: 'Robert' });
     const faceId = await seedFace(ctx, user.id);
-    const bobIdentity = await faceIdentityRepository.ensurePersonIdentity(bob.id);
-    const robertIdentity = await faceIdentityRepository.ensurePersonIdentity(robert.id);
-    await facePersonVerdictRepository.markRejected(bob.id, faceId, {
+    const bobIdentity = await faceIdentityRepository.ensurePersonIdentity(bob.personGroupId);
+    const robertIdentity = await faceIdentityRepository.ensurePersonIdentity(robert.personGroupId);
+    await facePersonVerdictRepository.markRejected(bob.personGroupId, faceId, {
       identityId: bobIdentity.id,
       source: 'cleanup',
       actorId: user.id,
     });
     // Survivor's pending row carries no identity of its own (upsertPending's real shape), so the promoted row
     // can only pick one up via the coalesce — which is what rekeyVerdictIdentity must then correct.
-    await facePersonVerdictRepository.upsertPending([{ personId: robert.id, assetFaceId: faceId, distance: 0.4 }]);
+    await facePersonVerdictRepository.upsertPending([{ personId: robert.personGroupId, assetFaceId: faceId, distance: 0.4 }]);
 
-    await retargetVerdictPersonId(defaultDatabase, bob.id, robert.id);
+    await retargetVerdictPersonId(defaultDatabase, bob.personGroupId, robert.personGroupId);
     // Sanity checkpoint: immediately after retarget and before any identity re-key, the promoted row is keyed
     // to BOB's identity (the coalesce's only option, since the survivor's own row carried none).
     const afterRetarget = await verdictRow(faceId);
@@ -523,7 +523,7 @@ describe('face verdict merge durability (D1)', () => {
 
     const rows = await verdictRow(faceId);
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ personId: robert.id, status: 'rejected', identityId: robertIdentity.id });
+    expect(rows[0]).toMatchObject({ personId: robert.personGroupId, status: 'rejected', identityId: robertIdentity.id });
   });
 
   it('GC (deleteUnreferencedIdentities) degrades an identity-only verdict to SET NULL, never deletes', async () => {
@@ -531,14 +531,14 @@ describe('face verdict merge durability (D1)', () => {
     const { user } = await ctx.newUser();
     const { person: bob } = await ctx.newPerson({ ownerId: user.id, name: 'Bob' });
     const faceId = await seedFace(ctx, user.id);
-    const bobIdentity = await faceIdentityRepository.ensurePersonIdentity(bob.id);
-    await facePersonVerdictRepository.markRejected(bob.id, faceId, {
+    const bobIdentity = await faceIdentityRepository.ensurePersonIdentity(bob.personGroupId);
+    await facePersonVerdictRepository.markRejected(bob.personGroupId, faceId, {
       identityId: bobIdentity.id,
       source: 'cleanup',
       actorId: user.id,
     });
     // remove the person so only the verdict references the identity, then GC
-    await defaultDatabase.deleteFrom('person').where('id', '=', bob.id).execute();
+    await defaultDatabase.deleteFrom('person').where('personGroupId', '=', bob.personGroupId).execute();
     await faceIdentityRepository.deleteUnreferencedIdentities();
 
     const rows = await verdictRow(faceId);
@@ -606,7 +606,7 @@ describe('face verdict merge durability (D1)', () => {
     await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: controlAsset.id, addedById: space.createdById });
     const { assetFace: controlFace } = await ctx.newAssetFace({
       assetId: controlAsset.id,
-      personId: null,
+      personGroupId: null,
       sourceType: SourceType.MachineLearning,
     });
     await facePersonVerdictRepository.upsertPendingForSpacePerson([
