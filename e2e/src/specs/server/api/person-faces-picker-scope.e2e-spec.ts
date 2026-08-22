@@ -35,16 +35,16 @@ describe('GET /people/:id/faces — space-scope (Slice 2 / M1)', () => {
 
     // A1: Timeline, added to the space the viewer belongs to -> space-reachable + shareable.
     // This is the ONLY face that grants the viewer PersonRead at all (checkSharedSpaceAccess).
-    spaceFaceId = await utils.createFace({ assetId: ctx.spaceAssetId, personId });
+    spaceFaceId = await utils.createFace({ assetId: ctx.spaceAssetId, personGroupId: personId });
 
     // A2: also added to the space (space-reachable) but Hidden -> fails spaceVisibilityGate.
     const hiddenAsset = await utils.createAsset(ctx.spaceOwner.token!, { visibility: AssetVisibility.Hidden });
     await utils.addSpaceAssets(ctx.spaceOwner.token!, ctx.spaceId, [hiddenAsset.id]);
-    hiddenFaceId = await utils.createFace({ assetId: hiddenAsset.id, personId });
+    hiddenFaceId = await utils.createFace({ assetId: hiddenAsset.id, personGroupId: personId });
 
     // A3: owned by spaceOwner, Timeline (shareable visibility), but NEVER added to any space
     // (ctx.ownerAssetId) -> not space-reachable.
-    neverSharedFaceId = await utils.createFace({ assetId: ctx.ownerAssetId, personId });
+    neverSharedFaceId = await utils.createFace({ assetId: ctx.ownerAssetId, personGroupId: personId });
   });
 
   it('owner sees the full, unscoped list, including the hidden- and never-shared-asset faces (positive control)', async () => {
