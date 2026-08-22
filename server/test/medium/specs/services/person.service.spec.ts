@@ -258,7 +258,7 @@ const getIdentityLinks = (ctx: ReturnType<typeof setupFaceDetection>['ctx'], fac
     .execute();
 
 const getPeopleByIds = (ctx: ReturnType<typeof setupFaceRecognition>['ctx'], ids: string[]) =>
-  ctx.database.selectFrom('person').select(['id', 'name']).where('personGroupId', 'in', ids).orderBy('name').execute();
+  ctx.database.selectFrom('person').select(['personGroupId', 'name']).where('personGroupId', 'in', ids).orderBy('name').execute();
 
 const getSpacePeople = (ctx: ReturnType<typeof setupFaceRecognition>['ctx'], spaceIds: string[]) =>
   ctx.database
@@ -427,7 +427,7 @@ describe(PersonService.name, () => {
       await expect(
         ctx.database
           .selectFrom('person')
-          .select(['id', 'name'])
+          .select(['personGroupId', 'name'])
           .where('personGroupId', 'in', [ml.person.personGroupId, manual.person.personGroupId, exif.person.personGroupId])
           .orderBy('name')
           .execute(),
@@ -734,7 +734,7 @@ describe(PersonService.name, () => {
       await expect(
         ctx.database
           .selectFrom('person')
-          .select(['id', 'name'])
+          .select(['personGroupId', 'name'])
           .where('personGroupId', 'in', [ml.person.personGroupId, manual.person.personGroupId, exif.person.personGroupId])
           .orderBy('name')
           .execute(),
@@ -895,7 +895,7 @@ describe(PersonService.name, () => {
         identityIds: [targetIdentity.identityId!],
         userIds: [user.id],
         visibility: AssetVisibility.Timeline,
-      });
+      }, factory.auth({ user: { id: user.id } }));
 
       expect(buckets.reduce((total, bucket) => total + Number(bucket.count), 0)).toBe(2);
     });
@@ -929,7 +929,7 @@ describe(PersonService.name, () => {
         identityIds: [targetIdentity.id],
         userIds: [user.id],
         visibility: AssetVisibility.Timeline,
-      });
+      }, factory.auth({ user: { id: user.id } }));
       expect(bucketsBeforeRepair.reduce((total, bucket) => total + Number(bucket.count), 0)).toBe(1);
 
       jobMock.queue.mockResolvedValue();
@@ -946,7 +946,7 @@ describe(PersonService.name, () => {
         identityIds: [targetIdentity.id],
         userIds: [user.id],
         visibility: AssetVisibility.Timeline,
-      });
+      }, factory.auth({ user: { id: user.id } }));
       expect(bucketsAfterRepair.reduce((total, bucket) => total + Number(bucket.count), 0)).toBe(2);
     });
   });
