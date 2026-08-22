@@ -130,9 +130,9 @@ export class AppMetricsRepository {
       .select((eb) => [
         eb.fn.countAll<number>().as('faces'),
         eb.fn
-          .count<number>('asset_face.personId')
+          .count<number>('asset_face.personGroupId')
           .distinct()
-          .filterWhere('asset_face.personId', 'is not', null)
+          .filterWhere('asset_face.personGroupId', 'is not', null)
           .as('people'),
       ])
       .where('asset_face.deletedAt', 'is', null)
