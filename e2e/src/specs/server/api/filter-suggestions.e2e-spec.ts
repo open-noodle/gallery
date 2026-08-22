@@ -111,8 +111,14 @@ describe('/search/suggestions/filters', () => {
     for (const { rating, assetIndex } of personFixtures) {
       const name = `Facet Person ${rating}`;
       const personResult = await db.query(
-        `INSERT INTO "person" ("ownerId", "name", "thumbnailPath")
-         VALUES ($1, $2, '/test/thumbnail.jpg') RETURNING id`,
+        `WITH new_group AS (
+           INSERT INTO "person_group" ("clusterGroupId")
+           SELECT "clusterGroupId" FROM "user" WHERE "id" = $1
+           RETURNING id
+         )
+         INSERT INTO "person" ("ownerId", "personGroupId", "name", "thumbnailPath")
+         SELECT $1, new_group.id, $2, '/test/thumbnail.jpg' FROM new_group
+         RETURNING "personGroupId" AS id`,
         [admin.userId, name],
       );
       const personId = personResult.rows[0].id as string;
@@ -409,8 +415,14 @@ describe('/search/suggestions/filters', () => {
     // Create a space person via DB (person → face → space_person + space_person_face)
     const db = await utils.connectDatabase();
     const personResult = await db.query(
-      `INSERT INTO "person" ("ownerId", "name", "thumbnailPath")
-       VALUES ($1, $2, '/test/thumbnail.jpg') RETURNING id`,
+      `WITH new_group AS (
+         INSERT INTO "person_group" ("clusterGroupId")
+         SELECT "clusterGroupId" FROM "user" WHERE "id" = $1
+         RETURNING id
+       )
+       INSERT INTO "person" ("ownerId", "personGroupId", "name", "thumbnailPath")
+       SELECT $1, new_group.id, $2, '/test/thumbnail.jpg' FROM new_group
+       RETURNING "personGroupId" AS id`,
       [admin.userId, 'SpaceTestPerson'],
     );
     const globalPersonId = personResult.rows[0].id as string;
@@ -508,8 +520,14 @@ describe('/search/suggestions/filters', () => {
     // Create a global person linked to asset A via asset_face
     const db = await utils.connectDatabase();
     const personResult = await db.query(
-      `INSERT INTO "person" ("ownerId", "name", "thumbnailPath")
-       VALUES ($1, $2, '/test/thumbnail.jpg') RETURNING id`,
+      `WITH new_group AS (
+         INSERT INTO "person_group" ("clusterGroupId")
+         SELECT "clusterGroupId" FROM "user" WHERE "id" = $1
+         RETURNING id
+       )
+       INSERT INTO "person" ("ownerId", "personGroupId", "name", "thumbnailPath")
+       SELECT $1, new_group.id, $2, '/test/thumbnail.jpg' FROM new_group
+       RETURNING "personGroupId" AS id`,
       [admin.userId, 'PersonCrossFilter'],
     );
     const globalPersonId = personResult.rows[0].id as string;
