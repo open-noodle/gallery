@@ -95,7 +95,7 @@ const seedFlaggedScan = async (
   };
   const persons = [
     {
-      personId: args.personId,
+      personGroupId: args.personId,
       ownerId: args.ownerUserId,
       personName: null,
       faceCount: args.faceIds.length,
@@ -171,7 +171,7 @@ const seedFlaggedScanMulti = async (
     reviewOnlyByReason: { overCap: 0, badTarget: 0, unAttributable: 0 },
   };
   const persons = args.groups.map((group) => ({
-    personId: group.personId,
+    personGroupId: group.personId,
     ownerId: args.ownerUserId,
     personName: null,
     faceCount: group.faceIds.length,
