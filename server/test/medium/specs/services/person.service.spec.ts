@@ -2095,13 +2095,13 @@ describe(PersonService.name, () => {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
       const { assetFace: face } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
       // distance 0.6 sits strictly inside the open eligibility band (0.5, 0.8] — a valid, claimable row.
-      await verdictRepo.upsertPending([{ personId: p.personGroupId, assetFaceId: face.id, distance: 0.6 }]);
+      await verdictRepo.upsertPending([{ personGroupId: p.personGroupId, assetFaceId: face.id, distance: 0.6 }]);
 
       // Positive control: the seeded row really is pending before the confirm call touches anything.
       const seeded = await ctx.database
         .selectFrom('face_person_verdict')
         .select(['status'])
-        .where('personId', '=', p.personGroupId)
+        .where('personGroupId', '=', p.personGroupId)
         .where('assetFaceId', '=', face.id)
         .executeTakeFirstOrThrow();
       expect(seeded.status).toBe('pending');
@@ -2131,7 +2131,7 @@ describe(PersonService.name, () => {
       const verdict = await ctx.database
         .selectFrom('face_person_verdict')
         .select(['status'])
-        .where('personId', '=', p.personGroupId)
+        .where('personGroupId', '=', p.personGroupId)
         .where('assetFaceId', '=', face.id)
         .executeTakeFirst();
       expect(verdict?.status).toBe('pending');

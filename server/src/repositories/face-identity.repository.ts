@@ -2382,7 +2382,7 @@ export class FaceIdentityRepository {
         .where('personGroupId', 'in', personIds.slice(index, index + 1000))
         .execute();
       for (const row of rows) {
-        map.set(row.personGroupId, targetTokens({ personId: row.personGroupId, identityId: row.identityId }));
+        map.set(row.personGroupId, targetTokens({ personGroupId: row.personGroupId, identityId: row.identityId }));
       }
     }
     return map;

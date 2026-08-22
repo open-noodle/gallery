@@ -170,7 +170,7 @@ const newCandidateFace = (ctx: MediumTestContext, ownerId: string) => seedFace(c
 
 const pendingFor = async (
   ctx: MediumTestContext,
-  column: 'personId' | 'spacePersonId',
+  column: 'personGroupId' | 'spacePersonId',
   targetId: string,
   assetFaceId: string,
 ) => {
@@ -218,7 +218,7 @@ describe('face suggestion engine reads the shared verdict layer (D3)', () => {
     );
     await expect(faceSuggestion.handleSpacePersonSuggestionScan({ id: spaceCarl.id })).resolves.toBe(JobStatus.Success);
 
-    expect(await pendingFor(ctx, 'personId', anna.personGroupId, face.id)).toBe(false);
+    expect(await pendingFor(ctx, 'personGroupId', anna.personGroupId, face.id)).toBe(false);
     expect(await pendingFor(ctx, 'spacePersonId', spaceAlice.id, face.id)).toBe(false);
     expect(await pendingFor(ctx, 'spacePersonId', spaceCarl.id, face.id)).toBe(false);
   });
@@ -250,9 +250,9 @@ describe('face suggestion engine reads the shared verdict layer (D3)', () => {
     await expect(faceSuggestion.handleSpacePersonSuggestionScan({ id: spaceAnna.id })).resolves.toBe(JobStatus.Success);
     await expect(faceSuggestion.handlePersonSuggestionScan({ id: q.personGroupId })).resolves.toBe(JobStatus.Success);
 
-    expect(await pendingFor(ctx, 'personId', anna.personGroupId, face.id)).toBe(false);
+    expect(await pendingFor(ctx, 'personGroupId', anna.personGroupId, face.id)).toBe(false);
     expect(await pendingFor(ctx, 'spacePersonId', spaceAnna.id, face.id)).toBe(false);
-    expect(await pendingFor(ctx, 'personId', q.personGroupId, face.id)).toBe(true);
+    expect(await pendingFor(ctx, 'personGroupId', q.personGroupId, face.id)).toBe(true);
   });
 
   it('an admin keep-here suppresses a later suggestion, even after the face is unassigned', async () => {
@@ -285,7 +285,7 @@ describe('face suggestion engine reads the shared verdict layer (D3)', () => {
     await expect(faceSuggestion.handlePersonSuggestionScan({ id: o.personGroupId })).resolves.toBe(JobStatus.Success);
     await expect(faceSuggestion.handleSpacePersonSuggestionScan({ id: spaceO.id })).resolves.toBe(JobStatus.Success);
 
-    expect(await pendingFor(ctx, 'personId', o.personGroupId, face.id)).toBe(false);
+    expect(await pendingFor(ctx, 'personGroupId', o.personGroupId, face.id)).toBe(false);
     expect(await pendingFor(ctx, 'spacePersonId', spaceO.id, face.id)).toBe(false);
   });
 
@@ -381,8 +381,8 @@ describe('face suggestion engine reads the shared verdict layer (D3)', () => {
 
     await expect(faceSuggestion.handlePersonSuggestionScan({ id: anna.personGroupId })).resolves.toBe(JobStatus.Success);
 
-    expect(await pendingFor(ctx, 'personId', anna.personGroupId, timelineFace.id)).toBe(true); // positive control
-    expect(await pendingFor(ctx, 'personId', anna.personGroupId, lockedFace.id)).toBe(false);
+    expect(await pendingFor(ctx, 'personGroupId', anna.personGroupId, timelineFace.id)).toBe(true); // positive control
+    expect(await pendingFor(ctx, 'personGroupId', anna.personGroupId, lockedFace.id)).toBe(false);
   });
 
   it('S1.5: handleSpacePersonSuggestionScan proposes only the timeline candidate, not the one on a locked asset', async () => {
@@ -497,11 +497,11 @@ describe('reject/ignore face-level authorization (F8)', () => {
     await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: face.assetId, addedById: owner.id });
 
     await expect(faceSuggestion.handlePersonSuggestionScan({ id: anna.personGroupId })).resolves.toBe(JobStatus.Success);
-    expect(await pendingFor(ctx, 'personId', anna.personGroupId, face.id)).toBe(true); // positive control: scan proposed it
+    expect(await pendingFor(ctx, 'personGroupId', anna.personGroupId, face.id)).toBe(true); // positive control: scan proposed it
 
     await expect(faceSuggestion.rejectFaceSuggestion(authOwner, anna.personGroupId, face.id)).resolves.toBe(true);
 
-    expect(await pendingFor(ctx, 'personId', anna.personGroupId, face.id)).toBe(false);
+    expect(await pendingFor(ctx, 'personGroupId', anna.personGroupId, face.id)).toBe(false);
   });
 
   it('S4.7: rejecting a face whose asset is in the trash 400s and writes no row', async () => {

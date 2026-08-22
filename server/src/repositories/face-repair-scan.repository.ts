@@ -36,7 +36,7 @@ export interface RepairScanSuspectedOwner {
 }
 
 export interface RepairScanPerson {
-  personId: string;
+  personGroupId: string;
   ownerId: string;
   personName: string | null;
   faceCount: number;
@@ -170,16 +170,16 @@ export class FaceRepairScanRepository {
   // Drop the given persons from the latest scan's persisted report after they have been applied, and keep the
   // headline `flaggedFaces`/`affectedPersons` totals coherent with the trimmed list. The report is a
   // point-in-time snapshot; without this an applied row reappears the next time the console refetches it.
-  async removePersonsFromLatestScan(personIds: string[]): Promise<void> {
-    if (personIds.length === 0) {
+  async removePersonsFromLatestScan(personGroupIds: string[]): Promise<void> {
+    if (personGroupIds.length === 0) {
       return;
     }
     const latest = await this.getLatestScan();
     if (!latest?.persons) {
       return;
     }
-    const remove = new Set(personIds);
-    const persons = (latest.persons as unknown as RepairScanPerson[]).filter((p) => !remove.has(p.personId));
+    const remove = new Set(personGroupIds);
+    const persons = (latest.persons as unknown as RepairScanPerson[]).filter((p) => !remove.has(p.personGroupId));
     const totals = latest.totals
       ? {
           ...(latest.totals as unknown as RepairScanTotals),
@@ -220,7 +220,7 @@ export class FaceRepairScanRepository {
     if (persons.length === 0) {
       return scan;
     }
-    const ids = [...new Set(persons.flatMap((p) => [p.personId, ...p.suspectedOwners.map((o) => o.ownerPersonId)]))];
+    const ids = [...new Set(persons.flatMap((p) => [p.personGroupId, ...p.suspectedOwners.map((o) => o.ownerPersonId)]))];
     // The join predicate must stay identical to FaceRepairRepository.getPersonMetadata and .searchOwnerPeople:
     // the review page renders this count next to the picker's, and a disagreement reads as a bug. It is covered
     // by the partial index asset_face_personId_assetId_notDeleted_isVisible_idx.
@@ -245,17 +245,17 @@ export class FaceRepairScanRepository {
     const faceCountOf = (id: string) => Number(byId.get(id)?.faceCount ?? 0);
 
     const refreshed = persons.map((p) => {
-      const personName = nameOf(p.personId);
+      const personName = nameOf(p.personGroupId);
       const namedNow = personName !== null;
       const reviewReasons =
         namedNow && !p.reviewReasons.includes('named') ? ['named', ...p.reviewReasons] : p.reviewReasons;
       return {
         ...p,
         personName,
-        thumbnailFaceId: thumbOf(p.personId),
+        thumbnailFaceId: thumbOf(p.personGroupId),
         // Live, like the name and thumbnail beside it. A cluster whose row is gone keeps its snapshot count
         // rather than claiming the cluster the admin is looking at has zero faces.
-        faceCount: byId.has(p.personId) ? faceCountOf(p.personId) : p.faceCount,
+        faceCount: byId.has(p.personGroupId) ? faceCountOf(p.personGroupId) : p.faceCount,
         recommendation: (namedNow ? 'review-first' : p.recommendation) as RepairScanPerson['recommendation'],
         reviewReasons,
         suspectedOwners: p.suspectedOwners.map((o) => ({
@@ -272,7 +272,7 @@ export class FaceRepairScanRepository {
 
   async replaceScanFlaggedFaces(
     scanId: string,
-    faces: { assetFaceId: string; personId: string; suspectedOwnerId: string }[],
+    faces: { assetFaceId: string; personGroupId: string; suspectedOwnerId: string }[],
   ): Promise<void> {
     await this.db.deleteFrom('face_repair_scan_flagged_face').where('scanId', '=', scanId).execute();
     for (let index = 0; index < faces.length; index += 1000) {
@@ -283,7 +283,7 @@ export class FaceRepairScanRepository {
           chunk.map((face) => ({
             scanId,
             assetFaceId: face.assetFaceId,
-            personId: face.personId,
+            personGroupId: face.personGroupId,
             suspectedOwnerId: face.suspectedOwnerId,
           })),
         )
@@ -293,7 +293,7 @@ export class FaceRepairScanRepository {
 
   async getScanFlaggedFaces(
     scanId: string,
-    personId: string,
+    personGroupId: string,
   ): Promise<{ assetFaceId: string; suspectedOwnerId: string }[]> {
     return (
       this.db
@@ -303,8 +303,8 @@ export class FaceRepairScanRepository {
         .innerJoin('face_search', 'face_search.faceId', 'asset_face.id')
         .select(['ff.assetFaceId as assetFaceId', 'ff.suspectedOwnerId as suspectedOwnerId'])
         .where('ff.scanId', '=', scanId)
-        .where('ff.personId', '=', personId)
-        .where('asset_face.personGroupId', '=', personId)
+        .where('ff.personGroupId', '=', personGroupId)
+        .where('asset_face.personGroupId', '=', personGroupId)
         .where('asset_face.sourceType', '=', sql.lit(SourceType.MachineLearning))
         .where('asset_face.deletedAt', 'is', null)
         .where('asset_face.isVisible', '=', true)
@@ -322,14 +322,14 @@ export class FaceRepairScanRepository {
   // Multi-person variant of getScanFlaggedFaces used by the apply path: read the persisted flagged-face
   // snapshot for a set of approved persons instead of recomputing the plan via per-face ANN in the request
   // (the scan already computed and stored exactly these rows). The eligibility join mirrors
-  // streamEligibleFaces / getScanFlaggedFaces exactly, and `asset_face.personId = ff.personId` keeps the read
+  // streamEligibleFaces / getScanFlaggedFaces exactly, and `asset_face.personGroupId = ff.personGroupId` keeps the read
   // self-correcting: a face moved off its recorded person since the scan is silently dropped, so applying the
-  // stored snapshot is safe. `personId` is returned so the caller can route each face from its recorded person.
+  // stored snapshot is safe. `personGroupId` is returned so the caller can route each face from its recorded person.
   async getScanFlaggedFacesForPersons(
     scanId: string,
-    personIds: string[],
-  ): Promise<{ assetFaceId: string; personId: string; suspectedOwnerId: string }[]> {
-    if (personIds.length === 0) {
+    personGroupIds: string[],
+  ): Promise<{ assetFaceId: string; personGroupId: string; suspectedOwnerId: string }[]> {
+    if (personGroupIds.length === 0) {
       return [];
     }
     return (
@@ -338,10 +338,10 @@ export class FaceRepairScanRepository {
         .innerJoin('asset_face', 'asset_face.id', 'ff.assetFaceId')
         .innerJoin('asset', 'asset.id', 'asset_face.assetId')
         .innerJoin('face_search', 'face_search.faceId', 'asset_face.id')
-        .select(['ff.assetFaceId as assetFaceId', 'ff.personId as personId', 'ff.suspectedOwnerId as suspectedOwnerId'])
+        .select(['ff.assetFaceId as assetFaceId', 'ff.personGroupId as personGroupId', 'ff.suspectedOwnerId as suspectedOwnerId'])
         .where('ff.scanId', '=', scanId)
-        .where('ff.personId', 'in', personIds)
-        .whereRef('asset_face.personGroupId', '=', 'ff.personId')
+        .where('ff.personGroupId', 'in', personGroupIds)
+        .whereRef('asset_face.personGroupId', '=', 'ff.personGroupId')
         .where('asset_face.sourceType', '=', sql.lit(SourceType.MachineLearning))
         .where('asset_face.deletedAt', 'is', null)
         .where('asset_face.isVisible', '=', true)
@@ -357,23 +357,23 @@ export class FaceRepairScanRepository {
 
   async enrichReportPersons(
     rows: Array<{
-      personId: string;
+      personGroupId: string;
       eligible: number;
       flagged: number;
       flaggedFraction: number;
       suspectedOwnerIds: string[];
     }>,
   ): Promise<RepairScanPerson[]> {
-    const personIds = [...new Set(rows.flatMap((r) => [r.personId, ...r.suspectedOwnerIds]))];
-    if (personIds.length === 0) {
+    const personGroupIds = [...new Set(rows.flatMap((r) => [r.personGroupId, ...r.suspectedOwnerIds]))];
+    if (personGroupIds.length === 0) {
       return [];
     }
     const people = await this.db
       .selectFrom('person')
-      .select(['personGroupId', 'ownerId', 'name', 'faceAssetId'])
-      .where('personGroupId', 'in', personIds)
+      .select(['personGroupId as id', 'ownerId', 'name', 'faceAssetId'])
+      .where('personGroupId', 'in', personGroupIds)
       .execute();
-    const byId = new Map(people.map((person) => [person.personGroupId, person]));
+    const byId = new Map(people.map((person) => [person.id, person]));
     const nameOf = (id: string) => (byId.get(id)?.name ? byId.get(id)!.name : null);
     const thumbOf = (id: string) => byId.get(id)?.faceAssetId ?? null;
 
@@ -383,11 +383,11 @@ export class FaceRepairScanRepository {
         counts.set(ownerId, (counts.get(ownerId) ?? 0) + 1);
       }
       return {
-        personId: row.personId,
-        ownerId: byId.get(row.personId)?.ownerId ?? '',
-        personName: nameOf(row.personId),
+        personGroupId: row.personGroupId,
+        ownerId: byId.get(row.personGroupId)?.ownerId ?? '',
+        personName: nameOf(row.personGroupId),
         faceCount: row.eligible,
-        thumbnailFaceId: thumbOf(row.personId),
+        thumbnailFaceId: thumbOf(row.personGroupId),
         eligible: row.eligible,
         flagged: row.flagged,
         flaggedFraction: row.flaggedFraction,

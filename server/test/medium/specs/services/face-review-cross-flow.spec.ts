@@ -219,7 +219,7 @@ const newSuggestionCandidateFace = (ctx: MediumTestContext, ownerId: string) =>
 
 const pendingFor = async (
   ctx: MediumTestContext,
-  column: 'personId' | 'spacePersonId',
+  column: 'personGroupId' | 'spacePersonId',
   targetId: string,
   assetFaceId: string,
 ) => {
@@ -236,7 +236,7 @@ const pendingFor = async (
 // Slice 8: a rejected/ignored row matched by whichever key the caller supplies.
 const negativeExists = async (
   ctx: MediumTestContext,
-  column: 'personId' | 'spacePersonId' | 'identityId',
+  column: 'personGroupId' | 'spacePersonId' | 'identityId',
   targetId: string,
   assetFaceId: string,
 ) => {
@@ -548,8 +548,8 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
     // Seed a genuine PENDING suggestion row inside the open band (maxDistance, suggestions.maxDistance] =
     // (0.5, 0.8] — the real precondition a confirm click drains. Positive control: assert it exists before
     // confirming, so the drain assertion below actually means something.
-    await verdictRepo.upsertPending([{ personId: anna.personGroupId, assetFaceId: face.id, distance: 0.6 }]);
-    expect(await pendingFor(ctx, 'personId', anna.personGroupId, face.id)).toBe(true);
+    await verdictRepo.upsertPending([{ personGroupId: anna.personGroupId, assetFaceId: face.id, distance: 0.6 }]);
+    expect(await pendingFor(ctx, 'personGroupId', anna.personGroupId, face.id)).toBe(true);
 
     // Nothing but the real confirm path.
     await faceSuggestion.confirmFaceSuggestion(auth, anna.personGroupId, face.id);
@@ -568,7 +568,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
       .where('assetFaceId', '=', face.id)
       .executeTakeFirst();
     expect(link?.source).toBe('manual');
-    expect(await pendingFor(ctx, 'personId', anna.personGroupId, face.id)).toBe(false);
+    expect(await pendingFor(ctx, 'personGroupId', anna.personGroupId, face.id)).toBe(false);
   });
 
   it("leak 4/5 — a user's rejection suppresses a later cleanup flag toward that same person", async () => {
@@ -606,7 +606,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
 
     // A pending suggestion for this face exists for a THIRD person (Carol), left over from an earlier scan.
     const { person: carol } = await ctx.newPerson({ ownerId: user.id, name: 'Carol' });
-    await verdictRepo.upsertPending([{ personId: carol.personGroupId, assetFaceId: face, distance: 0.62 }]);
+    await verdictRepo.upsertPending([{ personGroupId: carol.personGroupId, assetFaceId: face, distance: 0.62 }]);
 
     // The admin scans and moves the leaked face to its true owner, Bob.
     await repair.runRepair({ ownerId: user.id, ...repairParams });
@@ -616,7 +616,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
     // The stale pending suggestion is gone — drained at the write path, not merely hidden by a read filter.
     const rows = await db
       .selectFrom('face_person_verdict')
-      .select(['personId', 'status'])
+      .select(['personGroupId', 'status'])
       .where('assetFaceId', '=', face)
       .execute();
     expect(rows.filter((r) => r.status === 'pending')).toEqual([]);
@@ -645,7 +645,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
       },
     });
     await scanRepo.replaceScanFlaggedFaces(scan.id, [
-      { assetFaceId: face, personId: anna.personGroupId, suspectedOwnerId: anna.personGroupId },
+      { assetFaceId: face, personGroupId: anna.personGroupId, suspectedOwnerId: anna.personGroupId },
     ]);
     await scanRepo.completeScan(scan.id, {
       totals: {
@@ -659,7 +659,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
       },
       persons: [
         {
-          personId: anna.personGroupId,
+          personGroupId: anna.personGroupId,
           ownerId: user.id,
           personName: 'Anna',
           faceCount: 1,
@@ -728,8 +728,8 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
     await ctx.newSharedSpaceAsset({ spaceId: s.id, assetId: faceTwoControl.assetId, addedById: user.id });
     await space.rejectSpacePersonFaceSuggestion(auth, s.id, spaceAnna.id, faceTwo.id);
     await expect(faceSuggestion.handlePersonSuggestionScan({ id: anna.personGroupId })).resolves.toBe(JobStatus.Success);
-    expect(await pendingFor(ctx, 'personId', anna.personGroupId, faceTwo.id)).toBe(false);
-    expect(await pendingFor(ctx, 'personId', anna.personGroupId, faceTwoControl.id)).toBe(true);
+    expect(await pendingFor(ctx, 'personGroupId', anna.personGroupId, faceTwo.id)).toBe(false);
+    expect(await pendingFor(ctx, 'personGroupId', anna.personGroupId, faceTwoControl.id)).toBe(true);
   });
 
   it('keep-here suppresses a later suggestion', async () => {
@@ -773,7 +773,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
       },
     });
     await scanRepo.replaceScanFlaggedFaces(scan.id, [
-      { assetFaceId: face.id, personId: anna.personGroupId, suspectedOwnerId: o.personGroupId },
+      { assetFaceId: face.id, personGroupId: anna.personGroupId, suspectedOwnerId: o.personGroupId },
     ]);
     await scanRepo.completeScan(scan.id, {
       totals: {
@@ -787,7 +787,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
       },
       persons: [
         {
-          personId: anna.personGroupId,
+          personGroupId: anna.personGroupId,
           ownerId: user.id,
           personName: 'Anna',
           faceCount: 1,
@@ -813,7 +813,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
     const stayedVerdict = await ctx.database
       .selectFrom('face_person_verdict')
       .select(['status'])
-      .where('personId', '=', o.personGroupId)
+      .where('personGroupId', '=', o.personGroupId)
       .where('assetFaceId', '=', face.id)
       .executeTakeFirst();
     expect(stayedVerdict?.status).toBe('rejected');
@@ -833,8 +833,8 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
     await ctx.newSharedSpaceAsset({ spaceId: s.id, assetId: control.assetId, addedById: user.id });
 
     await expect(faceSuggestion.handlePersonSuggestionScan({ id: o.personGroupId })).resolves.toBe(JobStatus.Success);
-    expect(await pendingFor(ctx, 'personId', o.personGroupId, face.id)).toBe(false);
-    expect(await pendingFor(ctx, 'personId', o.personGroupId, control.id)).toBe(true);
+    expect(await pendingFor(ctx, 'personGroupId', o.personGroupId, face.id)).toBe(false);
+    expect(await pendingFor(ctx, 'personGroupId', o.personGroupId, control.id)).toBe(true);
 
     // The same keep-here decision, honoured in a DIFFERENT scope that shares O's identity — a space person
     // is a distinct (spacePersonId, assetFaceId) row from O's own, so this is not covered by the
@@ -904,13 +904,13 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
         source: 'cleanup',
         actorId: user.id,
       });
-      expect(await negativeExists(ctx, 'personId', q.personGroupId, face.id)).toBe(true); // positive control
-      expect(await negativeExists(ctx, 'personId', r.personGroupId, face.id)).toBe(true); // positive control
+      expect(await negativeExists(ctx, 'personGroupId', q.personGroupId, face.id)).toBe(true); // positive control
+      expect(await negativeExists(ctx, 'personGroupId', r.personGroupId, face.id)).toBe(true); // positive control
 
       await person.reassignFacesById(auth, q.personGroupId, { id: face.id });
 
-      expect(await negativeExists(ctx, 'personId', q.personGroupId, face.id)).toBe(false); // cleared: same target
-      expect(await negativeExists(ctx, 'personId', r.personGroupId, face.id)).toBe(true); // scoping: different target survives
+      expect(await negativeExists(ctx, 'personGroupId', q.personGroupId, face.id)).toBe(false); // cleared: same target
+      expect(await negativeExists(ctx, 'personGroupId', r.personGroupId, face.id)).toBe(true); // scoping: different target survives
     });
 
     it('S8.3 — identity-keyed clearing: a NULL-personId verdict against the target identity is cleared', async () => {
@@ -931,7 +931,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
         .insertInto('face_person_verdict')
         .values({
           assetFaceId: face.id,
-          personId: null,
+          personGroupId: null,
           spacePersonId: null,
           identityId: qIdentity.id,
           status: 'rejected',
@@ -1014,7 +1014,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
         source: 'cleanup',
         actorId: user.id,
       });
-      expect(await negativeExists(ctx, 'personId', q.personGroupId, moveFace.id)).toBe(true); // positive control
+      expect(await negativeExists(ctx, 'personGroupId', q.personGroupId, moveFace.id)).toBe(true); // positive control
 
       await repair.executeRepair({
         toRepair: [{ assetFaceId: moveFace.id, currentPersonId: holder.personGroupId, suspectedOwnerId: q.personGroupId }],
@@ -1024,7 +1024,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
         perPerson: [],
       });
 
-      expect(await negativeExists(ctx, 'personId', q.personGroupId, moveFace.id)).toBe(false); // cleared by the move
+      expect(await negativeExists(ctx, 'personGroupId', q.personGroupId, moveFace.id)).toBe(false); // cleared by the move
 
       // Lock half: F2 sits on `reviewed`; a rejected verdict directly keyed to (reviewed, F2) predates the
       // lock.
@@ -1040,14 +1040,14 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
         source: 'cleanup',
         actorId: user.id,
       });
-      expect(await negativeExists(ctx, 'personId', reviewed.personGroupId, lockFace.id)).toBe(true); // positive control
+      expect(await negativeExists(ctx, 'personGroupId', reviewed.personGroupId, lockFace.id)).toBe(true); // positive control
 
       await repair.resolveFaces(
         { personId: reviewed.personGroupId, moveToPerson: [], stay: [], lock: [lockFace.id], detach: [], unknown: [] },
         user.id,
       );
 
-      expect(await negativeExists(ctx, 'personId', reviewed.personGroupId, lockFace.id)).toBe(false); // cleared by the lock
+      expect(await negativeExists(ctx, 'personGroupId', reviewed.personGroupId, lockFace.id)).toBe(false); // cleared by the lock
     });
 
     it('S8.6 — after Q is deleted and re-created sharing the same identity, a later scan offers F again', async () => {
@@ -1072,7 +1072,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
         actorId: user.id,
       });
       await person.reassignFacesById(auth, q1.personGroupId, { id: face.id });
-      expect(await negativeExists(ctx, 'personId', q1.personGroupId, face.id)).toBe(false); // sanity: S8.1's fix ran
+      expect(await negativeExists(ctx, 'personGroupId', q1.personGroupId, face.id)).toBe(false); // sanity: S8.1's fix ran
 
       // When: a reset unassigns F (strips its manual identity link and its personId — scoped to just this
       // one face here, mirroring unassignFaces's two effects without perturbing sibling fixtures in this
@@ -1094,7 +1094,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
 
       // Then: a suggestion scan offers F again — it was permanently suppressed before this slice.
       await expect(faceSuggestion.handlePersonSuggestionScan({ id: q2.personGroupId })).resolves.toBe(JobStatus.Success);
-      expect(await pendingFor(ctx, 'personId', q2.personGroupId, face.id)).toBe(true);
+      expect(await pendingFor(ctx, 'personGroupId', q2.personGroupId, face.id)).toBe(true);
     });
 
     it('S8.9 — the reaper runs after the identity GC, so a row whose only remaining key is a GC-removed identity is collected', async () => {
@@ -1139,7 +1139,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
         .insertInto('face_person_verdict')
         .values({
           assetFaceId: targetFace.id,
-          personId: null,
+          personGroupId: null,
           spacePersonId: null,
           identityId: pIdentity.id,
           status: 'rejected',
@@ -1181,7 +1181,7 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
       await expect(person.handleQueueRecognizeFaces({ force: true })).resolves.toBe(JobStatus.Success);
 
       expect(await anyVerdictRowFor(targetFace.id)).toBe(false); // collected — the row itself is gone
-      expect(await negativeExists(ctx, 'personId', live.personGroupId, liveFace.id)).toBe(true); // live target kept
+      expect(await negativeExists(ctx, 'personGroupId', live.personGroupId, liveFace.id)).toBe(true); // live target kept
     });
   });
 });
