@@ -4,6 +4,7 @@ import { OnJob } from 'src/decorators';
 import { AuthDto } from 'src/dtos/auth.dto';
 import { PersonFaceSuggestionPageQueryDto, PersonFaceSuggestionPageResponseDto } from 'src/dtos/person.dto';
 import { JobName, JobStatus, Permission, QueueName } from 'src/enum';
+import { PersonId } from 'src/repositories/person.repository';
 import { BaseService } from 'src/services/base.service';
 import { JobItem, JobOf } from 'src/types';
 import { asDateTimeString } from 'src/utils/date';
@@ -39,18 +40,18 @@ export class FaceSuggestionService extends BaseService {
   // Duplicated from PersonService.createNewFeaturePhoto (still used there by upstream-adjacent call
   // sites this service does not own) rather than shared, matching the codebase's existing pattern of
   // a private findOrFail per service rather than one shared implementation.
-  private async createNewFeaturePhoto(changeFeaturePhoto: string[]) {
+  private async createNewFeaturePhoto(changeFeaturePhoto: PersonId[]) {
     this.logger.debug(
       `Changing feature photos for ${changeFeaturePhoto.length} ${changeFeaturePhoto.length > 1 ? 'people' : 'person'}`,
     );
 
     const jobs: JobItem[] = [];
-    for (const personId of changeFeaturePhoto) {
-      const assetFace = await this.personRepository.getRandomFace(personId);
+    for (const { ownerId, personGroupId } of changeFeaturePhoto) {
+      const assetFace = await this.personRepository.getRandomFace(personGroupId);
 
       if (assetFace) {
-        await this.personRepository.update({ id: personId, faceAssetId: assetFace.id });
-        jobs.push({ name: JobName.PersonGenerateThumbnail, data: { id: personId } });
+        await this.personRepository.update({ ownerId, personGroupId, faceAssetId: assetFace.id });
+        jobs.push({ name: JobName.PersonGenerateThumbnail, data: { ownerId, personGroupId } });
       }
     }
 
@@ -177,10 +178,10 @@ export class FaceSuggestionService extends BaseService {
     // Feature-photo refresh is display-only (a job enqueue + a non-identity person column), so it stays
     // OUTSIDE the transaction — mirrors reassignFacesById's own placement of this step.
     if (person.faceAssetId === null) {
-      await this.createNewFeaturePhoto([person.personGroupId]);
+      await this.createNewFeaturePhoto([person]);
     }
     if (face.person && face.person.faceAssetId === face.id) {
-      await this.createNewFeaturePhoto([face.person.personGroupId]);
+      await this.createNewFeaturePhoto([face.person]);
     }
     return true;
   }
