@@ -42,7 +42,7 @@ beforeAll(async () => {
 
 const seedFace = async (ctx: Ctx, ownerId: string, personId: string): Promise<string> => {
   const { asset } = await ctx.newAsset({ ownerId });
-  const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId, sourceType: SourceType.MachineLearning });
+  const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId, sourceType: SourceType.MachineLearning });
   return assetFace.id;
 };
 
@@ -80,9 +80,9 @@ describe('face_identity_face.source=manual durability (Slice 1 — load-bearing 
     const { ctx, faceIdentityRepository } = setup();
     const { user } = await ctx.newUser();
     const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Anna' });
-    const faceId = await seedFace(ctx, user.id, person.id);
+    const faceId = await seedFace(ctx, user.id, person.personGroupId);
 
-    const identity = await faceIdentityRepository.ensurePersonIdentity(person.id);
+    const identity = await faceIdentityRepository.ensurePersonIdentity(person.personGroupId);
     await faceIdentityRepository.replaceFaceIdentity({
       assetFaceId: faceId,
       identityId: identity.id,
@@ -105,9 +105,9 @@ describe('face_identity_face.source=manual durability (Slice 1 — load-bearing 
     const { ctx, faceIdentityRepository } = setup();
     const { user } = await ctx.newUser();
     const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Anna' });
-    const faceId = await seedFace(ctx, user.id, person.id);
+    const faceId = await seedFace(ctx, user.id, person.personGroupId);
 
-    const personIdentity = await faceIdentityRepository.ensurePersonIdentity(person.id);
+    const personIdentity = await faceIdentityRepository.ensurePersonIdentity(person.personGroupId);
     const stranded = await db
       .insertInto('face_identity')
       .values({ type: 'person' })
@@ -134,19 +134,19 @@ describe('face_identity_face.source=manual durability (Slice 1 — load-bearing 
     const { user } = await ctx.newUser();
     const { person: source } = await ctx.newPerson({ ownerId: user.id, name: 'Anna' });
     const { person: target } = await ctx.newPerson({ ownerId: user.id, name: 'Anna dup' });
-    const faceId = await seedFace(ctx, user.id, source.id);
+    const faceId = await seedFace(ctx, user.id, source.personGroupId);
 
-    const sourceIdentity = await faceIdentityRepository.ensurePersonIdentity(source.id);
+    const sourceIdentity = await faceIdentityRepository.ensurePersonIdentity(source.personGroupId);
     await faceIdentityRepository.replaceFaceIdentity({
       assetFaceId: faceId,
       identityId: sourceIdentity.id,
       source: 'manual',
     });
 
-    const targetIdentity = await faceIdentityRepository.ensurePersonIdentity(target.id);
+    const targetIdentity = await faceIdentityRepository.ensurePersonIdentity(target.personGroupId);
     await personRepository.mergePersonProfile({
-      sourcePersonId: source.id,
-      targetPersonId: target.id,
+      sourcePersonId: source.personGroupId,
+      targetPersonId: target.personGroupId,
       targetIdentityId: targetIdentity.id,
     });
 
@@ -161,9 +161,9 @@ describe('face_identity_face.source=manual durability (Slice 1 — load-bearing 
     const { ctx, faceIdentityRepository } = setup();
     const { user } = await ctx.newUser();
     const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Anna' });
-    const faceId = await seedFace(ctx, user.id, person.id);
+    const faceId = await seedFace(ctx, user.id, person.personGroupId);
 
-    const identity = await faceIdentityRepository.ensurePersonIdentity(person.id);
+    const identity = await faceIdentityRepository.ensurePersonIdentity(person.personGroupId);
     await faceIdentityRepository.replaceFaceIdentity({ assetFaceId: faceId, identityId: identity.id, source: 'ml' });
 
     await faceIdentityRepository.replaceFaceIdentity({
@@ -237,9 +237,9 @@ describe('face_identity_face.source=manual durability (Slice 4 — D4a/b/c non-h
     const { ctx, faceIdentityRepository } = setup();
     const { user } = await ctx.newUser();
     const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Anna' });
-    const identity = await faceIdentityRepository.ensurePersonIdentity(person.id);
-    const manualFaceId = await seedFace(ctx, user.id, person.id);
-    const mlFaceId = await seedFace(ctx, user.id, person.id);
+    const identity = await faceIdentityRepository.ensurePersonIdentity(person.personGroupId);
+    const manualFaceId = await seedFace(ctx, user.id, person.personGroupId);
+    const mlFaceId = await seedFace(ctx, user.id, person.personGroupId);
     await faceIdentityRepository.replaceFaceIdentity({
       assetFaceId: manualFaceId,
       identityId: identity.id,
@@ -274,20 +274,20 @@ describe('face_identity_face.source=manual durability (Slice 4 — D4a/b/c non-h
     const { ctx, faceIdentityRepository } = setup();
     const { user } = await ctx.newUser();
     const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Anna' });
-    const identity = await faceIdentityRepository.ensurePersonIdentity(person.id);
+    const identity = await faceIdentityRepository.ensurePersonIdentity(person.personGroupId);
     const staleIdentity = await db
       .insertInto('face_identity')
       .values({ type: 'person' })
       .returningAll()
       .executeTakeFirstOrThrow();
 
-    const manualFaceId = await seedFace(ctx, user.id, person.id);
-    const mlFaceId = await seedFace(ctx, user.id, person.id);
+    const manualFaceId = await seedFace(ctx, user.id, person.personGroupId);
+    const mlFaceId = await seedFace(ctx, user.id, person.personGroupId);
     // Both faces are on `person` but their links have drifted onto a stale, unrelated identity.
     await insertLinkRow(manualFaceId, staleIdentity.id, 'manual');
     await insertLinkRow(mlFaceId, staleIdentity.id, 'ml');
 
-    await faceIdentityRepository.linkPersonFaces({ personId: person.id, identityId: identity.id, source: 'backfill' });
+    await faceIdentityRepository.linkPersonFaces({ personId: person.personGroupId, identityId: identity.id, source: 'backfill' });
 
     const manualRow = await linkRowFor(manualFaceId);
     const mlRow = await linkRowFor(mlFaceId);

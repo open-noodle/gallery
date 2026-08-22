@@ -75,7 +75,7 @@ const seedOverCapPerson = async (ctx: Ctx, ownerId: string, opts: { leakedCount:
     const { asset } = await ctx.newAsset({ ownerId });
     const { assetFace } = await ctx.newAssetFace({
       assetId: asset.id,
-      personId: ownerQ.id,
+      personGroupId: ownerQ.personGroupId,
       sourceType: SourceType.MachineLearning,
     });
     await db
@@ -89,7 +89,7 @@ const seedOverCapPerson = async (ctx: Ctx, ownerId: string, opts: { leakedCount:
     const { asset } = await ctx.newAsset({ ownerId });
     const { assetFace } = await ctx.newAssetFace({
       assetId: asset.id,
-      personId: person.id,
+      personGroupId: person.personGroupId,
       sourceType: SourceType.MachineLearning,
     });
     await db
@@ -102,7 +102,7 @@ const seedOverCapPerson = async (ctx: Ctx, ownerId: string, opts: { leakedCount:
     const { asset } = await ctx.newAsset({ ownerId });
     const { assetFace } = await ctx.newAssetFace({
       assetId: asset.id,
-      personId: person.id,
+      personGroupId: person.personGroupId,
       sourceType: SourceType.MachineLearning,
     });
     await db
@@ -115,7 +115,7 @@ const seedOverCapPerson = async (ctx: Ctx, ownerId: string, opts: { leakedCount:
 
 const seedEligibleFace = async (ctx: Ctx, userId: string, personId: string): Promise<string> => {
   const { asset } = await ctx.newAsset({ ownerId: userId });
-  const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId, sourceType: SourceType.MachineLearning });
+  const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId, sourceType: SourceType.MachineLearning });
   await db.insertInto('face_search').values({ faceId: assetFace.id, embedding: EMBEDDING }).execute();
   return assetFace.id;
 };
@@ -147,7 +147,7 @@ describe('FaceRepairService.getPersonFlaggedFaces (scan-backed)', () => {
     await sut.handleFaceRepairScan({ scanId });
     expect((await sut.getLatestScanStatus())!.status).toBe('completed');
 
-    const result = await sut.getPersonFlaggedFaces(person.id);
+    const result = await sut.getPersonFlaggedFaces(person.personGroupId);
     expect(result.flaggedFaces.map((f) => f.assetFaceId).toSorted()).toEqual(leakedFaceIds.toSorted());
   });
 
@@ -157,16 +157,16 @@ describe('FaceRepairService.getPersonFlaggedFaces (scan-backed)', () => {
     const { person } = await ctx.newPerson({ ownerId: user.id });
     const { person: owner } = await ctx.newPerson({ ownerId: user.id });
     const { person: other } = await ctx.newPerson({ ownerId: user.id });
-    const f1 = await seedEligibleFace(ctx, user.id, person.id);
-    const f2 = await seedEligibleFace(ctx, user.id, person.id);
+    const f1 = await seedEligibleFace(ctx, user.id, person.personGroupId);
+    const f2 = await seedEligibleFace(ctx, user.id, person.personGroupId);
     await seedCompletedScanWithFlagged(scanRepo, [
-      { assetFaceId: f1, personId: person.id, suspectedOwnerId: owner.id },
-      { assetFaceId: f2, personId: person.id, suspectedOwnerId: owner.id },
+      { assetFaceId: f1, personId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
+      { assetFaceId: f2, personId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
     ]);
 
-    await db.updateTable('asset_face').set({ personId: other.id }).where('id', '=', f1).execute();
+    await db.updateTable('asset_face').set({ personId: other.personGroupId }).where('id', '=', f1).execute();
 
-    const result = await sut.getPersonFlaggedFaces(person.id);
+    const result = await sut.getPersonFlaggedFaces(person.personGroupId);
     expect(result.flaggedFaces.map((f) => f.assetFaceId)).toEqual([f2]);
   });
 
@@ -175,17 +175,17 @@ describe('FaceRepairService.getPersonFlaggedFaces (scan-backed)', () => {
     const { user } = await ctx.newUser();
     const { person } = await ctx.newPerson({ ownerId: user.id });
     const { person: owner } = await ctx.newPerson({ ownerId: user.id });
-    const f1 = await seedEligibleFace(ctx, user.id, person.id);
-    const f2 = await seedEligibleFace(ctx, user.id, person.id);
+    const f1 = await seedEligibleFace(ctx, user.id, person.personGroupId);
+    const f2 = await seedEligibleFace(ctx, user.id, person.personGroupId);
     await seedCompletedScanWithFlagged(scanRepo, [
-      { assetFaceId: f1, personId: person.id, suspectedOwnerId: owner.id },
-      { assetFaceId: f2, personId: person.id, suspectedOwnerId: owner.id },
+      { assetFaceId: f1, personId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
+      { assetFaceId: f2, personId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
     ]);
 
     // A face-level "keep here" is now a shared verdict, visible to both face engines.
-    await ctx.get(FacePersonVerdictRepository).markRejected(owner.id, f1, { source: 'cleanup', actorId: user.id });
+    await ctx.get(FacePersonVerdictRepository).markRejected(owner.personGroupId, f1, { source: 'cleanup', actorId: user.id });
 
-    const result = await sut.getPersonFlaggedFaces(person.id);
+    const result = await sut.getPersonFlaggedFaces(person.personGroupId);
     expect(result.flaggedFaces.map((f) => f.assetFaceId)).toEqual([f2]);
   });
 
@@ -194,17 +194,17 @@ describe('FaceRepairService.getPersonFlaggedFaces (scan-backed)', () => {
     const { user } = await ctx.newUser();
     const { person } = await ctx.newPerson({ ownerId: user.id });
     const { person: owner } = await ctx.newPerson({ ownerId: user.id });
-    const f1 = await seedEligibleFace(ctx, user.id, person.id);
+    const f1 = await seedEligibleFace(ctx, user.id, person.personGroupId);
     await seedCompletedScanWithFlagged(scanRepo, [
-      { assetFaceId: f1, personId: person.id, suspectedOwnerId: owner.id },
+      { assetFaceId: f1, personId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
     ]);
 
     await sut.createDeclines({
-      persons: [{ personId: person.id, suspectedOwnerIds: [owner.id] }],
+      persons: [{ personId: person.personGroupId, suspectedOwnerIds: [owner.personGroupId] }],
       declinedBy: user.id,
     });
 
-    const result = await sut.getPersonFlaggedFaces(person.id);
+    const result = await sut.getPersonFlaggedFaces(person.personGroupId);
     expect(result.flaggedFaces).toEqual([]);
   });
 
@@ -213,15 +213,15 @@ describe('FaceRepairService.getPersonFlaggedFaces (scan-backed)', () => {
     const { user } = await ctx.newUser();
     const { person } = await ctx.newPerson({ ownerId: user.id });
     const { person: owner } = await ctx.newPerson({ ownerId: user.id });
-    const f1 = await seedEligibleFace(ctx, user.id, person.id);
+    const f1 = await seedEligibleFace(ctx, user.id, person.personGroupId);
     await seedCompletedScanWithFlagged(scanRepo, [
-      { assetFaceId: f1, personId: person.id, suspectedOwnerId: owner.id },
+      { assetFaceId: f1, personId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
     ]);
 
     // Delete the suspected owner — a fresh recompute could no longer flag f1, but the read is a snapshot.
-    await db.deleteFrom('person').where('id', '=', owner.id).execute();
+    await db.deleteFrom('person').where('personGroupId', '=', owner.personGroupId).execute();
 
-    const result = await sut.getPersonFlaggedFaces(person.id);
+    const result = await sut.getPersonFlaggedFaces(person.personGroupId);
     expect(result.flaggedFaces.map((f) => f.assetFaceId)).toEqual([f1]);
   });
 
@@ -232,12 +232,12 @@ describe('FaceRepairService.getPersonFlaggedFaces (scan-backed)', () => {
     const { person: owner } = await ctx.newPerson({ ownerId: user.id });
     const faces = [];
     for (let i = 0; i < 150; i++) {
-      const id = await seedEligibleFace(ctx, user.id, person.id);
-      faces.push({ assetFaceId: id, personId: person.id, suspectedOwnerId: owner.id });
+      const id = await seedEligibleFace(ctx, user.id, person.personGroupId);
+      faces.push({ assetFaceId: id, personId: person.personGroupId, suspectedOwnerId: owner.personGroupId });
     }
     await seedCompletedScanWithFlagged(scanRepo, faces);
 
-    const result = await sut.getPersonFlaggedFaces(person.id);
+    const result = await sut.getPersonFlaggedFaces(person.personGroupId);
     expect(result.flaggedFaces).toHaveLength(150);
   });
 
@@ -246,15 +246,15 @@ describe('FaceRepairService.getPersonFlaggedFaces (scan-backed)', () => {
     const { user } = await ctx.newUser();
     const { person } = await ctx.newPerson({ ownerId: user.id });
     const { person: owner } = await ctx.newPerson({ ownerId: user.id });
-    const f1 = await seedEligibleFace(ctx, user.id, person.id);
+    const f1 = await seedEligibleFace(ctx, user.id, person.personGroupId);
     await seedCompletedScanWithFlagged(scanRepo, [
-      { assetFaceId: f1, personId: person.id, suspectedOwnerId: owner.id },
+      { assetFaceId: f1, personId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
     ]);
 
     // A newer scan (no rows yet) becomes the latest.
     await scanRepo.createScan({ requestedBy: null, params: PARAMS });
 
-    const result = await sut.getPersonFlaggedFaces(person.id);
+    const result = await sut.getPersonFlaggedFaces(person.personGroupId);
     expect(result.flaggedFaces).toEqual([]);
   });
 
@@ -262,7 +262,7 @@ describe('FaceRepairService.getPersonFlaggedFaces (scan-backed)', () => {
     const { sut, ctx } = setup();
     const { user } = await ctx.newUser();
     const { person } = await ctx.newPerson({ ownerId: user.id });
-    const result = await sut.getPersonFlaggedFaces(person.id);
+    const result = await sut.getPersonFlaggedFaces(person.personGroupId);
     expect(result.flaggedFaces).toEqual([]);
   });
 });

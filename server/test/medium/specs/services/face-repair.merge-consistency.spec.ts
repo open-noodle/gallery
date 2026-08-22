@@ -48,7 +48,7 @@ beforeAll(async () => {
 
 const seedFace = async (ctx: Ctx, ownerId: string, personId: string | null): Promise<string> => {
   const { asset } = await ctx.newAsset({ ownerId });
-  const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId, sourceType: SourceType.MachineLearning });
+  const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId, sourceType: SourceType.MachineLearning });
   return assetFace.id;
 };
 
@@ -77,14 +77,14 @@ describe('face verdicts survive person delete/merge without re-pointing', () => 
     const { person: owner } = await ctx.newPerson({ ownerId: user.id, name: 'Suspected' });
     const faceId = await seedFace(ctx, user.id, null);
 
-    const identity = await faceIdentityRepository.ensurePersonIdentity(owner.id);
-    await facePersonVerdictRepository.markRejected(owner.id, faceId, {
+    const identity = await faceIdentityRepository.ensurePersonIdentity(owner.personGroupId);
+    await facePersonVerdictRepository.markRejected(owner.personGroupId, faceId, {
       identityId: identity.id,
       source: 'cleanup',
       actorId: user.id,
     });
 
-    await personRepository.delete([owner.id]);
+    await personRepository.delete([owner.personGroupId]);
 
     const row = await verdictRowFor(faceId);
     expect(row).toBeDefined();
@@ -102,19 +102,19 @@ describe('face verdicts survive person delete/merge without re-pointing', () => 
     const { user } = await ctx.newUser();
     const { person: source } = await ctx.newPerson({ ownerId: user.id, name: 'Anna' });
     const { person: target } = await ctx.newPerson({ ownerId: user.id, name: 'Anna dup' });
-    const faceId = await seedFace(ctx, user.id, source.id);
+    const faceId = await seedFace(ctx, user.id, source.personGroupId);
 
-    const sourceIdentity = await faceIdentityRepository.ensurePersonIdentity(source.id);
+    const sourceIdentity = await faceIdentityRepository.ensurePersonIdentity(source.personGroupId);
     await faceIdentityRepository.replaceFaceIdentity({
       assetFaceId: faceId,
       identityId: sourceIdentity.id,
       source: 'manual',
     });
 
-    const targetIdentity = await faceIdentityRepository.ensurePersonIdentity(target.id);
+    const targetIdentity = await faceIdentityRepository.ensurePersonIdentity(target.personGroupId);
     await personRepository.mergePersonProfile({
-      sourcePersonId: source.id,
-      targetPersonId: target.id,
+      sourcePersonId: source.personGroupId,
+      targetPersonId: target.personGroupId,
       targetIdentityId: targetIdentity.id,
     });
 
@@ -129,17 +129,17 @@ describe('face verdicts survive person delete/merge without re-pointing', () => 
     const { person: target } = await ctx.newPerson({ ownerId: user.id, name: 'Bob dup' });
     const faceId = await seedFace(ctx, user.id, null);
 
-    const sourceIdentity = await faceIdentityRepository.ensurePersonIdentity(source.id);
-    await facePersonVerdictRepository.markRejected(source.id, faceId, {
+    const sourceIdentity = await faceIdentityRepository.ensurePersonIdentity(source.personGroupId);
+    await facePersonVerdictRepository.markRejected(source.personGroupId, faceId, {
       identityId: sourceIdentity.id,
       source: 'cleanup',
       actorId: user.id,
     });
 
-    const targetIdentity = await faceIdentityRepository.ensurePersonIdentity(target.id);
+    const targetIdentity = await faceIdentityRepository.ensurePersonIdentity(target.personGroupId);
     await personRepository.mergePersonProfile({
-      sourcePersonId: source.id,
-      targetPersonId: target.id,
+      sourcePersonId: source.personGroupId,
+      targetPersonId: target.personGroupId,
       targetIdentityId: targetIdentity.id,
     });
 
@@ -160,22 +160,22 @@ describe('cluster mutes survive a person merge', () => {
     const { source, survivor, ownerA } = await seedTwoPeople(ctx, user.id);
 
     await declineRepository.createClusterMutes({
-      persons: [{ personId: source.id, suspectedOwnerIds: [ownerA.id] }],
+      persons: [{ personId: source.personGroupId, suspectedOwnerIds: [ownerA.personGroupId] }],
       declinedBy: user.id,
     });
     // Positive control: without this, a broken seed produces the same green as a broken merge.
-    const before = await declineRepository.getClusterMuteMap([source.id]);
-    expect(before.get(source.id)).toEqual(new Set([ownerA.id]));
+    const before = await declineRepository.getClusterMuteMap([source.personGroupId]);
+    expect(before.get(source.personGroupId)).toEqual(new Set([ownerA.personGroupId]));
 
-    const targetIdentity = await faceIdentityRepository.ensurePersonIdentity(survivor.id);
+    const targetIdentity = await faceIdentityRepository.ensurePersonIdentity(survivor.personGroupId);
     await personRepository.mergePersonProfile({
-      sourcePersonId: source.id,
-      targetPersonId: survivor.id,
+      sourcePersonId: source.personGroupId,
+      targetPersonId: survivor.personGroupId,
       targetIdentityId: targetIdentity.id,
     });
 
-    const after = await declineRepository.getClusterMuteMap([survivor.id]);
-    expect(after.get(survivor.id)).toEqual(new Set([ownerA.id]));
+    const after = await declineRepository.getClusterMuteMap([survivor.personGroupId]);
+    expect(after.get(survivor.personGroupId)).toEqual(new Set([ownerA.personGroupId]));
   });
 
   // GIVEN both people muted their own cluster, each against a different suspected owner
@@ -190,23 +190,23 @@ describe('cluster mutes survive a person merge', () => {
     const { source, survivor, ownerA, ownerB } = await seedTwoPeople(ctx, user.id);
 
     await declineRepository.createClusterMutes({
-      persons: [{ personId: source.id, suspectedOwnerIds: [ownerA.id] }],
+      persons: [{ personId: source.personGroupId, suspectedOwnerIds: [ownerA.personGroupId] }],
       declinedBy: user.id,
     });
     await declineRepository.createClusterMutes({
-      persons: [{ personId: survivor.id, suspectedOwnerIds: [ownerB.id] }],
+      persons: [{ personId: survivor.personGroupId, suspectedOwnerIds: [ownerB.personGroupId] }],
       declinedBy: user.id,
     });
     // Positive control: both mutes really were written before the merge runs.
-    const beforeSource = await declineRepository.getClusterMuteMap([source.id]);
-    const beforeSurvivor = await declineRepository.getClusterMuteMap([survivor.id]);
-    expect(beforeSource.get(source.id)).toEqual(new Set([ownerA.id]));
-    expect(beforeSurvivor.get(survivor.id)).toEqual(new Set([ownerB.id]));
+    const beforeSource = await declineRepository.getClusterMuteMap([source.personGroupId]);
+    const beforeSurvivor = await declineRepository.getClusterMuteMap([survivor.personGroupId]);
+    expect(beforeSource.get(source.personGroupId)).toEqual(new Set([ownerA.personGroupId]));
+    expect(beforeSurvivor.get(survivor.personGroupId)).toEqual(new Set([ownerB.personGroupId]));
 
-    const targetIdentity = await faceIdentityRepository.ensurePersonIdentity(survivor.id);
+    const targetIdentity = await faceIdentityRepository.ensurePersonIdentity(survivor.personGroupId);
     await personRepository.mergePersonProfile({
-      sourcePersonId: source.id,
-      targetPersonId: survivor.id,
+      sourcePersonId: source.personGroupId,
+      targetPersonId: survivor.personGroupId,
       targetIdentityId: targetIdentity.id,
     });
 
@@ -214,10 +214,10 @@ describe('cluster mutes survive a person merge', () => {
       .selectFrom('face_repair_decline')
       .selectAll()
       .where('type', '=', 'person')
-      .where('personId', '=', survivor.id)
+      .where('personId', '=', survivor.personGroupId)
       .execute();
     expect(rows).toHaveLength(1);
-    expect(new Set(rows[0].suspectedOwnerIds as unknown as string[])).toEqual(new Set([ownerA.id, ownerB.id]));
+    expect(new Set(rows[0].suspectedOwnerIds as unknown as string[])).toEqual(new Set([ownerA.personGroupId, ownerB.personGroupId]));
   });
 
   it('leaves the survivor untouched when only the survivor had a mute', async () => {
@@ -226,22 +226,22 @@ describe('cluster mutes survive a person merge', () => {
     const { source, survivor, ownerB } = await seedTwoPeople(ctx, user.id);
 
     await declineRepository.createClusterMutes({
-      persons: [{ personId: survivor.id, suspectedOwnerIds: [ownerB.id] }],
+      persons: [{ personId: survivor.personGroupId, suspectedOwnerIds: [ownerB.personGroupId] }],
       declinedBy: user.id,
     });
     // Positive control
-    const before = await declineRepository.getClusterMuteMap([survivor.id]);
-    expect(before.get(survivor.id)).toEqual(new Set([ownerB.id]));
+    const before = await declineRepository.getClusterMuteMap([survivor.personGroupId]);
+    expect(before.get(survivor.personGroupId)).toEqual(new Set([ownerB.personGroupId]));
 
-    const targetIdentity = await faceIdentityRepository.ensurePersonIdentity(survivor.id);
+    const targetIdentity = await faceIdentityRepository.ensurePersonIdentity(survivor.personGroupId);
     await personRepository.mergePersonProfile({
-      sourcePersonId: source.id,
-      targetPersonId: survivor.id,
+      sourcePersonId: source.personGroupId,
+      targetPersonId: survivor.personGroupId,
       targetIdentityId: targetIdentity.id,
     });
 
-    const after = await declineRepository.getClusterMuteMap([survivor.id]);
-    expect(after.get(survivor.id)).toEqual(new Set([ownerB.id]));
+    const after = await declineRepository.getClusterMuteMap([survivor.personGroupId]);
+    expect(after.get(survivor.personGroupId)).toEqual(new Set([ownerB.personGroupId]));
   });
 
   it('is a no-op when neither person had a mute', async () => {
@@ -249,16 +249,16 @@ describe('cluster mutes survive a person merge', () => {
     const { user } = await ctx.newUser();
     const { source, survivor } = await seedTwoPeople(ctx, user.id);
 
-    const targetIdentity = await faceIdentityRepository.ensurePersonIdentity(survivor.id);
+    const targetIdentity = await faceIdentityRepository.ensurePersonIdentity(survivor.personGroupId);
     await expect(
       personRepository.mergePersonProfile({
-        sourcePersonId: source.id,
-        targetPersonId: survivor.id,
+        sourcePersonId: source.personGroupId,
+        targetPersonId: survivor.personGroupId,
         targetIdentityId: targetIdentity.id,
       }),
     ).resolves.not.toThrow();
 
-    const after = await declineRepository.getClusterMuteMap([survivor.id]);
+    const after = await declineRepository.getClusterMuteMap([survivor.personGroupId]);
     expect(after.size).toBe(0);
   });
 });

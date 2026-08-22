@@ -124,8 +124,8 @@ describe('FacePersonVerdictRepository', () => {
       const { user } = await ctx.newUser();
       const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Test Person', isHidden: false });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
-      personId = person.id;
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
+      personId = person.personGroupId;
       assetFaceId = assetFace.id;
     });
 
@@ -223,7 +223,7 @@ describe('FacePersonVerdictRepository', () => {
         isHidden: false,
         type: 'person',
       });
-      personPId = personP.id;
+      personPId = personP.personGroupId;
 
       const { person: personU } = await ctx.newPerson({
         ownerId: user.id,
@@ -231,7 +231,7 @@ describe('FacePersonVerdictRepository', () => {
         isHidden: false,
         type: 'person',
       });
-      unnamedPersonId = personU.id;
+      unnamedPersonId = personU.personGroupId;
 
       const { person: personH } = await ctx.newPerson({
         ownerId: user.id,
@@ -239,7 +239,7 @@ describe('FacePersonVerdictRepository', () => {
         isHidden: true,
         type: 'person',
       });
-      hiddenPersonId = personH.id;
+      hiddenPersonId = personH.personGroupId;
 
       const { person: personX } = await ctx.newPerson({
         ownerId: user.id,
@@ -247,20 +247,20 @@ describe('FacePersonVerdictRepository', () => {
         isHidden: false,
         type: 'pet',
       });
-      petPersonId = personX.id;
+      petPersonId = personX.personGroupId;
 
       // Create asset faces (unassigned, i.e. personId = null)
       const { asset } = await ctx.newAsset({ ownerId: user.id });
 
-      const { assetFace: f1 } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
-      const { assetFace: f2 } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
-      const { assetFace: f3 } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
-      const { assetFace: f4 } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
-      const { assetFace: f5 } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const { assetFace: f1 } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
+      const { assetFace: f2 } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
+      const { assetFace: f3 } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
+      const { assetFace: f4 } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
+      const { assetFace: f5 } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
       // Asset faces for gate-excluded persons
-      const { assetFace: fU } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
-      const { assetFace: fH } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
-      const { assetFace: fX } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const { assetFace: fU } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
+      const { assetFace: fH } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
+      const { assetFace: fX } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
 
       const { sut } = setup();
 
@@ -286,7 +286,7 @@ describe('FacePersonVerdictRepository', () => {
       await sut.upsertPending([{ personId: personPId, assetFaceId: f5.id, distance: 0.9 }]);
 
       // F6: in band (0.65) but face becomes assigned mid-review — excluded by af.personId IS NULL
-      const { assetFace: f6 } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const { assetFace: f6 } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
       f6Id = f6.id;
       await sut.upsertPending([{ personId: personPId, assetFaceId: f6Id, distance: 0.65 }]);
       await defaultDatabase.updateTable('asset_face').set({ personId: personPId }).where('id', '=', f6Id).execute();
@@ -314,11 +314,11 @@ describe('FacePersonVerdictRepository', () => {
         type: 'person',
       });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
 
-      await sut.upsertPending([{ personId: person.id, assetFaceId: assetFace.id, distance: opts.maxDistance }]);
+      await sut.upsertPending([{ personId: person.personGroupId, assetFaceId: assetFace.id, distance: opts.maxDistance }]);
 
-      const res = await sut.getPendingForPerson(person.id, opts);
+      const res = await sut.getPendingForPerson(person.personGroupId, opts);
       expect(res).toEqual({ total: 0, items: [] });
     });
 
@@ -332,13 +332,13 @@ describe('FacePersonVerdictRepository', () => {
         type: 'person',
       });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
 
       await sut.upsertPending([
-        { personId: person.id, assetFaceId: assetFace.id, distance: opts.suggestionMaxDistance },
+        { personId: person.personGroupId, assetFaceId: assetFace.id, distance: opts.suggestionMaxDistance },
       ]);
 
-      const res = await sut.getPendingForPerson(person.id, opts);
+      const res = await sut.getPendingForPerson(person.personGroupId, opts);
       expect(res.total).toBe(1);
       expect(res.items.map((i) => i.assetFaceId)).toEqual([assetFace.id]);
       expect(res.items[0].distance).toBe(opts.suggestionMaxDistance);
@@ -406,12 +406,12 @@ describe('FacePersonVerdictRepository', () => {
       const { asset: lockedAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Locked });
       const { asset: offlineAsset } = await ctx.newAsset({ ownerId: user.id, isOffline: true });
 
-      const { assetFace: normalFace } = await ctx.newAssetFace({ assetId: normalAsset.id, personId: null });
-      const { assetFace: trashedFace } = await ctx.newAssetFace({ assetId: trashedAsset.id, personId: null });
-      const { assetFace: hiddenFace } = await ctx.newAssetFace({ assetId: hiddenAsset.id, personId: null });
-      const { assetFace: lockedFace } = await ctx.newAssetFace({ assetId: lockedAsset.id, personId: null });
-      const { assetFace: offlineFace } = await ctx.newAssetFace({ assetId: offlineAsset.id, personId: null });
-      const { assetFace: invisibleFace } = await ctx.newAssetFace({ assetId: normalAsset.id, personId: null });
+      const { assetFace: normalFace } = await ctx.newAssetFace({ assetId: normalAsset.id, personGroupId: null });
+      const { assetFace: trashedFace } = await ctx.newAssetFace({ assetId: trashedAsset.id, personGroupId: null });
+      const { assetFace: hiddenFace } = await ctx.newAssetFace({ assetId: hiddenAsset.id, personGroupId: null });
+      const { assetFace: lockedFace } = await ctx.newAssetFace({ assetId: lockedAsset.id, personGroupId: null });
+      const { assetFace: offlineFace } = await ctx.newAssetFace({ assetId: offlineAsset.id, personGroupId: null });
+      const { assetFace: invisibleFace } = await ctx.newAssetFace({ assetId: normalAsset.id, personGroupId: null });
       await defaultDatabase
         .updateTable('asset_face')
         .set({ isVisible: false })
@@ -419,15 +419,15 @@ describe('FacePersonVerdictRepository', () => {
         .execute();
 
       await sut.upsertPending([
-        { personId: person.id, assetFaceId: normalFace.id, distance: 0.6 },
-        { personId: person.id, assetFaceId: trashedFace.id, distance: 0.61 },
-        { personId: person.id, assetFaceId: hiddenFace.id, distance: 0.62 },
-        { personId: person.id, assetFaceId: lockedFace.id, distance: 0.63 },
-        { personId: person.id, assetFaceId: offlineFace.id, distance: 0.64 },
-        { personId: person.id, assetFaceId: invisibleFace.id, distance: 0.65 },
+        { personId: person.personGroupId, assetFaceId: normalFace.id, distance: 0.6 },
+        { personId: person.personGroupId, assetFaceId: trashedFace.id, distance: 0.61 },
+        { personId: person.personGroupId, assetFaceId: hiddenFace.id, distance: 0.62 },
+        { personId: person.personGroupId, assetFaceId: lockedFace.id, distance: 0.63 },
+        { personId: person.personGroupId, assetFaceId: offlineFace.id, distance: 0.64 },
+        { personId: person.personGroupId, assetFaceId: invisibleFace.id, distance: 0.65 },
       ]);
 
-      const result = await sut.getPendingForPerson(person.id, opts);
+      const result = await sut.getPendingForPerson(person.personGroupId, opts);
 
       expect(result.total).toBe(1);
       expect(result.items.map((item) => item.assetFaceId)).toEqual([normalFace.id]);
@@ -435,7 +435,7 @@ describe('FacePersonVerdictRepository', () => {
       // Read-time gate: rows are never deleted, so restoring the trashed asset resurfaces its row.
       await defaultDatabase.updateTable('asset').set({ deletedAt: null }).where('id', '=', trashedAsset.id).execute();
 
-      const afterUntrash = await sut.getPendingForPerson(person.id, opts);
+      const afterUntrash = await sut.getPendingForPerson(person.personGroupId, opts);
       expect(afterUntrash.total).toBe(2);
       expect(afterUntrash.items.map((item) => item.assetFaceId)).toEqual(
         expect.arrayContaining([normalFace.id, trashedFace.id]),
@@ -453,8 +453,8 @@ describe('FacePersonVerdictRepository', () => {
       const { user } = await ctx.newUser();
       const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Suggestion Person', isHidden: false });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
-      personId = person.id;
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
+      personId = person.personGroupId;
       assetFaceId = assetFace.id;
     });
 
@@ -567,13 +567,13 @@ describe('FacePersonVerdictRepository', () => {
       });
       await sut.upsertPending([
         { personId, assetFaceId, distance: 0.6 },
-        { personId: siblingPerson.id, assetFaceId, distance: 0.65 },
+        { personId: siblingPerson.personGroupId, assetFaceId, distance: 0.65 },
       ]);
 
       expect(await sut[method](personId, assetFaceId)).toBe(1);
 
       const target = await getRow(personId, assetFaceId);
-      const sibling = await getRow(siblingPerson.id, assetFaceId);
+      const sibling = await getRow(siblingPerson.personGroupId, assetFaceId);
       expect(target.status).toBe(status);
       expect(sibling.status).toBe('pending');
     });
@@ -589,31 +589,31 @@ describe('FacePersonVerdictRepository', () => {
       const { user: admin } = await ctx.newUser();
       const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Coalesce Person', isHidden: false });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
-      const identity = await ctx.get(FaceIdentityRepository).ensurePersonIdentity(person.id);
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
+      const identity = await ctx.get(FaceIdentityRepository).ensurePersonIdentity(person.personGroupId);
 
       // A cleanup keep-here (rejected) row WITH identityId + actorId — the stronger existing key.
-      await sut.markRejected(person.id, assetFace.id, {
+      await sut.markRejected(person.personGroupId, assetFace.id, {
         identityId: identity.id,
         source: 'cleanup',
         actorId: admin.id,
       });
-      let row = await getRow(person.id, assetFace.id);
+      let row = await getRow(person.personGroupId, assetFace.id);
       expect(row).toMatchObject({ identityId: identity.id, status: 'rejected', source: 'cleanup', actorId: admin.id });
 
       // A degenerate caller reject WITHOUT opts must never null the stronger existing identityId.
-      await sut.markRejected(person.id, assetFace.id);
-      row = await getRow(person.id, assetFace.id);
+      await sut.markRejected(person.personGroupId, assetFace.id);
+      row = await getRow(person.personGroupId, assetFace.id);
       expect(row.identityId).toBe(identity.id);
       expect(row.status).toBe('rejected');
 
       // A subsequent human reject WITH opts overwrites status/source/actor and keeps identityId.
-      await sut.markRejected(person.id, assetFace.id, {
+      await sut.markRejected(person.personGroupId, assetFace.id, {
         identityId: identity.id,
         source: 'suggestion',
         actorId: user.id,
       });
-      row = await getRow(person.id, assetFace.id);
+      row = await getRow(person.personGroupId, assetFace.id);
       expect(row).toMatchObject({
         identityId: identity.id,
         status: 'rejected',
@@ -634,20 +634,20 @@ describe('FacePersonVerdictRepository', () => {
       const { user } = await ctx.newUser();
       const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Happy Path', isHidden: false, type: 'person' });
       const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
 
-      await sut.upsertPending([{ personId: person.id, assetFaceId: assetFace.id, distance: 0.6 }]);
+      await sut.upsertPending([{ personId: person.personGroupId, assetFaceId: assetFace.id, distance: 0.6 }]);
 
       // Confirm flow order: claim BEFORE reassign/resolve/relink (mirrors person.service.ts).
-      const claimed = await sut.claimPending(person.id, assetFace.id, { maxDistance: 0.5, suggestionMaxDistance: 0.8 });
+      const claimed = await sut.claimPending(person.personGroupId, assetFace.id, { maxDistance: 0.5, suggestionMaxDistance: 0.8 });
       expect(claimed).toBe(1);
 
       const personRepository = ctx.get(PersonRepository);
       const faceIdentityRepository = ctx.get(FaceIdentityRepository);
 
-      await personRepository.reassignFace(assetFace.id, person.id);
+      await personRepository.reassignFace(assetFace.id, person.personGroupId);
       await sut.resolveAssignedFace(assetFace.id);
-      const identity = await faceIdentityRepository.ensurePersonIdentity(person.id);
+      const identity = await faceIdentityRepository.ensurePersonIdentity(person.personGroupId);
       await faceIdentityRepository.replaceFaceIdentity({
         assetFaceId: assetFace.id,
         identityId: identity.id,
@@ -659,9 +659,9 @@ describe('FacePersonVerdictRepository', () => {
         .select(['personId'])
         .where('id', '=', assetFace.id)
         .executeTakeFirstOrThrow();
-      expect(face.personId).toBe(person.id); // reassigned
+      expect(face.personId).toBe(person.personGroupId); // reassigned
 
-      const verdictRow = await getRowOrUndefined(person.id, assetFace.id);
+      const verdictRow = await getRowOrUndefined(person.personGroupId, assetFace.id);
       expect(verdictRow).toBeUndefined(); // drained
 
       const link = await defaultDatabase
@@ -689,12 +689,12 @@ describe('FacePersonVerdictRepository', () => {
       });
 
       const { asset: controlAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
-      const { assetFace: controlFace } = await ctx.newAssetFace({ assetId: controlAsset.id, personId: null });
-      await sut.upsertPending([{ personId: person.id, assetFaceId: controlFace.id, distance: 0.6 }]);
+      const { assetFace: controlFace } = await ctx.newAssetFace({ assetId: controlAsset.id, personGroupId: null });
+      await sut.upsertPending([{ personId: person.personGroupId, assetFaceId: controlFace.id, distance: 0.6 }]);
 
       const { asset: lockedAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
-      const { assetFace: lockedFace } = await ctx.newAssetFace({ assetId: lockedAsset.id, personId: null });
-      await sut.upsertPending([{ personId: person.id, assetFaceId: lockedFace.id, distance: 0.6 }]);
+      const { assetFace: lockedFace } = await ctx.newAssetFace({ assetId: lockedAsset.id, personGroupId: null });
+      await sut.upsertPending([{ personId: person.personGroupId, assetFaceId: lockedFace.id, distance: 0.6 }]);
       // The asset moves to the Locked folder AFTER the pending row was written — the queue read would no
       // longer show it, so the claim must refuse it too.
       await defaultDatabase
@@ -703,10 +703,10 @@ describe('FacePersonVerdictRepository', () => {
         .where('id', '=', lockedAsset.id)
         .execute();
 
-      expect(await sut.claimPending(person.id, lockedFace.id, opts)).toBe(0);
-      expect(await getRowStatus(person.id, lockedFace.id)).toBe('pending'); // row intact, not claimed
+      expect(await sut.claimPending(person.personGroupId, lockedFace.id, opts)).toBe(0);
+      expect(await getRowStatus(person.personGroupId, lockedFace.id)).toBe('pending'); // row intact, not claimed
 
-      expect(await sut.claimPending(person.id, controlFace.id, opts)).toBe(1); // positive control
+      expect(await sut.claimPending(person.personGroupId, controlFace.id, opts)).toBe(1); // positive control
     });
 
     describe('S3.2: table-driven ineligible mutations', () => {
@@ -746,18 +746,18 @@ describe('FacePersonVerdictRepository', () => {
             ownerId: user.id,
             visibility: AssetVisibility.Timeline,
           });
-          const { assetFace: controlFace } = await ctx.newAssetFace({ assetId: controlAsset.id, personId: null });
-          await sut.upsertPending([{ personId: person.id, assetFaceId: controlFace.id, distance: 0.6 }]);
+          const { assetFace: controlFace } = await ctx.newAssetFace({ assetId: controlAsset.id, personGroupId: null });
+          await sut.upsertPending([{ personId: person.personGroupId, assetFaceId: controlFace.id, distance: 0.6 }]);
 
           const { asset: targetAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
-          const { assetFace: targetFace } = await ctx.newAssetFace({ assetId: targetAsset.id, personId: null });
-          await sut.upsertPending([{ personId: person.id, assetFaceId: targetFace.id, distance: 0.6 }]);
+          const { assetFace: targetFace } = await ctx.newAssetFace({ assetId: targetAsset.id, personGroupId: null });
+          await sut.upsertPending([{ personId: person.personGroupId, assetFaceId: targetFace.id, distance: 0.6 }]);
           await mutateAsset(targetAsset.id);
 
-          expect(await sut.claimPending(person.id, targetFace.id, opts)).toBe(0);
-          expect(await getRowStatus(person.id, targetFace.id)).toBe('pending');
+          expect(await sut.claimPending(person.personGroupId, targetFace.id, opts)).toBe(0);
+          expect(await getRowStatus(person.personGroupId, targetFace.id)).toBe('pending');
 
-          expect(await sut.claimPending(person.id, controlFace.id, opts)).toBe(1); // positive control
+          expect(await sut.claimPending(person.personGroupId, controlFace.id, opts)).toBe(1); // positive control
         },
       );
 
@@ -785,17 +785,17 @@ describe('FacePersonVerdictRepository', () => {
           });
           const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
 
-          const { assetFace: controlFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
-          await sut.upsertPending([{ personId: person.id, assetFaceId: controlFace.id, distance: 0.6 }]);
+          const { assetFace: controlFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
+          await sut.upsertPending([{ personId: person.personGroupId, assetFaceId: controlFace.id, distance: 0.6 }]);
 
-          const { assetFace: targetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
-          await sut.upsertPending([{ personId: person.id, assetFaceId: targetFace.id, distance: 0.6 }]);
+          const { assetFace: targetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
+          await sut.upsertPending([{ personId: person.personGroupId, assetFaceId: targetFace.id, distance: 0.6 }]);
           await mutateFace(targetFace.id);
 
-          expect(await sut.claimPending(person.id, targetFace.id, opts)).toBe(0);
-          expect(await getRowStatus(person.id, targetFace.id)).toBe('pending');
+          expect(await sut.claimPending(person.personGroupId, targetFace.id, opts)).toBe(0);
+          expect(await getRowStatus(person.personGroupId, targetFace.id)).toBe('pending');
 
-          expect(await sut.claimPending(person.id, controlFace.id, opts)).toBe(1); // positive control
+          expect(await sut.claimPending(person.personGroupId, controlFace.id, opts)).toBe(1); // positive control
         },
       );
 
@@ -816,21 +816,21 @@ describe('FacePersonVerdictRepository', () => {
         });
         const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
 
-        const { assetFace: controlFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
-        await sut.upsertPending([{ personId: person.id, assetFaceId: controlFace.id, distance: 0.6 }]);
+        const { assetFace: controlFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
+        await sut.upsertPending([{ personId: person.personGroupId, assetFaceId: controlFace.id, distance: 0.6 }]);
 
-        const { assetFace: targetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
-        await sut.upsertPending([{ personId: person.id, assetFaceId: targetFace.id, distance: 0.6 }]);
+        const { assetFace: targetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
+        await sut.upsertPending([{ personId: person.personGroupId, assetFaceId: targetFace.id, distance: 0.6 }]);
         await defaultDatabase
           .updateTable('asset_face')
-          .set({ personId: otherPerson.id })
+          .set({ personId: otherPerson.personGroupId })
           .where('id', '=', targetFace.id)
           .execute();
 
-        expect(await sut.claimPending(person.id, targetFace.id, opts)).toBe(0);
-        expect(await getRowStatus(person.id, targetFace.id)).toBe('pending');
+        expect(await sut.claimPending(person.personGroupId, targetFace.id, opts)).toBe(0);
+        expect(await getRowStatus(person.personGroupId, targetFace.id)).toBe('pending');
 
-        expect(await sut.claimPending(person.id, controlFace.id, opts)).toBe(1); // positive control
+        expect(await sut.claimPending(person.personGroupId, controlFace.id, opts)).toBe(1); // positive control
       });
     });
 
@@ -851,24 +851,24 @@ describe('FacePersonVerdictRepository', () => {
       });
       const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
 
-      const { assetFace: controlFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
-      await sut.upsertPending([{ personId: person.id, assetFaceId: controlFace.id, distance: 0.6 }]);
+      const { assetFace: controlFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
+      await sut.upsertPending([{ personId: person.personGroupId, assetFaceId: controlFace.id, distance: 0.6 }]);
 
-      const { assetFace: targetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
-      await sut.upsertPending([{ personId: person.id, assetFaceId: targetFace.id, distance: 0.6 }]);
+      const { assetFace: targetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
+      await sut.upsertPending([{ personId: person.personGroupId, assetFaceId: targetFace.id, distance: 0.6 }]);
 
       const faceIdentityRepository = ctx.get(FaceIdentityRepository);
-      const otherIdentity = await faceIdentityRepository.ensurePersonIdentity(otherPerson.id);
+      const otherIdentity = await faceIdentityRepository.ensurePersonIdentity(otherPerson.personGroupId);
       await faceIdentityRepository.replaceFaceIdentity({
         assetFaceId: targetFace.id,
         identityId: otherIdentity.id,
         source: 'manual',
       });
 
-      expect(await sut.claimPending(person.id, targetFace.id, opts)).toBe(0);
-      expect(await getRowStatus(person.id, targetFace.id)).toBe('pending');
+      expect(await sut.claimPending(person.personGroupId, targetFace.id, opts)).toBe(0);
+      expect(await getRowStatus(person.personGroupId, targetFace.id)).toBe('pending');
 
-      expect(await sut.claimPending(person.id, controlFace.id, opts)).toBe(1); // positive control
+      expect(await sut.claimPending(person.personGroupId, controlFace.id, opts)).toBe(1); // positive control
     });
 
     describe('S3.4: negative-verdict anti-join', () => {
@@ -888,17 +888,17 @@ describe('FacePersonVerdictRepository', () => {
         });
         const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
 
-        const { assetFace: controlFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
-        await sut.upsertPending([{ personId: person.id, assetFaceId: controlFace.id, distance: 0.6 }]);
+        const { assetFace: controlFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
+        await sut.upsertPending([{ personId: person.personGroupId, assetFaceId: controlFace.id, distance: 0.6 }]);
 
-        const { assetFace: targetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
-        await sut.upsertPending([{ personId: person.id, assetFaceId: targetFace.id, distance: 0.6 }]);
-        await sut.markRejected(person.id, targetFace.id);
+        const { assetFace: targetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
+        await sut.upsertPending([{ personId: person.personGroupId, assetFaceId: targetFace.id, distance: 0.6 }]);
+        await sut.markRejected(person.personGroupId, targetFace.id);
 
-        expect(await sut.claimPending(person.id, targetFace.id, opts)).toBe(0);
-        expect(await getRowStatus(person.id, targetFace.id)).toBe('rejected');
+        expect(await sut.claimPending(person.personGroupId, targetFace.id, opts)).toBe(0);
+        expect(await getRowStatus(person.personGroupId, targetFace.id)).toBe('rejected');
 
-        expect(await sut.claimPending(person.id, controlFace.id, opts)).toBe(1); // positive control
+        expect(await sut.claimPending(person.personGroupId, controlFace.id, opts)).toBe(1); // positive control
       });
 
       it('matched by identityId: returns 0 when a DIFFERENT person sharing the same identity already rejected the face; 1 for an eligible control', async () => {
@@ -919,20 +919,20 @@ describe('FacePersonVerdictRepository', () => {
         const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
 
         const faceIdentityRepository = ctx.get(FaceIdentityRepository);
-        const identity = await faceIdentityRepository.ensurePersonIdentity(person.id);
+        const identity = await faceIdentityRepository.ensurePersonIdentity(person.personGroupId);
 
-        const { assetFace: controlFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
-        await sut.upsertPending([{ personId: person.id, assetFaceId: controlFace.id, distance: 0.6 }]);
+        const { assetFace: controlFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
+        await sut.upsertPending([{ personId: person.personGroupId, assetFaceId: controlFace.id, distance: 0.6 }]);
 
-        const { assetFace: targetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
-        await sut.upsertPending([{ personId: person.id, assetFaceId: targetFace.id, distance: 0.6 }]);
+        const { assetFace: targetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
+        await sut.upsertPending([{ personId: person.personGroupId, assetFaceId: targetFace.id, distance: 0.6 }]);
         // A DIFFERENT person, sharing `person`'s identity, has already said "not this" about the face.
-        await sut.markRejected(otherPerson.id, targetFace.id, { identityId: identity.id });
+        await sut.markRejected(otherPerson.personGroupId, targetFace.id, { identityId: identity.id });
 
-        expect(await sut.claimPending(person.id, targetFace.id, opts)).toBe(0);
-        expect(await getRowStatus(person.id, targetFace.id)).toBe('pending'); // the row itself untouched
+        expect(await sut.claimPending(person.personGroupId, targetFace.id, opts)).toBe(0);
+        expect(await getRowStatus(person.personGroupId, targetFace.id)).toBe('pending'); // the row itself untouched
 
-        expect(await sut.claimPending(person.id, controlFace.id, opts)).toBe(1); // positive control
+        expect(await sut.claimPending(person.personGroupId, controlFace.id, opts)).toBe(1); // positive control
       });
     });
 
@@ -947,22 +947,22 @@ describe('FacePersonVerdictRepository', () => {
       });
       const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
 
-      const { assetFace: controlFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
-      await sut.upsertPending([{ personId: person.id, assetFaceId: controlFace.id, distance: 0.6 }]);
+      const { assetFace: controlFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
+      await sut.upsertPending([{ personId: person.personGroupId, assetFaceId: controlFace.id, distance: 0.6 }]);
 
-      const { assetFace: lowBoundaryFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
-      await sut.upsertPending([{ personId: person.id, assetFaceId: lowBoundaryFace.id, distance: opts.maxDistance }]);
+      const { assetFace: lowBoundaryFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
+      await sut.upsertPending([{ personId: person.personGroupId, assetFaceId: lowBoundaryFace.id, distance: opts.maxDistance }]);
 
-      const { assetFace: aboveUpperFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
-      await sut.upsertPending([{ personId: person.id, assetFaceId: aboveUpperFace.id, distance: 0.9 }]);
+      const { assetFace: aboveUpperFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
+      await sut.upsertPending([{ personId: person.personGroupId, assetFaceId: aboveUpperFace.id, distance: 0.9 }]);
 
-      expect(await sut.claimPending(person.id, lowBoundaryFace.id, opts)).toBe(0);
-      expect(await getRowStatus(person.id, lowBoundaryFace.id)).toBe('pending');
+      expect(await sut.claimPending(person.personGroupId, lowBoundaryFace.id, opts)).toBe(0);
+      expect(await getRowStatus(person.personGroupId, lowBoundaryFace.id)).toBe('pending');
 
-      expect(await sut.claimPending(person.id, aboveUpperFace.id, opts)).toBe(0);
-      expect(await getRowStatus(person.id, aboveUpperFace.id)).toBe('pending');
+      expect(await sut.claimPending(person.personGroupId, aboveUpperFace.id, opts)).toBe(0);
+      expect(await getRowStatus(person.personGroupId, aboveUpperFace.id)).toBe('pending');
 
-      expect(await sut.claimPending(person.id, controlFace.id, opts)).toBe(1); // positive control
+      expect(await sut.claimPending(person.personGroupId, controlFace.id, opts)).toBe(1); // positive control
     });
 
     it('S3.11: honours a passed transaction — a rollback leaves the row untouched', async () => {
@@ -975,19 +975,19 @@ describe('FacePersonVerdictRepository', () => {
         type: 'person',
       });
       const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
 
-      await sut.upsertPending([{ personId: person.id, assetFaceId: assetFace.id, distance: 0.6 }]);
+      await sut.upsertPending([{ personId: person.personGroupId, assetFaceId: assetFace.id, distance: 0.6 }]);
 
       await expect(
         defaultDatabase.transaction().execute(async (trx) => {
-          const claimed = await sut.claimPending(person.id, assetFace.id, opts, trx);
+          const claimed = await sut.claimPending(person.personGroupId, assetFace.id, opts, trx);
           expect(claimed).toBe(1);
           throw new Error('force rollback');
         }),
       ).rejects.toThrow('force rollback');
 
-      const row = await getRow(person.id, assetFace.id);
+      const row = await getRow(person.personGroupId, assetFace.id);
       expect(row.status).toBe('pending'); // rolled back — the claim never committed
     });
   });
@@ -1003,26 +1003,26 @@ describe('FacePersonVerdictRepository', () => {
       const { person: p1 } = await ctx.newPerson({ ownerId: user.id, name: 'Bulk P1' });
       const { person: p2 } = await ctx.newPerson({ ownerId: user.id, name: 'Bulk P2' });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace: fA } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
-      const { assetFace: fB } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
-      const identity = await ctx.get(FaceIdentityRepository).ensurePersonIdentity(p1.id);
+      const { assetFace: fA } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
+      const { assetFace: fB } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
+      const identity = await ctx.get(FaceIdentityRepository).ensurePersonIdentity(p1.personGroupId);
 
       const written = await sut.markRejectedMany(
         [
-          { personId: p1.id, assetFaceId: fA.id, identityId: identity.id },
-          { personId: p2.id, assetFaceId: fB.id },
+          { personId: p1.personGroupId, assetFaceId: fA.id, identityId: identity.id },
+          { personId: p2.personGroupId, assetFaceId: fB.id },
         ],
         { source: 'cleanup', actorId: admin.id },
       );
 
       expect(written).toBe(2);
-      expect(await getRow(p1.id, fA.id)).toMatchObject({
+      expect(await getRow(p1.personGroupId, fA.id)).toMatchObject({
         identityId: identity.id,
         status: 'rejected',
         source: 'cleanup',
         actorId: admin.id,
       });
-      expect(await getRow(p2.id, fB.id)).toMatchObject({ identityId: null, status: 'rejected', source: 'cleanup' });
+      expect(await getRow(p2.personGroupId, fB.id)).toMatchObject({ identityId: null, status: 'rejected', source: 'cleanup' });
     });
 
     // Postgres refuses an ON CONFLICT DO UPDATE that touches the same row twice in one statement. The per-face
@@ -1033,18 +1033,18 @@ describe('FacePersonVerdictRepository', () => {
       const { user } = await ctx.newUser();
       const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Bulk Dup' });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
 
       const written = await sut.markRejectedMany(
         [
-          { personId: person.id, assetFaceId: assetFace.id },
-          { personId: person.id, assetFaceId: assetFace.id },
+          { personId: person.personGroupId, assetFaceId: assetFace.id },
+          { personId: person.personGroupId, assetFaceId: assetFace.id },
         ],
         { source: 'cleanup' },
       );
 
       expect(written).toBe(1);
-      expect(await getRow(person.id, assetFace.id)).toMatchObject({ status: 'rejected' });
+      expect(await getRow(person.personGroupId, assetFace.id)).toMatchObject({ status: 'rejected' });
     });
 
     it('upserts over a pending row and preserves a stronger existing identityId (D10)', async () => {
@@ -1052,20 +1052,20 @@ describe('FacePersonVerdictRepository', () => {
       const { user } = await ctx.newUser();
       const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Bulk Coalesce' });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
-      const identity = await ctx.get(FaceIdentityRepository).ensurePersonIdentity(person.id);
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
+      const identity = await ctx.get(FaceIdentityRepository).ensurePersonIdentity(person.personGroupId);
 
-      await sut.upsertPending([{ personId: person.id, assetFaceId: assetFace.id, distance: 0.6 }]);
-      await sut.markRejectedMany([{ personId: person.id, assetFaceId: assetFace.id, identityId: identity.id }], {
+      await sut.upsertPending([{ personId: person.personGroupId, assetFaceId: assetFace.id, distance: 0.6 }]);
+      await sut.markRejectedMany([{ personId: person.personGroupId, assetFaceId: assetFace.id, identityId: identity.id }], {
         source: 'cleanup',
       });
       // A later batch WITHOUT an identity must not null the stronger existing key.
-      await sut.markRejectedMany([{ personId: person.id, assetFaceId: assetFace.id }], { source: 'cleanup' });
+      await sut.markRejectedMany([{ personId: person.personGroupId, assetFaceId: assetFace.id }], { source: 'cleanup' });
 
       const rows = await defaultDatabase
         .selectFrom('face_person_verdict')
         .selectAll()
-        .where('personId', '=', person.id)
+        .where('personId', '=', person.personGroupId)
         .where('assetFaceId', '=', assetFace.id)
         .execute();
       expect(rows).toHaveLength(1);
@@ -1086,12 +1086,12 @@ describe('FacePersonVerdictRepository', () => {
       const { asset } = await ctx.newAsset({ ownerId: user.id });
       const faces: string[] = [];
       for (let index = 0; index < 1200; index++) {
-        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
         faces.push(assetFace.id);
       }
 
       const written = await sut.markRejectedMany(
-        faces.map((assetFaceId) => ({ personId: person.id, assetFaceId })),
+        faces.map((assetFaceId) => ({ personId: person.personGroupId, assetFaceId })),
         { source: 'cleanup' },
       );
 
@@ -1106,18 +1106,18 @@ describe('FacePersonVerdictRepository', () => {
       const { ctx, sut } = setup();
       const { user } = await ctx.newUser();
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace: fA } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
-      const { assetFace: fB } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const { assetFace: fA } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
+      const { assetFace: fB } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
       const { person: p1 } = await ctx.newPerson({ ownerId: user.id, name: 'P1' });
       const { person: p2 } = await ctx.newPerson({ ownerId: user.id, name: 'P2' });
 
       await sut.upsertPending([
-        { personId: p1.id, assetFaceId: fA.id, distance: 0.6 },
-        { personId: p2.id, assetFaceId: fA.id, distance: 0.62 },
-        { personId: p1.id, assetFaceId: fB.id, distance: 0.63 },
+        { personId: p1.personGroupId, assetFaceId: fA.id, distance: 0.6 },
+        { personId: p2.personGroupId, assetFaceId: fA.id, distance: 0.62 },
+        { personId: p1.personGroupId, assetFaceId: fB.id, distance: 0.63 },
       ]);
       // A durable negative verdict on fA must survive the drain.
-      await sut.markRejected(p2.id, fA.id, { source: 'cleanup' });
+      await sut.markRejected(p2.personGroupId, fA.id, { source: 'cleanup' });
 
       const drained = await sut.drainPendingForFaces([fA.id]);
       expect(drained).toBe(1); // only p1's still-pending fA row (p2's fA row is now 'rejected')
@@ -1130,8 +1130,8 @@ describe('FacePersonVerdictRepository', () => {
       // fA keeps its rejected verdict; fB's pending row is untouched.
       expect(rows).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({ assetFaceId: fA.id, personId: p2.id, status: 'rejected' }),
-          expect.objectContaining({ assetFaceId: fB.id, personId: p1.id, status: 'pending' }),
+          expect.objectContaining({ assetFaceId: fA.id, personId: p2.personGroupId, status: 'rejected' }),
+          expect.objectContaining({ assetFaceId: fB.id, personId: p1.personGroupId, status: 'pending' }),
         ]),
       );
       expect(rows.filter((r) => r.assetFaceId === fA.id && r.status === 'pending')).toEqual([]);
@@ -1150,7 +1150,7 @@ describe('FacePersonVerdictRepository', () => {
       const { ctx } = setup();
       const { user } = await ctx.newUser();
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
       faceXId = assetFace.id;
 
       const { person: p1 } = await ctx.newPerson({ ownerId: user.id, name: 'Person One', isHidden: false });
@@ -1158,8 +1158,8 @@ describe('FacePersonVerdictRepository', () => {
       const { person: p3 } = await ctx.newPerson({ ownerId: user.id, name: 'Rejected Person', isHidden: false });
       const { person: p4 } = await ctx.newPerson({ ownerId: user.id, name: 'Ignored Person', isHidden: false });
       const { person: p5 } = await ctx.newPerson({ ownerId: user.id, name: 'Confirmed Person', isHidden: false });
-      const p1Id = p1.id;
-      const p2Id = p2.id;
+      const p1Id = p1.personGroupId;
+      const p2Id = p2.personGroupId;
 
       const { sut } = setup();
 
@@ -1168,25 +1168,25 @@ describe('FacePersonVerdictRepository', () => {
       await sut.upsertPending([{ personId: p2Id, assetFaceId: faceXId, distance: 0.65 }]);
 
       // faceX rejected for P3 — insert pending then set rejected via raw updateTable
-      await sut.upsertPending([{ personId: p3.id, assetFaceId: faceXId, distance: 0.7 }]);
+      await sut.upsertPending([{ personId: p3.personGroupId, assetFaceId: faceXId, distance: 0.7 }]);
       await defaultDatabase
         .updateTable('face_person_verdict')
         .set({ status: 'rejected' })
-        .where('personId', '=', p3.id)
+        .where('personId', '=', p3.personGroupId)
         .where('assetFaceId', '=', faceXId)
         .execute();
 
       // faceX ignored for P4 — insert pending then set ignored via raw updateTable
-      await sut.upsertPending([{ personId: p4.id, assetFaceId: faceXId, distance: 0.75 }]);
+      await sut.upsertPending([{ personId: p4.personGroupId, assetFaceId: faceXId, distance: 0.75 }]);
       await defaultDatabase
         .updateTable('face_person_verdict')
         .set({ status: 'ignored' })
-        .where('personId', '=', p4.id)
+        .where('personId', '=', p4.personGroupId)
         .where('assetFaceId', '=', faceXId)
         .execute();
 
       // faceX rejected for P5 by the CLEANUP console (no pending row ever existed for it)
-      await sut.markRejected(p5.id, faceXId, { source: 'cleanup' });
+      await sut.markRejected(p5.personGroupId, faceXId, { source: 'cleanup' });
 
       // Now resolve: deletes pending rows for faceX, leaves every negative verdict alone
       await sut.resolveAssignedFace(faceXId);
@@ -1214,9 +1214,9 @@ describe('FacePersonVerdictRepository', () => {
       const { person: person1 } = await ctx.newPerson({ ownerId: user.id, name: 'Edge12 Person1', isHidden: false });
       const { person: person2 } = await ctx.newPerson({ ownerId: user.id, name: 'Edge12 Person2', isHidden: false });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
-      p1Id = person1.id;
-      p2Id = person2.id;
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
+      p1Id = person1.personGroupId;
+      p2Id = person2.personGroupId;
       assetFaceId = assetFace.id;
     });
 
@@ -1262,8 +1262,8 @@ describe('FacePersonVerdictRepository', () => {
       const { user } = await ctx.newUser();
       const { person: person1 } = await ctx.newPerson({ ownerId: user.id, name: 'Edge8 Person1', isHidden: false });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
-      p1Id = person1.id;
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
+      p1Id = person1.personGroupId;
       assetFaceId = assetFace.id;
     });
 
@@ -1297,7 +1297,7 @@ describe('FacePersonVerdictRepository', () => {
         name: 'Edge8 Temp Person',
         isHidden: false,
       });
-      const tempPersonId = tempPerson.id;
+      const tempPersonId = tempPerson.personGroupId;
 
       const { sut } = setup();
       await sut.upsertPending([{ personId: tempPersonId, assetFaceId, distance: 0.6 }]);
@@ -1305,7 +1305,7 @@ describe('FacePersonVerdictRepository', () => {
       expect(before).toBeTruthy();
 
       // mergePerson → removeAllPeople([mergedAwayPerson]) deletes the person row
-      await defaultDatabase.deleteFrom('person').where('id', '=', tempPersonId).execute();
+      await defaultDatabase.deleteFrom('person').where('personGroupId', '=', tempPersonId).execute();
 
       // personId is ON DELETE SET NULL (post-Slice-1 semantics), not CASCADE: the row survives the person
       // delete with personId nulled out. Querying by the row's own id — not by personId, which is now null —
@@ -1331,7 +1331,7 @@ describe('FacePersonVerdictRepository', () => {
       const { space } = await ctx.newSharedSpace({ createdById: user.id });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
       const spacePerson = await ctx.database
         .insertInto('shared_space_person')
         .values({ spaceId: space.id, name: 'Alice' })
@@ -1357,7 +1357,7 @@ describe('FacePersonVerdictRepository', () => {
       const { space } = await ctx.newSharedSpace({ createdById: user.id });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
       const spacePerson = await ctx.database
         .insertInto('shared_space_person')
         .values({ spaceId: space.id, name: 'Alice' })
@@ -1392,7 +1392,7 @@ describe('FacePersonVerdictRepository', () => {
 
         const { asset: controlAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
         await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: controlAsset.id, addedById: user.id });
-        const { assetFace: controlFace } = await ctx.newAssetFace({ assetId: controlAsset.id, personId: null });
+        const { assetFace: controlFace } = await ctx.newAssetFace({ assetId: controlAsset.id, personGroupId: null });
         await sut.upsertPendingForSpacePerson([
           { spacePersonId: spacePerson.id, assetFaceId: controlFace.id, distance: 0.6 },
         ]);
@@ -1403,7 +1403,7 @@ describe('FacePersonVerdictRepository', () => {
             async () => {
               const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
               await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
-              const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+              const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
               await sut.upsertPendingForSpacePerson([
                 { spacePersonId: spacePerson.id, assetFaceId: assetFace.id, distance: 0.6 },
               ]);
@@ -1421,7 +1421,7 @@ describe('FacePersonVerdictRepository', () => {
             async () => {
               const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
               await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
-              const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+              const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
               await sut.upsertPendingForSpacePerson([
                 { spacePersonId: spacePerson.id, assetFaceId: assetFace.id, distance: 0.6 },
               ]);
@@ -1439,7 +1439,7 @@ describe('FacePersonVerdictRepository', () => {
             async () => {
               const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
               await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
-              const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+              const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
               await sut.upsertPendingForSpacePerson([
                 { spacePersonId: spacePerson.id, assetFaceId: assetFace.id, distance: 0.6 },
               ]);
@@ -1453,7 +1453,7 @@ describe('FacePersonVerdictRepository', () => {
             async () => {
               const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
               await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
-              const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+              const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
               await sut.upsertPendingForSpacePerson([
                 { spacePersonId: spacePerson.id, assetFaceId: assetFace.id, distance: 0.6 },
               ]);
@@ -1481,17 +1481,17 @@ describe('FacePersonVerdictRepository', () => {
         const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
         await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
 
-        const { assetFace: controlFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+        const { assetFace: controlFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
         await sut.upsertPendingForSpacePerson([
           { spacePersonId: spacePerson.id, assetFaceId: controlFace.id, distance: 0.6 },
         ]);
 
-        const { assetFace: targetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+        const { assetFace: targetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
         await sut.upsertPendingForSpacePerson([
           { spacePersonId: spacePerson.id, assetFaceId: targetFace.id, distance: 0.6 },
         ]);
         const faceIdentityRepository = ctx.get(FaceIdentityRepository);
-        const otherIdentity = await faceIdentityRepository.ensurePersonIdentity(otherPerson.id);
+        const otherIdentity = await faceIdentityRepository.ensurePersonIdentity(otherPerson.personGroupId);
         await faceIdentityRepository.replaceFaceIdentity({
           assetFaceId: targetFace.id,
           identityId: otherIdentity.id,
@@ -1518,12 +1518,12 @@ describe('FacePersonVerdictRepository', () => {
           .returningAll()
           .executeTakeFirstOrThrow();
 
-        const { assetFace: controlFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+        const { assetFace: controlFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
         await sut.upsertPendingForSpacePerson([
           { spacePersonId: spacePerson.id, assetFaceId: controlFace.id, distance: 0.6 },
         ]);
 
-        const { assetFace: targetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+        const { assetFace: targetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
         await sut.upsertPendingForSpacePerson([
           { spacePersonId: spacePerson.id, assetFaceId: targetFace.id, distance: 0.6 },
         ]);
@@ -1541,17 +1541,17 @@ describe('FacePersonVerdictRepository', () => {
         const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
         await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
 
-        const { assetFace: controlFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+        const { assetFace: controlFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
         await sut.upsertPendingForSpacePerson([
           { spacePersonId: spacePerson.id, assetFaceId: controlFace.id, distance: 0.6 },
         ]);
 
-        const { assetFace: lowBoundaryFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+        const { assetFace: lowBoundaryFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
         await sut.upsertPendingForSpacePerson([
           { spacePersonId: spacePerson.id, assetFaceId: lowBoundaryFace.id, distance: opts.maxDistance },
         ]);
 
-        const { assetFace: aboveUpperFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+        const { assetFace: aboveUpperFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
         await sut.upsertPendingForSpacePerson([
           { spacePersonId: spacePerson.id, assetFaceId: aboveUpperFace.id, distance: 0.9 },
         ]);
@@ -1571,7 +1571,7 @@ describe('FacePersonVerdictRepository', () => {
       const { space } = await ctx.newSharedSpace({ createdById: user.id });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
       const spacePerson = await ctx.database
         .insertInto('shared_space_person')
         .values({ spaceId: space.id, name: 'Alice' })
@@ -1601,7 +1601,7 @@ describe('FacePersonVerdictRepository', () => {
       const { space } = await ctx.newSharedSpace({ createdById: user.id });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
       const spacePerson = await ctx.database
         .insertInto('shared_space_person')
         .values({ spaceId: space.id, name: 'Alice' })
@@ -1638,7 +1638,7 @@ describe('FacePersonVerdictRepository', () => {
       const { space } = await ctx.newSharedSpace({ createdById: user.id });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
       const [spacePerson, siblingSpacePerson] = await ctx.database
         .insertInto('shared_space_person')
         .values([
@@ -1668,8 +1668,8 @@ describe('FacePersonVerdictRepository', () => {
       const { asset: keptAsset } = await ctx.newAsset({ ownerId: user.id });
       const { asset: unsharedAsset } = await ctx.newAsset({ ownerId: user.id });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: keptAsset.id, addedById: user.id });
-      const { assetFace: keptFace } = await ctx.newAssetFace({ assetId: keptAsset.id, personId: null });
-      const { assetFace: staleFace } = await ctx.newAssetFace({ assetId: unsharedAsset.id, personId: null });
+      const { assetFace: keptFace } = await ctx.newAssetFace({ assetId: keptAsset.id, personGroupId: null });
+      const { assetFace: staleFace } = await ctx.newAssetFace({ assetId: unsharedAsset.id, personGroupId: null });
       const spacePerson = await ctx.database
         .insertInto('shared_space_person')
         .values({ spaceId: space.id, name: 'Alice', type: 'person', isHidden: false })
@@ -1709,18 +1709,18 @@ describe('FacePersonVerdictRepository', () => {
         visibility: AssetVisibility.Locked,
       });
       const { asset: offlineAsset } = await ctx.newAsset({ ownerId: user.id, libraryId: library.id, isOffline: true });
-      const { assetFace: includedFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
-      const { assetFace: assignedFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
-      const { assetFace: deletedFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
-      const { assetFace: invisibleFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
-      const { assetFace: outOfBandFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
-      const { assetFace: hiddenAssetFace } = await ctx.newAssetFace({ assetId: hiddenAsset.id, personId: null });
-      const { assetFace: lockedAssetFace } = await ctx.newAssetFace({ assetId: lockedAsset.id, personId: null });
-      const { assetFace: offlineAssetFace } = await ctx.newAssetFace({ assetId: offlineAsset.id, personId: null });
+      const { assetFace: includedFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
+      const { assetFace: assignedFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
+      const { assetFace: deletedFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
+      const { assetFace: invisibleFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
+      const { assetFace: outOfBandFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
+      const { assetFace: hiddenAssetFace } = await ctx.newAssetFace({ assetId: hiddenAsset.id, personGroupId: null });
+      const { assetFace: lockedAssetFace } = await ctx.newAssetFace({ assetId: lockedAsset.id, personGroupId: null });
+      const { assetFace: offlineAssetFace } = await ctx.newAssetFace({ assetId: offlineAsset.id, personGroupId: null });
       const { person } = await ctx.newPerson({ ownerId: user.id });
       await ctx.database
         .updateTable('asset_face')
-        .set({ personId: person.id })
+        .set({ personId: person.personGroupId })
         .where('id', '=', assignedFace.id)
         .execute();
       await ctx.database
@@ -1770,7 +1770,7 @@ describe('FacePersonVerdictRepository', () => {
       });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
       const rows = await ctx.database
         .insertInto('shared_space_person')
         .values([
@@ -1815,7 +1815,7 @@ describe('FacePersonVerdictRepository', () => {
         const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
         const { asset } = await ctx.newAsset({ ownerId: user.id });
         await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
-        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
         const spacePerson = await ctx.database
           .insertInto('shared_space_person')
           .values({ spaceId: space.id, name: 'Alice', type: 'person', isHidden: false })
@@ -1834,7 +1834,7 @@ describe('FacePersonVerdictRepository', () => {
         const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
         const { asset } = await ctx.newAsset({ ownerId: user.id });
         await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
-        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
         const spacePerson = await ctx.database
           .insertInto('shared_space_person')
           .values({ spaceId: space.id, name: 'Alice', type: 'person', isHidden: false })
@@ -1858,7 +1858,7 @@ describe('FacePersonVerdictRepository', () => {
         const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
         const { asset } = await ctx.newAsset({ ownerId: user.id });
         await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
-        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
         const spacePerson = await ctx.database
           .insertInto('shared_space_person')
           .values({ spaceId: space.id, name: 'Alice', type: 'person', isHidden: false })
@@ -1886,7 +1886,7 @@ describe('FacePersonVerdictRepository', () => {
         const { space } = await ctx.newSharedSpace({ createdById: user.id, faceRecognitionEnabled: true });
         const { asset } = await ctx.newAsset({ ownerId: user.id });
         await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
-        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
         const spacePerson = await ctx.database
           .insertInto('shared_space_person')
           .values({ spaceId: space.id, name: 'Alice', type: 'person', isHidden: false })
@@ -1897,7 +1897,7 @@ describe('FacePersonVerdictRepository', () => {
         ]);
         await ctx.database
           .updateTable('asset_face')
-          .set({ personId: person.id })
+          .set({ personId: person.personGroupId })
           .where('id', '=', assetFace.id)
           .execute();
 
@@ -1915,7 +1915,7 @@ describe('FacePersonVerdictRepository', () => {
         const { asset } = await ctx.newAsset({ ownerId: user.id });
         await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
         await ctx.newSharedSpaceAsset({ spaceId: disabledSpace.id, assetId: asset.id, addedById: user.id });
-        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
         const rows = await ctx.database
           .insertInto('shared_space_person')
           .values([
@@ -1944,7 +1944,7 @@ describe('FacePersonVerdictRepository', () => {
         const { library } = await ctx.newLibrary({ ownerId: user.id });
         await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id, addedById: user.id });
         const { asset } = await ctx.newAsset({ ownerId: user.id, libraryId: library.id });
-        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
         const spacePerson = await ctx.database
           .insertInto('shared_space_person')
           .values({ spaceId: space.id, name: 'Alice', type: 'person', isHidden: false })
@@ -1982,24 +1982,24 @@ describe('FacePersonVerdictRepository', () => {
         const faceIdentityRepository = ctx.get(FaceIdentityRepository);
         const identity = await faceIdentityRepository.ensureSpacePersonIdentity(spacePerson.id);
 
-        const { assetFace: controlFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+        const { assetFace: controlFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
         await sut.upsertPendingForSpacePerson([
           { spacePersonId: spacePerson.id, assetFaceId: controlFace.id, distance: 0.6 },
         ]);
 
-        const { assetFace: manualLinkFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+        const { assetFace: manualLinkFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
         await sut.upsertPendingForSpacePerson([
           { spacePersonId: spacePerson.id, assetFaceId: manualLinkFace.id, distance: 0.6 },
         ]);
         const { person: otherPerson } = await ctx.newPerson({ ownerId: user.id, name: 'S3.7 Other' });
-        const otherIdentity = await faceIdentityRepository.ensurePersonIdentity(otherPerson.id);
+        const otherIdentity = await faceIdentityRepository.ensurePersonIdentity(otherPerson.personGroupId);
         await faceIdentityRepository.replaceFaceIdentity({
           assetFaceId: manualLinkFace.id,
           identityId: otherIdentity.id,
           source: 'manual',
         });
 
-        const { assetFace: negativeFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+        const { assetFace: negativeFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
         await sut.upsertPendingForSpacePerson([
           { spacePersonId: spacePerson.id, assetFaceId: negativeFace.id, distance: 0.6 },
         ]);
@@ -2027,14 +2027,14 @@ describe('FacePersonVerdictRepository', () => {
       const { space } = await ctx.newSharedSpace({ createdById: user.id });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
       const spacePerson = await ctx.database
         .insertInto('shared_space_person')
         .values({ spaceId: space.id, name: 'Space' })
         .returningAll()
         .executeTakeFirstOrThrow();
 
-      await sut.upsertPending([{ personId: person.id, assetFaceId: assetFace.id, distance: 0.65 }]);
+      await sut.upsertPending([{ personId: person.personGroupId, assetFaceId: assetFace.id, distance: 0.65 }]);
       await sut.upsertPendingForSpacePerson([
         { spacePersonId: spacePerson.id, assetFaceId: assetFace.id, distance: 0.7 },
       ]);
@@ -2057,7 +2057,7 @@ describe('FacePersonVerdictRepository', () => {
       const { space } = await ctx.newSharedSpace({ createdById: user.id });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
 
       await expect(sut.isFaceReachableInSpace(space.id, assetFace.id)).resolves.toBe(true);
 
@@ -2087,7 +2087,7 @@ describe('FacePersonVerdictRepository', () => {
         spaceId: space.id,
         addedById: contributor.id,
       });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
 
       await expect(sut.isFaceReachableInSpace(space.id, assetFace.id)).resolves.toBe(true);
     });
@@ -2102,25 +2102,25 @@ describe('FacePersonVerdictRepository', () => {
 
       const { asset: controlAsset } = await ctx.newAsset({ ownerId: user.id });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: controlAsset.id, addedById: user.id });
-      const { assetFace: controlFace } = await ctx.newAssetFace({ assetId: controlAsset.id, personId: null });
+      const { assetFace: controlFace } = await ctx.newAssetFace({ assetId: controlAsset.id, personGroupId: null });
 
       const { asset: lockedAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Locked });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: lockedAsset.id, addedById: user.id });
-      const { assetFace: lockedFace } = await ctx.newAssetFace({ assetId: lockedAsset.id, personId: null });
+      const { assetFace: lockedFace } = await ctx.newAssetFace({ assetId: lockedAsset.id, personGroupId: null });
 
       const { asset: trashedAsset } = await ctx.newAsset({ ownerId: user.id });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: trashedAsset.id, addedById: user.id });
-      const { assetFace: trashedFace } = await ctx.newAssetFace({ assetId: trashedAsset.id, personId: null });
+      const { assetFace: trashedFace } = await ctx.newAssetFace({ assetId: trashedAsset.id, personGroupId: null });
       await ctx.softDeleteAsset(trashedAsset.id);
 
       const { asset: offlineAsset } = await ctx.newAsset({ ownerId: user.id });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: offlineAsset.id, addedById: user.id });
-      const { assetFace: offlineFace } = await ctx.newAssetFace({ assetId: offlineAsset.id, personId: null });
+      const { assetFace: offlineFace } = await ctx.newAssetFace({ assetId: offlineAsset.id, personGroupId: null });
       await ctx.database.updateTable('asset').set({ isOffline: true }).where('id', '=', offlineAsset.id).execute();
 
       const { asset: deletedFaceAsset } = await ctx.newAsset({ ownerId: user.id });
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: deletedFaceAsset.id, addedById: user.id });
-      const { assetFace: deletedFace } = await ctx.newAssetFace({ assetId: deletedFaceAsset.id, personId: null });
+      const { assetFace: deletedFace } = await ctx.newAssetFace({ assetId: deletedFaceAsset.id, personGroupId: null });
       await ctx.database
         .updateTable('asset_face')
         .set({ deletedAt: new Date() })
@@ -2131,7 +2131,7 @@ describe('FacePersonVerdictRepository', () => {
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: invisibleFaceAsset.id, addedById: user.id });
       const { assetFace: invisibleFace } = await ctx.newAssetFace({
         assetId: invisibleFaceAsset.id,
-        personId: null,
+        personGroupId: null,
         isVisible: false,
       });
 
@@ -2154,16 +2154,16 @@ describe('FacePersonVerdictRepository', () => {
       const { user } = await ctx.newUser();
       const { person } = await ctx.newPerson({ ownerId: user.id });
       const { asset: rejectedAsset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace: rejectedFace } = await ctx.newAssetFace({ assetId: rejectedAsset.id, personId: null });
+      const { assetFace: rejectedFace } = await ctx.newAssetFace({ assetId: rejectedAsset.id, personGroupId: null });
       const { asset: untouchedAsset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace: untouchedFace } = await ctx.newAssetFace({ assetId: untouchedAsset.id, personId: null });
+      const { assetFace: untouchedFace } = await ctx.newAssetFace({ assetId: untouchedAsset.id, personGroupId: null });
 
-      await sut.markRejected(person.id, rejectedFace.id);
+      await sut.markRejected(person.personGroupId, rejectedFace.id);
 
       const filler = Array.from({ length: 70_000 }, () => randomUUID());
       const tokens = await sut.getNegativeVerdictTokens([rejectedFace.id, untouchedFace.id, ...filler]);
 
-      expect(tokens.get(rejectedFace.id)).toEqual(new Set([`person:${person.id}`]));
+      expect(tokens.get(rejectedFace.id)).toEqual(new Set([`person:${person.personGroupId}`]));
       expect(tokens.has(untouchedFace.id)).toBe(false); // positive control: no verdict recorded for this face
     });
   });
@@ -2179,27 +2179,27 @@ describe('FacePersonVerdictRepository', () => {
       const { person: personA } = await ctx.newPerson({ ownerId: user.id });
       const { person: personB } = await ctx.newPerson({ ownerId: user.id });
       const { asset: assetA } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace: faceA } = await ctx.newAssetFace({ assetId: assetA.id, personId: null });
+      const { assetFace: faceA } = await ctx.newAssetFace({ assetId: assetA.id, personGroupId: null });
       const { asset: assetB } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace: faceB } = await ctx.newAssetFace({ assetId: assetB.id, personId: null });
+      const { assetFace: faceB } = await ctx.newAssetFace({ assetId: assetB.id, personGroupId: null });
       const { asset: assetC } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace: faceC } = await ctx.newAssetFace({ assetId: assetC.id, personId: null });
+      const { assetFace: faceC } = await ctx.newAssetFace({ assetId: assetC.id, personGroupId: null });
 
-      await sut.markRejected(personA.id, faceA.id);
-      await sut.markIgnored(personA.id, faceB.id);
-      await sut.markRejected(personB.id, faceC.id); // positive control: not in the removal request
+      await sut.markRejected(personA.personGroupId, faceA.id);
+      await sut.markIgnored(personA.personGroupId, faceB.id);
+      await sut.markRejected(personB.personGroupId, faceC.id); // positive control: not in the removal request
 
-      const rowA = await getRow(personA.id, faceA.id);
-      const rowB = await getRow(personA.id, faceB.id);
-      const rowC = await getRow(personB.id, faceC.id);
+      const rowA = await getRow(personA.personGroupId, faceA.id);
+      const rowB = await getRow(personA.personGroupId, faceB.id);
+      const rowC = await getRow(personB.personGroupId, faceC.id);
 
       const filler = Array.from({ length: 70_000 }, () => randomUUID());
       const removed = await sut.removeVerdicts([rowA.id, rowB.id, ...filler]);
 
       expect(removed).toBe(2);
-      expect(await getRowOrUndefined(personA.id, faceA.id)).toBeUndefined();
-      expect(await getRowOrUndefined(personA.id, faceB.id)).toBeUndefined();
-      expect(await getRowOrUndefined(personB.id, faceC.id)).toEqual(rowC); // positive control: untouched
+      expect(await getRowOrUndefined(personA.personGroupId, faceA.id)).toBeUndefined();
+      expect(await getRowOrUndefined(personA.personGroupId, faceB.id)).toBeUndefined();
+      expect(await getRowOrUndefined(personB.personGroupId, faceC.id)).toEqual(rowC); // positive control: untouched
     });
   });
 
@@ -2212,25 +2212,25 @@ describe('FacePersonVerdictRepository', () => {
       const { person: q } = await ctx.newPerson({ ownerId: user.id, name: 'Q' });
       const { person: r } = await ctx.newPerson({ ownerId: user.id, name: 'R' });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace: face } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const { assetFace: face } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
 
-      await sut.markRejected(q.id, face.id);
-      await sut.markIgnored(r.id, face.id);
-      expect(await getRowOrUndefined(q.id, face.id)).toBeDefined(); // positive control: exists before clearing
-      expect(await getRowOrUndefined(r.id, face.id)).toBeDefined(); // positive control: exists before clearing
+      await sut.markRejected(q.personGroupId, face.id);
+      await sut.markIgnored(r.personGroupId, face.id);
+      expect(await getRowOrUndefined(q.personGroupId, face.id)).toBeDefined(); // positive control: exists before clearing
+      expect(await getRowOrUndefined(r.personGroupId, face.id)).toBeDefined(); // positive control: exists before clearing
 
-      const cleared = await sut.clearNegativeForTarget({ personId: q.id }, [face.id]);
+      const cleared = await sut.clearNegativeForTarget({ personId: q.personGroupId }, [face.id]);
 
       expect(cleared).toBe(1);
-      expect(await getRowOrUndefined(q.id, face.id)).toBeUndefined(); // cleared: same target
-      expect(await getRowOrUndefined(r.id, face.id)).toBeDefined(); // scoping: a different target survives
+      expect(await getRowOrUndefined(q.personGroupId, face.id)).toBeUndefined(); // cleared: same target
+      expect(await getRowOrUndefined(r.personGroupId, face.id)).toBeDefined(); // scoping: a different target survives
     });
 
     it('clears a row matched by spacePersonId only', async () => {
       const { ctx, sut } = setup();
       const { spacePerson, user } = await makeSpaceFixture(ctx);
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace: face } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const { assetFace: face } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
 
       await sut.markRejectedForSpacePerson(spacePerson.id, face.id);
       expect(await getSpaceRow(spacePerson.id, face.id)).toBeDefined(); // positive control
@@ -2246,9 +2246,9 @@ describe('FacePersonVerdictRepository', () => {
       const faceIdentityRepository = ctx.get(FaceIdentityRepository);
       const { user } = await ctx.newUser();
       const { person: q } = await ctx.newPerson({ ownerId: user.id, name: 'Q' });
-      const identity = await faceIdentityRepository.ensurePersonIdentity(q.id);
+      const identity = await faceIdentityRepository.ensurePersonIdentity(q.personGroupId);
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace: face } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const { assetFace: face } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
 
       await defaultDatabase
         .insertInto('face_person_verdict')
@@ -2284,15 +2284,15 @@ describe('FacePersonVerdictRepository', () => {
       const { user } = await ctx.newUser();
       const { person: q } = await ctx.newPerson({ ownerId: user.id, name: 'Q' });
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace: face } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const { assetFace: face } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
 
-      await sut.upsertPending([{ personId: q.id, assetFaceId: face.id, distance: 0.6 }]);
-      expect(await getRowStatus(q.id, face.id)).toBe('pending'); // positive control
+      await sut.upsertPending([{ personId: q.personGroupId, assetFaceId: face.id, distance: 0.6 }]);
+      expect(await getRowStatus(q.personGroupId, face.id)).toBe('pending'); // positive control
 
-      const cleared = await sut.clearNegativeForTarget({ personId: q.id }, [face.id]);
+      const cleared = await sut.clearNegativeForTarget({ personId: q.personGroupId }, [face.id]);
 
       expect(cleared).toBe(0);
-      expect(await getRowStatus(q.id, face.id)).toBe('pending');
+      expect(await getRowStatus(q.personGroupId, face.id)).toBe('pending');
     });
 
     it('S8.10a — clears the matching rows out of an assetFaceIds list far larger than the bind-parameter ceiling', async () => {
@@ -2300,21 +2300,21 @@ describe('FacePersonVerdictRepository', () => {
       const { user } = await ctx.newUser();
       const { person: q } = await ctx.newPerson({ ownerId: user.id, name: 'Q' });
       const { asset: assetA } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace: faceA } = await ctx.newAssetFace({ assetId: assetA.id, personId: null });
+      const { assetFace: faceA } = await ctx.newAssetFace({ assetId: assetA.id, personGroupId: null });
       const { asset: assetB } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace: faceB } = await ctx.newAssetFace({ assetId: assetB.id, personId: null });
+      const { assetFace: faceB } = await ctx.newAssetFace({ assetId: assetB.id, personGroupId: null });
 
-      await sut.markRejected(q.id, faceA.id);
-      await sut.markIgnored(q.id, faceB.id);
+      await sut.markRejected(q.personGroupId, faceA.id);
+      await sut.markIgnored(q.personGroupId, faceB.id);
 
       // Far larger than Postgres's 65 535 bind-parameter ceiling — mirrors the removeVerdicts (F20) test
       // above. Fake ids are cheap filler; the bind count is a function of list length, not of matches.
       const filler = Array.from({ length: 70_000 }, () => randomUUID());
-      const cleared = await sut.clearNegativeForTarget({ personId: q.id }, [faceA.id, faceB.id, ...filler]);
+      const cleared = await sut.clearNegativeForTarget({ personId: q.personGroupId }, [faceA.id, faceB.id, ...filler]);
 
       expect(cleared).toBe(2);
-      expect(await getRowOrUndefined(q.id, faceA.id)).toBeUndefined();
-      expect(await getRowOrUndefined(q.id, faceB.id)).toBeUndefined();
+      expect(await getRowOrUndefined(q.personGroupId, faceA.id)).toBeUndefined();
+      expect(await getRowOrUndefined(q.personGroupId, faceB.id)).toBeUndefined();
     });
   });
 
@@ -2326,7 +2326,7 @@ describe('FacePersonVerdictRepository', () => {
       const faceIdentityRepository = ctx.get(FaceIdentityRepository);
       const { user } = await ctx.newUser();
       const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Kept Person' });
-      const identity = await faceIdentityRepository.ensurePersonIdentity(person.id);
+      const identity = await faceIdentityRepository.ensurePersonIdentity(person.personGroupId);
       const { space } = await ctx.newSharedSpace({ createdById: user.id });
       const spacePerson = await ctx.database
         .insertInto('shared_space_person')
@@ -2338,7 +2338,7 @@ describe('FacePersonVerdictRepository', () => {
       const shapes = ['orphan', 'personOnly', 'spacePersonOnly', 'identityOnly'] as const;
       const faceIdByShape = {} as Record<(typeof shapes)[number], string>;
       for (const shape of shapes) {
-        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
         faceIdByShape[shape] = assetFace.id;
       }
 
@@ -2355,7 +2355,7 @@ describe('FacePersonVerdictRepository', () => {
           },
           {
             assetFaceId: faceIdByShape.personOnly,
-            personId: person.id,
+            personId: person.personGroupId,
             spacePersonId: null,
             identityId: null,
             status: 'rejected',
@@ -2464,14 +2464,14 @@ describe('FacePersonVerdictRepository', () => {
       const base = new Date('2026-01-01T00:00:00.000Z').getTime();
       const rows: { assetFaceId: string; createdAt: Date }[] = [];
       for (let index = 0; index < 5; index++) {
-        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+        const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
         rows.push({ assetFaceId: assetFace.id, createdAt: new Date(base + index * 60_000) });
       }
       for (const row of rows) {
         await defaultDatabase
           .insertInto('face_person_verdict')
           .values({
-            personId: person.id,
+            personId: person.personGroupId,
             assetFaceId: row.assetFaceId,
             status: 'rejected',
             source: 'cleanup',
@@ -2505,15 +2505,15 @@ describe('FacePersonVerdictRepository', () => {
       const { ctx, sut } = setup();
       const { user } = await ctx.newUser();
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace: personalFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
-      const { assetFace: spaceFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
-      const { assetFace: reprFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const { assetFace: personalFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
+      const { assetFace: spaceFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
+      const { assetFace: reprFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
 
       const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Personal' });
       await defaultDatabase
         .updateTable('person')
         .set({ faceAssetId: reprFace.id })
-        .where('id', '=', person.id)
+        .where('personGroupId', '=', person.personGroupId)
         .execute();
 
       const { space } = await ctx.newSharedSpace({ createdById: user.id, name: 'Trip' });
@@ -2529,7 +2529,7 @@ describe('FacePersonVerdictRepository', () => {
         .returningAll()
         .executeTakeFirstOrThrow();
 
-      await sut.markRejected(person.id, personalFace.id, { source: 'cleanup', actorId: user.id });
+      await sut.markRejected(person.personGroupId, personalFace.id, { source: 'cleanup', actorId: user.id });
       await sut.markRejectedForSpacePerson(spacePerson.id, spaceFace.id, { source: 'cleanup', actorId: user.id });
 
       const { items } = await sut.listNegativeVerdicts({ page: 1, size: 10 });
@@ -2553,15 +2553,15 @@ describe('FacePersonVerdictRepository', () => {
       const { ctx, sut } = setup();
       const { user } = await ctx.newUser();
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
       const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Cascade Target' });
 
-      await sut.markRejected(person.id, assetFace.id, { source: 'cleanup', actorId: user.id });
-      await expect(getRowOrUndefined(person.id, assetFace.id)).resolves.toBeDefined(); // positive control
+      await sut.markRejected(person.personGroupId, assetFace.id, { source: 'cleanup', actorId: user.id });
+      await expect(getRowOrUndefined(person.personGroupId, assetFace.id)).resolves.toBeDefined(); // positive control
 
       await defaultDatabase.deleteFrom('asset_face').where('id', '=', assetFace.id).execute();
 
-      await expect(getRowOrUndefined(person.id, assetFace.id)).resolves.toBeUndefined();
+      await expect(getRowOrUndefined(person.personGroupId, assetFace.id)).resolves.toBeUndefined();
     });
 
     it('deleting the actor user degrades actorId to NULL, and the scan requester field the same way — listNegativeVerdicts still renders the row', async () => {
@@ -2569,10 +2569,10 @@ describe('FacePersonVerdictRepository', () => {
       const { user: owner } = await ctx.newUser();
       const { user: actor } = await ctx.newUser();
       const { asset } = await ctx.newAsset({ ownerId: owner.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
       const { person } = await ctx.newPerson({ ownerId: owner.id, name: 'Actor Cascade' });
 
-      await sut.markRejected(person.id, assetFace.id, { source: 'cleanup', actorId: actor.id });
+      await sut.markRejected(person.personGroupId, assetFace.id, { source: 'cleanup', actorId: actor.id });
       const scan = await defaultDatabase
         .insertInto('face_repair_scan')
         .values({ requestedBy: actor.id })
@@ -2580,12 +2580,12 @@ describe('FacePersonVerdictRepository', () => {
         .executeTakeFirstOrThrow();
 
       // Positive control: the row DOES carry the acting user before the delete.
-      const before = await getRow(person.id, assetFace.id);
+      const before = await getRow(person.personGroupId, assetFace.id);
       expect(before.actorId).toBe(actor.id);
 
       await defaultDatabase.deleteFrom('user').where('id', '=', actor.id).execute();
 
-      const after = await getRow(person.id, assetFace.id);
+      const after = await getRow(person.personGroupId, assetFace.id);
       expect(after.actorId).toBeNull();
       const scanAfter = await defaultDatabase
         .selectFrom('face_repair_scan')
@@ -2615,7 +2615,7 @@ describe('FacePersonVerdictRepository', () => {
         .executeTakeFirstOrThrow();
       const identity = await ctx.get(FaceIdentityRepository).ensureSpacePersonIdentity(spacePerson.id);
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
 
       await sut.markRejectedForSpacePerson(spacePerson.id, assetFace.id, {
         identityId: identity.id,
