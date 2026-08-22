@@ -87,7 +87,7 @@ const scanTotals = (affectedPersons: number, flaggedFaces: number): RepairScanTo
 });
 
 const scanPerson = (personId: string, ownerId: string, flagged: number): RepairScanPerson => ({
-  personId,
+  personGroupId: personId,
   ownerId,
   personName: null,
   faceCount: flagged,
@@ -112,7 +112,7 @@ const seedFlaggedSnapshot = async (
   const scan = await scanRepo.createScan({ requestedBy: userId, params: scanParams() });
   await scanRepo.replaceScanFlaggedFaces(
     scan.id,
-    faces.map((f) => ({ assetFaceId: f.assetFaceId, personId, suspectedOwnerId: f.suspectedOwnerId })),
+    faces.map((f) => ({ assetFaceId: f.assetFaceId, personGroupId: personId, suspectedOwnerId: f.suspectedOwnerId })),
   );
   await scanRepo.completeScan(scan.id, {
     totals: scanTotals(1, faces.length),
@@ -219,7 +219,7 @@ describe('FaceRepairService.resolveFaces: move-to-owner (M1, M3, E14)', () => {
 
     // The source person drains from the latest scan snapshot (drop-on-any-resolution).
     const latest = await scanRepo.getLatestScan();
-    const snapshotPersonIds = ((latest!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personId);
+    const snapshotPersonIds = ((latest!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personGroupId);
     expect(snapshotPersonIds).not.toContain(source.personGroupId);
 
     // Never re-queues facial recognition.
@@ -284,7 +284,7 @@ describe('FaceRepairService.resolveFaces: move-to-owner (M1, M3, E14)', () => {
 
     // Still drained from the console/scan even though the person row itself survives.
     const latest = await scanRepo.getLatestScan();
-    const snapshotPersonIds = ((latest!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personId);
+    const snapshotPersonIds = ((latest!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personGroupId);
     expect(snapshotPersonIds).not.toContain(source.personGroupId);
   });
 });
@@ -367,7 +367,7 @@ describe('FaceRepairService.resolveFaces: a resolve that settles no flagged face
 
     // ...so the person MUST still be in the console, with its flagged snapshot intact.
     const latest = await scanRepo.getLatestScan();
-    const snapshotPersonIds = ((latest!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personId);
+    const snapshotPersonIds = ((latest!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personGroupId);
     expect(snapshotPersonIds).toContain(source.personGroupId);
 
     const stillFlagged = await scanRepo.getScanFlaggedFacesForPersons(latest!.id, [source.personGroupId]);
@@ -399,7 +399,7 @@ describe('FaceRepairService.resolveFaces: a resolve that settles no flagged face
     );
 
     const latest = await scanRepo.getLatestScan();
-    const snapshotPersonIds = ((latest!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personId);
+    const snapshotPersonIds = ((latest!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personGroupId);
     expect(snapshotPersonIds).not.toContain(source.personGroupId);
   });
 });
@@ -538,7 +538,7 @@ describe('FaceRepairService.resolveFaces: cross-owner destination rejected (M12,
     const byId = await personIdsOf([f1]);
     expect(byId[f1]).toBe(source.personGroupId);
     const latest = await scanRepo.getLatestScan();
-    const snapshotPersonIds = ((latest!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personId);
+    const snapshotPersonIds = ((latest!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personGroupId);
     expect(snapshotPersonIds).toContain(source.personGroupId);
   });
 });
@@ -574,7 +574,7 @@ describe('FaceRepairService.resolveFaces: destination person gone (M20, E18)', (
     const byId = await personIdsOf([f1]);
     expect(byId[f1]).toBe(source.personGroupId);
     const latest = await scanRepo.getLatestScan();
-    const snapshotPersonIds = ((latest!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personId);
+    const snapshotPersonIds = ((latest!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personGroupId);
     expect(snapshotPersonIds).toContain(source.personGroupId);
   });
 });
@@ -627,7 +627,7 @@ describe('FaceRepairService.resolveFaces: entireCluster (M13, E12)', () => {
 
     // Drained from the console...
     const latest = await scanRepo.getLatestScan();
-    const snapshotPersonIds = ((latest!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personId);
+    const snapshotPersonIds = ((latest!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personGroupId);
     expect(snapshotPersonIds).not.toContain(source.personGroupId);
 
     // ...and the now-fully-drained UNNAMED source is auto-deleted (same cleanup the retired applyRepair's manual move used).
@@ -663,7 +663,7 @@ describe('FaceRepairService.resolveFaces: entireCluster (M13, E12)', () => {
     const byId = await personIdsOf([f1]);
     expect(byId[f1]).toBe(source.personGroupId);
     const latest = await scanRepo.getLatestScan();
-    const snapshotPersonIds = ((latest!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personId);
+    const snapshotPersonIds = ((latest!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personGroupId);
     expect(snapshotPersonIds).toContain(source.personGroupId);
   });
 
@@ -696,7 +696,7 @@ describe('FaceRepairService.resolveFaces: entireCluster (M13, E12)', () => {
       const byId = await personIdsOf([f1]);
       expect(byId[f1]).toBe(source.personGroupId);
       const latest = await scanRepo.getLatestScan();
-      const snapshotPersonIds = ((latest!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personId);
+      const snapshotPersonIds = ((latest!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personGroupId);
       expect(snapshotPersonIds).toContain(source.personGroupId);
     }
   });
@@ -732,7 +732,7 @@ describe('FaceRepairService.resolveFaces: entireCluster cross-owner destination 
     const byId = await personIdsOf([f1]);
     expect(byId[f1]).toBe(source.personGroupId);
     const latest = await scanRepo.getLatestScan();
-    const snapshotPersonIds = ((latest!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personId);
+    const snapshotPersonIds = ((latest!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personGroupId);
     expect(snapshotPersonIds).toContain(source.personGroupId);
   });
 });
@@ -768,7 +768,7 @@ describe('FaceRepairService.resolveFaces: entireCluster destination person gone 
     const byId = await personIdsOf([f1]);
     expect(byId[f1]).toBe(source.personGroupId);
     const latest = await scanRepo.getLatestScan();
-    const snapshotPersonIds = ((latest!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personId);
+    const snapshotPersonIds = ((latest!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personGroupId);
     expect(snapshotPersonIds).toContain(source.personGroupId);
   });
 });
@@ -906,7 +906,7 @@ describe('FaceRepairService.resolveFaces: zero-override all-to-owner (M15, E10)'
     expect(sourceRow).toBeUndefined();
 
     const latest = await scanRepo.getLatestScan();
-    const snapshotPersonIds = ((latest!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personId);
+    const snapshotPersonIds = ((latest!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personGroupId);
     expect(snapshotPersonIds).not.toContain(source.personGroupId);
   });
 });
@@ -1046,7 +1046,7 @@ describe('FaceRepairService.resolveFaces: empty resolve is rejected (M19, E16)',
 
     // ...and — unlike today's bug — the person is NOT drained from the latest scan.
     const latest = await scanRepo.getLatestScan();
-    const snapshotPersonIds = ((latest!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personId);
+    const snapshotPersonIds = ((latest!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personGroupId);
     expect(snapshotPersonIds).toContain(source.personGroupId);
 
     const sourceRow = await db.selectFrom('person').select('personGroupId').where('personGroupId', '=', source.personGroupId).executeTakeFirst();
@@ -1063,7 +1063,7 @@ const declineRowsFor = (assetFaceId: string, suspectedOwnerId: string) =>
     .selectFrom('face_person_verdict')
     .select(['id', 'actorId as declinedBy', 'source', 'status', 'identityId', 'actorId'])
     .where('assetFaceId', '=', assetFaceId)
-    .where('personId', '=', suspectedOwnerId)
+    .where('personGroupId', '=', suspectedOwnerId)
     .where('status', 'in', ['rejected', 'ignored'])
     .execute();
 
@@ -1188,7 +1188,7 @@ describe('FaceRepairService.resolveFaces: stay-only drains the person (M11, E13)
     expect(result.moved).toBe(0);
 
     const latest = await scanRepo.getLatestScan();
-    const snapshotPersonIds = ((latest!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personId);
+    const snapshotPersonIds = ((latest!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personGroupId);
     expect(snapshotPersonIds).not.toContain(source.personGroupId);
 
     // The (unnamed) source is not auto-deleted — the face is still there, just no longer flagged (E13 is
@@ -1228,7 +1228,7 @@ describe('FaceRepairService.resolveFaces: disjoint buckets — stay overlapping 
     const rows = await declineRowsFor(f1, ownerA.personGroupId);
     expect(rows).toHaveLength(0);
     const latest = await scanRepo.getLatestScan();
-    const snapshotPersonIds = ((latest!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personId);
+    const snapshotPersonIds = ((latest!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personGroupId);
     expect(snapshotPersonIds).toContain(source.personGroupId);
   });
 });
@@ -1262,7 +1262,7 @@ describe('FaceRepairService.resolveFaces: stay on a non-flagged face (M14, E15)'
     const byId = await personIdsOf([notFlagged]);
     expect(byId[notFlagged]).toBe(source.personGroupId);
     const latest = await scanRepo.getLatestScan();
-    const snapshotPersonIds = ((latest!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personId);
+    const snapshotPersonIds = ((latest!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personGroupId);
     expect(snapshotPersonIds).toContain(source.personGroupId);
   });
 
@@ -1887,7 +1887,7 @@ describe('FaceRepairService.createDeclines: dismiss drains the latest scan snaps
 
     // Sanity: the person starts out present in the latest scan snapshot.
     const before = await scanRepo.getLatestScan();
-    const beforeIds = ((before!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personId);
+    const beforeIds = ((before!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personGroupId);
     expect(beforeIds).toContain(source.personGroupId);
 
     await sut.createDeclines({
@@ -1897,16 +1897,16 @@ describe('FaceRepairService.createDeclines: dismiss drains the latest scan snaps
 
     // Drained from the latest scan snapshot — a dashboard reload no longer resurfaces it.
     const latest = await scanRepo.getLatestScan();
-    const snapshotPersonIds = ((latest!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personId);
+    const snapshotPersonIds = ((latest!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personGroupId);
     expect(snapshotPersonIds).not.toContain(source.personGroupId);
 
     // The persisted person-decline row still exists — it governs future scans independently of the drain
     // (a genuinely new suspected owner can still resurface the person, per the existing subset check).
     const declineRow = await db
       .selectFrom('face_repair_decline')
-      .select(['id', 'personId'])
+      .select(['id', 'personGroupId'])
       .where('type', '=', 'person')
-      .where('personId', '=', source.personGroupId)
+      .where('personGroupId', '=', source.personGroupId)
       .executeTakeFirst();
     expect(declineRow).toBeDefined();
   });
@@ -2346,7 +2346,7 @@ describe('FaceRepairService.resolveFaces: unknown person (state 6)', () => {
 
     // Every flagged face is settled, so the person leaves the console.
     const latest = await scanRepo.getLatestScan();
-    const snapshotPersonIds = ((latest!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personId);
+    const snapshotPersonIds = ((latest!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personGroupId);
     expect(snapshotPersonIds).not.toContain(source.personGroupId);
   });
 
@@ -2680,7 +2680,7 @@ describe('FaceRepairService.resolveFaces: draining ignores faces already settled
       user.id,
     );
     let latest = await scanRepo.getLatestScan();
-    let snapshotPersonIds = ((latest!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personId);
+    let snapshotPersonIds = ((latest!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personGroupId);
     expect(snapshotPersonIds).toContain(source.personGroupId);
 
     // Resolve 2: settle the only still-pending face B. A is filtered out of the review UI (declined in resolve
@@ -2690,7 +2690,7 @@ describe('FaceRepairService.resolveFaces: draining ignores faces already settled
       user.id,
     );
     latest = await scanRepo.getLatestScan();
-    snapshotPersonIds = ((latest!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personId);
+    snapshotPersonIds = ((latest!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personGroupId);
     expect(snapshotPersonIds).not.toContain(source.personGroupId);
   });
 });
@@ -2723,7 +2723,7 @@ describe('FaceRepairService.resolveFaces: stay tolerates a suspected owner delet
     const byId = await personIdsOf([a]);
     expect(byId[a]).toBe(source.personGroupId);
     const latest = await scanRepo.getLatestScan();
-    const snapshotPersonIds = ((latest!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personId);
+    const snapshotPersonIds = ((latest!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personGroupId);
     expect(snapshotPersonIds).not.toContain(source.personGroupId);
   });
 });
@@ -2875,7 +2875,7 @@ describe('FaceRepairService.resolveFaces: stay bucket is transactional (F12)', (
     const verdictRepo = ctx.get(FacePersonVerdictRepository);
     // A pending suggestion row for f1, so the drain has something to remove — and so we can tell whether it
     // ran at all.
-    await verdictRepo.upsertPending([{ personId: ownerA.personGroupId, assetFaceId: f1, distance: 0.4 }]);
+    await verdictRepo.upsertPending([{ personGroupId: ownerA.personGroupId, assetFaceId: f1, distance: 0.4 }]);
 
     const drainSpy = vi.spyOn(verdictRepo, 'drainPendingForFaces').mockRejectedValueOnce(new Error('boom-stay'));
 
@@ -2946,7 +2946,7 @@ describe('FaceRepairService.resolveFaces: stay bucket rollback spans every inter
     const rows = await db
       .selectFrom('face_person_verdict')
       .select('id')
-      .where('personId', '=', ownerA.personGroupId)
+      .where('personGroupId', '=', ownerA.personGroupId)
       .where('status', 'in', ['rejected', 'ignored'])
       .execute();
     expect(rows).toHaveLength(0);
@@ -2961,7 +2961,7 @@ describe('FaceRepairService.resolveFaces: stay bucket rollback spans every inter
     const rowsAfter = await db
       .selectFrom('face_person_verdict')
       .select('id')
-      .where('personId', '=', ownerA.personGroupId)
+      .where('personGroupId', '=', ownerA.personGroupId)
       .where('status', 'in', ['rejected', 'ignored'])
       .execute();
     expect(rowsAfter).toHaveLength(2100);
@@ -2989,8 +2989,8 @@ describe('FaceRepairService.resolveFaces: stay happy path (S7.3 pin)', () => {
 
     const verdictRepo = ctx.get(FacePersonVerdictRepository);
     await verdictRepo.upsertPending([
-      { personId: ownerA.personGroupId, assetFaceId: f1, distance: 0.4 },
-      { personId: ownerB.personGroupId, assetFaceId: f2, distance: 0.4 },
+      { personGroupId: ownerA.personGroupId, assetFaceId: f1, distance: 0.4 },
+      { personGroupId: ownerB.personGroupId, assetFaceId: f2, distance: 0.4 },
     ]);
 
     const result = await sut.resolveFaces(
@@ -3051,7 +3051,7 @@ describe('FaceRepairService.resolveFaces: a face routed to two moveToPerson dest
     const linked = await manualLinkFor(f1);
     expect(linked).toHaveLength(0);
     const latest = await scanRepo.getLatestScan();
-    const snapshotPersonIds = ((latest!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personId);
+    const snapshotPersonIds = ((latest!.persons as unknown as RepairScanPerson[]) ?? []).map((p) => p.personGroupId);
     expect(snapshotPersonIds).toContain(source.personGroupId);
   });
 
