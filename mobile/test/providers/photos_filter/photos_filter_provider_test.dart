@@ -94,14 +94,14 @@ void main() {
 
   group('setLocation', () {
     test('assigns a location filter', () {
-      final loc = SearchLocationFilter(country: 'France');
+      const loc = SearchLocationFilter(country: 'France');
       final notifier = container.read(photosFilterProvider.notifier);
       notifier.setLocation(loc);
       expect(container.read(photosFilterProvider).location.country, 'France');
     });
     test('passing null resets to the empty SearchLocationFilter', () {
       final notifier = container.read(photosFilterProvider.notifier);
-      notifier.setLocation(SearchLocationFilter(country: 'France'));
+      notifier.setLocation(const SearchLocationFilter(country: 'France'));
       notifier.setLocation(null);
       expect(container.read(photosFilterProvider).location.country, null);
     });
@@ -110,14 +110,14 @@ void main() {
   group('setCamera', () {
     test('assigns a camera filter (make + model)', () {
       final notifier = container.read(photosFilterProvider.notifier);
-      notifier.setCamera(SearchCameraFilter(make: 'Canon', model: 'R5'));
+      notifier.setCamera(const SearchCameraFilter(make: 'Canon', model: 'R5'));
       final c = container.read(photosFilterProvider).camera;
       expect(c.make, 'Canon');
       expect(c.model, 'R5');
     });
     test('passing null resets to the empty SearchCameraFilter', () {
       final notifier = container.read(photosFilterProvider.notifier);
-      notifier.setCamera(SearchCameraFilter(make: 'Canon', model: 'R5'));
+      notifier.setCamera(const SearchCameraFilter(make: 'Canon', model: 'R5'));
       notifier.setCamera(null);
       final c = container.read(photosFilterProvider).camera;
       expect(c.make, null);
@@ -278,7 +278,7 @@ void main() {
     });
     test('clears location dimension', () {
       final notifier = container.read(photosFilterProvider.notifier);
-      notifier.setLocation(SearchLocationFilter(country: 'France'));
+      notifier.setLocation(const SearchLocationFilter(country: 'France'));
       notifier.clearDimension(Dimension.location);
       expect(container.read(photosFilterProvider).location.country, null);
     });
@@ -365,7 +365,7 @@ void main() {
     });
     test('LocationChipId clears location', () {
       final notifier = container.read(photosFilterProvider.notifier);
-      notifier.setLocation(SearchLocationFilter(country: 'France'));
+      notifier.setLocation(const SearchLocationFilter(country: 'France'));
       notifier.removeChip(const LocationChipId());
       expect(container.read(photosFilterProvider).location.country, null);
     });
@@ -379,7 +379,7 @@ void main() {
     });
     test('CameraChipId clears camera', () {
       final notifier = container.read(photosFilterProvider.notifier);
-      notifier.setCamera(SearchCameraFilter(make: 'Canon', model: 'R5'));
+      notifier.setCamera(const SearchCameraFilter(make: 'Canon', model: 'R5'));
       notifier.removeChip(const CameraChipId());
       final c = container.read(photosFilterProvider).camera;
       expect(c.make, null);
