@@ -73,7 +73,7 @@ void main() {
 
   test('Photos months activation changes the mode and anchor only', () async {
     container.read(photosFilterProvider.notifier)
-      ..setLocation(SearchLocationFilter(country: 'France'))
+      ..setLocation(const SearchLocationFilter(country: 'France'))
       ..setRating(4);
     final beforeFilter = container.read(photosFilterProvider);
     await container.read(timelineOverviewModeProvider.notifier).set(TimelineOverviewMode.months);

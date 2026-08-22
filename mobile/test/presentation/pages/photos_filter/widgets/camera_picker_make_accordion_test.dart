@@ -133,7 +133,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final container = ProviderScope.containerOf(tester.element(find.byType(CameraPickerMakeAccordion)));
-      container.read(photosFilterProvider.notifier).setCamera(SearchCameraFilter(make: 'Canon', model: 'EOS R5'));
+      container.read(photosFilterProvider.notifier).setCamera(const SearchCameraFilter(make: 'Canon', model: 'EOS R5'));
       await tester.pumpAndSettle();
 
       await tester.tap(find.byKey(const Key('camera-picker-make-Sony')));
