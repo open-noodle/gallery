@@ -79,7 +79,11 @@ const createIdentityBackedFace = async (
   }
 
   if (!person.identityId) {
-    await ctx.database.updateTable('person').set({ identityId }).where('personGroupId', '=', person.personGroupId).execute();
+    await ctx.database
+      .updateTable('person')
+      .set({ identityId })
+      .where('personGroupId', '=', person.personGroupId)
+      .execute();
   }
 
   const { asset } = await ctx.newAsset({
@@ -1526,7 +1530,11 @@ describe(SharedSpaceRepository.name, () => {
         .where('personGroupId', '=', person.personGroupId)
         .execute();
       const { asset } = await ctx.newAsset({ ownerId: user.id });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId, isVisible: true });
+      const { assetFace } = await ctx.newAssetFace({
+        assetId: asset.id,
+        personGroupId: person.personGroupId,
+        isVisible: true,
+      });
       await ctx.database
         .insertInto('face_search')
         .values({ faceId: assetFace.id, embedding: newEmbedding() })
@@ -1812,7 +1820,10 @@ describe(SharedSpaceRepository.name, () => {
           ownerId: owner.id,
           thumbnailPath: '/owner-thumb.jpg',
         });
-        const { assetFace: ownerFace } = await ctx.newAssetFace({ assetId: ownerAsset.id, personGroupId: ownerPerson.personGroupId });
+        const { assetFace: ownerFace } = await ctx.newAssetFace({
+          assetId: ownerAsset.id,
+          personGroupId: ownerPerson.personGroupId,
+        });
         await ctx.database
           .updateTable('person')
           .set({ identityId: identity.id, faceAssetId: ownerFace.id })
@@ -1952,7 +1963,10 @@ describe(SharedSpaceRepository.name, () => {
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
 
       const { result: person } = await ctx.newPerson({ ownerId: user.id, thumbnailPath: '/thumb.jpg' });
-      const { assetFace: representativeFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+      const { assetFace: representativeFace } = await ctx.newAssetFace({
+        assetId: asset.id,
+        personGroupId: person.personGroupId,
+      });
       // Second face on the same in-scope asset — will remain visible after the representative is deleted
       const { assetFace: secondFace } = await ctx.newAssetFace({ assetId: asset.id });
 
@@ -2055,7 +2069,10 @@ describe(SharedSpaceRepository.name, () => {
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
 
       const { result: globalBob } = await ctx.newPerson({ ownerId: user.id, name: 'Bob' });
-      const { assetFace: bobFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: globalBob.personGroupId });
+      const { assetFace: bobFace } = await ctx.newAssetFace({
+        assetId: asset.id,
+        personGroupId: globalBob.personGroupId,
+      });
 
       const addFace = async (personId: string) => {
         const { assetFace: f } = await ctx.newAssetFace({ assetId: asset.id });

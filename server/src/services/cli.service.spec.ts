@@ -517,7 +517,9 @@ describe(CliService.name, () => {
   describe('getSampleFilePaths', () => {
     it('should return file paths from assets, people, and users', async () => {
       mocks.asset.getFileSamples.mockResolvedValue([{ assetId: newUuid(), path: '/data/asset1.jpg' }]);
-      mocks.person.getFileSamples.mockResolvedValue([{ ownerId: newUuid(), personGroupId: newUuid(), thumbnailPath: '/data/person-thumb.jpg' }]);
+      mocks.person.getFileSamples.mockResolvedValue([
+        { ownerId: newUuid(), personGroupId: newUuid(), thumbnailPath: '/data/person-thumb.jpg' },
+      ]);
       mocks.user.getFileSamples.mockResolvedValue([{ id: newUuid(), profileImagePath: '/data/profile.jpg' }]);
 
       const result = await sut.getSampleFilePaths();
@@ -537,7 +539,9 @@ describe(CliService.name, () => {
 
     it('should filter out empty/falsy paths', async () => {
       mocks.asset.getFileSamples.mockResolvedValue([{ assetId: newUuid(), path: '' }]);
-      mocks.person.getFileSamples.mockResolvedValue([{ ownerId: newUuid(), personGroupId: newUuid(), thumbnailPath: '' }]);
+      mocks.person.getFileSamples.mockResolvedValue([
+        { ownerId: newUuid(), personGroupId: newUuid(), thumbnailPath: '' },
+      ]);
       mocks.user.getFileSamples.mockResolvedValue([{ id: newUuid(), profileImagePath: '' }]);
 
       const result = await sut.getSampleFilePaths();

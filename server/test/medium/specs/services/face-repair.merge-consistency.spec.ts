@@ -48,7 +48,11 @@ beforeAll(async () => {
 
 const seedFace = async (ctx: Ctx, ownerId: string, personId: string | null): Promise<string> => {
   const { asset } = await ctx.newAsset({ ownerId });
-  const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: personId, sourceType: SourceType.MachineLearning });
+  const { assetFace } = await ctx.newAssetFace({
+    assetId: asset.id,
+    personGroupId: personId,
+    sourceType: SourceType.MachineLearning,
+  });
   return assetFace.id;
 };
 
@@ -220,7 +224,9 @@ describe('cluster mutes survive a person merge', () => {
       .where('personGroupId', '=', survivor.personGroupId)
       .execute();
     expect(rows).toHaveLength(1);
-    expect(new Set(rows[0].suspectedOwnerIds as unknown as string[])).toEqual(new Set([ownerA.personGroupId, ownerB.personGroupId]));
+    expect(new Set(rows[0].suspectedOwnerIds as unknown as string[])).toEqual(
+      new Set([ownerA.personGroupId, ownerB.personGroupId]),
+    );
   });
 
   it('leaves the survivor untouched when only the survivor had a mute', async () => {
