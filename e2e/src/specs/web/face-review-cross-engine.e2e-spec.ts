@@ -168,7 +168,7 @@ test.describe.serial('Face review cross-engine', () => {
         JSON.stringify({ eligibleFaces: 2, flaggedFaces: 2, reviewOnlyFaces: 2, affectedPersons: 1 }),
         JSON.stringify([
           {
-            personId: cluster.id,
+            personGroupId: cluster.id,
             ownerId: admin.userId,
             personName: null,
             faceCount: 2,
