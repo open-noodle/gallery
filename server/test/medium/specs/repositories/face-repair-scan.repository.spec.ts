@@ -57,19 +57,19 @@ describe(FaceRepairScanRepository.name, () => {
     await db.insertInto('asset').values(asset).execute();
     const rows = [
       ...Array.from({ length: visible }, () =>
-        mediumFactory.assetFaceInsert({ assetId: asset.id, personId: person.id }),
+        mediumFactory.assetFaceInsert({ assetId: asset.id, personId: person.personGroupId }),
       ),
       ...Array.from({ length: extra.deleted ?? 0 }, () =>
-        mediumFactory.assetFaceInsert({ assetId: asset.id, personId: person.id, deletedAt: new Date() }),
+        mediumFactory.assetFaceInsert({ assetId: asset.id, personId: person.personGroupId, deletedAt: new Date() }),
       ),
       ...Array.from({ length: extra.invisible ?? 0 }, () =>
-        mediumFactory.assetFaceInsert({ assetId: asset.id, personId: person.id, isVisible: false }),
+        mediumFactory.assetFaceInsert({ assetId: asset.id, personId: person.personGroupId, isVisible: false }),
       ),
     ];
     if (rows.length > 0) {
       await db.insertInto('asset_face').values(rows).execute();
     }
-    return person.id;
+    return person.personGroupId;
   };
 
   const scanWith = async (
@@ -344,7 +344,7 @@ describe(FaceRepairScanRepository.name, () => {
         totals: zeroTotals(),
         persons: [
           {
-            personId: cluster.id,
+            personId: cluster.personGroupId,
             ownerId: user.id,
             personName: null, // unnamed at scan time
             faceCount: 35,
@@ -352,7 +352,7 @@ describe(FaceRepairScanRepository.name, () => {
             eligible: 35,
             flagged: 20,
             flaggedFraction: 20 / 35,
-            suspectedOwners: [{ ownerPersonId: owner.id, ownerName: null, thumbnailFaceId: null, count: 20 }],
+            suspectedOwners: [{ ownerPersonId: owner.personGroupId, ownerName: null, thumbnailFaceId: null, count: 20 }],
             recommendation: 'confident',
             reviewReasons: [],
           },
@@ -360,8 +360,8 @@ describe(FaceRepairScanRepository.name, () => {
       });
 
       // Both get named AFTER the scan ran.
-      await db.updateTable('person').set({ name: 'Karina' }).where('id', '=', cluster.id).execute();
-      await db.updateTable('person').set({ name: 'Christoph' }).where('id', '=', owner.id).execute();
+      await db.updateTable('person').set({ name: 'Karina' }).where('personGroupId', '=', cluster.personGroupId).execute();
+      await db.updateTable('person').set({ name: 'Christoph' }).where('personGroupId', '=', owner.personGroupId).execute();
 
       const refreshed = await sut.withCurrentNames((await sut.getLatestScan())!);
       const persons = refreshed.persons as unknown as RepairScanPerson[];
@@ -444,7 +444,7 @@ describe(FaceRepairScanRepository.name, () => {
       await db.insertInto('user').values(user).execute();
       const cluster = await insertPersonWithFaces(user.id, 1);
       const owner = await insertPersonWithFaces(user.id, 5);
-      await db.deleteFrom('person').where('id', '=', owner).execute();
+      await db.deleteFrom('person').where('personGroupId', '=', owner).execute();
 
       const [person] = await scanWith(cluster, [owner]);
 
@@ -493,7 +493,7 @@ describe(FaceRepairScanRepository.name, () => {
       await db.insertInto('user').values(user).execute();
       const cluster = await insertPersonWithFaces(user.id, 6);
       const owner = await insertPersonWithFaces(user.id, 2);
-      await db.deleteFrom('person').where('id', '=', cluster).execute();
+      await db.deleteFrom('person').where('personGroupId', '=', cluster).execute();
 
       const [person] = await scanWith(cluster, [owner], { faceCount: 42 });
 
@@ -521,10 +521,10 @@ describe(FaceRepairScanRepository.name, () => {
       // Create an asset + asset_face for p, then link faceAssetId
       const pAsset = mediumFactory.assetInsert({ ownerId });
       await db.insertInto('asset').values(pAsset).execute();
-      const pFace = mediumFactory.assetFaceInsert({ assetId: pAsset.id, personId: pData.id });
+      const pFace = mediumFactory.assetFaceInsert({ assetId: pAsset.id, personId: pData.personGroupId });
       await db.insertInto('asset_face').values(pFace).execute();
-      await db.updateTable('person').set({ faceAssetId: pFace.id }).where('id', '=', pData.id).execute();
-      p = { id: pData.id, faceAssetId: pFace.id, name: 'Jula' };
+      await db.updateTable('person').set({ faceAssetId: pFace.id }).where('personGroupId', '=', pData.personGroupId).execute();
+      p = { id: pData.personGroupId, faceAssetId: pFace.id, name: 'Jula' };
 
       // Person unnamed: name = '' (empty string → null after enrich)
       const unnamedData = mediumFactory.personInsert({ ownerId, name: '' });
@@ -533,12 +533,12 @@ describe(FaceRepairScanRepository.name, () => {
         .insertInto('person')
         .values({ ...unnamedData, name: '' })
         .execute();
-      unnamed = { id: unnamedData.id, faceAssetId: null, name: '' };
+      unnamed = { id: unnamedData.personGroupId, faceAssetId: null, name: '' };
 
       // Person q: suspected owner, no faceAssetId
       const qData = mediumFactory.personInsert({ ownerId });
       await db.insertInto('person').values(qData).execute();
-      q = { id: qData.id, faceAssetId: null, name: qData.name };
+      q = { id: qData.personGroupId, faceAssetId: null, name: qData.name };
     });
 
     afterEach(async () => {

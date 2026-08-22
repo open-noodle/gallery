@@ -32,7 +32,7 @@ const seedContributionWithFace = async (ctx: ReturnType<typeof setup>['ctx']) =>
   await ctx.newAlbumSpaceAsset({ albumId: album.id, assetId: asset.id, spaceId: space.id });
   // named face + identity — the CTE requires asset_face.personId NOT NULL + face_identity_face
   const { person } = await ctx.newPerson({ ownerId: carol.id });
-  const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+  const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
   const identity = await ctx.database
     .insertInto('face_identity')
     .values({ type: 'person' })
