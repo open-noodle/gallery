@@ -230,7 +230,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final container = ProviderScope.containerOf(tester.element(find.byType(PlacesStrip)));
-      container.read(photosFilterProvider.notifier).setLocation(SearchLocationFilter(country: 'France'));
+      container.read(photosFilterProvider.notifier).setLocation(const SearchLocationFilter(country: 'France'));
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('France'));
@@ -439,7 +439,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final container = ProviderScope.containerOf(tester.element(find.byType(CameraStrip)));
-      container.read(photosFilterProvider.notifier).setCamera(SearchCameraFilter(make: 'Canon'));
+      container.read(photosFilterProvider.notifier).setCamera(const SearchCameraFilter(make: 'Canon'));
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Canon'));

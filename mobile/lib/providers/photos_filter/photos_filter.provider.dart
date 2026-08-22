@@ -18,9 +18,8 @@ class PhotosFilterNotifier extends Notifier<SearchFilter> {
 
   void reset() => state = SearchFilter.empty();
 
-  // SearchFilter.copyWith null-coalesces, so use cascade to set nullable fields.
   void setText(String text) {
-    final next = state.copyWith()..context = text.isEmpty ? null : text;
+    final next = state.copyWith(context: text.isEmpty ? null : text);
     // Every new query starts over at Relevance, matching web: the search palette
     // resets `searchSortOrder` to relevance when a session opens on an empty query
     // and when the query is cleared (global-search-manager `open()` /
@@ -55,14 +54,16 @@ class PhotosFilterNotifier extends Notifier<SearchFilter> {
     } else {
       current.add(tagId);
     }
-    state = state.copyWith(display: state.display.copyWith(isUntagged: false))
-      ..tagIds = current.isEmpty ? null : current;
+    state = state.copyWith(
+      display: state.display.copyWith(isUntagged: false),
+      tagIds: current.isEmpty ? null : current,
+    );
   }
 
   void setLocation(SearchLocationFilter? location) =>
-      state = state.copyWith(location: location ?? SearchLocationFilter());
+      state = state.copyWith(location: location ?? const SearchLocationFilter());
 
-  void setCamera(SearchCameraFilter? camera) => state = state.copyWith(camera: camera ?? SearchCameraFilter());
+  void setCamera(SearchCameraFilter? camera) => state = state.copyWith(camera: camera ?? const SearchCameraFilter());
 
   void setDateRange({DateTime? start, DateTime? end}) => state = state.copyWith(
     date: SearchDateFilter(takenAfter: start, takenBefore: end),
@@ -81,12 +82,15 @@ class PhotosFilterNotifier extends Notifier<SearchFilter> {
 
   void setUntagged(bool v) {
     final previousTagIds = state.tagIds;
-    state = state.copyWith(display: state.display.copyWith(isUntagged: v))..tagIds = v ? null : previousTagIds;
+    state = state.copyWith(
+      display: state.display.copyWith(isUntagged: v),
+      tagIds: v ? null : previousTagIds,
+    );
   }
 
   void clearPeople() => state = state.copyWith(people: const {});
 
-  void clearTags() => state = state.copyWith()..tagIds = null;
+  void clearTags() => state = state.copyWith(tagIds: null);
 
   void clearDimension(Dimension d) {
     switch (d) {
@@ -99,7 +103,7 @@ class PhotosFilterNotifier extends Notifier<SearchFilter> {
       case Dimension.date:
         setDateRange(start: null, end: null);
       case Dimension.camera:
-        state = state.copyWith(camera: SearchCameraFilter());
+        state = state.copyWith(camera: const SearchCameraFilter());
       case Dimension.rating:
         setRating(null);
       case Dimension.mediaType:
@@ -119,7 +123,7 @@ class PhotosFilterNotifier extends Notifier<SearchFilter> {
         state = state.copyWith(people: state.people.where((p) => p.id != personId).toSet());
       case TagChipId(:final tagId):
         final next = List<String>.from(state.tagIds ?? const [])..remove(tagId);
-        state = state.copyWith()..tagIds = next.isEmpty ? null : next;
+        state = state.copyWith(tagIds: next.isEmpty ? null : next);
       case LocationChipId():
         setLocation(null);
       case CameraChipId():

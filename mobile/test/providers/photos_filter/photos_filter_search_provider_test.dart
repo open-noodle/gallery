@@ -18,8 +18,10 @@ List<BaseAsset> _assets(int n, String tag) =>
 void main() {
   setUpAll(() => registerFallbackValue(_FakeFilter()));
 
-  PhotosFilterSearchNotifier make(SearchService s) =>
-      PhotosFilterSearchNotifier(search: s, filter: SearchFilter.empty()..context = 'nature');
+  PhotosFilterSearchNotifier make(SearchService s) => PhotosFilterSearchNotifier(
+    search: s,
+    filter: SearchFilter.empty().copyWith(context: 'nature'),
+  );
 
   test('accumulates pages until nextPage is null', () async {
     final s = _MockSearch();
@@ -122,9 +124,9 @@ void main() {
 
   group('search activation', () {
     test('isSearchActive gate', () {
-      expect(isSearchActive(null, SearchFilter.empty()..context = 'x'), isFalse);
+      expect(isSearchActive(null, SearchFilter.empty().copyWith(context: 'x')), isFalse);
       expect(isSearchActive('u', SearchFilter.empty()), isFalse);
-      expect(isSearchActive('u', SearchFilter.empty()..context = 'x'), isTrue);
+      expect(isSearchActive('u', SearchFilter.empty().copyWith(context: 'x')), isTrue);
     });
 
     test('empty-filter notifier is terminal and never calls the API', () async {
