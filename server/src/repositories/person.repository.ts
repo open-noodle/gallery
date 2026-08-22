@@ -962,7 +962,7 @@ export class PersonRepository {
       WITH "eligible_faces" AS (
         SELECT
           "asset_face"."id" AS "assetFaceId",
-          "asset_face"."personId"
+          "asset_face"."personGroupId"
         FROM "asset_face"
         INNER JOIN "asset" ON "asset"."id" = "asset_face"."assetId"
         WHERE "asset"."ownerId" = ${userId}
@@ -974,12 +974,12 @@ export class PersonRepository {
       ),
       "eligible_people" AS (
         SELECT
-          "person"."id",
+          "person"."personGroupId",
           "person"."isHidden"
         FROM "person"
-        INNER JOIN "eligible_faces" ON "eligible_faces"."personId" = "person"."id"
+        INNER JOIN "eligible_faces" ON "eligible_faces"."personGroupId" = "person"."personGroupId"
         WHERE "person"."ownerId" = ${userId}
-        GROUP BY "person"."id"
+        GROUP BY "person"."personGroupId"
         HAVING NULLIF(BTRIM("person"."name"), '') IS NOT NULL
           OR COUNT(DISTINCT "eligible_faces"."assetFaceId") >= ${minimumFaceCount}
       )
@@ -988,7 +988,7 @@ export class PersonRepository {
         COUNT(DISTINCT "eligible_people"."id") FILTER (WHERE "eligible_people"."isHidden" = true)::int AS "hidden",
         COUNT(DISTINCT "eligible_faces"."assetFaceId")::int AS "detectedFaceCount"
       FROM "eligible_faces"
-      LEFT JOIN "eligible_people" ON "eligible_people"."id" = "eligible_faces"."personId"
+      LEFT JOIN "eligible_people" ON "eligible_people"."id" = "eligible_faces"."personGroupId"
     `.execute(this.db);
 
     const row = result.rows[0];
@@ -1009,7 +1009,7 @@ export class PersonRepository {
       WITH "eligible_faces" AS (
         SELECT
           "asset_face"."id" AS "assetFaceId",
-          "asset_face"."personId"
+          "asset_face"."personGroupId"
         FROM "asset_face"
         INNER JOIN "asset" ON "asset"."id" = "asset_face"."assetId"
         WHERE "asset"."ownerId" = ${userId}
@@ -1021,19 +1021,19 @@ export class PersonRepository {
       ),
       "person_face_counts" AS (
         SELECT
-          "personId",
+          "personGroupId" AS "personId",
           COUNT(DISTINCT "assetFaceId")::int AS "assetCount"
         FROM "eligible_faces"
-        WHERE "personId" IS NOT NULL
-        GROUP BY "personId"
+        WHERE "personGroupId" IS NOT NULL
+        GROUP BY "personGroupId"
       ),
       "detected_faces" AS (
         SELECT
           "eligible_faces"."assetFaceId",
-          "person"."id" AS "personId",
+          "person"."personGroupId" AS "personId",
           NULLIF(BTRIM("person"."name"), '') IS NOT NULL AS "isNamed",
           CASE
-            WHEN "person"."id" IS NOT NULL
+            WHEN "person"."personGroupId" IS NOT NULL
               AND (
                 NULLIF(BTRIM("person"."name"), '') IS NOT NULL
                 OR "person_face_counts"."assetCount" >= ${minimumFaceCount}
@@ -1043,10 +1043,10 @@ export class PersonRepository {
           END AS "isHidden"
         FROM "eligible_faces"
         LEFT JOIN "person"
-          ON "person"."id" = "eligible_faces"."personId"
+          ON "person"."personGroupId" = "eligible_faces"."personGroupId"
           AND "person"."ownerId" = ${userId}
         LEFT JOIN "person_face_counts"
-          ON "person_face_counts"."personId" = "person"."id"
+          ON "person_face_counts"."personId" = "person"."personGroupId"
       )
       SELECT
         COUNT(DISTINCT "assetFaceId")::int AS "detectedFaceCount",
