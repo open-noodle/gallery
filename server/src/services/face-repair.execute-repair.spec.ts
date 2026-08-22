@@ -73,7 +73,7 @@ describe(FaceRepairService.name, () => {
       // S11 (slice 11d): the move just stated a fact that contradicts any durable rejected/ignored row for
       // this SAME destination — clear it, scoped to `to`'s identity only.
       expect(mocks.facePersonVerdict.clearNegativeForTarget).toHaveBeenCalledWith(
-        { personId: 'q', identityId: 'identQ' },
+        { personGroupId: 'q', identityId: 'identQ' },
         ['f1', 'f2'],
         expect.anything(),
       );
@@ -113,7 +113,7 @@ describe(FaceRepairService.name, () => {
       await sut.executeRepair(plan([{ assetFaceId: 'f1', currentPersonId: 'p1', suspectedOwnerId: 'q' }]));
 
       // Without this the source person's card keeps showing the crop of the face that just moved away.
-      expect(mocks.job.queueAll).toHaveBeenCalledWith([{ name: JobName.PersonGenerateThumbnail, data: { id: 'p1' } }]);
+      expect(mocks.job.queueAll).toHaveBeenCalledWith([{ name: JobName.PersonGenerateThumbnail, data: { ownerId: 'u1', personGroupId: 'p1' } }]);
     });
 
     // S11 (slice 11e): C6 (defense-in-depth) — a route whose source and destination resolve to DIFFERENT
