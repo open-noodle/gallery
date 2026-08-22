@@ -14,7 +14,7 @@ import {
 import { JobService } from 'src/services/job.service';
 import { JobItem } from 'src/types';
 import { AssetFactory } from 'test/factories/asset.factory';
-import { factory, newUuid } from 'test/small.factory';
+import { newUuid } from 'test/small.factory';
 import { newTestService, ServiceMocks } from 'test/utils';
 
 describe(JobService.name, () => {

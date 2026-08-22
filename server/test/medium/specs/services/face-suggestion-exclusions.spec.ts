@@ -212,7 +212,9 @@ describe('face suggestion engine reads the shared verdict layer (D3)', () => {
       .get(FaceIdentityRepository)
       .replaceFaceIdentity({ assetFaceId: face.id, identityId: zedIdentity.id, source: 'manual' });
 
-    await expect(faceSuggestion.handlePersonSuggestionScan({ id: anna.personGroupId })).resolves.toBe(JobStatus.Success);
+    await expect(faceSuggestion.handlePersonSuggestionScan({ id: anna.personGroupId })).resolves.toBe(
+      JobStatus.Success,
+    );
     await expect(faceSuggestion.handleSpacePersonSuggestionScan({ id: spaceAlice.id })).resolves.toBe(
       JobStatus.Success,
     );
@@ -246,7 +248,9 @@ describe('face suggestion engine reads the shared verdict layer (D3)', () => {
 
     await faceSuggestion.rejectFaceSuggestion(auth, anna.personGroupId, face.id);
 
-    await expect(faceSuggestion.handlePersonSuggestionScan({ id: anna.personGroupId })).resolves.toBe(JobStatus.Success);
+    await expect(faceSuggestion.handlePersonSuggestionScan({ id: anna.personGroupId })).resolves.toBe(
+      JobStatus.Success,
+    );
     await expect(faceSuggestion.handleSpacePersonSuggestionScan({ id: spaceAnna.id })).resolves.toBe(JobStatus.Success);
     await expect(faceSuggestion.handlePersonSuggestionScan({ id: q.personGroupId })).resolves.toBe(JobStatus.Success);
 
@@ -379,7 +383,9 @@ describe('face suggestion engine reads the shared verdict layer (D3)', () => {
     });
     const { assetFace: timelineFace } = await seedFace(ctx, { ownerId: user.id, embedding: CANDIDATE });
 
-    await expect(faceSuggestion.handlePersonSuggestionScan({ id: anna.personGroupId })).resolves.toBe(JobStatus.Success);
+    await expect(faceSuggestion.handlePersonSuggestionScan({ id: anna.personGroupId })).resolves.toBe(
+      JobStatus.Success,
+    );
 
     expect(await pendingFor(ctx, 'personGroupId', anna.personGroupId, timelineFace.id)).toBe(true); // positive control
     expect(await pendingFor(ctx, 'personGroupId', anna.personGroupId, lockedFace.id)).toBe(false);
@@ -470,7 +476,9 @@ describe('reject/ignore face-level authorization (F8)', () => {
 
       // F lives in B's library, unassigned, with a pending suggestion for B's Anna.
       const { assetFace: face } = await newCandidateFace(ctx, userB.id);
-      await expect(faceSuggestion.handlePersonSuggestionScan({ id: annaB.personGroupId })).resolves.toBe(JobStatus.Success);
+      await expect(faceSuggestion.handlePersonSuggestionScan({ id: annaB.personGroupId })).resolves.toBe(
+        JobStatus.Success,
+      );
       const before = await faceSuggestion.getFaceSuggestions(authB, annaB.personGroupId, { page: 1, size: 50 });
       expect(before.items.map((item) => item.assetFaceId)).toContain(face.id); // positive control
 
@@ -496,7 +504,9 @@ describe('reject/ignore face-level authorization (F8)', () => {
     const { assetFace: face } = await newCandidateFace(ctx, owner.id);
     await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: face.assetId, addedById: owner.id });
 
-    await expect(faceSuggestion.handlePersonSuggestionScan({ id: anna.personGroupId })).resolves.toBe(JobStatus.Success);
+    await expect(faceSuggestion.handlePersonSuggestionScan({ id: anna.personGroupId })).resolves.toBe(
+      JobStatus.Success,
+    );
     expect(await pendingFor(ctx, 'personGroupId', anna.personGroupId, face.id)).toBe(true); // positive control: scan proposed it
 
     await expect(faceSuggestion.rejectFaceSuggestion(authOwner, anna.personGroupId, face.id)).resolves.toBe(true);
