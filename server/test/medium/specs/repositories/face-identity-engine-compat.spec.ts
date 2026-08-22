@@ -31,8 +31,8 @@ const vec = (x: number, y: number, z: number) => `[${x},${y},${z}]`;
 const insertFace = (faceId: string, embedding: string) =>
   sql`INSERT INTO face_search ("faceId", embedding) VALUES (${faceId}::uuid, ${embedding}::vector)`.execute(db);
 
-const insertAssetFace = (id: string, personId: string) =>
-  sql`INSERT INTO asset_face (id, "personId", "isVisible") VALUES (${id}::uuid, ${personId}::uuid, true)`.execute(db);
+const insertAssetFace = (id: string, personGroupId: string) =>
+  sql`INSERT INTO asset_face (id, "personGroupId", "isVisible") VALUES (${id}::uuid, ${personGroupId}::uuid, true)`.execute(db);
 
 const linkIdentityFace = (assetFaceId: string, identityId: string) =>
   sql`INSERT INTO face_identity_face ("assetFaceId", "identityId") VALUES (${assetFaceId}::uuid, ${identityId}::uuid)`.execute(
@@ -72,7 +72,7 @@ beforeAll(async () => {
   await sql`CREATE TABLE face_search ("faceId" uuid PRIMARY KEY, embedding vector(3))`.execute(db);
   await sql`CREATE TABLE asset_face (
     id uuid PRIMARY KEY,
-    "personId" uuid,
+    "personGroupId" uuid,
     "deletedAt" timestamptz,
     "isVisible" boolean NOT NULL DEFAULT true
   )`.execute(db);
