@@ -175,7 +175,7 @@ from
   inner join "asset_job_status" on "asset_job_status"."assetId" = "asset"."id"
 where
   "asset"."ownerId" = $1
-  and "asset_face"."personId" = $2
+  and "asset_face"."personGroupId" = $2
   and "asset_face"."deletedAt" is null
   and "asset_face"."isVisible" is true
   and "asset"."visibility" = $3
@@ -712,6 +712,10 @@ with
         group by
           "stacked"."stackId"
       ) as "stacked_assets" on true
+    where
+      "asset"."deletedAt" is null
+      and "asset"."visibility" in ('archive', 'timeline')
+      and date_trunc('MONTH', "localDateTime" AT TIME ZONE 'UTC') AT TIME ZONE 'UTC' = $4
     order by
       (asset."localDateTime" AT TIME ZONE 'UTC')::date desc,
       "asset"."fileCreatedAt" desc,
@@ -797,6 +801,10 @@ with
       "filtered"
       inner join "asset" on "asset"."id" = "filtered"."id"
       inner join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
+    where
+      "asset"."deletedAt" is null
+      and "asset"."visibility" in ('archive', 'timeline')
+      and date_trunc('YEAR', "localDateTime" AT TIME ZONE 'UTC') AT TIME ZONE 'UTC' = $3
     order by
       (asset."localDateTime" AT TIME ZONE 'UTC')::date desc,
       "asset"."fileCreatedAt" desc
@@ -880,6 +888,10 @@ with
       "filtered"
       inner join "asset" on "asset"."id" = "filtered"."id"
       inner join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
+    where
+      "asset"."deletedAt" is null
+      and "asset"."visibility" in ('archive', 'timeline')
+      and date_trunc('DAY', "localDateTime" AT TIME ZONE 'UTC') AT TIME ZONE 'UTC' = $3
     order by
       (asset."localDateTime" AT TIME ZONE 'UTC')::date desc,
       "asset"."fileCreatedAt" desc
