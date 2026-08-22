@@ -413,9 +413,11 @@ features:
         - server/src/schema/migrations-gallery/1784000000000-FixFaceRepairScanInFlightIndexOverride.ts
         - server/src/schema/migrations-gallery/1784800000000-RepairSharedSpaceAlbumGrantDrift.ts
         - server/src/schema/migrations-gallery/1787000000000-AddFacePersonVerdict.ts
+        - server/src/schema/migrations-gallery/1787100000000-DropPersonFksBeforeClusterGroups.ts
         - server/src/schema/migrations-gallery/1788000000000-ReconcileFacePersonVerdictConstraints.ts
         - server/src/schema/migrations-gallery/1789000000000-AddFacePersonVerdictStatusCreatedAtIdIndex.ts
         - server/src/schema/migrations-gallery/1790000000000-FixFaceRepairScanInFlightIndex.ts
+        - server/src/schema/migrations-gallery/1791000000000-RepointFaceReviewToPersonGroup.ts
     required_checks: [ci-invariants-check, fork-patches-check]
 
 checks:
