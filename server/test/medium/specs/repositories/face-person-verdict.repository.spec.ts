@@ -82,7 +82,7 @@ const seedAssetFacesBulk = async (count: number, ownerId: string): Promise<strin
       .values(assets.slice(index, index + 1000))
       .execute();
   }
-  const faces = assets.map((asset) => mediumFactory.assetFaceInsert({ assetId: asset.id, personId: null }));
+  const faces = assets.map((asset) => mediumFactory.assetFaceInsert({ assetId: asset.id, personGroupId: null }));
   for (let index = 0; index < faces.length; index += 1000) {
     await defaultDatabase
       .insertInto('asset_face')
