@@ -23,14 +23,14 @@ void main() {
       expect(a, isNot(b));
     });
     test('filters with same single tagId (different List instances) are equal', () {
-      final a = SearchFilter.empty().copyWith()..tagIds = ['t1'];
-      final b = SearchFilter.empty().copyWith()..tagIds = ['t1'];
+      final a = SearchFilter.empty().copyWith(tagIds: ['t1']);
+      final b = SearchFilter.empty().copyWith(tagIds: ['t1']);
       expect(a, b);
       expect(a.hashCode, b.hashCode);
     });
     test('filters with different tagId order are NOT equal (List preserves order)', () {
-      final a = SearchFilter.empty().copyWith()..tagIds = ['t1', 't2'];
-      final b = SearchFilter.empty().copyWith()..tagIds = ['t2', 't1'];
+      final a = SearchFilter.empty().copyWith(tagIds: ['t1', 't2']);
+      final b = SearchFilter.empty().copyWith(tagIds: ['t2', 't1']);
       expect(a, isNot(b));
     });
   });
