@@ -165,7 +165,7 @@ export class FaceSuggestionService extends BaseService {
       // defense-in-depth against that gate ever being relaxed independently, not something a fresh confirm
       // can currently observe deleting a row. Scoped to this target only — see clearNegativeForTarget.
       await this.facePersonVerdictRepository.clearNegativeForTarget(
-        { personId, identityId: identity.id },
+        { personGroupId: personId, identityId: identity.id },
         [face.id],
         trx,
       );
@@ -290,7 +290,7 @@ export class FaceSuggestionService extends BaseService {
       }
     }
 
-    const rows = [...bestByFace].map(([assetFaceId, distance]) => ({ personId: id, assetFaceId, distance }));
+    const rows = [...bestByFace].map(([assetFaceId, distance]) => ({ personGroupId: id, assetFaceId, distance }));
     await this.facePersonVerdictRepository.upsertPending(rows);
     return JobStatus.Success;
   }

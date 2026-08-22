@@ -177,7 +177,7 @@ describe('face_person_verdict migration', () => {
       .where('assetFaceId', '=', assetFace.id)
       .executeTakeFirst();
     expect(row).toBeDefined();
-    expect(row?.personId).toBeNull();
+    expect(row?.personGroupId).toBeNull();
   });
 
   it('registered the updatedAt trigger override row', async () => {
