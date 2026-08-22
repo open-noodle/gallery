@@ -32,7 +32,9 @@ const insertFace = (faceId: string, embedding: string) =>
   sql`INSERT INTO face_search ("faceId", embedding) VALUES (${faceId}::uuid, ${embedding}::vector)`.execute(db);
 
 const insertAssetFace = (id: string, personGroupId: string) =>
-  sql`INSERT INTO asset_face (id, "personGroupId", "isVisible") VALUES (${id}::uuid, ${personGroupId}::uuid, true)`.execute(db);
+  sql`INSERT INTO asset_face (id, "personGroupId", "isVisible") VALUES (${id}::uuid, ${personGroupId}::uuid, true)`.execute(
+    db,
+  );
 
 const linkIdentityFace = (assetFaceId: string, identityId: string) =>
   sql`INSERT INTO face_identity_face ("assetFaceId", "identityId") VALUES (${assetFaceId}::uuid, ${identityId}::uuid)`.execute(

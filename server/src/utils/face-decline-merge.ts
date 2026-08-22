@@ -47,7 +47,11 @@ export async function retargetDeclinePersonId(
 
   const survivor = rows.find((row) => row.personGroupId === survivorId);
   if (!survivor) {
-    await trx.updateTable('face_repair_decline').set({ personGroupId: survivorId }).where('id', '=', source.id).execute();
+    await trx
+      .updateTable('face_repair_decline')
+      .set({ personGroupId: survivorId })
+      .where('id', '=', source.id)
+      .execute();
     return;
   }
 
