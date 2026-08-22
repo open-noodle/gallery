@@ -28,10 +28,11 @@ void main() {
   });
 
   test('forwards filter fields to getTimeBuckets', () async {
-    final filter = SearchFilter.empty().copyWith()
-      ..location = SearchLocationFilter(country: 'France', city: 'Paris')
-      ..mediaType = AssetType.image
-      ..tagIds = const ['t1'];
+    final filter = SearchFilter.empty().copyWith(
+      location: const SearchLocationFilter(country: 'France', city: 'Paris'),
+      mediaType: AssetType.image,
+      tagIds: const ['t1'],
+    );
 
     when(
       () => mockTimelineApi.getTimeBuckets(

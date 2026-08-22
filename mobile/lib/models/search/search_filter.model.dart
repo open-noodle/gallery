@@ -142,12 +142,12 @@ abstract class SearchFilter with _$SearchFilter {
     @Default(SearchSortOrder.relevance) SearchSortOrder sort,
   }) = _SearchFilter;
 
-  static SearchFilter empty() => SearchFilter(
-    people: const {},
+  static SearchFilter empty() => const SearchFilter(
+    people: {},
     location: SearchLocationFilter(),
     camera: SearchCameraFilter(),
     date: SearchDateFilter(),
-    display: const SearchDisplayFilters(isFavorite: false, isArchive: false, isNotInAlbum: false),
+    display: SearchDisplayFilters(isFavorite: false, isArchive: false, isNotInAlbum: false),
     rating: SearchRatingFilter(),
     mediaType: AssetType.other,
   );

@@ -136,7 +136,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final container = ProviderScope.containerOf(tester.element(find.byType(PlacesPickerCountryAccordion)));
-      container.read(photosFilterProvider.notifier).setLocation(SearchLocationFilter(country: 'France', city: 'Paris'));
+      container.read(photosFilterProvider.notifier).setLocation(const SearchLocationFilter(country: 'France', city: 'Paris'));
       await tester.pumpAndSettle();
 
       await tester.tap(find.byKey(const Key('places-picker-country-Spain')));
