@@ -855,6 +855,22 @@ const assetJobStatusInsert = (
   };
 };
 
+/**
+ * Option M: `person.personGroupId` is a NOT NULL foreign key to `person_group`, which itself keys on
+ * the owner's cluster group. Specs that insert into `person` directly — rather than through
+ * `ctx.newPerson`, which does this for them — must mint the group first or every insert fails its
+ * foreign key.
+ */
+export const insertPersonGroup = async (db: Kysely<DB>, ownerId: string): Promise<string> => {
+  const { id } = await db
+    .insertInto('person_group')
+    .columns(['clusterGroupId'])
+    .expression((eb) => eb.selectFrom('user').select('user.clusterGroupId').where('user.id', '=', ownerId))
+    .returning('id')
+    .executeTakeFirstOrThrow();
+  return id;
+};
+
 const personInsert = (person: Partial<Insertable<PersonTable>> & { ownerId: string; personGroupId: string }) => {
   const defaults = {
     birthDate: person.birthDate || null,
