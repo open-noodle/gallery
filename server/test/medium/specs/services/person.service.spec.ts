@@ -2081,7 +2081,7 @@ describe(PersonService.name, () => {
       // The reassign must have rolled back — the face is still unassigned.
       const reloadedFace = await ctx.database
         .selectFrom('asset_face')
-        .select('personId')
+        .select('personGroupId')
         .where('id', '=', face.id)
         .executeTakeFirstOrThrow();
       expect(reloadedFace.personId).toBeNull();
@@ -2138,7 +2138,7 @@ describe(PersonService.name, () => {
 
       const row = await ctx.database
         .selectFrom('asset_face')
-        .select('personId')
+        .select('personGroupId')
         .where('id', '=', queryFace.id)
         .executeTakeFirstOrThrow();
       expect(row.personId).toBe(person.personGroupId);
