@@ -134,7 +134,7 @@ const seedFlaggedScan = async (
       await db.query(`UPDATE "face_identity_face" SET "source" = 'ml' WHERE "assetFaceId" = $1`, [faceId]);
     }
     await db.query(
-      `INSERT INTO "face_repair_scan_flagged_face" ("scanId", "assetFaceId", "personId", "suspectedOwnerId")
+      `INSERT INTO "face_repair_scan_flagged_face" ("scanId", "assetFaceId", "personGroupId", "suspectedOwnerId")
        VALUES ($1, $2, $3, $4)`,
       [scanId, faceId, args.personId, args.suspectedOwnerId],
     );
@@ -203,7 +203,7 @@ const seedFlaggedScanMulti = async (
         await db.query(`UPDATE "face_identity_face" SET "source" = 'ml' WHERE "assetFaceId" = $1`, [faceId]);
       }
       await db.query(
-        `INSERT INTO "face_repair_scan_flagged_face" ("scanId", "assetFaceId", "personId", "suspectedOwnerId")
+        `INSERT INTO "face_repair_scan_flagged_face" ("scanId", "assetFaceId", "personGroupId", "suspectedOwnerId")
          VALUES ($1, $2, $3, $4)`,
         [scanId, faceId, group.personId, group.suspectedOwnerId],
       );
@@ -687,7 +687,9 @@ test.describe.serial('Face Cleanup', () => {
 
     // The face actually moved to `other`, and its human placement is recorded as a manual identity link on
     // `other`'s identity (there is no separate lock table any more).
-    const { rows: faceRows } = await db.query(`SELECT "personId" FROM "asset_face" WHERE id = $1`, [faceId]);
+    const { rows: faceRows } = await db.query(`SELECT "personGroupId" AS "personId" FROM "asset_face" WHERE id = $1`, [
+      faceId,
+    ]);
     expect(faceRows[0].personId).toBe(other.id);
     const { rows: linkRows } = await db.query(
       `SELECT fif.source FROM "face_identity_face" fif WHERE fif."assetFaceId" = $1`,
@@ -774,7 +776,9 @@ test.describe.serial('Face Cleanup', () => {
     expect(linkRowsAfter[0].source).toBe('manual');
 
     // The merge itself re-points the face to the target too.
-    const { rows: faceRows } = await db.query(`SELECT "personId" FROM "asset_face" WHERE id = $1`, [faceId]);
+    const { rows: faceRows } = await db.query(`SELECT "personGroupId" AS "personId" FROM "asset_face" WHERE id = $1`, [
+      faceId,
+    ]);
     expect(faceRows[0].personId).toBe(mergeTarget.id);
 
     // Simulate a LATER real scan re-suspecting the same face (now on `mergeTarget`) toward some owner: the
@@ -998,7 +1002,10 @@ test.describe.serial('Face Cleanup', () => {
     // ---- Durable DB state, not UI text ----
 
     // Moved face: re-attributed to the destination, and its identity link now records the human placement.
-    const { rows: moveFaceRows } = await db.query(`SELECT "personId" FROM "asset_face" WHERE id = $1`, [faceMove]);
+    const { rows: moveFaceRows } = await db.query(
+      `SELECT "personGroupId" AS "personId" FROM "asset_face" WHERE id = $1`,
+      [faceMove],
+    );
     expect(moveFaceRows[0].personId).toBe(destination.id);
     const { rows: moveLinkRows } = await db.query(`SELECT source FROM "face_identity_face" WHERE "assetFaceId" = $1`, [
       faceMove,
@@ -1008,7 +1015,10 @@ test.describe.serial('Face Cleanup', () => {
 
     // Locked face: still on `source`; its identity link now records the confirmed placement (there is no
     // separate lock table — that link IS the lock, design §5.3).
-    const { rows: lockFaceRows } = await db.query(`SELECT "personId" FROM "asset_face" WHERE id = $1`, [faceLock]);
+    const { rows: lockFaceRows } = await db.query(
+      `SELECT "personGroupId" AS "personId" FROM "asset_face" WHERE id = $1`,
+      [faceLock],
+    );
     expect(lockFaceRows[0].personId).toBe(source.id);
     const { rows: lockLinkRows } = await db.query(`SELECT source FROM "face_identity_face" WHERE "assetFaceId" = $1`, [
       faceLock,
@@ -1017,9 +1027,10 @@ test.describe.serial('Face Cleanup', () => {
     expect(lockLinkRows[0].source).toBe('manual');
 
     // Detached face: unassigned and soft-deleted, identity link stripped entirely.
-    const { rows: detachFaceRows } = await db.query(`SELECT "personId", "deletedAt" FROM "asset_face" WHERE id = $1`, [
-      faceDetach,
-    ]);
+    const { rows: detachFaceRows } = await db.query(
+      `SELECT "personGroupId" AS "personId", "deletedAt" FROM "asset_face" WHERE id = $1`,
+      [faceDetach],
+    );
     expect(detachFaceRows[0].personId).toBeNull();
     expect(detachFaceRows[0].deletedAt).not.toBeNull();
     const { rows: detachLinkRows } = await db.query(
@@ -1094,9 +1105,10 @@ test.describe.serial('Face Cleanup', () => {
     // (getClusterFacePage, getEligibleFaceIdsForPerson, streamEligibleFaces) requires deletedAt IS NULL and a
     // live personId, both of which the detach cleared — so there is nothing here for a scan to resurrect; this
     // simply re-confirms the durable state the manual-flow test wrote still holds.
-    const { rows: detachFaceRows } = await db.query(`SELECT "personId", "deletedAt" FROM "asset_face" WHERE id = $1`, [
-      faceDetach,
-    ]);
+    const { rows: detachFaceRows } = await db.query(
+      `SELECT "personGroupId" AS "personId", "deletedAt" FROM "asset_face" WHERE id = $1`,
+      [faceDetach],
+    );
     expect(detachFaceRows[0].personId).toBeNull();
     expect(detachFaceRows[0].deletedAt).not.toBeNull();
     const { rows: detachLinkRows } = await db.query(
