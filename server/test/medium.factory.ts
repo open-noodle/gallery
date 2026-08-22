@@ -861,6 +861,15 @@ const assetJobStatusInsert = (
  * `ctx.newPerson`, which does this for them — must mint the group first or every insert fails its
  * foreign key.
  */
+/**
+ * Option M: `user.clusterGroupId` is a NOT NULL foreign key. `ctx.newUser` mints the group through
+ * ClusterGroupRepository; specs that build a user row by hand need the same.
+ */
+export const insertClusterGroup = async (db: Kysely<DB>): Promise<string> => {
+  const { id } = await db.insertInto('cluster_group').defaultValues().returning('id').executeTakeFirstOrThrow();
+  return id;
+};
+
 export const insertPersonGroup = async (db: Kysely<DB>, ownerId: string): Promise<string> => {
   const { id } = await db
     .insertInto('person_group')
