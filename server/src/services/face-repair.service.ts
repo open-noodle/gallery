@@ -273,7 +273,7 @@ export class FaceRepairService extends BaseService {
     const ownerOf = new Map<string, string | undefined>();
     const resolveOwner = async (id: string): Promise<string | undefined> => {
       if (!ownerOf.has(id)) {
-        const person = await this.personRepository.getById(id);
+        const person = await this.personRepository.getByGroupIdOnly(id);
         ownerOf.set(id, person?.ownerId);
       }
       return ownerOf.get(id);
@@ -416,7 +416,7 @@ export class FaceRepairService extends BaseService {
         // searchFaces includes the query face itself — drop it by id.
         const neighbors = matches
           .filter((match) => match.id !== face.assetFaceId)
-          .map((match) => ({ assetFaceId: match.id, personId: match.personId, distance: match.distance }));
+          .map((match) => ({ assetFaceId: match.id, personId: match.personGroupId, distance: match.distance }));
         return {
           assetFaceId: face.assetFaceId,
           currentPersonId: face.personId,
@@ -862,7 +862,7 @@ export class FaceRepairService extends BaseService {
     // any client that bypasses the picker. Slice 6 (M13) extends the same guard to entireCluster's
     // destination — it is just another destination the reviewed cluster's faces get routed to.
     if (moveToPerson.length > 0 || entireCluster) {
-      const reviewedPerson = await this.personRepository.getById(personId);
+      const reviewedPerson = await this.personRepository.getByGroupIdOnly(personId);
       if (!reviewedPerson) {
         throw new BadRequestException({
           message: 'Reviewed person not found',
@@ -874,7 +874,7 @@ export class FaceRepairService extends BaseService {
         destinationIds.add(entireCluster.destinationPersonId);
       }
       for (const destinationId of destinationIds) {
-        const destination = await this.personRepository.getById(destinationId);
+        const destination = await this.personRepository.getByGroupIdOnly(destinationId);
         if (!destination) {
           throw new BadRequestException({
             message: `Destination person ${destinationId} does not exist`,
@@ -1025,7 +1025,7 @@ export class FaceRepairService extends BaseService {
     if (stay.length > 0) {
       const liveOwnerIds = new Set<string>();
       for (const ownerId of new Set(stay.map((assetFaceId) => snapshotOwnerByFace.get(assetFaceId)!))) {
-        if (await this.personRepository.getById(ownerId)) {
+        if (await this.personRepository.getByGroupIdOnly(ownerId)) {
           liveOwnerIds.add(ownerId);
         }
       }
@@ -1162,7 +1162,7 @@ export class FaceRepairService extends BaseService {
     let unknownParked = 0;
     let unknownSkipped = 0;
     if (unknown.length > 0) {
-      const reviewedPerson = await this.personRepository.getById(personId);
+      const reviewedPerson = await this.personRepository.getByGroupIdOnly(personId);
       if (!reviewedPerson) {
         throw new BadRequestException({
           message: 'Reviewed person not found',
@@ -1175,7 +1175,7 @@ export class FaceRepairService extends BaseService {
           toRepair: unknown.map((assetFaceId) => ({
             assetFaceId,
             currentPersonId: personId,
-            suspectedOwnerId: cluster.id,
+            suspectedOwnerId: cluster.personGroupId,
           })),
           reviewOnlyFaces: [],
           reviewOnlyPersonIds: [],
@@ -1190,7 +1190,7 @@ export class FaceRepairService extends BaseService {
           // Every requested face turned out stale (moved off this person between the snapshot read and the
           // write), so executeRepair moved nothing and the cluster we just created would linger as an empty,
           // nameless person on the People page.
-          await this.personRepository.delete([cluster.id]);
+          await this.personRepository.delete([cluster.personGroupId]);
         }
       } catch (error) {
         // The cluster is created BEFORE the faces are moved into it, so any failure in between (a dropped
@@ -1201,9 +1201,9 @@ export class FaceRepairService extends BaseService {
         // cluster that did receive faces would unassign them — dumping them straight back into the recognition
         // pool this action exists to keep them out of. A partially-succeeded park leaves the faces safely on the
         // cluster and the error surfaces to the admin, who can retry.
-        const parkedFaces = await this.faceRepairRepository.countAllFaces(cluster.id);
+        const parkedFaces = await this.faceRepairRepository.countAllFaces(cluster.personGroupId);
         if (parkedFaces === 0) {
-          await this.personRepository.delete([cluster.id]);
+          await this.personRepository.delete([cluster.personGroupId]);
         }
         throw error;
       }
@@ -1213,7 +1213,7 @@ export class FaceRepairService extends BaseService {
     // source with ZERO remaining faces of any kind, and only when it was never named.
     const remaining = await this.faceRepairRepository.countEligibleFaces({ personId });
     if (remaining === 0) {
-      const source = await this.personRepository.getById(personId);
+      const source = await this.personRepository.getByGroupIdOnly(personId);
       if (source && (!source.name || source.name.trim().length === 0)) {
         const remainingAll = await this.faceRepairRepository.countAllFaces(personId);
         if (remainingAll === 0) {
@@ -1278,7 +1278,7 @@ export class FaceRepairService extends BaseService {
   // face owned by the same user — it passes the cross-owner guard above by construction.
   async createOwnerPerson(ownerId: string, name: string): Promise<{ id: string }> {
     const person = await this.personRepository.create({ ownerId, name });
-    return { id: person.id };
+    return { id: person.personGroupId };
   }
 
   // Slice 7 (D7): admin cleanup + resolutions surfaces render face crops for clusters the admin does not own.
