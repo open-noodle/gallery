@@ -193,6 +193,11 @@ ALTER TABLE "person"            DROP COLUMN IF EXISTS "species";
 ALTER TABLE "asset_job_status"  DROP COLUMN IF EXISTS "petsDetectedAt";
 ALTER TABLE "asset_job_status"  DROP COLUMN IF EXISTS "classifiedAt";
 ALTER TABLE "library"           DROP COLUMN IF EXISTS "createId";
+-- 1791000000000-RepointFaceReviewToPersonGroup added this unique index to make option M's
+-- one-person-per-group invariant a database fact. It lives on the upstream `person` table, so
+-- unlike the rest of that migration (which only touches Gallery-only face-review tables that
+-- section 2 already dropped CASCADE) it has to come off explicitly.
+DROP INDEX IF EXISTS "person_personGroupId_key";
 DROP INDEX IF EXISTS "asset_face_personId_idx";
 DROP INDEX IF EXISTS "person_ownerId_identityId_key";
 DROP INDEX IF EXISTS "person_identityId_idx";
@@ -243,6 +248,9 @@ DELETE FROM "migration_overrides"
    'index_face_identity_representativeFaceId_idx',
    'index_person_identityId_idx',
    'index_face_person_verdict_personId_assetFaceId_uq',
+  -- renamed by 1791000000000-RepointFaceReviewToPersonGroup; both spellings are listed so the
+  -- row is removed whether or not that migration ran.
+  'index_face_person_verdict_personGroupId_assetFaceId_uq',
    'index_face_person_verdict_spacePersonId_assetFaceId_uq',
    'index_face_person_verdict_spacePersonId_status_distance_idx',
    'index_face_person_verdict_identityId_assetFaceId_idx',
@@ -412,6 +420,122 @@ DELETE FROM "migration_overrides" WHERE "name" = 'trigger_asset_ocr_updatedAt';
 -- trigger above existed. There is no schema to reverse, and re-adding checkpoints
 -- would be wrong, so only its kysely_migrations row is removed in step 8.
 
+-- 1787148183729-ClusterGroups (upstream #30739) is the largest post-tag migration Gallery carries.
+-- It re-keys people: `person.id` is replaced by the composite primary key (ownerId, personGroupId),
+-- `asset_face.personId` becomes `personGroupId`, and four new tables appear (cluster_group,
+-- cluster_group_request, person_group, person_group_audit) along with user.clusterGroupId.
+--
+-- Gallery adopts that schema but never mounts the feature (option M — see
+-- docs/superpowers/specs/2026-08-21-cluster-groups-m-landing-plan.md), so a reverted database still
+-- has to be handed back to the tagged release with `person.id` restored. This mirrors the
+-- migration's own down(), made idempotent because the script also runs against a tagged-release DB
+-- where none of it was ever created.
+--
+-- Ordering note: person_group must outlive the asset_face repoint below, so the tables are dropped
+-- last. The Gallery-only face-review tables that 1787100000000 / 1791000000000 touched are already
+-- gone (section 2, CASCADE), which is why neither fork migration needs anything here beyond the
+-- unique index dropped in section 4.
+DO $$
+BEGIN
+  IF to_regclass('public.person_group') IS NULL THEN
+    RETURN;  -- the migration never ran on this database
+  END IF;
+
+  -- person: composite key back to a plain id
+  ALTER TABLE "person" DROP CONSTRAINT IF EXISTS "person_pkey";
+  ALTER TABLE "person" ADD COLUMN IF NOT EXISTS "id" uuid NOT NULL DEFAULT uuid_generate_v4();
+  UPDATE "person" SET "id" = "personGroupId";
+  ALTER TABLE "person" ADD CONSTRAINT "person_pkey" PRIMARY KEY ("id");
+  CREATE INDEX IF NOT EXISTS "person_ownerId_idx" ON "person" ("ownerId");
+
+  -- asset_face: personGroupId back to personId, repointed at person.id
+  DROP INDEX IF EXISTS "asset_face_assetId_personGroupId_idx";
+  DROP INDEX IF EXISTS "asset_face_personGroupId_assetId_notDeleted_isVisible_idx";
+  DROP INDEX IF EXISTS "asset_face_personGroupId_assetId_idx";
+  ALTER TABLE "asset_face" DROP CONSTRAINT IF EXISTS "asset_face_personGroupId_fkey";
+  ALTER TABLE "asset_face" RENAME COLUMN "personGroupId" TO "personId";
+  UPDATE "asset_face" SET "personId" = "person"."id"
+    FROM "person" WHERE "asset_face"."personId" = "person"."personGroupId";
+  ALTER TABLE "asset_face" ADD CONSTRAINT "asset_face_personId_fkey"
+    FOREIGN KEY ("personId") REFERENCES "person" ("id") ON UPDATE CASCADE ON DELETE SET NULL;
+  CREATE INDEX IF NOT EXISTS "asset_face_assetId_personId_idx" ON "asset_face" ("assetId", "personId");
+  CREATE INDEX IF NOT EXISTS "asset_face_personId_assetId_idx" ON "asset_face" ("personId", "assetId");
+  CREATE INDEX IF NOT EXISTS "asset_face_personId_assetId_notDeleted_isVisible_idx"
+    ON "asset_face" ("personId", "assetId") WHERE ("deletedAt" IS NULL AND "isVisible" IS TRUE);
+
+  -- person_audit
+  ALTER TABLE "person_audit" ADD COLUMN IF NOT EXISTS "personId" uuid;
+  UPDATE "person_audit" SET "personId" = "personGroupId";
+  ALTER TABLE "person_audit" ALTER COLUMN "personId" SET NOT NULL;
+  CREATE INDEX IF NOT EXISTS "person_audit_personId_idx" ON "person_audit" ("personId");
+  DROP INDEX IF EXISTS "person_audit_personGroupId_idx";
+  ALTER TABLE "person_audit" DROP COLUMN IF EXISTS "personGroupId";
+
+  -- person / user back-references, then the new tables
+  ALTER TABLE "person" DROP CONSTRAINT IF EXISTS "person_personGroupId_fkey";
+  DROP INDEX IF EXISTS "person_personGroupId_idx";
+  ALTER TABLE "person" DROP COLUMN IF EXISTS "personGroupId";
+  ALTER TABLE "user" DROP CONSTRAINT IF EXISTS "user_clusterGroupId_fkey";
+  DROP INDEX IF EXISTS "user_clusterGroupId_idx";
+  ALTER TABLE "user" DROP COLUMN IF EXISTS "clusterGroupId";
+  DROP TABLE IF EXISTS "cluster_group_request";
+  DROP TABLE IF EXISTS "person_group_audit";
+  DROP TABLE IF EXISTS "person_group";
+  DROP TABLE IF EXISTS "cluster_group";
+END $$;
+
+-- person_delete_audit went back to writing personId when person.id returned above; restore the
+-- function, its trigger and the two migration_overrides payloads to the tagged release's spelling.
+DO $$
+BEGIN
+  IF to_regclass('public.person_audit') IS NOT NULL THEN
+    CREATE OR REPLACE FUNCTION person_delete_audit()
+      RETURNS TRIGGER
+      LANGUAGE PLPGSQL
+      AS $func$
+        BEGIN
+          INSERT INTO person_audit ("personId", "ownerId")
+          SELECT "id", "ownerId"
+          FROM OLD;
+          RETURN NULL;
+        END
+      $func$;
+    CREATE OR REPLACE TRIGGER "person_delete_audit"
+      AFTER DELETE ON "person"
+      REFERENCING OLD TABLE AS "old"
+      FOR EACH STATEMENT
+      WHEN (pg_trigger_depth() <= 1)
+      EXECUTE FUNCTION person_delete_audit();
+  END IF;
+END $$;
+DROP FUNCTION IF EXISTS person_group_delete_audit;
+
+UPDATE "migration_overrides"
+SET "value" = '{"type":"function","name":"person_delete_audit","sql":"CREATE OR REPLACE FUNCTION person_delete_audit()\n  RETURNS TRIGGER\n  LANGUAGE PLPGSQL\n  AS $$\n    BEGIN\n      INSERT INTO person_audit (\"personId\", \"ownerId\")\n      SELECT \"id\", \"ownerId\"\n      FROM OLD;\n      RETURN NULL;\n    END\n  $$;"}'::jsonb
+WHERE "name" = 'function_person_delete_audit';
+
+UPDATE "migration_overrides"
+SET "value" = '{"type":"trigger","name":"person_delete_audit","sql":"CREATE OR REPLACE TRIGGER \"person_delete_audit\"\n  AFTER DELETE ON \"person\"\n  REFERENCING OLD TABLE AS \"old\"\n  FOR EACH STATEMENT\n  WHEN (pg_trigger_depth() <= 1)\n  EXECUTE FUNCTION person_delete_audit();"}'::jsonb
+WHERE "name" = 'trigger_person_delete_audit';
+
+DELETE FROM "migration_overrides" WHERE "name" IN (
+  'function_person_group_delete_audit',
+  'trigger_cluster_group_updatedAt',
+  'trigger_person_group_delete_audit',
+  'trigger_person_group_updatedAt',
+  'index_asset_face_personGroupId_assetId_notDeleted_isVisible_idx'
+);
+
+INSERT INTO "migration_overrides" ("name", "value")
+VALUES ('index_asset_face_personId_assetId_notDeleted_isVisible_idx', '{"type":"index","name":"asset_face_personId_assetId_notDeleted_isVisible_idx","sql":"CREATE INDEX \"asset_face_personId_assetId_notDeleted_isVisible_idx\" ON \"asset_face\" (\"personId\", \"assetId\") WHERE (\"deletedAt\" IS NULL AND \"isVisible\" IS TRUE);"}'::jsonb)
+ON CONFLICT ("name") DO UPDATE SET "value" = EXCLUDED."value";
+
+-- 1787100000000-DropPersonFksBeforeClusterGroups and 1791000000000-RepointFaceReviewToPersonGroup
+-- are Gallery-only and act entirely on face_person_verdict / face_repair_decline /
+-- face_repair_scan_flagged_face, which section 2 drops CASCADE. Their only footprint on an upstream
+-- table is the person_personGroupId_key index, removed in section 4. Nothing further to reverse —
+-- only their kysely_migrations rows, in step 8.
+
 -- -----------------------------------------------------------------------------
 -- 8. Delete Gallery + post-v<branding upstream.version> upstream migration rows
 --    from kysely_migrations.
@@ -483,7 +607,9 @@ DELETE FROM "kysely_migrations"
    '1787000000000-AddFacePersonVerdict',
    '1788000000000-ReconcileFacePersonVerdictConstraints',
    '1789000000000-AddFacePersonVerdictStatusCreatedAtIdIndex',
-   '1790000000000-FixFaceRepairScanInFlightIndex',
+   '1787100000000-DropPersonFksBeforeClusterGroups',
+  '1790000000000-FixFaceRepairScanInFlightIndex',
+  '1791000000000-RepointFaceReviewToPersonGroup',
 
    -- Pre-rename names for two migrations that were renumbered off timestamp collisions
    -- ("renumber AddFaceRepairScanFlaggedFace off the #722 collision",
@@ -516,7 +642,8 @@ DELETE FROM "kysely_migrations"
    '1786385711807-AlbumOwnerDeleteTrigger',
    '1786741078327-AddWorkflowLogsTable',
    '1786972746371-AssetOcrUpdatedAtTrigger',
-   '1786972746372-AssetOcrSyncReset'
+   '1786972746372-AssetOcrSyncReset',
+  '1787148183729-ClusterGroups'
  );
 
 -- -----------------------------------------------------------------------------
