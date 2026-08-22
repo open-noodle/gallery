@@ -108,20 +108,20 @@ const createIdentityFace = async (
         result: await ctx.database
           .selectFrom('person')
           .selectAll()
-          .where('id', '=', input.personId)
+          .where('personGroupId', '=', input.personId)
           .executeTakeFirstOrThrow(),
       }
     : await ctx.newPerson({ ownerId: input.ownerId, name: input.name ?? 'Alice' });
   const identity =
     input.identityId === undefined
-      ? await faceIdentityRepository.ensurePersonIdentity(person.id)
+      ? await faceIdentityRepository.ensurePersonIdentity(person.personGroupId)
       : { id: input.identityId, type: 'person' };
   const { asset } = await ctx.newAsset({
     ownerId: input.ownerId,
     libraryId: input.libraryId,
     visibility: AssetVisibility.Timeline,
   });
-  const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+  const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
   await ctx.database.insertInto('face_search').values({ faceId: assetFace.id, embedding: newEmbedding() }).execute();
   await faceIdentityRepository.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
 
@@ -144,13 +144,13 @@ const createExifIdentityFace = async (
         result: await ctx.database
           .selectFrom('person')
           .selectAll()
-          .where('id', '=', input.personId)
+          .where('personGroupId', '=', input.personId)
           .executeTakeFirstOrThrow(),
       }
     : await ctx.newPerson({ ownerId: input.ownerId, name: input.name ?? 'Alice EXIF' });
   const identity =
     input.identityId === undefined
-      ? await faceIdentityRepository.ensurePersonIdentity(person.id)
+      ? await faceIdentityRepository.ensurePersonIdentity(person.personGroupId)
       : { id: input.identityId, type: 'person' };
   const { asset } = await ctx.newAsset({
     ownerId: input.ownerId,
@@ -159,7 +159,7 @@ const createExifIdentityFace = async (
   });
   const { assetFace } = await ctx.newAssetFace({
     assetId: asset.id,
-    personId: person.id,
+    personGroupId: person.personGroupId,
     sourceType: SourceType.Exif,
   });
   await faceIdentityRepository.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'import' });
@@ -185,7 +185,7 @@ const createLegacyPetFace = async (
     libraryId: input.libraryId,
     visibility: AssetVisibility.Timeline,
   });
-  const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
+  const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
 
   return { person, asset, assetFace };
 };
@@ -199,8 +199,8 @@ describe('SharedSpaceService linked-library face identity repair', () => {
     await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: SharedSpaceRole.Owner });
     const { asset } = await ctx.newAsset({ ownerId: user.id });
     await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: user.id });
-    const { assetFace: targetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
-    const { assetFace: sourceFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+    const { assetFace: targetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
+    const { assetFace: sourceFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
     const target = await ctx.database
       .insertInto('shared_space_person')
       .values({ spaceId: space.id, name: 'Target', representativeFaceId: targetFace.id })
@@ -252,7 +252,7 @@ describe('SharedSpaceService linked-library face identity repair', () => {
     const second = await createExifIdentityFace(ctx, faceIdentityRepository, {
       ownerId: user.id,
       libraryId: library.id,
-      personId: first.person.id,
+      personId: first.person.personGroupId,
       identityId: first.identity.id,
     });
 
@@ -302,7 +302,7 @@ describe('SharedSpaceService linked-library face identity repair', () => {
     const second = await createIdentityFace(ctx, faceIdentityRepository, {
       ownerId: user.id,
       libraryId: library2.id,
-      personId: first.person.id,
+      personId: first.person.personGroupId,
       identityId: first.identity.id,
     });
 
@@ -356,19 +356,19 @@ describe('SharedSpaceService linked-library face identity repair', () => {
     const missing = await createIdentityFace(ctx, faceIdentityRepository, {
       ownerId: user.id,
       libraryId: library.id,
-      personId: target.person.id,
+      personId: target.person.personGroupId,
       identityId: target.identity.id,
     });
     const wrong = await createIdentityFace(ctx, faceIdentityRepository, {
       ownerId: user.id,
       libraryId: library.id,
-      personId: target.person.id,
+      personId: target.person.personGroupId,
       identityId: target.identity.id,
     });
     const stale = await createIdentityFace(ctx, faceIdentityRepository, {
       ownerId: user.id,
       libraryId: library.id,
-      personId: target.person.id,
+      personId: target.person.personGroupId,
       identityId: target.identity.id,
     });
 
@@ -384,7 +384,7 @@ describe('SharedSpaceService linked-library face identity repair', () => {
     });
 
     const { result: wrongOwnerPerson } = await ctx.newPerson({ ownerId: user.id, name: 'Wrong Alice' });
-    const wrongIdentity = await faceIdentityRepository.ensurePersonIdentity(wrongOwnerPerson.id);
+    const wrongIdentity = await faceIdentityRepository.ensurePersonIdentity(wrongOwnerPerson.personGroupId);
     const wrongSpacePerson = await sharedSpaceRepository.createPerson({
       spaceId: space.id,
       identityId: wrongIdentity.id,
@@ -824,7 +824,7 @@ describe('SharedSpaceService linked-library face identity repair', () => {
         createIdentityFace(ctx, faceIdentityRepository, {
           ownerId: user.id,
           libraryId: library.id,
-          personId: first.person.id,
+          personId: first.person.personGroupId,
           identityId: first.identity.id,
         }),
       ),

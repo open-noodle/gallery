@@ -57,14 +57,14 @@ describe('Face identity query shape', () => {
     for (const ownerId of [viewer.id, viewer.id, viewer.id, viewer.id, stranger.id, stranger.id]) {
       const { person } = await ctx.newPerson({ ownerId, name: `Person ${ownerId} ${accessiblePersonIds.length}` });
       const { asset } = await ctx.newAsset({ ownerId });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: person.id });
-      const identity = await sut.ensurePersonIdentity(person.id);
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+      const identity = await sut.ensurePersonIdentity(person.personGroupId);
       await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
 
       if (ownerId === viewer.id) {
-        accessiblePersonIds.push(person.id);
+        accessiblePersonIds.push(person.personGroupId);
       } else {
-        inaccessiblePersonIds.push(person.id);
+        inaccessiblePersonIds.push(person.personGroupId);
       }
     }
 

@@ -167,9 +167,9 @@ describe('face_person_verdict migration', () => {
     const { assetFace } = await ctx.newAssetFace({ assetId: asset.id });
     const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Doomed' });
 
-    await sut.markRejected(person.id, assetFace.id);
+    await sut.markRejected(person.personGroupId, assetFace.id);
 
-    await expect(db.deleteFrom('person').where('id', '=', person.id).execute()).resolves.toBeDefined();
+    await expect(db.deleteFrom('person').where('personGroupId', '=', person.personGroupId).execute()).resolves.toBeDefined();
 
     const row = await db
       .selectFrom('face_person_verdict')
