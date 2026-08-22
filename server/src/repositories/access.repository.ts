@@ -905,7 +905,7 @@ class PersonAccess {
       .select('person.id')
       .leftJoin('asset_face', 'asset_face.id', 'person.faceAssetId')
       .leftJoin('asset', 'asset.id', 'asset_face.assetId')
-      .where('person.id', 'in', [...personIds])
+      .where('person.personGroupId', 'in', [...personIds])
       .where((eb) => eb.or([eb('asset.visibility', 'is', null), eb('asset.visibility', '!=', AssetVisibility.Locked)]))
       .execute()
       .then((persons) => new Set(persons.map((person) => person.id)));
@@ -921,7 +921,7 @@ class PersonAccess {
     return this.db
       .selectFrom('person')
       .select('person.id')
-      .where('person.id', 'in', [...personIds])
+      .where('person.personGroupId', 'in', [...personIds])
       .where((eb) =>
         eb.exists(
           eb
@@ -935,7 +935,7 @@ class PersonAccess {
                 // space people grid via getPersonsBySpaceId — is also granted PersonRead. Never Hidden/Locked.
                 .on('asset.visibility', 'in', spaceVisibleAssetVisibilities),
             )
-            .whereRef('asset_face.personId', '=', 'person.id')
+            .whereRef('asset_face.personGroupId', '=', 'person.personGroupId')
             .where('asset_face.deletedAt', 'is', null)
             .where('asset_face.isVisible', 'is', true)
             .where((eb) =>
@@ -967,7 +967,7 @@ class PersonAccess {
     return this.db
       .selectFrom('person')
       .select('person.id')
-      .where('person.id', 'in', [...personIds])
+      .where('person.personGroupId', 'in', [...personIds])
       .where((eb) =>
         eb.exists(
           eb
@@ -981,7 +981,7 @@ class PersonAccess {
                 // space people grid via getPersonsBySpaceId — is also granted PersonRead. Never Hidden/Locked.
                 .on('asset.visibility', 'in', spaceVisibleAssetVisibilities),
             )
-            .whereRef('asset_face.personId', '=', 'person.id')
+            .whereRef('asset_face.personGroupId', '=', 'person.personGroupId')
             .where('asset_face.deletedAt', 'is', null)
             .where('asset_face.isVisible', 'is', true)
             .where((eb) =>

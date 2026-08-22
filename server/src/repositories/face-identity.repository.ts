@@ -311,11 +311,11 @@ export class FaceIdentityRepository {
     if (ownPersonTokenIds.size > 0) {
       const rows = await this.db
         .selectFrom('person')
-        .select(['id', 'identityId'])
+        .select(['personGroupId', 'identityId'])
         .where('ownerId', '=', input.userId)
-        .where('id', 'in', [...ownPersonTokenIds])
+        .where('personGroupId', 'in', [...ownPersonTokenIds])
         .execute();
-      const rowsById = new Map(rows.map((row) => [row.id, row]));
+      const rowsById = new Map(rows.map((row) => [row.personGroupId, row]));
 
       for (const personId of ownPersonTokenIds) {
         const row = rowsById.get(personId);
@@ -1349,7 +1349,7 @@ export class FaceIdentityRepository {
 
       await (
         profileRef.type === 'person'
-          ? trx.updateTable('person').set({ identityId: identity.id }).where('id', '=', profileRef.id)
+          ? trx.updateTable('person').set({ identityId: identity.id }).where('personGroupId', '=', profileRef.id)
           : trx
               .updateTable('shared_space_person')
               .set({ identityId: identity.id })
@@ -1416,8 +1416,8 @@ export class FaceIdentityRepository {
       if (ref.type === 'person') {
         const row = await db
           .selectFrom('person')
-          .select(['person.id', 'person.ownerId', 'person.identityId', 'person.type'])
-          .where('person.id', '=', ref.id)
+          .select(['person.personGroupId', 'person.ownerId', 'person.identityId', 'person.type'])
+          .where('person.personGroupId', '=', ref.id)
           .where('person.ownerId', '=', actorUserId)
           .executeTakeFirst();
 
@@ -1427,7 +1427,7 @@ export class FaceIdentityRepository {
 
         origins.push({
           kind: 'person',
-          id: row.id,
+          id: row.personGroupId,
           ownerId: row.ownerId,
           identityId: row.identityId,
           type: row.type,
@@ -1482,19 +1482,19 @@ export class FaceIdentityRepository {
         .selectFrom('person')
         .innerJoin('face_identity', 'face_identity.id', 'person.identityId')
         .select([
-          'person.id',
+          'person.personGroupId',
           'person.identityId',
           'person.faceAssetId as representativeFaceId',
           'face_identity.type as identityType',
         ])
-        .where('person.id', '=', ref.id)
+        .where('person.personGroupId', '=', ref.id)
         .where('person.ownerId', '=', actorUserId)
         .executeTakeFirst();
 
       return row?.identityId
         ? {
             type: 'person',
-            id: row.id,
+            id: row.personGroupId,
             spaceId: null,
             identityId: row.identityId,
             identityType: row.identityType,
@@ -1548,17 +1548,17 @@ export class FaceIdentityRepository {
         .selectFrom('person')
         .innerJoin('face_identity', 'face_identity.id', 'person.identityId')
         .select([
-          'person.id',
+          'person.personGroupId',
           'person.identityId',
           'person.faceAssetId as representativeFaceId',
           'face_identity.type as identityType',
         ])
-        .where('person.id', '=', profileRef.id)
+        .where('person.personGroupId', '=', profileRef.id)
         .executeTakeFirstOrThrow();
 
       return {
         type: 'person',
-        id: row.id,
+        id: row.personGroupId,
         spaceId: null,
         identityId: row.identityId!,
         identityType: row.identityType,
@@ -1592,7 +1592,7 @@ export class FaceIdentityRepository {
 
   private async getScopedProfileFaceIds(profileRef: ScopedPersonProfileRefDto, db: Kysely<DB> = this.db) {
     if (profileRef.type === 'person') {
-      const rows = await db.selectFrom('asset_face').select('id').where('personId', '=', profileRef.id).execute();
+      const rows = await db.selectFrom('asset_face').select('id').where('personGroupId', '=', profileRef.id).execute();
       return rows.map((row) => row.id);
     }
 
@@ -1615,10 +1615,10 @@ export class FaceIdentityRepository {
 
     const inaccessiblePersonal = await this.db
       .selectFrom('asset_face')
-      .innerJoin('person', 'person.id', 'asset_face.personId')
+      .innerJoin('person', 'person.personGroupId', 'asset_face.personGroupId')
       .select('asset_face.id')
       .where('asset_face.id', 'in', faceIds)
-      .$if(profileRef.type === 'person', (qb) => qb.where('person.id', '!=', profileRef.id))
+      .$if(profileRef.type === 'person', (qb) => qb.where('person.personGroupId', '!=', profileRef.id))
       .where('person.ownerId', '!=', actorUserId)
       .limit(1)
       .executeTakeFirst();
@@ -2162,8 +2162,8 @@ export class FaceIdentityRepository {
     const ensure = async (runner: Kysely<DB> | Transaction<DB>) => {
       const person = await runner
         .selectFrom('person')
-        .select(['id', 'identityId', 'type', 'faceAssetId'])
-        .where('id', '=', personId)
+        .select(['personGroupId', 'identityId', 'type', 'faceAssetId'])
+        .where('personGroupId', '=', personId)
         .executeTakeFirstOrThrow();
 
       if (person.identityId) {
@@ -2183,7 +2183,7 @@ export class FaceIdentityRepository {
         .returningAll()
         .executeTakeFirstOrThrow();
 
-      await runner.updateTable('person').set({ identityId: identity.id }).where('id', '=', person.id).execute();
+      await runner.updateTable('person').set({ identityId: identity.id }).where('personGroupId', '=', person.personGroupId).execute();
 
       return identity;
     };
@@ -2200,27 +2200,27 @@ export class FaceIdentityRepository {
 
     if (personIds.length > 0 || identityIds.length > 0) {
       let query = db.selectFrom('person').select(({ selectFrom }) => [
-        'person.id',
+        'person.personGroupId',
         'person.ownerId',
         'person.identityId',
         'person.type',
         'person.name',
         selectFrom('asset_face')
           .select(sql<number>`count(*)::int`.as('faceCount'))
-          .whereRef('asset_face.personId', '=', 'person.id')
+          .whereRef('asset_face.personGroupId', '=', 'person.personGroupId')
           .as('faceCount'),
       ]);
 
       query =
         personIds.length > 0
-          ? query.where('person.id', 'in', personIds)
+          ? query.where('person.personGroupId', 'in', personIds)
           : query.where('person.identityId', 'in', identityIds);
 
       const people = await query.execute();
       profiles.push(
         ...people.map((person) => ({
           kind: 'person' as const,
-          id: person.id,
+          id: person.personGroupId,
           ownerId: person.ownerId,
           identityId: person.identityId,
           type: person.type,
@@ -2378,11 +2378,11 @@ export class FaceIdentityRepository {
     for (let index = 0; index < personIds.length; index += 1000) {
       const rows = await this.db
         .selectFrom('person')
-        .select(['id', 'identityId'])
-        .where('id', 'in', personIds.slice(index, index + 1000))
+        .select(['personGroupId', 'identityId'])
+        .where('personGroupId', 'in', personIds.slice(index, index + 1000))
         .execute();
       for (const row of rows) {
-        map.set(row.id, targetTokens({ personId: row.id, identityId: row.identityId }));
+        map.set(row.personGroupId, targetTokens({ personId: row.personGroupId, identityId: row.identityId }));
       }
     }
     return map;
@@ -2483,7 +2483,7 @@ export class FaceIdentityRepository {
           .selectFrom('asset_face')
           .select('id')
           .where('id', 'in', chunk)
-          .where('personId', '=', input.requirePersonId)
+          .where('personGroupId', '=', input.requirePersonId)
           .execute();
         chunk = stillOnPerson.map((row) => row.id);
         if (chunk.length === 0) {
@@ -2529,7 +2529,7 @@ export class FaceIdentityRepository {
             eb.val(input.source).as('source'),
             eb.val(null).as('confidence'),
           ])
-          .where('asset_face.personId', '=', input.personId)
+          .where('asset_face.personGroupId', '=', input.personId)
           .where('asset_face.deletedAt', 'is', null)
           .where('asset_face.isVisible', '=', true)
           .where('asset.deletedAt', 'is', null)
@@ -2621,8 +2621,8 @@ export class FaceIdentityRepository {
   async backfillPersonalIdentities(input: { cursor?: string; limit: number }): Promise<BackfillResult> {
     const people = await this.db
       .selectFrom('person')
-      .select(['id', 'ownerId', 'identityId'])
-      .$if(!!input.cursor, (qb) => qb.where('id', '>', input.cursor!))
+      .select(['personGroupId', 'ownerId', 'identityId'])
+      .$if(!!input.cursor, (qb) => qb.where('personGroupId', '>', input.cursor!))
       .orderBy('id')
       .limit(input.limit + 1)
       .execute();
@@ -2635,7 +2635,7 @@ export class FaceIdentityRepository {
         .innerJoin('asset', 'asset.id', 'asset_face.assetId')
         .leftJoin('face_identity_face', 'face_identity_face.assetFaceId', 'asset_face.id')
         .select('asset_face.id')
-        .where('asset_face.personId', '=', person.id)
+        .where('asset_face.personGroupId', '=', person.personGroupId)
         .where('asset_face.deletedAt', 'is', null)
         .where('asset_face.isVisible', '=', true)
         .where('asset.deletedAt', 'is', null)
@@ -2647,7 +2647,7 @@ export class FaceIdentityRepository {
         ...(await this.addPendingSharedSpaceFaceMatchBackfillTargetsForAssetFaces(personAssetFaceIds)),
       );
 
-      const identity = await this.ensurePersonIdentity(person.id);
+      const identity = await this.ensurePersonIdentity(person.personGroupId);
       for (const face of faces) {
         await this.linkFace({ assetFaceId: face.id, identityId: identity.id, source: 'backfill' });
       }
@@ -2661,7 +2661,7 @@ export class FaceIdentityRepository {
 
     return {
       processed: page.length,
-      nextCursor: people.length > input.limit ? page.at(-1)?.id : undefined,
+      nextCursor: people.length > input.limit ? page.at(-1)?.personGroupId : undefined,
       affectedSpaceAssets: this.dedupeSharedSpaceFaceMatchBackfillTargets(affectedSpaceAssets),
     };
   }
@@ -2691,7 +2691,7 @@ export class FaceIdentityRepository {
 
       // Only move faces that actually resemble the target person — a corrupt identity link must not be
       // allowed to reassign a face onto someone it looks nothing like.
-      const assetFaceIds = await this.filterFacesResemblingPerson(targetPerson.id, candidateAssetFaceIds);
+      const assetFaceIds = await this.filterFacesResemblingPerson(targetPerson.personGroupId, candidateAssetFaceIds);
 
       // Faces we refuse to move keep their current person; realign their identity link to that person so
       // the mismatch is genuinely resolved. Otherwise person.identityId stays DISTINCT FROM the face's
@@ -2706,8 +2706,8 @@ export class FaceIdentityRepository {
 
       await this.db
         .updateTable('asset_face')
-        .set({ personId: targetPerson.id })
-        .where('personId', '=', person.id)
+        .set({ personId: targetPerson.personGroupId })
+        .where('personGroupId', '=', person.id)
         .where('id', 'in', assetFaceIds)
         .execute();
 
@@ -2742,7 +2742,7 @@ export class FaceIdentityRepository {
       .innerJoin('asset', 'asset.id', 'asset_face.assetId')
       .innerJoin('face_identity_face', 'face_identity_face.assetFaceId', 'asset_face.id')
       .select('face_identity_face.identityId')
-      .where('asset_face.personId', '=', person.id)
+      .where('asset_face.personGroupId', '=', person.id)
       .where('asset_face.deletedAt', 'is', null)
       .where('asset_face.isVisible', '=', true)
       .where('asset.deletedAt', 'is', null)
@@ -2758,7 +2758,7 @@ export class FaceIdentityRepository {
       .innerJoin('asset', 'asset.id', 'asset_face.assetId')
       .innerJoin('face_identity_face', 'face_identity_face.assetFaceId', 'asset_face.id')
       .select('asset_face.id')
-      .where('asset_face.personId', '=', personId)
+      .where('asset_face.personGroupId', '=', personId)
       .where('face_identity_face.identityId', '=', identityId)
       .where('asset_face.deletedAt', 'is', null)
       .where('asset_face.isVisible', '=', true)
@@ -2856,7 +2856,7 @@ export class FaceIdentityRepository {
       .innerJoin('asset', 'asset.id', 'asset_face.assetId')
       .innerJoin('face_identity_face', 'face_identity_face.assetFaceId', 'asset_face.id')
       .select('asset_face.id')
-      .where('asset_face.personId', '=', personId)
+      .where('asset_face.personGroupId', '=', personId)
       .where('face_identity_face.identityId', '!=', identityId)
       .where('asset_face.deletedAt', 'is', null)
       .where('asset_face.isVisible', '=', true)
@@ -2869,10 +2869,10 @@ export class FaceIdentityRepository {
   private getPersonByIdentity(ownerId: string, identityId: string, excludePersonId?: string) {
     return this.db
       .selectFrom('person')
-      .select(['id'])
+      .select(['personGroupId'])
       .where('ownerId', '=', ownerId)
       .where('identityId', '=', identityId)
-      .$if(!!excludePersonId, (qb) => qb.where('id', '!=', excludePersonId!))
+      .$if(!!excludePersonId, (qb) => qb.where('personGroupId', '!=', excludePersonId!))
       .executeTakeFirst();
   }
 
@@ -3301,7 +3301,7 @@ export class FaceIdentityRepository {
         .leftJoin('face_identity_face', 'face_identity_face.identityId', 'face_identity.id')
         .select('face_identity.id')
         .where('face_identity.id', 'in', mergeableSourceIdentityIds)
-        .where('person.id', 'is', null)
+        .where('person.personGroupId', 'is', null)
         .where('shared_space_person.id', 'is', null)
         .where('face_identity_face.assetFaceId', 'is', null)
         .execute();
@@ -3406,7 +3406,7 @@ export class FaceIdentityRepository {
       .leftJoin('face_identity_face', 'face_identity_face.identityId', 'face_identity.id')
       .select('face_identity.id')
       .where('face_identity.id', 'in', sourceIdentityIds)
-      .where('person.id', 'is', null)
+      .where('person.personGroupId', 'is', null)
       .where('shared_space_person.id', 'is', null)
       .where('face_identity_face.assetFaceId', 'is', null)
       .execute();
