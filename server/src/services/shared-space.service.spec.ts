@@ -3638,7 +3638,9 @@ describe(SharedSpaceService.name, () => {
           embedding: '[1,2,3]',
         },
       ]);
-      mocks.search.searchFaces.mockResolvedValue([{ id: 'local-face-1', personGroupId: 'local-person-1', distance: 0.2 }]);
+      mocks.search.searchFaces.mockResolvedValue([
+        { id: 'local-face-1', personGroupId: 'local-person-1', distance: 0.2 },
+      ]);
       mocks.person.getByGroupIdOnly.mockResolvedValue(
         factory.person({ personGroupId: 'local-person-1', ownerId: 'member-1', type: 'person', isHidden: false }),
       );
@@ -3700,7 +3702,9 @@ describe(SharedSpaceService.name, () => {
       ]);
       mocks.person.getByGroupIdOnly
         .mockResolvedValueOnce(factory.person({ personGroupId: 'local-person-1', ownerId: 'member-1', type: 'person' }))
-        .mockResolvedValueOnce(factory.person({ personGroupId: 'local-person-2', ownerId: 'member-1', type: 'person' }));
+        .mockResolvedValueOnce(
+          factory.person({ personGroupId: 'local-person-2', ownerId: 'member-1', type: 'person' }),
+        );
       mocks.faceIdentity.ensurePersonIdentity
         .mockResolvedValueOnce({ id: 'local-identity-1', type: 'person' } as any)
         .mockResolvedValueOnce({ id: 'local-identity-2', type: 'person' } as any);
@@ -3887,7 +3891,9 @@ describe(SharedSpaceService.name, () => {
           },
         ],
       });
-      mocks.search.searchFaces.mockResolvedValue([{ id: 'local-face-1', personGroupId: 'local-person-1', distance: 0.2 }]);
+      mocks.search.searchFaces.mockResolvedValue([
+        { id: 'local-face-1', personGroupId: 'local-person-1', distance: 0.2 },
+      ]);
       mocks.faceIdentity.ensurePersonIdentity.mockResolvedValue({ id: 'local-identity', type: 'person' } as any);
 
       await sut.handleSharedSpaceIdentityReconciliation({ spaceId: 'space-1', userId: 'member-1' });
