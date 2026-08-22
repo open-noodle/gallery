@@ -70,7 +70,7 @@ export class ClassificationRepository {
   async getFaceSummary(assetId: string): Promise<ClassificationFaceSummary> {
     const row = await this.db
       .selectFrom('asset_face')
-      .innerJoin('person', 'person.id', 'asset_face.personId')
+      .innerJoin('person', 'person.personGroupId', 'asset_face.personGroupId')
       .select([
         sql<boolean>`count(*) > 0`.as('hasAssignedFace'),
         sql<boolean>`count(*) filter (where btrim("person"."name") != '') > 0`.as('hasNamedPerson'),
@@ -81,7 +81,7 @@ export class ClassificationRepository {
       .where('asset_face.assetId', '=', assetId)
       .where('asset_face.deletedAt', 'is', null)
       .where('asset_face.isVisible', 'is', true)
-      .where('asset_face.personId', 'is not', null)
+      .where('asset_face.personGroupId', 'is not', null)
       .where('person.type', '=', 'person')
       .executeTakeFirst();
 
