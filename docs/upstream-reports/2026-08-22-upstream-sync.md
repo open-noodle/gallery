@@ -6,8 +6,9 @@
 - **Batches**: 13 planned (133–145), run as 6 replays (see "Deviation from the batch plan")
 - **Conflicts resolved**: 21 by hand + 9 auto-resolved in proven-mechanical classes
 - **Fork-side reconciliation commits**: 5 (asset-file/download, branding + Drift steps, OpenAPI regen, mobile freezed, web lint debt)
+- **Option-M debt repaired**: 4 further commits — see "★ Option-M debt this cycle exposed"
 - **Risk level**: MEDIUM
-- **Recommendation**: PROCEED — level with `upstream/main` (0 behind, 1258 ahead), all audits and local gates green
+- **Recommendation**: PROCEED — level with `upstream/main` (0 behind), all audits and local gates green
 
 This is a **rolling cycle**, not a cutover. The branch stays off `main`: upstream has not released a
 tag past `v3.1.0`, so the standing landing rule is not satisfied.
@@ -15,6 +16,38 @@ tag past `v3.1.0`, so the standing landing rule is not satisfied.
 Starting state: `58a1ca590ec`, based on `11b1aa5ecf7` (#30739, the option-M landing). Fork main was
 already fully integrated (`integratedForkHead` == `origin/main` == `690fd44e12c`), so no
 `upstream-sync-fork-main` was needed this cycle.
+
+## ★ Option-M debt this cycle exposed
+
+**The 19 upstream commits were not the hard part of this cycle.** The first CI dispatch after the
+option-M landing found four defects in that landing, none of them caused by this sync. They are
+recorded here because the pattern matters more than the individual fixes.
+
+**Why they were invisible until now.** Nothing from the option-M cycle was ever pushed — the last CI
+run on the rolling branch was batch 131 on 2026-08-20, _before_ the landing — so this dispatch is the
+first time option M has seen CI at all. Every defect below sits in a layer the local gates do not
+execute: raw SQL (invisible to `tsc`), generated `.sql` docs (needs a live DB), and a Docker-boot
+drift check against the tagged release image.
+
+| #   | Defect                                                                                                                                                                                     | Found by                                                                                     |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| 1   | `revert-to-immich.sql` restored the `trigger_person_delete_audit` override with #30739's `pg_trigger_depth() <= 1`; tagged v3.1.0 seeds `= 0`, so a reverted DB reports schema drift       | Revert-to-Immich Validation (Docker-boot half, runs against `:main`)                         |
+| 2   | 51 e2e raw-SQL sites across 15 files still used `person.id` / `asset_face."personId"` / `personId` on the three fork face-review tables                                                    | Storage Migration E2E: `column "id" does not exist`                                          |
+| 3   | Five `INSERT INTO "person" (…) RETURNING id` fixtures — `personGroupId` is a **foreign key** to `person_group` and part of the composite PK, not generated, so these could not work at all | pet-detection + gallery-map e2e (they have no SQL of their own; they use the shared helpers) |
+| 4   | `server/src/queries/*.sql` never regenerated after the `withPerson` / `withFacesAndPeople` fix changed the emitted SQL                                                                     | SQL Schema Checks (runs `sync-sql` against a live DB and diffs)                              |
+
+**The generalisable lesson**: a re-key of this size is only as complete as the layers you can execute.
+`tsc` covered the server; the unit and medium suites covered its behaviour; but the e2e layer talks to
+Postgres in string literals, and the generated SQL docs and the revert script are only checked by jobs
+that need a database or a container. The option-M memory already recorded "sync-sql against a live DB
+is the ONLY thing that finds broken raw SQL" — that was applied to `server/src`, and the same sweep was
+never run against `e2e/src`, which has no `@GenerateSql` decorators and so is not covered by `sync-sql`
+at all. **After any column re-key, grep `e2e/` for raw SQL explicitly; it is a separate surface.**
+
+Fixes: `00d603ba78c` (re-key + revert script), `53048a92f21` (regenerated SQL docs), and the
+person_group seeding commit. `sync-sql` was re-run against a fresh migrated database as part of the
+repair: 157 migrations apply, `migrations:generate` reports no changes, all 680 decorated queries
+execute with no `column does not exist`.
 
 ## Incoming Upstream Changes
 
