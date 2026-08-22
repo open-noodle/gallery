@@ -677,7 +677,7 @@ describe(PersonRepository.name, () => {
       await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
       await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId, isVisible: false });
 
-      await expect(sut.getStatistics(person.personGroupId)).resolves.toEqual({ assets: 1, faces: 2 });
+      await expect(sut.getStatistics(person.personGroupId, user.id)).resolves.toEqual({ assets: 1, faces: 2 });
       expect(firstFace.personGroupId).toBe(person.personGroupId);
     });
 
@@ -686,7 +686,7 @@ describe(PersonRepository.name, () => {
       const { user } = await ctx.newUser();
       const { person } = await ctx.newPerson({ ownerId: user.id, name: 'Empty' });
 
-      await expect(sut.getStatistics(person.personGroupId)).resolves.toEqual({ assets: 0, faces: 0 });
+      await expect(sut.getStatistics(person.personGroupId, user.id)).resolves.toEqual({ assets: 0, faces: 0 });
     });
 
     // L3: memberUserId scopes the count to what a space-only reader can actually reach, instead of
@@ -710,10 +710,10 @@ describe(PersonRepository.name, () => {
       await ctx.newAssetFace({ assetId: privateAsset.id, personGroupId: person.personGroupId });
 
       // Unscoped (owner) count sees both assets.
-      await expect(sut.getStatistics(person.personGroupId)).resolves.toEqual({ assets: 2, faces: 2 });
+      await expect(sut.getStatistics(person.personGroupId, owner.id)).resolves.toEqual({ assets: 2, faces: 2 });
 
       // memberUserId-scoped count only sees the space-reachable asset.
-      await expect(sut.getStatistics(person.personGroupId, { memberUserId: reader.id })).resolves.toEqual({
+      await expect(sut.getStatistics(person.personGroupId, reader.id, { memberUserId: reader.id })).resolves.toEqual({
         assets: 1,
         faces: 1,
       });
