@@ -184,6 +184,38 @@ The copy step (1) is needed because:
 - **TypeScript**: Strict mode in all packages
 - **Async**: `no-floating-promises` and `no-misused-promises` enforced everywhere
 
+## Commit Messages & PR Descriptions
+
+**Never refer to an upstream Immich PR with a form GitHub autolinks.** This repo is a **fork of
+`immich-app/immich`**, so GitHub resolves a bare `#30881` against the **parent** repo and files an
+"added a commit that referenced this pull request" event on Immich's PR. The rolling rebase branch
+replays every fork commit under a new SHA each cycle, so one such reference re-notifies that
+upstream PR on **every force-push** — it is not a one-off.
+
+| Write this                        | Never this                                                     |
+| --------------------------------- | -------------------------------------------------------------- |
+| `immich-30881`                    | `#30881` · `PR#30881` · `GH-30881` · `immich-app/immich#30881` |
+| `sveltejs/svelte 18546`           | `sveltejs/svelte#18546`                                        |
+| `xneo1/portainer_templates PR 13` | a `github.com/<other-repo>/pull/13` URL                        |
+
+**Our own `#NNN` stays** — a fork PR or issue number resolves inside this repo and is the normal,
+useful case. Only numbers above our own PR numbering, and any explicit `owner/repo#N` or foreign
+issue/PR URL, cause the problem.
+
+This applies to **commit messages, PR titles and PR descriptions** — all three create
+cross-references. Ordinary file contents do not, so `docs/upstream-reports/*.md` may cite `#30900`
+freely.
+
+To check a branch, grep its own commits — anything this prints is a reference that will notify
+another repo (5+ digits, because Immich is well past 30000 while our own PR numbers are 4-digit):
+
+```bash
+git log origin/main..HEAD --format=%B | grep -nE '(^|[^0-9A-Za-z_/-])#[0-9]{5,}|[a-z0-9._-]+/[a-z0-9._-]+#[0-9]+'
+```
+
+The rolling rebase branch also carries `make commit-autolink-check`, which covers every autolink
+form GitHub honours; it reaches `main` at the next upstream cutover.
+
 ## i18n
 
 `i18n/` at the repo root is shared by web and mobile — grep both before deleting or renaming a key.
