@@ -3503,6 +3503,8 @@
   "workflow_logging_disable": "關閉日誌記錄",
   "workflow_name": "工作流程名稱",
   "workflow_navigation_prompt": "您確定要不儲存變更就離開嗎？",
+  "workflow_space_album_choose_space_first": "請先選擇 Space",
+  "workflow_space_unavailable": "Space 無法使用",
   "workflow_summary": "工作流程摘要",
   "workflow_templates": "工作流程範本",
   "workflow_update_success": "已成功更新工作流程",
