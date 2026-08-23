@@ -988,4 +988,18 @@ export class FacePersonVerdictRepository {
   async lockFaceForAssignment(assetFaceId: string, db: Kysely<DB> | Transaction<DB> = this.db): Promise<void> {
     await db.selectFrom('asset_face').select('id').where('id', '=', assetFaceId).forUpdate().executeTakeFirst();
   }
+
+  /**
+   * Spec §6.6: who drew this box by hand, if anyone. NEVER `sourceType` — `PersonService.createFace`
+   * already writes `SourceType.Manual` for an OWNER-drawn box too, so `sourceType` cannot tell the
+   * two apart. `undefined` means the face row does not exist; `null` means it exists but was not
+   * editor-drawn (a detection, or an existing row from before this column existed).
+   */
+  async getFaceCreatedBy(
+    assetFaceId: string,
+    db: Kysely<DB> | Transaction<DB> = this.db,
+  ): Promise<string | null | undefined> {
+    const row = await db.selectFrom('asset_face').select('createdBy').where('id', '=', assetFaceId).executeTakeFirst();
+    return row?.createdBy;
+  }
 }

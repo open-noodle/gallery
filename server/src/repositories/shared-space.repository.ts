@@ -4788,6 +4788,23 @@ export class SharedSpaceRepository {
   }
 
   /**
+   * Spec §6.6 (Slice 6, Task 3): every space person, in EVERY space (not scoped to one, unlike
+   * `removePersonFaceAssignmentsForSpaceFace` above) currently holding `assetFaceId`. The caller
+   * hard-deletes an editor-drawn face row after this; the `ON DELETE CASCADE` on
+   * `shared_space_person_face.assetFaceId` removes the projection rows for free but does NOT
+   * recount, so the caller must snapshot the affected person ids here first and recount itself.
+   */
+  @GenerateSql({ params: [DummyValue.UUID] })
+  async getPersonIdsHoldingFace(assetFaceId: string, db: Kysely<DB> | Transaction<DB> = this.db): Promise<string[]> {
+    const rows = await db
+      .selectFrom('shared_space_person_face')
+      .select('personId')
+      .where('assetFaceId', '=', assetFaceId)
+      .execute();
+    return rows.map(({ personId }) => personId);
+  }
+
+  /**
    * Spec §6.1 (Slice 3): every live, visible face on `assetId`, joined to the space person
    * holding it in THIS space, if any — a face held by a person in a DIFFERENT space reads as
    * unassigned here (the `shared_space_person.spaceId` scoping on the join).

@@ -1762,8 +1762,8 @@ export class PersonRepository {
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })
-  async deleteAssetFace(id: string): Promise<void> {
-    await this.db.deleteFrom('asset_face').where('asset_face.id', '=', id).execute();
+  async deleteAssetFace(id: string, db: Kysely<DB> | Transaction<DB> = this.db): Promise<void> {
+    await db.deleteFrom('asset_face').where('asset_face.id', '=', id).execute();
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })

@@ -93,6 +93,14 @@ const SpaceAssetFacesParamsSchema = z
   })
   .meta({ id: 'SpaceAssetFacesParamsDto' });
 
+// Spec §6.6 (Slice 6, Task 3): delete a face box an editor drew.
+const SpaceFaceParamsSchema = z
+  .object({
+    id: z.uuidv4().describe('Shared space ID'),
+    assetFaceId: z.uuidv4().describe('Asset face ID'),
+  })
+  .meta({ id: 'SpaceFaceParamsDto' });
+
 // Spec §6.5 (Slice 6, Task 2): draw a face box on a member's asset. imageWidth/imageHeight are the
 // dimensions of the (possibly edited) PREVIEW the client drew on -- mirrors AssetFaceCreateDto's
 // own shape, since both feed the same coordinate transform (convertFaceBoxToOriginalImageSpace).
@@ -167,6 +175,7 @@ export class SpacePersonFaceParamsDto extends createZodDto(SpacePersonFaceParams
 export class SpacePersonFaceSuggestionParamsDto extends createZodDto(SpacePersonFaceSuggestionParamsSchema) {}
 export class SpaceAssetFacesParamsDto extends createZodDto(SpaceAssetFacesParamsSchema) {}
 export class SpaceAssetFaceCreateDto extends createZodDto(SpaceAssetFaceCreateSchema) {}
+export class SpaceFaceParamsDto extends createZodDto(SpaceFaceParamsSchema) {}
 export class SharedSpacePersonResponseDto extends createZodDto(SharedSpacePersonResponseSchema) {}
 export class SharedSpacePeopleStatisticsResponseDto extends createZodDto(SharedSpacePeopleStatisticsResponseSchema) {}
 export class SpaceAssetFaceResponseDto extends createZodDto(SpaceAssetFaceResponseSchema) {}
