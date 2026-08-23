@@ -60,12 +60,18 @@
 
   let isOwner = $derived(authManager.authenticated && authManager.user.id === asset.ownerId);
   // #734: a space Owner/Editor may edit a member's asset. Server-authoritative via `asset.canEdit`
-  // on a single-asset read; falls back to ownership otherwise (see `canEditAsset`). The people row
-  // stays on `isOwner` — person/face writes have no space-edit arm server-side. Tags is the one
+  // on a single-asset read; falls back to ownership otherwise (see `canEditAsset`). Tags is the one
   // row that needs BOTH values: it widens only the "add tag" affordance to `canEdit`, but keeps
   // per-tag remove on the real `isOwner` — tag removal resolves to tag ownership, which also has
   // no space-edit arm (see `DetailPanelTags.svelte`).
   let canEdit = $derived(canEditAsset(asset, { userId: authManager.authenticated ? authManager.user.id : undefined }));
+
+  // Slice 8: the People row's own sibling of `canEdit`, gating the space-flavoured face
+  // affordances (name/correct/draw) added by the shared-space face endpoints. `canEdit` is already
+  // true for the owner, so this is explicitly narrowed to `!isOwner` — the owner path keeps
+  // rendering the owner's own people through the owner components, unwidened, exactly like #734
+  // did for `DetailPanelTags`' `canEdit`. See `DetailPanelPeople.svelte`'s `canEditSpacePeople` doc.
+  let canEditSpacePeople = $derived(canEdit && !isOwner);
 
   // R4/E2 — shared links get NO filter affordance at all (they have no /photos to land on).
   // Threaded down to child rows the same way `isOwner` is; camera/lens live inline here.
@@ -243,7 +249,7 @@
 
     <DetailPanelDescription {asset} isOwner={canEdit} {canFilter} />
     <DetailPanelRating {asset} isOwner={canEdit} {canFilter} />
-    <DetailPanelPeople {asset} {isOwner} {canFilter} {previousRoute} spaceId={effectiveSpaceId} />
+    <DetailPanelPeople {asset} {isOwner} {canEditSpacePeople} {canFilter} {previousRoute} spaceId={effectiveSpaceId} />
 
     <div class="p-4">
       {#if asset.exifInfo}
