@@ -57,8 +57,8 @@ lockfile_platforms = [
 run = [
   "pnpm --filter @immich/sdk install --frozen-lockfile",
   "pnpm --filter @immich/sdk build",
-  "pnpm --filter @immich/sdk --filter @immich/plugin-sdk --filter @immich/plugin-core install --frozen-lockfile",
-  "pnpm --filter @immich/sdk --filter @immich/plugin-sdk --filter @immich/plugin-core build",
+  "pnpm --filter @immich/sdk --filter @immich/plugin-sdk --filter @immich/plugin-core --filter @immich/plugin-gallery install --frozen-lockfile",
+  "pnpm --filter @immich/sdk --filter @immich/plugin-sdk --filter @immich/plugin-core --filter @immich/plugin-gallery build",
 ]
 
 [tasks.open-api-typescript]
