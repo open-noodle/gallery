@@ -4,7 +4,7 @@ import type { CommandContext } from '$lib/managers/command-context-manager.svelt
  * One struct of booleans deciding which bulk-selection actions the current
  * `CommandContext` allows. Pure and side-effect free: no `authManager`
  * reads, no `$state`. See
- * `docs/superpowers/specs/2026-07-24-selection-toolbar-consistency-design.md`
+ * `specs/2026-07-24-selection-toolbar-consistency-design.md`
  * for the rule derivation ("the regular shared album is the reference model").
  */
 export interface SelectionCapabilities {
