@@ -70,6 +70,7 @@ const createFace = (params: Partial<AssetFace> = {}): AssetFace => ({
   updatedAt: new Date(),
   updateId: 'update-id',
   isVisible: true,
+  createdBy: null,
   ...params,
 });
 
