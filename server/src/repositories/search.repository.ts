@@ -116,7 +116,18 @@ export interface SearchExifOptions {
 
 export interface SearchEmbeddingOptions {
   embedding: string;
-  userIds: string[];
+  /**
+   * Owner scoping. Optional — and left unset on purpose under an `albumIds` scope, where the
+   * caller's AlbumRead check is the access boundary and `albumSharedSpaceScope` re-gates the rows
+   * (the same shape `searchMetadata` has always used). Matches `SearchUserIdOptions.userIds`.
+   */
+  userIds?: string[];
+  /**
+   * The searching user. Deliberately SEPARATE from `userIds`, which is an owner-scoping predicate
+   * and is absent under an album scope: the facets' people list still has to resolve identity
+   * people for the viewer, so it needs the caller even when nothing is owner-scoped.
+   */
+  callerId?: string;
   maxDistance?: number;
 }
 
@@ -930,7 +941,13 @@ export class SearchRepository {
     }
 
     if (options.timelineSpaceIds?.length) {
-      return this.getFilteredIdentityPeople(filteredIds, options.userIds[0], options.timelineSpaceIds, trx);
+      // `callerId`, not `userIds[0]`: an album-scoped search has no owner scoping at all.
+      return this.getFilteredIdentityPeople(
+        filteredIds,
+        options.callerId ?? options.userIds?.[0] ?? '',
+        options.timelineSpaceIds,
+        trx,
+      );
     }
 
     const peopleRows = await trx
