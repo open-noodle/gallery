@@ -36,6 +36,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest.dart';
 
 import '../../test_utils.dart';
+import '../../widget_tester_extensions.dart';
 
 class _MockTimelineFactory extends Mock implements TimelineFactory {}
 
@@ -192,7 +193,7 @@ void main() {
           supportedLocales: const [Locale('en')],
           path: '../i18n',
           fallbackLocale: const Locale('en'),
-          child: MaterialApp(home: RemoteAlbumPage(album: album)),
+          child: MaterialApp(home: withStubRouter(RemoteAlbumPage(album: album))),
         ),
       ),
     );
