@@ -2125,6 +2125,42 @@ export class SharedSpaceService extends BaseService {
   }
 
   /**
+   * Spec §6.4 (Slice 4): detach a face from a space person. Removes only the space's own
+   * `shared_space_person_face` projection row — deliberately leaves `face_identity_face` alone,
+   * or the face's global identity would be blanked for every other space sharing it (§5.1, F-22).
+   *
+   * Writes a negative verdict first so the suggestion pipeline does not immediately re-offer the
+   * face back to this same person, mirroring the reassign arm of `attachFaceToSpacePerson`.
+   *
+   * F-38: `isFaceAssignableInSpace` is re-checked here at write time, never trusted from the
+   * §6.1 read — a face the read returned a moment ago may have left the space since.
+   */
+  async detachFaceFromSpacePerson(
+    auth: AuthDto,
+    spaceId: string,
+    personId: string,
+    assetFaceId: string,
+  ): Promise<boolean> {
+    await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
+    const person = await this.requireSpacePersonInSpace(spaceId, personId);
+
+    if (!(await this.facePersonVerdictRepository.isFaceAssignableInSpace(spaceId, assetFaceId))) {
+      throw new BadRequestException('Face not found');
+    }
+
+    return this.databaseRepository.transaction(async (trx) => {
+      await this.facePersonVerdictRepository.markRejectedForSpacePerson(
+        person.id,
+        assetFaceId,
+        { source: 'suggestion', actorId: auth.user.id },
+        trx,
+      );
+      await this.sharedSpaceRepository.removePersonFace(person.id, assetFaceId, trx);
+      return true;
+    });
+  }
+
+  /**
    * Spec §6.1 (Slice 3): the face boxes on one asset, space-scoped. Editor-only — the response
    * exposes faces nobody has named yet, which a Viewer has no business seeing.
    *

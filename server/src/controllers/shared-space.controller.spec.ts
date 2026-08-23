@@ -480,6 +480,52 @@ describe(SharedSpaceController.name, () => {
     });
   });
 
+  // Slice 4, Task 1 (spec §6.4): DELETE /shared-spaces/:id/people/:personId/faces/:assetFaceId.
+  describe('DELETE /shared-spaces/:id/people/:personId/faces/:assetFaceId', () => {
+    const spaceId = '00000000-0000-4000-8000-000000000001';
+    const personId = '00000000-0000-4000-8000-000000000002';
+    const assetFaceId = '00000000-0000-4000-8000-000000000003';
+
+    it('should require shared-space update permission and respond with 200 when acted', async () => {
+      service.detachFaceFromSpacePerson.mockResolvedValue(true);
+
+      const { status, body } = await request(ctx.getHttpServer())
+        .delete(`/shared-spaces/${spaceId}/people/${personId}/faces/${assetFaceId}`)
+        .set('Authorization', `Bearer token`);
+
+      expect(status).toBe(200);
+      expect(body).toEqual({ acted: true });
+      expect(ctx.authenticate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({ permission: Permission.SharedSpaceUpdate }),
+        }),
+      );
+      expect(service.detachFaceFromSpacePerson).toHaveBeenCalledWith(undefined, spaceId, personId, assetFaceId);
+    });
+
+    it('should report acted: false on a no-op, still as 200', async () => {
+      service.detachFaceFromSpacePerson.mockResolvedValue(false);
+
+      const { status, body } = await request(ctx.getHttpServer())
+        .delete(`/shared-spaces/${spaceId}/people/${personId}/faces/${assetFaceId}`)
+        .set('Authorization', `Bearer token`);
+
+      expect(status).toBe(200);
+      expect(status).not.toBe(204);
+      expect(body).toEqual({ acted: false });
+    });
+
+    it('should validate assetFaceId independently', async () => {
+      const { status, body } = await request(ctx.getHttpServer())
+        .delete(`/shared-spaces/${spaceId}/people/${personId}/faces/not-a-uuid`)
+        .set('Authorization', `Bearer token`);
+
+      expect(status).toBe(400);
+      expect(body).toEqual(errorDto.validationError([{ path: ['assetFaceId'], message: 'Invalid UUID' }]));
+      expect(service.detachFaceFromSpacePerson).not.toHaveBeenCalled();
+    });
+  });
+
   // Slice 3 (spec §6.1): GET /shared-spaces/:id/assets/:assetId/faces. The decorator carries the
   // SharedSpaceRead API-key SCOPE (matching the sibling read at :id/people/:personId/faces) — the
   // real Editor-only RBAC is enforced in the service via requireRole, not visible at this layer.
