@@ -18,6 +18,7 @@ import 'package:immich_mobile/providers/infrastructure/storage.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/trash_sync.provider.dart';
 import 'package:immich_mobile/providers/server_info.provider.dart';
 import 'package:immich_mobile/providers/sync_status.provider.dart';
+import 'package:immich_mobile/repositories/memory_api.repository.dart';
 import 'package:immich_mobile/services/app_settings.service.dart';
 import 'package:immich_mobile/widgets/settings/beta_sync_settings/entity_count_tile.dart';
 import 'package:immich_mobile/widgets/settings/setting_group_title.dart';
@@ -223,7 +224,7 @@ class _SyncStatsCounts extends ConsumerWidget {
     final assetService = ref.watch(assetServiceProvider);
     final localAlbumService = LocalAlbumService(db.localAlbumRepository);
     final remoteAlbumService = ref.watch(remoteAlbumServiceProvider);
-    final memoryService = MemoryService(db.memoryRepository);
+    final memoryService = MemoryService(db.memoryRepository, ref.watch(memoryApiRepositoryProvider));
     final appSettingsService = ref.watch(appSettingsServiceProvider);
 
     Future<List<dynamic>> loadCounts() async {
