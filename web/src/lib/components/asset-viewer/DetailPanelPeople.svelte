@@ -5,17 +5,18 @@
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { Route } from '$lib/route';
   import { faceManager } from '$lib/stores/face.svelte';
-  import { locale } from '$lib/stores/preferences.store';
-  import { createUrl, getAssetUrls, getPeopleThumbnailUrl } from '$lib/utils';
+  import { cropFacesFromAsset, locale } from '$lib/stores/preferences.store';
+  import { getAssetUrls } from '$lib/utils';
   import {
     buildContextualFilterUrl,
     buildPersonFilterPatch,
     rememberContextualPersonName,
   } from '$lib/utils/filter-target';
   import { zoomImageToBase64 } from '$lib/utils/people-utils';
+  import { getRepresentativeThumbnailUrl, resolvePersonAvatar } from '$lib/utils/person-avatar';
   import { type AssetResponseDto } from '@immich/sdk';
   import { IconButton, Text } from '@immich/ui';
-  import { mdiEye, mdiEyeOff, mdiOpenInNew, mdiPencil, mdiPlus } from '@mdi/js';
+  import { mdiAccountBoxOutline, mdiCropFree, mdiEye, mdiEyeOff, mdiOpenInNew, mdiPencil, mdiPlus } from '@mdi/js';
   import { DateTime } from 'luxon';
   import { t } from 'svelte-i18n';
 
@@ -37,18 +38,6 @@
 
   const isSpaceMember = $derived(!!spaceId);
   const people = $derived(isSpaceMember && !isOwner ? asset.people || [] : Array.from(faceManager.people));
-  // `/people/{id}/thumbnail` is owner-gated AND is cropped from the person's feature photo — a
-  // DIFFERENT asset the viewer may have no right to see. Never request it for a non-owner (#796):
-  // their avatar is cropped client-side from the asset already on screen, and this asset's own
-  // thumbnail (which they can definitely see) stands in while that crop resolves.
-  const getPersonFallbackThumbnailUrl = (person: AssetPerson) => {
-    if (spaceId && person.spacePersonId) {
-      return createUrl(`/shared-spaces/${spaceId}/people/${person.spacePersonId}/thumbnail`, {
-        updatedAt: person.updatedAt,
-      });
-    }
-    return isOwner ? getPeopleThumbnailUrl(person) : getAssetUrls(asset).thumbnail;
-  };
 
   // A non-owner has no access to the owner-scoped person page, so their name is rendered as plain
   // text rather than a link into a 404.
@@ -120,6 +109,13 @@
         return { formattedBirthDate, formattedAge, ...person };
       }),
   );
+
+  // Only offer the switch where it can actually do something. A viewer reaching this asset through
+  // an album or partner share has no profile face to switch to, so for them the crop is the only
+  // option and the button would be dead.
+  const canChooseAvatarSource = $derived(
+    visiblePeople.some((person) => getRepresentativeThumbnailUrl(person, { isOwner, spaceId }) !== undefined),
+  );
 </script>
 
 <!--
@@ -129,11 +125,35 @@
   toggle, add-face, edit-faces) stay owner-gated. A non-owner with nobody to show gets no empty
   section; the owner keeps it so the add-face affordance stays reachable on a face-less asset.
 -->
+{#snippet avatar(url: string, person: AssetPerson, isHighlighted: boolean)}
+  <ImageThumbnail
+    curve
+    shadow
+    {url}
+    altText={person.name}
+    title={person.name}
+    widthStyle="100%"
+    hidden={person.isHidden}
+    highlighted={isHighlighted}
+    class="outline-offset-2 outline-immich-primary group-focus-visible:outline-2 dark:outline-immich-dark-primary"
+  />
+{/snippet}
 {#if !authManager.isSharedLink && (isOwner || visiblePeople.length > 0)}
   <section class="px-4 pt-4 text-sm" data-testid="detail-panel-people">
     <div class="flex h-10 w-full items-center justify-between">
       <Text size="small" color="muted">{$t('people')}</Text>
       <div class="flex items-center gap-2">
+        {#if canChooseAvatarSource}
+          <IconButton
+            aria-label={$cropFacesFromAsset ? $t('show_profile_faces') : $t('show_faces_from_photo')}
+            icon={$cropFacesFromAsset ? mdiAccountBoxOutline : mdiCropFree}
+            size="medium"
+            shape="round"
+            color="secondary"
+            variant="ghost"
+            onclick={() => cropFacesFromAsset.set(!$cropFacesFromAsset)}
+          />
+        {/if}
         {#if isOwner}
           {#if people.some((person) => person.isHidden)}
             <IconButton
@@ -175,7 +195,14 @@
       {#each visiblePeople as person (person.id)}
         {@const personFaces = faceManager.facesByPersonId.get(person.id) ?? []}
         {@const isHighlighted = personFaces.some((f) => assetViewerManager.highlightedFaces.some((b) => b.id === f.id))}
-        {@const fallbackThumbnailUrl = getPersonFallbackThumbnailUrl(person)}
+        {@const avatarSource = resolvePersonAvatar({
+          person,
+          isOwner,
+          spaceId,
+          hasFaceInAsset: personFaces.length > 0,
+          cropFacesFromAsset: $cropFacesFromAsset,
+          assetThumbnailUrl: getAssetUrls(asset).thumbnail,
+        })}
         {@const filterHref = getPersonFilterHref(person)}
         {@const personPageHref = getPersonPageHref(person)}
         <!--
@@ -196,44 +223,14 @@
             onpointerenter={() => assetViewerManager.setHighlightedFaces(personFaces)}
             onpointerleave={() => assetViewerManager.clearHighlightedFaces()}
           >
-            {#if personFaces[0]}
-              {#await zoomImageToBase64(personFaces[0], asset.id, asset.type, assetViewerManager.imgRef)}
-                <ImageThumbnail
-                  curve
-                  shadow
-                  url={fallbackThumbnailUrl}
-                  altText={person.name}
-                  title={person.name}
-                  widthStyle="100%"
-                  hidden={person.isHidden}
-                  highlighted={isHighlighted}
-                  class="outline-offset-2 outline-immich-primary group-focus-visible:outline-2 dark:outline-immich-dark-primary"
-                />
+            {#if avatarSource.kind === 'assetFace'}
+              {#await zoomImageToBase64(personFaces[0]!, asset.id, asset.type, assetViewerManager.imgRef)}
+                {@render avatar(avatarSource.fallbackUrl, person, isHighlighted)}
               {:then faceThumbnailUrl}
-                <ImageThumbnail
-                  curve
-                  shadow
-                  url={faceThumbnailUrl ?? fallbackThumbnailUrl}
-                  altText={person.name}
-                  title={person.name}
-                  widthStyle="100%"
-                  hidden={person.isHidden}
-                  highlighted={isHighlighted}
-                  class="outline-offset-2 outline-immich-primary group-focus-visible:outline-2 dark:outline-immich-dark-primary"
-                />
+                {@render avatar(faceThumbnailUrl ?? avatarSource.fallbackUrl, person, isHighlighted)}
               {/await}
             {:else}
-              <ImageThumbnail
-                curve
-                shadow
-                url={fallbackThumbnailUrl}
-                altText={person.name}
-                title={person.name}
-                widthStyle="100%"
-                hidden={person.isHidden}
-                highlighted={isHighlighted}
-                class="outline-offset-2 outline-immich-primary group-focus-visible:outline-2 dark:outline-immich-dark-primary"
-              />
+              {@render avatar(avatarSource.url, person, isHighlighted)}
             {/if}
             <p class="mt-1 truncate font-medium" title={person.name}>{person.name}</p>
             {#if person.birthDate && person.formattedAge}
