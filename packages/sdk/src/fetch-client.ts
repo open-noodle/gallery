@@ -3173,6 +3173,12 @@ export type SmartSearchFacetsResponseDto = {
     cities: string[];
     /** Available countries */
     countries: string[];
+    /** Whether any filtered asset belongs to an album */
+    hasAssetsInAlbum: boolean;
+    /** Whether any filtered asset belongs to no album */
+    hasAssetsNotInAlbum: boolean;
+    /** Whether any favourite exists in the filtered set, ignoring isFavorite */
+    hasFavorites: boolean;
     /** Whether unnamed people exist in the filtered smart-search set */
     hasUnnamedPeople: boolean;
     /** Available media types */
@@ -3264,6 +3270,12 @@ export type FilterSuggestionsResponseDto = {
     cameraMakes: string[];
     /** Available countries */
     countries: string[];
+    /** Whether any filtered asset belongs to an album */
+    hasAssetsInAlbum: boolean;
+    /** Whether any filtered asset belongs to no album */
+    hasAssetsNotInAlbum: boolean;
+    /** Whether any favourite exists in the filtered set, ignoring isFavorite */
+    hasFavorites: boolean;
     /** Whether unnamed people exist in the filtered set */
     hasUnnamedPeople: boolean;
     /** Available media types */
