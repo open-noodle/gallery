@@ -9,6 +9,7 @@
     FilterPanelConfig,
     FilterSection as FilterSectionType,
     FilterState,
+    FilterSuggestionsResponse,
     PersonOption,
     TagOption,
   } from './filter-panel';
@@ -16,10 +17,12 @@
     ALL_FILTER_SECTIONS,
     buildFilterContext,
     createFilterState,
+    getActiveFilterCount,
     loadFilterCollapsed,
     PRE_LEDGER_FILTER_SECTIONS,
     saveFilterCollapsed,
   } from './filter-panel';
+  import { getSectionAvailability, type SectionAvailability } from './filter-availability';
   import FilterSection from './filter-section.svelte';
   import FilterSectionMenu from './filter-section-menu.svelte';
   import TemporalPicker from './temporal-picker.svelte';
@@ -80,6 +83,13 @@
   let tags = $state<TagOption[]>([]);
   let availableRatings = $state<number[] | undefined>();
   let availableMediaTypes = $state<string[] | undefined>();
+
+  // #910: the facets for the filters in force right now, and for the same scope with none applied.
+  // The baseline answers "could this section EVER do anything here", which is what separates hiding a
+  // section from merely greying it.
+  let currentSuggestions = $state<FilterSuggestionsResponse | undefined>();
+  let baseline = $state<FilterSuggestionsResponse | undefined>();
+  let baselineRequested = false;
 
   // The count gate answers "has a *cross-section* filter narrowed the panel?". It drives the
   // empty-section disable in filter-section.svelte, not a request, so the location/camera/media
@@ -168,11 +178,16 @@
           cameraMakes = result.cameraMakes;
           tags = result.tags;
           // Note: availableRatings and availableMediaTypes are intentionally NOT set from
-          // suggestionsProvider. Hiding rating stars and media type buttons based on the
-          // current result set is too aggressive — it breaks existing E2E tests and confuses
-          // users who expect these fixed options to always be visible. The core value of
-          // interdependent filtering is in people/countries/cameras/tags narrowing.
+          // suggestionsProvider. Hiding or dimming rating stars and media type buttons based on the
+          // current result set breaks their positional meaning (PR #261) and the E2E suites that click
+          // them. #910 gates the *sections* instead — the facets reach getSectionAvailability through
+          // `currentSuggestions` below, never the controls. See spec §2.4.
           hasUnnamedPeople = result.hasUnnamedPeople;
+          currentSuggestions = result;
+          if (getActiveFilterCount(currentFilters) === 0) {
+            // Mounted clean, so this response is already the no-filters baseline — no second request.
+            baseline = result;
+          }
         })
         .catch((error: unknown) => {
           if (!controller.signal.aborted) {
@@ -191,6 +206,31 @@
     return () => {
       clearTimeout(timeout);
     };
+  });
+
+  // Only fires when the panel mounts with filters already applied (a deep link, or restored state) —
+  // otherwise the effect above captures the baseline for free. Scope changes remount the panel, so this
+  // needs no invalidation: see spec §4.5 for the `{#key}` blocks that guarantee it.
+  $effect(() => {
+    const provider = config.baselineProvider;
+    if (!config.suggestionsProvider || !provider || baselineRequested) {
+      return;
+    }
+    baselineRequested = true;
+
+    if (untrack(() => getActiveFilterCount(filters)) === 0) {
+      return;
+    }
+
+    void provider()
+      // A surface with no cheap baseline resolves `undefined` (every query-mode branch does). Assigning
+      // it is a no-op that keeps the "never hidden on missing information" rule intact.
+      .then((result) => {
+        baseline = result;
+      })
+      .catch(() => {
+        // Leave it undefined. A section is never hidden on missing information.
+      });
   });
 
   let prevTakenAfter: string | undefined = $state();
@@ -661,6 +701,27 @@
 
   // Whether any section has an active filter — surfaced as a single dot on the collapsed filter button.
   let anyActiveFilter = $derived(config.sections.some((section) => hasActiveFilter(section)));
+
+  // Availability is derived, never persisted — the storage effect keeps writing `config.sections`.
+  // Conflating the two would record a section as user-hidden the moment it went unavailable, and it
+  // would never come back.
+  let availability = $derived<Map<FilterSectionType, SectionAvailability>>(
+    new Map(
+      config.sections.map((section) => [
+        section,
+        config.suggestionsProvider && currentSuggestions
+          ? getSectionAvailability(section, {
+              current: currentSuggestions,
+              baseline,
+              hasActiveFilter: hasActiveFilter(section),
+              timeBucketCount: timeBuckets.length,
+            })
+          : 'available',
+      ]),
+    ),
+  );
+
+  let renderableSections = $derived(config.sections.filter((section) => availability.get(section) !== 'unavailable'));
 </script>
 
 {#if hidden}
@@ -710,10 +771,10 @@
         >
           <div class="flex items-center gap-1">
             <span class="text-sm font-medium">{$t('filters')}</span>
-            {#if config.sections.length > 0}
+            {#if renderableSections.length > 0}
               <FilterSectionMenu
                 bind:open={sectionMenuOpen}
-                sections={config.sections}
+                sections={renderableSections}
                 visible={visibleSections}
                 titles={sectionTitles}
                 toggleLabels={sectionToggleLabels}
@@ -735,25 +796,37 @@
         </div>
 
         <div class="pt-4">
-          {#each config.sections as section (section)}
+          {#each renderableSections as section (section)}
             {#if visibleSections.has(section)}
+              <!-- The "(0)" / disable gate answers "has a CROSS-SECTION filter narrowed the panel?",
+                   so the #910 availability verdict is gated on filterContext exactly as the legacy
+                   formula below is: #858 §3.3 decision 3 keeps `state` / `lensModel` / `ownerId`
+                   (and the location/camera/media dimensions) out of it, because those arrive from a
+                   contextual filter or a link rather than the panel's own controls. 'timeline' is
+                   the one exception — its `empty` means "this page has no assets at all", which no
+                   filter is responsible for. Hiding an `unavailable` section is separate and stays
+                   ungated (renderableSections, above). -->
               <FilterSection
                 title={sectionTitles[section]}
                 testId={section}
                 refetching={isRefetching && section !== 'timeline'}
                 expanded={expandedSections.has(section)}
                 onToggleExpanded={() => toggleSectionExpanded(section)}
-                count={filterContext
-                  ? section === 'people'
-                    ? people.length
-                    : section === 'location'
-                      ? countries.length
-                      : section === 'camera'
-                        ? cameraMakes.length
-                        : section === 'tags'
-                          ? tags.length
-                          : undefined
-                  : undefined}
+                count={config.suggestionsProvider
+                  ? (section === 'timeline' || filterContext) && availability.get(section) === 'empty'
+                    ? 0
+                    : undefined
+                  : filterContext
+                    ? section === 'people'
+                      ? people.length
+                      : section === 'location'
+                        ? countries.length
+                        : section === 'camera'
+                          ? cameraMakes.length
+                          : section === 'tags'
+                            ? tags.length
+                            : undefined
+                    : undefined}
               >
                 {#if section === 'timeline'}
                   <TemporalPicker
@@ -860,8 +933,10 @@
           {/each}
 
           <!-- Emptiness is per surface, not per ledger: the set can still hold a section another
-               surface tracks under the same storage key (#797). -->
-          {#if config.sections.every((section) => !visibleSections.has(section))}
+               surface tracks under the same storage key (#797). Gated on renderableSections, not
+               config.sections: an unavailable section still counts as "visible" in the persisted
+               ledger, so a panel rendering nothing could otherwise have no hint (#910). -->
+          {#if renderableSections.every((section) => !visibleSections.has(section))}
             <div class="flex flex-col items-center gap-2 px-4 py-8 text-center">
               <p class="text-xs text-gray-500 dark:text-gray-400">{$t('filter_show_sections_hint')}</p>
               <button

@@ -22501,6 +22501,18 @@
             },
             "type": "array"
           },
+          "hasAssetsInAlbum": {
+            "description": "Whether any filtered asset belongs to an album",
+            "type": "boolean"
+          },
+          "hasAssetsNotInAlbum": {
+            "description": "Whether any filtered asset belongs to no album",
+            "type": "boolean"
+          },
+          "hasFavorites": {
+            "description": "Whether any favourite exists in the filtered set, ignoring isFavorite",
+            "type": "boolean"
+          },
           "hasUnnamedPeople": {
             "description": "Whether unnamed people exist in the filtered set",
             "type": "boolean"
@@ -22537,6 +22549,9 @@
         "required": [
           "cameraMakes",
           "countries",
+          "hasAssetsInAlbum",
+          "hasAssetsNotInAlbum",
+          "hasFavorites",
           "hasUnnamedPeople",
           "mediaTypes",
           "people",
@@ -29679,6 +29694,18 @@
             },
             "type": "array"
           },
+          "hasAssetsInAlbum": {
+            "description": "Whether any filtered asset belongs to an album",
+            "type": "boolean"
+          },
+          "hasAssetsNotInAlbum": {
+            "description": "Whether any filtered asset belongs to no album",
+            "type": "boolean"
+          },
+          "hasFavorites": {
+            "description": "Whether any favourite exists in the filtered set, ignoring isFavorite",
+            "type": "boolean"
+          },
           "hasUnnamedPeople": {
             "description": "Whether unnamed people exist in the filtered smart-search set",
             "type": "boolean"
@@ -29730,6 +29757,9 @@
           "cameraModels",
           "cities",
           "countries",
+          "hasAssetsInAlbum",
+          "hasAssetsNotInAlbum",
+          "hasFavorites",
           "hasUnnamedPeople",
           "mediaTypes",
           "people",

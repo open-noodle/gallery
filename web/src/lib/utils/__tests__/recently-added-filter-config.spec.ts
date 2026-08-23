@@ -15,6 +15,9 @@ vi.mock('@immich/sdk', async (importOriginal) => {
       ratings: [5],
       mediaTypes: ['IMAGE'],
       hasUnnamedPeople: false,
+      hasFavorites: true,
+      hasAssetsInAlbum: false,
+      hasAssetsNotInAlbum: false,
     }),
     getSearchSuggestions: vi.fn().mockResolvedValue(['Berlin']),
     searchSmartFacets: vi.fn().mockResolvedValue({
@@ -174,6 +177,29 @@ describe('buildRecentlyAddedFilterConfig', () => {
     );
   });
 
+  it('forwards the #910 availability facets', async () => {
+    const result = await buildRecentlyAddedFilterConfig().suggestionsProvider!(createFilterState());
+
+    expect(result.hasFavorites).toBe(true);
+    expect(result.hasAssetsInAlbum).toBe(false);
+    expect(result.hasAssetsNotInAlbum).toBe(false);
+  });
+
+  it('offers a browse-mode baseline computed with no filters (#910)', async () => {
+    const config = buildRecentlyAddedFilterConfig();
+    vi.mocked(getFilterSuggestions).mockClear();
+
+    const baseline = await config.baselineProvider!();
+
+    expect(baseline).toBeDefined();
+    const call = vi.mocked(getFilterSuggestions).mock.calls.at(-1)?.[0];
+    expect(call).not.toHaveProperty('personIds');
+    expect(call).not.toHaveProperty('rating');
+    expect(call).not.toHaveProperty('withSharedSpaces');
+    expect(call).not.toHaveProperty('albumId');
+    expect(call).not.toHaveProperty('spaceId');
+  });
+
   it('passes the dependent-provider arguments and context through', async () => {
     const config = buildRecentlyAddedFilterConfig();
 
@@ -264,6 +290,17 @@ describe('buildRecentlyAddedFilterConfig in query mode', () => {
     expect(vi.mocked(searchSmartFacets).mock.calls[1][0].smartSearchFacetsDto).toEqual(
       expect.objectContaining({ query: 'sunset' }),
     );
+  });
+
+  it('offers no baseline in query mode (#910)', async () => {
+    // Regression guard for spec §4.5: this config is spread as-is into the Recently Added page's
+    // FilterPanelConfig (no page-level override), so the query-mode guard has to live here.
+    const config = buildRecentlyAddedFilterConfig(searchContext);
+    vi.mocked(getFilterSuggestions).mockClear();
+
+    await expect(config.baselineProvider!()).resolves.toBeUndefined();
+
+    expect(getFilterSuggestions).not.toHaveBeenCalled();
   });
 
   it('falls back to the browse path when the query is blank', async () => {

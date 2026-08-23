@@ -109,6 +109,9 @@ void main() {
             (ref, filter) => Future.value(
               FilterSuggestionsResponseDto(
                 hasUnnamedPeople: false,
+                hasFavorites: true,
+                hasAssetsInAlbum: true,
+                hasAssetsNotInAlbum: true,
                 people: [FilterSuggestionsPersonDto(id: 'p1', name: 'Emma')],
               ),
             ),
@@ -132,7 +135,15 @@ void main() {
       final scope = ProviderContainer(
         overrides: [
           photosFilterSuggestionsProvider.overrideWith(
-            (ref, filter) => Future.value(FilterSuggestionsResponseDto(hasUnnamedPeople: false, people: const [])),
+            (ref, filter) => Future.value(
+              FilterSuggestionsResponseDto(
+                hasUnnamedPeople: false,
+                hasFavorites: true,
+                hasAssetsInAlbum: true,
+                hasAssetsNotInAlbum: true,
+                people: const [],
+              ),
+            ),
           ),
           timeBucketsProvider.overrideWith((ref, filter) => Future.value(const <BucketLite>[])),
         ],
@@ -198,7 +209,14 @@ void main() {
         DeepContent(scrollController: controller),
         overrides: [
           photosFilterSuggestionsProvider.overrideWith(
-            (ref, filter) => Future.value(FilterSuggestionsResponseDto(hasUnnamedPeople: false)),
+            (ref, filter) => Future.value(
+              FilterSuggestionsResponseDto(
+                hasUnnamedPeople: false,
+                hasFavorites: true,
+                hasAssetsInAlbum: true,
+                hasAssetsNotInAlbum: true,
+              ),
+            ),
           ),
           timeBucketsProvider.overrideWith(
             (ref, filter) => Future.value(const <BucketLite>[(timeBucket: '2024-06-01', count: 10)]),
@@ -223,7 +241,15 @@ void main() {
         DeepContent(scrollController: controller),
         overrides: [
           photosFilterSuggestionsProvider.overrideWith(
-            (ref, filter) => Future.value(FilterSuggestionsResponseDto(hasUnnamedPeople: false, countries: ['France'])),
+            (ref, filter) => Future.value(
+              FilterSuggestionsResponseDto(
+                hasUnnamedPeople: false,
+                hasFavorites: true,
+                hasAssetsInAlbum: true,
+                hasAssetsNotInAlbum: true,
+                countries: ['France'],
+              ),
+            ),
           ),
           timeBucketsProvider.overrideWith((ref, filter) => Future.value(const <BucketLite>[])),
         ],
