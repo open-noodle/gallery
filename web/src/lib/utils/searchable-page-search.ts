@@ -40,8 +40,17 @@ export function getSearchablePageBasePath(pathname: string): string | null {
   }
 
   const parts = pathname.split('/').filter(Boolean);
+
+  if (parts[0] === 'albums') {
+    return albumBasePath(parts, '/albums', 1);
+  }
+
   if (parts[0] !== 'spaces' || parts[1] === undefined) {
     return null;
+  }
+
+  if (parts[2] === 'albums') {
+    return albumBasePath(parts, `/spaces/${parts[1]}/albums`, 3);
   }
 
   if (parts.length === 2) {
@@ -50,6 +59,32 @@ export function getSearchablePageBasePath(pathname: string): string | null {
 
   if (parts[2] === 'photos') {
     return `/spaces/${parts[1]}/photos`;
+  }
+
+  return null;
+}
+
+/**
+ * Shared tail of the two album detail routes — `/albums/<id>` and `/spaces/<sid>/albums/<id>` —
+ * which differ only in their prefix. `idIndex` is where the album id sits in `parts`.
+ *
+ * Mirrors the space timeline's shape above: the bare route and its `/photos` variant both resolve,
+ * and an open asset (`…/photos/<assetId>`) resolves to the `/photos` base so a search or filter
+ * change closes the viewer rather than trying to keep a now-filtered-out asset open. The album
+ * LIST pages (`/albums`, `/spaces/<sid>/albums`) have no album id and stay non-searchable.
+ */
+function albumBasePath(parts: string[], prefix: string, idIndex: number): string | null {
+  const albumId = parts[idIndex];
+  if (albumId === undefined) {
+    return null;
+  }
+
+  if (parts.length === idIndex + 1) {
+    return `${prefix}/${albumId}`;
+  }
+
+  if (parts[idIndex + 1] === 'photos') {
+    return `${prefix}/${albumId}/photos`;
   }
 
   return null;

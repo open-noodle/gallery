@@ -69,6 +69,23 @@ describe('search DTO albumless filters', () => {
     expect(result.data?.isInAlbum).toBe(true);
   });
 
+  // An album detail page runs a page-aware search scoped to its own album. Without albumIds on the
+  // facets schema the ZodValidationPipe strips it, and the facet counts / time buckets silently
+  // describe the whole library while the result grid shows one album.
+  it('should accept albumIds on smart search facet requests', () => {
+    const albumId = '00000000-0000-4000-8000-000000000009';
+    const result = SmartSearchFacetsDto.schema.safeParse({ query: 'beach', albumIds: [albumId] });
+
+    expect(result.success).toBe(true);
+    expect(result.data?.albumIds).toEqual([albumId]);
+  });
+
+  it('should reject a non-uuid albumIds entry on smart search facet requests', () => {
+    const result = SmartSearchFacetsDto.schema.safeParse({ query: 'beach', albumIds: ['not-a-uuid'] });
+
+    expect(result.success).toBe(false);
+  });
+
   // ownerId is a narrowing contributor filter, distinct from the owner-scoping userIds resolved by
   // the service. Without a schema field for it, the ZodValidationPipe would silently strip ownerId
   // from incoming requests before the service ever sees it — the metadata-search DTO must declare it.
