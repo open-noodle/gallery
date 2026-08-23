@@ -1,9 +1,10 @@
 import { AssetOrder } from '@immich/sdk';
-import { render } from '@testing-library/svelte';
+import { fireEvent, render, screen } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getIntersectionObserverMock } from '$lib/__mocks__/intersection-observer.mock';
 import type { FilterState } from '$lib/components/filter-panel/filter-panel';
 import SmartSearchResults from '$lib/components/search/smart-search-results.svelte';
+import SmartSearchResultsHost from '$lib/components/search/smart-search-results.test-host.svelte';
 import { SEARCH_FILTER_DEBOUNCE_MS } from '$lib/utils/space-search';
 
 const searchSmartMock = vi.fn();
@@ -241,6 +242,51 @@ describe('SmartSearchResults', () => {
     expect(searchSmartMock).toHaveBeenCalledWith(
       expect.objectContaining({ smartSearchDto: expect.objectContaining({ withSharedSpaces: true }) }),
     );
+  });
+
+  it('forwards the route album scope to buildSmartSearchParams', async () => {
+    render(SmartSearchResults, { props: { ...baseProps, albumIds: ['album-1'] } });
+    await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
+    expect(searchSmartMock).toHaveBeenCalledWith(
+      expect.objectContaining({ smartSearchDto: expect.objectContaining({ albumIds: ['album-1'] }) }),
+    );
+  });
+
+  // Hosts pass `$derived([album.id])`, and Svelte's derived compares with `===`, so every unrelated
+  // `album` reassignment (a rename, the `refreshAlbum()` after a delete) mints a fresh array. Track
+  // that identity and each of those discards the loaded pages and re-runs the whole vector search.
+  //
+  // Driven through a HOST component, not `rerender`: rerender re-fires the mount effect even for
+  // literally identical props, so it cannot tell the bug from the harness.
+  it('does not re-search when the host re-derives the album scope without changing it', async () => {
+    render(SmartSearchResultsHost, { props: { album: { id: 'album-1', name: 'a' }, filters: baseFilters } });
+    await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
+    expect(searchSmartMock).toHaveBeenCalledTimes(1);
+
+    await fireEvent.click(screen.getByTestId('host-rename-album'));
+    await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
+
+    expect(searchSmartMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('re-searches when the album scope actually changes', async () => {
+    render(SmartSearchResultsHost, { props: { album: { id: 'album-1', name: 'a' }, filters: baseFilters } });
+    await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
+
+    await fireEvent.click(screen.getByTestId('host-switch-album'));
+    await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
+
+    expect(searchSmartMock).toHaveBeenCalledTimes(2);
+    expect(searchSmartMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ smartSearchDto: expect.objectContaining({ albumIds: ['album-2'] }) }),
+    );
+  });
+
+  it('omits albumIds entirely when no album scope is given', async () => {
+    render(SmartSearchResults, { props: baseProps });
+    await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
+    const dto = searchSmartMock.mock.calls[0][0].smartSearchDto as Record<string, unknown>;
+    expect(dto).not.toHaveProperty('albumIds');
   });
 
   it('forwards route-provided exact total to the result grid', async () => {
