@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:immich_mobile/domain/models/person.model.dart';
+import 'package:immich_mobile/models/photos_filter/filter_person.model.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/toggles_section.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/filter_section_id.dart';
 import 'package:immich_mobile/providers/api.provider.dart';
@@ -209,11 +209,11 @@ void main() {
       // Three discrete taps in quick succession — each well inside the 250 ms debounce window
       // measured from the previous one.
       final notifier = container.read(photosFilterProvider.notifier);
-      notifier.togglePerson(const PersonDto(id: 'p1', name: 'A', isHidden: false, thumbnailPath: ''));
+      notifier.togglePerson(const FilterPerson(id: 'p1', name: 'A'));
       await tester.pump(const Duration(milliseconds: 50));
-      notifier.togglePerson(const PersonDto(id: 'p2', name: 'B', isHidden: false, thumbnailPath: ''));
+      notifier.togglePerson(const FilterPerson(id: 'p2', name: 'B'));
       await tester.pump(const Duration(milliseconds: 50));
-      notifier.togglePerson(const PersonDto(id: 'p3', name: 'C', isHidden: false, thumbnailPath: ''));
+      notifier.togglePerson(const FilterPerson(id: 'p3', name: 'C'));
 
       // Still within the window measured from the last change: no new request yet.
       await tester.pump(const Duration(milliseconds: 100));

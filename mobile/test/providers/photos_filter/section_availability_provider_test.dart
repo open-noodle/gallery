@@ -1,7 +1,7 @@
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:immich_mobile/domain/models/person.model.dart';
+import 'package:immich_mobile/models/photos_filter/filter_person.model.dart';
 import 'package:immich_mobile/models/search/search_filter.model.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/filter_section_id.dart';
 import 'package:immich_mobile/providers/api.provider.dart';
@@ -37,7 +37,7 @@ FilterSuggestionsResponseDto withMediaTypes(List<String> mediaTypes) => FilterSu
   mediaTypes: mediaTypes,
 );
 
-const aPerson = PersonDto(id: 'p1', name: 'Alice', isHidden: false, thumbnailPath: '');
+const aPerson = FilterPerson(id: 'p1', name: 'Alice');
 
 void main() {
   group('sectionAvailability (#910)', () {
@@ -98,7 +98,7 @@ void main() {
     test('never hides a section that holds an active filter', () {
       // `Option<int?>`: none = no filter, some(null) = unrated, some(1-5) = that rating.
       // See search_filter.model.dart:138-140.
-      final filter = SearchFilter.empty().copyWith(rating: SearchRatingFilter(rating: const Option.some(5)));
+      final filter = SearchFilter.empty().copyWith(rating: const SearchRatingFilter(rating: Option.some(5)));
 
       expect(
         availableSections(emptySuggestions(), emptySuggestions(), filter).contains(FilterSectionId.rating),
@@ -200,18 +200,18 @@ void main() {
         addTearDown(container.dispose);
 
         // Mount and let the at-rest (empty-filter) request settle before starting the burst.
-        container.listen(sectionAvailabilityProvider, (_, __) {});
+        container.listen(sectionAvailabilityProvider, (_, _) {});
         async.flushMicrotasks();
         clearInteractions(mockSearchApi);
 
         // Three discrete taps in quick succession — each well inside the 250 ms debounce window
         // measured from the previous one.
         final notifier = container.read(photosFilterProvider.notifier);
-        notifier.togglePerson(const PersonDto(id: 'p1', name: 'A', isHidden: false, thumbnailPath: ''));
+        notifier.togglePerson(const FilterPerson(id: 'p1', name: 'A'));
         async.elapse(const Duration(milliseconds: 50));
-        notifier.togglePerson(const PersonDto(id: 'p2', name: 'B', isHidden: false, thumbnailPath: ''));
+        notifier.togglePerson(const FilterPerson(id: 'p2', name: 'B'));
         async.elapse(const Duration(milliseconds: 50));
-        notifier.togglePerson(const PersonDto(id: 'p3', name: 'C', isHidden: false, thumbnailPath: ''));
+        notifier.togglePerson(const FilterPerson(id: 'p3', name: 'C'));
 
         // Still within the window measured from the last change: no new request yet.
         async.elapse(const Duration(milliseconds: 100));
@@ -295,7 +295,7 @@ void main() {
 
           container.read(photosFilterProvider.notifier).setText('sunset');
 
-          container.listen(sectionAvailabilityProvider, (_, __) {});
+          container.listen(sectionAvailabilityProvider, (_, _) {});
           async.flushMicrotasks();
 
           verify(
