@@ -35,6 +35,9 @@ function mapSuggestions(response: Awaited<ReturnType<typeof getFilterSuggestions
     ratings: response.ratings,
     mediaTypes: response.mediaTypes,
     hasUnnamedPeople: response.hasUnnamedPeople,
+    hasFavorites: response.hasFavorites,
+    hasAssetsInAlbum: response.hasAssetsInAlbum,
+    hasAssetsNotInAlbum: response.hasAssetsNotInAlbum,
   };
 }
 
@@ -58,6 +61,8 @@ function toSuggestionRequest(filters: FilterState) {
         : filters.mediaType === 'image'
           ? AssetTypeEnum.Image
           : AssetTypeEnum.Video,
+    isNotInAlbum: filters.isNotInAlbum === true ? true : undefined,
+    isInAlbum: filters.isInAlbum === true ? true : undefined,
     takenAfter: context?.takenAfter,
     takenBefore: context?.takenBefore,
   };
@@ -68,6 +73,9 @@ export function buildAlbumDetailFilterConfig(albumId: string): FilterPanelConfig
     sections: [...albumDetailSections],
     suggestionsProvider: async (filters) =>
       mapSuggestions(await getFilterSuggestions({ albumId, ...toSuggestionRequest(filters) })),
+    // #910: the baseline is the same call with the filter arguments dropped, keeping only the
+    // album scope.
+    baselineProvider: async () => mapSuggestions(await getFilterSuggestions({ albumId })),
     providers: {
       cities: (country, context) =>
         getSearchSuggestions({ $type: SearchSuggestionType.City, albumId, country, ...context }),
@@ -81,6 +89,8 @@ export function buildAlbumAssetPickerFilterConfig(): FilterPanelConfig {
   return {
     sections: [...albumPickerSections],
     suggestionsProvider: async (filters) => mapSuggestions(await getFilterSuggestions(toSuggestionRequest(filters))),
+    // #910: the picker is not scoped to anything, so the baseline is a plain, filter-free call.
+    baselineProvider: async () => mapSuggestions(await getFilterSuggestions({})),
     providers: {
       cities: (country, context) => getSearchSuggestions({ $type: SearchSuggestionType.City, country, ...context }),
       cameraModels: (make, context) =>
