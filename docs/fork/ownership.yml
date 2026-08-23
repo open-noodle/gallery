@@ -61,6 +61,10 @@ features:
       - web/src/lib/components/SchemaSpacePicker.svelte
       - web/src/lib/components/SchemaSpacePicker.test-wrapper.svelte
       - web/src/lib/components/SchemaSpacePicker.spec.ts
+      - web/src/lib/components/SchemaSpaceAlbumPicker.svelte
+      - web/src/lib/components/SchemaSpaceAlbumPicker.test-wrapper.svelte
+      - web/src/lib/components/SchemaSpaceAlbumPicker.spec.ts
+      - web/src/lib/components/SchemaConfiguration.spec.ts
       - e2e/src/specs/server/api/workflow-spaces.e2e-spec.ts
     upstream_extension_paths:
       - server/src/services/search.service.ts

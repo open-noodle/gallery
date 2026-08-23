@@ -3473,6 +3473,7 @@
   "workflow_json_help": "以 JSON 格式編輯工作流程設定。變更將同步至視覺化編輯器。",
   "workflow_name": "工作流程名稱",
   "workflow_navigation_prompt": "您確定要不儲存變更就離開嗎？",
+  "workflow_space_album_choose_space_first": "請先選擇 Space",
   "workflow_space_unavailable": "Space 無法使用",
   "workflow_summary": "工作流程摘要",
   "workflow_templates": "工作流程範本",

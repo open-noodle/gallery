@@ -46,7 +46,7 @@
             "type": "string",
             "title": "Album name",
             "description": "Uses this album if it exists in the space, otherwise creates and links it",
-            "uiHint": { "order": 2 }
+            "uiHint": { "type": "SpaceAlbumName", "order": 2 }
           }
         },
         "required": ["spaceId", "albumName"]

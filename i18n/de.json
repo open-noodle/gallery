@@ -3473,6 +3473,7 @@
   "workflow_json_help": "Workflow-Konfiguration im JSON-Editor bearbeiten. Änderungen werden mit dem visuellen Editor synchronisiert.",
   "workflow_name": "Workflow-Name",
   "workflow_navigation_prompt": "Bist du sicher, dass du den Editor ohne zu speichern verlassen willst?",
+  "workflow_space_album_choose_space_first": "Wähle zuerst einen Space aus",
   "workflow_space_unavailable": "Space nicht verfügbar",
   "workflow_summary": "Workflow-Zusammenfassung",
   "workflow_templates": "Vorlagen für Workflows",

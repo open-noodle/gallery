@@ -3473,6 +3473,7 @@
   "workflow_json_help": "Edite la configuración del flujo de trabajo en formato JSON. Los cambios se sincronizarán con el generador visual.",
   "workflow_name": "Nombre del flujo de trabajo",
   "workflow_navigation_prompt": "¿Estás seguro que deseas salir sin guardar los cambios?",
+  "workflow_space_album_choose_space_first": "Elige primero un Space",
   "workflow_space_unavailable": "Space no disponible",
   "workflow_summary": "Resumen del flujo de trabajo",
   "workflow_templates": "Plantillas de flujo de trabajo",
