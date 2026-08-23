@@ -1514,6 +1514,55 @@ describe('activate("command")', () => {
     expect(goto).toHaveBeenCalledWith('/photos?q=beach');
   });
 
+  it('activateSearch stays on a space album instead of bouncing to /photos', async () => {
+    const m = new GlobalSearchManager();
+    mockPage.url = new URL('https://gallery.test/spaces/space-1/albums/album-1');
+    mockResolvedTypedSearch('beach');
+
+    await m.activateSearch('beach');
+
+    expect(goto).toHaveBeenCalledWith('/spaces/space-1/albums/album-1?q=beach');
+  });
+
+  it('activateSearch stays on an album detail page and drops a stale asset id', async () => {
+    const m = new GlobalSearchManager();
+    mockPage.url = new URL('https://gallery.test/albums/album-1/photos/asset-123?view=grid');
+    mockResolvedTypedSearch('beach');
+
+    await m.activateSearch('beach');
+
+    expect(goto).toHaveBeenCalledWith('/albums/album-1/photos?view=grid&q=beach');
+  });
+
+  // The typed-search resolver emits a BARE space profile id under a space scope and a prefixed
+  // `space-person:` token otherwise. An album detail page — space album included — filters with the
+  // prefixed form, so resolving it space-scoped there yields ids that match nothing.
+  it('resolves typed search globally on a space album, not against the space', async () => {
+    const m = new GlobalSearchManager();
+    mockPage.url = new URL('https://gallery.test/spaces/space-1/albums/album-1');
+    mockResolvedTypedSearch('beach');
+
+    await m.activateSearch('person:Alice beach');
+
+    expect(typedSearchMock.resolveTypedSearchFilters).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ spaceId: undefined }),
+    );
+  });
+
+  it('still resolves typed search against the space on a space timeline', async () => {
+    const m = new GlobalSearchManager();
+    mockPage.url = new URL('https://gallery.test/spaces/space-1/photos');
+    mockResolvedTypedSearch('beach');
+
+    await m.activateSearch('person:Alice beach');
+
+    expect(typedSearchMock.resolveTypedSearchFilters).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ spaceId: 'space-1' }),
+    );
+  });
+
   describe('GlobalSearchManager typed search commit', () => {
     beforeEach(() => {
       typedSearchMock.resolveTypedSearchFilters.mockReset();
@@ -6935,18 +6984,32 @@ describe('person activation navigation', () => {
     expect(lastGoto()).toBe('/photos?people=space-person%3Aprofile-1');
   });
 
-  it('targets /photos from a space page that is not a timeline', () => {
+  // A space ALBUM is album-scoped, not space-scoped: its filter panel speaks the same prefixed
+  // person tokens /photos does, never the bare space profile id the space timeline uses. So the
+  // page-aware filter stays put but carries the PREFIXED token. Handing it the bare profile id
+  // (which is what a naive `pathname.startsWith('/spaces/')` test yields) would silently return an
+  // empty timeline — the server reads a bare id as a legacy person id the viewer does not own.
+  it('stays on a space album and uses the prefixed id for that space person', () => {
     const m = new GlobalSearchManager();
     mockPage.url = new URL('https://gallery.test/spaces/space-1/albums/album-1');
 
     m.activate('person', spacePerson('space-1'));
 
-    expect(lastGoto()).toBe('/photos?people=space-person%3Aprofile-1');
+    expect(lastGoto()).toBe('/spaces/space-1/albums/album-1?people=space-person%3Aprofile-1');
+  });
+
+  it('stays on an album detail page', () => {
+    const m = new GlobalSearchManager();
+    mockPage.url = new URL('https://gallery.test/albums/album-1');
+
+    m.activate('person', userPerson());
+
+    expect(lastGoto()).toBe('/albums/album-1?people=person%3Ap1');
   });
 
   it('targets /photos from a non-searchable page', () => {
     const m = new GlobalSearchManager();
-    mockPage.url = new URL('https://gallery.test/albums/album-1');
+    mockPage.url = new URL('https://gallery.test/albums');
 
     m.activate('person', userPerson());
 
@@ -7117,9 +7180,18 @@ describe('place activation navigation', () => {
     expect(lastGoto()).toBe('/spaces/space-1?city=Paris');
   });
 
-  it('targets /photos from a non-searchable page', () => {
+  it('stays on an album detail page', () => {
     const m = new GlobalSearchManager();
     mockPage.url = new URL('https://gallery.test/albums/album-1');
+
+    m.activate('place', paris);
+
+    expect(lastGoto()).toBe('/albums/album-1?city=Paris');
+  });
+
+  it('targets /photos from a non-searchable page', () => {
+    const m = new GlobalSearchManager();
+    mockPage.url = new URL('https://gallery.test/albums');
 
     m.activate('place', paris);
 
