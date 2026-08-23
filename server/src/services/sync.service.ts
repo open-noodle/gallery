@@ -14,7 +14,7 @@ import {
   SyncItem,
   SyncStreamDto,
 } from 'src/dtos/sync.dto';
-import { JobName, QueueName, SyncEntityType, SyncRequestType } from 'src/enum';
+import { JobName, MemoryType, QueueName, SyncEntityType, SyncRequestType } from 'src/enum';
 import { SyncQueryOptions } from 'src/repositories/sync.repository';
 import { SessionSyncCheckpointTable } from 'src/schema/tables/sync-checkpoint.table';
 import { BaseService } from 'src/services/base.service';
@@ -202,6 +202,16 @@ export class SyncService extends BaseService {
     const { nowId } = await this.syncCheckpointRepository.getNow();
     const options: SyncQueryOptions = { nowId, userId: auth.user.id };
 
+    // Gallery-fork-only memory types (e.g. rule-based "Smarter" memories) are sent verbatim in
+    // MemoryV1.type, but that field is a *required* enum in upstream Immich's OpenAPI spec whose
+    // only member is `on_this_day` — an unrecognized value there aborts an official Immich
+    // client's whole sync-stream parse, silently disabling background backup (#999). A
+    // gallery-fork client's generated Dart client has no such restriction, and unconditionally
+    // requests at least one gallery-fork-only sync type (SharedSpacesV1) alongside MemoriesV1, so
+    // its presence in the request reliably tells fork-aware clients apart from unmodified
+    // upstream ones, which have no way to request a type their client doesn't know exists.
+    const isForkAwareClient = dto.types.includes(SyncRequestType.SharedSpacesV1);
+
     const handlers: Record<SyncRequestType, () => Promise<void>> = {
       // deprecated handlers
       [SyncRequestType.AssetsV1]: () => this.syncAssetsV1(),
@@ -226,7 +236,7 @@ export class SyncService extends BaseService {
       [SyncRequestType.AlbumToAssetsV1]: () => this.syncAlbumToAssetsV1(options, response, checkpointMap, session.id),
       [SyncRequestType.AlbumAssetExifsV1]: () =>
         this.syncAlbumAssetExifsV1(options, response, checkpointMap, session.id),
-      [SyncRequestType.MemoriesV1]: () => this.syncMemoriesV1(options, response, checkpointMap),
+      [SyncRequestType.MemoriesV1]: () => this.syncMemoriesV1(options, response, checkpointMap, isForkAwareClient),
       [SyncRequestType.MemoryToAssetsV1]: () => this.syncMemoryAssetsV1(options, response, checkpointMap),
       [SyncRequestType.StacksV1]: () => this.syncStackV1(options, response, checkpointMap),
       [SyncRequestType.PartnerStacksV1]: () => this.syncPartnerStackV1(options, response, checkpointMap, session.id),
@@ -1609,7 +1619,12 @@ export class SyncService extends BaseService {
     }
   }
 
-  private async syncMemoriesV1(options: SyncQueryOptions, response: Writable, checkpointMap: CheckpointMap) {
+  private async syncMemoriesV1(
+    options: SyncQueryOptions,
+    response: Writable,
+    checkpointMap: CheckpointMap,
+    isForkAwareClient: boolean,
+  ) {
     const deleteType = SyncEntityType.MemoryDeleteV1;
     const deletes = this.syncRepository.memory.getDeletes({ ...options, ack: checkpointMap[deleteType] });
     for await (const { id, ...data } of deletes) {
@@ -1619,6 +1634,9 @@ export class SyncService extends BaseService {
     const upsertType = SyncEntityType.MemoryV1;
     const upserts = this.syncRepository.memory.getUpserts({ ...options, ack: checkpointMap[upsertType] });
     for await (const { updateId, ...data } of upserts) {
+      if (!isForkAwareClient && data.type !== MemoryType.OnThisDay) {
+        continue;
+      }
       await send(response, { type: upsertType, ids: [updateId], data });
     }
   }
