@@ -3532,6 +3532,8 @@
   "workflow_logging_halted_step": "Gestopt in stap #{step}",
   "workflow_name": "Werkstroom naam",
   "workflow_navigation_prompt": "Weet je zeker dat je weg wilt navigeren zonder je wijzigingen op te slaan?",
+  "workflow_space_album_choose_space_first": "Kies eerst een Space",
+  "workflow_space_unavailable": "Space niet beschikbaar",
   "workflow_summary": "Werkstroom samenvatting",
   "workflow_templates": "Werkstroomtemplates",
   "workflow_update_success": "Werkstroom succesvol bijgewerkt",
