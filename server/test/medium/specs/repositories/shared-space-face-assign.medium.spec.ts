@@ -392,3 +392,62 @@ describe('getAssetFacesForSpace', () => {
     await expect(spaceRepo.getAssetFacesForSpace(space.id, assetId)).resolves.toEqual([]);
   });
 });
+
+// Slice 4, Task 1 (spec §6.4, §9.4): DELETE /shared-spaces/:id/people/:personId/faces/:assetFaceId.
+// Removes only the shared_space_person_face projection row. Two traps this slice exists to catch:
+// a forgotten recount (F-32) and an accidental delete of face_identity_face (F-22).
+describe('detach', () => {
+  // F-32: the counts must come back down. Written FIRST — a missing recount is invisible
+  // to every other test here and only surfaces later as mis-ordered, silently-hidden people.
+  it('recounts faceCount/assetCount on detach (F-32)', async () => {
+    const { ctx } = setup();
+    const spaceRepo = ctx.get(SharedSpaceRepository);
+    const { bob, space } = await newSpaceWithEditorAndMember(ctx);
+    const { assetId } = await reachPathBuilders.direct(ctx, { spaceId: space.id, ownerId: bob.id });
+    const { result: faceId } = await ctx.newAssetFace({ assetId });
+    const person = await spaceRepo.createPerson({ spaceId: space.id, name: 'Aurelia' });
+    await spaceRepo.addPersonFaces([{ personId: person.id, assetFaceId: faceId }]);
+
+    const before = await defaultDatabase
+      .selectFrom('shared_space_person')
+      .selectAll()
+      .where('id', '=', person.id)
+      .executeTakeFirstOrThrow();
+    expect(before.faceCount).toBe(1);
+
+    await spaceRepo.removePersonFace(person.id, faceId);
+
+    const after = await defaultDatabase
+      .selectFrom('shared_space_person')
+      .selectAll()
+      .where('id', '=', person.id)
+      .executeTakeFirstOrThrow();
+    expect(after.faceCount).toBe(0);
+    expect(after.assetCount).toBe(0);
+  });
+
+  // F-22: the identity link survives, so other spaces sharing it are unaffected (§5.1).
+  it('leaves face_identity_face untouched (F-22)', async () => {
+    const { ctx } = setup();
+    const spaceRepo = ctx.get(SharedSpaceRepository);
+    const { bob, space } = await newSpaceWithEditorAndMember(ctx);
+    const { assetId } = await reachPathBuilders.direct(ctx, { spaceId: space.id, ownerId: bob.id });
+    const { result: faceId } = await ctx.newAssetFace({ assetId });
+    const person = await spaceRepo.createPerson({ spaceId: space.id, name: 'Aurelia' });
+    const identity = await ctx.get(FaceIdentityRepository).ensureSpacePersonIdentity(person.id);
+    await ctx
+      .get(FaceIdentityRepository)
+      .replaceFaceIdentity({ assetFaceId: faceId, identityId: identity.id, source: 'manual' });
+    await spaceRepo.addPersonFaces([{ personId: person.id, assetFaceId: faceId }]);
+
+    await spaceRepo.removePersonFace(person.id, faceId);
+
+    const link = await defaultDatabase
+      .selectFrom('face_identity_face')
+      .selectAll()
+      .where('assetFaceId', '=', faceId)
+      .executeTakeFirst();
+    expect(link).toBeDefined();
+    expect(link?.identityId).toBe(identity.id);
+  });
+});

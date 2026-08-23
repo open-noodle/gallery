@@ -3786,6 +3786,35 @@ export class SharedSpaceRepository {
     }
   }
 
+  /**
+   * Spec §6.4 (Slice 4): detach one face from one space person. Unlike the two bulk removals
+   * above, this is the single-pair primitive the DELETE route uses.
+   *
+   * Deliberately deletes ONLY the `shared_space_person_face` projection row — never
+   * `face_identity_face` (F-22). That link is the face's GLOBAL identity; blanking it here would
+   * mutate every other space sharing the same identity (§5.1).
+   *
+   * Must recount (F-32): `addPersonFaces` recounts on the way in, so a detach that skips this
+   * leaves `faceCount`/`assetCount` overstated — columns the people-list ordering index and the
+   * `minimumFaceCount` filters both read, so drift here silently reorders and hides people.
+   */
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
+  async removePersonFace(
+    personId: string,
+    assetFaceId: string,
+    db: Kysely<DB> | Transaction<DB> = this.db,
+  ): Promise<void> {
+    const result = await db
+      .deleteFrom('shared_space_person_face')
+      .where('personId', '=', personId)
+      .where('assetFaceId', '=', assetFaceId)
+      .executeTakeFirst();
+
+    if (Number(result.numDeletedRows ?? 0n) > 0) {
+      await this.recountPersons([personId], db);
+    }
+  }
+
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
   async removePersonFacesByLibrary(spaceId: string, libraryId: string) {
     const assetFaceSubquery = this.db

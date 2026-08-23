@@ -574,6 +574,25 @@ export class SharedSpaceController {
     return { acted: await this.service.attachFaceToSpacePerson(auth, id, personId, assetFaceId) };
   }
 
+  // Spec §6.4. Same API-key scope as the attach route; the real authority (Editor role +
+  // isFaceAssignableInSpace, re-checked at write time) is enforced in the service.
+  @Delete(':id/people/:personId/faces/:assetFaceId')
+  @Authenticated({ permission: Permission.SharedSpaceUpdate })
+  @HttpCode(HttpStatus.OK)
+  @Endpoint({
+    summary: 'Detach a face from a person in a shared space',
+    description:
+      'Remove the face from the space person. Only the space projection row is removed -- the ' +
+      "face's global identity is left untouched. Response reports whether it acted.",
+    history: new HistoryBuilder().added('v2').stable('v2'),
+  })
+  async detachSpacePersonFace(
+    @Auth() auth: AuthDto,
+    @Param() { id, personId, assetFaceId }: SpacePersonFaceParamsDto,
+  ): Promise<FaceSuggestionActionResponseDto> {
+    return { acted: await this.service.detachFaceFromSpacePerson(auth, id, personId, assetFaceId) };
+  }
+
   // Spec §6.1. The decorator carries the API-key SCOPE, matching the sibling read
   // (GET :id/people/:personId/faces above) — the real authority (Editor role, since this exposes
   // unnamed faces) is enforced in the service via requireRole.
