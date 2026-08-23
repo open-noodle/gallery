@@ -79,7 +79,12 @@ test.describe('addToSpaceAlbum step (album name)', () => {
     await dialog.getByRole('button', { name: 'Save' }).click();
     await expect(dialog).not.toBeVisible();
 
-    await page.getByRole('button', { name: 'Save' }).first().click();
+    // The editor enables Save only once something has changed, so a Save that never becomes
+    // enabled already means the typed name did not reach the config. Assert it rather than let
+    // the click time out, so the failure names the cause instead of the symptom.
+    const saveWorkflow = page.getByRole('button', { name: 'Save' }).first();
+    await expect(saveWorkflow).toBeEnabled({ timeout: 10_000 });
+    await saveWorkflow.click();
 
     await expect
       .poll(
