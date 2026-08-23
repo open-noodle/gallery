@@ -678,6 +678,11 @@ const SmartSearchFacetsSchema = BaseSearchSchema.pick({
   personIds: true,
   tagIds: true,
   rating: true,
+  // An album detail page runs its page-aware search scoped to its own album, so the facets that
+  // drive that page's result count and time-bucket rail have to carry the same scope. Omitting it
+  // here does not merely lose a filter: zod strips the field, so the facets would silently describe
+  // the whole library beside a result grid showing one album.
+  albumIds: true,
   spaceId: true,
   spacePersonIds: true,
 })
