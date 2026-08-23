@@ -35,6 +35,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../test_utils.dart';
+import '../../../widget_tester_extensions.dart';
 
 class _MockTimelineFactory extends Mock implements TimelineFactory {}
 
@@ -487,7 +488,7 @@ Future<void> _pumpPhotosTimeline(
         supportedLocales: const [Locale('en')],
         path: '../i18n',
         fallbackLocale: const Locale('en'),
-        child: const MaterialApp(
+        child: withStubRouter(const MaterialApp(
           home: TimelineRouteScope(
             timelineServiceBuilder: buildPhotosTimelineRouteService,
             // These tests pin the MAIN Photos page contract: the app-level grouping,
@@ -495,7 +496,7 @@ Future<void> _pumpPhotosTimeline(
             sharedGrouping: true,
             child: Timeline(appBar: null, bottomSheet: null, withScrubber: false),
           ),
-        ),
+        )),
       ),
     ),
   );
