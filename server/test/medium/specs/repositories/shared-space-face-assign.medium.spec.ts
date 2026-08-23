@@ -396,6 +396,27 @@ describe('getAssetFacesForSpace', () => {
     await defaultDatabase.updateTable('asset_face').set({ isVisible: false }).where('id', '=', faceId).execute();
     await expect(spaceRepo.getAssetFacesForSpace(space.id, assetId)).resolves.toEqual([]);
   });
+
+  // Slice 9, Task 1 (spec §6.6): `isEditorDrawn` is the client's only signal for whether the
+  // delete-box affordance applies -- derived from `asset_face.createdBy IS NOT NULL`, never
+  // `sourceType` (see deleteSpaceAssetFace's doc comment for why sourceType cannot tell the two
+  // apart). Both rows share the same fixture setup so a difference can only be explained by
+  // `createdBy`, not by something else about the face.
+  it('reports isEditorDrawn: true for a face with createdBy set, false for a detected face (spec §6.6)', async () => {
+    const { ctx } = setup();
+    const spaceRepo = ctx.get(SharedSpaceRepository);
+    const { anna, bob, space } = await newSpaceWithEditorAndMember(ctx);
+    const { assetId } = await reachPathBuilders.direct(ctx, { spaceId: space.id, ownerId: bob.id });
+    const { result: drawnFaceId } = await ctx.newAssetFace({ assetId, createdBy: anna.id });
+    const { result: detectedFaceId } = await ctx.newAssetFace({ assetId });
+
+    const faces = await spaceRepo.getAssetFacesForSpace(space.id, assetId);
+
+    const drawn = faces.find((face) => face.id === drawnFaceId);
+    const detected = faces.find((face) => face.id === detectedFaceId);
+    expect(drawn).toMatchObject({ isEditorDrawn: true });
+    expect(detected).toMatchObject({ isEditorDrawn: false });
+  });
 });
 
 // Slice 4, Task 1 (spec §6.4, §9.4): DELETE /shared-spaces/:id/people/:personId/faces/:assetFaceId.

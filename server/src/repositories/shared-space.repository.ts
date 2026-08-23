@@ -186,7 +186,9 @@ export type SpaceFaceAssignment = {
 };
 
 // Slice 3 (spec §6.1): one row per live, visible face on an asset, joined to the space person
-// holding it in THIS space (if any) — never the owner's `person.name`.
+// holding it in THIS space (if any) — never the owner's `person.name`. `isEditorDrawn` (Slice 9,
+// spec §6.6) is derived from `asset_face.createdBy IS NOT NULL` here, not left as the raw column
+// — nothing above the repository needs to know WHO drew a box, only whether it is deletable.
 export type SpaceAssetFace = {
   id: string;
   boundingBoxX1: number;
@@ -197,6 +199,7 @@ export type SpaceAssetFace = {
   imageHeight: number;
   spacePersonId: string | null;
   spacePersonName: string | null;
+  isEditorDrawn: boolean;
 };
 
 @Injectable()
@@ -4819,8 +4822,8 @@ export class SharedSpaceRepository {
    * before calling this, so a read of an asset that has left the space never reaches here.
    */
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
-  getAssetFacesForSpace(spaceId: string, assetId: string): Promise<SpaceAssetFace[]> {
-    return this.db
+  async getAssetFacesForSpace(spaceId: string, assetId: string): Promise<SpaceAssetFace[]> {
+    const rows = await this.db
       .selectFrom('asset_face')
       .innerJoin('asset', 'asset.id', 'asset_face.assetId')
       .leftJoin('person', 'person.id', 'asset_face.personId')
@@ -4838,6 +4841,7 @@ export class SharedSpaceRepository {
         'asset_face.boundingBoxY2',
         'asset_face.imageWidth',
         'asset_face.imageHeight',
+        'asset_face.createdBy',
         'shared_space_person.id as spacePersonId',
         'shared_space_person.name as spacePersonName',
       ])
@@ -4851,6 +4855,8 @@ export class SharedSpaceRepository {
       .where((eb) => eb.or([eb('shared_space_person.id', 'is', null), eb('shared_space_person.isHidden', '=', false)]))
       .orderBy('asset_face.id')
       .execute();
+
+    return rows.map(({ createdBy, ...row }) => ({ ...row, isEditorDrawn: createdBy !== null }));
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })

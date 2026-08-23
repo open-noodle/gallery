@@ -2279,6 +2279,7 @@ export class SharedSpaceService extends BaseService {
       imageHeight: face.imageHeight,
       spacePersonId: face.spacePersonId,
       spacePersonName: face.spacePersonName,
+      isEditorDrawn: face.isEditorDrawn,
     }));
   }
 
@@ -2364,6 +2365,9 @@ export class SharedSpaceService extends BaseService {
       imageHeight,
       spacePersonId: person.id,
       spacePersonName: person.name,
+      // This call is the only writer of a face with createdBy set to the caller (§6.5) — always
+      // editor-drawn, never a detection.
+      isEditorDrawn: true,
     };
   }
 
