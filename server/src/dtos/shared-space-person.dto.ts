@@ -140,8 +140,10 @@ const SharedSpacePersonResponseSchema = z
   .meta({ id: 'SharedSpacePersonResponseDto' });
 
 // Spec §6.1 (Slice 3): one row per live, visible face on an asset, space-scoped. `spacePersonId`/
-// `spacePersonName` are the SPACE's own person, never the owner's `person.name`. No `isEditorDrawn`
-// field here — `asset_face.createdBy` does not exist until Slice 6.
+// `spacePersonName` are the SPACE's own person, never the owner's `person.name`. `isEditorDrawn`
+// (Slice 9, spec §6.6) is the derived boolean `asset_face.createdBy IS NOT NULL` — the raw
+// `createdBy` (who drew it) is deliberately NOT exposed here; every space member does not need to
+// know which editor drew a box, only whether it is deletable.
 const SpaceAssetFaceResponseSchema = z
   .object({
     id: z.uuidv4().describe('Asset face ID'),
@@ -153,6 +155,9 @@ const SpaceAssetFaceResponseSchema = z
     imageHeight: z.number().describe('Original image height'),
     spacePersonId: z.uuidv4().nullable().describe('Space person ID this face is attached to, if any'),
     spacePersonName: z.string().nullable().describe('Space person name this face is attached to, if any'),
+    isEditorDrawn: z
+      .boolean()
+      .describe('Whether this face box was drawn by a space Owner/Editor, and so may be deleted by one'),
   })
   .meta({ id: 'SpaceAssetFaceResponseDto' });
 

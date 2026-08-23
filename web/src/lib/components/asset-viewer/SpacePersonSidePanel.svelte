@@ -9,6 +9,7 @@
   import {
     attachSpacePersonFace,
     createSpacePerson,
+    deleteSpaceAssetFace,
     detachSpacePersonFace,
     getSpaceAssetFaces,
     getSpacePeople,
@@ -17,7 +18,7 @@
     type SpaceAssetFaceResponseDto,
   } from '@immich/sdk';
   import { Button, IconButton, Input } from '@immich/ui';
-  import { mdiArrowLeftThin, mdiCloseCircle, mdiPencil } from '@mdi/js';
+  import { mdiArrowLeftThin, mdiCloseCircle, mdiPencil, mdiTrashCan } from '@mdi/js';
   import { onMount } from 'svelte';
   import { t } from 'svelte-i18n';
   import { linear } from 'svelte/easing';
@@ -140,6 +141,20 @@
     }
   };
 
+  // Spec §6.6 (Slice 9): deletes the box outright -- unlike `detach` above (which only removes
+  // this space's projection row and leaves the box itself intact), this destroys the row for
+  // every space holding it. Only offered when `face.isEditorDrawn` -- the server refuses this for
+  // a detected face regardless, but the control must never be offered for one.
+  const deleteFace = async (face: SpaceAssetFaceResponseDto) => {
+    try {
+      await deleteSpaceAssetFace({ id: spaceId, assetFaceId: face.id });
+      faces = faces?.filter((f) => f.id !== face.id);
+      onRefresh();
+    } catch (error) {
+      handleError(error, $t('errors.cant_apply_changes'));
+    }
+  };
+
   let pickerCandidates: PickerCandidate[] = $derived(
     spaceCandidates.map((person) => ({
       id: person.id,
@@ -233,6 +248,19 @@
                   size="small"
                   class="absolute inset-s-1/2 top-1/2 translate-[-50%] transform"
                   onclick={() => detach(face)}
+                />
+              </div>
+            {/if}
+            {#if face.isEditorDrawn}
+              <div class="absolute inset-e-[-3px] top-16 size-5 rounded-full">
+                <IconButton
+                  shape="round"
+                  color="danger"
+                  icon={mdiTrashCan}
+                  aria-label={$t('delete_face')}
+                  size="small"
+                  class="absolute inset-s-1/2 top-1/2 translate-[-50%] transform"
+                  onclick={() => deleteFace(face)}
                 />
               </div>
             {/if}

@@ -11,6 +11,7 @@ const {
   attachSpacePersonFaceMock,
   createSpacePersonMock,
   detachSpacePersonFaceMock,
+  deleteSpaceAssetFaceMock,
   zoomImageToBase64Mock,
 } = vi.hoisted(() => ({
   getSpaceAssetFacesMock: vi.fn(),
@@ -18,6 +19,7 @@ const {
   attachSpacePersonFaceMock: vi.fn(),
   createSpacePersonMock: vi.fn(),
   detachSpacePersonFaceMock: vi.fn(),
+  deleteSpaceAssetFaceMock: vi.fn(),
   zoomImageToBase64Mock: vi.fn(),
 }));
 
@@ -30,6 +32,7 @@ vi.mock('@immich/sdk', async (importOriginal) => {
     attachSpacePersonFace: (...args: unknown[]) => attachSpacePersonFaceMock(...args),
     createSpacePerson: (...args: unknown[]) => createSpacePersonMock(...args),
     detachSpacePersonFace: (...args: unknown[]) => detachSpacePersonFaceMock(...args),
+    deleteSpaceAssetFace: (...args: unknown[]) => deleteSpaceAssetFaceMock(...args),
   };
 });
 
@@ -59,6 +62,7 @@ const face = (overrides: Partial<SpaceAssetFaceResponseDto> = {}): SpaceAssetFac
   imageHeight: 1000,
   spacePersonId: null,
   spacePersonName: null,
+  isEditorDrawn: false,
   ...overrides,
 });
 
@@ -93,6 +97,7 @@ describe('SpacePersonSidePanel', () => {
     attachSpacePersonFaceMock.mockReset();
     createSpacePersonMock.mockReset();
     detachSpacePersonFaceMock.mockReset();
+    deleteSpaceAssetFaceMock.mockReset();
     zoomImageToBase64Mock.mockReset();
     zoomImageToBase64Mock.mockResolvedValue(null);
 
@@ -201,5 +206,40 @@ describe('SpacePersonSidePanel', () => {
 
     await waitFor(() => expect(screen.getByText('face_unassigned')).toBeInTheDocument());
     expect(screen.queryByRole('button', { name: 'unassign_face' })).toBeNull();
+  });
+
+  // Slice 9, Task 1 (spec §6.6): the delete-box control is the client's only use of
+  // `isEditorDrawn` -- it gates deleting the box outright (destroying it for every space that
+  // holds it), which is a different, more destructive action than "unassign" (detach from this
+  // space's person, box survives).
+  it('offers the delete control for a face the editor drew, and deletes it on click', async () => {
+    getSpaceAssetFacesMock.mockResolvedValue([
+      face({ id: 'face-1', spacePersonId: 'sp-1', spacePersonName: 'Bob', isEditorDrawn: true }),
+    ]);
+    deleteSpaceAssetFaceMock.mockResolvedValue(undefined);
+    const onRefresh = vi.fn();
+
+    renderPanel({ onRefresh });
+    await waitFor(() => expect(screen.getByText('Bob')).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole('button', { name: 'delete_face' }));
+
+    await waitFor(() =>
+      expect(deleteSpaceAssetFaceMock).toHaveBeenCalledWith({ id: 'space-1', assetFaceId: 'face-1' }),
+    );
+    expect(onRefresh).toHaveBeenCalled();
+    // The box is destroyed outright, unlike unassign -- the whole row disappears.
+    expect(screen.queryByText('Bob')).toBeNull();
+  });
+
+  it('never offers the delete control on a face the editor did not draw', async () => {
+    getSpaceAssetFacesMock.mockResolvedValue([
+      face({ id: 'face-1', spacePersonId: 'sp-1', spacePersonName: 'Bob', isEditorDrawn: false }),
+    ]);
+
+    renderPanel();
+
+    await waitFor(() => expect(screen.getByText('Bob')).toBeInTheDocument());
+    expect(screen.queryByRole('button', { name: 'delete_face' })).toBeNull();
   });
 });
