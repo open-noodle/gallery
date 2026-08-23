@@ -8,8 +8,7 @@ metadata:
   last_verified_fork_head: 690fd44e12c573418b40ae4ea5bbffbb86aaeacb
 
 coverage_ignore:
-  - docs/superpowers/**
-  - design-exploration/**
+  - specs/**
 
 fork_surface:
   preferred_namespaces:

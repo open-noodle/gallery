@@ -28,7 +28,7 @@ const bool _kRunScaleTest = bool.fromEnvironment('RUN_SCALE');
 //     cd mobile && flutter test test/infrastructure/repositories/shared_space_scale_test.dart --tags=scale --reporter expanded
 //
 // Expected output is recorded in
-// docs/plans/2026-04-08-mobile-shared-space-drift-sync-scale-notes.md.
+// specs/2026-04-08-mobile-shared-space-drift-sync-scale-notes.md.
 //
 // Important: this test exercises the SAME code path that runs during a real
 // backfill (sync_stream handler → Drift batch insert), NOT a synthetic raw
