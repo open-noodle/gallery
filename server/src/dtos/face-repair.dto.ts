@@ -310,7 +310,7 @@ export const FaceRepairClusterFacesResponseSchema = z
   .meta({ id: 'FaceRepairClusterFacesResponseDto' });
 export class FaceRepairClusterFacesResponseDto extends createZodDto(FaceRepairClusterFacesResponseSchema) {}
 
-// `resolve` (the full per-face resolution, spec docs/plans/2026-07-10-face-cleanup-full-resolution-design.md)
+// `resolve` (the full per-face resolution, spec specs/2026-07-10-face-cleanup-full-resolution-design.md)
 // replaces the retired 2-state `apply`. Every bucket is now wired end-to-end: `moveToPerson` (move to a chosen
 // person / owner), `stay` (soft-decline "keep here"), `lock` (confirm/lock), `detach` ("not a face"), `unknown`
 // (park in a fresh cluster), and `entireCluster` (server-enumerated whole-cluster move).

@@ -8,7 +8,7 @@ name: Gallery Mobile Scale Test
 # Results are recorded in the job log; a failure means either insert latency
 # or bucket query latency regressed past the loose 500ms assertion in the test.
 # Performance targets are documented in
-# docs/plans/2026-04-08-mobile-shared-space-drift-sync-scale-notes.md.
+# specs/2026-04-08-mobile-shared-space-drift-sync-scale-notes.md.
 
 on:
   schedule:
@@ -87,5 +87,5 @@ jobs:
             echo "- Bucket query: 200 ms"
             echo "- First page (100 assets): 100 ms"
             echo ""
-            echo "See \`docs/plans/2026-04-08-mobile-shared-space-drift-sync-scale-notes.md\` for context."
+            echo "See \`specs/2026-04-08-mobile-shared-space-drift-sync-scale-notes.md\` for context."
           } >> "$GITHUB_STEP_SUMMARY"

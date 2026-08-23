@@ -1250,7 +1250,7 @@ export class LibrarySync extends BaseSync {
   // soft-deletes a library would still see its assets re-streamed on every
   // sync.
   //
-  // See docs/plans/2026-04-11-library-user-access-backfill-design.md.
+  // See specs/2026-04-11-library-user-access-backfill-design.md.
   @GenerateSql({ params: [dummyCreateAfterOptions] })
   getCreatedAfter({ nowId, userId, afterCreateId }: SyncCreatedAfterOptions) {
     return this.db

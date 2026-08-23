@@ -6,7 +6,7 @@ export const ALLOWED_PREFIXES = [
   'web/src/lib/styles/',
   'web/scripts/',
   'web/src/lib/assets/fonts/',
-  'docs/superpowers/', // the spec + plan docs for this work
+  'specs/', // the design docs for this work
   'e2e/src/specs/web/reskin-', // the re-skin hardening e2e specs (+ their snapshots)
 ];
 // pnpm-lock.yaml is the single monorepo lockfile at the repo root (not under web/).

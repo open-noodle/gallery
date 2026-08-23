@@ -852,7 +852,7 @@ export const album_space_asset_delete_audit = registerFunction({
 
 // --- gallery-fork: library_user create-side trigger functions ---
 //
-// See docs/plans/2026-04-11-library-user-access-backfill-design.md for the
+// See specs/2026-04-11-library-user-access-backfill-design.md for the
 // full design. Summary: library_user is a (userId, libraryId) access-grant
 // denormalization; three insert triggers populate it, and one consumer
 // trigger (below) drains it when library_audit rows are emitted.

@@ -1,6 +1,6 @@
 // The shape the scan reports for one place a cluster's flagged faces could go. `count` and `ownerFaceCount`
 // are different numbers and the console must never print one under the other's label — see
-// docs/superpowers/specs/2026-07-29-face-review-destination-identity-design.md (D4).
+// specs/2026-07-29-face-review-destination-identity-design.md (D4).
 export interface SuspectedOwner {
   ownerPersonId: string;
   ownerName: string | null;

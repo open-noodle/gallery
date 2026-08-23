@@ -4,7 +4,7 @@ import { createUserDto } from 'src/fixtures';
 import { thumbnailUtils } from 'src/ui/specs/timeline/utils';
 import { utils } from 'src/utils';
 
-// Web E2E: Slice 5 of docs/superpowers/specs/2026-07-24-selection-toolbar-consistency-design.md —
+// Web E2E: Slice 5 of specs/2026-07-24-selection-toolbar-consistency-design.md —
 // case 8 of the "Web e2e matrix". The space-person page's multi-select control bar was replaced
 // with the same reusable <SelectionToolbar> component wired on the space timeline page (Slice 4),
 // with one deliberate difference: the space-person page passes NO `onSetCover`, so Set-cover must

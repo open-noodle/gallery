@@ -2,7 +2,9 @@
 
 .DS_Store
 
-# Superpowers brainstorming visual-companion scratch
+# Superpowers scratch: brainstorming visual companions and implementation plans.
+# Plans are execution checklists — they expire when the work lands, so they stay local.
+# Durable design docs go to specs/ instead (see AGENTS.md).
 .superpowers/
 
 # Certificates and secrets

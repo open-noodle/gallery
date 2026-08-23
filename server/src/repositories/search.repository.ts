@@ -1398,7 +1398,7 @@ export class SearchRepository {
   // ─── UPSTREAM SEARCH V3 — DORMANT ───────────────────────────────
   // Not wired to any controller/service. The fork's live search runs on the legacy path
   // (searchAssetBuilderLegacy). Do not call these V3 methods from fork code.
-  // Switch-over plan: docs/superpowers/specs/2026-07-23-search-v3-coexistence-design.md
+  // Switch-over plan: specs/2026-07-23-search-v3-coexistence-design.md
   @GenerateSql(...searchMetadataV3Examples)
   async searchMetadataV3(pagination: PaginationOptions, options: AssetSearchBuilderV3Options, scope: AssetSearchScope) {
     const items = await withSearchOrder(searchAssetBuilder(this.db, options, scope), options.order)

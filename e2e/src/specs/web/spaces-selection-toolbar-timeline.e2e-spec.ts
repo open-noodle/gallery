@@ -4,7 +4,7 @@ import { createUserDto } from 'src/fixtures';
 import { thumbnailUtils } from 'src/ui/specs/timeline/utils';
 import { utils } from 'src/utils';
 
-// Web E2E: Slice 4 of docs/superpowers/specs/2026-07-24-selection-toolbar-consistency-design.md —
+// Web E2E: Slice 4 of specs/2026-07-24-selection-toolbar-consistency-design.md —
 // the space timeline page's multi-select control bar was replaced with the reusable
 // <SelectionToolbar> component, gated by the pure `getSelectionCapabilities` rule engine
 // (web/src/lib/managers/selection-capabilities.ts). These tests exercise the resulting button
