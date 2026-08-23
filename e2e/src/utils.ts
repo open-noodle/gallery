@@ -601,6 +601,25 @@ export const utils = {
     return result.rows[0].id as string;
   },
 
+  /**
+   * Seeds a bare, UNASSIGNED asset_face (`personId IS NULL`) directly via SQL — there is no HTTP
+   * path that leaves a face unassigned: `POST /faces` (owner) requires `personId`, and the space
+   * draw endpoint (`POST /shared-spaces/:id/assets/:assetId/faces`) always attaches on creation.
+   * In production an unassigned face comes from ML detection, which does not run in this stack.
+   * Used by the space-editor face-assign journey to seed the "unrecognised face" an editor names.
+   */
+  createUnassignedFace: async (assetId: string): Promise<string> => {
+    if (!client) {
+      throw new Error('Database client not connected');
+    }
+
+    const result = await client.query(
+      `INSERT INTO asset_face ("assetId", "personId", "sourceType") VALUES ($1, NULL, 'machine-learning') RETURNING id`,
+      [assetId],
+    );
+    return result.rows[0].id as string;
+  },
+
   // Slice 3 — M2: PersonResponseDto does not expose `faceAssetId` (only `thumbnailPath`, which is
   // populated asynchronously via the PersonGenerateThumbnail job). Representative-face write-scope
   // specs need to assert "left unchanged" / "changed to X" directly, so read the column via SQL.
