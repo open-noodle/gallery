@@ -147,6 +147,7 @@ class RemoteAlbumNotifier extends Notifier<RemoteAlbumState> {
     String? thumbnailAssetId,
     bool? isActivityEnabled,
     AlbumAssetOrder? order,
+    DateTime? createdAt,
   }) async {
     try {
       final updatedAlbum = await _remoteAlbumService.updateAlbum(
@@ -156,6 +157,7 @@ class RemoteAlbumNotifier extends Notifier<RemoteAlbumState> {
         thumbnailAssetId: thumbnailAssetId,
         isActivityEnabled: isActivityEnabled,
         order: order,
+        createdAt: createdAt,
       );
 
       final updatedAlbums = state.albums.map((album) {
