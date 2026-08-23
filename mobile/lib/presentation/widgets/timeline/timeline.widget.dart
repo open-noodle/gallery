@@ -805,10 +805,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
                   CustomScrollView(
                     slivers: [
                       if (widget.appBar != null) widget.appBar!,
-                      const SliverFillRemaining(
-                        hasScrollBody: false,
-                        child: Center(child: ImmichLoadingIndicator()),
-                      ),
+                      const SliverFillRemaining(hasScrollBody: false, child: Center(child: ImmichLoadingIndicator())),
                     ],
                   ),
               onData: (segments) {
