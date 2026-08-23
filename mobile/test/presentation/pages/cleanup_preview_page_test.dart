@@ -35,7 +35,7 @@ void main() {
             appConfigProvider.overrideWithValue(const AppConfig(timeline: TimelineConfig(tilesPerRow: 3))),
             timelineFactoryProvider.overrideWithValue(factory),
           ],
-          child: MaterialApp(home: CleanupPreviewPage(assets: [asset])),
+          child: MaterialApp(home: withStubRouter(CleanupPreviewPage(assets: [asset]))),
         ),
       ),
     );

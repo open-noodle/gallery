@@ -31,6 +31,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../test_utils.dart';
+import '../../../widget_tester_extensions.dart';
 
 class _MockTimelineFactory extends Mock implements TimelineFactory {}
 
@@ -185,7 +186,7 @@ Future<void> _pumpTimeline(WidgetTester tester, {required bool withGroupingPill,
         supportedLocales: const [Locale('en')],
         path: '../i18n',
         fallbackLocale: const Locale('en'),
-        child: MaterialApp(
+        child: withStubRouter(MaterialApp(
           home: TimelineRouteScope(
             timelineServiceBuilder: buildPhotosTimelineRouteService,
             child: Timeline(
@@ -195,7 +196,7 @@ Future<void> _pumpTimeline(WidgetTester tester, {required bool withGroupingPill,
               withGroupingPill: withGroupingPill,
             ),
           ),
-        ),
+        )),
       ),
     ),
   );
