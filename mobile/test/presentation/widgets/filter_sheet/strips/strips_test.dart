@@ -74,6 +74,9 @@ FilterSuggestionsResponseDto _suggestions({
   List<String> cameraMakes = const [],
 }) => FilterSuggestionsResponseDto(
   hasUnnamedPeople: false,
+  hasFavorites: true,
+  hasAssetsInAlbum: true,
+  hasAssetsNotInAlbum: true,
   people: people,
   tags: tags,
   countries: countries,

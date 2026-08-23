@@ -196,5 +196,8 @@ export function mapSmartSearchFacetsToFilterSuggestions(
     ratings: facets.ratings,
     mediaTypes: facets.mediaTypes,
     hasUnnamedPeople: facets.hasUnnamedPeople,
+    hasFavorites: facets.hasFavorites,
+    hasAssetsInAlbum: facets.hasAssetsInAlbum,
+    hasAssetsNotInAlbum: facets.hasAssetsNotInAlbum,
   };
 }
