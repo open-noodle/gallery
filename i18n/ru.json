@@ -3534,6 +3534,8 @@
   "workflow_logging_halted_step": "Остановлено на шаге #{step}",
   "workflow_name": "Имя сценария",
   "workflow_navigation_prompt": "Вы действительно хотите выйти без сохранения изменений?",
+  "workflow_space_album_choose_space_first": "Сначала выберите Space",
+  "workflow_space_unavailable": "Space недоступен",
   "workflow_summary": "Информация о сценарии",
   "workflow_templates": "Шаблоны сценариев",
   "workflow_update_success": "Сценарий успешно обновлён",
