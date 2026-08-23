@@ -2665,6 +2665,8 @@
   "reassing_hint": "Markierte Dateien einer vorhandenen Person zuweisen",
   "recent": "Neueste",
   "recent_searches": "Letzte Suchen",
+  "recent_trip_subtitle": "{assetCount, plural, one {# Foto} other {# Fotos}} aus {dayCount, plural, one {einem Tag} other {# Tagen}}",
+  "recent_trip_title": "Kürzliche Reise nach {location}",
   "recently_added": "Kürzlich hinzugefügt",
   "recently_added_body": "Öffne direkt deine neusten Änderungen direkt auf einer Seite.",
   "recently_added_description": "Durchsuche deine Medien sortiert nach dem Zeitpunkt, an dem sie auf Immich hochgeladen wurden",
