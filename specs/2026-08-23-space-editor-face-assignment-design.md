@@ -66,7 +66,9 @@ owner's private taxonomy is untouched by construction.
 suggestion within a distance band_ for that space person (`hasPendingForSpacePerson`). There is:
 
 - no direct "assign this face to this person" path,
-- no `createSpacePerson` — space people are only born from the backfill/ML pipeline,
+- no _endpoint_ that creates a space person — `SharedSpaceRepository.createPerson`
+  (`shared-space.repository.ts:2236`) and the race-safe `createOrGetPersonForIdentity` (`:2245`)
+  both exist, but are reachable only from the backfill/ML pipeline,
 - no single-face detach (only bulk cleanup: `removePersonFacesByAssetIds` / `…ByLibrary`),
 - no space-scoped way to read the face boxes on one asset,
 - nothing in the asset viewer that surfaces any of it.
@@ -169,11 +171,15 @@ endpoint can be called without an explicit space.
 
 ## 6. Architecture — server
 
-All five endpoints live on the fork-only `SharedSpaceController`, guarded by
-`@Authenticated({ permission: Permission.SharedSpaceUpdate })` (matching every sibling space-person
-route) with the real authority enforced in the service via §3. **`server/src/utils/access.ts` is not
-touched, and neither are `person.controller.ts` / `face.controller.ts`.** That is the point of
-Approach A: zero delta in upstream-hot files.
+All five endpoints live on the fork-only `SharedSpaceController`. The route decorator carries the
+**API-key scope**, matching its siblings — `Permission.SharedSpaceRead` on the read (§6.1, like
+`GET :id/people/:personId/faces` at `shared-space.controller.ts:406`) and
+`Permission.SharedSpaceUpdate` on the four writes (like the suggestion confirm at `:472`). That
+decorator is _not_ the RBAC gate: the real authority is enforced in the service via §3, which is why
+§6.1 can be `SharedSpaceRead`-scoped and still be Editor-only.
+
+**`server/src/utils/access.ts` is not touched, and neither are `person.controller.ts` /
+`face.controller.ts`.** That is the point of Approach A: zero delta in upstream-hot files.
 
 ### 6.1 `GET /shared-spaces/:id/assets/:assetId/faces`
 
@@ -206,7 +212,15 @@ When `assetFaceId` is present this is create-and-attach, and it must be **one tr
 between the two leaves a nameless orphan person in the space's people list, which is exactly the
 failure mode `confirmSpacePersonFaceSuggestion`'s Slice-5 comment records for the suggestion path.
 
-New repository method `createPerson` on `SharedSpaceRepository`.
+Reuses the existing `SharedSpaceRepository.createPerson` (`shared-space.repository.ts:2236`) — no new
+repository method.
+
+**The `(spaceId, identityId)` unique index is the trap here.**
+`shared_space_person_spaceId_identityId_key` forbids two people in one space carrying the same
+identity. If the chosen face already has an identity, and that identity already has a space person in
+this space, a plain `createPerson` violates the index. `createOrGetPersonForIdentity` (`:2245`) exists
+precisely for this race and must be used whenever the seed face already carries an identity —
+returning the existing person rather than failing (F-33).
 
 ### 6.3 `PUT /shared-spaces/:id/people/:personId/faces/:assetFaceId`
 
@@ -227,7 +241,37 @@ S11 convention (a 200-vs-204 signal is unreadable through `@oazapfts/runtime`'s 
 in the same space moves it. The transaction must additionally remove the old
 `shared_space_person_face` row and write a **negative verdict** for the old person
 (`clearNegativeForTarget`'s counterpart), or the ML pipeline re-suggests the face straight back
-(F-13).
+(F-13). Removing the old row must go through the same recount as adding it — see §6.4.
+
+#### 6.3.1 When the face already belongs to one of the owner's own people
+
+This is the case the suggestion path never has to handle, and the one most able to damage Bob.
+
+`person.identityId` is unique per `(ownerId, identityId)` (`person.table.ts:35`), and
+`replaceFaceIdentity` rewrites the face's identity unconditionally. So attaching a face that Bob has
+already named — `asset_face.personId` is set, and Bob's person carries identity X — moves that face
+onto the space person's identity Y. Bob's `asset_face.personId` still says "Dad", but the identity
+layer now disagrees with the person layer for that face, and `applyResolvedPersonMetadata`
+(`asset.service.ts:180`) resolves Bob's _own_ view of names and birthdays through exactly that
+identity.
+
+**Decision: attach is refused (400) when `asset_face.personId` is non-null and the owner's person
+carries a different identity to the target space person.** The editor is told the face is already
+identified by its owner. Rationale: the whole safety argument of this design is "editors write only
+the space's taxonomy". Silently re-pointing an identity that the owner's person depends on breaks
+that promise, and the failure is invisible — Bob sees nothing change until a name or age resolves
+wrongly later.
+
+Three sub-cases, all pinned (F-34 … F-36):
+
+| Face state                                                          | Result                                         |
+| ------------------------------------------------------------------- | ---------------------------------------------- |
+| `personId IS NULL` (unrecognised)                                   | attach — the ordinary path                     |
+| `personId` set, owner person identity **equals** the space person's | attach — already the same human, no rewrite    |
+| `personId` set, owner person identity **differs** or is null        | 400, `face is already identified by its owner` |
+
+This is deliberately conservative. If it proves too strict in use, the widening is a follow-up with
+its own scenarios — not something to relax silently during implementation.
 
 ### 6.4 `DELETE /shared-spaces/:id/people/:personId/faces/:assetFaceId`
 
@@ -238,6 +282,13 @@ pipeline does not immediately re-offer it.
 face's global identity and thereby mutate space B (§5.1). New repository method
 `removePersonFace(personId, assetFaceId)` — the existing removals are bulk-by-asset and
 bulk-by-library only.
+
+**It must call `recountPersons`.** `addPersonFaces` recounts on the way in
+(`shared-space.repository.ts:2660`), so a detach that does not recount leaves
+`shared_space_person.faceCount` / `assetCount` overstated — and those columns are not cosmetic: the
+people-list ordering index sorts unnamed people by `assetCount`
+(`shared_space_person_space_name_idx`) and `minimumFaceCount` filters read them (`:1688`, `:1783`).
+Drift here silently reorders and hides people. Pinned by F-32.
 
 ### 6.5 `POST /shared-spaces/:id/assets/:assetId/faces`
 
@@ -250,15 +301,41 @@ member's asset, so an editor drawing on a rotated preview is a _likely_ path, no
 (F-16). Reject with 400 when dimensions are unavailable, same as the owner path.
 
 The created `asset_face` gets `personId = NULL` (never the owner's person) and is attached to the
-space person through §6.3's helper. Mark it `sourceType = 'editor-drawn'` (or equivalent) so §6.6 can
-distinguish it.
+space person through §6.3's helper.
 
-### 6.6 Editor-drawn boxes are deletable by the editor
+### 6.6 Editor-drawn boxes are deletable by the editor — and today they are not distinguishable
 
 An editor who draws a box must be able to remove it, or a misplaced rectangle is permanent for
 everyone. `FaceDelete` stays owner-only for **detected** faces; a face created under §6.5 may be
-deleted by an Owner/Editor of the space it was drawn in. This is the one place this spec creates an
-`asset_face` row and therefore the one place it may destroy one (F-18).
+deleted by an Owner/Editor of the space it was drawn in (F-18), while a detected face stays refused
+(F-19).
+
+**This cannot be expressed with the current schema, and the obvious shortcut is a permission
+regression.** `SourceType` has exactly three values — `machine-learning`, `exif`, `manual`
+(`enum.ts:462`) — and `PersonService.createFace` already writes `SourceType.Manual` for **owner**-drawn
+boxes (`person.service.ts:1567`). `asset_face` has no column recording who created the row. So:
+
+- gating the delete on `sourceType === Manual` would let a space editor delete boxes **the owner drew
+  by hand** — strictly worse than today, and exactly the class of regression #992's §2.3 was written
+  to catch;
+- gating on "has a `shared_space_person_face` row and `personId IS NULL`" is derivable today but
+  wrong: it also matches a _detected_ face that an editor merely attached, which F-19 must refuse.
+
+Three options, to be settled before Slice 5 starts:
+
+| Option                                               | Cost                                                                                                                                                |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A.** Add `SourceType.SpaceEditor = 'space-editor'` | enum + check-constraint migration; every `sourceType` consumer must be audited for a new value (`person.service.ts:876/1094/1193` all branch on it) |
+| **B.** Add `asset_face.createdBy` (nullable uuid)    | migration; but records the actor, which the activity feed already wants                                                                             |
+| **C.** Drop §6.6 from scope                          | zero cost; editor-drawn boxes become permanent, which is a poor first-run experience                                                                |
+
+**Recommendation: B.** It answers "who drew this" rather than encoding it in a type, and a nullable
+column added to `asset_face` is inert for every existing consumer — whereas A forces an audit of
+three live `sourceType` branches and risks the fork's own recognition jobs treating the new value as
+machine-learning-eligible. If the migration is unwelcome inside this change, take C and follow up;
+do **not** approximate with `sourceType`.
+
+Until this is settled, F-18 has no implementation and Slice 5 is blocked on it. Flagged in §11.
 
 ### 6.7 Attribution
 
@@ -281,7 +358,7 @@ Owner self-action logs nothing, matching #992's `asset_edit` rule, which keeps t
 ### 7.1 Threading the capability
 
 `DetailPanel.svelte:246` currently passes `DetailPanelPeople` the real `{isOwner}`. Add a sibling
-prop rather than widening `isOwner`, exactly as §734 did for `DetailPanelTags`' `canEdit`:
+prop rather than widening `isOwner`, exactly as #734 did for `DetailPanelTags`' `canEdit`:
 
 ```
 <DetailPanelPeople {asset} {isOwner} canEditSpacePeople={...} {canFilter} {previousRoute} spaceId={effectiveSpaceId} />
@@ -340,27 +417,38 @@ is already known from the space route's data, and the face list only ever comes 
 
 ### 8.3 Assignment semantics (server)
 
-| #    | Given                                            | When                         | Then                                                  |
-| ---- | ------------------------------------------------ | ---------------------------- | ----------------------------------------------------- |
-| F-13 | face held by space person P1 in A                | Anna attaches to P2 in A     | moved; P1 row removed; negative verdict for P1 (§6.3) |
-| F-14 | face already attached to P                       | Anna attaches to P again     | `{ acted: false }`, no duplicate row                  |
-| F-15 | no space person yet                              | Anna creates one from a face | person + attachment in one transaction (§6.2)         |
-| F-16 | Bob's asset carries a **rotate** edit from #992  | Anna draws a box             | stored in original-image coordinates (§6.5)           |
-| F-17 | asset lacks `exifImageWidth`/`Height`, has edits | Anna draws a box             | 400, message matches the owner path                   |
-| F-18 | Anna drew the box in F-16                        | Anna deletes it              | 204 — editor-drawn only (§6.6)                        |
-| F-19 | a **detected** face                              | Anna deletes it              | 400 — `FaceDelete` still owner-only                   |
+| #    | Given                                                                                | When                          | Then                                                                                                            |
+| ---- | ------------------------------------------------------------------------------------ | ----------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| F-13 | face held by space person P1 in A                                                    | Anna attaches to P2 in A      | moved; P1 row removed; negative verdict for P1 (§6.3)                                                           |
+| F-14 | face already attached to P                                                           | Anna attaches to P again      | `{ acted: false }`, no duplicate row                                                                            |
+| F-15 | no space person yet                                                                  | Anna creates one from a face  | person + attachment in one transaction (§6.2)                                                                   |
+| F-16 | Bob's asset carries a **rotate** edit from #992                                      | Anna draws a box              | stored in original-image coordinates (§6.5)                                                                     |
+| F-17 | asset lacks `exifImageWidth`/`Height`, has edits                                     | Anna draws a box              | 400, message matches the owner path                                                                             |
+| F-18 | Anna drew the box in F-16                                                            | Anna deletes it               | 204 — editor-drawn only (§6.6)                                                                                  |
+| F-19 | a **detected** face                                                                  | Anna deletes it               | 400 — `FaceDelete` still owner-only                                                                             |
+| F-32 | face attached to P, `faceCount`/`assetCount` at n                                    | Anna detaches                 | counts recount to n−1 (§6.4)                                                                                    |
+| F-33 | seed face's identity already has a person in A                                       | Anna creates a person from it | returns the existing person; no unique-index violation (§6.2)                                                   |
+| F-34 | face has `personId IS NULL`                                                          | Anna attaches                 | granted — the ordinary path (§6.3.1)                                                                            |
+| F-35 | face's owner person carries the **same** identity                                    | Anna attaches                 | granted; no identity rewrite (§6.3.1)                                                                           |
+| F-36 | face's owner person carries a **different** identity                                 | Anna attaches                 | 400 `face is already identified by its owner` (§6.3.1)                                                          |
+| F-37 | Anna and a second editor attach the same face to different space people concurrently | both submit                   | one wins; the loser is a no-op or a clean 400 — never two `shared_space_person_face` rows, never a lost recount |
+| F-38 | face listed by §6.1, then its asset leaves the space                                 | Anna attaches the stale id    | 400 — `isFaceReachableInSpace` re-checked at write time, not trusted from the read                              |
 
 ### 8.4 Cross-space propagation — the §5.1 contract (server)
 
-| #    | Given                                                     | When               | Then                                                         |
-| ---- | --------------------------------------------------------- | ------------------ | ------------------------------------------------------------ |
-| F-20 | B has a person sharing the identity Anna attaches to      | Anna attaches in A | the face appears for B's person too — **documented, pinned** |
-| F-21 | the same, B's person is named differently                 | Anna attaches in A | B's `shared_space_person.name` unchanged                     |
-| F-22 | Anna detaches in A                                        | —                  | `face_identity_face` untouched; B unaffected (§6.4)          |
-| F-23 | Bob views the asset in his own timeline, no space context | after F-1          | `asset_face.personId` unchanged; his People page unchanged   |
+| #    | Given                                                                     | When                   | Then                                                                               |
+| ---- | ------------------------------------------------------------------------- | ---------------------- | ---------------------------------------------------------------------------------- |
+| F-20 | B has a person sharing the identity Anna attaches to                      | Anna attaches in A     | the face appears for B's person too — **documented, pinned**                       |
+| F-21 | the same, B's person is named differently                                 | Anna attaches in A     | B's `shared_space_person.name` unchanged                                           |
+| F-22 | Anna detaches in A                                                        | —                      | `face_identity_face` untouched; B unaffected (§6.4)                                |
+| F-23 | Bob views the asset in his own timeline, no space context                 | after F-1              | `asset_face.personId` unchanged; his People page unchanged                         |
+| F-39 | Bob's own person carries identity X; Anna attaches an unrelated face in A | Bob re-reads the asset | the name and birthday `applyResolvedPersonMetadata` resolves for Bob are unchanged |
 
-F-20 and F-23 are the two that make the isolation claim falsifiable. Without them the design's central
-safety argument is untested.
+F-20, F-23 and F-39 are what make the isolation claim falsifiable. Without them the design's central
+safety argument is untested. F-39 is the strict one: F-23 only pins the `asset_face.personId` column,
+but Bob's own view of names and ages resolves through `face_identity`
+(`asset.service.ts:180` → `getResolvedPersonByIdentityId`), so a column-only assertion would pass
+while Bob's People page changed underneath him.
 
 ### 8.5 Attribution (server)
 
@@ -412,8 +500,14 @@ Then implement §6.1's filter and the service gates.
 
 ### 9.2 Slice 2 — the shared link helper
 
-Tests: **F-13, F-14** in `shared-space.service.spec.ts`, plus a regression run of the existing
-`confirmSpacePersonFaceSuggestion` specs.
+Tests: **F-13, F-14**, and **F-34 … F-36** (the owner-already-named guard, §6.3.1) in
+`shared-space.service.spec.ts`, plus a regression run of the existing
+`confirmSpacePersonFaceSuggestion` specs. **F-37** (concurrent attach) belongs here too and is
+medium-only — it needs two real transactions racing, which a mocked repository cannot express.
+
+Write **F-36 first**. It is the guard that keeps this design's central safety claim true, and the
+natural implementation (call `replaceFaceIdentity` unconditionally, as the suggestion path does)
+passes every other scenario in this slice while violating it.
 
 Then extract `linkFaceToSpacePerson` (§6.3) and re-point the suggestion confirm at it. The existing
 suggestion tests passing unchanged _is_ the refactor's proof; if they need editing, the extraction
@@ -421,21 +515,38 @@ changed behaviour and is wrong.
 
 ### 9.3 Slice 3 — create, attach, detach
 
-Tests: **F-15** (transactionality — assert no orphan person when the attach throws), **F-22**.
-Then §6.2 and §6.4, with `createPerson` / `removePersonFace` on the repository.
+Tests: **F-15** (transactionality — assert no orphan person when the attach throws), **F-22**,
+**F-32** (recount on detach), **F-33** (the `(spaceId, identityId)` unique index), and **F-38**
+(reachability re-checked at write time, not trusted from §6.1's read).
+
+Then §6.2 and §6.4, reusing `createPerson` / `createOrGetPersonForIdentity` and adding
+`removePersonFace` to the repository.
+
+F-32 is the one to write first: `addPersonFaces` recounts on the way in, so a `removePersonFace` that
+forgets is invisible to every other test in this slice and only shows up later as mis-ordered,
+silently-hidden people.
 
 ### 9.4 Slice 4 — cross-space propagation
 
-Tests: **F-20, F-21, F-23** as medium tests. No implementation follows — this slice exists to _pin
-existing behaviour_ before Slice 5 makes it easy to trigger. If F-20 fails, §5.1's premise is wrong
-and the design needs revisiting before proceeding.
+Tests: **F-20, F-21, F-23, F-39** as medium tests. No implementation follows — this slice exists to
+_pin existing behaviour_ before Slice 5 makes it easy to trigger. If F-20 fails, §5.1's premise is
+wrong and the design needs revisiting before proceeding.
+
+F-39 must assert the **resolved** name and birthday Bob sees, not the `person` row's columns. A
+column-level assertion passes vacuously, because the whole point of §5.1 is that resolution happens
+at read time through the identity.
 
 ### 9.5 Slice 5 — drawing boxes
 
-Tests: **F-16 … F-19**. F-16 first: the edit-aware transform is the subtle one, and #992 made rotated
-assets the common case.
+**Blocked until §6.6's schema question is settled** (option A, B or C). F-18 has no implementation
+until then, and approximating it with `sourceType === Manual` is a permission regression, not a
+shortcut.
 
-Then §6.5 and §6.6.
+Tests: **F-16, F-17, F-19** are unblocked and land first — F-16 first of all, since the edit-aware
+transform is the subtle one and #992 made rotated assets the common case. **F-18** lands with whatever
+§6.6 resolves to; under option C it is struck from §8.3 rather than left failing.
+
+Then §6.5, and §6.6 if in scope.
 
 ### 9.6 Slice 6 — attribution
 
@@ -460,7 +571,9 @@ she tries to rename Bob's _personal_ person or delete a detected face. The negat
 proves the line held.
 
 Plus a Playwright spec for F-27/F-28 proving the affordance is visible on a space surface and absent
-on the timeline, matching `aaab4de2680`'s precedent that gating claims get a real browser.
+on the timeline, matching the precedent set by #992's own Playwright affordance spec
+(`e2e/src/specs/web/spaces-editor-asset-viewer-affordances.e2e-spec.ts`) that gating claims get a real
+browser. Cite the path, not a SHA — #992's branch is rebased routinely and any SHA here goes stale.
 
 ---
 
@@ -481,10 +594,25 @@ on the timeline, matching `aaab4de2680`'s precedent that gating claims get a rea
 
 ---
 
-## 11. Follow-ups
+## 11. Open decisions and follow-ups
+
+### Blocking — must be settled before implementation
+
+1. **§6.6: how to distinguish an editor-drawn box.** Options A (new `SourceType`), B (new
+   `asset_face.createdBy`) or C (drop from scope). Recommendation B. Slice 5's F-18 is blocked on
+   this, and the approximation that looks obvious (`sourceType === Manual`) would let an editor delete
+   the owner's own hand-drawn boxes.
+2. **§6.3.1's strictness.** Refusing every attach on an owner-named face is deliberately conservative
+   and may prove annoying in real use — an editor cannot correct a face Bob mis-named. Confirm this is
+   the behaviour wanted before building, because relaxing it later is easy and tightening it later is
+   a breaking change.
+
+### Follow-ups
 
 - Mobile parity (§4.3). The gating pattern already exists (`driftSpaceEditableProvider`,
   `SharedSpaceApiRepository.updateSpacePerson`); the asset-viewer people strip and a face editor do
   not.
+- §6.1 returns every face on the asset with no limit. Bounded in practice by faces-per-photo, but
+  worth a cap if group shots prove pathological.
 - Bulk face assignment across a selection.
 - #992's known gap: tag add/remove are still unattributed. Unrelated, but the same feed.
