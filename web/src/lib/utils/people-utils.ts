@@ -105,6 +105,12 @@ export const getPersonFaceThumbnailUrl = (personId: string, faceId: string, upda
 export const getSpacePersonFaceThumbnailUrl = (spaceId: string, personId: string, faceId: string, updatedAt?: string) =>
   createUrl(`/shared-spaces/${spaceId}/people/${personId}/faces/${faceId}/thumbnail`, { updatedAt });
 
+// Slice 8, Task 2 -- the space-person equivalent of getPeopleThumbnailUrl, for rendering a space
+// person as a face-assignment PICKER candidate (SpacePersonSidePanel / SpaceFaceEditor), where only
+// the id/updatedAt pair is on hand rather than a full PersonResponseDto.
+export const getSpacePersonThumbnailUrl = (spaceId: string, personId: string, updatedAt?: string) =>
+  createUrl(`/shared-spaces/${spaceId}/people/${personId}/thumbnail`, { updatedAt });
+
 // Admin cleanup + resolutions surfaces render clusters the admin does not own — the person-scoped
 // thumbnail routes above 404/403 for those. Face-keyed, admin-gated, no person join required.
 export const getAdminFaceThumbnailUrl = (assetFaceId: string, updatedAt?: string) =>

@@ -1,33 +1,45 @@
 <script lang="ts">
   import { shortcut } from '$lib/actions/shortcut';
   import ImageThumbnail from '$lib/components/assets/thumbnail/ImageThumbnail.svelte';
-  import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
-  import FaceCreateTagModal from '$lib/modals/CreateFaceModal.svelte';
-  import { faceManager } from '$lib/stores/face.svelte';
-  import { getPeopleThumbnailUrl } from '$lib/utils';
-  import { getNaturalSize } from '$lib/utils/container-utils';
+  import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
   import {
     computeFaceCroppedCoordinates,
     computeImageContentMetrics,
     computeSelectorPosition,
   } from '$lib/utils/face-box-drag';
   import { handleError } from '$lib/utils/handle-error';
+  import { getSpacePersonThumbnailUrl } from '$lib/utils/people-utils';
   import { normalizeSearchString } from '$lib/utils/string-utils';
-  import { createFace, getAllPeople, type PersonResponseDto } from '@immich/sdk';
+  import CreateSpaceFaceModal from '$lib/modals/CreateSpaceFaceModal.svelte';
+  import { createSpaceAssetFace, getSpacePeople, type SharedSpacePersonResponseDto } from '@immich/sdk';
   import { Button, Input, modalManager, toastManager } from '@immich/ui';
   import { Canvas, InteractiveFabricObject, Rect } from 'fabric';
-  import { clamp } from 'lodash-es';
-  import { onDestroy, onMount, tick } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { t } from 'svelte-i18n';
 
+  /**
+   * Space-flavoured sibling of `FaceEditor.svelte` (Slice 8, Task 2) -- draws a face box on a
+   * member's asset and attaches it to a space person (spec §6.5), instead of the owner's
+   * `createFace`. The drag/canvas math (`computeImageContentMetrics`,
+   * `computeFaceCroppedCoordinates`, `computeSelectorPosition`) is shared with `FaceEditor.svelte`
+   * via `$lib/utils/face-box-drag` -- the SAME transform, so a rotated/edited asset (#992) is
+   * handled identically to the owner path. Only the SDK calls and the candidate source (space
+   * people, not the owner's global people) differ.
+   *
+   * `SpaceAssetFaceCreateDto.spacePersonId` is REQUIRED (spec §6.5) -- unlike the owner path, a box
+   * cannot be drawn "unassigned" here, so "create a new person" is `CreateSpaceFaceModal`'s
+   * create-then-draw, not a bare `createFace`.
+   */
   type Props = {
     htmlElement: HTMLImageElement | HTMLVideoElement;
     containerWidth: number;
     containerHeight: number;
     assetId: string;
+    spaceId: string;
+    onClose: () => void;
   };
 
-  let { htmlElement, containerWidth, containerHeight, assetId }: Props = $props();
+  let { htmlElement, containerWidth, containerHeight, assetId, spaceId, onClose }: Props = $props();
 
   let canvasEl: HTMLCanvasElement | undefined = $state();
   let canvas: Canvas | undefined = $state();
@@ -35,8 +47,8 @@
   let faceSelectorEl: HTMLDivElement | undefined = $state();
   let scrollableListEl: HTMLDivElement | undefined = $state();
   let searchInputEl: HTMLInputElement | null = $state(null);
-  let page = $state(1);
-  let candidates = $state<PersonResponseDto[]>([]);
+  let candidates = $state<SharedSpacePersonResponseDto[]>([]);
+  let isLoadingCandidates = $state(false);
 
   let searchTerm = $state('');
   let faceBoxPosition = $state({ left: 0, top: 0, width: 0, height: 0 });
@@ -88,7 +100,7 @@
 
   onMount(async () => {
     setupCanvas();
-    await getPeople();
+    await getCandidates();
     await tick();
     searchInputEl?.focus();
   });
@@ -136,21 +148,14 @@
     );
   };
 
-  const onClose = () => {
-    assetViewerManager.closeFaceEditMode();
-  };
-
-  const getPeople = async () => {
-    const { hasNextPage, people, total } = await getAllPeople({ page, size: 1000, withHidden: false });
-
-    if (candidates.length === total) {
-      return;
-    }
-
-    candidates = [...candidates, ...people];
-
-    if (hasNextPage) {
-      page++;
+  const getCandidates = async () => {
+    isLoadingCandidates = true;
+    try {
+      candidates = await getSpacePeople({ id: spaceId, withHidden: false });
+    } catch (error) {
+      handleError(error, $t('errors.cant_get_faces'));
+    } finally {
+      isLoadingCandidates = false;
     }
   };
 
@@ -213,45 +218,7 @@
     return computeFaceCroppedCoordinates(faceRect.getBoundingRect(), htmlElement, containerWidth, containerHeight);
   };
 
-  type FaceCoordinates = NonNullable<ReturnType<typeof getFaceCroppedCoordinates>>;
-
-  const getFacePreviewUrl = (data: FaceCoordinates) => {
-    if (!htmlElement) {
-      return;
-    }
-
-    const natural = getNaturalSize(htmlElement);
-    if (natural.width <= 0 || natural.height <= 0) {
-      return;
-    }
-
-    const x = clamp(data.x, 0, natural.width - 1);
-    const y = clamp(data.y, 0, natural.height - 1);
-    const width = clamp(data.width, 1, natural.width - x);
-    const height = clamp(data.height, 1, natural.height - y);
-
-    if (width <= 0 || height <= 0) {
-      return;
-    }
-
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-
-    const context = canvas.getContext('2d');
-    if (!context) {
-      return;
-    }
-
-    try {
-      context.drawImage(htmlElement, x, y, width, height, 0, 0, width, height);
-      return canvas.toDataURL('image/png');
-    } catch {
-      return;
-    }
-  };
-
-  const tagFace = async (person: PersonResponseDto) => {
+  const tagFace = async (person: SharedSpacePersonResponseDto) => {
     try {
       const data = getFaceCroppedCoordinates();
       if (!data) {
@@ -259,26 +226,12 @@
         return;
       }
 
-      const isConfirmed = await modalManager.showDialog({
-        prompt: person.name
-          ? $t('confirm_tag_face', { values: { name: person.name } })
-          : $t('confirm_tag_face_unnamed'),
+      await createSpaceAssetFace({
+        id: spaceId,
+        assetId,
+        spaceAssetFaceCreateDto: { spacePersonId: person.id, ...data },
       });
 
-      if (!isConfirmed) {
-        return;
-      }
-
-      await createFace({
-        assetFaceCreateDto: {
-          assetId,
-          personId: person.id,
-          ...data,
-        },
-      });
-
-      await assetViewerManager.setAssetId(assetId);
-      faceManager.clear();
       onClose();
     } catch (error) {
       handleError(error, 'Error tagging face');
@@ -293,30 +246,22 @@
         return;
       }
 
-      const created = await modalManager.show(FaceCreateTagModal, {
-        assetId,
-        ...data,
-        previewUrl: getFacePreviewUrl(data),
-      });
+      const created = await modalManager.show(CreateSpaceFaceModal, { spaceId, assetId, ...data });
       if (!created) {
         return;
       }
 
       onClose();
     } catch (error) {
-      handleError(error, 'Error creating and tagging face');
+      handleError(error, 'Error creating and tagging person');
     }
   };
-
-  onDestroy(() => {
-    onClose();
-  });
 </script>
 
 <svelte:document use:shortcut={{ shortcut: { key: 'Escape' }, onShortcut: onClose, ignoreInputFields: false }} />
 
 <div
-  id="face-editor-data"
+  id="space-face-editor-data"
   class="absolute inset-s-0 top-0 z-5 size-full overflow-hidden"
   data-overlay-interactive
   data-face-left={faceBoxPosition.left}
@@ -324,10 +269,10 @@
   data-face-width={faceBoxPosition.width}
   data-face-height={faceBoxPosition.height}
 >
-  <canvas bind:this={canvasEl} id="face-editor" class="absolute inset-s-0 top-0"></canvas>
+  <canvas bind:this={canvasEl} id="space-face-editor" class="absolute inset-s-0 top-0"></canvas>
 
   <div
-    id="face-selector"
+    id="space-face-selector"
     bind:this={faceSelectorEl}
     class="absolute inset-s-[calc(50%-125px)] top-[calc(50%-250px)] w-62.5 max-w-62.5 rounded-xl border border-gray-200 bg-white px-2 py-4 backdrop-blur-sm transition-[top,left] duration-200 ease-out dark:border-gray-800 dark:bg-immich-dark-gray dark:text-immich-dark-fg"
   >
@@ -338,7 +283,11 @@
     </div>
 
     <div bind:this={scrollableListEl} class="mt-2 h-62.5 overflow-y-auto">
-      {#if filteredCandidates.length > 0}
+      {#if isLoadingCandidates}
+        <div class="flex items-center justify-center py-4">
+          <LoadingSpinner />
+        </div>
+      {:else if filteredCandidates.length > 0}
         <div class="mt-2 rounded-lg">
           {#each filteredCandidates as person (person.id)}
             <button
@@ -349,7 +298,7 @@
               <ImageThumbnail
                 curve
                 shadow
-                url={getPeopleThumbnailUrl(person)}
+                url={getSpacePersonThumbnailUrl(spaceId, person.id, person.updatedAt)}
                 altText={person.name}
                 title={person.name}
                 widthStyle="30px"

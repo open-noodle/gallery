@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PersonPickerGrid, { type PickerCandidate } from '$lib/components/faces-page/PersonPickerGrid.svelte';
   import SearchPeople from '$lib/components/faces-page/PeopleSearch.svelte';
   import { timeBeforeShowLoadingSpinner } from '$lib/constants';
   import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
@@ -14,7 +15,6 @@
   import { linear } from 'svelte/easing';
   import { fly } from 'svelte/transition';
   import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
-  import ImageThumbnail from '../assets/thumbnail/ImageThumbnail.svelte';
 
   interface Props {
     editedFace: AssetFaceResponseDto;
@@ -54,6 +54,24 @@
   let searchName = $state('');
 
   let showPeople = $derived(searchName ? searchedPeople : allPeople.filter((person) => !person.isHidden));
+  let showPeopleCandidates: PickerCandidate[] = $derived(
+    showPeople
+      .filter((person) => !editedFace.person || person.id !== editedFace.person.id)
+      .map((person) => ({
+        id: person.id,
+        name: person.name,
+        isHidden: person.isHidden,
+        thumbnailUrl: getPeopleThumbnailUrl(person),
+        title: $getPersonNameWithHiddenValue(person.name, person.isHidden),
+      })),
+  );
+  const candidatesById = $derived(new Map(showPeople.map((person) => [person.id, person])));
+  const handleSelectCandidate = (candidate: PickerCandidate) => {
+    const person = candidatesById.get(candidate.id);
+    if (person) {
+      onReassign(person);
+    }
+  };
 
   onMount(() => {
     handlePromiseError(loadPeople());
@@ -149,40 +167,11 @@
   </div>
   <div class="p-4 text-sm">
     <h2 class="mt-4 mb-8">{$t('all_people')}</h2>
-    {#if isShowLoadingPeople}
-      <div class="flex w-full justify-center">
-        <LoadingSpinner />
-      </div>
-    {:else}
-      <div class="mt-4 flex immich-scrollbar flex-wrap gap-2 overflow-y-auto">
-        {#each showPeople as person (person.id)}
-          {#if !editedFace.person || person.id !== editedFace.person.id}
-            <div class="w-fit">
-              <button type="button" class="w-22.5" onclick={() => onReassign(person)}>
-                <div class="relative">
-                  <ImageThumbnail
-                    curve
-                    shadow
-                    url={getPeopleThumbnailUrl(person)}
-                    altText={$getPersonNameWithHiddenValue(person.name, person.isHidden)}
-                    title={$getPersonNameWithHiddenValue(person.name, person.isHidden)}
-                    widthStyle="90px"
-                    heightStyle="90px"
-                    hidden={person.isHidden}
-                  />
-                </div>
-
-                <p
-                  class="mt-1 truncate font-medium"
-                  title={$getPersonNameWithHiddenValue(person.name, person.isHidden)}
-                >
-                  {person.name}
-                </p>
-              </button>
-            </div>
-          {/if}
-        {/each}
-      </div>
-    {/if}
+    <PersonPickerGrid
+      candidates={showPeopleCandidates}
+      isLoading={isShowLoadingPeople}
+      emptyLabel={$t('no_people_found')}
+      onSelect={handleSelectCandidate}
+    />
   </div>
 </section>
