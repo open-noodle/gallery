@@ -576,6 +576,49 @@ describe(AlbumService.name, () => {
         owner.id,
       );
     });
+
+    it('should allow the owner to update the album created date', async () => {
+      const album = AlbumFactory.create();
+      const { user: owner } = album.albumUsers.find(({ role }) => role === AlbumUserRole.Owner)!;
+      const createdAt = new Date('1996-06-15T14:30:00.000Z');
+      mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set([album.id]));
+      mocks.album.getById.mockResolvedValue(getForAlbum(album));
+      mocks.album.update.mockResolvedValue(getForAlbum(album));
+
+      await sut.update(AuthFactory.create(owner), album.id, { createdAt });
+
+      expect(mocks.album.update).toHaveBeenCalledWith(album.id, { id: album.id, createdAt }, owner.id);
+    });
+
+    it('should update the album name and created date together', async () => {
+      const album = AlbumFactory.create();
+      const { user: owner } = album.albumUsers.find(({ role }) => role === AlbumUserRole.Owner)!;
+      const createdAt = new Date('1996-06-15T14:30:00.000Z');
+      mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set([album.id]));
+      mocks.album.getById.mockResolvedValue(getForAlbum(album));
+      mocks.album.update.mockResolvedValue(getForAlbum(album));
+
+      await sut.update(AuthFactory.create(owner), album.id, { albumName: 'Summer 1996', createdAt });
+
+      expect(mocks.album.update).toHaveBeenCalledWith(
+        album.id,
+        { id: album.id, albumName: 'Summer 1996', createdAt },
+        owner.id,
+      );
+    });
+
+    it('should leave the created date undefined when the dto omits it', async () => {
+      const album = AlbumFactory.create();
+      const { user: owner } = album.albumUsers.find(({ role }) => role === AlbumUserRole.Owner)!;
+      mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set([album.id]));
+      mocks.album.getById.mockResolvedValue(getForAlbum(album));
+      mocks.album.update.mockResolvedValue(getForAlbum(album));
+
+      await sut.update(AuthFactory.create(owner), album.id, { albumName: 'Renamed' });
+
+      const [, update] = mocks.album.update.mock.calls[0];
+      expect(update.createdAt).toBeUndefined();
+    });
   });
 
   describe('delete', () => {

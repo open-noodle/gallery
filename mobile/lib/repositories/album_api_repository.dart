@@ -80,6 +80,7 @@ class AlbumApiRepository extends ApiRepository {
     String? thumbnailAssetId,
     bool? isActivityEnabled,
     AlbumAssetOrder? order,
+    DateTime? createdAt,
   }) async {
     AssetOrder? apiOrder;
     if (order != null) {
@@ -94,6 +95,7 @@ class AlbumApiRepository extends ApiRepository {
           description: description == null
               ? const Optional.absent()
               : Optional.present(description.isEmpty ? null : description),
+          createdAt: createdAt == null ? const Optional.absent() : Optional.present(createdAt),
           albumThumbnailAssetId: thumbnailAssetId == null
               ? const Optional.absent()
               : Optional.present(thumbnailAssetId),
