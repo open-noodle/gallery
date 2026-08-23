@@ -9,7 +9,7 @@ name: Release Gallery Server
 # matches a mobile release, pass the same `version` and the `commit` SHA
 # that the mobile run recorded in its summary.
 #
-# See docs/plans/2026-05-18-decoupled-release-design.md.
+# See specs/2026-05-18-decoupled-release-design.md.
 
 on:
   workflow_dispatch:

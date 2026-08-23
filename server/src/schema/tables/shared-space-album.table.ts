@@ -19,7 +19,7 @@ import { UserTable } from 'src/schema/tables/user.table';
 @UpdatedAtTrigger('shared_space_album_updatedAt')
 // Populates shared_space_album_user for every member of the space when an album
 // is linked, and bumps album.updateId so the metadata row re-emits via
-// AlbumSync. See docs/superpowers/specs/2026-06-15-space-albums-phase2a-server-sync-design.md.
+// AlbumSync. See specs/2026-06-15-space-albums-phase2a-server-sync-design.md.
 @AfterInsertTrigger({
   name: 'shared_space_album_after_insert_user',
   scope: 'statement',
