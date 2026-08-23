@@ -2675,6 +2675,8 @@
   "reassing_hint": "Назначить выбранные объекты указанному человеку",
   "recent": "Недавние",
   "recent_searches": "Недавние поисковые запросы",
+  "recent_trip_subtitle": "{assetCount, plural, one {# фото} few {# фото} many {# фото} other {# фото}} за {dayCount, plural, one {# день} few {# дня} many {# дней} other {# дня}}",
+  "recent_trip_title": "Недавняя поездка в {location}",
   "recently_added": "Недавно добавленные",
   "recently_added_body": "Переход к отдельной странице с недавно добавленными объектами.",
   "recently_added_description": "Просмотр объектов, отсортированных по дате их загрузки в Immich",

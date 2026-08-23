@@ -2661,6 +2661,8 @@
   "reassing_hint": "將選取的項目指派給現有人物",
   "recent": "最近",
   "recent_searches": "最近搜尋項目",
+  "recent_trip_subtitle": "{assetCount, plural, one {# 張相片} other {# 張相片}}，跨越{dayCount, plural, other {# 天}}",
+  "recent_trip_title": "近期{location}之旅",
   "recently_added": "最近新增",
   "recently_added_body": "前往專屬頁面，直接查看您最近新增的所有內容。",
   "recently_added_description": "瀏覽您的項目，並按上傳到 Immich 的時間排序",
