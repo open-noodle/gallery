@@ -1,9 +1,15 @@
+import 'package:drift/drift.dart' as drift;
+import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
+import 'package:immich_mobile/domain/models/settings_key.dart';
 import 'package:immich_mobile/domain/models/space_album.model.dart';
 import 'package:immich_mobile/domain/services/asset.service.dart';
+import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
+import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
+import 'package:immich_mobile/pages/library/spaces/collection_sort.dart';
 import 'package:immich_mobile/presentation/widgets/images/thumbnail.widget.dart';
 import 'package:immich_mobile/presentation/widgets/spaces/space_albums_shelf.widget.dart';
 import 'package:immich_mobile/providers/infrastructure/asset.provider.dart';
@@ -35,16 +41,33 @@ Finder findByKeyPrefix(String prefix) => find.byWidgetPredicate(
 // Helpers
 // ---------------------------------------------------------------------------
 
-SpaceAlbum _album({required String id, String? name, String? thumbnailAssetId, bool showInTimeline = true}) =>
-    SpaceAlbum(
-      id: id,
-      name: name ?? 'Album $id',
-      thumbnailAssetId: thumbnailAssetId,
-      showInTimeline: showInTimeline,
-      linkedAt: DateTime.utc(2026, 1, 1),
-      updatedAt: DateTime.utc(2026, 1, 1),
-      createdAt: DateTime.utc(2026, 1, 1),
-    );
+SpaceAlbum _album({
+  required String id,
+  String? name,
+  String? thumbnailAssetId,
+  bool showInTimeline = true,
+  int assetCount = 0,
+  DateTime? linkedAt,
+}) => SpaceAlbum(
+  id: id,
+  name: name ?? 'Album $id',
+  thumbnailAssetId: thumbnailAssetId,
+  showInTimeline: showInTimeline,
+  assetCount: assetCount,
+  linkedAt: linkedAt ?? DateTime.utc(2026, 1, 1),
+  updatedAt: DateTime.utc(2026, 1, 1),
+  createdAt: DateTime.utc(2026, 1, 1),
+);
+
+/// The ids of the shelf's cover tiles in visual left-to-right order.
+///
+/// Read from real on-screen geometry rather than widget-tree order, so it
+/// still describes what the user sees if the strip's layout ever changes.
+List<String> _tileOrder(WidgetTester tester, List<String> ids) {
+  final positions = {for (final id in ids) id: tester.getTopLeft(find.byKey(Key('space-album-tile-$id'))).dx};
+  final sorted = ids.toList()..sort((a, b) => positions[a]!.compareTo(positions[b]!));
+  return sorted;
+}
 
 /// Overrides [spaceAlbumsProvider] with a fixed list, for use with
 /// [WidgetTester.pumpConsumerWidget]'s `overrides` param (which already
@@ -62,10 +85,26 @@ List<Override> _overrides({required String spaceId, required List<SpaceAlbum> al
 // ---------------------------------------------------------------------------
 
 void main() {
+  late Drift settingsDb;
+
   setUpAll(() async {
     // PresentationContext.create() calls TestUtils.init() + initializes
-    // StoreService (needed by Thumbnail.remote's RemoteImageProvider).
+    // StoreService (needed by Thumbnail.remote's RemoteImageProvider). It does
+    // NOT initialize SettingsRepository, which `appConfigProvider` — and hence
+    // the shelf's sort order — reads from, so wire up a real one here. Using
+    // the real repository rather than an `appConfigProvider` override keeps the
+    // persisted-choice → shelf chain under test end to end.
     await PresentationContext.create();
+    settingsDb = Drift(drift.DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true));
+    await SettingsRepository.ensureInitialized(settingsDb);
+  });
+
+  setUp(() async {
+    await SettingsRepository.instance.clear(SettingsKey.values);
+  });
+
+  tearDownAll(() async {
+    await settingsDb.close();
   });
 
   const spaceId = 'space-1';
@@ -191,5 +230,59 @@ void main() {
 
     expect(find.byType(Thumbnail), findsOneWidget);
     expect(find.byIcon(Icons.photo_album_outlined), findsNothing);
+  });
+
+  // -------------------------------------------------------------------------
+  // Sort order — regression: the shelf rendered the provider's list verbatim,
+  // so a sort picked on the "See all" page never reached the Space page.
+  //
+  // `spaceAlbumsProvider` always emits name-ASC (the repository's
+  // `orderBy(meta.name)`), so every list below is fed in name-ASC order and
+  // each expectation is a DIFFERENT order — a shelf that renders the provider's
+  // list verbatim fails all three.
+  // -------------------------------------------------------------------------
+
+  testWidgets('honors a persisted sort mode picked on the See all page', (tester) async {
+    await SettingsRepository.instance.write(SettingsKey.spaceAlbumsSortMode, SpaceAlbumSortMode.photoCount);
+
+    final albums = [_album(id: 'a1', name: 'Alps', assetCount: 5), _album(id: 'a2', name: 'Beach', assetCount: 50)];
+
+    await tester.pumpConsumerWidget(
+      SpaceAlbumsShelf(spaceId: spaceId, canEdit: false, onLinkTap: () {}, onAlbumTap: (_) {}),
+      overrides: _overrides(spaceId: spaceId, albums: albums),
+    );
+
+    // photoCount defaults to desc -> Beach (50) before Alps (5).
+    expect(_tileOrder(tester, ['a1', 'a2']), ['a2', 'a1']);
+  });
+
+  testWidgets('honors the persisted reverse flag', (tester) async {
+    await SettingsRepository.instance.write(SettingsKey.spaceAlbumsSortMode, SpaceAlbumSortMode.name);
+    await SettingsRepository.instance.write(SettingsKey.spaceAlbumsIsReverse, true);
+
+    final albums = [_album(id: 'a1', name: 'Alps'), _album(id: 'a2', name: 'Beach')];
+
+    await tester.pumpConsumerWidget(
+      SpaceAlbumsShelf(spaceId: spaceId, canEdit: false, onLinkTap: () {}, onAlbumTap: (_) {}),
+      overrides: _overrides(spaceId: spaceId, albums: albums),
+    );
+
+    // name is asc by default, reversed -> desc -> Beach before Alps.
+    expect(_tileOrder(tester, ['a1', 'a2']), ['a2', 'a1']);
+  });
+
+  testWidgets('with nothing persisted, falls back to the same default as the See all page', (tester) async {
+    final albums = [
+      _album(id: 'a1', name: 'Alps', linkedAt: DateTime.utc(2026, 1, 1)),
+      _album(id: 'a2', name: 'Beach', linkedAt: DateTime.utc(2026, 6, 1)),
+    ];
+
+    await tester.pumpConsumerWidget(
+      SpaceAlbumsShelf(spaceId: spaceId, canEdit: false, onLinkTap: () {}, onAlbumTap: (_) {}),
+      overrides: _overrides(spaceId: spaceId, albums: albums),
+    );
+
+    // Default is recentlyLinked desc -> the June link before the January one.
+    expect(_tileOrder(tester, ['a1', 'a2']), ['a2', 'a1']);
   });
 }
