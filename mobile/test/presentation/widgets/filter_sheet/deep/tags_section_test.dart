@@ -22,8 +22,13 @@ class _FakePrefs implements FilterSectionPrefs {
 
 Override _noCollapsed() => filterSectionPrefsProvider.overrideWithValue(_FakePrefs({}));
 
-FilterSuggestionsResponseDto _sugg({List<FilterSuggestionsTagDto>? tags}) =>
-    FilterSuggestionsResponseDto(hasUnnamedPeople: false, tags: tags ?? const []);
+FilterSuggestionsResponseDto _sugg({List<FilterSuggestionsTagDto>? tags}) => FilterSuggestionsResponseDto(
+  hasUnnamedPeople: false,
+  hasFavorites: true,
+  hasAssetsInAlbum: true,
+  hasAssetsNotInAlbum: true,
+  tags: tags ?? const [],
+);
 
 void main() {
   group('TagsSectionDeep', () {
