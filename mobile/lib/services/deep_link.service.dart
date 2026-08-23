@@ -13,6 +13,7 @@ import 'package:immich_mobile/providers/infrastructure/asset.provider.dart' as b
 import 'package:immich_mobile/providers/infrastructure/db.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
+import 'package:immich_mobile/repositories/memory_api.repository.dart';
 import 'package:immich_mobile/repositories/shared_space_api.repository.dart';
 import 'package:immich_mobile/routing/router.dart';
 import 'package:logging/logging.dart';
@@ -22,7 +23,7 @@ final deepLinkServiceProvider = Provider(
     ref.watch(timelineFactoryProvider),
     ref.watch(beta_asset_provider.assetServiceProvider),
     ref.watch(remoteAlbumServiceProvider),
-    MemoryService(ref.watch(driftProvider).memoryRepository),
+    MemoryService(ref.watch(driftProvider).memoryRepository, ref.watch(memoryApiRepositoryProvider)),
     ref.watch(sharedSpaceApiRepositoryProvider),
     ref.watch(currentUserProvider),
   ),
