@@ -295,6 +295,31 @@ DELETE FROM "migration_overrides"
  );
 
 -- -----------------------------------------------------------------------------
+-- 6b. Delete Gallery's own workflow plugin.
+--
+-- Plugins are stored IN THE DATABASE (`plugin.wasmBytes`), not just on disk, and the server loads
+-- every row from `getForLoad()` at boot. Gallery ships `gallery-core`, whose wasm imports the
+-- fork-only `gallery` host function. Upstream Immich does not register that function, so leaving
+-- the row behind makes its microservices worker die on startup with
+--
+--   cannot resolve import "extism:host/user" "gallery"
+--
+-- and the server never answers /api/server/ping. Unlike the migration_overrides cleanup above, this
+-- one is load-bearing: skip it and upstream Immich does not boot at all.
+--
+-- `plugin_method` cascades from `plugin`, and `workflow_step.pluginMethodId` cascades from
+-- `plugin_method`, so this also removes any workflow step wired to a Gallery action. Those steps
+-- could never run on upstream anyway. The parent `workflow` rows survive.
+--
+-- Upstream's own `immich-plugin-core` is deliberately left alone.
+-- -----------------------------------------------------------------------------
+DO $$
+BEGIN
+  IF to_regclass('public.plugin') IS NOT NULL THEN
+    DELETE FROM public."plugin" WHERE "name" = 'gallery-core';
+  END IF;
+END $$;
+
 -- 7. Undo post-v3.0.1 upstream migrations that Gallery pulled in via rebase.
 --
 -- Gallery regularly rebases onto `upstream/main`, which sits ahead of the
