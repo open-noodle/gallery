@@ -2677,6 +2677,8 @@
   "reassing_hint": "Assign selected assets to an existing person",
   "recent": "Recent",
   "recent_searches": "Recent searches",
+  "recent_trip_subtitle": "{assetCount, plural, one {# photo} other {# photos}} over {dayCount, plural, one {# day} other {# days}}",
+  "recent_trip_title": "Recent trip to {location}",
   "recently_added": "Recently added",
   "recently_added_body": "Jump straight to everything you've added lately on a dedicated page.",
   "recently_added_description": "Browse your assets sorted by when they were uploaded to Immich",
