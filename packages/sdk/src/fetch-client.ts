@@ -3946,6 +3946,8 @@ export type SpaceAssetFaceResponseDto = {
     imageHeight: number;
     /** Original image width */
     imageWidth: number;
+    /** Whether this face box was drawn by a space Owner/Editor, and so may be deleted by one */
+    isEditorDrawn: boolean;
     /** Space person ID this face is attached to, if any */
     spacePersonId: string | null;
     /** Space person name this face is attached to, if any */

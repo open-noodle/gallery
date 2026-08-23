@@ -40899,6 +40899,10 @@
             "description": "Original image width",
             "type": "number"
           },
+          "isEditorDrawn": {
+            "description": "Whether this face box was drawn by a space Owner/Editor, and so may be deleted by one",
+            "type": "boolean"
+          },
           "spacePersonId": {
             "description": "Space person ID this face is attached to, if any",
             "format": "uuid",
@@ -40920,6 +40924,7 @@
           "id",
           "imageHeight",
           "imageWidth",
+          "isEditorDrawn",
           "spacePersonId",
           "spacePersonName"
         ],
