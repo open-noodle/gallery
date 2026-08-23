@@ -902,4 +902,42 @@ export class FacePersonVerdictRepository {
       .executeTakeFirst();
     return row !== undefined;
   }
+
+  /**
+   * "May an editor assign this face in this space?" — `isFaceReachableInSpace` plus the
+   * hidden-person exclusion (spec §6.1).
+   *
+   * The exclusion is here, not at the call site, so the read (§6.1) and the write (§6.3)
+   * cannot disagree: an editor must never be able to attach a face the list would not show
+   * them by guessing its id (F-8/F-9).
+   *
+   * Scoped to the OWNER's `person.isHidden`. A space person's own `isHidden` is a separate
+   * concern handled by the read's projection filter.
+   */
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
+  async isFaceAssignableInSpace(spaceId: string, assetFaceId: string): Promise<boolean> {
+    const row = await this.db
+      .selectFrom('asset_face')
+      .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+      .leftJoin('person', 'person.id', 'asset_face.personId')
+      .select('asset_face.id')
+      .where('asset_face.id', '=', assetFaceId)
+      .where('asset_face.deletedAt', 'is', null)
+      .where('asset_face.isVisible', 'is', true)
+      .where('asset.deletedAt', 'is', null)
+      .where('asset.isOffline', 'is', false)
+      .where((eb) => reviewableAssetVisibility(eb))
+      .where((eb) => eb.or([eb('person.id', 'is', null), eb('person.isHidden', '=', false)]))
+      .where((eb) =>
+        eb.or(
+          spaceAssetPathBranches(eb as unknown as ExpressionBuilder<DB, keyof DB>, {
+            correlateAssetId: 'asset.id',
+            correlateLibraryId: 'asset.libraryId',
+            scope: { spaceId },
+          }),
+        ),
+      )
+      .executeTakeFirst();
+    return row !== undefined;
+  }
 }
