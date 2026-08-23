@@ -71,6 +71,26 @@ describe('getKeysDeep', () => {
       'hello.world',
     ]);
   });
+
+  it('should treat memories.types as the only empty-object default in the config tree', () => {
+    // `emptyObjectsAsLeaves` exists for sparse override maps whose keys are data rather than
+    // schema. `memories.types` is currently the only such default, so if this stops holding the
+    // config key-diffing call sites in src/utils/config.ts need to be revisited.
+    const withoutOption = getKeysDeep(defaults);
+    const withOption = getKeysDeep(defaults, [], { emptyObjectsAsLeaves: true });
+
+    expect(defaults.memories.types).toEqual({});
+    expect(withOption.filter((key) => !withoutOption.includes(key))).toEqual(['memories.types']);
+  });
+
+  it('should enumerate the sibling memories settings regardless of emptyObjectsAsLeaves', () => {
+    // the empty `memories.types` default must not shadow its plain-leaf siblings in either mode
+    for (const keys of [getKeysDeep(defaults), getKeysDeep(defaults, [], { emptyObjectsAsLeaves: true })]) {
+      expect(keys).toContain('memories.themeMaxDistance');
+      expect(keys).toContain('memories.personThrowbackDormancyMonths');
+      expect(keys).toContain('memories.retentionDays');
+    }
+  });
 });
 
 describe('unsetDeep', () => {

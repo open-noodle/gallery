@@ -171,8 +171,10 @@ The default configuration looks like this:
   },
   "memories": {
     "birthday": true,
+    "personThrowbackDormancyMonths": 6,
     "recentTrips": true,
     "retentionDays": 365,
+    "themeMaxDistance": 0.75,
     "types": {}
   },
   "metadata": {
@@ -332,6 +334,15 @@ The `memories` section configures generated memory retention and which memory ty
   - `on_this_day` — "N years ago" memories
   - `birthday` — birthday memories for named people
   - `recent_trip` — recent trip memories
+  - `month_recap` — a past year's photos from this calendar month
+  - `favorites_throwback` — your favorite photos from this calendar month in a past year
+  - `on_this_day_place` — a past year's on-this-day photos concentrated in one place
+  - `season_recap` — a recap of a past meteorological season
+  - `people_together` — two people or pets often photographed together in a past year
+  - `video_moments` — videos filmed in this calendar month in a past year
+  - `trip_anniversary` — a past trip resurfaced on the anniversary of the day it began
+  - `themed` — photo themes like sunsets, food, and beach days, found automatically via smart search
+  - `person_throwback` — a warm chapter with someone who has not appeared in your photos for a while
 
 For example, to disable recent trips globally and leave the rest on:
 
@@ -342,6 +353,12 @@ For example, to disable recent trips globally and leave the rest on:
   }
 }
 ```
+
+`themeMaxDistance` is the maximum CLIP cosine distance for the `themed` memory type (sunsets, food, beach days, etc. — found via smart search, not tags). It only takes effect for values `0 < x < 2`; the default is `0.75`. Setting it to `0` disables the quality gate entirely, so every smart-search result within a themed year is accepted regardless of similarity.
+
+This is a **text-to-image** distance, so it sits far higher than the image-to-image thresholds used for duplicate detection (`0.01`) or facial recognition (`0.5`) — CLIP's modality gap means even a perfect textual match rarely scores below `~0.6`. Values under `0.5` will typically produce **no themed memories at all**. If themed memories stop appearing, raise this in small steps rather than lowering it. `themed` requires smart search to be enabled — see the [Memories docs](/features/memories).
+
+`personThrowbackDormancyMonths` is how many months a person must be absent from your photos before the `person_throwback` memory type can resurface them. The default is `6`; valid values are `1`–`120`. Lower values surface more people — including some you still see regularly — while higher values concentrate the memory on people who have genuinely dropped out of your library. The gap itself is never shown in the memory and never affects ranking.
 
 The config file only controls **global availability**. Within each available type, every user can still enable or disable it for themselves in their account settings. Disabling a type globally removes it from every user's settings and immediately hides existing unsaved memories of that type (saved memories are kept).
 
