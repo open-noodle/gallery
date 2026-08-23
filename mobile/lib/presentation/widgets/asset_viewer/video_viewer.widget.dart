@@ -25,6 +25,12 @@ class NativeVideoViewer extends ConsumerStatefulWidget {
   final bool showControls;
   final Widget image;
 
+  /// Play regardless of the user's global `viewer.autoPlayVideo` setting.
+  ///
+  /// The memory viewer builds this widget with [showControls] `false`, so without an override a
+  /// user who has autoplay disabled gets a frozen first frame and no way to start playback.
+  final bool forceAutoPlay;
+
   const NativeVideoViewer({
     super.key,
     required this.asset,
@@ -32,6 +38,7 @@ class NativeVideoViewer extends ConsumerStatefulWidget {
     required this.image,
     this.isCurrent = false,
     this.showControls = true,
+    this.forceAutoPlay = false,
   });
 
   @override
@@ -228,7 +235,7 @@ class _NativeVideoViewerState extends ConsumerState<NativeVideoViewer> with Widg
     }
 
     final autoPlayVideo = ref.read(appConfigProvider).viewer.autoPlayVideo;
-    if (autoPlayVideo || widget.asset.isMotionPhoto) {
+    if (widget.forceAutoPlay || autoPlayVideo || widget.asset.isMotionPhoto) {
       await _notifier.play();
     }
   }
