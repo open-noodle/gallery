@@ -180,8 +180,67 @@ token changes` failed once with _expected "vi.fn()" to be called once, but got 2
 So it is order/parallelism dependent, the cross-file variant of the known "web vitest does not clear
 mocks" hazard. **Logged, not absolved** — a green re-run proves non-determinism, not correctness.
 
+## Remote CI Verification
+
+Dispatched on `45634b99869`. **9 of 10 green**; the tenth is a `main`-side regression this branch
+inherits rather than causes.
+
+| Workflow                                  | Result                                          |
+| ----------------------------------------- | ----------------------------------------------- |
+| `test.yml`                                | GREEN                                           |
+| `docker.yml`                              | GREEN                                           |
+| `static_analysis.yml`                     | GREEN                                           |
+| `gallery-build-mobile.yml`                | GREEN                                           |
+| `gallery-mobile-smoke.yml`                | GREEN                                           |
+| `gallery-ml-smoke.yml`                    | GREEN                                           |
+| `gallery-rebase-smoke.yml`                | GREEN                                           |
+| `storage-migration-tests.yml`             | GREEN                                           |
+| `storage-migration-e2e.yml`               | GREEN on re-run — see below                     |
+| `gallery-revert-to-immich-validation.yml` | RED — pre-existing `main` regression, see below |
+
+### `storage-migration-e2e` — environmental, confirmed by re-run
+
+The plugins build step failed with:
+
+```
+mise WARN  Failed to resolve tool version list for github:extism/js-pdk:
+HTTP timed out after 3.00s for https://api.github.com/repos/extism/js-pdk/releases
+  -> extism-js: not found
+```
+
+Two facts rule out the Dockerfile resolution: it failed for **`plugin-core`** as well — upstream's
+plugin, untouched here — and **`docker.yml` succeeded on the identical SHA**, building the same
+plugins stage including `plugin-gallery`. Re-running the failed job on the unchanged commit went
+green. This is the known `mise`/GitHub-API timeout class.
+
+### ★★ `gallery-revert-to-immich-validation` — a `main` regression from #981, NOT this branch
+
+This job boots **`ghcr.io/open-noodle/immich-server:main`**, not the branch, so it reports on `main`'s
+image. It fails with a plugin host-function mismatch:
+
+```
+microservices worker error: cannot resolve import "extism:host/user" "gallery"
+("extism:host/user" is a host module, but does not contain "gallery")
+  -> server did not respond to /api/server/ping within 180s
+```
+
+`main`'s `:main` image is internally inconsistent: its `plugin-gallery.wasm` imports a `gallery` host
+function that the server in that image does not register.
+
+Evidence it is not ours:
+
+- the workflow is failing on **unrelated branches too** — `feat/space-editor-asset-permissions`, three
+  separate runs at 15:55, 16:16 and 17:04;
+- it **passed at 14:44**, and **#981 merged to `main` at 15:43Z**; failures begin twelve minutes later;
+- the gate's actual subject — schema drift — was **clean**: "Pre-phase baseline drift (0 item(s))" and
+  "No schema drift detected". The local coverage detector also reports complete.
+
+**This needs its own fix on `main`, and it currently reds every branch that runs this workflow.**
+
 ## Follow-up
 
 - `global-search-manager.svelte.spec.ts` "clears stale status…" is order-dependent and should reset
   its mock rather than rely on suite ordering.
 - `gallery-map.e2e-spec.ts` "albumId visibility … (D4)" remains flaky from the previous cycle.
+- **`main` ships a `plugin-gallery` whose `gallery` host import the server does not register**, so the
+  `:main` image fails to boot its microservices worker. Introduced by #981; needs a fix on `main`.
