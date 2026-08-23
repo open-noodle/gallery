@@ -33,8 +33,16 @@ void main() {
       expect(chips, hasLength(1));
       expect(chips.single.id, const PersonChipId('p1'));
       expect(chips.single.label, 'Alice');
+      expect(chips.single.labelIsKey, isFalse); // a real name, not the unnamed-person key
       expect(chips.single.visual, ChipVisual.person);
       expect(chips.single.avatarPersonIds, ['p1']);
+    });
+
+    test('unnamed person → labelled with the unnamed-person i18n key', () {
+      final f = _base()..people.add(_person('p1', ''));
+      final chip = activeChipsFromFilter(f).single;
+      expect(chip.label, 'filter_sheet_unnamed_person');
+      expect(chip.labelIsKey, isTrue);
     });
 
     // The chip avatar must route a shared-space person to the space thumbnail endpoint, which
@@ -118,6 +126,7 @@ void main() {
       final chips = activeChipsFromFilter(f);
       expect(chips, hasLength(1));
       expect(chips.single.label, 'filter_sheet_tag_fallback');
+      expect(chips.single.labelIsKey, isTrue);
       expect(chips.single.id, const TagChipId('unknown'));
     });
 
@@ -215,6 +224,7 @@ void main() {
       final chips = activeChipsFromFilter(f);
       expect(chips, hasLength(1));
       expect(chips.single.label, 'filter_sheet_media_photos');
+      expect(chips.single.labelIsKey, isTrue);
       expect(chips.single.id, isA<MediaTypeChipId>());
     });
 
@@ -234,8 +244,13 @@ void main() {
       final f = _base().copyWith(
         display: const SearchDisplayFilters(isFavorite: true, isArchive: true, isNotInAlbum: true, isUntagged: true),
       );
-      final ids = activeChipsFromFilter(f).map((c) => c.id.runtimeType).toSet();
+      final chips = activeChipsFromFilter(f);
+      final ids = chips.map((c) => c.id.runtimeType).toSet();
       expect(ids, containsAll([FavouriteChipId, ArchiveChipId, NotInAlbumChipId, UntaggedChipId]));
+      // Every toggle chip's label is an i18n key, not resolved text — the
+      // widget must translate it, or the raw key leaks to the user (#1002
+      // follow-up: "filter_sheet_favourites" showing verbatim in the UI).
+      expect(chips.where((c) => c.visual == ChipVisual.toggle).every((c) => c.labelIsKey), isTrue);
     });
 
     test('combined filter preserves documented order', () {
