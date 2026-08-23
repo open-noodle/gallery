@@ -94,6 +94,9 @@ function renderPage(album = albumFactory.build({ assetCount: 2 })) {
         ratings: [5],
         mediaTypes: ['IMAGE'],
         hasUnnamedPeople: false,
+        hasFavorites: true,
+        hasAssetsInAlbum: true,
+        hasAssetsNotInAlbum: true,
       });
     }
 
@@ -108,6 +111,9 @@ function renderPage(album = albumFactory.build({ assetCount: 2 })) {
       ratings: [5],
       mediaTypes: ['IMAGE'],
       hasUnnamedPeople: false,
+      hasFavorites: true,
+      hasAssetsInAlbum: true,
+      hasAssetsNotInAlbum: true,
     });
   });
 
