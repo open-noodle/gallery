@@ -9,12 +9,25 @@ describe('findForeignAutolinks', () => {
     expect(texts('port #30881 onto the fork')).toEqual(['#30881']);
   });
 
-  it('keeps fork-local refs, including the ceiling itself', () => {
+  it('keeps fork-local refs, including four-digit ones', () => {
     expect(texts('fix #789 and #1016 and #1017')).toEqual([]);
   });
 
+  it('keeps our own PR numbers as they grow past the old frozen ceiling', () => {
+    // regression: the threshold was once pinned to the then-current max (1017), so #1020 was
+    // reported as foreign the day it merged
+    expect(
+      texts('docs: forbid commit messages that autolink Immich PRs (#1020)'),
+    ).toEqual([]);
+    expect(texts('see #9999')).toEqual([]);
+  });
+
   it('flags the first number above the fork ceiling', () => {
-    expect(texts('see #1018')).toEqual(['#1018']);
+    expect(texts('see #10000')).toEqual(['#10000']);
+  });
+
+  it('flags an older five-digit upstream ref', () => {
+    expect(texts('tracked upstream in #12848')).toEqual(['#12848']);
   });
 
   it('flags an explicit cross-repo ref but not our own', () => {
