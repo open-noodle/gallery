@@ -15,6 +15,9 @@ vi.mock('@immich/sdk', async (importOriginal) => {
       ratings: [5],
       mediaTypes: ['IMAGE'],
       hasUnnamedPeople: false,
+      hasFavorites: true,
+      hasAssetsInAlbum: true,
+      hasAssetsNotInAlbum: false,
     }),
     getSearchSuggestions: vi.fn().mockResolvedValue(['Berlin']),
   };
@@ -175,6 +178,25 @@ describe('buildAlbumDetailFilterConfig', () => {
       expect.objectContaining({ albumId: 'album-1', isFavorite: true }),
     );
   });
+
+  it('forwards the #910 availability facets', async () => {
+    const result = await buildAlbumDetailFilterConfig('album-1').suggestionsProvider!(createFilterState());
+
+    expect(result.hasFavorites).toBe(true);
+    expect(result.hasAssetsInAlbum).toBe(true);
+    expect(result.hasAssetsNotInAlbum).toBe(false);
+  });
+
+  it('offers a browse-mode baseline computed with no filters, scoped to the album (#910)', async () => {
+    const config = buildAlbumDetailFilterConfig('album-1');
+    vi.mocked(getFilterSuggestions).mockClear();
+
+    const baseline = await config.baselineProvider!();
+
+    expect(baseline).toBeDefined();
+    expect(getFilterSuggestions).toHaveBeenCalledWith(expect.objectContaining({ albumId: 'album-1' }));
+    expect(getFilterSuggestions).not.toHaveBeenCalledWith(expect.objectContaining({ rating: expect.anything() }));
+  });
 });
 
 describe('buildAlbumAssetPickerFilterConfig', () => {
@@ -260,5 +282,39 @@ describe('buildAlbumAssetPickerFilterConfig', () => {
     });
 
     expect(getFilterSuggestions).toHaveBeenCalledWith(expect.objectContaining({ albumId: 'album-1' }));
+  });
+
+  it('forwards isInAlbum and isNotInAlbum to filter suggestions (#910)', async () => {
+    const config = buildAlbumAssetPickerFilterConfig();
+
+    await config.suggestionsProvider!({ ...createFilterState(), isInAlbum: true });
+    const isInAlbumRequest = vi.mocked(getFilterSuggestions).mock.calls.at(-1)?.[0];
+    expect(isInAlbumRequest?.isInAlbum).toBe(true);
+    expect(isInAlbumRequest?.isNotInAlbum).toBeUndefined();
+
+    await config.suggestionsProvider!({ ...createFilterState(), isNotInAlbum: true });
+    const isNotInAlbumRequest = vi.mocked(getFilterSuggestions).mock.calls.at(-1)?.[0];
+    expect(isNotInAlbumRequest?.isNotInAlbum).toBe(true);
+    expect(isNotInAlbumRequest?.isInAlbum).toBeUndefined();
+
+    // An explicit `false` means "only assets that ARE/aren't in an album", not "don't filter" —
+    // it must not be forwarded as `false`, only `true` or omitted.
+    await config.suggestionsProvider!({ ...createFilterState(), isInAlbum: false, isNotInAlbum: false });
+    const bothFalseRequest = vi.mocked(getFilterSuggestions).mock.calls.at(-1)?.[0];
+    expect(bothFalseRequest?.isInAlbum).toBeUndefined();
+    expect(bothFalseRequest?.isNotInAlbum).toBeUndefined();
+  });
+
+  it('offers a browse-mode baseline computed with no filters, unscoped (#910)', async () => {
+    const config = buildAlbumAssetPickerFilterConfig();
+    vi.mocked(getFilterSuggestions).mockClear();
+
+    const baseline = await config.baselineProvider!();
+
+    expect(baseline).toBeDefined();
+    const call = vi.mocked(getFilterSuggestions).mock.calls.at(-1)?.[0];
+    expect(call).not.toHaveProperty('albumId');
+    expect(call).not.toHaveProperty('withSharedSpaces');
+    expect(call).not.toHaveProperty('rating');
   });
 });
