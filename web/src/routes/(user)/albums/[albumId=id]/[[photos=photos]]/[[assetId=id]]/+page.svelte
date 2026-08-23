@@ -459,6 +459,8 @@
     hasFavorites: false,
     hasAssetsInAlbum: false,
     hasAssetsNotInAlbum: false,
+    hasNoGpsAssets: false,
+    hasNoPlaceNameAssets: false,
   });
 
   /**
