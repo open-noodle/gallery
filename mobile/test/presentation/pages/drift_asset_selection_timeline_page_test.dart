@@ -138,7 +138,7 @@ void main() {
             castProvider.overrideWith((ref) => _StubCastNotifier()),
             serverInfoServiceProvider.overrideWithValue(serverInfoService),
           ],
-          child: const MaterialApp(home: DriftAssetSelectionTimelinePage()),
+          child: MaterialApp(home: withStubRouter(const DriftAssetSelectionTimelinePage())),
         ),
       ),
     );
