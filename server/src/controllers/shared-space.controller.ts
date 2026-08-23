@@ -34,6 +34,7 @@ import {
   SharedSpacePersonResponseDto,
   SharedSpacePersonUpdateDto,
   SpacePeopleQueryDto,
+  SpacePersonFaceParamsDto,
   SpacePersonFaceSuggestionParamsDto,
   SpacePersonParamsDto,
   SpaceRepresentativeFaceUpdateDto,
@@ -552,6 +553,23 @@ export class SharedSpaceController {
     @Param() { id, personId, assetFaceId }: SpacePersonFaceSuggestionParamsDto,
   ): Promise<FaceSuggestionActionResponseDto> {
     return { acted: await this.service.dismissSpacePersonFaceSuggestion(auth, id, personId, assetFaceId) };
+  }
+
+  // Spec §6.3. The decorator carries the API-key SCOPE, matching the sibling writes; the real
+  // authority (Editor role + face reachability) is enforced in the service.
+  @Put(':id/people/:personId/faces/:assetFaceId')
+  @Authenticated({ permission: Permission.SharedSpaceUpdate })
+  @HttpCode(HttpStatus.OK)
+  @Endpoint({
+    summary: 'Assign a face to a person in a shared space',
+    description: 'Attach the face to the space person. Idempotent — the response reports whether it acted.',
+    history: new HistoryBuilder().added('v2').stable('v2'),
+  })
+  async attachSpacePersonFace(
+    @Auth() auth: AuthDto,
+    @Param() { id, personId, assetFaceId }: SpacePersonFaceParamsDto,
+  ): Promise<FaceSuggestionActionResponseDto> {
+    return { acted: await this.service.attachFaceToSpacePerson(auth, id, personId, assetFaceId) };
   }
 
   @Get(':id/people/:personId')

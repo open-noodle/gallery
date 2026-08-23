@@ -432,4 +432,51 @@ describe(SharedSpaceController.name, () => {
       expect(body).toEqual(errorDto.validationError([{ path: ['folderId'], message: 'Invalid UUID' }]));
     });
   });
+
+  describe('PUT /shared-spaces/:id/people/:personId/faces/:assetFaceId', () => {
+    const spaceId = '00000000-0000-4000-8000-000000000001';
+    const personId = '00000000-0000-4000-8000-000000000002';
+    const assetFaceId = '00000000-0000-4000-8000-000000000003';
+
+    it('should require shared-space update permission and respond with 200 when acted', async () => {
+      service.attachFaceToSpacePerson.mockResolvedValue(true);
+
+      const { status, body } = await request(ctx.getHttpServer())
+        .put(`/shared-spaces/${spaceId}/people/${personId}/faces/${assetFaceId}`)
+        .set('Authorization', `Bearer token`);
+
+      expect(status).toBe(200);
+      expect(body).toEqual({ acted: true });
+      expect(ctx.authenticate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({ permission: Permission.SharedSpaceUpdate }),
+        }),
+      );
+      expect(service.attachFaceToSpacePerson).toHaveBeenCalledWith(undefined, spaceId, personId, assetFaceId);
+    });
+
+    it('should report acted: false on a no-op, still as 200', async () => {
+      service.attachFaceToSpacePerson.mockResolvedValue(false);
+
+      const { status, body } = await request(ctx.getHttpServer())
+        .put(`/shared-spaces/${spaceId}/people/${personId}/faces/${assetFaceId}`)
+        .set('Authorization', `Bearer token`);
+
+      // Explicitly NOT 204: a 204 carries no body, so oazapfts hands the caller `undefined` for both
+      // outcomes — the reason the previous contract could not ship.
+      expect(status).toBe(200);
+      expect(status).not.toBe(204);
+      expect(body).toEqual({ acted: false });
+    });
+
+    it('should validate assetFaceId independently', async () => {
+      const { status, body } = await request(ctx.getHttpServer())
+        .put(`/shared-spaces/${spaceId}/people/${personId}/faces/not-a-uuid`)
+        .set('Authorization', `Bearer token`);
+
+      expect(status).toBe(400);
+      expect(body).toEqual(errorDto.validationError([{ path: ['assetFaceId'], message: 'Invalid UUID' }]));
+      expect(service.attachFaceToSpacePerson).not.toHaveBeenCalled();
+    });
+  });
 });

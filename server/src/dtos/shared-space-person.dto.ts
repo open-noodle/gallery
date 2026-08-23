@@ -73,6 +73,10 @@ const SpacePersonParamsSchema = z
   })
   .meta({ id: 'SpacePersonParamsDto' });
 
+const SpacePersonFaceParamsSchema = SpacePersonParamsSchema.extend({
+  assetFaceId: z.uuidv4().describe('Asset face ID'),
+}).meta({ id: 'SpacePersonFaceParamsDto' });
+
 const SpacePersonFaceSuggestionParamsSchema = SpacePersonParamsSchema.extend({
   assetFaceId: z.uuidv4().describe('Unassigned asset face ID being reviewed'),
 }).meta({ id: 'SpacePersonFaceSuggestionParamsDto' });
@@ -110,6 +114,7 @@ export class SharedSpacePersonAliasDto extends createZodDto(SharedSpacePersonAli
 export class SpaceRepresentativeFaceUpdateDto extends createZodDto(SpaceRepresentativeFaceUpdateSchema) {}
 export class SharedSpacePersonMergeDto extends createZodDto(SharedSpacePersonMergeSchema) {}
 export class SpacePersonParamsDto extends createZodDto(SpacePersonParamsSchema) {}
+export class SpacePersonFaceParamsDto extends createZodDto(SpacePersonFaceParamsSchema) {}
 export class SpacePersonFaceSuggestionParamsDto extends createZodDto(SpacePersonFaceSuggestionParamsSchema) {}
 export class SharedSpacePersonResponseDto extends createZodDto(SharedSpacePersonResponseSchema) {}
 export class SharedSpacePeopleStatisticsResponseDto extends createZodDto(SharedSpacePeopleStatisticsResponseSchema) {}
