@@ -76,6 +76,7 @@
     allowCreate
     disabled={!spaceId}
     onSelect={(option) => (albumName = option?.value ?? '')}
+    onTextInput={(value) => (albumName = value)}
   />
 
   {#if !spaceId}

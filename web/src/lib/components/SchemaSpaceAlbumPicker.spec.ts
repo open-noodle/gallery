@@ -106,6 +106,26 @@ describe('SchemaSpaceAlbumPicker', () => {
     expect(boundValue()).toHaveTextContent('Ski trip');
   });
 
+  it('commits a typed name without it being selected from the list', async () => {
+    // A8 — the interaction that actually happens: type a new album name, then click Save. Nothing
+    // ever selects the created option, and Combobox's blur handler discards unselected text, so a
+    // commit that waits for selection silently saves "".
+    renderPicker({ spaceId: 'space-1' });
+    await vi.waitFor(() => expect(getSharedSpaceAlbums).toHaveBeenCalled());
+    await openDropdown();
+
+    await userEvent.type(field(), 'Ski trip');
+
+    expect(boundValue()).toHaveTextContent('Ski trip');
+  });
+
+  it('shows the saved name when a step is reopened', async () => {
+    // A9 — the step editor is reopened far more often than it is created.
+    renderPicker({ spaceId: 'space-1', initial: 'Ski trip' });
+
+    expect(await screen.findByDisplayValue('Ski trip')).toBeInTheDocument();
+  });
+
   it('reloads the album list when the space changes but keeps the chosen name', async () => {
     // A5 — a name stays valid in any space, so re-scoping the list must not clear the value.
     renderPicker({ spaceId: 'space-1', nextSpaceId: 'space-2', initial: 'Ski trip' });

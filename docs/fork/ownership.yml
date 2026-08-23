@@ -80,6 +80,7 @@ features:
       - server/src/services/workflow-execution.service.ts
       - web/src/lib/types.ts
       - web/src/lib/components/SchemaConfiguration.svelte
+      - web/src/lib/components/shared-components/Combobox.svelte
     database:
       tables:
         - shared_spaces
