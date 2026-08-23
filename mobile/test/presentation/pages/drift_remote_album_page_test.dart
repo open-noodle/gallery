@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:drift/drift.dart' as drift;
 import 'package:drift/native.dart';
 import 'package:easy_localization/easy_localization.dart';
@@ -20,6 +22,7 @@ import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/presentation/pages/drift_remote_album.page.dart';
+import 'package:immich_mobile/presentation/widgets/remote_album/drift_album_option.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_grouping_bottom_pill.widget.dart';
 import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
@@ -30,6 +33,7 @@ import 'package:mocktail/mocktail.dart';
 // easy_localization initializes shared_preferences internally; tests need the mock initializer.
 // ignore: depend_on_referenced_packages
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:timezone/data/latest.dart';
 
 import '../../test_utils.dart';
 
@@ -42,6 +46,12 @@ class _MockUserService extends Mock implements UserService {}
 class _StubCurrentUserNotifier extends CurrentUserProvider {
   _StubCurrentUserNotifier(super.service, UserDto user) {
     state = user;
+  }
+}
+
+class _NullCurrentUserNotifier extends CurrentUserProvider {
+  _NullCurrentUserNotifier(super.service) {
+    state = null;
   }
 }
 
@@ -90,6 +100,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     await EasyLocalization.ensureInitialized();
     await initializeDateFormatting('en');
+    initializeTimeZones();
     registerFallbackValue(const TimelineTemporalScope.none());
     registerFallbackValue(GroupAssetsBy.day);
     db = Drift(drift.DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true));
@@ -119,9 +130,15 @@ void main() {
     TimeBucket(date: DateTime(2026, 1, 1), assetCount: 12),
   ];
 
-  Future<void> pumpAlbumPage(WidgetTester tester) async {
+  Future<_MockRemoteAlbumService> pumpAlbumPage(
+    WidgetTester tester, {
+    String ownerId = 'user-1',
+    AlbumUserRole role = AlbumUserRole.viewer,
+    Completer<AlbumUserRole?>? roleCompleter,
+    bool noCurrentUser = false,
+  }) async {
     final user = _user('user-1');
-    final album = _albumFixture(user.id);
+    final album = _albumFixture(ownerId);
 
     final albumService = _MockRemoteAlbumService();
     // watchAlbum: return a stream that emits the album then closes.
@@ -133,8 +150,16 @@ void main() {
     ).thenAnswer((_) => Stream.value((DateTime(2026, 1, 1), DateTime(2026, 6, 1))));
     // getSharedUsers: empty list (no shared users icons).
     when(() => albumService.getSharedUsers(any())).thenAnswer((_) async => <UserDto>[]);
-    // getUserRole: viewer role.
-    when(() => albumService.getUserRole(any(), any())).thenAnswer((_) async => AlbumUserRole.viewer);
+    // An unresolved completer lets a test observe the pending state of the role lookup.
+    when(() => albumService.getUserRole(any(), any())).thenAnswer((_) => roleCompleter?.future ?? Future.value(role));
+    when(
+      () => albumService.updateAlbum(
+        any(),
+        name: any(named: 'name'),
+        description: any(named: 'description'),
+        createdAt: any(named: 'createdAt'),
+      ),
+    ).thenAnswer((_) async => album);
 
     final factory = _MockTimelineFactory();
     final service = _service(buckets);
@@ -148,7 +173,7 @@ void main() {
     ).thenReturn(service);
 
     final userService = _MockUserService();
-    when(() => userService.tryGetMyUser()).thenReturn(user);
+    when(() => userService.tryGetMyUser()).thenReturn(noCurrentUser ? null : user);
     when(() => userService.watchMyUser()).thenAnswer((_) => const Stream<UserDto?>.empty());
 
     await tester.pumpWidget(
@@ -157,7 +182,10 @@ void main() {
           timelineFactoryProvider.overrideWithValue(factory),
           remoteAlbumServiceProvider.overrideWithValue(albumService),
           infra.userServiceProvider.overrideWithValue(userService),
-          currentUserProvider.overrideWith((ref) => _StubCurrentUserNotifier(userService, user)),
+          currentUserProvider.overrideWith(
+            (ref) =>
+                noCurrentUser ? _NullCurrentUserNotifier(userService) : _StubCurrentUserNotifier(userService, user),
+          ),
           timelineUsersProvider.overrideWith((_) => Stream<List<String>>.value([user.id])),
         ],
         child: EasyLocalization(
@@ -178,6 +206,54 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
     await tester.pump(const Duration(milliseconds: 500));
     await tester.pump(const Duration(milliseconds: 500));
+
+    return albumService;
+  }
+
+  DriftRemoteAlbumOption albumOption(WidgetTester tester) =>
+      tester.widget<DriftRemoteAlbumOption>(find.byType(DriftRemoteAlbumOption));
+
+  Future<void> openEditDialog(WidgetTester tester) async {
+    albumOption(tester).onEditAlbum!();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+  }
+
+  /// Opens the created-at picker (assumes the edit dialog is open and its date is still the
+  /// fixture's original 2026-01-01) and drives it to day 12 of the same month, leaving the time
+  /// untouched. Confirms both the calendar and the outer date/time picker.
+  ///
+  /// Flutter's built-in calendar/time pickers ('12', 'OK') use MaterialLocalizations, which
+  /// resolves independently of this app's own i18n loader — reliable here. The picker's own
+  /// Cancel/Update buttons go through that app i18n loader, which this harness does not
+  /// reliably finish loading in time, so those two are targeted by position instead of text.
+  Future<void> pickCreatedAtDay12(WidgetTester tester) async {
+    await tester.tap(find.byKey(const Key('album-edit-created-at')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final originalPickerTile = DateFormat("dd-MM-yyyy hh:mm a").format(DateTime(2026, 1, 1));
+    await tester.tap(find.text(originalPickerTile));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    await tester.tap(find.text('12').last);
+    await tester.pump();
+    await tester.tap(find.text('OK').last);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // Confirm the time picker with the unchanged time.
+    await tester.tap(find.text('OK').last);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // Confirm the outer date/time picker (Update is the second action button).
+    final dateTimePickerActions = find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextButton));
+    expect(dateTimePickerActions, findsNWidgets(2));
+    await tester.tap(dateTimePickerActions.at(1));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
   }
 
   testWidgets('grouping selector stays visible after scrolling deep (bottom pill)', (tester) async {
@@ -226,5 +302,160 @@ void main() {
     const band = TimelineGroupingBottomPill.pillHeight + TimelineGroupingBottomPill.bottomFloat;
     expect(pillRect.bottom, closeTo(screenHeight - float, 1)); // floats bottomFloat above the edge
     expect(pillRect.top, closeTo(screenHeight - band, 1)); // top of the reserved clearance band
+  });
+
+  testWidgets('owner gets the edit album affordance', (tester) async {
+    await pumpAlbumPage(tester, ownerId: 'user-1');
+
+    expect(albumOption(tester).onEditAlbum, isNotNull);
+  });
+
+  testWidgets('editor gets the edit album affordance', (tester) async {
+    await pumpAlbumPage(tester, ownerId: 'someone-else', role: AlbumUserRole.editor);
+
+    expect(albumOption(tester).onEditAlbum, isNotNull);
+  });
+
+  testWidgets('viewer does not get the edit album affordance', (tester) async {
+    await pumpAlbumPage(tester, ownerId: 'someone-else', role: AlbumUserRole.viewer);
+
+    expect(albumOption(tester).onEditAlbum, isNull);
+  });
+
+  testWidgets('edit album affordance is withheld while the role is still resolving', (tester) async {
+    final completer = Completer<AlbumUserRole?>();
+    await pumpAlbumPage(tester, ownerId: 'someone-else', roleCompleter: completer);
+
+    // FutureBuilder default is `snapshot.data ?? false` — fail closed, matching onAddPhotos.
+    expect(albumOption(tester).onEditAlbum, isNull);
+
+    completer.complete(AlbumUserRole.editor);
+    await tester.pump();
+    await tester.pump();
+
+    expect(albumOption(tester).onEditAlbum, isNotNull);
+  });
+
+  testWidgets('edit dialog shows the album created date', (tester) async {
+    await pumpAlbumPage(tester, ownerId: 'user-1');
+    await openEditDialog(tester);
+
+    expect(find.byKey(const Key('album-edit-created-at')), findsOneWidget);
+    // _albumFixture pins createdAt to 2026-01-01; DateFormat.yMMMd() renders "Jan 1, 2026".
+    expect(find.text(DateFormat.yMMMd().format(DateTime(2026, 1, 1))), findsOneWidget);
+  });
+
+  testWidgets('saving without touching the date keeps the original created date', (tester) async {
+    final albumService = await pumpAlbumPage(tester, ownerId: 'user-1');
+    await openEditDialog(tester);
+
+    await tester.tap(find.byKey(const Key('album-edit-save')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    verify(
+      () => albumService.updateAlbum(
+        'album-1',
+        name: 'Test Album',
+        description: any(named: 'description'),
+        createdAt: DateTime(2026, 1, 1),
+      ),
+    ).called(1);
+  });
+
+  testWidgets('edit album affordance is hidden when there is no current user', (tester) async {
+    await pumpAlbumPage(tester, ownerId: 'user-1', noCurrentUser: true);
+
+    expect(albumOption(tester).onEditAlbum, isNull);
+  });
+
+  testWidgets('picking a new date updates the tile in local time and is sent on save', (tester) async {
+    final albumService = await pumpAlbumPage(tester, ownerId: 'user-1');
+    await openEditDialog(tester);
+
+    // Picks day 12 of the same month via the created-at row's picker; leaves the time untouched.
+    await pickCreatedAtDay12(tester);
+
+    // The picker always encodes the machine's own offset for the picked wall-clock time
+    // (see _getInitiationLocation), so round-tripping through DateTime.parse(...).toLocal()
+    // must land exactly back on the wall-clock day/time the user picked — Jan 12, 2026,
+    // midnight — regardless of what the host machine's timezone actually is.
+    final expected = DateTime(2026, 1, 12);
+    expect(find.text(DateFormat.yMMMd().format(expected)), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('album-edit-save')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final captured =
+        verify(
+              () => albumService.updateAlbum(
+                'album-1',
+                name: 'Test Album',
+                description: any(named: 'description'),
+                createdAt: captureAny(named: 'createdAt'),
+              ),
+            ).captured.single
+            as DateTime;
+
+    expect(captured.isAtSameMomentAs(expected), isTrue);
+    // Discriminates the bug regardless of the host's timezone offset: DateTime.parse of an
+    // offset-bearing string is always UTC-flagged; only .toLocal() clears the flag.
+    expect(captured.isUtc, isFalse);
+  });
+
+  testWidgets('dismissing the date/time picker leaves the pending date unchanged and Save resends the original', (
+    tester,
+  ) async {
+    final albumService = await pumpAlbumPage(tester, ownerId: 'user-1');
+    await openEditDialog(tester);
+
+    await tester.tap(find.byKey(const Key('album-edit-created-at')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // Dismiss the picker without picking anything. Target by position rather than the
+    // (possibly untranslated, see the sibling test) Cancel label — Cancel is the first action.
+    final dateTimePickerActions = find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextButton));
+    expect(dateTimePickerActions, findsNWidgets(2));
+    await tester.tap(dateTimePickerActions.at(0));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // The tile still shows the original date — the picked==null branch returned early.
+    expect(find.text(DateFormat.yMMMd().format(DateTime(2026, 1, 1))), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('album-edit-save')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    verify(
+      () => albumService.updateAlbum(
+        'album-1',
+        name: 'Test Album',
+        description: any(named: 'description'),
+        createdAt: DateTime(2026, 1, 1),
+      ),
+    ).called(1);
+  });
+
+  testWidgets('a second edit in the same session opens on the just-saved date, not the stale original', (tester) async {
+    await pumpAlbumPage(tester, ownerId: 'user-1');
+    await openEditDialog(tester);
+
+    // Pick day 12, then save — the page's own _album state must pick up the new date, not just
+    // the server/mock.
+    await pickCreatedAtDay12(tester);
+    await tester.tap(find.byKey(const Key('album-edit-save')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // Re-open the edit dialog for a second, unrelated edit (e.g. fixing a title typo).
+    await openEditDialog(tester);
+
+    // It must seed from the date just saved (Jan 12), not the stale pre-edit value (Jan 1) —
+    // otherwise this second, unrelated edit would silently resend the old date on save.
+    expect(find.text(DateFormat.yMMMd().format(DateTime(2026, 1, 12))), findsOneWidget);
+    expect(find.text(DateFormat.yMMMd().format(DateTime(2026, 1, 1))), findsNothing);
   });
 }
