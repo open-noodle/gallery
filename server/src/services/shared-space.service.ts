@@ -2122,6 +2122,24 @@ export class SharedSpaceService extends BaseService {
       }
 
       await this.linkFaceToSpacePerson(trx, person, assetFaceId, { writeIdentity });
+
+      // §6.7 (F-24/F-26): attribute the attach in the space's activity feed, unless the actor
+      // owns the asset -- an owner naming their own photos should not flood their own feed,
+      // matching #992's asset_edit rule. Ownership comes from the ASSET (ownerLink.assetOwnerId
+      // above), never from the actor's space role. Written inside this same transaction so a row
+      // can never describe a link that then rolled back.
+      if (ownerLink?.assetOwnerId !== auth.user.id) {
+        await this.sharedSpaceRepository.logActivity(
+          {
+            spaceId,
+            userId: auth.user.id,
+            type: SharedSpaceActivityType.PersonFaceAssign,
+            data: { personId: person.id, personName: person.name, count: 1 },
+          },
+          trx,
+        );
+      }
+
       return true;
     });
   }
@@ -2151,6 +2169,10 @@ export class SharedSpaceService extends BaseService {
     }
 
     return this.databaseRepository.transaction(async (trx) => {
+      // §6.7: read before the face's projection row is removed below, purely for the asset
+      // owner id it carries -- the personId/identityId half of this read is unused here.
+      const ownerLink = await this.facePersonVerdictRepository.getFaceOwnerLink(assetFaceId, trx);
+
       await this.facePersonVerdictRepository.markRejectedForSpacePerson(
         person.id,
         assetFaceId,
@@ -2158,6 +2180,21 @@ export class SharedSpaceService extends BaseService {
         trx,
       );
       await this.sharedSpaceRepository.removePersonFace(person.id, assetFaceId, trx);
+
+      // §6.7 (F-25/F-26): the detach twin of attachFaceToSpacePerson's attribution above --
+      // same owner-self exemption, same in-transaction write.
+      if (ownerLink?.assetOwnerId !== auth.user.id) {
+        await this.sharedSpaceRepository.logActivity(
+          {
+            spaceId,
+            userId: auth.user.id,
+            type: SharedSpaceActivityType.PersonFaceDetach,
+            data: { personId: person.id, personName: person.name, count: 1 },
+          },
+          trx,
+        );
+      }
+
       return true;
     });
   }
