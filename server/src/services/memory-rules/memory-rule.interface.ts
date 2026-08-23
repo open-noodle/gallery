@@ -3,7 +3,7 @@ import { DateTime } from 'luxon';
 export interface MemoryRuleCandidate {
   ruleId: string;
   dedupeKey: string;
-  title: string;
+  title?: string;
   subtitle?: string;
   score: number;
   assetIds: string[];
