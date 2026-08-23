@@ -772,4 +772,49 @@ describe(SharedSpaceController.name, () => {
       expect(service.createSpaceAssetFace).not.toHaveBeenCalled();
     });
   });
+
+  // Slice 6, Task 3 (spec §6.6): DELETE /shared-spaces/:id/faces/:assetFaceId. The decorator
+  // carries the SharedSpaceUpdate API-key SCOPE, matching the sibling writes -- the real
+  // authority (Editor role + reachability + createdBy IS NOT NULL) is enforced in the service.
+  describe('DELETE /shared-spaces/:id/faces/:assetFaceId', () => {
+    const spaceId = '00000000-0000-4000-8000-000000000001';
+    const faceId = '00000000-0000-4000-8000-000000000003';
+
+    it('should require shared-space update permission and delete the face', async () => {
+      service.deleteSpaceAssetFace.mockResolvedValue(undefined);
+
+      const { status, body } = await request(ctx.getHttpServer())
+        .delete(`/shared-spaces/${spaceId}/faces/${faceId}`)
+        .set('Authorization', `Bearer token`);
+
+      expect(status).toBe(204);
+      expect(body).toEqual({});
+      expect(ctx.authenticate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({ permission: Permission.SharedSpaceUpdate }),
+        }),
+      );
+      expect(service.deleteSpaceAssetFace).toHaveBeenCalledWith(undefined, spaceId, faceId);
+    });
+
+    it('should validate assetFaceId as a uuid', async () => {
+      const { status, body } = await request(ctx.getHttpServer())
+        .delete(`/shared-spaces/${spaceId}/faces/not-a-uuid`)
+        .set('Authorization', `Bearer token`);
+
+      expect(status).toBe(400);
+      expect(body).toEqual(errorDto.validationError([{ path: ['assetFaceId'], message: 'Invalid UUID' }]));
+      expect(service.deleteSpaceAssetFace).not.toHaveBeenCalled();
+    });
+
+    it('should validate the space id as a uuid', async () => {
+      const { status, body } = await request(ctx.getHttpServer())
+        .delete(`/shared-spaces/not-a-uuid/faces/${faceId}`)
+        .set('Authorization', `Bearer token`);
+
+      expect(status).toBe(400);
+      expect(body).toEqual(errorDto.validationError([{ path: ['id'], message: 'Invalid UUID' }]));
+      expect(service.deleteSpaceAssetFace).not.toHaveBeenCalled();
+    });
+  });
 });

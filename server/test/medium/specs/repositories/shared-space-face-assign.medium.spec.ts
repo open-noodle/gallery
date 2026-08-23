@@ -896,3 +896,116 @@ describe('createSpaceAssetFace', () => {
     expect(rows).toEqual([]);
   });
 });
+
+// Slice 6, Task 3 (spec §6.6, §9.6): DELETE /shared-spaces/:id/faces/:assetFaceId -- an editor may
+// delete a box THEY drew (F-18), but a genuinely detected face stays refused (F-19). Written
+// together, not sequentially: the two differ ONLY by whether createdBy is null, so an
+// implementation that forgets the check would pass F-18 and fail only F-19.
+describe('deleteSpaceAssetFace', () => {
+  const realRepos = [
+    FacePersonVerdictRepository,
+    SharedSpaceRepository,
+    FaceIdentityRepository,
+    DatabaseRepository,
+    PersonRepository,
+    AssetEditRepository,
+    AssetRepository,
+  ];
+
+  // F-18: Anna may delete a box SHE drew. Drawn through the real createSpaceAssetFace path (Task
+  // 2), so createdBy is set the genuine way, not poked in by hand.
+  it('deletes a face the editor drew (F-18)', async () => {
+    const { sut, ctx } = newMediumService(SharedSpaceService, {
+      database: defaultDatabase,
+      real: realRepos,
+      mock: [LoggingRepository],
+    });
+    const spaceRepo = ctx.get(SharedSpaceRepository);
+    const { anna, bob, space } = await newSpaceWithEditorAndMember(ctx);
+    const { assetId } = await reachPathBuilders.direct(ctx, { spaceId: space.id, ownerId: bob.id });
+    const person = await spaceRepo.createPerson({ spaceId: space.id, name: 'Aurelia' });
+    const auth = { user: { id: anna.id } } as AuthDto;
+
+    const drawn = await sut.createSpaceAssetFace(auth, space.id, assetId, {
+      x: 10,
+      y: 20,
+      width: 100,
+      height: 110,
+      imageWidth: 4000,
+      imageHeight: 3000,
+      spacePersonId: person.id,
+    });
+
+    const before = await defaultDatabase
+      .selectFrom('shared_space_person')
+      .select(['faceCount', 'assetCount'])
+      .where('id', '=', person.id)
+      .executeTakeFirstOrThrow();
+    expect(before.faceCount).toBe(1);
+
+    await expect(sut.deleteSpaceAssetFace(auth, space.id, drawn.id)).resolves.toBeUndefined();
+
+    const face = await defaultDatabase
+      .selectFrom('asset_face')
+      .selectAll()
+      .where('id', '=', drawn.id)
+      .executeTakeFirst();
+    expect(face).toBeUndefined();
+
+    const projectionRows = await defaultDatabase
+      .selectFrom('shared_space_person_face')
+      .selectAll()
+      .where('assetFaceId', '=', drawn.id)
+      .execute();
+    expect(projectionRows).toEqual([]);
+
+    // The cascade removes the projection row without recounting -- the delete must do that itself.
+    const after = await defaultDatabase
+      .selectFrom('shared_space_person')
+      .select(['faceCount', 'assetCount'])
+      .where('id', '=', person.id)
+      .executeTakeFirstOrThrow();
+    expect(after.faceCount).toBe(0);
+    expect(after.assetCount).toBe(0);
+  });
+
+  // F-19: a GENUINELY detected face -- created the normal way (ctx.newAssetFace, used throughout
+  // this file for every detected-face fixture), createdBy never set. FaceDelete stays owner-only
+  // for these; the space editor path must refuse it exactly like PersonService.deleteFace would
+  // for a non-owner, and must NOT decide this from sourceType (both this face and the F-18 one
+  // above carry sourceType default/Manual-shaped values -- createdBy is the only real signal).
+  it('refuses a genuinely detected face (F-19)', async () => {
+    const { sut, ctx } = newMediumService(SharedSpaceService, {
+      database: defaultDatabase,
+      real: realRepos,
+      mock: [LoggingRepository],
+    });
+    const spaceRepo = ctx.get(SharedSpaceRepository);
+    const { anna, bob, space } = await newSpaceWithEditorAndMember(ctx);
+    const { assetId } = await reachPathBuilders.direct(ctx, { spaceId: space.id, ownerId: bob.id });
+    const { result: faceId } = await ctx.newAssetFace({ assetId });
+    const person = await spaceRepo.createPerson({ spaceId: space.id, name: 'Aurelia' });
+    await spaceRepo.addPersonFaces([{ personId: person.id, assetFaceId: faceId }]);
+    const auth = { user: { id: anna.id } } as AuthDto;
+
+    // Non-vacuous baseline: this really is a detected face, not editor-drawn.
+    const seeded = await defaultDatabase
+      .selectFrom('asset_face')
+      .select(['createdBy'])
+      .where('id', '=', faceId)
+      .executeTakeFirstOrThrow();
+    expect(seeded.createdBy).toBeNull();
+
+    await expect(sut.deleteSpaceAssetFace(auth, space.id, faceId)).rejects.toThrow(BadRequestException);
+
+    // Nothing was destroyed.
+    const face = await defaultDatabase.selectFrom('asset_face').selectAll().where('id', '=', faceId).executeTakeFirst();
+    expect(face).toBeDefined();
+    const projectionRows = await defaultDatabase
+      .selectFrom('shared_space_person_face')
+      .selectAll()
+      .where('assetFaceId', '=', faceId)
+      .execute();
+    expect(projectionRows).toEqual([{ personId: person.id, assetFaceId: faceId }]);
+  });
+});

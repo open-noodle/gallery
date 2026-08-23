@@ -2330,6 +2330,45 @@ export class SharedSpaceService extends BaseService {
     };
   }
 
+  /**
+   * Spec §6.6 (Slice 6, Task 3): delete a face box an EDITOR of this space drew (§6.5).
+   *
+   * Deletable iff `asset_face.createdBy IS NOT NULL` AND the face is reachable in a space where
+   * the actor is Owner/Editor — NEVER `sourceType`. `PersonService.createFace` already writes
+   * `SourceType.Manual` for an OWNER-drawn box too, so gating on `sourceType === Manual` would let
+   * a space editor delete boxes the owner drew by hand — the exact regression this whole design
+   * exists to avoid. A detected face (`createdBy IS NULL`) is refused: `FaceDelete` stays
+   * owner-only for those.
+   *
+   * Hard-deletes the row. `shared_space_person_face` and `face_identity_face` both cascade away
+   * (`ON DELETE CASCADE`) in EVERY space holding this face, not just this one — the box itself is
+   * being destroyed, not merely detached here — but the cascade does not recount, so every
+   * affected space person is snapshotted first and recounted afterward (mirrors §6.4's detach).
+   */
+  async deleteSpaceAssetFace(auth: AuthDto, spaceId: string, assetFaceId: string): Promise<void> {
+    await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
+
+    if (!(await this.facePersonVerdictRepository.isFaceReachableInSpace(spaceId, assetFaceId))) {
+      // Deliberate non-disclosure, matching the sibling attach/detach/draw routes.
+      throw new BadRequestException('Face not found');
+    }
+
+    const createdBy = await this.facePersonVerdictRepository.getFaceCreatedBy(assetFaceId);
+    if (!createdBy) {
+      // Not editor-drawn (a detection, or an existing pre-Slice-6 row) — refused, same message as
+      // above so an editor cannot distinguish "wrong space" from "not deletable" by probing ids.
+      throw new BadRequestException('Face not found');
+    }
+
+    await this.databaseRepository.transaction(async (trx) => {
+      const personIds = await this.sharedSpaceRepository.getPersonIdsHoldingFace(assetFaceId, trx);
+      await this.personRepository.deleteAssetFace(assetFaceId, trx);
+      if (personIds.length > 0) {
+        await this.sharedSpaceRepository.recountPersons(personIds, trx);
+      }
+    });
+  }
+
   // D9/D2: reachability (RBAC — is this face's asset in the space at all), not pendingness, gates a space
   // reject/ignore; then the upsert runs unconditionally, same as the personal path. This matches the personal
   // path's semantics (a reject/ignore on a drained-but-otherwise-valid target still records) while still

@@ -37,6 +37,7 @@ import {
   SpaceAssetFaceCreateDto,
   SpaceAssetFaceResponseDto,
   SpaceAssetFacesParamsDto,
+  SpaceFaceParamsDto,
   SpacePeopleQueryDto,
   SpacePersonFaceParamsDto,
   SpacePersonFaceSuggestionParamsDto,
@@ -650,6 +651,23 @@ export class SharedSpaceController {
     @Body() dto: SpaceAssetFaceCreateDto,
   ): Promise<SpaceAssetFaceResponseDto> {
     return this.service.createSpaceAssetFace(auth, id, assetId, dto);
+  }
+
+  // Spec §6.6 (Slice 6, Task 3). Same API-key scope as the sibling writes -- the real authority
+  // (Editor role + reachability + createdBy IS NOT NULL, never sourceType) is enforced in the
+  // service. Detected faces stay refused; FaceDelete remains owner-only for those.
+  @Delete(':id/faces/:assetFaceId')
+  @Authenticated({ permission: Permission.SharedSpaceUpdate })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Endpoint({
+    summary: 'Delete a face box an editor drew in a shared space',
+    description:
+      'Permanently delete a face box drawn by a space Owner/Editor. Refused for a detected face -- FaceDelete ' +
+      'stays owner-only for those.',
+    history: new HistoryBuilder().added('v2').stable('v2'),
+  })
+  deleteSpaceAssetFace(@Auth() auth: AuthDto, @Param() { id, assetFaceId }: SpaceFaceParamsDto): Promise<void> {
+    return this.service.deleteSpaceAssetFace(auth, id, assetFaceId);
   }
 
   @Get(':id/people/:personId')
