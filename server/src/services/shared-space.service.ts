@@ -1977,9 +1977,12 @@ export class SharedSpaceService extends BaseService {
     // transaction makes the whole confirm all-or-nothing, mirroring the personal confirm path. Every call
     // below threads `trx` — never `this.db` inside this callback (issue #595).
     const claimed = await this.databaseRepository.transaction(async (trx) => {
-      const identity = await this.faceIdentityRepository.ensureSpacePersonIdentity(person.id, trx);
+      // Ensured up front, before the claim, so claimPendingForSpacePerson's own negative-verdict
+      // exclusion (matched by identityId as well as spacePersonId) has a non-null identityId to join
+      // against even when this confirm turns out to be a no-op below.
+      await this.faceIdentityRepository.ensureSpacePersonIdentity(person.id, trx);
       // Claim the queue row first so a double-submit resolves exactly once. No 'confirmed' status is written:
-      // the durable positive verdict is the manual identity link set immediately below.
+      // the durable positive verdict is the manual identity link set inside linkFaceToSpacePerson below.
       // Slice 3 (F5): pass the SAME band `hasPendingForSpacePerson` just checked, so the claim itself is gated
       // by the identical eligibility — not just the read that preceded it.
       const claimed = await this.facePersonVerdictRepository.claimPendingForSpacePerson(
@@ -1992,11 +1995,38 @@ export class SharedSpaceService extends BaseService {
         return claimed;
       }
 
+      // The suggestion confirm only ever handles an unassigned face (that is what made it pending in the
+      // first place), so it always writes the identity — see linkFaceToSpacePerson's doc comment for the one
+      // caller that passes false. ensureSpacePersonIdentity above already created it; this re-fetches the
+      // same row (idempotent) so linkFaceToSpacePerson stays the single implementation of the write.
+      await this.linkFaceToSpacePerson(trx, person, assetFaceId, { writeIdentity: true });
+      return claimed;
+    });
+    return claimed > 0;
+  }
+
+  /**
+   * The single implementation of "this face belongs to this space person" (spec §6.3).
+   *
+   * `writeIdentity: false` is §6.3.1 row 3 — the face already belongs to an owner `person`
+   * carrying a different identity. Writing the identity there would re-point an identity the
+   * OWNER's person depends on, and `applyResolvedPersonMetadata` resolves the owner's own view
+   * of names and ages through exactly that identity. Space-person reads go through
+   * `shared_space_person_face`, not the identity layer, so the projection alone is enough for
+   * the space to show the new name while the owner's library stays untouched.
+   */
+  private async linkFaceToSpacePerson(
+    trx: Transaction<DB>,
+    person: SharedSpacePerson,
+    assetFaceId: string,
+    { writeIdentity }: { writeIdentity: boolean },
+  ): Promise<void> {
+    if (writeIdentity) {
+      const identity = await this.faceIdentityRepository.ensureSpacePersonIdentity(person.id, trx);
       await this.faceIdentityRepository.replaceFaceIdentity(
         { assetFaceId, identityId: identity.id, source: 'manual' },
         trx,
       );
-      await this.facePersonVerdictRepository.resolveAssignedFace(assetFaceId, trx);
       // Slice 8 (F15): the editor just stated a fact ("this face IS this space person") that contradicts
       // any durable rejected/ignored row for this SAME target. As with the personal confirm,
       // claimPendingForSpacePerson's own eligibility gate already refuses the claim whenever such a row
@@ -2007,22 +2037,20 @@ export class SharedSpaceService extends BaseService {
         [assetFaceId],
         trx,
       );
-      // D3: write the space projection so getAssignedFaceIdsForSpace excludes this face from the same space's
-      // next scan, for every space person — not just this one. addPersonFaces is onConflict().doNothing(), so
-      // this is idempotent if a concurrent face-match backfill already wrote the same row.
-      await this.sharedSpaceRepository.addPersonFaces([{ personId: person.id, assetFaceId }], undefined, trx);
-      return claimed;
-    });
-    return claimed > 0;
+    }
+    await this.facePersonVerdictRepository.resolveAssignedFace(assetFaceId, trx);
+    // D3: write the space projection so getAssignedFaceIdsForSpace excludes this face from the same space's
+    // next scan, for every space person — not just this one. addPersonFaces is onConflict().doNothing(), so
+    // this is idempotent if a concurrent face-match backfill already wrote the same row.
+    await this.sharedSpaceRepository.addPersonFaces([{ personId: person.id, assetFaceId }], undefined, trx);
   }
 
   /**
    * #734 follow-up (spec §6.3): attach a space person to a face directly — no pending ML
    * suggestion required, unlike `confirmSpacePersonFaceSuggestion` above.
    *
-   * The transaction below is deliberately a near-copy of that method's. Slice 2 extracts the
-   * shared `linkFaceToSpacePerson` helper and re-points both callers at it; do NOT anticipate
-   * that here, or the extraction loses its regression proof.
+   * The transaction below shares `linkFaceToSpacePerson` with that method (Slice 2), so the two
+   * can never drift on what "this face belongs to this space person" means.
    *
    * Idempotent: `addPersonFaces` is onConflict-doNothing and `replaceFaceIdentity` upserts, so
    * a double-submit is a no-op. Returns whether it acted, matching the S11 convention on the
@@ -2043,13 +2071,7 @@ export class SharedSpaceService extends BaseService {
     }
 
     return this.databaseRepository.transaction(async (trx) => {
-      const identity = await this.faceIdentityRepository.ensureSpacePersonIdentity(person.id, trx);
-      await this.faceIdentityRepository.replaceFaceIdentity(
-        { assetFaceId, identityId: identity.id, source: 'manual' },
-        trx,
-      );
-      await this.facePersonVerdictRepository.resolveAssignedFace(assetFaceId, trx);
-      await this.sharedSpaceRepository.addPersonFaces([{ personId: person.id, assetFaceId }], undefined, trx);
+      await this.linkFaceToSpacePerson(trx, person, assetFaceId, { writeIdentity: true });
       return true;
     });
   }
