@@ -4,7 +4,7 @@ import { createUserDto } from 'src/fixtures';
 import { thumbnailUtils } from 'src/ui/specs/timeline/utils';
 import { asBearerAuth, utils } from 'src/utils';
 
-// Web E2E: Slice 6 of docs/superpowers/specs/2026-07-24-selection-toolbar-consistency-design.md —
+// Web E2E: Slice 6 of specs/2026-07-24-selection-toolbar-consistency-design.md —
 // cases 5-7 of the "Web e2e matrix". The space-album detail page's multi-select control bar
 // (previously a stripped Download+Remove-only bar, rbac-5/albums-8) was reversed to render the
 // same reusable <SelectionToolbar> component wired on the direct-space timeline (Slice 4) and the

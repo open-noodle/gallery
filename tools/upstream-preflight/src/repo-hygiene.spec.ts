@@ -14,7 +14,7 @@ import { describe, expect, it } from 'vitest';
 //
 // NOTE: LOW#18 (re-wiring the orphaned `native_class_nullable_items_in_arrays.patch` into
 // `open-api/bin/generate-dart-sdk.sh`) is intentionally NOT guarded here. Investigation
-// (see docs/superpowers/plans/2026-07-02-rolling-rebase-audit-slice-19.md) proved the
+// (see specs/2026-07-02-rolling-rebase-audit-findings.md) proved the
 // patch no longer applies cleanly against the current template (2 of 3 hunks reject with
 // `patch -p1 --dry-run`) because a separate, later template patch
 // (`native_class.mustache.patch`) already rewrote the same region for the

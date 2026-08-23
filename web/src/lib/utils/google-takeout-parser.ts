@@ -210,7 +210,7 @@ function basename(path: string): string {
  * Sidecar-to-media matching cascade. Ported from simulot/immich-go
  * (AGPL-3.0) —
  * https://github.com/simulot/immich-go/blob/cc928edbce49216584647e5f756a2af6478bb7ea/adapters/googlePhotos/matchers.go
- * See docs/plans/2026-04-22-google-takeout-gaps.md for gap context.
+ * See specs/2026-04-22-google-takeout-gaps.md for gap context.
  */
 
 /** Exact-match matcher: strip `.json`, compare for equality. */
@@ -272,7 +272,7 @@ export function matchNormal(jsonName: string, fileName: string): boolean {
  * that omit the media extension entirely (Gap #4). Unlike immich-go
  * `cc928edbce4`, this port strips `.supplemental-metadata` before the prefix
  * check so Gap #4 keeps matching sidecars that omit the media extension; see
- * `docs/plans/2026-04-22-google-takeout-gaps-design.md`.
+ * `specs/2026-04-22-google-takeout-gaps-design.md`.
  * Requires `fileName` to start with the stripped jsonStem and the code-point
  * length diff is < 10.
  */
@@ -292,7 +292,7 @@ export function matchForgottenDuplicates(jsonName: string, fileName: string): bo
  * Confirmed edited-copy suffixes Google Takeout appends to edited variants.
  * Only the 4 entries confirmed in immich-go's docs ship here — unconfirmed
  * variants are deliberately omitted to avoid false-match chains. See
- * docs/plans/2026-04-22-google-takeout-gaps.md for the full candidate list
+ * specs/2026-04-22-google-takeout-gaps.md for the full candidate list
  * and the rationale for the conservative cut.
  */
 const EDITED_SUFFIXES = ['-edited', '-modifié', '-bearbeitet', '-modificato'] as const;

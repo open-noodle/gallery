@@ -1,7 +1,7 @@
 /* web/src/styles/gallery-theme.css
  * Gallery fork-owned theme layer. Imported by web/src/app.css AFTER the
  * @immich/ui theme so these overrides win the cascade. See
- * docs/superpowers/specs/2026-06-22-web-tonal-reskin-design.md.
+ * specs/2026-06-22-web-tonal-reskin-design.md.
  * Token VALUE overrides are unlayered (beat @immich/ui's @layer base);
  * Tailwind palette/radius/font/shadow live in @theme.
  * Legacy --immich-* AND --immich-dark-* are mode-agnostic → defined here in

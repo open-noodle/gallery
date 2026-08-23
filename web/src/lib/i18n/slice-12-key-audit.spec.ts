@@ -32,7 +32,7 @@ const flattenKeys = (obj: Record<string, unknown>, prefix = ''): Set<string> => 
 
 const enKeys = flattenKeys(en);
 
-// The files this slice (docs/superpowers/plans/2026-07-30-face-review-remediation-slice-12.md) modified that
+// The files this slice (face-review remediation, slice 12) modified that
 // call `$t('…')`. Listed explicitly rather than glob-discovered, so this test is a durable record of what was
 // in scope — and a NEW $t call added to one of these files later without a matching en.json key still fails
 // this check for as long as the file stays in the list.
