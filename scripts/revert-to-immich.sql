@@ -214,6 +214,10 @@ ALTER TABLE "person"            DROP COLUMN IF EXISTS "identityId";
 -- #1018: the space a share link was created from. Dropping it implicitly drops
 -- shared_link_spaceId_idx; the links themselves survive as owner-only links.
 ALTER TABLE "shared_link"       DROP COLUMN IF EXISTS "spaceId";
+-- Records which user drew a face box, so a space editor may delete their own and never the
+-- owner's (1791000000000-AddAssetFaceCreatedBy). Upstream has no such column; the FK to "user"
+-- goes with it.
+ALTER TABLE "asset_face"        DROP COLUMN IF EXISTS "createdBy";
 
 -- -----------------------------------------------------------------------------
 -- 5. Strip Gallery's merged 'classification' key out of system_metadata's
@@ -499,6 +503,7 @@ DELETE FROM "kysely_migrations"
    '1789000000000-AddFacePersonVerdictStatusCreatedAtIdIndex',
   '1787100000000-DropPersonFksBeforeClusterGroups',
   '1790000000000-FixFaceRepairScanInFlightIndex',
+  '1791000000000-AddAssetFaceCreatedBy',
   '1791000000000-RepointFaceReviewToPersonGroup',
   '1792123120451-AddSharedLinkSpaceId',
   '1793000000000-AddSharedSpaceAlbumHidden',
