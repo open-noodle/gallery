@@ -524,3 +524,90 @@ where
       )
     )
   )
+
+-- FacePersonVerdictRepository.isFaceAssignableInSpace
+select
+  "asset_face"."id"
+from
+  "asset_face"
+  inner join "asset" on "asset"."id" = "asset_face"."assetId"
+  left join "person" on "person"."id" = "asset_face"."personId"
+where
+  "asset_face"."id" = $1
+  and "asset_face"."deletedAt" is null
+  and "asset_face"."isVisible" is true
+  and "asset"."deletedAt" is null
+  and "asset"."isOffline" is false
+  and "asset"."visibility" in ($2, $3)
+  and (
+    "person"."id" is null
+    or "person"."isHidden" = $4
+  )
+  and (
+    exists (
+      select
+        1 as "exists"
+      from
+        "shared_space_asset"
+      where
+        "shared_space_asset"."assetId" = "asset"."id"
+        and "shared_space_asset"."spaceId" = $5::uuid
+    )
+    or exists (
+      select
+        1 as "exists"
+      from
+        "shared_space_library"
+      where
+        "shared_space_library"."libraryId" = "asset"."libraryId"
+        and "shared_space_library"."spaceId" = $6::uuid
+    )
+    or (
+      exists (
+        select
+          1 as "exists"
+        from
+          "shared_space_album"
+          inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+          inner join "album" on "album"."id" = "shared_space_album"."albumId"
+          and "album"."deletedAt" is null
+        where
+          "album_asset"."assetId" = "asset"."id"
+          and "shared_space_album"."spaceId" = $7::uuid
+      )
+      or exists (
+        select
+          1 as "exists"
+        from
+          "shared_space_album"
+          inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+          and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+          inner join "album" on "album"."id" = "shared_space_album"."albumId"
+          and "album"."deletedAt" is null
+        where
+          "album_space_asset"."assetId" = "asset"."id"
+          and "shared_space_album"."spaceId" = $8::uuid
+      )
+    )
+  )
+
+-- FacePersonVerdictRepository.getFaceOwnerLink
+select
+  "asset_face"."personId" as "personId",
+  "person"."identityId" as "identityId",
+  "asset"."ownerId" as "assetOwnerId"
+from
+  "asset_face"
+  inner join "asset" on "asset"."id" = "asset_face"."assetId"
+  left join "person" on "person"."id" = "asset_face"."personId"
+where
+  "asset_face"."id" = $1
+
+-- FacePersonVerdictRepository.lockFaceForAssignment
+select
+  "id"
+from
+  "asset_face"
+where
+  "id" = $1
+for update
