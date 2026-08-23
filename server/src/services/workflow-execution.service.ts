@@ -30,6 +30,7 @@ import {
 import { AlbumService } from 'src/services/album.service.js';
 import { AssetService } from 'src/services/asset.service.js';
 import { BaseService } from 'src/services/base.service.js';
+import { GalleryWorkflowHostService } from 'src/services/gallery-workflow-host.service.js';
 import { TagService } from 'src/services/tag.service.js';
 
 const dummy = () => {
@@ -60,6 +61,7 @@ export class WorkflowExecutionService extends BaseService {
 
       const { environment, resourcePaths, plugins } = this.configRepository.getEnv();
       await this.importFolder(resourcePaths.corePlugin, { force: environment === ImmichEnvironment.Development });
+      await this.importFolder(resourcePaths.galleryPlugin, { force: environment === ImmichEnvironment.Development });
 
       if (plugins.external.allow && plugins.external.installFolder) {
         await this.importFolders(plugins.external.installFolder);
@@ -73,6 +75,7 @@ export class WorkflowExecutionService extends BaseService {
 
     const albumService = BaseService.create(AlbumService, this);
     const tagService = BaseService.create(TagService, this);
+    const galleryHost = BaseService.create(GalleryWorkflowHostService, this);
 
     const searchAlbums = this.wrap<[dto: GetAlbumsDto]>((authDto, ctx, args) => albumService.getAll(authDto, ...args));
     const createAlbum = this.wrap<[dto: CreateAlbumDto]>((authDto, ctx, args) => albumService.create(authDto, ...args));
@@ -114,6 +117,11 @@ export class WorkflowExecutionService extends BaseService {
       tagService.bulkTagAssets(authDto, ...args),
     );
 
+    // Gallery fork: one generic dispatcher, so fork actions and filters never add lines here again.
+    const gallery = this.wrap<[method: string, args: unknown]>((authDto, ctx, args) =>
+      galleryHost.dispatch(authDto, ...args),
+    );
+
     const functions = {
       searchAlbums,
       createAlbum,
@@ -121,6 +129,7 @@ export class WorkflowExecutionService extends BaseService {
       addAssetsToAlbums,
       httpRequest,
       bulkTagAssets,
+      gallery,
     };
 
     const stubs: typeof functions = {
@@ -130,6 +139,7 @@ export class WorkflowExecutionService extends BaseService {
       addAssetsToAlbums: dummy,
       httpRequest: dummy,
       bulkTagAssets: dummy,
+      gallery: dummy,
     };
 
     const plugins = await this.pluginRepository.getForLoad();

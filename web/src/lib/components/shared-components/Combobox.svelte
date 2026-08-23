@@ -46,6 +46,11 @@
      */
     defaultFirstOption?: boolean;
     onSelect?: (option: ComboBoxOption | undefined) => void;
+    /**
+     * Fires on every keystroke, for fields whose value is the typed text itself rather than a
+     * choice from `options`. Without it, text that is never selected is discarded on blur.
+     */
+    onTextInput?: (value: string) => void;
     forceFocus?: boolean;
   }
 
@@ -59,6 +64,7 @@
     allowCreate = false,
     defaultFirstOption = false,
     onSelect = () => {},
+    onTextInput = () => {},
     forceFocus = false,
   }: Props = $props();
 
@@ -165,6 +171,7 @@
     searchQuery = event.currentTarget.value;
     selectedIndex = defaultFirstOption ? 0 : undefined;
     optionRefs[0]?.scrollIntoView({ block: 'nearest' });
+    onTextInput(searchQuery);
   };
 
   let handleSelect = (option: ComboBoxOption) => {

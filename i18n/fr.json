@@ -3524,6 +3524,8 @@
   "workflow_logging_halted_step": "Arrêté à l'étape #{step}",
   "workflow_name": "Nom du flux de traitement",
   "workflow_navigation_prompt": "Êtes-vous sûr de vouloir quitter sans enregistrer vos changements ?",
+  "workflow_space_album_choose_space_first": "Choisissez d'abord un espace",
+  "workflow_space_unavailable": "Espace indisponible",
   "workflow_summary": "Résumé du flux de traitement",
   "workflow_templates": "Modèles de flux de traitement",
   "workflow_update_success": "Flux de traitement mis à jour avec succès",
