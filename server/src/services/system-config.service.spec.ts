@@ -499,7 +499,7 @@ describe(SystemConfigService.name, () => {
     it('should default themeMaxDistance to 0.75', async () => {
       mocks.systemMetadata.get.mockResolvedValue({});
 
-      await expect(sut.getSystemConfig()).resolves.toMatchObject({
+      await expect(sut.getAdminConfig()).resolves.toMatchObject({
         memories: { themeMaxDistance: 0.75 },
       });
     });
@@ -507,7 +507,7 @@ describe(SystemConfigService.name, () => {
     it('should default personThrowbackDormancyMonths to 6', async () => {
       mocks.systemMetadata.get.mockResolvedValue({});
 
-      await expect(sut.getSystemConfig()).resolves.toMatchObject({
+      await expect(sut.getAdminConfig()).resolves.toMatchObject({
         memories: { personThrowbackDormancyMonths: 6 },
       });
     });
@@ -532,7 +532,7 @@ describe(SystemConfigService.name, () => {
       const types = buildAlternatingMemoryTypes();
       mocks.systemMetadata.get.mockResolvedValue({ memories: { types } });
 
-      const result = await sut.getSystemConfig();
+      const result = await sut.getAdminConfig();
 
       expect(result.memories.types).toEqual(types);
     });
@@ -543,7 +543,7 @@ describe(SystemConfigService.name, () => {
       // pruning in buildConfig and get reported as unknown configuration.
       mocks.systemMetadata.get.mockResolvedValue({ memories: { types: { on_this_day: false, themed: true } } });
 
-      await sut.getSystemConfig();
+      await sut.getAdminConfig();
 
       expect(mocks.logger.warn).not.toHaveBeenCalled();
     });
@@ -554,7 +554,7 @@ describe(SystemConfigService.name, () => {
         memories: { types: { on_this_day: false }, notARealSetting: true },
       } as unknown as DeepPartial<SystemConfig>);
 
-      await sut.getSystemConfig();
+      await sut.getAdminConfig();
 
       expect(mocks.logger.warn).toHaveBeenCalledWith(expect.stringContaining('"notARealSetting"'));
       expect(mocks.logger.warn).not.toHaveBeenCalledWith(expect.stringContaining('"on_this_day"'));
@@ -830,12 +830,12 @@ describe(SystemConfigService.name, () => {
       const config = structuredClone(defaults);
       config.memories.types = types;
 
-      const result = await sut.updateSystemConfig(config);
+      const result = await sut.updateAdminConfig(config);
 
       expect(store.partial).toEqual({ memories: { types } });
       expect(result.memories.types).toEqual(types);
 
-      const reloaded = await sut.getSystemConfig();
+      const reloaded = await sut.getAdminConfig();
       expect(reloaded.memories.types).toEqual(types);
     });
 
@@ -846,7 +846,7 @@ describe(SystemConfigService.name, () => {
       config.memories.themeMaxDistance = 0.4;
       config.memories.personThrowbackDormancyMonths = 18;
 
-      await sut.updateSystemConfig(config);
+      await sut.updateAdminConfig(config);
 
       expect(store.partial).toEqual({
         memories: {
@@ -863,7 +863,7 @@ describe(SystemConfigService.name, () => {
       config.memories.themeMaxDistance = 0.4;
       config.memories.personThrowbackDormancyMonths = 18;
 
-      await sut.updateSystemConfig(config);
+      await sut.updateAdminConfig(config);
 
       expect(store.partial).toEqual({
         memories: { themeMaxDistance: 0.4, personThrowbackDormancyMonths: 18 },
@@ -875,15 +875,15 @@ describe(SystemConfigService.name, () => {
 
       const first = structuredClone(defaults);
       first.memories.types = { themed: false };
-      await sut.updateSystemConfig(first);
+      await sut.updateAdminConfig(first);
 
       // the admin UI re-reads the config and PUTs it back with one more type toggled
-      const loaded = await sut.getSystemConfig();
+      const loaded = await sut.getAdminConfig();
       expect(loaded.memories.types).toEqual({ themed: false });
 
       const second = structuredClone(defaults);
       second.memories.types = { ...loaded.memories.types, person_throwback: false };
-      const result = await sut.updateSystemConfig(second);
+      const result = await sut.updateAdminConfig(second);
 
       expect(store.partial).toEqual({ memories: { types: { themed: false, person_throwback: false } } });
       expect(result.memories.types).toEqual({ themed: false, person_throwback: false });
@@ -894,10 +894,10 @@ describe(SystemConfigService.name, () => {
 
       const overridden = structuredClone(defaults);
       overridden.memories.types = { themed: false };
-      await sut.updateSystemConfig(overridden);
+      await sut.updateAdminConfig(overridden);
       expect(store.partial).toEqual({ memories: { types: { themed: false } } });
 
-      await sut.updateSystemConfig(structuredClone(defaults));
+      await sut.updateAdminConfig(structuredClone(defaults));
 
       expect(store.partial).toEqual({});
     });
