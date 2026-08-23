@@ -9,6 +9,12 @@ export interface MemoryRuleCandidate {
   assetIds: string[];
   memoryAt: DateTime;
   context?: Record<string, unknown>;
+  /**
+   * How many days the memory stays visible, starting from its trigger day. Defaults to 1
+   * (visible only on the trigger day) so existing rules are unaffected. Recap-style rules
+   * set a larger window so they linger past the day they were generated.
+   */
+  visibleForDays?: number;
 }
 
 export interface MemoryRuleContext {
