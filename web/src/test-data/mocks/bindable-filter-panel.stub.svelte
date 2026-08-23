@@ -28,6 +28,14 @@
   }: Props = $props();
   let suggestions = $state('');
   let requestToken = 0;
+  // #910: 'not-loaded' vs the string 'undefined' lets tests tell "never clicked" apart from "the
+  // provider resolved undefined" without adding a second attribute.
+  let baseline = $state('not-loaded');
+
+  async function loadBaseline() {
+    const result = await config?.baselineProvider?.();
+    baseline = result === undefined ? 'undefined' : JSON.stringify(result);
+  }
 
   function updateFilters(nextFilters: FilterState) {
     filters = nextFilters;
@@ -102,6 +110,7 @@
   data-date-before={filters?.dateBefore ?? ''}
   data-time-buckets={JSON.stringify(timeBuckets)}
   data-suggestions={suggestions}
+  data-baseline={baseline}
   data-person-names={JSON.stringify([...(personNames?.entries() ?? [])])}
   data-tag-names={JSON.stringify([...(tagNames?.entries() ?? [])])}
   data-collapsed={String(collapsed)}
@@ -130,6 +139,7 @@
   <button type="button" data-testid="load-camera-model-suggestions" onclick={loadCameraModelSuggestions}>
     Load camera models
   </button>
+  <button type="button" data-testid="load-baseline" onclick={loadBaseline}>Load baseline</button>
   <button
     type="button"
     data-testid="filter-panel-set-country"

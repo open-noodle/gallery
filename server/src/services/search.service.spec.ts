@@ -1346,6 +1346,9 @@ describe(SearchService.name, () => {
       ratings: [4, 5],
       mediaTypes: [AssetType.Image],
       hasUnnamedPeople: false,
+      hasFavorites: false,
+      hasAssetsInAlbum: false,
+      hasAssetsNotInAlbum: false,
     };
 
     beforeEach(() => {
@@ -2023,6 +2026,9 @@ describe(SearchService.name, () => {
       ratings: [],
       mediaTypes: [],
       hasUnnamedPeople: false,
+      hasFavorites: false,
+      hasAssetsInAlbum: false,
+      hasAssetsNotInAlbum: false,
     };
 
     it('should return filter suggestions', async () => {
@@ -2037,6 +2043,9 @@ describe(SearchService.name, () => {
         ratings: [4, 5],
         mediaTypes: ['IMAGE', 'VIDEO'],
         hasUnnamedPeople: false,
+        hasFavorites: false,
+        hasAssetsInAlbum: false,
+        hasAssetsNotInAlbum: false,
       });
       (mocks.faceIdentity as any).getAccessiblePersonFilterSuggestions.mockResolvedValue({
         people: [{ id: 'p1', name: 'Alice' }],
@@ -2123,6 +2132,9 @@ describe(SearchService.name, () => {
         ratings: [5],
         mediaTypes: ['IMAGE'],
         hasUnnamedPeople: false,
+        hasFavorites: false,
+        hasAssetsInAlbum: false,
+        hasAssetsNotInAlbum: false,
       });
 
       const result = await sut.getFilterSuggestions(auth, { albumId });
