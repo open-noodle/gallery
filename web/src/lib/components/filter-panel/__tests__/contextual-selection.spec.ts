@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom';
-import { fireEvent, render, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
 import { buildPersonFilterPatch } from '$lib/utils/filter-target';
 import { getPhotosPersonFilterId } from '$lib/utils/photos-filter-options';
@@ -31,6 +31,9 @@ const suggestions = (overrides: Partial<FilterSuggestionsResponse> = {}): Filter
   ratings: [],
   mediaTypes: [],
   hasUnnamedPeople: false,
+  hasFavorites: false,
+  hasAssetsInAlbum: false,
+  hasAssetsNotInAlbum: false,
   ...overrides,
 });
 
@@ -70,7 +73,8 @@ describe('the panel reflects a contextual PERSON filter', () => {
       { personIds: patch.personIds },
     );
 
-    const row = await screen.findByTestId(`people-item-${optionId}`);
+    await waitFor(() => expect(screen.getByTestId(`people-item-${optionId}`)).toHaveTextContent('Bob'));
+    const row = screen.getByTestId(`people-item-${optionId}`);
     expect(row).toHaveTextContent('Bob');
     expect(row.className).toContain('font-medium');
     expect(screen.queryByTestId(`people-item-${PERSON_UUID}`)).toBeNull();
@@ -326,6 +330,7 @@ describe('the panel keeps a selected entry visible in a long list', () => {
       { tagIds: ['tag-30'] },
     );
 
+    await waitFor(() => expect(screen.getAllByTestId(/^tags-item-/)).toHaveLength(10));
     const row = await screen.findByTestId('tags-item-tag-30');
     expect(row).toHaveAttribute('aria-pressed', 'true');
     expect(row.querySelector('.bg-immich-primary')).not.toBeNull();
@@ -347,7 +352,8 @@ describe('the panel keeps a selected entry visible in a long list', () => {
       { tagIds: ['tag-30', 'tag-35'] },
     );
 
-    await screen.findByTestId('tags-item-tag-30');
+    await waitFor(() => expect(screen.getByTestId('tags-show-more')).toBeInTheDocument());
+    expect(screen.getByTestId('tags-item-tag-30')).toBeInTheDocument();
     expect(screen.getByTestId('tags-item-tag-35')).toBeInTheDocument();
     expect(screen.getByTestId('tags-show-more')).toHaveTextContent('30');
   });
@@ -362,6 +368,7 @@ describe('the panel keeps a selected entry visible in a long list', () => {
       { personIds: ['person-30'] },
     );
 
+    await waitFor(() => expect(screen.getAllByTestId(/^people-item-/)).toHaveLength(5));
     const row = await screen.findByTestId('people-item-person-30');
     expect(row.querySelector('.bg-immich-primary')).not.toBeNull();
 
