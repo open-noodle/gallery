@@ -17,6 +17,12 @@ enum ChipVisual { person, tag, location, camera, when, rating, media, toggle, te
 class ActiveChipSpec {
   final ChipId id;
   final String label;
+
+  /// True when [label] is an i18n key rather than resolved display text —
+  /// this pure helper has no BuildContext to call `.tr()` with, so the
+  /// widget must translate it before display (else the raw key leaks to
+  /// the user, e.g. "filter_sheet_favourites" instead of "Favourites").
+  final bool labelIsKey;
   final ChipVisual visual;
   final List<String>? avatarPersonIds;
 
@@ -33,6 +39,7 @@ class ActiveChipSpec {
     required this.id,
     required this.label,
     required this.visual,
+    this.labelIsKey = false,
     this.avatarPersonIds,
     this.avatarPersonSpaceIds,
     this.tagDotSeed,
@@ -52,6 +59,7 @@ List<ActiveChipSpec> activeChipsFromFilter(SearchFilter filter, {FilterSuggestio
         ActiveChipSpec(
           id: PersonChipId(p.id),
           label: p.name.isEmpty ? 'filter_sheet_unnamed_person' : p.name,
+          labelIsKey: p.name.isEmpty,
           visual: ChipVisual.person,
           avatarPersonIds: [p.id],
           avatarPersonSpaceIds: [p.spaceId],
@@ -65,6 +73,7 @@ List<ActiveChipSpec> activeChipsFromFilter(SearchFilter filter, {FilterSuggestio
         ActiveChipSpec(
           id: PersonChipId(p.id),
           label: p.name.isEmpty ? 'filter_sheet_unnamed_person' : p.name,
+          labelIsKey: p.name.isEmpty,
           visual: ChipVisual.person,
           avatarPersonIds: [p.id],
           avatarPersonSpaceIds: [p.spaceId],
@@ -102,6 +111,7 @@ List<ActiveChipSpec> activeChipsFromFilter(SearchFilter filter, {FilterSuggestio
       ActiveChipSpec(
         id: TagChipId(tagId),
         label: resolved ?? 'filter_sheet_tag_fallback',
+        labelIsKey: resolved == null,
         visual: ChipVisual.tag,
         tagDotSeed: tagId.hashCode,
       ),
@@ -194,7 +204,9 @@ List<ActiveChipSpec> activeChipsFromFilter(SearchFilter filter, {FilterSuggestio
         label = '';
         icon = Icons.help_outline_rounded;
     }
-    out.add(ActiveChipSpec(id: const MediaTypeChipId(), label: label, visual: ChipVisual.media, icon: icon));
+    out.add(
+      ActiveChipSpec(id: const MediaTypeChipId(), label: label, labelIsKey: true, visual: ChipVisual.media, icon: icon),
+    );
   }
 
   // ── toggles ──────────────────────────────────────────────────────────
@@ -203,6 +215,7 @@ List<ActiveChipSpec> activeChipsFromFilter(SearchFilter filter, {FilterSuggestio
       const ActiveChipSpec(
         id: FavouriteChipId(),
         label: 'filter_sheet_favourites',
+        labelIsKey: true,
         visual: ChipVisual.toggle,
         icon: Icons.favorite_rounded,
       ),
@@ -213,6 +226,7 @@ List<ActiveChipSpec> activeChipsFromFilter(SearchFilter filter, {FilterSuggestio
       const ActiveChipSpec(
         id: ArchiveChipId(),
         label: 'filter_sheet_archived',
+        labelIsKey: true,
         visual: ChipVisual.toggle,
         icon: Icons.archive_rounded,
       ),
@@ -223,6 +237,7 @@ List<ActiveChipSpec> activeChipsFromFilter(SearchFilter filter, {FilterSuggestio
       const ActiveChipSpec(
         id: NotInAlbumChipId(),
         label: 'filter_sheet_not_in_album',
+        labelIsKey: true,
         visual: ChipVisual.toggle,
         icon: Icons.folder_off_rounded,
       ),
@@ -233,6 +248,7 @@ List<ActiveChipSpec> activeChipsFromFilter(SearchFilter filter, {FilterSuggestio
       const ActiveChipSpec(
         id: UntaggedChipId(),
         label: 'untagged',
+        labelIsKey: true,
         visual: ChipVisual.toggle,
         icon: Icons.label_off_rounded,
       ),
