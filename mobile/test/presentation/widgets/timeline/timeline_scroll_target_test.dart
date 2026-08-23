@@ -70,7 +70,10 @@ void main() {
   test('findTimelineZoomAnchorSegment does not fall back to nearby years or months', () {
     final segments = [_segment(DateTime(2026, 1), 0, 100), _segment(DateTime(2024, 12), 100, 200)];
 
-    expect(findTimelineZoomAnchorSegment(segments, const TimelineZoomAnchor.year(2025), TimelineOverviewMode.months), isNull);
+    expect(
+      findTimelineZoomAnchorSegment(segments, const TimelineZoomAnchor.year(2025), TimelineOverviewMode.months),
+      isNull,
+    );
     expect(
       findTimelineZoomAnchorSegment(
         [_segment(DateTime(2025, 2), 0, 100), _segment(DateTime(2025, 4), 100, 200)],
@@ -84,9 +87,16 @@ void main() {
   test('findTimelineZoomAnchorSegment ignores anchors in stale modes', () {
     final segments = [_segment(DateTime(2025, 3), 0, 100)];
 
-    expect(findTimelineZoomAnchorSegment(segments, const TimelineZoomAnchor.year(2025), TimelineOverviewMode.all), isNull);
     expect(
-      findTimelineZoomAnchorSegment(segments, TimelineZoomAnchor.month(year: 2025, month: 3), TimelineOverviewMode.months),
+      findTimelineZoomAnchorSegment(segments, const TimelineZoomAnchor.year(2025), TimelineOverviewMode.all),
+      isNull,
+    );
+    expect(
+      findTimelineZoomAnchorSegment(
+        segments,
+        TimelineZoomAnchor.month(year: 2025, month: 3),
+        TimelineOverviewMode.months,
+      ),
       isNull,
     );
   });
@@ -99,7 +109,11 @@ void main() {
     ];
 
     expect(
-      findTimelineZoomAnchorSegment(segments, TimelineZoomAnchor.date(DateTime(2017, 11, 15)), TimelineOverviewMode.months),
+      findTimelineZoomAnchorSegment(
+        segments,
+        TimelineZoomAnchor.date(DateTime(2017, 11, 15)),
+        TimelineOverviewMode.months,
+      ),
       segments[1],
     );
   });
@@ -112,7 +126,11 @@ void main() {
     ];
 
     expect(
-      findTimelineZoomAnchorSegment(segments, TimelineZoomAnchor.date(DateTime(2020, 8, 1)), TimelineOverviewMode.years),
+      findTimelineZoomAnchorSegment(
+        segments,
+        TimelineZoomAnchor.date(DateTime(2020, 8, 1)),
+        TimelineOverviewMode.years,
+      ),
       segments[1],
     );
   });
