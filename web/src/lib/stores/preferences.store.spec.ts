@@ -1,5 +1,44 @@
 import { get } from 'svelte/store';
-import { recentSpaceAlbumsExpanded, setSpaceAlbumsExpanded } from '$lib/stores/preferences.store';
+import { cropFacesFromAsset, recentSpaceAlbumsExpanded, setSpaceAlbumsExpanded } from '$lib/stores/preferences.store';
+
+const CROP_KEY = 'crop-faces-from-asset';
+
+describe('cropFacesFromAsset', () => {
+  beforeEach(() => {
+    localStorage.removeItem(CROP_KEY);
+    cropFacesFromAsset.set(true);
+  });
+
+  it('defaults to cropping the face out of the asset on screen', () => {
+    // The pre-existing behaviour is the default, so nothing changes for anyone on upgrade.
+    expect(get(cropFacesFromAsset)).toBe(true);
+  });
+
+  it('persists a flip to localStorage', () => {
+    cropFacesFromAsset.set(false);
+
+    expect(get(cropFacesFromAsset)).toBe(false);
+    expect(localStorage.getItem(CROP_KEY)).toBe('false');
+  });
+
+  it('reads a previously stored choice on load', async () => {
+    localStorage.setItem(CROP_KEY, 'false');
+    vi.resetModules();
+
+    const reloaded = await import('$lib/stores/preferences.store');
+
+    expect(get(reloaded.cropFacesFromAsset)).toBe(false);
+  });
+
+  it('degrades a corrupt localStorage value to the default instead of throwing', async () => {
+    localStorage.setItem(CROP_KEY, 'not-valid-json');
+    vi.resetModules();
+
+    const reloaded = await import('$lib/stores/preferences.store');
+
+    expect(get(reloaded.cropFacesFromAsset)).toBe(true);
+  });
+});
 
 describe('recentSpaceAlbumsExpanded', () => {
   beforeEach(() => {
