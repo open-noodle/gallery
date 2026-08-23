@@ -262,10 +262,7 @@ void main() {
           takenBefore: any(named: 'takenBefore'),
           withSharedSpaces: any(named: 'withSharedSpaces'),
         ),
-      ).thenAnswer(
-        (_) async =>
-            FilterSuggestionsResponseDto(hasUnnamedPeople: false, hasNoGpsAssets: false, hasNoPlaceNameAssets: false),
-      );
+      ).thenAnswer((_) async => emptySuggestions());
 
       final filter = SearchFilter.empty().copyWith(location: SearchLocationFilter(locationPresence: 'noPlaceName'));
 
