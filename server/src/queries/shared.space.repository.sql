@@ -2528,6 +2528,12 @@ where
       "shared_space_person"."spaceId" = $2
   )
 
+-- SharedSpaceRepository.removePersonFace
+delete from "shared_space_person_face"
+where
+  "personId" = $1
+  and "assetFaceId" = $2
+
 -- SharedSpaceRepository.removePersonFacesByLibrary
 select distinct
   "personId"
@@ -3286,6 +3292,51 @@ where
   and "shared_space_person"."spaceId" = $2
 order by
   "shared_space_person_face"."personId"
+
+-- SharedSpaceRepository.getPersonIdsHoldingFace
+select
+  "personId"
+from
+  "shared_space_person_face"
+where
+  "assetFaceId" = $1
+
+-- SharedSpaceRepository.getAssetFacesForSpace
+select
+  "asset_face"."id",
+  "asset_face"."boundingBoxX1",
+  "asset_face"."boundingBoxY1",
+  "asset_face"."boundingBoxX2",
+  "asset_face"."boundingBoxY2",
+  "asset_face"."imageWidth",
+  "asset_face"."imageHeight",
+  "asset_face"."createdBy",
+  "shared_space_person"."id" as "spacePersonId",
+  "shared_space_person"."name" as "spacePersonName"
+from
+  "asset_face"
+  inner join "asset" on "asset"."id" = "asset_face"."assetId"
+  left join "person" on "person"."id" = "asset_face"."personId"
+  left join "shared_space_person_face" on "shared_space_person_face"."assetFaceId" = "asset_face"."id"
+  left join "shared_space_person" on "shared_space_person"."id" = "shared_space_person_face"."personId"
+  and "shared_space_person"."spaceId" = $1
+where
+  "asset_face"."assetId" = $2
+  and "asset_face"."deletedAt" is null
+  and "asset_face"."isVisible" = $3
+  and "asset"."deletedAt" is null
+  and "asset"."isOffline" = $4
+  and "asset"."visibility" in ($5, $6)
+  and (
+    "person"."id" is null
+    or "person"."isHidden" = $7
+  )
+  and (
+    "shared_space_person"."id" is null
+    or "shared_space_person"."isHidden" = $8
+  )
+order by
+  "asset_face"."id"
 
 -- SharedSpaceRepository.getPetFacesForAsset
 select
