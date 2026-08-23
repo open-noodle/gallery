@@ -303,10 +303,14 @@ export type AdminConfigMapDto = {
 export type AdminConfigMemoriesDto = {
     /** Birthday memories */
     birthday: boolean;
+    /** Months a person must be absent from photos before person_throwback resurfaces them */
+    personThrowbackDormancyMonths?: number;
     /** Recent trip memories */
     recentTrips: boolean;
     /** Retention days */
     retentionDays: number;
+    /** Max CLIP cosine distance for themed memories */
+    themeMaxDistance?: number;
     /** Per-type memory availability overrides */
     types?: {
         [key: string]: boolean;
