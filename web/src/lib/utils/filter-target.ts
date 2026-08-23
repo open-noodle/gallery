@@ -15,7 +15,9 @@ export type FilterTarget =
  * Which timeline surface is this URL on, for the purpose of contextual filtering?
  *
  * Deliberately SEPARATE from `getSearchablePageBasePath` in searchable-page-search.ts, which
- * answers a different question ("can ⌘K run a text query here?") and must not change.
+ * answers a different question ("can ⌘K run a text query here?"). The two overlap but do not
+ * coincide: a space ALBUM is a searchable page yet has no FilterTarget of its own, and /map is a
+ * FilterTarget that is not searchable. Keep them independent.
  */
 export function resolveFilterTarget(url: URL): FilterTarget | null {
   const parts = url.pathname.split('/').filter(Boolean);
@@ -220,10 +222,12 @@ export function buildContextualMapUrl(url: URL, point?: { lat: number; lng: numb
 /**
  * Write a COMPLETE FilterState into the current URL and return the URL to navigate to.
  *
- * This is the WRITE half of the hydrate → write → react loop on the surfaces that are not
- * "searchable pages" — /albums/{id} and /map. `getSearchablePageBasePath` returns null for both
- * (searchable-page-search.ts:37-56), so `buildSearchablePageUrl` returns null there and cannot be
- * reused.
+ * This is the WRITE half of the hydrate → write → react loop on /map (where
+ * `getSearchablePageBasePath` returns null, so `buildSearchablePageUrl` cannot be reused at all)
+ * and on the two album detail routes. Those two ARE searchable pages now, but they still write
+ * through here rather than through `buildSearchablePageUrl`, for the pathname reason below: their
+ * filter panel can be used with the asset viewer open, and targeting the base path would close it
+ * on every filter tweak. `q` and `sort` ride along untouched as ordinary non-filter params.
  *
  * Semantics, and how they differ from buildContextualFilterUrl:
  * - It REPLACES rather than merges. Every filter param is deleted, then re-emitted from `filters`

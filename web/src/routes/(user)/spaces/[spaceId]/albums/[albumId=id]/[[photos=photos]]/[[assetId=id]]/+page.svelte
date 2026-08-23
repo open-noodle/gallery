@@ -1,5 +1,6 @@
 <script lang="ts">
   import { goto, invalidateAll, onNavigate } from '$app/navigation';
+  import { page } from '$app/state';
   import UserPageLayout from '$lib/components/layouts/UserPageLayout.svelte';
   import AlbumTitle from '$lib/components/album-page/AlbumTitle.svelte';
   import AlbumDescription from '$lib/components/album-page/AlbumDescription.svelte';
@@ -10,6 +11,8 @@
     createFilterState,
     getActiveFilterCount,
     loadFilterCollapsed,
+    type FilterPanelConfig,
+    type FilterState,
   } from '$lib/components/filter-panel/filter-panel';
   import FilterPanel from '$lib/components/filter-panel/filter-panel.svelte';
   import FilterToggleButton from '$lib/components/filter-panel/filter-toggle-button.svelte';
@@ -34,6 +37,20 @@
   import { clearTimelineTemporalFilter } from '$lib/utils/timeline-temporal-filters';
   import { withNameCapture } from '$lib/utils/filter-name-capture';
   import { filterStateToSearchTerms } from '$lib/utils/filter-search-terms';
+  import type { SearchTerms } from '$lib/services/search.service';
+  import SmartSearchResults from '$lib/components/search/smart-search-results.svelte';
+  import { globalSearchManager } from '$lib/managers/global-search-manager.svelte';
+  import { buildFilterStateUrl, isFilterStateUrlUnchanged, withoutAtParam } from '$lib/utils/filter-target';
+  import { decodeFilterParams } from '$lib/utils/filter-url';
+  import { buildSearchablePageUrl, getSearchablePageState } from '$lib/utils/searchable-page-search';
+  import {
+    buildSmartSearchFacetKey,
+    buildSmartSearchFacetsParams,
+    mapSmartSearchFacetsToFilterSuggestions,
+  } from '$lib/utils/space-search';
+  import { consumeTypedSearchNamesInto } from '$lib/utils/typed-search/typed-search-name-cache';
+  import { removeSearchResults, selectAllSearchResults, updateSearchResults } from '$lib/utils/search-result-selection';
+  import { untrack } from 'svelte';
   import SearchAddAllToCollectionModal from '$lib/modals/SearchAddAllToCollectionModal.svelte';
   import { lang } from '$lib/stores/preferences.store';
   import { SvelteMap } from 'svelte/reactivity';
@@ -44,12 +61,17 @@
   } from '$lib/utils/timeline-zoom-navigation';
   import {
     AlbumUserRole,
+    AssetOrder,
+    type AssetVisibility,
     getAlbumInfo,
+    searchSmartFacets,
     SharedSpaceRole,
     updateAlbumInfo,
     type AlbumResponseDto,
+    type AssetResponseDto,
     type SharedSpaceMemberResponseDto,
     type SharedSpaceResponseDto,
+    type SmartSearchFacetsResponseDto,
   } from '@immich/sdk';
   import HeaderActionButton from '$lib/components/HeaderActionButton.svelte';
   import { Icon, IconButton, modalManager, toastManager } from '@immich/ui';
@@ -80,11 +102,41 @@
   // Picker multi-select manager (mirrors global album page's timelineMultiSelectManager)
   const pickerMultiSelectManager = new AssetMultiSelectManager();
 
-  // Independent filter state per mode (mirrors the global album page).
-  let browseFilters = $state(createFilterState());
+  /**
+   * The route already scopes the timeline to this album, and the server's `albumId` is a SCALAR
+   * driving one inner join, so album ∩ album is impossible. A stray `?album=` must be IGNORED:
+   * dropping it here keeps it out of the active-filter count, out of the chip bar, and out of the
+   * next URL write. Mirrors the global album page's `hydrateAlbumFilters`.
+   */
+  const hydrateAlbumFilters = (url: URL): FilterState => ({
+    ...createFilterState(),
+    ...decodeFilterParams(url),
+    albumId: undefined,
+    sortOrder: getSearchablePageState(url).sortOrder,
+  });
+
+  // Independent filter state per mode (mirrors the global album page). Browse filters are
+  // URL-backed — the album is a searchable page, so ⌘K writes its filters here.
+  let browseFilters = $state(hydrateAlbumFilters(page.url));
+  let committedSearchQuery = $state(getSearchablePageState(page.url).query);
+  /**
+   * Token guard for the re-hydrate $effect below, so our own goto() cannot loop it. Stripped of
+   * `at` because closing the asset viewer writes `?at=<assetId>`, which is not a filter change —
+   * re-hydrating on it would rebuild an identical FilterState and needlessly re-create the timeline
+   * options object. Mirrors the global album page.
+   */
+  let lastHandledSearch = $state(withoutAtParam(page.url.search));
+  const showSearchResults = $derived(committedSearchQuery.trim().length > 0);
+  // Loaded smart-search results. The browse Timeline (and its TimelineManager) is unmounted while
+  // these show, so the selection toolbar acts on this array instead — mirrors the space timeline.
+  let searchResults = $state<AssetResponseDto[]>([]);
+  let searchIsLoading = $state(false);
+  // Bumped to force a re-run of the current search (undo-delete restores the removed assets).
+  let searchReloadToken = $state(0);
   let pickerFilters = $state(createFilterState());
   const browsePersonNames = new SvelteMap<string, string>();
   const browseTagNames = new SvelteMap<string, string>();
+  consumeTypedSearchNamesInto(page.url.pathname + page.url.search, browsePersonNames, browseTagNames);
   const pickerPersonNames = new SvelteMap<string, string>();
   const pickerTagNames = new SvelteMap<string, string>();
   const currentMember = $derived(members.find((m) => m.userId === authManager.user.id));
@@ -110,9 +162,98 @@
     }
   });
 
-  const browseFilterConfig = $derived(
-    withNameCapture(buildAlbumDetailFilterConfig(album.id), browsePersonNames, browseTagNames),
-  );
+  let smartFacets = $state<SmartSearchFacetsResponseDto>();
+  let smartFacetKey = $state('');
+  let smartFacetInFlight:
+    | { key: string; controller: AbortController; promise: Promise<SmartSearchFacetsResponseDto | undefined> }
+    | undefined;
+
+  const emptyFilterSuggestions = () => ({
+    countries: [],
+    cities: [],
+    cameraMakes: [],
+    cameraModels: [],
+    tags: [],
+    people: [],
+    ratings: [],
+    mediaTypes: [],
+    hasUnnamedPeople: false,
+    hasFavorites: false,
+    hasAssetsInAlbum: false,
+    hasAssetsNotInAlbum: false,
+  });
+
+  /**
+   * Facets for the ACTIVE search, scoped to this album — the source of the result count and of the
+   * temporal picker's buckets while a query is running. Album-scoped, never space-scoped: see
+   * `searchAlbumIds`. Memoised on the request shape so a filter change that cannot alter the facets
+   * (sortOrder) does not refetch.
+   */
+  async function loadAlbumSmartFacets(nextFilters: FilterState): Promise<SmartSearchFacetsResponseDto | undefined> {
+    const query = committedSearchQuery.trim();
+    if (!query) {
+      return undefined;
+    }
+
+    const args = { query, filters: nextFilters, albumIds: searchAlbumIds, language: $lang };
+    const key = buildSmartSearchFacetKey(args);
+    if (smartFacets && smartFacetKey === key) {
+      return smartFacets;
+    }
+    if (smartFacetInFlight?.key === key) {
+      return smartFacetInFlight.promise;
+    }
+
+    smartFacetInFlight?.controller.abort();
+    const controller = new AbortController();
+
+    const promise = searchSmartFacets(
+      { smartSearchFacetsDto: buildSmartSearchFacetsParams(args) },
+      { signal: controller.signal },
+    )
+      .then((result) => {
+        if (smartFacetInFlight?.key === key && !controller.signal.aborted) {
+          smartFacets = result;
+          smartFacetKey = key;
+        }
+        return result;
+      })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) {
+          console.error('Failed to fetch smart search facets:', error);
+        }
+        return smartFacets;
+      })
+      .finally(() => {
+        if (smartFacetInFlight?.key === key) {
+          smartFacetInFlight = undefined;
+        }
+      });
+
+    smartFacetInFlight = { key, controller, promise };
+    return promise;
+  }
+
+  const browseFilterConfig = $derived.by<FilterPanelConfig>(() => {
+    const base = buildAlbumDetailFilterConfig(album.id);
+    const browseProvider = base.suggestionsProvider!;
+    return withNameCapture(
+      {
+        ...base,
+        // Browse mode asks the album's own suggestion endpoint; query mode has to ask the SEARCH,
+        // or the panel would offer facets that the visible results do not contain.
+        suggestionsProvider: async (nextFilters: FilterState) => {
+          if (!showSearchResults) {
+            return browseProvider(nextFilters);
+          }
+          const facets = await loadAlbumSmartFacets(nextFilters);
+          return facets ? mapSmartSearchFacetsToFilterSuggestions(facets) : emptyFilterSuggestions();
+        },
+      },
+      browsePersonNames,
+      browseTagNames,
+    );
+  });
   const browseTotal = $derived(timelineManager?.assetCount ?? 0);
   const browseHasMonths = $derived((timelineManager?.months?.length ?? 0) > 0);
   const browseActive = $derived(getActiveFilterCount(browseFilters));
@@ -126,26 +267,107 @@
     timelineManager?.isInitialized && !browseHasMonths && browseTotal === 0 && browseActive > 0,
   );
   const browseTimeBuckets = $derived(getTimelineManagerTimeBuckets(timelineManager));
+  // While a query is running the panel's temporal picker must bucket the MATCHES, not the album.
+  const filterTimeBuckets = $derived(showSearchResults ? (smartFacets?.timeBuckets ?? []) : browseTimeBuckets);
+  const searchTotal = $derived(showSearchResults ? smartFacets?.total : undefined);
+
+  /**
+   * The album scope handed to smart search. Deliberately the album alone, with no `spaceId`: this
+   * page's browse timeline is album-scoped too (`buildAlbumTimelineOptions`), and its filter panel
+   * speaks the personal person tokens that go with that. Sending `spaceId` as well would also be
+   * actively wrong server-side — `albumIds` makes the service resolve `timelineSpaceIds`, and the
+   * `spaceId` predicate is skipped whenever those are set (`database.ts`), so the space scope would
+   * silently widen to every space the caller is in rather than narrowing anything.
+   */
+  const searchAlbumIds = $derived([album.id]);
+
+  /**
+   * Browse order. An album carries its own `order`, but the navbar sort dropdown is rendered on
+   * every searchable page — browse mode included — so an EXPLICIT `?sort=` has to win, or the
+   * control would visibly do nothing here. Absent that param the album's own order stands.
+   */
+  const browseOrder = $derived.by(() => {
+    if (!getSearchablePageState(page.url).hasExplicitSort) {
+      return album.order ?? authManager.preferences.albums.defaultAssetOrder;
+    }
+    return browseFilters.sortOrder === 'asc' ? AssetOrder.Asc : AssetOrder.Desc;
+  });
 
   const browseOptions = $derived({
-    ...buildAlbumTimelineOptions(
-      album.id,
-      album.order ?? authManager.preferences.albums.defaultAssetOrder,
-      browseFilters,
-    ),
+    ...buildAlbumTimelineOptions(album.id, browseOrder, browseFilters),
     // The grouping MUST live in the options object — that is what the TimelineManager reads to
     // build buckets. The top-level <Timeline grouping={...}> prop alone does not re-group.
     grouping: timelineGrouping,
+  });
+
+  $effect(() => globalSearchManager.registerSearchablePageFilters(() => browseFilters));
+
+  /** Write a filter change back to the URL — the album page's half of the hydrate → write → react
+   *  loop. `buildFilterStateUrl` (not `buildSearchablePageUrl`) because it keeps the CURRENT
+   *  pathname: the panel can be used with the asset viewer open, and targeting the base path would
+   *  close it on every filter tweak. It preserves `q` and `sort` as ordinary non-filter params. */
+  function syncFilterUrl(nextFilters: FilterState) {
+    const nextUrl = buildFilterStateUrl(page.url, nextFilters);
+    // NOT a string compare: buildFilterStateUrl re-appends the filter params last, so an unchanged
+    // state can come back re-ordered. See filter-target.ts.
+    if (isFilterStateUrlUnchanged(page.url, nextUrl)) {
+      return;
+    }
+    void goto(nextUrl, { replaceState: true, keepFocus: true, noScroll: true });
+  }
+
+  const clearSearch = () => {
+    searchIsLoading = false;
+    const nextUrl = buildSearchablePageUrl(page.url, '', browseFilters.sortOrder, browseFilters);
+    if (!nextUrl) {
+      return;
+    }
+    void goto(nextUrl, { replaceState: true, keepFocus: true, noScroll: true });
+  };
+
+  // Re-hydrate from the URL on every change we did not just make: back/forward, a shared link, a
+  // ⌘K search, and the `?at=` write from closing the asset viewer (stripped, see lastHandledSearch).
+  $effect(() => {
+    const nextSearch = withoutAtParam(page.url.search);
+    if (nextSearch === lastHandledSearch) {
+      return;
+    }
+
+    untrack(() => {
+      // Every filter — including the temporal picker's year/month — round-trips through the URL, so
+      // rebuilding FilterState from the URL alone is lossless.
+      const nextQuery = getSearchablePageState(page.url).query;
+      // A NEW query invalidates the facets outright. Leaving them would let the previous query's
+      // total and time buckets annotate the new results until the fresh ones land — and a failed
+      // fetch returns the stale value, so they would never be corrected.
+      if (nextQuery !== committedSearchQuery) {
+        smartFacetInFlight?.controller.abort();
+        smartFacetInFlight = undefined;
+        smartFacets = undefined;
+        smartFacetKey = '';
+        searchResults = [];
+      }
+      browseFilters = hydrateAlbumFilters(page.url);
+      committedSearchQuery = nextQuery;
+      searchIsLoading = false;
+      lastHandledSearch = nextSearch;
+      consumeTypedSearchNamesInto(page.url.pathname + page.url.search, browsePersonNames, browseTagNames);
+    });
   });
 
   // Mirror the global album page: collect every asset matching the active browse filters
   // (scoped to this album) into another album/space. ActiveFiltersBar self-gates the button
   // on there being active filters + results.
   const handleAddAllToCollection = () => {
+    const query = committedSearchQuery.trim();
+    const terms: SearchTerms = { ...filterStateToSearchTerms(browseFilters), albumIds: [album.id] };
+    if (query) {
+      terms.query = query;
+    }
     void modalManager.show(SearchAddAllToCollectionModal, {
-      terms: { ...filterStateToSearchTerms(browseFilters), albumIds: [album.id] },
-      total: browseTotal,
-      smartSearchEnabled: false,
+      terms,
+      total: showSearchResults ? (searchTotal ?? 0) : browseTotal,
+      smartSearchEnabled: !!query,
       language: $lang,
     });
   };
@@ -189,11 +411,18 @@
     album = await getAlbumInfo({ id: album.id });
   };
 
+  // While search results are showing, <Timeline> is unmounted and its manager destroyed — every
+  // bulk action has to mutate the results array instead, or it silently no-ops and the asset stays
+  // on screen (#908, same split the space timeline makes).
   const handleRemoveAssets = (assetIds: string[]) => {
     // Prune the browse timeline immediately so removed photos don't linger.
     // RemoveFromAlbumAction already re-fetches the album via bind:album and clears the
     // selection internally before firing onRemove, so we only need to defensively clear here.
-    timelineManager?.removeAssets(assetIds);
+    if (showSearchResults) {
+      removeSearchResults(searchResults, assetIds);
+    } else {
+      timelineManager?.removeAssets(assetIds);
+    }
     assetMultiSelectManager.clear();
   };
 
@@ -201,8 +430,28 @@
   // folder takes them out of this (non-locked) timeline view. It isn't an album-membership
   // change (RemoveFromAlbum is the only membership mutation this route offers), so it doesn't
   // touch album.assetCount either.
+  const handleFavorite = (ids: string[], isFavorite: boolean) => {
+    if (showSearchResults) {
+      updateSearchResults(searchResults, ids, (asset) => (asset.isFavorite = isFavorite));
+      return;
+    }
+    timelineManager?.update(ids, (asset) => (asset.isFavorite = isFavorite));
+  };
+
+  const handleArchive = (ids: string[], visibility: AssetVisibility) => {
+    if (showSearchResults) {
+      updateSearchResults(searchResults, ids, (asset) => (asset.visibility = visibility));
+      return;
+    }
+    timelineManager?.update(ids, (asset) => (asset.visibility = visibility));
+  };
+
   const handleSetVisibility = (assetIds: string[]) => {
-    timelineManager?.removeAssets(assetIds);
+    if (showSearchResults) {
+      removeSearchResults(searchResults, assetIds);
+    } else {
+      timelineManager?.removeAssets(assetIds);
+    }
     assetMultiSelectManager.clear();
   };
 
@@ -212,7 +461,11 @@
   // space-person page's identical reasoning — so force a data reload here to keep
   // album.assetCount in sync with the server.
   const handleAssetDelete = (assetIds: string[]) => {
-    timelineManager?.removeAssets(assetIds);
+    if (showSearchResults) {
+      removeSearchResults(searchResults, assetIds);
+    } else {
+      timelineManager?.removeAssets(assetIds);
+    }
     void invalidateAll();
   };
 
@@ -220,6 +473,12 @@
   // restore, so re-add the assets to the local view directly; no count refresh is needed since
   // undoing a delete doesn't change album membership either.
   const handleUndoAssetDelete = (assets: TimelineAsset[]) => {
+    if (showSearchResults) {
+      // Undo hands back TimelineAssets; the results list holds full AssetResponseDtos, so
+      // re-running the search is how they come back.
+      searchReloadToken++;
+      return;
+    }
     timelineManager?.upsertAssets(assets);
   };
 
@@ -279,9 +538,19 @@
 
     album = data.album;
     mode = 'browse';
-    browseFilters = createFilterState();
+    // Re-seed from the URL, not from a blank slate: the sibling album's own URL carries its query
+    // and filters, and a bare reset would drop a ⌘K search the moment it navigated.
+    browseFilters = hydrateAlbumFilters(page.url);
+    committedSearchQuery = getSearchablePageState(page.url).query;
+    lastHandledSearch = withoutAtParam(page.url.search);
+    searchIsLoading = false;
+    smartFacetInFlight?.controller.abort();
+    smartFacets = undefined;
+    smartFacetKey = '';
+    smartFacetInFlight = undefined;
     browsePersonNames.clear();
     browseTagNames.clear();
+    consumeTypedSearchNamesInto(page.url.pathname + page.url.search, browsePersonNames, browseTagNames);
     assetMultiSelectManager.clear();
     resetPicker();
   });
@@ -338,15 +607,20 @@
   {#if mode === 'browse'}
     <div class="flex h-full">
       {#if !assetMultiSelectManager.selectionActive}
-        {#key `space-album-${album.id}`}
+        <!-- Keyed on the search too: switching between browse and query mode swaps the whole
+             suggestions provider, so the panel has to re-run it rather than keep browse facets. -->
+        {#key `space-album-${album.id}:${showSearchResults ? `search-${committedSearchQuery.trim()}:${$lang}` : 'browse'}`}
           <FilterPanel
             config={browseFilterConfig}
             bind:filters={browseFilters}
             bind:collapsed={filterCollapsed}
             externalToggle
-            timeBuckets={browseTimeBuckets}
+            timeBuckets={filterTimeBuckets}
             storageKey="gallery-filter-visible-sections-space-album"
-            hidden={isBrowseEmpty}
+            hidden={isBrowseEmpty && !showSearchResults}
+            personNames={browsePersonNames}
+            tagNames={browseTagNames}
+            onFiltersChange={syncFilterUrl}
           />
         {/key}
       {/if}
@@ -370,11 +644,11 @@
           </div>
         {/if}
 
-        {#if browseActive > 0}
+        {#if browseActive > 0 || showSearchResults}
           <div class="mb-4 shrink-0">
             <ActiveFiltersBar
               filters={browseFilters}
-              resultCount={browseTotal}
+              resultCount={showSearchResults ? searchTotal : browseTotal}
               personNames={browsePersonNames}
               tagNames={browseTagNames}
               onRemoveFilter={(type, id) => {
@@ -384,17 +658,34 @@
                 } else {
                   browseFilters = handlePhotosRemoveFilter(browseFilters, type, id);
                 }
+                syncFilterUrl(browseFilters);
               }}
               onClearAll={() => {
                 browseFilters = clearFilters(browseFilters);
                 temporalAnchor = undefined;
+                syncFilterUrl(browseFilters);
               }}
+              searchQuery={committedSearchQuery}
+              onClearSearch={clearSearch}
               onAddAllToCollection={handleAddAllToCollection}
             />
           </div>
         {/if}
 
-        {#if showBrowseFilteredEmpty}
+        {#if showSearchResults}
+          <SmartSearchResults
+            searchQuery={committedSearchQuery}
+            bind:isLoading={searchIsLoading}
+            bind:results={searchResults}
+            reloadToken={searchReloadToken}
+            filters={browseFilters}
+            albumIds={searchAlbumIds}
+            language={$lang}
+            space={{ id: space.id, canWrite: isSpaceEditor }}
+            isShared={album.shared}
+            total={searchTotal}
+          />
+        {:else if showBrowseFilteredEmpty}
           <div class="flex flex-1 flex-col items-center justify-center gap-2" data-testid="browse-filtered-empty">
             <p class="text-sm text-gray-500 dark:text-gray-400">{$t('space_album_no_photos_match_filters')}</p>
             <button
@@ -404,6 +695,9 @@
               onclick={() => {
                 browseFilters = clearFilters(browseFilters);
                 temporalAnchor = undefined;
+                // The filters are URL-backed now: without this the params survive the "clear",
+                // so a refresh or back/forward restores what the user just cleared.
+                syncFilterUrl(browseFilters);
               }}
             >
               {$t('space_album_clear_all_filters')}
@@ -494,15 +788,16 @@
      `isAllUserOwned` gates the whole metadata-edit block, matching the merged direct-space timeline. -->
 {#if mode === 'browse' && assetMultiSelectManager.selectionActive}
   <SelectionToolbar
-    {timelineManager}
+    timelineManager={showSearchResults ? undefined : timelineManager}
     assetInteraction={assetMultiSelectManager}
     {album}
     space={{ id: space.id, canWrite: isSpaceEditor }}
     downloadFilename={`${album.albumName}.zip`}
+    onSelectAll={showSearchResults ? () => selectAllSearchResults(searchResults, assetMultiSelectManager) : undefined}
     onRemove={handleRemoveAssets}
     onSetCover={handleSetAlbumCover}
-    onFavorite={(ids, isFavorite) => timelineManager.update(ids, (asset) => (asset.isFavorite = isFavorite))}
-    onArchive={(ids, visibility) => timelineManager.update(ids, (asset) => (asset.visibility = visibility))}
+    onFavorite={handleFavorite}
+    onArchive={handleArchive}
     onVisibilitySet={handleSetVisibility}
     onAssetDelete={handleAssetDelete}
     onUndoDelete={handleUndoAssetDelete}

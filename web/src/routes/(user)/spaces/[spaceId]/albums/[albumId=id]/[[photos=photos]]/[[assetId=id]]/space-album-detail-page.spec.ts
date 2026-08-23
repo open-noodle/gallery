@@ -3,6 +3,8 @@ import {
   AssetOrder,
   SharedSpaceRole,
   getAlbumInfo,
+  getFilterSuggestions,
+  searchSmartFacets,
   type AlbumResponseDto,
   type SharedSpaceMemberResponseDto,
   type SharedSpaceResponseDto,
@@ -11,12 +13,14 @@ import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import type { Component } from 'svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
+import { goto } from '$app/navigation';
 import { getAnimateMock } from '$lib/__mocks__/animate.mock';
 import TestWrapper from '$lib/components/TestWrapper.svelte';
 import { authManager } from '$lib/managers/auth-manager.svelte';
 import { addAssetsToAlbumWithOutcome, getAlbumAssetsActions } from '$lib/services/album.service';
 import { preferencesFactory } from '@test-data/factories/preferences-factory';
 import { userAdminFactory } from '@test-data/factories/user-factory';
+import { reactivePageMock as mockPage } from '@test-data/mocks/reactive-page.mock.svelte';
 import SpaceAlbumDetailPage from './+page.svelte';
 import { mockTimelineState, resetMockTimelineState, setMockTimelineEmpty } from './mock-timeline-state';
 
@@ -62,6 +66,19 @@ vi.mock('$lib/components/filter-panel/active-filters-bar.svelte', async () => {
 });
 
 vi.mock('$app/navigation', () => ({ goto: vi.fn(), invalidateAll: vi.fn(), onNavigate: vi.fn() }));
+
+// Reactive, not a plain hoisted object: this page's filters and committed query are URL-backed, so
+// its re-hydrate $effect only re-runs when `page.url` is a real signal. A plain object would let a
+// broken re-hydrate pass. See reactive-page.mock.svelte.ts.
+vi.mock('$app/state', async () => {
+  const { reactivePageMock } = await import('@test-data/mocks/reactive-page.mock.svelte');
+  return { page: reactivePageMock };
+});
+
+vi.mock('$lib/components/search/smart-search-results.svelte', async () => {
+  const { default: MockComponent } = await import('@test-data/mocks/smart-search-results.stub.svelte');
+  return { default: MockComponent };
+});
 
 vi.mock('$lib/components/timeline/TimelineGroupingControl.svelte', async () => {
   const { default: MockComponent } = await import('./mock-grouping-control.test-wrapper.svelte');
@@ -128,6 +145,8 @@ vi.mock('@immich/sdk', async (importOriginal) => {
   return {
     ...actual,
     getAlbumInfo: vi.fn(),
+    getFilterSuggestions: vi.fn(),
+    searchSmartFacets: vi.fn(),
   };
 });
 
@@ -256,6 +275,7 @@ describe('Space album detail page', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    mockPage.reset('https://gallery.test/spaces/space-1/albums/album-1');
     // The add→browse transition calls element.animate(); without a mock it returns undefined and
     // setting .onfinish on it throws an async unhandled error that fails the run (seen only in CI's
     // test ordering). Mirror the global-album route spec.
@@ -1201,6 +1221,235 @@ describe('Space album detail page', () => {
       await rerender(rerenderWith(makeAlbum({ id: 'album-2' })));
 
       expect(screen.getByTestId('space-album-timeline')).toHaveAttribute('data-mode', 'browse');
+    });
+  });
+
+  // #986: searching from inside a space album used to bounce the user to /photos and run the query
+  // against their whole library. The album is a searchable page now, so the query runs in place,
+  // scoped to the album.
+  describe('page-aware search', () => {
+    const rerenderWith = (album: AlbumResponseDto) => ({
+      component: SpaceAlbumDetailPage,
+      componentProps: { data: makePageData(album) },
+    });
+
+    it('runs the search in place instead of showing the browse timeline', () => {
+      mockPage.reset('https://gallery.test/spaces/space-1/albums/album-1?q=beach');
+
+      renderPage();
+
+      expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-search-query', 'beach');
+      expect(screen.queryByTestId('space-album-timeline')).not.toBeInTheDocument();
+    });
+
+    it('scopes the search to the album it was launched from', () => {
+      mockPage.reset('https://gallery.test/spaces/space-1/albums/album-1?q=beach');
+
+      renderPage({ album: makeAlbum({ id: 'album-1' }) });
+
+      expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-album-ids', 'album-1');
+    });
+
+    // A space album is scoped by its album, not by its space: sending spaceId as well would make the
+    // server drop the space gate in favour of the caller's full timeline-space set (database.ts).
+    it('does not send a space scope alongside the album scope', () => {
+      mockPage.reset('https://gallery.test/spaces/space-1/albums/album-1?q=beach');
+
+      renderPage();
+
+      expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-space-id', '');
+    });
+
+    it('shows the browse timeline when there is no query', () => {
+      renderPage();
+
+      expect(screen.getByTestId('space-album-timeline')).toBeInTheDocument();
+      expect(screen.queryByTestId('smart-search-results')).not.toBeInTheDocument();
+    });
+
+    it('hydrates filters from the URL into the search', () => {
+      mockPage.reset('https://gallery.test/spaces/space-1/albums/album-1?q=beach&city=Berlin&type=video');
+
+      renderPage();
+
+      expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-filter-city', 'Berlin');
+      expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-filter-media-type', 'video');
+    });
+
+    it('hydrates filters from the URL into the browse timeline', () => {
+      mockPage.reset('https://gallery.test/spaces/space-1/albums/album-1?city=Berlin');
+
+      renderPage();
+
+      const options = JSON.parse(screen.getByTestId('timeline-options').textContent ?? '{}');
+      expect(options.city).toBe('Berlin');
+    });
+
+    it('carries an explicit sort into the search', () => {
+      mockPage.reset('https://gallery.test/spaces/space-1/albums/album-1?q=beach&sort=asc');
+
+      renderPage();
+
+      expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-sort-order', 'asc');
+    });
+
+    // The navbar sort dropdown appears on every searchable page, browse mode included. Ignoring the
+    // param there would leave a control that visibly does nothing.
+    it('lets an explicit sort override the album order in browse mode', () => {
+      mockPage.reset('https://gallery.test/spaces/space-1/albums/album-1?sort=asc');
+
+      renderPage({ album: makeAlbum({ order: AssetOrder.Desc }) });
+
+      expect(JSON.parse(screen.getByTestId('timeline-options').textContent ?? '{}').order).toBe(AssetOrder.Asc);
+    });
+
+    it("keeps the album's own order in browse mode when the URL carries no sort", () => {
+      renderPage({ album: makeAlbum({ order: AssetOrder.Asc }) });
+
+      expect(JSON.parse(screen.getByTestId('timeline-options').textContent ?? '{}').order).toBe(AssetOrder.Asc);
+    });
+
+    it('writes a filter change back to the URL', async () => {
+      renderPage();
+
+      await fireEvent.click(screen.getByTestId('filter-panel-add-person'));
+
+      await waitFor(() =>
+        expect(goto).toHaveBeenCalledWith(
+          '/spaces/space-1/albums/album-1?people=person-1',
+          expect.objectContaining({ replaceState: true }),
+        ),
+      );
+    });
+
+    it('keeps the query in the URL when a filter changes during a search', async () => {
+      mockPage.reset('https://gallery.test/spaces/space-1/albums/album-1?q=beach');
+
+      renderPage();
+
+      await fireEvent.click(screen.getByTestId('filter-panel-add-person'));
+
+      await waitFor(() =>
+        expect(goto).toHaveBeenCalledWith(
+          expect.stringContaining('q=beach'),
+          expect.objectContaining({ replaceState: true }),
+        ),
+      );
+    });
+
+    it('re-hydrates when the URL changes under it (back/forward, shared link)', async () => {
+      renderPage();
+
+      expect(screen.getByTestId('space-album-timeline')).toBeInTheDocument();
+
+      mockPage.url = new URL('https://gallery.test/spaces/space-1/albums/album-1?q=sunset');
+
+      await waitFor(() =>
+        expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-search-query', 'sunset'),
+      );
+    });
+
+    const facetsWith = (people: Array<{ id: string; name: string }> = []) =>
+      ({
+        total: 7,
+        timeBuckets: [{ timeBucket: '2025-06-01', count: 7 }],
+        countries: [],
+        cities: [],
+        cameraMakes: [],
+        cameraModels: [],
+        tags: [],
+        people,
+        ratings: [],
+        mediaTypes: [],
+        hasUnnamedPeople: false,
+      }) as never;
+
+    // The panel's suggestions must come from the SEARCH in query mode, not the album's own
+    // suggestion endpoint — otherwise it offers facets the visible results do not contain.
+    it('sources the filter panel options from the search facets while a query is running', async () => {
+      mockPage.reset('https://gallery.test/spaces/space-1/albums/album-1?q=beach');
+      vi.mocked(searchSmartFacets).mockResolvedValue(facetsWith([{ id: 'facet-person', name: 'Facet Person' }]));
+
+      renderPage();
+
+      await waitFor(() => expect(screen.getByTestId('filter-panel-suggested-person-facet-person')).toBeInTheDocument());
+      expect(vi.mocked(getFilterSuggestions)).not.toHaveBeenCalled();
+    });
+
+    it('feeds the search facet time buckets to the filter panel instead of the album buckets', async () => {
+      mockPage.reset('https://gallery.test/spaces/space-1/albums/album-1?q=beach');
+      vi.mocked(searchSmartFacets).mockResolvedValue(facetsWith());
+
+      renderPage();
+
+      await waitFor(() =>
+        expect(screen.getByTestId('filter-panel')).toHaveAttribute('data-time-buckets', '2025-06-01'),
+      );
+    });
+
+    it('shows the search total rather than the browse count', async () => {
+      mockPage.reset('https://gallery.test/spaces/space-1/albums/album-1?q=beach');
+      vi.mocked(searchSmartFacets).mockResolvedValue(facetsWith());
+
+      renderPage();
+
+      await waitFor(() => expect(screen.getByTestId('active-filters-bar')).toHaveAttribute('data-result-count', '7'));
+    });
+
+    it('clears the query from the URL when the search chip is dismissed', async () => {
+      mockPage.reset('https://gallery.test/spaces/space-1/albums/album-1?q=beach');
+      vi.mocked(searchSmartFacets).mockResolvedValue(facetsWith());
+
+      renderPage();
+
+      await fireEvent.click(await screen.findByTestId('active-filters-clear-search'));
+
+      await waitFor(() => {
+        const [target] = vi.mocked(goto).mock.calls.at(-1) as [string];
+        expect(target).not.toContain('q=beach');
+      });
+    });
+
+    // The filters are URL-backed now, so removing a chip has to write the URL too — otherwise the
+    // param survives and a refresh restores the filter the user just removed.
+    it('writes temporal chip removal back to the URL', async () => {
+      mockPage.reset('https://gallery.test/spaces/space-1/albums/album-1?year=2025');
+
+      renderPage();
+
+      await fireEvent.click(await screen.findByTestId('active-filters-remove-timeline'));
+
+      await waitFor(() => {
+        const [target] = vi.mocked(goto).mock.calls.at(-1) as [string];
+        expect(target).not.toContain('year=2025');
+      });
+    });
+
+    it('writes a filtered-empty "clear all filters" back to the URL', async () => {
+      mockPage.reset('https://gallery.test/spaces/space-1/albums/album-1?city=Berlin');
+      setMockTimelineEmpty();
+
+      renderPage();
+
+      await fireEvent.click(await screen.findByTestId('browse-clear-filters'));
+
+      await waitFor(() => {
+        const [target] = vi.mocked(goto).mock.calls.at(-1) as [string];
+        expect(target).not.toContain('city=Berlin');
+      });
+    });
+
+    it('re-scopes the search when navigating straight to a sibling album', async () => {
+      mockPage.reset('https://gallery.test/spaces/space-1/albums/album-1?q=beach');
+
+      const { rerender } = renderPage({ album: makeAlbum({ id: 'album-1' }) });
+
+      expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-album-ids', 'album-1');
+
+      mockPage.url = new URL('https://gallery.test/spaces/space-1/albums/album-2?q=beach');
+      await rerender(rerenderWith(makeAlbum({ id: 'album-2' })));
+
+      expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-album-ids', 'album-2');
     });
   });
 });
