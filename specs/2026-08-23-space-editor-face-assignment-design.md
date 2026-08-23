@@ -125,7 +125,8 @@ different questions.
 
 - Mobile. Deferred to a follow-up spec, matching how #992 handled it. Editors will see actions on web
   their phone does not offer.
-- Any surface other than `/spaces/:id/…` — see §5.2.
+- Assets in no space the viewer edits — see §5.2. (An earlier draft scoped this to the `/spaces/:id/…`
+  route; the shipped boundary is asset reachability, not the URL.)
 - Merging space people from the asset viewer (`POST …/people/:personId/merge` already exists on the
   space person page).
 - Bulk face assignment across a multi-asset selection.
@@ -156,16 +157,37 @@ right_: identity means "this is the same human", which does not stop being true 
 name for the shared identity. The design preserves this by never writing a name outside the acting
 space (F-21).
 
-### 5.2 Space surfaces only
+### 5.2 Every write names its space explicitly; the affordance follows the asset
 
 Every write needs a `spaceId`, and `findSpaceForAssetAndUser` (`asset.service.ts:145`) picks _one_
 space arbitrarily when an asset sits in several — fine for resolving a display name, not fine for
 deciding which taxonomy a write lands in.
 
-Therefore `spaceId` is a **path parameter on every endpoint**, and the web affordances render only
-under `/spaces/:id/…`, where the route supplies it unambiguously. On the main timeline, albums and
-search the People row stays read-only for non-owned assets. No disambiguation UI is needed, and no
-endpoint can be called without an explicit space.
+Therefore `spaceId` is a **path parameter on every endpoint**. No endpoint can be called without an
+explicit space, and the server never guesses which taxonomy a write lands in.
+
+**The client-side affordance is asset-scoped, not route-scoped.** An earlier draft of this section
+said the affordances render only under `/spaces/:id/…`. That is not what ships, and the difference was
+found by a Playwright test rather than by reading the code.
+
+`AssetService.get` auto-detects a space for any single-asset read that carries no explicit `spaceId`
+(`asset.service.ts:145-154`) and sets `resolvedSpaceId`. The web layer derives its capability from
+that (`canEditSpacePeople` in `asset-editability.ts`), so the affordance appears **wherever a photo is
+reachable through a space you edit** — the main timeline and albums included — and is absent only when
+the asset belongs to no such space.
+
+**Decision (2026-08-23): accept the asset-scoped behaviour.** It matches how #992's `canEdit` already
+behaves for asset edits, so the People row and the rest of the detail panel agree with each other
+rather than following different rules on the same screen. Route-scoping would also be the odd one out:
+nothing else in the viewer changes what it offers based on which URL you arrived by.
+
+What this does **not** loosen: the space a write lands in is still whichever space the server resolved,
+named explicitly in the request path, and every server-side gate in §3 applies unchanged. The
+multi-space ambiguity §5.2 originally worried about is handled by the server picking one space and the
+client naming it — not by hiding the affordance.
+
+The genuine negative boundary is therefore "the asset is in no space this user edits", not "the URL is
+not a space URL" — which is what F-28 now asserts.
 
 ---
 
@@ -487,13 +509,13 @@ while Bob's People page changed underneath him.
 
 ### 8.6 Web
 
-| #    | Given                                     | When               | Then                                      |
-| ---- | ----------------------------------------- | ------------------ | ----------------------------------------- |
-| F-27 | Anna on `/spaces/A/...`, Bob's photo      | opens detail panel | tag/edit people affordances visible       |
-| F-28 | Anna on the **main timeline**, same photo | opens detail panel | People row read-only (§5.2)               |
-| F-29 | **Vic** on `/spaces/A/...`                | opens detail panel | read-only                                 |
-| F-30 | Bob on his own photo anywhere             | opens detail panel | unchanged owner affordances, owner people |
-| F-31 | Anna, §6.1 request fails                  | opens the panel    | error state, no affordance guessed (§7.3) |
+| #    | Given                                                                               | When               | Then                                                                                          |
+| ---- | ----------------------------------------------------------------------------------- | ------------------ | --------------------------------------------------------------------------------------------- |
+| F-27 | Anna on `/spaces/A/...`, Bob's photo                                                | opens detail panel | tag/edit people affordances visible                                                           |
+| F-28 | Anna views Bob's photo that is in **no space she edits** (reached by partner share) | opens detail panel | People row read-only — the real negative boundary is asset reachability, not the route (§5.2) |
+| F-29 | **Vic** on `/spaces/A/...`                                                          | opens detail panel | read-only                                                                                     |
+| F-30 | Bob on his own photo anywhere                                                       | opens detail panel | unchanged owner affordances, owner people                                                     |
+| F-31 | Anna, §6.1 request fails                                                            | opens the panel    | error state, no affordance guessed (§7.3)                                                     |
 
 ---
 
@@ -667,8 +689,20 @@ browser. Cite the path, not a SHA — #992's branch is rebased routinely and any
    space-local: the space projection is written, the identity link is not. Bob's own library and his
    resolved names and ages are untouched (F-36, F-40).
 
-Both were open questions in the first draft; neither should be reopened during implementation without
-re-running the scenarios that pin them.
+3. **§5.2 — where the affordance appears.** Asset-scoped, not route-scoped: it shows wherever a photo
+   is reachable through a space the viewer edits, including the main timeline. The first draft said
+   `/spaces/:id/…` only; the shipped behaviour differs because `AssetService.get` auto-resolves a space
+   for any single-asset read. Accepted so the People row agrees with the rest of the detail panel,
+   which already behaves this way for #992's `canEdit`. Pinned by F-28, whose negative case is now "in
+   no space she edits" rather than "not on a space URL".
+
+All three were open questions in the first draft; none should be reopened during implementation
+without re-running the scenarios that pin them.
+
+Item 3 is worth one caution for whoever reads this next: it was found by a **Playwright test failing**,
+not by reading the code. The component tests passed throughout, because they set the props directly and
+so never exercised how those props get derived. Route-versus-asset scoping is invisible below the
+browser.
 
 ### Follow-ups
 
