@@ -1,0 +1,56 @@
+{
+  "name": "gallery-core",
+  "version": "1.0.0",
+  "title": "Gallery",
+  "description": "Gallery workflow actions for shared spaces",
+  "author": "Gallery",
+  "wasmPath": "dist/plugin.wasm",
+  "templates": [],
+  "methods": [
+    {
+      "name": "addToSpace",
+      "title": "Add to space",
+      "description": "Add the asset to one or more shared spaces",
+      "types": ["AssetV1"],
+      "hostFunctions": true,
+      "schema": {
+        "type": "object",
+        "properties": {
+          "spaceIds": {
+            "type": "string",
+            "array": true,
+            "title": "Spaces",
+            "description": "Target shared spaces",
+            "uiHint": { "type": "SpaceId" }
+          }
+        },
+        "required": ["spaceIds"]
+      }
+    },
+    {
+      "name": "addToSpaceAlbum",
+      "title": "Add to space album",
+      "description": "Add the asset to an album in a shared space, creating it if needed",
+      "types": ["AssetV1"],
+      "hostFunctions": true,
+      "schema": {
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "title": "Space",
+            "description": "The shared space that owns the album",
+            "uiHint": { "type": "SpaceId", "order": 1 }
+          },
+          "albumName": {
+            "type": "string",
+            "title": "Album name",
+            "description": "Uses this album if it exists in the space, otherwise creates and links it",
+            "uiHint": { "type": "SpaceAlbumName", "order": 2 }
+          }
+        },
+        "required": ["spaceId", "albumName"]
+      }
+    }
+  ]
+}
