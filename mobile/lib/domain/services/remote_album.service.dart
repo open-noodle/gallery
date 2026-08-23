@@ -139,6 +139,7 @@ class RemoteAlbumService {
     String? thumbnailAssetId,
     bool? isActivityEnabled,
     AlbumAssetOrder? order,
+    DateTime? createdAt,
   }) async {
     final owner = await _repository.getOwner(albumId);
     final updatedAlbum = await _albumApiRepository.updateAlbum(
@@ -149,6 +150,7 @@ class RemoteAlbumService {
       thumbnailAssetId: thumbnailAssetId,
       isActivityEnabled: isActivityEnabled,
       order: order,
+      createdAt: createdAt,
     );
 
     // Update the local database
