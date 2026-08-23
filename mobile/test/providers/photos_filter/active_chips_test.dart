@@ -39,7 +39,7 @@ void main() {
     });
 
     test('unnamed person → labelled with the unnamed-person i18n key', () {
-      final f = _base()..people.add(_person('p1', ''));
+      final f = _base().copyWith(people: {_person('p1', '')});
       final chip = activeChipsFromFilter(f).single;
       expect(chip.label, 'filter_sheet_unnamed_person');
       expect(chip.labelIsKey, isTrue);
