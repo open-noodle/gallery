@@ -16,11 +16,20 @@ describe('memory-type.metadata', () => {
       expect(new Set(keys).size).toBe(keys.length);
     });
 
-    it('contains the three current types with expected attributes', () => {
+    it('contains the current types with expected attributes', () => {
       expect(MEMORY_TYPE_METADATA).toEqual([
         { key: 'on_this_day', kind: 'on_this_day', defaultEnabled: true, adminConfigurable: true },
         { key: 'birthday', kind: 'rule', defaultEnabled: true, adminConfigurable: true },
         { key: 'recent_trip', kind: 'rule', defaultEnabled: true, adminConfigurable: true },
+        { key: 'month_recap', kind: 'rule', defaultEnabled: true, adminConfigurable: true },
+        { key: 'favorites_throwback', kind: 'rule', defaultEnabled: true, adminConfigurable: true },
+        { key: 'on_this_day_place', kind: 'rule', defaultEnabled: true, adminConfigurable: true },
+        { key: 'season_recap', kind: 'rule', defaultEnabled: true, adminConfigurable: true },
+        { key: 'people_together', kind: 'rule', defaultEnabled: true, adminConfigurable: true },
+        { key: 'video_moments', kind: 'rule', defaultEnabled: true, adminConfigurable: true },
+        { key: 'trip_anniversary', kind: 'rule', defaultEnabled: true, adminConfigurable: true },
+        { key: 'themed', kind: 'rule', defaultEnabled: true, adminConfigurable: true },
+        { key: 'person_throwback', kind: 'rule', defaultEnabled: true, adminConfigurable: true },
       ]);
     });
 
@@ -33,13 +42,39 @@ describe('memory-type.metadata', () => {
     });
 
     it('MEMORY_TYPE_KEYS lists keys in registry order', () => {
-      expect(MEMORY_TYPE_KEYS).toEqual(['on_this_day', 'birthday', 'recent_trip']);
+      expect(MEMORY_TYPE_KEYS).toEqual([
+        'on_this_day',
+        'birthday',
+        'recent_trip',
+        'month_recap',
+        'favorites_throwback',
+        'on_this_day_place',
+        'season_recap',
+        'people_together',
+        'video_moments',
+        'trip_anniversary',
+        'themed',
+        'person_throwback',
+      ]);
     });
   });
 
   describe('buildDefaultMemoryTypeMap', () => {
     it('returns all keys enabled', () => {
-      expect(buildDefaultMemoryTypeMap()).toEqual({ on_this_day: true, birthday: true, recent_trip: true });
+      expect(buildDefaultMemoryTypeMap()).toEqual({
+        on_this_day: true,
+        birthday: true,
+        recent_trip: true,
+        month_recap: true,
+        favorites_throwback: true,
+        on_this_day_place: true,
+        season_recap: true,
+        people_together: true,
+        video_moments: true,
+        trip_anniversary: true,
+        themed: true,
+        person_throwback: true,
+      });
     });
   });
 
@@ -62,6 +97,10 @@ describe('memory-type.metadata', () => {
       expect(getMemoryTypeKeyForMemory(MemoryType.Rule, { ruleId: 'birthday' })).toBe('birthday');
     });
 
+    it('maps Rule to people_together', () => {
+      expect(getMemoryTypeKeyForMemory(MemoryType.Rule, { ruleId: 'people_together' })).toBe('people_together');
+    });
+
     it('returns undefined for Rule without a string ruleId', () => {
       expect(getMemoryTypeKeyForMemory(MemoryType.Rule, {})).toBeUndefined();
       expect(getMemoryTypeKeyForMemory(MemoryType.Rule, null)).toBeUndefined();
@@ -70,8 +109,33 @@ describe('memory-type.metadata', () => {
   });
 
   describe('getAdminAvailableMemoryTypeKeys', () => {
-    it('returns all three when no overrides', () => {
-      expect(getAdminAvailableMemoryTypeKeys({})).toEqual(new Set(['on_this_day', 'birthday', 'recent_trip']));
+    it('returns all types when no overrides', () => {
+      expect(getAdminAvailableMemoryTypeKeys({})).toEqual(
+        new Set([
+          'on_this_day',
+          'birthday',
+          'recent_trip',
+          'month_recap',
+          'favorites_throwback',
+          'on_this_day_place',
+          'season_recap',
+          'people_together',
+          'video_moments',
+          'trip_anniversary',
+          'themed',
+          'person_throwback',
+        ]),
+      );
+    });
+
+    it('adds month_recap as a rule type mapping to its ruleId', () => {
+      expect(getMemoryTypeKeyForMemory(MemoryType.Rule, { ruleId: 'month_recap' })).toBe('month_recap');
+      expect(getMemoryTypeMetadata('month_recap')).toEqual({
+        key: 'month_recap',
+        kind: 'rule',
+        defaultEnabled: true,
+        adminConfigurable: true,
+      });
     });
 
     it('honors an explicit types override', () => {
@@ -94,7 +158,20 @@ describe('memory-type.metadata', () => {
 
     it('ignores unknown keys in the types map', () => {
       expect(getAdminAvailableMemoryTypeKeys({ types: { unknown_key: true } })).toEqual(
-        new Set(['on_this_day', 'birthday', 'recent_trip']),
+        new Set([
+          'on_this_day',
+          'birthday',
+          'recent_trip',
+          'month_recap',
+          'favorites_throwback',
+          'on_this_day_place',
+          'season_recap',
+          'people_together',
+          'video_moments',
+          'trip_anniversary',
+          'themed',
+          'person_throwback',
+        ]),
       );
     });
   });
@@ -102,6 +179,10 @@ describe('memory-type.metadata', () => {
   describe('isMemoryTypeEnabledForUser', () => {
     it('defaults to enabled for a known key', () => {
       expect(isMemoryTypeEnabledForUser(undefined, 'birthday')).toBe(true);
+    });
+
+    it('defaults to enabled for people_together', () => {
+      expect(isMemoryTypeEnabledForUser(undefined, 'people_together')).toBe(true);
     });
 
     it('honors an explicit override', () => {

@@ -1,7 +1,9 @@
 import { MEMORY_TYPE_KEYS, MEMORY_TYPE_METADATA } from 'src/services/memory-rules/memory-type.metadata';
 import { createMemoryRules, MemoryRuleDeps } from 'src/services/memory-rules/memory-type.registry';
 
-const deps = {} as MemoryRuleDeps;
+const deps = {
+  themeSearchPort: { resolveEmbedding: vi.fn(), searchByEmbedding: vi.fn() },
+} as unknown as MemoryRuleDeps;
 const ruleKeys = MEMORY_TYPE_METADATA.filter((m) => m.kind === 'rule').map((m) => m.key);
 
 describe('createMemoryRules', () => {
@@ -14,6 +16,30 @@ describe('createMemoryRules', () => {
   it('instantiates multiple rules in registry order', () => {
     const rules = createMemoryRules(['birthday', 'recent_trip'], deps);
     expect(rules.map((r) => r.id)).toEqual(['birthday', 'recent_trip']);
+  });
+
+  it('instantiates video_moments by key', () => {
+    const rules = createMemoryRules(['video_moments'], deps);
+    expect(rules).toHaveLength(1);
+    expect(rules[0].id).toBe('video_moments');
+  });
+
+  it('instantiates trip_anniversary by key', () => {
+    const rules = createMemoryRules(['trip_anniversary'], deps);
+    expect(rules).toHaveLength(1);
+    expect(rules[0].id).toBe('trip_anniversary');
+  });
+
+  it('instantiates themed by key', () => {
+    const rules = createMemoryRules(['themed'], deps);
+    expect(rules).toHaveLength(1);
+    expect(rules[0].id).toBe('themed');
+  });
+
+  it('instantiates person_throwback by key', () => {
+    const rules = createMemoryRules(['person_throwback'], deps);
+    expect(rules).toHaveLength(1);
+    expect(rules[0].id).toBe('person_throwback');
   });
 
   it('returns nothing for a non-rule key', () => {
