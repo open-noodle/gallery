@@ -40,11 +40,17 @@ Leave `immich_postgres` (and `immich_redis`, if you run it) running.
 
 ## 3. Download the cleanup script
 
-The script lives at [`scripts/revert-to-immich.sql`](https://github.com/open-noodle/gallery/blob/main/scripts/revert-to-immich.sql) in the Gallery repository. Download it into your working directory:
+**Use the script attached to the release you're actually running, not the copy on the `main` branch.** The script targets the exact set of Gallery-only tables, columns, and fork migrations for its release — `main` is always ahead, so its copy can drop things your schema doesn't have (or miss things it does) if your instance is even one release behind.
+
+Find your version first: run [`immich-admin version`](/administration/server-commands#examples) in the `immich_server` container, or click the version number at the bottom of the sidebar in the Gallery web UI to open the About dialog.
+
+Then open that version's page on the [Gallery releases page](https://github.com/open-noodle/gallery/releases) — for example `https://github.com/open-noodle/gallery/releases/tag/v5.4.0` — and download the `revert-to-immich.sql` asset attached to it, either from the browser or with `curl`:
 
 ```bash
-curl -O https://raw.githubusercontent.com/open-noodle/gallery/main/scripts/revert-to-immich.sql
+curl -LO https://github.com/open-noodle/gallery/releases/download/v5.4.0/revert-to-immich.sql
 ```
+
+Replace `v5.4.0` with your own version. Every release since this asset was introduced ships one; if yours predates it, upgrade to the nearest later release first and use the script attached there.
 
 Read the script header before running it — it lists every table and column it will drop.
 
