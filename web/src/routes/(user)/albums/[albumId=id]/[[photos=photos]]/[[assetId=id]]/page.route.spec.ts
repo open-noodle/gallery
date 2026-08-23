@@ -1,4 +1,5 @@
-import { AlbumUserRole } from '@immich/sdk';
+import { AlbumUserRole, AssetOrder } from '@immich/sdk';
+import { modalManager } from '@immich/ui';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
@@ -39,6 +40,11 @@ vi.mock('$app/state', async () => {
 vi.mock('$lib/components/timeline/Timeline.svelte', async () => {
   const { default: MockTimeline } = await import('./mock-timeline.test-wrapper.svelte');
   return { default: MockTimeline };
+});
+
+vi.mock('$lib/components/search/smart-search-results.svelte', async () => {
+  const { default: MockComponent } = await import('@test-data/mocks/smart-search-results.stub.svelte');
+  return { default: MockComponent };
 });
 
 vi.mock('$lib/managers/command-context-manager.svelte', () => ({
@@ -727,6 +733,203 @@ describe('album detail filter panel route', () => {
           expect.anything(),
         ),
       );
+    });
+  });
+
+  // #986: an album is a searchable page, so a query launched from one runs against that album
+  // instead of bouncing the user to /photos and searching their whole library.
+  describe('page-aware search', () => {
+    const album1 = () => albumFactory.build({ id: 'album-1', assetCount: 2 });
+
+    it('runs the search in place instead of showing the browse timeline', async () => {
+      mockPage.url = new URL('https://gallery.test/albums/album-1?q=beach');
+
+      renderPage(album1());
+
+      await waitFor(() =>
+        expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-search-query', 'beach'),
+      );
+      expect(screen.queryByTestId('timeline-options')).not.toBeInTheDocument();
+    });
+
+    it('scopes the search to the album it was launched from', async () => {
+      mockPage.url = new URL('https://gallery.test/albums/album-1?q=beach');
+
+      renderPage(album1());
+
+      await waitFor(() =>
+        expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-album-ids', 'album-1'),
+      );
+    });
+
+    it('shows the browse timeline when there is no query', async () => {
+      renderPage(album1());
+
+      await waitFor(() => expect(screen.getByTestId('timeline-options')).toBeInTheDocument());
+      expect(screen.queryByTestId('smart-search-results')).not.toBeInTheDocument();
+    });
+
+    it('hydrates filters from the URL into the search', async () => {
+      mockPage.url = new URL('https://gallery.test/albums/album-1?q=beach&make=Apple');
+
+      renderPage(album1());
+
+      await waitFor(() =>
+        expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-filter-make', 'Apple'),
+      );
+    });
+
+    it('keeps the query in the URL when a filter changes during a search', async () => {
+      mockPage.url = new URL('https://gallery.test/albums/album-1?q=beach');
+      // In query mode the panel's options come from the SEARCH facets, not the album's suggestion
+      // endpoint. The id MUST differ from the browse mock's `person-view` (see getFilterSuggestions
+      // above): with the same id the row exists in both modes and the test passes even if the
+      // query-mode branch is deleted.
+      sdkMock.searchSmartFacets.mockResolvedValue({
+        total: 3,
+        timeBuckets: [],
+        countries: [],
+        cities: [],
+        cameraMakes: [],
+        cameraModels: [],
+        tags: [],
+        people: [{ id: 'person-from-facets', name: 'Search Person' }],
+        ratings: [],
+        mediaTypes: [],
+        hasUnnamedPeople: false,
+      } as never);
+      renderPage(album1());
+      const user = userEvent.setup();
+
+      await waitFor(() => expect(screen.getByTestId('people-item-person-from-facets')).toBeInTheDocument());
+      await user.click(screen.getByTestId('people-item-person-from-facets'));
+
+      await waitFor(() => {
+        const [target] = gotoMock.mock.calls.at(-1) as [string];
+        expect(target).toContain('q=beach');
+        expect(target).toContain('people=person-from-facets');
+      });
+    });
+
+    it('re-hydrates when the URL changes under it (back/forward, shared link)', async () => {
+      renderPage(album1());
+
+      await waitFor(() => expect(screen.getByTestId('timeline-options')).toBeInTheDocument());
+
+      mockPage.url = new URL('https://gallery.test/albums/album-1?q=sunset');
+
+      await waitFor(() =>
+        expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-search-query', 'sunset'),
+      );
+    });
+
+    // The navbar sort dropdown renders on every searchable page, browse mode included, so an
+    // explicit ?sort= has to reach the browse query or the control visibly does nothing.
+    it('lets an explicit sort override the album order in browse mode', async () => {
+      mockPage.url = new URL('https://gallery.test/albums/album-1?sort=asc');
+
+      renderPage(albumFactory.build({ id: 'album-1', assetCount: 2, order: AssetOrder.Desc }));
+
+      await waitFor(() => expect(screen.getByTestId('timeline-options').textContent).toContain('"order":"asc"'));
+    });
+
+    it("keeps the album's own order in browse mode when the URL carries no sort", async () => {
+      renderPage(albumFactory.build({ id: 'album-1', assetCount: 2, order: AssetOrder.Asc }));
+
+      await waitFor(() => expect(screen.getByTestId('timeline-options').textContent).toContain('"order":"asc"'));
+    });
+
+    const facetsWith = (people: Array<{ id: string; name: string }> = []) =>
+      ({
+        total: 3,
+        timeBuckets: [],
+        countries: [],
+        cities: [],
+        cameraMakes: [],
+        cameraModels: [],
+        tags: [],
+        people,
+        ratings: [],
+        mediaTypes: [],
+        hasUnnamedPeople: false,
+      }) as never;
+
+    // `vi.clearAllMocks()` in the outer beforeEach clears call history but NOT implementations, so
+    // a `mockResolvedValue` (or the never-resolving promise one test below installs) would leak
+    // into every later test in the file. Reset the facets mock per test.
+    beforeEach(() => {
+      sdkMock.searchSmartFacets.mockReset();
+      sdkMock.searchSmartFacets.mockResolvedValue(facetsWith());
+    });
+
+    // The bar's label prints the SEARCH total, so the collect call has to run the same search.
+    // Dropping the query sends it down the metadata branch, which then adds every asset in the
+    // album — "Add all 3" quietly adding 800.
+    it('carries the query into add-all-to-collection so it collects the matches, not the album', async () => {
+      mockPage.url = new URL('https://gallery.test/albums/album-1?q=beach');
+      // Spied, not rendered: the real modal mounts CollectionPickerModal, which needs album/space
+      // data this suite does not stub. The assertion is about what the page HANDS the modal.
+      const showSpy = vi.spyOn(modalManager, 'show').mockResolvedValue(undefined as never);
+      renderPage(album1());
+      const user = userEvent.setup();
+
+      await user.click(await screen.findByTestId('add-all-to-collection'));
+
+      await waitFor(() => expect(showSpy).toHaveBeenCalled());
+      const props = showSpy.mock.calls.at(-1)![1] as unknown as { terms: { query?: string } };
+      expect(props.terms.query).toBe('beach');
+      expect(props).toMatchObject({ smartSearchEnabled: true, total: 3 });
+      showSpy.mockRestore();
+    });
+
+    // Search mode unmounts <Timeline>, so `timelineManager` is undefined (direct `?q=` load) or
+    // destroyed (typed query). Every bulk handler used to dereference it unguarded: the favourite
+    // path threw, and the delete path silently no-opped while the asset stayed on screen.
+    it('offers bulk handlers in search mode that act on the results, not the unmounted timeline', async () => {
+      mockPage.url = new URL('https://gallery.test/albums/album-1?q=beach');
+      renderPage(album1());
+
+      await waitFor(() => expect(screen.getByTestId('smart-search-results')).toBeInTheDocument());
+
+      const options = registerSelectionContextMock.mock.calls.at(-1)![0];
+      const onFavorite = options.getOnFavorite();
+      const onDelete = options.getOnDelete();
+
+      expect(onFavorite).toBeTypeOf('function');
+      expect(onDelete).toBeTypeOf('function');
+      // Would throw on `undefined.update(...)` before the fix.
+      expect(() => onFavorite!(['asset-1'], true)).not.toThrow();
+    });
+
+    // The provider's query-mode branch returns early, so without name capture the chip renders the
+    // raw `person:<uuid>` token the facets emitted.
+    it('names a person chip picked from the search facets', async () => {
+      mockPage.url = new URL('https://gallery.test/albums/album-1?q=beach');
+      sdkMock.searchSmartFacets.mockResolvedValue(facetsWith([{ id: 'person-from-facets', name: 'Search Person' }]));
+      renderPage(album1());
+      const user = userEvent.setup();
+
+      await waitFor(() => expect(screen.getByTestId('people-item-person-from-facets')).toBeInTheDocument());
+      await user.click(screen.getByTestId('people-item-person-from-facets'));
+
+      await waitFor(() => expect(screen.getByTestId('active-filters-bar')).toHaveTextContent('Search Person'));
+    });
+
+    // Until the new facets land, the previous query's total keeps annotating the new results.
+    it('drops the previous query facets when the query changes', async () => {
+      mockPage.url = new URL('https://gallery.test/albums/album-1?q=beach');
+      renderPage(album1());
+
+      await waitFor(() => expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-total', '3'));
+
+      // A slow response for the new query — the stale total must not survive in the meantime.
+      sdkMock.searchSmartFacets.mockImplementation((() => new Promise(() => {})) as never);
+      mockPage.url = new URL('https://gallery.test/albums/album-1?q=mountain');
+
+      await waitFor(() =>
+        expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-search-query', 'mountain'),
+      );
+      expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-total', '');
     });
   });
 });
