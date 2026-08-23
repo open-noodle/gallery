@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Writable } from 'node:stream';
-import { AlbumUserRole, AssetVisibility, SyncEntityType, SyncRequestType } from 'src/enum';
+import { AlbumUserRole, AssetVisibility, MemoryType, SyncEntityType, SyncRequestType } from 'src/enum';
 import { send, SyncService } from 'src/services/sync.service';
 import { serialize, toAck } from 'src/utils/sync';
 import { authStub } from 'test/fixtures/auth.stub';
@@ -557,13 +557,66 @@ describe(SyncService.name, () => {
       mocks.syncCheckpoint.getAll.mockResolvedValue([]);
       mocks.syncCheckpoint.getNow.mockResolvedValue({ nowId: 'now-id' });
       syncSubs.memory.getDeletes.mockReturnValue(makeStream([{ id: deleteId, memoryId: 'm1' }]));
-      syncSubs.memory.getUpserts.mockReturnValue(makeStream([{ updateId, id: 'm1', ownerId: 'u1' }]));
+      syncSubs.memory.getUpserts.mockReturnValue(
+        makeStream([{ updateId, id: 'm1', ownerId: 'u1', type: MemoryType.OnThisDay }]),
+      );
 
       await sut.stream(authStub.user1, writable, { types: [SyncRequestType.MemoriesV1] });
 
       const messages = parseChunks(chunks);
       expect(messages.some((m: any) => m.type === SyncEntityType.MemoryDeleteV1)).toBe(true);
       expect(messages.some((m: any) => m.type === SyncEntityType.MemoryV1)).toBe(true);
+    });
+
+    it('should omit fork-only memory types from the stream for clients that do not request a gallery-fork-only sync type (upstream Immich client compatibility, #999)', async () => {
+      const { writable, chunks } = makeWritable();
+      const onThisDayId = newUuid();
+      const ruleId = newUuid();
+
+      mocks.session.isPendingSyncReset.mockResolvedValue(false);
+      mocks.syncCheckpoint.getAll.mockResolvedValue([]);
+      mocks.syncCheckpoint.getNow.mockResolvedValue({ nowId: 'now-id' });
+      syncSubs.memory.getUpserts.mockReturnValue(
+        makeStream([
+          { updateId: onThisDayId, id: 'm1', ownerId: 'u1', type: MemoryType.OnThisDay },
+          { updateId: ruleId, id: 'm2', ownerId: 'u1', type: MemoryType.Rule },
+        ]),
+      );
+
+      // No gallery-fork-only sync type (e.g. SharedSpacesV1) requested alongside MemoriesV1 —
+      // this is the request shape an unmodified upstream Immich client sends, since its
+      // generated client has no fork-only SyncRequestType values to request in the first place.
+      await sut.stream(authStub.user1, writable, { types: [SyncRequestType.MemoriesV1] });
+
+      const memoryMessages = parseChunks(chunks).filter((m: any) => m.type === SyncEntityType.MemoryV1);
+      expect(memoryMessages).toHaveLength(1);
+      expect(memoryMessages[0].data.type).toBe(MemoryType.OnThisDay);
+    });
+
+    it('should include fork-only memory types for clients that also request a gallery-fork-only sync type', async () => {
+      const { writable, chunks } = makeWritable();
+      const onThisDayId = newUuid();
+      const ruleId = newUuid();
+
+      mocks.session.isPendingSyncReset.mockResolvedValue(false);
+      mocks.syncCheckpoint.getAll.mockResolvedValue([]);
+      mocks.syncCheckpoint.getNow.mockResolvedValue({ nowId: 'now-id' });
+      syncSubs.memory.getUpserts.mockReturnValue(
+        makeStream([
+          { updateId: onThisDayId, id: 'm1', ownerId: 'u1', type: MemoryType.OnThisDay },
+          { updateId: ruleId, id: 'm2', ownerId: 'u1', type: MemoryType.Rule },
+        ]),
+      );
+
+      await sut.stream(authStub.user1, writable, {
+        types: [SyncRequestType.MemoriesV1, SyncRequestType.SharedSpacesV1],
+      });
+
+      const memoryMessages = parseChunks(chunks).filter((m: any) => m.type === SyncEntityType.MemoryV1);
+      expect(memoryMessages.map((m: any) => m.data.type)).toEqual(
+        expect.arrayContaining([MemoryType.OnThisDay, MemoryType.Rule]),
+      );
+      expect(memoryMessages).toHaveLength(2);
     });
 
     it('should handle MemoryToAssetsV1 sync type', async () => {
