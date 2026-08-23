@@ -1,4 +1,4 @@
-import { SystemConfig } from 'src/config';
+import { SystemConfig } from 'src/dtos/config.dto';
 import { AssetType, AssetVisibility } from 'src/enum';
 import { MemoryThemeSearchAdapter, SEARCH_WINDOW_MARGIN_DAYS } from 'src/services/memory-rules/theme-search.adapter';
 
