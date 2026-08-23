@@ -183,6 +183,54 @@ resolution. The change is whitespace and trailing commas only; verified by compa
 against `HEAD` with whitespace and commas stripped, and by re-running analyze (clean), the `lib`
 format gate (866 files, 0 changed) and the suite (3411 passed).
 
+## Remote CI Verification
+
+Ten workflows, all green. The cycle's commits were pushed in three stages, so results sit on three
+SHAs; each later stage changed strictly less than the one before.
+
+| Workflow                                  | Result                        | Validated on          |
+| ----------------------------------------- | ----------------------------- | --------------------- |
+| `test.yml`                                | GREEN (21/21 jobs, 0 skipped) | `9fe9446be71` (final) |
+| `static_analysis.yml`                     | GREEN                         | `7b7f5f15476`         |
+| `gallery-mobile-smoke.yml`                | GREEN                         | `7b7f5f15476`         |
+| `gallery-build-mobile.yml`                | GREEN                         | `7b7f5f15476`         |
+| `docker.yml`                              | GREEN                         | `8563db85f15`         |
+| `gallery-ml-smoke.yml`                    | GREEN                         | `8563db85f15`         |
+| `gallery-rebase-smoke.yml`                | GREEN                         | `8563db85f15`         |
+| `gallery-revert-to-immich-validation.yml` | GREEN                         | `8563db85f15`         |
+| `storage-migration-tests.yml`             | GREEN                         | `8563db85f15`         |
+| `storage-migration-e2e.yml`               | GREEN                         | `8563db85f15`         |
+
+`8563db85f15` → `7b7f5f15476` differs only by `mobile/test/**` whitespace; `7b7f5f15476` →
+`9fe9446be71` only by `Makefile` + `tools/upstream-preflight`. Three runs show `cancelled` on
+`8563db85f15` — that is the same-ref `cancel-in-progress` concurrency killing them when the next
+stage was dispatched, not a failure; each was re-run to completion on the later SHA.
+
+### Confirmed flake — pre-existing, NOT from this cycle
+
+`End-to-End Tests (Server & CLI) (ubuntu-latest)` failed once on `9fe9446be71`:
+
+```
+FAIL src/specs/server/api/gallery-map.e2e-spec.ts > /gallery/map/markers
+     > albumId visibility: the album map matches the album GRID (D4)
+AssertionError: expected [ …(4) ] to deeply equal [ …(5) ]
+```
+
+Classified before any re-run, per the matrix-twin method:
+
+- the **arm twin passed on the identical commit**;
+- **exactly one** spec file failed — not a mass infrastructure die-off;
+- **zero `ECONNREFUSED`** — a real assertion, not a dead server container;
+- the commit's diff is `Makefile` + `tools/upstream-preflight` only and **cannot reach** that spec;
+- the same job was green on the immediately preceding SHA.
+
+Re-running the failed job alone on the identical commit went **green, 21/21, with no code change** —
+so the test is non-deterministic. The map returned 4 markers where the album grid has 5, one asset
+id missing, which reads as a geo/EXIF indexing race between the map query and the grid.
+
+**This is logged, not absolved.** A passing re-run proves non-determinism, not correctness, and this
+repo does not accept "retry if flaky" as a resolution. See Follow-up.
+
 ## Cross-repo autolink spam (fixed this cycle)
 
 Upstream noticed the fork spamming their PRs — e.g. immich-30881 accumulated a wall of
@@ -223,6 +271,9 @@ remote to resolve its range; a PR-scoped equivalent would key off `origin/main..
 
 ## Follow-up
 
+- **`gallery-map.e2e-spec.ts` "albumId visibility … (D4)" is flaky** and should wait on indexing
+  rather than race it. Pre-existing, unrelated to this cycle, confirmed non-deterministic on an
+  unchanged commit.
 - The guard runs per rolling cycle, not on PRs. A fork PR merged to `main` could still introduce a
   foreign autolink; it would be caught at the next cycle rather than at review time.
 - `main` still carries the pre-rewrite messages. It re-spams only when force-pushed, i.e. at the
