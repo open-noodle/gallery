@@ -928,6 +928,7 @@ describe(SearchService.name, () => {
           embedding: '[1, 2, 3]',
           userIds: [authStub.user1.user.id],
           viewingUserId: authStub.user1.user.id,
+          callerId: authStub.user1.user.id,
           maxDistance: 0,
           visibility: 'not-locked',
         },
@@ -1037,6 +1038,87 @@ describe(SearchService.name, () => {
       const result = await sut.searchSmart(authStub.user1, { query: 'test' });
 
       expect(result.assets.nextPage).toBeNull();
+    });
+
+    // An album detail page searches the album it is showing. Browse mode there scopes by album
+    // ACCESS (timeline.service resolves albumSpaceIds from plain membership) and shows every
+    // member's photos; query mode kept the owner-scoping `userIds`, so the same album searched
+    // returned only the caller's own assets beside a grid that had just shown everyone's.
+    // searchMetadata already resolves this the right way — access check instead of userIds, letting
+    // `albumSharedSpaceScope` re-gate — and searchSmart now matches it.
+    describe('album access (albumIds)', () => {
+      it('checks album read access when albumIds is provided', async () => {
+        const albumId = newUuid();
+        mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set());
+        mocks.access.album.checkSharedAlbumAccess.mockResolvedValue(new Set([albumId]));
+        mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
+
+        await sut.searchSmart(authStub.user1, { query: 'test', albumIds: [albumId] });
+
+        expect(mocks.access.album.checkSharedAlbumAccess).toHaveBeenCalled();
+      });
+
+      it('throws when the caller cannot read the album', async () => {
+        const albumId = newUuid();
+        mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set());
+        mocks.access.album.checkSharedAlbumAccess.mockResolvedValue(new Set());
+        // Mocked so the ONLY thing that can reject here is the access check. Without it the call
+        // throws on an unstubbed repository method instead, and the assertion passes either way.
+        mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
+
+        await expect(sut.searchSmart(authStub.user1, { query: 'test', albumIds: [albumId] })).rejects.toThrow(
+          BadRequestException,
+        );
+      });
+
+      it('drops the owner scope so a shared album returns every member’s matching photos', async () => {
+        const albumId = newUuid();
+        mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set());
+        mocks.access.album.checkSharedAlbumAccess.mockResolvedValue(new Set([albumId]));
+        mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
+
+        await sut.searchSmart(authStub.user1, { query: 'test', albumIds: [albumId] });
+
+        const [, options] = mocks.search.searchSmart.mock.calls.at(-1)!;
+        expect(options.albumIds).toEqual([albumId]);
+        expect(options.userIds).toBeUndefined();
+      });
+
+      it('keeps the owner scope when no album scope is given', async () => {
+        await sut.searchSmart(authStub.user1, { query: 'test' });
+
+        const [, options] = mocks.search.searchSmart.mock.calls.at(-1)!;
+        expect(options.userIds).toEqual([authStub.user1.user.id]);
+      });
+
+      // The facets' people list resolves the VIEWER's identity people, and it used to read that
+      // viewer off `userIds[0]`. Under an album scope there is no `userIds`, so the caller has to
+      // be carried explicitly or the facets request dereferences undefined.
+      it('carries the caller id independently of the owner scope', async () => {
+        const albumId = newUuid();
+        mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set());
+        mocks.access.album.checkSharedAlbumAccess.mockResolvedValue(new Set([albumId]));
+        mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
+
+        await sut.searchSmart(authStub.user1, { query: 'test', albumIds: [albumId] });
+
+        const [, options] = mocks.search.searchSmart.mock.calls.at(-1)!;
+        expect(options.callerId).toBe(authStub.user1.user.id);
+      });
+
+      it('applies the same album scope to the facets that annotate those results', async () => {
+        const albumId = newUuid();
+        mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set());
+        mocks.access.album.checkSharedAlbumAccess.mockResolvedValue(new Set([albumId]));
+        mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
+        mocks.search.getSmartSearchFacets.mockResolvedValue({ total: 0, timeBuckets: [], people: [] } as never);
+
+        await sut.searchSmartFacets(authStub.user1, { query: 'test', albumIds: [albumId] });
+
+        const [options] = mocks.search.getSmartSearchFacets.mock.calls.at(-1)!;
+        expect(options.albumIds).toEqual([albumId]);
+        expect(options.userIds).toBeUndefined();
+      });
     });
 
     describe('shared space access (spaceId)', () => {
@@ -1236,6 +1318,8 @@ describe(SearchService.name, () => {
         const albumId = newUuid();
         const spaceId = newUuid();
         mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId }]);
+        // An albumIds scope is now AlbumRead-checked before anything else runs.
+        mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set([albumId]));
 
         await sut.searchSmart(authStub.user1, { query: 'test', albumIds: [albumId] });
 

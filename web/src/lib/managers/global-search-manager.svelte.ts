@@ -171,16 +171,28 @@ function withoutEmptyLabels(names?: Map<string, string>): Map<string, string> {
 
 /**
  * The space id of the current page when that page is a space *timeline* (`/spaces/<id>` or
- * `/spaces/<id>/photos`). Deliberately not a `pathname.startsWith('/spaces/')` test:
- * `/spaces/<id>/albums/<albumId>` is a space page but not a searchable one, so no filter can be
- * applied in place there.
+ * `/spaces/<id>/photos`), and only then.
+ *
+ * Deliberately not a `pathname.startsWith('/spaces/')` test, and not a bare
+ * `getSearchablePageBasePath(...).startsWith('/spaces/')` one either: `/spaces/<id>/albums/<aid>`
+ * IS a searchable page under `/spaces/`, but it is album-scoped, not space-scoped. Its filter panel
+ * speaks the same prefixed person tokens `/photos` does (`person:` / `space-person:`), never the
+ * bare space profile id a space timeline forwards as `spacePersonIds`. Handing it a bare id yields
+ * a silently empty timeline — the server reads it as a legacy person id the viewer does not own.
+ *
+ * Hence the segment count: a space timeline base path is `/spaces/<id>` (2) or
+ * `/spaces/<id>/photos` (3); anything deeper is a sub-surface with its own scope.
  */
 function getCurrentSpaceTimelineId(pathname: string): string | undefined {
   const base = getSearchablePageBasePath(pathname);
   if (!base?.startsWith('/spaces/')) {
     return undefined;
   }
-  return base.split('/').filter(Boolean)[1];
+  const parts = base.split('/').filter(Boolean);
+  if (parts.length > 3) {
+    return undefined;
+  }
+  return parts[1];
 }
 
 // Entity-section keys dispatched by runBatch per scope. Navigation is intentionally
@@ -1860,9 +1872,10 @@ export class GlobalSearchManager {
       return;
     }
 
-    const spaceId = page.url.pathname.startsWith('/spaces/')
-      ? page.url.pathname.split('/').filter(Boolean)[1]
-      : undefined;
+    // Space-scoped resolution emits BARE space profile ids; every other surface needs the prefixed
+    // `space-person:` token. Only the space timeline forwards the bare form, so the scope has to be
+    // the timeline test, not a `/spaces/` prefix — see getCurrentSpaceTimelineId.
+    const spaceId = getCurrentSpaceTimelineId(page.url.pathname);
     const resolved = await resolveTypedSearchFilters(parsed, {
       spaceId,
       signal: this.closeSignal,

@@ -3095,6 +3095,8 @@ export type SmartSearchDto = {
     withSharedSpaces?: boolean;
 };
 export type SmartSearchFacetsDto = {
+    /** Filter by album IDs */
+    albumIds?: string[];
     /** Filter by city name */
     city?: string | null;
     /** Filter by country name */
