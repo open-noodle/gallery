@@ -102,6 +102,12 @@ mobile-drift-rebase-check:
 ci-invariants-check:
 	$(UPSTREAM_PREFLIGHT) run ci-invariants-check
 
+.PHONY: commit-autolink-check
+# `pnpm run <script> -- --range X` swallows the argument and reports a false OK, so invoke the CLI
+# directly. Override the range with: make commit-autolink-check RANGE=upstream/main..some-branch
+commit-autolink-check:
+	$(UPSTREAM_PREFLIGHT) exec tsx src/index.ts commit-autolink-check $(if $(RANGE),--range $(RANGE),)
+
 .PHONY: fork-patches-check
 fork-patches-check:
 	$(UPSTREAM_PREFLIGHT) run fork-patches-check
