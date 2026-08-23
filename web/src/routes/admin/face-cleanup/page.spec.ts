@@ -6,7 +6,7 @@ import Page from './+page.svelte';
 
 // The chooser at /admin/face-cleanup: two equal-weight cards (guided scan vs. manual review), covering
 // the two presentations (first visit / returning) and all five scan states from §6.2 of
-// docs/superpowers/specs/2026-07-23-manual-face-review-mode-design.md. Assertions key off stable
+// specs/2026-07-23-manual-face-review-mode-design.md. Assertions key off stable
 // testids (chooser-card-guided / chooser-card-manual / chooser-guided-cta / chooser-manual-cta) so they
 // don't depend on copy.
 

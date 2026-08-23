@@ -102,14 +102,14 @@ export type MergePropagationProfileInput =
 // embeddings are farther apart than this cosine distance. A single representative-face match (the basis
 // of space dedup / reconciliation) is not enough evidence to merge two identities, so we re-check the
 // whole-cluster centroids at the merge chokepoint. Manual merges bypass this — a human overrides.
-// See docs/plans/2026-05-30-hagen-face-cluster-corruption-diagnosis.md.
+// See specs/2026-05-30-hagen-face-cluster-corruption-diagnosis.md.
 const MERGE_IDENTITY_MAX_CENTROID_DISTANCE = 0.5;
 const MERGE_IDENTITY_CENTROID_SAMPLE_SIZE = 200;
 
 // Defense-in-depth at the point where personal identity backfill rewrites asset_face.personId: never move
 // a face onto a person whose existing cluster it does not resemble (face-to-centroid cosine distance
 // beyond this bound). This contains corruption regardless of how the identity link became wrong — even a
-// link already corrupt in the database. See docs/plans/2026-05-30-hagen-face-cluster-corruption-diagnosis.md.
+// link already corrupt in the database. See specs/2026-05-30-hagen-face-cluster-corruption-diagnosis.md.
 const REPAIR_FACE_MAX_PERSON_DISTANCE = 0.5;
 
 export type AccessibleIdentityFaceMatch = {
