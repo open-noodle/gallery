@@ -620,6 +620,24 @@ export const utils = {
     return result.rows[0].id as string;
   },
 
+  /**
+   * Spec §6.3.1: `face_identity_face`'s `identityId` for one face, or `undefined` if the face
+   * has no identity link yet. No SDK/HTTP surface exposes this directly (space-person reads go
+   * through `shared_space_person_face`, not the identity layer), so the space-editor face-assign
+   * journey reads it straight from the DB to prove the identity-write-vs-skip behaviour that
+   * `writeIdentity` gates -- without asserting on internal repository calls.
+   */
+  getFaceIdentityId: async (assetFaceId: string): Promise<string | undefined> => {
+    if (!client) {
+      throw new Error('Database client not connected');
+    }
+
+    const result = await client.query(`SELECT "identityId" FROM "face_identity_face" WHERE "assetFaceId" = $1`, [
+      assetFaceId,
+    ]);
+    return result.rows[0]?.identityId as string | undefined;
+  },
+
   // Slice 3 — M2: PersonResponseDto does not expose `faceAssetId` (only `thumbnailPath`, which is
   // populated asynchronously via the PersonGenerateThumbnail job). Representative-face write-scope
   // specs need to assert "left unchanged" / "changed to X" directly, so read the column via SQL.
