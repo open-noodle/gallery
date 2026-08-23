@@ -31,6 +31,19 @@ class _FilterSheetState extends ConsumerState<FilterSheet> {
   /// Allow drag to go below `_snapBrowse` so the dismiss gesture is reachable.
   static const _minExtent = 0.3;
 
+  /// A live drag fires a `DraggableScrollableNotification` on every frame of
+  /// motion, so a "half" swipe can pass *through* the browse extent (or dip
+  /// below the dismiss threshold) well before the user's thumb comes to
+  /// rest — e.g. on its way back up after an overshoot. Committing the snap
+  /// on each of those transient extents flips the sheet between deep/browse/
+  /// hidden mid-gesture, unmounting `DeepContent`/`BrowseContent` (and, once
+  /// hidden, the sheet itself) while the drag is still live — losing the
+  /// notification stream and, further up, the pointer routing for the rest
+  /// of that same gesture (#1002). Debounce so only the extent the drag
+  /// actually *settles* on (no further motion for `_settleDelay`) commits.
+  static const _settleDelay = Duration(milliseconds: 160);
+  Timer? _settleTimer;
+
   double _targetExtent(FilterSheetSnap snap) => switch (snap) {
     FilterSheetSnap.browse => _snapBrowse,
     FilterSheetSnap.deep => _snapDeep,
@@ -39,29 +52,37 @@ class _FilterSheetState extends ConsumerState<FilterSheet> {
 
   @override
   void dispose() {
+    _settleTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }
 
   bool _onNotification(DraggableScrollableNotification n) {
-    if (n.extent < _dismissThreshold) {
+    final extent = n.extent;
+    _settleTimer?.cancel();
+    _settleTimer = Timer(_settleDelay, () => _commitSettledExtent(extent));
+    return false;
+  }
+
+  void _commitSettledExtent(double extent) {
+    if (!mounted) return;
+    if (extent < _dismissThreshold) {
       final current = ref.read(photosFilterSheetProvider);
       if (current != FilterSheetSnap.hidden) {
         ref.read(photosFilterSheetProvider.notifier).state = FilterSheetSnap.hidden;
       }
-      return false;
+      return;
     }
     final mapping = <double, FilterSheetSnap>{_snapBrowse: FilterSheetSnap.browse, _snapDeep: FilterSheetSnap.deep};
     for (final entry in mapping.entries) {
-      if ((n.extent - entry.key).abs() < _snapTolerance) {
+      if ((extent - entry.key).abs() < _snapTolerance) {
         final current = ref.read(photosFilterSheetProvider);
         if (current != entry.value) {
           ref.read(photosFilterSheetProvider.notifier).state = entry.value;
         }
-        return false;
+        return;
       }
     }
-    return false;
   }
 
   void _onScrimTap() {
