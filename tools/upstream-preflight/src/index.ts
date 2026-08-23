@@ -490,8 +490,20 @@ program
 program
   .command('commit-autolink-check')
   .option('--range <range>', 'commit range to scan', 'upstream/main..HEAD')
-  .action((options: { range: string }) => {
-    const result = runCommitAutolinkAudit(options.range, repoRoot());
+  .option(
+    '--fork-pr-ceiling <n>',
+    'highest PR number that belongs to this repo; above it, #N resolves upstream',
+  )
+  .action((options: { range: string; forkPrCeiling?: string }) => {
+    const ceiling = options.forkPrCeiling
+      ? Number(options.forkPrCeiling)
+      : undefined;
+    if (ceiling !== undefined && !Number.isInteger(ceiling)) {
+      throw new Error(
+        `--fork-pr-ceiling must be an integer, got ${options.forkPrCeiling}`,
+      );
+    }
+    const result = runCommitAutolinkAudit(options.range, repoRoot(), ceiling);
     console.log(`${result.ok ? 'OK' : 'ISSUE'}: ${result.title}`);
     for (const detail of result.details) console.log(`- ${detail}`);
     process.exitCode = result.ok ? 0 : 1;
