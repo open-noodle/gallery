@@ -72,11 +72,11 @@ where
 
 -- PersonRepository.getDormantPeople
 select
-  "person"."id",
+  "person"."personGroupId" as "id",
   "person"."name"
 from
   "person"
-  inner join "asset_face" on "asset_face"."personId" = "person"."id"
+  inner join "asset_face" on "asset_face"."personGroupId" = "person"."personGroupId"
   inner join "asset" on "asset"."id" = "asset_face"."assetId"
 where
   "person"."ownerId" = $1
@@ -98,13 +98,14 @@ where
       and "asset_file"."type" = $8
   )
 group by
-  "person"."id"
+  "person"."personGroupId",
+  "person"."name"
 having
   max("asset"."localDateTime") < $9
   and count(distinct ("asset"."id")) >= $10
 order by
   count(distinct ("asset"."id")) desc,
-  "person"."id" asc
+  "person"."personGroupId" asc
 limit
   $11
 
