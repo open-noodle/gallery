@@ -69,7 +69,7 @@ const manifest: Manifest = {
       required_check: 'mobile-drift-rebase-check',
     },
   ],
-  coverage_ignore: ['docs/superpowers/**'],
+  coverage_ignore: ['specs/**'],
 };
 
 const dotfileManifest: Manifest = manifestWith({
@@ -100,7 +100,7 @@ describe('fork ownership coverage', () => {
         [
           'server/src/services/shared-space.service.ts',
           'server/src/schema/migrations-gallery/1772250000000-AddShowInTimelineToSharedSpaceMember.ts',
-          'docs/superpowers/plans/scratch.md',
+          'specs/scratch.md',
           'web/src/routes/(user)/photos/+page.svelte',
         ],
         manifest,
