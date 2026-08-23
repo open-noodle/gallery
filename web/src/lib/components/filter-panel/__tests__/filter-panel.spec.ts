@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
+import { tick } from 'svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
 import type { FilterPanelConfig, FilterSection } from '../filter-panel';
 import { ALL_FILTER_SECTIONS, createFilterState } from '../filter-panel';
@@ -985,6 +986,80 @@ describe('Section Selector', () => {
       renderPanel([...ALL_FILTER_SECTIONS]);
 
       expect(screen.queryByTestId('filter-section-text')).toBeNull();
+    });
+  });
+
+  // #797: two people on the same version saw different filter category lists. Which sections a
+  // user sees is a per-browser ledger, and it could silently diverge from the app's section list.
+  describe('#797 stored-ledger divergence', () => {
+    // What a browser stored before #447 replaced the bare array with { selected, known }: the
+    // sections that existed at the time. Everything added since must still be revealed.
+    const PRE_LEDGER_STORED: FilterSection[] = ['timeline', 'people', 'location', 'camera', 'tags', 'rating', 'media'];
+
+    it('reveals every section added since the ledger format to a browser on legacy storage', () => {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(PRE_LEDGER_STORED));
+
+      renderPanel([...ALL_FILTER_SECTIONS]);
+
+      for (const section of ALL_FILTER_SECTIONS) {
+        expect(screen.getByTestId(`filter-section-${section}`)).toBeTruthy();
+      }
+    });
+
+    it('reveals sections added since the ledger without un-hiding ones hidden back then', () => {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(['timeline', 'people']));
+
+      renderPanel([...ALL_FILTER_SECTIONS]);
+
+      expect(screen.getByTestId('filter-section-favorites')).toBeTruthy();
+      expect(screen.getByTestId('filter-section-albums')).toBeTruthy();
+      expect(screen.getByTestId('filter-section-text')).toBeTruthy();
+      expect(screen.queryByTestId('filter-section-camera')).toBeNull();
+      expect(screen.queryByTestId('filter-section-rating')).toBeNull();
+    });
+
+    // Album detail and the album asset picker share one storage key but offer different section
+    // lists (detail drops 'albums'). Visiting detail must not erase the picker's record.
+    it('keeps a hidden section hidden after a surface that does not offer it rewrites the ledger', async () => {
+      const picker = renderPanel([...ALL_FILTER_SECTIONS]);
+      await openSectionMenu();
+      await fireEvent.click(screen.getByTestId('section-toggle-albums'));
+      picker.unmount();
+
+      const detail = renderPanel(ALL_FILTER_SECTIONS.filter((section) => section !== 'albums'));
+      await tick();
+      detail.unmount();
+
+      renderPanel([...ALL_FILTER_SECTIONS]);
+
+      expect(screen.queryByTestId('filter-section-albums')).toBeNull();
+    });
+
+    it('keeps a visible section visible after a surface that does not offer it rewrites the ledger', async () => {
+      const detail = renderPanel(ALL_FILTER_SECTIONS.filter((section) => section !== 'albums'));
+      await openSectionMenu();
+      await fireEvent.click(screen.getByTestId('section-toggle-camera'));
+      detail.unmount();
+
+      renderPanel([...ALL_FILTER_SECTIONS]);
+
+      expect(screen.getByTestId('filter-section-albums')).toBeTruthy();
+      expect(screen.queryByTestId('filter-section-camera')).toBeNull();
+    });
+
+    it('offers to show all sections when every section this surface renders is hidden', async () => {
+      const picker = renderPanel([...ALL_FILTER_SECTIONS]);
+      await openSectionMenu();
+      for (const section of ALL_FILTER_SECTIONS) {
+        if (section !== 'albums') {
+          await fireEvent.click(screen.getByTestId(`section-toggle-${section}`));
+        }
+      }
+      picker.unmount();
+
+      renderPanel(ALL_FILTER_SECTIONS.filter((section) => section !== 'albums'));
+
+      expect(screen.getByTestId('show-all-sections')).toBeTruthy();
     });
   });
 
