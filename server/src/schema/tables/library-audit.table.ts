@@ -4,7 +4,7 @@ import { library_user_delete_after_audit } from 'src/schema/functions';
 
 @Table('library_audit')
 // When audit rows land, drop the corresponding library_user rows. See
-// docs/plans/2026-04-11-library-user-access-backfill-design.md.
+// specs/2026-04-11-library-user-access-backfill-design.md.
 @AfterInsertTrigger({
   name: 'library_user_delete_after_audit',
   scope: 'statement',

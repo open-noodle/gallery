@@ -8,7 +8,7 @@ import { UserTable } from 'src/schema/tables/user.table';
 // album_user. Drives SharedSpaceAlbumSync.getCreatedAfter (the per-album asset
 // backfill loop). Mirrors library_user.
 //
-// See docs/superpowers/specs/2026-06-15-space-albums-phase2a-server-sync-design.md §4.1.
+// See specs/2026-06-15-space-albums-phase2a-server-sync-design.md §4.1.
 @Table({ name: 'shared_space_album_user' })
 @Index({ name: 'shared_space_album_user_userId_createId_idx', columns: ['userId', 'createId'] })
 export class SharedSpaceAlbumUserTable {
