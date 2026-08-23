@@ -28,6 +28,70 @@ const setup = (db?: Kysely<DB>) => {
   return { ctx, sut: ctx.get(AssetRepository) };
 };
 
+const seedPeriodAsset = async (
+  ctx: ReturnType<typeof setup>['ctx'],
+  ownerId: string,
+  {
+    localDateTime,
+    country = null,
+    city = null,
+    isFavorite = false,
+    withPreview = true,
+    visibility = AssetVisibility.Timeline,
+    deleted = false,
+    type = AssetType.Image,
+    duration = null,
+  }: {
+    localDateTime: Date;
+    country?: string | null;
+    city?: string | null;
+    isFavorite?: boolean;
+    withPreview?: boolean;
+    visibility?: AssetVisibility;
+    deleted?: boolean;
+    type?: AssetType;
+    duration?: number | null;
+  },
+) => {
+  const { asset } = await ctx.newAsset({
+    ownerId,
+    visibility,
+    localDateTime,
+    isFavorite,
+    deletedAt: deleted ? new Date() : null,
+    type,
+    duration,
+  });
+  await Promise.all([
+    ctx.newExif({ assetId: asset.id, country, city }),
+    ctx.newJobStatus({ assetId: asset.id }),
+    withPreview ? ctx.newAssetFile({ assetId: asset.id, type: AssetFileType.Preview, path: `${asset.id}.jpg` }) : null,
+  ]);
+  return asset;
+};
+
+const seedPerson = async (
+  ctx: ReturnType<typeof setup>['ctx'],
+  ownerId: string,
+  {
+    name = 'Test Person',
+    type = 'person',
+    isHidden = false,
+  }: { name?: string; type?: string; isHidden?: boolean } = {},
+) => {
+  const { person } = await ctx.newPerson({ ownerId, name, type, isHidden });
+  return person;
+};
+
+const seedFace = async (
+  ctx: ReturnType<typeof setup>['ctx'],
+  assetId: string,
+  personId: string,
+  { isVisible = true, deletedAt = null }: { isVisible?: boolean; deletedAt?: Date | null } = {},
+) => {
+  await ctx.newAssetFace({ assetId, personId, isVisible, deletedAt });
+};
+
 const createTimelineAssetWithPeople = async (
   ctx: ReturnType<typeof setup>['ctx'],
   ownerId: string,
@@ -946,6 +1010,422 @@ describe(AssetRepository.name, () => {
           expect.objectContaining({ id: duplicateFaceAsset.id, localDateTime: new Date('2024-04-01T12:00:00Z') }),
         ]),
       );
+    });
+  });
+
+  describe('getMemoryAssetsForPeriod', () => {
+    it('filters by month across years and returns the correct UTC year', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-07-10T12:00:00Z') });
+      await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2022-07-20T12:00:00Z') });
+      await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-06-10T12:00:00Z') }); // wrong month
+
+      const result = await sut.getMemoryAssetsForPeriod(user.id, {
+        months: [7],
+        takenBefore: new Date('2026-01-01T00:00:00Z'),
+      });
+
+      expect(result).toHaveLength(2);
+      expect(result.map((r) => r.year).toSorted((left, right) => left - right)).toEqual([2022, 2023]);
+    });
+
+    it('unions multiple months', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-06-10T12:00:00Z') });
+      await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-07-10T12:00:00Z') });
+      await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-08-10T12:00:00Z') });
+      await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-09-10T12:00:00Z') }); // excluded
+
+      const result = await sut.getMemoryAssetsForPeriod(user.id, {
+        months: [6, 7, 8],
+        takenBefore: new Date('2026-01-01T00:00:00Z'),
+      });
+
+      expect(result).toHaveLength(3);
+    });
+
+    it('narrows to a day-of-month across years', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-07-15T12:00:00Z') });
+      await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2022-07-15T12:00:00Z') });
+      await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-07-16T12:00:00Z') }); // wrong day
+
+      const result = await sut.getMemoryAssetsForPeriod(user.id, {
+        months: [7],
+        day: 15,
+        takenBefore: new Date('2026-01-01T00:00:00Z'),
+      });
+
+      expect(result).toHaveLength(2);
+    });
+
+    it('returns only favorites when favoritesOnly is set', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const fav = await seedPeriodAsset(ctx, user.id, {
+        localDateTime: new Date('2023-07-10T12:00:00Z'),
+        isFavorite: true,
+      });
+      await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-07-11T12:00:00Z'), isFavorite: false });
+
+      const result = await sut.getMemoryAssetsForPeriod(user.id, {
+        months: [7],
+        favoritesOnly: true,
+        takenBefore: new Date('2026-01-01T00:00:00Z'),
+      });
+
+      expect(result.map((r) => r.id)).toEqual([fav.id]);
+      expect(result[0].isFavorite).toBe(true);
+    });
+
+    it('excludes assets taken after takenBefore', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-07-10T12:00:00Z') });
+      await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2025-07-10T12:00:00Z') }); // after cutoff
+
+      const result = await sut.getMemoryAssetsForPeriod(user.id, {
+        months: [7],
+        takenBefore: new Date('2024-01-01T00:00:00Z'),
+      });
+
+      expect(result).toHaveLength(1);
+      expect(result[0].year).toBe(2023);
+    });
+
+    it('returns city and country for geotagged assets and nulls for ungeotagged', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      await seedPeriodAsset(ctx, user.id, {
+        localDateTime: new Date('2023-07-10T12:00:00Z'),
+        country: 'France',
+        city: 'Paris',
+      });
+      await seedPeriodAsset(ctx, user.id, {
+        localDateTime: new Date('2023-07-11T12:00:00Z'),
+        country: null,
+        city: null,
+      });
+
+      const result = await sut.getMemoryAssetsForPeriod(user.id, {
+        months: [7],
+        takenBefore: new Date('2026-01-01T00:00:00Z'),
+      });
+
+      expect(result).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ country: 'France', city: 'Paris' }),
+          expect.objectContaining({ country: null, city: null }),
+        ]),
+      );
+    });
+
+    it('excludes assets without a preview, deleted, non-timeline, and other owners; orders by localDateTime asc', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { user: other } = await ctx.newUser();
+      const first = await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-07-05T12:00:00Z') });
+      const second = await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-07-25T12:00:00Z') });
+      await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-07-10T12:00:00Z'), withPreview: false });
+      await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-07-10T12:00:00Z'), deleted: true });
+      await seedPeriodAsset(ctx, user.id, {
+        localDateTime: new Date('2023-07-10T12:00:00Z'),
+        visibility: AssetVisibility.Archive,
+      });
+      await seedPeriodAsset(ctx, other.id, { localDateTime: new Date('2023-07-10T12:00:00Z') });
+
+      const result = await sut.getMemoryAssetsForPeriod(user.id, {
+        months: [7],
+        takenBefore: new Date('2026-01-01T00:00:00Z'),
+      });
+
+      expect(result.map((r) => r.id)).toEqual([first.id, second.id]);
+    });
+
+    it('returns type and duration on each row', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const image = await seedPeriodAsset(ctx, user.id, {
+        localDateTime: new Date('2023-07-10T12:00:00Z'),
+        type: AssetType.Image,
+        duration: null,
+      });
+      const video = await seedPeriodAsset(ctx, user.id, {
+        localDateTime: new Date('2023-07-11T12:00:00Z'),
+        type: AssetType.Video,
+        duration: 5000,
+      });
+
+      const result = await sut.getMemoryAssetsForPeriod(user.id, {
+        months: [7],
+        takenBefore: new Date('2026-01-01T00:00:00Z'),
+      });
+
+      expect(result).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: image.id, type: AssetType.Image, duration: null }),
+          expect.objectContaining({ id: video.id, type: AssetType.Video, duration: 5000 }),
+        ]),
+      );
+    });
+
+    it('type: AssetType.Video returns only videos', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      await seedPeriodAsset(ctx, user.id, {
+        localDateTime: new Date('2023-07-10T12:00:00Z'),
+        type: AssetType.Image,
+        duration: null,
+      });
+      const video1 = await seedPeriodAsset(ctx, user.id, {
+        localDateTime: new Date('2023-07-11T12:00:00Z'),
+        type: AssetType.Video,
+        duration: 5000,
+      });
+      const video2 = await seedPeriodAsset(ctx, user.id, {
+        localDateTime: new Date('2023-07-12T12:00:00Z'),
+        type: AssetType.Video,
+        duration: 8000,
+      });
+
+      const result = await sut.getMemoryAssetsForPeriod(user.id, {
+        months: [7],
+        type: AssetType.Video,
+        takenBefore: new Date('2026-01-01T00:00:00Z'),
+      });
+
+      expect(result).toHaveLength(2);
+      expect(result.map((r) => r.id).toSorted()).toEqual([video1.id, video2.id].toSorted());
+      for (const row of result) {
+        expect(row.type).toBe(AssetType.Video);
+      }
+    });
+
+    it('omitting type returns both images and videos', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      await seedPeriodAsset(ctx, user.id, {
+        localDateTime: new Date('2023-07-10T12:00:00Z'),
+        type: AssetType.Image,
+        duration: null,
+      });
+      await seedPeriodAsset(ctx, user.id, {
+        localDateTime: new Date('2023-07-11T12:00:00Z'),
+        type: AssetType.Video,
+        duration: 5000,
+      });
+      await seedPeriodAsset(ctx, user.id, {
+        localDateTime: new Date('2023-07-12T12:00:00Z'),
+        type: AssetType.Video,
+        duration: 8000,
+      });
+
+      const result = await sut.getMemoryAssetsForPeriod(user.id, {
+        months: [7],
+        takenBefore: new Date('2026-01-01T00:00:00Z'),
+      });
+
+      expect(result).toHaveLength(3);
+    });
+
+    it('returns a video with a null duration', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const video = await seedPeriodAsset(ctx, user.id, {
+        localDateTime: new Date('2023-07-10T12:00:00Z'),
+        type: AssetType.Video,
+        duration: null,
+      });
+
+      const result = await sut.getMemoryAssetsForPeriod(user.id, {
+        months: [7],
+        takenBefore: new Date('2026-01-01T00:00:00Z'),
+      });
+
+      expect(result.map((r) => r.id)).toEqual([video.id]);
+      expect(result[0].type).toBe(AssetType.Video);
+      expect(result[0].duration).toBeNull();
+    });
+
+    it('includes an asset exactly on takenBefore', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const takenBefore = new Date('2023-07-10T12:00:00Z');
+      const asset = await seedPeriodAsset(ctx, user.id, { localDateTime: takenBefore });
+
+      const result = await sut.getMemoryAssetsForPeriod(user.id, {
+        months: [7],
+        takenBefore,
+      });
+
+      expect(result.map((r) => r.id)).toEqual([asset.id]);
+    });
+  });
+
+  describe('getMemoryFacesForPeriod', () => {
+    describe('given assets in and out of the requested months', () => {
+      it('then returns only rows in the requested months, unioning multi-month filters', async () => {
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const person = await seedPerson(ctx, user.id, { name: 'Anna' });
+
+        const june = await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-06-10T12:00:00Z') });
+        await seedFace(ctx, june.id, person.id);
+        const july = await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-07-10T12:00:00Z') });
+        await seedFace(ctx, july.id, person.id);
+        const august = await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-08-10T12:00:00Z') });
+        await seedFace(ctx, august.id, person.id);
+        const september = await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-09-10T12:00:00Z') });
+        await seedFace(ctx, september.id, person.id); // excluded — wrong month
+
+        const result = await sut.getMemoryFacesForPeriod(user.id, {
+          months: [6, 7, 8],
+          takenBefore: new Date('2026-01-01T00:00:00Z'),
+        });
+
+        expect(result.map((r) => r.assetId).toSorted()).toEqual([june.id, july.id, august.id].toSorted());
+      });
+    });
+
+    describe('given an asset with two named subjects', () => {
+      it('then returns one row per (asset, person)', async () => {
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const asset = await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-06-10T12:00:00Z') });
+        const anna = await seedPerson(ctx, user.id, { name: 'Anna' });
+        const ben = await seedPerson(ctx, user.id, { name: 'Ben' });
+        await seedFace(ctx, asset.id, anna.id);
+        await seedFace(ctx, asset.id, ben.id);
+
+        const result = await sut.getMemoryFacesForPeriod(user.id, {
+          months: [6],
+          takenBefore: new Date('2026-01-01T00:00:00Z'),
+        });
+
+        expect(result).toHaveLength(2);
+        expect(result.map((r) => r.personName).toSorted()).toEqual(['Anna', 'Ben']);
+        expect(result.every((r) => r.assetId === asset.id)).toBe(true);
+      });
+    });
+
+    describe('given an asset taken after takenBefore', () => {
+      it('then excludes that asset', async () => {
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const person = await seedPerson(ctx, user.id, { name: 'Anna' });
+        const early = await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-06-10T12:00:00Z') });
+        await seedFace(ctx, early.id, person.id);
+        const late = await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2025-06-10T12:00:00Z') });
+        await seedFace(ctx, late.id, person.id);
+
+        const result = await sut.getMemoryFacesForPeriod(user.id, {
+          months: [6],
+          takenBefore: new Date('2024-01-01T00:00:00Z'),
+        });
+
+        expect(result.map((r) => r.assetId)).toEqual([early.id]);
+        expect(result[0].year).toBe(2023);
+      });
+    });
+
+    describe('given an asset at a UTC month/year boundary', () => {
+      it('then extracts the year in UTC', async () => {
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const person = await seedPerson(ctx, user.id, { name: 'Anna' });
+        // Local time is Dec 31 23:30 in UTC-1, but the stored localDateTime column (interpreted
+        // as a naive UTC wall-clock reading) falls on Jan 1 the next year.
+        const asset = await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2024-01-01T00:30:00Z') });
+        await seedFace(ctx, asset.id, person.id);
+
+        const result = await sut.getMemoryFacesForPeriod(user.id, {
+          months: [1],
+          takenBefore: new Date('2026-01-01T00:00:00Z'),
+        });
+
+        expect(result.map((r) => r.year)).toEqual([2024]);
+      });
+    });
+
+    describe('given exclusion cases', () => {
+      it('excludes unnamed people, hidden people, invisible faces, soft-deleted faces, assets without a preview, soft-deleted assets, non-timeline assets, and another owner entirely; includes pets; orders by localDateTime asc', async () => {
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const { user: other } = await ctx.newUser();
+
+        const unnamed = await seedPerson(ctx, user.id, { name: '' });
+        const hidden = await seedPerson(ctx, user.id, { name: 'Hidden', isHidden: true });
+        const normal = await seedPerson(ctx, user.id, { name: 'Zoe' });
+        const pet = await seedPerson(ctx, user.id, { name: 'Rex', type: 'pet' });
+        const otherOwnersPerson = await seedPerson(ctx, other.id, { name: 'Stranger' });
+
+        // unnamed person
+        const unnamedAsset = await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-06-05T12:00:00Z') });
+        await seedFace(ctx, unnamedAsset.id, unnamed.id);
+
+        // hidden person
+        const hiddenAsset = await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-06-06T12:00:00Z') });
+        await seedFace(ctx, hiddenAsset.id, hidden.id);
+
+        // invisible face
+        const invisibleFaceAsset = await seedPeriodAsset(ctx, user.id, {
+          localDateTime: new Date('2023-06-07T12:00:00Z'),
+        });
+        await seedFace(ctx, invisibleFaceAsset.id, normal.id, { isVisible: false });
+
+        // soft-deleted face
+        const deletedFaceAsset = await seedPeriodAsset(ctx, user.id, {
+          localDateTime: new Date('2023-06-08T12:00:00Z'),
+        });
+        await seedFace(ctx, deletedFaceAsset.id, normal.id, { deletedAt: new Date() });
+
+        // asset without a preview file
+        const noPreviewAsset = await seedPeriodAsset(ctx, user.id, {
+          localDateTime: new Date('2023-06-09T12:00:00Z'),
+          withPreview: false,
+        });
+        await seedFace(ctx, noPreviewAsset.id, normal.id);
+
+        // soft-deleted asset
+        const deletedAsset = await seedPeriodAsset(ctx, user.id, {
+          localDateTime: new Date('2023-06-10T12:00:00Z'),
+          deleted: true,
+        });
+        await seedFace(ctx, deletedAsset.id, normal.id);
+
+        // non-timeline (archived) asset
+        const archivedAsset = await seedPeriodAsset(ctx, user.id, {
+          localDateTime: new Date('2023-06-11T12:00:00Z'),
+          visibility: AssetVisibility.Archive,
+        });
+        await seedFace(ctx, archivedAsset.id, normal.id);
+
+        // another owner's asset + person entirely
+        const otherAsset = await seedPeriodAsset(ctx, other.id, { localDateTime: new Date('2023-06-12T12:00:00Z') });
+        await seedFace(ctx, otherAsset.id, otherOwnersPerson.id);
+
+        // qualifying rows, seeded out of chronological order to prove ordering
+        const later = await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-06-20T12:00:00Z') });
+        await seedFace(ctx, later.id, normal.id);
+        const earlier = await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-06-15T12:00:00Z') });
+        await seedFace(ctx, earlier.id, normal.id);
+        const petAsset = await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-06-16T12:00:00Z') });
+        await seedFace(ctx, petAsset.id, pet.id);
+
+        const result = await sut.getMemoryFacesForPeriod(user.id, {
+          months: [6],
+          takenBefore: new Date('2026-01-01T00:00:00Z'),
+        });
+
+        expect(result.map((r) => ({ assetId: r.assetId, personName: r.personName }))).toEqual([
+          { assetId: earlier.id, personName: 'Zoe' },
+          { assetId: petAsset.id, personName: 'Rex' },
+          { assetId: later.id, personName: 'Zoe' },
+        ]);
+      });
     });
   });
 
