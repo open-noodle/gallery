@@ -11,7 +11,7 @@ Gallery supports two memory families:
 | **On this day** | Photos taken around the same calendar day in previous years | App-generated "N years ago" title  |
 | **Rule memory** | Server-curated sets such as birthdays and recent trips      | Server-provided title and subtitle |
 
-Each individual type — **On this day**, **Birthdays**, and **Recent trips** — can be enabled or disabled both globally by an admin and per user. See [Generated memory controls](#generated-memory-controls) below.
+Each individual type can be enabled or disabled both globally by an admin and per user. See [Generated memory controls](#generated-memory-controls) below for the full list of type keys.
 
 Saved memories stay available after their normal display window. Hidden or deleted assets are excluded from generated memories.
 
@@ -41,6 +41,8 @@ The rule compares the last 30 days of location clusters with the preceding 90 da
 
 Trip memories are titled **Recent trip to City, Country** or **Recent trip to Country**. The subtitle shows the number of photos and days in the trip window.
 
+Because a trip surfaces at most once per place every 30 days, the card stays in the memory lane for several days rather than the single day it was generated on: 3 days for a short trip, up to 7 for a longer one.
+
 ### Trip photo curation
 
 Trip memories try to show representative photos instead of every near-duplicate burst:
@@ -54,7 +56,7 @@ Trip memories try to show representative photos instead of every near-duplicate 
 
 The **Generate memories** nightly task creates both classic **On this day** memories and rule memories.
 
-Rule memories run only through the current day and are capped at 2 rule-generated cards per user per day. If one rule fails for a user, Gallery logs the failure and continues evaluating the remaining users and rules where possible.
+Rule memories run only through the current day and are capped at 6 rule-generated cards visible per user per day. If one rule fails for a user, Gallery logs the failure and continues evaluating the remaining users and rules where possible.
 
 You can enable, disable, or reschedule this task from **Administration → Settings → Nightly Tasks**. The same setting is exposed as `nightlyTasks.generateMemories` in the [config file](/install/config-file).
 
@@ -71,15 +73,54 @@ Every memory type is controlled at two independent layers:
 
 A user receives a memory type only when it is **both** globally available **and** enabled in that user's own settings.
 
-The three built-in types each have a stable key used in configuration:
+The built-in types each have a stable key used in configuration:
 
-| Type key      | Setting label | Controls                                |
-| ------------- | ------------- | --------------------------------------- |
-| `on_this_day` | On this day   | "N years ago" photo memories            |
-| `birthday`    | Birthdays     | Birthday rule memories for named people |
-| `recent_trip` | Recent trips  | Recent trip rule memories               |
+| Type key              | Setting label           | Controls                                                                    |
+| --------------------- | ----------------------- | --------------------------------------------------------------------------- |
+| `on_this_day`         | On this day             | "N years ago" photo memories                                                |
+| `birthday`            | Birthdays               | Birthday rule memories for named people                                     |
+| `recent_trip`         | Recent trips            | Recent trip rule memories                                                   |
+| `month_recap`         | This month              | A past year's photos from this calendar month, shown early in the month     |
+| `favorites_throwback` | Favorite moments        | Your favorite photos from this calendar month in a past year                |
+| `on_this_day_place`   | On this day, in a place | A past year's on-this-day photos when they cluster in one place             |
+| `season_recap`        | Season recap            | A past meteorological season, shown when the new season begins              |
+| `people_together`     | People together         | Two people or pets often photographed together in a past year               |
+| `video_moments`       | Video moments           | Videos you filmed in this month of a past year                              |
+| `trip_anniversary`    | Trip anniversaries      | A past trip resurfaced on the anniversary of the day it began               |
+| `themed`              | Themes                  | Photo themes like sunsets, food, and beach days, found automatically        |
+| `person_throwback`    | Times with someone      | A warm chapter with someone who has not appeared in your photos for a while |
 
-All three default to **on**.
+All default to **on**.
+
+`themed` (Themes) additionally requires [Smart Search](/features/searching) to be enabled — it matches photos to a rotating monthly theme (sunsets, food, beach days, etc.) via CLIP embeddings. If smart search is disabled or the machine learning service is unavailable, Gallery simply skips the rule for that night; it does not surface an error.
+
+Two of these types are tunable in **Administration → Settings → Memories**, or via the [config file](/install/config-file):
+
+- **Theme match threshold** (`memories.themeMaxDistance`, default `0.75`) — how close a photo must be to the month's theme. This is a text-to-image CLIP distance, so it is much larger than a face-matching threshold; values under `0.5` usually yield no themed memories at all.
+- **Person throwback dormancy** (`memories.personThrowbackDormancyMonths`, default `6`) — how long someone must be absent from your photos before `person_throwback` can resurface them.
+
+### When each type appears
+
+Most generated types are anchored to a day of the month, so a new server does not produce all of them right away — a type only generates on its own day. Dates are evaluated in UTC.
+
+Once created, a memory stays in the memory lane on the home page for its visibility window. After the window closes the memory is still kept and remains browsable under **Memories** in the Library sidebar, it simply stops appearing on the home page.
+
+| Type key              | Generated on                                       | Stays in the memory lane for |
+| --------------------- | -------------------------------------------------- | ---------------------------- |
+| `on_this_day`         | every day                                          | 1 day                        |
+| `birthday`            | every day (a person's birthday must fall that day) | 1 day                        |
+| `recent_trip`         | every day                                          | 3–7 days, matching the trip  |
+| `on_this_day_place`   | every day                                          | 1 day                        |
+| `trip_anniversary`    | every day (the anniversary of a past trip's start) | 3–7 days, matching the trip  |
+| `month_recap`         | the 1st                                            | 7 days                       |
+| `video_moments`       | the 8th                                            | 5 days                       |
+| `person_throwback`    | the 13th                                           | 7 days                       |
+| `favorites_throwback` | the 15th                                           | 7 days                       |
+| `people_together`     | the 20th                                           | 7 days                       |
+| `themed`              | the 22nd                                           | 5 days                       |
+| `season_recap`        | the 1st of March, June, September, and December    | 10 days                      |
+
+A type generates a memory only when your library has enough matching photos for it, so a qualifying day does not guarantee a card. The cap of 6 rule memories per day also applies, and it counts memories still inside their window from earlier days: when more qualify than there is room for, the highest-scoring cards win and the rest are skipped. **On this day** memories are not part of that cap.
 
 ### Per-user toggles
 
