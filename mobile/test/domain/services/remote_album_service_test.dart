@@ -17,7 +17,7 @@ void main() {
 
   setUpAll(() {
     registerFallbackValue(UserDto(id: 'fallback', email: 'f@e.com', name: 'f', profileChangedAt: DateTime(2024)));
-    // Required because the updateAlbum test below stubs `repository.update(any())`,
+    // Required because the updateAlbum test below stubs `repository.updateAlbum(any())`,
     // and mocktail needs a fallback instance for any type used with `any()`.
     registerFallbackValue(
       RemoteAlbum(
@@ -89,7 +89,7 @@ void main() {
 
     test('forwards createdAt to the api repository and stores the result locally', () async {
       when(() => repository.getOwner(any())).thenAnswer((_) async => owner);
-      when(() => repository.update(any())).thenAnswer((_) async {});
+      when(() => repository.updateAlbum(any())).thenAnswer((_) async {});
       when(
         () => albumApiRepository.updateAlbum(
           any(),
@@ -118,7 +118,7 @@ void main() {
           createdAt: createdAt,
         ),
       ).called(1);
-      verify(() => repository.update(updated)).called(1);
+      verify(() => repository.updateAlbum(updated)).called(1);
     });
   });
 }
