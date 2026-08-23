@@ -89,7 +89,7 @@ const seedFace = async (
   personId: string,
   { isVisible = true, deletedAt = null }: { isVisible?: boolean; deletedAt?: Date | null } = {},
 ) => {
-  await ctx.newAssetFace({ assetId, personId, isVisible, deletedAt });
+  await ctx.newAssetFace({ assetId, personGroupId: personId, isVisible, deletedAt });
 };
 
 const createTimelineAssetWithPeople = async (
@@ -1273,13 +1273,13 @@ describe(AssetRepository.name, () => {
         const person = await seedPerson(ctx, user.id, { name: 'Anna' });
 
         const june = await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-06-10T12:00:00Z') });
-        await seedFace(ctx, june.id, person.id);
+        await seedFace(ctx, june.id, person.personGroupId);
         const july = await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-07-10T12:00:00Z') });
-        await seedFace(ctx, july.id, person.id);
+        await seedFace(ctx, july.id, person.personGroupId);
         const august = await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-08-10T12:00:00Z') });
-        await seedFace(ctx, august.id, person.id);
+        await seedFace(ctx, august.id, person.personGroupId);
         const september = await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-09-10T12:00:00Z') });
-        await seedFace(ctx, september.id, person.id); // excluded — wrong month
+        await seedFace(ctx, september.id, person.personGroupId); // excluded — wrong month
 
         const result = await sut.getMemoryFacesForPeriod(user.id, {
           months: [6, 7, 8],
@@ -1297,8 +1297,8 @@ describe(AssetRepository.name, () => {
         const asset = await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-06-10T12:00:00Z') });
         const anna = await seedPerson(ctx, user.id, { name: 'Anna' });
         const ben = await seedPerson(ctx, user.id, { name: 'Ben' });
-        await seedFace(ctx, asset.id, anna.id);
-        await seedFace(ctx, asset.id, ben.id);
+        await seedFace(ctx, asset.id, anna.personGroupId);
+        await seedFace(ctx, asset.id, ben.personGroupId);
 
         const result = await sut.getMemoryFacesForPeriod(user.id, {
           months: [6],
@@ -1317,9 +1317,9 @@ describe(AssetRepository.name, () => {
         const { user } = await ctx.newUser();
         const person = await seedPerson(ctx, user.id, { name: 'Anna' });
         const early = await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-06-10T12:00:00Z') });
-        await seedFace(ctx, early.id, person.id);
+        await seedFace(ctx, early.id, person.personGroupId);
         const late = await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2025-06-10T12:00:00Z') });
-        await seedFace(ctx, late.id, person.id);
+        await seedFace(ctx, late.id, person.personGroupId);
 
         const result = await sut.getMemoryFacesForPeriod(user.id, {
           months: [6],
@@ -1339,7 +1339,7 @@ describe(AssetRepository.name, () => {
         // Local time is Dec 31 23:30 in UTC-1, but the stored localDateTime column (interpreted
         // as a naive UTC wall-clock reading) falls on Jan 1 the next year.
         const asset = await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2024-01-01T00:30:00Z') });
-        await seedFace(ctx, asset.id, person.id);
+        await seedFace(ctx, asset.id, person.personGroupId);
 
         const result = await sut.getMemoryFacesForPeriod(user.id, {
           months: [1],
@@ -1364,56 +1364,56 @@ describe(AssetRepository.name, () => {
 
         // unnamed person
         const unnamedAsset = await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-06-05T12:00:00Z') });
-        await seedFace(ctx, unnamedAsset.id, unnamed.id);
+        await seedFace(ctx, unnamedAsset.id, unnamed.personGroupId);
 
         // hidden person
         const hiddenAsset = await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-06-06T12:00:00Z') });
-        await seedFace(ctx, hiddenAsset.id, hidden.id);
+        await seedFace(ctx, hiddenAsset.id, hidden.personGroupId);
 
         // invisible face
         const invisibleFaceAsset = await seedPeriodAsset(ctx, user.id, {
           localDateTime: new Date('2023-06-07T12:00:00Z'),
         });
-        await seedFace(ctx, invisibleFaceAsset.id, normal.id, { isVisible: false });
+        await seedFace(ctx, invisibleFaceAsset.id, normal.personGroupId, { isVisible: false });
 
         // soft-deleted face
         const deletedFaceAsset = await seedPeriodAsset(ctx, user.id, {
           localDateTime: new Date('2023-06-08T12:00:00Z'),
         });
-        await seedFace(ctx, deletedFaceAsset.id, normal.id, { deletedAt: new Date() });
+        await seedFace(ctx, deletedFaceAsset.id, normal.personGroupId, { deletedAt: new Date() });
 
         // asset without a preview file
         const noPreviewAsset = await seedPeriodAsset(ctx, user.id, {
           localDateTime: new Date('2023-06-09T12:00:00Z'),
           withPreview: false,
         });
-        await seedFace(ctx, noPreviewAsset.id, normal.id);
+        await seedFace(ctx, noPreviewAsset.id, normal.personGroupId);
 
         // soft-deleted asset
         const deletedAsset = await seedPeriodAsset(ctx, user.id, {
           localDateTime: new Date('2023-06-10T12:00:00Z'),
           deleted: true,
         });
-        await seedFace(ctx, deletedAsset.id, normal.id);
+        await seedFace(ctx, deletedAsset.id, normal.personGroupId);
 
         // non-timeline (archived) asset
         const archivedAsset = await seedPeriodAsset(ctx, user.id, {
           localDateTime: new Date('2023-06-11T12:00:00Z'),
           visibility: AssetVisibility.Archive,
         });
-        await seedFace(ctx, archivedAsset.id, normal.id);
+        await seedFace(ctx, archivedAsset.id, normal.personGroupId);
 
         // another owner's asset + person entirely
         const otherAsset = await seedPeriodAsset(ctx, other.id, { localDateTime: new Date('2023-06-12T12:00:00Z') });
-        await seedFace(ctx, otherAsset.id, otherOwnersPerson.id);
+        await seedFace(ctx, otherAsset.id, otherOwnersPerson.personGroupId);
 
         // qualifying rows, seeded out of chronological order to prove ordering
         const later = await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-06-20T12:00:00Z') });
-        await seedFace(ctx, later.id, normal.id);
+        await seedFace(ctx, later.id, normal.personGroupId);
         const earlier = await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-06-15T12:00:00Z') });
-        await seedFace(ctx, earlier.id, normal.id);
+        await seedFace(ctx, earlier.id, normal.personGroupId);
         const petAsset = await seedPeriodAsset(ctx, user.id, { localDateTime: new Date('2023-06-16T12:00:00Z') });
-        await seedFace(ctx, petAsset.id, pet.id);
+        await seedFace(ctx, petAsset.id, pet.personGroupId);
 
         const result = await sut.getMemoryFacesForPeriod(user.id, {
           months: [6],
