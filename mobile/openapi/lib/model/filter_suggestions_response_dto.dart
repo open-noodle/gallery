@@ -41,6 +41,7 @@ class FilterSuggestionsResponseDto {
 
   /// Whether any favourite exists in the filtered set, ignoring isFavorite
   bool hasFavorites;
+
   /// Whether assets without coordinates exist in the filtered set
   bool hasNoGpsAssets;
 
