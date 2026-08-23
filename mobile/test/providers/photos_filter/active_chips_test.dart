@@ -112,6 +112,9 @@ void main() {
       final f = _base().copyWith(tagIds: ['t1']);
       final suggestions = FilterSuggestionsResponseDto(
         hasUnnamedPeople: false,
+        hasFavorites: false,
+        hasAssetsInAlbum: false,
+        hasAssetsNotInAlbum: false,
         tags: [FilterSuggestionsTagDto(id: 't1', value: 'wedding')],
       );
       final chips = activeChipsFromFilter(f, suggestions: suggestions);
@@ -285,7 +288,12 @@ void main() {
 
     test('person in state but absent from current suggestions still emits (id + state name)', () {
       final f = _base().copyWith(people: {_person('p1', 'Alice')});
-      final suggestions = FilterSuggestionsResponseDto(hasUnnamedPeople: false); // no people field
+      final suggestions = FilterSuggestionsResponseDto(
+        hasUnnamedPeople: false,
+        hasFavorites: false,
+        hasAssetsInAlbum: false,
+        hasAssetsNotInAlbum: false,
+      ); // no people field
       final chips = activeChipsFromFilter(f, suggestions: suggestions);
       expect(chips.single.label, 'Alice');
     });
