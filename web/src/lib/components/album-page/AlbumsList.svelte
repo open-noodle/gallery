@@ -17,7 +17,13 @@
     SortOrder,
     type AlbumViewSettings,
   } from '$lib/stores/preferences.store';
-  import { getSelectedAlbumGroupOption, sortAlbums, stringToSortOrder, type AlbumGroup } from '$lib/utils/album-utils';
+  import {
+    getSelectedAlbumGroupOption,
+    isAlbumEditor,
+    sortAlbums,
+    stringToSortOrder,
+    type AlbumGroup,
+  } from '$lib/utils/album-utils';
   import type { ContextMenuPosition } from '$lib/utils/context-menu';
   import { normalizeSearchString } from '$lib/utils/string-utils';
   import { AlbumUserRole, type AlbumResponseDto, type SharedLinkResponseDto } from '@immich/sdk';
@@ -170,8 +176,17 @@
     albumGroupIds = groupedAlbums.map(({ id }) => id);
   });
 
-  let showFullContextMenu = $derived(
-    allowEdit && selectedAlbum && selectedAlbum.albumUsers[0].user.id === authManager.user.id,
+  // Editing follows the server's Permission.AlbumUpdate (owner ∪ editor). Delete stays
+  // owner-only because Permission.AlbumDelete is. Share stays owner-only because this menu
+  // has always gated it that way — the server's Permission.AlbumShare is actually owner ∪
+  // editor, so the UI is deliberately the stricter of the two, and widening it is not this
+  // change's business. `allowEdit` gates all of them — only /albums passes it, and a list
+  // that opted out of editing must not sprout an Edit entry.
+  let canEditSelectedAlbum = $derived(
+    allowEdit && !!selectedAlbum && isAlbumEditor(selectedAlbum, authManager.user.id),
+  );
+  let isSelectedAlbumOwner = $derived(
+    allowEdit && !!selectedAlbum && selectedAlbum.albumUsers[0].user.id === authManager.user.id,
   );
 
   onMount(async () => {
@@ -290,12 +305,14 @@
 
 <!-- Context Menu -->
 <RightClickContextMenu title={$t('album_options')} {...contextMenuPosition} {isOpen} onClose={closeAlbumContextMenu}>
-  {#if showFullContextMenu}
+  {#if canEditSelectedAlbum}
     <MenuOption icon={mdiRenameOutline} text={$t('edit_album')} onClick={() => handleSelect('edit')} />
+  {/if}
+  {#if isSelectedAlbumOwner}
     <MenuOption icon={mdiShareVariantOutline} text={$t('share')} onClick={() => handleSelect('share')} />
   {/if}
   <MenuOption icon={mdiDownload} text={$t('download')} onClick={() => handleSelect('download')} />
-  {#if showFullContextMenu}
+  {#if isSelectedAlbumOwner}
     <MenuOption icon={mdiDeleteOutline} text={$t('delete')} onClick={() => handleSelect('delete')} />
   {/if}
 </RightClickContextMenu>
