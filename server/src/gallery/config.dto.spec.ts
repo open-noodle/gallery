@@ -76,7 +76,14 @@ describe('fork config survives schema composition', () => {
 
   it('keeps the fork top-level blocks', () => {
     expect(parsed.classification).toEqual({ enabled: true, categories: [] });
-    expect(parsed.memories).toEqual({ retentionDays: 365, birthday: true, recentTrips: true, types: {} });
+    expect(parsed.memories).toEqual({
+      retentionDays: 365,
+      birthday: true,
+      recentTrips: true,
+      types: {},
+      themeMaxDistance: 0.75,
+      personThrowbackDormancyMonths: 6,
+    });
     expect(parsed.storageUsage).toEqual({ includeDerivatives: false });
   });
 
