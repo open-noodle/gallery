@@ -22,7 +22,12 @@ extension PumpConsumerWidget on WidgetTester {
     List<Override> overrides = const [],
   }) async {
     await pumpWidget(
-      _localized(ProviderScope(overrides: overrides, child: _MaterialHost(child: widget))),
+      _localized(
+        ProviderScope(
+          overrides: overrides,
+          child: _MaterialHost(child: widget),
+        ),
+      ),
       duration: duration,
       phase: phase,
     );
@@ -49,7 +54,12 @@ extension PumpConsumerWidgetRaw on WidgetTester {
     List<Override> overrides = const [],
   }) async {
     await pumpWidget(
-      _localized(ProviderScope(overrides: overrides, child: _MaterialHost(child: widget))),
+      _localized(
+        ProviderScope(
+          overrides: overrides,
+          child: _MaterialHost(child: widget),
+        ),
+      ),
       duration: duration,
       phase: phase,
     );
