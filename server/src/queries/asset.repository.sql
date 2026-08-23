@@ -301,7 +301,7 @@ order by
 select
   "asset"."id" as "assetId",
   "asset"."localDateTime",
-  "person"."id" as "personId",
+  "person"."personGroupId" as "personId",
   "person"."name" as "personName",
   extract(
     year
@@ -311,7 +311,7 @@ select
 from
   "asset"
   inner join "asset_face" on "asset_face"."assetId" = "asset"."id"
-  inner join "person" on "person"."id" = "asset_face"."personId"
+  inner join "person" on "person"."personGroupId" = "asset_face"."personGroupId"
 where
   "asset"."ownerId" = $1
   and "asset"."visibility" = $2
@@ -341,7 +341,7 @@ order by
 
 -- AssetRepository.getMemoryPersonDailyCounts
 select
-  "asset_face"."personId",
+  "asset_face"."personGroupId" as "personId",
   date_trunc('day', asset."localDateTime" at time zone 'UTC') as "day",
   count(distinct ("asset"."id")) as "count"
 from
@@ -352,7 +352,7 @@ where
   and "asset"."visibility" = $2
   and "asset"."deletedAt" is null
   and "asset"."localDateTime" <= $3
-  and "asset_face"."personId" in ($4)
+  and "asset_face"."personGroupId" in ($4)
   and "asset_face"."deletedAt" is null
   and "asset_face"."isVisible" = $5
   and exists (
@@ -365,10 +365,10 @@ where
       and "asset_file"."type" = $6
   )
 group by
-  "asset_face"."personId",
+  "asset_face"."personGroupId",
   "day"
 order by
-  "asset_face"."personId",
+  "asset_face"."personGroupId",
   "day" asc
 
 -- AssetRepository.getMemoryAssetsForPersonWindow
@@ -380,7 +380,7 @@ from
   inner join "asset_face" on "asset_face"."assetId" = "asset"."id"
 where
   "asset"."ownerId" = $1
-  and "asset_face"."personId" = $2
+  and "asset_face"."personGroupId" = $2
   and "asset_face"."deletedAt" is null
   and "asset_face"."isVisible" = $3
   and "asset"."visibility" = $4

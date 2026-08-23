@@ -1,4 +1,4 @@
-import { SystemConfig } from 'src/config';
+import { SystemConfig } from 'src/dtos/config.dto';
 import { AssetType, AssetVisibility } from 'src/enum';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { MachineLearningRepository } from 'src/repositories/machine-learning.repository';
