@@ -2641,6 +2641,8 @@
   "reassing_hint": "指派选择的项目到已存在的人物",
   "recent": "最近",
   "recent_searches": "最近搜索",
+  "recent_trip_subtitle": "{assetCount, plural, one {# 张照片} other {# 张照片}}，跨越{dayCount, plural, one {# 天} other {# 天}}",
+  "recent_trip_title": "近期{location}之旅",
   "recently_added": "近期添加",
   "recently_added_body": "在专属页面上，直接查看您近期添加的所有内容。",
   "recently_added_description": "浏览您的媒体，并按上传到 Immich 的时间排序。",
