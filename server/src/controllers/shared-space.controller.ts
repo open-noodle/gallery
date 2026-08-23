@@ -34,6 +34,7 @@ import {
   SharedSpacePersonMergeDto,
   SharedSpacePersonResponseDto,
   SharedSpacePersonUpdateDto,
+  SpaceAssetFaceCreateDto,
   SpaceAssetFaceResponseDto,
   SpaceAssetFacesParamsDto,
   SpacePeopleQueryDto,
@@ -629,6 +630,26 @@ export class SharedSpaceController {
     @Param() { id, assetId }: SpaceAssetFacesParamsDto,
   ): Promise<SpaceAssetFaceResponseDto[]> {
     return this.service.getSpaceAssetFaces(auth, id, assetId);
+  }
+
+  // Spec §6.5 (Slice 6, Task 2). The decorator carries the API-key SCOPE, matching the sibling
+  // writes (e.g. the attach route above) — the real authority (Editor role + asset/person
+  // reachability) is enforced in the service.
+  @Post(':id/assets/:assetId/faces')
+  @Authenticated({ permission: Permission.SharedSpaceUpdate })
+  @Endpoint({
+    summary: 'Draw a face box on an asset, space-scoped',
+    description:
+      'Create a face box on an asset for a shared space and attach it to a space person. Coordinates are given ' +
+      'in the (possibly edited) preview image the client rendered and are converted to original-image space.',
+    history: new HistoryBuilder().added('v2').stable('v2'),
+  })
+  createSpaceAssetFace(
+    @Auth() auth: AuthDto,
+    @Param() { id, assetId }: SpaceAssetFacesParamsDto,
+    @Body() dto: SpaceAssetFaceCreateDto,
+  ): Promise<SpaceAssetFaceResponseDto> {
+    return this.service.createSpaceAssetFace(auth, id, assetId, dto);
   }
 
   @Get(':id/people/:personId')
