@@ -151,6 +151,15 @@ export const autoPlayVideo = persisted<boolean>('auto-play-video', true, {});
 
 export const alwaysLoadOriginalVideo = persisted<boolean>('always-load-original-video', false, {});
 
+/**
+ * Whether the asset-viewer Info panel crops each person's avatar out of the photo on screen
+ * (`true`, the long-standing behaviour) or shows their profile face instead (`false`).
+ *
+ * Defaults to `true` so nothing changes visually on upgrade. The setting is deliberately inert
+ * for a viewer with no reachable profile face — see resolvePersonAvatar in $lib/utils/person-avatar.
+ */
+export const cropFacesFromAsset = persisted<boolean>('crop-faces-from-asset', true, {});
+
 export const recentAlbumsDropdown = persisted<boolean>('recent-albums-open', true, {});
 export const recentSpacesDropdown = persisted<boolean>('recent-spaces-open', true, {});
 
