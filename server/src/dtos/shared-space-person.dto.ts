@@ -93,6 +93,21 @@ const SpaceAssetFacesParamsSchema = z
   })
   .meta({ id: 'SpaceAssetFacesParamsDto' });
 
+// Spec §6.5 (Slice 6, Task 2): draw a face box on a member's asset. imageWidth/imageHeight are the
+// dimensions of the (possibly edited) PREVIEW the client drew on -- mirrors AssetFaceCreateDto's
+// own shape, since both feed the same coordinate transform (convertFaceBoxToOriginalImageSpace).
+const SpaceAssetFaceCreateSchema = z
+  .object({
+    spacePersonId: z.uuidv4().describe('Space person ID this face will be attached to'),
+    imageWidth: z.int().describe('Image width in pixels (of the preview the box was drawn on)'),
+    imageHeight: z.int().describe('Image height in pixels (of the preview the box was drawn on)'),
+    x: z.int().describe('Face bounding box X coordinate'),
+    y: z.int().describe('Face bounding box Y coordinate'),
+    width: z.int().describe('Face bounding box width'),
+    height: z.int().describe('Face bounding box height'),
+  })
+  .meta({ id: 'SpaceAssetFaceCreateDto' });
+
 const SpacePersonFaceSuggestionParamsSchema = SpacePersonParamsSchema.extend({
   assetFaceId: z.uuidv4().describe('Unassigned asset face ID being reviewed'),
 }).meta({ id: 'SpacePersonFaceSuggestionParamsDto' });
@@ -151,6 +166,7 @@ export class SpacePersonParamsDto extends createZodDto(SpacePersonParamsSchema) 
 export class SpacePersonFaceParamsDto extends createZodDto(SpacePersonFaceParamsSchema) {}
 export class SpacePersonFaceSuggestionParamsDto extends createZodDto(SpacePersonFaceSuggestionParamsSchema) {}
 export class SpaceAssetFacesParamsDto extends createZodDto(SpaceAssetFacesParamsSchema) {}
+export class SpaceAssetFaceCreateDto extends createZodDto(SpaceAssetFaceCreateSchema) {}
 export class SharedSpacePersonResponseDto extends createZodDto(SharedSpacePersonResponseSchema) {}
 export class SharedSpacePeopleStatisticsResponseDto extends createZodDto(SharedSpacePeopleStatisticsResponseSchema) {}
 export class SpaceAssetFaceResponseDto extends createZodDto(SpaceAssetFaceResponseSchema) {}

@@ -64,6 +64,7 @@ import {
   QueueName,
   SharedSpaceActivityType,
   SharedSpaceRole,
+  SourceType,
   SystemMetadataKey,
   UserAvatarColor,
 } from 'src/enum';
@@ -83,6 +84,7 @@ import {
 } from 'src/services/accessible-identity-reconciliation';
 import { BaseService } from 'src/services/base.service';
 import { JobOf } from 'src/types';
+import { convertFaceBoxToOriginalImageSpace } from 'src/utils/asset.util';
 import { asDateString, asDateTimeString } from 'src/utils/date';
 import { ImmichMediaResponse } from 'src/utils/file';
 import { createCrossOwnerMergeAuthorizer } from 'src/utils/merge-policy';
@@ -2241,6 +2243,91 @@ export class SharedSpaceService extends BaseService {
       spacePersonId: face.spacePersonId,
       spacePersonName: face.spacePersonName,
     }));
+  }
+
+  /**
+   * Spec §6.5 (Slice 6, Task 2): draw a face box on a member's asset.
+   *
+   * Coordinates arrive in the (possibly edited) PREVIEW image's space — #992 lets an editor
+   * rotate a member's asset, so a rotated preview is a likely path, not an exotic one (F-16).
+   * `convertFaceBoxToOriginalImageSpace` is the SAME transform `PersonService.createFace` uses
+   * for the owner path, so the two can never drift on this geometry (a drift here silently
+   * misplaces boxes).
+   *
+   * The created face gets `personId = NULL` (never the owner's), `sourceType = Manual`, and
+   * `createdBy = auth.user.id` — the column §6.6 uses to decide whether the editor may later
+   * delete it, never `sourceType` (see that section's doc comment for why). It is then attached
+   * to the target space person through `linkFaceToSpacePerson`, always with `writeIdentity:
+   * true`: a face this call just created cannot already belong to one of the owner's own people
+   * (§6.3.1), so the identity-skip override case never applies here.
+   */
+  async createSpaceAssetFace(
+    auth: AuthDto,
+    spaceId: string,
+    assetId: string,
+    dto: {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      imageWidth: number;
+      imageHeight: number;
+      spacePersonId: string;
+    },
+  ): Promise<SpaceAssetFaceResponseDto> {
+    await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
+
+    if (!(await this.sharedSpaceRepository.isAssetInSpace(spaceId, assetId))) {
+      // Deliberate non-disclosure, matching getSpaceAssetFaces/attachFaceToSpacePerson's
+      // 'Asset not found' / 'Face not found' — an editor probing ids learns nothing about
+      // whether the asset exists at all.
+      throw new BadRequestException('Asset not found');
+    }
+    const person = await this.requireSpacePersonInSpace(spaceId, dto.spacePersonId);
+
+    const asset = await this.assetRepository.getById(assetId, { edits: true, exifInfo: true });
+    if (!asset) {
+      throw new NotFoundException('Asset not found');
+    }
+
+    const { topLeft, bottomRight, imageWidth, imageHeight } = convertFaceBoxToOriginalImageSpace(dto, asset);
+    const boundingBoxX1 = Math.round(topLeft.x);
+    const boundingBoxY1 = Math.round(topLeft.y);
+    const boundingBoxX2 = Math.round(bottomRight.x);
+    const boundingBoxY2 = Math.round(bottomRight.y);
+
+    const faceId = await this.databaseRepository.transaction(async (trx) => {
+      const faceId = await this.personRepository.createAssetFace(
+        {
+          assetId,
+          personId: null,
+          imageHeight,
+          imageWidth,
+          boundingBoxX1,
+          boundingBoxX2,
+          boundingBoxY1,
+          boundingBoxY2,
+          sourceType: SourceType.Manual,
+          createdBy: auth.user.id,
+        },
+        trx,
+      );
+
+      await this.linkFaceToSpacePerson(trx, person, faceId, { writeIdentity: true });
+      return faceId;
+    });
+
+    return {
+      id: faceId,
+      boundingBoxX1,
+      boundingBoxY1,
+      boundingBoxX2,
+      boundingBoxY2,
+      imageWidth,
+      imageHeight,
+      spacePersonId: person.id,
+      spacePersonName: person.name,
+    };
   }
 
   // D9/D2: reachability (RBAC — is this face's asset in the space at all), not pendingness, gates a space

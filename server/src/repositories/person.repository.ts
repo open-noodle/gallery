@@ -1756,8 +1756,8 @@ export class PersonRepository {
       .executeTakeFirst();
   }
 
-  async createAssetFace(face: Insertable<AssetFaceTable>): Promise<string> {
-    const result = await this.db.insertInto('asset_face').values(face).returning('id').executeTakeFirstOrThrow();
+  async createAssetFace(face: Insertable<AssetFaceTable>, db: Kysely<DB> | Transaction<DB> = this.db): Promise<string> {
+    const result = await db.insertInto('asset_face').values(face).returning('id').executeTakeFirstOrThrow();
     return result.id;
   }
 

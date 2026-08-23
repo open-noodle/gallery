@@ -14,13 +14,18 @@
  * a GRANT row in the same block also uses, so a deny can only be explained by the specific
  * property under test.
  */
+import { BadRequestException } from '@nestjs/common';
 import { Kysely } from 'kysely';
 import { AuthDto } from 'src/dtos/auth.dto';
-import { AssetVisibility } from 'src/enum';
+import { AssetEditAction } from 'src/dtos/editing.dto';
+import { AssetVisibility, SourceType } from 'src/enum';
+import { AssetEditRepository } from 'src/repositories/asset-edit.repository';
+import { AssetRepository } from 'src/repositories/asset.repository';
 import { DatabaseRepository } from 'src/repositories/database.repository';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository';
 import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
+import { PersonRepository } from 'src/repositories/person.repository';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
 import { DB } from 'src/schema';
 import { BaseService } from 'src/services/base.service';
@@ -761,5 +766,133 @@ describe('attach leaves the owner untouched (F-23, F-39)', () => {
     const after = await faceIdentityRepo.getResolvedPersonByIdentityId(bob.id, bobIdentity.id);
     expect(after?.name).toBe('Dad');
     expect(after?.birthDate).toBe('1970-06-15');
+  });
+});
+
+// Slice 6, Task 2 (spec §6.5, §9.6): POST /shared-spaces/:id/assets/:assetId/faces -- draw a box.
+// F-16 pins the edit-aware coordinate transform: it is not optional, since #992 lets an editor
+// rotate a member's asset, making a rotated preview a likely path rather than an exotic one.
+describe('createSpaceAssetFace', () => {
+  const realRepos = [
+    FacePersonVerdictRepository,
+    SharedSpaceRepository,
+    FaceIdentityRepository,
+    DatabaseRepository,
+    PersonRepository,
+    AssetEditRepository,
+    AssetRepository,
+  ];
+
+  // F-16: mirrors transform.spec.ts's own 'should rotate 90 degrees clockwise' case (the FORWARD
+  // direction used to display an already-stored face): an original box (100,100)-(200,200) on a
+  // 1000x800 original becomes (600,100)-(700,200) on the resulting 800x1000 preview. Anna draws on
+  // the PREVIEW here, so the box she submits is that same preview-space box, and the stored result
+  // must be exactly the ORIGINAL box the forward case started from -- computed independently, not
+  // just "a row exists".
+  it('stores a box drawn on a rotated preview in ORIGINAL-image coordinates (F-16)', async () => {
+    const { sut, ctx } = newMediumService(SharedSpaceService, {
+      database: defaultDatabase,
+      real: realRepos,
+      mock: [LoggingRepository],
+    });
+    const spaceRepo = ctx.get(SharedSpaceRepository);
+    const { anna, bob, space } = await newSpaceWithEditorAndMember(ctx);
+    const { asset } = await ctx.newAsset({
+      ownerId: bob.id,
+      visibility: AssetVisibility.Timeline,
+      width: 800,
+      height: 1000,
+    });
+    await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+    await ctx.newExif({ assetId: asset.id, exifImageWidth: 1000, exifImageHeight: 800 });
+    await ctx
+      .get(AssetEditRepository)
+      .replaceAll(asset.id, [{ action: AssetEditAction.Rotate, parameters: { angle: 90 } }]);
+    const person = await spaceRepo.createPerson({ spaceId: space.id, name: 'Aurelia' });
+    const auth = { user: { id: anna.id } } as AuthDto;
+
+    const result = await sut.createSpaceAssetFace(auth, space.id, asset.id, {
+      x: 600,
+      y: 100,
+      width: 100,
+      height: 100,
+      imageWidth: 800,
+      imageHeight: 1000,
+      spacePersonId: person.id,
+    });
+
+    // Original-image coordinates, not the preview coordinates Anna submitted.
+    expect(result.boundingBoxX1).toBe(100);
+    expect(result.boundingBoxY1).toBe(100);
+    expect(result.boundingBoxX2).toBe(200);
+    expect(result.boundingBoxY2).toBe(200);
+    expect(result.imageWidth).toBe(1000);
+    expect(result.imageHeight).toBe(800);
+    expect(result.spacePersonId).toBe(person.id);
+
+    const face = await defaultDatabase
+      .selectFrom('asset_face')
+      .selectAll()
+      .where('id', '=', result.id)
+      .executeTakeFirstOrThrow();
+    expect(face.boundingBoxX1).toBe(100);
+    expect(face.boundingBoxY1).toBe(100);
+    expect(face.boundingBoxX2).toBe(200);
+    expect(face.boundingBoxY2).toBe(200);
+    expect(face.imageWidth).toBe(1000);
+    expect(face.imageHeight).toBe(800);
+    // Editor-drawn: never the owner's personId, always sourceType Manual, and createdBy is Anna.
+    expect(face.personId).toBeNull();
+    expect(face.sourceType).toBe(SourceType.Manual);
+    expect(face.createdBy).toBe(anna.id);
+
+    const projectionRows = await defaultDatabase
+      .selectFrom('shared_space_person_face')
+      .selectAll()
+      .where('assetFaceId', '=', result.id)
+      .execute();
+    expect(projectionRows).toEqual([{ personId: person.id, assetFaceId: result.id }]);
+  });
+
+  // F-17: the asset carries edits (so the transform must run) but has no exif dimensions to invert
+  // against -- 400, matching the message the owner path (PersonService.createFace) uses for the
+  // identical condition, since both now share convertFaceBoxToOriginalImageSpace.
+  it('rejects with 400 when the asset has edits but no exif dimensions (F-17)', async () => {
+    const { sut, ctx } = newMediumService(SharedSpaceService, {
+      database: defaultDatabase,
+      real: realRepos,
+      mock: [LoggingRepository],
+    });
+    const spaceRepo = ctx.get(SharedSpaceRepository);
+    const { anna, bob, space } = await newSpaceWithEditorAndMember(ctx);
+    const { asset } = await ctx.newAsset({
+      ownerId: bob.id,
+      visibility: AssetVisibility.Timeline,
+      width: 800,
+      height: 1000,
+    });
+    await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+    // Deliberately NO ctx.newExif call -- the asset has no exif row, so exifImageWidth/Height come
+    // back null from the left join.
+    await ctx
+      .get(AssetEditRepository)
+      .replaceAll(asset.id, [{ action: AssetEditAction.Rotate, parameters: { angle: 90 } }]);
+    const person = await spaceRepo.createPerson({ spaceId: space.id, name: 'Aurelia' });
+    const auth = { user: { id: anna.id } } as AuthDto;
+
+    await expect(
+      sut.createSpaceAssetFace(auth, space.id, asset.id, {
+        x: 600,
+        y: 100,
+        width: 100,
+        height: 100,
+        imageWidth: 800,
+        imageHeight: 1000,
+        spacePersonId: person.id,
+      }),
+    ).rejects.toThrow(new BadRequestException('Asset does not have valid dimensions'));
+
+    const rows = await defaultDatabase.selectFrom('asset_face').selectAll().where('assetId', '=', asset.id).execute();
+    expect(rows).toEqual([]);
   });
 });
