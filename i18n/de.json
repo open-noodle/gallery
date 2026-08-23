@@ -3521,6 +3521,8 @@
   "workflow_logging_halted_step": "Angehalten bei Schritt #{step}",
   "workflow_name": "Workflow-Name",
   "workflow_navigation_prompt": "Bist du sicher, dass du den Editor ohne zu speichern verlassen willst?",
+  "workflow_space_album_choose_space_first": "Wähle zuerst einen Space aus",
+  "workflow_space_unavailable": "Space nicht verfügbar",
   "workflow_summary": "Workflow-Zusammenfassung",
   "workflow_templates": "Vorlagen für Workflows",
   "workflow_update_success": "Workflow erfolgreich aktualisiert",
