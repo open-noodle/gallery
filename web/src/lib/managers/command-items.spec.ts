@@ -574,6 +574,11 @@ describe('album-context commands', () => {
     album: { ...makeCtx().album!, isOwner: false, isMember: false },
     userId: 'u-stranger',
   });
+  const ctxEditor = (): CommandContext => ({
+    ...makeCtx(),
+    album: { ...makeCtx().album!, isOwner: false, isEditor: true, isMember: true },
+    userId: 'u-editor',
+  });
 
   let handleErrorSpy: ReturnType<typeof vi.spyOn>;
   beforeEach(() => {
@@ -595,11 +600,14 @@ describe('album-context commands', () => {
     it('hides when album is null', () => {
       expect(cmd().isAvailable!(ctxNoAlbum())).toBe(false);
     });
-    it('hides for non-owners', () => {
+    it('hides for a member who is neither owner nor editor', () => {
       expect(cmd().isAvailable!(ctxNonOwner())).toBe(false);
     });
     it('shows for owner', () => {
       expect(cmd().isAvailable!(makeCtx())).toBe(true);
+    });
+    it('shows for an album editor', () => {
+      expect(cmd().isAvailable!(ctxEditor())).toBe(true);
     });
     it('handler opens AlbumEditModal with raw DTO', async () => {
       await cmd().handler(makeCtx());
