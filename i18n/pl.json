@@ -2693,6 +2693,8 @@
   "reassing_hint": "Przypisz wybrane zasoby do istniejącej osoby",
   "recent": "Ostatnie",
   "recent_searches": "Ostatnie wyszukiwania",
+  "recent_trip_subtitle": "{assetCount, plural, one {# zdjęcie} few {# zdjęcia} many {# zdjęć} other {# zdjęć}} z {dayCount, plural, one {# dnia} few {# dni} many {# dni} other {# dni}}",
+  "recent_trip_title": "Ostatnia podróż do {location}",
   "recently_added": "Ostatnio dodane",
   "recently_added_body": "Przejdź od razu do wszystkich elementów, które ostatnio dodałeś, na specjalnej stronie.",
   "recently_added_description": "Przeglądaj swoje zasoby posortowane według daty przesłania ich do Immich",

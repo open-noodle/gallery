@@ -2673,6 +2673,8 @@
   "reassing_hint": "Geselecteerde items toewijzen aan een bestaand persoon",
   "recent": "Recent",
   "recent_searches": "Recente zoekopdrachten",
+  "recent_trip_subtitle": "{assetCount, plural, one {# foto} other {# foto's}} over {dayCount, plural, one {# dag} other {# dagen}}",
+  "recent_trip_title": "Recente reis naar {location}",
   "recently_added": "Onlangs toegevoegd",
   "recently_added_body": "Ga direct naar een aparte pagina met al je recent toegevoegde items.",
   "recently_added_description": "Blader door je items, op volgorde van wanneer ze zijn toegevoegd aan Immich",
