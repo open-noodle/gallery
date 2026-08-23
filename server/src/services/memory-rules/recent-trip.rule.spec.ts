@@ -93,11 +93,18 @@ describe(RecentTripMemoryRule.name, () => {
     expect(candidate).toMatchObject({
       ruleId: 'recent_trip',
       dedupeKey: 'recent_trip:france:paris:2026-04-23',
-      title: 'Recent trip to Paris, France',
-      subtitle: '9 photos over 3 days',
       assetIds: ['asset-1', 'asset-2', 'asset-3', 'asset-4', 'asset-5', 'asset-6', 'asset-7'],
       visibleForDays: 3,
+      context: {
+        placeLabel: 'Paris, France',
+        country: 'France',
+        city: 'Paris',
+        assetCount: 9,
+        dayCount: 3,
+      },
     });
+    expect(candidate?.title).toBeUndefined();
+    expect(candidate?.subtitle).toBeUndefined();
   });
 
   it('scales the visibility window with trip length, clamped to 3–7 days', async () => {
@@ -202,9 +209,16 @@ describe(RecentTripMemoryRule.name, () => {
 
     expect(candidate).toMatchObject({
       ruleId: 'recent_trip',
-      title: 'Recent trip to France',
-      subtitle: '8 photos over 2 days',
+      context: {
+        placeLabel: 'France',
+        country: 'France',
+        city: null,
+        assetCount: 8,
+        dayCount: 2,
+      },
     });
+    expect(candidate?.title).toBeUndefined();
+    expect(candidate?.subtitle).toBeUndefined();
   });
 
   it('skips same-country clusters when city metadata is missing or not trustworthy', async () => {
@@ -339,10 +353,15 @@ describe(RecentTripMemoryRule.name, () => {
     });
 
     expect(candidate).toMatchObject({
-      title: 'Recent trip to Paris, France',
-      subtitle: '12 photos over 3 days',
+      context: {
+        placeLabel: 'Paris, France',
+        assetCount: 12,
+        dayCount: 3,
+      },
       assetIds: ['a-1', 'a-3', 'a-5', 'a-6', 'a-9', 'a-11', 'a-12'],
     });
+    expect(candidate?.title).toBeUndefined();
+    expect(candidate?.subtitle).toBeUndefined();
   });
 
   it('collapses adjacent assets inside the two-minute burst window', async () => {
