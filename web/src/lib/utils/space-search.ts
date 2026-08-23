@@ -17,6 +17,13 @@ type SmartSearchParamsArgs = {
   spaceId?: string;
   withSharedSpaces?: boolean;
   language?: string;
+  /**
+   * Album scope imposed by the ROUTE, not by the filter panel — how an album detail page
+   * (`/albums/<id>` and `/spaces/<sid>/albums/<id>`) narrows a page-aware search to what it is
+   * showing. Unioned with `filters.albumId` rather than replacing it, so the route scope cannot be
+   * dropped by a hand-edited `?album=` in the URL.
+   */
+  albumIds?: string[];
 };
 
 /**
@@ -64,7 +71,7 @@ export const QUERY_MODE_FILTER_HANDLING = {
 } satisfies Record<keyof FilterState, 'sent' | 'derived' | 'unsupported'>;
 
 export function buildSmartSearchParams(args: SmartSearchParamsArgs): SmartSearchDto {
-  const { query, filters, spaceId, withSharedSpaces, language } = args;
+  const { query, filters, spaceId, withSharedSpaces, language, albumIds: scopeAlbumIds } = args;
   const params: SmartSearchDto = { query };
   if (language) {
     params.language = language;
@@ -108,12 +115,14 @@ export function buildSmartSearchParams(args: SmartSearchParamsArgs): SmartSearch
   if (filters.ocr?.trim()) {
     params.ocr = filters.ocr.trim();
   }
-  if (filters.albumId) {
-    // SmartSearchDto's albumIds is plural; wrap the single contextual filter value, matching
-    // filterStateToSearchTerms. Unlike the suggestion endpoints — where albumId is a *scope* and
-    // carries IsNotSiblingOf guards against spaceId / withSharedSpaces — here albumIds is a plain
-    // filter with no sibling guard, so it composes safely with either scope.
-    params.albumIds = [filters.albumId];
+  // SmartSearchDto's albumIds is plural; wrap the single contextual filter value, matching
+  // filterStateToSearchTerms, and union it with any route-imposed scope. Unlike the suggestion
+  // endpoints — where albumId is a *scope* and carries IsNotSiblingOf guards against spaceId /
+  // withSharedSpaces — here albumIds is a plain filter with no sibling guard, so it composes safely
+  // with either scope.
+  const albumIds = [...new Set([...(scopeAlbumIds ?? []), ...(filters.albumId ? [filters.albumId] : [])])];
+  if (albumIds.length > 0) {
+    params.albumIds = albumIds;
   }
   if (filters.tagIds.length > 0) {
     params.tagIds = filters.tagIds;
