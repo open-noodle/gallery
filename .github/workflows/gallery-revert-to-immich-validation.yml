@@ -5,7 +5,7 @@ name: Gallery Revert-to-Immich Validation
 # where upstream Immich boots cleanly, with no schema drift warnings and no
 # stale kysely_migration rows.
 #
-# See docs/plans/2026-04-14-revert-to-immich-validation-design.md for the
+# See specs/2026-04-14-revert-to-immich-validation-design.md for the
 # full design, the pass-criterion rationale, and the review history.
 
 on:
