@@ -443,7 +443,12 @@ void main() {
   });
 
   testWidgets('T1: a space with recent assets renders a collage, not a plain colour disc', (tester) async {
-    await pump(tester, spaces: [space('s1', recentAssetIds: ['a1', 'a2'])]);
+    await pump(
+      tester,
+      spaces: [
+        space('s1', recentAssetIds: ['a1', 'a2']),
+      ],
+    );
 
     expect(find.byType(SpaceCollage), findsOneWidget);
     expect(find.byType(CircleAvatar), findsNothing);
