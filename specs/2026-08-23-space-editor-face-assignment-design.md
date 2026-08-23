@@ -237,6 +237,26 @@ Idempotent: `addPersonFaces` is `onConflict().doNothing()` and `replaceFaceIdent
 double-submit is a no-op. Returns `{ acted: boolean }`, matching the sibling confirm/reject routes'
 S11 convention (a 200-vs-204 signal is unreadable through `@oazapfts/runtime`'s `ok()`).
 
+#### 6.3.2 The transaction needs an explicit row lock
+
+Idempotence above covers a repeated attach to the **same** space person. It does **not** cover two
+editors attaching the same face to **different** space people at once: `shared_space_person_face`'s
+primary key is `(personId, assetFaceId)`, not unique on `assetFaceId` alone, so both inserts succeed
+and the face ends up claimed twice in one space.
+
+Nothing at the schema level prevents this. The transaction therefore takes
+`SELECT ... FOR UPDATE` on the `asset_face` row **first**, before any read it will act on
+(`FacePersonVerdictRepository.lockFaceForAssignment`). F-37 is a genuine race, not a formality — it
+fails without the lock.
+
+**Every repository method called from inside this transaction must take a trailing `db`/`trx`
+parameter and use it.** `markRejectedForSpacePerson`, `markIgnoredForSpacePerson` and
+`recordSpacePersonVerdict` did not when this work started — they always used `this.db`, which was
+harmless only because nothing had ever called them from inside a transaction. Calling one from within
+the attach transaction deadlocks until timeout: the transaction holds a connection while the
+non-transactional insert waits for a second one the pool will not release. All three now take the
+parameter. Check the signature before calling anything new from inside a transaction.
+
 **Reassign is this endpoint**, not a sixth one: attaching a face already held by another space person
 in the same space moves it. The transaction must additionally remove the old
 `shared_space_person_face` row and write a **negative verdict** for the old person
@@ -423,23 +443,23 @@ is already known from the space route's data, and the face list only ever comes 
 
 ### 8.3 Assignment semantics (server)
 
-| #    | Given                                                                                | When                          | Then                                                                                                            |
-| ---- | ------------------------------------------------------------------------------------ | ----------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| F-13 | face held by space person P1 in A                                                    | Anna attaches to P2 in A      | moved; P1 row removed; negative verdict for P1 (§6.3)                                                           |
-| F-14 | face already attached to P                                                           | Anna attaches to P again      | `{ acted: false }`, no duplicate row                                                                            |
-| F-15 | no space person yet                                                                  | Anna creates one from a face  | person + attachment in one transaction (§6.2)                                                                   |
-| F-16 | Bob's asset carries a **rotate** edit from #992                                      | Anna draws a box              | stored in original-image coordinates (§6.5)                                                                     |
-| F-17 | asset lacks `exifImageWidth`/`Height`, has edits                                     | Anna draws a box              | 400, message matches the owner path                                                                             |
-| F-18 | Anna drew the box in F-16                                                            | Anna deletes it               | 204 — editor-drawn only (§6.6)                                                                                  |
-| F-19 | a **detected** face                                                                  | Anna deletes it               | 400 — `FaceDelete` still owner-only                                                                             |
-| F-32 | face attached to P, `faceCount`/`assetCount` at n                                    | Anna detaches                 | counts recount to n−1 (§6.4)                                                                                    |
-| F-33 | seed face's identity already has a person in A                                       | Anna creates a person from it | returns the existing person; no unique-index violation (§6.2)                                                   |
-| F-34 | face has `personId IS NULL`                                                          | Anna attaches                 | granted; identity written (§6.3.1 row 1)                                                                        |
-| F-35 | face's owner person carries the **same** identity                                    | Anna attaches                 | granted; identity unchanged (§6.3.1 row 2)                                                                      |
-| F-36 | face's owner person carries a **different** identity                                 | Anna attaches                 | granted; space shows the new name; `face_identity_face` **unchanged**; negative verdict written (§6.3.1 row 3)  |
-| F-40 | the override in F-36                                                                 | Bob re-reads his own asset    | his `person`, `asset_face.personId` and resolved name/birthday all unchanged — the override is space-local      |
-| F-37 | Anna and a second editor attach the same face to different space people concurrently | both submit                   | one wins; the loser is a no-op or a clean 400 — never two `shared_space_person_face` rows, never a lost recount |
-| F-38 | face listed by §6.1, then its asset leaves the space                                 | Anna attaches the stale id    | 400 — `isFaceReachableInSpace` re-checked at write time, not trusted from the read                              |
+| #    | Given                                                                                | When                          | Then                                                                                                                                                                      |
+| ---- | ------------------------------------------------------------------------------------ | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| F-13 | face held by space person P1 in A                                                    | Anna attaches to P2 in A      | moved; P1 row removed; negative verdict for P1 (§6.3)                                                                                                                     |
+| F-14 | face already attached to P                                                           | Anna attaches to P again      | `{ acted: false }`, no duplicate row                                                                                                                                      |
+| F-15 | no space person yet                                                                  | Anna creates one from a face  | person + attachment in one transaction (§6.2)                                                                                                                             |
+| F-16 | Bob's asset carries a **rotate** edit from #992                                      | Anna draws a box              | stored in original-image coordinates (§6.5)                                                                                                                               |
+| F-17 | asset lacks `exifImageWidth`/`Height`, has edits                                     | Anna draws a box              | 400, message matches the owner path                                                                                                                                       |
+| F-18 | Anna drew the box in F-16                                                            | Anna deletes it               | 204 — editor-drawn only (§6.6)                                                                                                                                            |
+| F-19 | a **detected** face                                                                  | Anna deletes it               | 400 — `FaceDelete` still owner-only                                                                                                                                       |
+| F-32 | face attached to P, `faceCount`/`assetCount` at n                                    | Anna detaches                 | counts recount to n−1 (§6.4)                                                                                                                                              |
+| F-33 | seed face's identity already has a person in A                                       | Anna creates a person from it | returns the existing person; no unique-index violation (§6.2)                                                                                                             |
+| F-34 | face has `personId IS NULL`                                                          | Anna attaches                 | granted; identity written (§6.3.1 row 1)                                                                                                                                  |
+| F-35 | face's owner person carries the **same** identity                                    | Anna attaches                 | granted; identity unchanged (§6.3.1 row 2)                                                                                                                                |
+| F-36 | face's owner person carries a **different** identity                                 | Anna attaches                 | granted; space shows the new name; `face_identity_face` **unchanged**; negative verdict written (§6.3.1 row 3)                                                            |
+| F-40 | the override in F-36                                                                 | Bob re-reads his own asset    | his `person`, `asset_face.personId` and resolved name/birthday all unchanged — the override is space-local                                                                |
+| F-37 | Anna and a second editor attach the same face to different space people concurrently | both submit                   | one wins; the loser is a no-op or a clean 400 — never two `shared_space_person_face` rows, never a lost recount. Enforced by the §6.3.2 row lock, **not** by a constraint |
+| F-38 | face listed by §6.1, then its asset leaves the space                                 | Anna attaches the stale id    | 400 — `isFaceReachableInSpace` re-checked at write time, not trusted from the read                                                                                        |
 
 ### 8.4 Cross-space propagation — the §5.1 contract (server)
 
