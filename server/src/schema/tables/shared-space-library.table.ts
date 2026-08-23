@@ -19,7 +19,7 @@ import { UserTable } from 'src/schema/tables/user.table';
 // Populates library_user for every member of the space when a library is
 // linked, and bumps library.updateId so the metadata row re-emits via
 // LibrarySync.getUpserts. See
-// docs/plans/2026-04-11-library-user-access-backfill-design.md.
+// specs/2026-04-11-library-user-access-backfill-design.md.
 @AfterInsertTrigger({
   name: 'shared_space_library_after_insert_user',
   scope: 'statement',

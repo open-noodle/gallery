@@ -2,7 +2,7 @@ import type { FaceRepairResolveRequestDto } from '@immich/sdk';
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import { FACE_ACTIONS, GUIDED_STATE_IDS } from '$lib/components/face-cleanup/face-actions';
 
-// Model B (full per-face resolution, docs/plans/2026-07-10-face-cleanup-full-resolution-design.md). Every
+// Model B (full per-face resolution, specs/2026-07-10-face-cleanup-full-resolution-design.md). Every
 // flagged face resolves to exactly one of six terminal states.
 //
 // `unknown` is the sixth: a real face of a real person the admin cannot name. It is the standard case whenever
