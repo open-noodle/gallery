@@ -70,6 +70,44 @@ where
       "birthDate"
   ) = $6
 
+-- PersonRepository.getDormantPeople
+select
+  "person"."id",
+  "person"."name"
+from
+  "person"
+  inner join "asset_face" on "asset_face"."personId" = "person"."id"
+  inner join "asset" on "asset"."id" = "asset_face"."assetId"
+where
+  "person"."ownerId" = $1
+  and "person"."type" = $2
+  and "person"."name" != $3
+  and "person"."isHidden" = $4
+  and "asset_face"."deletedAt" is null
+  and "asset_face"."isVisible" = $5
+  and "asset"."ownerId" = $6
+  and "asset"."visibility" = $7
+  and "asset"."deletedAt" is null
+  and exists (
+    select
+      "asset_file"."assetId"
+    from
+      "asset_file"
+    where
+      "asset_file"."assetId" = "asset"."id"
+      and "asset_file"."type" = $8
+  )
+group by
+  "person"."id"
+having
+  max("asset"."localDateTime") < $9
+  and count(distinct ("asset"."id")) >= $10
+order by
+  count(distinct ("asset"."id")) desc,
+  "person"."id" asc
+limit
+  $11
+
 -- PersonRepository.getFileSamples
 select
   "ownerId",
