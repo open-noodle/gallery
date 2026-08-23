@@ -65,7 +65,9 @@ class _FilterSheetState extends ConsumerState<FilterSheet> {
   }
 
   void _commitSettledExtent(double extent) {
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     if (extent < _dismissThreshold) {
       final current = ref.read(photosFilterSheetProvider);
       if (current != FilterSheetSnap.hidden) {

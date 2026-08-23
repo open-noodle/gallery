@@ -84,10 +84,16 @@ Set<FilterSectionId> availableSections(
 ) {
   bool offered(FilterSectionId id) {
     // Never strand a filter the user cannot then reach to clear.
-    if (hasActiveFilterFor(id, filter)) return true;
-    if (!_facetEmpty(id, facets)) return true;
+    if (hasActiveFilterFor(id, filter)) {
+      return true;
+    }
+    if (!_facetEmpty(id, facets)) {
+      return true;
+    }
     // A section is never hidden on missing information.
-    if (baseline == null) return true;
+    if (baseline == null) {
+      return true;
+    }
     // Empty under the current filters but not for the whole scope: transient, so keep it.
     return !_facetEmpty(id, baseline);
   }
@@ -105,8 +111,12 @@ Set<FilterSectionId> availableSections(
 /// filters and the whole-scope baseline. Missing information (loading/error, i.e. `null`) fails
 /// open on both sides, matching `availableSections`'s `baseline == null` early return.
 bool toggleAvailable({required bool activeFilter, required bool? currentFacet, required bool? baselineFacet}) {
-  if (activeFilter) return true;
-  if (currentFacet ?? true) return true;
+  if (activeFilter) {
+    return true;
+  }
+  if (currentFacet ?? true) {
+    return true;
+  }
   return baselineFacet ?? true;
 }
 
