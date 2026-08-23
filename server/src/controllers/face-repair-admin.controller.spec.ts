@@ -374,7 +374,7 @@ describe(FaceRepairAdminController.name, () => {
     });
   });
 
-  // Slice 3 (manual face review, docs/superpowers/plans/2026-07-23-manual-face-review-slice-3.md): the manual
+  // Slice 3 of manual face review (spec specs/2026-07-23-manual-face-review-mode-design.md): the manual
   // review page has no scan to read personName/ownerId off, so it needs a dedicated admin-gated lookup.
   describe('GET /admin/face-repair/person/:personId', () => {
     const personId = '00000000-0000-4000-a000-000000000050';

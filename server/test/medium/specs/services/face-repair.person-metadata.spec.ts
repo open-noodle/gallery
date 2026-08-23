@@ -7,7 +7,7 @@ import { FaceRepairService } from 'src/services/face-repair.service';
 import { newMediumService } from 'test/medium.factory';
 import { getKyselyDB } from 'test/utils';
 
-// Slice 3 (manual face review, docs/superpowers/plans/2026-07-23-manual-face-review-slice-3.md, spec §5.5/§7):
+// Slice 3 of manual face review (spec specs/2026-07-23-manual-face-review-mode-design.md §5.5/§7):
 // GET admin/face-repair/person/:personId. The manual review page has no scan to read personName/ownerId off,
 // so it needs this dedicated, admin-gated lookup. faceCount/thumbnailFaceId must agree with
 // searchOwnerPeople's browser-grid counts, so getPersonMetadata reuses that method's exact join conditions.
