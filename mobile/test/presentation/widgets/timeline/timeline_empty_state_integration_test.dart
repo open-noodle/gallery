@@ -44,6 +44,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../test_utils.dart';
+import '../../../widget_tester_extensions.dart';
 
 class _MockTimelineFactory extends Mock implements TimelineFactory {}
 
@@ -139,7 +140,7 @@ Future<TimelineService> _pumpTimeline(
         supportedLocales: const [Locale('en')],
         path: '../i18n',
         fallbackLocale: const Locale('en'),
-        child: MaterialApp(
+        child: withStubRouter(MaterialApp(
           home: DefaultAssetBundle(
             bundle: _FakeAssetBundle(),
             child: const TimelineRouteScope(
@@ -147,7 +148,7 @@ Future<TimelineService> _pumpTimeline(
               child: Timeline(appBar: null, bottomSheet: null, withScrubber: false, emptyWidget: TimelineEmptyState()),
             ),
           ),
-        ),
+        )),
       ),
     ),
   );
@@ -190,7 +191,7 @@ Future<Completer<SearchResult?>> _pumpSearchingTimeline(WidgetTester tester, Dri
         supportedLocales: const [Locale('en')],
         path: '../i18n',
         fallbackLocale: const Locale('en'),
-        child: MaterialApp(
+        child: withStubRouter(MaterialApp(
           home: DefaultAssetBundle(
             bundle: _FakeAssetBundle(),
             child: const TimelineRouteScope(
@@ -198,7 +199,7 @@ Future<Completer<SearchResult?>> _pumpSearchingTimeline(WidgetTester tester, Dri
               child: Timeline(appBar: null, bottomSheet: null, withScrubber: false, emptyWidget: TimelineEmptyState()),
             ),
           ),
-        ),
+        )),
       ),
     ),
   );
