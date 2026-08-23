@@ -104,13 +104,13 @@ const seedDormantPersonChapter = async (
 
   for (let hour = 10; hour < 14; hour++) {
     const asset = await seedRuleAsset(ctx, { ownerId, localDateTime: `2020-01-10T${hour}:00:00Z` });
-    await ctx.newAssetFace({ assetId: asset.id, personId: person.id, isVisible: true });
+    await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId, isVisible: true });
   }
 
   const chapterAssetIds: string[] = [];
   for (let day = 5; day <= 10; day++) {
     const asset = await seedRuleAsset(ctx, { ownerId, localDateTime: `2023-08-${day}T12:00:00Z` });
-    await ctx.newAssetFace({ assetId: asset.id, personId: person.id, isVisible: true });
+    await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId, isVisible: true });
     chapterAssetIds.push(asset.id);
   }
 
@@ -1009,8 +1009,8 @@ describe(MemoryService.name, () => {
       const assetIds: string[] = [];
       for (let day = 5; day <= 10; day++) {
         const asset = await seedRuleAsset(ctx, { ownerId: user.id, localDateTime: `2023-06-${day}T12:00:00Z` });
-        await ctx.newAssetFace({ assetId: asset.id, personId: anna.id, isVisible: true });
-        await ctx.newAssetFace({ assetId: asset.id, personId: ben.id, isVisible: true });
+        await ctx.newAssetFace({ assetId: asset.id, personGroupId: anna.personGroupId, isVisible: true });
+        await ctx.newAssetFace({ assetId: asset.id, personGroupId: ben.personGroupId, isVisible: true });
         assetIds.push(asset.id);
       }
 
@@ -1021,7 +1021,9 @@ describe(MemoryService.name, () => {
 
       // Title/dedupeKey/context are ordered by person id (D6) — the ids are random UUIDs, so
       // derive the expected order from the created people rather than hardcoding "Anna & Ben".
-      const [first, second] = [anna, ben].toSorted((a, b) => (a.id === b.id ? 0 : a.id < b.id ? -1 : 1));
+      const [first, second] = [anna, ben].toSorted((a, b) =>
+        a.personGroupId === b.personGroupId ? 0 : a.personGroupId < b.personGroupId ? -1 : 1,
+      );
 
       expect(memories).toEqual([
         expect.objectContaining({
@@ -1036,8 +1038,8 @@ describe(MemoryService.name, () => {
             context: expect.objectContaining({
               year: 2023,
               count: 6,
-              personAId: first.id,
-              personBId: second.id,
+              personAId: first.personGroupId,
+              personBId: second.personGroupId,
             }),
           }),
         }),
@@ -1056,8 +1058,8 @@ describe(MemoryService.name, () => {
       // Only 5 co-occurring photos across 5 distinct days — below MIN_ASSETS (6).
       for (let day = 5; day <= 9; day++) {
         const asset = await seedRuleAsset(ctx, { ownerId: user.id, localDateTime: `2023-06-${day}T12:00:00Z` });
-        await ctx.newAssetFace({ assetId: asset.id, personId: anna.id, isVisible: true });
-        await ctx.newAssetFace({ assetId: asset.id, personId: ben.id, isVisible: true });
+        await ctx.newAssetFace({ assetId: asset.id, personGroupId: anna.personGroupId, isVisible: true });
+        await ctx.newAssetFace({ assetId: asset.id, personGroupId: ben.personGroupId, isVisible: true });
       }
 
       vi.setSystemTime(now.toJSDate());
@@ -1390,7 +1392,7 @@ describe(MemoryService.name, () => {
             ruleId: 'person_throwback',
             title: `Times with ${person.name}`,
             subtitle: '6 photos · August 2023',
-            context: expect.objectContaining({ personId: person.id, count: 6 }),
+            context: expect.objectContaining({ personId: person.personGroupId, count: 6 }),
           }),
         }),
       ]);
@@ -1454,7 +1456,7 @@ describe(MemoryService.name, () => {
         localDateTime: '2026-07-01T12:00:00Z',
         visibility: AssetVisibility.Archive,
       });
-      await ctx.newAssetFace({ assetId: recentArchived.id, personId: person.id, isVisible: true });
+      await ctx.newAssetFace({ assetId: recentArchived.id, personGroupId: person.personGroupId, isVisible: true });
 
       vi.setSystemTime(target.toJSDate());
       await sut.onMemoriesCreate();
@@ -1489,7 +1491,7 @@ describe(MemoryService.name, () => {
           localDateTime: `2023-08-${day}T18:00:00Z`,
           withPreview: false,
         });
-        await ctx.newAssetFace({ assetId: asset.id, personId: anna.id, isVisible: true });
+        await ctx.newAssetFace({ assetId: asset.id, personGroupId: anna.personGroupId, isVisible: true });
       }
 
       // Ben's only real (preview-bearing) history is a 6-asset chapter with no padding -- below
@@ -1500,7 +1502,7 @@ describe(MemoryService.name, () => {
       const { person: ben } = await ctx.newPerson({ ownerId: user.id, name: 'Ben' });
       for (const day of [5, 6, 7, 8, 9, 10]) {
         const asset = await seedRuleAsset(ctx, { ownerId: user.id, localDateTime: `2023-08-${day}T12:00:00Z` });
-        await ctx.newAssetFace({ assetId: asset.id, personId: ben.id, isVisible: true });
+        await ctx.newAssetFace({ assetId: asset.id, personGroupId: ben.personGroupId, isVisible: true });
       }
       for (let hour = 10; hour < 18; hour++) {
         const asset = await seedRuleAsset(ctx, {
@@ -1508,7 +1510,7 @@ describe(MemoryService.name, () => {
           localDateTime: `2020-01-10T${hour}:00:00Z`,
           withPreview: false,
         });
-        await ctx.newAssetFace({ assetId: asset.id, personId: ben.id, isVisible: true });
+        await ctx.newAssetFace({ assetId: asset.id, personGroupId: ben.personGroupId, isVisible: true });
       }
 
       vi.setSystemTime(target.toJSDate());
@@ -1539,11 +1541,16 @@ describe(MemoryService.name, () => {
       const { person: anna, chapterAssetIds } = await seedDormantPersonChapter(ctx, { ownerId: user.id, name: 'Anna' });
       for (const day of [5, 6, 7]) {
         const asset = await seedRuleAsset(ctx, { ownerId: user.id, localDateTime: `2023-08-${day}T18:00:00Z` });
-        await ctx.newAssetFace({ assetId: asset.id, personId: anna.id, isVisible: false });
+        await ctx.newAssetFace({ assetId: asset.id, personGroupId: anna.personGroupId, isVisible: false });
       }
       for (const day of [8, 9, 10]) {
         const asset = await seedRuleAsset(ctx, { ownerId: user.id, localDateTime: `2023-08-${day}T18:00:00Z` });
-        await ctx.newAssetFace({ assetId: asset.id, personId: anna.id, isVisible: true, deletedAt: new Date() });
+        await ctx.newAssetFace({
+          assetId: asset.id,
+          personGroupId: anna.personGroupId,
+          isVisible: true,
+          deletedAt: new Date(),
+        });
       }
 
       // Ben's only real (visible-face) history is a 6-asset chapter with no padding -- below
@@ -1553,15 +1560,20 @@ describe(MemoryService.name, () => {
       const { person: ben } = await ctx.newPerson({ ownerId: user.id, name: 'Ben' });
       for (const day of [5, 6, 7, 8, 9, 10]) {
         const asset = await seedRuleAsset(ctx, { ownerId: user.id, localDateTime: `2023-08-${day}T12:00:00Z` });
-        await ctx.newAssetFace({ assetId: asset.id, personId: ben.id, isVisible: true });
+        await ctx.newAssetFace({ assetId: asset.id, personGroupId: ben.personGroupId, isVisible: true });
       }
       for (let hour = 10; hour < 14; hour++) {
         const asset = await seedRuleAsset(ctx, { ownerId: user.id, localDateTime: `2020-01-10T${hour}:00:00Z` });
-        await ctx.newAssetFace({ assetId: asset.id, personId: ben.id, isVisible: false });
+        await ctx.newAssetFace({ assetId: asset.id, personGroupId: ben.personGroupId, isVisible: false });
       }
       for (let hour = 14; hour < 18; hour++) {
         const asset = await seedRuleAsset(ctx, { ownerId: user.id, localDateTime: `2020-01-10T${hour}:00:00Z` });
-        await ctx.newAssetFace({ assetId: asset.id, personId: ben.id, isVisible: true, deletedAt: new Date() });
+        await ctx.newAssetFace({
+          assetId: asset.id,
+          personGroupId: ben.personGroupId,
+          isVisible: true,
+          deletedAt: new Date(),
+        });
       }
 
       vi.setSystemTime(target.toJSDate());
@@ -1611,11 +1623,11 @@ describe(MemoryService.name, () => {
       const { person: anna } = await ctx.newPerson({ ownerId: user.id, name: 'Anna' });
       for (let hour = 10; hour < 14; hour++) {
         const asset = await seedRuleAsset(ctx, { ownerId: user.id, localDateTime: `2020-01-10T${hour}:00:00Z` });
-        await ctx.newAssetFace({ assetId: asset.id, personId: anna.id, isVisible: true });
+        await ctx.newAssetFace({ assetId: asset.id, personGroupId: anna.personGroupId, isVisible: true });
       }
       for (const day of [5, 6, 7, 8, 9, 10, 11, 12, 13]) {
         const asset = await seedRuleAsset(ctx, { ownerId: user.id, localDateTime: `2023-08-${day}T12:00:00Z` });
-        await ctx.newAssetFace({ assetId: asset.id, personId: anna.id, isVisible: true });
+        await ctx.newAssetFace({ assetId: asset.id, personGroupId: anna.personGroupId, isVisible: true });
       }
 
       const { person: ben } = await seedDormantPersonChapter(ctx, { ownerId: user.id, name: 'Ben' });
@@ -1623,7 +1635,7 @@ describe(MemoryService.name, () => {
       // Anna's person_throwback already fired a year before `target`. Dates sit well outside
       // `target`'s search window, so this pre-existing memory doesn't itself occupy one of
       // today's rule slots -- the test isolates the dedupeKey skip (D8), not the slot cap.
-      const dedupeKeyAnna = `person_throwback:${anna.id}`;
+      const dedupeKeyAnna = `person_throwback:${anna.personGroupId}`;
       const priorShowAt = DateTime.fromObject({ year: 2025, month: 8, day: 13 }, { zone: 'utc' });
       await ctx.newMemory({
         ownerId: user.id,
@@ -1634,7 +1646,7 @@ describe(MemoryService.name, () => {
           title: `Times with ${anna.name}`,
           subtitle: '9 photos · August 2023',
           score: 144,
-          context: { personId: anna.id, count: 9 },
+          context: { personId: anna.personGroupId, count: 9 },
         },
         memoryAt: priorShowAt.plus({ days: 2 }).toJSDate(),
         showAt: priorShowAt.toJSDate(),

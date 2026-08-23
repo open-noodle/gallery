@@ -515,6 +515,8 @@ export class PersonRepository {
     ownerId: string,
     { lastSeenBefore, minAssets, limit }: { lastSeenBefore: Date; minAssets: number; limit: number },
   ): Promise<DormantPerson[]> {
+    // Grouped by (personGroupId, name): `person`'s PK is the composite (ownerId, personGroupId),
+    // so personGroupId alone does not functionally determine `person.name` for Postgres.
     return this.db
       .selectFrom('person')
       .select(['person.personGroupId as id', 'person.name'])
@@ -538,8 +540,6 @@ export class PersonRepository {
             .where('asset_file.type', '=', AssetFileType.Preview),
         ),
       )
-      // `person`'s PK is the composite (ownerId, personGroupId), so grouping by personGroupId
-      // alone does not functionally determine `person.name` for Postgres — group by both.
       .groupBy(['person.personGroupId', 'person.name'])
       .having((eb) => eb.fn.max('asset.localDateTime'), '<', lastSeenBefore)
       .having((eb) => eb.fn.count(eb.fn('distinct', ['asset.id'])), '>=', minAssets)
