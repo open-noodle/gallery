@@ -286,7 +286,7 @@ test.describe('Spaces — Albums UI (editor flows + viewer-denied gating)', () =
       await expect(page.getByTestId('space-album-card-menu').first()).toBeVisible();
     });
 
-    // Slice 6 of docs/superpowers/specs/2026-07-24-selection-toolbar-consistency-design.md
+    // Slice 6 of specs/2026-07-24-selection-toolbar-consistency-design.md
     // replaced the space-album detail's stripped Download+Remove-only bar with the full
     // album-equivalent <SelectionToolbar>. RemoveFromAlbum now lives as a menu item inside the
     // toolbar's "⋮" overflow menu (mirrors spaces-selection-toolbar-timeline.e2e-spec.ts's

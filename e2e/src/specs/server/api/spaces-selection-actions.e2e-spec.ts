@@ -1,7 +1,7 @@
 /**
  * Slice 1 — Server/API RBAC matrix for the selection-toolbar-consistency spec.
  *
- * Source: docs/superpowers/specs/2026-07-24-selection-toolbar-consistency-design.md,
+ * Source: specs/2026-07-24-selection-toolbar-consistency-design.md,
  * "### Server/API RBAC matrix (Slice 1 — runs first, gates now RESOLVED)". This suite is the
  * regression tripwire for the RBAC gate decisions the web capability rule engine (Slice 2) depends
  * on: Q1/Q2 (Share / Add-to-album are owner∪partner-only via `Permission.AssetShare`), decision C

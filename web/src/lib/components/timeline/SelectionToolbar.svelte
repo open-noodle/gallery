@@ -43,7 +43,7 @@
    * also works on surfaces (space-person, space-album) that register none of
    * those contexts.
    *
-   * See `docs/superpowers/specs/2026-07-24-selection-toolbar-consistency-design.md`.
+   * See `specs/2026-07-24-selection-toolbar-consistency-design.md`.
    */
   interface Props {
     /** Absent on surfaces with no timeline behind them — e.g. smart search results. */

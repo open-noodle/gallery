@@ -6,7 +6,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import PersonPicker from './PersonPicker.svelte';
 
 // Slice 4 (move to a chosen person — owner-scoped picker). Mirrors the mockup
-// (docs/plans/2026-07-10-face-cleanup-resolution-mockup.html): search owner-scoped people, pick a row, or
+// (specs/mockups/2026-07-10-face-cleanup-resolution-mockup.html): search owner-scoped people, pick a row, or
 // create a new person under the owner. §8.5 P3 / E8.
 vi.mock('@immich/sdk', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@immich/sdk')>();

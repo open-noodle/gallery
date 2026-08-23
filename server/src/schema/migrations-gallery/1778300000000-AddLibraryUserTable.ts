@@ -5,7 +5,7 @@ import { Kysely, sql } from 'kysely';
 // so users who gain access to pre-existing libraries via shared-space links
 // correctly receive the library metadata and its asset backfill on next sync.
 //
-// See docs/plans/2026-04-11-library-user-access-backfill-design.md for the full
+// See specs/2026-04-11-library-user-access-backfill-design.md for the full
 // design, trade-offs, and rationale.
 
 export async function up(db: Kysely<any>): Promise<void> {
