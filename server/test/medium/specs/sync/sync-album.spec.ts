@@ -95,6 +95,33 @@ describe(SyncRequestType.AlbumsV1, () => {
     await ctx.assertSyncIsComplete(auth, [SyncRequestType.AlbumsV1]);
   });
 
+  it('should detect and sync a changed album created date', async () => {
+    const { auth, ctx } = await setup();
+    const albumRepo = ctx.get(AlbumRepository);
+    const { album } = await ctx.newAlbum({ ownerId: auth.user.id });
+
+    const initial = await ctx.syncStream(auth, [SyncRequestType.AlbumsV1]);
+    await ctx.syncAckAll(auth, initial);
+    await ctx.assertSyncIsComplete(auth, [SyncRequestType.AlbumsV1]);
+
+    const createdAt = new Date('1996-06-15T14:30:00.000Z');
+    await albumRepo.update(album.id, { createdAt }, auth.user.id);
+
+    const response = await ctx.syncStream(auth, [SyncRequestType.AlbumsV1]);
+    const entry = response.find((item) => item.type === SyncEntityType.AlbumV1);
+
+    expect(entry).toBeDefined();
+    expect(entry!.data).toEqual(expect.objectContaining({ id: album.id }));
+    // Compare instants, not representations: the medium harness may hand back a Date
+    // or the encoded ISO string depending on serialization.
+    expect(new Date((entry!.data as { createdAt: string | Date }).createdAt).toISOString()).toBe(
+      '1996-06-15T14:30:00.000Z',
+    );
+
+    await ctx.syncAckAll(auth, response);
+    await ctx.assertSyncIsComplete(auth, [SyncRequestType.AlbumsV1]);
+  });
+
   describe('shared albums', () => {
     it('should detect and sync an album create', async () => {
       const { auth, ctx } = await setup();

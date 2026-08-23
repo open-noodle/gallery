@@ -9,7 +9,7 @@ import { MapAsset } from 'src/dtos/asset-response.dto.js';
 import { UserResponseSchema, mapUser } from 'src/dtos/user.dto.js';
 import { AlbumUserRole, AlbumUserRoleSchema, AssetOrder, AssetOrderSchema } from 'src/enum.js';
 import { asDateTimeString } from 'src/utils/date.js';
-import { stringToBool } from 'src/validation.js';
+import { isoDatetimeToDate, stringToBool } from 'src/validation.js';
 
 const AlbumUserAddSchema = z
   .object({
@@ -88,6 +88,9 @@ const UpdateAlbumSchema = z
           )
           .getExtensions(),
       }),
+    createdAt: isoDatetimeToDate
+      .optional()
+      .describe('Album creation date. Must include a timezone designator (Z or ±HH:MM).'),
     albumThumbnailAssetId: z.uuidv4().optional().describe('Album thumbnail asset ID'),
     isActivityEnabled: z.boolean().optional().describe('Enable activity feed'),
     order: AssetOrderSchema.optional(),

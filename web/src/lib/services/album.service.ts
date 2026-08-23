@@ -40,7 +40,7 @@ import AlbumOptionsModal from '$lib/modals/AlbumOptionsModal.svelte';
 import SharedLinkCreateModal from '$lib/modals/SharedLinkCreateModal.svelte';
 import SpacePickerModal from '$lib/modals/SpacePickerModal.svelte';
 import { Route } from '$lib/route';
-import { createAlbumAndRedirect } from '$lib/utils/album-utils';
+import { createAlbumAndRedirect, isAlbumEditor } from '$lib/utils/album-utils';
 import { downloadArchive } from '$lib/utils/asset-utils';
 import { openFileUploadDialog } from '$lib/utils/file-uploader';
 import { handleError } from '$lib/utils/handle-error';
@@ -86,10 +86,13 @@ export const getAlbumActions = ($t: MessageFormatter, album: AlbumResponseDto) =
     onAction: () => handleDownloadAlbum(album),
   };
 
+  // Gallery (#990): editing follows the server's Permission.AlbumUpdate (owner ∪ editor), so an
+  // album editor can change the album's name, description and creation date. Share and delete stay
+  // owner-only (Permission.AlbumDelete is owner-only; share keeps the stricter UI gate).
   const Edit: ActionItem = {
     title: $t('edit_album'),
     icon: mdiRenameOutline,
-    $if: () => isOwned,
+    $if: () => isAlbumEditor(album, authManager.user.id),
     onAction: () => modalManager.show(AlbumEditModal, { album }),
   };
 
