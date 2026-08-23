@@ -99,6 +99,8 @@ void main() {
                 hasFavorites: false,
                 hasAssetsInAlbum: false,
                 hasAssetsNotInAlbum: false,
+                hasNoGpsAssets: false,
+                hasNoPlaceNameAssets: false,
               ),
             ),
           ),
@@ -125,6 +127,8 @@ void main() {
                 hasFavorites: false,
                 hasAssetsInAlbum: false,
                 hasAssetsNotInAlbum: false,
+                hasNoGpsAssets: false,
+                hasNoPlaceNameAssets: false,
               ),
             ),
           ),
@@ -195,6 +199,8 @@ void main() {
           hasFavorites: true,
           hasAssetsInAlbum: true,
           hasAssetsNotInAlbum: true,
+          hasNoGpsAssets: false,
+          hasNoPlaceNameAssets: false,
         ),
       );
 

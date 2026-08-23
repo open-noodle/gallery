@@ -19,6 +19,8 @@ FilterSuggestionsResponseDto emptySuggestions() => FilterSuggestionsResponseDto(
   hasFavorites: false,
   hasAssetsInAlbum: false,
   hasAssetsNotInAlbum: false,
+  hasNoGpsAssets: false,
+  hasNoPlaceNameAssets: false,
 );
 
 FilterSuggestionsResponseDto withRatings(List<num> ratings) => FilterSuggestionsResponseDto(
@@ -26,6 +28,8 @@ FilterSuggestionsResponseDto withRatings(List<num> ratings) => FilterSuggestions
   hasFavorites: false,
   hasAssetsInAlbum: false,
   hasAssetsNotInAlbum: false,
+  hasNoGpsAssets: false,
+  hasNoPlaceNameAssets: false,
   ratings: ratings,
 );
 
@@ -34,6 +38,8 @@ FilterSuggestionsResponseDto withMediaTypes(List<String> mediaTypes) => FilterSu
   hasFavorites: false,
   hasAssetsInAlbum: false,
   hasAssetsNotInAlbum: false,
+  hasNoGpsAssets: false,
+  hasNoPlaceNameAssets: false,
   mediaTypes: mediaTypes,
 );
 
@@ -70,12 +76,62 @@ void main() {
       expect(available, containsAll(FilterSectionId.values));
     });
 
+    // #868 put two more entries in the places section, so an empty country list no longer means
+    // the section can do nothing: a scope where nothing has coordinates is exactly the scope the
+    // "No location" entry filters for. Mirrors web's filter-availability.spec.ts.
+    test('keeps places available on no-GPS assets alone', () {
+      final noGpsOnly = FilterSuggestionsResponseDto(
+        hasUnnamedPeople: false,
+        hasFavorites: false,
+        hasAssetsInAlbum: false,
+        hasAssetsNotInAlbum: false,
+        hasNoGpsAssets: true,
+        hasNoPlaceNameAssets: false,
+      );
+
+      expect(availableSections(noGpsOnly, noGpsOnly, SearchFilter.empty()).contains(FilterSectionId.places), isTrue);
+    });
+
+    test('keeps places available on place-name-less assets alone', () {
+      final noPlaceOnly = FilterSuggestionsResponseDto(
+        hasUnnamedPeople: false,
+        hasFavorites: false,
+        hasAssetsInAlbum: false,
+        hasAssetsNotInAlbum: false,
+        hasNoGpsAssets: false,
+        hasNoPlaceNameAssets: true,
+      );
+
+      expect(
+        availableSections(noPlaceOnly, noPlaceOnly, SearchFilter.empty()).contains(FilterSectionId.places),
+        isTrue,
+      );
+    });
+
+    test('hides places only when no country, no missing GPS and no missing place name', () {
+      final available = availableSections(emptySuggestions(), emptySuggestions(), SearchFilter.empty());
+
+      expect(available.contains(FilterSectionId.places), isFalse);
+    });
+
+    // An active locationPresence selection must pin the section open, or clearing it becomes
+    // unreachable the moment the filter empties every other location facet.
+    test('keeps places available while a locationPresence filter is active', () {
+      final filter = SearchFilter.empty().copyWith(location: SearchLocationFilter(locationPresence: 'noGps'));
+
+      final available = availableSections(emptySuggestions(), emptySuggestions(), filter);
+
+      expect(available.contains(FilterSectionId.places), isTrue);
+    });
+
     test('keeps people available while unnamed faces exist', () {
       final unnamed = FilterSuggestionsResponseDto(
         hasUnnamedPeople: true,
         hasFavorites: false,
         hasAssetsInAlbum: false,
         hasAssetsNotInAlbum: false,
+        hasNoGpsAssets: false,
+        hasNoPlaceNameAssets: false,
       );
 
       expect(availableSections(unnamed, unnamed, SearchFilter.empty()).contains(FilterSectionId.people), isTrue);

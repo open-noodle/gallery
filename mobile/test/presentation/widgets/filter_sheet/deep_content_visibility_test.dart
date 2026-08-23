@@ -28,6 +28,8 @@ FilterSuggestionsResponseDto emptySuggestions() => FilterSuggestionsResponseDto(
   hasFavorites: false,
   hasAssetsInAlbum: false,
   hasAssetsNotInAlbum: false,
+  hasNoGpsAssets: false,
+  hasNoPlaceNameAssets: false,
 );
 
 extension _CopyWithRatings on FilterSuggestionsResponseDto {
@@ -39,6 +41,8 @@ extension _CopyWithRatings on FilterSuggestionsResponseDto {
     hasAssetsInAlbum: hasAssetsInAlbum,
     hasAssetsNotInAlbum: hasAssetsNotInAlbum,
     hasFavorites: hasFavorites,
+    hasNoGpsAssets: hasNoGpsAssets,
+    hasNoPlaceNameAssets: hasNoPlaceNameAssets,
     hasUnnamedPeople: hasUnnamedPeople,
     mediaTypes: mediaTypes,
     people: people,
@@ -172,6 +176,8 @@ void main() {
               hasFavorites: filter.isEmpty,
               hasAssetsInAlbum: false,
               hasAssetsNotInAlbum: true,
+              hasNoGpsAssets: false,
+              hasNoPlaceNameAssets: false,
             ),
           );
         }),

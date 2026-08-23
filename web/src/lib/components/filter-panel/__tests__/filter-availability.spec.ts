@@ -14,6 +14,8 @@ const full = (): FilterSuggestionsResponse => ({
   hasFavorites: true,
   hasAssetsInAlbum: true,
   hasAssetsNotInAlbum: true,
+  hasNoGpsAssets: true,
+  hasNoPlaceNameAssets: true,
 });
 
 /** A scope in which no section can filter anything. */
@@ -28,6 +30,8 @@ const barren = (): FilterSuggestionsResponse => ({
   hasFavorites: false,
   hasAssetsInAlbum: false,
   hasAssetsNotInAlbum: true,
+  hasNoGpsAssets: false,
+  hasNoPlaceNameAssets: false,
 });
 
 const input = (overrides: Partial<AvailabilityInput> = {}): AvailabilityInput => ({
@@ -109,6 +113,26 @@ describe('getSectionAvailability', () => {
     it('hides favorites when nothing is favourited', () => {
       const none = { ...full(), hasFavorites: false };
       expect(getSectionAvailability('favorites', input({ current: none, baseline: none }))).toBe('unavailable');
+    });
+
+    // #868 put two more entries in the location section, so an empty country list no longer means
+    // the section can do nothing: a scope where nothing has coordinates is exactly the scope the
+    // "No location" entry filters for. Hiding on `countries.length === 0` alone would make the
+    // feature unreachable in the library it was built for.
+    it('keeps location available on no-GPS assets alone', () => {
+      const noGpsOnly = { ...barren(), hasNoGpsAssets: true };
+      expect(getSectionAvailability('location', input({ current: noGpsOnly, baseline: noGpsOnly }))).toBe('available');
+    });
+
+    it('keeps location available on place-name-less assets alone', () => {
+      const noPlaceOnly = { ...barren(), hasNoPlaceNameAssets: true };
+      expect(getSectionAvailability('location', input({ current: noPlaceOnly, baseline: noPlaceOnly }))).toBe(
+        'available',
+      );
+    });
+
+    it('hides location only when no country, no missing GPS and no missing place name', () => {
+      expect(getSectionAvailability('location', input({ current: barren(), baseline: barren() }))).toBe('unavailable');
     });
   });
 
