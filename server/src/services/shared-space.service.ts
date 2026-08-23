@@ -2161,6 +2161,58 @@ export class SharedSpaceService extends BaseService {
   }
 
   /**
+   * Spec §6.2 (Slice 4): create a space person, optionally attaching a seed face ("add a name").
+   *
+   * When `assetFaceId` is present this is create-and-attach, and it runs as ONE transaction
+   * (F-15) — a crash between the create and the attach would leave a nameless orphan person in
+   * the space's people list, the same failure mode `confirmSpacePersonFaceSuggestion` guards
+   * against for the suggestion path.
+   *
+   * F-33: the `(spaceId, identityId)` unique index is the trap. A face left over from an earlier
+   * attach/detach cycle (Task 1 deliberately never touches `face_identity_face`) or from ML
+   * backfill may already resolve to an identity that some OTHER space person here already holds.
+   * `createOrGetPersonForIdentity` is used whenever the seed face already carries an identity, so
+   * that case returns the existing person instead of racing a plain insert into a duplicate key.
+   */
+  async createSpacePerson(
+    auth: AuthDto,
+    spaceId: string,
+    dto: { name?: string; assetFaceId?: string },
+  ): Promise<SharedSpacePersonResponseDto> {
+    await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
+
+    if (!dto.assetFaceId) {
+      const created = await this.sharedSpaceRepository.createPerson({ spaceId, name: dto.name ?? '' });
+      return this.mapSpacePerson(created, null);
+    }
+
+    const assetFaceId = dto.assetFaceId;
+    if (!(await this.facePersonVerdictRepository.isFaceAssignableInSpace(spaceId, assetFaceId))) {
+      throw new BadRequestException('Face not found');
+    }
+
+    const person = await this.databaseRepository.transaction(async (trx) => {
+      // Mirrors attachFaceToSpacePerson's F-37 lock: two concurrent creates seeded from the SAME
+      // face must not both succeed with two different new people each holding a projection row.
+      await this.facePersonVerdictRepository.lockFaceForAssignment(assetFaceId, trx);
+
+      const existingIdentityId = await this.faceIdentityRepository.getIdentityIdForFace(assetFaceId, trx);
+      const created = existingIdentityId
+        ? await this.sharedSpaceRepository.createOrGetPersonForIdentity(
+            { spaceId, identityId: existingIdentityId, name: dto.name ?? '' },
+            trx,
+          )
+        : await this.sharedSpaceRepository.createPerson({ spaceId, name: dto.name ?? '' }, trx);
+
+      await this.linkFaceToSpacePerson(trx, created, assetFaceId, { writeIdentity: true });
+      return created;
+    });
+
+    const alias = await this.sharedSpaceRepository.getAlias(person.id, auth.user.id);
+    return this.mapSpacePerson(person, alias?.alias ?? null);
+  }
+
+  /**
    * Spec §6.1 (Slice 3): the face boxes on one asset, space-scoped. Editor-only — the response
    * exposes faces nobody has named yet, which a Viewer has no business seeing.
    *

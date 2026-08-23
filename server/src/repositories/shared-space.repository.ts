@@ -3021,8 +3021,8 @@ export class SharedSpaceRepository {
       .execute();
   }
 
-  createPerson(values: Insertable<SharedSpacePersonTable>) {
-    return this.db.insertInto('shared_space_person').values(values).returningAll().executeTakeFirstOrThrow();
+  createPerson(values: Insertable<SharedSpacePersonTable>, db: Kysely<DB> | Transaction<DB> = this.db) {
+    return db.insertInto('shared_space_person').values(values).returningAll().executeTakeFirstOrThrow();
   }
 
   // Race-safe insert-or-get for the `(spaceId, identityId)` unique index. Concurrent
@@ -3032,8 +3032,9 @@ export class SharedSpaceRepository {
   // committed row instead of throwing.
   async createOrGetPersonForIdentity(
     values: Insertable<SharedSpacePersonTable> & { spaceId: string; identityId: string },
+    db: Kysely<DB> | Transaction<DB> = this.db,
   ) {
-    const inserted = await this.db
+    const inserted = await db
       .insertInto('shared_space_person')
       .values(values)
       .onConflict((oc) => oc.columns(['spaceId', 'identityId']).where('identityId', 'is not', null).doNothing())
@@ -3043,7 +3044,7 @@ export class SharedSpaceRepository {
       return inserted;
     }
 
-    return this.db
+    return db
       .selectFrom('shared_space_person')
       .selectAll()
       .where('spaceId', '=', values.spaceId)
