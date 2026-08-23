@@ -29,7 +29,7 @@
  *      predate and cover the full-resolution feature) — see the test bodies for what each proves and the
  *      "re-scan" proxy technique both use (a real, live-embeddings scan job isn't available in this
  *      ML-disabled stack, same constraint as X1/X2 above).
- *   8. Slice 11 (manual review mode, design docs/superpowers/specs/2026-07-23-manual-face-review-mode-design.md
+ *   8. Slice 11 (manual review mode, design specs/2026-07-23-manual-face-review-mode-design.md
  *      §7/§8) — the manual flow end to end: a never-scanned person is reviewed through
  *      /admin/face-cleanup/people/[personId], routing faces into move/lock/detach and asserting the durable DB
  *      state each writes. Then the cross-engine invariant: a later (seeded) scan must honour every one of
@@ -878,7 +878,7 @@ test.describe.serial('Face Cleanup', () => {
 
   /**
    * Slice 11 (manual review mode, design §7/§8 of
-   * docs/superpowers/specs/2026-07-23-manual-face-review-mode-design.md) — manual flow end to end.
+   * specs/2026-07-23-manual-face-review-mode-design.md) — manual flow end to end.
    *
    * Seeds a person with faces and NO scan at all — the chooser must still treat manual mode as reachable
    * (design §6.2: "manual must be reachable on a brand-new instance"), and the manual review page must list
