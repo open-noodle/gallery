@@ -87,13 +87,15 @@ void main() {
   test('preserves cover quality for extreme aspect ratios', () async {
     // Cover-fitting a square box keeps the source aspect ratio, so the expected
     // width is tied to whichever artwork ships at this path. The fork replaces it
-    // with the Gallery mark (984x328, 3:1) where upstream ships 3038x742 (~4.09:1),
-    // so this is 960 here and 1311 upstream. Re-derive as `320 * width / height` if
-    // branding swaps the logo again.
-    final image = await loadEncoded('assets/immich-logo-inline-light.png', const ui.Size.square(320));
+    // with the Gallery mark (984x282, ~3.49:1) where upstream ships 3038x742
+    // (~4.09:1). Re-derive as `box * width / height` if branding swaps the logo
+    // again — and keep the box BELOW the artwork's height (282 here), or the
+    // loader's no-upscale rule returns the native size and this stops testing
+    // cover-downscaling at all, which is the whole point of the case.
+    final image = await loadEncoded('assets/immich-logo-inline-light.png', const ui.Size.square(200));
 
-    expect(image.width, 960);
-    expect(image.height, 320);
+    expect(image.width, 698);
+    expect(image.height, 200);
     image.dispose();
   });
 
