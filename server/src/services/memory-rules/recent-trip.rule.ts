@@ -79,8 +79,6 @@ export class RecentTripMemoryRule implements MemoryRule {
       {
         ruleId: this.id,
         dedupeKey: `recent_trip:${placeKey}:${dedupeDay}`,
-        title: `Recent trip to ${placeLabel}`,
-        subtitle: `${candidate.assetCount} photos over ${candidate.dayCount} days`,
         score: 50 + candidate.dayCount * 5 + Math.min(candidate.assetCount, 20),
         assetIds,
         memoryAt: target,

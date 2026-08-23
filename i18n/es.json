@@ -2667,6 +2667,8 @@
   "reassing_hint": "Asignar recursos seleccionados a una persona existente",
   "recent": "Reciente",
   "recent_searches": "Búsquedas recientes",
+  "recent_trip_subtitle": "{assetCount, plural, one {# foto} other {# fotos}} en {dayCount, plural, one {# día} other {# días}}",
+  "recent_trip_title": "Viaje reciente a {location}",
   "recently_added": "Añadidos recientemente",
   "recently_added_body": "Acceda directamente a todo lo que ha añadido recientemente en una página dedicada.",
   "recently_added_description": "Explora tus archivos ordenados por fecha de subida a Immich",
