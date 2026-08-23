@@ -182,21 +182,20 @@ mocks" hazard. **Logged, not absolved** — a green re-run proves non-determinis
 
 ## Remote CI Verification
 
-Dispatched on `45634b99869`. **9 of 10 green**; the tenth is a `main`-side regression this branch
-inherits rather than causes.
+Dispatched on `45634b99869`. **10 of 10 green.** The tenth needed a real fix, described below.
 
-| Workflow                                  | Result                                          |
-| ----------------------------------------- | ----------------------------------------------- |
-| `test.yml`                                | GREEN                                           |
-| `docker.yml`                              | GREEN                                           |
-| `static_analysis.yml`                     | GREEN                                           |
-| `gallery-build-mobile.yml`                | GREEN                                           |
-| `gallery-mobile-smoke.yml`                | GREEN                                           |
-| `gallery-ml-smoke.yml`                    | GREEN                                           |
-| `gallery-rebase-smoke.yml`                | GREEN                                           |
-| `storage-migration-tests.yml`             | GREEN                                           |
-| `storage-migration-e2e.yml`               | GREEN on re-run — see below                     |
-| `gallery-revert-to-immich-validation.yml` | RED — pre-existing `main` regression, see below |
+| Workflow                                  | Result                                  |
+| ----------------------------------------- | --------------------------------------- |
+| `test.yml`                                | GREEN                                   |
+| `docker.yml`                              | GREEN                                   |
+| `static_analysis.yml`                     | GREEN                                   |
+| `gallery-build-mobile.yml`                | GREEN                                   |
+| `gallery-mobile-smoke.yml`                | GREEN                                   |
+| `gallery-ml-smoke.yml`                    | GREEN                                   |
+| `gallery-rebase-smoke.yml`                | GREEN                                   |
+| `storage-migration-tests.yml`             | GREEN                                   |
+| `storage-migration-e2e.yml`               | GREEN on re-run — see below             |
+| `gallery-revert-to-immich-validation.yml` | GREEN after a fork-side fix — see below |
 
 ### `storage-migration-e2e` — environmental, confirmed by re-run
 
@@ -213,34 +212,62 @@ plugin, untouched here — and **`docker.yml` succeeded on the identical SHA**, 
 plugins stage including `plugin-gallery`. Re-running the failed job on the unchanged commit went
 green. This is the known `mise`/GitHub-API timeout class.
 
-### ★★ `gallery-revert-to-immich-validation` — a `main` regression from #981, NOT this branch
+### ★★★ `gallery-revert-to-immich-validation` — `revert-to-immich.sql` was missing plugin cleanup
 
-This job boots **`ghcr.io/open-noodle/immich-server:main`**, not the branch, so it reports on `main`'s
-image. It fails with a plugin host-function mismatch:
+Red on every branch since #981 merged. **My first diagnosis was wrong** and worth recording: I
+concluded the `:main` image was internally inconsistent and the fix belonged on `main`. It did not.
+
+The tell was one line in the log — `Initializing Immich v3.1.0`. The failing **post** phase boots
+**tagged upstream Immich** against the reverted database, not Gallery. And **plugins live in the
+database** (`plugin.wasmBytes`): the server loads every `plugin` row at boot and instantiates its
+wasm. #981 added `gallery-core`, whose wasm imports the fork-only `gallery` host function, which
+upstream does not register:
 
 ```
 microservices worker error: cannot resolve import "extism:host/user" "gallery"
-("extism:host/user" is a host module, but does not contain "gallery")
-  -> server did not respond to /api/server/ping within 180s
+microservices worker exited with code 1
+-> post: server did not respond to /api/server/ping within 180s
 ```
 
-`main`'s `:main` image is internally inconsistent: its `plugin-gallery.wasm` imports a `gallery` host
-function that the server in that image does not register.
+`scripts/revert-to-immich.sql` had **no plugin cleanup at all** — precisely the class step 7i exists
+for: a fork-only object the revert must tear down. Added step 6b deleting `gallery-core`;
+`plugin_method` cascades from `plugin`, and `workflow_step.pluginMethodId` cascades from that, so any
+workflow step wired to a Gallery action goes too. Upstream's `immich-plugin-core` is untouched.
 
-Evidence it is not ours:
+Verified against a migrated database seeded with both plugins, a method each and a workflow step on
+the Gallery method:
 
-- the workflow is failing on **unrelated branches too** — `feat/space-editor-asset-permissions`, three
-  separate runs at 15:55, 16:16 and 17:04;
-- it **passed at 14:44**, and **#981 merged to `main` at 15:43Z**; failures begin twelve minutes later;
-- the gate's actual subject — schema drift — was **clean**: "Pre-phase baseline drift (0 item(s))" and
-  "No schema drift detected". The local coverage detector also reports complete.
+|                 | before | after                             |
+| --------------- | ------ | --------------------------------- |
+| `plugin`        | 2      | 1 (`immich-plugin-core` retained) |
+| `plugin_method` | 2      | 1                                 |
+| `workflow_step` | 1      | 0 (cascaded)                      |
+| `workflow`      | 1      | 1 (parent kept)                   |
 
-**This needs its own fix on `main`, and it currently reds every branch that runs this workflow.**
+Re-running is a no-op, and the `to_regclass` guard was checked against a database with the table
+dropped. That guard test also caught a mismatch worth keeping: the guard named `public.plugin` while
+the DELETE was unqualified — now aligned.
+
+**CI confirmation, on runtime output rather than the green tick.** The first re-run "passed" in 29
+seconds having died on `docker: toomanyrequests` before the validation started; three lines that read
+like passes were the workflow printing its own script (`${phase}` unexpanded). The real run took four
+minutes and emitted:
+
+```
+##[notice]pre: /api/server/ping OK
+##[notice]gallery: /api/server/ping OK
+##[notice]post: /api/server/ping OK          <- upstream Immich booted
+##[notice]post: no new schema drift compared to pre-phase baseline
+##[notice]revert-to-immich validation PASSED
+```
+
+`post: ping OK` is the exact step that previously timed out, and `cannot resolve import` appears zero
+times.
 
 ## Follow-up
 
 - `global-search-manager.svelte.spec.ts` "clears stale status…" is order-dependent and should reset
   its mock rather than rely on suite ordering.
 - `gallery-map.e2e-spec.ts` "albumId visibility … (D4)" remains flaky from the previous cycle.
-- **`main` ships a `plugin-gallery` whose `gallery` host import the server does not register**, so the
-  `:main` image fails to boot its microservices worker. Introduced by #981; needs a fix on `main`.
+- `scripts/revert-to-immich.sql` now deletes the Gallery plugin row. `main` carries the same gap until
+  this branch lands, so the gate stays red there; the fix is one SQL block if it needs porting sooner.
