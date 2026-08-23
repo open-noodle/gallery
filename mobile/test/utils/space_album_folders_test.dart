@@ -6,7 +6,7 @@ import 'package:immich_mobile/utils/space_album_folders.dart';
 SpaceAlbumFolder folder(String id, String name, [String? parentId]) =>
     SpaceAlbumFolder(id: id, spaceId: 'space-1', parentId: parentId, name: name);
 
-// SpaceAlbum carries id, name, thumbnailAssetId, showInTimeline, assetCount, linkedAt, updatedAt,
+// SpaceAlbum carries id, name, thumbnailAssetId, showInTimeline, assetCount, linkedAt, updatedAt, createdAt,
 // plus the folderId Task 4 adds. Only id/name/folderId/updatedAt/thumbnailAssetId matter here; the
 // rest are filled with inert defaults so the constructor is satisfied.
 //
@@ -21,6 +21,7 @@ SpaceAlbum album(String id, String name, {String? folderId, DateTime? updatedAt,
   assetCount: 0,
   linkedAt: DateTime.utc(2026, 1, 1),
   updatedAt: updatedAt ?? DateTime.utc(2026, 1, 1),
+  createdAt: DateTime.utc(2026, 1, 1),
   folderId: folderId,
 );
 

@@ -37,6 +37,7 @@ SpaceAlbum _album({required String id, String? thumbnailAssetId, DateTime? updat
   showInTimeline: true,
   linkedAt: DateTime.utc(2026, 1, 1),
   updatedAt: updatedAt ?? DateTime.utc(2026, 1, 1),
+  createdAt: DateTime.utc(2026, 1, 1),
 );
 
 RemoteAsset _remoteAsset({required String id}) => RemoteAsset(
