@@ -480,35 +480,49 @@ while Bob's People page changed underneath him.
 ## 9. TDD plan
 
 Every slice is **red → green → refactor**: the listed spec is written and observed failing before the
-implementation lands. Slices are ordered so each is independently reviewable and leaves the tree
-green.
+implementation lands.
 
-### 9.1 Slice 1 — authority and reachability, against a real database
+**Ordering principle: the attach path lands first.** Almost every scenario in §8 is phrased "Anna
+attaches", so authority and reachability cannot be proved before an attach exists to exercise them.
+The read endpoint (§6.1) depends on the same hidden-person predicate the write uses, so it follows
+rather than leads. An earlier draft of this section had it the other way round; its Slice 1 could
+never have gone green.
+
+Each slice below leaves the tree green and ships something exercisable.
+
+### 9.1 Slice 1 — attach, and the authority that guards it
+
+The foundation: `PUT /shared-spaces/:id/people/:personId/faces/:assetFaceId` (§6.3), gated by
+`requireRole(Editor)` → `requireSpacePersonInSpace` → `isFaceReachableInSpace`, plus the
+hidden-person exclusion as a **shared predicate** (Slice 3 reuses it for the read).
+
+At this slice the transaction may call the existing confirm steps inline; the extraction is Slice 2's
+job and must not be anticipated here.
 
 **Tests first.** New `server/test/medium/specs/shared-space-face-assign.medium.spec.ts`.
 
 Medium-only by necessity, for the same reason #992's Slice 1 was: `isFaceReachableInSpace` is a
 three-branch path query with correlated visibility gates. Unit mocks prove nothing about it.
 
-Table-driven over **F-1 … F-12** — the whole of §8.1 and §8.2. Each deny row must be
-**mutation-proved non-vacuous** — flip the single property under test (role, membership, visibility,
-`isVisible`) and observe it turn to grant. #992 established this discipline; a deny that passes for
-the wrong reason is worse than no test.
+Table-driven over **F-1 … F-7** (authority), **F-9 … F-11** (reachability and the hidden-person
+exclusion at the write) and **F-14** (idempotence). Each deny row must be **mutation-proved
+non-vacuous** — flip the single property under test (role, membership, visibility, `isVisible`) and
+observe it turn to grant. #992 established this discipline; a deny that passes for the wrong reason is
+worse than no test.
 
 **F-6 is the row to write first.** It is the one place this spec deliberately diverges from #992's
 rule, and the failure mode is a reviewer "fixing" it into an owner-is-member check.
 
-**F-8 and F-9 are the pair that must not be separated.** §6.1 calls the hidden-person exclusion
-load-bearing and claims it is pinned at both the read and the write; F-8 covers the read, F-9 the
-write. Testing only F-8 leaves an editor able to attach a face they cannot see by guessing its id —
-the exact hole the filter exists to close.
+**F-9 is the hidden-person exclusion at the write**, and is the half that closes the hole: without it
+an editor can attach a face they cannot see by guessing its id. Its read-side twin is F-8 in Slice 3;
+§6.1 claims the exclusion is pinned at both ends, and this is the first end.
 
-Then implement §6.1's filter and the service gates.
+Working software at the end of this slice: an editor can attach an existing space person to a face.
 
-### 9.2 Slice 2 — the shared link helper
+### 9.2 Slice 2 — the shared helper, and the owner-named override
 
-Tests: **F-13, F-14**, **F-34 … F-36** (the three §6.3.1 rows) and **F-40** (the override is
-space-local) in `shared-space.service.spec.ts`, plus a regression run of the existing
+Tests: **F-13** (reassign between space people), **F-34 … F-36** (the three §6.3.1 rows) and **F-40**
+(the override is space-local) in `shared-space.service.spec.ts`, plus a regression run of the existing
 `confirmSpacePersonFaceSuggestion` specs. **F-37** (concurrent attach) belongs here too and is
 medium-only — it needs two real transactions racing, which a mocked repository cannot express.
 
@@ -518,37 +532,53 @@ returns 200 and passes every other scenario in this slice while silently re-poin
 owner's person depends on. A status-only assertion cannot see that. F-40 is its companion: it checks
 the same event from Bob's side.
 
-Then extract `linkFaceToSpacePerson` (§6.3) and re-point the suggestion confirm at it. The existing
-suggestion tests passing unchanged _is_ the refactor's proof; if they need editing, the extraction
-changed behaviour and is wrong.
+Then extract `linkFaceToSpacePerson(trx, person, assetFaceId, { writeIdentity })` (§6.3, §6.3.1) and
+re-point the suggestion confirm at it, passing `writeIdentity: true`. The existing suggestion tests
+passing unchanged _is_ the refactor's proof; if they need editing, the extraction changed behaviour
+and is wrong.
 
-### 9.3 Slice 3 — create, attach, detach
+### 9.3 Slice 3 — the space-scoped face read
 
-Tests: **F-15** (transactionality — assert no orphan person when the attach throws), **F-22**,
-**F-32** (recount on detach), **F-33** (the `(spaceId, identityId)` unique index), and **F-38**
-(reachability re-checked at write time, not trusted from §6.1's read).
+`GET /shared-spaces/:id/assets/:assetId/faces` (§6.1), reusing Slice 1's hidden-person predicate and
+adding the asset-level reachability check.
+
+Tests: **F-8** (owner-hidden person's faces absent) and **F-12** (space-hidden person's faces absent).
+
+F-8 is F-9's twin. Write it by asserting on a face the fixture proves _is_ present when the owner
+un-hides the person — otherwise "absent" is indistinguishable from "the fixture never created it",
+which is the vacuous-pass shape #992's Slice 1 comment warns about.
+
+Working software: the client can list the faces on an asset and attach to them.
+
+### 9.4 Slice 4 — create and detach
+
+Tests: **F-15** (transactionality — assert no orphan person when the attach throws), **F-22**
+(detach leaves `face_identity_face` untouched), **F-32** (recount on detach), **F-33** (the
+`(spaceId, identityId)` unique index) and **F-38** (reachability re-checked at write time, not
+trusted from §6.1's read).
 
 Then §6.2 and §6.4, reusing `createPerson` / `createOrGetPersonForIdentity` and adding
 `removePersonFace` to the repository.
 
-F-32 is the one to write first: `addPersonFaces` recounts on the way in, so a `removePersonFace` that
-forgets is invisible to every other test in this slice and only shows up later as mis-ordered,
-silently-hidden people.
+F-32 is the one to write first: `addPersonFaces` recounts on the way in
+(`shared-space.repository.ts:2660`), so a `removePersonFace` that forgets is invisible to every other
+test in this slice and only shows up later as mis-ordered, silently-hidden people.
 
-### 9.4 Slice 4 — cross-space propagation
+### 9.5 Slice 5 — cross-space propagation
 
 Tests: **F-20, F-21, F-23, F-39** as medium tests. No implementation follows — this slice exists to
-_pin existing behaviour_ before Slice 5 makes it easy to trigger. If F-20 fails, §5.1's premise is
-wrong and the design needs revisiting before proceeding.
+_pin existing behaviour_ before Slice 6 adds a second way to reach it. If F-20 fails, §5.1's premise
+is wrong and the design needs revisiting before proceeding.
 
 F-39 must assert the **resolved** name and birthday Bob sees, not the `person` row's columns. A
 column-level assertion passes vacuously, because the whole point of §5.1 is that resolution happens
 at read time through the identity.
 
-### 9.5 Slice 5 — drawing boxes
+### 9.6 Slice 6 — drawing boxes
 
 Opens with the `asset_face.createdBy` migration (§6.6) in
-`server/src/schema/migrations-gallery/`, since F-18 cannot be written without the column.
+`server/src/schema/migrations-gallery/`, with a round timestamp per CLAUDE.md, since F-18 cannot be
+written without the column.
 
 Tests: **F-16 … F-19**. F-16 first — the edit-aware coordinate transform is the subtle one, and #992
 made rotated assets the common case rather than an exotic one.
@@ -560,11 +590,11 @@ F-19. Assert on a genuinely detected face — one the fixture created through de
 
 Then §6.5 and §6.6.
 
-### 9.6 Slice 6 — attribution
+### 9.7 Slice 7 — attribution
 
 Tests: **F-24 … F-26**. Then §6.7, the enum members, the feed rendering, and the nine locales.
 
-### 9.7 Slice 7 — web
+### 9.8 Slice 8 — web
 
 Tests: **F-27 … F-31** as component specs on `DetailPanelPeople.spec.ts` and the new panels.
 
@@ -575,7 +605,7 @@ with `expect(queryBy...).toBeNull()` — a bare `queryBy` passes either way and 
 Per `feedback_web_vitest_no_clearmocks`: this repo does not clear mocks between tests in a file;
 reset SDK mocks explicitly or F-31's failure path leaks into neighbours.
 
-### 9.8 Slice 8 — end-to-end journey
+### 9.9 Slice 9 — end-to-end journey
 
 An `e2e/src/specs/server/api/` journey mirroring #992's: Anna opens Bob's photo in space A, names an
 unrecognised face, corrects a wrong match, draws a box, sees both activity rows — and is refused when
@@ -587,7 +617,8 @@ on the timeline, matching the precedent set by #992's own Playwright affordance 
 (`e2e/src/specs/web/spaces-editor-asset-viewer-affordances.e2e-spec.ts`) that gating claims get a real
 browser. Cite the path, not a SHA — #992's branch is rebased routinely and any SHA here goes stale.
 
----
+**OpenAPI regeneration happens once, here**, after every endpoint is final: `pnpm build` →
+`pnpm sync:open-api` → `make open-api` (§10 trap 1).
 
 ## 10. Traps
 
