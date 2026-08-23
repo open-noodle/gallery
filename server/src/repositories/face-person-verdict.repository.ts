@@ -380,15 +380,18 @@ export class FacePersonVerdictRepository {
     return this.recordPersonalVerdict({ personGroupId, assetFaceId, status: 'ignored', ...opts });
   }
 
-  private async recordSpacePersonVerdict(input: {
-    spacePersonId: string;
-    assetFaceId: string;
-    status: 'rejected' | 'ignored';
-    identityId?: string | null;
-    source?: FacePersonVerdictSource;
-    actorId?: string | null;
-  }): Promise<number> {
-    const result = await this.db
+  private async recordSpacePersonVerdict(
+    input: {
+      spacePersonId: string;
+      assetFaceId: string;
+      status: 'rejected' | 'ignored';
+      identityId?: string | null;
+      source?: FacePersonVerdictSource;
+      actorId?: string | null;
+    },
+    db: Kysely<DB> | Transaction<DB> = this.db,
+  ): Promise<number> {
+    const result = await db
       .insertInto('face_person_verdict')
       .values({
         spacePersonId: input.spacePersonId,
@@ -417,13 +420,19 @@ export class FacePersonVerdictRepository {
     return Number(result.numInsertedOrUpdatedRows ?? 0n);
   }
 
+  // §6.3.1/F-13: `db` defaults to `this.db`, but `attachFaceToSpacePerson` (Slice 2) is the first caller
+  // that passes its own `trx` — the negative verdict it writes must land in the SAME transaction as the
+  // reassign/override it accompanies, or a mid-transaction failure could leave the projection write rolled
+  // back while the verdict survives (or vice versa), reopening the suggestion re-offer this call exists to
+  // close.
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID, { source: 'cleanup' }] })
   async markRejectedForSpacePerson(
     spacePersonId: string,
     assetFaceId: string,
     opts?: { identityId?: string | null; source?: FacePersonVerdictSource; actorId?: string | null },
+    db: Kysely<DB> | Transaction<DB> = this.db,
   ): Promise<number> {
-    return this.recordSpacePersonVerdict({ spacePersonId, assetFaceId, status: 'rejected', ...opts });
+    return this.recordSpacePersonVerdict({ spacePersonId, assetFaceId, status: 'rejected', ...opts }, db);
   }
 
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID, { source: 'suggestion' }] })
@@ -431,8 +440,9 @@ export class FacePersonVerdictRepository {
     spacePersonId: string,
     assetFaceId: string,
     opts?: { identityId?: string | null; source?: FacePersonVerdictSource; actorId?: string | null },
+    db: Kysely<DB> | Transaction<DB> = this.db,
   ): Promise<number> {
-    return this.recordSpacePersonVerdict({ spacePersonId, assetFaceId, status: 'ignored', ...opts });
+    return this.recordSpacePersonVerdict({ spacePersonId, assetFaceId, status: 'ignored', ...opts }, db);
   }
 
   // The shared negative-verdict read, identity-first with target fallback. Both engines call this: the
@@ -939,5 +949,43 @@ export class FacePersonVerdictRepository {
       )
       .executeTakeFirst();
     return row !== undefined;
+  }
+
+  /**
+   * §6.3.1: the face's own `personId`, plus — when it is set — that OWNER `person`'s
+   * `identityId`. This is the pair `attachFaceToSpacePerson` needs to decide whether the face
+   * already belongs to one of the owner's own people, and if so, whether that person's identity
+   * already matches the space person being attached to (row 2) or differs (row 3, where the
+   * identity write must be skipped).
+   *
+   * Never throws for a missing face: callers reach this only after `isFaceAssignableInSpace`
+   * has already confirmed the face exists, but a null-safe read here costs nothing and avoids a
+   * second implicit contract on call order.
+   */
+  @GenerateSql({ params: [DummyValue.UUID] })
+  async getFaceOwnerLink(
+    assetFaceId: string,
+    db: Kysely<DB> | Transaction<DB> = this.db,
+  ): Promise<{ personId: string | null; identityId: string | null } | undefined> {
+    return db
+      .selectFrom('asset_face')
+      .leftJoin('person', 'person.id', 'asset_face.personId')
+      .select(['asset_face.personId as personId', 'person.identityId as identityId'])
+      .where('asset_face.id', '=', assetFaceId)
+      .executeTakeFirst();
+  }
+
+  /**
+   * F-37: serializes concurrent `attachFaceToSpacePerson` calls that target the SAME face.
+   * `shared_space_person_face`'s primary key is `(personId, assetFaceId)`, not `assetFaceId`
+   * alone, so nothing at the schema level stops two different target space people from each
+   * inserting their own row for the same face if their transactions interleave. Taking this lock
+   * as the FIRST statement in the attach transaction forces a second concurrent attach on the
+   * same face to wait for the first to commit, then see its result (via the reassign read) rather
+   * than race past it — the loser becomes an ordinary sequential reassign, never a duplicate row.
+   */
+  @GenerateSql({ params: [DummyValue.UUID] })
+  async lockFaceForAssignment(assetFaceId: string, db: Kysely<DB> | Transaction<DB> = this.db): Promise<void> {
+    await db.selectFrom('asset_face').select('id').where('id', '=', assetFaceId).forUpdate().executeTakeFirst();
   }
 }

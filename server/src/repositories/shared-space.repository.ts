@@ -4714,8 +4714,12 @@ export class SharedSpaceRepository {
   }
 
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
-  async removePersonFaceAssignmentsForSpaceFace(spaceId: string, assetFaceId: string): Promise<string[]> {
-    const assignments = await this.db
+  async removePersonFaceAssignmentsForSpaceFace(
+    spaceId: string,
+    assetFaceId: string,
+    db: Kysely<DB> | Transaction<DB> = this.db,
+  ): Promise<string[]> {
+    const assignments = await db
       .selectFrom('shared_space_person_face')
       .innerJoin('shared_space_person', 'shared_space_person.id', 'shared_space_person_face.personId')
       .select('shared_space_person_face.personId')
@@ -4729,7 +4733,7 @@ export class SharedSpaceRepository {
       return [];
     }
 
-    await this.db
+    await db
       .deleteFrom('shared_space_person_face')
       .where('assetFaceId', '=', assetFaceId)
       .where('personId', 'in', personIds)
