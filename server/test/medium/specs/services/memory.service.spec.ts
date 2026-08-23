@@ -695,7 +695,7 @@ describe(MemoryService.name, () => {
             type: MemoryType.Rule,
             data: expect.objectContaining({
               ruleId: 'recent_trip',
-              title: 'Recent trip to Paris, France',
+              context: expect.objectContaining({ placeLabel: 'Paris, France' }),
             }),
           }),
         ]),
@@ -848,7 +848,7 @@ describe(MemoryService.name, () => {
       const [memory] = await memoryRepo.search(user.id, { type: MemoryType.Rule, for: now.toJSDate() });
       expect(memory?.data).toMatchObject({
         ruleId: 'recent_trip',
-        title: 'Recent trip to Paris, France',
+        context: { placeLabel: 'Paris, France' },
       });
       expect(memory?.assets).toHaveLength(7);
       expect(memory?.assets.map(({ id }) => id)).toEqual([
