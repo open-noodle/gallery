@@ -15,12 +15,16 @@
  * property under test.
  */
 import { Kysely } from 'kysely';
+import { AuthDto } from 'src/dtos/auth.dto';
 import { AssetVisibility } from 'src/enum';
+import { DatabaseRepository } from 'src/repositories/database.repository';
+import { FaceIdentityRepository } from 'src/repositories/face-identity.repository';
 import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
 import { DB } from 'src/schema';
 import { BaseService } from 'src/services/base.service';
+import { SharedSpaceService } from 'src/services/shared-space.service';
 import { newMediumService } from 'test/medium.factory';
 import { getKyselyDB } from 'test/utils';
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -176,5 +180,30 @@ describe('isFaceAssignableInSpace', () => {
     await expect(verdictRepo.isFaceAssignableInSpace(space.id, faceId)).resolves.toBe(true);
     await defaultDatabase.updateTable('asset_face').set(patch).where('id', '=', faceId).execute();
     await expect(verdictRepo.isFaceAssignableInSpace(space.id, faceId)).resolves.toBe(false);
+  });
+});
+
+describe('attach idempotence (F-14)', () => {
+  it('a second identical attach is a no-op, with no duplicate projection row', async () => {
+    const { sut, ctx } = newMediumService(SharedSpaceService, {
+      database: defaultDatabase,
+      real: [FacePersonVerdictRepository, SharedSpaceRepository, FaceIdentityRepository, DatabaseRepository],
+      mock: [LoggingRepository],
+    });
+    const { anna, bob, space } = await newSpaceWithEditorAndMember(ctx);
+    const { assetId } = await reachPathBuilders.direct(ctx, { spaceId: space.id, ownerId: bob.id });
+    const { result: faceId } = await ctx.newAssetFace({ assetId });
+    const person = await ctx.get(SharedSpaceRepository).createPerson({ spaceId: space.id, name: 'Aurelia' });
+
+    const auth = { user: { id: anna.id } } as AuthDto;
+    await sut.attachFaceToSpacePerson(auth, space.id, person.id, faceId);
+    await sut.attachFaceToSpacePerson(auth, space.id, person.id, faceId);
+
+    const rows = await defaultDatabase
+      .selectFrom('shared_space_person_face')
+      .selectAll()
+      .where('assetFaceId', '=', faceId)
+      .execute();
+    expect(rows).toHaveLength(1);
   });
 });
