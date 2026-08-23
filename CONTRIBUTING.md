@@ -132,4 +132,4 @@ If a store rejects the mobile build, discard the draft and rerun phase 1 after f
 gh release delete vX.Y.Z --cleanup-tag --yes
 ```
 
-See `docs/plans/2026-04-17-split-mobile-server-release-design.md` for the full design.
+See `specs/2026-04-17-split-mobile-server-release-design.md` for the full design.

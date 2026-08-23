@@ -9,9 +9,9 @@ import { userAdminFactory } from '@test-data/factories/user-factory';
 import Page from './+page.svelte';
 
 // Manual people browser at /admin/face-cleanup/people (Slice 6, §6.3 of
-// docs/superpowers/specs/2026-07-23-manual-face-review-mode-design.md). Owner selector →
+// specs/2026-07-23-manual-face-review-mode-design.md). Owner selector →
 // paginated people grid via getFaceRepairOwnerPeople(ownerId, {query, page}). Covers plan Step 1's
-// 12 cases (docs/superpowers/plans/2026-07-23-manual-face-review-slice-6.md).
+// 12 cases (manual face review, slice 6).
 
 vi.mock('@immich/sdk', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@immich/sdk')>();
