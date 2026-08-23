@@ -40,16 +40,16 @@
   // The step matches names trimmed and case-insensitively and takes the oldest on a tie, so two
   // rows differing only by case would be two ways to pick the same album.
   const options = $derived.by(() => {
-    const seen = new Set<string>();
     const result: ComboBoxOption[] = [];
 
+    // A plain array rather than a Set: `svelte/prefer-svelte-reactivity` rejects a mutable built-in
+    // Set inside a component, and a linked-album list is far too short for the lookup to matter.
     for (const album of albums) {
       const key = album.albumName.trim().toLowerCase();
-      if (key === '' || seen.has(key)) {
+      if (key === '' || result.some((option) => option.value.trim().toLowerCase() === key)) {
         continue;
       }
 
-      seen.add(key);
       result.push({ id: album.id, label: album.albumName, value: album.albumName });
     }
 
