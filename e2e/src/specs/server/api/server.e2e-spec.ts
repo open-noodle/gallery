@@ -145,7 +145,20 @@ describe('/server', () => {
         mapDarkStyleUrl: 'https://tiles.openfreemap.org/styles/dark',
         mapLightStyleUrl: 'https://tiles.openfreemap.org/styles/positron',
         minFaces: 3,
-        availableMemoryTypes: ['on_this_day', 'birthday', 'recent_trip'],
+        availableMemoryTypes: [
+          'on_this_day',
+          'birthday',
+          'recent_trip',
+          'month_recap',
+          'favorites_throwback',
+          'on_this_day_place',
+          'season_recap',
+          'people_together',
+          'video_moments',
+          'trip_anniversary',
+          'themed',
+          'person_throwback',
+        ],
       });
     });
   });

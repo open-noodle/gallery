@@ -61,6 +61,19 @@ export const GalleryMemoriesSchema = z
     /** @deprecated superseded by `types['recent_trip']`; kept for back-compat */
     recentTrips: galleryConfigBool.describe('Recent trip memories'),
     types: z.record(z.string(), z.boolean()).default({}).describe('Per-type memory availability overrides'),
+    themeMaxDistance: z.coerce
+      .number()
+      .min(0)
+      .max(2)
+      .default(0.75)
+      .describe('Max CLIP cosine distance for themed memories'),
+    personThrowbackDormancyMonths: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(120)
+      .default(6)
+      .describe('Months a person must be absent from photos before person_throwback resurfaces them'),
   })
   .meta({ id: 'AdminConfigMemoriesDto' });
 
@@ -129,7 +142,18 @@ export const galleryMachineLearningDefaults = {
 export const galleryServerDefaults = { mergePeopleAcrossOwners: false };
 
 export const galleryTopLevelDefaults = {
-  memories: { retentionDays: 365, birthday: true, recentTrips: true, types: {} },
+  // CLIP text->image distances sit far higher than the image->image thresholds used elsewhere
+  // (duplicateDetection 0.01, facialRecognition 0.5) because of the modality gap: even a perfect
+  // textual match rarely drops below ~0.6. Matches the 0.75 the admin UI recommends for
+  // `machineLearning.clip.maxDistance`, the same metric over the same embeddings.
+  memories: {
+    retentionDays: 365,
+    birthday: true,
+    recentTrips: true,
+    types: {},
+    themeMaxDistance: 0.75,
+    personThrowbackDormancyMonths: 6,
+  },
   classification: { enabled: true, categories: [] },
   // Gallery-fork: defaults to false, so out of the box storage usage matches upstream Immich
   // and counts original files only.
