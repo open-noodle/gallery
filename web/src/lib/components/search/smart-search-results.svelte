@@ -92,7 +92,7 @@
       // (smart_search.embedding <=>) so that vchord's ordered index scan can
       // be used; identical embeddings (byte-identical image content) can then
       // yield the same asset.id on adjacent pages. See
-      // docs/plans/2026-04-21-search-tiebreaker-design.md.
+      // specs/2026-04-21-search-tiebreaker-design.md.
       searchResults = append ? dedupeAppend(searchResults, assets.items) : assets.items;
       searchPage = page;
       hasMoreResults = assets.nextPage !== null;

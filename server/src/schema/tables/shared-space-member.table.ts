@@ -36,7 +36,7 @@ import { UserTable } from 'src/schema/tables/user.table';
 // linked to the space the new member joined. Name-suffixed with `_album` so
 // it sorts between shared_space_member_after_insert and _library in
 // alphabetical trigger order. See
-// docs/superpowers/specs/2026-06-15-space-albums-phase2a-server-sync-design.md.
+// specs/2026-06-15-space-albums-phase2a-server-sync-design.md.
 @AfterInsertTrigger({
   name: 'shared_space_member_after_insert_album',
   scope: 'statement',
@@ -46,7 +46,7 @@ import { UserTable } from 'src/schema/tables/user.table';
 // Populates library_user + bumps library.updateId for every library linked
 // to the space the new member joined. Name-suffixed with `_library` so it
 // sorts after shared_space_member_after_insert in alphabetical trigger order.
-// See docs/plans/2026-04-11-library-user-access-backfill-design.md.
+// See specs/2026-04-11-library-user-access-backfill-design.md.
 @AfterInsertTrigger({
   name: 'shared_space_member_after_insert_library',
   scope: 'statement',
