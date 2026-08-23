@@ -3532,6 +3532,8 @@
   "workflow_logging_halted_step": "Fermato sul passo #{step}",
   "workflow_name": "Nome della sequenza",
   "workflow_navigation_prompt": "Sei sicuro di voler uscire senza salvare i cambiamenti?",
+  "workflow_space_album_choose_space_first": "Scegli prima uno Space",
+  "workflow_space_unavailable": "Space non disponibile",
   "workflow_summary": "Sommario della sequenza",
   "workflow_templates": "Modelli di sequenze",
   "workflow_update_success": "Sequenza aggiornata con successo",

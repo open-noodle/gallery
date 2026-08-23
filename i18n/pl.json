@@ -3552,6 +3552,8 @@
   "workflow_logging_halted_step": "Zatrzymany na kroku #{step}",
   "workflow_name": "Nazwa przepływu pracy",
   "workflow_navigation_prompt": "Czy na pewno chcesz wyjść bez zapisania zmian?",
+  "workflow_space_album_choose_space_first": "Najpierw wybierz Space",
+  "workflow_space_unavailable": "Space niedostępny",
   "workflow_summary": "Podsumowanie przepływu pracy",
   "workflow_templates": "Szablony przepływu pracy",
   "workflow_update_success": "Przepływ pracy zaktualizowany pomyślnie",
