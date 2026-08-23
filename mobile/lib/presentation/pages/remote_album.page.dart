@@ -401,7 +401,7 @@ class _EditAlbumDialogState extends ConsumerState<_EditAlbumDialog> {
 
                 // Created date
                 Text(
-                  'date_created'.t(context: context).toUpperCase(),
+                  context.t.date_created.toUpperCase(),
                   style: context.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 4),
