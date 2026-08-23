@@ -10,7 +10,7 @@ import {
   locale,
   type AlbumViewSettings,
 } from '#lib/stores/preferences.store.ts';
-import type { AlbumResponseDto } from '@immich/sdk';
+import { AlbumUserRole, type AlbumResponseDto } from '@immich/sdk';
 import { orderBy } from 'lodash-es';
 import { get } from 'svelte/store';
 import { goto } from '$app/navigation';
@@ -24,6 +24,21 @@ export const createAlbumAndRedirect = (name?: string, assetIds?: string[]) =>
   executeMutation(createAlbumMutation, [{ createAlbumDto: { albumName: name ?? '', assetIds } }], {
     onSuccess: (album) => void goto(Route.viewAlbum(album)),
   });
+
+/**
+ * Whether `userId` may edit `album`'s metadata.
+ *
+ * Mirrors the server's `Permission.AlbumUpdate` (owner ∪ shared-with-editor,
+ * `server/src/utils/access.ts:208-216`). Deletion is server-side owner-only
+ * (`AlbumDelete`, :218-220). Sharing (`AlbumShare`, :222-230) is *also* owner ∪
+ * editor server-side, but this UI deliberately keeps sharing owner-gated — the
+ * stricter check is always safe, since it can never offer an action the server
+ * would refuse. Callers must keep using their own ownership check for sharing.
+ */
+export const isAlbumEditor = (album: AlbumResponseDto, userId: string) =>
+  album.albumUsers.some(
+    ({ user, role }) => user.id === userId && (role === AlbumUserRole.Owner || role === AlbumUserRole.Editor),
+  );
 
 /**
  * -------------
