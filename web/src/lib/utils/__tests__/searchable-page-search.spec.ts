@@ -286,3 +286,46 @@ describe('recently added page', () => {
     expect(buildSearchablePageUrl(new URL('https://gallery.test/photos'), 'beach')).toContain('q=beach');
   });
 });
+
+describe('album detail pages', () => {
+  it('resolves the base path for an album, its photos route and an open asset', () => {
+    expect(getSearchablePageBasePath('/albums/album-1')).toBe('/albums/album-1');
+    expect(getSearchablePageBasePath('/albums/album-1/photos')).toBe('/albums/album-1/photos');
+    expect(getSearchablePageBasePath('/albums/album-1/photos/asset-9')).toBe('/albums/album-1/photos');
+  });
+
+  it('resolves the base path for a space album, its photos route and an open asset', () => {
+    expect(getSearchablePageBasePath('/spaces/space-1/albums/album-1')).toBe('/spaces/space-1/albums/album-1');
+    expect(getSearchablePageBasePath('/spaces/space-1/albums/album-1/photos')).toBe(
+      '/spaces/space-1/albums/album-1/photos',
+    );
+    expect(getSearchablePageBasePath('/spaces/space-1/albums/album-1/photos/asset-9')).toBe(
+      '/spaces/space-1/albums/album-1/photos',
+    );
+  });
+
+  it('leaves the album list pages non-searchable', () => {
+    expect(getSearchablePageBasePath('/albums')).toBeNull();
+    expect(getSearchablePageBasePath('/spaces/space-1/albums')).toBeNull();
+  });
+
+  it('leaves the other space sub-pages non-searchable', () => {
+    expect(getSearchablePageBasePath('/spaces/space-1/members')).toBeNull();
+    expect(getSearchablePageBasePath('/spaces/space-1/people')).toBeNull();
+  });
+
+  it('builds a query URL that stays on the space album', () => {
+    expect(buildSearchablePageUrl(new URL('https://gallery.test/spaces/space-1/albums/album-1'), 'beach')).toBe(
+      '/spaces/space-1/albums/album-1?q=beach',
+    );
+  });
+
+  it('builds a filter URL for an album', () => {
+    const url = buildSearchablePageUrl(new URL('https://gallery.test/albums/album-1'), '', 'desc', {
+      ...createFilterState(),
+      rating: 5,
+    });
+
+    expect(url).toContain('rating=5');
+  });
+});

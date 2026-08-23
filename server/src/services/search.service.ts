@@ -49,7 +49,10 @@ const unique = <T>(items: T[]) => [...new Set(items)];
 type ResolvedSmartSearch = {
   options: Omit<SmartSearchDto, 'page' | 'size' | 'order' | 'visibility'> & {
     embedding: string;
-    userIds: string[];
+    // Optional: an `albumIds` scope deliberately leaves this unset so the album access check is the
+    // boundary and `albumSharedSpaceScope` re-gates — see resolveSmartSearch.
+    userIds?: string[];
+    callerId?: string;
     timelineSpaceIds?: string[];
     maxDistance?: number;
     orderDirection?: SmartSearchDto['order'];
@@ -643,6 +646,23 @@ export class SearchService extends BaseService {
       throw new BadRequestException('spacePersonIds requires spaceId');
     }
 
+    /**
+     * An `albumIds` scope makes the ALBUM the access boundary, exactly as `searchMetadata` already
+     * treats it (see the matching branch there): check `AlbumRead` up front, then leave `userIds`
+     * unset so `albumSharedSpaceScope` re-gates the rows in the query builder.
+     *
+     * Keeping the owner-scoping `userIds` here instead was a filter-honesty bug. An album page
+     * BROWSES by album access — timeline.service resolves `albumSpaceIds` from plain membership —
+     * and shows every member's photos; searching that same album then returned only the caller's
+     * own, silently, beside a grid that had just shown everyone's. It also split query mode from
+     * browse mode for the same `?album=` filter everywhere else.
+     */
+    const albumIds = 'albumIds' in dto ? dto.albumIds : undefined;
+    const albumScoped = !!albumIds?.length;
+    if (albumScoped) {
+      await this.requireAccess({ auth, ids: albumIds!, permission: Permission.AlbumRead });
+    }
+
     // Cached read — the uncached path runs class-transformer + class-validator over
     // the full nested SystemConfigDto, which is ~1-3s per call on slower CPUs and
     // dominates smart-search latency. Cache invalidates on ConfigUpdate.
@@ -695,7 +715,12 @@ export class SearchService extends BaseService {
     const resolvedOptions = await this.resolveScopedPersonFilters(auth, {
       ...dto,
       timelineSpaceIds,
-      userIds: await this.getUserIdsToSearch(auth, visibility),
+      // Undefined under an album scope — the AlbumRead check above is the boundary there, and
+      // `albumSharedSpaceScope` in the query builder is what re-gates visibility and trash.
+      userIds: albumScoped ? undefined : await this.getUserIdsToSearch(auth, visibility),
+      // Always set, unlike userIds: the facets' people list needs the viewer even when nothing is
+      // owner-scoped. See SearchEmbeddingOptions.callerId.
+      callerId: auth.user.id,
       viewingUserId: auth.user.id,
       embedding,
       maxDistance: machineLearning.clip.maxDistance,
