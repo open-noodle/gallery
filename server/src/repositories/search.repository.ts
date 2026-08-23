@@ -224,7 +224,17 @@ export type SmartSearchOptions = SearchDateOptions &
 export type SmartSearchFacetsOptions = Omit<SmartSearchOptions, 'orderDirection'>;
 
 type SmartFacetExclude =
-  'time' | 'people' | 'location' | 'city' | 'camera' | 'cameraModel' | 'tags' | 'rating' | 'media';
+  | 'time'
+  | 'people'
+  | 'location'
+  | 'city'
+  | 'camera'
+  | 'cameraModel'
+  | 'tags'
+  | 'rating'
+  | 'media'
+  | 'favorites'
+  | 'albums';
 
 export interface SmartSearchFacetsResult {
   total: number;
@@ -238,6 +248,9 @@ export interface SmartSearchFacetsResult {
   ratings: number[];
   mediaTypes: AssetType[];
   hasUnnamedPeople: boolean;
+  hasFavorites: boolean;
+  hasAssetsInAlbum: boolean;
+  hasAssetsNotInAlbum: boolean;
 }
 
 export type LargeAssetSearchOptions = AssetSearchOptions & { minFileSize?: number };
@@ -353,6 +366,9 @@ export interface FilterSuggestionsResult {
   ratings: number[];
   mediaTypes: string[];
   hasUnnamedPeople: boolean;
+  hasFavorites: boolean;
+  hasAssetsInAlbum: boolean;
+  hasAssetsNotInAlbum: boolean;
 }
 
 /** Skip threshold when disabled (0), undefined, or at max cosine distance (>= 2) since it would filter nothing */
@@ -630,6 +646,8 @@ export class SearchRepository {
       const peopleResult = await this.getSmartFacetPeople(trx, options);
       const ratings = await this.getSmartFacetRatings(trx, options);
       const mediaTypes = await this.getSmartFacetMediaTypes(trx, options);
+      const hasFavorites = await this.getSmartFacetHasFavorites(trx, options);
+      const albumMembership = await this.getSmartFacetAlbumMembership(trx, options);
 
       return {
         total,
@@ -643,6 +661,8 @@ export class SearchRepository {
         ratings,
         mediaTypes,
         hasUnnamedPeople: peopleResult.hasUnnamedPeople,
+        hasFavorites,
+        ...albumMembership,
       };
     });
   }
@@ -660,6 +680,8 @@ export class SearchRepository {
         'rating',
         'type',
         'isFavorite',
+        'isInAlbum',
+        'isNotInAlbum',
         'takenAfter',
         'takenBefore',
         'personIds',
@@ -719,7 +741,17 @@ export class SearchRepository {
         qb.where('asset.fileCreatedAt', '<=', options.takenBefore!),
       )
       .$if(exclude !== 'media' && !!options.type, (qb) => qb.where('asset.type', '=', options.type!))
-      .$if(options.isFavorite !== undefined, (qb) => qb.where('asset.isFavorite', '=', options.isFavorite!))
+      .$if(exclude !== 'favorites' && options.isFavorite !== undefined, (qb) =>
+        qb.where('asset.isFavorite', '=', options.isFavorite!),
+      )
+      .$if(exclude !== 'albums' && !!options.isNotInAlbum && !options.albumIds?.length, (qb) =>
+        qb.where((eb) =>
+          eb.not(eb.exists(eb.selectFrom('album_asset').whereRef('album_asset.assetId', '=', 'asset.id'))),
+        ),
+      )
+      .$if(exclude !== 'albums' && !!options.isInAlbum && !options.albumIds?.length, (qb) =>
+        qb.where((eb) => eb.exists(eb.selectFrom('album_asset').whereRef('album_asset.assetId', '=', 'asset.id'))),
+      )
       .$if(needsExifJoin, (qb) =>
         qb
           .innerJoin('asset_exif', 'asset_exif.assetId', 'asset.id')
@@ -966,6 +998,37 @@ export class SearchRepository {
       .orderBy('type')
       .execute();
     return rows.map((row) => row.type);
+  }
+
+  private async getSmartFacetHasFavorites(trx: Kysely<DB>, options: SmartSearchFacetsOptions): Promise<boolean> {
+    const row = await trx
+      .selectFrom('asset')
+      .select('asset.id')
+      .where('asset.id', 'in', this.buildSmartFacetFilteredAssetIds(trx, options, 'favorites'))
+      .where('asset.isFavorite', '=', true)
+      .limit(1)
+      .executeTakeFirst();
+    return !!row;
+  }
+
+  private async getSmartFacetAlbumMembership(
+    trx: Kysely<DB>,
+    options: SmartSearchFacetsOptions,
+  ): Promise<{ hasAssetsInAlbum: boolean; hasAssetsNotInAlbum: boolean }> {
+    const probe = (filed: boolean) =>
+      trx
+        .selectFrom('asset')
+        .select('asset.id')
+        .where('asset.id', 'in', this.buildSmartFacetFilteredAssetIds(trx, options, 'albums'))
+        .where((eb) => {
+          const inAlbum = eb.exists(eb.selectFrom('album_asset').whereRef('album_asset.assetId', '=', 'asset.id'));
+          return filed ? inAlbum : eb.not(inAlbum);
+        })
+        .limit(1)
+        .executeTakeFirst();
+
+    const [filed, unfiled] = await Promise.all([probe(true), probe(false)]);
+    return { hasAssetsInAlbum: !!filed, hasAssetsNotInAlbum: !!unfiled };
   }
 
   @GenerateSql(
@@ -1448,22 +1511,28 @@ export class SearchRepository {
       'WITH\n  filtered_assets',
       'select distinct\n  "rating"',
       'select distinct\n  "type"',
+      'and "asset"."isFavorite" = $',
+      '  and exists (\n    select\n    from\n      "album_asset"',
+      '  and not exists (\n    select\n    from\n      "album_asset"',
     ],
   })
   async getFilterSuggestions(userIds: string[], options: FilterSuggestionsOptions): Promise<FilterSuggestionsResult> {
-    const [countries, cameraMakes, tags, peopleResult, ratings, mediaTypes] = await Promise.all([
-      // `state` joins `country` / `city` in the location group's self-exclusion: it implies its
-      // country, so leaving it applied would collapse the country selector to a single row —
-      // exactly the reason `city` is excluded here. Every other list keeps `state` applied.
-      this.getFilteredCountries(userIds, without(options, 'country', 'state', 'city')),
-      // `lensModel` deliberately stays applied, matching the standalone getCameraMakes endpoint:
-      // clicking a make does not clear the lens chip, so the make list may honestly narrow by it.
-      this.getFilteredCameraMakes(userIds, without(options, 'make', 'model')),
-      this.getFilteredTags(userIds, without(options, 'tagIds')),
-      this.getFilteredPeople(userIds, without(options, 'personIds', 'identityIds')),
-      this.getFilteredRatings(userIds, without(options, 'rating')),
-      this.getFilteredMediaTypes(userIds, without(options, 'mediaType')),
-    ]);
+    const [countries, cameraMakes, tags, peopleResult, ratings, mediaTypes, hasFavorites, albumMembership] =
+      await Promise.all([
+        // `state` joins `country` / `city` in the location group's self-exclusion: it implies its
+        // country, so leaving it applied would collapse the country selector to a single row —
+        // exactly the reason `city` is excluded here. Every other list keeps `state` applied.
+        this.getFilteredCountries(userIds, without(options, 'country', 'state', 'city')),
+        // `lensModel` deliberately stays applied, matching the standalone getCameraMakes endpoint:
+        // clicking a make does not clear the lens chip, so the make list may honestly narrow by it.
+        this.getFilteredCameraMakes(userIds, without(options, 'make', 'model')),
+        this.getFilteredTags(userIds, without(options, 'tagIds')),
+        this.getFilteredPeople(userIds, without(options, 'personIds', 'identityIds')),
+        this.getFilteredRatings(userIds, without(options, 'rating')),
+        this.getFilteredMediaTypes(userIds, without(options, 'mediaType')),
+        this.getFilteredHasFavorites(userIds, without(options, 'isFavorite')),
+        this.getFilteredAlbumMembership(userIds, without(options, 'isInAlbum', 'isNotInAlbum')),
+      ]);
 
     return {
       countries,
@@ -1473,6 +1542,8 @@ export class SearchRepository {
       ratings,
       mediaTypes,
       hasUnnamedPeople: peopleResult.hasUnnamedPeople,
+      hasFavorites,
+      ...albumMembership,
     };
   }
 
@@ -1959,5 +2030,40 @@ export class SearchRepository {
       .orderBy('type')
       .execute();
     return res.map((row) => row.type);
+  }
+
+  /**
+   * #910: presence probes for the Favourites / Albums sections. `limit 1` rather than an aggregate so
+   * Postgres stops at the first matching row — the answer is "does one exist", not "how many".
+   */
+  private async getFilteredHasFavorites(userIds: string[], options: FilterSuggestionsOptions): Promise<boolean> {
+    const row = await this.db
+      .selectFrom('asset')
+      .select('asset.id')
+      .where('asset.id', 'in', this.buildFilteredAssetIds(userIds, options))
+      .where('asset.isFavorite', '=', true)
+      .limit(1)
+      .executeTakeFirst();
+    return !!row;
+  }
+
+  private async getFilteredAlbumMembership(
+    userIds: string[],
+    options: FilterSuggestionsOptions,
+  ): Promise<{ hasAssetsInAlbum: boolean; hasAssetsNotInAlbum: boolean }> {
+    const probe = (filed: boolean) =>
+      this.db
+        .selectFrom('asset')
+        .select('asset.id')
+        .where('asset.id', 'in', this.buildFilteredAssetIds(userIds, options))
+        .where((eb) => {
+          const inAlbum = eb.exists(eb.selectFrom('album_asset').whereRef('album_asset.assetId', '=', 'asset.id'));
+          return filed ? inAlbum : eb.not(inAlbum);
+        })
+        .limit(1)
+        .executeTakeFirst();
+
+    const [filed, unfiled] = await Promise.all([probe(true), probe(false)]);
+    return { hasAssetsInAlbum: !!filed, hasAssetsNotInAlbum: !!unfiled };
   }
 }

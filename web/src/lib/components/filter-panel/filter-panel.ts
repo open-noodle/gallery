@@ -108,11 +108,25 @@ export interface FilterSuggestionsResponse {
   ratings: number[];
   mediaTypes: string[];
   hasUnnamedPeople: boolean;
+  hasFavorites: boolean;
+  hasAssetsInAlbum: boolean;
+  hasAssetsNotInAlbum: boolean;
 }
 
 export interface FilterPanelConfig {
   sections: FilterSection[];
   suggestionsProvider?: (filters: FilterState) => Promise<FilterSuggestionsResponse>;
+  /**
+   * Facets for this surface's scope with no filters applied (#910). The panel only calls this when it
+   * mounts with filters already active — otherwise the ordinary response is already the baseline.
+   *
+   * Resolving `undefined` means "no cheap baseline here", and the panel then never hides a section.
+   * The three query-mode surfaces return `undefined` deliberately: their `smartFacetInFlight` slot is
+   * single-entry and their `smartFacets` state feeds the timeline and the result count, so a second
+   * concurrent facet request would abort the first and then overwrite the page's own data. See spec
+   * §4.5 — this hook exists because `suggestionsProvider(createFilterState())` cannot be used.
+   */
+  baselineProvider?: () => Promise<FilterSuggestionsResponse | undefined>;
   providers?: {
     people?: (context?: FilterContext) => Promise<PersonOption[]>;
     allPeople?: () => Promise<PersonOption[]>;

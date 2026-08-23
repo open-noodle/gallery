@@ -14,6 +14,27 @@ import {
 import { createUrl } from '$lib/utils';
 import { getPhotosPersonFilterId, getPhotosPersonFilterThumbnailUrl } from '$lib/utils/photos-filter-options';
 
+function mapSuggestions(response: Awaited<ReturnType<typeof getFilterSuggestions>>, spaceId?: string) {
+  return {
+    countries: response.countries,
+    cameraMakes: response.cameraMakes,
+    tags: response.tags.map((t: { id: string; value: string }) => ({ id: t.id, name: t.value })),
+    people: response.people.map((p: FilterSuggestionsPersonDto) => ({
+      id: spaceId ? p.id : getPhotosPersonFilterId(p),
+      name: p.name,
+      thumbnailUrl: spaceId
+        ? createUrl(`/shared-spaces/${spaceId}/people/${p.primaryProfile?.id ?? p.id}/thumbnail`)
+        : getPhotosPersonFilterThumbnailUrl(p),
+    })),
+    ratings: response.ratings,
+    mediaTypes: response.mediaTypes,
+    hasUnnamedPeople: response.hasUnnamedPeople,
+    hasFavorites: response.hasFavorites,
+    hasAssetsInAlbum: response.hasAssetsInAlbum,
+    hasAssetsNotInAlbum: response.hasAssetsNotInAlbum,
+  };
+}
+
 export function buildMapFilterConfig(spaceId?: string): FilterPanelConfig {
   const suggestionsProvider = async (filters: FilterState) => {
     const context = buildFilterContext(filters);
@@ -41,26 +62,15 @@ export function buildMapFilterConfig(spaceId?: string): FilterPanelConfig {
       takenBefore: context?.takenBefore,
       ...(spaceId ? { spaceId } : { withSharedSpaces: true }),
     });
-    return {
-      countries: response.countries,
-      cameraMakes: response.cameraMakes,
-      tags: response.tags.map((t: { id: string; value: string }) => ({ id: t.id, name: t.value })),
-      people: response.people.map((p: FilterSuggestionsPersonDto) => ({
-        id: spaceId ? p.id : getPhotosPersonFilterId(p),
-        name: p.name,
-        thumbnailUrl: spaceId
-          ? createUrl(`/shared-spaces/${spaceId}/people/${p.primaryProfile?.id ?? p.id}/thumbnail`)
-          : getPhotosPersonFilterThumbnailUrl(p),
-      })),
-      ratings: response.ratings,
-      mediaTypes: response.mediaTypes,
-      hasUnnamedPeople: response.hasUnnamedPeople,
-    };
+    return mapSuggestions(response, spaceId);
   };
 
   return {
     sections: [...ALL_FILTER_SECTIONS],
     suggestionsProvider,
+    // #910: the baseline is the same call with the filter arguments dropped, keeping only scope.
+    baselineProvider: async () =>
+      mapSuggestions(await getFilterSuggestions({ ...(spaceId ? { spaceId } : { withSharedSpaces: true }) }), spaceId),
     providers: {
       cities: (country: string, context) =>
         getSearchSuggestions({

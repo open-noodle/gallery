@@ -14,6 +14,9 @@ const EMPTY_SUGGESTIONS: FilterSuggestionsResponse = {
   ratings: [],
   mediaTypes: [],
   hasUnnamedPeople: false,
+  hasFavorites: false,
+  hasAssetsInAlbum: false,
+  hasAssetsNotInAlbum: false,
 };
 
 function makeConfig(suggestions: FilterSuggestionsResponse, hasProvider = true): FilterPanelConfig {

@@ -19,6 +19,9 @@ final photosFilterSuggestionsProvider = FutureProvider.autoDispose.family<Filter
     city: filter.location.city,
     country: filter.location.country,
     isFavorite: filter.display.isFavorite ? true : null,
+    // #910: the albums facet is computed with this filter excluded, but every OTHER facet must still
+    // honour it — dropping it here made all of them ignore the not-in-album toggle.
+    isNotInAlbum: filter.display.isNotInAlbum ? true : null,
     make: filter.camera.make,
     mediaType: mapAssetType(filter.mediaType),
     model: filter.camera.model,
@@ -33,5 +36,11 @@ final photosFilterSuggestionsProvider = FutureProvider.autoDispose.family<Filter
     // server RBAC-projects the result. See issue #727 family (#737 / #738).
     withSharedSpaces: true,
   );
-  return response ?? FilterSuggestionsResponseDto(hasUnnamedPeople: false);
+  if (response == null) {
+    // #910: never fabricate an empty response. `sectionAvailabilityProvider` cannot tell a fabricated
+    // empty from a genuinely empty library and would hide six sections at once; an AsyncValue.error
+    // makes it fall back to offering everything. Mirrors web's slice-4 sentinel removal (spec §4.6).
+    throw Exception('filter suggestions unavailable');
+  }
+  return response;
 });

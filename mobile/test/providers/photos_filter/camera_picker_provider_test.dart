@@ -5,8 +5,13 @@ import 'package:immich_mobile/providers/photos_filter/filter_debounce.provider.d
 import 'package:immich_mobile/providers/photos_filter/filter_suggestions.provider.dart';
 import 'package:openapi/api.dart';
 
-FilterSuggestionsResponseDto _sugg(List<String> cameraMakes) =>
-    FilterSuggestionsResponseDto(hasUnnamedPeople: false, cameraMakes: cameraMakes);
+FilterSuggestionsResponseDto _sugg(List<String> cameraMakes) => FilterSuggestionsResponseDto(
+  hasUnnamedPeople: false,
+  hasFavorites: true,
+  hasAssetsInAlbum: true,
+  hasAssetsNotInAlbum: true,
+  cameraMakes: cameraMakes,
+);
 
 ProviderContainer _containerWith(List<String> cameraMakes) {
   return ProviderContainer(
