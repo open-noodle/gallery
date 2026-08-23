@@ -2674,6 +2674,8 @@
   "recent": "Recenti",
   "recent_searches": "Ricerche recenti",
   "recently_added": "Aggiunti di recente",
+  "recent_trip_subtitle": "{assetCount, plural, one {# foto} other {# foto}} in {dayCount, plural, one {# giorno} other {# giorni}}",
+  "recent_trip_title": "Viaggio recente a {location}",
   "recently_added_body": "Vai direttamente a tutto ciò che hai aggiunto di recente su una pagina dedicata.",
   "recently_added_description": "Sfoglia le tue risorse ordinate in base alla data di caricamento su Immich",
   "recently_added_page_title": "Aggiunti di recente",
