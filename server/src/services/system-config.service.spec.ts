@@ -17,6 +17,7 @@ import {
   VideoCodec,
   VideoContainer,
 } from 'src/enum';
+import { MEMORY_TYPE_KEYS } from 'src/services/memory-rules/memory-type.metadata';
 import { SystemConfigService } from 'src/services/system-config.service';
 import { DeepPartial } from 'src/types';
 import { mockEnvData } from 'test/repositories/config.repository.mock';
@@ -29,6 +30,34 @@ const partialConfig = {
   trash: { days: 10 },
   user: { deleteDelay: 15 },
 } satisfies DeepPartial<SystemConfig>;
+
+/**
+ * Every registry memory type, with alternating values. `memories.types` is a `z.record` whose keys
+ * are data rather than schema, so an override map that gets truncated, key-filtered, or collapsed to
+ * a single boolean must not be able to satisfy a deep-equality assertion against this.
+ */
+const buildAlternatingMemoryTypes = (): Record<string, boolean> =>
+  Object.fromEntries(MEMORY_TYPE_KEYS.map((key, index) => [key, index % 2 === 0]));
+
+/**
+ * Wires the system-metadata mock as a real read/write store, so a round-trip assertion reads back
+ * whatever `updateConfig` actually persisted instead of a value the mock was primed to return.
+ */
+const useMetadataStore = (mocks: ServiceMocks) => {
+  const store: { partial: DeepPartial<SystemConfig> } = { partial: {} };
+
+  mocks.systemMetadata.get.mockImplementation((key) =>
+    Promise.resolve(key === SystemMetadataKey.SystemConfig ? store.partial : null),
+  );
+  mocks.systemMetadata.set.mockImplementation((key, value) => {
+    if (key === SystemMetadataKey.SystemConfig) {
+      store.partial = value as DeepPartial<SystemConfig>;
+    }
+    return Promise.resolve();
+  });
+
+  return store;
+};
 
 const updatedConfig = Object.freeze<SystemConfig>({
   job: {
@@ -167,6 +196,8 @@ const updatedConfig = Object.freeze<SystemConfig>({
     birthday: true,
     recentTrips: true,
     types: {},
+    themeMaxDistance: 0.75,
+    personThrowbackDormancyMonths: 6,
   },
   reverseGeocoding: {
     enabled: true,
@@ -465,6 +496,22 @@ describe(SystemConfigService.name, () => {
       });
     });
 
+    it('should default themeMaxDistance to 0.75', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({});
+
+      await expect(sut.getSystemConfig()).resolves.toMatchObject({
+        memories: { themeMaxDistance: 0.75 },
+      });
+    });
+
+    it('should default personThrowbackDormancyMonths to 6', async () => {
+      mocks.systemMetadata.get.mockResolvedValue({});
+
+      await expect(sut.getSystemConfig()).resolves.toMatchObject({
+        memories: { personThrowbackDormancyMonths: 6 },
+      });
+    });
+
     it('should accept a per-type memory availability override', async () => {
       mocks.systemMetadata.get.mockResolvedValue({ memories: { types: { recent_trip: false } } });
 
@@ -479,6 +526,38 @@ describe(SystemConfigService.name, () => {
       await sut.getAdminConfig();
 
       expect(mocks.logger.warn).not.toHaveBeenCalled();
+    });
+
+    it('should load a populated per-type memory availability map without dropping entries', async () => {
+      const types = buildAlternatingMemoryTypes();
+      mocks.systemMetadata.get.mockResolvedValue({ memories: { types } });
+
+      const result = await sut.getSystemConfig();
+
+      expect(result.memories.types).toEqual(types);
+    });
+
+    it('should not warn about unknown keys when per-type memory overrides are set', async () => {
+      // the populated case is the one `emptyObjectsAsLeaves` exists for: without it the defaults
+      // enumeration never yields `memories.types`, so the stored overrides survive the unknown-key
+      // pruning in buildConfig and get reported as unknown configuration.
+      mocks.systemMetadata.get.mockResolvedValue({ memories: { types: { on_this_day: false, themed: true } } });
+
+      await sut.getSystemConfig();
+
+      expect(mocks.logger.warn).not.toHaveBeenCalled();
+    });
+
+    it('should report an unknown memories key without reporting per-type override keys as unknown', async () => {
+      // `notARealSetting` is deliberately off-schema, hence the cast
+      mocks.systemMetadata.get.mockResolvedValue({
+        memories: { types: { on_this_day: false }, notARealSetting: true },
+      } as unknown as DeepPartial<SystemConfig>);
+
+      await sut.getSystemConfig();
+
+      expect(mocks.logger.warn).toHaveBeenCalledWith(expect.stringContaining('"notARealSetting"'));
+      expect(mocks.logger.warn).not.toHaveBeenCalledWith(expect.stringContaining('"on_this_day"'));
     });
 
     it('should accept zero generated memory retention from a config file', async () => {
@@ -743,6 +822,84 @@ describe(SystemConfigService.name, () => {
       expect(mocks.systemMetadata.set).toHaveBeenCalledWith(SystemMetadataKey.SystemConfig, {
         memories: { types: { recent_trip: false } },
       });
+    });
+
+    it('should persist every per-type memory availability override and read them all back', async () => {
+      const store = useMetadataStore(mocks);
+      const types = buildAlternatingMemoryTypes();
+      const config = structuredClone(defaults);
+      config.memories.types = types;
+
+      const result = await sut.updateSystemConfig(config);
+
+      expect(store.partial).toEqual({ memories: { types } });
+      expect(result.memories.types).toEqual(types);
+
+      const reloaded = await sut.getSystemConfig();
+      expect(reloaded.memories.types).toEqual(types);
+    });
+
+    it('should persist per-type overrides alongside non-default sibling memory settings', async () => {
+      const store = useMetadataStore(mocks);
+      const config = structuredClone(defaults);
+      config.memories.types = { themed: false, person_throwback: false };
+      config.memories.themeMaxDistance = 0.4;
+      config.memories.personThrowbackDormancyMonths = 18;
+
+      await sut.updateSystemConfig(config);
+
+      expect(store.partial).toEqual({
+        memories: {
+          types: { themed: false, person_throwback: false },
+          themeMaxDistance: 0.4,
+          personThrowbackDormancyMonths: 18,
+        },
+      });
+    });
+
+    it('should not persist the per-type map while it is left at its empty default', async () => {
+      const store = useMetadataStore(mocks);
+      const config = structuredClone(defaults);
+      config.memories.themeMaxDistance = 0.4;
+      config.memories.personThrowbackDormancyMonths = 18;
+
+      await sut.updateSystemConfig(config);
+
+      expect(store.partial).toEqual({
+        memories: { themeMaxDistance: 0.4, personThrowbackDormancyMonths: 18 },
+      });
+    });
+
+    it('should keep an earlier per-type override when a second type is toggled off', async () => {
+      const store = useMetadataStore(mocks);
+
+      const first = structuredClone(defaults);
+      first.memories.types = { themed: false };
+      await sut.updateSystemConfig(first);
+
+      // the admin UI re-reads the config and PUTs it back with one more type toggled
+      const loaded = await sut.getSystemConfig();
+      expect(loaded.memories.types).toEqual({ themed: false });
+
+      const second = structuredClone(defaults);
+      second.memories.types = { ...loaded.memories.types, person_throwback: false };
+      const result = await sut.updateSystemConfig(second);
+
+      expect(store.partial).toEqual({ memories: { types: { themed: false, person_throwback: false } } });
+      expect(result.memories.types).toEqual({ themed: false, person_throwback: false });
+    });
+
+    it('should drop the per-type map from the stored partial when it is reset to the default', async () => {
+      const store = useMetadataStore(mocks);
+
+      const overridden = structuredClone(defaults);
+      overridden.memories.types = { themed: false };
+      await sut.updateSystemConfig(overridden);
+      expect(store.partial).toEqual({ memories: { types: { themed: false } } });
+
+      await sut.updateSystemConfig(structuredClone(defaults));
+
+      expect(store.partial).toEqual({});
     });
 
     it('should throw an error if a config file is in use', async () => {
