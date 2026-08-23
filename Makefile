@@ -105,8 +105,18 @@ ci-invariants-check:
 .PHONY: commit-autolink-check
 # `pnpm run <script> -- --range X` swallows the argument and reports a false OK, so invoke the CLI
 # directly. Override the range with: make commit-autolink-check RANGE=upstream/main..some-branch
+#
+# Resolve this repo's highest PR number at run time: anything above it is not ours, so `#N` resolves
+# to the upstream repo. Freezing this as a constant makes the check flag our OWN new PRs (it did —
+# #1020 was reported as foreign the day it merged), while a constant with headroom misses genuine
+# low-numbered foreign refs. Falls back to the source default when gh is unavailable/offline.
 commit-autolink-check:
-	$(UPSTREAM_PREFLIGHT) exec tsx src/index.ts commit-autolink-check $(if $(RANGE),--range $(RANGE),)
+	@ceiling=$$(gh --repo open-noodle/gallery pr list --state all --limit 1 --json number \
+	             --jq '.[0].number' 2>/dev/null); \
+	if [ -n "$$ceiling" ]; then echo "fork PR ceiling: $$ceiling (resolved)"; \
+	else echo "fork PR ceiling: source default (gh unavailable)"; fi; \
+	$(UPSTREAM_PREFLIGHT) exec tsx src/index.ts commit-autolink-check \
+	  $(if $(RANGE),--range $(RANGE),) $${ceiling:+--fork-pr-ceiling $$ceiling}
 
 .PHONY: fork-patches-check
 fork-patches-check:
