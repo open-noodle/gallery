@@ -155,9 +155,8 @@ void main() {
         appConfigProvider.overrideWithValue(const AppConfig()),
         sharedSpacesProvider.overrideWith((ref) async => spaces),
         multiSelectProvider.overrideWith(
-          () => MultiSelectNotifier(
-            MultiSelectState(selectedAssets: selection.toSet(), lockedSelectionAssets: const {}),
-          ),
+          () =>
+              MultiSelectNotifier(MultiSelectState(selectedAssets: selection.toSet(), lockedSelectionAssets: const {})),
         ),
       ],
     );
@@ -398,10 +397,9 @@ void main() {
     expect(find.byKey(const Key('space-row-s2')), findsNothing);
 
     // Asserting only on the narrowed rows would pass even if every keystroke dropped focus.
-    final editable = tester.widget<EditableText>(find.descendant(
-      of: find.byType(SearchField),
-      matching: find.byType(EditableText),
-    ));
+    final editable = tester.widget<EditableText>(
+      find.descendant(of: find.byType(SearchField), matching: find.byType(EditableText)),
+    );
     expect(editable.focusNode.hasFocus, isTrue);
   });
 
