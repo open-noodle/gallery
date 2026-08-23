@@ -24,6 +24,9 @@ function mapSuggestions(response: Awaited<ReturnType<typeof getFilterSuggestions
     ratings: response.ratings,
     mediaTypes: response.mediaTypes,
     hasUnnamedPeople: response.hasUnnamedPeople,
+    hasFavorites: response.hasFavorites,
+    hasAssetsInAlbum: response.hasAssetsInAlbum,
+    hasAssetsNotInAlbum: response.hasAssetsNotInAlbum,
   };
 }
 
@@ -77,6 +80,16 @@ export function buildRecentlyAddedFilterConfig(
         return mapSuggestions(await getFilterSuggestions(buildRecentlyAddedSuggestionRequest(filters)));
       }
       return mapSmartSearchFacetsToFilterSuggestions(await fetchFacets(context, filters));
+    },
+    // #910: unlike Photos and Spaces, this config is spread as-is into the page's FilterPanelConfig
+    // with no page-level override (see the +page.svelte's `baseFilterConfig` spread) — so the
+    // query-mode guard has to live here. Own + partner scope only, so the browse-mode call carries
+    // no scope arguments either.
+    baselineProvider: async () => {
+      if (activeSearch()) {
+        return undefined;
+      }
+      return mapSuggestions(await getFilterSuggestions({}));
     },
     providers: {
       cities: async (country, filterContext) => {
