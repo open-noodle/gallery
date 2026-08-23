@@ -4,8 +4,10 @@ import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/space_album.model.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
+import 'package:immich_mobile/pages/library/spaces/collection_sort.dart';
 import 'package:immich_mobile/presentation/widgets/images/thumbnail.widget.dart';
 import 'package:immich_mobile/providers/infrastructure/asset.provider.dart';
+import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/space_album.provider.dart';
 
 /// Fixed height of the Albums shelf when it is visible (at least one album
@@ -40,6 +42,12 @@ const double _kTileRadius = 16.0;
 /// Callbacks [onLinkTap] and [onAlbumTap] are **no-op stubs in B2** — B4 wires
 /// album-tap navigation and B5 wires the link picker.
 /// [onSeeAll] is wired in B3 to push [SpaceAlbumsRoute].
+///
+/// Album order comes from the same persisted [AppConfig.spaceAlbums] the "See
+/// all" page ([SpaceAlbumsPage]) writes, so the sort a user picks there is the
+/// order they see here. `spaceAlbumsProvider` emits name-ASC (the repository's
+/// `orderBy`), which is NOT the default sort — so the config has to be applied
+/// even when the user has never opened the sort menu.
 class SpaceAlbumsShelf extends ConsumerWidget {
   const SpaceAlbumsShelf({
     super.key,
@@ -62,11 +70,15 @@ class SpaceAlbumsShelf extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final albumsAsync = ref.watch(spaceAlbumsProvider(spaceId));
+    final sortConfig = ref.watch(appConfigProvider.select((config) => config.spaceAlbums));
 
     return albumsAsync.when(
       loading: () => const SizedBox.shrink(),
       error: (_, _) => const SizedBox.shrink(),
-      data: (albums) => _buildShelf(context, albums),
+      // Empty query: the shelf shows every linked album — only the See all page
+      // filters.
+      data: (albums) =>
+          _buildShelf(context, filterAndSortSpaceAlbums(albums, '', sortConfig.sortMode, sortConfig.isReverse)),
     );
   }
 
