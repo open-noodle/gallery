@@ -242,6 +242,7 @@ export class AlbumService extends BaseService {
         id: album.id,
         albumName: dto.albumName,
         description: dto.description,
+        createdAt: dto.createdAt,
         albumThumbnailAssetId: dto.albumThumbnailAssetId,
         isActivityEnabled: dto.isActivityEnabled,
         order: dto.order,
