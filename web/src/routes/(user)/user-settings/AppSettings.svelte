@@ -8,6 +8,7 @@
     alwaysLoadOriginalFile,
     alwaysLoadOriginalVideo,
     autoPlayVideo,
+    cropFacesFromAsset,
     locale,
     loopVideo,
     playVideoThumbnailOnHover,
@@ -94,6 +95,10 @@
 
       <Field label={$t('display_original_photos')} description={$t('display_original_photos_setting_description')}>
         <Switch bind:checked={$alwaysLoadOriginalFile} />
+      </Field>
+
+      <Field label={$t('crop_faces_from_photo')} description={$t('crop_faces_from_photo_description')}>
+        <Switch bind:checked={$cropFacesFromAsset} />
       </Field>
 
       <Field label={$t('video_hover_setting')} description={$t('video_hover_setting_description')}>
