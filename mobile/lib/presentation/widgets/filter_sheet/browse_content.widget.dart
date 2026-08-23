@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/drag_handle.widget.dart';
+import 'package:immich_mobile/presentation/widgets/filter_sheet/filter_section_id.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/match_count_footer.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/search_bar.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/strips/camera_strip.widget.dart';
@@ -12,6 +13,7 @@ import 'package:immich_mobile/presentation/widgets/filter_sheet/strips/places_st
 import 'package:immich_mobile/presentation/widgets/filter_sheet/strips/tags_strip.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/strips/when_strip.widget.dart';
 import 'package:immich_mobile/providers/photos_filter/filter_sheet.provider.dart';
+import 'package:immich_mobile/providers/photos_filter/hidden_sections.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 
 class BrowseContent extends ConsumerWidget {
@@ -22,6 +24,7 @@ class BrowseContent extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final isEmpty = ref.watch(photosFilterProvider.select((f) => f.isEmpty));
+    final hidden = ref.watch(hiddenSectionsProvider);
 
     return Material(
       color: theme.colorScheme.surface,
@@ -53,11 +56,14 @@ class BrowseContent extends ConsumerWidget {
               ),
               const Padding(padding: EdgeInsets.fromLTRB(20, 6, 20, 0), child: FilterSheetSearchBar()),
               const SizedBox(height: 18),
-              const PeopleStrip(),
-              const PlacesStrip(),
-              const TagsStrip(),
-              const CameraStrip(),
-              const WhenStrip(),
+              // Mirrors the Deep view's "Manage sections" visibility (#1002) — a
+              // section hidden there must stay hidden here too, not just reappear
+              // whenever the sheet collapses from deep to browse.
+              if (!hidden.contains(FilterSectionId.people)) const PeopleStrip(),
+              if (!hidden.contains(FilterSectionId.places)) const PlacesStrip(),
+              if (!hidden.contains(FilterSectionId.tags)) const TagsStrip(),
+              if (!hidden.contains(FilterSectionId.camera)) const CameraStrip(),
+              if (!hidden.contains(FilterSectionId.when)) const WhenStrip(),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
                 child: Align(
