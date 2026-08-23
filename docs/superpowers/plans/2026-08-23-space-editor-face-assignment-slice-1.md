@@ -18,6 +18,7 @@
 - **Do NOT write `asset_face.personId`** on any path (spec §4.2).
 - **Param DTO uuid version:** `asset_face.id`, `shared_space_person.id` and `shared_space.id` all use `@PrimaryGeneratedColumn()` (v4). Use `z.uuidv4()`. Using `z.uuidv7()` makes every route 400.
 - **Medium tests need a live Postgres.** Run with `--maxWorkers=4`; default parallelism exhausts connections and the failure set shifts between runs.
+- **Never put `--` before a vitest filter.** `pnpm test:medium -- --run <filter>` silently discards the filter and runs all 161 medium files, which then fail on Postgres connection contention that has nothing to do with your change. The correct form is `pnpm test:medium --run <substring>` — no `--`. Same trap applies to `pnpm test`.
 - **`@GenerateSql` regeneration:** never run `make sql` without a running database — it deletes every query file.
 - **No OpenAPI regeneration in this slice.** It happens once, in Slice 9 (spec §10 trap 1).
 
@@ -236,7 +237,7 @@ describe('isFaceAssignableInSpace', () => {
 
 - [ ] **Step 2: Run the test to verify it fails**
 
-Run: `cd server && pnpm test:medium -- --run test/medium/specs/repositories/shared-space-face-assign.medium.spec.ts --maxWorkers=4`
+Run: `cd server && pnpm test:medium --run shared-space-face-assign --maxWorkers=4`
 
 Expected: FAIL — `verdictRepo.isFaceAssignableInSpace is not a function`.
 
@@ -287,7 +288,7 @@ Add to `server/src/repositories/face-person-verdict.repository.ts`, immediately 
 
 - [ ] **Step 4: Run the test to verify it passes**
 
-Run: `cd server && pnpm test:medium -- --run test/medium/specs/repositories/shared-space-face-assign.medium.spec.ts --maxWorkers=4`
+Run: `cd server && pnpm test:medium --run shared-space-face-assign --maxWorkers=4`
 
 Expected: PASS, all cases.
 
@@ -459,7 +460,7 @@ describe('attach idempotence (F-14)', () => {
 
 - [ ] **Step 6: Run the medium suite**
 
-Run: `cd server && pnpm test:medium -- --run test/medium/specs/repositories/shared-space-face-assign.medium.spec.ts --maxWorkers=4`
+Run: `cd server && pnpm test:medium --run shared-space-face-assign --maxWorkers=4`
 
 Expected: PASS, all cases including F-14.
 
@@ -582,7 +583,7 @@ All four must pass before committing:
 ```bash
 cd server && pnpm check
 cd server && pnpm test -- --run src/services/shared-space.service.spec.ts src/controllers/shared-space.controller.spec.ts
-cd server && pnpm test:medium -- --run test/medium/specs/repositories/shared-space-face-assign.medium.spec.ts --maxWorkers=4
+cd server && pnpm test:medium --run shared-space-face-assign --maxWorkers=4
 cd server && pnpm lint && npx prettier --check "src/**/*.ts"
 ```
 
