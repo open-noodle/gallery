@@ -2,6 +2,8 @@ import 'dart:io';
 
 const String kMobileMetadataKey = "mobile-app";
 
+const String kAppTitle = 'Noodle Gallery';
+
 // Number of log entries to retain on app start
 const int kLogTruncateLimit = 2000;
 
