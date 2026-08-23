@@ -35,6 +35,89 @@ describe(SharedSpaceController.name, () => {
     });
   });
 
+  // Slice 4, Task 2 (spec §6.2): POST /shared-spaces/:id/people.
+  describe('POST /shared-spaces/:id/people', () => {
+    const spaceId = '00000000-0000-4000-8000-000000000001';
+    const personId = '00000000-0000-4000-8000-000000000002';
+
+    it('should require shared-space update permission and create a person', async () => {
+      service.createSpacePerson.mockResolvedValue({
+        id: personId,
+        spaceId,
+        name: 'Aurelia',
+        thumbnailPath: '',
+        isHidden: false,
+        representativeFaceSource: 'auto',
+        faceCount: 0,
+        assetCount: 0,
+        alias: null,
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-01-01T00:00:00.000Z',
+      });
+
+      const { status, body } = await request(ctx.getHttpServer())
+        .post(`/shared-spaces/${spaceId}/people`)
+        .set('Authorization', `Bearer token`)
+        .send({ name: 'Aurelia' });
+
+      expect(status).toBe(201);
+      expect(body).toMatchObject({ id: personId, name: 'Aurelia' });
+      expect(ctx.authenticate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({ permission: Permission.SharedSpaceUpdate }),
+        }),
+      );
+      expect(service.createSpacePerson).toHaveBeenCalledWith(undefined, spaceId, { name: 'Aurelia' });
+    });
+
+    it('should pass an assetFaceId seed through to the service', async () => {
+      const assetFaceId = '00000000-0000-4000-8000-000000000003';
+      service.createSpacePerson.mockResolvedValue({
+        id: personId,
+        spaceId,
+        name: 'Aurelia',
+        thumbnailPath: '',
+        isHidden: false,
+        representativeFaceSource: 'auto',
+        faceCount: 1,
+        assetCount: 1,
+        alias: null,
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-01-01T00:00:00.000Z',
+      });
+
+      const { status } = await request(ctx.getHttpServer())
+        .post(`/shared-spaces/${spaceId}/people`)
+        .set('Authorization', `Bearer token`)
+        .send({ name: 'Aurelia', assetFaceId });
+
+      expect(status).toBe(201);
+      expect(service.createSpacePerson).toHaveBeenCalledWith(undefined, spaceId, { name: 'Aurelia', assetFaceId });
+    });
+
+    it('should validate the space id as a uuid', async () => {
+      const { status, body } = await request(ctx.getHttpServer())
+        .post(`/shared-spaces/not-a-uuid/people`)
+        .set('Authorization', `Bearer token`)
+        .send({ name: 'Aurelia' });
+
+      expect(status).toBe(400);
+      expect(body).toEqual(errorDto.validationError([{ path: ['id'], message: 'Invalid UUID' }]));
+      expect(service.createSpacePerson).not.toHaveBeenCalled();
+    });
+
+    it('should validate assetFaceId as a uuid', async () => {
+      const { status, body } = await request(ctx.getHttpServer())
+        .post(`/shared-spaces/${spaceId}/people`)
+        .set('Authorization', `Bearer token`)
+        .send({ name: 'Aurelia', assetFaceId: 'not-a-uuid' });
+
+      expect(status).toBe(400);
+      expect(body).toEqual(errorDto.validationError([{ path: ['assetFaceId'], message: 'Invalid UUID' }]));
+      expect(service.createSpacePerson).not.toHaveBeenCalled();
+    });
+  });
+
   describe('representative face routes', () => {
     it('should allow clearing a space representative face override', async () => {
       const spaceId = '00000000-0000-4000-8000-000000000001';

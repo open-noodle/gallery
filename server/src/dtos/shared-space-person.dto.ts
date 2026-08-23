@@ -40,6 +40,15 @@ const SharedSpacePersonUpdateSchema = z
   })
   .meta({ id: 'SharedSpacePersonUpdateDto' });
 
+// Spec §6.2 (Slice 4, Task 2): create a space person, optionally attaching a seed face in the
+// same transaction.
+const SharedSpacePersonCreateSchema = z
+  .object({
+    name: z.string().max(100).optional().describe('Person name'),
+    assetFaceId: z.uuidv4().optional().describe('Seed face to attach to the new person'),
+  })
+  .meta({ id: 'SharedSpacePersonCreateDto' });
+
 const SharedSpacePersonAliasSchema = z
   .object({
     alias: z.string().trim().min(1).max(100).describe('Alias name for this person'),
@@ -133,6 +142,7 @@ const SharedSpacePeopleStatisticsResponseSchema = z
   .meta({ id: 'SharedSpacePeopleStatisticsResponseDto' });
 
 export class SpacePeopleQueryDto extends createZodDto(SpacePeopleQuerySchema) {}
+export class SharedSpacePersonCreateDto extends createZodDto(SharedSpacePersonCreateSchema) {}
 export class SharedSpacePersonUpdateDto extends createZodDto(SharedSpacePersonUpdateSchema) {}
 export class SharedSpacePersonAliasDto extends createZodDto(SharedSpacePersonAliasSchema) {}
 export class SpaceRepresentativeFaceUpdateDto extends createZodDto(SpaceRepresentativeFaceUpdateSchema) {}

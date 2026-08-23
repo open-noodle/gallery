@@ -27,7 +27,7 @@ import { BaseService } from 'src/services/base.service';
 import { SharedSpaceService } from 'src/services/shared-space.service';
 import { newMediumService } from 'test/medium.factory';
 import { getKyselyDB } from 'test/utils';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 let defaultDatabase: Kysely<DB>;
 
@@ -449,5 +449,116 @@ describe('detach', () => {
       .executeTakeFirst();
     expect(link).toBeDefined();
     expect(link?.identityId).toBe(identity.id);
+  });
+});
+
+// Slice 4, Task 2 (spec §6.2, §9.4): POST /shared-spaces/:id/people — create a space person,
+// optionally attaching a seed face in the same transaction.
+describe('createSpacePerson', () => {
+  // F-15: person + attachment are one transaction. A crash between them would leave a
+  // nameless orphan in the space's people list.
+  it('creates the person and attaches the seed face atomically (F-15)', async () => {
+    const { sut, ctx } = newMediumService(SharedSpaceService, {
+      database: defaultDatabase,
+      real: [FacePersonVerdictRepository, SharedSpaceRepository, FaceIdentityRepository, DatabaseRepository],
+      mock: [LoggingRepository],
+    });
+    const { anna, bob, space } = await newSpaceWithEditorAndMember(ctx);
+    const { assetId } = await reachPathBuilders.direct(ctx, { spaceId: space.id, ownerId: bob.id });
+    const { result: faceId } = await ctx.newAssetFace({ assetId });
+    const auth = { user: { id: anna.id } } as AuthDto;
+
+    const person = await sut.createSpacePerson(auth, space.id, { name: 'Aurelia', assetFaceId: faceId });
+
+    expect(person.name).toBe('Aurelia');
+    expect(person.spaceId).toBe(space.id);
+
+    const projectionRows = await defaultDatabase
+      .selectFrom('shared_space_person_face')
+      .selectAll()
+      .where('assetFaceId', '=', faceId)
+      .execute();
+    expect(projectionRows).toEqual([{ personId: person.id, assetFaceId: faceId }]);
+
+    const dbPerson = await defaultDatabase
+      .selectFrom('shared_space_person')
+      .selectAll()
+      .where('id', '=', person.id)
+      .executeTakeFirstOrThrow();
+    expect(dbPerson.faceCount).toBe(1);
+    expect(dbPerson.assetCount).toBe(1);
+    expect(dbPerson.identityId).not.toBeNull();
+  });
+
+  // F-15 negative: force the attach to throw and assert NO person row survives.
+  it('rolls the person back when the attach fails (F-15)', async () => {
+    const { sut, ctx } = newMediumService(SharedSpaceService, {
+      database: defaultDatabase,
+      real: [FacePersonVerdictRepository, SharedSpaceRepository, FaceIdentityRepository, DatabaseRepository],
+      mock: [LoggingRepository],
+    });
+    const spaceRepo = ctx.get(SharedSpaceRepository);
+    const { anna, bob, space } = await newSpaceWithEditorAndMember(ctx);
+    const { assetId } = await reachPathBuilders.direct(ctx, { spaceId: space.id, ownerId: bob.id });
+    const { result: faceId } = await ctx.newAssetFace({ assetId });
+    const auth = { user: { id: anna.id } } as AuthDto;
+
+    vi.spyOn(spaceRepo, 'addPersonFaces').mockRejectedValueOnce(new Error('boom'));
+
+    await expect(sut.createSpacePerson(auth, space.id, { name: 'Aurelia', assetFaceId: faceId })).rejects.toThrow(
+      'boom',
+    );
+
+    const rows = await defaultDatabase
+      .selectFrom('shared_space_person')
+      .selectAll()
+      .where('spaceId', '=', space.id)
+      .execute();
+    expect(rows).toEqual([]);
+  });
+
+  // F-33: the seed face's identity already has a space person in this space.
+  it('returns the existing person instead of violating the unique index (F-33)', async () => {
+    const { sut, ctx } = newMediumService(SharedSpaceService, {
+      database: defaultDatabase,
+      real: [FacePersonVerdictRepository, SharedSpaceRepository, FaceIdentityRepository, DatabaseRepository],
+      mock: [LoggingRepository],
+    });
+    const spaceRepo = ctx.get(SharedSpaceRepository);
+    const faceIdentityRepo = ctx.get(FaceIdentityRepository);
+    const { anna, bob, space } = await newSpaceWithEditorAndMember(ctx);
+    const { assetId } = await reachPathBuilders.direct(ctx, { spaceId: space.id, ownerId: bob.id });
+    const { result: faceId } = await ctx.newAssetFace({ assetId });
+    const auth = { user: { id: anna.id } } as AuthDto;
+
+    // An existing space person already carries an identity, established via a DIFFERENT face of
+    // the same identity than the one we are about to seed with.
+    const existingPerson = await spaceRepo.createPerson({ spaceId: space.id, name: 'Uncle Tom' });
+    const identity = await faceIdentityRepo.ensureSpacePersonIdentity(existingPerson.id);
+    // The seed face already resolves to that SAME identity (e.g. left over from an earlier
+    // attach/detach cycle, or ML backfill) -- a plain createPerson would violate
+    // shared_space_person_spaceId_identityId_key the moment linkFaceToSpacePerson tried to point
+    // a NEW person's identity here.
+    await faceIdentityRepo.replaceFaceIdentity({ assetFaceId: faceId, identityId: identity.id, source: 'manual' });
+
+    const person = await sut.createSpacePerson(auth, space.id, { name: 'Someone Else', assetFaceId: faceId });
+
+    expect(person.id).toBe(existingPerson.id);
+    // The pre-existing name wins -- create-from-face does not rename an existing person.
+    expect(person.name).toBe('Uncle Tom');
+
+    const peopleInSpace = await defaultDatabase
+      .selectFrom('shared_space_person')
+      .selectAll()
+      .where('spaceId', '=', space.id)
+      .execute();
+    expect(peopleInSpace).toHaveLength(1);
+
+    const projectionRows = await defaultDatabase
+      .selectFrom('shared_space_person_face')
+      .selectAll()
+      .where('assetFaceId', '=', faceId)
+      .execute();
+    expect(projectionRows).toEqual([{ personId: existingPerson.id, assetFaceId: faceId }]);
   });
 });

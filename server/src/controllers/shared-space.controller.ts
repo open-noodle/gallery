@@ -30,6 +30,7 @@ import {
 import {
   SharedSpacePeopleStatisticsResponseDto,
   SharedSpacePersonAliasDto,
+  SharedSpacePersonCreateDto,
   SharedSpacePersonMergeDto,
   SharedSpacePersonResponseDto,
   SharedSpacePersonUpdateDto,
@@ -355,6 +356,25 @@ export class SharedSpaceController {
     @Query() query: SharedSpaceActivityQueryDto,
   ): Promise<SharedSpaceActivityResponseDto[]> {
     return this.service.getActivities(auth, id, query);
+  }
+
+  // Spec §6.2 (Slice 4, Task 2): create-and-attach is one transaction when assetFaceId is
+  // present; the real authority (Editor role) is enforced in the service.
+  @Post(':id/people')
+  @Authenticated({ permission: Permission.SharedSpaceUpdate })
+  @Endpoint({
+    summary: 'Create a person in a shared space',
+    description:
+      'Create a new space person, optionally attaching a seed face. When the seed face already ' +
+      'carries an identity shared by an existing space person, the existing person is returned instead.',
+    history: new HistoryBuilder().added('v2').stable('v2'),
+  })
+  createSpacePerson(
+    @Auth() auth: AuthDto,
+    @Param() { id }: UUIDParamDto,
+    @Body() dto: SharedSpacePersonCreateDto,
+  ): Promise<SharedSpacePersonResponseDto> {
+    return this.service.createSpacePerson(auth, id, dto);
   }
 
   @Get(':id/people')
