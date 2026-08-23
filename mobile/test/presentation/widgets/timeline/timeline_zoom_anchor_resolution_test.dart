@@ -26,6 +26,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../test_utils.dart';
+import '../../../widget_tester_extensions.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -186,7 +187,7 @@ Future<void> _pumpTimeline(WidgetTester tester, TimelineService service) async {
         supportedLocales: const [Locale('en')],
         path: '../i18n',
         fallbackLocale: const Locale('en'),
-        child: const MaterialApp(home: Timeline(appBar: null, bottomSheet: null, withScrubber: false)),
+        child: MaterialApp(home: withStubRouter(const Timeline(appBar: null, bottomSheet: null, withScrubber: false))),
       ),
     ),
   );
