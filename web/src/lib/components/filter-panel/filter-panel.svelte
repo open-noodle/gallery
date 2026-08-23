@@ -12,7 +12,14 @@
     PersonOption,
     TagOption,
   } from './filter-panel';
-  import { buildFilterContext, createFilterState, loadFilterCollapsed, saveFilterCollapsed } from './filter-panel';
+  import {
+    ALL_FILTER_SECTIONS,
+    buildFilterContext,
+    createFilterState,
+    loadFilterCollapsed,
+    PRE_LEDGER_FILTER_SECTIONS,
+    saveFilterCollapsed,
+  } from './filter-panel';
   import FilterSection from './filter-section.svelte';
   import FilterSectionMenu from './filter-section-menu.svelte';
   import TemporalPicker from './temporal-picker.svelte';
@@ -351,109 +358,91 @@
 
   type StoredSectionSet = string[] | { selected?: string[]; known?: string[] };
 
-  const LEGACY_INTRODUCED_SECTIONS = new Set<FilterSectionType>(['favorites', 'albums']);
-
-  function isFilterSection(value: string, configSections: FilterSectionType[]): value is FilterSectionType {
-    return configSections.includes(value as FilterSectionType);
+  /**
+   * The stored record behind a section set. It is scoped to the browser, not to the surface:
+   * album detail and the album asset picker share a storage key but offer different section
+   * lists, so entries this surface does not render are carried through untouched rather than
+   * intersected away — otherwise the shorter surface forgets them and the longer one keeps
+   * treating them as brand new (#797).
+   */
+  interface SectionLedger {
+    selected: FilterSectionType[];
+    known: FilterSectionType[];
   }
 
-  function getValidSections(values: unknown, configSections: FilterSectionType[]): FilterSectionType[] {
+  const PRE_LEDGER_SECTIONS = new Set<FilterSectionType>(PRE_LEDGER_FILTER_SECTIONS);
+
+  function isFilterSection(value: unknown): value is FilterSectionType {
+    return typeof value === 'string' && (ALL_FILTER_SECTIONS as readonly string[]).includes(value);
+  }
+
+  function getValidSections(values: unknown): FilterSectionType[] {
     if (!Array.isArray(values)) {
       return [];
     }
-    return values.filter((value): value is FilterSectionType => {
-      return typeof value === 'string' && isFilterSection(value, configSections);
-    });
+    return values.filter((value): value is FilterSectionType => isFilterSection(value));
   }
 
-  function getLegacyKnownSections(
-    selected: FilterSectionType[],
-    configSections: FilterSectionType[],
-  ): FilterSectionType[] {
-    const selectedSections = new Set(selected);
-    return configSections.filter(
-      (section) => selectedSections.has(section) || !LEGACY_INTRODUCED_SECTIONS.has(section),
-    );
-  }
-
-  function getLegacySections(
-    values: unknown,
-    configSections: FilterSectionType[],
-    fallback: () => SvelteSet<FilterSectionType>,
-  ): SvelteSet<FilterSectionType> {
-    if (!Array.isArray(values)) {
-      return fallback();
-    }
-
-    const selected = getValidSections(values, configSections);
-    if (values.length > 0 && selected.length === 0) {
-      return fallback();
-    }
-
-    const known = getLegacyKnownSections(selected, configSections);
-    const knownSet = new Set(known);
-    const introduced = configSections.filter((section) => !knownSet.has(section));
-    return new SvelteSet([...selected, ...introduced]);
-  }
-
-  function hydrateSectionSet(
-    configSections: FilterSectionType[],
-    raw: string | null,
-    fallback: () => SvelteSet<FilterSectionType>,
-  ): SvelteSet<FilterSectionType> {
+  function readLedger(raw: string | null): SectionLedger | undefined {
     if (raw === null) {
-      return fallback();
+      return undefined;
     }
 
+    let parsed: StoredSectionSet;
     try {
-      const parsed = JSON.parse(raw) as StoredSectionSet;
-      if (Array.isArray(parsed)) {
-        return getLegacySections(parsed, configSections, fallback);
-      }
-
-      const selected = getValidSections(parsed?.selected, configSections);
-      const known = getValidSections(parsed?.known, configSections);
-      const knownSet = new Set(known);
-      const introduced = configSections.filter((section) => !knownSet.has(section));
-
-      return new SvelteSet([...selected, ...introduced]);
+      parsed = JSON.parse(raw) as StoredSectionSet;
     } catch {
-      return fallback();
+      return undefined;
     }
+
+    if (!Array.isArray(parsed)) {
+      return { selected: getValidSections(parsed?.selected), known: getValidSections(parsed?.known) };
+    }
+
+    const selected = getValidSections(parsed);
+    // A stored list none of whose entries survive is unusable — fall back to showing everything.
+    if (parsed.length > 0 && selected.length === 0) {
+      return undefined;
+    }
+
+    // Legacy storage predates the `known` list, so the sections that existed back then are all it
+    // can vouch for; everything added since counts as introduced and is revealed on upgrade.
+    return { selected, known: [...new Set([...selected, ...PRE_LEDGER_SECTIONS])] };
   }
 
-  function serializeSectionSet(sections: SvelteSet<FilterSectionType>, configSections: FilterSectionType[]): string {
+  function resolveSections(
+    configSections: FilterSectionType[],
+    ledger: SectionLedger | undefined,
+  ): SvelteSet<FilterSectionType> {
+    if (!ledger) {
+      return new SvelteSet(configSections);
+    }
+
+    const known = new Set(ledger.known);
+    const introduced = configSections.filter((section) => !known.has(section));
+    return new SvelteSet([...ledger.selected, ...introduced]);
+  }
+
+  function serializeSectionSet(
+    sections: SvelteSet<FilterSectionType>,
+    configSections: FilterSectionType[],
+    ledger: SectionLedger | undefined,
+  ): string {
     return JSON.stringify({
       selected: [...sections],
-      known: [...configSections],
+      known: [...new Set([...(ledger?.known ?? []), ...configSections])],
     });
   }
 
-  function loadVisibleSections(configSections: FilterSectionType[], key: string): SvelteSet<FilterSectionType> {
-    if (browser) {
-      return hydrateSectionSet(configSections, localStorage.getItem(key), () => new SvelteSet(configSections));
-    }
-    return new SvelteSet(configSections);
-  }
-
-  let visibleSections = $state(loadVisibleSections(config.sections, storageKey));
+  const visibleLedger = readLedger(browser ? localStorage.getItem(storageKey) : null);
+  let visibleSections = $state(resolveSections(config.sections, visibleLedger));
 
   let sectionMenuOpen = $state(false);
 
   const EXPANDED_SECTIONS_KEY = 'gallery-filter-expanded-sections';
 
-  function loadExpandedSections(configSections: FilterSectionType[]): SvelteSet<FilterSectionType> {
-    if (browser) {
-      return hydrateSectionSet(
-        configSections,
-        localStorage.getItem(EXPANDED_SECTIONS_KEY),
-        () => new SvelteSet(configSections),
-      );
-    }
-    return new SvelteSet(configSections);
-  }
-
-  let expandedSections = $state(loadExpandedSections(config.sections));
+  const expandedLedger = readLedger(browser ? localStorage.getItem(EXPANDED_SECTIONS_KEY) : null);
+  let expandedSections = $state(resolveSections(config.sections, expandedLedger));
 
   function toggleSectionExpanded(section: FilterSectionType) {
     const next = new SvelteSet(expandedSections);
@@ -476,13 +465,15 @@
   }
 
   function showAllSections() {
-    visibleSections = new SvelteSet(config.sections);
+    // Union rather than replace: sections another surface tracks under the same storage key are
+    // not this surface's to clear.
+    visibleSections = new SvelteSet([...visibleSections, ...config.sections]);
   }
 
   $effect(() => {
     if (browser) {
       try {
-        localStorage.setItem(storageKey, serializeSectionSet(visibleSections, config.sections));
+        localStorage.setItem(storageKey, serializeSectionSet(visibleSections, config.sections, visibleLedger));
       } catch {
         /* localStorage unavailable */
       }
@@ -500,7 +491,10 @@
   $effect(() => {
     if (browser) {
       try {
-        localStorage.setItem(EXPANDED_SECTIONS_KEY, serializeSectionSet(expandedSections, config.sections));
+        localStorage.setItem(
+          EXPANDED_SECTIONS_KEY,
+          serializeSectionSet(expandedSections, config.sections, expandedLedger),
+        );
       } catch {
         /* localStorage unavailable */
       }
@@ -865,7 +859,9 @@
             {/if}
           {/each}
 
-          {#if visibleSections.size === 0}
+          <!-- Emptiness is per surface, not per ledger: the set can still hold a section another
+               surface tracks under the same storage key (#797). -->
+          {#if config.sections.every((section) => !visibleSections.has(section))}
             <div class="flex flex-col items-center gap-2 px-4 py-8 text-center">
               <p class="text-xs text-gray-500 dark:text-gray-400">{$t('filter_show_sections_hint')}</p>
               <button
