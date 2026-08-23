@@ -55,6 +55,17 @@ features:
       - mobile/lib/pages/library/spaces/**
       - mobile/lib/infrastructure/entities/shared_space*
       - mobile/lib/infrastructure/entities/library*
+      - packages/plugin-gallery/**
+      - server/src/services/gallery-workflow-host.service.ts
+      - server/src/services/gallery-workflow-host.service.spec.ts
+      - web/src/lib/components/SchemaSpacePicker.svelte
+      - web/src/lib/components/SchemaSpacePicker.test-wrapper.svelte
+      - web/src/lib/components/SchemaSpacePicker.spec.ts
+      - web/src/lib/components/SchemaSpaceAlbumPicker.svelte
+      - web/src/lib/components/SchemaSpaceAlbumPicker.test-wrapper.svelte
+      - web/src/lib/components/SchemaSpaceAlbumPicker.spec.ts
+      - web/src/lib/components/SchemaConfiguration.spec.ts
+      - e2e/src/specs/server/api/workflow-spaces.e2e-spec.ts
     upstream_extension_paths:
       - server/src/services/search.service.ts
       - server/src/repositories/search.repository.ts
@@ -64,6 +75,12 @@ features:
       - web/src/routes/(user)/map/**
       - mobile/lib/domain/services/sync_stream.service.dart
       - mobile/lib/infrastructure/entities/merged_asset.drift
+      - server/src/repositories/config.repository.ts
+      - server/test/repositories/config.repository.mock.ts
+      - server/src/services/workflow-execution.service.ts
+      - web/src/lib/types.ts
+      - web/src/lib/components/SchemaConfiguration.svelte
+      - web/src/lib/components/shared-components/Combobox.svelte
     database:
       tables:
         - shared_spaces
