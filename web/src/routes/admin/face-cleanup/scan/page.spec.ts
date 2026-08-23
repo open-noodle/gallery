@@ -14,7 +14,7 @@ import { Route } from '$lib/route';
 import Page from './+page.svelte';
 
 // The post-scan console, retriaged into two lanes (design
-// docs/superpowers/specs/2026-07-24-face-cleanup-scan-two-lane-redesign-design.md): a confident bulk
+// specs/2026-07-24-face-cleanup-scan-two-lane-redesign-design.md): a confident bulk
 // (ConfidentLane, approve-all + spot-check exclude) and a clickable review-first list (ReviewFirstLane).
 // The lanes' own behaviours are covered by ConfidentLane.spec.ts / ReviewFirstLane.spec.ts; here we verify
 // the page composes them, wires the bulk-approve/dismiss handlers, and keeps every non-completed state.

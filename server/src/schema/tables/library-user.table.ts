@@ -8,7 +8,7 @@ import { UserTable } from 'src/schema/tables/user.table';
 // libraries via shared-space links correctly receive library metadata and
 // asset backfill on next sync.
 //
-// See docs/plans/2026-04-11-library-user-access-backfill-design.md for the
+// See specs/2026-04-11-library-user-access-backfill-design.md for the
 // full design, triggers, and migration backfill strategy.
 @Table({ name: 'library_user' })
 // Hot-path index: LibrarySync.getCreatedAfter filters by userId then createId,

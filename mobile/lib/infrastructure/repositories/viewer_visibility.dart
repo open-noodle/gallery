@@ -18,7 +18,7 @@
 //     Returns an Expression<bool> composed from isInQuery subqueries. No
 //     reactivity concern, and isInQuery naturally deduplicates.
 //
-// See docs/plans/2026-04-12-mobile-timeline-space-visibility-design.md for
+// See specs/2026-04-12-mobile-timeline-space-visibility-design.md for
 // the full rationale and the .drift-SQL fallback plan.
 
 import 'package:drift/drift.dart';

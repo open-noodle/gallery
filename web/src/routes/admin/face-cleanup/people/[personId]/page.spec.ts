@@ -17,11 +17,11 @@ import Page from './+page.svelte';
 import { createManualReviewModel, type ManualReviewModel } from './manual-review.svelte';
 
 // Manual review page (Slice 8, design §6.4 of
-// docs/superpowers/specs/2026-07-23-manual-face-review-mode-design.md). Route:
+// specs/2026-07-23-manual-face-review-mode-design.md). Route:
 // /admin/face-cleanup/people/[personId]. Person name/ownerId/faceCount come from the slice 3 metadata
 // endpoint (getFaceRepairPersonMetadata), fetched from the URL param — never navigation state — so a hard
 // refresh or a deep link works. Faces come from getFaceRepairClusterFaces with excludeFaceIds: [] (scan-free).
-// Covers plan Step 1's 12 cases (docs/superpowers/plans/2026-07-23-manual-face-review-slice-8.md).
+// Covers plan Step 1's 12 cases (manual face review, slice 8).
 //
 // THE VISUAL INVERSION (§6.4): manual defaults every face to `keep`, which is signalled by ABSENCE — a keep
 // tile carries no badge, no ribbon. Colour only appears once the admin has acted. Bulk-action UI that WRITES
