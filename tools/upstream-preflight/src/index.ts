@@ -4,6 +4,7 @@ import path from 'node:path';
 import micromatch from 'micromatch';
 import { Command } from 'commander';
 import { runCiInvariantAudits } from './audits/ci-invariants';
+import { runCommitAutolinkAudit } from './audits/commit-autolinks';
 import { runMobileDriftAudit } from './audits/mobile-drift';
 import { runPatchAudits } from './audits/patches';
 import {
@@ -484,6 +485,16 @@ program
       for (const detail of result.details) console.log(`- ${detail}`);
     }
     process.exitCode = results.every((result) => result.ok) ? 0 : 1;
+  });
+
+program
+  .command('commit-autolink-check')
+  .option('--range <range>', 'commit range to scan', 'upstream/main..HEAD')
+  .action((options: { range: string }) => {
+    const result = runCommitAutolinkAudit(options.range, repoRoot());
+    console.log(`${result.ok ? 'OK' : 'ISSUE'}: ${result.title}`);
+    for (const detail of result.details) console.log(`- ${detail}`);
+    process.exitCode = result.ok ? 0 : 1;
   });
 
 program
