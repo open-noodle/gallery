@@ -258,6 +258,148 @@ where
 order by
   "asset"."localDateTime" asc
 
+-- AssetRepository.getMemoryAssetsForPeriod
+select
+  "asset"."id",
+  "asset"."localDateTime",
+  "asset"."isFavorite",
+  "asset"."type",
+  "asset"."duration",
+  "asset_exif"."country" as "country",
+  "asset_exif"."city" as "city",
+  extract(
+    year
+    from
+      (asset."localDateTime" at time zone 'UTC')
+  )::int as "year"
+from
+  "asset"
+  left join "asset_exif" on "asset_exif"."assetId" = "asset"."id"
+where
+  "asset"."ownerId" = $1
+  and "asset"."visibility" = $2
+  and "asset"."deletedAt" is null
+  and "asset"."localDateTime" <= $3
+  and extract(
+    month
+    from
+      (asset."localDateTime" at time zone 'UTC')
+  )::int in ($4)
+  and exists (
+    select
+      "asset_file"."assetId"
+    from
+      "asset_file"
+    where
+      "asset_file"."assetId" = "asset"."id"
+      and "asset_file"."type" = $5
+  )
+order by
+  "asset"."localDateTime" asc
+
+-- AssetRepository.getMemoryFacesForPeriod
+select
+  "asset"."id" as "assetId",
+  "asset"."localDateTime",
+  "person"."id" as "personId",
+  "person"."name" as "personName",
+  extract(
+    year
+    from
+      (asset."localDateTime" at time zone 'UTC')
+  )::int as "year"
+from
+  "asset"
+  inner join "asset_face" on "asset_face"."assetId" = "asset"."id"
+  inner join "person" on "person"."id" = "asset_face"."personId"
+where
+  "asset"."ownerId" = $1
+  and "asset"."visibility" = $2
+  and "asset"."deletedAt" is null
+  and "asset"."localDateTime" <= $3
+  and extract(
+    month
+    from
+      (asset."localDateTime" at time zone 'UTC')
+  )::int in ($4)
+  and "asset_face"."deletedAt" is null
+  and "asset_face"."isVisible" = $5
+  and "person"."ownerId" = $6
+  and "person"."name" != $7
+  and "person"."isHidden" = $8
+  and exists (
+    select
+      "asset_file"."assetId"
+    from
+      "asset_file"
+    where
+      "asset_file"."assetId" = "asset"."id"
+      and "asset_file"."type" = $9
+  )
+order by
+  "asset"."localDateTime" asc
+
+-- AssetRepository.getMemoryPersonDailyCounts
+select
+  "asset_face"."personId",
+  date_trunc('day', asset."localDateTime" at time zone 'UTC') as "day",
+  count(distinct ("asset"."id")) as "count"
+from
+  "asset"
+  inner join "asset_face" on "asset_face"."assetId" = "asset"."id"
+where
+  "asset"."ownerId" = $1
+  and "asset"."visibility" = $2
+  and "asset"."deletedAt" is null
+  and "asset"."localDateTime" <= $3
+  and "asset_face"."personId" in ($4)
+  and "asset_face"."deletedAt" is null
+  and "asset_face"."isVisible" = $5
+  and exists (
+    select
+      "asset_file"."assetId"
+    from
+      "asset_file"
+    where
+      "asset_file"."assetId" = "asset"."id"
+      and "asset_file"."type" = $6
+  )
+group by
+  "asset_face"."personId",
+  "day"
+order by
+  "asset_face"."personId",
+  "day" asc
+
+-- AssetRepository.getMemoryAssetsForPersonWindow
+select distinct
+  on ("asset"."id") "asset"."id",
+  "asset"."localDateTime"
+from
+  "asset"
+  inner join "asset_face" on "asset_face"."assetId" = "asset"."id"
+where
+  "asset"."ownerId" = $1
+  and "asset_face"."personId" = $2
+  and "asset_face"."deletedAt" is null
+  and "asset_face"."isVisible" = $3
+  and "asset"."visibility" = $4
+  and "asset"."deletedAt" is null
+  and "asset"."localDateTime" >= $5
+  and "asset"."localDateTime" < $6
+  and exists (
+    select
+      "asset_file"."assetId"
+    from
+      "asset_file"
+    where
+      "asset_file"."assetId" = "asset"."id"
+      and "asset_file"."type" = $7
+  )
+order by
+  "asset"."id",
+  "asset"."localDateTime" asc
+
 -- AssetRepository.getOwnedManifestAssets
 select
   "asset"."id",
