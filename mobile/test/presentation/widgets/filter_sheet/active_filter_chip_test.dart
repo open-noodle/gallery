@@ -82,6 +82,26 @@ void main() {
       expect(find.byIcon(Icons.close_rounded), findsOneWidget);
     });
 
+    // activeChipsFromFilter is a pure Dart helper with no BuildContext, so
+    // toggle/media/fallback specs carry an i18n *key* (labelIsKey: true)
+    // rather than resolved text — the widget must translate it before
+    // display, or the raw key ("filter_sheet_favourites") leaks to the user.
+    testWidgets('labelIsKey spec renders the translated string, not the raw key', (tester) async {
+      const spec = ActiveChipSpec(
+        id: FavouriteChipId(),
+        label: 'filter_sheet_favourites',
+        labelIsKey: true,
+        visual: ChipVisual.toggle,
+        icon: Icons.favorite_rounded,
+      );
+
+      await tester.pumpConsumerWidget(const ActiveFilterChip(spec: spec));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Favourites'), findsOneWidget);
+      expect(find.text('filter_sheet_favourites'), findsNothing);
+    });
+
     testWidgets('tag spec renders leading dot with key', (tester) async {
       const spec = ActiveChipSpec(id: TagChipId('t1'), label: 'wedding', visual: ChipVisual.tag, tagDotSeed: 42);
 
