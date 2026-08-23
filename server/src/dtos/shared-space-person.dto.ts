@@ -77,6 +77,13 @@ const SpacePersonFaceParamsSchema = SpacePersonParamsSchema.extend({
   assetFaceId: z.uuidv4().describe('Asset face ID'),
 }).meta({ id: 'SpacePersonFaceParamsDto' });
 
+const SpaceAssetFacesParamsSchema = z
+  .object({
+    id: z.uuidv4().describe('Shared space ID'),
+    assetId: z.uuidv4().describe('Asset ID'),
+  })
+  .meta({ id: 'SpaceAssetFacesParamsDto' });
+
 const SpacePersonFaceSuggestionParamsSchema = SpacePersonParamsSchema.extend({
   assetFaceId: z.uuidv4().describe('Unassigned asset face ID being reviewed'),
 }).meta({ id: 'SpacePersonFaceSuggestionParamsDto' });
@@ -100,6 +107,23 @@ const SharedSpacePersonResponseSchema = z
   })
   .meta({ id: 'SharedSpacePersonResponseDto' });
 
+// Spec §6.1 (Slice 3): one row per live, visible face on an asset, space-scoped. `spacePersonId`/
+// `spacePersonName` are the SPACE's own person, never the owner's `person.name`. No `isEditorDrawn`
+// field here — `asset_face.createdBy` does not exist until Slice 6.
+const SpaceAssetFaceResponseSchema = z
+  .object({
+    id: z.uuidv4().describe('Asset face ID'),
+    boundingBoxX1: z.number().describe('Bounding box X1'),
+    boundingBoxY1: z.number().describe('Bounding box Y1'),
+    boundingBoxX2: z.number().describe('Bounding box X2'),
+    boundingBoxY2: z.number().describe('Bounding box Y2'),
+    imageWidth: z.number().describe('Original image width'),
+    imageHeight: z.number().describe('Original image height'),
+    spacePersonId: z.uuidv4().nullable().describe('Space person ID this face is attached to, if any'),
+    spacePersonName: z.string().nullable().describe('Space person name this face is attached to, if any'),
+  })
+  .meta({ id: 'SpaceAssetFaceResponseDto' });
+
 const SharedSpacePeopleStatisticsResponseSchema = z
   .object({
     total: z.int().min(0).describe('Total number of people'),
@@ -116,5 +140,7 @@ export class SharedSpacePersonMergeDto extends createZodDto(SharedSpacePersonMer
 export class SpacePersonParamsDto extends createZodDto(SpacePersonParamsSchema) {}
 export class SpacePersonFaceParamsDto extends createZodDto(SpacePersonFaceParamsSchema) {}
 export class SpacePersonFaceSuggestionParamsDto extends createZodDto(SpacePersonFaceSuggestionParamsSchema) {}
+export class SpaceAssetFacesParamsDto extends createZodDto(SpaceAssetFacesParamsSchema) {}
 export class SharedSpacePersonResponseDto extends createZodDto(SharedSpacePersonResponseSchema) {}
 export class SharedSpacePeopleStatisticsResponseDto extends createZodDto(SharedSpacePeopleStatisticsResponseSchema) {}
+export class SpaceAssetFaceResponseDto extends createZodDto(SpaceAssetFaceResponseSchema) {}

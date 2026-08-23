@@ -21,6 +21,7 @@ import {
   SharedSpacePersonMergeDto,
   SharedSpacePersonResponseDto,
   SharedSpacePersonUpdateDto,
+  SpaceAssetFaceResponseDto,
   SpacePeopleQueryDto,
   SpaceRepresentativeFaceUpdateDto,
 } from 'src/dtos/shared-space-person.dto';
@@ -2121,6 +2122,37 @@ export class SharedSpaceService extends BaseService {
       await this.linkFaceToSpacePerson(trx, person, assetFaceId, { writeIdentity });
       return true;
     });
+  }
+
+  /**
+   * Spec §6.1 (Slice 3): the face boxes on one asset, space-scoped. Editor-only — the response
+   * exposes faces nobody has named yet, which a Viewer has no business seeing.
+   *
+   * The hidden-person exclusion lives in the repository read (`getAssetFacesForSpace`) so it
+   * cannot drift from `isFaceAssignableInSpace`'s write-side exclusion — an editor must never be
+   * able to attach a face this list would not show them (F-8/F-9).
+   */
+  async getSpaceAssetFaces(auth: AuthDto, spaceId: string, assetId: string): Promise<SpaceAssetFaceResponseDto[]> {
+    await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
+
+    if (!(await this.sharedSpaceRepository.isAssetInSpace(spaceId, assetId))) {
+      // Deliberate non-disclosure, matching attachFaceToSpacePerson's 'Face not found' — an editor
+      // probing ids learns nothing about whether the asset exists at all.
+      throw new BadRequestException('Asset not found');
+    }
+
+    const faces = await this.sharedSpaceRepository.getAssetFacesForSpace(spaceId, assetId);
+    return faces.map((face) => ({
+      id: face.id,
+      boundingBoxX1: face.boundingBoxX1,
+      boundingBoxY1: face.boundingBoxY1,
+      boundingBoxX2: face.boundingBoxX2,
+      boundingBoxY2: face.boundingBoxY2,
+      imageWidth: face.imageWidth,
+      imageHeight: face.imageHeight,
+      spacePersonId: face.spacePersonId,
+      spacePersonName: face.spacePersonName,
+    }));
   }
 
   // D9/D2: reachability (RBAC — is this face's asset in the space at all), not pendingness, gates a space

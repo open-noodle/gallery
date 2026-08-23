@@ -479,4 +479,77 @@ describe(SharedSpaceController.name, () => {
       expect(service.attachFaceToSpacePerson).not.toHaveBeenCalled();
     });
   });
+
+  // Slice 3 (spec §6.1): GET /shared-spaces/:id/assets/:assetId/faces. The decorator carries the
+  // SharedSpaceRead API-key SCOPE (matching the sibling read at :id/people/:personId/faces) — the
+  // real Editor-only RBAC is enforced in the service via requireRole, not visible at this layer.
+  describe('GET /shared-spaces/:id/assets/:assetId/faces', () => {
+    const spaceId = '00000000-0000-4000-8000-000000000001';
+    const assetId = '00000000-0000-4000-8000-000000000002';
+    const faceId = '00000000-0000-4000-8000-000000000003';
+    const personId = '00000000-0000-4000-8000-000000000004';
+
+    it('should require shared-space read permission and return the space-scoped faces', async () => {
+      service.getSpaceAssetFaces.mockResolvedValue([
+        {
+          id: faceId,
+          boundingBoxX1: 10,
+          boundingBoxY1: 20,
+          boundingBoxX2: 110,
+          boundingBoxY2: 120,
+          imageWidth: 4000,
+          imageHeight: 3000,
+          spacePersonId: personId,
+          spacePersonName: 'Uncle Tom',
+        },
+      ]);
+
+      const { status, body } = await request(ctx.getHttpServer())
+        .get(`/shared-spaces/${spaceId}/assets/${assetId}/faces`)
+        .set('Authorization', `Bearer token`);
+
+      expect(status).toBe(200);
+      expect(ctx.authenticate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({ permission: Permission.SharedSpaceRead }),
+        }),
+      );
+      expect(service.getSpaceAssetFaces).toHaveBeenCalledWith(undefined, spaceId, assetId);
+      expect(body).toEqual([
+        {
+          id: faceId,
+          boundingBoxX1: 10,
+          boundingBoxY1: 20,
+          boundingBoxX2: 110,
+          boundingBoxY2: 120,
+          imageWidth: 4000,
+          imageHeight: 3000,
+          spacePersonId: personId,
+          spacePersonName: 'Uncle Tom',
+        },
+      ]);
+      // No isEditorDrawn field yet -- asset_face.createdBy does not exist until Slice 6.
+      expect(body[0]).not.toHaveProperty('isEditorDrawn');
+    });
+
+    it('should validate assetId as a uuid', async () => {
+      const { status, body } = await request(ctx.getHttpServer())
+        .get(`/shared-spaces/${spaceId}/assets/not-a-uuid/faces`)
+        .set('Authorization', `Bearer token`);
+
+      expect(status).toBe(400);
+      expect(body).toEqual(errorDto.validationError([{ path: ['assetId'], message: 'Invalid UUID' }]));
+      expect(service.getSpaceAssetFaces).not.toHaveBeenCalled();
+    });
+
+    it('should validate the space id as a uuid', async () => {
+      const { status, body } = await request(ctx.getHttpServer())
+        .get(`/shared-spaces/not-a-uuid/assets/${assetId}/faces`)
+        .set('Authorization', `Bearer token`);
+
+      expect(status).toBe(400);
+      expect(body).toEqual(errorDto.validationError([{ path: ['id'], message: 'Invalid UUID' }]));
+      expect(service.getSpaceAssetFaces).not.toHaveBeenCalled();
+    });
+  });
 });

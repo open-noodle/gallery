@@ -33,6 +33,8 @@ import {
   SharedSpacePersonMergeDto,
   SharedSpacePersonResponseDto,
   SharedSpacePersonUpdateDto,
+  SpaceAssetFaceResponseDto,
+  SpaceAssetFacesParamsDto,
   SpacePeopleQueryDto,
   SpacePersonFaceParamsDto,
   SpacePersonFaceSuggestionParamsDto,
@@ -570,6 +572,24 @@ export class SharedSpaceController {
     @Param() { id, personId, assetFaceId }: SpacePersonFaceParamsDto,
   ): Promise<FaceSuggestionActionResponseDto> {
     return { acted: await this.service.attachFaceToSpacePerson(auth, id, personId, assetFaceId) };
+  }
+
+  // Spec §6.1. The decorator carries the API-key SCOPE, matching the sibling read
+  // (GET :id/people/:personId/faces above) — the real authority (Editor role, since this exposes
+  // unnamed faces) is enforced in the service via requireRole.
+  @Get(':id/assets/:assetId/faces')
+  @Authenticated({ permission: Permission.SharedSpaceRead })
+  @Endpoint({
+    summary: 'Get the faces on an asset, space-scoped',
+    description:
+      'Retrieve the face boxes on an asset for a shared space, joined to the space person holding each one, if any.',
+    history: new HistoryBuilder().added('v2').stable('v2'),
+  })
+  getSpaceAssetFaces(
+    @Auth() auth: AuthDto,
+    @Param() { id, assetId }: SpaceAssetFacesParamsDto,
+  ): Promise<SpaceAssetFaceResponseDto[]> {
+    return this.service.getSpaceAssetFaces(auth, id, assetId);
   }
 
   @Get(':id/people/:personId')

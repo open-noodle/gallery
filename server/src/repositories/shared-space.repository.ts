@@ -24,6 +24,7 @@ import { SharedSpacePersonFaceTable } from 'src/schema/tables/shared-space-perso
 import { SharedSpacePersonTable } from 'src/schema/tables/shared-space-person.table';
 import { SharedSpaceTable } from 'src/schema/tables/shared-space.table';
 import { anyUuid, asUuid, retryOnDeadlock, searchAssetBuilderLegacy } from 'src/utils/database';
+import { reviewableAssetVisibility } from 'src/utils/face-review';
 import { retargetVerdictSpacePersonId } from 'src/utils/face-verdict-merge';
 import {
   spaceAlbumAssetExists,
@@ -182,6 +183,20 @@ export type SpaceFaceAssignment = {
   personId: string;
   identityId: string | null;
   type: string;
+};
+
+// Slice 3 (spec §6.1): one row per live, visible face on an asset, joined to the space person
+// holding it in THIS space (if any) — never the owner's `person.name`.
+export type SpaceAssetFace = {
+  id: string;
+  boundingBoxX1: number;
+  boundingBoxY1: number;
+  boundingBoxX2: number;
+  boundingBoxY2: number;
+  imageWidth: number;
+  imageHeight: number;
+  spacePersonId: string | null;
+  spacePersonName: string | null;
 };
 
 @Injectable()
@@ -4740,6 +4755,55 @@ export class SharedSpaceRepository {
       .execute();
 
     return personIds;
+  }
+
+  /**
+   * Spec §6.1 (Slice 3): every live, visible face on `assetId`, joined to the space person
+   * holding it in THIS space, if any — a face held by a person in a DIFFERENT space reads as
+   * unassigned here (the `shared_space_person.spaceId` scoping on the join).
+   *
+   * The hidden-person exclusions mirror `FacePersonVerdictRepository.isFaceAssignableInSpace`
+   * exactly (owner `person.isHidden`) plus the space-projection exclusion the asset detail read
+   * already applies (`shared_space_person.isHidden`, matching `asset.service.ts:135`) — so an
+   * editor can never attach a face this list would not show them (F-8/F-9, F-12).
+   *
+   * Reachability of `assetId` itself in `spaceId` is NOT re-checked here: the caller
+   * (`SharedSpaceService.getSpaceAssetFaces`) asserts that separately via `isAssetInSpace`
+   * before calling this, so a read of an asset that has left the space never reaches here.
+   */
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
+  getAssetFacesForSpace(spaceId: string, assetId: string): Promise<SpaceAssetFace[]> {
+    return this.db
+      .selectFrom('asset_face')
+      .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+      .leftJoin('person', 'person.id', 'asset_face.personId')
+      .leftJoin('shared_space_person_face', 'shared_space_person_face.assetFaceId', 'asset_face.id')
+      .leftJoin('shared_space_person', (join) =>
+        join
+          .onRef('shared_space_person.id', '=', 'shared_space_person_face.personId')
+          .on('shared_space_person.spaceId', '=', spaceId),
+      )
+      .select([
+        'asset_face.id',
+        'asset_face.boundingBoxX1',
+        'asset_face.boundingBoxY1',
+        'asset_face.boundingBoxX2',
+        'asset_face.boundingBoxY2',
+        'asset_face.imageWidth',
+        'asset_face.imageHeight',
+        'shared_space_person.id as spacePersonId',
+        'shared_space_person.name as spacePersonName',
+      ])
+      .where('asset_face.assetId', '=', assetId)
+      .where('asset_face.deletedAt', 'is', null)
+      .where('asset_face.isVisible', '=', true)
+      .where('asset.deletedAt', 'is', null)
+      .where('asset.isOffline', '=', false)
+      .where((eb) => reviewableAssetVisibility(eb))
+      .where((eb) => eb.or([eb('person.id', 'is', null), eb('person.isHidden', '=', false)]))
+      .where((eb) => eb.or([eb('shared_space_person.id', 'is', null), eb('shared_space_person.isHidden', '=', false)]))
+      .orderBy('asset_face.id')
+      .execute();
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })
