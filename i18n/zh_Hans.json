@@ -3474,6 +3474,8 @@
   "workflow_json_help": "以JSON格式编辑工作流配置。变动会同步到可视化生成器。",
   "workflow_name": "工作流名称",
   "workflow_navigation_prompt": "你确定不保存而退出？",
+  "workflow_space_album_choose_space_first": "请先选择 Space",
+  "workflow_space_unavailable": "Space 不可用",
   "workflow_summary": "工作流摘要",
   "workflow_templates": "工作流模板",
   "workflow_update_success": "工作流成功更新",

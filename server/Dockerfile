@@ -82,6 +82,7 @@ COPY --from=ghcr.io/jdx/mise:2026.8.16@sha256:05fdec33a6b3f72198fd918927cfa2a345
 # on demand by `mise exec` below, with wasm-opt supplied by the binaryen package instead of mise.
 # WORKDIR is inherited from builder (/usr/src/app) — the final stage copies plugin-core from there.
 COPY ./packages/plugin-core ./packages/plugin-core/
+COPY ./packages/plugin-gallery ./packages/plugin-gallery/
 ENV MISE_DATA_DIR=/buildcache/mise
 
 RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
@@ -93,9 +94,9 @@ RUN --mount=type=cache,id=pnpm,target=/buildcache/pnpm-store \
   --mount=type=cache,id=mise-plugin-tools-${TARGETPLATFORM},target=/buildcache/mise \
   --mount=type=secret,id=github_token \
   if [ -f /run/secrets/github_token ]; then export GITHUB_TOKEN="$(cat /run/secrets/github_token)"; fi; \
-  pnpm --filter @immich/sdk --filter @immich/plugin-sdk --filter @immich/plugin-core install --frozen-lockfile && \
+  pnpm --filter @immich/sdk --filter @immich/plugin-sdk --filter @immich/plugin-core --filter @immich/plugin-gallery install --frozen-lockfile && \
   mise exec --no-deps --jobs=1 github:extism/js-pdk@1.6.0 -- \
-    pnpm --filter @immich/plugin-sdk --filter @immich/plugin-core build
+    pnpm --filter @immich/plugin-sdk --filter @immich/plugin-core --filter @immich/plugin-gallery build
 
 FROM ghcr.io/immich-app/base-server-prod:202608300913@sha256:e809772a5ee5babfe2073563a40757818f997feff8d161d30bf7b904ca49eb6b
 
@@ -109,6 +110,8 @@ COPY --from=web /usr/src/app/web/build /build/www
 COPY --from=cli /output/cli-pruned ./cli
 COPY --from=plugins /usr/src/app/packages/plugin-core/dist /build/plugins/immich-plugin-core/dist
 COPY --from=plugins /usr/src/app/packages/plugin-core/manifest.json /build/plugins/immich-plugin-core/manifest.json
+COPY --from=plugins /usr/src/app/packages/plugin-gallery/dist /build/plugins/gallery-core/dist
+COPY --from=plugins /usr/src/app/packages/plugin-gallery/manifest.json /build/plugins/gallery-core/manifest.json
 RUN ln -s ../../cli/bin/immich server/bin/immich
 COPY LICENSE /licenses/LICENSE.txt
 COPY LICENSE /LICENSE
