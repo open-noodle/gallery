@@ -534,7 +534,26 @@ export const utils = {
     return person;
   },
 
-  createFace: async ({ assetId, personGroupId }: { assetId: string; personGroupId: string }): Promise<string> => {
+  createFace: async ({
+    assetId,
+    personGroupId,
+    sourceType = 'machine-learning',
+  }: {
+    assetId: string;
+    personGroupId: string;
+    /**
+     * Defaults to the schema default, `machine-learning`, because that is what the face-repair
+     * surfaces require: getScanFlaggedFaces (and the cross-engine console) join `face_search` on
+     * `sourceType = MachineLearning`, so a face seeded any other way is invisible to them and the
+     * scan silently finds nothing — see face-cleanup / face-review-cross-engine.
+     *
+     * Pass `'manual'` from specs that upload real assets and let detection run: on a stack with
+     * facial recognition enabled, `handleDetectFaces` treats an existing MachineLearning-sourced
+     * face as a prior ML detection, re-runs detection, finds 0 real faces in these fixtures, and
+     * deletes every face whose id was not re-confirmed — wiping the seeded face.
+     */
+    sourceType?: 'machine-learning' | 'manual';
+  }): Promise<string> => {
     if (!client) {
       throw new Error('Database client not connected');
     }
@@ -542,8 +561,8 @@ export const utils = {
     const result = await client.query(
       `
       WITH inserted_face AS (
-        INSERT INTO asset_face ("assetId", "personGroupId")
-        VALUES ($1, $2)
+        INSERT INTO asset_face ("assetId", "personGroupId", "sourceType")
+        VALUES ($1, $2, $3)
         RETURNING id
       ),
       person_row AS (
@@ -577,7 +596,7 @@ export const utils = {
       SELECT (SELECT id FROM inserted_face), (SELECT id FROM resolved_identity), 'manual'
       RETURNING "assetFaceId" AS id
       `,
-      [assetId, personGroupId],
+      [assetId, personGroupId, sourceType],
     );
     return result.rows[0].id as string;
   },
@@ -663,9 +682,11 @@ export const utils = {
       );
       const globalPersonId = personResult.rows[0].id as string;
 
-      // 2. Create a face row linking the asset to the global person.
+      // 2. Create a face row linking the asset to the global person. sourceType: 'manual' — see the
+      // comment on utils.createFace above; left at the default it gets silently deleted by
+      // handleDetectFaces on any stack with facial recognition enabled.
       const faceResult = await client.query(
-        `INSERT INTO "asset_face" ("assetId", "personGroupId") VALUES ($1, $2) RETURNING id`,
+        `INSERT INTO "asset_face" ("assetId", "personGroupId", "sourceType") VALUES ($1, $2, 'manual') RETURNING id`,
         [assetId, globalPersonId],
       );
       const faceId = faceResult.rows[0].id as string;

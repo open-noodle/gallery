@@ -218,7 +218,11 @@ test.describe('Rebase Smoke — UI Permission Matrix', () => {
 
     // FilterPanel is open by default on /photos. Wait for all 3 sections to mount.
     await page.locator('[data-testid="filter-section-location"]').waitFor({ timeout: 10_000 });
-    await page.locator('[data-testid="filter-section-camera"]').waitFor({ timeout: 10_000 });
+    // #910: an asset with no EXIF make gives an empty camera facet, so the section is not rendered.
+    // The assertion below is already guarded on `make`; the wait has to be too.
+    if (fullAsset.exifInfo?.make) {
+      await page.locator('[data-testid="filter-section-camera"]').waitFor({ timeout: 10_000 });
+    }
     await page.locator('[data-testid="filter-section-tags"]').waitFor({ timeout: 10_000 });
 
     // Tags: the owner's "rebase-smoke" tag must appear.

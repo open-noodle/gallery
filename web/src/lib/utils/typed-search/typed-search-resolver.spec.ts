@@ -27,6 +27,9 @@ describe('resolveTypedSearchFilters', () => {
       ratings: [],
       mediaTypes: [AssetTypeEnum.Image, AssetTypeEnum.Video],
       hasUnnamedPeople: false,
+      hasFavorites: false,
+      hasAssetsInAlbum: false,
+      hasAssetsNotInAlbum: false,
     });
     vi.mocked(getSearchSuggestions).mockResolvedValue([]);
   });
@@ -41,6 +44,9 @@ describe('resolveTypedSearchFilters', () => {
       ratings: [4],
       mediaTypes: [AssetTypeEnum.Image],
       hasUnnamedPeople: false,
+      hasFavorites: false,
+      hasAssetsInAlbum: false,
+      hasAssetsNotInAlbum: false,
     });
 
     const result = await resolveTypedSearchFilters(parseTypedSearch('beach person:anna tag:travel camera:nikon'), {});
@@ -119,6 +125,9 @@ describe('resolveTypedSearchFilters', () => {
       ratings: [],
       mediaTypes: [AssetTypeEnum.Image],
       hasUnnamedPeople: false,
+      hasFavorites: false,
+      hasAssetsInAlbum: false,
+      hasAssetsNotInAlbum: false,
     });
     vi.mocked(getSearchSuggestions).mockResolvedValue(['Munich']);
 
@@ -230,6 +239,9 @@ describe('resolveTypedSearchFilters', () => {
       ratings: [],
       mediaTypes: [],
       hasUnnamedPeople: false,
+      hasFavorites: false,
+      hasAssetsInAlbum: false,
+      hasAssetsNotInAlbum: false,
     });
 
     const result = await resolveTypedSearchFilters(
@@ -265,6 +277,9 @@ describe('resolveTypedSearchFilters', () => {
       ratings: [],
       mediaTypes: [],
       hasUnnamedPeople: false,
+      hasFavorites: false,
+      hasAssetsInAlbum: false,
+      hasAssetsNotInAlbum: false,
     });
 
     const result = await resolveTypedSearchFilters(parseTypedSearch('tag:trav'), {});
@@ -296,6 +311,9 @@ describe('resolveTypedSearchFilters', () => {
       ratings: [],
       mediaTypes: [],
       hasUnnamedPeople: false,
+      hasFavorites: false,
+      hasAssetsInAlbum: false,
+      hasAssetsNotInAlbum: false,
     });
 
     const result = await resolveTypedSearchFilters(parseTypedSearch('person:anna'), { spaceId: 'space-1' });
@@ -317,6 +335,9 @@ describe('resolveTypedSearchFilters', () => {
       ratings: [],
       mediaTypes: [],
       hasUnnamedPeople: false,
+      hasFavorites: false,
+      hasAssetsInAlbum: false,
+      hasAssetsNotInAlbum: false,
     });
     vi.mocked(getSearchSuggestions).mockResolvedValue(['Nikon']);
 
