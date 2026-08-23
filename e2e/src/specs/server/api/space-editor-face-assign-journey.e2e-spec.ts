@@ -361,4 +361,130 @@ describe('Space editor face-assign journey (spec 2026-08-23, Slice 9)', () => {
       );
     });
   });
+
+  // Spec §6.3.1: the three cases of "does this face already belong to one of the OWNER's own
+  // people". Covered elsewhere only at the unit level (shared-space.service.spec.ts F-34/F-35/F-36,
+  // which mocks every repository call) and the medium level (shared-space-face-assign.medium.spec.ts
+  // F-36/F-40, which asserts against Postgres directly). Neither proves it through the HTTP surface a
+  // real client uses -- and the failure mode is silent: a wrong implementation returns 200 either way
+  // while quietly re-pointing an identity the asset owner's own library depends on.
+  describe('the owner-named override (§6.3.1) — F-34/F-35/F-36', () => {
+    it('Row 1 (F-34): an unassigned face — attach succeeds, and the identity IS written', async () => {
+      const faceId = await utils.createUnassignedFace(ctx.spaceAssetId);
+      await expect(utils.getFaceIdentityId(faceId)).resolves.toBeUndefined();
+
+      const result = await attachSpacePersonFace(
+        { id: ctx.spaceId, personId: sueId, assetFaceId: faceId },
+        { headers: asBearerAuth(ctx.spaceEditor.token!) },
+      );
+      expect(result.acted).toBe(true);
+
+      // §6.3.1 row 1: `personId IS NULL` -> ordinary path, the identity IS written.
+      await expect(utils.getFaceIdentityId(faceId)).resolves.toBeDefined();
+    });
+
+    it("Row 2 (F-35): the face's owner-person identity already equals the target space person's — attach succeeds", async () => {
+      const bobPerson = await utils.createPerson(ctx.spaceOwner.token!, { name: 'Grandma' });
+      // The first face under a fresh owner person creates their identity; every subsequent face
+      // under the same person resolves to that SAME identity (utils.createFace's COALESCE).
+      await utils.createFace({ assetId: ctx.spaceAssetId, personId: bobPerson.id, sourceType: 'manual' });
+      const targetSeedFaceId = await utils.createFace({
+        assetId: ctx.spaceAssetId,
+        personId: bobPerson.id,
+        sourceType: 'manual',
+      });
+      const faceId = await utils.createFace({
+        assetId: ctx.spaceAssetId,
+        personId: bobPerson.id,
+        sourceType: 'manual',
+      });
+
+      // Seeds the target space person with the SAME identity as Grandma, via create-and-attach.
+      const targetPerson = await createSpacePerson(
+        { id: ctx.spaceId, sharedSpacePersonCreateDto: { name: 'Grandma (space)', assetFaceId: targetSeedFaceId } },
+        { headers: asBearerAuth(ctx.spaceEditor.token!) },
+      );
+
+      const result = await attachSpacePersonFace(
+        { id: ctx.spaceId, personId: targetPerson.id, assetFaceId: faceId },
+        { headers: asBearerAuth(ctx.spaceEditor.token!) },
+      );
+      expect(result.acted).toBe(true);
+
+      const faces = await getSpaceAssetFaces(
+        { id: ctx.spaceId, assetId: ctx.spaceAssetId },
+        { headers: asBearerAuth(ctx.spaceEditor.token!) },
+      );
+      expect(faces.find((face) => face.id === faceId)).toMatchObject({ spacePersonId: targetPerson.id });
+    });
+
+    it("Row 3 (F-36) — THE IMPORTANT ONE: Bob has already named the face under a DIFFERENT identity; Anna's attach overrides the space projection WITHOUT rewriting Bob's identity", async () => {
+      const bobPerson = await utils.createPerson(ctx.spaceOwner.token!, { name: 'Dad' });
+      const faceId = await utils.createFace({
+        assetId: ctx.spaceAssetId,
+        personId: bobPerson.id,
+        sourceType: 'manual',
+      });
+      const bobIdentityBefore = await utils.getFaceIdentityId(faceId);
+      expect(bobIdentityBefore).toBeDefined();
+
+      // Target space person carries a DIFFERENT identity than Bob's "Dad" (a fresh, unrelated seed
+      // face — never linked to bobPerson).
+      const throwawaySeedFaceId = await utils.createUnassignedFace(ctx.spaceAssetId);
+      const targetPerson = await createSpacePerson(
+        { id: ctx.spaceId, sharedSpacePersonCreateDto: { name: 'Uncle Tom', assetFaceId: throwawaySeedFaceId } },
+        { headers: asBearerAuth(ctx.spaceEditor.token!) },
+      );
+
+      // Bob's own view BEFORE Anna acts -- the baseline point (c) below compares against. Read as
+      // Bob, with no spaceId, so the server resolves it through `applyResolvedPersonMetadata`
+      // (asset.service.ts) exactly the way Bob's own asset viewer / info panel would.
+      const before = await utils.getAssetInfo(ctx.spaceOwner.token!, ctx.spaceAssetId);
+      const bobsPersonBefore = before.people?.find((person) => person.id === bobPerson.id);
+      // Non-vacuous: the person Anna's action must not disturb is actually present beforehand.
+      expect(bobsPersonBefore).toMatchObject({ id: bobPerson.id, name: 'Dad' });
+
+      // (a) the attach SUCCEEDS -- this is the override the product owner explicitly chose.
+      const result = await attachSpacePersonFace(
+        { id: ctx.spaceId, personId: targetPerson.id, assetFaceId: faceId },
+        { headers: asBearerAuth(ctx.spaceEditor.token!) },
+      );
+      expect(result.acted).toBe(true);
+
+      // (b) the space now shows the face under Anna's space person.
+      const faces = await getSpaceAssetFaces(
+        { id: ctx.spaceId, assetId: ctx.spaceAssetId },
+        { headers: asBearerAuth(ctx.spaceEditor.token!) },
+      );
+      expect(faces.find((face) => face.id === faceId)).toMatchObject({
+        spacePersonId: targetPerson.id,
+        spacePersonName: 'Uncle Tom',
+      });
+
+      // (c) Bob's own view of the asset, re-read from scratch, is EXACTLY what it was before Anna
+      // acted -- not merely "some field is non-null". This is the HTTP surface the spec asks this
+      // test to pin: `asset_face.personId` and Bob's own `person` row are the only things
+      // `GET /assets/:id` resolves through for the OWNER's own view (`applyResolvedPersonMetadata`
+      // falls back to the raw, untouched `person.name`/`birthDate` whenever the identity-keyed
+      // resolver has nothing newer to say), and this write path never touches either one -- only
+      // `face_identity_face` for this one face. That is also why this assertion alone is *not*
+      // sufficient to catch a regression here: see the mutation-check note on the identity
+      // assertion below, which is what actually goes red.
+      const after = await utils.getAssetInfo(ctx.spaceOwner.token!, ctx.spaceAssetId);
+      expect(after.people).toEqual(before.people);
+      const bobsPersonAfter = after.people?.find((person) => person.id === bobPerson.id);
+      expect(bobsPersonAfter).toMatchObject({ id: bobPerson.id, name: 'Dad' });
+
+      // The direct proof of the mechanism the point-(c) read above cannot observe: no read-only
+      // HTTP endpoint in this system exposes `face_identity_face` (every owner-facing read --
+      // GET /assets/:id, GET /people, GET /people/:id/faces -- resolves through `asset_face.personId`
+      // or the static `person.identityId` column, never through this specific face's identity link),
+      // so this is the one assertion that is actually sensitive to a `writeIdentity` regression here
+      // -- confirmed by mutation: forcing `writeIdentity = true` unconditionally in
+      // `attachFaceToSpacePerson` (shared-space.service.ts) makes ONLY this assertion fail; every
+      // HTTP-level assertion above and below it still passes, which is the honest finding this
+      // header records rather than papers over.
+      await expect(utils.getFaceIdentityId(faceId)).resolves.toBe(bobIdentityBefore);
+    });
+  });
 });
