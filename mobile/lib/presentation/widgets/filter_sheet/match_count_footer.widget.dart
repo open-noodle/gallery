@@ -13,16 +13,20 @@ class MatchCountFooter extends ConsumerWidget {
     return Material(
       color: theme.colorScheme.surface,
       elevation: 6,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 12, 12, 20),
-        child: Row(
-          children: [
-            const Expanded(child: MatchCountLabel()),
-            FilledButton.tonal(
-              onPressed: () => ref.read(photosFilterSheetProvider.notifier).state = FilterSheetSnap.hidden,
-              child: Text(context.t.filter_sheet_done),
-            ),
-          ],
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 12, 20),
+          child: Row(
+            children: [
+              const Expanded(child: MatchCountLabel()),
+              FilledButton.tonal(
+                key: const Key('match-count-footer-done'),
+                onPressed: () => ref.read(photosFilterSheetProvider.notifier).state = FilterSheetSnap.hidden,
+                child: Text(context.t.filter_sheet_done),
+              ),
+            ],
+          ),
         ),
       ),
     );
