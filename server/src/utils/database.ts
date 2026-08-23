@@ -1307,7 +1307,7 @@ function branchPredicates(eb: AssetExpressionBuilder, branch: SearchFilterBranch
 // ─── UPSTREAM SEARCH V3 — DORMANT ───────────────────────────────
 // Not wired to any controller/service. The fork's live search uses searchAssetBuilderLegacy
 // (above), which carries the owner/space RBAC gate. Do not call this V3 builder from fork code.
-// Switch-over plan: docs/superpowers/specs/2026-07-23-search-v3-coexistence-design.md
+// Switch-over plan: specs/2026-07-23-search-v3-coexistence-design.md
 //
 // ordering is deliberately left to the caller so aggregate-only consumers (counts, stats)
 // can compose the same filters without stripping an order by
