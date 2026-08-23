@@ -74,6 +74,7 @@ services:
       - ${UPLOAD_LOCATION}/photos:/data
       - /etc/localtime:/etc/localtime:ro
       - ../packages/plugin-core:/build/plugins/immich-plugin-core
+      - ../packages/plugin-gallery:/build/plugins/gallery-core
     env_file:
       - .env
     environment:
