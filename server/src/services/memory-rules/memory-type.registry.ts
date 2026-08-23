@@ -1,4 +1,4 @@
-import { SystemConfig } from 'src/config';
+import { SystemConfig } from 'src/dtos/config.dto';
 import { AssetRepository } from 'src/repositories/asset.repository';
 import { MemoryRepository } from 'src/repositories/memory.repository';
 import { PersonRepository } from 'src/repositories/person.repository';

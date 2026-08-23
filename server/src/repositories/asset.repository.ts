@@ -1041,8 +1041,13 @@ export class AssetRepository {
     return this.db
       .selectFrom('asset')
       .innerJoin('asset_face', 'asset_face.assetId', 'asset.id')
-      .innerJoin('person', 'person.id', 'asset_face.personId')
-      .select(['asset.id as assetId', 'asset.localDateTime', 'person.id as personId', 'person.name as personName'])
+      .innerJoin('person', 'person.personGroupId', 'asset_face.personGroupId')
+      .select([
+        'asset.id as assetId',
+        'asset.localDateTime',
+        'person.personGroupId as personId',
+        'person.name as personName',
+      ])
       .select(sql<number>`extract(year from (asset."localDateTime" at time zone 'UTC'))::int`.as('year'))
       .where('asset.ownerId', '=', ownerId)
       .where('asset.visibility', '=', AssetVisibility.Timeline)
@@ -1081,7 +1086,7 @@ export class AssetRepository {
     return this.db
       .selectFrom('asset')
       .innerJoin('asset_face', 'asset_face.assetId', 'asset.id')
-      .select('asset_face.personId')
+      .select('asset_face.personGroupId as personId')
       .select(sql<Date>`date_trunc('day', asset."localDateTime" at time zone 'UTC')`.as('day'))
       .select((eb) =>
         eb.fn
@@ -1094,7 +1099,7 @@ export class AssetRepository {
       .where('asset.visibility', '=', AssetVisibility.Timeline)
       .where('asset.deletedAt', 'is', null)
       .where('asset.localDateTime', '<=', takenBefore)
-      .where('asset_face.personId', 'in', personIds)
+      .where('asset_face.personGroupId', 'in', personIds)
       .where('asset_face.deletedAt', 'is', null)
       .where('asset_face.isVisible', '=', true)
       .where((eb) =>
@@ -1106,8 +1111,8 @@ export class AssetRepository {
             .where('asset_file.type', '=', AssetFileType.Preview),
         ),
       )
-      .groupBy(['asset_face.personId', 'day'])
-      .orderBy('asset_face.personId')
+      .groupBy(['asset_face.personGroupId', 'day'])
+      .orderBy('asset_face.personGroupId')
       .orderBy('day', 'asc')
       .execute();
   }
@@ -1133,7 +1138,7 @@ export class AssetRepository {
       .select(['asset.id', 'asset.localDateTime'])
       .innerJoin('asset_face', 'asset_face.assetId', 'asset.id')
       .where('asset.ownerId', '=', ownerId)
-      .where('asset_face.personId', '=', personId)
+      .where('asset_face.personGroupId', '=', personId)
       .where('asset_face.deletedAt', 'is', null)
       .where('asset_face.isVisible', '=', true)
       .where('asset.visibility', '=', AssetVisibility.Timeline)
