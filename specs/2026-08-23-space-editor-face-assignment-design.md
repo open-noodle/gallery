@@ -255,23 +255,35 @@ layer now disagrees with the person layer for that face, and `applyResolvedPerso
 (`asset.service.ts:180`) resolves Bob's _own_ view of names and birthdays through exactly that
 identity.
 
-**Decision: attach is refused (400) when `asset_face.personId` is non-null and the owner's person
-carries a different identity to the target space person.** The editor is told the face is already
-identified by its owner. Rationale: the whole safety argument of this design is "editors write only
-the space's taxonomy". Silently re-pointing an identity that the owner's person depends on breaks
-that promise, and the failure is invisible — Bob sees nothing change until a name or age resolves
-wrongly later.
+**Decision: the attach is allowed — an editor may override the owner's naming _within the space_ —
+but it must not rewrite the identity.**
+
+The two goals look opposed and are not, because **space people are read through the direct projection,
+not the identity layer**: every space-person read joins `shared_space_person_face`
+(`shared-space.repository.ts:1791`, `:2016`, `:2122`, `:2153`). So writing the projection alone is
+sufficient for the space to show the face under "Uncle Tom", and skipping `replaceFaceIdentity` leaves
+Bob's `person`, his `asset_face.personId`, and everything `applyResolvedPersonMetadata` resolves for
+him exactly as they were. The space and the owner simply hold different opinions about the same face,
+which is the honest model — a shared space is not entitled to relabel someone's private library, and
+the owner is not entitled to dictate the space's.
 
 Three sub-cases, all pinned (F-34 … F-36):
 
-| Face state                                                          | Result                                         |
-| ------------------------------------------------------------------- | ---------------------------------------------- |
-| `personId IS NULL` (unrecognised)                                   | attach — the ordinary path                     |
-| `personId` set, owner person identity **equals** the space person's | attach — already the same human, no rewrite    |
-| `personId` set, owner person identity **differs** or is null        | 400, `face is already identified by its owner` |
+| Face state                                                          | Identity write | Space projection | Result                           |
+| ------------------------------------------------------------------- | -------------- | ---------------- | -------------------------------- |
+| `personId IS NULL` (unrecognised)                                   | yes            | yes              | ordinary path                    |
+| `personId` set, owner person identity **equals** the space person's | no-op          | yes              | already the same human           |
+| `personId` set, owner person identity **differs** or is null        | **skipped**    | yes              | override, owner's view untouched |
 
-This is deliberately conservative. If it proves too strict in use, the widening is a follow-up with
-its own scenarios — not something to relax silently during implementation.
+Row 3 is the one this section exists for. Because the identity link is skipped, the ML suggestion
+pipeline would otherwise re-offer the face — so row 3 **must** also write the negative verdict that
+§6.3's reassign path writes, or the suggestion comes straight back (F-36).
+
+`linkFaceToSpacePerson` therefore takes a `writeIdentity: boolean`. The suggestion-confirm caller
+always passes `true` (it only ever handles unassigned faces); the direct-attach caller passes `false`
+for row 3. This is the one behavioural difference between the two callers of the shared helper, and it
+is the thing a future refactor is most likely to flatten — hence F-36 asserts the _absence_ of an
+identity rewrite, not merely a 200.
 
 ### 6.4 `DELETE /shared-spaces/:id/people/:personId/faces/:assetFaceId`
 
@@ -303,39 +315,33 @@ member's asset, so an editor drawing on a rotated preview is a _likely_ path, no
 The created `asset_face` gets `personId = NULL` (never the owner's person) and is attached to the
 space person through §6.3's helper.
 
-### 6.6 Editor-drawn boxes are deletable by the editor — and today they are not distinguishable
+### 6.6 Editor-drawn boxes are deletable by the editor
 
 An editor who draws a box must be able to remove it, or a misplaced rectangle is permanent for
 everyone. `FaceDelete` stays owner-only for **detected** faces; a face created under §6.5 may be
 deleted by an Owner/Editor of the space it was drawn in (F-18), while a detected face stays refused
 (F-19).
 
-**This cannot be expressed with the current schema, and the obvious shortcut is a permission
-regression.** `SourceType` has exactly three values — `machine-learning`, `exif`, `manual`
-(`enum.ts:462`) — and `PersonService.createFace` already writes `SourceType.Manual` for **owner**-drawn
-boxes (`person.service.ts:1567`). `asset_face` has no column recording who created the row. So:
+**Decision: add `asset_face.createdBy` (nullable uuid, FK to `user`, `ON DELETE SET NULL`).** Written
+only by §6.5; `NULL` for every existing row and for every face the detector produces. A face is
+deletable under this section iff `createdBy IS NOT NULL` **and** it is reachable in a space where the
+actor is Owner/Editor.
 
-- gating the delete on `sourceType === Manual` would let a space editor delete boxes **the owner drew
-  by hand** — strictly worse than today, and exactly the class of regression #992's §2.3 was written
-  to catch;
-- gating on "has a `shared_space_person_face` row and `personId IS NULL`" is derivable today but
-  wrong: it also matches a _detected_ face that an editor merely attached, which F-19 must refuse.
+This needs a fork migration in `server/src/schema/migrations-gallery/` with a round timestamp, per
+CLAUDE.md.
 
-Three options, to be settled before Slice 5 starts:
+**Why not the two cheaper-looking routes**, both of which are wrong:
 
-| Option                                               | Cost                                                                                                                                                |
-| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **A.** Add `SourceType.SpaceEditor = 'space-editor'` | enum + check-constraint migration; every `sourceType` consumer must be audited for a new value (`person.service.ts:876/1094/1193` all branch on it) |
-| **B.** Add `asset_face.createdBy` (nullable uuid)    | migration; but records the actor, which the activity feed already wants                                                                             |
-| **C.** Drop §6.6 from scope                          | zero cost; editor-drawn boxes become permanent, which is a poor first-run experience                                                                |
+- Gating on `sourceType === Manual` would let a space editor delete boxes **the owner drew by hand**.
+  `SourceType` has exactly three values — `machine-learning`, `exif`, `manual` (`enum.ts:462`) — and
+  `PersonService.createFace` already writes `Manual` for owner-drawn boxes (`person.service.ts:1567`).
+  That is a permission regression, and exactly the class #992's §2.3 was written to catch.
+- Adding `SourceType.SpaceEditor` would force an audit of every live `sourceType` branch
+  (`person.service.ts:876`, `:1094`, `:1193`) and risks the fork's recognition jobs mis-treating the
+  new value. A nullable column is inert for every existing consumer; a new enum value is not.
 
-**Recommendation: B.** It answers "who drew this" rather than encoding it in a type, and a nullable
-column added to `asset_face` is inert for every existing consumer — whereas A forces an audit of
-three live `sourceType` branches and risks the fork's own recognition jobs treating the new value as
-machine-learning-eligible. If the migration is unwelcome inside this change, take C and follow up;
-do **not** approximate with `sourceType`.
-
-Until this is settled, F-18 has no implementation and Slice 5 is blocked on it. Flagged in §11.
+`createdBy` also gives §6.7 the actor it wants for free, and answers "who drew this" as data rather
+than encoding it in a type.
 
 ### 6.7 Attribution
 
@@ -428,9 +434,10 @@ is already known from the space route's data, and the face list only ever comes 
 | F-19 | a **detected** face                                                                  | Anna deletes it               | 400 — `FaceDelete` still owner-only                                                                             |
 | F-32 | face attached to P, `faceCount`/`assetCount` at n                                    | Anna detaches                 | counts recount to n−1 (§6.4)                                                                                    |
 | F-33 | seed face's identity already has a person in A                                       | Anna creates a person from it | returns the existing person; no unique-index violation (§6.2)                                                   |
-| F-34 | face has `personId IS NULL`                                                          | Anna attaches                 | granted — the ordinary path (§6.3.1)                                                                            |
-| F-35 | face's owner person carries the **same** identity                                    | Anna attaches                 | granted; no identity rewrite (§6.3.1)                                                                           |
-| F-36 | face's owner person carries a **different** identity                                 | Anna attaches                 | 400 `face is already identified by its owner` (§6.3.1)                                                          |
+| F-34 | face has `personId IS NULL`                                                          | Anna attaches                 | granted; identity written (§6.3.1 row 1)                                                                        |
+| F-35 | face's owner person carries the **same** identity                                    | Anna attaches                 | granted; identity unchanged (§6.3.1 row 2)                                                                      |
+| F-36 | face's owner person carries a **different** identity                                 | Anna attaches                 | granted; space shows the new name; `face_identity_face` **unchanged**; negative verdict written (§6.3.1 row 3)  |
+| F-40 | the override in F-36                                                                 | Bob re-reads his own asset    | his `person`, `asset_face.personId` and resolved name/birthday all unchanged — the override is space-local      |
 | F-37 | Anna and a second editor attach the same face to different space people concurrently | both submit                   | one wins; the loser is a no-op or a clean 400 — never two `shared_space_person_face` rows, never a lost recount |
 | F-38 | face listed by §6.1, then its asset leaves the space                                 | Anna attaches the stale id    | 400 — `isFaceReachableInSpace` re-checked at write time, not trusted from the read                              |
 
@@ -500,14 +507,16 @@ Then implement §6.1's filter and the service gates.
 
 ### 9.2 Slice 2 — the shared link helper
 
-Tests: **F-13, F-14**, and **F-34 … F-36** (the owner-already-named guard, §6.3.1) in
-`shared-space.service.spec.ts`, plus a regression run of the existing
+Tests: **F-13, F-14**, **F-34 … F-36** (the three §6.3.1 rows) and **F-40** (the override is
+space-local) in `shared-space.service.spec.ts`, plus a regression run of the existing
 `confirmSpacePersonFaceSuggestion` specs. **F-37** (concurrent attach) belongs here too and is
 medium-only — it needs two real transactions racing, which a mocked repository cannot express.
 
-Write **F-36 first**. It is the guard that keeps this design's central safety claim true, and the
-natural implementation (call `replaceFaceIdentity` unconditionally, as the suggestion path does)
-passes every other scenario in this slice while violating it.
+Write **F-36 first**, and assert the **absence** of an identity rewrite, not merely a 200. The
+natural implementation — call `replaceFaceIdentity` unconditionally, as the suggestion path does —
+returns 200 and passes every other scenario in this slice while silently re-pointing an identity the
+owner's person depends on. A status-only assertion cannot see that. F-40 is its companion: it checks
+the same event from Bob's side.
 
 Then extract `linkFaceToSpacePerson` (§6.3) and re-point the suggestion confirm at it. The existing
 suggestion tests passing unchanged _is_ the refactor's proof; if they need editing, the extraction
@@ -538,15 +547,18 @@ at read time through the identity.
 
 ### 9.5 Slice 5 — drawing boxes
 
-**Blocked until §6.6's schema question is settled** (option A, B or C). F-18 has no implementation
-until then, and approximating it with `sourceType === Manual` is a permission regression, not a
-shortcut.
+Opens with the `asset_face.createdBy` migration (§6.6) in
+`server/src/schema/migrations-gallery/`, since F-18 cannot be written without the column.
 
-Tests: **F-16, F-17, F-19** are unblocked and land first — F-16 first of all, since the edit-aware
-transform is the subtle one and #992 made rotated assets the common case. **F-18** lands with whatever
-§6.6 resolves to; under option C it is struck from §8.3 rather than left failing.
+Tests: **F-16 … F-19**. F-16 first — the edit-aware coordinate transform is the subtle one, and #992
+made rotated assets the common case rather than an exotic one.
 
-Then §6.5, and §6.6 if in scope.
+**F-19 is the security half and must be written alongside F-18, not after it.** The two differ only
+by whether `createdBy` is null, so an implementation that forgets the check passes F-18 and fails only
+F-19. Assert on a genuinely detected face — one the fixture created through detection, not one with
+`createdBy` nulled by hand — or the test proves less than it appears to.
+
+Then §6.5 and §6.6.
 
 ### 9.6 Slice 6 — attribution
 
@@ -594,18 +606,18 @@ browser. Cite the path, not a SHA — #992's branch is rebased routinely and any
 
 ---
 
-## 11. Open decisions and follow-ups
+## 11. Decisions taken, and follow-ups
 
-### Blocking — must be settled before implementation
+### Settled 2026-08-23
 
-1. **§6.6: how to distinguish an editor-drawn box.** Options A (new `SourceType`), B (new
-   `asset_face.createdBy`) or C (drop from scope). Recommendation B. Slice 5's F-18 is blocked on
-   this, and the approximation that looks obvious (`sourceType === Manual`) would let an editor delete
-   the owner's own hand-drawn boxes.
-2. **§6.3.1's strictness.** Refusing every attach on an owner-named face is deliberately conservative
-   and may prove annoying in real use — an editor cannot correct a face Bob mis-named. Confirm this is
-   the behaviour wanted before building, because relaxing it later is easy and tightening it later is
-   a breaking change.
+1. **§6.6 — editor-drawn boxes.** Add `asset_face.createdBy`. Editors may delete boxes they drew;
+   detected faces stay owner-only. Fork migration required.
+2. **§6.3.1 — faces the owner already named.** An editor **may** override, and the override is
+   space-local: the space projection is written, the identity link is not. Bob's own library and his
+   resolved names and ages are untouched (F-36, F-40).
+
+Both were open questions in the first draft; neither should be reopened during implementation without
+re-running the scenarios that pin them.
 
 ### Follow-ups
 
