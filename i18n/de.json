@@ -3487,6 +3487,7 @@
   "unarchive": "Dearchivieren",
   "unarchive_action_prompt": "{count} aus dem Archiv entfernt",
   "unarchived_count": "{count, plural, other {# entarchiviert}}",
+  "unassign_face": "Gesichtszuordnung aufheben",
   "unassigned": "Nicht zugewiesen",
   "undo": "Rückgängig",
   "unfavorite": "Favorit entfernen",

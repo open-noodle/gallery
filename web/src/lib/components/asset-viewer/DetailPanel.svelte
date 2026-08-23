@@ -71,7 +71,12 @@
   // true for the owner, so this is explicitly narrowed to `!isOwner` — the owner path keeps
   // rendering the owner's own people through the owner components, unwidened, exactly like #734
   // did for `DetailPanelTags`' `canEdit`. See `DetailPanelPeople.svelte`'s `canEditSpacePeople` doc.
-  let canEditSpacePeople = $derived(canEdit && !isOwner);
+  //
+  // Unlike `canEdit`, this ALSO requires `effectiveSpaceId` explicitly (W-18 in detail-panel.spec.ts
+  // pins this): `canEdit` can be true with no space context at all (e.g. a partner/album share
+  // whose single-asset read still sets `asset.canEdit`), and the people affordances must stay
+  // read-only there — there is no space for the space-flavoured panels to write into.
+  let canEditSpacePeople = $derived(!!effectiveSpaceId && canEdit && !isOwner);
 
   // R4/E2 — shared links get NO filter affordance at all (they have no /photos to land on).
   // Threaded down to child rows the same way `isOwner` is; camera/lens live inline here.

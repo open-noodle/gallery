@@ -3448,6 +3448,7 @@
   "unarchive": "取消归档",
   "unarchive_action_prompt": "已从归档中移除 {count} 项",
   "unarchived_count": "{count, plural, other {取消归档#项}}",
+  "unassign_face": "取消人脸分配",
   "unassigned": "未分配",
   "undo": "撤销",
   "unfavorite": "取消收藏",

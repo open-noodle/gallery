@@ -3502,6 +3502,7 @@
   "unarchive": "Unarchive",
   "unarchive_action_prompt": "{count} removed from Archive",
   "unarchived_count": "{count, plural, other {Unarchived #}}",
+  "unassign_face": "Unassign face",
   "unassigned": "Unassigned",
   "undo": "Undo",
   "unfavorite": "Unfavorite",

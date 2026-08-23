@@ -3515,6 +3515,7 @@
   "unarchive": "Przywróć z archiwum",
   "unarchive_action_prompt": "{count} usunięto z archiwum",
   "unarchived_count": "{count, plural, one {# cofnięta archiwizacja} few {# cofnięte archiwizacje} other {# cofniętych archiwizacji}}",
+  "unassign_face": "Usuń przypisanie twarzy",
   "unassigned": "Nieprzypisane",
   "undo": "Cofnij",
   "unfavorite": "Usuń z ulubionych",

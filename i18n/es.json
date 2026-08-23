@@ -3489,6 +3489,7 @@
   "unarchive": "Desarchivar",
   "unarchive_action_prompt": "{count} eliminados del archivo",
   "unarchived_count": "{count, plural, one {# No archivado} other {# No archivados}}",
+  "unassign_face": "Quitar asignación de cara",
   "unassigned": "Sin asignar",
   "undo": "Deshacer",
   "unfavorite": "Retirar favorito",

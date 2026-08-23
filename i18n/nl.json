@@ -3495,6 +3495,7 @@
   "unarchive": "Herstellen uit archief",
   "unarchive_action_prompt": "{count} verwijderd uit het archief",
   "unarchived_count": "{count, plural, other {# verwijderd uit archief}}",
+  "unassign_face": "Gezichtstoewijzing ongedaan maken",
   "unassigned": "Niet toegewezen",
   "undo": "Ongedaan maken",
   "unfavorite": "Verwijderen uit favorieten",

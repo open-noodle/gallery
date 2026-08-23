@@ -3490,6 +3490,7 @@
   "unarchive": "Désarchiver",
   "unarchive_action_prompt": "{count} supprimé(s) de l'archive",
   "unarchived_count": "{count, plural, one {# supprimé} other {# supprimés}} de l'archive",
+  "unassign_face": "Dissocier le visage",
   "unassigned": "Non attribué",
   "undo": "Annuler",
   "unfavorite": "Enlever des favoris",

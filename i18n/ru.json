@@ -3497,6 +3497,7 @@
   "unarchive": "Восстановить",
   "unarchive_action_prompt": "Объекты удалены из архива ({count} шт.)",
   "unarchived_count": "{count, plural, one {# объект возвращён} many {# объектов возвращено} other {# объекта возвращено}} из архива",
+  "unassign_face": "Отменить назначение лица",
   "unassigned": "Не назначено",
   "undo": "Отменить",
   "unfavorite": "Удалить из избранного",

@@ -3495,6 +3495,7 @@
   "unarchive": "Annulla l'archiviazione",
   "unarchive_action_prompt": "{count} elementi rimossi dall'Archivio",
   "unarchived_count": "{count, plural, other {Non archiviati #}}",
+  "unassign_face": "Annulla assegnazione viso",
   "unassigned": "Non assegnati",
   "undo": "Annulla",
   "unfavorite": "Rimuovi preferito",

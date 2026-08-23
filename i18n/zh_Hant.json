@@ -3474,6 +3474,7 @@
   "unarchive": "取消封存",
   "unarchive_action_prompt": "已從封存的檔案中移除了 {count} 個項目",
   "unarchived_count": "{count, plural, other {已取消封存 # 個項目}}",
+  "unassign_face": "取消臉孔指派",
   "unassigned": "未指派",
   "undo": "還原",
   "unfavorite": "取消收藏",
