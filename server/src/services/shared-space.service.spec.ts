@@ -7758,6 +7758,87 @@ describe(SharedSpaceService.name, () => {
     });
   });
 
+  describe('attachFaceToSpacePerson', () => {
+    beforeEach(() => {
+      mocks.sharedSpace.getPersonById.mockResolvedValue(
+        factory.sharedSpacePerson({ id: 'space-person-1', spaceId: 'space-1' }),
+      );
+      mocks.faceIdentity.ensureSpacePersonIdentity.mockResolvedValue({ id: 'space-identity-1' } as any);
+    });
+
+    // F-4: a Viewer is refused. The fixture is otherwise identical to the F-5 grant below, so this can only
+    // fail on the role gate.
+    it('throws for a space Viewer (F-4)', async () => {
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Viewer }));
+
+      await expect(
+        sut.attachFaceToSpacePerson(factory.auth(), 'space-1', 'space-person-1', 'face-1'),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(mocks.facePersonVerdict.isFaceAssignableInSpace).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.addPersonFaces).not.toHaveBeenCalled();
+    });
+
+    // F-5: a space Owner is granted — ROLE_HIERARCHY admits Owner as well as Editor, and only Editor is
+    // otherwise exercised.
+    it('permits a space Owner (F-5)', async () => {
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Owner }));
+      mocks.facePersonVerdict.isFaceAssignableInSpace.mockResolvedValue(true);
+      mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
+
+      await expect(sut.attachFaceToSpacePerson(factory.auth(), 'space-1', 'space-person-1', 'face-1')).resolves.toBe(
+        true,
+      );
+    });
+
+    // F-9 at the service boundary: an unassignable face is refused before any write.
+    it('throws when the face is not assignable in this space', async () => {
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
+      mocks.facePersonVerdict.isFaceAssignableInSpace.mockResolvedValue(false);
+
+      await expect(sut.attachFaceToSpacePerson(factory.auth(), 'space-1', 'space-person-1', 'face-1')).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(mocks.sharedSpace.addPersonFaces).not.toHaveBeenCalled();
+    });
+
+    it('rejects a person from another space before checking face assignability', async () => {
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
+      mocks.sharedSpace.getPersonById.mockResolvedValue(
+        factory.sharedSpacePerson({ id: 'space-person-1', spaceId: 'other-space' }),
+      );
+
+      await expect(sut.attachFaceToSpacePerson(factory.auth(), 'space-1', 'space-person-1', 'face-1')).rejects.toThrow(
+        new BadRequestException('Person not found'),
+      );
+      expect(mocks.facePersonVerdict.isFaceAssignableInSpace).not.toHaveBeenCalled();
+      expect(mocks.faceIdentity.ensureSpacePersonIdentity).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.addPersonFaces).not.toHaveBeenCalled();
+    });
+
+    it('links the face and writes the space projection row inside one transaction', async () => {
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
+      mocks.facePersonVerdict.isFaceAssignableInSpace.mockResolvedValue(true);
+      mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
+
+      await expect(sut.attachFaceToSpacePerson(factory.auth(), 'space-1', 'space-person-1', 'face-1')).resolves.toBe(
+        true,
+      );
+
+      expect(mocks.facePersonVerdict.isFaceAssignableInSpace).toHaveBeenCalledWith('space-1', 'face-1');
+      expect(mocks.faceIdentity.ensureSpacePersonIdentity).toHaveBeenCalledWith('space-person-1', mocks.database);
+      expect(mocks.faceIdentity.replaceFaceIdentity).toHaveBeenCalledWith(
+        { assetFaceId: 'face-1', identityId: 'space-identity-1', source: 'manual' },
+        mocks.database,
+      );
+      expect(mocks.facePersonVerdict.resolveAssignedFace).toHaveBeenCalledWith('face-1', mocks.database);
+      expect(mocks.sharedSpace.addPersonFaces).toHaveBeenCalledWith(
+        [{ personId: 'space-person-1', assetFaceId: 'face-1' }],
+        undefined,
+        mocks.database,
+      );
+    });
+  });
+
   describe('rejectSpacePersonFaceSuggestion, ignoreSpacePersonFaceSuggestion, dismissSpacePersonFaceSuggestion', () => {
     const enabled = {
       machineLearning: {

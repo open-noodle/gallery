@@ -2016,6 +2016,44 @@ export class SharedSpaceService extends BaseService {
     return claimed > 0;
   }
 
+  /**
+   * #734 follow-up (spec §6.3): attach a space person to a face directly — no pending ML
+   * suggestion required, unlike `confirmSpacePersonFaceSuggestion` above.
+   *
+   * The transaction below is deliberately a near-copy of that method's. Slice 2 extracts the
+   * shared `linkFaceToSpacePerson` helper and re-points both callers at it; do NOT anticipate
+   * that here, or the extraction loses its regression proof.
+   *
+   * Idempotent: `addPersonFaces` is onConflict-doNothing and `replaceFaceIdentity` upserts, so
+   * a double-submit is a no-op. Returns whether it acted, matching the S11 convention on the
+   * sibling confirm/reject routes (a 200-vs-204 status signal is unreadable through
+   * @oazapfts/runtime's ok()).
+   */
+  async attachFaceToSpacePerson(
+    auth: AuthDto,
+    spaceId: string,
+    personId: string,
+    assetFaceId: string,
+  ): Promise<boolean> {
+    await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
+    const person = await this.requireSpacePersonInSpace(spaceId, personId);
+
+    if (!(await this.facePersonVerdictRepository.isFaceAssignableInSpace(spaceId, assetFaceId))) {
+      throw new BadRequestException('Face not found');
+    }
+
+    return this.databaseRepository.transaction(async (trx) => {
+      const identity = await this.faceIdentityRepository.ensureSpacePersonIdentity(person.id, trx);
+      await this.faceIdentityRepository.replaceFaceIdentity(
+        { assetFaceId, identityId: identity.id, source: 'manual' },
+        trx,
+      );
+      await this.facePersonVerdictRepository.resolveAssignedFace(assetFaceId, trx);
+      await this.sharedSpaceRepository.addPersonFaces([{ personId: person.id, assetFaceId }], undefined, trx);
+      return true;
+    });
+  }
+
   // D9/D2: reachability (RBAC — is this face's asset in the space at all), not pendingness, gates a space
   // reject/ignore; then the upsert runs unconditionally, same as the personal path. This matches the personal
   // path's semantics (a reject/ignore on a drained-but-otherwise-valid target still records) while still
