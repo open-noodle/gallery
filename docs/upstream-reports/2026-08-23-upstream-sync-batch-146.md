@@ -170,11 +170,19 @@ its 551 tracked files ride along with any cherry-pick that touches one.
   `Invalid SDK hash` and then `requires Flutter SDK version 3.44.9`. The codegen steps were run
   directly from `~/.local/share/mise/installs/aqua-flutter-flutter/3.44.9/flutter/bin`.
 - **`dart format lib test` is NOT the gate.** `//mobile:format` covers `lib` only, excluding
-  generated files. Six `test/` files are format-dirty at HEAD, untouched by this sync — confirmed
-  by a control run against pre-sync content — and are therefore pre-existing, not a regression.
-  They were restored rather than reformatted, to keep the diff honest.
+  generated files. Six `test/` files were format-dirty at HEAD and untouched by this sync —
+  confirmed pre-existing by a control run against pre-sync content, not a regression from it.
+  They have been formatted anyway (see below) rather than left dirty.
+
+## Pre-existing cleanup
+
+The whole of `mobile/test/**` now satisfies `dart format` (379 files, 0 changed). Seven files were
+dirty: six pre-existing — invisible to CI because `//mobile:format` scopes to `lib` — plus
+`places_picker_country_accordion_test.dart`, whose long line came from this cycle's conflict
+resolution. The change is whitespace and trailing commas only; verified by comparing each file
+against `HEAD` with whitespace and commas stripped, and by re-running analyze (clean), the `lib`
+format gate (866 files, 0 changed) and the suite (3411 passed).
 
 ## Follow-up
 
-- Six `mobile/test/**` files do not satisfy `dart format`. Harmless today because the gate scopes to
-  `lib`, but the drift is real and will surface if the gate is ever widened.
+- None outstanding.
