@@ -2,16 +2,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/utils/space_face_recognition.dart';
 import 'package:openapi/api.dart' as api;
 
-api.SharedSpaceResponseDto _space({
-  api.Optional<bool?> faceRecognitionEnabled = const api.Optional.absent(),
-}) => api.SharedSpaceResponseDto(
-  id: 'space-1',
-  name: 'Family Trip',
-  createdAt: '2024-01-01T00:00:00.000Z',
-  updatedAt: '2024-01-01T00:00:00.000Z',
-  createdById: 'user-1',
-  faceRecognitionEnabled: faceRecognitionEnabled,
-);
+api.SharedSpaceResponseDto _space({api.Optional<bool?> faceRecognitionEnabled = const api.Optional.absent()}) =>
+    api.SharedSpaceResponseDto(
+      id: 'space-1',
+      name: 'Family Trip',
+      createdAt: '2024-01-01T00:00:00.000Z',
+      updatedAt: '2024-01-01T00:00:00.000Z',
+      createdById: 'user-1',
+      faceRecognitionEnabled: faceRecognitionEnabled,
+    );
 
 void main() {
   test('is visible when face recognition is explicitly enabled', () {
