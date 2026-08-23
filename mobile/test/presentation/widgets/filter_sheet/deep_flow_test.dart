@@ -45,9 +45,15 @@ void main() {
             (ref, filter) => Future.value(
               FilterSuggestionsResponseDto(
                 hasUnnamedPeople: false,
+                hasFavorites: true,
+                hasAssetsInAlbum: true,
+                hasAssetsNotInAlbum: true,
                 people: [FilterSuggestionsPersonDto(id: 'p1', name: 'Emma')],
                 tags: [FilterSuggestionsTagDto(id: 't1', value: 'Travel')],
                 countries: ['France'],
+                // #910: the rating section only renders when its facet is non-empty — this flow
+                // taps rating-star-4, so the mocked facets must include a rating.
+                ratings: [4],
               ),
             ),
           ),
@@ -107,6 +113,9 @@ void main() {
             (ref, filter) => Future.value(
               FilterSuggestionsResponseDto(
                 hasUnnamedPeople: false,
+                hasFavorites: true,
+                hasAssetsInAlbum: true,
+                hasAssetsNotInAlbum: true,
                 people: [FilterSuggestionsPersonDto(id: 'p1', name: 'Emma')],
                 tags: [FilterSuggestionsTagDto(id: 't1', value: 'Travel')],
               ),
