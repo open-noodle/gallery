@@ -677,6 +677,8 @@ describe('mapSmartSearchFacetsToFilterSuggestions', () => {
       hasFavorites: false,
       hasAssetsInAlbum: false,
       hasAssetsNotInAlbum: true,
+      hasNoGpsAssets: false,
+      hasNoPlaceNameAssets: false,
     });
 
     expect(result.hasFavorites).toBe(false);
