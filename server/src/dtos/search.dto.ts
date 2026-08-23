@@ -218,6 +218,9 @@ const FilterSuggestionsResponseSchema = z
     ratings: z.array(z.number()).describe('Available ratings'),
     mediaTypes: z.array(z.string()).describe('Available media types'),
     hasUnnamedPeople: z.boolean().describe('Whether unnamed people exist in the filtered set'),
+    hasFavorites: z.boolean().describe('Whether any favourite exists in the filtered set, ignoring isFavorite'),
+    hasAssetsInAlbum: z.boolean().describe('Whether any filtered asset belongs to an album'),
+    hasAssetsNotInAlbum: z.boolean().describe('Whether any filtered asset belongs to no album'),
   })
   .meta({ id: 'FilterSuggestionsResponseDto' });
 
@@ -236,6 +239,9 @@ const SmartSearchFacetsResponseSchema = z
     ratings: z.array(z.number()).describe('Available ratings'),
     mediaTypes: z.array(AssetTypeSchema).describe('Available media types'),
     hasUnnamedPeople: z.boolean().describe('Whether unnamed people exist in the filtered smart-search set'),
+    hasFavorites: z.boolean().describe('Whether any favourite exists in the filtered set, ignoring isFavorite'),
+    hasAssetsInAlbum: z.boolean().describe('Whether any filtered asset belongs to an album'),
+    hasAssetsNotInAlbum: z.boolean().describe('Whether any filtered asset belongs to no album'),
   })
   .meta({ id: 'SmartSearchFacetsResponseDto' });
 
