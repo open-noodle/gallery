@@ -125,7 +125,10 @@ describe(OnThisDayPlaceMemoryRule.name, () => {
   it('emits one candidate per qualifying year', async () => {
     const { rule } = ruleWith([...cityAssets(2023, 'Lisbon', 6), ...cityAssets(2022, 'Rome', 5, 'Italy')]);
     const result = await rule.evaluate({ ownerId: 'user-1', target });
-    expect(result.map((c) => c.title).toSorted()).toEqual(['On this day in Lisbon', 'On this day in Rome']);
+    expect(result.map((c) => c.title).toSorted((a, b) => (a ?? '').localeCompare(b ?? ''))).toEqual([
+      'On this day in Lisbon',
+      'On this day in Rome',
+    ]);
   });
 
   it('caps at the top 3 years by score', async () => {
