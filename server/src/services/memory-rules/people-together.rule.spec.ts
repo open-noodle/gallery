@@ -138,7 +138,10 @@ describe(PeopleTogetherMemoryRule.name, () => {
     const { rule } = ruleWith(rows);
     const result = await rule.evaluate({ ownerId: 'user-1', target });
     expect(result).toHaveLength(2);
-    expect(result.map((c) => c.title).toSorted()).toEqual(['Anna & Rex', 'Rex & Whiskers']);
+    expect(result.map((c) => c.title).toSorted((a, b) => (a ?? '').localeCompare(b ?? ''))).toEqual([
+      'Anna & Rex',
+      'Rex & Whiskers',
+    ]);
   });
 
   it('given more than 8 co-occurring photos, then assetIds is capped at 8', async () => {
