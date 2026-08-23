@@ -11,13 +11,27 @@ import type { AuditResult } from '../types';
  */
 export const OUR_REPO = 'open-noodle/gallery';
 
-/** Above this, `#N` cannot be one of ours and therefore resolves to the upstream repo. */
-export const FORK_PR_CEILING = 1017;
+/**
+ * Above this, `#N` is assumed to resolve to the upstream repo rather than ours.
+ *
+ * Discriminated by DIGIT COUNT, not by our current PR number: ours are 4-digit (~1000) and Immich
+ * is long past 30000. An earlier version froze this at the repo's then-current max (1017) and
+ * immediately began flagging our own new PRs — `#1020` was reported as foreign the day it merged.
+ *
+ * Two accepted limits: our repo would have to reach 10000 PRs to false-positive (roughly a decade
+ * at the current rate), and an Immich reference below 10000 would slip. Fork commits reference
+ * recent upstream work — every one found in the 2026-08-23 sweep was 27000+ — so the second is
+ * theoretical. Matches the grep documented in AGENTS.md, which keys off 5-or-more digits.
+ */
+export const FORK_PR_CEILING = 9999;
 
 export type Autolink = { form: string; text: string };
 
 /** Every GitHub autolink form in `message` that points at a repository other than ours. */
-export function findForeignAutolinks(message: string): Autolink[] {
+export function findForeignAutolinks(
+  message: string,
+  forkPrCeiling: number = FORK_PR_CEILING,
+): Autolink[] {
   const found: Autolink[] = [];
 
   const OWNER_REPO_REF = /\b([\w.-]+\/[\w.-]+)#\d+\b/g;
@@ -35,11 +49,11 @@ export function findForeignAutolinks(message: string): Autolink[] {
   // `#N` both standalone and glued to a preceding word char — GitHub's exact boundary rules are not
   // worth relying on, so both shapes count.
   for (const match of rest.matchAll(/(?<![\w/-])#(\d+)\b/g)) {
-    if (Number(match[1]) > FORK_PR_CEILING)
+    if (Number(match[1]) > forkPrCeiling)
       found.push({ form: 'bare #N', text: match[0] });
   }
   for (const match of rest.matchAll(/\w#(\d+)\b/g)) {
-    if (Number(match[1]) > FORK_PR_CEILING)
+    if (Number(match[1]) > forkPrCeiling)
       found.push({ form: 'glued #N', text: `#${match[1]}` });
   }
 
@@ -60,6 +74,7 @@ export function findForeignAutolinks(message: string): Autolink[] {
 export function runCommitAutolinkAudit(
   range = 'upstream/main..HEAD',
   cwd = process.cwd(),
+  forkPrCeiling: number = FORK_PR_CEILING,
 ): AuditResult {
   const raw = execFileSync('git', ['log', range, '--format=%H%x00%B%x01'], {
     cwd,
@@ -74,7 +89,7 @@ export function runCommitAutolinkAudit(
     if (!record.includes('\x00')) continue;
     const [sha, message] = record.replace(/^\n+/, '').split('\x00');
     scanned += 1;
-    for (const link of findForeignAutolinks(message)) {
+    for (const link of findForeignAutolinks(message, forkPrCeiling)) {
       details.push(`${sha.slice(0, 11)} ${link.form}: ${link.text}`);
     }
   }
@@ -89,6 +104,8 @@ export function runCommitAutolinkAudit(
             `Rewrite these so they do not autolink (e.g. \`#30881\` -> \`immich-30881\`); every`,
             `force-push of the rolling branch re-notifies the referenced repo otherwise.`,
           ]
-        : [`${scanned} commit messages scanned; no cross-repo autolink`],
+        : [
+            `${scanned} commit messages scanned (fork PR ceiling ${forkPrCeiling}); no cross-repo autolink`,
+          ],
   };
 }
