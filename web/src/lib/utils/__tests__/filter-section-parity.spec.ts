@@ -16,6 +16,9 @@ vi.mock('@immich/sdk', async (importOriginal) => {
       ratings: [],
       mediaTypes: [],
       hasUnnamedPeople: false,
+      hasFavorites: false,
+      hasAssetsInAlbum: false,
+      hasAssetsNotInAlbum: false,
     }),
     getSearchSuggestions: vi.fn().mockResolvedValue([]),
   };
