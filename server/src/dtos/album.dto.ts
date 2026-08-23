@@ -8,7 +8,7 @@ import { UserResponseSchema, mapUser } from 'src/dtos/user.dto';
 import { AlbumUserRole, AlbumUserRoleSchema, AssetOrder, AssetOrderSchema } from 'src/enum';
 import { MaybeDehydrated } from 'src/types';
 import { asDateTimeString } from 'src/utils/date';
-import { stringToBool } from 'src/validation';
+import { isoDatetimeToDate, stringToBool } from 'src/validation';
 import z from 'zod';
 
 const AlbumUserAddSchema = z
@@ -88,6 +88,9 @@ const UpdateAlbumSchema = z
           )
           .getExtensions(),
       }),
+    createdAt: isoDatetimeToDate
+      .optional()
+      .describe('Album creation date. Must include a timezone designator (Z or ±HH:MM).'),
     albumThumbnailAssetId: z.uuidv4().optional().describe('Album thumbnail asset ID'),
     isActivityEnabled: z.boolean().optional().describe('Enable activity feed'),
     order: AssetOrderSchema.optional(),
