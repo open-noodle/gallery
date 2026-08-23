@@ -323,6 +323,45 @@ describe('buildSmartSearchParams', () => {
       expect(result.albumIds).toBeUndefined();
     });
 
+    it('scopes the search to the album route it was called from', () => {
+      const result = buildSmartSearchParams({
+        query: 'beach',
+        filters: baseFilters,
+        albumIds: ['cccccccc-cccc-4ccc-cccc-cccccccccccc'],
+      });
+
+      expect(result.albumIds).toEqual(['cccccccc-cccc-4ccc-cccc-cccccccccccc']);
+    });
+
+    // An album detail page is scoped by its ROUTE, and its filter panel never offers an album
+    // control, so the two can only ever coincide via a hand-edited URL. Union rather than
+    // overwrite: the route scope must survive whatever the URL carries.
+    it('unions the route album scope with an albumId filter', () => {
+      const result = buildSmartSearchParams({
+        query: 'beach',
+        filters: { ...baseFilters, albumId: 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb' },
+        albumIds: ['cccccccc-cccc-4ccc-cccc-cccccccccccc'],
+      });
+
+      expect(result.albumIds).toEqual(['cccccccc-cccc-4ccc-cccc-cccccccccccc', 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb']);
+    });
+
+    it('does not duplicate an album that is both the route scope and the filter', () => {
+      const result = buildSmartSearchParams({
+        query: 'beach',
+        filters: { ...baseFilters, albumId: 'cccccccc-cccc-4ccc-cccc-cccccccccccc' },
+        albumIds: ['cccccccc-cccc-4ccc-cccc-cccccccccccc'],
+      });
+
+      expect(result.albumIds).toEqual(['cccccccc-cccc-4ccc-cccc-cccccccccccc']);
+    });
+
+    it('omits albumIds for an empty route scope', () => {
+      const result = buildSmartSearchParams({ query: 'beach', filters: baseFilters, albumIds: [] });
+
+      expect(result.albumIds).toBeUndefined();
+    });
+
     it('does not send description or originalFileName, which SmartSearchDto cannot express', () => {
       const result = buildSmartSearchParams({
         query: 'beach',
@@ -392,6 +431,33 @@ describe('buildSmartSearchFacetsParams', () => {
     expect(result).toMatchObject({ spaceId: 'space-1', spacePersonIds: ['space-person-1'] });
     expect(result.personIds).toBeUndefined();
     expect(result.withSharedSpaces).toBeUndefined();
+  });
+
+  // The facet counts and the time-bucket rail sit beside a result grid that IS album-scoped. If the
+  // scope did not reach the facets request they would describe the whole library instead.
+  it('carries the route album scope so the facets match the results they annotate', () => {
+    const result = buildSmartSearchFacetsParams({
+      query: 'beach',
+      filters: baseFilters,
+      albumIds: ['cccccccc-cccc-4ccc-cccc-cccccccccccc'],
+    });
+
+    expect(result.albumIds).toEqual(['cccccccc-cccc-4ccc-cccc-cccccccccccc']);
+  });
+
+  it('uses a different facet key per album scope', () => {
+    const albumOne = buildSmartSearchFacetKey({
+      query: 'beach',
+      filters: baseFilters,
+      albumIds: ['cccccccc-cccc-4ccc-cccc-cccccccccccc'],
+    });
+    const albumTwo = buildSmartSearchFacetKey({
+      query: 'beach',
+      filters: baseFilters,
+      albumIds: ['dddddddd-dddd-4ddd-dddd-dddddddddddd'],
+    });
+
+    expect(albumOne).not.toBe(albumTwo);
   });
 
   it('uses the same key for sort-only changes', () => {
