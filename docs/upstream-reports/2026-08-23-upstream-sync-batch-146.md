@@ -183,6 +183,47 @@ resolution. The change is whitespace and trailing commas only; verified by compa
 against `HEAD` with whitespace and commas stripped, and by re-running analyze (clean), the `lib`
 format gate (866 files, 0 changed) and the suite (3411 passed).
 
+## Cross-repo autolink spam (fixed this cycle)
+
+Upstream noticed the fork spamming their PRs — e.g. immich-30881 accumulated a wall of
+"added a commit that referenced this pull request" events, the same commits appearing twice hours
+apart.
+
+**Cause.** `open-noodle/gallery` is a real fork (`parent: immich-app/immich`), so GitHub resolves a
+bare `#N` in a commit message against the **parent** repo whenever N is not one of ours. The rolling
+branch replays every fork commit under a **new SHA every cycle**, so each reference re-fires on every
+force-push. 171 fork commits referenced 154 distinct immich PRs — re-notified in full, every cycle.
+
+**Fix.** Commit messages across `upstream/main..HEAD` were rewritten to de-link foreign references:
+
+| Form                 | Before                                                 | After                             |
+| -------------------- | ------------------------------------------------------ | --------------------------------- |
+| bare `#N`, N > 1017  | `port #30881`                                          | `port immich-30881`               |
+| `#N` glued to a word | `removed PR#27022`                                     | `removed PR immich-27022`         |
+| `owner/repo#N`       | `sveltejs/svelte#18546`                                | `sveltejs/svelte 18546`           |
+| foreign issue/PR URL | `https://github.com/xneo1/portainer_templates/pull/13` | `xneo1/portainer_templates PR 13` |
+
+Fork-local refs are the useful case and were **preserved**: 1369 `#N` at or below our PR ceiling
+(1017), plus our own `github.com/open-noodle/gallery/issues/685` URL.
+
+Two things beyond the reported symptom were found and fixed by the same sweep: an explicit
+`sveltejs/svelte#18546` (definitely autolinked — we were notifying an unrelated project), and a
+foreign PR URL.
+
+**Safety.** The rewrite is message-only. The resulting tree is byte-identical
+(`009a150f0e0e…`) to the CI-validated commit `7b7f5f15476`, and `git diff` between them is empty,
+so this cycle's green CI carries over unchanged. Author and committer identity and dates are
+preserved. Backups: `backup/pre-delink-2026-08-23`, `backup/pre-delink-pass2-2026-08-23`.
+
+**Guard.** `make commit-autolink-check` (new `commit-autolink-check` audit) fails on any commit
+message carrying a foreign autolink, covering all five forms GitHub honours. Proven in both
+directions before being wired up — 246 findings against the pre-rewrite history, clean across all
+1296 commits after. It is a rolling-cycle check rather than a CI job because it needs the `upstream`
+remote to resolve its range; a PR-scoped equivalent would key off `origin/main..HEAD`.
+
 ## Follow-up
 
-- None outstanding.
+- The guard runs per rolling cycle, not on PRs. A fork PR merged to `main` could still introduce a
+  foreign autolink; it would be caught at the next cycle rather than at review time.
+- `main` still carries the pre-rewrite messages. It re-spams only when force-pushed, i.e. at the
+  next cutover — at which point it inherits the rewritten history from this branch.
