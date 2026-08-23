@@ -14,6 +14,7 @@ import 'package:immich_mobile/presentation/widgets/filter_sheet/filter_section_i
 import 'package:immich_mobile/presentation/widgets/filter_sheet/match_count_footer.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/search_bar.widget.dart';
 import 'package:immich_mobile/providers/photos_filter/hidden_sections.provider.dart';
+import 'package:immich_mobile/providers/photos_filter/section_availability.provider.dart';
 import 'package:immich_mobile/routing/router.dart';
 
 /// The Deep snap body. Owns the scroll view, the sticky Done bar, and the
@@ -77,6 +78,7 @@ class DeepContent extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final hidden = ref.watch(hiddenSectionsProvider);
+    final available = ref.watch(sectionAvailabilityProvider);
     return Material(
       color: theme.colorScheme.surface,
       elevation: 3,
@@ -95,7 +97,9 @@ class DeepContent extends ConsumerWidget {
                 child: KeyedSubtree(key: Key('deep-search'), child: FilterSheetSearchBar()),
               ),
               for (final id in FilterSectionId.values)
-                if (!hidden.contains(id)) _sectionFor(id),
+                // Two independent gates: `hidden` is the user's persisted choice, `available` is
+                // derived from the facets. Never merge them — see the provider's doc comment. #910
+                if (!hidden.contains(id) && available.contains(id)) _sectionFor(id),
             ],
           ),
           const Positioned(

@@ -334,6 +334,9 @@ describe(SearchRepository.name, () => {
         ratings: [],
         mediaTypes: [],
         hasUnnamedPeople: false,
+        hasFavorites: false,
+        hasAssetsInAlbum: false,
+        hasAssetsNotInAlbum: false,
       });
     });
 
@@ -482,6 +485,173 @@ describe(SearchRepository.name, () => {
       ]);
       expect(result.hasUnnamedPeople).toBe(false);
     });
+
+    it('computes hasFavorites ignoring its own isFavorite filter (#910)', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: favourite } = await ctx.newAsset({ ownerId: user.id, isFavorite: true });
+      await addEmbedding(defaultDatabase, favourite.id);
+      const { asset: plain } = await ctx.newAsset({ ownerId: user.id });
+      await addEmbedding(defaultDatabase, plain.id);
+
+      const result = await sut.getSmartSearchFacets({
+        userIds: [user.id],
+        embedding: matchingEmbedding,
+        isFavorite: false,
+      });
+
+      expect(result.hasFavorites).toBe(true);
+      // The isFavorite: false filter still applies to `total` itself — only hasFavorites ignores it.
+      // If a future change over-corrected and dropped the predicate everywhere, hasFavorites would
+      // still read true here but total would silently go from 1 to 2.
+      expect(result.total).toBe(1);
+    });
+
+    it('honours the other active dimensions on the smart-search path (tag) (#910)', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: favourite } = await ctx.newAsset({ ownerId: user.id, isFavorite: true });
+      await addEmbedding(defaultDatabase, favourite.id);
+      const { asset: plain } = await ctx.newAsset({ ownerId: user.id });
+      await addEmbedding(defaultDatabase, plain.id);
+      const [tagA, tagB] = await upsertTags(ctx.get(TagRepository), { userId: user.id, tags: ['TagA', 'TagB'] });
+      await ctx.newTagAsset({ tagIds: [tagA.id], assetIds: [favourite.id] });
+      await ctx.newTagAsset({ tagIds: [tagB.id], assetIds: [plain.id] });
+
+      // The only favourite carries tag A, so filtering to tag B must report no favourites — the
+      // smart-search mirror of the browse-path tag case above.
+      const result = await sut.getSmartSearchFacets({
+        userIds: [user.id],
+        embedding: matchingEmbedding,
+        tagIds: [tagB.id],
+      });
+
+      expect(result.hasFavorites).toBe(false);
+    });
+
+    it('computes album membership ignoring its own isNotInAlbum filter (#910)', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: filed } = await ctx.newAsset({ ownerId: user.id });
+      await addEmbedding(defaultDatabase, filed.id);
+      const { asset: unfiled } = await ctx.newAsset({ ownerId: user.id });
+      await addEmbedding(defaultDatabase, unfiled.id);
+      const { album } = await ctx.newAlbum({ ownerId: user.id });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: filed.id });
+
+      const result = await sut.getSmartSearchFacets({
+        userIds: [user.id],
+        embedding: matchingEmbedding,
+        isNotInAlbum: true,
+      });
+
+      expect(result.hasAssetsInAlbum).toBe(true);
+      expect(result.hasAssetsNotInAlbum).toBe(true);
+    });
+
+    it('still applies isNotInAlbum to the non-album facets (#910)', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: filed } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newExif({ assetId: filed.id, make: 'Canon' });
+      await addEmbedding(defaultDatabase, filed.id);
+      const { asset: unfiled } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newExif({ assetId: unfiled.id, make: 'Nikon' });
+      await addEmbedding(defaultDatabase, unfiled.id);
+      const { album } = await ctx.newAlbum({ ownerId: user.id });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: filed.id });
+
+      const result = await sut.getSmartSearchFacets({
+        userIds: [user.id],
+        embedding: matchingEmbedding,
+        isNotInAlbum: true,
+      });
+
+      // Only the un-filed Nikon survives the filter, so Canon must be gone from the makes facet.
+      expect(result.cameraMakes).toEqual(['Nikon']);
+    });
+
+    it('still applies isInAlbum to the non-album facets (#910)', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: filed } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newExif({ assetId: filed.id, make: 'Canon' });
+      await addEmbedding(defaultDatabase, filed.id);
+      const { asset: unfiled } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newExif({ assetId: unfiled.id, make: 'Nikon' });
+      await addEmbedding(defaultDatabase, unfiled.id);
+      const { album } = await ctx.newAlbum({ ownerId: user.id });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: filed.id });
+
+      const result = await sut.getSmartSearchFacets({
+        userIds: [user.id],
+        embedding: matchingEmbedding,
+        isInAlbum: true,
+      });
+
+      // Only the filed Canon survives the filter, so Nikon must be gone from the makes facet.
+      expect(result.cameraMakes).toEqual(['Canon']);
+    });
+
+    it('reports no favourites and mixed album membership on the smart path (#910)', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: filed } = await ctx.newAsset({ ownerId: user.id });
+      await addEmbedding(defaultDatabase, filed.id);
+      const { asset: unfiled } = await ctx.newAsset({ ownerId: user.id });
+      await addEmbedding(defaultDatabase, unfiled.id);
+      const { album } = await ctx.newAlbum({ ownerId: user.id });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: filed.id });
+
+      const result = await sut.getSmartSearchFacets({ userIds: [user.id], embedding: matchingEmbedding });
+
+      expect(result.total).toBe(2);
+      expect(result.hasFavorites).toBe(false);
+      expect(result.hasAssetsInAlbum).toBe(true);
+      expect(result.hasAssetsNotInAlbum).toBe(true);
+    });
+
+    it('reports hasAssetsNotInAlbum false on the smart path when everything is filed (#910)', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      await addEmbedding(defaultDatabase, asset.id);
+      const { album } = await ctx.newAlbum({ ownerId: user.id });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+
+      const result = await sut.getSmartSearchFacets({ userIds: [user.id], embedding: matchingEmbedding });
+
+      expect(result.total).toBe(1);
+      expect(result.hasAssetsInAlbum).toBe(true);
+      expect(result.hasAssetsNotInAlbum).toBe(false);
+    });
+
+    it('reports hasAssetsInAlbum false on the smart path when nothing is filed (#910)', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      await addEmbedding(defaultDatabase, asset.id);
+
+      const result = await sut.getSmartSearchFacets({ userIds: [user.id], embedding: matchingEmbedding });
+
+      expect(result.total).toBe(1);
+      expect(result.hasAssetsInAlbum).toBe(false);
+      expect(result.hasAssetsNotInAlbum).toBe(true);
+    });
+
+    it('reports hasFavorites true on the smart path when a favourite is present (#910)', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: favourite } = await ctx.newAsset({ ownerId: user.id, isFavorite: true });
+      await addEmbedding(defaultDatabase, favourite.id);
+      const { asset: plain } = await ctx.newAsset({ ownerId: user.id });
+      await addEmbedding(defaultDatabase, plain.id);
+
+      const result = await sut.getSmartSearchFacets({ userIds: [user.id], embedding: matchingEmbedding });
+
+      expect(result.total).toBe(2);
+      expect(result.hasFavorites).toBe(true);
+    });
   });
 
   describe('getFilterSuggestions', () => {
@@ -560,6 +730,207 @@ describe(SearchRepository.name, () => {
         ratings: [],
         mediaTypes: [],
         hasUnnamedPeople: false,
+        hasFavorites: false,
+        hasAssetsInAlbum: false,
+        hasAssetsNotInAlbum: false,
+      });
+    });
+
+    it('reports every #910 facet false under forceEmptyResult', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      // The favourite is filed (makes hasAssetsInAlbum load-bearing) and a separate plain asset
+      // is left unfiled (makes hasAssetsNotInAlbum load-bearing too) — without forceEmptyResult
+      // all three facets would flip to true/true/true, not vacuously stay false.
+      const { asset: favourite } = await ctx.newAsset({ ownerId: user.id, isFavorite: true });
+      const { album } = await ctx.newAlbum({ ownerId: user.id });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: favourite.id });
+      await ctx.newAsset({ ownerId: user.id });
+
+      const result = await sut.getFilterSuggestions([user.id], { forceEmptyResult: true });
+
+      expect(result.hasFavorites).toBe(false);
+      expect(result.hasAssetsInAlbum).toBe(false);
+      expect(result.hasAssetsNotInAlbum).toBe(false);
+    });
+
+    describe('hasFavorites (#910)', () => {
+      it('is false when the scope has no favourite', async () => {
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        await ctx.newAsset({ ownerId: user.id });
+
+        const result = await sut.getFilterSuggestions([user.id], {});
+
+        expect(result.hasFavorites).toBe(false);
+      });
+
+      it('is true when the scope has a favourite', async () => {
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        await ctx.newAsset({ ownerId: user.id, isFavorite: true });
+
+        const result = await sut.getFilterSuggestions([user.id], {});
+
+        expect(result.hasFavorites).toBe(true);
+      });
+
+      it('ignores its own isFavorite filter', async () => {
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        await ctx.newAsset({ ownerId: user.id, isFavorite: true });
+        await ctx.newAsset({ ownerId: user.id });
+
+        // Filtering to non-favourites must not make the facet claim there are none.
+        const result = await sut.getFilterSuggestions([user.id], { isFavorite: false });
+
+        expect(result.hasFavorites).toBe(true);
+      });
+
+      it('honours the other active dimensions', async () => {
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const { asset: favourite } = await ctx.newAsset({ ownerId: user.id, isFavorite: true });
+        await ctx.newExif({ assetId: favourite.id, make: 'Canon' });
+        const { asset: plain } = await ctx.newAsset({ ownerId: user.id });
+        await ctx.newExif({ assetId: plain.id, make: 'Nikon' });
+
+        // The only favourite is a Canon, so a Nikon filter must report no favourites.
+        const result = await sut.getFilterSuggestions([user.id], { make: 'Nikon' });
+
+        expect(result.hasFavorites).toBe(false);
+      });
+
+      it('honours the other active dimensions (tag)', async () => {
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const { asset: favourite } = await ctx.newAsset({ ownerId: user.id, isFavorite: true });
+        const { asset: plain } = await ctx.newAsset({ ownerId: user.id });
+        const [tagA, tagB] = await upsertTags(ctx.get(TagRepository), { userId: user.id, tags: ['TagA', 'TagB'] });
+        await ctx.newTagAsset({ tagIds: [tagA.id], assetIds: [favourite.id] });
+        await ctx.newTagAsset({ tagIds: [tagB.id], assetIds: [plain.id] });
+
+        // The only favourite carries tag A, so filtering to tag B must report no favourites. Tags go
+        // through a `tag_asset` EXISTS subquery rather than the `asset_exif` join the make case above
+        // exercises, so this covers a different code path.
+        const result = await sut.getFilterSuggestions([user.id], { tagIds: [tagB.id] });
+
+        expect(result.hasFavorites).toBe(false);
+      });
+
+      it('sees a shared-space favourite only with timelineSpaceIds (#910)', async () => {
+        const { ctx, sut } = setup();
+        const { user: owner } = await ctx.newUser();
+        const { user: member } = await ctx.newUser();
+        const { asset } = await ctx.newAsset({ ownerId: owner.id, isFavorite: true });
+        // A distinctive make so the second assertion can identify THIS asset specifically —
+        // a `toBe(true)` non-emptiness check alone would also pass for an over-broad scope
+        // that leaked in unrelated assets.
+        await ctx.newExif({ assetId: asset.id, make: 'SpaceMake' });
+
+        const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+        await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: 'owner' });
+        await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: 'viewer' });
+        await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
+
+        // The member owns nothing. Without the space in scope the favourite is invisible to them...
+        const ownScope = await sut.getFilterSuggestions([member.id], {});
+        expect(ownScope.hasFavorites).toBe(false);
+
+        // ...and with it, it is. The two scopes disagree, which is exactly what §4.6 documents:
+        // the photos page drops withSharedSpaces when isFavorite is set, so `current` is narrower
+        // than `baseline`. Subset, so it can only grey — never wrongly hide.
+        const spaceScope = await sut.getFilterSuggestions([member.id], { timelineSpaceIds: [space.id] });
+        expect(spaceScope.hasFavorites).toBe(true);
+        // Pins the space asset specifically, not merely "scope became non-empty": an over-broad
+        // scope (e.g. the timelineSpaceIds arm silently falling through to unfiltered) would leak
+        // other tests' makes into this array and fail the toEqual.
+        expect(spaceScope.cameraMakes).toEqual(['SpaceMake']);
+      });
+    });
+
+    describe('album membership (#910)', () => {
+      it('reports not-in-album only when the scope has no albums', async () => {
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        await ctx.newAsset({ ownerId: user.id });
+
+        const result = await sut.getFilterSuggestions([user.id], {});
+
+        expect(result.hasAssetsInAlbum).toBe(false);
+        expect(result.hasAssetsNotInAlbum).toBe(true);
+      });
+
+      it('reports in-album only when every asset is filed', async () => {
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const { asset } = await ctx.newAsset({ ownerId: user.id });
+        const { album } = await ctx.newAlbum({ ownerId: user.id });
+        await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+
+        const result = await sut.getFilterSuggestions([user.id], {});
+
+        expect(result.hasAssetsInAlbum).toBe(true);
+        expect(result.hasAssetsNotInAlbum).toBe(false);
+      });
+
+      it('reports both when the scope is mixed', async () => {
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const { asset: filed } = await ctx.newAsset({ ownerId: user.id });
+        await ctx.newAsset({ ownerId: user.id });
+        const { album } = await ctx.newAlbum({ ownerId: user.id });
+        await ctx.newAlbumAsset({ albumId: album.id, assetId: filed.id });
+
+        const result = await sut.getFilterSuggestions([user.id], {});
+
+        expect(result.hasAssetsInAlbum).toBe(true);
+        expect(result.hasAssetsNotInAlbum).toBe(true);
+      });
+
+      it('ignores its own isNotInAlbum filter', async () => {
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const { asset: filed } = await ctx.newAsset({ ownerId: user.id });
+        await ctx.newAsset({ ownerId: user.id });
+        const { album } = await ctx.newAlbum({ ownerId: user.id });
+        await ctx.newAlbumAsset({ albumId: album.id, assetId: filed.id });
+
+        // Filtering to un-filed assets must not erase the evidence that filed ones exist.
+        const result = await sut.getFilterSuggestions([user.id], { isNotInAlbum: true });
+
+        expect(result.hasAssetsInAlbum).toBe(true);
+        expect(result.hasAssetsNotInAlbum).toBe(true);
+      });
+
+      it('reports every asset filed when scoped to one album', async () => {
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const { asset } = await ctx.newAsset({ ownerId: user.id });
+        await ctx.newAsset({ ownerId: user.id });
+        const { album } = await ctx.newAlbum({ ownerId: user.id });
+        await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+
+        const result = await sut.getFilterSuggestions([user.id], { albumId: album.id });
+
+        expect(result.hasAssetsInAlbum).toBe(true);
+        expect(result.hasAssetsNotInAlbum).toBe(false);
+      });
+
+      it('honours the other active dimensions', async () => {
+        const { ctx, sut } = setup();
+        const { user } = await ctx.newUser();
+        const { asset: filed } = await ctx.newAsset({ ownerId: user.id });
+        await ctx.newExif({ assetId: filed.id, make: 'Canon' });
+        const { asset: unfiled } = await ctx.newAsset({ ownerId: user.id });
+        await ctx.newExif({ assetId: unfiled.id, make: 'Nikon' });
+        const { album } = await ctx.newAlbum({ ownerId: user.id });
+        await ctx.newAlbumAsset({ albumId: album.id, assetId: filed.id });
+
+        const result = await sut.getFilterSuggestions([user.id], { make: 'Nikon' });
+
+        expect(result.hasAssetsInAlbum).toBe(false);
+        expect(result.hasAssetsNotInAlbum).toBe(true);
       });
     });
   });

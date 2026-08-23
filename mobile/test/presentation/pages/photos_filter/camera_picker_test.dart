@@ -10,8 +10,13 @@ import 'package:openapi/api.dart';
 
 import '../../../widget_tester_extensions.dart';
 
-FilterSuggestionsResponseDto _sugg(List<String> cameraMakes) =>
-    FilterSuggestionsResponseDto(hasUnnamedPeople: false, cameraMakes: cameraMakes);
+FilterSuggestionsResponseDto _sugg(List<String> cameraMakes) => FilterSuggestionsResponseDto(
+  hasUnnamedPeople: false,
+  hasFavorites: true,
+  hasAssetsInAlbum: true,
+  hasAssetsNotInAlbum: true,
+  cameraMakes: cameraMakes,
+);
 
 List<Override> _overrideMakes(List<String> cameraMakes) => [
   photosFilterSuggestionsProvider.overrideWith((ref, filter) async => _sugg(cameraMakes)),

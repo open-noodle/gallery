@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/toggles_section.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/filter_section_id.dart';
+import 'package:immich_mobile/providers/api.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/collapsed_sections.provider.dart';
+import 'package:immich_mobile/providers/photos_filter/filter_suggestions.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
+import 'package:mocktail/mocktail.dart';
+import 'package:openapi/api.dart';
 
+import '../../../../service.mocks.dart';
 import '../../../../widget_tester_extensions.dart';
 
 class _FakePrefs implements FilterSectionPrefs {
@@ -77,6 +83,60 @@ void main() {
       expect(container.read(photosFilterProvider).display.isNotInAlbum, isFalse);
     });
 
+    // The escape hatch that keeps a switch reachable while it holds a filter, even when its facet
+    // says the library has nothing left to match — otherwise the user could set the filter but never
+    // clear it. Untested before #910's fix-wave (deleting `|| display.isFavorite` kept the suite
+    // green).
+    testWidgets('keeps the favourites switch when its facet is empty but the filter is already active', (tester) async {
+      await tester.pumpConsumerWidget(
+        const Material(child: TogglesSection()),
+        overrides: [
+          ..._prefs(),
+          photosFilterSuggestionsProvider.overrideWith(
+            (ref, filter) => Future.value(
+              FilterSuggestionsResponseDto(
+                hasUnnamedPeople: false,
+                hasFavorites: false,
+                hasAssetsInAlbum: false,
+                hasAssetsNotInAlbum: false,
+              ),
+            ),
+          ),
+        ],
+      );
+      final container = ProviderScope.containerOf(tester.element(find.byType(TogglesSection)));
+      container.read(photosFilterProvider.notifier).setFavouritesOnly(true);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('toggle-favourites')), findsOneWidget);
+    });
+
+    testWidgets('keeps the not-in-album switch when its facet is empty but the filter is already active', (
+      tester,
+    ) async {
+      await tester.pumpConsumerWidget(
+        const Material(child: TogglesSection()),
+        overrides: [
+          ..._prefs(),
+          photosFilterSuggestionsProvider.overrideWith(
+            (ref, filter) => Future.value(
+              FilterSuggestionsResponseDto(
+                hasUnnamedPeople: false,
+                hasFavorites: false,
+                hasAssetsInAlbum: false,
+                hasAssetsNotInAlbum: false,
+              ),
+            ),
+          ),
+        ],
+      );
+      final container = ProviderScope.containerOf(tester.element(find.byType(TogglesSection)));
+      container.read(photosFilterProvider.notifier).setNotInAlbum(true);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('toggle-not-in-album')), findsOneWidget);
+    });
+
     testWidgets('initial switch state reflects provider', (tester) async {
       await tester.pumpConsumerWidget(const Material(child: TogglesSection()), overrides: _prefs());
       final container = ProviderScope.containerOf(tester.element(find.byType(TogglesSection)));
@@ -103,6 +163,101 @@ void main() {
       expect(find.byKey(const Key('toggle-archived')), findsOneWidget);
       expect(find.byKey(const Key('toggle-not-in-album')), findsOneWidget);
       expect(find.byKey(const Key('toggle-untagged')), findsOneWidget);
+    });
+
+    // #910 fix-wave finding 1: this widget's own facets watch must key on the debounced filter too
+    // (sectionAvailabilityProvider is only one of the two flagged call sites). A burst of rapid,
+    // discrete filter changes settles to exactly one NEW facets request, not one per change.
+    testWidgets('coalesces a burst of rapid filter changes into a single new facets request', (tester) async {
+      final mockApiService = MockApiService();
+      final mockSearchApi = MockSearchApi();
+      when(() => mockApiService.searchApi).thenReturn(mockSearchApi);
+      when(
+        () => mockSearchApi.getFilterSuggestions(
+          city: any(named: 'city'),
+          country: any(named: 'country'),
+          isFavorite: any(named: 'isFavorite'),
+          isNotInAlbum: any(named: 'isNotInAlbum'),
+          make: any(named: 'make'),
+          mediaType: any(named: 'mediaType'),
+          model: any(named: 'model'),
+          personIds: any(named: 'personIds'),
+          rating: any(named: 'rating'),
+          spaceId: any(named: 'spaceId'),
+          tagIds: any(named: 'tagIds'),
+          takenAfter: any(named: 'takenAfter'),
+          takenBefore: any(named: 'takenBefore'),
+          withSharedSpaces: any(named: 'withSharedSpaces'),
+        ),
+      ).thenAnswer(
+        (_) async => FilterSuggestionsResponseDto(
+          hasUnnamedPeople: false,
+          hasFavorites: true,
+          hasAssetsInAlbum: true,
+          hasAssetsNotInAlbum: true,
+        ),
+      );
+
+      await tester.pumpConsumerWidget(
+        const Material(child: TogglesSection()),
+        overrides: [..._prefs(), apiServiceProvider.overrideWithValue(mockApiService)],
+      );
+      final container = ProviderScope.containerOf(tester.element(find.byType(TogglesSection)));
+      // The initial (empty-filter) mount request is not what this test is about; only the burst is.
+      clearInteractions(mockSearchApi);
+
+      // Three discrete taps in quick succession — each well inside the 250 ms debounce window
+      // measured from the previous one.
+      final notifier = container.read(photosFilterProvider.notifier);
+      notifier.togglePerson(const PersonDto(id: 'p1', name: 'A', isHidden: false, thumbnailPath: ''));
+      await tester.pump(const Duration(milliseconds: 50));
+      notifier.togglePerson(const PersonDto(id: 'p2', name: 'B', isHidden: false, thumbnailPath: ''));
+      await tester.pump(const Duration(milliseconds: 50));
+      notifier.togglePerson(const PersonDto(id: 'p3', name: 'C', isHidden: false, thumbnailPath: ''));
+
+      // Still within the window measured from the last change: no new request yet.
+      await tester.pump(const Duration(milliseconds: 100));
+      verifyNever(
+        () => mockSearchApi.getFilterSuggestions(
+          city: any(named: 'city'),
+          country: any(named: 'country'),
+          isFavorite: any(named: 'isFavorite'),
+          isNotInAlbum: any(named: 'isNotInAlbum'),
+          make: any(named: 'make'),
+          mediaType: any(named: 'mediaType'),
+          model: any(named: 'model'),
+          personIds: any(named: 'personIds'),
+          rating: any(named: 'rating'),
+          spaceId: any(named: 'spaceId'),
+          tagIds: any(named: 'tagIds'),
+          takenAfter: any(named: 'takenAfter'),
+          takenBefore: any(named: 'takenBefore'),
+          withSharedSpaces: any(named: 'withSharedSpaces'),
+        ),
+      );
+
+      // Past the debounce window: the burst settles to exactly ONE new request.
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pumpAndSettle();
+
+      verify(
+        () => mockSearchApi.getFilterSuggestions(
+          city: any(named: 'city'),
+          country: any(named: 'country'),
+          isFavorite: any(named: 'isFavorite'),
+          isNotInAlbum: any(named: 'isNotInAlbum'),
+          make: any(named: 'make'),
+          mediaType: any(named: 'mediaType'),
+          model: any(named: 'model'),
+          personIds: any(named: 'personIds'),
+          rating: any(named: 'rating'),
+          spaceId: any(named: 'spaceId'),
+          tagIds: any(named: 'tagIds'),
+          takenAfter: any(named: 'takenAfter'),
+          takenBefore: any(named: 'takenBefore'),
+          withSharedSpaces: any(named: 'withSharedSpaces'),
+        ),
+      ).called(1);
     });
   });
 }

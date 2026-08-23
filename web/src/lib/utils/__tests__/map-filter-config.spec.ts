@@ -14,6 +14,9 @@ vi.mock('@immich/sdk', async (importOriginal) => {
       ratings: [],
       mediaTypes: [],
       hasUnnamedPeople: false,
+      hasFavorites: false,
+      hasAssetsInAlbum: true,
+      hasAssetsNotInAlbum: true,
     }),
     getSearchSuggestions: vi.fn().mockResolvedValue([]),
   };
@@ -265,6 +268,15 @@ describe('buildMapFilterConfig', () => {
       expect(result.tags).toHaveLength(1);
       expect(result.tags[0]).toEqual({ id: 'tag-1', name: 'Nature' });
     });
+
+    it('forwards the #910 availability facets', async () => {
+      const config = buildMapFilterConfig();
+      const result = await config.suggestionsProvider!(emptyFilters);
+
+      expect(result.hasFavorites).toBe(false);
+      expect(result.hasAssetsInAlbum).toBe(true);
+      expect(result.hasAssetsNotInAlbum).toBe(true);
+    });
   });
 
   it('should pass withSharedSpaces to cameraModels provider when no spaceId', async () => {
@@ -285,6 +297,28 @@ describe('buildMapFilterConfig', () => {
     await config.providers!.cameraModels!('Nikon');
 
     expect(getSearchSuggestions).toHaveBeenCalledWith(expect.objectContaining({ spaceId: 'space-123', make: 'Nikon' }));
+  });
+
+  describe('baselineProvider', () => {
+    it('offers a browse-mode baseline computed with no filters (#910)', async () => {
+      const config = buildMapFilterConfig();
+      vi.mocked(getFilterSuggestions).mockClear();
+
+      const baseline = await config.baselineProvider!();
+
+      expect(baseline).toBeDefined();
+      expect(getFilterSuggestions).toHaveBeenCalledWith(expect.objectContaining({ withSharedSpaces: true }));
+      expect(getFilterSuggestions).not.toHaveBeenCalledWith(expect.objectContaining({ rating: expect.anything() }));
+    });
+
+    it('scopes the baseline by spaceId when provided', async () => {
+      const config = buildMapFilterConfig('space-123');
+      vi.mocked(getFilterSuggestions).mockClear();
+
+      await config.baselineProvider!();
+
+      expect(getFilterSuggestions).toHaveBeenCalledWith(expect.objectContaining({ spaceId: 'space-123' }));
+    });
   });
 
   it('should pass withSharedSpaces to cities provider when no spaceId', async () => {

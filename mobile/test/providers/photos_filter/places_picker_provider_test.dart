@@ -5,8 +5,13 @@ import 'package:immich_mobile/providers/photos_filter/filter_suggestions.provide
 import 'package:immich_mobile/providers/photos_filter/places_picker.provider.dart';
 import 'package:openapi/api.dart';
 
-FilterSuggestionsResponseDto _sugg(List<String> countries) =>
-    FilterSuggestionsResponseDto(hasUnnamedPeople: false, countries: countries);
+FilterSuggestionsResponseDto _sugg(List<String> countries) => FilterSuggestionsResponseDto(
+  hasUnnamedPeople: false,
+  hasFavorites: true,
+  hasAssetsInAlbum: true,
+  hasAssetsNotInAlbum: true,
+  countries: countries,
+);
 
 ProviderContainer _containerWith(List<String> countries) {
   return ProviderContainer(

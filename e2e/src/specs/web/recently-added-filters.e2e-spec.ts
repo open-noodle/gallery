@@ -1,8 +1,9 @@
 import type { LoginResponseDto } from '@immich/sdk';
 import { updateAsset } from '@immich/sdk';
 import { expect, test } from '@playwright/test';
+import { readFileSync } from 'node:fs';
 import { thumbnailUtils } from 'src/ui/specs/timeline/utils';
-import { asBearerAuth, utils } from 'src/utils';
+import { asBearerAuth, testAssetDir, utils } from 'src/utils';
 
 test.describe('Recently Added', () => {
   let admin: LoginResponseDto;
@@ -84,16 +85,42 @@ test.describe('Recently Added filters', () => {
 
     // Seed with *taken* dates deliberately unrelated to upload order, so "ordered by added date"
     // is a meaningful assertion: taken dates run backwards while added order runs forwards.
+    // #910: two of the images carry real EXIF instead of synthetic bytes, so location/camera have
+    // something to populate their facets with — without real data those sections are correctly
+    // hidden. Swapping into the existing loop (not adding new assets) keeps TOTAL accurate for every
+    // header-count assertion below. See slice 6's recipe table.
     const images = [];
     for (let i = 0; i < TOTAL - VIDEOS; i++) {
       const day = String(TOTAL - VIDEOS - i).padStart(2, '0');
-      images.push(
-        await utils.createAsset(admin.accessToken, {
-          fileCreatedAt: `2023-09-${day}T10:00:00.000Z`,
-          fileModifiedAt: `2023-09-${day}T10:00:00.000Z`,
-        }),
-      );
+      const fileCreatedAt = `2023-09-${day}T10:00:00.000Z`;
+      const fileModifiedAt = fileCreatedAt;
+      if (i === 0) {
+        images.push(
+          await utils.createAsset(admin.accessToken, {
+            fileCreatedAt,
+            fileModifiedAt,
+            assetData: {
+              bytes: readFileSync(`${testAssetDir}/metadata/gps-position/thompson-springs.jpg`),
+              filename: 'gps.jpg',
+            },
+          }),
+        );
+      } else if (i === 1) {
+        images.push(
+          await utils.createAsset(admin.accessToken, {
+            fileCreatedAt,
+            fileModifiedAt,
+            assetData: {
+              bytes: readFileSync(`${testAssetDir}/metadata/rating/mongolels.jpg`),
+              filename: 'canon.jpg',
+            },
+          }),
+        );
+      } else {
+        images.push(await utils.createAsset(admin.accessToken, { fileCreatedAt, fileModifiedAt }));
+      }
     }
+    await utils.waitForQueueFinish(admin.accessToken, 'metadataExtraction');
 
     // Videos' taken dates run *opposite* to their upload order, so within the video-filtered set
     // "newest added first" and "newest taken first" disagree. That disagreement is the whole point
@@ -112,6 +139,26 @@ test.describe('Recently Added filters', () => {
     for (const asset of images.slice(0, RATED)) {
       await updateAsset({ id: asset.id, updateAssetDto: { rating: 5 } }, { headers: asBearerAuth(admin.accessToken) });
     }
+
+    // #910: tag/favorite/album metadata on already-seeded assets — no new assets, so TOTAL stays
+    // exact. See slice 6's recipe table.
+    const [tag] = await utils.upsertTags(admin.accessToken, ['e2e-recently-added-tag']);
+    await utils.tagAssets(admin.accessToken, tag.id, [images[2].id]);
+    await updateAsset(
+      { id: images[3].id, updateAssetDto: { isFavorite: true } },
+      { headers: asBearerAuth(admin.accessToken) },
+    );
+    // Albums needs BOTH sides — some filed, some not.
+    await utils.createAlbum(admin.accessToken, {
+      albumName: '#910 recently-added album',
+      assetIds: [images[4].id],
+    });
+
+    // People: createFace inserts asset_face + face_identity + face_identity_face directly, so it
+    // needs no ML — see e2e/src/utils.ts:490. No new asset, so TOTAL stays exact.
+    const person = await utils.createPerson(admin.accessToken, { name: '#910 Person' });
+    // sourceType: 'manual' — see utils.createFace; detection runs on these uploads.
+    await utils.createFace({ assetId: images[0].id, personGroupId: person.id, sourceType: 'manual' });
   });
 
   async function gotoRecentlyAdded(
@@ -127,7 +174,7 @@ test.describe('Recently Added filters', () => {
     await page.waitForSelector('[data-testid="discovery-panel"], [data-testid="filter-toggle-btn"]');
   }
 
-  test('renders all ten metadata filter sections, including text', async ({ context, page }) => {
+  test('renders every metadata filter section its library can populate (#910)', async ({ context, page }) => {
     await gotoRecentlyAdded(context, page);
 
     await expect(page.getByTestId('discovery-panel')).toBeVisible();

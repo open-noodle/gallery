@@ -23,8 +23,13 @@ class _FakePrefs implements FilterSectionPrefs {
 
 Override _noCollapsed() => filterSectionPrefsProvider.overrideWithValue(_FakePrefs({}));
 
-FilterSuggestionsResponseDto _sugg({List<String>? cameraMakes}) =>
-    FilterSuggestionsResponseDto(hasUnnamedPeople: false, cameraMakes: cameraMakes ?? const []);
+FilterSuggestionsResponseDto _sugg({List<String>? cameraMakes}) => FilterSuggestionsResponseDto(
+  hasUnnamedPeople: false,
+  hasFavorites: true,
+  hasAssetsInAlbum: true,
+  hasAssetsNotInAlbum: true,
+  cameraMakes: cameraMakes ?? const [],
+);
 
 void main() {
   group('CameraCascadeSection', () {
