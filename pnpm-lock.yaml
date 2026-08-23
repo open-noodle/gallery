@@ -359,7 +359,7 @@ importers:
         version: link:../sdk
       esbuild:
         specifier: ^0.28.0
-        version: 0.28.1
+        version: 0.28.2
       typescript:
         specifier: ^7.0.0
         version: 7.0.2
