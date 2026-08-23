@@ -105,6 +105,31 @@ Widget _localized(Widget child) => EasyLocalization(
   child: child,
 );
 
+// The timeline embeds a [BackButtonListener] (upstream immich-30689), which resolves its dispatcher
+// via `Router.of(context)` and throws without a [Router] ancestor. The running app always has one
+// via `MaterialApp.router`; this host is a plain [MaterialApp], so supply a minimal Router. Mirrors
+// the stub upstream added to its own timeline test for the same reason.
+class _StubRouterDelegate extends RouterDelegate<void> with ChangeNotifier {
+  _StubRouterDelegate(this.child);
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => child;
+
+  @override
+  Future<bool> popRoute() => Future.value(false);
+
+  @override
+  Future<void> setNewRoutePath(void configuration) => Future.value();
+}
+
+/// Wrap [child] in a minimal [Router] so a [BackButtonListener] beneath it can resolve its
+/// dispatcher. Tests that build their own [MaterialApp] around a timeline-bearing page need this;
+/// [pumpConsumerWidget] and friends already apply it.
+Widget withStubRouter(Widget child) =>
+    Router<void>(routerDelegate: _StubRouterDelegate(child), backButtonDispatcher: RootBackButtonDispatcher());
+
 class _MaterialHost extends StatelessWidget {
   const _MaterialHost({required this.child, this.theme});
 
@@ -118,7 +143,7 @@ class _MaterialHost extends StatelessWidget {
     localizationsDelegates: context.localizationDelegates,
     supportedLocales: context.supportedLocales,
     locale: context.locale,
-    home: Material(child: child),
+    home: Material(child: withStubRouter(child)),
   );
 }
 
