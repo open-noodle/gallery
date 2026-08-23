@@ -20,7 +20,7 @@ import { describe, expect, it } from 'vitest';
 // landmine). So the three known pre-existing collisions are kept as-is and guarded:
 //   - 1775100000000: AddAssetDuplicateChecksum + DropSpacePersonThumbnailPath
 //   - 1777000000000: AddSpacePersonCounts + AdminScopedClassification
-//       (both long-documented in docs/upstream-reports/2026-04-09-upstream-sync.md)
+//       (both long-documented in specs/upstream-reports/2026-04-09-upstream-sync.md)
 //   - 1778800000000: ReconcileFaceIdentityIndexOverrides + TrimSpacePersonNameIndex
 //       (the LOW#2/#15 pair — benign; per the remediation decision it is kept + guarded
 //        rather than renamed, because renaming risks bricking already-deployed staging/RC DBs)

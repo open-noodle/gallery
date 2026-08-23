@@ -17,7 +17,7 @@ import { library_after_insert } from 'src/schema/functions.js';
 @Table('library')
 @UpdatedAtTrigger('library_updatedAt')
 // Populate library_user for the owner on library creation. See
-// docs/plans/2026-04-11-library-user-access-backfill-design.md.
+// specs/2026-04-11-library-user-access-backfill-design.md.
 @AfterInsertTrigger({
   name: 'library_after_insert',
   scope: 'statement',

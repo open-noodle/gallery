@@ -48,8 +48,8 @@
   // the scan's suspected owner — has no owner to ride here, so it opens PersonPicker for an explicit destination
   // and is wired straight to `resolveFaces` with ONLY `entireCluster` populated, never through the per-face
   // model (selection can only ever cover loaded faces; entireCluster is enumerated server-side precisely so a
-  // whole-cluster move never has to). And the shared FaceActionsHelpModal (docs/superpowers/specs/
-  // 2026-07-31-face-cleanup-ux-unification-design.md §3.3), passed `mode: 'manual'` and manual's own action
+  // whole-cluster move never has to). And the shared FaceActionsHelpModal
+  // (specs/2026-07-31-face-cleanup-ux-unification-design.md §3.3), passed `mode: 'manual'` and manual's own action
   // subset (keep/other/lock/unknown/detach/unmark — no owner/stay, which both require a suspected owner manual
   // has no scan to supply).
 

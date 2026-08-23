@@ -52,7 +52,7 @@ risk_patterns:
     subject_regex: 'refactor!'
     notes: Breaking upstream refactor
 coverage_ignore:
-  - docs/superpowers/**
+  - specs/**
 fork_surface:
   preferred_namespaces:
     server: [server/src/gallery/**]
@@ -86,7 +86,7 @@ describe('parseManifest', () => {
       'patches/@immich__ui@0.79.0.patch',
     );
     expect(manifest.risk_patterns?.[0].id).toBe('breaking-refactor');
-    expect(manifest.coverage_ignore).toEqual(['docs/superpowers/**']);
+    expect(manifest.coverage_ignore).toEqual(['specs/**']);
     expect(manifest.fork_surface?.preferred_namespaces?.server).toEqual([
       'server/src/gallery/**',
     ]);

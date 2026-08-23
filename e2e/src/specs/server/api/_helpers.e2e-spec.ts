@@ -5,7 +5,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 // Smoke tests for the e2e Actor / SpaceContext / forEachActor helpers in src/actors.ts.
 // These exist to validate that the helpers work end-to-end before downstream specs (T03+)
-// adopt them. See docs/plans/2026-04-06-e2e-T02-helpers-design.md for the full rationale.
+// adopt them. See specs/2026-04-06-e2e-T02-helpers-design.md for the full rationale.
 //
 // The underscore prefix on the filename groups this spec at the top of the directory listing
 // without occupying a "real" spec slot.
