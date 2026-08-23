@@ -18,8 +18,13 @@ import 'package:openapi/api.dart';
 
 import '../../../../widget_tester_extensions.dart';
 
-FilterSuggestionsResponseDto _sugg({List<FilterSuggestionsPersonDto>? people}) =>
-    FilterSuggestionsResponseDto(hasUnnamedPeople: false, people: people ?? const []);
+FilterSuggestionsResponseDto _sugg({List<FilterSuggestionsPersonDto>? people}) => FilterSuggestionsResponseDto(
+  hasUnnamedPeople: false,
+  hasFavorites: true,
+  hasAssetsInAlbum: true,
+  hasAssetsNotInAlbum: true,
+  people: people ?? const [],
+);
 
 void main() {
   late Drift db;

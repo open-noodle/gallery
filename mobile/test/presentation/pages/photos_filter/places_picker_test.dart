@@ -10,8 +10,13 @@ import 'package:openapi/api.dart';
 
 import '../../../widget_tester_extensions.dart';
 
-FilterSuggestionsResponseDto _sugg(List<String> countries) =>
-    FilterSuggestionsResponseDto(hasUnnamedPeople: false, countries: countries);
+FilterSuggestionsResponseDto _sugg(List<String> countries) => FilterSuggestionsResponseDto(
+  hasUnnamedPeople: false,
+  hasFavorites: true,
+  hasAssetsInAlbum: true,
+  hasAssetsNotInAlbum: true,
+  countries: countries,
+);
 
 List<Override> _overrideCountries(List<String> countries) => [
   photosFilterSuggestionsProvider.overrideWith((ref, filter) async => _sugg(countries)),
