@@ -7765,8 +7765,14 @@ describe(SharedSpaceService.name, () => {
       );
       mocks.faceIdentity.ensureSpacePersonIdentity.mockResolvedValue({ id: 'space-identity-1' } as any);
       // §6.3.1 default: the face has no owner-side personId, so the ordinary (row 1) path applies unless a
-      // test below overrides this to exercise row 2 or row 3.
-      mocks.facePersonVerdict.getFaceOwnerLink.mockResolvedValue({ personId: null, identityId: null });
+      // test below overrides this to exercise row 2 or row 3. assetOwnerId is a fixed id distinct from
+      // factory.auth()'s random actor, so the §6.7 attribution write below fires by default too.
+      mocks.facePersonVerdict.getFaceOwnerLink.mockResolvedValue({
+        personId: null,
+        identityId: null,
+        assetOwnerId: 'default-asset-owner',
+      });
+      mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
     });
 
     // F-4: a Viewer is refused. The fixture is otherwise identical to the F-5 grant below, so this can only
@@ -7846,7 +7852,11 @@ describe(SharedSpaceService.name, () => {
     it('writes the identity for an unassigned face (F-34)', async () => {
       mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
       mocks.facePersonVerdict.isFaceAssignableInSpace.mockResolvedValue(true);
-      mocks.facePersonVerdict.getFaceOwnerLink.mockResolvedValue({ personId: null, identityId: null });
+      mocks.facePersonVerdict.getFaceOwnerLink.mockResolvedValue({
+        personId: null,
+        identityId: null,
+        assetOwnerId: 'default-asset-owner',
+      });
       mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
 
       await expect(sut.attachFaceToSpacePerson(factory.auth(), 'space-1', 'space-person-1', 'face-1')).resolves.toBe(
@@ -7871,6 +7881,7 @@ describe(SharedSpaceService.name, () => {
       mocks.facePersonVerdict.getFaceOwnerLink.mockResolvedValue({
         personId: 'owner-person-1',
         identityId: 'shared-identity',
+        assetOwnerId: 'default-asset-owner',
       });
       mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
 
@@ -7897,6 +7908,7 @@ describe(SharedSpaceService.name, () => {
       mocks.facePersonVerdict.getFaceOwnerLink.mockResolvedValue({
         personId: 'owner-person-1',
         identityId: 'owner-identity',
+        assetOwnerId: 'default-asset-owner',
       });
       mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
 
@@ -7946,6 +7958,104 @@ describe(SharedSpaceService.name, () => {
         expect.objectContaining({ source: 'suggestion' }),
         mocks.database,
       );
+    });
+
+    // F-24 (spec §6.7): an editor naming a face on someone ELSE's asset is attributed in the
+    // space's activity feed. Written inside the same transaction as the attach itself.
+    it('logs a person_face_assign activity attributed to the editor (F-24)', async () => {
+      const auth = factory.auth({ user: { id: 'anna' } });
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
+      mocks.sharedSpace.getPersonById.mockResolvedValue(
+        factory.sharedSpacePerson({ id: 'space-person-1', spaceId: 'space-1', name: 'Bob' }),
+      );
+      mocks.facePersonVerdict.isFaceAssignableInSpace.mockResolvedValue(true);
+      mocks.facePersonVerdict.getFaceOwnerLink.mockResolvedValue({
+        personId: null,
+        identityId: null,
+        assetOwnerId: 'bob',
+      });
+      mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
+      mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
+
+      await expect(sut.attachFaceToSpacePerson(auth, 'space-1', 'space-person-1', 'face-1')).resolves.toBe(true);
+
+      expect(mocks.sharedSpace.logActivity).toHaveBeenCalledWith(
+        {
+          spaceId: 'space-1',
+          userId: 'anna',
+          type: SharedSpaceActivityType.PersonFaceAssign,
+          data: { personId: 'space-person-1', personName: 'Bob', count: 1 },
+        },
+        mocks.database,
+      );
+    });
+
+    // F-26 (spec §6.7): the owner-self rule. Bob attaching a face on his OWN asset must log
+    // nothing -- this is the only one of F-24/F-25/F-26 that an implementation logging
+    // unconditionally would fail. Ownership is read from the ASSET's owner, never space role.
+    it('logs nothing when the actor owns the asset (F-26)', async () => {
+      const auth = factory.auth({ user: { id: 'bob' } });
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
+      mocks.sharedSpace.getPersonById.mockResolvedValue(
+        factory.sharedSpacePerson({ id: 'space-person-1', spaceId: 'space-1', name: 'Bob' }),
+      );
+      mocks.facePersonVerdict.isFaceAssignableInSpace.mockResolvedValue(true);
+      mocks.facePersonVerdict.getFaceOwnerLink.mockResolvedValue({
+        personId: null,
+        identityId: null,
+        assetOwnerId: 'bob',
+      });
+      mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
+
+      await expect(sut.attachFaceToSpacePerson(auth, 'space-1', 'space-person-1', 'face-1')).resolves.toBe(true);
+
+      expect(mocks.sharedSpace.logActivity).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('detachFaceFromSpacePerson', () => {
+    beforeEach(() => {
+      mocks.sharedSpace.getPersonById.mockResolvedValue(
+        factory.sharedSpacePerson({ id: 'space-person-1', spaceId: 'space-1', name: 'Bob' }),
+      );
+      mocks.facePersonVerdict.isFaceAssignableInSpace.mockResolvedValue(true);
+      mocks.facePersonVerdict.getFaceOwnerLink.mockResolvedValue({
+        personId: null,
+        identityId: null,
+        assetOwnerId: 'bob',
+      });
+      mocks.sharedSpace.removePersonFace.mockResolvedValue(void 0);
+      mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
+    });
+
+    // F-25 (spec §6.7): the detach twin of F-24. An editor un-naming a face on someone ELSE's
+    // asset is attributed too.
+    it('logs a person_face_detach activity attributed to the editor (F-25)', async () => {
+      const auth = factory.auth({ user: { id: 'anna' } });
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
+
+      await expect(sut.detachFaceFromSpacePerson(auth, 'space-1', 'space-person-1', 'face-1')).resolves.toBe(true);
+
+      expect(mocks.sharedSpace.logActivity).toHaveBeenCalledWith(
+        {
+          spaceId: 'space-1',
+          userId: 'anna',
+          type: SharedSpaceActivityType.PersonFaceDetach,
+          data: { personId: 'space-person-1', personName: 'Bob', count: 1 },
+        },
+        mocks.database,
+      );
+    });
+
+    // Detach's own owner-self case, mirroring F-26 -- the attach implementation passing F-26
+    // does not by itself constrain detach, since each method must independently apply the check.
+    it('logs nothing when the actor owns the asset', async () => {
+      const auth = factory.auth({ user: { id: 'bob' } });
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
+
+      await expect(sut.detachFaceFromSpacePerson(auth, 'space-1', 'space-person-1', 'face-1')).resolves.toBe(true);
+
+      expect(mocks.sharedSpace.logActivity).not.toHaveBeenCalled();
     });
   });
 

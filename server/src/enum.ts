@@ -92,6 +92,8 @@ export enum SharedSpaceActivityType {
   PersonUpdate = 'person_update',
   PersonDelete = 'person_delete',
   PersonMerge = 'person_merge',
+  PersonFaceAssign = 'person_face_assign',
+  PersonFaceDetach = 'person_face_detach',
   AlbumLink = 'album_link',
   AlbumUnlink = 'album_unlink',
 }

@@ -958,6 +958,10 @@ export class FacePersonVerdictRepository {
    * already matches the space person being attached to (row 2) or differs (row 3, where the
    * identity write must be skipped).
    *
+   * Also carries `assetOwnerId` — the asset (not the space role) that §6.7's owner-self
+   * attribution rule keys off. Piggybacking it here avoids a second round-trip in the same
+   * attach/detach transaction that already calls this method.
+   *
    * Never throws for a missing face: callers reach this only after `isFaceAssignableInSpace`
    * has already confirmed the face exists, but a null-safe read here costs nothing and avoids a
    * second implicit contract on call order.
@@ -966,11 +970,12 @@ export class FacePersonVerdictRepository {
   async getFaceOwnerLink(
     assetFaceId: string,
     db: Kysely<DB> | Transaction<DB> = this.db,
-  ): Promise<{ personId: string | null; identityId: string | null } | undefined> {
+  ): Promise<{ personId: string | null; identityId: string | null; assetOwnerId: string } | undefined> {
     return db
       .selectFrom('asset_face')
+      .innerJoin('asset', 'asset.id', 'asset_face.assetId')
       .leftJoin('person', 'person.id', 'asset_face.personId')
-      .select(['asset_face.personId as personId', 'person.identityId as identityId'])
+      .select(['asset_face.personId as personId', 'person.identityId as identityId', 'asset.ownerId as assetOwnerId'])
       .where('asset_face.id', '=', assetFaceId)
       .executeTakeFirst();
   }
