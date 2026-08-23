@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
-import { canEditAsset, resolveEditableAssetIds } from './asset-editability';
+import { canEditAsset, canEditSpacePeople, resolveEditableAssetIds } from './asset-editability';
 
 const space = (canWrite: boolean, memberIds: string[]) => ({
   canWrite,
@@ -38,6 +38,34 @@ describe('canEditAsset', () => {
 
   it('W-16: denies when there is no authenticated user (shared link)', () => {
     expect(canEditAsset({ ownerId: 'bob' })).toBe(false);
+  });
+});
+
+describe('canEditSpacePeople', () => {
+  it('W-20: true for a non-owner space editor with an explicit spaceId and server canEdit true', () => {
+    expect(canEditSpacePeople({ ownerId: 'bob', canEdit: true }, { userId: 'anna', spaceId: 'space-1' })).toBe(true);
+  });
+
+  it('W-21: true using the asset-resolved space when no explicit spaceId is given', () => {
+    expect(canEditSpacePeople({ ownerId: 'bob', canEdit: true, resolvedSpaceId: 'space-1' }, { userId: 'anna' })).toBe(
+      true,
+    );
+  });
+
+  it('W-22: false for the owner even when canEdit is true and a space is present (never widen isOwner)', () => {
+    expect(canEditSpacePeople({ ownerId: 'anna', canEdit: true }, { userId: 'anna', spaceId: 'space-1' })).toBe(false);
+  });
+
+  it('W-23: false with no effective space at all, even when canEdit is true', () => {
+    expect(canEditSpacePeople({ ownerId: 'bob', canEdit: true }, { userId: 'anna' })).toBe(false);
+  });
+
+  it('W-24: false when canEdit is false, even with a space present', () => {
+    expect(canEditSpacePeople({ ownerId: 'bob', canEdit: false }, { userId: 'anna', spaceId: 'space-1' })).toBe(false);
+  });
+
+  it('W-25: false with no authenticated user (shared link) when canEdit is not server-provided', () => {
+    expect(canEditSpacePeople({ ownerId: 'bob' }, { spaceId: 'space-1' })).toBe(false);
   });
 });
 

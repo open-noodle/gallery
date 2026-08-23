@@ -14,7 +14,7 @@
   import { Route } from '$lib/route';
   import { locale } from '$lib/stores/preferences.store';
   import { getAssetMediaUrl } from '$lib/utils';
-  import { canEditAsset } from '$lib/utils/asset-editability';
+  import { canEditAsset, canEditSpacePeople as resolveCanEditSpacePeople } from '$lib/utils/asset-editability';
   import { delay, getDimensions } from '$lib/utils/asset-utils';
   import { getByteUnitString } from '$lib/utils/byte-units';
   import { getMapProviderLinks } from '$lib/utils/exif-utils';
@@ -42,6 +42,7 @@
   import { t } from 'svelte-i18n';
   import { slide } from 'svelte/transition';
   import PersonSidePanel from '../faces-page/PersonSidePanel.svelte';
+  import SpacePersonSidePanel from './SpacePersonSidePanel.svelte';
   import OnEvents from '../OnEvents.svelte';
   import UserAvatar from '../shared-components/UserAvatar.svelte';
   import AlbumListItemDetails from './AlbumListItemDetails.svelte';
@@ -76,7 +77,14 @@
   // pins this): `canEdit` can be true with no space context at all (e.g. a partner/album share
   // whose single-asset read still sets `asset.canEdit`), and the people affordances must stay
   // read-only there — there is no space for the space-flavoured panels to write into.
-  let canEditSpacePeople = $derived(!!effectiveSpaceId && canEdit && !isOwner);
+  //
+  // Factored into `resolveCanEditSpacePeople` (asset-editability.ts) so the side-panel swap below
+  // and the face-editor swap in PhotoViewer.svelte/VideoNativeViewer.svelte (Slice 8 gap closure)
+  // compute the SAME value for the SAME asset — they must never disagree about which endpoints a
+  // given viewer is allowed to hit.
+  let canEditSpacePeople = $derived(
+    resolveCanEditSpacePeople(asset, { userId: authManager.authenticated ? authManager.user.id : undefined, spaceId }),
+  );
 
   // R4/E2 — shared links get NO filter affordance at all (they have no /photos to land on).
   // Threaded down to child rows the same way `isOwner` is; camera/lens live inline here.
@@ -560,10 +568,26 @@
 {/if}
 
 {#if assetViewerManager.isEditFacesPanelOpen}
-  <PersonSidePanel
-    assetId={asset.id}
-    assetType={asset.type}
-    onClose={() => assetViewerManager.closeEditFacesPanel()}
-    onRefresh={handleRefreshPeople}
-  />
+  <!--
+    Slice 8 gap closure: the People-row edit affordances are visible whenever `isOwner ||
+    canEditSpacePeople` (DetailPanelPeople.svelte), but the two panels below call DIFFERENT
+    endpoints (owner-only vs shared-space) — they must be mutually exclusive, and the
+    space-flavoured panel additionally needs a real space id to write into.
+  -->
+  {#if canEditSpacePeople && effectiveSpaceId}
+    <SpacePersonSidePanel
+      spaceId={effectiveSpaceId}
+      assetId={asset.id}
+      assetType={asset.type}
+      onClose={() => assetViewerManager.closeEditFacesPanel()}
+      onRefresh={handleRefreshPeople}
+    />
+  {:else}
+    <PersonSidePanel
+      assetId={asset.id}
+      assetType={asset.type}
+      onClose={() => assetViewerManager.closeEditFacesPanel()}
+      onRefresh={handleRefreshPeople}
+    />
+  {/if}
 {/if}
