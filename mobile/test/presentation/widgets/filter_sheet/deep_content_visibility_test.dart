@@ -5,12 +5,12 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
+import 'package:immich_mobile/models/photos_filter/filter_person.model.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep/manage_sections_sheet.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep_content.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/filter_section_id.dart';
@@ -155,7 +155,7 @@ void main() {
   // Mirrors the provider-level `keeps a section whose facet a CROSS-SECTION filter emptied` test.
   testWidgets('keeps the favourites switch when a CROSS-SECTION filter emptied its facet, because the '
       'baseline still has it (#910)', (tester) async {
-    const aPerson = PersonDto(id: 'p1', name: 'Alice', isHidden: false, thumbnailPath: '');
+    const aPerson = FilterPerson(id: 'p1', name: 'Alice');
     final controller = ScrollController();
     addTearDown(controller.dispose);
 
