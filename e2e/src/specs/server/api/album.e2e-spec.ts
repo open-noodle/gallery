@@ -631,6 +631,168 @@ describe('/albums', () => {
         }),
       );
     });
+
+    it('should set the album created date as the owner', async () => {
+      const album = await utils.createAlbum(user1.accessToken, { albumName: 'Backdated' });
+
+      const { status, body } = await request(app)
+        .patch(`/albums/${album.id}`)
+        .set('Authorization', `Bearer ${user1.accessToken}`)
+        .send({ createdAt: '1996-06-15T14:30:00.000Z' });
+
+      expect(status).toBe(200);
+      expect(body.createdAt).toBe('1996-06-15T14:30:00.000Z');
+      expect(body.updatedAt).not.toBe(album.updatedAt);
+
+      const after = await getAlbumInfo({ id: album.id }, { headers: asBearerAuth(user1.accessToken) });
+      expect(after.createdAt).toBe('1996-06-15T14:30:00.000Z');
+    });
+
+    it('should set the album created date as an editor', async () => {
+      const album = await utils.createAlbum(user1.accessToken, {
+        albumName: 'Editor may re-date',
+        albumUsers: [{ userId: user2.userId, role: AlbumUserRole.Editor }],
+      });
+
+      const { status, body } = await request(app)
+        .patch(`/albums/${album.id}`)
+        .set('Authorization', `Bearer ${user2.accessToken}`)
+        .send({ createdAt: '1996-06-15T14:30:00.000Z' });
+
+      expect(status).toBe(200);
+      expect(body.createdAt).toBe('1996-06-15T14:30:00.000Z');
+    });
+
+    it('should apply albumName and createdAt together in one request', async () => {
+      const album = await utils.createAlbum(user1.accessToken, { albumName: 'Combined update' });
+
+      const { status, body } = await request(app)
+        .patch(`/albums/${album.id}`)
+        .set('Authorization', `Bearer ${user1.accessToken}`)
+        .send({ albumName: 'Combined update - renamed', createdAt: '1996-06-15T14:30:00.000Z' });
+
+      expect(status).toBe(200);
+      expect(body.albumName).toBe('Combined update - renamed');
+      expect(body.createdAt).toBe('1996-06-15T14:30:00.000Z');
+    });
+
+    it('should not set the album created date as a viewer', async () => {
+      const album = await utils.createAlbum(user1.accessToken, {
+        albumName: 'Viewer may not re-date',
+        albumUsers: [{ userId: user2.userId, role: AlbumUserRole.Viewer }],
+      });
+
+      const { status, body } = await request(app)
+        .patch(`/albums/${album.id}`)
+        .set('Authorization', `Bearer ${user2.accessToken}`)
+        .send({ createdAt: '1996-06-15T14:30:00.000Z' });
+
+      expect(status).toBe(400);
+      expect(body).toEqual(errorDto.badRequest('Not found or no album.update access'));
+    });
+
+    it('should not set the album created date as a non-member', async () => {
+      const album = await utils.createAlbum(user2.accessToken, { albumName: 'Not yours' });
+
+      const { status, body } = await request(app)
+        .patch(`/albums/${album.id}`)
+        .set('Authorization', `Bearer ${user1.accessToken}`)
+        .send({ createdAt: '1996-06-15T14:30:00.000Z' });
+
+      expect(status).toBe(400);
+      expect(body).toEqual(errorDto.badRequest('Not found or no album.update access'));
+    });
+
+    it('should leave the created date alone when the request omits it', async () => {
+      const album = await utils.createAlbum(user1.accessToken, { albumName: 'Keep my date' });
+
+      const { status, body } = await request(app)
+        .patch(`/albums/${album.id}`)
+        .set('Authorization', `Bearer ${user1.accessToken}`)
+        .send({ albumName: 'Renamed' });
+
+      expect(status).toBe(200);
+      expect(body.albumName).toBe('Renamed');
+      expect(body.createdAt).toBe(album.createdAt);
+    });
+
+    it('should accept an empty body without changing anything', async () => {
+      const album = await utils.createAlbum(user1.accessToken, { albumName: 'Untouched' });
+
+      const { status, body } = await request(app)
+        .patch(`/albums/${album.id}`)
+        .set('Authorization', `Bearer ${user1.accessToken}`)
+        .send({});
+
+      expect(status).toBe(200);
+      expect(body.albumName).toBe('Untouched');
+      expect(body.createdAt).toBe(album.createdAt);
+      expect(body.updatedAt).not.toBe(album.updatedAt);
+    });
+
+    it.each([
+      ['1996-06-15T14:30:00.000Z', 'UTC with milliseconds', 200, '1996-06-15T14:30:00.000Z'],
+      ['1996-06-15T14:30:00+02:00', 'a numeric offset', 200, '1996-06-15T12:30:00.000Z'],
+      ['1996-06-15T14:30Z', 'omitted seconds', 200, '1996-06-15T14:30:00.000Z'],
+      ['1996-02-29T00:00:00.000Z', 'a real leap day', 200, '1996-02-29T00:00:00.000Z'],
+      // Status only, deliberately. This row exists to pin the *grammar* boundary — the
+      // schema's `\d{4}` year accepts `0001` — not storage fidelity, and year 1 does not
+      // survive the Postgres round trip: it comes back as `2001-01-01T00:00:00.000Z`.
+      // Asserting the returned value here would enshrine that as intended behaviour.
+      // Nobody backdates an album to year 1, so it is not worth a validation floor; the
+      // real lower-bound users reach is covered by the 1996 rows.
+      ['0001-01-01T00:00:00.000Z', 'the earliest four-digit year', 200, undefined],
+      ['1996-06-15T14:30:00', 'no timezone designator', 400, undefined],
+      ['1996-06-15', 'a date with no time', 400, undefined],
+      ['not-a-date', 'a non-date string', 400, undefined],
+      ['', 'an empty string', 400, undefined],
+      [null, 'null', 400, undefined],
+      ['12345-06-15T14:30:00Z', 'a five-digit year', 400, undefined],
+      ['1996-06-31T00:00:00.000Z', 'the 31st of a 30-day month', 400, undefined],
+      ['1997-02-29T00:00:00.000Z', 'a leap day in a non-leap year', 400, undefined],
+      ['1996-06-15T24:00:00.000Z', 'hour 24', 400, undefined],
+      ['1996-06-15t14:30:00z', 'lowercase t and z', 400, undefined],
+    ] as [createdAt: unknown, label: string, expectedStatus: number, expectedStored: string | undefined][])(
+      'createdAt %s (%s) should answer %i',
+      async (createdAt, label, expectedStatus, expectedStored) => {
+        const album = await utils.createAlbum(user1.accessToken, { albumName: `Grammar: ${label}` });
+
+        const { status, body } = await request(app)
+          .patch(`/albums/${album.id}`)
+          .set('Authorization', `Bearer ${user1.accessToken}`)
+          .send({ createdAt });
+
+        expect(status).toBe(expectedStatus);
+        if (expectedStored !== undefined) {
+          expect(body.createdAt).toBe(expectedStored);
+        }
+      },
+    );
+
+    it('should accept a future created date', async () => {
+      const album = await utils.createAlbum(user1.accessToken, { albumName: 'From the future' });
+      const future = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
+
+      const { status, body } = await request(app)
+        .patch(`/albums/${album.id}`)
+        .set('Authorization', `Bearer ${user1.accessToken}`)
+        .send({ createdAt: future });
+
+      expect(status).toBe(200);
+      expect(body.createdAt).toBe(future);
+    });
+
+    it('should truncate sub-millisecond precision', async () => {
+      const album = await utils.createAlbum(user1.accessToken, { albumName: 'Microseconds' });
+
+      const { status, body } = await request(app)
+        .patch(`/albums/${album.id}`)
+        .set('Authorization', `Bearer ${user1.accessToken}`)
+        .send({ createdAt: '1996-06-15T14:30:00.123456Z' });
+
+      expect(status).toBe(200);
+      expect(body.createdAt).toBe('1996-06-15T14:30:00.123Z');
+    });
   });
 
   describe('DELETE /albums/:id/assets', () => {
