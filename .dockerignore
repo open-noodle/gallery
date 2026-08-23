@@ -15,6 +15,7 @@
 **/*.tsbuildinfo
 
 design/
+specs/
 docker/
 !docker/scripts
 
