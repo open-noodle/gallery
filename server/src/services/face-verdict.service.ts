@@ -15,8 +15,7 @@ export interface FaceVerdictServiceDependencies {
 // `this.faceVerdictService` — the same cross-service-sharing pattern IdentityMergePropagationService already
 // uses. This is the join point of the two face features: the suggestion side's negative verdicts and the
 // human-placement record (manual identity links) are consulted here, so a face a user confirmed or rejected
-// is never re-proposed to an admin, and vice versa (D3, docs/superpowers/plans/
-// 2026-07-23-face-verdict-remediation-slice-3.md).
+// is never re-proposed to an admin, and vice versa (D3 of the face-verdict remediation work).
 export class FaceVerdictService {
   constructor(private deps: FaceVerdictServiceDependencies) {}
 

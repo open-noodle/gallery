@@ -12,7 +12,7 @@ import type { Translations } from 'svelte-i18n';
 /**
  * The single source of truth behind every face-cleanup action: its button label, its hover tip, its help-modal
  * explanation, its glyph, its tile colour and its severity. One registry so an explanation can never drift from
- * the button it explains (design docs/superpowers/specs/2026-07-31-face-cleanup-ux-unification-design.md §3.1).
+ * the button it explains (design specs/2026-07-31-face-cleanup-ux-unification-design.md §3.1).
  */
 export type FaceActionId = 'owner' | 'stay' | 'lock' | 'other' | 'unknown' | 'detach' | 'keep' | 'unmark';
 
@@ -55,7 +55,7 @@ export interface FaceActionMeta {
   readonly tone: 'default' | 'danger';
 }
 
-// Model B state colours (docs/plans/2026-07-10-face-cleanup-resolution-mockup.html :root vars).
+// Model B state colours (specs/mockups/2026-07-10-face-cleanup-resolution-mockup.html :root vars).
 const COLOR = {
   owner: '#4f46e5',
   other: '#d97706',

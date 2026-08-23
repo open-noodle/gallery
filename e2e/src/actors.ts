@@ -5,7 +5,7 @@ import type { Response } from 'supertest';
 import request from 'supertest';
 
 // E2E test helpers for actor-matrix-style coverage. See
-// docs/plans/2026-04-06-e2e-T02-helpers-design.md for the rationale.
+// specs/2026-04-06-e2e-T02-helpers-design.md for the rationale.
 //
 // Composes existing helpers in src/utils.ts — does NOT make supertest calls
 // directly, so when utils.ts evolves during a rebase, this file adapts and

@@ -813,7 +813,7 @@ export class FaceRepairService extends BaseService {
     return { removed };
   }
 
-  // Slice 1 of the full per-face resolution (docs/plans/2026-07-10-face-cleanup-full-resolution-design.md):
+  // Slice 1 of the full per-face resolution (specs/2026-07-10-face-cleanup-full-resolution-design.md):
   // replaces the 2-state `apply` for a single reviewed person. Slice 2 wires the `stay` (soft-decline) bucket
   // on top of Slice 1's move-to-owner path; Slice 3 wires `lock` (durable, owner-agnostic confirm) on the same
   // raw-snapshot membership check; Slice 5 wires `detach` ("Not a face" — unassign + strip the identity link)

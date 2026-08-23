@@ -27,15 +27,8 @@ describe('isInScope', () => {
     const r = isInScope(['web/src/lib/assets/fonts/dm-sans.woff2', 'web/package.json'], []);
     expect(r.ok).toBe(true);
   });
-  it('allows the root monorepo lockfile and the spec/plan docs', () => {
-    const r = isInScope(
-      [
-        'pnpm-lock.yaml',
-        'docs/superpowers/specs/2026-06-22-web-tonal-reskin-design.md',
-        'docs/superpowers/plans/2026-06-22-web-tonal-reskin.md',
-      ],
-      [],
-    );
+  it('allows the root monorepo lockfile and the design docs', () => {
+    const r = isInScope(['pnpm-lock.yaml', 'specs/2026-06-22-web-tonal-reskin-design.md'], []);
     expect(r.ok).toBe(true);
     expect(r.violations).toEqual([]);
   });
