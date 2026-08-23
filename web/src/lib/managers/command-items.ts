@@ -257,7 +257,7 @@ export const COMMAND_ITEMS: readonly CommandItem[] = [
     labelKey: 'cmdk_cmd_album_rename_label',
     descriptionKey: 'cmdk_cmd_album_rename_description',
     icon: mdiRenameOutline,
-    isAvailable: (ctx) => ctx.album !== null && ctx.album.isOwner,
+    isAvailable: (ctx) => ctx.album !== null && (ctx.album.isOwner || ctx.album.isEditor),
     handler: (ctx) => {
       if (!ctx?.album) {
         return;

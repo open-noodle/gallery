@@ -101,6 +101,9 @@ export const getAlbumActions = ($t: MessageFormatter, album: AlbumResponseDto) =
     onAction: () => handleDownloadAlbum(album),
   };
 
+  // Gallery (#990): editing follows the server's Permission.AlbumUpdate (owner ∪ editor), so an
+  // album editor can change the album's name, description and creation date. Share and delete stay
+  // owner-only (Permission.AlbumDelete is owner-only; share keeps the stricter UI gate).
   const Edit: ActionItem = {
     title: $t('edit_album'),
     icon: mdiRenameOutline,
