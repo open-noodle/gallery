@@ -28,6 +28,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../test_utils.dart';
+import '../../../widget_tester_extensions.dart';
 
 class _MockTimelineFactory extends Mock implements TimelineFactory {}
 
@@ -122,7 +123,7 @@ Future<_Harness> _pumpMapTimeline(
         supportedLocales: const [Locale('en')],
         path: '../i18n',
         fallbackLocale: const Locale('en'),
-        child: const MaterialApp(home: MapBottomSheetTimeline()),
+        child: MaterialApp(home: withStubRouter(const MapBottomSheetTimeline())),
       ),
     ),
   );

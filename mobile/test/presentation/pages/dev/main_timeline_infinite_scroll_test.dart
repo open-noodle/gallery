@@ -135,7 +135,7 @@ void main() {
       localizedForTest(
         UncontrolledProviderScope(
           container: container,
-          child: const MaterialApp(home: MainTimelinePage()),
+          child: MaterialApp(home: withStubRouter(const MainTimelinePage())),
         ),
       ),
     );
@@ -185,7 +185,7 @@ void main() {
       localizedForTest(
         UncontrolledProviderScope(
           container: container,
-          child: const MaterialApp(home: MainTimelinePage()),
+          child: MaterialApp(home: withStubRouter(const MainTimelinePage())),
         ),
       ),
     );
