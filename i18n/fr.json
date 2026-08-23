@@ -2665,6 +2665,8 @@
   "reassing_hint": "Attribuer ces médias à une personne existante",
   "recent": "Récent",
   "recent_searches": "Recherches récentes",
+  "recent_trip_subtitle": "{assetCount, plural, one {# photo} other {# photos}} en {dayCount, plural, one {# jour} other {# jours}}",
+  "recent_trip_title": "Voyage récent à {location}",
   "recently_added": "Récemment ajouté",
   "recently_added_body": "Allez directement à ce que vous avez ajouté récemment dans une page dédiée.",
   "recently_added_description": "Naviguez dans vos médias, triés par date d'envoi dans Immich",

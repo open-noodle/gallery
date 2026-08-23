@@ -682,7 +682,7 @@ export type OnThisDayData = { year: number };
 export type RuleMemoryData = {
   ruleId: string;
   dedupeKey: string;
-  title: string;
+  title?: string;
   subtitle?: string;
   score?: number;
   context?: Record<string, unknown>;
