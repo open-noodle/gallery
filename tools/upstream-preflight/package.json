@@ -20,6 +20,7 @@
     "postrebase-audit": "tsx src/index.ts postrebase-audit",
     "mobile-drift-check": "tsx src/index.ts mobile-drift-check",
     "ci-invariants-check": "tsx src/index.ts ci-invariants-check",
+    "commit-autolink-check": "tsx src/index.ts commit-autolink-check",
     "fork-patches-check": "tsx src/index.ts fork-patches-check",
     "rebase-confidence-check": "tsx src/index.ts rebase-confidence-check",
     "coverage": "tsx src/coverage.ts"
