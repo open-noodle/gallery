@@ -2071,7 +2071,54 @@ export class SharedSpaceService extends BaseService {
     }
 
     return this.databaseRepository.transaction(async (trx) => {
-      await this.linkFaceToSpacePerson(trx, person, assetFaceId, { writeIdentity: true });
+      // F-37: lock first, before any read below, so a second concurrent attach on this SAME face
+      // waits for this transaction to commit rather than racing its own read of who holds the
+      // face right now.
+      await this.facePersonVerdictRepository.lockFaceForAssignment(assetFaceId, trx);
+
+      // §6.3.1: does this face already belong to one of the OWNER's own people? If so, and that
+      // person's identity differs from (or is absent, and so can never equal) the target space
+      // person's own identity, the attach is still granted but must NOT rewrite the face's global
+      // identity — see linkFaceToSpacePerson's doc comment for why the projection alone suffices.
+      const ownerLink = await this.facePersonVerdictRepository.getFaceOwnerLink(assetFaceId, trx);
+      const writeIdentity = !ownerLink?.personId || ownerLink.identityId === person.identityId;
+
+      if (!writeIdentity) {
+        // Row 3: the identity write above is intentionally skipped, so record a negative verdict
+        // for this space person against the owner's identity, or the suggestion pipeline offers
+        // the face straight back (F-36).
+        await this.facePersonVerdictRepository.markRejectedForSpacePerson(
+          person.id,
+          assetFaceId,
+          { identityId: ownerLink!.identityId, source: 'suggestion', actorId: auth.user.id },
+          trx,
+        );
+      }
+
+      // F-13 (spec §6.3): reassign — attaching a face already held by a DIFFERENT space person in
+      // this same space moves it. Remove every current holder's projection row (a plain re-attach
+      // to the SAME person is a harmless no-op here, since linkFaceToSpacePerson re-adds it below),
+      // recount the ones that actually changed (§6.4), and record a negative verdict for each so
+      // the suggestion pipeline does not immediately re-offer the face back to them.
+      const allRemovedPersonIds = await this.sharedSpaceRepository.removePersonFaceAssignmentsForSpaceFace(
+        spaceId,
+        assetFaceId,
+        trx,
+      );
+      const removedPersonIds = allRemovedPersonIds.filter((removedPersonId) => removedPersonId !== person.id);
+      if (removedPersonIds.length > 0) {
+        await this.sharedSpaceRepository.recountPersons(removedPersonIds, trx);
+        for (const removedPersonId of removedPersonIds) {
+          await this.facePersonVerdictRepository.markRejectedForSpacePerson(
+            removedPersonId,
+            assetFaceId,
+            { source: 'suggestion', actorId: auth.user.id },
+            trx,
+          );
+        }
+      }
+
+      await this.linkFaceToSpacePerson(trx, person, assetFaceId, { writeIdentity });
       return true;
     });
   }

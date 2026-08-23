@@ -207,3 +207,121 @@ describe('attach idempotence (F-14)', () => {
     expect(rows).toHaveLength(1);
   });
 });
+
+// §6.3.1 row 3: the face already belongs to one of Bob's own people, under an identity Anna's target
+// space person does not share. F-40 is the companion pin: the override must be entirely space-local,
+// so everything Bob's OWN reads go through -- his person row, asset_face.personId, and the identity
+// resolution his People page and asset viewer resolve names/birthdays through -- must come out unchanged
+// on the other side of Anna's write.
+describe('the owner-named override is space-local (F-36, F-40)', () => {
+  it('overrides Bob’s naming in the space without rewriting the face’s identity, and without touching Bob’s own person, asset_face.personId, or his resolved view (F-36, F-40)', async () => {
+    const { sut, ctx } = newMediumService(SharedSpaceService, {
+      database: defaultDatabase,
+      real: [FacePersonVerdictRepository, SharedSpaceRepository, FaceIdentityRepository, DatabaseRepository],
+      mock: [LoggingRepository],
+    });
+    const faceIdentityRepo = ctx.get(FaceIdentityRepository);
+    const { anna, bob, space } = await newSpaceWithEditorAndMember(ctx);
+    const { assetId } = await reachPathBuilders.direct(ctx, { spaceId: space.id, ownerId: bob.id });
+
+    // Bob already named this face himself, under HIS OWN identity.
+    const { result: bobPerson } = await ctx.newPerson({ ownerId: bob.id, name: 'Dad' });
+    const bobIdentity = await faceIdentityRepo.ensurePersonIdentity(bobPerson.id);
+    const { result: faceId } = await ctx.newAssetFace({ assetId, personId: bobPerson.id });
+    await faceIdentityRepo.linkFace({ assetFaceId: faceId, identityId: bobIdentity.id, source: 'owner-person' });
+
+    // Anna creates a DIFFERENT space person and overrides the naming, space-locally.
+    const spacePerson = await ctx.get(SharedSpaceRepository).createPerson({ spaceId: space.id, name: 'Uncle Tom' });
+    const auth = { user: { id: anna.id } } as AuthDto;
+
+    await expect(sut.attachFaceToSpacePerson(auth, space.id, spacePerson.id, faceId)).resolves.toBe(true);
+
+    // The space's own projection shows the face under Anna's person.
+    const projectionRows = await defaultDatabase
+      .selectFrom('shared_space_person_face')
+      .selectAll()
+      .where('assetFaceId', '=', faceId)
+      .execute();
+    expect(projectionRows).toEqual([{ personId: spacePerson.id, assetFaceId: faceId }]);
+
+    // F-36: the face's GLOBAL identity link is untouched -- still Bob's identity, not the space person's.
+    const identityLink = await defaultDatabase
+      .selectFrom('face_identity_face')
+      .selectAll()
+      .where('assetFaceId', '=', faceId)
+      .executeTakeFirstOrThrow();
+    expect(identityLink.identityId).toBe(bobIdentity.id);
+    expect(identityLink.source).toBe('owner-person');
+
+    // F-40: asset_face.personId, Bob's own person row, and the RESOLVED view his own reads go through
+    // (not just the columns) are exactly as they were before Anna's write.
+    const face = await defaultDatabase
+      .selectFrom('asset_face')
+      .selectAll()
+      .where('id', '=', faceId)
+      .executeTakeFirstOrThrow();
+    expect(face.personId).toBe(bobPerson.id);
+
+    const person = await defaultDatabase
+      .selectFrom('person')
+      .selectAll()
+      .where('id', '=', bobPerson.id)
+      .executeTakeFirstOrThrow();
+    expect(person.name).toBe('Dad');
+    expect(person.identityId).toBe(bobIdentity.id);
+
+    const resolved = await faceIdentityRepo.getResolvedPersonByIdentityId(bob.id, bobIdentity.id);
+    expect(resolved?.name).toBe('Dad');
+  });
+});
+
+// F-37: two editors attach the SAME face to two DIFFERENT space people at the same time. Needs two real
+// Postgres transactions actually racing -- a mocked repository cannot express the interleaving this pins.
+describe('concurrent attach to the same face (F-37)', () => {
+  it('serializes -- one wins, never two projection rows, never a lost recount', async () => {
+    const { sut, ctx } = newMediumService(SharedSpaceService, {
+      database: defaultDatabase,
+      real: [FacePersonVerdictRepository, SharedSpaceRepository, FaceIdentityRepository, DatabaseRepository],
+      mock: [LoggingRepository],
+    });
+    const { anna, bob, space } = await newSpaceWithEditorAndMember(ctx);
+    const { assetId } = await reachPathBuilders.direct(ctx, { spaceId: space.id, ownerId: bob.id });
+    const { result: faceId } = await ctx.newAssetFace({ assetId });
+    const personA = await ctx.get(SharedSpaceRepository).createPerson({ spaceId: space.id, name: 'A' });
+    const personB = await ctx.get(SharedSpaceRepository).createPerson({ spaceId: space.id, name: 'B' });
+
+    const auth = { user: { id: anna.id } } as AuthDto;
+    const [resultA, resultB] = await Promise.all([
+      sut.attachFaceToSpacePerson(auth, space.id, personA.id, faceId),
+      sut.attachFaceToSpacePerson(auth, space.id, personB.id, faceId),
+    ]);
+
+    // Neither side is refused -- the loser's write becomes an ordinary sequential reassign once it
+    // acquires the lock the winner already released.
+    expect(resultA).toBe(true);
+    expect(resultB).toBe(true);
+
+    const rows = await defaultDatabase
+      .selectFrom('shared_space_person_face')
+      .selectAll()
+      .where('assetFaceId', '=', faceId)
+      .execute();
+    expect(rows).toHaveLength(1);
+
+    const winnerId = rows[0].personId;
+    const loserId = winnerId === personA.id ? personB.id : personA.id;
+
+    const winner = await defaultDatabase
+      .selectFrom('shared_space_person')
+      .select(['faceCount'])
+      .where('id', '=', winnerId)
+      .executeTakeFirstOrThrow();
+    const loser = await defaultDatabase
+      .selectFrom('shared_space_person')
+      .select(['faceCount'])
+      .where('id', '=', loserId)
+      .executeTakeFirstOrThrow();
+    expect(winner.faceCount).toBe(1);
+    expect(loser.faceCount).toBe(0);
+  });
+});

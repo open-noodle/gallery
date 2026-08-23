@@ -7764,6 +7764,9 @@ describe(SharedSpaceService.name, () => {
         factory.sharedSpacePerson({ id: 'space-person-1', spaceId: 'space-1' }),
       );
       mocks.faceIdentity.ensureSpacePersonIdentity.mockResolvedValue({ id: 'space-identity-1' } as any);
+      // §6.3.1 default: the face has no owner-side personId, so the ordinary (row 1) path applies unless a
+      // test below overrides this to exercise row 2 or row 3.
+      mocks.facePersonVerdict.getFaceOwnerLink.mockResolvedValue({ personId: null, identityId: null });
     });
 
     // F-4: a Viewer is refused. The fixture is otherwise identical to the F-5 grant below, so this can only
@@ -7834,6 +7837,113 @@ describe(SharedSpaceService.name, () => {
       expect(mocks.sharedSpace.addPersonFaces).toHaveBeenCalledWith(
         [{ personId: 'space-person-1', assetFaceId: 'face-1' }],
         undefined,
+        mocks.database,
+      );
+    });
+
+    // F-34 (§6.3.1 row 1): unrecognised face — ordinary path, identity IS written. Covered structurally by
+    // the beforeEach default (getFaceOwnerLink -> personId null), pinned explicitly here.
+    it('writes the identity for an unassigned face (F-34)', async () => {
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
+      mocks.facePersonVerdict.isFaceAssignableInSpace.mockResolvedValue(true);
+      mocks.facePersonVerdict.getFaceOwnerLink.mockResolvedValue({ personId: null, identityId: null });
+      mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
+
+      await expect(sut.attachFaceToSpacePerson(factory.auth(), 'space-1', 'space-person-1', 'face-1')).resolves.toBe(
+        true,
+      );
+
+      expect(mocks.faceIdentity.replaceFaceIdentity).toHaveBeenCalledWith(
+        { assetFaceId: 'face-1', identityId: 'space-identity-1', source: 'manual' },
+        mocks.database,
+      );
+    });
+
+    // F-35 (§6.3.1 row 2): the face's owner person already carries the SAME identity as the target space
+    // person. Granted, and the identity link is (harmlessly) written again — no rewrite is needed, but
+    // nothing forbids it either, unlike row 3.
+    it('succeeds without a rewrite when the identities already match (F-35)', async () => {
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
+      mocks.sharedSpace.getPersonById.mockResolvedValue(
+        factory.sharedSpacePerson({ id: 'space-person-1', spaceId: 'space-1', identityId: 'shared-identity' }),
+      );
+      mocks.facePersonVerdict.isFaceAssignableInSpace.mockResolvedValue(true);
+      mocks.facePersonVerdict.getFaceOwnerLink.mockResolvedValue({
+        personId: 'owner-person-1',
+        identityId: 'shared-identity',
+      });
+      mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
+
+      await expect(sut.attachFaceToSpacePerson(factory.auth(), 'space-1', 'space-person-1', 'face-1')).resolves.toBe(
+        true,
+      );
+
+      expect(mocks.faceIdentity.replaceFaceIdentity).toHaveBeenCalledWith(
+        { assetFaceId: 'face-1', identityId: 'space-identity-1', source: 'manual' },
+        mocks.database,
+      );
+    });
+
+    // F-36 (§6.3.1 row 3): the owner already named this face under a DIFFERENT identity. The attach is
+    // ALLOWED, but the identity must NOT be rewritten — the owner's person depends on it, and
+    // applyResolvedPersonMetadata resolves their view through it. This is the assertion the design exists
+    // for: a status-only check would pass even if the implementation always called replaceFaceIdentity.
+    it('overrides an owner-named face WITHOUT rewriting its identity (F-36)', async () => {
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
+      mocks.sharedSpace.getPersonById.mockResolvedValue(
+        factory.sharedSpacePerson({ id: 'space-person-1', spaceId: 'space-1', identityId: 'space-identity' }),
+      );
+      mocks.facePersonVerdict.isFaceAssignableInSpace.mockResolvedValue(true);
+      mocks.facePersonVerdict.getFaceOwnerLink.mockResolvedValue({
+        personId: 'owner-person-1',
+        identityId: 'owner-identity',
+      });
+      mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
+
+      await expect(sut.attachFaceToSpacePerson(factory.auth(), 'space-1', 'space-person-1', 'face-1')).resolves.toBe(
+        true,
+      );
+
+      // the space sees the new name
+      expect(mocks.sharedSpace.addPersonFaces).toHaveBeenCalledWith(
+        [{ personId: 'space-person-1', assetFaceId: 'face-1' }],
+        undefined,
+        mocks.database,
+      );
+      // but the owner's identity is untouched
+      expect(mocks.faceIdentity.replaceFaceIdentity).not.toHaveBeenCalled();
+      // and the pipeline will not re-offer it
+      expect(mocks.facePersonVerdict.markRejectedForSpacePerson).toHaveBeenCalledWith(
+        'space-person-1',
+        'face-1',
+        expect.objectContaining({ identityId: 'owner-identity' }),
+        mocks.database,
+      );
+    });
+
+    // F-13: reassign between two space people in the SAME space. Attaching a face already held by another
+    // space person moves it, and the old person must not be silently re-suggested the face it just lost.
+    it('moves the face off the previous space person and records a negative verdict (F-13)', async () => {
+      mocks.sharedSpace.getMember.mockResolvedValue(makeMemberResult({ role: SharedSpaceRole.Editor }));
+      mocks.facePersonVerdict.isFaceAssignableInSpace.mockResolvedValue(true);
+      mocks.sharedSpace.removePersonFaceAssignmentsForSpaceFace.mockResolvedValue(['other-person-id']);
+      mocks.sharedSpace.addPersonFaces.mockResolvedValue([]);
+
+      await expect(sut.attachFaceToSpacePerson(factory.auth(), 'space-1', 'space-person-1', 'face-1')).resolves.toBe(
+        true,
+      );
+
+      expect(mocks.sharedSpace.removePersonFaceAssignmentsForSpaceFace).toHaveBeenCalledWith(
+        'space-1',
+        'face-1',
+        mocks.database,
+      );
+      // §6.4: removing the old row must go through the same recount as adding it.
+      expect(mocks.sharedSpace.recountPersons).toHaveBeenCalledWith(['other-person-id'], mocks.database);
+      expect(mocks.facePersonVerdict.markRejectedForSpacePerson).toHaveBeenCalledWith(
+        'other-person-id',
+        'face-1',
+        expect.objectContaining({ source: 'suggestion' }),
         mocks.database,
       );
     });
