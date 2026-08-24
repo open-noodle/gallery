@@ -157,7 +157,7 @@ export function runMobileDriftAudit(
   );
   const repositoryPath = path.join(
     cwd,
-    'mobile/lib/infrastructure/repositories/db.repository.dart',
+    'mobile/lib/data/db/main/database.dart',
   );
   const snapshotsPath = path.join(cwd, 'mobile/drift_schemas/main');
 
