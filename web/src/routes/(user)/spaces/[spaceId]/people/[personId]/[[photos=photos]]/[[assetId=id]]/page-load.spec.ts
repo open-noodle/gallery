@@ -34,4 +34,22 @@ describe('space person detail page load', () => {
 
     expect(result.previousRoute).toBe('/spaces/space-1/people');
   });
+
+  it('drops a cross-origin previous route', async () => {
+    const url = new URL(
+      `https://gallery.test/spaces/space-1/people/person-1?${QueryParameter.PREVIOUS_ROUTE}=https://evil.test/steal`,
+    );
+
+    const result = await load({ params: { spaceId: 'space-1', personId: 'person-1' }, url } as never);
+
+    expect(result.previousRoute).toBeNull();
+  });
+
+  it('has no previous route when the param is absent', async () => {
+    const url = new URL('https://gallery.test/spaces/space-1/people/person-1');
+
+    const result = await load({ params: { spaceId: 'space-1', personId: 'person-1' }, url } as never);
+
+    expect(result.previousRoute).toBeNull();
+  });
 });
