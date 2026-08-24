@@ -17,11 +17,8 @@ export const load = (async ({ url, params }) => {
   const requestedPrevious = url.searchParams.has(QueryParameter.PREVIOUS_ROUTE)
     ? Route.continue(url.searchParams.get(QueryParameter.PREVIOUS_ROUTE), '')
     : '';
-  const previousUrl =
-    requestedPrevious === '' ? null : new URL(requestedPrevious.toString(), url);
-  const previousRoute = previousUrl
-    ? previousUrl.pathname + previousUrl.search
-    : null;
+  const previousUrl = requestedPrevious === '' ? null : new URL(requestedPrevious.toString(), url);
+  const previousRoute = previousUrl ? previousUrl.pathname + previousUrl.search : null;
 
   const [space, members, person, statistics] = await Promise.all([
     getSpace({ id: params.spaceId }),
