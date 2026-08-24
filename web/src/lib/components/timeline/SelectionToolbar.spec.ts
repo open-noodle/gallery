@@ -225,7 +225,8 @@ describe('SelectionToolbar', () => {
     expect(screen.getByRole('menuitem', { name: 'download' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'remove_from_album' })).toBeInTheDocument();
     expect(screen.queryByLabelText('remove_from_space')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('share')).not.toBeInTheDocument();
+    // Share is present since #1018 — the space Owner/Editor role carries it, like add-to-album.
+    expect(screen.getByLabelText('share')).toBeInTheDocument();
     expect(screen.queryByLabelText('to_favorite')).not.toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: 'delete' })).not.toBeInTheDocument();
   });
@@ -248,7 +249,7 @@ describe('SelectionToolbar', () => {
     expect(screen.queryByRole('menuitem', { name: 'delete' })).not.toBeInTheDocument();
   });
 
-  it("Given a space editor selecting only other members' assets, When the toolbar renders, Then Add-to-album is shown for contribution but Share is not", () => {
+  it("Given a space editor selecting only other members' assets, When the toolbar renders, Then both Add-to-album and Share are shown — the space role covers both (#764 contribution, #1018 link)", () => {
     renderToolbar({
       timelineManager: fakeTimelineManager,
       assetInteraction: makeAssetInteraction({
@@ -260,7 +261,7 @@ describe('SelectionToolbar', () => {
     });
 
     expect(screen.getByLabelText('add_to_album_or_space')).toBeInTheDocument();
-    expect(screen.queryByLabelText('share')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('share')).toBeInTheDocument();
   });
 
   it('Given a space VIEWER with a mixed selection, When the toolbar renders, Then Share is shown for the owned subset but Add-to-album is not — a viewer cannot contribute', () => {
