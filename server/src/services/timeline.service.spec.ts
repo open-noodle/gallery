@@ -382,18 +382,26 @@ describe(TimelineService.name, () => {
       mocks.sharedSpace.getMemberSpaceIdsLinkingAlbum.mockResolvedValue([spaceId]);
       mocks.asset.getTimeBuckets.mockResolvedValue([]);
 
-      await sut.getTimeBuckets(sharedLinkAuth(spaceId), { albumId });
+      const auth = sharedLinkAuth(spaceId);
+      await sut.getTimeBuckets(auth, { albumId });
 
-      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(expect.objectContaining({ albumSpaceIds: [spaceId] }));
+      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
+        expect.objectContaining({ albumSpaceIds: [spaceId] }),
+        auth,
+      );
     });
 
     it('leaves the contributed arm off when the link carries no space', async () => {
       mocks.sharedSpace.getMemberSpaceIdsLinkingAlbum.mockResolvedValue([spaceId]);
       mocks.asset.getTimeBuckets.mockResolvedValue([]);
 
-      await sut.getTimeBuckets(sharedLinkAuth(null), { albumId });
+      const auth = sharedLinkAuth(null);
+      await sut.getTimeBuckets(auth, { albumId });
 
-      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(expect.objectContaining({ albumSpaceIds: undefined }));
+      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
+        expect.objectContaining({ albumSpaceIds: undefined }),
+        auth,
+      );
     });
 
     it('resolves only spaces where the creator still holds a write role', async () => {
@@ -414,9 +422,13 @@ describe(TimelineService.name, () => {
       mocks.sharedSpace.getMemberSpaceIdsLinkingAlbum.mockResolvedValue([newUuid()]);
       mocks.asset.getTimeBuckets.mockResolvedValue([]);
 
-      await sut.getTimeBuckets(sharedLinkAuth(spaceId), { albumId });
+      const auth = sharedLinkAuth(spaceId);
+      await sut.getTimeBuckets(auth, { albumId });
 
-      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(expect.objectContaining({ albumSpaceIds: undefined }));
+      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(
+        expect.objectContaining({ albumSpaceIds: undefined }),
+        auth,
+      );
     });
   });
 
