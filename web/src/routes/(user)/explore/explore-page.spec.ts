@@ -98,4 +98,48 @@ describe('Explore page', () => {
     const link = screen.getByRole('link', { name: /Cape Town/ });
     expect(link).toHaveAttribute('href', '/photos?city=Cape%20Town');
   });
+
+  // #989: the tile linked with `city` alone, so the location filter had no country to nest the
+  // city under and rendered it flat beside the country list. The country is already on the
+  // representative asset the strip renders — carry it through.
+  it('scopes a place tile to the country of its representative asset', () => {
+    renderPage(
+      [],
+      [
+        {
+          fieldName: 'exifInfo.city',
+          items: [
+            {
+              value: 'Cape Town',
+              data: assetFactory.build({ id: 'asset-1', exifInfo: { city: 'Cape Town', country: 'South Africa' } }),
+            },
+          ],
+        },
+      ],
+    );
+
+    const link = screen.getByRole('link', { name: /Cape Town/ });
+    expect(link).toHaveAttribute('href', '/photos?city=Cape%20Town&country=South%20Africa');
+  });
+
+  // Reverse geocoding can resolve a city without a country. Falling back to the city-only link
+  // keeps the tile working (as an orphaned selection) rather than emitting `country=`.
+  it('falls back to a city-only link when the asset has no country', () => {
+    renderPage(
+      [],
+      [
+        {
+          fieldName: 'exifInfo.city',
+          items: [
+            {
+              value: 'Cape Town',
+              data: assetFactory.build({ id: 'asset-1', exifInfo: { city: 'Cape Town', country: null } }),
+            },
+          ],
+        },
+      ],
+    );
+
+    expect(screen.getByRole('link', { name: /Cape Town/ })).toHaveAttribute('href', '/photos?city=Cape%20Town');
+  });
 });

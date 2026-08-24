@@ -121,6 +121,27 @@ describe('Route', () => {
     it('should ignore an empty city', () => {
       expect(Route.photos({ city: '' })).toBe('/photos');
     });
+
+    // #989: a city alone lands in the location filter as an ORPHAN — the panel has no country to
+    // nest it under, so it renders flat beside the countries. Carrying the country makes the panel
+    // expand that country and select the city inside it.
+    it('should support a city scoped to its country', () => {
+      expect(Route.photos({ city: 'Cape Town', country: 'South Africa' })).toBe(
+        '/photos?city=Cape%20Town&country=South%20Africa',
+      );
+    });
+
+    it('should ignore an empty country', () => {
+      expect(Route.photos({ city: 'Cape Town', country: '' })).toBe('/photos?city=Cape%20Town');
+    });
+
+    // The param order is fixed by the route helper, not by the caller's object literal, so the two
+    // call sites (#989: the Explore strip and the Places grid) cannot drift apart.
+    it('should emit a stable param order regardless of the caller key order', () => {
+      expect(Route.photos({ country: 'South Africa', city: 'Cape Town' })).toBe(
+        '/photos?city=Cape%20Town&country=South%20Africa',
+      );
+    });
   });
 
   describe('viewSpaceAlbum', () => {
