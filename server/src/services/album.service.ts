@@ -99,9 +99,17 @@ export class AlbumService extends BaseService {
     await this.requireAccess({ auth, permission: Permission.AlbumRead, ids: [id] });
     await this.albumRepository.updateThumbnails();
     const album = await this.findOrFail(id, auth.user.id, { withAssets: false });
-    const [albumMetadataForIds] = await this.albumRepository.getMetadataForIds([album.id], {
-      forUserId: auth.sharedLink ? undefined : auth.user.id,
-    });
+    // #1018: for a shared link the count is scoped to the ONE space the link was created from, so
+    // it matches the grid the link renders. A link with no space counts owner rows only, as before —
+    // passing the creator's id unscoped would count contributions from every space they belong to.
+    const [albumMetadataForIds] = await this.albumRepository.getMetadataForIds(
+      [album.id],
+      auth.sharedLink
+        ? auth.sharedLink.spaceId
+          ? { forUserId: auth.sharedLink.userId, spaceId: auth.sharedLink.spaceId }
+          : { forUserId: undefined }
+        : { forUserId: auth.user.id },
+    );
 
     const hasSharedUsers = album.albumUsers && album.albumUsers.length > 1;
     const hasSharedLink = album.sharedLinks && album.sharedLinks.length > 0;

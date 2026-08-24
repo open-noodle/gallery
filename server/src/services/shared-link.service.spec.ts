@@ -1,7 +1,7 @@
 import { BadRequestException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { AssetIdErrorReason } from 'src/dtos/asset-ids.response.dto';
 import { mapSharedLink } from 'src/dtos/shared-link.dto';
-import { SharedLinkType } from 'src/enum';
+import { SharedLinkType, SharedSpaceRole } from 'src/enum';
 import { SharedLinkService } from 'src/services/shared-link.service';
 import { AlbumFactory } from 'test/factories/album.factory';
 import { AssetFactory } from 'test/factories/asset.factory';
@@ -11,6 +11,17 @@ import { sharedLinkStub } from 'test/fixtures/shared-link.stub';
 import { getForSharedLink } from 'test/mappers';
 import { factory, newUuid } from 'test/small.factory';
 import { newTestService, ServiceMocks } from 'test/utils';
+
+// Seeds a link whose single asset belongs to SOMEONE ELSE — the shape #1018 made reachable on a
+// public link. Module scope so `unicorn/consistent-function-scoping` stays satisfied.
+const seedPublicLinkWithContributedAsset = (mocks: ServiceMocks) => {
+  const contributed = AssetFactory.from({ ownerId: newUuid() }).exif().build();
+  const link = SharedLinkFactory.from({ userId: authStub.adminSharedLink.user.id })
+    .asset(contributed, (builder) => builder.exif())
+    .build();
+  mocks.sharedLink.get.mockResolvedValue(getForSharedLink(link) as never);
+  return { contributed };
+};
 
 describe(SharedLinkService.name, () => {
   let sut: SharedLinkService;
@@ -156,6 +167,47 @@ describe(SharedLinkService.name, () => {
     });
   });
 
+  // #1018: a link can now carry photos its creator does not own, so the payload an ANONYMOUS
+  // visitor receives must not name the people behind them. Before this feature an individual link
+  // only ever held the creator's own assets, so a third party's user id was never reachable here.
+  describe('public payload redaction (#1018)', () => {
+    it('does not name the owner of an asset in the link a visitor fetches', async () => {
+      seedPublicLinkWithContributedAsset(mocks);
+
+      const result = await sut.getMine(authStub.adminSharedLink, []);
+
+      for (const asset of result.assets) {
+        expect(asset).not.toHaveProperty('ownerId');
+      }
+    });
+
+    it('does not tell a visitor which space the link came from', async () => {
+      seedPublicLinkWithContributedAsset(mocks);
+
+      const result = await sut.getMine(authStub.adminSharedLink, []);
+
+      expect(result).not.toHaveProperty('spaceId');
+    });
+
+    it('redacts the same way on the password-login response', async () => {
+      const contributed = AssetFactory.from({ ownerId: newUuid() }).exif().build();
+      const link = SharedLinkFactory.from({
+        userId: authStub.adminSharedLink.user.id,
+        password: 'correct-password',
+      })
+        .asset(contributed, (builder) => builder.exif())
+        .build();
+      mocks.sharedLink.get.mockResolvedValue(getForSharedLink(link) as never);
+      mocks.crypto.hashSha256.mockReturnValue(Buffer.from('hashed-token'));
+
+      const { sharedLink } = await sut.login(authStub.adminSharedLink, { password: 'correct-password' });
+
+      for (const asset of sharedLink.assets) {
+        expect(asset).not.toHaveProperty('ownerId');
+      }
+    });
+  });
+
   describe('get', () => {
     it('should throw an error for an invalid shared link', async () => {
       mocks.sharedLink.get.mockResolvedValue(void 0);
@@ -221,6 +273,7 @@ describe(SharedLinkService.name, () => {
         slug: null,
         showExif: true,
         key: Buffer.from('random-bytes', 'utf8'),
+        spaceId: null,
       });
     });
 
@@ -257,6 +310,120 @@ describe(SharedLinkService.name, () => {
         expiresAt: null,
         showExif: true,
         key: Buffer.from('random-bytes', 'utf8'),
+        spaceId: null,
+      });
+    });
+
+    // #1018: a share link made from inside a space covers what the SPACE shows, not just what the
+    // link creator owns. Gated on the space Owner/Editor role (the #764 rule) and tethered to the
+    // space, so the link stops serving a contribution the moment it leaves the space.
+    describe('from a space (#1018)', () => {
+      const spaceId = newUuid();
+      const assetId = newUuid();
+
+      it('should let a space editor share an asset contributed by another member', async () => {
+        const asset = AssetFactory.create();
+        const sharedLink = SharedLinkFactory.from()
+          .asset(asset, (builder) => builder.exif())
+          .build();
+        mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Editor } as any);
+        mocks.access.asset.checkSpaceAccessForSpace.mockResolvedValue(new Set([asset.id]));
+        mocks.sharedLink.create.mockResolvedValue(getForSharedLink(sharedLink));
+
+        await sut.create(authStub.admin, { type: SharedLinkType.Individual, assetIds: [asset.id], spaceId });
+
+        expect(mocks.access.asset.checkSpaceAccessForSpace).toHaveBeenCalledWith(
+          authStub.admin.user.id,
+          spaceId,
+          new Set([asset.id]),
+        );
+        expect(mocks.sharedLink.create).toHaveBeenCalledWith(expect.objectContaining({ spaceId }));
+      });
+
+      it('should not consult the owner-only share permission when a space is given', async () => {
+        const asset = AssetFactory.create();
+        mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Editor } as any);
+        mocks.access.asset.checkSpaceAccessForSpace.mockResolvedValue(new Set([asset.id]));
+        mocks.sharedLink.create.mockResolvedValue(getForSharedLink(SharedLinkFactory.create()));
+
+        await sut.create(authStub.admin, { type: SharedLinkType.Individual, assetIds: [asset.id], spaceId });
+
+        expect(mocks.access.asset.checkOwnerAccess).not.toHaveBeenCalled();
+      });
+
+      it('should reject a space viewer before looking the assets up', async () => {
+        mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Viewer } as any);
+        // Deliberately permissive — the role gate, not the asset lookup, has to be what rejects.
+        mocks.access.asset.checkSpaceAccessForSpace.mockResolvedValue(new Set([assetId]));
+
+        await expect(
+          sut.create(authStub.admin, { type: SharedLinkType.Individual, assetIds: [assetId], spaceId }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(mocks.access.asset.checkSpaceAccessForSpace).not.toHaveBeenCalled();
+        expect(mocks.sharedLink.create).not.toHaveBeenCalled();
+      });
+
+      it('should reject a non-member before looking the assets up', async () => {
+        mocks.sharedSpace.getMember.mockResolvedValue(undefined as never);
+        mocks.access.asset.checkSpaceAccessForSpace.mockResolvedValue(new Set([assetId]));
+
+        await expect(
+          sut.create(authStub.admin, { type: SharedLinkType.Individual, assetIds: [assetId], spaceId }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(mocks.access.asset.checkSpaceAccessForSpace).not.toHaveBeenCalled();
+        expect(mocks.sharedLink.create).not.toHaveBeenCalled();
+      });
+
+      it('should reject an asset that is not visible in the space', async () => {
+        const [inSpace, outsideSpace] = [newUuid(), newUuid()];
+        mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Owner } as any);
+        mocks.access.asset.checkSpaceAccessForSpace.mockResolvedValue(new Set([inSpace]));
+
+        await expect(
+          sut.create(authStub.admin, {
+            type: SharedLinkType.Individual,
+            assetIds: [inSpace, outsideSpace],
+            spaceId,
+          }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(mocks.sharedLink.create).not.toHaveBeenCalled();
+      });
+
+      it('should let a space editor share an album linked to the space', async () => {
+        const album = AlbumFactory.from().asset().build();
+        const sharedLink = SharedLinkFactory.from().album(album).build();
+        mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Editor } as any);
+        mocks.sharedSpace.getMemberSpaceIdsLinkingAlbum.mockResolvedValue([spaceId]);
+        mocks.sharedLink.create.mockResolvedValue(getForSharedLink(sharedLink));
+
+        await sut.create(authStub.admin, { type: SharedLinkType.Album, albumId: album.id, spaceId });
+
+        expect(mocks.sharedSpace.getMemberSpaceIdsLinkingAlbum).toHaveBeenCalledWith(album.id, authStub.admin.user.id);
+        expect(mocks.access.album.checkOwnerAccess).not.toHaveBeenCalled();
+        expect(mocks.sharedLink.create).toHaveBeenCalledWith(expect.objectContaining({ spaceId, albumId: album.id }));
+      });
+
+      it('should reject an album linked only to a different space', async () => {
+        const otherSpaceId = newUuid();
+        mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Editor } as any);
+        // Linked somewhere, just not to the space the link claims to come from.
+        mocks.sharedSpace.getMemberSpaceIdsLinkingAlbum.mockResolvedValue([otherSpaceId]);
+
+        await expect(
+          sut.create(authStub.admin, { type: SharedLinkType.Album, albumId: newUuid(), spaceId }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(mocks.sharedLink.create).not.toHaveBeenCalled();
+      });
+
+      it('should store no space on a link created outside a space', async () => {
+        const asset = AssetFactory.create();
+        mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+        mocks.sharedLink.create.mockResolvedValue(getForSharedLink(SharedLinkFactory.create()));
+
+        await sut.create(authStub.admin, { type: SharedLinkType.Individual, assetIds: [asset.id] });
+
+        expect(mocks.sharedSpace.getMember).not.toHaveBeenCalled();
+        expect(mocks.sharedLink.create).toHaveBeenCalledWith(expect.objectContaining({ spaceId: null }));
       });
     });
 
@@ -293,6 +460,7 @@ describe(SharedLinkService.name, () => {
         showExif: false,
         slug: null,
         key: Buffer.from('random-bytes', 'utf8'),
+        spaceId: null,
       });
     });
 
