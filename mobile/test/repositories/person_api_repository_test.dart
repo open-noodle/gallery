@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:immich_mobile/data/server/person.dart';
 import 'package:immich_mobile/domain/models/person.model.dart';
-import 'package:immich_mobile/repositories/person_api.repository.dart';
 import 'package:immich_mobile/services/api.service.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:openapi/api.dart' as api;

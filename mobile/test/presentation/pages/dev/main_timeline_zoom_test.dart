@@ -4,6 +4,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/data/db/main/database.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/settings_key.dart';
 import 'package:immich_mobile/domain/models/store.model.dart';
@@ -16,7 +17,6 @@ import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/domain/services/timeline.service.dart';
 import 'package:immich_mobile/domain/services/user.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
-import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
@@ -488,15 +488,17 @@ Future<void> _pumpPhotosTimeline(
         supportedLocales: const [Locale('en')],
         path: '../i18n',
         fallbackLocale: const Locale('en'),
-        child: withStubRouter(const MaterialApp(
-          home: TimelineRouteScope(
-            timelineServiceBuilder: buildPhotosTimelineRouteService,
-            // These tests pin the MAIN Photos page contract: the app-level grouping,
-            // shared across the page rather than scoped per route.
-            sharedGrouping: true,
-            child: Timeline(appBar: null, bottomSheet: null, withScrubber: false),
+        child: withStubRouter(
+          const MaterialApp(
+            home: TimelineRouteScope(
+              timelineServiceBuilder: buildPhotosTimelineRouteService,
+              // These tests pin the MAIN Photos page contract: the app-level grouping,
+              // shared across the page rather than scoped per route.
+              sharedGrouping: true,
+              child: Timeline(appBar: null, bottomSheet: null, withScrubber: false),
+            ),
           ),
-        )),
+        ),
       ),
     ),
   );
