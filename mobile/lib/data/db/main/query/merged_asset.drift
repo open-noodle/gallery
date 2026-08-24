@@ -8,11 +8,11 @@ import '../table/local/album_asset.dart';
 -- work, but the .watch() stream won't re-emit when a space membership or
 -- link row changes — so toggling showInTimeline has no visible effect until
 -- the user re-enters the page.
-import '../table/remote/shared_space_asset.entity.dart';
-import '../table/remote/shared_space_library.entity.dart';
-import '../table/remote/shared_space_member.entity.dart';
-import '../table/remote/shared_space_album_asset.entity.dart';
-import '../table/remote/shared_space_album_link.entity.dart';
+import '../table/remote/shared_space_asset.dart';
+import '../table/remote/shared_space_library.dart';
+import '../table/remote/shared_space_member.dart';
+import '../table/remote/shared_space_album_asset.dart';
+import '../table/remote/shared_space_album_link.dart';
 
 -- A viewer's main timeline is a UNION over three sources:
 --   1. Remote assets owned by the timeline users (self + partners)

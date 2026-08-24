@@ -211,7 +211,7 @@ function renderPreflightForContext(
       context.upstreamRange.files,
     ),
     mobileDriftChanges: collectSignalFiles(context.upstreamRange.files, [
-      'mobile/lib/infrastructure/repositories/db.repository.dart',
+      'mobile/lib/data/db/main/database.dart',
       'mobile/drift_schemas/main/**',
     ]),
     ciWorkflowChanges: collectSignalFiles(context.upstreamRange.files, [
