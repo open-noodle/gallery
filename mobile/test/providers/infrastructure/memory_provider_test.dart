@@ -8,14 +8,18 @@ import 'package:immich_mobile/infrastructure/repositories/memory.repository.dart
 import 'package:immich_mobile/providers/infrastructure/db.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/memory.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
+import 'package:immich_mobile/repositories/memory_api.repository.dart';
 import 'package:mocktail/mocktail.dart';
 
 import '../../infrastructure/repository.mock.dart';
 
 class MockUserService extends Mock implements UserService {}
 
+class MockMemoryApiRepository extends Mock implements MemoryApiRepository {}
+
 void main() {
   late MockMemoryRepository memoryRepository;
+  late MockMemoryApiRepository memoryApiRepository;
   late MockUserService userService;
 
   UserDto user({bool memoryEnabled = true}) => UserDto(
@@ -36,6 +40,7 @@ void main() {
     final container = ProviderContainer(
       overrides: [
         driftProvider.overrideWithValue(mockDrift(memoryRepository)),
+        memoryApiRepositoryProvider.overrideWithValue(memoryApiRepository),
         currentUserProvider.overrideWith((ref) => CurrentUserProvider(userService)),
       ],
     );
@@ -45,8 +50,12 @@ void main() {
 
   setUp(() {
     memoryRepository = MockMemoryRepository();
+    memoryApiRepository = MockMemoryApiRepository();
     userService = MockUserService();
 
+    // #997 moved the memory lane onto the server, falling back to the local table only on
+    // failure — so the API repository, not `getAll`, is what a successful refresh calls.
+    when(() => memoryApiRepository.getMemoryLane()).thenAnswer((_) async => []);
     when(() => memoryRepository.getAll('user-1')).thenAnswer((_) async => []);
     when(() => userService.tryGetMyUser()).thenReturn(user());
     when(() => userService.watchMyUser()).thenAnswer((_) => const Stream.empty());
@@ -59,15 +68,15 @@ void main() {
         container.listen(memoryLaneProvider, (_, _) {});
         async.flushMicrotasks();
 
-        verify(() => memoryRepository.getAll('user-1')).called(1);
+        verify(() => memoryApiRepository.getMemoryLane()).called(1);
 
         async.elapse(const Duration(seconds: 4));
         async.flushMicrotasks();
-        verifyNever(() => memoryRepository.getAll('user-1'));
+        verifyNever(() => memoryApiRepository.getMemoryLane());
 
         async.elapse(const Duration(hours: 25));
         async.flushMicrotasks();
-        verify(() => memoryRepository.getAll('user-1')).called(greaterThanOrEqualTo(1));
+        verify(() => memoryApiRepository.getMemoryLane()).called(greaterThanOrEqualTo(1));
       });
     });
 
@@ -76,13 +85,13 @@ void main() {
         final container = makeContainer();
         final subscription = container.listen(memoryLaneProvider, (_, _) {});
         async.flushMicrotasks();
-        verify(() => memoryRepository.getAll('user-1')).called(1);
+        verify(() => memoryApiRepository.getMemoryLane()).called(1);
 
         subscription.close();
         async.elapse(const Duration(hours: 25));
         async.flushMicrotasks();
 
-        verifyNever(() => memoryRepository.getAll('user-1'));
+        verifyNever(() => memoryApiRepository.getMemoryLane());
       });
     });
 

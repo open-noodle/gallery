@@ -13,13 +13,13 @@
 
 import 'package:drift/drift.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:immich_mobile/infrastructure/entities/remote_asset.entity.drift.dart';
-import 'package:immich_mobile/infrastructure/entities/shared_space.entity.drift.dart';
-import 'package:immich_mobile/infrastructure/entities/shared_space_asset.entity.drift.dart';
-import 'package:immich_mobile/infrastructure/entities/shared_space_library.entity.drift.dart';
-import 'package:immich_mobile/infrastructure/entities/shared_space_member.entity.drift.dart';
-import 'package:immich_mobile/infrastructure/entities/user.entity.drift.dart';
-import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
+import 'package:immich_mobile/data/db/main/database.dart';
+import 'package:immich_mobile/data/db/main/table/remote/asset.drift.dart';
+import 'package:immich_mobile/data/db/main/table/remote/shared_space.drift.dart';
+import 'package:immich_mobile/data/db/main/table/remote/shared_space_asset.drift.dart';
+import 'package:immich_mobile/data/db/main/table/remote/shared_space_library.drift.dart';
+import 'package:immich_mobile/data/db/main/table/remote/shared_space_member.drift.dart';
+import 'package:immich_mobile/data/db/main/table/user/user.drift.dart';
 
 typedef MatrixCase = ({
   String name,
