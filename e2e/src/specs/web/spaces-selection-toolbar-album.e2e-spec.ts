@@ -120,7 +120,7 @@ test.describe('Spaces — SelectionToolbar space-album control bar (Slice 6)', (
   // but isAllUserOwned is false (Share / Add-to-album / Favorite / Delete / metadata-edit hidden)
   // — manager and ownership gating are independent axes, exactly as selection-capabilities.ts
   // encodes them for the space-album (isSpaceAlbum) branch.
-  test('editor (canManage) selecting a not-owned album asset sees Select-all + Download + Remove-from-album + Set-cover', async ({
+  test('editor (canManage) selecting a not-owned album asset sees Select-all + Download + Remove-from-album + Set-cover + Share', async ({
     context,
     page,
   }) => {
@@ -145,8 +145,11 @@ test.describe('Spaces — SelectionToolbar space-album control bar (Slice 6)', (
     await expect(controlBar.getByRole('button', { name: 'Select all' })).toBeVisible();
 
     // Ownership-gated, top-level: hidden (editor doesn't own the asset).
-    await expect(controlBar.getByRole('button', { name: 'Share' })).toHaveCount(0);
     await expect(controlBar.getByRole('button', { name: /favorite/i })).toHaveCount(0);
+
+    // Role-gated: a space Editor may publish a non-owned asset through the space (#1018), so
+    // Share stays — the link is created against the space and warns before it is made.
+    await expect(controlBar.getByRole('button', { name: 'Share' })).toBeVisible();
 
     // Role-gated: a space Editor may contribute a non-owned asset into an album linked to this
     // space (#764), so Add-to-album stays — it opens the picker restricted to the space.
