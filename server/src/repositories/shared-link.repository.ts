@@ -10,6 +10,8 @@ import { DB } from 'src/schema';
 import { AssetExifTable } from 'src/schema/tables/asset-exif.table';
 import { AssetTable } from 'src/schema/tables/asset.table';
 import { SharedLinkTable } from 'src/schema/tables/shared-link.table';
+import { asBaseEb, sharedLinkAssetIsServable, sharedLinkCreatorCanPublish } from 'src/utils/shared-link-space-tether';
+import { spaceVisibilityGate } from 'src/utils/shared-space-album-scope';
 
 export type SharedLinkSearchOptions = {
   userId: string;
@@ -18,13 +20,19 @@ export type SharedLinkSearchOptions = {
 };
 
 const withSharedAssets = (eb: ExpressionBuilder<DB, 'shared_link'>) => {
-  return eb
-    .selectFrom('shared_link_asset')
-    .whereRef('shared_link.id', '=', 'shared_link_asset.sharedLinkId')
-    .innerJoin('asset', 'asset.id', 'shared_link_asset.assetId')
-    .where('asset.deletedAt', 'is', null)
-    .selectAll('asset')
-    .orderBy('asset.fileCreatedAt', 'asc');
+  return (
+    eb
+      .selectFrom('shared_link_asset')
+      .whereRef('shared_link.id', '=', 'shared_link_asset.sharedLinkId')
+      .innerJoin('asset', 'asset.id', 'shared_link_asset.assetId')
+      .where('asset.deletedAt', 'is', null)
+      // #1018: the payload must list exactly what the access gate serves, or the visitor's grid
+      // renders holes. Assets the creator does not own are tethered to the link's space, so one
+      // withdrawn contribution drops out of both at the same moment.
+      .where((eb) => sharedLinkAssetIsServable(asBaseEb(eb)))
+      .selectAll('asset')
+      .orderBy('asset.fileCreatedAt', 'asc')
+  );
 };
 
 export const withExifInfo = (eb: ExpressionBuilder<DB, 'asset'>) => {
@@ -79,13 +87,44 @@ export class SharedLinkRepository {
       .leftJoinLateral(
         (eb) =>
           withSharedLinkAlbum(eb)
-            .leftJoin('album_asset', 'album_asset.albumId', 'album.id')
+            // #1018: album contents = the album's own rows ∪ the cross-owner contributions (#764)
+            // made to the space this link was created from. LATERAL so the contributed arm can
+            // correlate to `shared_link.spaceId`; a link with no space matches no contribution and
+            // this collapses back to the pre-#1018 `album_asset` join. UNION (not ALL) dedupes an
+            // asset that is both an album row and a retained contribution.
+            .leftJoinLateral(
+              (eb) =>
+                eb
+                  .selectFrom('album_asset')
+                  .select('album_asset.assetId as assetId')
+                  .whereRef('album_asset.albumId', '=', 'album.id')
+                  .union(
+                    eb
+                      .selectFrom('album_space_asset')
+                      .innerJoin('shared_space_album', (join) =>
+                        join
+                          .onRef('shared_space_album.albumId', '=', 'album_space_asset.albumId')
+                          .onRef('shared_space_album.spaceId', '=', 'album_space_asset.spaceId'),
+                      )
+                      // The contributed arm returns another member's asset, so it carries the space
+                      // visibility gate: archive + timeline only, never hidden or locked. The album's
+                      // own rows above keep plain album semantics and are deliberately not gated.
+                      .innerJoin('asset', 'asset.id', 'album_space_asset.assetId')
+                      .where((eb) => spaceVisibilityGate(eb))
+                      .select('album_space_asset.assetId as assetId')
+                      .whereRef('album_space_asset.albumId', '=', 'album.id')
+                      .whereRef('album_space_asset.spaceId', '=', 'shared_link.spaceId')
+                      .where((eb) => sharedLinkCreatorCanPublish(asBaseEb(eb))),
+                  )
+                  .as('album_members'),
+              (join) => join.onTrue(),
+            )
             .leftJoinLateral(
               (eb) =>
                 eb
                   .selectFrom('asset')
                   .selectAll('asset')
-                  .whereRef('album_asset.assetId', '=', 'asset.id')
+                  .whereRef('album_members.assetId', '=', 'asset.id')
                   .where('asset.deletedAt', 'is', null)
                   .innerJoinLateral(withExifInfo, (join) => join.onTrue())
                   .select((eb) => eb.fn.toJson(eb.table('exifInfo')).as('exifInfo'))
@@ -161,6 +200,7 @@ export class SharedLinkRepository {
         'shared_link.id',
         'shared_link.userId',
         'shared_link.albumId',
+        'shared_link.spaceId',
         'shared_link.expiresAt',
         'shared_link.showExif',
         'shared_link.allowUpload',

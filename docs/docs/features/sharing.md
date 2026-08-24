@@ -50,6 +50,31 @@ You can create a public share link by selecting the photos or videos, or from th
 
 <img src={require('./img/public-shared-link-album.webp').default} width='30%' title='Creating public shared link from album' />
 
+### Sharing from a Shared Space
+
+A link created from inside a [Shared Space](shared-spaces.md) covers what the space shows, not just
+the photos you own. Contributions from other members are included, so the link matches what members
+see in the space.
+
+Because publishing someone else's photo is a decision you make on their behalf, this is restricted
+and announced:
+
+- Only a space **Owner** or **Editor** can create one. A Viewer can still share a link, but only
+  covering their own photos, as before.
+- The create-link dialog warns you before the link exists, naming how many of the selected photos
+  other members contributed.
+
+The link stays tied to the space rather than taking a permanent copy of the permission. It serves
+another member's photo only while:
+
+- that photo is still in the space,
+- the album it was contributed to is still linked to the space, and
+- you are still a member of the space.
+
+So a contributor who removes their photo from the space revokes it from the link at the same moment,
+without needing to know the link exists. Photos you own yourself are unaffected by any of this — they
+stay in the link either way. Deleting the space leaves the link working, reduced to your own photos.
+
 ### Customizing the public share link
 
 You can customize the public share link by setting an expiration date, password protection, allow what actions can be performed on the shared assets, and more.
