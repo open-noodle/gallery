@@ -129,9 +129,15 @@ export const Route = {
     `/spaces/${spaceId}/people/${personId}` + asQueryString(params),
 
   // photos
-  // `city` is a filter-panel param (SEARCHABLE_PAGE_FILTER_PARAMS) — /photos hydrates its filter
+  // `city` / `country` are filter-panel params (FILTER_URL_PARAMS) — /photos hydrates its filter
   // state from the URL, so this lands on the timeline already narrowed to that place (#867).
-  photos: (params?: { at?: string; city?: string }) => '/photos' + asQueryString(params),
+  //
+  // #989: pass BOTH halves of a place. The location filter nests cities under their country, and a
+  // `city` with no `country` has nowhere to nest — it renders flat beside the country list as an
+  // orphaned selection. The params are rebuilt here in a fixed order rather than forwarded, so the
+  // emitted URL does not depend on the caller's object-literal key order.
+  photos: (params?: { at?: string; city?: string; country?: string }) =>
+    '/photos' + asQueryString({ at: params?.at, city: params?.city, country: params?.country }),
   viewAsset: ({ id }: { id: string }) => `/photos/${id}`,
   archive: () => '/archive',
   favorites: () => '/favorites',
