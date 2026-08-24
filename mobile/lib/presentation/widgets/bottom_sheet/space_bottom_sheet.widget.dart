@@ -7,6 +7,7 @@ import 'package:immich_mobile/presentation/actions/download.action.dart';
 import 'package:immich_mobile/presentation/actions/favorite.action.dart';
 import 'package:immich_mobile/presentation/actions/remove_from_space.action.dart';
 import 'package:immich_mobile/presentation/actions/share.action.dart';
+import 'package:immich_mobile/presentation/actions/share_link.action.dart';
 import 'package:immich_mobile/presentation/widgets/bottom_sheet/base_bottom_sheet.widget.dart';
 import 'package:immich_mobile/presentation/widgets/collection/collection_picker.widget.dart';
 import 'package:immich_mobile/providers/timeline/multiselect.provider.dart';
@@ -59,6 +60,13 @@ class _SpaceBottomSheetState extends ConsumerState<SpaceBottomSheet> {
         if (multiselect.hasRemote) ...[
           const ActionMenuItem(action: DownloadAction(source: ActionSource.timeline)),
           const ActionColumnButton(action: FavoriteAction(source: ActionSource.timeline)),
+          // #1018: a link covering what the SPACE shows, contributions included. Same gate as
+          // remove-from-space — the server authorizes a space-scoped link against Owner/Editor, so
+          // offering it to a Viewer would only ever produce a rejected request.
+          if (_canEdit)
+            ActionColumnButton(
+              action: ShareLinkAction(source: ActionSource.timeline, spaceId: widget.spaceId),
+            ),
           if (_canEdit)
             ActionColumnButton(
               action: RemoveFromSpaceAction(
