@@ -82,7 +82,7 @@ export type AdminConfigClassificationDto = {
     /** Classification categories */
     categories: AdminConfigClassificationCategoryDto[];
     /** Enable classification globally */
-    enabled: boolean;
+    enabled?: boolean;
 };
 export type AdminConfigFFmpegRealtimeDto = {
     /** Enable real-time HLS transcoding (alpha) */
@@ -302,11 +302,11 @@ export type AdminConfigMapDto = {
 };
 export type AdminConfigMemoriesDto = {
     /** Birthday memories */
-    birthday: boolean;
+    birthday?: boolean;
     /** Months a person must be absent from photos before person_throwback resurfaces them */
     personThrowbackDormancyMonths?: number;
     /** Recent trip memories */
-    recentTrips: boolean;
+    recentTrips?: boolean;
     /** Retention days */
     retentionDays: number;
     /** Max CLIP cosine distance for themed memories */
@@ -427,7 +427,7 @@ export type AdminConfigServerDto = {
     /** Login page message */
     loginPageMessage: string;
     /** Allow a people merge to combine two of another user's people, or two people in a shared space the actor cannot edit, into one (a destructive collapse). Re-points that only move a single person to another identity are always allowed. When off, such combining merges are blocked; when on, each still requires an explicit confirmation. */
-    mergePeopleAcrossOwners: boolean;
+    mergePeopleAcrossOwners?: boolean;
     /** Public users */
     publicUsers: boolean;
 };
@@ -441,7 +441,7 @@ export type AdminConfigStorageTemplateDto = {
 };
 export type AdminConfigStorageUsageDto = {
     /** Include thumbnails and transcoded videos in storage usage */
-    includeDerivatives: boolean;
+    includeDerivatives?: boolean;
 };
 export type AdminConfigTemplateEmailsDto = {
     /** Album invite template */
@@ -9843,7 +9843,7 @@ export function getTimeBucketCovers({ albumId, bbox, bucketSize, city, country, 
     tagIds?: string[];
     takenAfter?: string;
     takenBefore?: string;
-    timeBuckets: string[];
+    timeBuckets?: string[];
     $type?: AssetTypeEnum;
     userId?: string;
     visibility?: AssetVisibility;
