@@ -5,6 +5,7 @@ import { ChunkedSet, DummyValue, GenerateSql } from 'src/decorators.js';
 import { AlbumUserRole, AssetVisibility, SharedSpaceRole } from 'src/enum.js';
 import { DB } from 'src/schema/index.js';
 import { asUuid } from 'src/utils/database.js';
+import { asBaseEb, sharedLinkAssetIsServable, sharedLinkCreatorCanPublish } from 'src/utils/shared-link-space-tether.js';
 import {
   spaceAssetPathBranches,
   spaceVisibilityGate,
@@ -551,58 +552,92 @@ class AssetAccess {
       return new Set<string>();
     }
 
-    return this.db
-      .with('target', (qb) => qb.selectNoFrom(sql<string[]>`array[${sql.join([...assetIds])}]::uuid[]`.as('ids')))
-      .with('link', (qb) =>
-        qb
-          .selectFrom('shared_link')
-          .select(['shared_link.id', 'shared_link.albumId'])
-          .where('shared_link.id', '=', sharedLinkId),
-      )
-      .selectFrom('asset')
-      .crossJoin('target')
-      .innerJoinLateral(
-        (eb) =>
-          eb
-            .selectFrom('link')
-            .innerJoin('shared_link_asset', 'shared_link_asset.sharedLinkId', 'link.id')
-            .select(sql.lit(1).as('match'))
-            .whereRef('shared_link_asset.assetId', '=', 'asset.id')
-            .unionAll(
-              eb
-                .selectFrom('link')
-                .innerJoin('album', (join) =>
-                  join.onRef('album.id', '=', 'link.albumId').on('album.deletedAt', 'is', null),
-                )
-                .innerJoin('album_asset', 'album_asset.albumId', 'album.id')
-                .select(sql.lit(1).as('match'))
-                .whereRef('album_asset.assetId', '=', 'asset.id'),
+    return (
+      this.db
+        .selectFrom('shared_link')
+        .leftJoin('album', (join) =>
+          join.onRef('album.id', '=', 'shared_link.albumId').on('album.deletedAt', 'is', null),
+        )
+        .leftJoin('shared_link_asset', 'shared_link_asset.sharedLinkId', 'shared_link.id')
+        .leftJoin('asset', (join) =>
+          join
+            .onRef('asset.id', '=', 'shared_link_asset.assetId')
+            .on('asset.deletedAt', 'is', null)
+            // #1018: the `shared_link_asset` row alone grants nothing for an asset the link creator
+            // does NOT own — that half is re-derived from live space state on every read, so pulling
+            // the photo out of the space (or the creator leaving it) revokes the link immediately.
+            .on((eb) => sharedLinkAssetIsServable(asBaseEb(eb))),
+        )
+        .leftJoin('album_asset', 'album_asset.albumId', 'album.id')
+        .leftJoin('asset as albumAssets', (join) =>
+          join.onRef('albumAssets.id', '=', 'album_asset.assetId').on('albumAssets.deletedAt', 'is', null),
+        )
+        // #1018: cross-owner contributions (#764) in the album, correlated to the space the link was
+        // made from so a multi-space album never leaks another space's contributions. Requires a LIVE
+        // album↔space link — a retained `album_space_asset` row of an unlinked album is inert.
+        .leftJoin('album_space_asset', (join) =>
+          join
+            .onRef('album_space_asset.albumId', '=', 'album.id')
+            .onRef('album_space_asset.spaceId', '=', 'shared_link.spaceId')
+            .on((eb) =>
+              eb.exists(
+                eb
+                  .selectFrom('shared_space_album')
+                  .select(eb.lit(1).as('exists'))
+                  .whereRef('shared_space_album.albumId', '=', 'album_space_asset.albumId')
+                  .whereRef('shared_space_album.spaceId', '=', 'album_space_asset.spaceId'),
+              ),
             )
-            .limit(1)
-            .as('membership'),
-        (join) => join.onTrue(),
-      )
-      .select(['asset.id', 'asset.livePhotoVideoId'])
-      .where('asset.deletedAt', 'is', null)
-      .where((eb) =>
-        eb.or([
-          eb('asset.id', '=', eb.fn.any('target.ids')),
-          eb('asset.livePhotoVideoId', '=', eb.fn.any('target.ids')),
-        ]),
-      )
-      .execute()
-      .then((rows) => {
-        const allowedIds = new Set<string>();
-        for (const row of rows) {
-          if (assetIds.has(row.id)) {
-            allowedIds.add(row.id);
+            .on((eb) => sharedLinkCreatorCanPublish(asBaseEb(eb))),
+        )
+        .leftJoin('asset as contributedAssets', (join) =>
+          join
+            .onRef('contributedAssets.id', '=', 'album_space_asset.assetId')
+            .on('contributedAssets.deletedAt', 'is', null)
+            // Same gate as spaceVisibilityGate, spelled out because that helper's column type is
+            // keyed on DB and this is a join alias: archive + timeline only, never hidden or locked.
+            .on('contributedAssets.visibility', 'in', spaceVisibleAssetVisibilities),
+        )
+        .select([
+          'asset.id as assetId',
+          'asset.livePhotoVideoId as assetLivePhotoVideoId',
+          'albumAssets.id as albumAssetId',
+          'albumAssets.livePhotoVideoId as albumAssetLivePhotoVideoId',
+          'contributedAssets.id as contributedAssetId',
+          'contributedAssets.livePhotoVideoId as contributedAssetLivePhotoVideoId',
+        ])
+        .where('shared_link.id', '=', sharedLinkId)
+        .where(
+          sql`array["asset"."id", "asset"."livePhotoVideoId", "albumAssets"."id", "albumAssets"."livePhotoVideoId", "contributedAssets"."id", "contributedAssets"."livePhotoVideoId"]`,
+          '&&',
+          sql`array[${sql.join([...assetIds])}]::uuid[] `,
+        )
+        .execute()
+        .then((rows) => {
+          const allowedIds = new Set<string>();
+          for (const row of rows) {
+            if (row.assetId && assetIds.has(row.assetId)) {
+              allowedIds.add(row.assetId);
+            }
+            if (row.assetLivePhotoVideoId && assetIds.has(row.assetLivePhotoVideoId)) {
+              allowedIds.add(row.assetLivePhotoVideoId);
+            }
+            if (row.albumAssetId && assetIds.has(row.albumAssetId)) {
+              allowedIds.add(row.albumAssetId);
+            }
+            if (row.albumAssetLivePhotoVideoId && assetIds.has(row.albumAssetLivePhotoVideoId)) {
+              allowedIds.add(row.albumAssetLivePhotoVideoId);
+            }
+            if (row.contributedAssetId && assetIds.has(row.contributedAssetId)) {
+              allowedIds.add(row.contributedAssetId);
+            }
+            if (row.contributedAssetLivePhotoVideoId && assetIds.has(row.contributedAssetLivePhotoVideoId)) {
+              allowedIds.add(row.contributedAssetLivePhotoVideoId);
+            }
           }
-          if (row.livePhotoVideoId && assetIds.has(row.livePhotoVideoId)) {
-            allowedIds.add(row.livePhotoVideoId);
-          }
-        }
-        return allowedIds;
-      });
+          return allowedIds;
+        })
+    );
   }
 }
 

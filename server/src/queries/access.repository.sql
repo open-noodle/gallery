@@ -373,38 +373,120 @@ with
       "shared_link"."id" = $2
   )
 select
-  "asset"."id",
-  "asset"."livePhotoVideoId"
+  "asset"."id" as "assetId",
+  "asset"."livePhotoVideoId" as "assetLivePhotoVideoId",
+  "albumAssets"."id" as "albumAssetId",
+  "albumAssets"."livePhotoVideoId" as "albumAssetLivePhotoVideoId",
+  "contributedAssets"."id" as "contributedAssetId",
+  "contributedAssets"."livePhotoVideoId" as "contributedAssetLivePhotoVideoId"
 from
-  "asset"
-  cross join "target"
-  inner join lateral (
-    select
-      1 as "match"
-    from
-      "link"
-      inner join "shared_link_asset" on "shared_link_asset"."sharedLinkId" = "link"."id"
-    where
-      "shared_link_asset"."assetId" = "asset"."id"
-    union all
-    select
-      1 as "match"
-    from
-      "link"
-      inner join "album" on "album"."id" = "link"."albumId"
-      and "album"."deletedAt" is null
-      inner join "album_asset" on "album_asset"."albumId" = "album"."id"
-    where
-      "album_asset"."assetId" = "asset"."id"
-    limit
-      $3
-  ) as "membership" on true
-where
-  "asset"."deletedAt" is null
+  "shared_link"
+  left join "album" on "album"."id" = "shared_link"."albumId"
+  and "album"."deletedAt" is null
+  left join "shared_link_asset" on "shared_link_asset"."sharedLinkId" = "shared_link"."id"
+  left join "asset" on "asset"."id" = "shared_link_asset"."assetId"
+  and "asset"."deletedAt" is null
   and (
-    "asset"."id" = any ("target"."ids")
-    or "asset"."livePhotoVideoId" = any ("target"."ids")
+    "asset"."ownerId" = "shared_link"."userId"
+    or (
+      "shared_link"."spaceId" is not null
+      and exists (
+        select
+          1 as "exists"
+        from
+          "shared_space_member"
+        where
+          "shared_space_member"."spaceId" = "shared_link"."spaceId"
+          and "shared_space_member"."userId" = "shared_link"."userId"
+          and "shared_space_member"."role" in ($1, $2)
+      )
+      and "asset"."visibility" in ($3, $4)
+      and (
+        exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_asset"
+          where
+            "shared_space_asset"."assetId" = "asset"."id"
+            and "shared_space_asset"."spaceId" = "shared_link"."spaceId"
+        )
+        or exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_library"
+          where
+            "shared_space_library"."libraryId" = "asset"."libraryId"
+            and "shared_space_library"."spaceId" = "shared_link"."spaceId"
+        )
+        or (
+          exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+              inner join "album" on "album"."id" = "shared_space_album"."albumId"
+              and "album"."deletedAt" is null
+            where
+              "album_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = "shared_link"."spaceId"
+          )
+          or exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album"
+              inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+              and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+              inner join "album" on "album"."id" = "shared_space_album"."albumId"
+              and "album"."deletedAt" is null
+            where
+              "album_space_asset"."assetId" = "asset"."id"
+              and "shared_space_album"."spaceId" = "shared_link"."spaceId"
+          )
+        )
+      )
+    )
   )
+  left join "album_asset" on "album_asset"."albumId" = "album"."id"
+  left join "asset" as "albumAssets" on "albumAssets"."id" = "album_asset"."assetId"
+  and "albumAssets"."deletedAt" is null
+  left join "album_space_asset" on "album_space_asset"."albumId" = "album"."id"
+  and "album_space_asset"."spaceId" = "shared_link"."spaceId"
+  and exists (
+    select
+      1 as "exists"
+    from
+      "shared_space_album"
+    where
+      "shared_space_album"."albumId" = "album_space_asset"."albumId"
+      and "shared_space_album"."spaceId" = "album_space_asset"."spaceId"
+  )
+  and exists (
+    select
+      1 as "exists"
+    from
+      "shared_space_member"
+    where
+      "shared_space_member"."spaceId" = "shared_link"."spaceId"
+      and "shared_space_member"."userId" = "shared_link"."userId"
+      and "shared_space_member"."role" in ($5, $6)
+  )
+  left join "asset" as "contributedAssets" on "contributedAssets"."id" = "album_space_asset"."assetId"
+  and "contributedAssets"."deletedAt" is null
+  and "contributedAssets"."visibility" in ($7, $8)
+where
+  "shared_link"."id" = $9
+  and array[
+    "asset"."id",
+    "asset"."livePhotoVideoId",
+    "albumAssets"."id",
+    "albumAssets"."livePhotoVideoId",
+    "contributedAssets"."id",
+    "contributedAssets"."livePhotoVideoId"
+  ] && array[$10]::uuid[]
 
 -- AccessRepository.assetFile.checkOwnerAccess
 select

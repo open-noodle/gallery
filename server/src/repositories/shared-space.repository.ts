@@ -334,7 +334,14 @@ export class SharedSpaceRepository {
   // getSpaceIdsForTimeline, a member who hid the space from their home timeline still sees the
   // album's contributions on the album page itself.
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
-  async getMemberSpaceIdsLinkingAlbum(albumId: string, userId: string): Promise<string[]> {
+  async getMemberSpaceIdsLinkingAlbum(
+    albumId: string,
+    userId: string,
+    // #1018: when set, only spaces where the user still holds one of these roles are returned.
+    // Shared-link reads pass Owner/Editor so a demoted creator resolves none; the authenticated
+    // browse path passes nothing and keeps its any-role membership semantics.
+    options: { roles?: SharedSpaceRole[] } = {},
+  ): Promise<string[]> {
     const rows = await this.db
       .selectFrom('shared_space_album')
       .innerJoin('album', (join) =>
@@ -343,6 +350,7 @@ export class SharedSpaceRepository {
       .innerJoin('shared_space_member', 'shared_space_member.spaceId', 'shared_space_album.spaceId')
       .where('shared_space_album.albumId', '=', albumId)
       .where('shared_space_member.userId', '=', userId)
+      .$if(!!options.roles?.length, (qb) => qb.where('shared_space_member.role', 'in', options.roles!))
       .select('shared_space_album.spaceId')
       .execute();
     return rows.map((row) => row.spaceId);

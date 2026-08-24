@@ -3,7 +3,7 @@ import z from 'zod';
 import { SharedLink } from 'src/database.js';
 import { HistoryBuilder } from 'src/decorators.js';
 import { AlbumResponseSchema, mapAlbum } from 'src/dtos/album.dto.js';
-import { AssetResponseSchema, mapAsset } from 'src/dtos/asset-response.dto.js';
+import { type AssetResponseDto, AssetResponseSchema, mapAsset } from 'src/dtos/asset-response.dto.js';
 import { AuthDto } from 'src/dtos/auth.dto.js';
 import { SharedLinkType, SharedLinkTypeSchema } from 'src/enum.js';
 import { isoDatetimeToDate } from 'src/validation.js';
@@ -31,6 +31,13 @@ const SharedLinkCreateSchema = z
     allowUpload: z.boolean().optional().describe('Allow uploads'),
     allowDownload: z.boolean().default(true).optional().describe('Allow downloads'),
     showMetadata: z.boolean().default(true).optional().describe('Show metadata'),
+    spaceId: z
+      .uuidv4()
+      .optional()
+      .describe(
+        'Shared space this link is created from. Lets the link cover assets contributed by other ' +
+          'members, which requires the caller to be an Owner or Editor of the space.',
+      ),
   })
   .superRefine(({ type, albumId, assetIds }, ctx) => {
     switch (type) {
@@ -102,8 +109,18 @@ export class SharedLinkLoginDto extends createZodDto(SharedLinkLoginSchema) {}
 export class SharedLinkResponseDto extends createZodDto(SharedLinkResponseSchema) {}
 
 export function mapSharedLink(
-  sharedLink: Omit<SharedLink, 'assets'> & Partial<Pick<SharedLink, 'assets'>>,
-  { auth }: { auth: AuthDto },
+  sharedLink: SharedLink,
+  options: {
+    auth: AuthDto;
+    /**
+     * #1018: set on the two paths an ANONYMOUS visitor can reach (`getMine`, `login`). A link may
+     * now carry photos its creator does not own, and `ownerId` would name the member behind each
+     * one. Before this feature an individual link only ever held the creator's own assets, so no
+     * third party's id was reachable here. Hidden metadata already drops it (the sanitized
+     * shape omits `ownerId`), so this only matters for links that show metadata.
+     */
+    redactAssetOwners?: boolean;
+  },
 ): SharedLinkResponseDto {
   const assets = sharedLink.assets || [];
 
@@ -116,7 +133,15 @@ export function mapSharedLink(
     type: sharedLink.type,
     createdAt: sharedLink.createdAt,
     expiresAt: sharedLink.expiresAt,
-    assets: assets.map((asset) => mapAsset(asset, { auth })),
+    assets: assets.map((asset) => {
+      const mapped = mapAsset(asset, { auth: options.auth });
+      if (options.redactAssetOwners) {
+        // Deleted after mapping so everything derived from the owner (isFavorite, isOwner) is
+        // already resolved — this removes the identifier, not the behaviour.
+        delete (mapped as Partial<AssetResponseDto>).ownerId;
+      }
+      return mapped;
+    }),
     album: sharedLink.album ? mapAlbum(sharedLink.album, { auth }) : undefined,
     allowUpload: sharedLink.allowUpload,
     allowDownload: sharedLink.allowDownload,
