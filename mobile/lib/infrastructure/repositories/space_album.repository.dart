@@ -1,7 +1,7 @@
 import 'package:drift/drift.dart';
+import 'package:immich_mobile/data/db/main/database.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/space_album.model.dart';
-import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/space_album.repository.drift.dart';
 
 @DriftAccessor()
