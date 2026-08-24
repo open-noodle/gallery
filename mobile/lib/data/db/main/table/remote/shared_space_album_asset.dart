@@ -1,5 +1,5 @@
 import 'package:drift/drift.dart';
-import 'package:immich_mobile/infrastructure/utils/drift_default.mixin.dart';
+import 'package:immich_mobile/data/db/util/defaults_mixin.dart';
 
 // Album↔asset MEMBERSHIP (fed by SharedSpaceAlbumToAssetV1 {albumId, assetId}).
 // Keyed (albumId, assetId) — per-album, so an album linked to two spaces dedupes

@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/data/db/main/database.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/config/app_config.dart';
 import 'package:immich_mobile/domain/models/config/timeline_config.dart';
@@ -21,7 +22,6 @@ import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/domain/services/timeline.service.dart';
 import 'package:immich_mobile/domain/services/user.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
-import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/models/search/search_filter.model.dart';
@@ -140,15 +140,22 @@ Future<TimelineService> _pumpTimeline(
         supportedLocales: const [Locale('en')],
         path: '../i18n',
         fallbackLocale: const Locale('en'),
-        child: withStubRouter(MaterialApp(
-          home: DefaultAssetBundle(
-            bundle: _FakeAssetBundle(),
-            child: const TimelineRouteScope(
-              timelineServiceBuilder: buildPhotosTimelineRouteService,
-              child: Timeline(appBar: null, bottomSheet: null, withScrubber: false, emptyWidget: TimelineEmptyState()),
+        child: withStubRouter(
+          MaterialApp(
+            home: DefaultAssetBundle(
+              bundle: _FakeAssetBundle(),
+              child: const TimelineRouteScope(
+                timelineServiceBuilder: buildPhotosTimelineRouteService,
+                child: Timeline(
+                  appBar: null,
+                  bottomSheet: null,
+                  withScrubber: false,
+                  emptyWidget: TimelineEmptyState(),
+                ),
+              ),
             ),
           ),
-        )),
+        ),
       ),
     ),
   );
@@ -191,15 +198,22 @@ Future<Completer<SearchResult?>> _pumpSearchingTimeline(WidgetTester tester, Dri
         supportedLocales: const [Locale('en')],
         path: '../i18n',
         fallbackLocale: const Locale('en'),
-        child: withStubRouter(MaterialApp(
-          home: DefaultAssetBundle(
-            bundle: _FakeAssetBundle(),
-            child: const TimelineRouteScope(
-              timelineServiceBuilder: buildPhotosTimelineRouteService,
-              child: Timeline(appBar: null, bottomSheet: null, withScrubber: false, emptyWidget: TimelineEmptyState()),
+        child: withStubRouter(
+          MaterialApp(
+            home: DefaultAssetBundle(
+              bundle: _FakeAssetBundle(),
+              child: const TimelineRouteScope(
+                timelineServiceBuilder: buildPhotosTimelineRouteService,
+                child: Timeline(
+                  appBar: null,
+                  bottomSheet: null,
+                  withScrubber: false,
+                  emptyWidget: TimelineEmptyState(),
+                ),
+              ),
             ),
           ),
-        )),
+        ),
       ),
     ),
   );
