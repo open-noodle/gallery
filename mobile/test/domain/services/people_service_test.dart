@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:immich_mobile/data/db/main/dao/person.dart';
+import 'package:immich_mobile/data/server/person.dart';
 import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/domain/services/people.service.dart';
-import 'package:immich_mobile/infrastructure/repositories/people.repository.dart';
-import 'package:immich_mobile/repositories/person_api.repository.dart';
 import 'package:immich_mobile/repositories/shared_space_api.repository.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:openapi/api.dart' as api;
