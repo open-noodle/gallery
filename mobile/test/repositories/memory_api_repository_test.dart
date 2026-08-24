@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
-import 'package:immich_mobile/constants/errors.dart';
+import 'package:immich_mobile/data/server/errors.dart';
 import 'package:immich_mobile/domain/models/memory.model.dart';
 import 'package:immich_mobile/repositories/memory_api.repository.dart';
 import 'package:immich_mobile/services/api.service.dart';
