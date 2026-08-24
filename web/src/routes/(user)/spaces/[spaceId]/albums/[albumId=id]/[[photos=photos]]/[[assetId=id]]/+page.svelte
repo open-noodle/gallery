@@ -52,6 +52,7 @@
   import { removeSearchResults, selectAllSearchResults, updateSearchResults } from '$lib/utils/search-result-selection';
   import { untrack } from 'svelte';
   import SearchAddAllToCollectionModal from '$lib/modals/SearchAddAllToCollectionModal.svelte';
+  import SharedLinkCreateModal from '$lib/modals/SharedLinkCreateModal.svelte';
   import { lang } from '$lib/stores/preferences.store';
   import { SvelteMap } from 'svelte/reactivity';
   import {
@@ -76,7 +77,7 @@
   import HeaderActionButton from '$lib/components/HeaderActionButton.svelte';
   import { Icon, IconButton, modalManager, toastManager } from '@immich/ui';
   import { handleError } from '$lib/utils/handle-error';
-  import { mdiArrowLeft, mdiImageOutline, mdiImagePlusOutline } from '@mdi/js';
+  import { mdiArrowLeft, mdiImageOutline, mdiImagePlusOutline, mdiLink } from '@mdi/js';
   import { t } from 'svelte-i18n';
   import type { PageData } from './$types';
 
@@ -600,6 +601,23 @@
         data-testid="add-photos-button"
         onclick={enterAddMode}
         icon={mdiImagePlusOutline}
+      />
+    {/if}
+    <!--
+      #1018: a link for the whole album, covering what the SPACE shows — the album's own photos plus
+      the cross-owner contributions members made to it. Gated on the space role rather than
+      `canManage`: the server authorizes a space-scoped link against Owner/Editor of the space, so an
+      album editor who is only a space Viewer would be rejected.
+    -->
+    {#if isSpaceEditor && mode === 'browse'}
+      <IconButton
+        variant="ghost"
+        shape="round"
+        color="secondary"
+        aria-label={$t('create_link_to_share')}
+        data-testid="space-album-create-link-button"
+        onclick={() => void modalManager.show(SharedLinkCreateModal, { albumId: album.id, spaceId: space.id })}
+        icon={mdiLink}
       />
     {/if}
   {/snippet}
