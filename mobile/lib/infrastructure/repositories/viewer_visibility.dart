@@ -22,9 +22,9 @@
 // the full rationale and the .drift-SQL fallback plan.
 
 import 'package:drift/drift.dart';
-import 'package:immich_mobile/infrastructure/entities/remote_asset.entity.drift.dart';
-import 'package:immich_mobile/infrastructure/entities/shared_space_member.entity.drift.dart';
-import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
+import 'package:immich_mobile/data/db/main/database.dart';
+import 'package:immich_mobile/data/db/main/table/remote/asset.drift.dart';
+import 'package:immich_mobile/data/db/main/table/remote/shared_space_member.drift.dart';
 
 typedef ViewerVisibilityJoinSpec = ({
   List<Join> joins,
