@@ -152,7 +152,10 @@ test.describe('Spaces — SelectionToolbar timeline control bar (Slice 4)', () =
   // (Share/Favorite/Delete hidden) but space.canWrite is still true, so the role-gated actions
   // stay visible: Remove-from-space, Set-cover, and Add-to-album — the last because a space
   // manager may contribute a non-owned asset into an album linked to this space (#764).
-  test("editor selecting the owner's asset sees role-gated actions plus add-to-album", async ({ context, page }) => {
+  test("editor selecting the owner's asset sees role-gated actions plus add-to-album and share", async ({
+    context,
+    page,
+  }) => {
     const space = await createDirectSpaceFixture(
       owner.accessToken,
       [{ userId: editor.userId, role: SharedSpaceRole.Editor }],
@@ -170,7 +173,9 @@ test.describe('Spaces — SelectionToolbar timeline control bar (Slice 4)', () =
 
     await expect(controlBar.getByRole('button', { name: 'Add to album or space' })).toBeVisible();
 
-    await expect(controlBar.getByRole('button', { name: 'Share' })).toHaveCount(0);
+    // #1018: a space Owner/Editor may also publish assets they do not own, through the space —
+    // the second such action after add-to-album (#764). Favorite stays ownership-gated.
+    await expect(controlBar.getByRole('button', { name: 'Share' })).toBeVisible();
     await expect(controlBar.getByRole('button', { name: /favorite/i })).toHaveCount(0);
 
     await openOverflowMenu(controlBar);

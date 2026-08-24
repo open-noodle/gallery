@@ -40,6 +40,7 @@ export class SharedLinkFactory {
       showExif: true,
       password: null,
       slug: null,
+      spaceId: null,
       ...dto,
     });
   }
