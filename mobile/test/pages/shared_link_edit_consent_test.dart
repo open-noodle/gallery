@@ -5,8 +5,8 @@ import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:immich_mobile/data/db/main/database.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
-import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/pages/library/shared_link/shared_link_edit.page.dart';
 import 'package:immich_mobile/providers/server_info.provider.dart';
@@ -26,7 +26,7 @@ void main() {
   setUpAll(() async {
     TestUtils.init();
     await StoreService.init(
-      storeRepository: DriftStoreRepository(
+      storeRepository: StoreRepository(
         Drift(DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true)),
       ),
     );

@@ -1,6 +1,6 @@
 import 'package:drift/drift.dart';
-import 'package:immich_mobile/infrastructure/entities/shared_space.entity.dart';
-import 'package:immich_mobile/infrastructure/utils/drift_default.mixin.dart';
+import 'package:immich_mobile/data/db/main/table/remote/shared_space.dart';
+import 'package:immich_mobile/data/db/util/defaults_mixin.dart';
 
 // Mirrors the server `shared_space_library` join row. spaceId has a FK to
 // SharedSpaceEntity with cascade delete. libraryId is intentionally a loose

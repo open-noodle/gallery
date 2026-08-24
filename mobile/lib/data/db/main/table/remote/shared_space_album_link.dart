@@ -1,6 +1,6 @@
 import 'package:drift/drift.dart';
-import 'package:immich_mobile/infrastructure/entities/shared_space.entity.dart';
-import 'package:immich_mobile/infrastructure/utils/drift_default.mixin.dart';
+import 'package:immich_mobile/data/db/main/table/remote/shared_space.dart';
+import 'package:immich_mobile/data/db/util/defaults_mixin.dart';
 
 // Space↔album LINK row (fed by SharedSpaceAlbumLinkV1). spaceId has a cascade FK
 // to SharedSpaceEntity. albumId is a loose reference (no FK) — the album

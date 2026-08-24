@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:immich_mobile/data/db/main/dao/person.dart';
 import 'package:immich_mobile/domain/models/person.model.dart';
-import 'package:immich_mobile/infrastructure/repositories/people.repository.dart';
 
 import '../../medium/repository_context.dart';
 
