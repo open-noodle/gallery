@@ -1062,13 +1062,15 @@ describe('Space album detail page', () => {
       expect(screen.getByRole('menuitem', { name: 'Set as album cover' })).toBeInTheDocument();
     });
 
-    it('manager + NOT-owned selection: RemoveFromAlbum + Set-cover + Add-to-album present (canManage-gated), metadata-edit + Delete + Share absent (ownership-gated)', async () => {
+    it('manager + NOT-owned selection: RemoveFromAlbum + Set-cover + Add-to-album + Share present (canManage/space-role-gated), metadata-edit + Delete absent (ownership-gated)', async () => {
       mockAssetMultiSelectManager.selectionActive = true;
       mockAssetMultiSelectManager.isAllUserOwned = false;
       mockAssetMultiSelectManager.assets = [{ id: 'asset-1' }];
       renderPage({ members: [makeMember(SharedSpaceRole.Editor)] });
 
-      expect(screen.queryByRole('button', { name: 'Share' })).not.toBeInTheDocument();
+      // A space Editor may also publish non-owned assets through the space (#1018), so Share
+      // stays — the link is created against the space and warns before it is made.
+      expect(screen.getByRole('button', { name: 'Share' })).toBeInTheDocument();
       // A space Editor may contribute non-owned assets into an album linked to this space
       // (#764), so the "+" stays — it opens the picker restricted to that space's albums.
       expect(screen.getByRole('button', { name: 'Add to album or space' })).toBeInTheDocument();
