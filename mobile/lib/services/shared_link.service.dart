@@ -42,6 +42,10 @@ class SharedLinkService {
     String? albumId,
     List<String>? assetIds,
     DateTime? expiresAt,
+    // #1018: the Space this link is created from. Naming it makes the server authorize the link
+    // against the space rather than against asset ownership, so it can cover photos other members
+    // contributed — which requires the caller to be an Owner or Editor of that space.
+    String? spaceId,
   }) async {
     try {
       final type = albumId != null ? SharedLinkType.ALBUM : SharedLinkType.INDIVIDUAL;
@@ -57,6 +61,7 @@ class SharedLinkService {
           description: description == null ? const Optional.absent() : Optional.present(description),
           password: password == null ? const Optional.absent() : Optional.present(password),
           slug: slug == null ? const Optional.absent() : Optional.present(slug),
+          spaceId: spaceId == null ? const Optional.absent() : Optional.present(spaceId),
         );
       } else if (assetIds != null) {
         dto = SharedLinkCreateDto(
@@ -69,6 +74,7 @@ class SharedLinkService {
           password: password == null ? const Optional.absent() : Optional.present(password),
           slug: slug == null ? const Optional.absent() : Optional.present(slug),
           assetIds: Optional.present(assetIds),
+          spaceId: spaceId == null ? const Optional.absent() : Optional.present(spaceId),
         );
       }
 

@@ -11,11 +11,18 @@ export interface SelectionCapabilities {
   canSelectAll: boolean;
   canDownload: boolean;
   /**
-   * CreateSharedLink. True when *any* of the selection is the user's own — the action
-   * shares the owned subset, because `Permission.AssetShare` rejects the whole request
-   * if it names one asset the caller does not own.
+   * CreateSharedLink. True when *any* of the selection is the user's own — the action shares the
+   * owned subset, because `Permission.AssetShare` rejects the whole request if it names one asset
+   * the caller does not own. A space Owner/Editor is the exception (#1018): they can share the
+   * whole selection through the space, so the action is offered even when they own none of it.
    */
   canShare: boolean;
+  /**
+   * #1018: the link must be created against the space rather than against asset ownership, because
+   * the selection contains photos other members contributed. The modal warns before publishing, and
+   * the resulting link stays tethered to the space. Only ever set for a space Owner/Editor.
+   */
+  shareScopedToSpace: boolean;
   canAddToAlbum: boolean;
   /**
    * The add-to-collection picker must offer only albums linked to this space, because the
@@ -38,6 +45,7 @@ const NO_CAPABILITIES: SelectionCapabilities = {
   canSelectAll: false,
   canDownload: false,
   canShare: false,
+  shareScopedToSpace: false,
   canAddToAlbum: false,
   addToAlbumRestrictedToSpace: false,
   canFavorite: false,
@@ -92,8 +100,10 @@ export function getSelectionCapabilities(ctx: CommandContext, tagsEnabled: boole
     canSelectAll: true,
     canDownload: true,
     // Not `isAllUserOwned`: the action sends only the owned subset, so it stays useful on a
-    // mixed selection and is denied only when nothing in the selection is the user's.
-    canShare: sel.ownedSelectedAssetIds.length > 0,
+    // mixed selection and is denied only when nothing in the selection is the user's — unless the
+    // space editor arm (#1018) covers the rest through the space.
+    canShare: sel.ownedSelectedAssetIds.length > 0 || isSpaceEditor,
+    shareScopedToSpace: isSpaceEditor && !sel.isAllUserOwned,
     canAddToAlbum: sel.isAllUserOwned || isSpaceEditor,
     addToAlbumRestrictedToSpace: !sel.isAllUserOwned && isSpaceEditor,
     canFavorite: sel.isAllUserOwned,
