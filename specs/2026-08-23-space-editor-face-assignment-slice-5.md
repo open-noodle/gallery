@@ -8,7 +8,7 @@
 
 **Tech Stack:** Vitest medium tests against real Postgres (testcontainers).
 
-**Spec:** `docs/superpowers/specs/2026-08-23-space-editor-face-assignment-design.md` — §5.1, §6.3.1, §9.5
+**Spec:** `specs/2026-08-23-space-editor-face-assignment-design.md` — §5.1, §6.3.1, §9.5
 
 **Baseline (Slices 1–4, committed):** attach, the shared `linkFaceToSpacePerson` helper with its `writeIdentity` flag, the space-scoped face read, create and detach.
 

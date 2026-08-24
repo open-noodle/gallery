@@ -8,7 +8,7 @@
 
 **Tech Stack:** NestJS 11 · Kysely (not TypeORM) · PostgreSQL · Vitest (unit + medium/testcontainers) · SvelteKit + Svelte 5 runes · Playwright
 
-**Spec:** `docs/superpowers/specs/2026-08-14-space-editor-asset-permissions-design.md` — read it alongside this plan. The plan argues from the spec; scenario ids (S-1…S-46, W-1…W-18) refer to spec §6.
+**Spec:** `specs/2026-08-14-space-editor-asset-permissions-design.md` — read it alongside this plan. The plan argues from the spec; scenario ids (S-1…S-46, W-1…W-18) refer to spec §6.
 
 ## Global Constraints
 
@@ -94,15 +94,15 @@ Create `server/test/medium/specs/repositories/access-space-edit.repository.spec.
  * for `spaceAssetPathBranches` drops those gates and still compiles — this file is
  * what catches it.
  */
-import { Kysely } from 'kysely';
-import { AssetVisibility } from 'src/enum';
-import { AccessRepository } from 'src/repositories/access.repository';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
-import { DB } from 'src/schema';
-import { BaseService } from 'src/services/base.service';
-import { newMediumService } from 'test/medium.factory';
-import { getKyselyDB } from 'test/utils';
+import { Kysely } from "kysely";
+import { AssetVisibility } from "src/enum";
+import { AccessRepository } from "src/repositories/access.repository";
+import { LoggingRepository } from "src/repositories/logging.repository";
+import { SharedSpaceRepository } from "src/repositories/shared-space.repository";
+import { DB } from "src/schema";
+import { BaseService } from "src/services/base.service";
+import { newMediumService } from "test/medium.factory";
+import { getKyselyDB } from "test/utils";
 
 let defaultDatabase: Kysely<DB>;
 
@@ -119,24 +119,22 @@ beforeAll(async () => {
   defaultDatabase = await getKyselyDB();
 });
 
-const markOffline = (assetId: string) =>
-  defaultDatabase.updateTable('asset').set({ isOffline: true }).where('id', '=', assetId).execute();
+const markOffline = (assetId: string) => defaultDatabase.updateTable("asset").set({ isOffline: true }).where("id", "=", assetId).execute();
 
-const trash = (assetId: string) =>
-  defaultDatabase.updateTable('asset').set({ deletedAt: new Date() }).where('id', '=', assetId).execute();
+const trash = (assetId: string) => defaultDatabase.updateTable("asset").set({ deletedAt: new Date() }).where("id", "=", assetId).execute();
 
 /** Anna (Editor) + Bob (Member) in one space. */
-const newSpaceWithEditorAndMember = async (ctx: ReturnType<typeof setup>['ctx']) => {
+const newSpaceWithEditorAndMember = async (ctx: ReturnType<typeof setup>["ctx"]) => {
   const { user: anna } = await ctx.newUser();
   const { user: bob } = await ctx.newUser();
   const { space } = await ctx.newSharedSpace({ createdById: bob.id });
-  await ctx.newSharedSpaceMember({ spaceId: space.id, userId: bob.id, role: 'owner' });
-  await ctx.newSharedSpaceMember({ spaceId: space.id, userId: anna.id, role: 'editor' });
+  await ctx.newSharedSpaceMember({ spaceId: space.id, userId: bob.id, role: "owner" });
+  await ctx.newSharedSpaceMember({ spaceId: space.id, userId: anna.id, role: "editor" });
   return { anna, bob, space };
 };
 
-describe('checkSpaceEditAccess — the three access paths', () => {
-  it('S-1: grants a directly-added asset owned by a space member', async () => {
+describe("checkSpaceEditAccess — the three access paths", () => {
+  it("S-1: grants a directly-added asset owned by a space member", async () => {
     const { ctx, accessRepo } = setup();
     const { anna, bob, space } = await newSpaceWithEditorAndMember(ctx);
     const { asset } = await ctx.newAsset({ ownerId: bob.id, visibility: AssetVisibility.Timeline });
@@ -147,7 +145,7 @@ describe('checkSpaceEditAccess — the three access paths', () => {
     expect(allowed).toEqual(new Set([asset.id]));
   });
 
-  it('S-2: grants an asset reaching the space through a linked library', async () => {
+  it("S-2: grants an asset reaching the space through a linked library", async () => {
     const { ctx, accessRepo } = setup();
     const { anna, bob, space } = await newSpaceWithEditorAndMember(ctx);
     const { library } = await ctx.newLibrary({ ownerId: bob.id });
@@ -163,10 +161,10 @@ describe('checkSpaceEditAccess — the three access paths', () => {
     expect(allowed).toEqual(new Set([asset.id]));
   });
 
-  it('S-3: grants an asset reaching the space through a linked album (NEW)', async () => {
+  it("S-3: grants an asset reaching the space through a linked album (NEW)", async () => {
     const { ctx, accessRepo } = setup();
     const { anna, bob, space } = await newSpaceWithEditorAndMember(ctx);
-    const { result: album } = await ctx.newAlbum({ ownerId: bob.id, albumName: 'Trip' });
+    const { result: album } = await ctx.newAlbum({ ownerId: bob.id, albumName: "Trip" });
     const { asset } = await ctx.newAsset({ ownerId: bob.id, visibility: AssetVisibility.Timeline });
     await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
     await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
@@ -176,10 +174,10 @@ describe('checkSpaceEditAccess — the three access paths', () => {
     expect(allowed).toEqual(new Set([asset.id]));
   });
 
-  it('S-11: the album arm ignores showInTimeline', async () => {
+  it("S-11: the album arm ignores showInTimeline", async () => {
     const { ctx, accessRepo } = setup();
     const { anna, bob, space } = await newSpaceWithEditorAndMember(ctx);
-    const { result: album } = await ctx.newAlbum({ ownerId: bob.id, albumName: 'Quiet' });
+    const { result: album } = await ctx.newAlbum({ ownerId: bob.id, albumName: "Quiet" });
     const { asset } = await ctx.newAsset({ ownerId: bob.id, visibility: AssetVisibility.Timeline });
     await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
     await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id, showInTimeline: false });
@@ -190,12 +188,12 @@ describe('checkSpaceEditAccess — the three access paths', () => {
   });
 });
 
-describe('checkSpaceEditAccess — owner must be a space member', () => {
-  it('S-4: denies Carol’s asset, reached via a linked album, when Carol is not in the space', async () => {
+describe("checkSpaceEditAccess — owner must be a space member", () => {
+  it("S-4: denies Carol’s asset, reached via a linked album, when Carol is not in the space", async () => {
     const { ctx, accessRepo } = setup();
     const { anna, bob, space } = await newSpaceWithEditorAndMember(ctx);
     const { user: carol } = await ctx.newUser();
-    const { result: album } = await ctx.newAlbum({ ownerId: bob.id, albumName: 'Shared' });
+    const { result: album } = await ctx.newAlbum({ ownerId: bob.id, albumName: "Shared" });
     await ctx.newAlbumUser({ albumId: album.id, userId: carol.id });
     const { asset } = await ctx.newAsset({ ownerId: carol.id, visibility: AssetVisibility.Timeline });
     await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
@@ -206,7 +204,7 @@ describe('checkSpaceEditAccess — owner must be a space member', () => {
     expect(allowed).toEqual(new Set());
   });
 
-  it('S-5: denies Dave’s partner-shared asset that Bob direct-added (tightening, spec §2.3)', async () => {
+  it("S-5: denies Dave’s partner-shared asset that Bob direct-added (tightening, spec §2.3)", async () => {
     const { ctx, accessRepo } = setup();
     const { anna, bob, space } = await newSpaceWithEditorAndMember(ctx);
     const { user: dave } = await ctx.newUser();
@@ -219,19 +217,15 @@ describe('checkSpaceEditAccess — owner must be a space member', () => {
     expect(allowed).toEqual(new Set());
   });
 
-  it('S-13: membership binds to the space granting the role, not to any space', async () => {
+  it("S-13: membership binds to the space granting the role, not to any space", async () => {
     const { ctx, accessRepo } = setup();
     const { anna, bob, space: spaceA } = await newSpaceWithEditorAndMember(ctx);
     // Bob leaves A; he is a member of B only. His asset still reaches A via a linked album.
-    await defaultDatabase
-      .deleteFrom('shared_space_member')
-      .where('spaceId', '=', spaceA.id)
-      .where('userId', '=', bob.id)
-      .execute();
+    await defaultDatabase.deleteFrom("shared_space_member").where("spaceId", "=", spaceA.id).where("userId", "=", bob.id).execute();
     const { space: spaceB } = await ctx.newSharedSpace({ createdById: bob.id });
-    await ctx.newSharedSpaceMember({ spaceId: spaceB.id, userId: bob.id, role: 'owner' });
+    await ctx.newSharedSpaceMember({ spaceId: spaceB.id, userId: bob.id, role: "owner" });
 
-    const { result: album } = await ctx.newAlbum({ ownerId: bob.id, albumName: 'Cross' });
+    const { result: album } = await ctx.newAlbum({ ownerId: bob.id, albumName: "Cross" });
     const { asset } = await ctx.newAsset({ ownerId: bob.id, visibility: AssetVisibility.Timeline });
     await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
     await ctx.newSharedSpaceAlbum({ spaceId: spaceA.id, albumId: album.id });
@@ -242,12 +236,12 @@ describe('checkSpaceEditAccess — owner must be a space member', () => {
   });
 });
 
-describe('checkSpaceEditAccess — role gate', () => {
-  it('S-6: denies a Viewer on the direct path', async () => {
+describe("checkSpaceEditAccess — role gate", () => {
+  it("S-6: denies a Viewer on the direct path", async () => {
     const { ctx, accessRepo } = setup();
     const { bob, space } = await newSpaceWithEditorAndMember(ctx);
     const { user: vic } = await ctx.newUser();
-    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: vic.id, role: 'viewer' });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: vic.id, role: "viewer" });
     const { asset } = await ctx.newAsset({ ownerId: bob.id, visibility: AssetVisibility.Timeline });
     await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
 
@@ -256,12 +250,12 @@ describe('checkSpaceEditAccess — role gate', () => {
     expect(allowed).toEqual(new Set());
   });
 
-  it('S-44: denies a Viewer on the NEW album path', async () => {
+  it("S-44: denies a Viewer on the NEW album path", async () => {
     const { ctx, accessRepo } = setup();
     const { bob, space } = await newSpaceWithEditorAndMember(ctx);
     const { user: vic } = await ctx.newUser();
-    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: vic.id, role: 'viewer' });
-    const { result: album } = await ctx.newAlbum({ ownerId: bob.id, albumName: 'ViewerAlbum' });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: vic.id, role: "viewer" });
+    const { result: album } = await ctx.newAlbum({ ownerId: bob.id, albumName: "ViewerAlbum" });
     const { asset } = await ctx.newAsset({ ownerId: bob.id, visibility: AssetVisibility.Timeline });
     await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
     await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
@@ -271,12 +265,12 @@ describe('checkSpaceEditAccess — role gate', () => {
     expect(allowed).toEqual(new Set());
   });
 
-  it('S-43: grants a space Owner, not only an Editor', async () => {
+  it("S-43: grants a space Owner, not only an Editor", async () => {
     const { ctx, accessRepo } = setup();
     const { bob, space } = await newSpaceWithEditorAndMember(ctx);
     const { user: olive } = await ctx.newUser();
-    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: olive.id, role: 'owner' });
-    const { result: album } = await ctx.newAlbum({ ownerId: bob.id, albumName: 'OwnerAlbum' });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: olive.id, role: "owner" });
+    const { result: album } = await ctx.newAlbum({ ownerId: bob.id, albumName: "OwnerAlbum" });
     const { asset } = await ctx.newAsset({ ownerId: bob.id, visibility: AssetVisibility.Timeline });
     await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
     await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
@@ -287,18 +281,18 @@ describe('checkSpaceEditAccess — role gate', () => {
   });
 });
 
-describe('checkSpaceEditAccess — gates that must survive any refactor', () => {
+describe("checkSpaceEditAccess — gates that must survive any refactor", () => {
   it.each([
-    ['S-7 Hidden', AssetVisibility.Hidden],
-    ['S-8 Locked', AssetVisibility.Locked],
-  ])('%s: denies a non-space-shareable visibility on every path', async (_label, visibility) => {
+    ["S-7 Hidden", AssetVisibility.Hidden],
+    ["S-8 Locked", AssetVisibility.Locked],
+  ])("%s: denies a non-space-shareable visibility on every path", async (_label, visibility) => {
     const { ctx, accessRepo } = setup();
     const { anna, bob, space } = await newSpaceWithEditorAndMember(ctx);
 
     const { asset: direct } = await ctx.newAsset({ ownerId: bob.id, visibility });
     await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: direct.id });
 
-    const { result: album } = await ctx.newAlbum({ ownerId: bob.id, albumName: 'V' });
+    const { result: album } = await ctx.newAlbum({ ownerId: bob.id, albumName: "V" });
     const { asset: viaAlbum } = await ctx.newAsset({ ownerId: bob.id, visibility });
     await ctx.newAlbumAsset({ albumId: album.id, assetId: viaAlbum.id });
     await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
@@ -308,7 +302,7 @@ describe('checkSpaceEditAccess — gates that must survive any refactor', () => 
     expect(allowed).toEqual(new Set());
   });
 
-  it('S-9: denies a trashed asset', async () => {
+  it("S-9: denies a trashed asset", async () => {
     const { ctx, accessRepo } = setup();
     const { anna, bob, space } = await newSpaceWithEditorAndMember(ctx);
     const { asset } = await ctx.newAsset({ ownerId: bob.id, visibility: AssetVisibility.Timeline });
@@ -320,7 +314,7 @@ describe('checkSpaceEditAccess — gates that must survive any refactor', () => 
     expect(allowed).toEqual(new Set());
   });
 
-  it('S-10: denies an offline library asset', async () => {
+  it("S-10: denies an offline library asset", async () => {
     const { ctx, accessRepo } = setup();
     const { anna, bob, space } = await newSpaceWithEditorAndMember(ctx);
     const { library } = await ctx.newLibrary({ ownerId: bob.id });
@@ -337,7 +331,7 @@ describe('checkSpaceEditAccess — gates that must survive any refactor', () => 
     expect(allowed).toEqual(new Set());
   });
 
-  it('S-12: resolves the motion half of a live photo', async () => {
+  it("S-12: resolves the motion half of a live photo", async () => {
     const { ctx, accessRepo } = setup();
     const { anna, bob, space } = await newSpaceWithEditorAndMember(ctx);
     const { asset: motion } = await ctx.newAsset({ ownerId: bob.id, visibility: AssetVisibility.Timeline });
@@ -506,8 +500,8 @@ deletedAt/isOffline filters."
 Add to `server/src/services/asset.service.spec.ts`. The mock shape matches the existing `rbac-3` tests in that file.
 
 ```ts
-describe('asset edits — space editor access (#734)', () => {
-  it('S-15: allows a space editor to READ the edits of a member asset', async () => {
+describe("asset edits — space editor access (#734)", () => {
+  it("S-15: allows a space editor to READ the edits of a member asset", async () => {
     const auth = AuthFactory.create();
     const asset = AssetFactory.create();
     mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
@@ -517,7 +511,7 @@ describe('asset edits — space editor access (#734)', () => {
     await expect(sut.getAssetEdits(auth, asset.id)).resolves.toEqual({ assetId: asset.id, edits: [] });
   });
 
-  it('S-16: allows a space editor to WRITE edits on a member asset', async () => {
+  it("S-16: allows a space editor to WRITE edits on a member asset", async () => {
     const auth = AuthFactory.create();
     const asset = AssetFactory.create({ type: AssetType.Image });
     mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
@@ -532,7 +526,7 @@ describe('asset edits — space editor access (#734)', () => {
     expect(mocks.assetEdit.replaceAll).toHaveBeenCalled();
   });
 
-  it('S-18: allows a space editor to REVERT edits on a member asset', async () => {
+  it("S-18: allows a space editor to REVERT edits on a member asset", async () => {
     const auth = AuthFactory.create();
     const asset = AssetFactory.create();
     mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
@@ -542,18 +536,16 @@ describe('asset edits — space editor access (#734)', () => {
     await expect(sut.removeAssetEdits(auth, asset.id)).resolves.not.toThrow();
   });
 
-  it('S-19: still rejects an asset the caller has no space-edit access to', async () => {
+  it("S-19: still rejects an asset the caller has no space-edit access to", async () => {
     const auth = AuthFactory.create();
     const asset = AssetFactory.create();
     mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
     mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set());
 
-    await expect(sut.editAsset(auth, asset.id, { edits: [] } as AssetEditsCreateDto)).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
+    await expect(sut.editAsset(auth, asset.id, { edits: [] } as AssetEditsCreateDto)).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('S-45: allows a space editor to upsert asset metadata on a member asset', async () => {
+  it("S-45: allows a space editor to upsert asset metadata on a member asset", async () => {
     const auth = AuthFactory.create();
     const asset = AssetFactory.create();
     mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
@@ -625,8 +617,8 @@ rotate on the read with a misleading error."
 Add to `server/src/services/stack.service.spec.ts`:
 
 ```ts
-describe('create — owner-only guard (#734)', () => {
-  it('S-26: rejects stacking an asset the caller does not own', async () => {
+describe("create — owner-only guard (#734)", () => {
+  it("S-26: rejects stacking an asset the caller does not own", async () => {
     const auth = AuthFactory.create();
     const assetId = newUuid();
     // AssetUpdate passes via space-edit, but the asset is not owned.
@@ -638,7 +630,7 @@ describe('create — owner-only guard (#734)', () => {
     expect(mocks.stack.create).not.toHaveBeenCalled();
   });
 
-  it('S-27: rejects the whole request when only some assets are owned', async () => {
+  it("S-27: rejects the whole request when only some assets are owned", async () => {
     const auth = AuthFactory.create();
     const mine = newUuid();
     const theirs = newUuid();
@@ -650,7 +642,7 @@ describe('create — owner-only guard (#734)', () => {
     expect(mocks.stack.create).not.toHaveBeenCalled();
   });
 
-  it('S-28: still stacks the caller’s own assets', async () => {
+  it("S-28: still stacks the caller’s own assets", async () => {
     const auth = AuthFactory.create();
     const a = newUuid();
     const b = newUuid();
@@ -686,7 +678,7 @@ await this.requireAccess({ auth, permission: Permission.AssetUpdate, ids: dto.as
 // rbac-3 shape in asset.service.ts.
 const ownedIds = await this.checkAccess({ auth, permission: Permission.AssetDelete, ids: dto.assetIds });
 if (ownedIds.size !== new Set(dto.assetIds).size) {
-  throw new ForbiddenException('Stacks can only be created from assets you own');
+  throw new ForbiddenException("Stacks can only be created from assets you own");
 }
 ```
 
@@ -729,8 +721,8 @@ Guard on the pure owner arm and reject the whole request otherwise."
 - [ ] **Step 1: Write the failing tests**
 
 ```ts
-describe('canEdit / editable (#734)', () => {
-  it('S-29: sets canEdit true for a space editor viewing a member asset', async () => {
+describe("canEdit / editable (#734)", () => {
+  it("S-29: sets canEdit true for a space editor viewing a member asset", async () => {
     const auth = AuthFactory.create();
     const asset = AssetFactory.create();
     mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
@@ -742,7 +734,7 @@ describe('canEdit / editable (#734)', () => {
     expect(result.canEdit).toBe(true);
   });
 
-  it('S-30: sets canEdit false when the caller has no edit access', async () => {
+  it("S-30: sets canEdit false when the caller has no edit access", async () => {
     const auth = AuthFactory.create();
     const asset = AssetFactory.create();
     mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
@@ -754,7 +746,7 @@ describe('canEdit / editable (#734)', () => {
     expect(result.canEdit).toBe(false);
   });
 
-  it('S-33: returns only the editable subset', async () => {
+  it("S-33: returns only the editable subset", async () => {
     const auth = AuthFactory.create();
     const mine = newUuid();
     const editable = newUuid();
@@ -767,7 +759,7 @@ describe('canEdit / editable (#734)', () => {
     expect(new Set(result.editableAssetIds)).toEqual(new Set([mine, editable]));
   });
 
-  it('S-34: handles an empty request without error', async () => {
+  it("S-34: handles an empty request without error", async () => {
     const auth = AuthFactory.create();
     mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
     mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set());
@@ -775,7 +767,7 @@ describe('canEdit / editable (#734)', () => {
     await expect(sut.getEditable(auth, { assetIds: [] })).resolves.toEqual({ editableAssetIds: [] });
   });
 
-  it('S-35: silently excludes an unknown id rather than 404ing', async () => {
+  it("S-35: silently excludes an unknown id rather than 404ing", async () => {
     const auth = AuthFactory.create();
     mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
     mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set());
@@ -812,16 +804,16 @@ In `server/src/dtos/asset.dto.ts`:
 ```ts
 const AssetEditableSchema = z
   .object({
-    assetIds: z.array(z.uuidv4()).describe('Asset IDs to resolve editability for'),
-    spaceId: z.uuidv4().optional().describe('Space context the assets are being viewed through'),
+    assetIds: z.array(z.uuidv4()).describe("Asset IDs to resolve editability for"),
+    spaceId: z.uuidv4().optional().describe("Space context the assets are being viewed through"),
   })
-  .meta({ id: 'AssetEditableDto' });
+  .meta({ id: "AssetEditableDto" });
 
 const AssetEditableResponseSchema = z
   .object({
-    editableAssetIds: z.array(z.string()).describe('Subset of the requested IDs the caller may edit'),
+    editableAssetIds: z.array(z.string()).describe("Subset of the requested IDs the caller may edit"),
   })
-  .meta({ id: 'AssetEditableResponseDto' });
+  .meta({ id: "AssetEditableResponseDto" });
 
 export class AssetEditableDto extends createZodDto(AssetEditableSchema) {}
 export class AssetEditableResponseDto extends createZodDto(AssetEditableResponseSchema) {}
@@ -923,36 +915,34 @@ check and a required field would emit a wrong false for owners."
 - [ ] **Step 1: Write the failing tests**
 
 ```ts
-describe('cross-owner edit attribution (#734)', () => {
-  it('S-37: logs one activity row when an editor edits a member asset', async () => {
+describe("cross-owner edit attribution (#734)", () => {
+  it("S-37: logs one activity row when an editor edits a member asset", async () => {
     const auth = AuthFactory.create();
     const asset = AssetFactory.create();
     mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
     mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set([asset.id]));
     mocks.asset.getById.mockResolvedValue(getForAsset(asset));
     mocks.asset.update.mockResolvedValue(getForAsset(asset));
-    mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue({ spaceId: 'space-1' });
+    mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue({ spaceId: "space-1" });
 
-    await sut.update(auth, asset.id, { description: 'fixed' });
+    await sut.update(auth, asset.id, { description: "fixed" });
 
-    expect(mocks.sharedSpace.logActivity).toHaveBeenCalledWith(
-      expect.objectContaining({ spaceId: 'space-1', userId: auth.user.id, type: SharedSpaceActivityType.AssetEdit }),
-    );
+    expect(mocks.sharedSpace.logActivity).toHaveBeenCalledWith(expect.objectContaining({ spaceId: "space-1", userId: auth.user.id, type: SharedSpaceActivityType.AssetEdit }));
   });
 
-  it('S-38: logs nothing when the owner edits their own asset', async () => {
+  it("S-38: logs nothing when the owner edits their own asset", async () => {
     const asset = AssetFactory.create();
     const auth = AuthFactory.create({ id: asset.ownerId });
     mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
     mocks.asset.getById.mockResolvedValue(getForAsset(asset));
     mocks.asset.update.mockResolvedValue(getForAsset(asset));
 
-    await sut.update(auth, asset.id, { description: 'mine' });
+    await sut.update(auth, asset.id, { description: "mine" });
 
     expect(mocks.sharedSpace.logActivity).not.toHaveBeenCalled();
   });
 
-  it('S-40: logs nothing, and does not throw, when no space contains the asset', async () => {
+  it("S-40: logs nothing, and does not throw, when no space contains the asset", async () => {
     const auth = AuthFactory.create();
     const asset = AssetFactory.create();
     mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
@@ -961,24 +951,24 @@ describe('cross-owner edit attribution (#734)', () => {
     mocks.asset.update.mockResolvedValue(getForAsset(asset));
     mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue(null);
 
-    await expect(sut.update(auth, asset.id, { description: 'x' })).resolves.toBeDefined();
+    await expect(sut.update(auth, asset.id, { description: "x" })).resolves.toBeDefined();
     expect(mocks.sharedSpace.logActivity).not.toHaveBeenCalled();
   });
 
-  it('S-41: a failing logActivity must not fail the edit', async () => {
+  it("S-41: a failing logActivity must not fail the edit", async () => {
     const auth = AuthFactory.create();
     const asset = AssetFactory.create();
     mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
     mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set([asset.id]));
     mocks.asset.getById.mockResolvedValue(getForAsset(asset));
     mocks.asset.update.mockResolvedValue(getForAsset(asset));
-    mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue({ spaceId: 'space-1' });
-    mocks.sharedSpace.logActivity.mockRejectedValue(new Error('activity insert failed'));
+    mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue({ spaceId: "space-1" });
+    mocks.sharedSpace.logActivity.mockRejectedValue(new Error("activity insert failed"));
 
-    await expect(sut.update(auth, asset.id, { description: 'x' })).resolves.toBeDefined();
+    await expect(sut.update(auth, asset.id, { description: "x" })).resolves.toBeDefined();
   });
 
-  it('S-46: groups a bulk edit by space — one row per space, none for spaceless assets', async () => {
+  it("S-46: groups a bulk edit by space — one row per space, none for spaceless assets", async () => {
     const auth = AuthFactory.create();
     const inA1 = newUuid();
     const inA2 = newUuid();
@@ -989,19 +979,13 @@ describe('cross-owner edit attribution (#734)', () => {
     mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set(ids));
     // No getByIds mock: logCrossOwnerEdit derives cross-owner from the pure owner arm
     // (checkOwnerAccess above returning empty) rather than fetching asset rows.
-    mocks.sharedSpace.findSpaceForAssetAndUser.mockImplementation((assetId: string) =>
-      Promise.resolve(assetId === inB ? { spaceId: 'space-b' } : assetId === nowhere ? null : { spaceId: 'space-a' }),
-    );
+    mocks.sharedSpace.findSpaceForAssetAndUser.mockImplementation((assetId: string) => Promise.resolve(assetId === inB ? { spaceId: "space-b" } : assetId === nowhere ? null : { spaceId: "space-a" }));
 
-    await sut.updateAll(auth, { ids, description: 'bulk' });
+    await sut.updateAll(auth, { ids, description: "bulk" });
 
     expect(mocks.sharedSpace.logActivity).toHaveBeenCalledTimes(2);
-    expect(mocks.sharedSpace.logActivity).toHaveBeenCalledWith(
-      expect.objectContaining({ spaceId: 'space-a', data: expect.objectContaining({ count: 2 }) }),
-    );
-    expect(mocks.sharedSpace.logActivity).toHaveBeenCalledWith(
-      expect.objectContaining({ spaceId: 'space-b', data: expect.objectContaining({ count: 1 }) }),
-    );
+    expect(mocks.sharedSpace.logActivity).toHaveBeenCalledWith(expect.objectContaining({ spaceId: "space-a", data: expect.objectContaining({ count: 2 }) }));
+    expect(mocks.sharedSpace.logActivity).toHaveBeenCalledWith(expect.objectContaining({ spaceId: "space-b", data: expect.objectContaining({ count: 1 }) }));
   });
 });
 ```
@@ -1128,45 +1112,45 @@ No migration: shared_space_activity.type is varchar(30), not a PG enum."
 Create `web/src/lib/utils/asset-editability.spec.ts`:
 
 ```ts
-import { describe, expect, it } from 'vitest';
-import { canEditAsset } from './asset-editability';
+import { describe, expect, it } from "vitest";
+import { canEditAsset } from "./asset-editability";
 
 const space = (canWrite: boolean, memberIds: string[]) => ({
   canWrite,
   members: memberIds.map((userId) => ({ userId })),
 });
 
-describe('canEditAsset', () => {
-  it('W-1: trusts a server canEdit of true', () => {
-    expect(canEditAsset({ ownerId: 'bob', canEdit: true }, { userId: 'anna' })).toBe(true);
+describe("canEditAsset", () => {
+  it("W-1: trusts a server canEdit of true", () => {
+    expect(canEditAsset({ ownerId: "bob", canEdit: true }, { userId: "anna" })).toBe(true);
   });
 
-  it('W-3: trusts a server canEdit of false even for the owner', () => {
-    expect(canEditAsset({ ownerId: 'anna', canEdit: false }, { userId: 'anna' })).toBe(false);
+  it("W-3: trusts a server canEdit of false even for the owner", () => {
+    expect(canEditAsset({ ownerId: "anna", canEdit: false }, { userId: "anna" })).toBe(false);
   });
 
-  it('W-5: falls back to ownership when canEdit is absent', () => {
-    expect(canEditAsset({ ownerId: 'anna' }, { userId: 'anna' })).toBe(true);
+  it("W-5: falls back to ownership when canEdit is absent", () => {
+    expect(canEditAsset({ ownerId: "anna" }, { userId: "anna" })).toBe(true);
   });
 
-  it('W-6: falls back to the space derivation for a non-owner editor', () => {
-    expect(canEditAsset({ ownerId: 'bob' }, { userId: 'anna', space: space(true, ['anna', 'bob']) })).toBe(true);
+  it("W-6: falls back to the space derivation for a non-owner editor", () => {
+    expect(canEditAsset({ ownerId: "bob" }, { userId: "anna", space: space(true, ["anna", "bob"]) })).toBe(true);
   });
 
-  it('W-7: denies when the asset owner is not a space member', () => {
-    expect(canEditAsset({ ownerId: 'carol' }, { userId: 'anna', space: space(true, ['anna', 'bob']) })).toBe(false);
+  it("W-7: denies when the asset owner is not a space member", () => {
+    expect(canEditAsset({ ownerId: "carol" }, { userId: "anna", space: space(true, ["anna", "bob"]) })).toBe(false);
   });
 
-  it('W-15: denies when the caller cannot write to the space', () => {
-    expect(canEditAsset({ ownerId: 'bob' }, { userId: 'anna', space: space(false, ['anna', 'bob']) })).toBe(false);
+  it("W-15: denies when the caller cannot write to the space", () => {
+    expect(canEditAsset({ ownerId: "bob" }, { userId: "anna", space: space(false, ["anna", "bob"]) })).toBe(false);
   });
 
-  it('W-8: denies a non-owner with no space context', () => {
-    expect(canEditAsset({ ownerId: 'bob' }, { userId: 'anna' })).toBe(false);
+  it("W-8: denies a non-owner with no space context", () => {
+    expect(canEditAsset({ ownerId: "bob" }, { userId: "anna" })).toBe(false);
   });
 
-  it('W-16: denies when there is no authenticated user (shared link)', () => {
-    expect(canEditAsset({ ownerId: 'bob' })).toBe(false);
+  it("W-16: denies when there is no authenticated user (shared link)", () => {
+    expect(canEditAsset({ ownerId: "bob" })).toBe(false);
   });
 });
 ```
@@ -1235,48 +1219,48 @@ Add to `web/src/lib/components/asset-viewer/AssetViewerNavBar.spec.ts`. Assert p
 // #734: a space editor may edit a member's asset. The server answers per asset via
 // `canEdit`; these tests pin that the nav bar honours it without leaking the owner-only
 // actions.
-describe('space editor on a member photo (#734)', () => {
+describe("space editor on a member photo (#734)", () => {
   const renderEditableSpacePhoto = async (canEdit: boolean) => {
-    authManager.setUser(userAdminFactory.build({ id: 'space-member' }));
+    authManager.setUser(userAdminFactory.build({ id: "space-member" }));
     authManager.setPreferences(preferencesFactory.build({ cast: { gCastEnabled: false } }));
     const asset = assetFactory.build({
-      id: 'space-photo',
-      ownerId: 'space-owner',
+      id: "space-photo",
+      ownerId: "space-owner",
       isTrashed: false,
       canEdit,
     });
 
     renderWithTooltips(AssetViewerNavBar, {
       asset,
-      space: { id: 'space-1', canWrite: true },
+      space: { id: "space-1", canWrite: true },
       ...additionalProps,
     });
-    await fireEvent.click(screen.getByLabelText('more'));
+    await fireEvent.click(screen.getByLabelText("more"));
   };
 
-  it('W-1: offers rotate and the re-processing jobs when canEdit is true', async () => {
+  it("W-1: offers rotate and the re-processing jobs when canEdit is true", async () => {
     await renderEditableSpacePhoto(true);
 
-    expect(screen.getByText('rotate_left')).toBeInTheDocument();
-    expect(screen.getByText('rotate_180')).toBeInTheDocument();
-    expect(screen.getByText('refresh_faces')).toBeInTheDocument();
-    expect(screen.getByText('refresh_metadata')).toBeInTheDocument();
+    expect(screen.getByText("rotate_left")).toBeInTheDocument();
+    expect(screen.getByText("rotate_180")).toBeInTheDocument();
+    expect(screen.getByText("refresh_faces")).toBeInTheDocument();
+    expect(screen.getByText("refresh_metadata")).toBeInTheDocument();
   });
 
-  it('W-2: still withholds the owner-only actions from a non-owner', async () => {
+  it("W-2: still withholds the owner-only actions from a non-owner", async () => {
     await renderEditableSpacePhoto(true);
 
-    expect(screen.queryByLabelText('delete')).toBeNull();
-    expect(screen.queryByText('archive')).toBeNull();
-    expect(screen.queryByText('add_to_stack')).toBeNull();
-    expect(screen.queryByText('view_in_timeline')).toBeNull();
+    expect(screen.queryByLabelText("delete")).toBeNull();
+    expect(screen.queryByText("archive")).toBeNull();
+    expect(screen.queryByText("add_to_stack")).toBeNull();
+    expect(screen.queryByText("view_in_timeline")).toBeNull();
   });
 
-  it('W-3: withholds the edit actions when canEdit is false', async () => {
+  it("W-3: withholds the edit actions when canEdit is false", async () => {
     await renderEditableSpacePhoto(false);
 
-    expect(screen.queryByText('rotate_left')).toBeNull();
-    expect(screen.queryByText('refresh_faces')).toBeNull();
+    expect(screen.queryByText("rotate_left")).toBeNull();
+    expect(screen.queryByText("refresh_faces")).toBeNull();
   });
 });
 ```
@@ -1338,14 +1322,14 @@ never resolved."
 Add to `web/src/lib/managers/selection-capabilities.spec.ts`, reusing that file's existing `makeMixedSelection` factory:
 
 ```ts
-describe('space-editor bulk editing (#734)', () => {
-  it('W-9: allows metadata edits on the editable subset but never visibility', () => {
+describe("space-editor bulk editing (#734)", () => {
+  it("W-9: allows metadata edits on the editable subset but never visibility", () => {
     const ctx = makeContext({
       selection: makeSelection({
-        selectedAssetIds: ['mine-1', 'theirs-1', 'theirs-2'],
-        ownedSelectedAssetIds: ['mine-1'],
+        selectedAssetIds: ["mine-1", "theirs-1", "theirs-2"],
+        ownedSelectedAssetIds: ["mine-1"],
         isAllUserOwned: false,
-        editableSelectedAssetIds: ['mine-1', 'theirs-1'],
+        editableSelectedAssetIds: ["mine-1", "theirs-1"],
       }),
       space: makeSpace({ canWrite: true }),
     });
@@ -1357,11 +1341,11 @@ describe('space-editor bulk editing (#734)', () => {
     expect(caps.canDelete).toBe(false);
   });
 
-  it('W-11: reports pending while editability is unresolved', () => {
+  it("W-11: reports pending while editability is unresolved", () => {
     const ctx = makeContext({
       selection: makeSelection({
-        selectedAssetIds: ['mine-1', 'theirs-1'],
-        ownedSelectedAssetIds: ['mine-1'],
+        selectedAssetIds: ["mine-1", "theirs-1"],
+        ownedSelectedAssetIds: ["mine-1"],
         isAllUserOwned: false,
         editableSelectedAssetIds: undefined,
       }),
@@ -1373,9 +1357,9 @@ describe('space-editor bulk editing (#734)', () => {
     expect(caps.capabilitiesPending).toBe(true);
   });
 
-  it('W-12: an all-owned selection is never pending and never needs a request', () => {
+  it("W-12: an all-owned selection is never pending and never needs a request", () => {
     const ctx = makeContext({
-      selection: makeSelection({ selectedAssetIds: ['mine-1'], isAllUserOwned: true }),
+      selection: makeSelection({ selectedAssetIds: ["mine-1"], isAllUserOwned: true }),
     });
 
     const caps = getSelectionCapabilities(ctx, true);
@@ -1385,10 +1369,10 @@ describe('space-editor bulk editing (#734)', () => {
     expect(caps.canSetVisibility).toBe(true);
   });
 
-  it('denies metadata edits when nothing in the selection is editable', () => {
+  it("denies metadata edits when nothing in the selection is editable", () => {
     const ctx = makeContext({
       selection: makeSelection({
-        selectedAssetIds: ['theirs-1'],
+        selectedAssetIds: ["theirs-1"],
         ownedSelectedAssetIds: [],
         isAllUserOwned: false,
         editableSelectedAssetIds: [],

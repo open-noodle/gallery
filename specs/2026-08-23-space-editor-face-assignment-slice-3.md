@@ -8,7 +8,7 @@
 
 **Tech Stack:** NestJS 11, Kysely, Zod DTOs (`createZodDto`), Vitest (unit + medium).
 
-**Spec:** `docs/superpowers/specs/2026-08-23-space-editor-face-assignment-design.md` — §6.1, §9.3
+**Spec:** `specs/2026-08-23-space-editor-face-assignment-design.md` — §6.1, §9.3
 
 **Baseline (Slices 1–2, committed):**
 
@@ -62,10 +62,10 @@
 Append to `server/test/medium/specs/repositories/shared-space-face-assign.medium.spec.ts`, reusing its existing `setup()`, `newSpaceWithEditorAndMember` and `reachPathBuilders` helpers.
 
 ```ts
-describe('getAssetFacesForSpace', () => {
+describe("getAssetFacesForSpace", () => {
   // F-8: the read-side twin of F-9. Written so "absent" is proved to mean the filter fired,
   // not that the fixture never created the face — un-hide and the same face appears.
-  it('omits a face belonging to a person the OWNER marked hidden (F-8)', async () => {
+  it("omits a face belonging to a person the OWNER marked hidden (F-8)", async () => {
     const { ctx } = setup();
     const spaceRepo = ctx.get(SharedSpaceRepository);
     const { bob, space } = await newSpaceWithEditorAndMember(ctx);
@@ -75,33 +75,29 @@ describe('getAssetFacesForSpace', () => {
 
     await expect(spaceRepo.getAssetFacesForSpace(space.id, assetId)).resolves.toEqual([]);
 
-    await defaultDatabase.updateTable('person').set({ isHidden: false }).where('id', '=', person.id).execute();
+    await defaultDatabase.updateTable("person").set({ isHidden: false }).where("id", "=", person.id).execute();
     const shown = await spaceRepo.getAssetFacesForSpace(space.id, assetId);
     expect(shown.map((f) => f.id)).toEqual([faceId]);
   });
 
   // F-12: a face held by a space person the SPACE hid is likewise absent.
-  it('omits a face held by a hidden space person (F-12)', async () => {
+  it("omits a face held by a hidden space person (F-12)", async () => {
     const { ctx } = setup();
     const spaceRepo = ctx.get(SharedSpaceRepository);
     const { bob, space } = await newSpaceWithEditorAndMember(ctx);
     const { assetId } = await reachPathBuilders.direct(ctx, { spaceId: space.id, ownerId: bob.id });
     const { result: faceId } = await ctx.newAssetFace({ assetId });
-    const person = await spaceRepo.createPerson({ spaceId: space.id, name: 'Hidden one', isHidden: true });
+    const person = await spaceRepo.createPerson({ spaceId: space.id, name: "Hidden one", isHidden: true });
     await spaceRepo.addPersonFaces([{ personId: person.id, assetFaceId: faceId }]);
 
     await expect(spaceRepo.getAssetFacesForSpace(space.id, assetId)).resolves.toEqual([]);
 
-    await defaultDatabase
-      .updateTable('shared_space_person')
-      .set({ isHidden: false })
-      .where('id', '=', person.id)
-      .execute();
+    await defaultDatabase.updateTable("shared_space_person").set({ isHidden: false }).where("id", "=", person.id).execute();
     const shown = await spaceRepo.getAssetFacesForSpace(space.id, assetId);
     expect(shown.map((f) => f.id)).toEqual([faceId]);
   });
 
-  it('returns an unassigned face with a null space person', async () => {
+  it("returns an unassigned face with a null space person", async () => {
     const { ctx } = setup();
     const spaceRepo = ctx.get(SharedSpaceRepository);
     const { bob, space } = await newSpaceWithEditorAndMember(ctx);
@@ -113,7 +109,7 @@ describe('getAssetFacesForSpace', () => {
     expect(faces[0]).toMatchObject({ id: faceId, spacePersonId: null, spacePersonName: null });
   });
 
-  it('omits soft-deleted and invisible faces', async () => {
+  it("omits soft-deleted and invisible faces", async () => {
     const { ctx } = setup();
     const spaceRepo = ctx.get(SharedSpaceRepository);
     const { bob, space } = await newSpaceWithEditorAndMember(ctx);
@@ -121,7 +117,7 @@ describe('getAssetFacesForSpace', () => {
     const { result: faceId } = await ctx.newAssetFace({ assetId });
 
     await expect(spaceRepo.getAssetFacesForSpace(space.id, assetId)).resolves.toHaveLength(1);
-    await defaultDatabase.updateTable('asset_face').set({ isVisible: false }).where('id', '=', faceId).execute();
+    await defaultDatabase.updateTable("asset_face").set({ isVisible: false }).where("id", "=", faceId).execute();
     await expect(spaceRepo.getAssetFacesForSpace(space.id, assetId)).resolves.toEqual([]);
   });
 });

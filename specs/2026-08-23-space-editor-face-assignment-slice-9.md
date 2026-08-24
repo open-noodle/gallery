@@ -8,7 +8,7 @@
 
 **Tech Stack:** NestJS 11, Svelte 5, Vitest (e2e API), Playwright (web).
 
-**Spec:** `docs/superpowers/specs/2026-08-23-space-editor-face-assignment-design.md` — §6.1, §6.6, §9.9
+**Spec:** `specs/2026-08-23-space-editor-face-assignment-design.md` — §6.1, §6.6, §9.9
 
 **Baseline (Slices 1–8 + wiring, all pushed and green):** six endpoints, SDK regenerated, People-row affordances wired to space-flavoured panels for editors and owner panels for owners.
 

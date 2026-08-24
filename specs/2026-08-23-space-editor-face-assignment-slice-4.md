@@ -8,7 +8,7 @@
 
 **Tech Stack:** NestJS 11, Kysely, Zod DTOs, Vitest (unit + medium).
 
-**Spec:** `docs/superpowers/specs/2026-08-23-space-editor-face-assignment-design.md` — §6.2, §6.4, §9.4
+**Spec:** `specs/2026-08-23-space-editor-face-assignment-design.md` — §6.2, §6.4, §9.4
 
 **Baseline (Slices 1–3, committed):** `isFaceAssignableInSpace`, `attachFaceToSpacePerson`, `linkFaceToSpacePerson`, `getAssetFacesForSpace`, the attach `PUT` route and the faces `GET` route.
 
@@ -46,57 +46,43 @@ The existing removals are bulk-only (`removePersonFacesByAssetIds`, `removePerso
 Append to `server/test/medium/specs/repositories/shared-space-face-assign.medium.spec.ts`, reusing its `setup()` / `newSpaceWithEditorAndMember` / `reachPathBuilders` helpers.
 
 ```ts
-describe('detach', () => {
+describe("detach", () => {
   // F-32: the counts must come back down. Written FIRST — a missing recount is invisible
   // to every other test here and only surfaces later as mis-ordered, silently-hidden people.
-  it('recounts faceCount/assetCount on detach (F-32)', async () => {
+  it("recounts faceCount/assetCount on detach (F-32)", async () => {
     const { ctx } = setup();
     const spaceRepo = ctx.get(SharedSpaceRepository);
     const { bob, space } = await newSpaceWithEditorAndMember(ctx);
     const { assetId } = await reachPathBuilders.direct(ctx, { spaceId: space.id, ownerId: bob.id });
     const { result: faceId } = await ctx.newAssetFace({ assetId });
-    const person = await spaceRepo.createPerson({ spaceId: space.id, name: 'Aurelia' });
+    const person = await spaceRepo.createPerson({ spaceId: space.id, name: "Aurelia" });
     await spaceRepo.addPersonFaces([{ personId: person.id, assetFaceId: faceId }]);
 
-    const before = await defaultDatabase
-      .selectFrom('shared_space_person')
-      .selectAll()
-      .where('id', '=', person.id)
-      .executeTakeFirstOrThrow();
+    const before = await defaultDatabase.selectFrom("shared_space_person").selectAll().where("id", "=", person.id).executeTakeFirstOrThrow();
     expect(before.faceCount).toBe(1);
 
     await spaceRepo.removePersonFace(person.id, faceId);
 
-    const after = await defaultDatabase
-      .selectFrom('shared_space_person')
-      .selectAll()
-      .where('id', '=', person.id)
-      .executeTakeFirstOrThrow();
+    const after = await defaultDatabase.selectFrom("shared_space_person").selectAll().where("id", "=", person.id).executeTakeFirstOrThrow();
     expect(after.faceCount).toBe(0);
     expect(after.assetCount).toBe(0);
   });
 
   // F-22: the identity link survives, so other spaces sharing it are unaffected (§5.1).
-  it('leaves face_identity_face untouched (F-22)', async () => {
+  it("leaves face_identity_face untouched (F-22)", async () => {
     const { ctx } = setup();
     const spaceRepo = ctx.get(SharedSpaceRepository);
     const { bob, space } = await newSpaceWithEditorAndMember(ctx);
     const { assetId } = await reachPathBuilders.direct(ctx, { spaceId: space.id, ownerId: bob.id });
     const { result: faceId } = await ctx.newAssetFace({ assetId });
-    const person = await spaceRepo.createPerson({ spaceId: space.id, name: 'Aurelia' });
+    const person = await spaceRepo.createPerson({ spaceId: space.id, name: "Aurelia" });
     const identity = await ctx.get(FaceIdentityRepository).ensureSpacePersonIdentity(person.id);
-    await ctx
-      .get(FaceIdentityRepository)
-      .replaceFaceIdentity({ assetFaceId: faceId, identityId: identity.id, source: 'manual' });
+    await ctx.get(FaceIdentityRepository).replaceFaceIdentity({ assetFaceId: faceId, identityId: identity.id, source: "manual" });
     await spaceRepo.addPersonFaces([{ personId: person.id, assetFaceId: faceId }]);
 
     await spaceRepo.removePersonFace(person.id, faceId);
 
-    const link = await defaultDatabase
-      .selectFrom('face_identity_face')
-      .selectAll()
-      .where('assetFaceId', '=', faceId)
-      .executeTakeFirst();
+    const link = await defaultDatabase.selectFrom("face_identity_face").selectAll().where("assetFaceId", "=", faceId).executeTakeFirst();
     expect(link).toBeDefined();
     expect(link?.identityId).toBe(identity.id);
   });
@@ -143,20 +129,20 @@ Reuses the existing `SharedSpaceRepository.createPerson` (`:2236`) — **not a n
 - [ ] **Step 1: Write F-15 and F-33 as failing medium tests**
 
 ```ts
-describe('createSpacePerson', () => {
+describe("createSpacePerson", () => {
   // F-15: person + attachment are one transaction. A crash between them would leave a
   // nameless orphan in the space's people list.
-  it('creates the person and attaches the seed face atomically (F-15)', async () => {
+  it("creates the person and attaches the seed face atomically (F-15)", async () => {
     /* ... */
   });
 
   // F-15 negative: force the attach to throw and assert NO person row survives.
-  it('rolls the person back when the attach fails (F-15)', async () => {
+  it("rolls the person back when the attach fails (F-15)", async () => {
     /* ... */
   });
 
   // F-33: the seed face's identity already has a space person in this space.
-  it('returns the existing person instead of violating the unique index (F-33)', async () => {
+  it("returns the existing person instead of violating the unique index (F-33)", async () => {
     /* ... */
   });
 });
