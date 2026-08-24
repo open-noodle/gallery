@@ -14,6 +14,7 @@ import {
   AssetVisibility,
   ChecksumAlgorithm,
   MemoryType,
+  SharedLinkType,
   SourceType,
   SyncEntityType,
   SyncRequestType,
@@ -465,6 +466,26 @@ export class MediumTestContext<S extends ClassConstructor<typeof BaseService> = 
       .returningAll()
       .executeTakeFirstOrThrow();
     return { spaceAlbum: result, result };
+  }
+
+  async newSharedLink(dto: {
+    userId: string;
+    type: SharedLinkType;
+    albumId?: string | null;
+    spaceId?: string | null;
+    assetIds?: string[];
+  }) {
+    const sharedLink = await this.get(SharedLinkRepository).create({
+      userId: dto.userId,
+      type: dto.type,
+      key: randomBytes(32),
+      allowUpload: false,
+      albumId: dto.albumId ?? null,
+      spaceId: dto.spaceId ?? null,
+      assetIds: dto.assetIds,
+    });
+
+    return { sharedLink, result: sharedLink };
   }
 
   async newAlbumSpaceAsset(dto: { albumId: string; assetId: string; spaceId: string; addedById?: string | null }) {
