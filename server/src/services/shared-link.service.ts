@@ -11,9 +11,10 @@ import {
   SharedLinkResponseDto,
   SharedLinkSearchDto,
 } from 'src/dtos/shared-link.dto';
-import { Permission, SharedLinkType } from 'src/enum';
+import { Permission, SharedLinkType, SharedSpaceRole } from 'src/enum';
 import { BaseService } from 'src/services/base.service';
 import { findOrFail, getExternalDomain, OpenGraphTags } from 'src/utils/misc';
+import { sharedLinkPublisherRoles } from 'src/utils/shared-link-space-tether';
 
 @Injectable()
 export class SharedLinkService extends BaseService {
@@ -41,7 +42,11 @@ export class SharedLinkService extends BaseService {
     }
 
     return {
-      sharedLink: mapSharedLink(sharedLink, { stripAssetMetadata: !sharedLink.showExif }),
+      // Anonymous visitor path — redact who owns what (#1018).
+      sharedLink: mapSharedLink(sharedLink, {
+        stripAssetMetadata: !sharedLink.showExif,
+        redactAssetOwners: true,
+      }),
       token: this.asToken({ id, password }),
     };
   }
@@ -58,7 +63,8 @@ export class SharedLinkService extends BaseService {
       throw new UnauthorizedException('Password required');
     }
 
-    return mapSharedLink(sharedLink, { stripAssetMetadata: !sharedLink.showExif });
+    // Anonymous visitor path — redact who owns what (#1018).
+    return mapSharedLink(sharedLink, { stripAssetMetadata: !sharedLink.showExif, redactAssetOwners: true });
   }
 
   async get(auth: AuthDto, id: string): Promise<SharedLinkResponseDto> {
@@ -67,12 +73,30 @@ export class SharedLinkService extends BaseService {
   }
 
   async create(auth: AuthDto, dto: SharedLinkCreateDto): Promise<SharedLinkResponseDto> {
+    // #1018: a link created from inside a space is authorized against the SPACE, not against
+    // asset ownership, so it can cover what the space shows rather than only the creator's own
+    // photos. Both branches below require the caller to be an Owner/Editor of the space first —
+    // the same role that may already act on assets it does not own (#764 contributions).
+    if (dto.spaceId) {
+      await this.requireSpaceEditor(auth, dto.spaceId);
+    }
+
     switch (dto.type) {
       case SharedLinkType.Album: {
         if (!dto.albumId) {
           throw new BadRequestException('Invalid albumId');
         }
-        await this.requireAccess({ auth, permission: Permission.AlbumShare, ids: [dto.albumId] });
+
+        if (dto.spaceId) {
+          // The album must be live-linked to this very space, and the caller must still be a
+          // member of it. An album linked to some OTHER space grants nothing here.
+          const spaceIds = await this.sharedSpaceRepository.getMemberSpaceIdsLinkingAlbum(dto.albumId, auth.user.id);
+          if (!spaceIds.includes(dto.spaceId)) {
+            throw new BadRequestException('Album is not linked to this space');
+          }
+        } else {
+          await this.requireAccess({ auth, permission: Permission.AlbumShare, ids: [dto.albumId] });
+        }
         break;
       }
 
@@ -81,7 +105,23 @@ export class SharedLinkService extends BaseService {
           throw new BadRequestException('Invalid assetIds');
         }
 
-        await this.requireAccess({ auth, permission: Permission.AssetShare, ids: dto.assetIds });
+        if (dto.spaceId) {
+          // Every asset must be visible in the space through one of its four paths (direct add,
+          // linked library, linked album, cross-owner contribution). Deliberately NOT unioned
+          // with `AssetShare`: a link that claims to come from a space must contain only that
+          // space's assets, or the tether on the read side would have nothing to re-derive.
+          const allowed = await this.accessRepository.asset.checkSpaceAccessForSpace(
+            auth.user.id,
+            dto.spaceId,
+            new Set(dto.assetIds),
+          );
+          const denied = dto.assetIds.filter((assetId) => !allowed.has(assetId));
+          if (denied.length > 0) {
+            throw new BadRequestException('Not found or not visible in this space');
+          }
+        } else {
+          await this.requireAccess({ auth, permission: Permission.AssetShare, ids: dto.assetIds });
+        }
 
         break;
       }
@@ -101,11 +141,24 @@ export class SharedLinkService extends BaseService {
         allowDownload: dto.showMetadata === false ? false : (dto.allowDownload ?? true),
         showExif: dto.showMetadata ?? true,
         slug: dto.slug || null,
+        spaceId: dto.spaceId || null,
       });
 
       return mapSharedLink(sharedLink, { stripAssetMetadata: false });
     } catch (error) {
       this.handleError(error);
+    }
+  }
+
+  /**
+   * #1018: only a space Owner/Editor may publish a link that reaches other members' photos.
+   * Rejects BEFORE any asset or album lookup, so a Viewer never learns what a space contains
+   * from the shape of the error.
+   */
+  private async requireSpaceEditor(auth: AuthDto, spaceId: string): Promise<void> {
+    const member = await this.sharedSpaceRepository.getMember(spaceId, auth.user.id);
+    if (!member || !sharedLinkPublisherRoles.includes(member.role as SharedSpaceRole)) {
+      throw new BadRequestException('Not found or no shared space editor access');
     }
   }
 
