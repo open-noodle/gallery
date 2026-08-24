@@ -36,10 +36,7 @@ class _ShareLinkTestRouter extends RootStackRouter {
     builder: (data) => Material(child: ActionIconButton(action: action)),
   );
 
-  static final _editorPage = PageInfo(
-    SharedLinkEditRoute.name,
-    builder: (data) => const SizedBox(key: _editorPageKey),
-  );
+  static final _editorPage = PageInfo(SharedLinkEditRoute.name, builder: (data) => const SizedBox(key: _editorPageKey));
 
   @override
   List<AutoRoute> get routes => [AutoRoute(page: _homePage, initial: true), AutoRoute(page: _editorPage)];
@@ -64,13 +61,15 @@ void main() {
   RemoteAsset theirs() => RemoteAssetFactory.create(ownerId: 'someone-else');
   RemoteAsset alsoTheirs() => RemoteAssetFactory.create(ownerId: 'another-member');
 
-  /// Taps the action and returns the arguments it pushed at the editor.
-  Future<Map<String, dynamic>> tapAndCapture(
+  /// Taps the action and returns the typed arguments it pushed at the editor.
+  Future<SharedLinkEditRouteArgs> tapAndCapture(
     WidgetTester tester,
     Set<BaseAsset> selection, {
     String? spaceId,
   }) async {
-    final router = _ShareLinkTestRouter(action: ShareLinkAction(source: .timeline, spaceId: spaceId));
+    final router = _ShareLinkTestRouter(
+      action: ShareLinkAction(source: .timeline, spaceId: spaceId),
+    );
     await tester.pumpWidget(
       EasyLocalization(
         supportedLocales: locales.values.toList(),
@@ -101,29 +100,29 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(router.pushed, isNotNull, reason: 'the action must open the shared-link editor');
-    return router.pushed!.rawArgs;
+    return router.pushed!.args! as SharedLinkEditRouteArgs;
   }
 
   group('ShareLinkAction contributedCount', () {
     testWidgets('counts only the assets other members own', (tester) async {
       final args = await tapAndCapture(tester, {mine(), theirs(), alsoTheirs()}, spaceId: 'space-1');
 
-      expect(args['contributedCount'], 2);
-      expect(args['spaceId'], 'space-1');
-      expect((args['assetsList'] as List).length, 3, reason: 'the whole selection is published, not the owned subset');
+      expect(args.contributedCount, 2);
+      expect(args.spaceId, 'space-1');
+      expect(args.assetsList, hasLength(3), reason: 'the whole selection is published, not the owned subset');
     });
 
     testWidgets('counts none when the caller owns the whole selection', (tester) async {
       final args = await tapAndCapture(tester, {mine()}, spaceId: 'space-1');
 
-      expect(args['contributedCount'], 0);
+      expect(args.contributedCount, 0);
     });
 
     testWidgets('counts none off a space surface, where the link is narrowed to the caller anyway', (tester) async {
       final args = await tapAndCapture(tester, {mine(), theirs()});
 
-      expect(args['contributedCount'], 0);
-      expect(args['spaceId'], isNull);
+      expect(args.contributedCount, 0);
+      expect(args.spaceId, isNull);
     });
   });
 }

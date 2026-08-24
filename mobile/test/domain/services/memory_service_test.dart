@@ -5,13 +5,13 @@ import 'package:immich_mobile/infrastructure/repositories/memory.repository.dart
 import 'package:immich_mobile/repositories/memory_api.repository.dart';
 import 'package:mocktail/mocktail.dart';
 
-class MockDriftMemoryRepository extends Mock implements DriftMemoryRepository {}
+class MockMemoryRepository extends Mock implements MemoryRepository {}
 
 class MockMemoryApiRepository extends Mock implements MemoryApiRepository {}
 
 void main() {
   late DriftMemoryService sut;
-  late MockDriftMemoryRepository mockRepository;
+  late MockMemoryRepository mockRepository;
   late MockMemoryApiRepository mockApiRepository;
 
   DriftMemory memory(String id, {String ownerId = 'user-1'}) => DriftMemory(
@@ -27,7 +27,7 @@ void main() {
   );
 
   setUp(() {
-    mockRepository = MockDriftMemoryRepository();
+    mockRepository = MockMemoryRepository();
     mockApiRepository = MockMemoryApiRepository();
     sut = DriftMemoryService(mockRepository, mockApiRepository);
 

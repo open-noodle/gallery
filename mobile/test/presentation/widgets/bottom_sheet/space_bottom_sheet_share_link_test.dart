@@ -2,6 +2,12 @@
 // role, so the button belongs to the same gate as remove-from-space — an Owner/Editor sees it, a
 // Viewer does not. Without it the mobile app has no way to make a link that covers what the space
 // shows, which is the gap the discussion reports.
+import 'package:drift/drift.dart';
+import 'package:drift/native.dart';
+import 'package:immich_mobile/data/db/main/database.dart';
+import 'package:immich_mobile/domain/services/store.service.dart';
+import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
+import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/domain/models/album/album.model.dart';
@@ -63,6 +69,18 @@ Finder _shareLinkAction() =>
 
 void main() {
   final user = UserStub.user1;
+
+  // Rolling's sheet leads with AssetDebugAction, which reads the settings provider, so this
+  // harness needs a real Store — upstream's action model moved that read into the sheet itself.
+  late Drift db;
+
+  setUpAll(() async {
+    db = Drift(DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true));
+    await StoreService.init(storeRepository: StoreRepository(db), listenUpdates: false);
+    await SettingsRepository.ensureInitialized(db);
+  });
+
+  tearDownAll(() async => db.close());
 
   /// The remote-asset actions only render when the selection holds one. Owned by someone else, so
   /// this is exactly the case the pre-#1018 owner-only link could not cover.
