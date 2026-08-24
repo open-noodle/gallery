@@ -1,5 +1,5 @@
 import 'package:drift/drift.dart';
-import 'package:immich_mobile/infrastructure/utils/drift_default.mixin.dart';
+import 'package:immich_mobile/data/db/util/defaults_mixin.dart';
 
 // Space-album METADATA, keyed by albumId (fed by the SharedSpaceAlbumV1 wire
 // stream → SyncAlbumV2). Mirrors the wire entity family, NOT the server's
