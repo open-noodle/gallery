@@ -1,7 +1,7 @@
 import 'package:drift/drift.dart';
-import 'package:immich_mobile/infrastructure/entities/shared_space.entity.dart';
-import 'package:immich_mobile/infrastructure/entities/user.entity.dart';
-import 'package:immich_mobile/infrastructure/utils/drift_default.mixin.dart';
+import 'package:immich_mobile/data/db/main/table/remote/shared_space.dart';
+import 'package:immich_mobile/data/db/main/table/user/user.dart';
+import 'package:immich_mobile/data/db/util/defaults_mixin.dart';
 
 class SharedSpaceMemberEntity extends Table with DriftDefaultsMixin {
   const SharedSpaceMemberEntity();
