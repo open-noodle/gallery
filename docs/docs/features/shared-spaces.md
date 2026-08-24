@@ -12,6 +12,7 @@ Gallery enforces strict role-based access on every endpoint. Three roles — Own
 - **Role-based access** — Three roles: Owner, Editor, and Viewer with different permissions.
 - **Multiple spaces** — Create as many spaces as you need (e.g., "Family", "Friends", "Vacation 2025").
 - **Works alongside existing sharing** — Partner sharing, album sharing, and shared links continue to work as before.
+- **Public links that match the space** — an Owner or Editor can share a link covering what the space shows, contributions included. See [Sharing from a Shared Space](sharing.md#sharing-from-a-shared-space).
 - **Web and mobile** — Full support on both web and the mobile app.
 - **Shared face recognition** — People detected across the space are browsable by all members.
 - **Activity log** — A feed of all actions taken in the space (photos added/removed, members joining/leaving, settings changes).
@@ -38,6 +39,7 @@ Gallery enforces strict role-based access on every endpoint. Three roles — Own
 | Delete the space            | Yes   | No     | No     |
 | Leave the space             | No    | Yes    | Yes    |
 | Search within space         | Yes   | Yes    | Yes    |
+| Create a public share link  | Yes   | Yes    | No\*   |
 | View activity log           | Yes   | Yes    | Yes    |
 | View space on map           | Yes   | Yes    | Yes    |
 | Manage people (name, merge) | Yes   | Yes    | No     |
@@ -46,6 +48,10 @@ Gallery enforces strict role-based access on every endpoint. Three roles — Own
 | Link/unlink libraries\*     | Yes   | Yes    | No     |
 
 \* Requires server admin privileges in addition to the space role.
+
+\* A Viewer can still create a public link covering their own photos; only a link that also includes
+other members' contributions needs the Owner or Editor role. See
+[Sharing from a Shared Space](sharing.md#sharing-from-a-shared-space).
 
 For album-specific permissions — linking and creating albums, contributing photos across owners, and controlling which albums appear in the space timeline — see [Space Albums](space-albums.md#roles-and-permissions).
 

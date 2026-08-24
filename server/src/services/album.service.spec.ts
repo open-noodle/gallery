@@ -9,8 +9,20 @@ import { AuthFactory } from 'test/factories/auth.factory';
 import { UserFactory } from 'test/factories/user.factory';
 import { authStub } from 'test/fixtures/auth.stub';
 import { getForAlbum } from 'test/mappers';
-import { newUuid } from 'test/small.factory';
+import { factory, newUuid } from 'test/small.factory';
 import { newTestService, ServiceMocks } from 'test/utils';
+
+// Seeds an album reachable only through a shared link, returning the link auth to call `get` with.
+// Declared at module scope so `unicorn/consistent-function-scoping` stays satisfied.
+const setupSharedLinkAlbum = (mocks: ServiceMocks, spaceId: string | null) => {
+  const album = AlbumFactory.from().albumUser().build();
+  mocks.album.getById.mockResolvedValue(getForAlbum(album));
+  mocks.access.album.checkSharedLinkAccess.mockResolvedValue(new Set([album.id]));
+  mocks.album.getMetadataForIds.mockResolvedValue([
+    { albumId: album.id, assetCount: 0, startDate: null, endDate: null, lastModifiedAssetTimestamp: null },
+  ]);
+  return { album, auth: factory.auth({ sharedLink: { albumId: album.id, spaceId } }) };
+};
 
 describe(AlbumService.name, () => {
   let sut: AlbumService;
@@ -1103,6 +1115,31 @@ describe(AlbumService.name, () => {
 
       expect(result.contributorCounts).toEqual([{ userId: user.id, assetCount: 3 }]);
       expect(mocks.album.getContributorCounts).toHaveBeenCalledWith(album.id);
+    });
+  });
+
+  // #1018: the asset count behind a share link has to agree with the grid the link renders. A link
+  // made from a space shows contributions, so its count must include them — scoped to that ONE
+  // space, never the link creator's whole membership.
+  describe('get — asset count through a shared link (#1018)', () => {
+    it('counts contributions from the space the link was made from', async () => {
+      const spaceId = newUuid();
+      const { album, auth } = setupSharedLinkAlbum(mocks, spaceId);
+
+      await sut.get(auth, album.id);
+
+      expect(mocks.album.getMetadataForIds).toHaveBeenCalledWith([album.id], {
+        forUserId: auth.sharedLink!.userId,
+        spaceId,
+      });
+    });
+
+    it('counts no contributions for a link with no space', async () => {
+      const { album, auth } = setupSharedLinkAlbum(mocks, null);
+
+      await sut.get(auth, album.id);
+
+      expect(mocks.album.getMetadataForIds).toHaveBeenCalledWith([album.id], { forUserId: undefined });
     });
   });
 
