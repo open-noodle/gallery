@@ -9,6 +9,7 @@
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
+import 'package:immich_mobile/data/server/person.dart';
 import 'package:immich_mobile/infrastructure/repositories/search_api.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/tags_api.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/user_api.repository.dart';
@@ -17,7 +18,6 @@ import 'package:immich_mobile/repositories/asset_api.repository.dart';
 import 'package:immich_mobile/repositories/drift_album_api_repository.dart';
 import 'package:immich_mobile/repositories/folder_api.repository.dart';
 import 'package:immich_mobile/repositories/partner_api.repository.dart';
-import 'package:immich_mobile/repositories/person_api.repository.dart';
 import 'package:immich_mobile/repositories/sessions_api.repository.dart';
 import 'package:immich_mobile/services/api.service.dart';
 import 'package:mocktail/mocktail.dart';

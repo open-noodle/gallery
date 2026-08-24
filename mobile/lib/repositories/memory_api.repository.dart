@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:immich_mobile/constants/errors.dart';
+import 'package:immich_mobile/data/server/errors.dart';
 import 'package:immich_mobile/domain/models/memory.model.dart';
 import 'package:immich_mobile/extensions/asset_extensions.dart';
 import 'package:immich_mobile/providers/api.provider.dart';
