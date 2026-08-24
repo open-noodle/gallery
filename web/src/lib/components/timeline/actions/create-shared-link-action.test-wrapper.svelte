@@ -3,8 +3,10 @@
   // context. Mirrors remove-from-album-action.test-wrapper.svelte.
   import CreateSharedLinkAction from './CreateSharedLinkAction.svelte';
   import { TooltipProvider } from '@immich/ui';
+
+  let { spaceId }: { spaceId?: string } = $props();
 </script>
 
 <TooltipProvider>
-  <CreateSharedLinkAction />
+  <CreateSharedLinkAction {spaceId} />
 </TooltipProvider>

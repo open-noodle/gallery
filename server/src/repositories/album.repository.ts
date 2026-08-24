@@ -186,7 +186,13 @@ export class AlbumRepository {
 
   @GenerateSql({ params: [[DummyValue.UUID]] }, { params: [[DummyValue.UUID], { forUserId: DummyValue.UUID }] })
   @ChunkedArray()
-  async getMetadataForIds(ids: string[], { forUserId }: { forUserId?: string } = {}): Promise<AlbumAssetCount[]> {
+  async getMetadataForIds(
+    ids: string[],
+    // #1018: `spaceId` narrows the contributed arm to a single space instead of every space
+    // `forUserId` belongs to. Set for shared-link reads, where widening would count another
+    // space's contributions into a public link's total.
+    { forUserId, spaceId }: { forUserId?: string; spaceId?: string } = {},
+  ): Promise<AlbumAssetCount[]> {
     // Guard against running invalid query when ids list is empty.
     if (ids.length === 0) {
       return [];
@@ -225,7 +231,8 @@ export class AlbumRepository {
                           .on('shared_space_member.userId', '=', asUuid(forUserId)),
                       )
                       .select(['album_space_asset.albumId as albumId', 'album_space_asset.assetId as assetId'])
-                      .where('album_space_asset.albumId', 'in', ids),
+                      .where('album_space_asset.albumId', 'in', ids)
+                      .$if(!!spaceId, (qb) => qb.where('shared_space_album.spaceId', '=', asUuid(spaceId!))),
                   )
                 : ownerRows
             ).as('album_members');

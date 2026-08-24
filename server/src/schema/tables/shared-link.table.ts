@@ -9,6 +9,7 @@ import {
 } from '@immich/sql-tools';
 import { SharedLinkType } from 'src/enum';
 import { AlbumTable } from 'src/schema/tables/album.table';
+import { SharedSpaceTable } from 'src/schema/tables/shared-space.table';
 import { UserTable } from 'src/schema/tables/user.table';
 
 @Table('shared_link')
@@ -51,4 +52,12 @@ export class SharedLinkTable {
 
   @Column({ type: 'character varying', nullable: true, unique: true })
   slug!: string | null;
+
+  // #1018: the shared space this link was created from, when it was created from one.
+  // It is the tether that lets the link serve assets the creator does not own: on every
+  // read those are re-derived from live space state (membership + the asset still being in
+  // the space), never from the `shared_link_asset` row alone. SET NULL rather than CASCADE —
+  // deleting the space must degrade the link to the creator's own assets, not destroy it.
+  @ForeignKeyColumn(() => SharedSpaceTable, { nullable: true, onDelete: 'SET NULL', onUpdate: 'CASCADE' })
+  spaceId!: string | null;
 }

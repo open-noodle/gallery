@@ -27978,6 +27978,12 @@
             "nullable": true,
             "type": "string"
           },
+          "spaceId": {
+            "description": "Shared space this link is created from. Lets the link cover assets contributed by other members, which requires the caller to be an Owner or Editor of the space.",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
           "type": {
             "$ref": "#/components/schemas/SharedLinkType"
           }
