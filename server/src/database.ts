@@ -168,6 +168,8 @@ export type AuthSharedLink = {
   expiresAt: Date | null;
   userId: string;
   albumId: string | null;
+  /** #1018: the space this link was created from; the tether for non-owned assets. */
+  spaceId: string | null;
   showExif: boolean;
   allowUpload: boolean;
   allowDownload: boolean;
@@ -190,6 +192,7 @@ export type SharedLink = {
   type: SharedLinkType;
   userId: string;
   slug: string | null;
+  spaceId: string | null;
 };
 
 export type Album = Selectable<AlbumTable> & {

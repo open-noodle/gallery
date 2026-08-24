@@ -43,6 +43,7 @@ export const authStub = {
       allowDownload: true,
       allowUpload: true,
       albumId: null,
+      spaceId: null,
       expiresAt: null,
       password: null,
       userId: '42',

@@ -35,6 +35,61 @@ describe('CreateSharedLinkAction', () => {
     await user.click(screen.getByRole('button', { name: /share/i }));
   };
 
+  // #1018: on a space surface where the caller is an Owner/Editor, the toolbar passes the space
+  // down and the whole selection goes into the link — the server authorizes it against the space
+  // instead of against ownership. Off a space surface `spaceId` is undefined and nothing changes.
+  describe('from a space (#1018)', () => {
+    it('sends the whole selection, not just the owned subset', async () => {
+      assetMultiSelectManager.selectAssets([asset('mine', 'me'), asset('theirs', 'someone-else')]);
+      render(CreateSharedLinkAction, { spaceId: 'space-1' });
+
+      await clickShare();
+
+      expect(modalManager.show).toHaveBeenCalledWith(expect.anything(), {
+        assetIds: ['mine', 'theirs'],
+        spaceId: 'space-1',
+        contributedCount: 1,
+      });
+    });
+
+    it('opens the modal even when the caller owns none of the selection', async () => {
+      assetMultiSelectManager.selectAssets([asset('theirs-1', 'other-1'), asset('theirs-2', 'other-2')]);
+      render(CreateSharedLinkAction, { spaceId: 'space-1' });
+
+      await clickShare();
+
+      expect(modalManager.show).toHaveBeenCalledWith(expect.anything(), {
+        assetIds: ['theirs-1', 'theirs-2'],
+        spaceId: 'space-1',
+        contributedCount: 2,
+      });
+      expect(toastManager.warning).not.toHaveBeenCalled();
+    });
+
+    it('reports no contributions when the caller owns the whole selection', async () => {
+      assetMultiSelectManager.selectAssets([asset('a1', 'me'), asset('a2', 'me')]);
+      render(CreateSharedLinkAction, { spaceId: 'space-1' });
+
+      await clickShare();
+
+      expect(modalManager.show).toHaveBeenCalledWith(expect.anything(), {
+        assetIds: ['a1', 'a2'],
+        spaceId: 'space-1',
+        contributedCount: 0,
+      });
+    });
+
+    it('still refuses an unauthenticated viewer', async () => {
+      mockUser.current = null as never;
+      assetMultiSelectManager.selectAssets([asset('a1', 'someone')]);
+      render(CreateSharedLinkAction, { spaceId: 'space-1' });
+
+      await clickShare();
+
+      expect(modalManager.show).not.toHaveBeenCalled();
+    });
+  });
+
   it('shares every asset when the whole selection is the user’s own', async () => {
     assetMultiSelectManager.selectAssets([asset('a1', 'me'), asset('a2', 'me')]);
     render(CreateSharedLinkAction);

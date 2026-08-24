@@ -71,9 +71,6 @@ class SqlGenerator {
   }
 
   private async setup() {
-    await rm(this.options.targetDir, { force: true, recursive: true });
-    await mkdir(this.options.targetDir);
-
     if (!process.env.DB_HOSTNAME) {
       process.env.DB_HOSTNAME = 'localhost';
     }
@@ -193,6 +190,24 @@ class SqlGenerator {
   }
 
   private async write() {
+    // The wipe lives HERE, not in setup(), and that ordering is load-bearing.
+    //
+    // It used to be the first thing setup() did — before the database was ever contacted. Pointing
+    // the generator at a database that was not running therefore deleted all ~39 query files and
+    // then died with nothing to put in their place: a silent, total loss visible only in
+    // `git diff`. Nothing can be generated without a live connection, so there is no reason to
+    // destroy the previous output before the replacement exists. Deferring it also covers a
+    // failure part-way through generation, not just a dead connection.
+    if (Object.keys(this.results).length === 0) {
+      throw new Error(
+        `sync-sql generated no queries — refusing to delete ${this.options.targetDir}. ` +
+          `This usually means the database was unreachable; start one or set DB_URL.`,
+      );
+    }
+
+    await rm(this.options.targetDir, { force: true, recursive: true });
+    await mkdir(this.options.targetDir);
+
     for (const [repoName, data] of Object.entries(this.results)) {
       // only contains the header
       if (data.length === 1) {

@@ -178,6 +178,11 @@
   // to THIS space, so the picker is narrowed to those. `caps` already encodes the space-editor
   // check; `space` is non-null whenever that flag is set.
   const restrictToSpaceId = $derived(caps.addToAlbumRestrictedToSpace ? space?.id : undefined);
+
+  // #1018: the same shape for sharing — when the selection reaches beyond what the caller owns and
+  // they are a space Owner/Editor, the link is created against the space instead of being narrowed
+  // to the owned subset. `caps` encodes the role check; `space` is non-null whenever it is set.
+  const shareSpaceId = $derived(caps.shareScopedToSpace ? space?.id : undefined);
 </script>
 
 {#if assetInteraction.selectionActive}
@@ -185,7 +190,7 @@
     {@const Actions = getAssetBulkActions($t, { restrictToSpaceId })}
     <CommandPaletteDefaultProvider name={$t('assets')} actions={Object.values(Actions)} />
     {#if caps.canShare}
-      <CreateSharedLink />
+      <CreateSharedLink spaceId={shareSpaceId} />
     {/if}
     {#if caps.canSelectAll}
       <SelectAllAssets {timelineManager} {assetInteraction} {onSelectAll} />

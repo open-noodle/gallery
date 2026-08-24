@@ -94,6 +94,7 @@ const ALL_FALSE: SelectionCapabilities = {
   canRemoveFromAlbum: false,
   canRemoveFromSpace: false,
   addToAlbumRestrictedToSpace: false,
+  shareScopedToSpace: false,
 };
 
 // ---------------------------------------------------------------------------
@@ -132,12 +133,14 @@ describe('getSelectionCapabilities — space timeline (direct space)', () => {
       canSetCover: true,
       canRemoveFromAlbum: false,
       canRemoveFromSpace: true,
+      // Everything is mine, so nothing needs the space to be shareable.
+      shareScopedToSpace: false,
       // Everything is mine, so the picker offers every album and space.
       addToAlbumRestrictedToSpace: false,
     });
   });
 
-  it("E3: Given a space editor selecting another member's asset, When capabilities resolve, Then add-to-album is allowed in restricted mode (#764 contribution) while share and the other owner-gated actions stay denied", () => {
+  it("E3: Given a space editor selecting another member's asset, When capabilities resolve, Then add-to-album is allowed in restricted mode (#764 contribution) and share is allowed scoped to the space (#1018), while the owner-gated actions stay denied", () => {
     const ctx = makeCtx({
       space: makeSpace({ canWrite: true }),
       selection: makeSelection({ isAllUserOwned: false, selectedAssetIds: ['asset-1'] }),
@@ -146,7 +149,11 @@ describe('getSelectionCapabilities — space timeline (direct space)', () => {
     expect(getSelectionCapabilities(ctx, true)).toEqual({
       canSelectAll: true,
       canDownload: true,
-      canShare: false,
+      // #1018 reverses the pre-existing denial here: a space Owner/Editor may publish what the
+      // space shows, through the space, with a warning. Favorite/edit/tag/delete stay owner-gated —
+      // sharing is the only one of them the space role confers.
+      canShare: true,
+      shareScopedToSpace: true,
       canAddToAlbum: true,
       canFavorite: false,
       canEditMetadata: false,
@@ -159,7 +166,7 @@ describe('getSelectionCapabilities — space timeline (direct space)', () => {
     });
   });
 
-  it("E4: Given a space owner selecting another member's asset, When capabilities resolve, Then role actions plus restricted add-to-album are allowed but share and the owner-gated mutations are denied", () => {
+  it("E4: Given a space owner selecting another member's asset, When capabilities resolve, Then role actions, restricted add-to-album and space-scoped share are allowed but the owner-gated mutations are denied", () => {
     const ctx = makeCtx({
       space: makeSpace({ isOwner: true, canWrite: true }),
       selection: makeSelection({ isAllUserOwned: false, selectedAssetIds: ['asset-1'] }),
@@ -168,7 +175,8 @@ describe('getSelectionCapabilities — space timeline (direct space)', () => {
     const caps = getSelectionCapabilities(ctx, true);
     expect(caps.canRemoveFromSpace).toBe(true);
     expect(caps.canSetCover).toBe(true);
-    expect(caps.canShare).toBe(false);
+    expect(caps.canShare).toBe(true);
+    expect(caps.shareScopedToSpace).toBe(true);
     expect(caps.canAddToAlbum).toBe(true);
     expect(caps.addToAlbumRestrictedToSpace).toBe(true);
     expect(caps.canFavorite).toBe(false);
@@ -290,9 +298,9 @@ describe('getSelectionCapabilities — cross-cutting edge cases', () => {
     expect(caps.addToAlbumRestrictedToSpace).toBe(false);
   });
 
-  it('E21: Given a selection where none of the assets are mine, When capabilities resolve, Then share is denied because there would be nothing left to put in the link', () => {
+  it('E21: Given a selection where none of the assets are mine and no space role covers them, When capabilities resolve, Then share is denied because there would be nothing left to put in the link', () => {
     const ctx = makeCtx({
-      space: makeSpace({ canWrite: true }),
+      space: makeSpace({ canWrite: false }),
       selection: makeSelection({ isAllUserOwned: false, selectedAssetIds: ['theirs-1', 'theirs-2'] }),
     });
 
@@ -389,6 +397,8 @@ describe('getSelectionCapabilities — cross-cutting edge cases', () => {
       canRemoveFromAlbum: true,
       canRemoveFromSpace: false,
       addToAlbumRestrictedToSpace: false,
+      // No space is involved, so nothing needs to be scoped to one.
+      shareScopedToSpace: false,
     });
   });
 
@@ -443,14 +453,13 @@ describe('getSelectionCapabilities — album/space parity guard', () => {
         const spaceCaps = getSelectionCapabilities(spaceTimelineCtx, true);
         const spaceAlbumCaps = getSelectionCapabilities(spaceAlbumCtx, true);
 
-        // canAddToAlbum is deliberately NOT here — it is the one owner-gated action a space
+        // canAddToAlbum is deliberately NOT here — it is one of two owner-gated actions a space
         // Owner/Editor may take on assets they do not own (#764 contribution). See deviation (c).
-        // canShare stays: it is a function of "how much of the selection is mine", which no
-        // album or space role changes.
+        // canShare is the other one, since #1018 — see deviation (d). Everything else below is a
+        // pure function of "how much of the selection is mine", which no album or space role changes.
         const universalFields = [
           'canSelectAll',
           'canDownload',
-          'canShare',
           'canFavorite',
           'canEditMetadata',
           'canTag',
@@ -524,24 +533,40 @@ describe('getSelectionCapabilities — album/space parity guard', () => {
     expect(spaceViewerCaps.canAddToAlbum).toBe(false);
   });
 
-  it('Share depends only on how much of the selection the user owns, so personal/album/space/space-album contexts always agree', () => {
+  it('deviation (d): share is the second owner-gated action a space Owner/Editor may take on assets they do not own (#1018) — outside a space it stays ownership-only', () => {
     for (const isAllUserOwned of ownerships) {
       const sel = makeSelection({ isAllUserOwned });
       const personalCaps = getSelectionCapabilities(makeCtx({ selection: sel }), true);
       const albumCaps = getSelectionCapabilities(makeCtx({ album: makeAlbum(), selection: sel }), true);
-      const spaceCaps = getSelectionCapabilities(
+      const spaceViewerCaps = getSelectionCapabilities(
+        makeCtx({ space: makeSpace({ canWrite: false }), selection: sel }),
+        true,
+      );
+      const spaceEditorCaps = getSelectionCapabilities(
         makeCtx({ space: makeSpace({ canWrite: true }), selection: sel }),
         true,
       );
-      const spaceAlbumCaps = getSelectionCapabilities(
+      const spaceAlbumEditorCaps = getSelectionCapabilities(
         makeCtx({ album: makeAlbum(), space: makeSpace({ canWrite: true }), selection: sel }),
         true,
       );
 
+      // Ownership-only wherever no space write role applies.
       expect(personalCaps.canShare).toBe(isAllUserOwned);
       expect(albumCaps.canShare).toBe(personalCaps.canShare);
-      expect(spaceCaps.canShare).toBe(personalCaps.canShare);
-      expect(spaceAlbumCaps.canShare).toBe(personalCaps.canShare);
+      expect(spaceViewerCaps.canShare).toBe(personalCaps.canShare);
+
+      // A space Owner/Editor can always share, and the link is scoped to the space exactly when
+      // the selection reaches beyond what they own.
+      expect(spaceEditorCaps.canShare).toBe(true);
+      expect(spaceAlbumEditorCaps.canShare).toBe(true);
+      expect(spaceEditorCaps.shareScopedToSpace).toBe(!isAllUserOwned);
+      expect(spaceAlbumEditorCaps.shareScopedToSpace).toBe(!isAllUserOwned);
+
+      // Never scoped to a space where there is no space, or no write role in it.
+      expect(personalCaps.shareScopedToSpace).toBe(false);
+      expect(albumCaps.shareScopedToSpace).toBe(false);
+      expect(spaceViewerCaps.shareScopedToSpace).toBe(false);
     }
   });
 
@@ -557,5 +582,59 @@ describe('getSelectionCapabilities — album/space parity guard', () => {
       expect(caps.canAddToAlbum).toBe(true);
       expect(caps.addToAlbumRestrictedToSpace).toBe(false);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #1018 — sharing a space selection that includes other members' photos
+// ---------------------------------------------------------------------------
+
+describe('getSelectionCapabilities — share from a space (#1018)', () => {
+  it('lets a space editor share a selection they own none of', () => {
+    const ctx = makeCtx({
+      space: makeSpace({ canWrite: true }),
+      selection: makeSelection({ isAllUserOwned: false, selectedAssetIds: ['theirs-1'] }),
+    });
+
+    const caps = getSelectionCapabilities(ctx, true);
+
+    expect(caps.canShare).toBe(true);
+    expect(caps.shareScopedToSpace).toBe(true);
+  });
+
+  it('scopes a mixed space-editor selection to the space', () => {
+    const ctx = makeCtx({ space: makeSpace({ canWrite: true }), selection: makeMixedSelection() });
+
+    expect(getSelectionCapabilities(ctx, true).shareScopedToSpace).toBe(true);
+  });
+
+  it('does not scope a space editor selection they own entirely', () => {
+    const ctx = makeCtx({
+      space: makeSpace({ canWrite: true }),
+      selection: makeSelection({ isAllUserOwned: true }),
+    });
+
+    expect(getSelectionCapabilities(ctx, true).shareScopedToSpace).toBe(false);
+  });
+
+  it('still refuses a space viewer who owns none of the selection', () => {
+    const ctx = makeCtx({
+      space: makeSpace({ canWrite: false }),
+      selection: makeSelection({ isAllUserOwned: false, selectedAssetIds: ['theirs-1'] }),
+    });
+
+    const caps = getSelectionCapabilities(ctx, true);
+
+    expect(caps.canShare).toBe(false);
+    expect(caps.shareScopedToSpace).toBe(false);
+  });
+
+  it('does not scope a mixed selection outside a space', () => {
+    const ctx = makeCtx({ album: makeAlbum({ isEditor: true }), selection: makeMixedSelection() });
+
+    const caps = getSelectionCapabilities(ctx, true);
+
+    expect(caps.canShare).toBe(true);
+    expect(caps.shareScopedToSpace).toBe(false);
   });
 });
