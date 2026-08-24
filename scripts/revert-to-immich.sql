@@ -448,6 +448,11 @@ DELETE FROM "migration_overrides" WHERE "name" = 'trigger_asset_ocr_updatedAt';
 -- trigger above existed. There is no schema to reverse, and re-adding checkpoints
 -- would be wrong, so only its kysely_migrations row is removed in step 8.
 
+-- 1787148183730-DeleteMismatchedMemoryAssets (upstream #28950) is data-only: it deletes
+-- memory_asset rows whose memory and asset have different owners. There is no schema to
+-- reverse, and the deleted rows cannot be reconstructed, so only its kysely_migrations row
+-- is removed in step 8.
+
 -- 1787148183729-ClusterGroups (upstream #30739) is the largest post-tag migration Gallery carries.
 -- It re-keys people: `person.id` is replaced by the composite primary key (ownerId, personGroupId),
 -- `asset_face.personId` becomes `personGroupId`, and four new tables appear (cluster_group,
@@ -672,7 +677,8 @@ DELETE FROM "kysely_migrations"
    '1786741078327-AddWorkflowLogsTable',
    '1786972746371-AssetOcrUpdatedAtTrigger',
    '1786972746372-AssetOcrSyncReset',
-  '1787148183729-ClusterGroups'
+  '1787148183729-ClusterGroups',
+  '1787148183730-DeleteMismatchedMemoryAssets'
  );
 
 -- -----------------------------------------------------------------------------
