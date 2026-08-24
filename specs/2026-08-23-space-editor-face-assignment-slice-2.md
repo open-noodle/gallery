@@ -8,7 +8,7 @@
 
 **Tech Stack:** NestJS 11, Kysely, Vitest (unit + medium with testcontainers Postgres).
 
-**Spec:** `docs/superpowers/specs/2026-08-23-space-editor-face-assignment-design.md` — §5.1, §6.3, §6.3.1, §9.2
+**Spec:** `specs/2026-08-23-space-editor-face-assignment-design.md` — §5.1, §6.3, §6.3.1, §9.2
 
 **Baseline (Slice 1, already committed):**
 
@@ -163,19 +163,15 @@ Add to `server/src/services/shared-space.service.spec.ts`, inside the existing `
 // F-36 (§6.3.1 row 3): the owner already named this face under a DIFFERENT identity.
 // The attach is ALLOWED, but the identity must NOT be rewritten — the owner's person
 // depends on it, and applyResolvedPersonMetadata resolves their view through it.
-it('overrides an owner-named face WITHOUT rewriting its identity (F-36)', async () => {
+it("overrides an owner-named face WITHOUT rewriting its identity (F-36)", async () => {
   // arrange: face has personId set, owner person identity 'owner-identity',
   // target space person identity 'space-identity'
   // ...mock per the file's idiom...
 
-  await expect(sut.attachFaceToSpacePerson(auth, 'space-id', 'person-id', 'face-id')).resolves.toBe(true);
+  await expect(sut.attachFaceToSpacePerson(auth, "space-id", "person-id", "face-id")).resolves.toBe(true);
 
   // the space sees the new name
-  expect(mocks.sharedSpace.addPersonFaces).toHaveBeenCalledWith(
-    [{ personId: 'person-id', assetFaceId: 'face-id' }],
-    undefined,
-    expect.anything(),
-  );
+  expect(mocks.sharedSpace.addPersonFaces).toHaveBeenCalledWith([{ personId: "person-id", assetFaceId: "face-id" }], undefined, expect.anything());
   // but the owner's identity is untouched
   expect(mocks.faceIdentity.replaceFaceIdentity).not.toHaveBeenCalled();
   // and the pipeline will not re-offer it
@@ -183,19 +179,19 @@ it('overrides an owner-named face WITHOUT rewriting its identity (F-36)', async 
 });
 
 // F-34 (row 1): unrecognised face — ordinary path, identity IS written.
-it('writes the identity for an unassigned face (F-34)', async () => {
+it("writes the identity for an unassigned face (F-34)", async () => {
   // ...personId null...
   expect(mocks.faceIdentity.replaceFaceIdentity).toHaveBeenCalled();
 });
 
 // F-35 (row 2): same identity on both sides — no rewrite needed, still succeeds.
-it('succeeds without a rewrite when the identities already match (F-35)', async () => {
+it("succeeds without a rewrite when the identities already match (F-35)", async () => {
   // ...owner person identity === space person identity...
-  await expect(sut.attachFaceToSpacePerson(auth, 'space-id', 'person-id', 'face-id')).resolves.toBe(true);
+  await expect(sut.attachFaceToSpacePerson(auth, "space-id", "person-id", "face-id")).resolves.toBe(true);
 });
 
 // F-13: reassign between two space people in the SAME space.
-it('moves the face off the previous space person and records a negative verdict (F-13)', async () => {
+it("moves the face off the previous space person and records a negative verdict (F-13)", async () => {
   // ...face already held by 'other-person-id' in this space...
   expect(mocks.sharedSpace.removePersonFaceAssignmentsForSpaceFace).toHaveBeenCalled();
   expect(mocks.facePersonVerdict.markRejectedForSpacePerson).toHaveBeenCalled();

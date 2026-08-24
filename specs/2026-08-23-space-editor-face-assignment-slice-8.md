@@ -8,7 +8,7 @@
 
 **Tech Stack:** Svelte 5 (runes), `@immich/sdk`, Vitest + @testing-library/svelte (happy-dom).
 
-**Spec:** `docs/superpowers/specs/2026-08-23-space-editor-face-assignment-design.md` — §7, §9.8
+**Spec:** `specs/2026-08-23-space-editor-face-assignment-design.md` — §7, §9.8
 
 **Baseline (Slices 1–7, committed and pushed):** all five endpoints exist server-side —
 
@@ -73,27 +73,27 @@ The mobile Dart client changes only as a side effect of regeneration — mobile 
 
 ```ts
 // F-27: editor on a space surface, member's photo -> affordances visible
-it('shows the tag-people affordance to a space editor', () => {
+it("shows the tag-people affordance to a space editor", () => {
   // render with { isOwner: false, canEditSpacePeople: true, spaceId: 'space-1' }
-  expect(getByLabelText('tag_people')).toBeInTheDocument();
+  expect(getByLabelText("tag_people")).toBeInTheDocument();
 });
 
 // F-28: same editor, but NOT on a space surface -> read-only
-it('hides the affordances when there is no space context', () => {
+it("hides the affordances when there is no space context", () => {
   // render with { isOwner: false, canEditSpacePeople: false, spaceId: undefined }
-  expect(queryByLabelText('tag_people')).toBeNull();
+  expect(queryByLabelText("tag_people")).toBeNull();
 });
 
 // F-29: viewer on a space surface -> read-only
-it('hides the affordances from a space viewer', () => {
+it("hides the affordances from a space viewer", () => {
   // render with { isOwner: false, canEditSpacePeople: false, spaceId: 'space-1' }
-  expect(queryByLabelText('tag_people')).toBeNull();
+  expect(queryByLabelText("tag_people")).toBeNull();
 });
 
 // F-30: the owner path is unchanged
-it('still shows the owner their own affordances', () => {
+it("still shows the owner their own affordances", () => {
   // render with { isOwner: true, canEditSpacePeople: false }
-  expect(getByLabelText('tag_people')).toBeInTheDocument();
+  expect(getByLabelText("tag_people")).toBeInTheDocument();
 });
 ```
 

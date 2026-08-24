@@ -8,7 +8,7 @@
 
 **Tech Stack:** NestJS 11, Kysely, Svelte 5, Vitest.
 
-**Spec:** `docs/superpowers/specs/2026-08-23-space-editor-face-assignment-design.md` — §6.7, §9.7
+**Spec:** `specs/2026-08-23-space-editor-face-assignment-design.md` — §6.7, §9.7
 
 **Baseline (Slices 1–6, committed):** attach, detach, create, the space face read, draw and delete boxes, and the cross-space pins.
 

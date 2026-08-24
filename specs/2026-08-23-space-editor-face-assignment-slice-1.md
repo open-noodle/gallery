@@ -8,7 +8,7 @@
 
 **Tech Stack:** NestJS 11, Kysely, Zod DTOs (`createZodDto`), Vitest (unit + medium with testcontainers Postgres).
 
-**Spec:** `docs/superpowers/specs/2026-08-23-space-editor-face-assignment-design.md` (§3, §6.1 filter, §6.3, §9.1)
+**Spec:** `specs/2026-08-23-space-editor-face-assignment-design.md` (§3, §6.1 filter, §6.3, §9.1)
 
 ## Global Constraints
 
@@ -61,20 +61,20 @@ Create `server/test/medium/specs/repositories/shared-space-face-assign.medium.sp
  * a GRANT row in the same block also uses, so a deny can only be explained by the specific
  * property under test.
  */
-import { Kysely } from 'kysely';
-import { AuthDto } from 'src/dtos/auth.dto';
-import { AssetVisibility } from 'src/enum';
-import { DatabaseRepository } from 'src/repositories/database.repository';
-import { FaceIdentityRepository } from 'src/repositories/face-identity.repository';
-import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository';
-import { LoggingRepository } from 'src/repositories/logging.repository';
-import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
-import { DB } from 'src/schema';
-import { BaseService } from 'src/services/base.service';
-import { SharedSpaceService } from 'src/services/shared-space.service';
-import { newMediumService } from 'test/medium.factory';
-import { getKyselyDB } from 'test/utils';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { Kysely } from "kysely";
+import { AuthDto } from "src/dtos/auth.dto";
+import { AssetVisibility } from "src/enum";
+import { DatabaseRepository } from "src/repositories/database.repository";
+import { FaceIdentityRepository } from "src/repositories/face-identity.repository";
+import { FacePersonVerdictRepository } from "src/repositories/face-person-verdict.repository";
+import { LoggingRepository } from "src/repositories/logging.repository";
+import { SharedSpaceRepository } from "src/repositories/shared-space.repository";
+import { DB } from "src/schema";
+import { BaseService } from "src/services/base.service";
+import { SharedSpaceService } from "src/services/shared-space.service";
+import { newMediumService } from "test/medium.factory";
+import { getKyselyDB } from "test/utils";
+import { beforeAll, describe, expect, it } from "vitest";
 ```
 
 The `AuthDto`, `DatabaseRepository`, `FaceIdentityRepository` and `SharedSpaceService` imports are unused until Task 2 Step 5 adds the idempotence block. Add them now so Task 2 does not have to revisit the import list; ESLint's unused-import rule does not fire on type-only value imports referenced later in the same file, but if it does complain at Task 1, move these four lines into Task 2 Step 5 instead.
@@ -96,21 +96,18 @@ beforeAll(async () => {
 });
 
 /** Anna (Editor) + Bob (space Owner, asset owner) in one space. */
-const newSpaceWithEditorAndMember = async (ctx: ReturnType<typeof setup>['ctx']) => {
+const newSpaceWithEditorAndMember = async (ctx: ReturnType<typeof setup>["ctx"]) => {
   const { user: anna } = await ctx.newUser();
   const { user: bob } = await ctx.newUser();
   const { space } = await ctx.newSharedSpace({ createdById: bob.id });
-  await ctx.newSharedSpaceMember({ spaceId: space.id, userId: bob.id, role: 'owner' });
-  await ctx.newSharedSpaceMember({ spaceId: space.id, userId: anna.id, role: 'editor' });
+  await ctx.newSharedSpaceMember({ spaceId: space.id, userId: bob.id, role: "owner" });
+  await ctx.newSharedSpaceMember({ spaceId: space.id, userId: anna.id, role: "editor" });
   return { anna, bob, space };
 };
 
-type ReachPath = 'direct' | 'library' | 'album';
+type ReachPath = "direct" | "library" | "album";
 
-const reachPathBuilders: Record<
-  ReachPath,
-  (ctx: ReturnType<typeof setup>['ctx'], args: { spaceId: string; ownerId: string }) => Promise<{ assetId: string }>
-> = {
+const reachPathBuilders: Record<ReachPath, (ctx: ReturnType<typeof setup>["ctx"], args: { spaceId: string; ownerId: string }) => Promise<{ assetId: string }>> = {
   direct: async (ctx, { spaceId, ownerId }) => {
     const { asset } = await ctx.newAsset({ ownerId, visibility: AssetVisibility.Timeline });
     await ctx.newSharedSpaceAsset({ spaceId, assetId: asset.id });
@@ -123,7 +120,7 @@ const reachPathBuilders: Record<
     return { assetId: asset.id };
   },
   album: async (ctx, { spaceId, ownerId }) => {
-    const { result: album } = await ctx.newAlbum({ ownerId, albumName: 'Face assign album' });
+    const { result: album } = await ctx.newAlbum({ ownerId, albumName: "Face assign album" });
     const { asset } = await ctx.newAsset({ ownerId, visibility: AssetVisibility.Timeline });
     await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
     await ctx.newSharedSpaceAlbum({ spaceId, albumId: album.id });
@@ -131,10 +128,10 @@ const reachPathBuilders: Record<
   },
 };
 
-describe('isFaceAssignableInSpace', () => {
+describe("isFaceAssignableInSpace", () => {
   // F-1, F-2, F-3: all three reach paths grant.
-  describe.each<ReachPath>(['direct', 'library', 'album'])('reach path: %s', (path) => {
-    it('grants for a face on a member-owned asset reachable by this path', async () => {
+  describe.each<ReachPath>(["direct", "library", "album"])("reach path: %s", (path) => {
+    it("grants for a face on a member-owned asset reachable by this path", async () => {
       const { ctx, verdictRepo } = setup();
       const { bob, space } = await newSpaceWithEditorAndMember(ctx);
       const { assetId } = await reachPathBuilders[path](ctx, { spaceId: space.id, ownerId: bob.id });
@@ -146,7 +143,7 @@ describe('isFaceAssignableInSpace', () => {
 
   // F-6: the asset owner need NOT be a space member. This is the deliberate divergence
   // from #992's checkSpaceEditAccess, whose album arm requires owner-is-member.
-  it('grants when the asset owner is NOT a space member (F-6)', async () => {
+  it("grants when the asset owner is NOT a space member (F-6)", async () => {
     const { ctx, verdictRepo } = setup();
     const { space } = await newSpaceWithEditorAndMember(ctx);
     const { user: carol } = await ctx.newUser();
@@ -157,7 +154,7 @@ describe('isFaceAssignableInSpace', () => {
   });
 
   // F-7: reachability binds to the space asked about.
-  it('denies when the asset is reachable only through a DIFFERENT space (F-7)', async () => {
+  it("denies when the asset is reachable only through a DIFFERENT space (F-7)", async () => {
     const { ctx, verdictRepo } = setup();
     const { bob, space } = await newSpaceWithEditorAndMember(ctx);
     const { space: otherSpace } = await ctx.newSharedSpace({ createdById: bob.id });
@@ -170,7 +167,7 @@ describe('isFaceAssignableInSpace', () => {
   });
 
   // F-9: the hidden-person exclusion at the WRITE. Its read-side twin is F-8 in Slice 3.
-  it('denies a face belonging to a person the OWNER marked hidden (F-9)', async () => {
+  it("denies a face belonging to a person the OWNER marked hidden (F-9)", async () => {
     const { ctx, verdictRepo } = setup();
     const { bob, space } = await newSpaceWithEditorAndMember(ctx);
     const { assetId } = await reachPathBuilders.direct(ctx, { spaceId: space.id, ownerId: bob.id });
@@ -180,33 +177,17 @@ describe('isFaceAssignableInSpace', () => {
     await expect(verdictRepo.isFaceAssignableInSpace(space.id, faceId)).resolves.toBe(false);
 
     // Non-vacuous: un-hide the same person and the same face becomes assignable.
-    await defaultDatabase.updateTable('person').set({ isHidden: false }).where('id', '=', person.id).execute();
+    await defaultDatabase.updateTable("person").set({ isHidden: false }).where("id", "=", person.id).execute();
     await expect(verdictRepo.isFaceAssignableInSpace(space.id, faceId)).resolves.toBe(true);
   });
 
   // F-10: asset-level gates, each mutation-proved.
   it.each([
-    [
-      'trashed',
-      (db: Kysely<DB>, assetId: string) =>
-        db.updateTable('asset').set({ deletedAt: new Date() }).where('id', '=', assetId).execute(),
-    ],
-    [
-      'offline',
-      (db: Kysely<DB>, assetId: string) =>
-        db.updateTable('asset').set({ isOffline: true }).where('id', '=', assetId).execute(),
-    ],
-    [
-      'hidden',
-      (db: Kysely<DB>, assetId: string) =>
-        db.updateTable('asset').set({ visibility: AssetVisibility.Hidden }).where('id', '=', assetId).execute(),
-    ],
-    [
-      'locked',
-      (db: Kysely<DB>, assetId: string) =>
-        db.updateTable('asset').set({ visibility: AssetVisibility.Locked }).where('id', '=', assetId).execute(),
-    ],
-  ])('denies when the asset is %s (F-10)', async (_label, mutate) => {
+    ["trashed", (db: Kysely<DB>, assetId: string) => db.updateTable("asset").set({ deletedAt: new Date() }).where("id", "=", assetId).execute()],
+    ["offline", (db: Kysely<DB>, assetId: string) => db.updateTable("asset").set({ isOffline: true }).where("id", "=", assetId).execute()],
+    ["hidden", (db: Kysely<DB>, assetId: string) => db.updateTable("asset").set({ visibility: AssetVisibility.Hidden }).where("id", "=", assetId).execute()],
+    ["locked", (db: Kysely<DB>, assetId: string) => db.updateTable("asset").set({ visibility: AssetVisibility.Locked }).where("id", "=", assetId).execute()],
+  ])("denies when the asset is %s (F-10)", async (_label, mutate) => {
     const { ctx, verdictRepo } = setup();
     const { bob, space } = await newSpaceWithEditorAndMember(ctx);
     const { assetId } = await reachPathBuilders.direct(ctx, { spaceId: space.id, ownerId: bob.id });
@@ -220,16 +201,16 @@ describe('isFaceAssignableInSpace', () => {
 
   // F-11: face-level gates.
   it.each([
-    ['soft-deleted', { deletedAt: new Date(), isVisible: true }],
-    ['not visible', { deletedAt: null, isVisible: false }],
-  ])('denies when the face is %s (F-11)', async (_label, patch) => {
+    ["soft-deleted", { deletedAt: new Date(), isVisible: true }],
+    ["not visible", { deletedAt: null, isVisible: false }],
+  ])("denies when the face is %s (F-11)", async (_label, patch) => {
     const { ctx, verdictRepo } = setup();
     const { bob, space } = await newSpaceWithEditorAndMember(ctx);
     const { assetId } = await reachPathBuilders.direct(ctx, { spaceId: space.id, ownerId: bob.id });
     const { result: faceId } = await ctx.newAssetFace({ assetId });
 
     await expect(verdictRepo.isFaceAssignableInSpace(space.id, faceId)).resolves.toBe(true);
-    await defaultDatabase.updateTable('asset_face').set(patch).where('id', '=', faceId).execute();
+    await defaultDatabase.updateTable("asset_face").set(patch).where("id", "=", faceId).execute();
     await expect(verdictRepo.isFaceAssignableInSpace(space.id, faceId)).resolves.toBe(false);
   });
 });
@@ -327,39 +308,35 @@ Covers F-1, F-2, F-3, F-6, F-7, F-9, F-10, F-11."
 Add to `server/src/services/shared-space.service.spec.ts`. Read the file's existing `confirmSpacePersonFaceSuggestion` describe block first and mirror its mocking idiom exactly.
 
 ```ts
-describe('attachFaceToSpacePerson', () => {
+describe("attachFaceToSpacePerson", () => {
   // F-4: a Viewer is refused. The fixture is otherwise identical to the F-5 grant below,
   // so this can only fail on the role gate.
-  it('throws for a space Viewer (F-4)', async () => {
+  it("throws for a space Viewer (F-4)", async () => {
     mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Viewer } as never);
 
-    await expect(sut.attachFaceToSpacePerson(authStub.user1, 'space-id', 'person-id', 'face-id')).rejects.toThrow(
-      ForbiddenException,
-    );
+    await expect(sut.attachFaceToSpacePerson(authStub.user1, "space-id", "person-id", "face-id")).rejects.toThrow(ForbiddenException);
 
     expect(mocks.sharedSpace.addPersonFaces).not.toHaveBeenCalled();
   });
 
   // F-5: a space Owner is granted — ROLE_HIERARCHY admits Owner as well as Editor, and
   // only Editor is otherwise exercised.
-  it('permits a space Owner (F-5)', async () => {
+  it("permits a space Owner (F-5)", async () => {
     mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Owner } as never);
-    mocks.sharedSpace.getPersonById.mockResolvedValue({ id: 'person-id', spaceId: 'space-id' } as never);
+    mocks.sharedSpace.getPersonById.mockResolvedValue({ id: "person-id", spaceId: "space-id" } as never);
     mocks.facePersonVerdict.isFaceAssignableInSpace.mockResolvedValue(true);
-    mocks.faceIdentity.ensureSpacePersonIdentity.mockResolvedValue({ id: 'identity-id' } as never);
+    mocks.faceIdentity.ensureSpacePersonIdentity.mockResolvedValue({ id: "identity-id" } as never);
 
-    await expect(sut.attachFaceToSpacePerson(authStub.user1, 'space-id', 'person-id', 'face-id')).resolves.toBe(true);
+    await expect(sut.attachFaceToSpacePerson(authStub.user1, "space-id", "person-id", "face-id")).resolves.toBe(true);
   });
 
   // F-9 at the service boundary: an unassignable face is refused before any write.
-  it('throws when the face is not assignable in this space', async () => {
+  it("throws when the face is not assignable in this space", async () => {
     mocks.sharedSpace.getMember.mockResolvedValue({ role: SharedSpaceRole.Editor } as never);
-    mocks.sharedSpace.getPersonById.mockResolvedValue({ id: 'person-id', spaceId: 'space-id' } as never);
+    mocks.sharedSpace.getPersonById.mockResolvedValue({ id: "person-id", spaceId: "space-id" } as never);
     mocks.facePersonVerdict.isFaceAssignableInSpace.mockResolvedValue(false);
 
-    await expect(sut.attachFaceToSpacePerson(authStub.user1, 'space-id', 'person-id', 'face-id')).rejects.toThrow(
-      BadRequestException,
-    );
+    await expect(sut.attachFaceToSpacePerson(authStub.user1, "space-id", "person-id", "face-id")).rejects.toThrow(BadRequestException);
 
     expect(mocks.sharedSpace.addPersonFaces).not.toHaveBeenCalled();
   });
@@ -431,8 +408,8 @@ If `mocks.facePersonVerdict` does not exist, add `FacePersonVerdictRepository` t
 Append to `server/test/medium/specs/repositories/shared-space-face-assign.medium.spec.ts`. This one needs the real service, so use a second `setup` that registers it.
 
 ```ts
-describe('attach idempotence (F-14)', () => {
-  it('a second identical attach is a no-op, with no duplicate projection row', async () => {
+describe("attach idempotence (F-14)", () => {
+  it("a second identical attach is a no-op, with no duplicate projection row", async () => {
     const { ctx } = newMediumService(SharedSpaceService, {
       database: defaultDatabase,
       real: [FacePersonVerdictRepository, SharedSpaceRepository, FaceIdentityRepository, DatabaseRepository],
@@ -442,17 +419,13 @@ describe('attach idempotence (F-14)', () => {
     const { anna, bob, space } = await newSpaceWithEditorAndMember(ctx);
     const { assetId } = await reachPathBuilders.direct(ctx, { spaceId: space.id, ownerId: bob.id });
     const { result: faceId } = await ctx.newAssetFace({ assetId });
-    const person = await ctx.get(SharedSpaceRepository).createPerson({ spaceId: space.id, name: 'Aurelia' });
+    const person = await ctx.get(SharedSpaceRepository).createPerson({ spaceId: space.id, name: "Aurelia" });
 
     const auth = { user: { id: anna.id } } as AuthDto;
     await sut.attachFaceToSpacePerson(auth, space.id, person.id, faceId);
     await sut.attachFaceToSpacePerson(auth, space.id, person.id, faceId);
 
-    const rows = await defaultDatabase
-      .selectFrom('shared_space_person_face')
-      .selectAll()
-      .where('assetFaceId', '=', faceId)
-      .execute();
+    const rows = await defaultDatabase.selectFrom("shared_space_person_face").selectAll().where("assetFaceId", "=", faceId).execute();
     expect(rows).toHaveLength(1);
   });
 });
@@ -500,12 +473,12 @@ In `server/src/dtos/shared-space-person.dto.ts`, replace lines 68-70 with:
 
 ```ts
 const SpacePersonFaceParamsSchema = SpacePersonParamsSchema.extend({
-  assetFaceId: z.uuidv4().describe('Asset face ID'),
-}).meta({ id: 'SpacePersonFaceParamsDto' });
+  assetFaceId: z.uuidv4().describe("Asset face ID"),
+}).meta({ id: "SpacePersonFaceParamsDto" });
 
 const SpacePersonFaceSuggestionParamsSchema = SpacePersonParamsSchema.extend({
-  assetFaceId: z.uuidv4().describe('Unassigned asset face ID being reviewed'),
-}).meta({ id: 'SpacePersonFaceSuggestionParamsDto' });
+  assetFaceId: z.uuidv4().describe("Unassigned asset face ID being reviewed"),
+}).meta({ id: "SpacePersonFaceSuggestionParamsDto" });
 ```
 
 and add beside line 105:
@@ -521,18 +494,14 @@ Keep both schemas: they carry different `meta({ id })` values, and collapsing th
 Add to `server/src/controllers/shared-space.controller.spec.ts` (create the describe if absent; mirror the file's existing route-test idiom).
 
 ```ts
-describe('PUT /shared-spaces/:id/people/:personId/faces/:assetFaceId', () => {
-  it('requires authentication', async () => {
-    const { status } = await request(ctx.getHttpServer()).put(
-      `/shared-spaces/${factory.uuid()}/people/${factory.uuid()}/faces/${factory.uuid()}`,
-    );
+describe("PUT /shared-spaces/:id/people/:personId/faces/:assetFaceId", () => {
+  it("requires authentication", async () => {
+    const { status } = await request(ctx.getHttpServer()).put(`/shared-spaces/${factory.uuid()}/people/${factory.uuid()}/faces/${factory.uuid()}`);
     expect(status).toBe(401);
   });
 
-  it('rejects a non-uuid assetFaceId', async () => {
-    const { status } = await request(ctx.getHttpServer())
-      .put(`/shared-spaces/${factory.uuid()}/people/${factory.uuid()}/faces/not-a-uuid`)
-      .set('Authorization', `Bearer ${factory.uuid()}`);
+  it("rejects a non-uuid assetFaceId", async () => {
+    const { status } = await request(ctx.getHttpServer()).put(`/shared-spaces/${factory.uuid()}/people/${factory.uuid()}/faces/not-a-uuid`).set("Authorization", `Bearer ${factory.uuid()}`);
     expect(status).toBe(400);
   });
 });

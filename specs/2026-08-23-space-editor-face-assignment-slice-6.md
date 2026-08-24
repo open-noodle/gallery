@@ -8,7 +8,7 @@
 
 **Tech Stack:** NestJS 11, Kysely, a fork migration, Vitest (unit + medium).
 
-**Spec:** `docs/superpowers/specs/2026-08-23-space-editor-face-assignment-design.md` — §6.5, §6.6, §9.6
+**Spec:** `specs/2026-08-23-space-editor-face-assignment-design.md` — §6.5, §6.6, §9.6
 
 **Baseline (Slices 1–5, committed):** attach, `linkFaceToSpacePerson`, the space face read, create, detach, and the cross-space propagation pins.
 
