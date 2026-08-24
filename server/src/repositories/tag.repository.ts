@@ -1,5 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import { ExpressionBuilder, Insertable, InsertQueryBuilder, Kysely, QueryCreator, Selectable, Updateable } from 'kysely';
+import {
+  ExpressionBuilder,
+  Insertable,
+  InsertQueryBuilder,
+  Kysely,
+  QueryCreator,
+  Selectable,
+  Updateable,
+} from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { columns } from 'src/database';
 import { Chunked, ChunkedSet, DummyValue, GenerateSql } from 'src/decorators';
