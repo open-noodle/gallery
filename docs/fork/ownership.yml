@@ -52,8 +52,8 @@ features:
       - web/src/routes/(user)/spaces/**
       - web/src/lib/components/spaces/**
       - mobile/lib/pages/library/spaces/**
-      - mobile/lib/infrastructure/entities/shared_space*
-      - mobile/lib/infrastructure/entities/library*
+      - mobile/lib/data/db/main/table/remote/shared_space*
+      - mobile/lib/data/db/main/table/remote/library*
       - packages/plugin-gallery/**
       - server/src/services/gallery-workflow-host.service.ts
       - server/src/services/gallery-workflow-host.service.spec.ts
@@ -73,7 +73,7 @@ features:
       - web/src/routes/(user)/photos/**
       - web/src/routes/(user)/map/**
       - mobile/lib/domain/services/sync_stream.service.dart
-      - mobile/lib/infrastructure/entities/merged_asset.drift
+      - mobile/lib/data/db/main/query/merged_asset.drift
       - server/src/repositories/config.repository.ts
       - server/test/repositories/config.repository.mock.ts
       - server/src/services/workflow-execution.service.ts
@@ -102,7 +102,7 @@ features:
           24: [libraryEntity, sharedSpaceLibraryEntity]
           25: [idxSharedSpaceAssetAssetSpace, idxSharedSpaceLibraryLibrarySpace]
       paths:
-        - mobile/lib/infrastructure/repositories/db.repository.dart
+        - mobile/lib/data/db/main/database.dart
         - mobile/drift_schemas/main/drift_schema_v23.json
         - mobile/drift_schemas/main/drift_schema_v24.json
         - mobile/drift_schemas/main/drift_schema_v25.json
@@ -519,7 +519,7 @@ risk_patterns:
   - id: mobile-drift
     risk: high
     path_globs:
-      - mobile/lib/infrastructure/repositories/db.repository.dart
+      - mobile/lib/data/db/main/database.dart
       - mobile/drift_schemas/main/**
     notes: Mobile Drift schema change
   - id: server-migration
