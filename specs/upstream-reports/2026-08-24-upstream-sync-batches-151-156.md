@@ -181,9 +181,34 @@ Three loose ends the relocation itself could not surface:
 ## Remote CI Verification
 
 - **Test branch**: `rebase/upstream-batch-156`
-- **Commit validated**: `71b6c41dc88`
+- **Commit validated**: `50f5302ff26` (7 workflows were validated at `71b6c41dc88`; the delta to
+  `50f5302ff26` is this report plus whitespace in one web route and one mobile test)
 
-(Results appended once the dispatched runs report.)
+| Workflow                                  | Status | Run           | Notes                                                                       |
+| ----------------------------------------- | ------ | ------------- | --------------------------------------------------------------------------- |
+| `test.yml`                                | GREEN  | `50f5302ff26` | 21/21 jobs, incl. Lint Web, OpenAPI Clients, Medium Tests, Unit Test Mobile |
+| `docker.yml`                              | GREEN  | `50f5302ff26` | re-run after the web whitespace fix                                         |
+| `static_analysis.yml`                     | GREEN  | `50f5302ff26` |                                                                             |
+| `gallery-mobile-smoke.yml`                | GREEN  | `50f5302ff26` |                                                                             |
+| `gallery-build-mobile.yml`                | GREEN  | `71b6c41dc88` | iOS + Android compile                                                       |
+| `gallery-ml-smoke.yml`                    | GREEN  | `71b6c41dc88` |                                                                             |
+| `gallery-rebase-smoke.yml`                | GREEN  | `71b6c41dc88` |                                                                             |
+| `storage-migration-tests.yml`             | GREEN  | `71b6c41dc88` |                                                                             |
+| `storage-migration-e2e.yml`               | GREEN  | `71b6c41dc88` |                                                                             |
+| `gallery-revert-to-immich-validation.yml` | GREEN  | `71b6c41dc88` | coverage grep + Docker boot                                                 |
+
+**Failures fixed** (first round, all self-inflicted and formatting-only — no code defect):
+
+- `Test Web`: prettier on the space people `+page.ts`. The local sweep covered `server`, `e2e`,
+  `docs`, `packages/cli`, `.github` and `i18n` but **skipped `web/`**, so that gate never ran here.
+- `Static Code Analysis` + `Gallery Mobile Smoke`: one `directives_ordering` info in
+  `space_bottom_sheet_share_link_test.dart`, which was edited _after_ the last `dart analyze`.
+
+Both are the same process error — editing a file after its gate has already run. The full sweep was
+re-run on the final tree afterwards.
+
+**Confirmed flakes**: none. Every failure was real and reproducible locally once the right gate was
+run.
 
 ## Post-Rebase Verification
 
