@@ -117,7 +117,11 @@
       <SingleGridRow class="grid grid-flow-col grid-auto-fill-28 gap-x-4 md:grid-auto-fill-36">
         {#snippet children({ itemCount })}
           {#each places.slice(0, itemCount) as item (item.data.id)}
-            <a class="relative" href={Route.photos({ city: item.value })} draggable="false">
+            <a
+              class="relative"
+              href={Route.photos({ city: item.value, country: item.data.exifInfo?.country ?? undefined })}
+              draggable="false"
+            >
               <div class="flex justify-center overflow-hidden rounded-xl brightness-75 filter">
                 <img
                   src={getAssetMediaUrl({ id: item.data.id, size: AssetMediaSize.Thumbnail })}
