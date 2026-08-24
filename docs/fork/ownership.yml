@@ -434,6 +434,7 @@ features:
         - server/src/schema/migrations-gallery/1789000000000-AddFacePersonVerdictStatusCreatedAtIdIndex.ts
         - server/src/schema/migrations-gallery/1790000000000-FixFaceRepairScanInFlightIndex.ts
         - server/src/schema/migrations-gallery/1791000000000-RepointFaceReviewToPersonGroup.ts
+        - server/src/schema/migrations-gallery/1792123120451-AddSharedLinkSpaceId.ts
     required_checks: [ci-invariants-check, fork-patches-check]
 
 checks:
