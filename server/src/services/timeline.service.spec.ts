@@ -1,7 +1,8 @@
 import { BadRequestException, UnauthorizedException } from '@nestjs/common';
-import { AssetType, AssetVisibility, TimeBucketSize } from 'src/enum';
+import { AssetType, AssetVisibility, SharedSpaceRole, TimeBucketSize } from 'src/enum';
 import { TimelineService } from 'src/services/timeline.service';
 import { authStub } from 'test/fixtures/auth.stub';
+import { factory, newUuid } from 'test/small.factory';
 import { newTestService, ServiceMocks } from 'test/utils';
 
 describe(TimelineService.name, () => {
@@ -360,6 +361,62 @@ describe(TimelineService.name, () => {
           authStub.admin,
         );
       });
+    });
+  });
+
+  // #1018: a share link made from inside a space carries that space, and the album grid behind it
+  // must show what the space shows — including cross-owner contributions. Without a space on the
+  // link (every pre-#1018 link, and every album_user share) the contributed arm stays off.
+  describe('getTimeBuckets — album link from a space', () => {
+    const spaceId = newUuid();
+    const albumId = newUuid();
+
+    const sharedLinkAuth = (linkSpaceId: string | null) =>
+      factory.auth({ sharedLink: { albumId, spaceId: linkSpaceId } });
+
+    beforeEach(() => {
+      mocks.access.album.checkSharedLinkAccess.mockResolvedValue(new Set([albumId]));
+    });
+
+    it('resolves the contributed arm from the space the link was made from', async () => {
+      mocks.sharedSpace.getMemberSpaceIdsLinkingAlbum.mockResolvedValue([spaceId]);
+      mocks.asset.getTimeBuckets.mockResolvedValue([]);
+
+      await sut.getTimeBuckets(sharedLinkAuth(spaceId), { albumId });
+
+      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(expect.objectContaining({ albumSpaceIds: [spaceId] }));
+    });
+
+    it('leaves the contributed arm off when the link carries no space', async () => {
+      mocks.sharedSpace.getMemberSpaceIdsLinkingAlbum.mockResolvedValue([spaceId]);
+      mocks.asset.getTimeBuckets.mockResolvedValue([]);
+
+      await sut.getTimeBuckets(sharedLinkAuth(null), { albumId });
+
+      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(expect.objectContaining({ albumSpaceIds: undefined }));
+    });
+
+    it('resolves only spaces where the creator still holds a write role', async () => {
+      // The role, not just membership, is what authorised publishing another member's photo. The
+      // service must ask for write-capable spaces so a demoted creator resolves none.
+      mocks.sharedSpace.getMemberSpaceIdsLinkingAlbum.mockResolvedValue([]);
+      mocks.asset.getTimeBuckets.mockResolvedValue([]);
+
+      await sut.getTimeBuckets(sharedLinkAuth(spaceId), { albumId });
+
+      expect(mocks.sharedSpace.getMemberSpaceIdsLinkingAlbum).toHaveBeenCalledWith(albumId, expect.any(String), {
+        roles: [SharedSpaceRole.Owner, SharedSpaceRole.Editor],
+      });
+    });
+
+    it('leaves the contributed arm off when the album is no longer linked to that space', async () => {
+      // The link creator's membership resolves other spaces, but not the one on the link.
+      mocks.sharedSpace.getMemberSpaceIdsLinkingAlbum.mockResolvedValue([newUuid()]);
+      mocks.asset.getTimeBuckets.mockResolvedValue([]);
+
+      await sut.getTimeBuckets(sharedLinkAuth(spaceId), { albumId });
+
+      expect(mocks.asset.getTimeBuckets).toHaveBeenCalledWith(expect.objectContaining({ albumSpaceIds: undefined }));
     });
   });
 
