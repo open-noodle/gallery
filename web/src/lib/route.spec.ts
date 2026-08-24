@@ -229,7 +229,9 @@ describe('Route.search call sites', () => {
       if (!/\.(ts|svelte)$/.test(name) || /\.spec\.ts$/.test(name)) {
         continue;
       }
-      if (readFileSync(full, 'utf8').includes('Route.search')) {
+      // Anchored so a local like `previousRoute.search` cannot masquerade as `Route.search`
+      // — a plain substring match reads the tail of any identifier ending in `Route`.
+      if (/(?<![A-Za-z0-9_$])Route\.search\b/.test(readFileSync(full, 'utf8'))) {
         found.push(relative(SRC_ROOT, full));
       }
     }
