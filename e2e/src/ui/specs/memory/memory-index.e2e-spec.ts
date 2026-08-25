@@ -15,7 +15,7 @@ import { setupTimelineMockApiRoutes, TimelineTestContext } from 'src/ui/mock-net
 
 test.describe.configure({ mode: 'parallel' });
 
-test.describe('Memory History Index', () => {
+test.describe('Memory Index', () => {
   let adminUserId: string;
   let timelineRestData: TimelineData;
   let memories: MemoryResponseDto[];
@@ -87,23 +87,18 @@ test.describe('Memory History Index', () => {
     memoryChanges.assetRemovals.clear();
   });
 
-  test('shows memory history groups, filters saved memories, and opens the history viewer', async ({ page }) => {
+  test('lists memories and opens one in the viewer', async ({ page }) => {
     await page.goto('/memories');
 
-    await expect(page.getByRole('heading', { name: 'April 2026' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'March 2026' })).toBeVisible();
+    const memoryLink = page.getByRole('link', { name: /april/i }).first();
+    await expect(memoryLink).toBeVisible();
 
-    const aprilHistoryLink = page.getByRole('link', { name: 'April history' });
-    await expect(aprilHistoryLink).toBeVisible();
+    await memoryLink.click();
 
-    await page.getByRole('group', { name: 'Memories' }).getByText('Saved').click();
-
-    await expect(aprilHistoryLink).toBeVisible();
-    await expect(page.getByRole('link', { name: 'March history' })).not.toBeVisible();
-
-    await aprilHistoryLink.click();
-
-    await expect(page).toHaveURL(/\/memory\?id=.*source=history/);
+    // Upstream's `Route.viewMemory` (web/src/lib/route.ts) scopes the viewer by memory id in the
+    // path and carries the initial asset as an `assetId` query param, unlike the fork's old
+    // `/memory?id=...&source=history` URL.
+    await expect(page).toHaveURL(/\/memories\/[0-9a-f-]{36}\?assetId=/);
     await expect(page.locator('#memory-viewer')).toBeVisible();
   });
 });
