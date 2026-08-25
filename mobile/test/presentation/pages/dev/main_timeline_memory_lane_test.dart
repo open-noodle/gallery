@@ -92,7 +92,7 @@ ProviderContainer _makeContainer({required SearchService search, required Drift 
       timelineUsersProvider.overrideWith((_) => Stream.value([_testUser.id])),
       photosFilterCountProvider.overrideWith((ref) => 0),
       featureMessageServiceProvider.overrideWithValue(_StubFeatureMessageService()),
-      driftMemoryFutureProvider.overrideWith((ref) async => [_memory()]),
+      driftMemoryLaneProvider.overrideWith((ref) async => [_memory()]),
     ],
   );
 }
