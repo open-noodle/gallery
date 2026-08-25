@@ -159,7 +159,7 @@ These must survive future rebases — none of them is caught by any existing gat
   calls into the fork's `getMemoryTitle`. Search and month grouping have no upstream
   equivalent and are accepted as lost; reversible if rule volume later demands them back.
 
-  **Correction (final fix wave):** rule-aware **subtitles** did *not* survive for free, contrary
+  **Correction (final fix wave):** rule-aware **subtitles** did _not_ survive for free, contrary
   to design decision D5 as originally written. Nothing on upstream's page or viewer imports
   `getMemorySubtitle`; its only caller was the deleted `memory-index-utils.ts`. Left as adopted,
   a recent-trip memory would have lost its `"12 photos over 3 days"` line, `getMemorySubtitle`
@@ -168,6 +168,7 @@ These must survive future rebases — none of them is caught by any existing gat
   upstream's card as a small fork delta (a bottom-anchored wrapper plus a conditional second
   `<p>`), guarded by `web/src/routes/(user)/memories/memories-page.spec.ts`. D5 in the design doc
   has been corrected to match.
+
 - The memory **viewer now always exits to `/memories`** instead of returning to `/photos` when
   it was opened from the timeline lane. Upstream's viewer exits unconditionally to
   `memoryManager.memoriesHref`; the fork's source-aware exit route and its helper
@@ -191,25 +192,25 @@ These must survive future rebases — none of them is caught by any existing gat
 A whole-branch review plus two red CI jobs produced one more pass. Everything below is in the
 branch; the three doc corrections above came from the same wave.
 
-| Finding | Disposition |
-| --- | --- |
-| `//web:format` red — `MemoryViewer.spec.ts` unformatted | Ran prettier; `npx prettier --check .` clean across the `web` package. |
-| `Upstream Rebase Tooling` red — 2 assertions in `tools/upstream-preflight/src/branded-spinner.spec.ts` | **Real fork-branding regression.** `routes/(user)/memories/+page.svelte` is member 25 of the fork's 25-file branded-spinner swapped set; adopting upstream's file byte-identically reverted the swap and shipped `@immich/ui`'s generic spinner instead of the Gallery-branded `$lib/components/shared-components/LoadingSpinner.svelte` (`/gallery-loader.svg`). Re-applied the swap in the sibling pattern used by `routes/(user)/utilities/geolocation/+page.svelte`; both assertions pass. This is exactly the class of loss the preflight guard exists to catch — it worked. |
-| Memory viewer lost `enableGrouping` (fork feature #625) | Re-applied on upstream's `GalleryViewer` call site. The prop still exists and is still honoured (`GalleryViewer.svelte:60/93/103/508`), so this was a genuine silent loss, not an obsolete prop. Guarded by a new `MemoryViewer.spec.ts` case asserting the stub's `data-enable-grouping`; proven load-bearing by removing the prop and watching it fail. |
-| `getMemorySubtitle` dead code / D5 wrong | Rendered the subtitle on upstream's card (route (a), not deletion) — see the corrected regression bullet above and D5 in the design doc. New `memories-page.spec.ts` (3 cases), red without the delta. |
-| Mobile list truncated after a filtered page | **Real bug.** `MemoryApiRepository.getAllMemories` stopped on `batch.length < pageSize`, but the server applies `LIMIT`/`OFFSET` in SQL and only *then* drops memories of a viewer-disabled type and memories left with no viewable assets (`memory.service.ts` `search`). Any user who turned one memory type off got a short page 1 and the list stopped there, hiding everything behind it. Fixed by keying the stop on `GET /memories/statistics`, whose `statisticsAccessible` counts through the **same** `accessibleSearchBuilder` predicates *without* the `LIMIT` — the only signal that reflects what the server actually paged over. Web's `memory-manager.svelte.ts` stops the same way. A statistics failure degrades to an empty-page stop (never back to the post-filter length) rather than failing the call into the offline fallback. `maxPages = 50` backstop kept. Test `keeps paging past a page the server filtered short` fails against the old condition (3 memories instead of 53) and passes now. |
+| Finding                                                                                                | Disposition                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `//web:format` red — `MemoryViewer.spec.ts` unformatted                                                | Ran prettier; `npx prettier --check .` clean across the `web` package.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `Upstream Rebase Tooling` red — 2 assertions in `tools/upstream-preflight/src/branded-spinner.spec.ts` | **Real fork-branding regression.** `routes/(user)/memories/+page.svelte` is member 25 of the fork's 25-file branded-spinner swapped set; adopting upstream's file byte-identically reverted the swap and shipped `@immich/ui`'s generic spinner instead of the Gallery-branded `$lib/components/shared-components/LoadingSpinner.svelte` (`/gallery-loader.svg`). Re-applied the swap in the sibling pattern used by `routes/(user)/utilities/geolocation/+page.svelte`; both assertions pass. This is exactly the class of loss the preflight guard exists to catch — it worked.                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Memory viewer lost `enableGrouping` (fork feature #625)                                                | Re-applied on upstream's `GalleryViewer` call site. The prop still exists and is still honoured (`GalleryViewer.svelte:60/93/103/508`), so this was a genuine silent loss, not an obsolete prop. Guarded by a new `MemoryViewer.spec.ts` case asserting the stub's `data-enable-grouping`; proven load-bearing by removing the prop and watching it fail.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `getMemorySubtitle` dead code / D5 wrong                                                               | Rendered the subtitle on upstream's card (route (a), not deletion) — see the corrected regression bullet above and D5 in the design doc. New `memories-page.spec.ts` (3 cases), red without the delta.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Mobile list truncated after a filtered page                                                            | **Real bug.** `MemoryApiRepository.getAllMemories` stopped on `batch.length < pageSize`, but the server applies `LIMIT`/`OFFSET` in SQL and only _then_ drops memories of a viewer-disabled type and memories left with no viewable assets (`memory.service.ts` `search`). Any user who turned one memory type off got a short page 1 and the list stopped there, hiding everything behind it. Fixed by keying the stop on `GET /memories/statistics`, whose `statisticsAccessible` counts through the **same** `accessibleSearchBuilder` predicates _without_ the `LIMIT` — the only signal that reflects what the server actually paged over. Web's `memory-manager.svelte.ts` stops the same way. A statistics failure degrades to an empty-page stop (never back to the post-filter length) rather than failing the call into the offline fallback. `maxPages = 50` backstop kept. Test `keeps paging past a page the server filtered short` fails against the old condition (3 memories instead of 53) and passes now. |
 
 ## Fork Feature Verification
 
-| Feature                                                   | Status                       | Notes                                                                                                                                                                            |
-| --------------------------------------------------------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Memory rule engine (11 rule types, server)                | OK                           | Untouched — `memory.service.ts` and every `*.rule.ts` file carry no delta from this cycle. Its rule-aware **subtitles** were unreachable on web until the final fix wave restored the card rendering |
-| Memories admin settings (system-wide)                     | OK                           | `MemoriesSettings.spec.ts` (212 lines) confirmed still green, not assumed                                                                                                        |
-| Memories per-user settings (`FeatureSettings`)            | OK                           | Four-key merge verified in all five source-of-truth files; guarded by a new exact-match test                                                                                     |
+| Feature                                                   | Status                       | Notes                                                                                                                                                                                                                                                                                                                                                           |
+| --------------------------------------------------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Memory rule engine (11 rule types, server)                | OK                           | Untouched — `memory.service.ts` and every `*.rule.ts` file carry no delta from this cycle. Its rule-aware **subtitles** were unreachable on web until the final fix wave restored the card rendering                                                                                                                                                            |
+| Memories admin settings (system-wide)                     | OK                           | `MemoriesSettings.spec.ts` (212 lines) confirmed still green, not assumed                                                                                                                                                                                                                                                                                       |
+| Memories per-user settings (`FeatureSettings`)            | OK                           | Four-key merge verified in all five source-of-truth files; guarded by a new exact-match test                                                                                                                                                                                                                                                                    |
 | Memories web index + viewer                               | OK (converged onto upstream) | See product-direction gate; #791 regression assertions ported onto upstream's viewer, proven load-bearing by temporarily reintroducing the bug they guard and watching them fail. Two fork deltas were **lost and restored in the final fix wave**: the branded `LoadingSpinner` on the index and `enableGrouping` (#625) on the viewer — both now test-guarded |
-| Memory lane (mobile, #997)                                | OK                           | `getMemoryLane` untouched — still hard-scoped to `for=<today>`, unaffected by this cycle                                                                                         |
-| Memories list (mobile, new this cycle)                    | OK (fixed in final wave)     | Server-sourced with local-Drift fallback. The final wave fixed a real truncation: the page-exhaustion condition trusted the post-filter page length. See the final fix wave table; `memory_api_repository_test.dart` 20/20                                       |
-| Shared Spaces, Storage Migration, Pet Detection, Branding | OK                           | No conflicts touched these; verified no regression in local gate run                                                                                                             |
+| Memory lane (mobile, #997)                                | OK                           | `getMemoryLane` untouched — still hard-scoped to `for=<today>`, unaffected by this cycle                                                                                                                                                                                                                                                                        |
+| Memories list (mobile, new this cycle)                    | OK (fixed in final wave)     | Server-sourced with local-Drift fallback. The final wave fixed a real truncation: the page-exhaustion condition trusted the post-filter page length. See the final fix wave table; `memory_api_repository_test.dart` 20/20                                                                                                                                      |
+| Shared Spaces, Storage Migration, Pet Detection, Branding | OK                           | No conflicts touched these; verified no regression in local gate run                                                                                                                                                                                                                                                                                            |
 
 ## Preferences merge detail
 
@@ -298,22 +299,60 @@ family was kept, since `FeatureSettings.svelte` still builds and asserts it at r
 ## Remote CI Verification
 
 - **Test branch**: `rebase/upstream-batch-161`
-- **Commit dispatched**: `7492093fe72`
-- 10 workflows dispatched. Results pending — the controller will fill in this table once runs
-  complete; do not infer outcomes from the local gate results above.
+- **Final commit validated**: `23ccee65f85`
 
-| Workflow                                  | Status    | Run | Notes |
-| ----------------------------------------- | --------- | --- | ----- |
-| `test.yml`                                | _pending_ |     |       |
-| `docker.yml`                              | _pending_ |     |       |
-| `static_analysis.yml`                     | _pending_ |     |       |
-| `gallery-mobile-smoke.yml`                | _pending_ |     |       |
-| `gallery-build-mobile.yml`                | _pending_ |     |       |
-| `gallery-ml-smoke.yml`                    | _pending_ |     |       |
-| `gallery-rebase-smoke.yml`                | _pending_ |     |       |
-| `storage-migration-tests.yml`             | _pending_ |     |       |
-| `storage-migration-e2e.yml`               | _pending_ |     |       |
-| `gallery-revert-to-immich-validation.yml` | _pending_ |     |       |
+**All 10 workflows green.** Two commits are cited below because the final fix wave touched only
+`mobile/`, `web/` and `specs/` — never `server/`, `machine-learning/`, `scripts/` or `.github/`.
+The four workflows whose inputs did not change were therefore not re-run, and the commit each was
+green on is recorded rather than implied.
+
+| Workflow                                  | Status | Green on      | Notes                                                      |
+| ----------------------------------------- | ------ | ------------- | ---------------------------------------------------------- |
+| `test.yml`                                | GREEN  | `23ccee65f85` | 20-job suite; see the infrastructure note below            |
+| `docker.yml`                              | GREEN  | `23ccee65f85` | builds the shipped server/web/cli/ml images                |
+| `static_analysis.yml`                     | GREEN  | `23ccee65f85` | `dart analyze --fatal-infos`, format, generated-file drift |
+| `gallery-mobile-smoke.yml`                | GREEN  | `23ccee65f85` | Android codegen/analyze smoke                              |
+| `gallery-build-mobile.yml`                | GREEN  | `23ccee65f85` | iOS + Android compile                                      |
+| `gallery-rebase-smoke.yml`                | GREEN  | `23ccee65f85` | rebase-targeted e2e smoke                                  |
+| `gallery-ml-smoke.yml`                    | GREEN  | `7492093fe72` | `machine-learning/` unchanged since                        |
+| `storage-migration-tests.yml`             | GREEN  | `7492093fe72` | `server/` unchanged since                                  |
+| `storage-migration-e2e.yml`               | GREEN  | `7492093fe72` | `server/` + storage e2e unchanged since                    |
+| `gallery-revert-to-immich-validation.yml` | GREEN  | `7492093fe72` | `scripts/` + migrations unchanged since                    |
+
+### Real failures found and fixed by CI
+
+Two defects reached CI that no local gate caught, both worth recording:
+
+1. **A fork-branding regression.** `web/src/routes/(user)/memories/+page.svelte` is member 25 of
+   the fork's 25-file branded-`LoadingSpinner` swapped set, enforced by
+   `tools/upstream-preflight/src/branded-spinner.spec.ts`. Adopting upstream's page
+   byte-identically reverted the swap, so the page would have shipped upstream's generic spinner
+   instead of `/gallery-loader.svg`. The guard's own comment says it exists to "fail the _next_
+   rebase if any file in the fork's swapped set reverts" — it did exactly that.
+   **Byte-identical-to-upstream is the correct resolution for most adopted files and the wrong one
+   for these 25.**
+2. **Two web lint violations** (`better-tailwindcss` class order; `unicorn/prefer-scoped-selector`)
+   in files added by the fix wave. Neither was catchable locally: `eslint` crashes on every
+   `.svelte` file in this worktree due to the known `@koddsson/eslint-plugin-tscompat` bug,
+   confirmed by a control run against untouched files.
+
+Also of note: web `prettier --check` was initially skipped locally in favour of `eslint`, which is
+the documented "eslint green != prettier green" trap in this repo. CI's `//web:format` caught it.
+
+### Infrastructure incident (not repo defects)
+
+Three intermediate runs failed on GitHub infrastructure while `githubstatus.com` reported "All
+Systems Operational". Recorded so a future reader does not mistake them for regressions:
+
+- DNS: `Name or service not known (internal-api.service.iad.github.net:443)` when fetching the
+  `actions/github-script` and `immich-app/devtools` actions — 3 attempts, then hard failure. No
+  repository code ran.
+- Registry: `toomanyrequests: retry-after: 1.095831ms, allowed: 44000/minute` pulling the e2e
+  `database`/`redis` images, and a 404 pulling `ghcr.io/immich-app/postgres:14-vectorchord0.4.3`
+  for the medium-test container.
+
+The documented remedy applied: wait out the limit, then re-dispatch staggered rather than firing
+the full set at once. Every affected job passed on the staggered re-run with no code change.
 
 ## Post-Rebase Verification
 
