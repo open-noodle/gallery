@@ -188,7 +188,10 @@ describe('MemoryViewer memory-scoped navigation (#790)', () => {
     // The same asset id appears in two memories (e.g. a birthday memory and an on-this-day
     // memory). This duplication is the only reason memory-scoped navigation is observable at
     // all -- without it, any implementation (correct or regressed) resolves the same way.
-    memoryManager.memories = [memory('memory-1', ['dup-asset', 'm1-only']), memory('memory-2', ['dup-asset', 'm2-only'])];
+    memoryManager.memories = [
+      memory('memory-1', ['dup-asset', 'm1-only']),
+      memory('memory-2', ['dup-asset', 'm2-only']),
+    ];
 
     // Route param names the memory; the query param names the asset within it -- upstream's
     // actual URL shape (Route.viewMemory -> `/memories/<id>?assetId=<assetId>`), not the fork's
@@ -221,6 +224,18 @@ describe('MemoryViewer memory-scoped navigation (#790)', () => {
     expect(container.querySelector('[data-testid="asset-row-m2-only"]')).toBeInTheDocument();
     expect(container.querySelector('[data-testid="asset-row-m1-only"]')).not.toBeInTheDocument();
     expect(galleryViewer).toHaveAttribute('data-asset-count', '2');
+  });
+
+  // Fork feature #625 (asset grouping in the gallery viewer). Upstream's viewer does not pass
+  // `enableGrouping`, so the prop defaults to `false` and the grouping headers silently vanish
+  // whenever this fork delta is dropped during a rebase. Asserting on the stub's
+  // `data-enable-grouping` attribute makes that loss loud instead of silent.
+  it('enables asset grouping on the memory gallery strip (#625)', async () => {
+    renderViewer();
+
+    const galleryViewer = await screen.findByTestId('gallery-viewer');
+
+    expect(galleryViewer).toHaveAttribute('data-enable-grouping', 'true');
   });
 
   it('links progress bar segments to assets scoped to the current memory', async () => {
