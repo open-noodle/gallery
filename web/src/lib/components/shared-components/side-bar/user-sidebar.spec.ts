@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
   authManager: {
     preferences: {
       folders: { enabled: false, sidebarWeb: false },
-      memories: { enabled: true },
+      memories: { enabled: true, sidebarWeb: true },
       people: { enabled: false, sidebarWeb: false },
       recentlyAdded: { sidebarWeb: false },
       sharedLinks: { enabled: false, sidebarWeb: false },
@@ -81,6 +81,7 @@ vi.mock('$lib/stores/sidebar-mode.svelte', () => ({ sidebarModeStore: sidebarMoc
 describe('UserSidebar', () => {
   beforeEach(() => {
     mocks.authManager.preferences.memories.enabled = true;
+    mocks.authManager.preferences.memories.sidebarWeb = true;
     mockPage.url = new URL('https://gallery.test/photos');
     sidebarMocks.sidebarModeStore.layout = 'expanded';
     sidebarMocks.sidebarModeStore.hoverExpanded = false;
@@ -118,14 +119,27 @@ describe('UserSidebar', () => {
     });
   });
 
-  it('shows a memories link under Library when memories are enabled', () => {
+  it('shows a memories link under Library when memories are enabled and the sidebar is on', () => {
+    mocks.authManager.preferences.memories.enabled = true;
+    mocks.authManager.preferences.memories.sidebarWeb = true;
+
     render(UserSidebar);
 
     expect(screen.getByRole('link', { name: /^memories$/i })).toHaveAttribute('href', '/memories');
   });
 
-  it('hides the memories link when memories are disabled', () => {
+  it('hides the memories link when memories are disabled, even with the sidebar on', () => {
     mocks.authManager.preferences.memories.enabled = false;
+    mocks.authManager.preferences.memories.sidebarWeb = true;
+
+    render(UserSidebar);
+
+    expect(screen.queryByRole('link', { name: /^memories$/i })).not.toBeInTheDocument();
+  });
+
+  it('hides the memories link when the sidebar preference is off, even with memories enabled', () => {
+    mocks.authManager.preferences.memories.enabled = true;
+    mocks.authManager.preferences.memories.sidebarWeb = false;
 
     render(UserSidebar);
 
