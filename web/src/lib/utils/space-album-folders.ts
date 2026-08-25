@@ -168,6 +168,19 @@ export const getRecursiveAlbumCount = (
 const recencyOf = (album: SharedSpaceLinkedAlbumDto): number =>
   new Date(album.endDate ?? album.updatedAt ?? 0).getTime();
 
+/**
+ * Newest first, ties broken by id.
+ *
+ * The tie-break is not cosmetic. Albums routinely share a recency — a bulk import lands many in
+ * the same tick, and an album with no photos falls back to a timestamp it shares with its
+ * siblings. Without a total order, which four covers a folder shows depends on the order the
+ * albums happen to arrive in, so the same folder can render a different collage after a refetch,
+ * and two callers that walk the space differently disagree about the same folder. Mobile's
+ * `_byRecencyThenId` is the same comparator, for the same reason.
+ */
+const byRecencyThenId = (a: SharedSpaceLinkedAlbumDto, b: SharedSpaceLinkedAlbumDto): number =>
+  recencyOf(b) - recencyOf(a) || a.id.localeCompare(b.id);
+
 export const getFolderPreviewAssetIds = (
   folders: SharedSpaceAlbumFolderDto[],
   albums: SharedSpaceLinkedAlbumDto[],
@@ -177,9 +190,110 @@ export const getFolderPreviewAssetIds = (
     // A null cover means getLinkedAlbums found no space-visible asset. Emitting it would
     // render a broken tile, which is the exact bug the server-side COALESCE prevents.
     .filter((a) => a.albumThumbnailAssetId !== null)
-    .sort((a, b) => recencyOf(b) - recencyOf(a))
+    .sort(byRecencyThenId)
     .slice(0, FOLDER_PREVIEW_LIMIT)
     .map((a) => a.albumThumbnailAssetId as string);
+
+export type FolderSummary = { albumCount: number; previewAssetIds: string[] };
+
+export const EMPTY_FOLDER_SUMMARY: FolderSummary = { albumCount: 0, previewAssetIds: [] };
+
+/**
+ * Every folder's recursive album count and preview covers, in one pass over the space.
+ *
+ * `getRecursiveAlbumCount` and `getFolderPreviewAssetIds` are each O(folders + albums) on their
+ * own — both rebuild the parent index and re-scan every album in the space. Calling them from a
+ * card's props, once per rendered folder, makes a level of F folders cost O(F × (folders +
+ * albums)) and re-pays it on every reactive change. At this feature's own limits (500 folders per
+ * space, and `GET /:id/albums` deliberately unpaginated) that is millions of array operations per
+ * render.
+ *
+ * Here the two indexes are built once and shared, so each folder only walks its own subtree:
+ * O(folders × depth + albums) for the whole level, with depth capped at 10 server-side.
+ *
+ * Cycle and dangling-parent behaviour is deliberately identical to the single-folder functions —
+ * self-references are not treated as children, and the `seen` set terminates any longer cycle,
+ * with every member of it counting the others' albums exactly as `subtreeIds` does. The
+ * "agrees with the single-folder functions" test pins that equivalence so the two cannot drift.
+ */
+export const buildFolderSummaries = (
+  folders: SharedSpaceAlbumFolderDto[],
+  albums: SharedSpaceLinkedAlbumDto[],
+): Map<string, FolderSummary> => {
+  const childrenByParent = new Map<string, string[]>();
+  for (const folder of folders) {
+    const parentId = folder.parentId;
+    // A self-reference is not a child of itself — same rule as `subtreeIds`.
+    if (!parentId || parentId === folder.id) {
+      continue;
+    }
+    const siblings = childrenByParent.get(parentId);
+    if (siblings) {
+      siblings.push(folder.id);
+    } else {
+      childrenByParent.set(parentId, [folder.id]);
+    }
+  }
+
+  const albumsByFolder = new Map<string, SharedSpaceLinkedAlbumDto[]>();
+  for (const album of albums) {
+    const folderId = album.folderId;
+    if (!folderId) {
+      continue;
+    }
+    const bucket = albumsByFolder.get(folderId);
+    if (bucket) {
+      bucket.push(album);
+    } else {
+      albumsByFolder.set(folderId, [album]);
+    }
+  }
+
+  const summaries = new Map<string, FolderSummary>();
+  const seen = new Set<string>();
+  const stack: string[] = [];
+
+  for (const folder of folders) {
+    seen.clear();
+    stack.length = 0;
+    stack.push(folder.id);
+
+    let albumCount = 0;
+    const withCovers: SharedSpaceLinkedAlbumDto[] = [];
+
+    while (stack.length > 0) {
+      const current = stack.pop()!;
+      if (seen.has(current)) {
+        continue;
+      }
+      seen.add(current);
+
+      for (const album of albumsByFolder.get(current) ?? []) {
+        albumCount++;
+        // A null cover means getLinkedAlbums found no space-visible asset; it still counts
+        // toward the album total, but emitting it would render a broken tile.
+        if (album.albumThumbnailAssetId !== null) {
+          withCovers.push(album);
+        }
+      }
+
+      const children = childrenByParent.get(current);
+      if (children) {
+        stack.push(...children);
+      }
+    }
+
+    summaries.set(folder.id, {
+      albumCount,
+      previewAssetIds: withCovers
+        .sort(byRecencyThenId)
+        .slice(0, FOLDER_PREVIEW_LIMIT)
+        .map((a) => a.albumThumbnailAssetId as string),
+    });
+  }
+
+  return summaries;
+};
 
 export const isDescendant = (
   folders: SharedSpaceAlbumFolderDto[],

@@ -11,10 +11,10 @@
   } from '$lib/utils/space-album-grouping';
   import { sortSpaceAlbums } from '$lib/utils/space-album-sort';
   import {
+    buildFolderSummaries,
+    EMPTY_FOLDER_SUMMARY,
     flattenForSearch,
     getFolderContents,
-    getFolderPreviewAssetIds,
-    getRecursiveAlbumCount,
   } from '$lib/utils/space-album-folders';
   import type { DragPayload } from '$lib/utils/space-album-folder-dnd';
   import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
@@ -93,6 +93,11 @@
   const searchHitAlbums = $derived(searchHits.map((hit) => hit.album));
 
   const contents = $derived(getFolderContents(folders, albums, currentFolderId ?? null));
+
+  // Computed ONCE per (folders, albums) change, not once per rendered card. Reading the
+  // single-folder helpers from a card's props re-derived the parent index and re-scanned every
+  // album in the space for each folder on screen — see buildFolderSummaries for the arithmetic.
+  const folderSummaries = $derived(buildFolderSummaries(folders, albums));
 
   // Folders sort by NAME, honouring the sort direction but ignoring the sort key: assetCount and
   // mostRecentPhoto do not map onto a folder, and reshuffling them under "sort by item count" is
@@ -215,10 +220,11 @@
     {#if sortedFolders.length > 0}
       <div class="grid grid-auto-fill-56 gap-y-4" data-testid="space-album-folders-grid">
         {#each sortedFolders as folder (folder.id)}
+          {@const summary = folderSummaries.get(folder.id) ?? EMPTY_FOLDER_SUMMARY}
           <SpaceAlbumFolderCard
             {folder}
-            albumCount={getRecursiveAlbumCount(folders, albums, folder.id)}
-            previewAssetIds={getFolderPreviewAssetIds(folders, albums, folder.id)}
+            albumCount={summary.albumCount}
+            previewAssetIds={summary.previewAssetIds}
             {canManage}
             {folders}
             {albums}

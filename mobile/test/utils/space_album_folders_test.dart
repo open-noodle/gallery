@@ -13,7 +13,14 @@ SpaceAlbumFolder folder(String id, String name, [String? parentId]) =>
 // `hasCover` defaults to true (a synthetic non-null thumbnailAssetId) so most fixtures behave like
 // a normal album with a cover; pass `hasCover: false` for the folderPreviewAlbums cover-filter
 // cases, which need a genuinely null thumbnailAssetId.
-SpaceAlbum album(String id, String name, {String? folderId, DateTime? updatedAt, bool hasCover = true}) => SpaceAlbum(
+SpaceAlbum album(
+  String id,
+  String name, {
+  String? folderId,
+  DateTime? updatedAt,
+  DateTime? endDate,
+  bool hasCover = true,
+}) => SpaceAlbum(
   id: id,
   name: name,
   thumbnailAssetId: hasCover ? 'thumb-$id' : null,
@@ -23,6 +30,7 @@ SpaceAlbum album(String id, String name, {String? folderId, DateTime? updatedAt,
   updatedAt: updatedAt ?? DateTime.utc(2026, 1, 1),
   createdAt: DateTime.utc(2026, 1, 1),
   folderId: folderId,
+  endDate: endDate,
 );
 
 /// Walks [nodes] depth-first, counting every visited node. Throws if the count ever exceeds
@@ -261,6 +269,108 @@ void main() {
 
       expect(flattenForSearch(tripsTree(), albums, ''), isEmpty);
       expect(flattenForSearch(tripsTree(), albums, '   '), isEmpty);
+    });
+  });
+
+  group('buildFolderSummaries', () {
+    // The batch pass and the single-folder functions are two implementations of one definition:
+    // the grid needs the batch one, the tests above pin the readable one. This is what stops
+    // them drifting — for EVERY folder in each fixture, both must agree. The pathological shapes
+    // are included because a shared-index rewrite is exactly where they diverge.
+    final fixtures = <String, ({List<SpaceAlbumFolder> folders, List<SpaceAlbum> albums})>{
+      'an empty space': (folders: <SpaceAlbumFolder>[], albums: <SpaceAlbum>[]),
+      'a nested tree with albums at several depths': (
+        folders: tripsTree(),
+        albums: [
+          album('a1', 'Rome', folderId: 'italy'),
+          album('a2', 'Venice', folderId: 'y2026'),
+          album('a3', 'Skiing', folderId: 'trips'),
+          album('a4', 'Reunion', folderId: 'family'),
+          album('a5', 'Unfiled'),
+        ],
+      ),
+      'a dangling parentId': (
+        folders: [folder('trips', 'Trips'), folder('orphan', 'Orphan', 'gone')],
+        albums: [
+          album('a1', 'Rome', folderId: 'orphan'),
+          album('a2', 'Milan', folderId: 'trips'),
+        ],
+      ),
+      'a self-referencing folder': (
+        folders: [folder('loop', 'Loop', 'loop')],
+        albums: [album('a1', 'Rome', folderId: 'loop')],
+      ),
+      'a two-folder cycle': (
+        folders: [folder('a', 'A', 'b'), folder('b', 'B', 'a')],
+        albums: [
+          album('a1', 'Rome', folderId: 'a'),
+          album('a2', 'Milan', folderId: 'b'),
+        ],
+      ),
+      'albums whose cover is null': (
+        folders: [folder('trips', 'Trips')],
+        albums: [
+          album('a1', 'Rome', folderId: 'trips', hasCover: false),
+          album('a2', 'Milan', folderId: 'trips', hasCover: false),
+        ],
+      ),
+      'more than four albums in one subtree': (
+        folders: tripsTree(),
+        albums: [
+          for (var i = 0; i < 9; i++)
+            album('a$i', 'Album $i', folderId: 'italy', endDate: DateTime.utc(2026, (i % 9) + 1, 1)),
+        ],
+      ),
+    };
+
+    fixtures.forEach((name, fixture) {
+      test('agrees with the single-folder functions for $name', () {
+        final summaries = buildFolderSummaries(fixture.folders, fixture.albums);
+
+        expect(summaries.keys.toSet(), fixture.folders.map((f) => f.id).toSet());
+        for (final f in fixture.folders) {
+          expect(
+            summaries[f.id]!.albumCount,
+            recursiveAlbumCount(fixture.folders, fixture.albums, f.id),
+            reason: 'albumCount for ${f.id}',
+          );
+          expect(
+            summaries[f.id]!.previewAlbums.map((a) => a.id).toList(),
+            folderPreviewAlbums(fixture.folders, fixture.albums, f.id).map((a) => a.id).toList(),
+            reason: 'previewAlbums for ${f.id}',
+          );
+        }
+      });
+    });
+
+    // Recency is the album's newest PHOTO, matching web's `endDate ?? updatedAt`. Sorting by
+    // updatedAt alone made a stale album that merely re-synced recently outrank a genuinely
+    // newer one, and made the two clients disagree about the same folder's collage.
+    test('ranks previews by the newest photo, not by when the row was last touched', () {
+      final folders = [folder('trips', 'Trips')];
+      final albums = [
+        // Touched most recently, but its photos are the oldest.
+        album(
+          'stale',
+          'Old holiday',
+          folderId: 'trips',
+          updatedAt: DateTime.utc(2026, 12, 1),
+          endDate: DateTime.utc(2020, 1, 1),
+        ),
+        album(
+          'fresh',
+          'Last week',
+          folderId: 'trips',
+          updatedAt: DateTime.utc(2026, 1, 1),
+          endDate: DateTime.utc(2026, 6, 1),
+        ),
+      ];
+
+      expect(folderPreviewAlbums(folders, albums, 'trips').map((a) => a.id).toList(), ['fresh', 'stale']);
+      expect(buildFolderSummaries(folders, albums)['trips']!.previewAlbums.map((a) => a.id).toList(), [
+        'fresh',
+        'stale',
+      ]);
     });
   });
 }

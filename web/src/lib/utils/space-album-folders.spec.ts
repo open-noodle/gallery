@@ -1,5 +1,6 @@
 import type { SharedSpaceAlbumFolderDto, SharedSpaceLinkedAlbumDto } from '@immich/sdk';
 import {
+  buildFolderSummaries,
   buildFolderTree,
   flattenForSearch,
   getFolderContents,
@@ -279,6 +280,93 @@ describe('space-album-folders', () => {
     // uses a non-empty query as the signal to switch into flattened mode at all.
     it.each([['', ' '.repeat(3)]])('U-11: returns nothing for a blank query (%p)', (query) => {
       expect(flattenForSearch(tripsTree(), [album('a1', 'Rome')], query)).toEqual([]);
+    });
+  });
+
+  describe('buildFolderSummaries', () => {
+    // The batch pass and the single-folder functions are two implementations of one definition,
+    // kept apart because the components need the batch one and the tests above pin the readable
+    // one. This is what stops them drifting: for EVERY folder in each fixture, both must agree.
+    // Run against the pathological shapes too, since those are exactly where a shared-index
+    // rewrite is most likely to diverge.
+    const fixtures: Array<[string, SharedSpaceAlbumFolderDto[], SharedSpaceLinkedAlbumDto[]]> = [
+      ['an empty space', [], []],
+      [
+        'a nested tree with albums at several depths',
+        tripsTree(),
+        [
+          album('a1', 'Rome', 'italy'),
+          album('a2', 'Venice', 'y2026'),
+          album('a3', 'Skiing', 'trips'),
+          album('a4', 'Reunion', 'family'),
+          album('a5', 'Unfiled'),
+        ],
+      ],
+      [
+        'a dangling parentId',
+        [folder('trips', 'Trips'), folder('orphan', 'Orphan', 'gone')],
+        [album('a1', 'Rome', 'orphan'), album('a2', 'Milan', 'trips')],
+      ],
+      [
+        'a self-referencing folder',
+        [{ ...folder('loop', 'Loop'), parentId: 'loop' } as SharedSpaceAlbumFolderDto],
+        [album('a1', 'Rome', 'loop')],
+      ],
+      [
+        'a two-folder cycle',
+        [folder('a', 'A', 'b'), folder('b', 'B', 'a')],
+        [album('a1', 'Rome', 'a'), album('a2', 'Milan', 'b')],
+      ],
+      [
+        'albums whose cover is null',
+        [folder('trips', 'Trips')],
+        [
+          album('a1', 'Rome', 'trips', { albumThumbnailAssetId: null }),
+          album('a2', 'Milan', 'trips', { albumThumbnailAssetId: null }),
+        ],
+      ],
+      [
+        'more than four albums in one subtree',
+        tripsTree(),
+        Array.from({ length: 9 }, (_, i) =>
+          album(`a${i}`, `Album ${i}`, 'italy', { endDate: `2026-0${(i % 9) + 1}-01T00:00:00.000Z` }),
+        ),
+      ],
+    ];
+
+    it.each(fixtures)('agrees with the single-folder functions for %s', (_name, folders, albums) => {
+      const summaries = buildFolderSummaries(folders, albums);
+
+      expect([...summaries.keys()].sort()).toEqual(folders.map((f) => f.id).sort());
+      for (const { id } of folders) {
+        expect(summaries.get(id)).toEqual({
+          albumCount: getRecursiveAlbumCount(folders, albums, id),
+          previewAssetIds: getFolderPreviewAssetIds(folders, albums, id),
+        });
+      }
+    });
+
+    // The whole point of the batch pass: cost must not grow with the number of folders times the
+    // number of albums. Asserted as work done, not wall-clock, so it cannot flake on a busy
+    // machine — a per-card implementation reads every album once PER FOLDER.
+    it('scans the album list a bounded number of times, not once per folder', () => {
+      const folders = Array.from({ length: 200 }, (_, i) => folder(`f${i}`, `Folder ${i}`));
+      let folderIdReads = 0;
+      const albums = Array.from({ length: 200 }, (_, i) => {
+        const base = album(`a${i}`, `Album ${i}`, `f${i}`);
+        return Object.defineProperty({ ...base }, 'folderId', {
+          get() {
+            folderIdReads++;
+            return `f${i}`;
+          },
+        }) as SharedSpaceLinkedAlbumDto;
+      });
+
+      buildFolderSummaries(folders, albums);
+
+      // Exactly one bucketing pass, one read per album. The per-card shape this replaced read
+      // folderId once per album PER FOLDER, twice over (count + previews) — 200 x 200 x 2.
+      expect(folderIdReads).toBe(albums.length);
     });
   });
 });

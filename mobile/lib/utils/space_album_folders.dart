@@ -158,9 +158,93 @@ List<SpaceAlbum> folderPreviewAlbums(List<SpaceAlbumFolder> folders, List<SpaceA
   return withCovers.take(_previewLimit).toList();
 }
 
+/// An album's newest photo, falling back to its own `updatedAt` when it has none.
+///
+/// Deliberately the SAME key web sorts previews by (`endDate ?? updatedAt`, see
+/// `space-album-folders.ts`). This used to be `updatedAt` alone, which meant the two clients
+/// picked different covers for the same folder — a folder full of old holiday photos that was
+/// merely re-synced recently would jump to the front of the collage on mobile but not on web.
+DateTime _recencyOf(SpaceAlbum album) => album.endDate ?? album.updatedAt;
+
 int _byRecencyThenId(SpaceAlbum a, SpaceAlbum b) {
-  final byDate = b.updatedAt.compareTo(a.updatedAt);
+  final byDate = _recencyOf(b).compareTo(_recencyOf(a));
   return byDate != 0 ? byDate : a.id.compareTo(b.id);
+}
+
+/// A folder's recursive album count and its preview albums, computed together.
+class FolderSummary {
+  const FolderSummary({required this.albumCount, required this.previewAlbums});
+
+  final int albumCount;
+  final List<SpaceAlbum> previewAlbums;
+
+  static const empty = FolderSummary(albumCount: 0, previewAlbums: []);
+}
+
+/// Every folder's summary, in one pass over the space.
+///
+/// [recursiveAlbumCount] and [folderPreviewAlbums] are each O(folders + albums) on their own:
+/// both rebuild the parent index and re-scan every album. Calling them from a grid's
+/// `itemBuilder` — once per folder tile, and again for every tile whenever the parent rebuilds —
+/// makes scrolling a folder list cost O(tiles x (folders + albums)) per frame. Building the two
+/// indexes once and walking only each folder's own subtree makes it O(folders x depth + albums)
+/// for the whole level, with depth capped at 10 by the server.
+///
+/// Cycle and dangling-parent behaviour is identical to the single-folder functions: a
+/// self-reference is not a child of itself, and the `seen` set terminates any longer cycle.
+/// `space_album_folders_test.dart` pins that equivalence folder-by-folder so the two cannot
+/// drift apart.
+Map<String, FolderSummary> buildFolderSummaries(List<SpaceAlbumFolder> folders, List<SpaceAlbum> albums) {
+  final childrenByParent = <String, List<String>>{};
+  for (final f in folders) {
+    final parentId = f.parentId;
+    if (parentId != null && parentId != f.id) {
+      childrenByParent.putIfAbsent(parentId, () => []).add(f.id);
+    }
+  }
+
+  final albumsByFolder = <String, List<SpaceAlbum>>{};
+  for (final a in albums) {
+    final folderId = a.folderId;
+    if (folderId == null) continue;
+    albumsByFolder.putIfAbsent(folderId, () => []).add(a);
+  }
+
+  final summaries = <String, FolderSummary>{};
+  final seen = <String>{};
+  final stack = <String>[];
+
+  for (final folder in folders) {
+    seen.clear();
+    stack
+      ..clear()
+      ..add(folder.id);
+
+    var albumCount = 0;
+    final withCovers = <SpaceAlbum>[];
+
+    while (stack.isNotEmpty) {
+      final current = stack.removeLast();
+      if (!seen.add(current)) continue;
+
+      for (final a in albumsByFolder[current] ?? const <SpaceAlbum>[]) {
+        albumCount++;
+        // Filter before the take, exactly as folderPreviewAlbums does: a null cover renders a
+        // broken tile, and taking first would discard good covers further down the list.
+        if (a.thumbnailAssetId != null) withCovers.add(a);
+      }
+
+      stack.addAll(childrenByParent[current] ?? const <String>[]);
+    }
+
+    withCovers.sort(_byRecencyThenId);
+    summaries[folder.id] = FolderSummary(
+      albumCount: albumCount,
+      previewAlbums: withCovers.take(_previewLimit).toList(),
+    );
+  }
+
+  return summaries;
 }
 
 bool isDescendant(List<SpaceAlbumFolder> folders, String candidateId, String ancestorId) {

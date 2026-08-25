@@ -560,6 +560,9 @@ class SpaceAlbumsPage extends HookConsumerWidget {
           final contents = folderContents(folders, albums, currentFolderId);
           final sortedFolders = _sortFolders(contents.folders, sortConfig.isReverse);
           final sortedAlbums = filterAndSortSpaceAlbums(contents.albums, '', sortConfig.sortMode, sortConfig.isReverse);
+          // Whole-space, so a folder's count and covers still reflect its entire subtree — but
+          // computed here, once, rather than inside the grid's per-tile builder.
+          final folderSummaries = buildFolderSummaries(folders, albums);
 
           if (sortedFolders.isEmpty && sortedAlbums.isEmpty) {
             if (currentFolderId != null) {
@@ -587,8 +590,7 @@ class SpaceAlbumsPage extends HookConsumerWidget {
                 child: _LevelGrid(
                   folders: sortedFolders,
                   albums: sortedAlbums,
-                  allFolders: folders,
-                  allAlbums: albums,
+                  folderSummaries: folderSummaries,
                   canEdit: canEdit,
                   onFolderTap: (folder) => context.pushRoute(
                     SpaceAlbumsRoute(
@@ -869,8 +871,7 @@ class _LevelGrid extends StatelessWidget {
   const _LevelGrid({
     required this.folders,
     required this.albums,
-    required this.allFolders,
-    required this.allAlbums,
+    required this.folderSummaries,
     required this.canEdit,
     required this.onFolderTap,
     required this.onToggle,
@@ -888,10 +889,10 @@ class _LevelGrid extends StatelessWidget {
   /// This level's albums, already filtered + sorted.
   final List<SpaceAlbum> albums;
 
-  /// The whole space's folders/albums — `recursiveAlbumCount`/`folderPreviewAlbums` need the
-  /// full subtree, not just this level.
-  final List<SpaceAlbumFolder> allFolders;
-  final List<SpaceAlbum> allAlbums;
+  /// Every folder's recursive count and preview covers, built ONCE per (folders, albums) change
+  /// by `buildFolderSummaries`. Computing them here, per tile in the builder below, re-scanned
+  /// the whole space for each folder on screen — see buildFolderSummaries for the arithmetic.
+  final Map<String, FolderSummary> folderSummaries;
   final bool canEdit;
   final void Function(SpaceAlbumFolder folder) onFolderTap;
   final void Function(String albumId) onToggle;
@@ -913,11 +914,12 @@ class _LevelGrid extends StatelessWidget {
               gridDelegate: _gridDelegate,
               delegate: SliverChildBuilderDelegate((context, index) {
                 final folder = folders[index];
+                final summary = folderSummaries[folder.id] ?? FolderSummary.empty;
                 return SpaceAlbumFolderCard(
                   key: Key('space-album-folder-card-${folder.id}'),
                   folder: folder,
-                  albumCount: recursiveAlbumCount(allFolders, allAlbums, folder.id),
-                  previewAlbums: folderPreviewAlbums(allFolders, allAlbums, folder.id),
+                  albumCount: summary.albumCount,
+                  previewAlbums: summary.previewAlbums,
                   canEdit: canEdit,
                   onTap: () => onFolderTap(folder),
                   onRename: () => onRenameFolder(folder),
