@@ -76,7 +76,10 @@ class BrowseContent extends ConsumerWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 88),
+              // Clears the MatchCountFooter stacked on top of this list — it grows
+              // by the system nav bar inset on Android, and the last row has to
+              // clear all of it.
+              SizedBox(height: MatchCountFooter.reservedHeightFor(context)),
             ],
           ),
           const Positioned(left: 0, right: 0, bottom: 0, child: MatchCountFooter()),
