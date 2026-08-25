@@ -34,18 +34,37 @@ export class MemoryRepository implements IBulkAsset {
       .execute();
   }
 
+  /** The fork's owner-scoped path. Keeps #486's implicit "hide not-yet-shown" default. */
   searchBuilder(ownerId: string, dto: MemorySearchDto) {
-    return this.baseSearchBuilder(dto).where('ownerId', '=', ownerId);
+    return this.baseSearchBuilder(dto, { hideUnshownByDefault: true }).where('ownerId', '=', ownerId);
   }
 
-  private baseSearchBuilder(dto: MemorySearchDto) {
+  /**
+   * #486 hides memories that are scheduled but not yet shown, for callers that say nothing about
+   * `showAt`. immich-28675 turned that into an explicit, three-state request:
+   *
+   * - `isUpcoming: true`  — only the memories #486 hides. Applying #486 too makes the query
+   *   provably empty.
+   * - `isUpcoming: false` — the same thing #486 implies, stated by the caller.
+   * - omitted             — no `showAt` scoping at all.
+   *
+   * The omitted case is why `hideUnshownByDefault` exists rather than a check on `dto`: upstream's
+   * index says "show upcoming memories" by *leaving the parameter out*, which at this level is
+   * indistinguishable from a legacy caller relying on #486. So the default is kept on the fork's
+   * internal owner-scoped path and dropped on `GET /memories`, whose contract is upstream's. A
+   * `for` window (the memory lane) still carries its own `showAt <= for` bound on both paths.
+   */
+  private baseSearchBuilder(dto: MemorySearchDto, { hideUnshownByDefault }: { hideUnshownByDefault: boolean }) {
     const visibleAt = dto.for ?? DateTime.now().toJSDate();
+    const hideUnshown = dto.isUpcoming === undefined && (hideUnshownByDefault || dto.for !== undefined);
 
     return this.db
       .selectFrom('memory')
       .$if(dto.isSaved !== undefined, (qb) => qb.where('isSaved', '=', dto.isSaved!))
       .$if(dto.type !== undefined, (qb) => qb.where('type', '=', dto.type!))
-      .where((where) => where.or([where('showAt', 'is', null), where('showAt', '<=', visibleAt)]))
+      .$if(hideUnshown, (qb) =>
+        qb.where((where) => where.or([where('showAt', 'is', null), where('showAt', '<=', visibleAt)])),
+      )
       .$if(dto.for !== undefined, (qb) =>
         qb.where((where) => where.or([where('hideAt', 'is', null), where('hideAt', '>=', dto.for!)])),
       )
@@ -58,8 +77,9 @@ export class MemoryRepository implements IBulkAsset {
       .where('deletedAt', dto.isTrashed ? 'is not' : 'is', null);
   }
 
+  /** Serves `GET /memories`. Follows upstream's contract: `isUpcoming` alone scopes `showAt`. */
   private accessibleSearchBuilder(userId: string, dto: MemorySearchDto) {
-    return this.baseSearchBuilder(dto).where((eb) =>
+    return this.baseSearchBuilder(dto, { hideUnshownByDefault: false }).where((eb) =>
       eb.or([
         eb('memory.ownerId', '=', userId),
         eb.exists(
@@ -179,39 +199,51 @@ export class MemoryRepository implements IBulkAsset {
   }
 
   searchAccessible(userId: string, dto: MemorySearchDto) {
-    return this.accessibleSearchBuilder(userId, dto)
-      .select((eb) =>
-        jsonArrayFrom(
-          eb
-            .selectFrom('asset')
-            .selectAll('asset')
-            .innerJoin('memory_asset', 'asset.id', 'memory_asset.assetId')
-            .whereRef('memory_asset.memoriesId', '=', 'memory.id')
-            .where('asset.visibility', '=', sql.lit(AssetVisibility.Timeline))
-            .where('asset.deletedAt', 'is', null)
-            .where((eb) =>
-              eb.not(
-                eb.exists(
-                  eb
-                    .selectFrom('asset_face')
-                    .innerJoin('person', 'person.personGroupId', 'asset_face.personGroupId')
-                    .select((eb) => eb.val(1).as('one'))
-                    .whereRef('asset_face.assetId', '=', 'asset.id')
-                    .where('person.isHidden', '=', true),
+    return (
+      this.accessibleSearchBuilder(userId, dto)
+        .select((eb) =>
+          jsonArrayFrom(
+            eb
+              .selectFrom('asset')
+              .selectAll('asset')
+              .innerJoin('memory_asset', 'asset.id', 'memory_asset.assetId')
+              .whereRef('memory_asset.memoriesId', '=', 'memory.id')
+              .where('asset.visibility', '=', sql.lit(AssetVisibility.Timeline))
+              .where('asset.deletedAt', 'is', null)
+              .where((eb) =>
+                eb.not(
+                  eb.exists(
+                    eb
+                      .selectFrom('asset_face')
+                      .innerJoin('person', 'person.personGroupId', 'asset_face.personGroupId')
+                      .select((eb) => eb.val(1).as('one'))
+                      .whereRef('asset_face.assetId', '=', 'asset.id')
+                      .where('person.isHidden', '=', true),
+                  ),
                 ),
-              ),
-            )
-            .orderBy('asset.localDateTime', 'asc'),
-        ).as('assets'),
-      )
-      .selectAll('memory')
-      .$call((qb) =>
-        dto.order === AssetOrderWithRandom.Random
-          ? qb.orderBy(sql`RANDOM()`)
-          : qb.orderBy('memoryAt', (dto.order?.toLowerCase() || 'desc') as OrderByDirection),
-      )
-      .$if(dto.size !== undefined, (qb) => qb.limit(dto.size!))
-      .execute();
+              )
+              .orderBy('asset.localDateTime', 'asc'),
+          ).as('assets'),
+        )
+        .selectAll('memory')
+        // Ordering, `id` and `page` are upstream's `search` contract (immich-28675). This is the
+        // method that actually serves `GET /memories`, so it has to carry them: without `id` a deep
+        // link resolves to an arbitrary memory, and without the offset every page returns page one.
+        .$call((qb) => {
+          if (dto.order === AssetOrderWithRandom.Random) {
+            return qb.orderBy(sql`RANDOM()`);
+          }
+
+          const direction = (dto.order?.toLowerCase() || 'desc') as OrderByDirection;
+          return qb
+            .orderBy('showAt', (ob) => (direction === 'asc' ? ob.asc() : ob.desc()).nullsLast())
+            .orderBy('memoryAt', direction);
+        })
+        .$if(dto.id !== undefined, (qb) => qb.where('id', '=', dto.id!))
+        .$if(dto.size !== undefined, (qb) => qb.limit(dto.size!))
+        .$if(dto.page !== undefined && dto.size !== undefined, (qb) => qb.offset((dto.page! - 1) * dto.size!))
+        .execute()
+    );
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })
