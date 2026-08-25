@@ -28,6 +28,6 @@ final allMemoriesProvider = FutureProvider.autoDispose.family<List<Memory>, bool
     return const [];
   }
 
-  final service = MemoryService(ref.watch(driftProvider).memoryRepository);
+  final service = MemoryService(ref.watch(driftProvider).memoryRepository, ref.watch(memoryApiRepositoryProvider));
   return service.getAll(userId, onlyFavorites: onlyFavorites);
 });
