@@ -192,7 +192,13 @@ describe('attach idempotence (F-14)', () => {
   it('a second identical attach is a no-op, with no duplicate projection row', async () => {
     const { sut, ctx } = newMediumService(SharedSpaceService, {
       database: defaultDatabase,
-      real: [FacePersonVerdictRepository, SharedSpaceRepository, FaceIdentityRepository, DatabaseRepository],
+      real: [
+        FacePersonVerdictRepository,
+        SharedSpaceRepository,
+        FaceIdentityRepository,
+        DatabaseRepository,
+        PersonRepository,
+      ],
       mock: [LoggingRepository],
     });
     const { anna, bob, space } = await newSpaceWithEditorAndMember(ctx);
@@ -213,16 +219,26 @@ describe('attach idempotence (F-14)', () => {
   });
 });
 
-// §6.3.1 row 3: the face already belongs to one of Bob's own people, under an identity Anna's target
-// space person does not share. F-40 is the companion pin: the override must be entirely space-local,
-// so everything Bob's OWN reads go through -- his person row, asset_face.personId, and the identity
-// resolution his People page and asset viewer resolve names/birthdays through -- must come out unchanged
-// on the other side of Anna's write.
-describe('the owner-named override is space-local (F-36, F-40)', () => {
-  it('overrides Bob’s naming in the space without rewriting the face’s identity, and without touching Bob’s own person, asset_face.personId, or his resolved view (F-36, F-40)', async () => {
+// §6.3.1 row 3 (REVISED 2026-08-25): the face already belongs to one of Bob's own people, under an
+// identity Anna's target space person does not share. This row used to be the "space-local override"
+// -- Anna's correction stopped at the space boundary. The revision reverses that: a correction is a
+// correction everywhere, so Anna re-pointing this face at Uncle Tom re-points the identity link and
+// Bob's own copy of the photo too.
+//
+// What survives the revision is that Anna edits the FACE, never Bob's PEOPLE: his 'Dad' person row
+// keeps its name and its own identity, and every other face he filed under Dad stays there. Only the
+// one face Anna actually re-pointed moves. That distinction is what the assertions below separate.
+describe('the owner-named override re-points the face for everyone (F-36 revised, F-40 revised)', () => {
+  it("re-points the face's identity and Bob's own asset_face.personId, while leaving Bob's 'Dad' person row and his other faces intact (F-36, F-40)", async () => {
     const { sut, ctx } = newMediumService(SharedSpaceService, {
       database: defaultDatabase,
-      real: [FacePersonVerdictRepository, SharedSpaceRepository, FaceIdentityRepository, DatabaseRepository],
+      real: [
+        FacePersonVerdictRepository,
+        SharedSpaceRepository,
+        FaceIdentityRepository,
+        DatabaseRepository,
+        PersonRepository,
+      ],
       mock: [LoggingRepository],
     });
     const faceIdentityRepo = ctx.get(FaceIdentityRepository);
@@ -234,6 +250,18 @@ describe('the owner-named override is space-local (F-36, F-40)', () => {
     const bobIdentity = await faceIdentityRepo.ensurePersonIdentity(bobPerson.id);
     const { result: faceId } = await ctx.newAssetFace({ assetId, personId: bobPerson.id });
     await faceIdentityRepo.linkFace({ assetFaceId: faceId, identityId: bobIdentity.id, source: 'owner-person' });
+
+    // A SECOND face Bob filed under Dad, on a different asset, which Anna never touches. Without it
+    // the "Bob's other faces are intact" assertion below would be vacuous -- and Dad would be left
+    // with no faces at all, which is a different scenario (a person emptied out) than the one this
+    // case is about.
+    const { assetId: otherAssetId } = await reachPathBuilders.direct(ctx, { spaceId: space.id, ownerId: bob.id });
+    const { result: otherFaceId } = await ctx.newAssetFace({ assetId: otherAssetId, personId: bobPerson.id });
+    await faceIdentityRepo.linkFace({
+      assetFaceId: otherFaceId,
+      identityId: bobIdentity.id,
+      source: 'owner-person',
+    });
 
     // Anna creates a DIFFERENT space person and overrides the naming, space-locally.
     const spacePerson = await ctx.get(SharedSpaceRepository).createPerson({ spaceId: space.id, name: 'Uncle Tom' });
@@ -249,24 +277,35 @@ describe('the owner-named override is space-local (F-36, F-40)', () => {
       .execute();
     expect(projectionRows).toEqual([{ personId: spacePerson.id, assetFaceId: faceId }]);
 
-    // F-36: the face's GLOBAL identity link is untouched -- still Bob's identity, not the space person's.
+    // F-36 (revised): the face's GLOBAL identity link now follows Anna's correction, off Bob's
+    // identity and onto the space person's.
     const identityLink = await defaultDatabase
       .selectFrom('face_identity_face')
       .selectAll()
       .where('assetFaceId', '=', faceId)
       .executeTakeFirstOrThrow();
-    expect(identityLink.identityId).toBe(bobIdentity.id);
-    expect(identityLink.source).toBe('owner-person');
+    expect(identityLink.identityId).not.toBe(bobIdentity.id);
 
-    // F-40: asset_face.personId, Bob's own person row, and the RESOLVED view his own reads go through
-    // (not just the columns) are exactly as they were before Anna's write.
+    // F-40 (revised): Bob's own copy of the photo moves too -- off 'Dad' and onto a person carrying
+    // Anna's name. Asserting it is no longer bobPerson.id would pass even if the column were nulled,
+    // so pin the row it actually lands on.
     const face = await defaultDatabase
       .selectFrom('asset_face')
       .selectAll()
       .where('id', '=', faceId)
       .executeTakeFirstOrThrow();
-    expect(face.personId).toBe(bobPerson.id);
+    expect(face.personId).not.toBe(bobPerson.id);
+    const landedOn = await defaultDatabase
+      .selectFrom('person')
+      .selectAll()
+      .where('id', '=', face.personId!)
+      .executeTakeFirstOrThrow();
+    expect(landedOn.ownerId).toBe(bob.id);
+    expect(landedOn.name).toBe('Uncle Tom');
 
+    // The half the revision did NOT change: Anna re-pointed a FACE, not Bob's person. 'Dad' still
+    // exists, still named, still under his own identity -- so any OTHER face Bob filed under Dad is
+    // untouched, and his People page still resolves Dad as Dad.
     const person = await defaultDatabase
       .selectFrom('person')
       .selectAll()
@@ -274,6 +313,14 @@ describe('the owner-named override is space-local (F-36, F-40)', () => {
       .executeTakeFirstOrThrow();
     expect(person.name).toBe('Dad');
     expect(person.identityId).toBe(bobIdentity.id);
+
+    // The other face Bob filed under Dad did not move with the one Anna corrected.
+    const otherFace = await defaultDatabase
+      .selectFrom('asset_face')
+      .selectAll()
+      .where('id', '=', otherFaceId)
+      .executeTakeFirstOrThrow();
+    expect(otherFace.personId).toBe(bobPerson.id);
 
     const resolved = await faceIdentityRepo.getResolvedPersonByIdentityId(bob.id, bobIdentity.id);
     expect(resolved?.name).toBe('Dad');
@@ -286,7 +333,13 @@ describe('concurrent attach to the same face (F-37)', () => {
   it('serializes -- one wins, never two projection rows, never a lost recount', async () => {
     const { sut, ctx } = newMediumService(SharedSpaceService, {
       database: defaultDatabase,
-      real: [FacePersonVerdictRepository, SharedSpaceRepository, FaceIdentityRepository, DatabaseRepository],
+      real: [
+        FacePersonVerdictRepository,
+        SharedSpaceRepository,
+        FaceIdentityRepository,
+        DatabaseRepository,
+        PersonRepository,
+      ],
       mock: [LoggingRepository],
     });
     const { anna, bob, space } = await newSpaceWithEditorAndMember(ctx);
@@ -486,7 +539,13 @@ describe('createSpacePerson', () => {
   it('creates the person and attaches the seed face atomically (F-15)', async () => {
     const { sut, ctx } = newMediumService(SharedSpaceService, {
       database: defaultDatabase,
-      real: [FacePersonVerdictRepository, SharedSpaceRepository, FaceIdentityRepository, DatabaseRepository],
+      real: [
+        FacePersonVerdictRepository,
+        SharedSpaceRepository,
+        FaceIdentityRepository,
+        DatabaseRepository,
+        PersonRepository,
+      ],
       mock: [LoggingRepository],
     });
     const { anna, bob, space } = await newSpaceWithEditorAndMember(ctx);
@@ -520,7 +579,13 @@ describe('createSpacePerson', () => {
   it('rolls the person back when the attach fails (F-15)', async () => {
     const { sut, ctx } = newMediumService(SharedSpaceService, {
       database: defaultDatabase,
-      real: [FacePersonVerdictRepository, SharedSpaceRepository, FaceIdentityRepository, DatabaseRepository],
+      real: [
+        FacePersonVerdictRepository,
+        SharedSpaceRepository,
+        FaceIdentityRepository,
+        DatabaseRepository,
+        PersonRepository,
+      ],
       mock: [LoggingRepository],
     });
     const spaceRepo = ctx.get(SharedSpaceRepository);
@@ -547,7 +612,13 @@ describe('createSpacePerson', () => {
   it('returns the existing person instead of violating the unique index (F-33)', async () => {
     const { sut, ctx } = newMediumService(SharedSpaceService, {
       database: defaultDatabase,
-      real: [FacePersonVerdictRepository, SharedSpaceRepository, FaceIdentityRepository, DatabaseRepository],
+      real: [
+        FacePersonVerdictRepository,
+        SharedSpaceRepository,
+        FaceIdentityRepository,
+        DatabaseRepository,
+        PersonRepository,
+      ],
       mock: [LoggingRepository],
     });
     const spaceRepo = ctx.get(SharedSpaceRepository);
@@ -603,7 +674,13 @@ describe('cross-space identity propagation (F-20, F-21)', () => {
   it('an attach in space A propagates to space B through the shared identity (F-20)', async () => {
     const { sut, ctx } = newMediumService(SharedSpaceService, {
       database: defaultDatabase,
-      real: [FacePersonVerdictRepository, SharedSpaceRepository, FaceIdentityRepository, DatabaseRepository],
+      real: [
+        FacePersonVerdictRepository,
+        SharedSpaceRepository,
+        FaceIdentityRepository,
+        DatabaseRepository,
+        PersonRepository,
+      ],
       mock: [LoggingRepository],
     });
     const spaceRepo = ctx.get(SharedSpaceRepository);
@@ -671,7 +748,13 @@ describe('cross-space identity propagation (F-20, F-21)', () => {
   it('naming does not propagate -- B keeps its own name for the shared identity (F-21)', async () => {
     const { sut, ctx } = newMediumService(SharedSpaceService, {
       database: defaultDatabase,
-      real: [FacePersonVerdictRepository, SharedSpaceRepository, FaceIdentityRepository, DatabaseRepository],
+      real: [
+        FacePersonVerdictRepository,
+        SharedSpaceRepository,
+        FaceIdentityRepository,
+        DatabaseRepository,
+        PersonRepository,
+      ],
       mock: [LoggingRepository],
     });
     const spaceRepo = ctx.get(SharedSpaceRepository);
@@ -708,17 +791,29 @@ describe('cross-space identity propagation (F-20, F-21)', () => {
   });
 });
 
-// Slice 5 (spec §6.3.1): F-23 and F-39 are a pair. F-23 pins the raw columns an ordinary attach
-// (row 1 of the §6.3.1 table -- the face was unassigned) must never touch on the owner's side. F-39
-// pins the READ that actually matters to the owner: the RESOLVED name/birthday `applyResolvedPersonMetadata`
-// (asset.service.ts:180) computes through the identity layer at request time. A column-only
-// assertion would pass vacuously, because resolution happens at read time, not at write time.
-describe('attach leaves the owner untouched (F-23, F-39)', () => {
-  // F-23: columns.
-  it('does not touch asset_face.personId and creates no new person row (F-23)', async () => {
+// Slice 5 (spec §6.3.1, REVISED 2026-08-25): F-23 and F-39 are a pair, and the revision splits them
+// apart rather than pointing them the same way. The original insulation ("an attach never touches the
+// owner's side") was reversed: an editor naming a face must show up on the owner's OWN copy of the
+// photo, creating a person in his library when he has never named that human. So F-23 now pins the
+// propagation.
+//
+// F-39 is NOT reversed and still pins isolation, because the propagation is identity-scoped: it moves
+// only the face actually being attached. An attach elsewhere, under an identity of its own, must still
+// leave Bob's unrelated people alone -- and it pins the RESOLVED name/birthday
+// `applyResolvedPersonMetadata` (asset.service.ts:180) computes through the identity layer at request
+// time, which a column-only assertion would miss, since resolution happens at read time.
+describe('attach propagates to the owner, but only for the attached identity (F-23 revised, F-39)', () => {
+  // F-23 (revised): columns -- the attach reaches asset_face.personId and Bob's person table.
+  it("writes asset_face.personId and creates the owner's person row (F-23)", async () => {
     const { sut, ctx } = newMediumService(SharedSpaceService, {
       database: defaultDatabase,
-      real: [FacePersonVerdictRepository, SharedSpaceRepository, FaceIdentityRepository, DatabaseRepository],
+      real: [
+        FacePersonVerdictRepository,
+        SharedSpaceRepository,
+        FaceIdentityRepository,
+        DatabaseRepository,
+        PersonRepository,
+      ],
       mock: [LoggingRepository],
     });
     const spaceRepo = ctx.get(SharedSpaceRepository);
@@ -746,10 +841,14 @@ describe('attach leaves the owner untouched (F-23, F-39)', () => {
       .select('personId')
       .where('id', '=', faceId)
       .executeTakeFirstOrThrow();
-    expect(faceAfter.personId).toBeNull();
-    await expect(
-      defaultDatabase.selectFrom('person').selectAll().where('ownerId', '=', bob.id).execute(),
-    ).resolves.toEqual([]);
+    expect(faceAfter.personId).not.toBeNull();
+
+    // Bob had never named this human, so the propagation had to CREATE the person, carrying Anna's
+    // name across -- and the face must point at exactly that new row, not merely at "some" person.
+    const bobPeople = await defaultDatabase.selectFrom('person').selectAll().where('ownerId', '=', bob.id).execute();
+    expect(bobPeople).toHaveLength(1);
+    expect(bobPeople[0].name).toBe('Aurelia');
+    expect(faceAfter.personId).toBe(bobPeople[0].id);
   });
 
   // F-39: the resolved view. An attach happening anywhere in a space Bob's asset is reachable through
@@ -757,7 +856,13 @@ describe('attach leaves the owner untouched (F-23, F-39)', () => {
   it("leaves Bob's RESOLVED name and birthday unchanged after an unrelated attach elsewhere (F-39)", async () => {
     const { sut, ctx } = newMediumService(SharedSpaceService, {
       database: defaultDatabase,
-      real: [FacePersonVerdictRepository, SharedSpaceRepository, FaceIdentityRepository, DatabaseRepository],
+      real: [
+        FacePersonVerdictRepository,
+        SharedSpaceRepository,
+        FaceIdentityRepository,
+        DatabaseRepository,
+        PersonRepository,
+      ],
       mock: [LoggingRepository],
     });
     const spaceRepo = ctx.get(SharedSpaceRepository);
@@ -862,10 +967,19 @@ describe('createSpaceAssetFace', () => {
     expect(face.boundingBoxY2).toBe(200);
     expect(face.imageWidth).toBe(1000);
     expect(face.imageHeight).toBe(800);
-    // Editor-drawn: never the owner's personId, always sourceType Manual, and createdBy is Anna.
-    expect(face.personId).toBeNull();
+    // Editor-drawn: sourceType Manual and createdBy is Anna. Since §6.3.1 was revised (2026-08-25)
+    // the box Anna draws AND names propagates, so personId lands on a person in Bob's own library
+    // carrying her name -- this used to assert null.
     expect(face.sourceType).toBe(SourceType.Manual);
     expect(face.createdBy).toBe(anna.id);
+    expect(face.personId).not.toBeNull();
+    const ownerPerson = await defaultDatabase
+      .selectFrom('person')
+      .selectAll()
+      .where('id', '=', face.personId!)
+      .executeTakeFirstOrThrow();
+    expect(ownerPerson.ownerId).toBe(bob.id);
+    expect(ownerPerson.name).toBe('Aurelia');
 
     const projectionRows = await defaultDatabase
       .selectFrom('shared_space_person_face')
