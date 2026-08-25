@@ -210,8 +210,16 @@ the fork's server deltas on `memory.service.spec.ts` (+975) and the medium
 
 **e2e** — upstream modifies `e2e/src/ui/specs/memory/memory-viewer.e2e-spec.ts`,
 `specs/memory/utils.ts`, `mock-network/memory-network.ts` and
-`generators/memory/model-objects.ts`. Take upstream's versions and run the memory suite; the
-fork has no memory e2e of its own to preserve.
+`generators/memory/model-objects.ts`. Take upstream's versions.
+
+The fork **does** have its own memory e2e: `memory-index.e2e-spec.ts` is fork-only, and every
+assertion in it targets something this change removes — the month-group headings, the `Saved`
+tab, and the `/memory?id=…&source=history` URL. Upstream ships no memory-index e2e, so
+deleting it outright would leave the index with zero coverage on either side. It is rewritten
+to cover the surviving journey: the index lists memories and opens one in the viewer.
+
+Note that `e2e/`'s `pnpm check` is a type-check only — it never runs a spec. The memory UI
+specs must be run explicitly under the `ui` Playwright project.
 
 **Mobile** — D4 needs new coverage for the server-first list path and its offline fallback,
 alongside the fork's existing `memory_api_repository_test.dart` (240 lines),
