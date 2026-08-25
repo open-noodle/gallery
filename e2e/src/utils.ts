@@ -638,6 +638,34 @@ export const utils = {
     return result.rows[0]?.identityId as string | undefined;
   },
 
+  /**
+   * Spec §6.3.1 (revised): the OWNER-side `asset_face.personId` for one face, plus the owning
+   * `person`'s name when it is set.
+   *
+   * This is the column a space-editor face edit now propagates onto, and it is the column the
+   * asset-detail People row is seeded from -- so reading it directly is the sharpest available
+   * proof that an editor's attach/detach reached the owner's own layer rather than stopping at
+   * the space projection. The owner-facing `GET /assets/:id` assertion in the same spec proves the
+   * user-visible half; this proves which column moved.
+   */
+  getFaceOwnerPerson: async (assetFaceId: string): Promise<{ personId: string | null; name: string | null }> => {
+    if (!client) {
+      throw new Error('Database client not connected');
+    }
+
+    const result = await client.query(
+      `SELECT af."personId", p."name"
+         FROM "asset_face" af
+         LEFT JOIN "person" p ON p."id" = af."personId"
+        WHERE af."id" = $1`,
+      [assetFaceId],
+    );
+    return {
+      personId: (result.rows[0]?.personId as string | null) ?? null,
+      name: (result.rows[0]?.name as string | null) ?? null,
+    };
+  },
+
   // Slice 3 — M2: PersonResponseDto does not expose `faceAssetId` (only `thumbnailPath`, which is
   // populated asynchronously via the PersonGenerateThumbnail job). Representative-face write-scope
   // specs need to assert "left unchanged" / "changed to X" directly, so read the column via SQL.
