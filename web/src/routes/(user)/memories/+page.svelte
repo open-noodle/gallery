@@ -1,5 +1,6 @@
 <script lang="ts">
   import { scrollMemory } from '$lib/actions/scroll-memory';
+  import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
   import UserPageLayout from '$lib/components/layouts/UserPageLayout.svelte';
   import { memoryManager } from '$lib/managers/memory-manager.svelte';
   import { userPreferencesManager } from '$lib/managers/user-preferences-manager.svelte';
@@ -7,11 +8,11 @@
   import MemoriesSettingsModal from '$lib/modals/MemoriesSettingsModal.svelte';
   import { Route } from '$lib/route';
   import { locale } from '$lib/stores/preferences.store';
-  import { getAssetMediaUrl, memoryLaneTitle } from '$lib/utils';
+  import { getAssetMediaUrl, getMemorySubtitle, memoryLaneTitle } from '$lib/utils';
   import { getAltText } from '$lib/utils/thumbnail-util';
   import { toTimelineAsset } from '$lib/utils/timeline-util';
   import type { MemoryResponseDto } from '@immich/sdk';
-  import { IconButton, LoadingSpinner, modalManager } from '@immich/ui';
+  import { IconButton, modalManager } from '@immich/ui';
   import { mdiTune } from '@mdi/js';
   import { t } from 'svelte-i18n';
   import type { PageData } from './$types';
@@ -71,6 +72,7 @@
           item={{
             id: memory.id,
             title: $memoryLaneTitle(memory),
+            subtitle: getMemorySubtitle(memory, $t),
             href: Route.viewMemory({
               id: memory.id,
               assetId: memory.assets[0].id,
