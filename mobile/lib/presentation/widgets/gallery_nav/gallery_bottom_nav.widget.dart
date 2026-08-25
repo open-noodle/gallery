@@ -146,7 +146,7 @@ class _GalleryBottomNavState extends ConsumerState<GalleryBottomNav> {
 
     switch (tab) {
       case GalleryTabEnum.photos:
-        ref.invalidate(driftMemoryFutureProvider);
+        ref.invalidate(driftMemoryLaneProvider);
       case GalleryTabEnum.albums:
         unawaited(ref.read(remoteAlbumProvider.notifier).refresh());
       case GalleryTabEnum.library:
