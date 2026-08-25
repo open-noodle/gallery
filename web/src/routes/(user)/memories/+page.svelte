@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { scrollMemory } from '#lib/actions/scroll-memory.svelte.ts';
+  import { scrollMemory } from '#lib/actions/scroll-memory.ts';
+  import LoadingSpinner from '#lib/components/shared-components/LoadingSpinner.svelte';
   import UserPageLayout from '#lib/components/layouts/UserPageLayout.svelte';
   import { memoryManager } from '#lib/managers/memory-manager.svelte.ts';
   import { userPreferencesManager } from '#lib/managers/user-preferences-manager.svelte.ts';
@@ -7,11 +8,11 @@
   import MemoriesSettingsModal from '#lib/modals/MemoriesSettingsModal.svelte';
   import { Route } from '#lib/route.ts';
   import { locale } from '#lib/stores/preferences.store.ts';
-  import { getAssetMediaUrl, memoryLaneTitle } from '#lib/utils.ts';
+  import { getAssetMediaUrl, getMemorySubtitle, memoryLaneTitle } from '#lib/utils.ts';
   import { getAltText } from '#lib/utils/thumbnail-util.ts';
   import { toTimelineAsset } from '#lib/utils/timeline-util.ts';
   import type { MemoryResponseDto } from '@immich/sdk';
-  import { IconButton, LoadingSpinner, modalManager } from '@immich/ui';
+  import { IconButton, modalManager } from '@immich/ui';
   import { mdiTune } from '@mdi/js';
   import { t } from 'svelte-i18n';
   import type { PageData } from './$types';
@@ -42,7 +43,7 @@
 <UserPageLayout
   title={data.meta.title}
   description={memoryManager.total === undefined ? undefined : `(${memoryManager.total.toLocaleString($locale)})`}
-  {@attach scrollMemory({ routeStartsWith: Route.memories() })}
+  use={[[scrollMemory, { routeStartsWith: Route.memories() }]]}
 >
   {#snippet buttons()}
     <div class="flex place-items-center gap-2">
@@ -71,6 +72,7 @@
           item={{
             id: memory.id,
             title: $memoryLaneTitle(memory),
+            subtitle: getMemorySubtitle(memory, $t),
             href: Route.viewMemory({
               id: memory.id,
               assetId: memory.assets[0].id,
