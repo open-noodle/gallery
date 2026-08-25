@@ -83,3 +83,31 @@ describe('FeatureSettings memory types', () => {
     expect(screen.queryByRole('switch', { name: 'memory_type_recent_trip' })).toBeNull();
   });
 });
+
+describe('memories preference payload', () => {
+  // The fork carries `types` (per-user memory-type map) alongside upstream's keys, all in a
+  // single object literal in handleSave. An upstream merge that resolves that literal to one
+  // side silently drops the other side's key -- and dropping `types` resets every user's
+  // per-type memory preferences.
+  //
+  // Asserted with toEqual, not objectContaining: an exact match catches a dropped key AND
+  // tells us when upstream adds one, which is the signal Task 3 acts on.
+  it('sends every memories key, not just the ones upstream knows about', async () => {
+    mocks.preferences = {
+      memories: { enabled: true, duration: 5, types: { on_this_day: true, birthday: false } },
+    };
+    mocks.serverConfig = { availableMemoryTypes: ['on_this_day', 'birthday'] };
+    mocks.updateMyPreferences.mockResolvedValue(mocks.preferences);
+
+    const user = userEvent.setup();
+    render(FeatureSettings);
+    await user.click(screen.getByRole('button', { name: 'save' }));
+
+    const payload = mocks.updateMyPreferences.mock.calls.at(-1)?.[0].userPreferencesUpdateDto;
+    expect(payload.memories).toEqual({
+      enabled: true,
+      duration: 5,
+      types: { on_this_day: true, birthday: false },
+    });
+  });
+});
