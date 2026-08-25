@@ -123,6 +123,14 @@ export class AssetService extends BaseService {
         spaceId,
         new Set([id]),
       );
+      // The response must carry the space it was resolved in whether the caller named the space or
+      // the server inferred it (the `else` branch below sets the same field). Without this, a client
+      // that re-reads WITH `spaceId` gets an asset whose `resolvedSpaceId` is suddenly absent, and
+      // any affordance gated on an effective space id -- `canEditSpacePeople`, which falls back to
+      // `resolvedSpaceId` when the route carries no space -- silently switches itself off. That is
+      // exactly what made the People-row edit controls vanish after a face edit on /photos/:id.
+      data.resolvedSpaceId = spaceId;
+
       if (hasSpaceAccess.size === 0 || !data.people) {
         data.people = [];
       } else {
