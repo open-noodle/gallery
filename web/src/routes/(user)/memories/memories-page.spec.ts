@@ -89,6 +89,6 @@ describe('Memories page', () => {
     const { container } = renderPage([memory({ title: 'Years ago' })]);
 
     expect(screen.getByText('Years ago')).toBeInTheDocument();
-    expect(container.querySelectorAll('.item-card p')).toHaveLength(1);
+    expect(container.querySelectorAll(':scope .item-card p')).toHaveLength(1);
   });
 });
