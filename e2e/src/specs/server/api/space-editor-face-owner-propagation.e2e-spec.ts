@@ -85,6 +85,30 @@ describe('Space editor face edits propagate to the asset owner (spec §6.3.1 rev
   });
 
   /**
+   * The EDITOR's own view, read the way DetailPanel re-reads it after a face edit: with `spaceId`
+   * passed explicitly. That is a different server branch from the owner's inferred-space read every
+   * other case here uses, and it is the branch behind "I tag a new person and it doesn't show up
+   * until I refresh" -- the newly created space person has to survive the branch's
+   * `spacePersonId` filter, which it can only do because the attach now writes the owner-side
+   * `asset_face.personId` the filter's lookup keys off.
+   *
+   * Also pins `resolvedSpaceId` on this branch: the panel's edit affordances fall back to it when
+   * the route carries no space, so a response without it silently disables them.
+   */
+  it("shows a newly tagged person in the editor's space-scoped read", async () => {
+    const { assetFaceId } = await editorNamesNewFace('Freshly Tagged Dana');
+
+    const asEditor = await getAssetInfo(
+      { id: ctx.spaceAssetId, spaceId: ctx.spaceId },
+      { headers: asBearerAuth(ctx.spaceEditor.token!) },
+    );
+
+    expect((asEditor.people ?? []).map((person) => person.name)).toContain('Freshly Tagged Dana');
+    expect(asEditor.resolvedSpaceId).toBe(ctx.spaceId);
+    expect((await utils.getFaceOwnerPerson(assetFaceId)).name).toBe('Freshly Tagged Dana');
+  });
+
+  /**
    * The guard that separates "propagate the editor's edit" from "let an editor wipe arbitrary
    * owner tags". Detaching space person X must only clear the owner's tag when the owner's person
    * is the SAME human; a face the owner named as someone else is left alone.
