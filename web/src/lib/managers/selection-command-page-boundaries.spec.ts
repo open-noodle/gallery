@@ -21,7 +21,7 @@ const deniedPages = [
   'src/routes/(user)/locked/[[photos=photos]]/[[assetId=id]]/+page.svelte',
   'src/routes/(user)/utilities/duplicates/[[photos=photos]]/[[assetId=id]]/+page.svelte',
   'src/routes/(user)/utilities/large-files/[[photos=photos]]/[[assetId=id]]/+page.svelte',
-  'src/routes/(user)/memory/[[photos=photos]]/[[assetId=id]]/+page.svelte',
+  'src/routes/(user)/memories/[id]/[[photos=photos]]/[[assetId=id]]/+page.svelte',
 ];
 
 const read = (path: string) => readFileSync(resolve(root, path), 'utf8');
