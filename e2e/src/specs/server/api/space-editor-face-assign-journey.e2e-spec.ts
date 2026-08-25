@@ -461,30 +461,30 @@ describe('Space editor face-assign journey (spec 2026-08-23, Slice 9)', () => {
         spacePersonName: 'Uncle Tom',
       });
 
-      // (c) Bob's own view of the asset, re-read from scratch, is EXACTLY what it was before Anna
-      // acted -- not merely "some field is non-null". This is the HTTP surface the spec asks this
-      // test to pin: `asset_face.personId` and Bob's own `person` row are the only things
-      // `GET /assets/:id` resolves through for the OWNER's own view (`applyResolvedPersonMetadata`
-      // falls back to the raw, untouched `person.name`/`birthDate` whenever the identity-keyed
-      // resolver has nothing newer to say), and this write path never touches either one -- only
-      // `face_identity_face` for this one face. That is also why this assertion alone is *not*
-      // sufficient to catch a regression here: see the mutation-check note on the identity
-      // assertion below, which is what actually goes red.
+      // (c) §6.3.1 (REVISED): Bob's own view now CHANGES. This assertion used to be
+      // `expect(after.people).toEqual(before.people)` -- the insulated model, where an editor's
+      // override was invisible outside the space. That model was dropped because it made the
+      // asset-detail People row unable to reflect an editor's edit in either direction: an attach
+      // never appeared, and a detach never removed anyone.
+      //
+      // So the face moves on Bob's side too: it stops counting toward "Dad" and starts counting
+      // toward an owner-side person for Uncle Tom's identity, created in Bob's library on demand.
       const after = await utils.getAssetInfo(ctx.spaceOwner.token!, ctx.spaceAssetId);
-      expect(after.people).toEqual(before.people);
-      const bobsPersonAfter = after.people?.find((person) => person.id === bobPerson.id);
-      expect(bobsPersonAfter).toMatchObject({ id: bobPerson.id, name: 'Dad' });
+      expect(after.people).not.toEqual(before.people);
 
-      // The direct proof of the mechanism the point-(c) read above cannot observe: no read-only
-      // HTTP endpoint in this system exposes `face_identity_face` (every owner-facing read --
-      // GET /assets/:id, GET /people, GET /people/:id/faces -- resolves through `asset_face.personId`
-      // or the static `person.identityId` column, never through this specific face's identity link),
-      // so this is the one assertion that is actually sensitive to a `writeIdentity` regression here
-      // -- confirmed by mutation: forcing `writeIdentity = true` unconditionally in
-      // `attachFaceToSpacePerson` (shared-space.service.ts) makes ONLY this assertion fail; every
-      // HTTP-level assertion above and below it still passes, which is the honest finding this
-      // header records rather than papers over.
-      await expect(utils.getFaceIdentityId(faceId)).resolves.toBe(bobIdentityBefore);
+      // "Dad" no longer holds a face on this asset, so Bob's own view of it drops him.
+      expect(after.people?.find((person) => person.id === bobPerson.id)).toBeUndefined();
+      // ...and the name Anna chose is what Bob now sees on his own photo.
+      expect((after.people ?? []).map((person) => person.name)).toContain('Uncle Tom');
+
+      // The identity follows the person rather than staying pinned. Keeping `face_identity_face`
+      // on Bob's old identity while `asset_face.personId` moved would leave Bob's own two layers
+      // disagreeing about this one face -- and `applyResolvedPersonMetadata` resolves his names and
+      // birthdays through the identity, so that split is exactly what the original §6.3.1 was
+      // written to prevent. Both move together now.
+      const identityAfter = await utils.getFaceIdentityId(faceId);
+      expect(identityAfter).toBeDefined();
+      expect(identityAfter).not.toBe(bobIdentityBefore);
     });
   });
 });
