@@ -102,10 +102,25 @@ discovered in review.
 
 Of the fork index's three features, **all/saved is subsumed** by upstream's `onlyFavorites`
 filter — and upstream's is strictly better, filtering server-side (`isSaved` on the search)
-and threading the choice through the URL so it survives into the viewer. **Rule-aware titles
-and subtitles are preserved for free**: upstream's page imports `memoryLaneTitle` from
-`$lib/utils`, which the fork already redirects to its rule-aware `getMemoryTitle`. Only
-**search** and **month grouping** are genuinely lost.
+and threading the choice through the URL so it survives into the viewer. Only **search** and
+**month grouping** are genuinely lost.
+
+**Rule-aware _titles_ are preserved for free; rule-aware _subtitles_ are not.** Upstream's page
+and viewer import `memoryLaneTitle` from `$lib/utils`, which the fork already redirects to its
+rule-aware `getMemoryTitle` — so titles come across at zero cost. Nothing on either surface
+imports `getMemorySubtitle`: its only caller was the fork's `memory-index-utils.ts`, which this
+change deletes. Adopting upstream's card verbatim therefore drops the subtitle the rule engine
+still produces (recent-trip's `"12 photos over 3 days"`, from the `assetCount`/`dayCount` rule
+context), leaves `getMemorySubtitle` dead code with unreachable tests, and orphans
+`recent_trip_subtitle` in all ten locales.
+
+**Corrected disposition (2026-08-25, final fix wave):** the subtitle is **restored** on
+upstream's card rather than deleted. Upstream's card body is a single absolutely-positioned
+`<p>` holding the title; wrapping it in a bottom-anchored `<div>` and appending a conditional
+second `<p>` is a small, self-contained fork delta that does not fight upstream's layout, and it
+recovers real behaviour the server-side rule engine is already generating. Guarded by
+`web/src/routes/(user)/memories/memories-page.spec.ts`, which goes red when the subtitle line is
+removed.
 
 Approved to ship. Reversible — re-add search onto upstream's page only if rule volume proves
 it necessary. Call the removal out in release notes.
@@ -132,6 +147,12 @@ viewer components and `memory-viewer-source.ts`; keep upstream's `/memory/…/+p
 redirect. The #791 regression assertions from the fork's `MemoryViewer.spec.ts` are **ported
 onto upstream's viewer** rather than dropped: D2 claims upstream provides that behaviour
 structurally, so a test must go red if it stops.
+
+One fork delta **must** be re-applied on upstream's viewer: the fork passes `enableGrouping` to
+`GalleryViewer` on the memory gallery strip (feature #625). Upstream's viewer does not, and the
+prop defaults `false`, so adopting the file byte-identically silently removes asset grouping
+with no conflict, no type error and no test failure. Guarded by an `enableGrouping` assertion in
+the ported `MemoryViewer.spec.ts`.
 
 **Routing** — `Route.memories` exists on both sides with **different signatures**: upstream
 repurposes it from the viewer (`/memory`, `{id}`) to the index (`/memories`, `{isSaved}`) and
