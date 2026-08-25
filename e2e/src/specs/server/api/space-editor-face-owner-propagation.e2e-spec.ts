@@ -33,6 +33,23 @@ import { app, asBearerAuth, utils } from 'src/utils';
 import request from 'supertest';
 import { beforeAll, describe, expect, it } from 'vitest';
 
+/**
+ * `asset_face.personId` / that person's name, read straight from the owner's own layer.
+ *
+ * Destructured rather than `(await ...).personId` inline because eslint's
+ * `unicorn/no-await-expression-member` rejects member access on an await expression. At module
+ * scope because they close over nothing (`unicorn/consistent-function-scoping`).
+ */
+const ownerPersonIdOf = async (assetFaceId: string) => {
+  const { personId } = await utils.getFaceOwnerPerson(assetFaceId);
+  return personId;
+};
+
+const ownerPersonNameOf = async (assetFaceId: string) => {
+  const { name } = await utils.getFaceOwnerPerson(assetFaceId);
+  return name;
+};
+
 describe('Space editor face edits propagate to the asset owner (spec §6.3.1 revised)', () => {
   let ctx: SpaceContext;
 
@@ -71,7 +88,7 @@ describe('Space editor face edits propagate to the asset owner (spec §6.3.1 rev
 
   it("clears the owner's personId when the editor detaches that same face", async () => {
     const { assetFaceId, personId } = await editorNamesNewFace('Detachable Bea');
-    expect((await utils.getFaceOwnerPerson(assetFaceId)).name).toBe('Detachable Bea');
+    expect(await ownerPersonNameOf(assetFaceId)).toBe('Detachable Bea');
     expect(await ownerPeopleNames()).toContain('Detachable Bea');
 
     await detachSpacePersonFace(
@@ -79,7 +96,7 @@ describe('Space editor face edits propagate to the asset owner (spec §6.3.1 rev
       { headers: asBearerAuth(ctx.spaceEditor.token!) },
     );
 
-    expect((await utils.getFaceOwnerPerson(assetFaceId)).personId).toBeNull();
+    expect(await ownerPersonIdOf(assetFaceId)).toBeNull();
     // The originating bug: this used to still contain her, and reloading never helped.
     expect(await ownerPeopleNames()).not.toContain('Detachable Bea');
   });
@@ -105,7 +122,7 @@ describe('Space editor face edits propagate to the asset owner (spec §6.3.1 rev
 
     expect((asEditor.people ?? []).map((person) => person.name)).toContain('Freshly Tagged Dana');
     expect(asEditor.resolvedSpaceId).toBe(ctx.spaceId);
-    expect((await utils.getFaceOwnerPerson(assetFaceId)).name).toBe('Freshly Tagged Dana');
+    expect(await ownerPersonNameOf(assetFaceId)).toBe('Freshly Tagged Dana');
   });
 
   /**
@@ -127,7 +144,7 @@ describe('Space editor face edits propagate to the asset owner (spec §6.3.1 rev
       .set(authHeaders(ctx.spaceOwner))
       .send({ id: ownTaggedFaceId })
       .expect(200);
-    expect((await utils.getFaceOwnerPerson(ownTaggedFaceId)).name).toBe("Bob's Own Dad");
+    expect(await ownerPersonNameOf(ownTaggedFaceId)).toBe("Bob's Own Dad");
 
     // Anna attaches and then detaches a space person that has nothing to do with Bob's tagged face.
     const { assetFaceId: unrelatedFaceId, personId } = await editorNamesNewFace('Unrelated Uncle Tom');
@@ -137,7 +154,7 @@ describe('Space editor face edits propagate to the asset owner (spec §6.3.1 rev
     );
 
     // Bob's unrelated tag survives untouched, on both layers.
-    expect((await utils.getFaceOwnerPerson(ownTaggedFaceId)).name).toBe("Bob's Own Dad");
+    expect(await ownerPersonNameOf(ownTaggedFaceId)).toBe("Bob's Own Dad");
     expect(await ownerPeopleNames()).toContain("Bob's Own Dad");
   });
 
@@ -149,14 +166,14 @@ describe('Space editor face edits propagate to the asset owner (spec §6.3.1 rev
    */
   it('restores the owner personId when the editor re-attaches a detached face', async () => {
     const { assetFaceId, personId } = await editorNamesNewFace('Round Trip Cara');
-    const firstOwnerPersonId = (await utils.getFaceOwnerPerson(assetFaceId)).personId;
+    const firstOwnerPersonId = await ownerPersonIdOf(assetFaceId);
     expect(firstOwnerPersonId).not.toBeNull();
 
     await detachSpacePersonFace(
       { id: ctx.spaceId, personId, assetFaceId },
       { headers: asBearerAuth(ctx.spaceEditor.token!) },
     );
-    expect((await utils.getFaceOwnerPerson(assetFaceId)).personId).toBeNull();
+    expect(await ownerPersonIdOf(assetFaceId)).toBeNull();
 
     await attachSpacePersonFace(
       { id: ctx.spaceId, personId, assetFaceId },
@@ -164,7 +181,7 @@ describe('Space editor face edits propagate to the asset owner (spec §6.3.1 rev
     );
 
     // Same owner person as the first attach -- a second one would mean a duplicate in Bob's library.
-    expect((await utils.getFaceOwnerPerson(assetFaceId)).personId).toBe(firstOwnerPersonId);
+    expect(await ownerPersonIdOf(assetFaceId)).toBe(firstOwnerPersonId);
     expect(await ownerPeopleNames()).toContain('Round Trip Cara');
   });
 });
