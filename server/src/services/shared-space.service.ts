@@ -125,6 +125,23 @@ export const SHARED_SPACE_ALBUM_FOLDER_MAX_PER_SPACE = 500;
  */
 export const SHARED_SPACE_ALBUM_FOLDER_NAME_CONFLICT_MESSAGE = 'A folder with that name already exists here';
 
+/**
+ * The foreign keys that point AT a folder row. Used by
+ * {@link SharedSpaceService.withAlbumFolderConstraintsMapped} to recognise "the folder was
+ * deleted underneath us" and nothing else.
+ *
+ * Keyed on the constraint name rather than on error code 23503 alone, because the same writes
+ * touch other foreign keys: a `shared_space_album` row also references the album and the space,
+ * so a blanket 23503 → "Folder not found" would confidently misreport a concurrently-deleted
+ * album as a missing folder.
+ */
+const SHARED_SPACE_ALBUM_FOLDER_REFERENCE_CONSTRAINTS = new Set([
+  // shared_space_album.folderId -> shared_space_album_folder.id
+  'shared_space_album_folderId_fkey',
+  // shared_space_album_folder.parentId -> shared_space_album_folder.id (self)
+  'shared_space_album_folder_parentId_fkey',
+]);
+
 type SpacePersonMatchResult = {
   id: string;
   identityId?: string | null;
@@ -906,11 +923,20 @@ export class SharedSpaceService extends BaseService {
       }
     }
 
-    const result = await this.sharedSpaceRepository.addAlbum({
-      spaceId,
-      albumId,
-      addedById: auth.user.id,
-    });
+    // A-10: the placement rides along on the INSERT rather than following it as a second write,
+    // so a first-time link into a folder is atomic — there is no window in which the row exists
+    // at the root, and no failure mode where the caller sees an error but the album is silently
+    // linked one level up from where they asked for it.
+    const result = await this.withAlbumFolderConstraintsMapped(
+      () =>
+        this.sharedSpaceRepository.addAlbum({
+          spaceId,
+          albumId,
+          addedById: auth.user.id,
+          folderId: folderId ?? null,
+        }),
+      'Folder not found',
+    );
 
     // Only queue face sync for newly created links (not idempotent re-links).
     if (result) {
@@ -935,10 +961,15 @@ export class SharedSpaceService extends BaseService {
       await this.queueAlbumGrantReconcile([albumId]);
     }
 
-    // A-10: placed last, after logActivity, so re-linking an already-linked album (result is
-    // falsy) still lands it in the requested folder.
-    if (folderId) {
-      await this.sharedSpaceRepository.setAlbumLinkFolder(spaceId, albumId, folderId);
+    // addAlbum is `onConflict doNothing`, so its folderId only ever applies to a row it actually
+    // inserted. Re-linking an album that is already linked (result is falsy) must still honour
+    // the requested folder, which needs its own UPDATE — the one case where the placement is a
+    // second write, and the only case where it can lose a race with a folder delete.
+    if (folderId && !result) {
+      await this.withAlbumFolderConstraintsMapped(
+        () => this.sharedSpaceRepository.setAlbumLinkFolder(spaceId, albumId, folderId),
+        'Folder not found',
+      );
     }
   }
 
@@ -1015,7 +1046,13 @@ export class SharedSpaceService extends BaseService {
       }
     }
 
-    const updated = await this.sharedSpaceRepository.setAlbumLinkFolder(spaceId, albumId, folderId);
+    // Mapped, not raw: the getAlbumFolderById check above and this write are two statements, so
+    // another editor deleting the folder in between turns the write into a foreign-key violation
+    // rather than the 400 the check would have produced (C-03).
+    const updated = await this.withAlbumFolderConstraintsMapped(
+      () => this.sharedSpaceRepository.setAlbumLinkFolder(spaceId, albumId, folderId),
+      'Folder not found',
+    );
     if (!updated) {
       throw new BadRequestException('Album is not linked to this space');
     }
@@ -1097,13 +1134,15 @@ export class SharedSpaceService extends BaseService {
 
     await this.assertNoAlbumFolderNameConflict(spaceId, parentId, name, null);
 
-    const created = await this.withAlbumFolderNameConflictMapped(() =>
-      this.sharedSpaceRepository.createAlbumFolder({
-        spaceId,
-        parentId,
-        name,
-        createdById: auth.user.id,
-      }),
+    const created = await this.withAlbumFolderConstraintsMapped(
+      () =>
+        this.sharedSpaceRepository.createAlbumFolder({
+          spaceId,
+          parentId,
+          name,
+          createdById: auth.user.id,
+        }),
+      'Parent folder not found',
     );
     return this.mapAlbumFolder(created);
   }
@@ -1164,13 +1203,15 @@ export class SharedSpaceService extends BaseService {
     await this.assertNoAlbumFolderNameConflict(spaceId, destinationParentId, name, folderId);
 
     if (isMove) {
-      const outcome = await this.withAlbumFolderNameConflictMapped(() =>
-        this.sharedSpaceRepository.moveAlbumFolderChecked(
-          spaceId,
-          folderId,
-          destinationParentId,
-          dto.name === undefined ? undefined : name,
-        ),
+      const outcome = await this.withAlbumFolderConstraintsMapped(
+        () =>
+          this.sharedSpaceRepository.moveAlbumFolderChecked(
+            spaceId,
+            folderId,
+            destinationParentId,
+            dto.name === undefined ? undefined : name,
+          ),
+        'Destination folder not found',
       );
       if (outcome === 'cycle') {
         throw new BadRequestException('A folder cannot be moved into one of its own descendants');
@@ -1181,8 +1222,11 @@ export class SharedSpaceService extends BaseService {
       return;
     }
 
-    await this.withAlbumFolderNameConflictMapped(() =>
-      this.sharedSpaceRepository.updateAlbumFolder(spaceId, folderId, { name }),
+    // A rename touches no foreign key, so the 23503 arm of the mapper is unreachable here; the
+    // message is supplied for uniformity, not because a rename can hit it.
+    await this.withAlbumFolderConstraintsMapped(
+      () => this.sharedSpaceRepository.updateAlbumFolder(spaceId, folderId, { name }),
+      'Folder not found',
     );
   }
 
@@ -1232,21 +1276,49 @@ export class SharedSpaceService extends BaseService {
   }
 
   /**
-   * The name-conflict pre-check above (assertNoAlbumFolderNameConflict) is optimistic — see
-   * moveAlbumFolderChecked's comment on why a full re-check under lock isn't worth the cost for
-   * plain create/rename/move. A concurrent request can still race past the pre-check and hit one
-   * of the partial unique indexes (shared_space_album_folder_nested_name_key / _root_name_key),
-   * which Postgres reports as error code 23505. Map ONLY that code to the same 400 the pre-check
-   * throws; any other error (a different constraint, a connection failure, …) propagates
-   * unchanged — the same error object, not rewrapped — so it is never mistaken for a name
-   * collision.
+   * Maps the two ways a folder write can lose a race with another editor onto the same 400s the
+   * service's own pre-checks produce. Every other error propagates unchanged — the same error
+   * object, not rewrapped — so neither arm can swallow a genuine failure.
+   *
+   * **23505, a name collision.** The pre-check above (assertNoAlbumFolderNameConflict) is
+   * optimistic — see moveAlbumFolderChecked's comment on why a full re-check under lock isn't
+   * worth the cost for plain create/rename/move. A concurrent request can still race past it and
+   * hit one of the partial unique indexes (shared_space_album_folder_nested_name_key /
+   * _root_name_key). Mapped to the same shared message the pre-check throws.
+   *
+   * **23503, the folder was deleted underneath us.** Every folder write here is
+   * check-then-write, and another editor can delete the folder in between: `setAlbumFolder`
+   * validates with getAlbumFolderById and then writes `folderId`, `moveAlbumFolderChecked` reads
+   * its target and then reparents. Postgres rejects the write with a foreign-key violation, and
+   * without this arm that surfaced as a 500 — design §5.7 C-03 promises the move 400s, and the
+   * medium test `C-03b` in shared-space-album-folder.repository.spec.ts pins the raw repository
+   * behaviour being mapped here. [missingMessage] is the caller's own wording for that folder,
+   * so a missing destination and a missing placement target don't have to share one message.
+   *
+   * Only constraints in {@link SHARED_SPACE_ALBUM_FOLDER_REFERENCE_CONSTRAINTS} count — see that
+   * constant for why the error code alone is not enough.
    */
-  private async withAlbumFolderNameConflictMapped<T>(operation: () => Promise<T>): Promise<T> {
+  private async withAlbumFolderConstraintsMapped<T>(operation: () => Promise<T>, missingMessage: string): Promise<T> {
     try {
       return await operation();
     } catch (error) {
-      if ((error as { code?: string })?.code === '23505') {
+      const { code, constraint_name, constraint } = (error ?? {}) as {
+        code?: string;
+        constraint_name?: string;
+        constraint?: string;
+      };
+      if (code === '23505') {
         throw new BadRequestException(SHARED_SPACE_ALBUM_FOLDER_NAME_CONFLICT_MESSAGE);
+      }
+      // BOTH spellings, deliberately. Kysely's postgres.js dialect — what this server actually
+      // runs on — names the field `constraint_name` (postgres/src/connection.js maps Postgres
+      // error field 110 to it), while node-postgres calls the same field `constraint`. Reading
+      // only the node-postgres spelling makes this whole arm a silent no-op in production while
+      // unit tests that hand-roll the error object still pass; the medium test C-03b is what
+      // pins the real runtime shape.
+      const violated = constraint_name ?? constraint;
+      if (code === '23503' && violated && SHARED_SPACE_ALBUM_FOLDER_REFERENCE_CONSTRAINTS.has(violated)) {
+        throw new BadRequestException(missingMessage);
       }
       throw error;
     }

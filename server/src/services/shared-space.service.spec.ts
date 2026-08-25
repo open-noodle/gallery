@@ -9923,6 +9923,8 @@ describe(SharedSpaceService.name, () => {
         spaceId: space.id,
         albumId,
         addedById: auth.user.id,
+        // No folder requested, so the link lands at the space root.
+        folderId: null,
       });
     });
 
@@ -9960,6 +9962,8 @@ describe(SharedSpaceService.name, () => {
         spaceId: space.id,
         albumId,
         addedById: auth.user.id,
+        // No folder requested, so the link lands at the space root.
+        folderId: null,
       });
     });
 
@@ -14086,6 +14090,23 @@ describe(SharedSpaceService.name, () => {
         await expect(promise).rejects.toBeInstanceOf(BadRequestException);
         await expect(promise).rejects.toThrow(SHARED_SPACE_ALBUM_FOLDER_NAME_CONFLICT_MESSAGE);
       });
+
+      // The destination can be deleted between this service's own target lookup and the reparent
+      // UPDATE inside moveAlbumFolderChecked's transaction. Its own message names the
+      // destination, so a raced delete reads the same as a destination that was already gone.
+      it('maps a raced foreign-key violation (23503) on the move to a 400', async () => {
+        const { auth, space, folder, target } = setupAlbumFolderMove(mocks);
+        mocks.sharedSpace.moveAlbumFolderChecked.mockRejectedValue(
+          Object.assign(new Error('violates foreign key constraint'), {
+            code: '23503',
+            constraint: 'shared_space_album_folder_parentId_fkey',
+          }),
+        );
+
+        await expect(sut.updateAlbumFolder(auth, space.id, folder.id, { parentId: target.id } as any)).rejects.toThrow(
+          new BadRequestException('Destination folder not found'),
+        );
+      });
     });
 
     describe('deleteAlbumFolder', () => {
@@ -14224,21 +14245,57 @@ describe(SharedSpaceService.name, () => {
         );
         expect(mocks.sharedSpace.setAlbumLinkFolder).not.toHaveBeenCalled();
       });
+
+      // C-03: another editor deletes the folder between the existence check and the write. The
+      // repository surfaces Postgres's raw foreign-key violation — pinned by the medium test
+      // C-03b — and the design promises the move 400s, not 500s.
+      it('C-03: maps a raced foreign-key violation to a 400 rather than letting a 500 escape', async () => {
+        const { auth, space } = setupAlbumFolderEditor(mocks);
+        const folder = albumFolderRow({ spaceId: space.id });
+        mocks.sharedSpace.getAlbumFolderById.mockResolvedValue(folder);
+        mocks.sharedSpace.setAlbumLinkFolder.mockRejectedValue(
+          // `constraint_name`, the spelling Kysely's postgres.js dialect actually produces and
+          // which the medium test C-03b pins — node-postgres's `constraint` is covered by the
+          // linkAlbum insert test below. Both are read, because reading only the wrong one makes
+          // the mapping a no-op in production while every hand-rolled unit test still passes.
+          Object.assign(new Error('violates foreign key constraint'), {
+            code: '23503',
+            constraint_name: 'shared_space_album_folderId_fkey',
+          }),
+        );
+
+        await expect(sut.setAlbumFolder(auth, space.id, newUuid(), { folderId: folder.id } as any)).rejects.toThrow(
+          new BadRequestException('Folder not found'),
+        );
+      });
+
+      it('propagates a non-constraint repository error unchanged', async () => {
+        const { auth, space } = setupAlbumFolderEditor(mocks);
+        const folder = albumFolderRow({ spaceId: space.id });
+        mocks.sharedSpace.getAlbumFolderById.mockResolvedValue(folder);
+        const error = new Error('connection terminated');
+        mocks.sharedSpace.setAlbumLinkFolder.mockRejectedValue(error);
+
+        await expect(sut.setAlbumFolder(auth, space.id, newUuid(), { folderId: folder.id } as any)).rejects.toBe(error);
+      });
     });
 
     describe('linkAlbum with a folder', () => {
       // A-10: one request, not link-then-move — otherwise a bulk link doubles its round-trips
       // and every album visibly flashes at the root first.
-      it('A-10: links and places the album in a single call', async () => {
+      it('A-10: links and places the album in a single INSERT, with no follow-up write', async () => {
         const { auth, space, albumId } = setupAlbumLink(mocks);
         const folder = albumFolderRow({ spaceId: space.id });
         mocks.sharedSpace.getAlbumFolderById.mockResolvedValue(folder);
-        mocks.sharedSpace.setAlbumLinkFolder.mockResolvedValue(true);
 
         await sut.linkAlbum(auth, space.id, albumId, folder.id);
 
-        expect(mocks.sharedSpace.addAlbum).toHaveBeenCalled();
-        expect(mocks.sharedSpace.setAlbumLinkFolder).toHaveBeenCalledWith(space.id, albumId, folder.id);
+        expect(mocks.sharedSpace.addAlbum).toHaveBeenCalledWith(
+          expect.objectContaining({ spaceId: space.id, albumId, folderId: folder.id }),
+        );
+        // The placement rides on the insert, so a first-time link never briefly exists at the
+        // root and can never half-succeed. A second write here would reopen both.
+        expect(mocks.sharedSpace.setAlbumLinkFolder).not.toHaveBeenCalled();
       });
 
       // A-09: the folder is validated BEFORE the link is created, so a bad folderId never
@@ -14256,16 +14313,16 @@ describe(SharedSpaceService.name, () => {
 
         await sut.linkAlbum(auth, space.id, albumId);
 
-        expect(mocks.sharedSpace.addAlbum).toHaveBeenCalled();
+        expect(mocks.sharedSpace.addAlbum).toHaveBeenCalledWith(expect.objectContaining({ folderId: null }));
         expect(mocks.sharedSpace.getAlbumFolderById).not.toHaveBeenCalled();
         expect(mocks.sharedSpace.setAlbumLinkFolder).not.toHaveBeenCalled();
       });
 
-      // Regression guard for A-10's placement: an idempotent re-link (addAlbum resolves falsy
-      // because the row already exists) must still honour the requested folderId. The placement
-      // write is deliberately OUTSIDE the `if (result)` branch used for face-sync/activity-log
-      // side effects — if it were moved inside that branch, this is the only test that would fail.
-      it('re-links an already-linked album and still places it (placement is outside the if(result) branch)', async () => {
+      // Regression guard for A-10's placement: addAlbum is `onConflict doNothing`, so on an
+      // idempotent re-link (addAlbum resolves falsy because the row already exists) the folderId
+      // it carried was discarded along with the insert. That is the one case that still needs
+      // the follow-up UPDATE — drop it and re-linking silently leaves the album where it was.
+      it('re-links an already-linked album and still places it, via the follow-up UPDATE', async () => {
         const { auth, space, albumId } = setupAlbumLink(mocks);
         mocks.sharedSpace.addAlbum.mockResolvedValue(void 0 as any);
         const folder = albumFolderRow({ spaceId: space.id });
@@ -14275,6 +14332,40 @@ describe(SharedSpaceService.name, () => {
         await sut.linkAlbum(auth, space.id, albumId, folder.id);
 
         expect(mocks.sharedSpace.setAlbumLinkFolder).toHaveBeenCalledWith(space.id, albumId, folder.id);
+      });
+
+      // C-03: the folder can be deleted between the getAlbumFolderById check above and the
+      // insert. Postgres refuses the write with a foreign-key violation; that must read as the
+      // same 400 the check itself produces, not as a 500.
+      it('maps a raced foreign-key violation on the insert to a 400', async () => {
+        const { auth, space, albumId } = setupAlbumLink(mocks);
+        const folder = albumFolderRow({ spaceId: space.id });
+        mocks.sharedSpace.getAlbumFolderById.mockResolvedValue(folder);
+        mocks.sharedSpace.addAlbum.mockRejectedValue(
+          Object.assign(new Error('violates foreign key constraint'), {
+            code: '23503',
+            constraint: 'shared_space_album_folderId_fkey',
+          }),
+        );
+
+        await expect(sut.linkAlbum(auth, space.id, albumId, folder.id)).rejects.toThrow(
+          new BadRequestException('Folder not found'),
+        );
+      });
+
+      // The same insert also references the album and the space. A foreign-key violation on one
+      // of THOSE must not be reported as a missing folder — it propagates untouched.
+      it('propagates a foreign-key violation on an unrelated constraint unchanged', async () => {
+        const { auth, space, albumId } = setupAlbumLink(mocks);
+        const folder = albumFolderRow({ spaceId: space.id });
+        mocks.sharedSpace.getAlbumFolderById.mockResolvedValue(folder);
+        const error = Object.assign(new Error('violates foreign key constraint'), {
+          code: '23503',
+          constraint: 'shared_space_album_albumId_fkey',
+        });
+        mocks.sharedSpace.addAlbum.mockRejectedValue(error);
+
+        await expect(sut.linkAlbum(auth, space.id, albumId, folder.id)).rejects.toBe(error);
       });
     });
   });

@@ -1529,6 +1529,19 @@ export class SharedSpaceRepository {
     return this.db
       .transaction()
       .execute(async (trx) => {
+        // The SAME per-space advisory lock moveAlbumFolderChecked takes, for the same reason
+        // and in the same namespace: a delete and a move are both structural rewrites of the
+        // tree, and interleaving them corrupts it. Without this, moving X into F while F is
+        // being deleted races the promote — the move's foreign-key check blocks on the row lock
+        // below, then fails with 23503 once the delete commits (a 500 before the service learned
+        // to map it), and in the window where it does NOT block, F's self-referencing CASCADE
+        // would delete X and its whole subtree instead of promoting it. Taking the lock first
+        // makes delete and move mutually exclusive per space, so neither can observe the other
+        // mid-flight. Folder writes are rare; serialising them per space costs nothing.
+        await sql`SELECT pg_advisory_xact_lock(hashtext('shared-space-album-folder-move'), hashtext(${spaceId}))`.execute(
+          trx,
+        );
+
         const folder = await trx
           .selectFrom('shared_space_album_folder')
           .select(['id', 'parentId'])
@@ -1599,10 +1612,11 @@ export class SharedSpaceRepository {
       });
   }
 
-  // Serialised per space by a transaction-scoped advisory lock. A row lock on the moved folder
-  // alone is NOT enough: in the mutual race (move X into Y while moving Y into X) the two
-  // transactions touch disjoint rows, both ancestor checks pass, and the result is a detached
-  // cycle. Folder moves are rare, so serialising them per space costs nothing.
+  // Serialised per space by a transaction-scoped advisory lock, shared with
+  // deleteAlbumFolderPromotingChildren so no move can interleave with a promote. A row lock on
+  // the moved folder alone is NOT enough: in the mutual race (move X into Y while moving Y into
+  // X) the two transactions touch disjoint rows, both ancestor checks pass, and the result is a
+  // detached cycle. Folder moves are rare, so serialising them per space costs nothing.
   //
   // Two-argument hashtext form: the single-arg pg_advisory_xact_lock(hashtext(id)) shares one
   // cluster-wide keyspace with DatabaseRepository.withLock's pg_advisory_lock(DatabaseLock.X) and

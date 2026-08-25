@@ -965,6 +965,80 @@ describe('SharedSpaceRepository — album folder moves', () => {
     releaseLock();
     await holder;
   });
+
+  // A delete is a structural rewrite of the tree just like a move, so it takes the SAME per-space
+  // lock. Without it, moving X into F while F is being deleted races the promote: F's
+  // self-referencing CASCADE would delete X and its whole subtree instead of promoting it one
+  // level, and in the orderings where the foreign-key check blocks instead, the move dies with a
+  // raw 23503. Holding the move lock must therefore hold the delete too.
+  it('C-03 mechanism: a held move lock on the same space blocks a concurrent delete until released', async () => {
+    const { ctx, sut } = setup();
+    const { user, space } = await seed(ctx);
+    const trips = await sut.createAlbumFolder({
+      spaceId: space.id,
+      parentId: null,
+      name: 'Trips',
+      createdById: user.id,
+    });
+
+    const { promise: releaseSignal, resolve: releaseLock } = Promise.withResolvers<void>();
+    const { promise: lockAcquiredSignal, resolve: lockAcquired } = Promise.withResolvers<void>();
+
+    const holder = ctx.database.transaction().execute(async (trx) => {
+      await sql`SELECT pg_advisory_xact_lock(hashtext('shared-space-album-folder-move'), hashtext(${space.id}))`.execute(
+        trx,
+      );
+      lockAcquired();
+      await releaseSignal;
+    });
+
+    await lockAcquiredSignal;
+
+    const deletePromise = sut.deleteAlbumFolderPromotingChildren(space.id, trips.id);
+
+    const raceResult = await Promise.race([
+      deletePromise.then(() => 'resolved' as const),
+      new Promise<'pending'>((resolve) => setTimeout(() => resolve('pending'), 300)),
+    ]);
+    expect(raceResult).toBe('pending');
+
+    releaseLock();
+    await holder;
+
+    await expect(deletePromise).resolves.toEqual({ outcome: 'ok' });
+  });
+
+  // Negative control, mirroring the move's: the delete's lock must be scoped per space too, so a
+  // test proving only "some lock exists" cannot pass with the space id dropped from the key.
+  it('C-03 mechanism: a held move lock on a different space does not block the delete', async () => {
+    const { ctx, sut } = setup();
+    const { user, space } = await seed(ctx);
+    const { space: otherSpace } = await ctx.newSharedSpace({ createdById: user.id });
+    const trips = await sut.createAlbumFolder({
+      spaceId: space.id,
+      parentId: null,
+      name: 'Trips',
+      createdById: user.id,
+    });
+
+    const { promise: releaseSignal, resolve: releaseLock } = Promise.withResolvers<void>();
+    const { promise: lockAcquiredSignal, resolve: lockAcquired } = Promise.withResolvers<void>();
+
+    const holder = ctx.database.transaction().execute(async (trx) => {
+      await sql`SELECT pg_advisory_xact_lock(hashtext('shared-space-album-folder-move'), hashtext(${otherSpace.id}))`.execute(
+        trx,
+      );
+      lockAcquired();
+      await releaseSignal;
+    });
+
+    await lockAcquiredSignal;
+
+    await expect(sut.deleteAlbumFolderPromotingChildren(space.id, trips.id)).resolves.toEqual({ outcome: 'ok' });
+
+    releaseLock();
+    await holder;
+  });
 });
 
 describe('album placement lifecycle', () => {
@@ -1045,6 +1119,10 @@ describe('album placement lifecycle', () => {
   // C-03(b): the opposite order — delete the folder FIRST, then try to place the link there. The
   // folder id no longer exists, so the UPDATE trips shared_space_album_folderId_fkey and must
   // reject with a foreign-key violation (23503), not silently write a dangling folderId.
+  // The repository deliberately does NOT soften this: a foreign-key violation is the honest
+  // report that the folder is gone. SharedSpaceService.withAlbumFolderConstraintsMapped is what
+  // turns it into the 400 the design's C-03 row promises, keyed on this exact constraint name —
+  // so this test is also what pins the name that mapping matches on.
   it('C-03b: setAlbumLinkFolder rejects with a foreign-key error when the folder was already deleted', async () => {
     const { ctx, sut } = setup();
     const { user, space } = await seed(ctx);
@@ -1059,6 +1137,19 @@ describe('album placement lifecycle', () => {
 
     await expect(sut.deleteAlbumFolderPromotingChildren(space.id, folder.id)).resolves.toEqual({ outcome: 'ok' });
 
-    await expect(sut.setAlbumLinkFolder(space.id, album.id, folder.id)).rejects.toMatchObject({ code: '23503' });
+    await expect(sut.setAlbumLinkFolder(space.id, album.id, folder.id)).rejects.toMatchObject({
+      code: '23503',
+      // Load-bearing on BOTH counts, and only observable here.
+      //
+      // The service maps on the CONSTRAINT, not the code alone, so that a concurrently-deleted
+      // ALBUM (a different foreign key on this same row) is never misreported as a missing
+      // folder. Rename the constraint and that mapping goes silent.
+      //
+      // And the FIELD NAME is `constraint_name`, not node-postgres's `constraint`: this server
+      // runs Kysely's postgres.js dialect, which spells it that way. A unit test that hand-rolls
+      // the error object cannot catch that — this assertion is the only thing standing between
+      // the mapping and being a no-op against a real database.
+      constraint_name: 'shared_space_album_folderId_fkey',
+    });
   });
 });
