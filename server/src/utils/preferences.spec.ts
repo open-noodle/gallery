@@ -15,7 +15,7 @@ const getDefaultPreferences = (): UserPreferences => ({
   memories: {
     enabled: true,
     duration: 5,
-    sidebarWeb: false,
+    sidebarWeb: true,
     types: {
       on_this_day: true,
       birthday: true,
@@ -72,6 +72,13 @@ describe('getPreferences', () => {
   it('should return default preferences when metadata is empty', () => {
     const result = getPreferences([]);
     expect(result).toEqual(getDefaultPreferences());
+  });
+
+  it('defaults the memories sidebar link to on, unlike upstream', () => {
+    // Upstream defaults memories.sidebarWeb to false. The fork's memories link has been
+    // live on `enabled` alone since #455, so taking upstream's default would remove it for
+    // every existing user. Nothing else in CI detects that.
+    expect(getPreferences([]).memories.sidebarWeb).toBe(true);
   });
 
   it('should return default preferences when no preferences metadata item exists', () => {
