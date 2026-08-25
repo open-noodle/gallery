@@ -573,6 +573,29 @@ describe(AssetService.name, () => {
       expect(result).toHaveProperty('people', []);
     });
 
+    // The explicit-spaceId branch must report the SAME `resolvedSpaceId` the inferred branch below
+    // does. It used to omit it, so a client re-reading an asset WITH the space id got a response
+    // whose resolved space had vanished -- and `canEditSpacePeople` falls back to that field when
+    // the route carries no space, so the People-row edit controls turned themselves off after a
+    // face edit on /photos/:id until the panel was closed and reopened.
+    it('should report resolvedSpaceId when the space is given explicitly', async () => {
+      const asset = AssetFactory.from()
+        .exif()
+        .face({}, (f) => f.person({ id: 'person-1', name: 'Test Person' }))
+        .build();
+      mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getById.mockResolvedValue(asset as any);
+      mocks.sharedSpace.getMember.mockResolvedValue({ userId: authStub.admin.user.id } as any);
+      mocks.access.asset.checkSpaceAccessForSpace.mockResolvedValue(new Set([asset.id]));
+      mocks.sharedSpace.findSpacePersonsByLinkedPersonIds.mockResolvedValue(
+        new Map([['person-1', { id: 'sp-1', isHidden: false }]]),
+      );
+
+      const result = await sut.get(authStub.admin, asset.id, 'space-1');
+
+      expect((result as any).resolvedSpaceId).toBe('space-1');
+    });
+
     it('should keep people for space member without spaceId (fallback)', async () => {
       const asset = AssetFactory.from()
         .exif()
