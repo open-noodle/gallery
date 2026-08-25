@@ -12,20 +12,22 @@ import { utils } from 'src/utils';
 // create-and-attach through the browser and then proves the result survives a page reload --
 // i.e. it came from the server, not from client-side state.
 //
-// What actually gets asserted for "the UI reflects the assignment" needs a footnote. The natural
-// first guess -- the newly-created person appearing as a chip in the asset's own People row
-// (DetailPanelPeople.svelte) -- was tried first and does NOT show it, even after a reload: that
-// component's non-owner branch reads `AssetResponseDto.people`, which server-side
-// (`findSpacePersonsByLinkedPersonIds`, shared-space.repository.ts:4091) only surfaces a space
-// person for a face that ALSO carries an owner-side `asset_face.personId` -- and every face this
-// UI can create (`SpaceFaceEditor`'s draw-and-attach, `CreateSpaceFaceModal`'s create-and-attach)
-// leaves that column NULL by design (§6.3.1: space assignment is a separate projection, deliberately
-// never written back onto the owner's own person model). So a space editor's own freshly-tagged
-// face never appears as a chip on the asset she just tagged, for herself or anyone else who isn't
-// the asset's owner -- confirmed against the running server, not assumed; see the finding recorded
-// alongside this spec's commit. That is a real, separate gap this spec does not paper over by
-// picking a different assertion silently -- it is called out here explicitly, and the two
-// surfaces below that DO correctly reflect the assignment are used instead:
+// What actually gets asserted for "the UI reflects the assignment" needs a footnote.
+//
+// HISTORICAL NOTE (the gap described here has since been CLOSED): the natural first assertion --
+// the newly-created person appearing as a chip in the asset's own People row
+// (DetailPanelPeople.svelte) -- used to fail even after a reload. That component's non-owner branch
+// reads `AssetResponseDto.people`, which server-side (`findSpacePersonsByLinkedPersonIds`,
+// shared-space.repository.ts) only surfaces a space person for a face that ALSO carries an
+// owner-side `asset_face.personId`, and space assignment deliberately left that column NULL under
+// the original §6.3.1 (space assignment as a separate projection, never written back onto the
+// owner's person model).
+//
+// §6.3.1 was later REVISED: a space-editor face edit now propagates into the owner's layer, writing
+// `asset_face.personId` on attach and clearing it on detach. So the People row does reflect the
+// assignment now, and its detach twin removes it. The two surfaces below remain the assertions this
+// spec uses -- they are independent of that read path and were never the weaker proof -- but they
+// are no longer a workaround for a known gap:
 //
 //   (3) re-opening "Tag People" in the SAME page session (no reload) re-fetches
 //       `GET /shared-spaces/:id/people` fresh, so the just-created person shows up as a selectable

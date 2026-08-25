@@ -952,7 +952,7 @@ export class FacePersonVerdictRepository {
   }
 
   /**
-   * §6.3.1: the face's own `personId`, plus — when it is set — that OWNER `person`'s
+   * §6.3.1: the face's own `personGroupId`, plus — when it is set — that OWNER `person`'s
    * `identityId`. This is the pair `attachFaceToSpacePerson` needs to decide whether the face
    * already belongs to one of the owner's own people, and if so, whether that person's identity
    * already matches the space person being attached to (row 2) or differs (row 3, where the
@@ -970,12 +970,16 @@ export class FacePersonVerdictRepository {
   async getFaceOwnerLink(
     assetFaceId: string,
     db: Kysely<DB> | Transaction<DB> = this.db,
-  ): Promise<{ personId: string | null; identityId: string | null; assetOwnerId: string } | undefined> {
+  ): Promise<{ personGroupId: string | null; identityId: string | null; assetOwnerId: string } | undefined> {
     return db
       .selectFrom('asset_face')
       .innerJoin('asset', 'asset.id', 'asset_face.assetId')
-      .leftJoin('person', 'person.id', 'asset_face.personId')
-      .select(['asset_face.personId as personId', 'person.identityId as identityId', 'asset.ownerId as assetOwnerId'])
+      .leftJoin('person', 'person.personGroupId', 'asset_face.personGroupId')
+      .select([
+        'asset_face.personGroupId as personGroupId',
+        'person.identityId as identityId',
+        'asset.ownerId as assetOwnerId',
+      ])
       .where('asset_face.id', '=', assetFaceId)
       .executeTakeFirst();
   }
