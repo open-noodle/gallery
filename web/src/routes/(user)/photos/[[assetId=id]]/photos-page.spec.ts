@@ -33,6 +33,8 @@ const {
   },
   mockMemoryManager: {
     memories: [] as unknown[],
+    // The page scopes the timeline lane to today via upstream's manager filters (immich-28675).
+    setFilters: vi.fn(),
   },
   mockRegisterSelectionContext: vi.fn(),
   mockRegisterSearchablePageFilters: vi.fn(() => vi.fn()),
