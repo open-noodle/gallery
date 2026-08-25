@@ -50,6 +50,7 @@ export const setupBaseMockApiRoutes = async (context: BrowserContext, adminUserI
         memories: {
           enabled: true,
           duration: 5,
+          sidebarWeb: true,
         },
         people: {
           enabled: true,
