@@ -102,14 +102,25 @@ now returns upcoming memories — an explicit decision, not a side effect.
 
 **2. Upstream's `search()` gained `id`, a `page` offset and `showAt` ordering; the fork's
 `searchAccessible` — which actually serves `/memories` — got none of them.** Two silent
-consequences: pagination returned page 1 forever (capping the visible list at upstream's
-default page size, roughly 250 total), and `loadMemory(id)` on a deep link opened an
-**arbitrary** memory rather than the one the link named, because `id` was never applied as a
+consequences: `page` was never applied as an offset, and `loadMemory(id)` on a deep link opened
+an **arbitrary** memory rather than the one the link named, because `id` was never applied as a
 filter. Ported all three (`id` filter, `page`/`size` offset, `showAt`-then-`memoryAt`
 ordering) into `searchAccessible`, matched clause-for-clause against upstream's own `search()`
 rather than a hardcoded string, and verified `statisticsAccessible` shares the same builder so
 `#total` and the list agree (this also closes the pagination spin risk, since `#hasNextPage`
 can now actually go false).
+
+**Correction (final fix wave):** an earlier draft of this section said the missing offset made
+pagination "return page 1 forever, capping the visible list at roughly 250". That rationale was
+wrong, though the fix is not. On `/memories` the served request was **unpaginated**, not capped:
+`MemoryManager` seeds `#filters` with `{ size: 250, order }`, but `applyPreferences()` calls
+`setFilters()` with a **freshly constructed** object (`{ order, isSaved?, isUpcoming? }`) that
+replaces `#filters` wholesale and drops `size`. The server applies `LIMIT` only under
+`dto.size !== undefined` and `OFFSET` only under `page && size`, so with `size` gone every call
+returned the whole result set in one response and page 1 was all there ever was. The user-visible
+symptom was therefore an over-large single response, not a 250-item cap. The `id`/`page`/`size`/
+ordering port is still required — it is what makes a `size`-carrying caller (the mobile list,
+and `/memories` before any preference is applied) page correctly at all.
 
 ## Standing divergences created or confirmed this cycle
 
@@ -144,9 +155,19 @@ These must survive future rebases — none of them is caught by any existing gat
 
 - The memories index loses **search** and **month grouping**. Upstream's `onlyFavorites`
   filter subsumes the fork's all/saved tabs (and does it better — server-side, URL-persisted
-  into the viewer), and rule-aware titles/subtitles survive for free since upstream's page
-  already calls into the fork's `getMemoryTitle`. Search and month grouping have no upstream
+  into the viewer), and rule-aware **titles** survive for free since upstream's page already
+  calls into the fork's `getMemoryTitle`. Search and month grouping have no upstream
   equivalent and are accepted as lost; reversible if rule volume later demands them back.
+
+  **Correction (final fix wave):** rule-aware **subtitles** did *not* survive for free, contrary
+  to design decision D5 as originally written. Nothing on upstream's page or viewer imports
+  `getMemorySubtitle`; its only caller was the deleted `memory-index-utils.ts`. Left as adopted,
+  a recent-trip memory would have lost its `"12 photos over 3 days"` line, `getMemorySubtitle`
+  would have been dead code with unreachable tests, and `recent_trip_subtitle` would have been
+  orphaned in all ten locales. **Fixed rather than accepted:** the subtitle is rendered on
+  upstream's card as a small fork delta (a bottom-anchored wrapper plus a conditional second
+  `<p>`), guarded by `web/src/routes/(user)/memories/memories-page.spec.ts`. D5 in the design doc
+  has been corrected to match.
 - The memory **viewer now always exits to `/memories`** instead of returning to `/photos` when
   it was opened from the timeline lane. Upstream's viewer exits unconditionally to
   `memoryManager.memoriesHref`; the fork's source-aware exit route and its helper
@@ -154,17 +175,40 @@ These must survive future rebases — none of them is caught by any existing gat
 - A bookmarked `/memory?id=…` deep link now **lands on the memories index rather than the
   original photo** — upstream's redirect shim sends it to `Route.memories()` and drops the
   asset. Accepted alongside the two regressions above.
+- The **`/explore` memories strip now surfaces not-yet-shown memories**, with no "Upcoming"
+  affordance to explain them. `web/src/routes/(user)/explore/+page.ts:9` sends neither `for` nor
+  `isUpcoming`, and Critical 1 of this cycle changed exactly that combination: the fork's `#486`
+  hide-unshown default moved off the DTO and onto the caller, so `accessibleSearchBuilder` now
+  passes `hideUnshownByDefault: false` and an omitted `isUpcoming` no longer implies "hide".
+  `/memories` handles this — it splits upcoming into its own labelled section and offers a
+  `showUpcoming` toggle — but `/explore` renders one flat strip and does neither. **Documented,
+  not changed:** the alternatives (pinning `isUpcoming: false` on `/explore`, or restoring the
+  DTO-level default) each re-introduce the ambiguity Critical 1 removed, and the strip is a
+  browsing surface where a few days of lookahead is not harmful. Revisit if it confuses users.
+
+## Final fix wave (post-review, same cycle)
+
+A whole-branch review plus two red CI jobs produced one more pass. Everything below is in the
+branch; the three doc corrections above came from the same wave.
+
+| Finding | Disposition |
+| --- | --- |
+| `//web:format` red — `MemoryViewer.spec.ts` unformatted | Ran prettier; `npx prettier --check .` clean across the `web` package. |
+| `Upstream Rebase Tooling` red — 2 assertions in `tools/upstream-preflight/src/branded-spinner.spec.ts` | **Real fork-branding regression.** `routes/(user)/memories/+page.svelte` is member 25 of the fork's 25-file branded-spinner swapped set; adopting upstream's file byte-identically reverted the swap and shipped `@immich/ui`'s generic spinner instead of the Gallery-branded `$lib/components/shared-components/LoadingSpinner.svelte` (`/gallery-loader.svg`). Re-applied the swap in the sibling pattern used by `routes/(user)/utilities/geolocation/+page.svelte`; both assertions pass. This is exactly the class of loss the preflight guard exists to catch — it worked. |
+| Memory viewer lost `enableGrouping` (fork feature #625) | Re-applied on upstream's `GalleryViewer` call site. The prop still exists and is still honoured (`GalleryViewer.svelte:60/93/103/508`), so this was a genuine silent loss, not an obsolete prop. Guarded by a new `MemoryViewer.spec.ts` case asserting the stub's `data-enable-grouping`; proven load-bearing by removing the prop and watching it fail. |
+| `getMemorySubtitle` dead code / D5 wrong | Rendered the subtitle on upstream's card (route (a), not deletion) — see the corrected regression bullet above and D5 in the design doc. New `memories-page.spec.ts` (3 cases), red without the delta. |
+| Mobile list truncated after a filtered page | **Real bug.** `MemoryApiRepository.getAllMemories` stopped on `batch.length < pageSize`, but the server applies `LIMIT`/`OFFSET` in SQL and only *then* drops memories of a viewer-disabled type and memories left with no viewable assets (`memory.service.ts` `search`). Any user who turned one memory type off got a short page 1 and the list stopped there, hiding everything behind it. Fixed by keying the stop on `GET /memories/statistics`, whose `statisticsAccessible` counts through the **same** `accessibleSearchBuilder` predicates *without* the `LIMIT` — the only signal that reflects what the server actually paged over. Web's `memory-manager.svelte.ts` stops the same way. A statistics failure degrades to an empty-page stop (never back to the post-filter length) rather than failing the call into the offline fallback. `maxPages = 50` backstop kept. Test `keeps paging past a page the server filtered short` fails against the old condition (3 memories instead of 53) and passes now. |
 
 ## Fork Feature Verification
 
 | Feature                                                   | Status                       | Notes                                                                                                                                                                            |
 | --------------------------------------------------------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Memory rule engine (11 rule types, server)                | OK                           | Untouched — `memory.service.ts` and every `*.rule.ts` file carry no delta from this cycle                                                                                        |
+| Memory rule engine (11 rule types, server)                | OK                           | Untouched — `memory.service.ts` and every `*.rule.ts` file carry no delta from this cycle. Its rule-aware **subtitles** were unreachable on web until the final fix wave restored the card rendering |
 | Memories admin settings (system-wide)                     | OK                           | `MemoriesSettings.spec.ts` (212 lines) confirmed still green, not assumed                                                                                                        |
 | Memories per-user settings (`FeatureSettings`)            | OK                           | Four-key merge verified in all five source-of-truth files; guarded by a new exact-match test                                                                                     |
-| Memories web index + viewer                               | OK (converged onto upstream) | See product-direction gate; #791 regression assertions ported onto upstream's viewer, proven load-bearing by temporarily reintroducing the bug they guard and watching them fail |
+| Memories web index + viewer                               | OK (converged onto upstream) | See product-direction gate; #791 regression assertions ported onto upstream's viewer, proven load-bearing by temporarily reintroducing the bug they guard and watching them fail. Two fork deltas were **lost and restored in the final fix wave**: the branded `LoadingSpinner` on the index and `enableGrouping` (#625) on the viewer — both now test-guarded |
 | Memory lane (mobile, #997)                                | OK                           | `getMemoryLane` untouched — still hard-scoped to `for=<today>`, unaffected by this cycle                                                                                         |
-| Memories list (mobile, new this cycle)                    | OK                           | Server-sourced with local-Drift fallback; 32/32 tests on the four touched specs                                                                                                  |
+| Memories list (mobile, new this cycle)                    | OK (fixed in final wave)     | Server-sourced with local-Drift fallback. The final wave fixed a real truncation: the page-exhaustion condition trusted the post-filter page length. See the final fix wave table; `memory_api_repository_test.dart` 20/20                                       |
 | Shared Spaces, Storage Migration, Pet Detection, Branding | OK                           | No conflicts touched these; verified no regression in local gate run                                                                                                             |
 
 ## Preferences merge detail
