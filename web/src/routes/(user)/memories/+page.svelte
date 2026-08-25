@@ -1,15 +1,16 @@
 <script lang="ts">
+  import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
   import UserPageLayout from '$lib/components/layouts/UserPageLayout.svelte';
   import { memoryManager } from '$lib/managers/memory-manager.svelte';
   import { userPreferencesManager } from '$lib/managers/user-preferences-manager.svelte';
   import MemoriesSettingsModal from '$lib/modals/MemoriesSettingsModal.svelte';
   import { Route } from '$lib/route';
   import { locale } from '$lib/stores/preferences.store';
-  import { getAssetMediaUrl, memoryLaneTitle } from '$lib/utils';
+  import { getAssetMediaUrl, getMemorySubtitle, memoryLaneTitle } from '$lib/utils';
   import { getAltText } from '$lib/utils/thumbnail-util';
   import { toTimelineAsset } from '$lib/utils/timeline-util';
   import type { MemoryResponseDto } from '@immich/sdk';
-  import { Icon, IconButton, LoadingSpinner, modalManager, type CarouselImageItem } from '@immich/ui';
+  import { Icon, IconButton, modalManager, type CarouselImageItem } from '@immich/ui';
   import { mdiHeart, mdiTune } from '@mdi/js';
   import { t } from 'svelte-i18n';
   import type { PageData } from './$types';
@@ -37,7 +38,7 @@
   };
 </script>
 
-{#snippet card(item: CarouselImageItem & { isSaved?: boolean })}
+{#snippet card(item: CarouselImageItem & { isSaved?: boolean; subtitle?: string })}
   <a
     class="item-card relative me-2 inline-block aspect-3/4 size-full overflow-hidden rounded-xl last:me-0 max-md:h-37.5 md:me-4 md:aspect-4/3 xl:aspect-video"
     href={item.href}
@@ -51,9 +52,18 @@
     <div
       class="absolute inset-s-0 top-0 size-full w-full rounded-xl bg-linear-to-t from-black/40 via-transparent to-transparent transition-all hover:bg-black/20"
     ></div>
-    <p class="absolute inset-s-4 bottom-2 text-lg text-white max-md:text-sm">
-      {item.title}
-    </p>
+    <div class="absolute inset-s-4 bottom-2 inset-e-4">
+      <p class="text-lg text-white max-md:text-sm">
+        {item.title}
+      </p>
+      <!-- Fork delta: the rule engine emits rule-aware subtitles (e.g. recent-trip's
+           "12 photos over 3 days"); upstream's card renders the title only. -->
+      {#if item.subtitle}
+        <p class="text-sm text-white/80 max-md:text-xs">
+          {item.subtitle}
+        </p>
+      {/if}
+    </div>
   </a>
 {/snippet}
 
@@ -85,6 +95,7 @@
         {/if}
         {@render card({
           title: $memoryLaneTitle(memory),
+          subtitle: getMemorySubtitle(memory, $t),
           href: Route.viewMemory({
             id: memory.id,
             assetId: memory.assets[0].id,
