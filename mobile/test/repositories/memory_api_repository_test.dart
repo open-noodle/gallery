@@ -239,69 +239,142 @@ void main() {
   });
 
   group('getAllMemories', () {
-    // stubMemories replies with one fixed body, so pagination needs stubResponse: the stub
-    // runs per request and requestedUris is appended before it is called, so the closure can
-    // read the page it is answering.
-    test('pages until a short page and returns every memory', () async {
+    // stubMemories replies with one fixed body, so pagination needs stubResponse: the stub runs
+    // per request and requestedUris is appended before it is called, so the closure can read the
+    // request it is answering.
+
+    /// Serves `/memories/statistics` with [total] (404 when it is null) and `/memories` with
+    /// whatever [page] yields for the requested page number.
+    void stubPagedMemories({required int? total, required List<api.MemoryResponseDto> Function(int page) page}) {
       stubResponse(() {
-        final page = requestedUris.last.queryParameters['page'];
-        final memories = page == '1'
-            ? List.generate(100, (i) => memoryDto('page1-$i', assets: [assetDto('a$i')]))
-            : [memoryDto('page2-0', assets: [assetDto('b0')])];
-        return jsonResponse(jsonEncode(memories.map((memory) => memory.toJson()).toList()));
+        final uri = requestedUris.last;
+        if (uri.path.endsWith('/memories/statistics')) {
+          return total == null
+              ? jsonResponse('{"message":"not found"}', status: 404)
+              : jsonResponse(jsonEncode({'total': total}));
+        }
+        final pageNumber = int.parse(uri.queryParameters['page']!);
+        return jsonResponse(jsonEncode(page(pageNumber).map((memory) => memory.toJson()).toList()));
       });
+    }
+
+    /// The `page` values of the `/memories` requests only — statistics has no `page`.
+    List<String> requestedPages() => requestedUris
+        .where((uri) => !uri.path.endsWith('/memories/statistics'))
+        .map((uri) => uri.queryParameters['page']!)
+        .toList();
+
+    // The regression this group exists for. The server LIMITs in SQL and only THEN drops
+    // memories of a type the viewer disabled (`memory.service.ts` search), so page 1 arrives
+    // short with 147 rows still behind it. Stopping on `batch.length < pageSize` swallowed all
+    // of them; the statistics total is the signal that survives the filtering.
+    test('keeps paging past a page the server filtered short', () async {
+      stubPagedMemories(
+        total: 150,
+        page: (page) => switch (page) {
+          1 => List.generate(3, (i) => memoryDto('page1-$i', assets: [assetDto('a$i')])),
+          2 => List.generate(50, (i) => memoryDto('page2-$i', assets: [assetDto('b$i')])),
+          _ => const [],
+        },
+      );
+
+      final result = await sut.getAllMemories();
+
+      expect(result, hasLength(53));
+      expect(requestedPages(), ['1', '2']);
+    });
+
+    test('pages until the statistics total is covered and returns every memory', () async {
+      stubPagedMemories(
+        total: 101,
+        page: (page) => page == 1
+            ? List.generate(100, (i) => memoryDto('page1-$i', assets: [assetDto('a$i')]))
+            : [
+                memoryDto('page2-0', assets: [assetDto('b0')]),
+              ],
+      );
 
       final result = await sut.getAllMemories();
 
       expect(result, hasLength(101));
-      expect(requestedUris.map((uri) => uri.queryParameters['page']), ['1', '2']);
+      expect(requestedPages(), ['1', '2']);
     });
 
-    test('sends isSaved only when onlyFavorites is set', () async {
-      stubMemories([]);
+    test('stops as soon as the total is covered, without a probing extra page', () async {
+      stubPagedMemories(
+        total: 100,
+        page: (page) => List.generate(100, (i) => memoryDto('page$page-$i', assets: [assetDto('a$page-$i')])),
+      );
+
+      await sut.getAllMemories();
+
+      expect(requestedPages(), ['1']);
+    });
+
+    test('falls back to an empty page when statistics are unavailable', () async {
+      // No total (old server / transient failure) must still not resurrect the short-page stop:
+      // page 1 is short for the same filtering reason and page 2 still has rows.
+      stubPagedMemories(
+        total: null,
+        page: (page) => switch (page) {
+          1 => List.generate(3, (i) => memoryDto('page1-$i', assets: [assetDto('a$i')])),
+          2 => List.generate(50, (i) => memoryDto('page2-$i', assets: [assetDto('b$i')])),
+          _ => const [],
+        },
+      );
+
+      final result = await sut.getAllMemories();
+
+      expect(result, hasLength(53));
+      expect(requestedPages(), ['1', '2', '3']);
+    });
+
+    test('sends isSaved only when onlyFavorites is set, on both the count and the pages', () async {
+      stubPagedMemories(total: 0, page: (_) => const []);
       await sut.getAllMemories(onlyFavorites: true);
-      expect(requestedUris.last.queryParameters, containsPair('isSaved', 'true'));
+      for (final uri in requestedUris) {
+        expect(uri.queryParameters, containsPair('isSaved', 'true'), reason: '$uri');
+      }
 
       requestedUris.clear();
-      stubMemories([]);
+      stubPagedMemories(total: 0, page: (_) => const []);
       await sut.getAllMemories();
-      expect(requestedUris.last.queryParameters.containsKey('isSaved'), isFalse);
+      for (final uri in requestedUris) {
+        expect(uri.queryParameters.containsKey('isSaved'), isFalse, reason: '$uri');
+      }
     });
 
     test('omits `for` but pins isUpcoming=false, so the list is neither day-scoped nor upcoming', () async {
-      stubMemories([]);
+      stubPagedMemories(total: 0, page: (_) => const []);
       await sut.getAllMemories();
 
-      final params = requestedUris.last.queryParameters;
-      expect(params.containsKey('for'), isFalse);
-      // Task 2 moved the fork's #486 hide-unshown default off this endpoint, so omitting the
-      // flag would now pull in not-yet-shown memories. The mobile list has no upcoming section.
-      expect(params['isUpcoming'], 'false');
+      expect(requestedUris, isNotEmpty);
+      for (final uri in requestedUris) {
+        expect(uri.queryParameters.containsKey('for'), isFalse, reason: '$uri');
+        // Task 2 moved the fork's #486 hide-unshown default off this endpoint, so omitting the
+        // flag would now pull in not-yet-shown memories. The mobile list has no upcoming section.
+        expect(uri.queryParameters['isUpcoming'], 'false', reason: '$uri');
+      }
     });
 
     test('drops memories the viewer can see no assets in', () async {
       // The list renders assets[0], exactly as the lane card does, so it needs the same
       // guarantee: memoryDto defaults assets to const [].
-      stubMemories([memoryDto('assetless')]);
+      stubPagedMemories(total: 1, page: (_) => [memoryDto('assetless')]);
 
       expect(await sut.getAllMemories(), isEmpty);
     });
 
     test('stops at the page cap when the server ignores `page`', () async {
       // A server that returns a full page forever would otherwise spin here indefinitely.
-      stubResponse(
-        () => jsonResponse(
-          jsonEncode(
-            List.generate(100, (i) => memoryDto('m$i', assets: [assetDto('a$i')]))
-                .map((memory) => memory.toJson())
-                .toList(),
-          ),
-        ),
+      stubPagedMemories(
+        total: 1000000,
+        page: (page) => List.generate(100, (i) => memoryDto('m$page-$i', assets: [assetDto('a$page-$i')])),
       );
 
       await sut.getAllMemories();
 
-      expect(requestedUris.length, lessThanOrEqualTo(50));
+      expect(requestedPages(), hasLength(50));
     });
   });
 }

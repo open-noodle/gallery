@@ -97,17 +97,71 @@ class MemoryApiRepository extends ApiRepository {
     const maxPages = 50;
     final dtos = <MemoryResponseDto>[];
 
+    // How many rows the server's paged query MATCHES, before it filters the page it just read.
+    //
+    // `GET /memories` applies LIMIT/OFFSET in SQL and only afterwards drops memories whose type
+    // the viewer disabled in settings, and memories left with no viewable assets (server
+    // `memory.service.ts` `search`). A page can therefore come back short -- or even entirely
+    // empty -- with more rows still behind it, so the post-filter `batch.length` says nothing
+    // about whether the server is exhausted. Keying the stop on it silently truncated the list
+    // for any user who turned a single memory type off.
+    //
+    // `GET /memories/statistics` counts through the same predicates without the LIMIT, so it is
+    // the one end-of-results signal that keys on what the server actually paged over. Web's
+    // `memory-manager.svelte.ts` stops the same way.
+    final total = await _searchMemoriesTotal(onlyFavorites: onlyFavorites);
+
     for (var page = 1; page <= maxPages; page++) {
       final batch = await _searchMemoriesPage(page: page, size: pageSize, onlyFavorites: onlyFavorites);
       dtos.addAll(batch);
-      // A short page means the server has nothing left; this is also the stop condition when
-      // the very first page comes back empty.
-      if (batch.length < pageSize) {
+
+      if (total == null) {
+        // Statistics unavailable (older server, transient failure). Fall back to the weakest
+        // still-safe signal -- an empty page -- rather than to `batch.length < pageSize`, which
+        // is the post-filter length this whole fix exists to stop trusting.
+        if (batch.isEmpty) {
+          break;
+        }
+      } else if (page * pageSize >= total) {
         break;
       }
     }
 
     return dtos.map(_toDriftMemory).where((memory) => memory.assets.isNotEmpty).toList(growable: false);
+  }
+
+  /// Total rows `GET /memories` matches under the same filters, before its post-LIMIT filtering.
+  ///
+  /// Returns `null` rather than throwing when the endpoint is unavailable: a missing count only
+  /// degrades [getAllMemories]'s stop condition, and failing the whole call would drop the list
+  /// to the offline local-Drift fallback over a count the list can do without.
+  Future<int?> _searchMemoriesTotal({required bool onlyFavorites}) async {
+    try {
+      final response = await _apiService.apiClient.invokeAPI(
+        '/memories/statistics',
+        'GET',
+        [const QueryParam('isUpcoming', 'false'), if (onlyFavorites) const QueryParam('isSaved', 'true')],
+        null,
+        <String, String>{},
+        <String, String>{},
+        null,
+      );
+
+      if (response.statusCode >= 400) {
+        return null;
+      }
+
+      final body = response.bodyBytes.isEmpty ? '' : utf8.decode(response.bodyBytes);
+      if (body.isEmpty) {
+        return null;
+      }
+
+      final decoded = await _apiService.apiClient.deserializeAsync(body, 'MemoryStatisticsResponseDto');
+      return (decoded as MemoryStatisticsResponseDto?)?.total;
+    } catch (error) {
+      debugPrint('Failed to read memories statistics, falling back to empty-page pagination: $error');
+      return null;
+    }
   }
 
   /// One page of `GET /memories?page=&size=`.
