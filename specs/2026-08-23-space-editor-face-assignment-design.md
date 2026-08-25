@@ -297,8 +297,32 @@ layer now disagrees with the person layer for that face, and `applyResolvedPerso
 (`asset.service.ts:180`) resolves Bob's _own_ view of names and birthdays through exactly that
 identity.
 
-**Decision: the attach is allowed — an editor may override the owner's naming _within the space_ —
-but it must not rewrite the identity.**
+> **REVISED 2026-08-25 — the insulated model below was dropped.** The original decision kept a space
+> editor's face edits inside `shared_space_person_face` and never touched `asset_face.personId`. In
+> practice that produced a surface users read as simply broken: the asset-detail People row is seeded
+> from `asset_face.personId`, so an editor's assignment never appeared there, and — worse — an
+> editor's _detach_ never removed anyone, because the space-person lookup
+> (`findSpacePersonsByLinkedPersonIds`) is not scoped to the asset and keeps resolving a person who
+> is attached anywhere else in the space. That state could not converge on reload.
+>
+> **Current decision: a space-editor face edit propagates into the owner's layer.** Attach writes the
+> face's identity AND `asset_face.personId`, creating a `person` for the asset owner when they have
+> never named that human themselves (so an editor naming a face can add a person to the owner's
+> People page). Detach clears `asset_face.personId` — but only when the owner's person carries the
+> _same_ identity as the space person being detached, so an editor removing "Uncle Tom" can never
+> null out the owner's unrelated "Dad" tag on that face.
+>
+> Both owner-side layers move together deliberately: propagating `personId` while pinning the
+> identity would leave the owner's own person row and `face_identity_face` disagreeing about one
+> face, which is the inconsistency the original text below was written to avoid.
+>
+> Consequence: the privacy guarantee in the paragraph below no longer holds — an editor CAN alter
+> face tags on the owner's own copy of a photo shared into the space. That is intended. Scope is
+> still bounded to assets actually shared into the space; an editor cannot reach anything else.
+> F-36 now asserts the propagation rather than the insulation.
+
+**Superseded decision (kept for context): the attach is allowed — an editor may override the owner's
+naming _within the space_ — but it must not rewrite the identity.**
 
 The two goals look opposed and are not, because **space people are read through the direct projection,
 not the identity layer**: every space-person read joins `shared_space_person_face`
