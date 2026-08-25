@@ -23,7 +23,8 @@ const double _kTileSize = 112.0;
 const double _kTileRadius = 16.0;
 
 /// Albums shelf rendered as a horizontal scroll strip at the top of the space
-/// timeline. Three visibility cases (§10.3 B2 / mobile design §Surface 1):
+/// timeline. Three visibility cases (layout: "Surfaces > 1 — The Albums shelf"
+/// in `specs/2026-06-15-space-albums-phase2-mobile-design.md`):
 ///
 ///  1. [albums] not empty → cover tiles + (if [canEdit]) trailing Link tile.
 ///  2. [albums] empty && [canEdit] → slim shelf with only the Link tile.
@@ -36,12 +37,11 @@ const double _kTileRadius = 16.0;
 /// synced, a [Icons.photo_album_outlined] fallback on [surfaceContainerHighest]
 /// is shown (reuses the album_tile.dart D4 pattern without FutureBuilder since
 /// the shelf has no assetService access — a null thumbnailAssetId is enough to
-/// trigger the fallback unconditionally; B4 can wire real thumbnail loads if
-/// needed).
+/// trigger the fallback unconditionally).
 ///
-/// Callbacks [onLinkTap] and [onAlbumTap] are **no-op stubs in B2** — B4 wires
-/// album-tap navigation and B5 wires the link picker.
-/// [onSeeAll] is wired in B3 to push [SpaceAlbumsRoute].
+/// [onLinkTap], [onAlbumTap] and [onSeeAll] are all supplied by the caller —
+/// [SpaceDetailPage] passes the link picker, album navigation and the push to
+/// [SpaceAlbumsRoute] respectively. The shelf itself navigates nowhere.
 ///
 /// Album order comes from the same persisted [AppConfig.spaceAlbums] the "See
 /// all" page ([SpaceAlbumsPage]) writes, so the sort a user picks there is the
@@ -64,7 +64,7 @@ class SpaceAlbumsShelf extends ConsumerWidget {
   final void Function(String albumId) onAlbumTap;
 
   /// Called when the "See all ▸" header tap is fired. If null, the "See all"
-  /// text is non-tappable (visual only). B3 wires this to push [SpaceAlbumsRoute].
+  /// text is non-tappable (visual only).
   final VoidCallback? onSeeAll;
 
   @override

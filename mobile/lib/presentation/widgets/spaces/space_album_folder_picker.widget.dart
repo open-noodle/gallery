@@ -8,7 +8,7 @@ import 'package:immich_mobile/utils/space_album_folders.dart';
 /// folder's own ⋮ menu, an album's ⋮ menu, and (on mobile) nothing else --
 /// there is no drag-and-drop equivalent of the web modal.
 ///
-/// Renders [buildFolderTree]'s output (Task 6) as an indented flat list, each
+/// Renders [buildFolderTree]'s output as an indented flat list, each
 /// row keyed `folder-option-<id>`, plus a root row keyed `folder-option-root`
 /// representing the space's top level (a `null` folder id). A row is
 /// selected and dismissed in one tap -- unlike the web `FormModal`, which
@@ -17,8 +17,9 @@ import 'package:immich_mobile/utils/space_album_folders.dart';
 ///
 /// When [excludeFolderId] is set (moving a FOLDER), that folder and every
 /// folder beneath it are disabled: offering them would guarantee a server
-/// 400, since a folder can never become its own descendant. Uses the Task 6
-/// [isDescendant] guard rather than reimplementing the walk (U-07). When
+/// 400, since a folder can never become its own descendant. Uses the shared
+/// [isDescendant] guard from `utils/space_album_folders.dart` rather than
+/// reimplementing the walk (U-07). When
 /// [excludeFolderId] is null (moving an ALBUM), nothing is excluded -- an
 /// album has no subtree, so every folder stays selectable (U-08).
 ///
@@ -92,8 +93,8 @@ class SpaceAlbumFolderPickerSheet extends StatelessWidget {
   }
 
   /// Depth-first flatten of `buildFolderTree`'s output into (folder, depth)
-  /// rows for a plain indented `ListView` -- the tree is already built by
-  /// Task 6; this only walks the resulting `.children`, never `parentId`.
+  /// rows for a plain indented `ListView` -- the tree is already built and
+  /// cycle-safe, so this only walks the resulting `.children`, never `parentId`.
   List<({SpaceAlbumFolder folder, int depth})> _flatten(List<FolderNode> nodes, [int depth = 0]) => [
     for (final node in nodes) ...[(folder: node.folder, depth: depth), ..._flatten(node.children, depth + 1)],
   ];

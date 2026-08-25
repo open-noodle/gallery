@@ -26,8 +26,8 @@ import 'package:immich_mobile/widgets/common/immich_toast.dart';
 ///   [canEdit]  — true for Owner/Editor role; drives kebab and bottom-sheet
 ///                gating (space role, NOT album ownership — see D3).
 ///
-/// B6: mutations (Add photos, Show/Hide in timeline, Unlink) are wired to the
-/// real REST calls via [SpaceAlbumActions] + sync-nudge.
+/// Mutations (Add photos, Show/Hide in timeline, Unlink) go through
+/// [SpaceAlbumActions] to the real REST calls, followed by a sync-nudge.
 @RoutePage()
 class SpaceAlbumDetailPage extends ConsumerStatefulWidget {
   final String spaceId;

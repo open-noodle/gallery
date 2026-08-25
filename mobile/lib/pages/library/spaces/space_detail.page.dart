@@ -26,7 +26,7 @@ import 'package:immich_mobile/widgets/common/immich_toast.dart';
 import 'package:immich_mobile/widgets/spaces/sync_status_banner.dart';
 import 'package:openapi/api.dart';
 
-// PR 2 — Task 35: the space timeline is now served directly by the Drift
+// The space timeline is served directly by the Drift
 // sharedSpace() query (see DriftTimelineRepository.sharedSpace), so this page
 // no longer fetches assets over the network. Metadata + member list still
 // load from the API because they are not yet mirrored in Drift.
@@ -283,8 +283,8 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
     await _onAlbumsPicked(picked, folderId);
   }
 
-  /// B6: Loop PUT /shared-spaces/:id/albums/:albumId for each picked album,
-  /// then fire the sync-nudge and show a success toast.
+  /// Loops PUT /shared-spaces/:id/albums/:albumId for each picked album, then
+  /// fires the sync-nudge and shows a success toast.
   Future<void> _onAlbumsPicked(List<String> ids, [String? folderId]) async {
     if (ids.isEmpty) return;
     try {
@@ -307,7 +307,7 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
     }
   }
 
-  /// B6: Toggle `showInTimeline` for a linked album from the list/manage page.
+  /// Toggles `showInTimeline` for a linked album from the list/manage page.
   Future<void> _onToggleAlbumTimeline(String albumId) async {
     final albumsAsync = ref.read(spaceAlbumsProvider(widget.spaceId));
     final album = albumsAsync.valueOrNull?.where((a) => a.id == albumId).firstOrNull;
@@ -335,7 +335,7 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
     }
   }
 
-  /// B6: Confirm + unlink an album from the list/manage page.
+  /// Confirms, then unlinks an album from the list/manage page.
   Future<void> _onUnlinkAlbum(String albumId) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -446,12 +446,13 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
         topSliverWidget: SpaceTopSliver(
           spaceId: widget.spaceId,
           canEdit: _canEdit,
-          // B5: opens the link picker.
+          // Opens the link picker.
           onLinkTap: () => _openLinkPicker(),
-          // B4: tapping an album tile pushes the detail page.
+          // Tapping an album tile pushes the detail page.
           onAlbumTap: (albumId) =>
               context.pushRoute(SpaceAlbumDetailRoute(spaceId: widget.spaceId, albumId: albumId, canEdit: _canEdit)),
-          // B3: "See all ▸" pushes the list/manage page; B5/B6 pass the real callbacks.
+          // "See all ▸" pushes the list/manage page, carrying the same link and
+          // mutation callbacks this page owns.
           onSeeAll: () => context.pushRoute(
             SpaceAlbumsRoute(
               spaceId: widget.spaceId,
