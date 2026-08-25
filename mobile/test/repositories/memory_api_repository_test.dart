@@ -237,4 +237,71 @@ void main() {
       await expectLater(sut.getMemoryLane(), throwsA(isA<NoResponseDtoError>()));
     });
   });
+
+  group('getAllMemories', () {
+    // stubMemories replies with one fixed body, so pagination needs stubResponse: the stub
+    // runs per request and requestedUris is appended before it is called, so the closure can
+    // read the page it is answering.
+    test('pages until a short page and returns every memory', () async {
+      stubResponse(() {
+        final page = requestedUris.last.queryParameters['page'];
+        final memories = page == '1'
+            ? List.generate(100, (i) => memoryDto('page1-$i', assets: [assetDto('a$i')]))
+            : [memoryDto('page2-0', assets: [assetDto('b0')])];
+        return jsonResponse(jsonEncode(memories.map((memory) => memory.toJson()).toList()));
+      });
+
+      final result = await sut.getAllMemories();
+
+      expect(result, hasLength(101));
+      expect(requestedUris.map((uri) => uri.queryParameters['page']), ['1', '2']);
+    });
+
+    test('sends isSaved only when onlyFavorites is set', () async {
+      stubMemories([]);
+      await sut.getAllMemories(onlyFavorites: true);
+      expect(requestedUris.last.queryParameters, containsPair('isSaved', 'true'));
+
+      requestedUris.clear();
+      stubMemories([]);
+      await sut.getAllMemories();
+      expect(requestedUris.last.queryParameters.containsKey('isSaved'), isFalse);
+    });
+
+    test('omits `for` but pins isUpcoming=false, so the list is neither day-scoped nor upcoming', () async {
+      stubMemories([]);
+      await sut.getAllMemories();
+
+      final params = requestedUris.last.queryParameters;
+      expect(params.containsKey('for'), isFalse);
+      // Task 2 moved the fork's #486 hide-unshown default off this endpoint, so omitting the
+      // flag would now pull in not-yet-shown memories. The mobile list has no upcoming section.
+      expect(params['isUpcoming'], 'false');
+    });
+
+    test('drops memories the viewer can see no assets in', () async {
+      // The list renders assets[0], exactly as the lane card does, so it needs the same
+      // guarantee: memoryDto defaults assets to const [].
+      stubMemories([memoryDto('assetless')]);
+
+      expect(await sut.getAllMemories(), isEmpty);
+    });
+
+    test('stops at the page cap when the server ignores `page`', () async {
+      // A server that returns a full page forever would otherwise spin here indefinitely.
+      stubResponse(
+        () => jsonResponse(
+          jsonEncode(
+            List.generate(100, (i) => memoryDto('m$i', assets: [assetDto('a$i')]))
+                .map((memory) => memory.toJson())
+                .toList(),
+          ),
+        ),
+      );
+
+      await sut.getAllMemories();
+
+      expect(requestedUris.length, lessThanOrEqualTo(50));
+    });
+  });
 }

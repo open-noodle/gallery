@@ -75,6 +75,78 @@ class MemoryApiRepository extends ApiRepository {
     return (decoded as List).cast<MemoryResponseDto>();
   }
 
+  /// Every memory the viewer can see, including memories built from photos shared with them
+  /// through a Space, via the paginated `GET /memories` that immich-28675 added.
+  ///
+  /// Deliberately does NOT reuse [getMemoryLane]: that call is scoped to a single day
+  /// (`for=<today>`), which is what the lane wants and the list does not.
+  ///
+  /// It also does not send `for` at all. The server only applies `hideAt` when `for` is
+  /// present, so an unscoped call is the only way to get the full list -- at the cost of
+  /// `showAt` still being applied against now, which omits not-yet-shown memories. The
+  /// mobile list has no upcoming section, so that is the right trade here.
+  ///
+  /// `isUpcoming: false` is sent explicitly and unconditionally: `searchAccessible()` (which
+  /// serves this endpoint) passes `hideUnshownByDefault: false`, so omitting `isUpcoming`
+  /// entirely would let not-yet-shown memories back in -- unlike [getMemoryLane], which keeps
+  /// the hide-unshown default via `for`.
+  Future<List<DriftMemory>> getAllMemories({bool onlyFavorites = false}) async {
+    const pageSize = 100;
+    // Backstop, not a product limit: a server that ignored `page` would otherwise loop here
+    // forever. 50 pages is 5000 memories, far past any real library's retention window.
+    const maxPages = 50;
+    final dtos = <MemoryResponseDto>[];
+
+    for (var page = 1; page <= maxPages; page++) {
+      final batch = await _searchMemoriesPage(page: page, size: pageSize, onlyFavorites: onlyFavorites);
+      dtos.addAll(batch);
+      // A short page means the server has nothing left; this is also the stop condition when
+      // the very first page comes back empty.
+      if (batch.length < pageSize) {
+        break;
+      }
+    }
+
+    return dtos.map(_toDriftMemory).where((memory) => memory.assets.isNotEmpty).toList(growable: false);
+  }
+
+  /// One page of `GET /memories?page=&size=`.
+  ///
+  /// Hand-rolled for the same reason as [_searchMemoriesFor]: the generated client is used
+  /// directly through `invokeAPI` so auth and the base path still apply.
+  Future<List<MemoryResponseDto>> _searchMemoriesPage({
+    required int page,
+    required int size,
+    required bool onlyFavorites,
+  }) async {
+    final response = await _apiService.apiClient.invokeAPI(
+      '/memories',
+      'GET',
+      [
+        QueryParam('page', page.toString()),
+        QueryParam('size', size.toString()),
+        const QueryParam('isUpcoming', 'false'),
+        if (onlyFavorites) const QueryParam('isSaved', 'true'),
+      ],
+      null,
+      <String, String>{},
+      <String, String>{},
+      null,
+    );
+
+    if (response.statusCode >= 400) {
+      throw ApiException(response.statusCode, response.body);
+    }
+
+    final body = response.bodyBytes.isEmpty ? '' : utf8.decode(response.bodyBytes);
+    if (body.isEmpty) {
+      throw const NoResponseDtoError();
+    }
+
+    final decoded = await _apiService.apiClient.deserializeAsync(body, 'List<MemoryResponseDto>');
+    return (decoded as List).cast<MemoryResponseDto>();
+  }
+
   /// The local calendar day as `YYYY-MM-DD` — the same value web sends
   /// (`DateTime.now().toFormat('yyyy-MM-dd')`), so both clients ask for the same window.
   ///
