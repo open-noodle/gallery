@@ -3107,6 +3107,7 @@
   "space_album_unlink_action": "Unlink",
   "space_album_unlink_confirmation": "Remove this album from the space? Its photos will no longer appear here.",
   "space_album_unlink_from_space": "Unlink from space",
+  "space_album_unlink_title": "Unlink album?",
   "space_album_unlinked_success": "Album unlinked",
   "space_albums_also_hide_from_my_timeline": "Also hide it from my own timeline",
   "space_albums_empty": "No albums linked yet",

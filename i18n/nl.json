@@ -3104,6 +3104,7 @@
   "space_album_unlink_action": "Ontkoppelen",
   "space_album_unlink_confirmation": "Dit album uit de Space verwijderen? De foto's verschijnen hier niet meer.",
   "space_album_unlink_from_space": "Ontkoppelen van Space",
+  "space_album_unlink_title": "Album ontkoppelen?",
   "space_album_unlinked_success": "Album ontkoppeld",
   "space_albums_also_hide_from_my_timeline": "Ook verbergen uit mijn eigen tijdlijn",
   "space_albums_empty": "Nog geen albums gekoppeld",

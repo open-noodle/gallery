@@ -3104,6 +3104,7 @@
   "space_album_unlink_action": "Verknüpfung aufheben",
   "space_album_unlink_confirmation": "Dieses Album aus dem Space entfernen? Seine Fotos werden hier nicht mehr angezeigt.",
   "space_album_unlink_from_space": "Verknüpfung mit Space aufheben",
+  "space_album_unlink_title": "Verknüpfung aufheben?",
   "space_album_unlinked_success": "Album-Verknüpfung aufgehoben",
   "space_albums_also_hide_from_my_timeline": "Auch aus meiner eigenen Zeitleiste ausblenden",
   "space_albums_empty": "Noch keine Alben verknüpft",

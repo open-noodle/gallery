@@ -3,7 +3,7 @@
 **Date:** 2026-08-05
 **Status:** Approved, ready for planning
 **Scope:** Server sync entity + Flutter mobile app. Feature parity with the web implementation on PR #931.
-**Predecessor:** `docs/superpowers/specs/2026-08-04-space-album-folders-design.md` (server + web)
+**Predecessor:** `specs/2026-08-04-space-album-folders-design.md` (server + web)
 
 ## 1. Summary
 
@@ -473,7 +473,9 @@ pnpm exec vitest run --config test/vitest.config.medium.mjs shared-space-album-f
 make open-api    # ONLY for the new sync DTOs — the REST endpoints already exist (§8.1)
 ```
 
-Prettier must be run over this spec — CI Docs Build is strict and covers `docs/superpowers/specs/`.
+This file lives in `specs/`, outside `docs/` — so it is not prettier-gated and does not trigger
+the Docs Build workflow. (It previously said the opposite, from when these docs lived under
+`docs/superpowers/specs/`.)
 
 ## 11. Out of scope
 

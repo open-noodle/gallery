@@ -18,7 +18,7 @@ import 'package:immich_mobile/providers/infrastructure/asset.provider.dart';
 /// never reads "0 albums" (U-12).
 ///
 /// [previewAlbums] is expected to already be narrowed by `folderPreviewAlbums`
-/// (Task 6): at most four albums, newest first, each with a non-null
+/// at most four albums, newest first, each with a non-null
 /// `thumbnailAssetId`. This widget does not re-filter or re-sort it, and lays
 /// out correctly whether it receives 0, 1, 2, 3 or 4 covers -- an empty list
 /// falls back to a folder glyph rather than rendering broken/blank tiles.

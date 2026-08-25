@@ -121,18 +121,13 @@
   // the space, flat — far better than silently hiding anything with a non-null folderId.
   const levelAlbums = $derived(isSearching ? [] : foldersUnavailable ? albums : contents.albums);
 
-  const filtered = $derived.by(() => {
-    const q = (searchQuery ?? '').trim().toLowerCase();
-    if (!q) {
-      return levelAlbums;
-    }
-    return levelAlbums.filter(
-      (a) => a.albumName.toLowerCase().includes(q) || (a.description ?? '').toLowerCase().includes(q),
-    );
-  });
-
+  // No per-level name filter here: a non-empty query leaves the tree entirely and renders
+  // `searchHits` instead, which is where the matching actually happens (flattenForSearch, over
+  // the whole space). `levelAlbums` is already `[]` in that case, so a filter here could only
+  // ever run against an empty array — it looked like a second, level-scoped search and was
+  // unreachable.
   const sorted = $derived(
-    sortSpaceAlbums(filtered, {
+    sortSpaceAlbums(levelAlbums, {
       sortBy: $spaceAlbumViewSettings.sortBy,
       orderBy: $spaceAlbumViewSettings.sortOrder,
     }),
@@ -185,7 +180,7 @@
   <p class="p-8 text-center text-gray-500" data-testid="space-album-folder-empty">
     {$t('space_album_folder_empty')}
   </p>
-{:else if sortedFolders.length > 0 || filtered.length > 0}
+{:else if sortedFolders.length > 0 || levelAlbums.length > 0}
   {#if $spaceAlbumViewSettings.view === AlbumViewMode.List}
     {#if isGrouped}
       <SpaceAlbumsTable
@@ -237,7 +232,7 @@
         {/each}
       </div>
     {/if}
-    {#if filtered.length > 0}
+    {#if levelAlbums.length > 0}
       {#if isGrouped}
         {#each groups as group (group.id)}
           {@const collapsed = isSpaceAlbumGroupCollapsed($spaceAlbumViewSettings, group.id)}

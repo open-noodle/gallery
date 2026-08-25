@@ -3104,6 +3104,7 @@
   "space_album_unlink_action": "Délier",
   "space_album_unlink_confirmation": "Retirer cet album de l'espace ? Ses photos n'apparaîtront plus ici.",
   "space_album_unlink_from_space": "Délier de l'espace",
+  "space_album_unlink_title": "Délier l'album ?",
   "space_album_unlinked_success": "Album délié",
   "space_albums_also_hide_from_my_timeline": "Le masquer aussi de ma propre Chronologie",
   "space_albums_empty": "Aucun album lié pour le moment",

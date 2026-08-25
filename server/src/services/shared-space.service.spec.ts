@@ -26,8 +26,11 @@ import {
   UserAvatarColor,
 } from 'src/enum';
 import {
+  SHARED_SPACE_ALBUM_FOLDER_CAP_MESSAGE,
+  SHARED_SPACE_ALBUM_FOLDER_MAX_PER_SPACE,
   SHARED_SPACE_ALBUM_FOLDER_NAME_CONFLICT_MESSAGE,
   SHARED_SPACE_DEDUP_MAX_PASSES,
+  sharedSpaceAlbumFolderDepthMessage,
   SharedSpaceService,
 } from 'src/services/shared-space.service';
 import { StorageService } from 'src/services/storage.service';
@@ -13563,9 +13566,35 @@ describe(SharedSpaceService.name, () => {
 
   describe('album folders', () => {
     beforeEach(() => {
-      mocks.sharedSpace.countAlbumFoldersBySpace.mockResolvedValue(0);
       mocks.sharedSpace.hasSiblingAlbumFolderName.mockResolvedValue(false);
       mocks.sharedSpace.getAlbumFolderAncestors.mockResolvedValue([]);
+    });
+
+    // The mobile client has no error codes to work with: `_folderErrorKey`
+    // (mobile/lib/pages/library/spaces/space_albums.page.dart) substring-matches these messages
+    // against the fragments in space_album_folder_errors.dart to pick a specific toast over a
+    // generic "something went wrong". Nothing in either language enforces that coupling, so it
+    // is asserted here — reword a message past its fragment and this fails, instead of mobile
+    // silently degrading. Keep these fragments in step with SpaceAlbumFolderErrors.
+    describe('error messages the mobile client substring-matches', () => {
+      it.each([
+        ['name conflict', SHARED_SPACE_ALBUM_FOLDER_NAME_CONFLICT_MESSAGE, 'already exists here'],
+        ['folder cap', SHARED_SPACE_ALBUM_FOLDER_CAP_MESSAGE, 'is limited to'],
+        ['folder cap', SHARED_SPACE_ALBUM_FOLDER_CAP_MESSAGE, 'folders'],
+        ['depth cap', sharedSpaceAlbumFolderDepthMessage(11), 'nesting is limited to'],
+      ])('the %s message still contains %p', (_label, message, fragment) => {
+        expect(message).toContain(fragment);
+      });
+
+      // The cap fragment ('is limited to') is a SUBSTRING of the depth fragment's message, so
+      // mobile tests depth first. If the depth message ever stopped containing 'folders', the
+      // ordering would stop mattering — pin the property that makes the ordering necessary, so
+      // a future reword cannot silently make the two messages ambiguous in the other direction.
+      it('the depth message is not also matched by the folder-cap fragments', () => {
+        const depthMessage = sharedSpaceAlbumFolderDepthMessage(11);
+
+        expect(depthMessage.includes('is limited to') && depthMessage.includes('folders')).toBe(false);
+      });
     });
 
     describe('getAlbumFolders', () => {
@@ -13598,16 +13627,19 @@ describe(SharedSpaceService.name, () => {
       it('F-01: creates a root folder', async () => {
         const { auth, space } = setupAlbumFolderEditor(mocks);
         const created = albumFolderRow({ spaceId: space.id });
-        mocks.sharedSpace.createAlbumFolder.mockResolvedValue(created);
+        mocks.sharedSpace.createAlbumFolder.mockResolvedValue({ outcome: 'ok', folder: created });
 
         const result = await sut.createAlbumFolder(auth, space.id, { name: 'Trips' } as any);
 
-        expect(mocks.sharedSpace.createAlbumFolder).toHaveBeenCalledWith({
-          spaceId: space.id,
-          parentId: null,
-          name: 'Trips',
-          createdById: auth.user.id,
-        });
+        expect(mocks.sharedSpace.createAlbumFolder).toHaveBeenCalledWith(
+          {
+            spaceId: space.id,
+            parentId: null,
+            name: 'Trips',
+            createdById: auth.user.id,
+          },
+          SHARED_SPACE_ALBUM_FOLDER_MAX_PER_SPACE,
+        );
         expect(result).toEqual(expect.objectContaining({ id: created.id, parentId: null }));
       });
 
@@ -13617,14 +13649,16 @@ describe(SharedSpaceService.name, () => {
         const parent = albumFolderRow({ spaceId: space.id });
         mocks.sharedSpace.getAlbumFolderById.mockResolvedValue(parent);
         mocks.sharedSpace.getAlbumFolderAncestors.mockResolvedValue([{ id: parent.id, parentId: null, name: 'Trips' }]);
-        mocks.sharedSpace.createAlbumFolder.mockResolvedValue(
-          albumFolderRow({ spaceId: space.id, parentId: parent.id, name: '2026' }),
-        );
+        mocks.sharedSpace.createAlbumFolder.mockResolvedValue({
+          outcome: 'ok',
+          folder: albumFolderRow({ spaceId: space.id, parentId: parent.id, name: '2026' }),
+        });
 
         await sut.createAlbumFolder(auth, space.id, { name: '2026', parentId: parent.id } as any);
 
         expect(mocks.sharedSpace.createAlbumFolder).toHaveBeenCalledWith(
           expect.objectContaining({ parentId: parent.id, name: '2026' }),
+          SHARED_SPACE_ALBUM_FOLDER_MAX_PER_SPACE,
         );
       });
 
@@ -13644,7 +13678,10 @@ describe(SharedSpaceService.name, () => {
       // legitimately exist elsewhere in the tree.
       it('F-04: scopes the collision check to the target parent', async () => {
         const { auth, space } = setupAlbumFolderEditor(mocks);
-        mocks.sharedSpace.createAlbumFolder.mockResolvedValue(albumFolderRow({ spaceId: space.id, name: '2026' }));
+        mocks.sharedSpace.createAlbumFolder.mockResolvedValue({
+          outcome: 'ok',
+          folder: albumFolderRow({ spaceId: space.id, name: '2026' }),
+        });
 
         await sut.createAlbumFolder(auth, space.id, { name: '2026' } as any);
 
@@ -13654,11 +13691,17 @@ describe(SharedSpaceService.name, () => {
       // F-05
       it('F-05: trims the stored name', async () => {
         const { auth, space } = setupAlbumFolderEditor(mocks);
-        mocks.sharedSpace.createAlbumFolder.mockResolvedValue(albumFolderRow({ spaceId: space.id }));
+        mocks.sharedSpace.createAlbumFolder.mockResolvedValue({
+          outcome: 'ok',
+          folder: albumFolderRow({ spaceId: space.id }),
+        });
 
         await sut.createAlbumFolder(auth, space.id, { name: '  Trips  ' } as any);
 
-        expect(mocks.sharedSpace.createAlbumFolder).toHaveBeenCalledWith(expect.objectContaining({ name: 'Trips' }));
+        expect(mocks.sharedSpace.createAlbumFolder).toHaveBeenCalledWith(
+          expect.objectContaining({ name: 'Trips' }),
+          SHARED_SPACE_ALBUM_FOLDER_MAX_PER_SPACE,
+        );
       });
 
       // F-06 / F-07 — the service re-validates rather than trusting zod, so these hold for any
@@ -13678,7 +13721,10 @@ describe(SharedSpaceService.name, () => {
 
       it('F-07: accepts a name of exactly the maximum length', async () => {
         const { auth, space } = setupAlbumFolderEditor(mocks);
-        mocks.sharedSpace.createAlbumFolder.mockResolvedValue(albumFolderRow({ spaceId: space.id }));
+        mocks.sharedSpace.createAlbumFolder.mockResolvedValue({
+          outcome: 'ok',
+          folder: albumFolderRow({ spaceId: space.id }),
+        });
 
         await sut.createAlbumFolder(auth, space.id, { name: 'x'.repeat(128) } as any);
 
@@ -13722,34 +13768,42 @@ describe(SharedSpaceService.name, () => {
         mocks.sharedSpace.getAlbumFolderAncestors.mockResolvedValue(
           Array.from({ length: 9 }, () => ({ id: newUuid(), parentId: null, name: 'x' })),
         );
-        mocks.sharedSpace.createAlbumFolder.mockResolvedValue(
-          albumFolderRow({ spaceId: space.id, parentId: parent.id }),
-        );
+        mocks.sharedSpace.createAlbumFolder.mockResolvedValue({
+          outcome: 'ok',
+          folder: albumFolderRow({ spaceId: space.id, parentId: parent.id }),
+        });
 
         await sut.createAlbumFolder(auth, space.id, { name: 'depth ten', parentId: parent.id } as any);
 
         expect(mocks.sharedSpace.createAlbumFolder).toHaveBeenCalled();
       });
 
-      // F-12: the cap is what makes the web client's whole-space folder fetch safe.
-      it('F-12: rejects a create beyond the per-space folder cap', async () => {
+      // F-12: the cap is what makes the web client's whole-space folder fetch safe. It is
+      // enforced inside the repository's locked transaction (the service counting first and
+      // inserting after was a TOCTOU), so at this layer the contract is: pass the cap down, and
+      // turn a 'cap' outcome into the 400.
+      it('F-12: passes the per-space cap down to the repository', async () => {
         const { auth, space } = setupAlbumFolderEditor(mocks);
-        mocks.sharedSpace.countAlbumFoldersBySpace.mockResolvedValue(500);
+        mocks.sharedSpace.createAlbumFolder.mockResolvedValue({
+          outcome: 'ok',
+          folder: albumFolderRow({ spaceId: space.id }),
+        });
 
-        await expect(sut.createAlbumFolder(auth, space.id, { name: 'one too many' } as any)).rejects.toBeInstanceOf(
-          BadRequestException,
+        await sut.createAlbumFolder(auth, space.id, { name: 'Trips' } as any);
+
+        expect(mocks.sharedSpace.createAlbumFolder).toHaveBeenCalledWith(
+          expect.anything(),
+          SHARED_SPACE_ALBUM_FOLDER_MAX_PER_SPACE,
         );
-        expect(mocks.sharedSpace.createAlbumFolder).not.toHaveBeenCalled();
       });
 
-      it('F-12: allows a create at one below the cap', async () => {
+      it('F-12: rejects a create the repository refused for the cap', async () => {
         const { auth, space } = setupAlbumFolderEditor(mocks);
-        mocks.sharedSpace.countAlbumFoldersBySpace.mockResolvedValue(499);
-        mocks.sharedSpace.createAlbumFolder.mockResolvedValue(albumFolderRow({ spaceId: space.id }));
+        mocks.sharedSpace.createAlbumFolder.mockResolvedValue({ outcome: 'cap' });
 
-        await sut.createAlbumFolder(auth, space.id, { name: 'last one' } as any);
-
-        expect(mocks.sharedSpace.createAlbumFolder).toHaveBeenCalled();
+        await expect(sut.createAlbumFolder(auth, space.id, { name: 'one too many' } as any)).rejects.toThrow(
+          new BadRequestException(SHARED_SPACE_ALBUM_FOLDER_CAP_MESSAGE),
+        );
       });
 
       // R-03 / R-09: the role gate runs FIRST, so an unauthorised actor learns nothing about
@@ -13761,7 +13815,7 @@ describe(SharedSpaceService.name, () => {
           sut.createAlbumFolder(auth, space.id, { name: '', parentId: newUuid() } as any),
         ).rejects.toBeInstanceOf(ForbiddenException);
         expect(mocks.sharedSpace.getAlbumFolderById).not.toHaveBeenCalled();
-        expect(mocks.sharedSpace.countAlbumFoldersBySpace).not.toHaveBeenCalled();
+        expect(mocks.sharedSpace.createAlbumFolder).not.toHaveBeenCalled();
       });
 
       // Task 3 review, Part A (path 1/3): the name pre-check (F-03) is optimistic — a concurrent

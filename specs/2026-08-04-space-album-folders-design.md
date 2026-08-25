@@ -130,7 +130,23 @@ that does not change the indexed value conflicts with nothing.
 - **Max 500 folders per space.** The web client fetches every folder in the space on page load
   (§4.2); the cap is what makes that safe rather than merely likely. One constant beside the depth
   cap.
+
+  Enforced inside `createAlbumFolder`'s transaction, under the same per-space advisory lock as the
+  move and delete paths — **not** by a count in the service followed by an insert. That ordering is
+  a TOCTOU: under `READ COMMITTED` every concurrent create sitting at cap-minus-one reads the same
+  count and every one of them inserts. Folding the count into a single
+  `INSERT … SELECT … WHERE (SELECT count(*)) < cap` does not fix it either, since that subquery is
+  still evaluated against each statement's own snapshot. Only serialising the read-then-write
+  closes it. Pinned by P-06's racing-creates test.
 - **No cycles.** A folder may not move into itself or any descendant.
+
+  Separately, every recursive walk over the folder tree (`getAlbumFolderAncestors`,
+  `getAlbumFolderSubtree`, and the ancestor re-check inside `moveAlbumFolderChecked`) carries a hop
+  bound. Refusing to _create_ a cycle does not stop one already being in the data — a restored
+  backup, a manual `UPDATE`, a future defect — and a `WITH RECURSIVE` walk over a cyclic adjacency
+  list does not error, it spins, holding a request-path connection. The bound sits deliberately
+  **above** the depth cap: at or below it, a legitimate deep chain would be truncated, under-
+  reporting a folder's depth and admitting a create that should have been refused.
 - **Same space.** A folder's parent, and an album's target folder, must belong to the same space.
 - **Name pre-check excludes self** (§3.3).
 
@@ -424,6 +440,24 @@ re-read would still see pre-lock data and both concurrent moves could pass the c
 C-03 is why the promote-and-delete is one transaction, and why `folderId` is `ON DELETE SET NULL`
 rather than left dangling: even if a move interleaves, the worst outcome is an album at root.
 
+**C-03 covers an album moving into a folder being deleted. A _folder_ moving into one is worse**,
+and was missed here originally. `deleteAlbumFolderPromotingChildren` took only a row lock on the
+folder being deleted, so a concurrent `moveAlbumFolderChecked` could reparent X under F while F was
+being promoted-and-deleted. In the interleavings where the foreign-key check did not block, F's
+self-referencing `ON DELETE CASCADE` deleted X **and its whole subtree** instead of promoting it one
+level. The delete path now takes the same per-space advisory lock the move path does, making the two
+mutually exclusive. Pinned by the C-03 mechanism tests, with a different-space negative control.
+
+**Losing either race must be a 400, not a 500.** `setAlbumFolder` validates the folder and then
+writes `folderId`; `moveAlbumFolderChecked` reads its target and then reparents. A delete landing in
+between turns the write into a raw Postgres foreign-key violation (23503), which escaped as a 500
+until `withAlbumFolderConstraintsMapped` began mapping it. That mapper keys on the violated
+**constraint**, not the error code alone — the same writes touch other foreign keys, and a
+concurrently-deleted _album_ must not be reported as a missing folder. Note the field carrying the
+constraint name is `constraint_name` under Kysely's postgres.js dialect (node-postgres calls it
+`constraint`); reading only the latter leaves the mapping a silent no-op against a real database
+while hand-rolled unit tests still pass, which is why medium test C-03b pins the runtime shape.
+
 ### 5.8 Cascade — `X-*`
 
 | ID   | Given                              | When                    | Then                                                                       |
@@ -551,7 +585,20 @@ the file-upload overlay.
 - `dataTransfer.setData('application/x-gallery-space-item', JSON.stringify({ kind, id }))`. The
   **custom MIME type is load-bearing**: `DragAndDropUploadOverlay` listens for file drags, and a
   generic payload would light it up mid-drag.
-- Drop targets: folder cards, breadcrumb crumbs, and the grid background of the current folder.
+- Drop targets: folder cards and breadcrumb crumbs.
+
+  This originally also listed **the grid background of the current folder**. That target was not
+  built, because it cannot fire. Outside search, every draggable item on screen is already at the
+  current level — albums rendered in the grid have `folderId === currentFolderId`, and folder
+  cards are children of the current folder — so `canDrop` rejects a drop onto "the current level"
+  as a no-op in every case, exactly as it already rejects the current folder's own breadcrumb
+  crumb. Building it would add a drop target that highlights for nothing.
+
+  The one state where it would be reachable is `foldersUnavailable`: with the folder fetch failed
+  the grid degrades to every album in the space, flat, so an album with a non-null `folderId` is
+  on screen while `currentFolderId` is null. But that same state hides the breadcrumb and the
+  folder cards, so there is no tree to reorganise against — the answer there is to retry the
+  fetch, not to offer a lone drop zone.
 - `dragover` must `preventDefault()` for a drop to fire; the highlight ring appears on valid targets
   only.
 - Optimistic local move; rollback plus `handleError` toast on failure.
@@ -741,8 +788,9 @@ make open-api          # after the DTO changes (server build first)
 make sql               # requires a running dev DB
 ```
 
-Prettier must also be run over this spec file — CI Docs Build is strict and reaches
-`docs/superpowers/specs/`.
+This file lives in `specs/`, which is deliberately outside `docs/`: it is neither published to
+docs.opennoodle.de, prettier-gated, nor a trigger for the Docs Build workflow. (It previously said
+the opposite, from when these docs lived under `docs/superpowers/specs/`.)
 
 ## 11. Risks and recorded assumptions
 

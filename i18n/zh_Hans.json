@@ -3104,6 +3104,7 @@
   "space_album_unlink_action": "取消关联",
   "space_album_unlink_confirmation": "要将此相簿从 Space 中移除吗？其中的照片将不再显示在这里。",
   "space_album_unlink_from_space": "取消与 Space 的关联",
+  "space_album_unlink_title": "取消关联相簿吗？",
   "space_album_unlinked_success": "已取消关联相簿",
   "space_albums_also_hide_from_my_timeline": "同时从我自己的时间线中隐藏",
   "space_albums_empty": "尚未关联任何相簿",

@@ -118,4 +118,36 @@ describe('space-album-folder-dnd', () => {
       expect(getActiveDragPayload()).toBeNull();
     });
   });
+
+  // Design §6.6 originally listed "the grid background of the current folder" as a third drop
+  // target alongside folder cards and breadcrumb crumbs. It was not built, and these are the
+  // tests that keep that decision honest: outside search every draggable item on screen is
+  // ALREADY at the current level, so such a target could only ever reject.
+  //
+  // If a future change makes one of these return true — say, rendering albums from descendant
+  // folders in the current grid — that target stops being dead and should be reconsidered.
+  describe('a drop onto the current level (the un-built grid-background target)', () => {
+    it('rejects an album already at this level', () => {
+      // Viewing Trips: a1 lives in Trips, so "move to Trips" is a no-op.
+      expect(canDrop(folders, albums, { kind: 'album', id: 'a1' }, 'trips')).toBe(false);
+    });
+
+    it('rejects an album already at the root', () => {
+      expect(canDrop(folders, albums, { kind: 'album', id: 'a2' }, null)).toBe(false);
+    });
+
+    it('rejects a folder card dropped onto the level that already contains it', () => {
+      // Viewing Trips, whose grid shows the 2026 card: "move 2026 to Trips" is a no-op.
+      expect(canDrop(folders, albums, { kind: 'folder', id: 'y2026' }, 'trips')).toBe(false);
+      // Same one level up: Trips is a root folder rendered in the root grid.
+      expect(canDrop(folders, albums, { kind: 'folder', id: 'trips' }, null)).toBe(false);
+    });
+
+    // The counterpart: a real cross-level move is still accepted, so the three rejections above
+    // are about "already there", not about canDrop refusing everything.
+    it('still accepts a genuine move between levels', () => {
+      expect(canDrop(folders, albums, { kind: 'album', id: 'a1' }, 'family')).toBe(true);
+      expect(canDrop(folders, albums, { kind: 'folder', id: 'family' }, 'trips')).toBe(true);
+    });
+  });
 });

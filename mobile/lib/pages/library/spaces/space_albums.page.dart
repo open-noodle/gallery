@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:auto_route/auto_route.dart';
 import 'package:collection/collection.dart';
@@ -14,6 +13,7 @@ import 'package:immich_mobile/domain/models/space_album_folder.model.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/extensions/translate_extensions.dart';
 import 'package:immich_mobile/pages/library/spaces/collection_sort.dart';
+import 'package:immich_mobile/pages/library/spaces/space_album_folder_errors.dart';
 import 'package:immich_mobile/presentation/widgets/images/thumbnail.widget.dart';
 import 'package:immich_mobile/presentation/widgets/spaces/space_album_folder_card.widget.dart';
 import 'package:immich_mobile/presentation/widgets/spaces/space_album_folder_picker.widget.dart';
@@ -29,7 +29,10 @@ import 'package:immich_mobile/widgets/common/immich_toast.dart';
 import 'package:immich_mobile/widgets/common/search_field.dart';
 import 'package:openapi/api.dart' show ApiException;
 
-/// Space Albums list/manage page — Surface 2 of the Phase-2B design.
+/// Space Albums list/manage page.
+///
+/// See `specs/2026-08-05-space-album-folders-mobile-design.md` for the folder behaviour and
+/// `specs/2026-06-15-space-albums-phase2-mobile-design.md` for the surrounding surface.
 ///
 /// Pushed via [SpaceAlbumsRoute(spaceId, canEdit)] (standard slide-right).
 /// [folderId] is optional: `null` is the space root, and tapping a folder
@@ -39,20 +42,19 @@ import 'package:openapi/api.dart' show ApiException;
 /// naturally returns to the parent level.
 ///
 /// Renders a 2-column grid of cards (cover + name + asset count + Hidden
-/// label), with folder cards (Task 10) rendered above album cards at the
-/// current level:
+/// label), with folder cards rendered above album cards at the current level:
 ///  - Editor-only card ⋮ overflow (Show/Hide in timeline, Unlink, Move to
-///    folder…) — stub callbacks [onToggle]/[onUnlink] (real mutations land
-///    in B6); "Move to folder…" is wired directly against
-///    [spaceAlbumActionsProvider] since it doesn't need to be shared with
-///    the space-detail top sliver's own inline cards.
+///    folder…). [onToggle] and [onUnlink] are supplied by the caller, because
+///    the space-detail page owns those mutations and its top sliver renders
+///    the same cards; "Move to folder…" is wired directly against
+///    [spaceAlbumActionsProvider] since it is not shared with that sliver.
 ///  - Editor-only folder-card ⋮ overflow (Rename / Move to folder… / Delete)
 ///    and app-bar "New folder" action, all wired directly against
 ///    [spaceAlbumActionsProvider]'s `renameFolder`/`moveFolder`/`deleteFolder`/
 ///    `createFolder`. "New folder" creates in the CURRENT folder (this page
 ///    instance's own [folderId] as the parent), not always at the space root.
-///  - Editor-only app-bar "＋ Link" action — stub callback [onLink] (link
-///    picker lands in B5).
+///  - Editor-only app-bar "＋ Link" action, delegating to [onLink] — the link
+///    picker lives on the space-detail page, which owns it.
 ///  - Centered empty state for an empty list, and a folder-specific empty
 ///    state (distinct — see [_FolderEmptyState]) for an empty folder.
 ///  - A search field + reversible `CollectionSortButton` (persisted via
@@ -73,15 +75,16 @@ class SpaceAlbumsPage extends HookConsumerWidget {
   final String? folderId;
 
   /// Called when the editor taps "Show/Hide in timeline" for an album.
-  /// No-op default in B3; B6 supplies the real mutation.
+  /// Defaults to a no-op so the page can be rendered standalone (and in tests)
+  /// without the space-detail page's mutation wiring.
   final void Function(String albumId) onToggle;
 
-  /// Called when the editor taps "Unlink from space" for an album.
-  /// No-op default in B3; B6 supplies the real mutation + confirm dialog.
+  /// Called when the editor taps "Unlink from space" for an album. The caller
+  /// owns the confirm dialog. No-op by default — see [onToggle].
   final void Function(String albumId) onUnlink;
 
-  /// Called when the editor taps the "＋ Link" app-bar action.
-  /// No-op default in B3; B5 supplies the link picker.
+  /// Called when the editor taps the "＋ Link" app-bar action. No-op by
+  /// default — see [onToggle].
   ///
   /// Takes the folder the user is currently looking at, so a linked album lands there rather
   /// than at the space root. The picker itself lives on the parent space-detail page, which has
@@ -130,10 +133,9 @@ class SpaceAlbumsPage extends HookConsumerWidget {
     // auto_route 11.1.0: `AutoRoutePage.canUpdate` keys on the route NAME, not a per-push unique
     // id, and since this route is deliberately self-recursive Flutter's declarative page-diff
     // cannot tell two stacked instances apart — removing a non-topmost one crashes ("setState
-    // during build") and silently swaps mounted state between routes (see
-    // .superpowers/sdd/space-album-folders-review-fixes/task-2-report.md for the full trace).
+    // during build") and silently swaps mounted state between routes.
     //
-    // DEFERRED SELF-POP instead (binding controller decision, task-2-brief.md addendum):
+    // DEFERRED SELF-POP instead:
     //  - Topmost when the folder vanishes: pop immediately — a plain `context.maybePop()` on the
     //    LAST entry is always unambiguous (there's no "which instance?" question for the tail).
     //  - Buried: don't touch the stack now. Record a pending flag and wait for a notification
@@ -155,7 +157,7 @@ class SpaceAlbumsPage extends HookConsumerWidget {
     //    `notifyListeners()` whenever the computed url/active-segments state differs from before
     //    — exactly "the visible route changed", confirmed against B's pop in this task's tests.
     //
-    //    CAVEAT (task-2 review, Finding 1) — `navigationHistory` is URL-STRING based, so it can
+    //    CAVEAT — `navigationHistory` is URL-STRING based, so it can
     //    silently no-op: `onNewUrlState` only notifies when `_urlState != newState`
     //    (navigation_history_base.dart:52), and `UrlState.==` compares route SEGMENTS, which for
     //    two stacked `SpaceAlbumsRoute`s sharing the SAME `folderId` are IDENTICAL before and
@@ -166,7 +168,7 @@ class SpaceAlbumsPage extends HookConsumerWidget {
     //    `stackData`/`isTopmost()` directly off a scheduled frame, so it still catches the pop
     //    even when `navigationHistory` stays silent.
     //
-    //    UPDATE (Task 6) — identical-args stacking (same `spaceId` AND `folderId`) is now blocked
+    //    Identical-args stacking (same `spaceId` AND `folderId`) is now blocked
     //    in PRODUCTION: `SpaceAlbumsRoute` carries `SpaceAlbumsDuplicateGuard`, an args-aware guard
     //    wired at router.dart:179 (`SpacesRoute`/`SpaceDetailRoute`/`SpaceMembersRoute` — the
     //    routes that keep the plain `_duplicateGuard` — are the ones at router.dart:167-169 now;
@@ -210,7 +212,7 @@ class SpaceAlbumsPage extends HookConsumerWidget {
       var disposed = false;
 
       // The ONLY place either call site below (the listener and the poll) may act — both funnel
-      // through here rather than calling `maybePop` directly (task-2 review, Finding 2):
+      // through here rather than calling `maybePop` directly:
       // `StackRouter.maybePop` is async, and the listener/poll below aren't torn down until the
       // NEXT rebuild processes `pendingSelfPop.value` flipping to false, so a second notification
       // or scheduled frame landing before that rebuild lands must be a no-op, not a second pop
@@ -267,7 +269,7 @@ class SpaceAlbumsPage extends HookConsumerWidget {
           pendingSelfPop.value = true;
         }
       } else {
-        // Finding 3 (task-2 review): a transient false-vanish emission (folder momentarily
+        // A transient false-vanish emission (folder momentarily
         // missing, then present again in a later sync batch) must not leave a stale pending pop
         // armed — otherwise this page would pop itself later, once it resurfaces, even though its
         // folder is valid again.
@@ -381,7 +383,7 @@ class SpaceAlbumsPage extends HookConsumerWidget {
         context,
         folders: folders,
         // The folder itself and its whole subtree must not be offered as a destination — a folder
-        // can never become its own descendant. Same guard as the picker sheet's own Task 6
+        // can never become its own descendant. Same guard as the picker sheet's own
         // `isDescendant` check; passing `excludeFolderId` here is what actually engages it for
         // this call site (the album-move path above passes `null` since an album has no subtree).
         excludeFolderId: folder.id,
@@ -659,21 +661,12 @@ List<SpaceAlbumFolder> _sortFolders(List<SpaceAlbumFolder> folders, bool isRever
 /// rather than the exact (parameterized) text. Web does not perform this mapping — it shows the
 /// raw server message via `handleError` — so there is no web behaviour to mirror here; the three
 /// keys these substrings resolve to are the ones the web PR added but never wired up.
+/// Only an [ApiException] carries a server message worth matching; anything else (a socket
+/// failure, a parse error) goes straight to the caller's generic per-action toast. The matching
+/// itself lives in space_album_folder_errors.dart, next to the fragments it depends on.
 String _folderErrorKey(Object error, String fallbackKey) {
   if (error is! ApiException) return fallbackKey;
-  var message = error.message ?? '';
-  try {
-    final decoded = jsonDecode(message);
-    if (decoded is Map && decoded['message'] is String) {
-      message = decoded['message'] as String;
-    }
-  } catch (_) {
-    // Not JSON (e.g. a plain-text body) — match on the raw text as-is.
-  }
-  if (message.contains('nesting is limited to')) return 'space_album_folder_depth_exceeded';
-  if (message.contains('is limited to') && message.contains('folders')) return 'space_album_folder_limit_reached';
-  if (message.contains('already exists here')) return 'space_album_folder_name_taken';
-  return fallbackKey;
+  return spaceAlbumFolderErrorKey(error.message, fallbackKey);
 }
 
 /// Prompts for a folder name via a simple text dialog — shared by "New folder" and "Rename".
@@ -856,7 +849,7 @@ class _SearchAndSortBar extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Level grid — folders (Task 10) rendered above albums, each its own section
+// Level grid — folders rendered above albums, each its own section
 // so folders always land in a strictly earlier row than any album (U-01).
 // ---------------------------------------------------------------------------
 

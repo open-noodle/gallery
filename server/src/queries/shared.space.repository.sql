@@ -590,12 +590,19 @@ where
   and "albumId" = $3
 
 -- SharedSpaceRepository.createAlbumFolder
-insert into
-  "shared_space_album_folder" ("spaceId", "parentId", "name", "createdById")
-values
-  ($1, $2, $3, $4)
-returning
-  *
+begin
+SELECT
+  pg_advisory_xact_lock(
+    hashtext ('shared-space-album-folder-move'),
+    hashtext ($1)
+  )
+select
+  count(*) as "count"
+from
+  "shared_space_album_folder"
+where
+  "spaceId" = $1
+rollback
 
 -- SharedSpaceRepository.getAlbumFolderById
 select
@@ -616,21 +623,14 @@ where
 order by
   "name" asc
 
--- SharedSpaceRepository.countAlbumFoldersBySpace
-select
-  count(*) as "count"
-from
-  "shared_space_album_folder"
-where
-  "spaceId" = $1
-
 -- SharedSpaceRepository.getAlbumFolderAncestors
 with recursive
   "ancestors" as (
     select
       "id",
       "parentId",
-      "name"
+      "name",
+      0 as "hops"
     from
       "shared_space_album_folder"
     where
@@ -639,13 +639,18 @@ with recursive
     select
       "f"."id",
       "f"."parentId",
-      "f"."name"
+      "f"."name",
+      a.hops + 1 as "hops"
     from
       "shared_space_album_folder" as "f"
       inner join "ancestors" as "a" on "a"."parentId" = "f"."id"
+    where
+      a.hops < $2
   )
 select
-  *
+  "id",
+  "parentId",
+  "name"
 from
   "ancestors"
 
@@ -666,6 +671,8 @@ with recursive
     from
       "shared_space_album_folder" as "f"
       inner join "subtree" as "s" on "s"."id" = "f"."parentId"
+    where
+      s.depth < $2
   )
 select
   *
@@ -692,6 +699,11 @@ where
 
 -- SharedSpaceRepository.deleteAlbumFolderPromotingChildren
 begin
+SELECT
+  pg_advisory_xact_lock(
+    hashtext ('shared-space-album-folder-move'),
+    hashtext ($1)
+  )
 select
   "id",
   "parentId"
@@ -701,7 +713,7 @@ where
   "spaceId" = $1
   and "id" = $2
 for update
-commit
+rollback
 
 -- SharedSpaceRepository.moveAlbumFolderChecked
 begin
@@ -717,7 +729,7 @@ from
 where
   "spaceId" = $1
   and "id" = $2
-commit
+rollback
 
 -- SharedSpaceRepository.setAlbumLinkFolder
 update "shared_space_album"

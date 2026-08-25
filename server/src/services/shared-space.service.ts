@@ -116,14 +116,30 @@ export const SHARED_SPACE_ALBUM_FOLDER_MAX_DEPTH = 10;
 export const SHARED_SPACE_ALBUM_FOLDER_MAX_PER_SPACE = 500;
 
 /**
- * Shared by the optimistic pre-check ({@link SharedSpaceService.assertNoAlbumFolderNameConflict})
- * and the raced-23505 mapper ({@link SharedSpaceService.withAlbumFolderNameConflictMapped}) so the
- * two 400 paths can never drift apart in wording. The mobile client
- * (`mobile/lib/pages/library/spaces/space_albums.page.dart`, `_folderErrorKey`) substring-matches
- * `'already exists here'` on this exact text to pick the specific `space_album_folder_name_taken`
- * toast instead of a generic error — do not reword this without updating that match too.
+ * The three folder-write rejection messages, in one place.
+ *
+ * All three are load-bearing STRINGS, not just copy. The mobile client has no error codes to work
+ * with — `_folderErrorKey` in `mobile/lib/pages/library/spaces/space_albums.page.dart`
+ * substring-matches each of these to choose a specific toast over a generic one, against the
+ * fragments in `mobile/lib/pages/library/spaces/space_album_folder_errors.dart`. Rewording any of
+ * them past its fragment silently downgrades mobile to "something went wrong".
+ *
+ * `shared-space.service.spec.ts` asserts each message still contains the fragment mobile looks
+ * for, so that coupling fails a test rather than failing quietly in the app.
+ *
+ * The name-conflict message is additionally shared by the optimistic pre-check
+ * ({@link SharedSpaceService.assertNoAlbumFolderNameConflict}) and the raced-23505 mapper
+ * ({@link SharedSpaceService.withAlbumFolderConstraintsMapped}), so the two 400 paths cannot
+ * drift apart in wording.
  */
 export const SHARED_SPACE_ALBUM_FOLDER_NAME_CONFLICT_MESSAGE = 'A folder with that name already exists here';
+
+/** @see SHARED_SPACE_ALBUM_FOLDER_NAME_CONFLICT_MESSAGE — mobile matches on 'nesting is limited to'. */
+export const sharedSpaceAlbumFolderDepthMessage = (resultingDepth: number) =>
+  `Folder nesting is limited to ${SHARED_SPACE_ALBUM_FOLDER_MAX_DEPTH} levels (this would be ${resultingDepth})`;
+
+/** @see SHARED_SPACE_ALBUM_FOLDER_NAME_CONFLICT_MESSAGE — mobile matches on 'is limited to' plus 'folders'. */
+export const SHARED_SPACE_ALBUM_FOLDER_CAP_MESSAGE = `A space is limited to ${SHARED_SPACE_ALBUM_FOLDER_MAX_PER_SPACE} folders`;
 
 /**
  * The foreign keys that point AT a folder row. Used by
@@ -1121,30 +1137,32 @@ export class SharedSpaceService extends BaseService {
       const ancestors = await this.sharedSpaceRepository.getAlbumFolderAncestors(parentId);
       const depth = ancestors.length + 1;
       if (depth > SHARED_SPACE_ALBUM_FOLDER_MAX_DEPTH) {
-        throw new BadRequestException(
-          `Folder nesting is limited to ${SHARED_SPACE_ALBUM_FOLDER_MAX_DEPTH} levels (this would be ${depth})`,
-        );
+        throw new BadRequestException(sharedSpaceAlbumFolderDepthMessage(depth));
       }
-    }
-
-    const count = await this.sharedSpaceRepository.countAlbumFoldersBySpace(spaceId);
-    if (count >= SHARED_SPACE_ALBUM_FOLDER_MAX_PER_SPACE) {
-      throw new BadRequestException(`A space is limited to ${SHARED_SPACE_ALBUM_FOLDER_MAX_PER_SPACE} folders`);
     }
 
     await this.assertNoAlbumFolderNameConflict(spaceId, parentId, name, null);
 
-    const created = await this.withAlbumFolderConstraintsMapped(
+    // The per-space cap is enforced INSIDE the repository's locked transaction, not by a count
+    // here followed by an insert: that ordering is a TOCTOU, and under READ COMMITTED any number
+    // of concurrent creates sitting at the cap minus one all read the same count and all insert.
+    const result = await this.withAlbumFolderConstraintsMapped(
       () =>
-        this.sharedSpaceRepository.createAlbumFolder({
-          spaceId,
-          parentId,
-          name,
-          createdById: auth.user.id,
-        }),
+        this.sharedSpaceRepository.createAlbumFolder(
+          {
+            spaceId,
+            parentId,
+            name,
+            createdById: auth.user.id,
+          },
+          SHARED_SPACE_ALBUM_FOLDER_MAX_PER_SPACE,
+        ),
       'Parent folder not found',
     );
-    return this.mapAlbumFolder(created);
+    if (result.outcome === 'cap') {
+      throw new BadRequestException(SHARED_SPACE_ALBUM_FOLDER_CAP_MESSAGE);
+    }
+    return this.mapAlbumFolder(result.folder);
   }
 
   async updateAlbumFolder(
@@ -1187,9 +1205,7 @@ export class SharedSpaceService extends BaseService {
       const height = Math.max(...subtree.map((node) => node.depth));
       const resultingDepth = targetAncestors.length + 1 + height;
       if (resultingDepth > SHARED_SPACE_ALBUM_FOLDER_MAX_DEPTH) {
-        throw new BadRequestException(
-          `Folder nesting is limited to ${SHARED_SPACE_ALBUM_FOLDER_MAX_DEPTH} levels (this would be ${resultingDepth})`,
-        );
+        throw new BadRequestException(sharedSpaceAlbumFolderDepthMessage(resultingDepth));
       }
     }
 

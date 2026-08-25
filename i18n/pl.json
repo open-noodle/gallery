@@ -3122,6 +3122,7 @@
   "space_album_unlink_action": "Odłącz",
   "space_album_unlink_confirmation": "Usunąć ten album z przestrzeni? Jego zdjęcia nie będą już tutaj widoczne.",
   "space_album_unlink_from_space": "Odłącz od przestrzeni",
+  "space_album_unlink_title": "Odłączyć album?",
   "space_album_unlinked_success": "Album odłączony",
   "space_albums_also_hide_from_my_timeline": "Ukryj to również z mojej własnej osi czasu",
   "space_albums_empty": "Brak połączonych albumów",

@@ -3106,6 +3106,7 @@
   "space_album_unlink_action": "Отвязать",
   "space_album_unlink_confirmation": "Убрать этот альбом из Space? Его фото больше не будут отображаться здесь.",
   "space_album_unlink_from_space": "Отвязать от Space",
+  "space_album_unlink_title": "Отвязать альбом?",
   "space_album_unlinked_success": "Альбом отвязан",
   "space_albums_also_hide_from_my_timeline": "Также скрыть с моей собственной временной шкалы",
   "space_albums_empty": "Пока не привязано ни одного альбома",

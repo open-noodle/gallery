@@ -1,8 +1,9 @@
 import { Kysely, sql } from 'kysely';
 import { LoggingRepository } from 'src/repositories/logging.repository';
-import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
+import { ALBUM_FOLDER_TRAVERSAL_LIMIT, SharedSpaceRepository } from 'src/repositories/shared-space.repository';
 import { DB } from 'src/schema';
 import { BaseService } from 'src/services/base.service';
+import { SHARED_SPACE_ALBUM_FOLDER_MAX_DEPTH } from 'src/services/shared-space.service';
 import { newMediumService } from 'test/medium.factory';
 import { getKyselyDB } from 'test/utils';
 
@@ -39,6 +40,48 @@ const insertFolder = async (
     .returningAll()
     .executeTakeFirstOrThrow();
   return row;
+};
+
+/**
+ * Fixture helper: creates a folder through the repository and unwraps the capped result.
+ *
+ * `createAlbumFolder` enforces the per-space cap inside its own locked transaction, so it returns
+ * a discriminated result rather than a row. Fixtures are never trying to exercise the cap — they
+ * pass NO_FIXTURE_CAP and treat anything but 'ok' as a broken fixture, loudly. The cap's own
+ * behaviour is covered by the P-06 tests, which pass a deliberately small cap.
+ */
+const NO_FIXTURE_CAP = 10_000;
+
+const createFolder = async (
+  sut: SharedSpaceRepository,
+  dto: { spaceId: string; parentId: string | null; name: string; createdById: string | null },
+) => {
+  const result = await sut.createAlbumFolder(dto, NO_FIXTURE_CAP);
+  if (result.outcome !== 'ok') {
+    throw new Error(`fixture folder create returned '${result.outcome}', expected 'ok'`);
+  }
+  return result.folder;
+};
+
+/** Fails loudly instead of hanging the run if a guard is ever removed. */
+const withinTimeout = async <T>(label: string, work: Promise<T>, ms = 15_000): Promise<T> => {
+  let timer: NodeJS.Timeout | undefined;
+  const bomb = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} did not terminate within ${ms}ms — cycle guard missing?`)), ms);
+  });
+  try {
+    return await Promise.race([work, bomb]);
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
+/** A ↔ B, neither reachable from a root. */
+const seedCycle = async (ctx: ReturnType<typeof setup>['ctx'], spaceId: string) => {
+  const a = await insertFolder(ctx, { spaceId, name: 'A' });
+  const b = await insertFolder(ctx, { spaceId, parentId: a.id, name: 'B' });
+  await ctx.database.updateTable('shared_space_album_folder').set({ parentId: b.id }).where('id', '=', a.id).execute();
+  return { a, b };
 };
 
 beforeAll(async () => {
@@ -277,7 +320,7 @@ describe('SharedSpaceRepository — album folder primitives', () => {
     const { ctx, sut } = setup();
     const { user, space } = await seed(ctx);
 
-    const created = await sut.createAlbumFolder({
+    const created = await createFolder(sut, {
       spaceId: space.id,
       parentId: null,
       name: 'Trips',
@@ -294,7 +337,7 @@ describe('SharedSpaceRepository — album folder primitives', () => {
     const { ctx, sut } = setup();
     const { user, space } = await seed(ctx);
     const { space: other } = await ctx.newSharedSpace({ createdById: user.id });
-    const folder = await sut.createAlbumFolder({
+    const folder = await createFolder(sut, {
       spaceId: other.id,
       parentId: null,
       name: 'Trips',
@@ -310,9 +353,9 @@ describe('SharedSpaceRepository — album folder primitives', () => {
     const { user, space } = await seed(ctx);
     const { space: other } = await ctx.newSharedSpace({ createdById: user.id });
 
-    const a = await sut.createAlbumFolder({ spaceId: space.id, parentId: null, name: 'Trips', createdById: user.id });
-    const b = await sut.createAlbumFolder({ spaceId: space.id, parentId: a.id, name: '2026', createdById: user.id });
-    await sut.createAlbumFolder({ spaceId: other.id, parentId: null, name: 'Secret', createdById: user.id });
+    const a = await createFolder(sut, { spaceId: space.id, parentId: null, name: 'Trips', createdById: user.id });
+    const b = await createFolder(sut, { spaceId: space.id, parentId: a.id, name: '2026', createdById: user.id });
+    await createFolder(sut, { spaceId: other.id, parentId: null, name: 'Secret', createdById: user.id });
 
     const rows = await sut.getAlbumFoldersBySpace(space.id);
 
@@ -323,19 +366,19 @@ describe('SharedSpaceRepository — album folder primitives', () => {
   it('P-03: getAlbumFolderAncestors returns the chain self-first up to the root', async () => {
     const { ctx, sut } = setup();
     const { user, space } = await seed(ctx);
-    const trips = await sut.createAlbumFolder({
+    const trips = await createFolder(sut, {
       spaceId: space.id,
       parentId: null,
       name: 'Trips',
       createdById: user.id,
     });
-    const y2026 = await sut.createAlbumFolder({
+    const y2026 = await createFolder(sut, {
       spaceId: space.id,
       parentId: trips.id,
       name: '2026',
       createdById: user.id,
     });
-    const italy = await sut.createAlbumFolder({
+    const italy = await createFolder(sut, {
       spaceId: space.id,
       parentId: y2026.id,
       name: 'Italy',
@@ -351,7 +394,7 @@ describe('SharedSpaceRepository — album folder primitives', () => {
   it('P-03: getAlbumFolderAncestors returns a single element for a root folder', async () => {
     const { ctx, sut } = setup();
     const { user, space } = await seed(ctx);
-    const trips = await sut.createAlbumFolder({
+    const trips = await createFolder(sut, {
       spaceId: space.id,
       parentId: null,
       name: 'Trips',
@@ -365,19 +408,19 @@ describe('SharedSpaceRepository — album folder primitives', () => {
   it('P-04: getAlbumFolderSubtree returns the folder and all descendants with relative depth', async () => {
     const { ctx, sut } = setup();
     const { user, space } = await seed(ctx);
-    const trips = await sut.createAlbumFolder({
+    const trips = await createFolder(sut, {
       spaceId: space.id,
       parentId: null,
       name: 'Trips',
       createdById: user.id,
     });
-    const y2026 = await sut.createAlbumFolder({
+    const y2026 = await createFolder(sut, {
       spaceId: space.id,
       parentId: trips.id,
       name: '2026',
       createdById: user.id,
     });
-    const italy = await sut.createAlbumFolder({
+    const italy = await createFolder(sut, {
       spaceId: space.id,
       parentId: y2026.id,
       name: 'Italy',
@@ -398,7 +441,7 @@ describe('SharedSpaceRepository — album folder primitives', () => {
   it('P-04: getAlbumFolderSubtree returns only self for a leaf', async () => {
     const { ctx, sut } = setup();
     const { user, space } = await seed(ctx);
-    const trips = await sut.createAlbumFolder({
+    const trips = await createFolder(sut, {
       spaceId: space.id,
       parentId: null,
       name: 'Trips',
@@ -412,19 +455,19 @@ describe('SharedSpaceRepository — album folder primitives', () => {
   it('P-05: deleteAlbumFolderPromotingChildren promotes direct children one level only', async () => {
     const { ctx, sut } = setup();
     const { user, space } = await seed(ctx);
-    const trips = await sut.createAlbumFolder({
+    const trips = await createFolder(sut, {
       spaceId: space.id,
       parentId: null,
       name: 'Trips',
       createdById: user.id,
     });
-    const y2026 = await sut.createAlbumFolder({
+    const y2026 = await createFolder(sut, {
       spaceId: space.id,
       parentId: trips.id,
       name: '2026',
       createdById: user.id,
     });
-    const italy = await sut.createAlbumFolder({
+    const italy = await createFolder(sut, {
       spaceId: space.id,
       parentId: y2026.id,
       name: 'Italy',
@@ -454,13 +497,13 @@ describe('SharedSpaceRepository — album folder primitives', () => {
   it('P-05: deleteAlbumFolderPromotingChildren repoints album links and never unlinks', async () => {
     const { ctx, sut } = setup();
     const { user, space } = await seed(ctx);
-    const archive = await sut.createAlbumFolder({
+    const archive = await createFolder(sut, {
       spaceId: space.id,
       parentId: null,
       name: 'Archive',
       createdById: user.id,
     });
-    const trips = await sut.createAlbumFolder({
+    const trips = await createFolder(sut, {
       spaceId: space.id,
       parentId: archive.id,
       name: 'Trips',
@@ -500,19 +543,19 @@ describe('SharedSpaceRepository — album folder primitives', () => {
   it('P-05: deleteAlbumFolderPromotingChildren refuses a promote that collides with a sibling name, rolling back', async () => {
     const { ctx, sut } = setup();
     const { user, space } = await seed(ctx);
-    const trips = await sut.createAlbumFolder({
+    const trips = await createFolder(sut, {
       spaceId: space.id,
       parentId: null,
       name: 'Trips',
       createdById: user.id,
     });
-    const nested2026 = await sut.createAlbumFolder({
+    const nested2026 = await createFolder(sut, {
       spaceId: space.id,
       parentId: trips.id,
       name: '2026',
       createdById: user.id,
     });
-    const root2026 = await sut.createAlbumFolder({
+    const root2026 = await createFolder(sut, {
       spaceId: space.id,
       parentId: null,
       name: '2026',
@@ -536,19 +579,19 @@ describe('SharedSpaceRepository — album folder primitives', () => {
   it('P-05: deleteAlbumFolderPromotingChildren still promotes normally when no sibling name collides', async () => {
     const { ctx, sut } = setup();
     const { user, space } = await seed(ctx);
-    const trips = await sut.createAlbumFolder({
+    const trips = await createFolder(sut, {
       spaceId: space.id,
       parentId: null,
       name: 'Trips',
       createdById: user.id,
     });
-    const y2026 = await sut.createAlbumFolder({
+    const y2026 = await createFolder(sut, {
       spaceId: space.id,
       parentId: trips.id,
       name: '2026',
       createdById: user.id,
     });
-    await sut.createAlbumFolder({ spaceId: space.id, parentId: null, name: 'Unrelated', createdById: user.id });
+    await createFolder(sut, { spaceId: space.id, parentId: null, name: 'Unrelated', createdById: user.id });
 
     await expect(sut.deleteAlbumFolderPromotingChildren(space.id, trips.id)).resolves.toEqual({ outcome: 'ok' });
 
@@ -556,23 +599,82 @@ describe('SharedSpaceRepository — album folder primitives', () => {
     await expect(sut.getAlbumFolderById(space.id, trips.id)).resolves.toBeUndefined();
   });
 
-  // P-06
-  it('P-06: countAlbumFoldersBySpace counts only this space', async () => {
+  // P-06: the per-space folder cap. Enforced inside createAlbumFolder's own locked transaction
+  // rather than by a count in the service followed by an insert — see the method's comment.
+  it('P-06: refuses the create once the space is at the cap', async () => {
+    const { ctx, sut } = setup();
+    const { user, space } = await seed(ctx);
+    await createFolder(sut, { spaceId: space.id, parentId: null, name: 'A', createdById: user.id });
+    await createFolder(sut, { spaceId: space.id, parentId: null, name: 'B', createdById: user.id });
+
+    await expect(
+      sut.createAlbumFolder({ spaceId: space.id, parentId: null, name: 'C', createdById: user.id }, 2),
+    ).resolves.toEqual({ outcome: 'cap' });
+
+    const rows = await ctx.database
+      .selectFrom('shared_space_album_folder')
+      .selectAll()
+      .where('spaceId', '=', space.id)
+      .execute();
+    expect(rows.map((r) => r.name).sort()).toEqual(['A', 'B']);
+  });
+
+  it('P-06: allows the create at one below the cap', async () => {
+    const { ctx, sut } = setup();
+    const { user, space } = await seed(ctx);
+    await createFolder(sut, { spaceId: space.id, parentId: null, name: 'A', createdById: user.id });
+
+    await expect(
+      sut.createAlbumFolder({ spaceId: space.id, parentId: null, name: 'B', createdById: user.id }, 2),
+    ).resolves.toMatchObject({ outcome: 'ok', folder: { name: 'B' } });
+  });
+
+  // P-06: the cap is scoped to ONE space. Without the spaceId predicate on the count, a busy
+  // instance would start refusing creates in every space at once.
+  it('P-06: counts only this space toward the cap', async () => {
     const { ctx, sut } = setup();
     const { user, space } = await seed(ctx);
     const { space: other } = await ctx.newSharedSpace({ createdById: user.id });
-    await sut.createAlbumFolder({ spaceId: space.id, parentId: null, name: 'A', createdById: user.id });
-    await sut.createAlbumFolder({ spaceId: space.id, parentId: null, name: 'B', createdById: user.id });
-    await sut.createAlbumFolder({ spaceId: other.id, parentId: null, name: 'C', createdById: user.id });
+    await createFolder(sut, { spaceId: other.id, parentId: null, name: 'A', createdById: user.id });
+    await createFolder(sut, { spaceId: other.id, parentId: null, name: 'B', createdById: user.id });
 
-    await expect(sut.countAlbumFoldersBySpace(space.id)).resolves.toBe(2);
+    await expect(
+      sut.createAlbumFolder({ spaceId: space.id, parentId: null, name: 'C', createdById: user.id }, 2),
+    ).resolves.toMatchObject({ outcome: 'ok' });
+  });
+
+  // P-06: THE reason the count moved inside the transaction. Counting in the service and
+  // inserting afterwards is a TOCTOU — under READ COMMITTED every concurrent create sitting at
+  // cap-minus-one reads the same count and every one of them inserts. Four racing creates into
+  // a space holding 2 folders with a cap of 3 must yield exactly one winner.
+  it('P-06: concurrent creates at the cap admit exactly one', async () => {
+    const { ctx, sut } = setup();
+    const { user, space } = await seed(ctx);
+    await createFolder(sut, { spaceId: space.id, parentId: null, name: 'A', createdById: user.id });
+    await createFolder(sut, { spaceId: space.id, parentId: null, name: 'B', createdById: user.id });
+
+    const results = await Promise.all(
+      ['W', 'X', 'Y', 'Z'].map((name) =>
+        sut.createAlbumFolder({ spaceId: space.id, parentId: null, name, createdById: user.id }, 3),
+      ),
+    );
+
+    expect(results.filter((r) => r.outcome === 'ok')).toHaveLength(1);
+    expect(results.filter((r) => r.outcome === 'cap')).toHaveLength(3);
+
+    const rows = await ctx.database
+      .selectFrom('shared_space_album_folder')
+      .selectAll()
+      .where('spaceId', '=', space.id)
+      .execute();
+    expect(rows).toHaveLength(3);
   });
 
   // P-07
   it('P-07: setAlbumLinkFolder writes folderId on the link', async () => {
     const { ctx, sut } = setup();
     const { user, space } = await seed(ctx);
-    const trips = await sut.createAlbumFolder({
+    const trips = await createFolder(sut, {
       spaceId: space.id,
       parentId: null,
       name: 'Trips',
@@ -596,7 +698,7 @@ describe('SharedSpaceRepository — album folder primitives', () => {
   it('P-07: setAlbumLinkFolder returns false when the album is not linked to the space', async () => {
     const { ctx, sut } = setup();
     const { user, space } = await seed(ctx);
-    const trips = await sut.createAlbumFolder({
+    const trips = await createFolder(sut, {
       spaceId: space.id,
       parentId: null,
       name: 'Trips',
@@ -610,7 +712,7 @@ describe('SharedSpaceRepository — album folder primitives', () => {
   it('P-07: setAlbumLinkFolder clears the placement when given null', async () => {
     const { ctx, sut } = setup();
     const { user, space } = await seed(ctx);
-    const trips = await sut.createAlbumFolder({
+    const trips = await createFolder(sut, {
       spaceId: space.id,
       parentId: null,
       name: 'Trips',
@@ -639,7 +741,7 @@ describe('SharedSpaceRepository — album folder primitives', () => {
   it('A-03: setAlbumLinkFolder is idempotent when repeated with the same folderId', async () => {
     const { ctx, sut } = setup();
     const { user, space } = await seed(ctx);
-    const trips = await sut.createAlbumFolder({
+    const trips = await createFolder(sut, {
       spaceId: space.id,
       parentId: null,
       name: 'Trips',
@@ -669,7 +771,7 @@ describe('SharedSpaceRepository — album folder primitives', () => {
     const { ctx, sut } = setup();
     const { user, space } = await seed(ctx);
     const { space: otherSpace } = await ctx.newSharedSpace({ createdById: user.id });
-    const trips = await sut.createAlbumFolder({
+    const trips = await createFolder(sut, {
       spaceId: space.id,
       parentId: null,
       name: 'Trips',
@@ -693,7 +795,7 @@ describe('SharedSpaceRepository — album folder primitives', () => {
   it('hasSiblingAlbumFolderName detects a case-insensitive collision and honours excludeId', async () => {
     const { ctx, sut } = setup();
     const { user, space } = await seed(ctx);
-    const trips = await sut.createAlbumFolder({
+    const trips = await createFolder(sut, {
       spaceId: space.id,
       parentId: null,
       name: 'Trips',
@@ -714,13 +816,13 @@ describe('SharedSpaceRepository — album folder primitives', () => {
   it('hasSiblingAlbumFolderName detects a case-insensitive collision under a NON-NULL parent', async () => {
     const { ctx, sut } = setup();
     const { user, space } = await seed(ctx);
-    const trips = await sut.createAlbumFolder({
+    const trips = await createFolder(sut, {
       spaceId: space.id,
       parentId: null,
       name: 'Trips',
       createdById: user.id,
     });
-    const y2026 = await sut.createAlbumFolder({
+    const y2026 = await createFolder(sut, {
       spaceId: space.id,
       parentId: trips.id,
       name: '2026',
@@ -741,7 +843,7 @@ describe('SharedSpaceRepository — album folder primitives', () => {
   it('updateAlbumFolder renames, and returns false for an unknown folder', async () => {
     const { ctx, sut } = setup();
     const { user, space } = await seed(ctx);
-    const trips = await sut.createAlbumFolder({
+    const trips = await createFolder(sut, {
       spaceId: space.id,
       parentId: null,
       name: 'Trips',
@@ -760,17 +862,99 @@ describe('SharedSpaceRepository — album folder primitives', () => {
   });
 });
 
+// A cycle should be impossible to create through the service — moveAlbumFolderChecked re-checks
+// the ancestor chain under a per-space advisory lock. These tests build one with raw SQL anyway,
+// because "impossible" only covers the code paths we know about: a restored backup, a manual
+// UPDATE, or a future defect can all put one in the table. A `WITH RECURSIVE` walk over a cyclic
+// adjacency list does not error, it SPINS — holding a request-path connection until something
+// kills it. Every assertion below is really "this returned at all"; without the traversal guard
+// each one hangs until the test times out.
+describe('folder-tree traversal guards', () => {
+  // The bound must sit ABOVE the service's depth cap. Below or equal, and a legitimate chain
+  // would be truncated — under-reporting a folder's depth and letting a create through that
+  // should have been refused. That would be a correctness bug wearing a safety guard's clothes.
+  it('the traversal limit is above the depth cap, so it can never truncate a legal chain', () => {
+    expect(ALBUM_FOLDER_TRAVERSAL_LIMIT).toBeGreaterThan(SHARED_SPACE_ALBUM_FOLDER_MAX_DEPTH);
+  });
+
+  it('getAlbumFolderAncestors returns a chain at the cap in full', async () => {
+    const { ctx, sut } = setup();
+    const { space } = await seed(ctx);
+    let parentId: string | null = null;
+    let deepest = '';
+    for (let level = 1; level <= SHARED_SPACE_ALBUM_FOLDER_MAX_DEPTH; level++) {
+      const row = await insertFolder(ctx, { spaceId: space.id, parentId, name: `L${level}` });
+      parentId = row.id;
+      deepest = row.id;
+    }
+
+    await expect(sut.getAlbumFolderAncestors(deepest)).resolves.toHaveLength(SHARED_SPACE_ALBUM_FOLDER_MAX_DEPTH);
+  });
+
+  it('getAlbumFolderAncestors terminates on a cycle instead of spinning', async () => {
+    const { ctx, sut } = setup();
+    const { space } = await seed(ctx);
+    const { a } = await seedCycle(ctx, space.id);
+
+    const chain = await withinTimeout('getAlbumFolderAncestors', sut.getAlbumFolderAncestors(a.id));
+
+    // hops 0..LIMIT inclusive — the walk is cut off, not completed.
+    expect(chain).toHaveLength(ALBUM_FOLDER_TRAVERSAL_LIMIT + 1);
+  });
+
+  it('getAlbumFolderSubtree terminates on a cycle instead of spinning', async () => {
+    const { ctx, sut } = setup();
+    const { space } = await seed(ctx);
+    const { a } = await seedCycle(ctx, space.id);
+
+    const subtree = await withinTimeout('getAlbumFolderSubtree', sut.getAlbumFolderSubtree(a.id));
+
+    expect(subtree).toHaveLength(ALBUM_FOLDER_TRAVERSAL_LIMIT + 1);
+    // The height it reports is over the depth cap, so the service refuses the move rather than
+    // silently accepting one into corrupt structure.
+    expect(Math.max(...subtree.map((node) => node.depth))).toBeGreaterThan(SHARED_SPACE_ALBUM_FOLDER_MAX_DEPTH);
+  });
+
+  // The worst place to hang: this walk IS the cycle check, and it runs holding the per-space
+  // advisory lock, so spinning here would block every other folder move in the space too.
+  it('moveAlbumFolderChecked terminates when the destination sits in a pre-existing cycle', async () => {
+    const { ctx, sut } = setup();
+    const { space } = await seed(ctx);
+    const { a } = await seedCycle(ctx, space.id);
+    const loose = await insertFolder(ctx, { spaceId: space.id, name: 'Loose' });
+
+    await expect(
+      withinTimeout('moveAlbumFolderChecked', sut.moveAlbumFolderChecked(space.id, loose.id, a.id)),
+    ).resolves.toBe('ok');
+  });
+
+  // And the case the guard must NOT break: a genuine descendant is still detected as a cycle.
+  it('still detects a real cycle once the guard is in place', async () => {
+    const { ctx, sut } = setup();
+    const { user, space } = await seed(ctx);
+    const trips = await createFolder(sut, { spaceId: space.id, parentId: null, name: 'Trips', createdById: user.id });
+    const nested = await createFolder(sut, {
+      spaceId: space.id,
+      parentId: trips.id,
+      name: '2026',
+      createdById: user.id,
+    });
+
+    await expect(sut.moveAlbumFolderChecked(space.id, trips.id, nested.id)).resolves.toBe('cycle');
+  });
+});
+
 describe('SharedSpaceRepository — album folder moves', () => {
   it('moveAlbumFolderChecked reparents a folder', async () => {
     const { ctx, sut } = setup();
     const { user, space } = await seed(ctx);
-    const archive = await sut.createAlbumFolder({
+    const archive = await createFolder(sut, {
       spaceId: space.id,
       parentId: null,
       name: 'Archive',
       createdById: user.id,
     });
-    const trips = await sut.createAlbumFolder({
+    const trips = await createFolder(sut, {
       spaceId: space.id,
       parentId: null,
       name: 'Trips',
@@ -784,13 +968,13 @@ describe('SharedSpaceRepository — album folder moves', () => {
   it('moveAlbumFolderChecked reports a cycle when the target is a descendant', async () => {
     const { ctx, sut } = setup();
     const { user, space } = await seed(ctx);
-    const trips = await sut.createAlbumFolder({
+    const trips = await createFolder(sut, {
       spaceId: space.id,
       parentId: null,
       name: 'Trips',
       createdById: user.id,
     });
-    const y2026 = await sut.createAlbumFolder({
+    const y2026 = await createFolder(sut, {
       spaceId: space.id,
       parentId: trips.id,
       name: '2026',
@@ -805,7 +989,7 @@ describe('SharedSpaceRepository — album folder moves', () => {
     const { ctx, sut } = setup();
     const { user, space } = await seed(ctx);
     const { space: other } = await ctx.newSharedSpace({ createdById: user.id });
-    const foreign = await sut.createAlbumFolder({
+    const foreign = await createFolder(sut, {
       spaceId: other.id,
       parentId: null,
       name: 'Trips',
@@ -824,15 +1008,15 @@ describe('SharedSpaceRepository — album folder moves', () => {
   it('moveAlbumFolderChecked renames and reparents atomically, without a transient name collision', async () => {
     const { ctx, sut } = setup();
     const { user, space } = await seed(ctx);
-    const archive = await sut.createAlbumFolder({
+    const archive = await createFolder(sut, {
       spaceId: space.id,
       parentId: null,
       name: 'Archive',
       createdById: user.id,
     });
     // Archive already holds a folder named "Trips" — the CURRENT name of the folder about to move in.
-    await sut.createAlbumFolder({ spaceId: space.id, parentId: archive.id, name: 'Trips', createdById: user.id });
-    const trips = await sut.createAlbumFolder({
+    await createFolder(sut, { spaceId: space.id, parentId: archive.id, name: 'Trips', createdById: user.id });
+    const trips = await createFolder(sut, {
       spaceId: space.id,
       parentId: null,
       name: 'Trips',
@@ -862,8 +1046,8 @@ describe('SharedSpaceRepository — album folder moves', () => {
   it('C-01: concurrent X->Y and Y->X moves cannot both succeed', async () => {
     const { ctx, sut } = setup();
     const { user, space } = await seed(ctx);
-    const x = await sut.createAlbumFolder({ spaceId: space.id, parentId: null, name: 'X', createdById: user.id });
-    const y = await sut.createAlbumFolder({ spaceId: space.id, parentId: null, name: 'Y', createdById: user.id });
+    const x = await createFolder(sut, { spaceId: space.id, parentId: null, name: 'X', createdById: user.id });
+    const y = await createFolder(sut, { spaceId: space.id, parentId: null, name: 'Y', createdById: user.id });
 
     const results = await Promise.all([
       sut.moveAlbumFolderChecked(space.id, x.id, y.id),
@@ -886,13 +1070,13 @@ describe('SharedSpaceRepository — album folder moves', () => {
   it('C-01 mechanism: a held lock on the same space blocks a concurrent move until released', async () => {
     const { ctx, sut } = setup();
     const { user, space } = await seed(ctx);
-    const trips = await sut.createAlbumFolder({
+    const trips = await createFolder(sut, {
       spaceId: space.id,
       parentId: null,
       name: 'Trips',
       createdById: user.id,
     });
-    const archive = await sut.createAlbumFolder({
+    const archive = await createFolder(sut, {
       spaceId: space.id,
       parentId: null,
       name: 'Archive',
@@ -934,13 +1118,13 @@ describe('SharedSpaceRepository — album folder moves', () => {
     const { ctx, sut } = setup();
     const { user, space } = await seed(ctx);
     const { space: otherSpace } = await ctx.newSharedSpace({ createdById: user.id });
-    const trips = await sut.createAlbumFolder({
+    const trips = await createFolder(sut, {
       spaceId: space.id,
       parentId: null,
       name: 'Trips',
       createdById: user.id,
     });
-    const archive = await sut.createAlbumFolder({
+    const archive = await createFolder(sut, {
       spaceId: space.id,
       parentId: null,
       name: 'Archive',
@@ -974,7 +1158,7 @@ describe('SharedSpaceRepository — album folder moves', () => {
   it('C-03 mechanism: a held move lock on the same space blocks a concurrent delete until released', async () => {
     const { ctx, sut } = setup();
     const { user, space } = await seed(ctx);
-    const trips = await sut.createAlbumFolder({
+    const trips = await createFolder(sut, {
       spaceId: space.id,
       parentId: null,
       name: 'Trips',
@@ -1014,7 +1198,7 @@ describe('SharedSpaceRepository — album folder moves', () => {
     const { ctx, sut } = setup();
     const { user, space } = await seed(ctx);
     const { space: otherSpace } = await ctx.newSharedSpace({ createdById: user.id });
-    const trips = await sut.createAlbumFolder({
+    const trips = await createFolder(sut, {
       spaceId: space.id,
       parentId: null,
       name: 'Trips',
@@ -1047,7 +1231,7 @@ describe('album placement lifecycle', () => {
   it('A-07: unlinking removes the placement and re-linking lands at the root', async () => {
     const { ctx, sut } = setup();
     const { user, space } = await seed(ctx);
-    const folder = await sut.createAlbumFolder({
+    const folder = await createFolder(sut, {
       spaceId: space.id,
       parentId: null,
       name: 'Trips',
@@ -1090,13 +1274,13 @@ describe('album placement lifecycle', () => {
   it("C-03a: setAlbumLinkFolder then deleteAlbumFolderPromotingChildren repoints the link to the folder's parent", async () => {
     const { ctx, sut } = setup();
     const { user, space } = await seed(ctx);
-    const archive = await sut.createAlbumFolder({
+    const archive = await createFolder(sut, {
       spaceId: space.id,
       parentId: null,
       name: 'Archive',
       createdById: user.id,
     });
-    const trips = await sut.createAlbumFolder({
+    const trips = await createFolder(sut, {
       spaceId: space.id,
       parentId: archive.id,
       name: 'Trips',
@@ -1126,7 +1310,7 @@ describe('album placement lifecycle', () => {
   it('C-03b: setAlbumLinkFolder rejects with a foreign-key error when the folder was already deleted', async () => {
     const { ctx, sut } = setup();
     const { user, space } = await seed(ctx);
-    const folder = await sut.createAlbumFolder({
+    const folder = await createFolder(sut, {
       spaceId: space.id,
       parentId: null,
       name: 'Trips',

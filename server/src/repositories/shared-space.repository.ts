@@ -54,6 +54,26 @@ class AlbumFolderPromotionConflictError extends Error {
   }
 }
 
+/**
+ * Hard stop for the folder-tree recursive CTEs.
+ *
+ * The service refuses to CREATE a cycle (moveAlbumFolderChecked re-checks the ancestor chain
+ * under a per-space advisory lock), but nothing stops one already being in the data: a restored
+ * backup, a manual `UPDATE`, or a defect in a future code path. A `WITH RECURSIVE` walk over a
+ * cyclic adjacency list never terminates — it does not error, it spins, holding a connection
+ * until something kills it. Every one of these walks is on the request path, so that is an
+ * availability bug, not a data bug.
+ *
+ * Bounding the walk turns it into a refusal instead. It is deliberately ABOVE the service's
+ * depth cap (SHARED_SPACE_ALBUM_FOLDER_MAX_DEPTH), so a legitimate chain is always returned
+ * whole and the bound can never make a folder look shallower than it is — which would let a
+ * create through that should have been refused. Anything that does hit the bound is either
+ * cyclic or already deeper than the cap, and both correctly end in a 400.
+ *
+ * `shared-space-album-folder.repository.spec.ts` pins the ordering against the service's cap.
+ */
+export const ALBUM_FOLDER_TRAVERSAL_LIMIT = 32;
+
 type SpacePersonStatistics = {
   assets: number;
   faces: number;
@@ -1380,9 +1400,48 @@ export class SharedSpaceRepository {
   // Shared Space Album Folder CRUD
   // ==========================================
 
-  @GenerateSql({ params: [{ spaceId: DummyValue.UUID, parentId: null, name: 'Trips', createdById: DummyValue.UUID }] })
-  createAlbumFolder(dto: { spaceId: string; parentId: string | null; name: string; createdById: string | null }) {
-    return this.db.insertInto('shared_space_album_folder').values(dto).returningAll().executeTakeFirstOrThrow();
+  // Counts and inserts under the SAME per-space advisory lock the move and delete paths take, so
+  // the per-space folder cap is actually a cap. Checking the count in the service and inserting
+  // afterwards was a TOCTOU: under READ COMMITTED, N concurrent creates at 499 all read 499 and
+  // all insert. Folding the count into an `INSERT ... SELECT ... WHERE (SELECT count(*)) < cap`
+  // would NOT have fixed it either — each statement still evaluates that subquery against its own
+  // snapshot. Only serialising the read-then-write closes it.
+  //
+  // The cap is what makes the whole-space folder fetch the web client does on page load safe
+  // rather than merely likely, so it is worth holding to. Creates are rare and bounded (500 per
+  // space, ever), so the lock costs nothing.
+  //
+  // Everything below uses `trx` — a `this.db` query inside a transaction callback deadlocks.
+  @GenerateSql({
+    params: [{ spaceId: DummyValue.UUID, parentId: null, name: 'Trips', createdById: DummyValue.UUID }, 500],
+  })
+  createAlbumFolder(
+    dto: { spaceId: string; parentId: string | null; name: string; createdById: string | null },
+    maxPerSpace: number,
+  ) {
+    return this.db.transaction().execute(async (trx) => {
+      await sql`SELECT pg_advisory_xact_lock(hashtext('shared-space-album-folder-move'), hashtext(${dto.spaceId}))`.execute(
+        trx,
+      );
+
+      const { count } = await trx
+        .selectFrom('shared_space_album_folder')
+        .select((eb) => eb.fn.countAll<string>().as('count'))
+        .where('spaceId', '=', dto.spaceId)
+        .executeTakeFirstOrThrow();
+
+      if (Number(count) >= maxPerSpace) {
+        return { outcome: 'cap' as const };
+      }
+
+      const folder = await trx
+        .insertInto('shared_space_album_folder')
+        .values(dto)
+        .returningAll()
+        .executeTakeFirstOrThrow();
+
+      return { outcome: 'ok' as const, folder };
+    });
   }
 
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
@@ -1405,36 +1464,32 @@ export class SharedSpaceRepository {
       .execute();
   }
 
-  @GenerateSql({ params: [DummyValue.UUID] })
-  async countAlbumFoldersBySpace(spaceId: string): Promise<number> {
-    const row = await this.db
-      .selectFrom('shared_space_album_folder')
-      .select((eb) => eb.fn.countAll<string>().as('count'))
-      .where('spaceId', '=', spaceId)
-      .executeTakeFirstOrThrow();
-    return Number(row.count);
-  }
-
   // Self first, then each parent up to the root. The service uses `.length` as the folder's
   // depth (root = 1) and reverses the array for the breadcrumb.
   @GenerateSql({ params: [DummyValue.UUID] })
   getAlbumFolderAncestors(folderId: string) {
-    return this.db
-      .withRecursive('ancestors', (qb) =>
-        qb
-          .selectFrom('shared_space_album_folder')
-          .select(['id', 'parentId', 'name'])
-          .where('id', '=', folderId)
-          .unionAll(
-            qb
-              .selectFrom('shared_space_album_folder as f')
-              .innerJoin('ancestors as a', 'a.parentId', 'f.id')
-              .select(['f.id', 'f.parentId', 'f.name']),
-          ),
-      )
-      .selectFrom('ancestors')
-      .selectAll()
-      .execute();
+    return (
+      this.db
+        .withRecursive('ancestors', (qb) =>
+          qb
+            .selectFrom('shared_space_album_folder')
+            .select(['id', 'parentId', 'name', sql<number>`0`.as('hops')])
+            .where('id', '=', folderId)
+            .unionAll(
+              qb
+                .selectFrom('shared_space_album_folder as f')
+                .innerJoin('ancestors as a', 'a.parentId', 'f.id')
+                .select(['f.id', 'f.parentId', 'f.name', sql<number>`a.hops + 1`.as('hops')])
+                // Cycle stop — see ALBUM_FOLDER_TRAVERSAL_LIMIT. Without it a cyclic parent chain
+                // spins this CTE forever instead of returning.
+                .where(sql<boolean>`a.hops < ${ALBUM_FOLDER_TRAVERSAL_LIMIT}`),
+            ),
+        )
+        .selectFrom('ancestors')
+        // `hops` is internal bookkeeping; the caller's shape is unchanged.
+        .select(['id', 'parentId', 'name'])
+        .execute()
+    );
   }
 
   // Self at depth 0, descendants at increasing depth. max(depth) is the subtree's height,
@@ -1451,7 +1506,11 @@ export class SharedSpaceRepository {
             qb
               .selectFrom('shared_space_album_folder as f')
               .innerJoin('subtree as s', 's.id', 'f.parentId')
-              .select(['f.id', sql<number>`s.depth + 1`.as('depth')]),
+              .select(['f.id', sql<number>`s.depth + 1`.as('depth')])
+              // Cycle stop — see ALBUM_FOLDER_TRAVERSAL_LIMIT. `depth` doubles as the hop
+              // counter here, so a cyclic subtree reports an over-cap height and the move is
+              // refused rather than the query spinning.
+              .where(sql<boolean>`s.depth < ${ALBUM_FOLDER_TRAVERSAL_LIMIT}`),
           ),
       )
       .selectFrom('subtree')
@@ -1675,13 +1734,18 @@ export class SharedSpaceRepository {
           .withRecursive('ancestors', (qb) =>
             qb
               .selectFrom('shared_space_album_folder')
-              .select(['id', 'parentId'])
+              .select(['id', 'parentId', sql<number>`0`.as('hops')])
               .where('id', '=', newParentId)
               .unionAll(
                 qb
                   .selectFrom('shared_space_album_folder as f')
                   .innerJoin('ancestors as a', 'a.parentId', 'f.id')
-                  .select(['f.id', 'f.parentId']),
+                  .select(['f.id', 'f.parentId', sql<number>`a.hops + 1`.as('hops')])
+                  // Cycle stop — see ALBUM_FOLDER_TRAVERSAL_LIMIT. This walk is the cycle CHECK
+                  // itself, so it is the one that must never be the thing that hangs: a cycle
+                  // that predates this transaction would otherwise spin here, holding the
+                  // per-space lock the whole time and blocking every other move in the space.
+                  .where(sql<boolean>`a.hops < ${ALBUM_FOLDER_TRAVERSAL_LIMIT}`),
               ),
           )
           .selectFrom('ancestors')
