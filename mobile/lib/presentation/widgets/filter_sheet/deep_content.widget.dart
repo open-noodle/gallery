@@ -89,7 +89,10 @@ class DeepContent extends ConsumerWidget {
             key: const PageStorageKey('filter-sheet-deep-scroll'),
             controller: scrollController,
             keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-            padding: const EdgeInsets.only(bottom: 88),
+            // Clears the MatchCountFooter stacked on top of this list — it grows
+            // by the system nav bar inset on Android, and the last section has
+            // to clear all of it.
+            padding: EdgeInsets.only(bottom: MatchCountFooter.reservedHeightFor(context)),
             children: [
               const KeyedSubtree(key: Key('deep-header'), child: DeepHeader()),
               const Padding(
