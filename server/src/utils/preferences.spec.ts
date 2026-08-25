@@ -15,6 +15,7 @@ const getDefaultPreferences = (): UserPreferences => ({
   memories: {
     enabled: true,
     duration: 5,
+    sidebarWeb: false,
     types: {
       on_this_day: true,
       birthday: true,
