@@ -46,7 +46,24 @@ invent a permission hierarchy that does not exist. This is enforced by where the
 
 `server/src/schema/tables/shared-space-album-folder.table.ts`, with the migration in
 `server/src/schema/migrations-gallery/1785000000000-AddSharedSpaceAlbumFolderTable.ts` (round
-timestamp per the fork convention; the highest existing fork migration is `1784800000000`).
+timestamp per the fork convention; `1784800000000` was the highest existing fork migration when
+this branch started).
+
+**These timestamps now sit BELOW main's, and must stay that way.** `main` has since gained
+`1787000000000`–`1792123120451`, so on a database that already tracks main these two apply out of
+order. That is fine at runtime — `DatabaseRepository.createMigrator()` sets
+`allowUnorderedMigrations: true` precisely for this, which is what makes fork migrations
+interleavable with upstream ones at all. The only cost is `pnpm migrations:run`, whose `sql-tools`
+CLI hardcodes `allowUnorderedMigrations: false` and will refuse them on a dev database that already
+ran main's later migrations; the server applies them itself on startup.
+
+Re-stamping them above main's would be **worse than the untidiness it fixes**. Release-candidate
+images have been built from this branch and run against real databases, which have therefore
+already recorded `1785000000000` / `1786000000000`. Renaming the files would make those databases
+treat the migrations as un-run and re-apply them (`CREATE TABLE` on a table that exists → boot
+failure), *and* leave the recorded names with no matching file on disk, which Kysely hard-fails on
+at boot. This is the same trap the `ChangeDurationToInteger` compatibility alias in
+`server/bin/sync-gallery-migrations.mjs` exists to paper over — do not re-open it.
 
 | Column        | Type                | Notes                                                                              |
 | ------------- | ------------------- | ---------------------------------------------------------------------------------- |
