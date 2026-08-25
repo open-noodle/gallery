@@ -70,4 +70,46 @@ void main() {
       verifyNever(() => mockRepository.getAll(any()));
     });
   });
+
+  group('getAll', () {
+    test('reads from the server so shared-space memories appear', () async {
+      when(() => mockApiRepository.getAllMemories(onlyFavorites: any(named: 'onlyFavorites')))
+          .thenAnswer((_) async => [memory('from-server')]);
+
+      final result = await sut.getAll('owner-1');
+
+      expect(result.single.id, 'from-server');
+      verifyNever(
+        () => mockRepository.getAll(any(), onlyToday: any(named: 'onlyToday'), onlyFavorites: any(named: 'onlyFavorites')),
+      );
+    });
+
+    test('falls back to the owner-scoped local list when the server fails', () async {
+      when(() => mockApiRepository.getAllMemories(onlyFavorites: any(named: 'onlyFavorites')))
+          .thenThrow(Exception('offline'));
+      when(
+        () => mockRepository.getAll('owner-1', onlyToday: false, onlyFavorites: false),
+      ).thenAnswer((_) async => [memory('from-local')]);
+
+      expect((await sut.getAll('owner-1')).single.id, 'from-local');
+    });
+
+    test('returns empty when the server fails and the local DB is empty', () async {
+      when(() => mockApiRepository.getAllMemories(onlyFavorites: any(named: 'onlyFavorites')))
+          .thenThrow(Exception('offline'));
+      when(
+        () => mockRepository.getAll('owner-1', onlyToday: false, onlyFavorites: false),
+      ).thenAnswer((_) async => []);
+
+      expect(await sut.getAll('owner-1'), isEmpty);
+    });
+
+    test('threads onlyFavorites through to both paths', () async {
+      when(() => mockApiRepository.getAllMemories(onlyFavorites: true)).thenAnswer((_) async => []);
+
+      await sut.getAll('owner-1', onlyFavorites: true);
+
+      verify(() => mockApiRepository.getAllMemories(onlyFavorites: true)).called(1);
+    });
+  });
 }

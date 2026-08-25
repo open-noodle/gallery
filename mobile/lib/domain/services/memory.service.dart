@@ -29,8 +29,18 @@ class MemoryService {
     }
   }
 
-  Future<List<Memory>> getAll(String ownerId, {bool onlyFavorites = false}) {
-    return _repository.getAll(ownerId, onlyToday: false, onlyFavorites: onlyFavorites);
+  /// Every memory for the memories list page.
+  ///
+  /// Server-first for the same reason as [getMemoryLane]: the memory sync streams are
+  /// owner-scoped, so the local DB can never hold a memory built from Space-shared photos.
+  /// Both surfaces on this screen therefore read the same source. See issue #997.
+  Future<List<Memory>> getAll(String ownerId, {bool onlyFavorites = false}) async {
+    try {
+      return await _apiRepository.getAllMemories(onlyFavorites: onlyFavorites);
+    } catch (error, stackTrace) {
+      log.warning("Failed to fetch all memories from the server; using the local sync DB", error, stackTrace);
+      return _repository.getAll(ownerId, onlyToday: false, onlyFavorites: onlyFavorites);
+    }
   }
 
   Future<Memory?> get(String memoryId) {
