@@ -26,13 +26,14 @@ function makePerson(overrides: Partial<PersonResponseDto> = {}): PersonResponseD
 function renderPage(people: PersonResponseDto[] = [makePerson()], items: SearchExploreResponseDto[] = []) {
   const props = {
     data: {
-      items,
-      response: {
+      explore: items,
+      people: {
         people,
         total: people.length,
         hidden: 0,
         hasNextPage: false,
       },
+      memories: [],
       meta: { title: 'Explore' },
     },
   };
