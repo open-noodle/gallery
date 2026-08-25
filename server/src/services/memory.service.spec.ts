@@ -706,7 +706,6 @@ describe(MemoryService.name, () => {
       const memory1 = MemoryFactory.from({ ownerId: userId }).asset(asset).build();
       const memory2 = MemoryFactory.create({ ownerId: userId });
       mocks.memory.searchAccessible.mockResolvedValue([getForMemory(memory1), getForMemory(memory2)]);
-      mocks.memory.statistics.mockResolvedValue({ total: 2 });
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
 
       await expect(sut.search(factory.auth({ user: { id: userId } }), {})).resolves.toEqual(
@@ -717,8 +716,6 @@ describe(MemoryService.name, () => {
           }),
         ]),
       );
-      mocks.memory.searchAccessible.mockResolvedValue([]);
-      await expect(sut.search(factory.auth(), {})).resolves.toEqual([]);
     });
 
     it('should map empty result', async () => {
