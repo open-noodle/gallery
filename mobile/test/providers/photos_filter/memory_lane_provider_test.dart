@@ -18,7 +18,7 @@ DriftMemory _memory() => DriftMemory(
 );
 
 ProviderContainer _container({required List<DriftMemory> memories}) {
-  final c = ProviderContainer(overrides: [driftMemoryFutureProvider.overrideWith((ref) async => memories)]);
+  final c = ProviderContainer(overrides: [driftMemoryLaneProvider.overrideWith((ref) async => memories)]);
   addTearDown(c.dispose);
   return c;
 }
@@ -26,7 +26,7 @@ ProviderContainer _container({required List<DriftMemory> memories}) {
 void main() {
   test('the strip shows while browsing an unfiltered timeline', () async {
     final c = _container(memories: [_memory()]);
-    await c.read(driftMemoryFutureProvider.future);
+    await c.read(driftMemoryLaneProvider.future);
     expect(c.read(photosMemoryLaneVisibleProvider), isTrue);
   });
 
@@ -34,21 +34,21 @@ void main() {
     // #902: web's photos page renders the memories carousel only when no filter
     // or search is active, so results are not pushed down the viewport.
     final c = _container(memories: [_memory()]);
-    await c.read(driftMemoryFutureProvider.future);
+    await c.read(driftMemoryLaneProvider.future);
     c.read(photosFilterProvider.notifier).setText('beach');
     expect(c.read(photosMemoryLaneVisibleProvider), isFalse);
   });
 
   test('the strip hides for a metadata-only filter too', () async {
     final c = _container(memories: [_memory()]);
-    await c.read(driftMemoryFutureProvider.future);
+    await c.read(driftMemoryLaneProvider.future);
     c.read(photosFilterProvider.notifier).setFavouritesOnly(true);
     expect(c.read(photosMemoryLaneVisibleProvider), isFalse);
   });
 
   test('the strip comes back when the filter is cleared', () async {
     final c = _container(memories: [_memory()]);
-    await c.read(driftMemoryFutureProvider.future);
+    await c.read(driftMemoryLaneProvider.future);
     final notifier = c.read(photosFilterProvider.notifier);
     notifier.setText('beach');
     notifier.reset();
@@ -57,7 +57,7 @@ void main() {
 
   test('the strip stays hidden when there are no memories', () async {
     final c = _container(memories: const []);
-    await c.read(driftMemoryFutureProvider.future);
+    await c.read(driftMemoryLaneProvider.future);
     expect(c.read(photosMemoryLaneVisibleProvider), isFalse);
   });
 }

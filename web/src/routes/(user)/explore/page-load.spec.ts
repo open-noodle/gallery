@@ -7,7 +7,12 @@ const { authenticate, getFormatter } = vi.hoisted(() => ({
 }));
 
 vi.mock('$lib/utils/auth', () => ({ authenticate }));
-vi.mock('$lib/utils/i18n', () => ({ getFormatter }));
+// Partial mock: upstream's loader pulls in the memory manager, which pulls in `$lib/utils` ->
+// `preferences.store` -> `getPreferredLocale`. Replacing the whole module would drop it.
+vi.mock(import('$lib/utils/i18n'), async (importOriginal) => ({
+  ...(await importOriginal()),
+  getFormatter,
+}));
 
 describe('explore page load', () => {
   beforeEach(() => {
@@ -15,6 +20,8 @@ describe('explore page load', () => {
     getFormatter.mockResolvedValue((key: string) => key);
     sdkMock.getExploreData.mockResolvedValue([]);
     sdkMock.getAllPeople.mockResolvedValue({ people: [], total: 0, hidden: 0, hasNextPage: false });
+    sdkMock.searchMemories.mockResolvedValue([]);
+    sdkMock.memoriesStatistics.mockResolvedValue({ total: 0 });
   });
 
   it('loads visible global people with shared-space identities', async () => {
