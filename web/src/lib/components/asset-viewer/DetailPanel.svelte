@@ -10,7 +10,7 @@
   import { timeToLoadTheMap } from '$lib/constants';
   import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
   import { authManager } from '$lib/managers/auth-manager.svelte';
-  import { eventManager } from '$lib/managers/event-manager.svelte';
+  import { refreshAssetPeople } from '$lib/utils/refresh-asset-people';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import { Route } from '$lib/route';
   import { locale } from '$lib/stores/preferences.store';
@@ -203,16 +203,11 @@
   };
 
   const handleRefreshPeople = async () => {
-    const refreshed = await getAssetInfo({ id: asset.id, spaceId: effectiveSpaceId });
-    // `asset` is a plain prop, and AssetViewer derives it from `cursor.current` -- so assigning it
-    // here only updated THIS component's copy. Closing and reopening the info panel re-read the
-    // parent's untouched asset and showed the pre-edit people again until a full page reload.
-    // Emitting AssetUpdate is the existing path back to the parent: AssetViewer's `onAssetUpdate`
-    // listener replaces `cursor.current`, which flows back down through the derived prop.
-    eventManager.emit('AssetUpdate', refreshed);
+    // Shared with the on-photo face editor (SpaceFaceEditor) so the two cannot drift on what
+    // "people changed" means -- see refreshAssetPeople for why both the asset and faceManager
+    // have to be refreshed, and why assigning `asset` here is not enough.
+    await refreshAssetPeople(asset.id, effectiveSpaceId);
     assetViewerManager.closeEditFacesPanel();
-    faceManager.clear();
-    await faceManager.getAssetFaces(asset.id);
   };
 
   const getAssetFolderHref = (asset: AssetResponseDto) => {

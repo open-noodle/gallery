@@ -11,6 +11,10 @@ const { getSpacePeopleMock, createSpaceAssetFaceMock, modalShowMock } = vi.hoist
   modalShowMock: vi.fn(),
 }));
 
+const refreshAssetPeopleMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+
+vi.mock('$lib/utils/refresh-asset-people', () => ({ refreshAssetPeople: refreshAssetPeopleMock }));
+
 vi.mock('@immich/sdk', async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
   return {
@@ -107,6 +111,7 @@ describe('SpaceFaceEditor', () => {
     getSpacePeopleMock.mockReset();
     createSpaceAssetFaceMock.mockReset();
     modalShowMock.mockReset();
+    refreshAssetPeopleMock.mockClear();
     getSpacePeopleMock.mockResolvedValue([]);
   });
 
@@ -170,6 +175,50 @@ describe('SpaceFaceEditor', () => {
     // creating a new person is delegated entirely to the modal (create person, then draw attached).
     expect(createSpaceAssetFaceMock).not.toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
+  });
+
+  /**
+   * The reported bug: tagging from the ON-PHOTO editor left both the People row and the face boxes
+   * over the photo showing their pre-tag contents until a full page reload. This component simply
+   * called `onClose()` and told nothing to re-read.
+   *
+   * Asserting the refresh happens BEFORE `onClose` matters -- closing first unmounts the editor,
+   * and a refresh fired after that races the teardown.
+   */
+  it('refreshes the asset people after attaching to an existing space person', async () => {
+    getSpacePeopleMock.mockResolvedValue([spacePerson({ id: 'sp-1', name: 'Bob' })]);
+    createSpaceAssetFaceMock.mockResolvedValue({ id: 'new-face' });
+    const onClose = vi.fn();
+
+    renderEditor({ onClose });
+    await screen.findByText('Bob');
+    await userEvent.click(screen.getByRole('button', { name: 'Bob' }));
+
+    await waitFor(() => expect(refreshAssetPeopleMock).toHaveBeenCalledWith('asset-1', 'space-1'));
+    expect(refreshAssetPeopleMock.mock.invocationCallOrder[0]).toBeLessThan(onClose.mock.invocationCallOrder[0]);
+  });
+
+  it('refreshes the asset people after creating a brand new person', async () => {
+    modalShowMock.mockResolvedValue(true);
+    const onClose = vi.fn();
+
+    renderEditor({ onClose });
+    await waitFor(() => expect(getSpacePeopleMock).toHaveBeenCalled());
+    await userEvent.click(screen.getByRole('button', { name: 'create_person' }));
+
+    await waitFor(() => expect(refreshAssetPeopleMock).toHaveBeenCalledWith('asset-1', 'space-1'));
+    expect(refreshAssetPeopleMock.mock.invocationCallOrder[0]).toBeLessThan(onClose.mock.invocationCallOrder[0]);
+  });
+
+  it('does not refresh when the create-person modal is dismissed', async () => {
+    modalShowMock.mockResolvedValue(false);
+
+    renderEditor();
+    await waitFor(() => expect(getSpacePeopleMock).toHaveBeenCalled());
+    await userEvent.click(screen.getByRole('button', { name: 'create_person' }));
+
+    await waitFor(() => expect(modalShowMock).toHaveBeenCalled());
+    expect(refreshAssetPeopleMock).not.toHaveBeenCalled();
   });
 
   it('cancels without creating anything', async () => {

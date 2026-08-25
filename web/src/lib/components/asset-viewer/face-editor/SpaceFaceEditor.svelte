@@ -8,6 +8,7 @@
     computeSelectorPosition,
   } from '$lib/utils/face-box-drag';
   import { handleError } from '$lib/utils/handle-error';
+  import { refreshAssetPeople } from '$lib/utils/refresh-asset-people';
   import { getSpacePersonThumbnailUrl } from '$lib/utils/people-utils';
   import { normalizeSearchString } from '$lib/utils/string-utils';
   import CreateSpaceFaceModal from '$lib/modals/CreateSpaceFaceModal.svelte';
@@ -232,6 +233,10 @@
         spaceAssetFaceCreateDto: { spacePersonId: person.id, ...data },
       });
 
+      // Without this the editor just closed: the People row and the face boxes over the photo both
+      // kept their pre-tag contents until a full page reload. The owner's FaceEditor at least
+      // cleared faceManager here; this path did neither.
+      await refreshAssetPeople(assetId, spaceId);
       onClose();
     } catch (error) {
       handleError(error, 'Error tagging face');
@@ -251,6 +256,8 @@
         return;
       }
 
+      // The reported case: naming a BRAND NEW person left them invisible until a page reload.
+      await refreshAssetPeople(assetId, spaceId);
       onClose();
     } catch (error) {
       handleError(error, 'Error creating and tagging person');
