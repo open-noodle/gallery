@@ -52,7 +52,7 @@
     <div
       class="absolute inset-s-0 top-0 size-full w-full rounded-xl bg-linear-to-t from-black/40 via-transparent to-transparent transition-all hover:bg-black/20"
     ></div>
-    <div class="absolute inset-s-4 bottom-2 inset-e-4">
+    <div class="absolute inset-s-4 inset-e-4 bottom-2">
       <p class="text-lg text-white max-md:text-sm">
         {item.title}
       </p>
