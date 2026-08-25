@@ -70,7 +70,12 @@ describe('FeatureSettings memory types', () => {
 
     expect(mocks.updateMyPreferences).toHaveBeenCalledWith({
       userPreferencesUpdateDto: expect.objectContaining({
-        memories: { enabled: true, duration: 5, types: { on_this_day: true, birthday: true, recent_trip: true } },
+        memories: {
+          enabled: true,
+          duration: 5,
+          types: { on_this_day: true, birthday: true, recent_trip: true },
+          sidebarWeb: true,
+        },
       }),
     });
   });
@@ -108,6 +113,9 @@ describe('memories preference payload', () => {
       enabled: true,
       duration: 5,
       types: { on_this_day: true, birthday: false },
+      // Upstream's key (immich-28675). The mock preferences omit it, so `true` here is also
+      // the fork's D3 default surviving: upstream's component defaults it to `false`.
+      sidebarWeb: true,
     });
   });
 });

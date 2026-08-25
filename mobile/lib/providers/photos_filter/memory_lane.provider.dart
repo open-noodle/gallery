@@ -9,7 +9,7 @@ import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dar
 /// results start at the top of the viewport instead of being pushed down by a
 /// strip unrelated to the query — mobile matches that here (#902).
 final photosMemoryLaneVisibleProvider = Provider<bool>((ref) {
-  final hasMemories = ref.watch(driftMemoryFutureProvider.select((memories) => memories.value?.isNotEmpty ?? false));
+  final hasMemories = ref.watch(driftMemoryLaneProvider.select((memories) => memories.value?.isNotEmpty ?? false));
   final isFiltering = ref.watch(photosFilterProvider.select((filter) => !filter.isEmpty));
   return hasMemories && !isFiltering;
 });
