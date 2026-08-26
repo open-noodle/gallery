@@ -947,13 +947,15 @@ describe(MemoryService.name, () => {
       ).toHaveLength(0);
     });
 
-    it('creates an on_this_day_place memory from a city-dominant prior-year day (1-day window)', async () => {
+    it('creates one on_this_day_place memory spanning the years the place recurs (1-day window)', async () => {
       const { sut, ctx } = setup();
       const memoryRepo = ctx.get(MemoryRepository);
       const now = DateTime.fromObject({ year: 2026, month: 7, day: 10 }, { zone: 'utc' }) as DateTime<true>;
       const { user } = await ctx.newUser();
 
-      // 6 Lisbon + 2 Porto on Jul 10 2023 -> Lisbon dominates 6/8 = 75% (>= 60%, >= 4).
+      // Jul 10 2023: 6 Lisbon + 2 Porto -> Lisbon dominates 6/8 = 75%.
+      // Jul 10 2021: 5 Lisbon          -> Lisbon dominates 5/5 = 100%.
+      // Lisbon therefore spans two past years and earns a single card covering both.
       const lisbonIds: string[] = [];
       for (let i = 0; i < 6; i++) {
         const asset = await seedRuleAsset(ctx, {
@@ -972,6 +974,15 @@ describe(MemoryService.name, () => {
           country: 'Portugal',
         });
       }
+      for (let i = 0; i < 5; i++) {
+        const asset = await seedRuleAsset(ctx, {
+          ownerId: user.id,
+          localDateTime: `2021-07-10T0${i}:00:00Z`,
+          city: 'Lisbon',
+          country: 'Portugal',
+        });
+        lisbonIds.push(asset.id);
+      }
 
       vi.setSystemTime(now.toJSDate());
       await sut.onMemoriesCreate();
@@ -982,16 +993,95 @@ describe(MemoryService.name, () => {
           type: MemoryType.Rule,
           showAt: now.startOf('day').toJSDate(),
           hideAt: now.endOf('day').toJSDate(), // single-day window
+          // anchored to the most recent year it covers
+          memoryAt: DateTime.fromISO('2023-07-10T00:00:00Z')!.toJSDate(),
           data: expect.objectContaining({
             ruleId: 'on_this_day_place',
             title: 'On this day in Lisbon',
-            subtitle: '6 photos from 2023',
-            context: expect.objectContaining({ year: 2023, city: 'Lisbon', country: 'Portugal', count: 6 }),
+            subtitle: '11 photos from 2021 and 2023',
+            context: expect.objectContaining({
+              city: 'Lisbon',
+              country: 'Portugal',
+              count: 11,
+              years: [2021, 2023],
+            }),
           }),
         }),
       ]);
-      // only the dominant-city (Lisbon) assets are attached
+      // only the dominant-city (Lisbon) assets are attached, from both years
       expect(memories[0]?.assets.map(({ id }) => id).toSorted()).toEqual([...lisbonIds].toSorted());
+
+      // Lisbon covers 75% of 2023's day and 100% of 2021's, so the card stands in for BOTH
+      // years' plain cards rather than sitting beside them holding the same photos.
+      const onThisDay = await memoryRepo.search(user.id, { type: MemoryType.OnThisDay, for: now.toJSDate() });
+      expect(onThisDay).toEqual([]);
+    });
+
+    it('does not create an on_this_day_place memory for a place seen in only one past year', async () => {
+      const { sut, ctx } = setup();
+      const memoryRepo = ctx.get(MemoryRepository);
+      const now = DateTime.fromObject({ year: 2026, month: 7, day: 10 }, { zone: 'utc' }) as DateTime<true>;
+      const { user } = await ctx.newUser();
+
+      // A city-dominant day, but in 2023 alone — the plain "3 years ago" card already shows it.
+      for (let i = 0; i < 8; i++) {
+        await seedRuleAsset(ctx, {
+          ownerId: user.id,
+          localDateTime: `2023-07-10T0${i}:00:00Z`,
+          city: 'Lisbon',
+          country: 'Portugal',
+        });
+      }
+
+      vi.setSystemTime(now.toJSDate());
+      await sut.onMemoriesCreate();
+
+      expect(await memoryRepo.search(user.id, { type: MemoryType.Rule, for: now.toJSDate() })).toEqual([]);
+      const onThisDay = await memoryRepo.search(user.id, { type: MemoryType.OnThisDay, for: now.toJSDate() });
+      expect(onThisDay).toEqual([expect.objectContaining({ data: { year: 2023 } })]);
+    });
+
+    it('supersedes only the years the place card covers, keeping the rest', async () => {
+      const { sut, ctx } = setup();
+      const memoryRepo = ctx.get(MemoryRepository);
+      const now = DateTime.fromObject({ year: 2026, month: 7, day: 10 }, { zone: 'utc' }) as DateTime<true>;
+      const { user } = await ctx.newUser();
+
+      // 2023 is all Lisbon -> superseded. 2021 is 5 Lisbon + 5 ungeotagged: Lisbon is 100% of
+      // that year's GEOTAGGED photos so the year still contributes, but the card holds only
+      // half of what 2021 shot that day, so 2021's plain card must survive.
+      for (let i = 0; i < 6; i++) {
+        await seedRuleAsset(ctx, {
+          ownerId: user.id,
+          localDateTime: `2023-07-10T0${i}:00:00Z`,
+          city: 'Lisbon',
+          country: 'Portugal',
+        });
+      }
+      for (let i = 0; i < 5; i++) {
+        await seedRuleAsset(ctx, {
+          ownerId: user.id,
+          localDateTime: `2021-07-10T0${i}:00:00Z`,
+          city: 'Lisbon',
+          country: 'Portugal',
+        });
+      }
+      for (let i = 0; i < 5; i++) {
+        await seedRuleAsset(ctx, { ownerId: user.id, localDateTime: `2021-07-10T1${i}:00:00Z` });
+      }
+
+      vi.setSystemTime(now.toJSDate());
+      await sut.onMemoriesCreate();
+
+      const rules = await memoryRepo.search(user.id, { type: MemoryType.Rule, for: now.toJSDate() });
+      expect(rules).toEqual([
+        expect.objectContaining({
+          data: expect.objectContaining({ ruleId: 'on_this_day_place', title: 'On this day in Lisbon' }),
+        }),
+      ]);
+
+      const onThisDay = await memoryRepo.search(user.id, { type: MemoryType.OnThisDay, for: now.toJSDate() });
+      expect(onThisDay).toEqual([expect.objectContaining({ data: { year: 2021 } })]);
     });
   });
 
