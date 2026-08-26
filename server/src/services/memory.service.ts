@@ -221,6 +221,15 @@ export class MemoryService extends BaseService {
         },
         new Set(candidate.assetIds),
       );
+      // A card that stands in for the day's plain "N years ago" memory replaces it rather than
+      // sitting beside it — the two hold substantially the same photos. Safe to run after the
+      // insert: the on-this-day loop writes up to DAYS ahead and runs first inside this lock,
+      // so that memory already exists, and its cursor only ever moves forward, so it is never
+      // recreated afterwards. (Resetting MemoriesState can bring the pair back for a few days;
+      // retention clears it.)
+      for (const year of candidate.supersedesOnThisDayYears ?? []) {
+        await this.memoryRepository.deleteOnThisDay({ ownerId, year, showAt });
+      }
       if (isMultiDay) {
         insertedMultiDayRuleIds.add(candidate.ruleId);
       }

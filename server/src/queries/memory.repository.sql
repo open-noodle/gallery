@@ -276,6 +276,15 @@ delete from "memory"
 where
   "id" = $1
 
+-- MemoryRepository.deleteOnThisDay
+delete from "memory"
+where
+  "ownerId" = $1
+  and "type" = $2
+  and "isSaved" = $3
+  and "showAt" = $4
+  and memory.data ->> 'year' = $5
+
 -- MemoryRepository.hasRuleMemory
 select
   "id"
