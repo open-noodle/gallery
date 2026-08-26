@@ -1,6 +1,9 @@
 name: Migration Order
 
 on:
+  # Fork addition: the rolling rebase branch sits off `main` for long stretches, so without a
+  # manual trigger this gate would never run there. Upstream has no equivalent need.
+  workflow_dispatch:
   pull_request:
   push:
     branches: [main, 'release/*']
@@ -47,7 +50,17 @@ jobs:
       # Upstream's migrations/ folder keeps upstream's append-only invariant: the fork never adds
       # files there, so a violation means a rebase dropped or reordered an upstream migration.
       - name: Verify migration ORDER
-        run: mise //server:migrations verify-order --append-only-from "${BASELINE}"
+        # The baseline is absent whenever the base commit predates the ORDER manifest -- notably the
+        # `main` cutover push, where `github.event.before` is the pre-rebase main. Reading it
+        # unconditionally would throw. Degrade to the consistency check in that case; the
+        # append-only invariant resumes as soon as the base carries an ORDER file.
+        run: |
+          if [ -f "${BASELINE}" ]; then
+            mise //server:migrations verify-order --append-only-from "${BASELINE}"
+          else
+            echo "::notice::No ORDER baseline at the base commit; checking consistency only."
+            mise //server:migrations verify-order
+          fi
 
       # The fork's own migrations-gallery/ folder is checked for consistency only, NOT append-only.
       # Gallery migrations use hand-picked round timestamps and the server runs with
