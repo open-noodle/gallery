@@ -6,10 +6,10 @@
 - **Batches**: 162, 163, 164, 165, 166
 - **Fork commits synced from `origin/main`**: 0 — `integratedForkHead` already equalled `origin/main` (`bcb635ae28f`)
 - **Conflicts resolved**: 7 (across 6 files)
-- **Zero-conflict semantic breaks found**: 2 (both fixed)
+- **Zero-conflict semantic breaks found**: 3 (all fixed) — two caught locally, one only by CI
 - **Risk level**: MEDIUM — a dependency/toolchain bump plus an ML refactor that deleted a symbol a fork test used
 - **Recommendation**: PROCEED
-- **Branch tip**: `fc97cc5b1f5` · 1341 fork commits ahead, **0 behind `upstream/main`**
+- **Branch tip**: `f9879fa35b6` · 1343 fork commits ahead, **0 behind `upstream/main`** · **10/10 CI green**
 
 ## Incoming Upstream Changes
 
@@ -260,6 +260,72 @@ is gated by CI:
 ## Remote CI Verification
 
 - **Test branch**: `rebase/upstream-batch-166`
-- **Commit validated**: `fc97cc5b1f5`
+- **Commit validated**: `f9879fa35b6` — **10/10 workflows green on this single SHA**
 
-_To be filled in once the dispatched workflows report._
+| Workflow                                  | Status | Run                       |
+| ----------------------------------------- | ------ | ------------------------- |
+| `test.yml`                                | GREEN  | 32959429451 — all 21 jobs |
+| `docker.yml`                              | GREEN  | 32959438765               |
+| `static_analysis.yml`                     | GREEN  | 32959447801               |
+| `gallery-rebase-smoke.yml`                | GREEN  | 32959456447               |
+| `storage-migration-tests.yml`             | GREEN  | 32959464419               |
+| `gallery-revert-to-immich-validation.yml` | GREEN  | 32959472185               |
+| `gallery-ml-smoke.yml`                    | GREEN  | 32959479480               |
+| `gallery-mobile-smoke.yml`                | GREEN  | 32959487057               |
+| `storage-migration-e2e.yml`               | GREEN  | 32959494791               |
+| `gallery-build-mobile.yml`                | GREEN  | 32959502611               |
+
+### Third zero-conflict semantic break — found by CI, fixed in `f9879fa35b6`
+
+The first dispatch (on `37982090834`) came back with `Test` red: **384 passed, 1 failed**
+through all five retries, in the fork-only `e2e/src/specs/web/face-cleanup.e2e-spec.ts`.
+It was **not** the faker risk flagged above — that suite passed.
+
+**Root cause — Shape H, the third instance this cycle.** immich-31006 wraps the SDK's
+fetch in a `jsonOnly` guard that throws `MalformedResponseError` when a JSON-accepting
+request receives a non-204 response whose `content-type` is not JSON.
+`FaceRepairAdminController.getLatestScan` was declared
+`Promise<FaceRepairScanStatusDto | null>`, and Nest emits a bare `null` as a **200 with an
+empty body and no content-type**. On a fresh instance — exactly the e2e's state — every
+caller of `getLatestScan()` therefore threw, and the console rendered its load-error branch
+instead of the first-run empty state.
+
+**Why upstream is unaffected:** `git grep` over `upstream/main`'s controllers finds **zero**
+handlers returning a nullable DTO. Nothing on their side exercises the path, so their suites
+stayed green. The fork is the sole consumer of the pattern — the same "which upstream
+feature does the fork use that upstream itself does not?" question that caught the
+`nestjs-zod` `z.literal()` break.
+
+**Two diagnostic notes worth keeping:**
+
+1. The failure looked self-contradictory — the test's
+   `getByRole('button', { name: 'Run first scan' })` assertion **passed** while
+   `getByTestId('first-scan-cta')` on the next line failed. There are two such buttons: a
+   toolbar one rendered unconditionally (`scan/+page.svelte:422`) and the empty-state CTA
+   gated behind `{:else if !scan}` (`:463`). The toolbar button passing while the CTA was
+   absent is what pinned the page to the `loadError` branch.
+2. **The branch's previous run was green and was NOT a valid control.** That tip,
+   `608bf574925`, dates from **2026-06-01** — an unrelated older cycle left on the same
+   branch name. Its green `Test` says nothing about this tree. (An earlier SHA-blind poll
+   did briefly report those stale runs as this cycle's results; the monitor was re-armed
+   filtered to the exact head SHA. Always compare `headSha`.)
+
+**Fix**: return **204** when no scan exists — the honest representation of "no scan yet",
+and precisely what `jsonOnly` passes through untouched. Implemented with the repo's own
+`@Res({ passthrough: true })` idiom (as in `activity.controller.ts`) and documented with
+`@ApiResponse` for both statuses, following `asset-media.controller.ts`'s dual-status
+precedent. Side benefit: because the return type is no longer `| null`, the Nest swagger
+plugin can resolve it, so the spec moved from an untyped `data: object` to a real
+`FaceRepairScanStatusDto` schema and the generated client is now
+`{status:200; data: FaceRepairScanStatusDto} | {status:204}`.
+
+**Blast radius checked before changing the contract**: four web call sites, all of which
+already treat a falsy result as "no scan" (one via `.catch(() => null)`); **no** Dart/mobile
+consumer of this admin-only endpoint; no e2e or medium spec asserts on `scan/latest`
+directly. The controller spec's `expect(status).toBe(200)` for the null case was updated to
+204 and a second case added asserting the 200-with-JSON-body branch.
+
+**Note for review**: this is a small API-contract change to a fork endpoint, made as rebase
+reconciliation rather than as a planned change. 204 is the standard answer and the blast
+radius is web-only, but keeping 200 with an always-JSON body is a defensible alternative if
+preferred.
