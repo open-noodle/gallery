@@ -16,6 +16,7 @@ import 'package:immich_mobile/infrastructure/repositories/settings.repository.da
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/active_filter_chip.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/match_count_label.widget.dart';
+import 'package:immich_mobile/presentation/widgets/filter_sheet/sort_icon_button.widget.dart';
 import 'package:immich_mobile/presentation/widgets/photos_filter/filter_subheader.widget.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 import 'package:immich_mobile/providers/timeline/overview_drilldown.provider.dart';
@@ -64,6 +65,29 @@ void main() {
       expect(find.byKey(const Key('photos-filter-subheader')), findsOneWidget);
       expect(find.byKey(const Key('photos-filter-subheader-clear-all')), findsOneWidget);
       expect(find.byType(ActiveFilterChip), findsOneWidget);
+    });
+
+    // #1030: sort used to be an app-bar action. It appears and disappears with the filter, so it
+    // kept changing how much width the app bar's title slot was offered, and the logo — fitted
+    // with BoxFit.contain — resized to match. It belongs next to the chips it orders anyway.
+    testWidgets('carries the sort control, so the app bar does not have to', (tester) async {
+      await tester.pumpConsumerWidget(_scroll(const PhotosFilterSubheader()));
+      await tester.pumpAndSettle();
+      expect(find.byType(SortIconButton), findsNothing, reason: 'no filter yet, so nothing to sort');
+
+      final container = ProviderScope.containerOf(tester.element(find.byType(CustomScrollView)));
+      container.read(photosFilterProvider.notifier).setText('paris');
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('photos-filter-sort-button')), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('photos-filter-subheader')),
+          matching: find.byKey(const Key('photos-filter-sort-button')),
+        ),
+        findsOneWidget,
+        reason: 'sort must live inside the subheader strip, not somewhere else in the tree',
+      );
     });
 
     testWidgets('tapping Clear all resets the filter', (tester) async {
