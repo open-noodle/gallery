@@ -23,10 +23,12 @@ class TimelineGroupingSelector extends ConsumerWidget {
 
   static const double _maxWidth = 218;
   static const double _height = 48;
-  // Kept just wide enough for the longest label ("Months") at the default text scale so the chip
-  // hugs its label instead of sprawling across the app bar; larger text scales down via FittedBox
-  // rather than truncating.
-  static const double _compactWidth = 98;
+  // The compact chip shows one localized initial rather than the whole word. Spelling out
+  // "Months" needed 98 px, and the app bar only has ~155 px of slack before the title slot starts
+  // squeezing the logo (#1030) — the chip alone ate two thirds of it. 48 is the Material minimum
+  // tap target, so it does not shrink further. The full word stays one long-press away in the
+  // menu, and in the accessibility label.
+  static const double _compactWidth = 48;
   static const double _compactHeight = 40;
 
   final bool enabled;
@@ -170,7 +172,9 @@ class _TimelineGroupingCompactSelector extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
+    // Screen readers get the whole word; only the painted chip is abbreviated.
     final label = _label(context, selected);
+    final initial = _shortLabel(context, selected);
     final foreground = enabled ? colors.onPrimary : colors.onSurface.withValues(alpha: 0.5);
 
     return Semantics(
@@ -203,15 +207,15 @@ class _TimelineGroupingCompactSelector extends ConsumerWidget {
                 onLongPress: enabled ? () => unawaited(_showMenu(context)) : null,
                 borderRadius: BorderRadius.circular(999),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
                   child: Center(
                     child: FittedBox(
                       fit: BoxFit.scaleDown,
                       child: Text(
-                        label,
+                        initial,
                         maxLines: 1,
                         softWrap: false,
-                        style: theme.textTheme.labelLarge?.copyWith(color: foreground, fontWeight: FontWeight.w700),
+                        style: theme.textTheme.titleMedium?.copyWith(color: foreground, fontWeight: FontWeight.w800),
                       ),
                     ),
                   ),
@@ -293,6 +297,20 @@ String _label(BuildContext context, TimelineOverviewMode mode) {
     TimelineOverviewMode.years => _translated('timeline_grouping_years', 'Years'),
     TimelineOverviewMode.months => _translated('timeline_grouping_months', 'Months'),
     TimelineOverviewMode.all => _translated('timeline_grouping_all', 'All'),
+  };
+}
+
+/// One-glyph form of [_label] for the compact app-bar chip.
+///
+/// These are translated rather than derived from the full label's first character: zh_Hans
+/// ("按年" / "按月") and zh_Hant ("依年份" / "依月份") both share their leading glyph, so slicing
+/// would render Years and Months identically. Each locale supplies three forms that are distinct
+/// within that locale.
+String _shortLabel(BuildContext context, TimelineOverviewMode mode) {
+  return switch (mode) {
+    TimelineOverviewMode.years => _translated('timeline_grouping_years_short', 'Y'),
+    TimelineOverviewMode.months => _translated('timeline_grouping_months_short', 'M'),
+    TimelineOverviewMode.all => _translated('timeline_grouping_all_short', 'A'),
   };
 }
 
