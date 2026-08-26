@@ -42,6 +42,40 @@ export const medianTime = (assets: Pick<TimedAsset, 'localDateTime'>[]): Date =>
   return sorted[Math.floor((sorted.length - 1) / 2)]!.localDateTime;
 };
 
+/**
+ * Sample up to `cap` ids spread evenly across `groups`, and evenly in time within each group.
+ *
+ * A multi-year card must show every year it claims, not just the busiest one, so slots are
+ * handed out one at a time in round-robin order: every group is served once before any group
+ * gets a second. A group smaller than its share simply stops taking slots and the rest absorb
+ * them. Group order is preserved in the result.
+ */
+export const sampleAssetsAcrossGroups = <T extends TimedAsset>(groups: T[][], cap: number): string[] => {
+  const quotas = Array.from({ length: groups.length }, () => 0);
+  let remaining = Math.min(
+    cap,
+    groups.reduce((total, group) => total + group.length, 0),
+  );
+
+  while (remaining > 0) {
+    let served = false;
+    for (const [index, group] of groups.entries()) {
+      if (remaining === 0 || quotas[index]! >= group.length) {
+        continue;
+      }
+      quotas[index]!++;
+      remaining--;
+      served = true;
+    }
+    // Every group is full; the cap simply exceeds what the groups hold.
+    if (!served) {
+      break;
+    }
+  }
+
+  return groups.flatMap((group, index) => sampleAssetsByTime(group, quotas[index]!));
+};
+
 export interface DominantGroup<T> {
   key: string;
   items: T[];

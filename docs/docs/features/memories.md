@@ -75,20 +75,20 @@ A user receives a memory type only when it is **both** globally available **and*
 
 The built-in types each have a stable key used in configuration:
 
-| Type key              | Setting label           | Controls                                                                    |
-| --------------------- | ----------------------- | --------------------------------------------------------------------------- |
-| `on_this_day`         | On this day             | "N years ago" photo memories                                                |
-| `birthday`            | Birthdays               | Birthday rule memories for named people                                     |
-| `recent_trip`         | Recent trips            | Recent trip rule memories                                                   |
-| `month_recap`         | This month              | A past year's photos from this calendar month, shown early in the month     |
-| `favorites_throwback` | Favorite moments        | Your favorite photos from this calendar month in a past year                |
-| `on_this_day_place`   | On this day, in a place | A past year's on-this-day photos when they cluster in one place             |
-| `season_recap`        | Season recap            | A past meteorological season, shown when the new season begins              |
-| `people_together`     | People together         | Two people or pets often photographed together in a past year               |
-| `video_moments`       | Video moments           | Videos you filmed in this month of a past year                              |
-| `trip_anniversary`    | Trip anniversaries      | A past trip resurfaced on the anniversary of the day it began               |
-| `themed`              | Themes                  | Photo themes like sunsets, food, and beach days, found automatically        |
-| `person_throwback`    | Times with someone      | A warm chapter with someone who has not appeared in your photos for a while |
+| Type key              | Setting label           | Controls                                                                      |
+| --------------------- | ----------------------- | ----------------------------------------------------------------------------- |
+| `on_this_day`         | On this day             | "N years ago" photo memories                                                  |
+| `birthday`            | Birthdays               | Birthday rule memories for named people                                       |
+| `recent_trip`         | Recent trips            | Recent trip rule memories                                                     |
+| `month_recap`         | This month              | A past year's photos from this calendar month, shown early in the month       |
+| `favorites_throwback` | Favorite moments        | Your favorite photos from this calendar month in a past year                  |
+| `on_this_day_place`   | On this day, in a place | This date across two or more past years, when those days cluster in one place |
+| `season_recap`        | Season recap            | A past meteorological season, shown when the new season begins                |
+| `people_together`     | People together         | Two people or pets often photographed together in a past year                 |
+| `video_moments`       | Video moments           | Videos you filmed in this month of a past year                                |
+| `trip_anniversary`    | Trip anniversaries      | A past trip resurfaced on the anniversary of the day it began                 |
+| `themed`              | Themes                  | Photo themes like sunsets, food, and beach days, found automatically          |
+| `person_throwback`    | Times with someone      | A warm chapter with someone who has not appeared in your photos for a while   |
 
 All default to **on**.
 
@@ -121,6 +121,10 @@ Once created, a memory stays in the memory lane on the home page for its visibil
 | `season_recap`        | the 1st of March, June, September, and December    | 10 days                      |
 
 A type generates a memory only when your library has enough matching photos for it, so a qualifying day does not guarantee a card. The cap of 6 rule memories per day also applies, and it counts memories still inside their window from earlier days: when more qualify than there is room for, the highest-scoring cards win and the rest are skipped. **On this day** memories are not part of that cap.
+
+`on_this_day_place` is deliberately narrow, because it sits on top of what `on_this_day` already shows. A year counts towards it only if that year has at least 4 photos on this date and at least 60% of that year's geotagged photos for the day are in one place — and the memory is only created when **two or more** years qualify for the same place. One year in one city is what the plain **On this day** card already shows, so naming the city would add nothing; two years is a thing no other memory type says. The result is a single card covering all the qualifying years ("11 photos from 2021 and 2023"), with its photos drawn evenly from each year rather than from whichever year you shot most.
+
+Because it then describes the same days as the plain **On this day** cards, it replaces them: for each year it covers at least 75% of that year's photos for the day, that year's plain card is removed instead of sitting next to it holding the same photos. Below 75% that year's plain card is kept, because the place card only holds photos from the one dominant city and dropping it would hide the rest of that day. This is decided per year, so one card can replace one of its years and leave another. A **saved** memory is never replaced, and only newly generated memories are affected — any duplicate pair already in your library stays until it ages out under `memories.retentionDays`.
 
 ### Per-user toggles
 
