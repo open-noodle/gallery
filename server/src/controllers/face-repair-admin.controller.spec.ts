@@ -333,12 +333,26 @@ describe(FaceRepairAdminController.name, () => {
       );
     });
 
-    it('delegates to service.getLatestScanStatus', async () => {
+    it('answers 204 when the instance has never scanned', async () => {
+      // Not 200-with-an-empty-body: that has no content-type, and the SDK's `jsonOnly` guard
+      // (immich-31006) rejects it as malformed, which surfaced as a load error in the console.
       service.getLatestScanStatus.mockResolvedValue(null);
-      const { status } = await request(ctx.getHttpServer())
+      const { status, text } = await request(ctx.getHttpServer())
+        .get('/admin/face-repair/scan/latest')
+        .set('Authorization', 'Bearer token');
+      expect(status).toBe(204);
+      expect(text).toBe('');
+      expect(service.getLatestScanStatus).toHaveBeenCalled();
+    });
+
+    it('answers 200 with a JSON body once a scan exists', async () => {
+      service.getLatestScanStatus.mockResolvedValue({ id: 'scan-1', status: 'completed' } as never);
+      const { status, body, headers } = await request(ctx.getHttpServer())
         .get('/admin/face-repair/scan/latest')
         .set('Authorization', 'Bearer token');
       expect(status).toBe(200);
+      expect(headers['content-type']).toContain('json');
+      expect(body).toMatchObject({ id: 'scan-1', status: 'completed' });
       expect(service.getLatestScanStatus).toHaveBeenCalled();
     });
   });
