@@ -301,6 +301,36 @@ describe('Space people page', () => {
     expect(screen.getAllByPlaceholderText('add_a_name')).toHaveLength(PAGE_SIZE + 1);
   });
 
+  // Merging by id and paging by `people.length` cannot both be right: the merge drops the rows the
+  // server repeated, so the kept-row count falls behind the number of rows the server actually
+  // served, while OFFSET counts what it served. Paging on the kept count re-requests every dropped
+  // row on the following page -- and a page that is entirely duplicates does not advance the count
+  // at all, so `hasMore` stays true and the sentinel re-fires the identical request forever.
+  it('advances the page offset by the rows the server returned, not by the rows it kept', async () => {
+    const firstPage = Array.from({ length: PAGE_SIZE }, (_, index) =>
+      makeSpacePerson({ id: `space-person-${index}`, name: `Person ${String(index).padStart(3, '0')}` }),
+    );
+    const secondPage = [
+      firstPage.at(-1)!,
+      ...Array.from({ length: PAGE_SIZE - 1 }, (_, index) =>
+        makeSpacePerson({ id: `space-person-second-${index}`, name: `Second ${String(index).padStart(3, '0')}` }),
+      ),
+    ];
+    sdkMock.getSpacePeople.mockResolvedValueOnce(secondPage).mockResolvedValue([]);
+
+    const { intersect } = renderPaginatedPage(firstPage);
+    await intersect();
+
+    await waitFor(() =>
+      expect(sdkMock.getSpacePeople).toHaveBeenCalledWith(expect.objectContaining({ offset: PAGE_SIZE })),
+    );
+
+    await intersect();
+
+    await waitFor(() => expect(sdkMock.getSpacePeople).toHaveBeenCalledTimes(2));
+    expect(sdkMock.getSpacePeople).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 2 * PAGE_SIZE }));
+  });
+
   // The visibility manager pages the same read into a second keyed grid of its own, so it carries
   // the same exposure as the page behind it — and it is the more likely of the two to be open while
   // someone else edits, since hiding people is what a space editor does after a naming session.
