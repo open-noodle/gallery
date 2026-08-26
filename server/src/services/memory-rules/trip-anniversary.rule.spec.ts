@@ -4,6 +4,7 @@ import { MemoryAsset, MemoryLocationCluster, MemoryPeriodAsset } from 'src/repos
 import { recencyBonus } from 'src/services/memory-rules/curation.util';
 import {
   MAX_COUNT_BONUS,
+  MAX_YEAR_BONUS,
   OnThisDayPlaceMemoryRule,
   SCORE_BASE as PLACE_SCORE_BASE,
 } from 'src/services/memory-rules/on-this-day-place.rule';
@@ -158,7 +159,10 @@ describe(TripAnniversaryMemoryRule.name, () => {
 
   describe('shared-key contract with OnThisDayPlaceMemoryRule', () => {
     it("trip_anniversary's dedupeKey equals on_this_day_place's REAL output for the same probe fixture", async () => {
-      const probeAssets = probeCityAssets(TARGET, 2023, 'Rome', 6);
+      // on_this_day_place needs the place in two past years before it emits anything; the key it
+      // then produces is anchored to the most recent of them, which is the year the trip card
+      // for this anniversary is also anchored to.
+      const probeAssets = [...probeCityAssets(TARGET, 2023, 'Rome', 6), ...probeCityAssets(TARGET, 2021, 'Rome', 5)];
 
       const placeRule = new OnThisDayPlaceMemoryRule({
         getMemoryAssetsForPeriod: vi.fn().mockResolvedValue(probeAssets),
@@ -168,7 +172,10 @@ describe(TripAnniversaryMemoryRule.name, () => {
       const { rule: tripRule, assetRepository } = ruleWith(probeAssets);
       assetRepository.getMemoryLocationClusters
         .mockResolvedValueOnce([germanyHome()])
-        .mockResolvedValueOnce([romeTrip(2023)]);
+        .mockResolvedValueOnce([romeTrip(2023)])
+        // The probe now yields 2021 as well (newest first), which needs its own home lookup;
+        // returning nothing leaves 2023 as the only trip candidate.
+        .mockResolvedValue([]);
       const [tripCandidate] = await tripRule.evaluate({ ownerId: 'user-1', target: TARGET });
 
       expect(placeCandidate.dedupeKey).toBe('place_day:2023-06-10:italy:rome');
@@ -188,18 +195,24 @@ describe(TripAnniversaryMemoryRule.name, () => {
         .mockResolvedValueOnce([romeTrip(tripYear, { assetCount: MIN_TRIP_ASSETS, dayCount: MIN_TRIP_DAYS })]);
       const [tripCandidate] = await tripRule.evaluate({ ownerId: 'user-1', target: TARGET });
 
-      // on_this_day_place maximum: count >= 30 (capped), most recent past year (recencyBonus -> 9).
+      // on_this_day_place maximum: count >= 30 (capped), most recent past year (recencyBonus -> 9),
+      // and enough recurring years to saturate MAX_YEAR_BONUS.
       const placeYear = 2025; // target.year - 1 -> recencyBonus(2025, 2026) = 9
       const placeRule = new OnThisDayPlaceMemoryRule({
-        getMemoryAssetsForPeriod: vi
-          .fn()
-          .mockResolvedValue(probeCityAssets(TARGET, placeYear, 'Lisbon', 30, 'Portugal')),
+        getMemoryAssetsForPeriod: vi.fn().mockResolvedValue([
+          ...probeCityAssets(TARGET, placeYear, 'Lisbon', 30, 'Portugal'),
+          // eight further years, far more than MAX_YEAR_BONUS / YEAR_BONUS can reward
+          ...Array.from({ length: 8 }, (_, index) =>
+            probeCityAssets(TARGET, placeYear - 1 - index, 'Lisbon', 5, 'Portugal'),
+          ).flat(),
+        ]),
       } as never);
       const [placeCandidate] = await placeRule.evaluate({ ownerId: 'user-1', target: TARGET });
 
       const expectedTripMinScore =
         TRIP_SCORE_BASE + MIN_TRIP_DAYS * 4 + Math.min(MIN_TRIP_ASSETS, 20) + recencyBonus(tripYear, TARGET.year);
-      const expectedPlaceMaxScore = PLACE_SCORE_BASE + MAX_COUNT_BONUS * 3 + recencyBonus(placeYear, TARGET.year);
+      const expectedPlaceMaxScore =
+        PLACE_SCORE_BASE + MAX_COUNT_BONUS * 3 + recencyBonus(placeYear, TARGET.year) + MAX_YEAR_BONUS;
 
       expect(tripCandidate.score).toBe(expectedTripMinScore);
       expect(placeCandidate.score).toBe(expectedPlaceMaxScore);
