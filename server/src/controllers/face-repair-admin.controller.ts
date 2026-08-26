@@ -1,5 +1,17 @@
-import { Body, Controller, Delete, Get, Next, Param, ParseUUIDPipe, Post, Query, Res } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpStatus,
+  Next,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+  Res,
+} from '@nestjs/common';
+import { ApiResponse, ApiTags } from '@nestjs/swagger';
 import { NextFunction, Response } from 'express';
 import { Endpoint, HistoryBuilder } from 'src/decorators';
 import { AuthDto } from 'src/dtos/auth.dto';
@@ -67,9 +79,20 @@ export class FaceRepairAdminController {
 
   @Get('scan/latest')
   @Authenticated({ admin: true })
+  @ApiResponse({ status: 200, description: 'The latest face-repair scan', type: FaceRepairScanStatusDto })
+  @ApiResponse({ status: 204, description: 'This instance has never run a face-repair scan' })
   @Endpoint({ summary: 'Get the latest face-repair scan', history: new HistoryBuilder().added('v1') })
-  getLatestScan(): Promise<FaceRepairScanStatusDto | null> {
-    return this.service.getLatestScanStatus() as Promise<FaceRepairScanStatusDto | null>;
+  async getLatestScan(@Res({ passthrough: true }) res: Response): Promise<FaceRepairScanStatusDto | undefined> {
+    const scan = (await this.service.getLatestScanStatus()) as FaceRepairScanStatusDto | null;
+    if (!scan) {
+      // A fresh instance has never scanned. Returning `null` made Nest emit a 200 with an empty body and
+      // no content-type, which immich-31006's `jsonOnly` fetch guard now rejects as a malformed response —
+      // the admin console then rendered its load-error state instead of the first-run empty state.
+      // 204 is the honest representation of "no scan yet", and the guard passes it through untouched.
+      res.status(HttpStatus.NO_CONTENT);
+      return;
+    }
+    return scan;
   }
 
   @Get('scan/defaults')
