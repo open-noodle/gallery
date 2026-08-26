@@ -7,6 +7,7 @@ import {
   pairCounts,
   pickEvenlySpaced,
   recencyBonus,
+  sampleAssetsAcrossGroups,
   sampleAssetsByTime,
 } from 'src/services/memory-rules/curation.util';
 
@@ -18,6 +19,12 @@ const face = (assetId: string, personId: string, personName: string, iso: string
   personName,
   localDateTime: DateTime.fromISO(iso, { zone: 'utc' }).toJSDate(),
 });
+
+/** `count` assets one day apart, ids prefixed so a test can tell the groups apart. */
+const group = (prefix: string, count: number, startIso: string) =>
+  Array.from({ length: count }, (_, index) =>
+    asset(`${prefix}${index}`, DateTime.fromISO(startIso, { zone: 'utc' }).plus({ days: index }).toISO()!),
+  );
 
 describe('pickEvenlySpaced', () => {
   it('returns [] when count is zero or negative', () => {
@@ -76,6 +83,43 @@ describe('sampleAssetsByTime', () => {
       asset(`a${i}`, DateTime.fromISO('2023-07-01T00:00:00', { zone: 'utc' }).plus({ days: i }).toISO()!),
     );
     expect(sampleAssetsByTime(assets, 4)).toEqual(['a0', 'a3', 'a6', 'a9']);
+  });
+});
+
+describe('sampleAssetsAcrossGroups', () => {
+  it('returns [] for no groups, and for a zero cap', () => {
+    expect(sampleAssetsAcrossGroups([], 5)).toEqual([]);
+    expect(sampleAssetsAcrossGroups([group('a', 3, '2021-07-01T00:00:00')], 0)).toEqual([]);
+  });
+
+  it('returns everything, in group order, when the cap exceeds what the groups hold', () => {
+    const groups = [group('a', 2, '2021-07-01T00:00:00'), group('b', 2, '2023-07-01T00:00:00')];
+    expect(sampleAssetsAcrossGroups(groups, 10)).toEqual(['a0', 'a1', 'b0', 'b1']);
+  });
+
+  it('splits the cap evenly between groups of very different sizes', () => {
+    // The 30-strong group does not get to claim the slots its bulk would earn from a flat sample.
+    const groups = [group('a', 30, '2021-07-01T00:00:00'), group('b', 10, '2023-07-01T00:00:00')];
+    const result = sampleAssetsAcrossGroups(groups, 16);
+    expect(result.filter((id) => id.startsWith('a'))).toHaveLength(8);
+    expect(result.filter((id) => id.startsWith('b'))).toHaveLength(8);
+  });
+
+  it('lets a group too small for its share release the remainder to the others', () => {
+    const groups = [group('a', 40, '2021-07-01T00:00:00'), group('b', 5, '2023-07-01T00:00:00')];
+    const result = sampleAssetsAcrossGroups(groups, 16);
+    expect(result.filter((id) => id.startsWith('b'))).toHaveLength(5);
+    expect(result.filter((id) => id.startsWith('a'))).toHaveLength(11);
+  });
+
+  it('spreads the share a group receives evenly in time', () => {
+    const groups = [group('a', 10, '2021-07-01T00:00:00'), group('b', 10, '2023-07-01T00:00:00')];
+    expect(sampleAssetsAcrossGroups(groups, 8)).toEqual(['a0', 'a3', 'a6', 'a9', 'b0', 'b3', 'b6', 'b9']);
+  });
+
+  it('skips an empty group without stalling the round-robin', () => {
+    const groups = [group('a', 4, '2021-07-01T00:00:00'), [], group('b', 4, '2023-07-01T00:00:00')];
+    expect(sampleAssetsAcrossGroups(groups, 4)).toEqual(['a0', 'a3', 'b0', 'b3']);
   });
 });
 
