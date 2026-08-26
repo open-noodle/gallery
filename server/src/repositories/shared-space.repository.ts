@@ -2337,6 +2337,11 @@ export class SharedSpaceRepository {
           ]),
         )
         .orderBy('shared_space_activity.createdAt', 'desc')
+        // `createdAt` alone is not a total order -- every row written inside one transaction takes
+        // that transaction's `now()` -- and an ambiguous order under OFFSET paging hands the client
+        // a row it already has (its keyed feed then throws each_key_duplicate) or silently skips
+        // one. The id makes the order total; which way it breaks the tie does not matter.
+        .orderBy('shared_space_activity.id', 'desc')
         .limit(limit)
         .offset(offset)
         .execute()
@@ -4810,7 +4815,15 @@ export class SharedSpaceRepository {
   /**
    * Spec §6.1 (Slice 3): every live, visible face on `assetId`, joined to the space person
    * holding it in THIS space, if any — a face held by a person in a DIFFERENT space reads as
-   * unassigned here (the `shared_space_person.spaceId` scoping on the join).
+   * unassigned here.
+   *
+   * That scoping has to happen INSIDE the join, in the derived table below, not as a condition on
+   * a second join hanging off an unscoped `shared_space_person_face`: the projection table is
+   * per-space, so joining it directly emits one row per space that named the face, and the
+   * `shared_space_person.spaceId` condition then merely NULLs the other spaces' columns instead of
+   * dropping their rows. The read must be one row per face — the editor's panel keys its `{#each}`
+   * on the face id, and Svelte aborts the render on a duplicate key, so a face named in two spaces
+   * used to leave the panel spinning for good (#992 field report).
    *
    * The hidden-person exclusions mirror `FacePersonVerdictRepository.isFaceAssignableInSpace`
    * exactly (owner `person.isHidden`) plus the space-projection exclusion the asset detail read
@@ -4827,11 +4840,24 @@ export class SharedSpaceRepository {
       .selectFrom('asset_face')
       .innerJoin('asset', 'asset.id', 'asset_face.assetId')
       .leftJoin('person', 'person.id', 'asset_face.personId')
-      .leftJoin('shared_space_person_face', 'shared_space_person_face.assetFaceId', 'asset_face.id')
-      .leftJoin('shared_space_person', (join) =>
-        join
-          .onRef('shared_space_person.id', '=', 'shared_space_person_face.personId')
-          .on('shared_space_person.spaceId', '=', spaceId),
+      // Hoisted above the derived join below on purpose: `reviewableAssetVisibility` takes an
+      // ExpressionBuilder over `DB` itself, and the aliased subquery widens that to `DB & {
+      // space_person }`. Where a predicate sits in the chain has no effect on the SQL.
+      .where((eb) => reviewableAssetVisibility(eb))
+      .leftJoin(
+        (eb) =>
+          eb
+            .selectFrom('shared_space_person_face')
+            .innerJoin('shared_space_person', 'shared_space_person.id', 'shared_space_person_face.personId')
+            .select([
+              'shared_space_person_face.assetFaceId',
+              'shared_space_person.id',
+              'shared_space_person.name',
+              'shared_space_person.isHidden',
+            ])
+            .where('shared_space_person.spaceId', '=', spaceId)
+            .as('space_person'),
+        (join) => join.onRef('space_person.assetFaceId', '=', 'asset_face.id'),
       )
       .select([
         'asset_face.id',
@@ -4842,17 +4868,16 @@ export class SharedSpaceRepository {
         'asset_face.imageWidth',
         'asset_face.imageHeight',
         'asset_face.createdBy',
-        'shared_space_person.id as spacePersonId',
-        'shared_space_person.name as spacePersonName',
+        'space_person.id as spacePersonId',
+        'space_person.name as spacePersonName',
       ])
       .where('asset_face.assetId', '=', assetId)
       .where('asset_face.deletedAt', 'is', null)
       .where('asset_face.isVisible', '=', true)
       .where('asset.deletedAt', 'is', null)
       .where('asset.isOffline', '=', false)
-      .where((eb) => reviewableAssetVisibility(eb))
       .where((eb) => eb.or([eb('person.id', 'is', null), eb('person.isHidden', '=', false)]))
-      .where((eb) => eb.or([eb('shared_space_person.id', 'is', null), eb('shared_space_person.isHidden', '=', false)]))
+      .where((eb) => eb.or([eb('space_person.id', 'is', null), eb('space_person.isHidden', '=', false)]))
       .orderBy('asset_face.id')
       .execute();
 

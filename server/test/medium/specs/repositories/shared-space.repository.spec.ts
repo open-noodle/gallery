@@ -1428,6 +1428,35 @@ describe(SharedSpaceRepository.name, () => {
       expect(activities[1].type).toBe('type_3');
     });
 
+    // `createdAt` alone is not a total order: rows written inside ONE transaction all take that
+    // transaction's `now()`, so they tie. Without a tiebreaker Postgres may return a tie in any
+    // order, and it need not be the SAME order for the next page's query -- so OFFSET paging can
+    // hand the client a row it already has (the feed's keyed list then throws each_key_duplicate)
+    // or skip one entirely. Asserted as a defined order, not merely "no duplicates", because a
+    // duplicate-free result proves nothing about a plan that happened to be stable this run.
+    it('orders activities sharing a createdAt by id, so paging cannot repeat or skip one', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: user.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: user.id, role: 'editor' });
+
+      const createdAt = new Date('2026-08-26T10:00:00.000Z');
+      for (const type of ['tied_1', 'tied_2', 'tied_3']) {
+        await ctx.database
+          .insertInto('shared_space_activity')
+          .values({ spaceId: space.id, userId: user.id, type, data: {}, createdAt })
+          .execute();
+      }
+
+      const activities = await sut.getActivities(space.id);
+      const expectedOrder = [...activities].map((activity) => activity.id).sort((a, b) => b.localeCompare(a));
+      expect(activities.map((activity) => activity.id)).toEqual(expectedOrder);
+
+      const firstPage = await sut.getActivities(space.id, 2, 0);
+      const secondPage = await sut.getActivities(space.id, 2, 2);
+      expect([...firstPage, ...secondPage].map((activity) => activity.id)).toEqual(expectedOrder);
+    });
+
     it('should handle activities from deleted users', async () => {
       const { ctx, sut } = setup();
       const { user: owner } = await ctx.newUser();

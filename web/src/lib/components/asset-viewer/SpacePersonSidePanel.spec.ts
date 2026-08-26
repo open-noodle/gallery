@@ -118,6 +118,26 @@ describe('SpacePersonSidePanel', () => {
     expect(screen.getByText('face_unassigned')).toBeInTheDocument();
   });
 
+  // Field report on #992: an editor opening this panel got a spinner that never resolved. The
+  // space-scoped read had returned the same face twice (it was named in a second space too), and a
+  // keyed `{#each}` throws `each_key_duplicate` on the repeat — Svelte then abandons the branch
+  // swap, leaving the spinner mounted with no error and no way back. The read no longer repeats a
+  // face, and this pins that the panel does not go back to depending on that to render at all.
+  it('renders one row per face, and no spinner, when the read repeats a face id', async () => {
+    getSpaceAssetFacesMock.mockResolvedValue([
+      face({ id: 'face-1', spacePersonId: 'sp-1', spacePersonName: 'Bob' }),
+      face({ id: 'face-1', spacePersonId: 'sp-2', spacePersonName: 'Bob' }),
+      face({ id: 'face-2' }),
+    ]);
+
+    renderPanel();
+
+    expect(await screen.findByText('Bob')).toBeInTheDocument();
+    expect(screen.getAllByText('Bob')).toHaveLength(1);
+    expect(screen.getByText('face_unassigned')).toBeInTheDocument();
+    expect(screen.queryByTestId('loading-spinner')).not.toBeInTheDocument();
+  });
+
   it('F-31: shows an error state and no affordances when the faces request rejects', async () => {
     getSpaceAssetFacesMock.mockRejectedValue(new Error('boom'));
 

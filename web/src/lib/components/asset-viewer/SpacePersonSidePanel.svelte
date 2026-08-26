@@ -5,7 +5,7 @@
   import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
   import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
   import { handleError } from '$lib/utils/handle-error';
-  import { getSpacePersonThumbnailUrl, zoomImageToBase64 } from '$lib/utils/people-utils';
+  import { appendUniqueById, getSpacePersonThumbnailUrl, zoomImageToBase64 } from '$lib/utils/people-utils';
   import {
     attachSpacePersonFace,
     createSpacePerson,
@@ -55,7 +55,12 @@
 
   const loadFaces = async () => {
     try {
-      faces = await getSpaceAssetFaces({ id: spaceId, assetId });
+      // Deduped on the way in, though the read returns one row per face: a repeated id throws
+      // `each_key_duplicate` in the keyed block below, and Svelte abandons the branch swap when it
+      // does -- stranding this panel on its loading spinner, with no error and no way back, which
+      // is how a face named in a second space presented in the field (#992). See appendUniqueById,
+      // written for the same failure mode on the people grid.
+      faces = appendUniqueById([], await getSpaceAssetFaces({ id: spaceId, assetId }));
     } catch (error) {
       handleError(error, $t('errors.cant_get_faces'));
       loadError = true;
