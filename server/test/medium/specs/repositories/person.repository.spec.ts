@@ -1863,4 +1863,45 @@ describe(PersonRepository.name, () => {
       expect(ids).toContain(controlFace.id); // positive control
     });
   });
+
+  // `expectedPersonId` is a compare-and-set, and it is the last thing standing between a space
+  // editor's detach and an owner tag that changed underneath it (#992 §6.3.1): the detach resolves
+  // the owner's person, decides the two are the same human, and only then clears the tag. Without
+  // the guard, anything that re-tagged the face in between is silently overwritten. It had no test
+  // at any layer -- deleting the whole `expectedPersonId` block left the suite green.
+  describe('setFaceOwnerPerson', () => {
+    it('applies the write only when the face still points at the person the caller read', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      const { person: dad } = await ctx.newPerson({ ownerId: user.id, name: 'Dad' });
+      const { person: other } = await ctx.newPerson({ ownerId: user.id, name: 'Uncle Tom' });
+      const { result: faceId } = await ctx.newAssetFace({ assetId: asset.id, personId: dad.id });
+
+      const personIdOf = async () =>
+        ctx.database
+          .selectFrom('asset_face')
+          .select('personId')
+          .where('id', '=', faceId)
+          .executeTakeFirstOrThrow()
+          .then((row) => row.personId);
+
+      // The face moved on since the caller read it: the clear must not land.
+      await sut.setFaceOwnerPerson({ assetFaceId: faceId, personId: null, expectedPersonId: other.id });
+      await expect(personIdOf()).resolves.toBe(dad.id);
+
+      // Same call, same fixture, correct expectation -- so the refusal above was the guard firing,
+      // not the update being a no-op for some other reason.
+      await sut.setFaceOwnerPerson({ assetFaceId: faceId, personId: null, expectedPersonId: dad.id });
+      await expect(personIdOf()).resolves.toBeNull();
+
+      // `expectedPersonId: null` is its own case: it means "only if still untagged".
+      await sut.setFaceOwnerPerson({ assetFaceId: faceId, personId: other.id, expectedPersonId: null });
+      await expect(personIdOf()).resolves.toBe(other.id);
+
+      // Omitting it writes unconditionally, which is what the attach path relies on.
+      await sut.setFaceOwnerPerson({ assetFaceId: faceId, personId: dad.id });
+      await expect(personIdOf()).resolves.toBe(dad.id);
+    });
+  });
 });

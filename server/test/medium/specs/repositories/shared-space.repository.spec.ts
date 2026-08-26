@@ -23,6 +23,19 @@ beforeAll(async () => {
   defaultDatabase = await getKyselyDB();
 });
 
+/**
+ * Anna views; Bob owns both the space and the asset. Anna is only ever a member -- used by the
+ * `findSpaceForAssetAndUser` block, where the point is which reach paths resolve for a member.
+ */
+const newSpaceWithViewer = async (ctx: ReturnType<typeof setup>['ctx']) => {
+  const { user: anna } = await ctx.newUser();
+  const { user: bob } = await ctx.newUser();
+  const { space } = await ctx.newSharedSpace({ createdById: bob.id });
+  await ctx.newSharedSpaceMember({ spaceId: space.id, userId: bob.id, role: 'owner' });
+  await ctx.newSharedSpaceMember({ spaceId: space.id, userId: anna.id, role: 'editor' });
+  return { anna, bob, space };
+};
+
 const expectStats = (
   result: {
     detectedFaceCount: number;
@@ -5099,6 +5112,90 @@ describe(SharedSpaceRepository.name, () => {
       await expect(sut.getAssetIdsWithoutOtherSpacePath('00000000-0000-0000-0000-000000000000', [])).resolves.toEqual(
         [],
       );
+    });
+  });
+
+  // Two things resolve "which space am I seeing this asset through" from here: `resolvedSpaceId` on
+  // a single-asset read (which gates the space face affordances) and the cross-owner edit
+  // attribution that writes the owner's `asset_edit` activity row. The PERMISSION to make that edit
+  // is resolved elsewhere, by `checkSpaceEditAccess`, which #992 gave a linked-album arm. This had
+  // no such arm, so an album-reached member asset was editable while resolving to no space at all:
+  // the metadata affordances appeared, the face affordances silently did not, and the edit that
+  // followed was never attributed in the owner's feed. Every path that grants the edit must resolve
+  // here too, so the matrix below is the reach-path set, not a single case.
+  describe('findSpaceForAssetAndUser', () => {
+    it('resolves an asset added directly to the space', async () => {
+      const { ctx, sut } = setup();
+      const { anna, bob, space } = await newSpaceWithViewer(ctx);
+      const { asset } = await ctx.newAsset({ ownerId: bob.id, visibility: AssetVisibility.Timeline });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+
+      await expect(sut.findSpaceForAssetAndUser(asset.id, anna.id)).resolves.toEqual({ spaceId: space.id });
+    });
+
+    it('resolves an asset reachable through a linked library', async () => {
+      const { ctx, sut } = setup();
+      const { anna, bob, space } = await newSpaceWithViewer(ctx);
+      const { library } = await ctx.newLibrary({ ownerId: bob.id });
+      const { asset } = await ctx.newAsset({
+        ownerId: bob.id,
+        libraryId: library.id,
+        visibility: AssetVisibility.Timeline,
+      });
+      await ctx.newSharedSpaceLibrary({ spaceId: space.id, libraryId: library.id });
+
+      await expect(sut.findSpaceForAssetAndUser(asset.id, anna.id)).resolves.toEqual({ spaceId: space.id });
+    });
+
+    it('resolves an asset reachable through a linked album', async () => {
+      const { ctx, sut } = setup();
+      const { anna, bob, space } = await newSpaceWithViewer(ctx);
+      const { result: album } = await ctx.newAlbum({ ownerId: bob.id, albumName: 'Linked' });
+      const { asset } = await ctx.newAsset({ ownerId: bob.id, visibility: AssetVisibility.Timeline });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+      await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
+
+      await expect(sut.findSpaceForAssetAndUser(asset.id, anna.id)).resolves.toEqual({ spaceId: space.id });
+    });
+
+    it('resolves a cross-owner contribution to a linked album', async () => {
+      const { ctx, sut } = setup();
+      const { anna, bob, space } = await newSpaceWithViewer(ctx);
+      const { user: carol } = await ctx.newUser();
+      const { result: album } = await ctx.newAlbum({ ownerId: bob.id, albumName: 'Linked' });
+      const { asset } = await ctx.newAsset({ ownerId: carol.id, visibility: AssetVisibility.Timeline });
+      await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
+      await ctx.newAlbumSpaceAsset({ albumId: album.id, assetId: asset.id, spaceId: space.id });
+
+      await expect(sut.findSpaceForAssetAndUser(asset.id, anna.id)).resolves.toEqual({ spaceId: space.id });
+    });
+
+    // Non-vacuity for the whole block: the album fixture above resolves only because Anna is a
+    // member. A stranger gets nothing from the identical fixture.
+    it('resolves nothing for a user who is not a member of the space', async () => {
+      const { ctx, sut } = setup();
+      const { bob, space } = await newSpaceWithViewer(ctx);
+      const { user: stranger } = await ctx.newUser();
+      const { result: album } = await ctx.newAlbum({ ownerId: bob.id, albumName: 'Linked' });
+      const { asset } = await ctx.newAsset({ ownerId: bob.id, visibility: AssetVisibility.Timeline });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+      await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
+
+      await expect(sut.findSpaceForAssetAndUser(asset.id, stranger.id)).resolves.toBeUndefined();
+    });
+
+    it('resolves nothing for a soft-deleted asset', async () => {
+      const { ctx, sut } = setup();
+      const { anna, bob, space } = await newSpaceWithViewer(ctx);
+      const { result: album } = await ctx.newAlbum({ ownerId: bob.id, albumName: 'Linked' });
+      const { asset } = await ctx.newAsset({ ownerId: bob.id, visibility: AssetVisibility.Timeline });
+      await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
+      await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id });
+
+      await expect(sut.findSpaceForAssetAndUser(asset.id, anna.id)).resolves.toEqual({ spaceId: space.id });
+
+      await defaultDatabase.updateTable('asset').set({ deletedAt: new Date() }).where('id', '=', asset.id).execute();
+      await expect(sut.findSpaceForAssetAndUser(asset.id, anna.id)).resolves.toBeUndefined();
     });
   });
 

@@ -84,12 +84,13 @@ import {
 } from 'src/services/accessible-identity-reconciliation';
 import { BaseService } from 'src/services/base.service';
 import { JobOf } from 'src/types';
-import { convertFaceBoxToOriginalImageSpace } from 'src/utils/asset.util';
+import { convertFaceBoxToOriginalImageSpace, getDimensions } from 'src/utils/asset.util';
 import { asDateString, asDateTimeString } from 'src/utils/date';
 import { ImmichMediaResponse } from 'src/utils/file';
 import { createCrossOwnerMergeAuthorizer } from 'src/utils/merge-policy';
 import { mimeTypes } from 'src/utils/mime-types';
 import { isFaceSuggestionEnabled } from 'src/utils/misc';
+import { transformFaceBoundingBox } from 'src/utils/transform';
 
 const ROLE_HIERARCHY: Record<SharedSpaceRole, number> = {
   [SharedSpaceRole.Viewer]: 0,
@@ -2295,6 +2296,14 @@ export class SharedSpaceService extends BaseService {
    * The hidden-person exclusion lives in the repository read (`getAssetFacesForSpace`) so it
    * cannot drift from `isFaceAssignableInSpace`'s write-side exclusion — an editor must never be
    * able to attach a face this list would not show them (F-8/F-9).
+   *
+   * Boxes are STORED against the original bytes, and the client renders the edited preview and
+   * crops each face out of it, so they are projected on the way out — the same transform the
+   * owner's twin read applies (`PersonService.getFacesById` → `mapFaces`), and the exact inverse of
+   * the one `createSpaceAssetFace` applies on the way in. Returning them raw put this endpoint on
+   * the opposite convention from its own write, so every crop in the editor's panel was cut from
+   * the wrong region of an edited asset — and #992 is what makes editing a MEMBER's asset possible,
+   * so an edited member asset is an ordinary case here, not an exotic one.
    */
   async getSpaceAssetFaces(auth: AuthDto, spaceId: string, assetId: string): Promise<SpaceAssetFaceResponseDto[]> {
     await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
@@ -2306,18 +2315,37 @@ export class SharedSpaceService extends BaseService {
     }
 
     const faces = await this.sharedSpaceRepository.getAssetFacesForSpace(spaceId, assetId);
-    return faces.map((face) => ({
-      id: face.id,
-      boundingBoxX1: face.boundingBoxX1,
-      boundingBoxY1: face.boundingBoxY1,
-      boundingBoxX2: face.boundingBoxX2,
-      boundingBoxY2: face.boundingBoxY2,
-      imageWidth: face.imageWidth,
-      imageHeight: face.imageHeight,
-      spacePersonId: face.spacePersonId,
-      spacePersonName: face.spacePersonName,
-      isEditorDrawn: face.isEditorDrawn,
-    }));
+    if (faces.length === 0) {
+      return [];
+    }
+
+    const asset = await this.assetRepository.getById(assetId, { edits: true, exifInfo: true });
+    const edits = asset?.edits ?? [];
+    const dimensions = asset?.exifInfo ? getDimensions(asset.exifInfo) : { width: 0, height: 0 };
+    // `transformFaceBoundingBox` is already a no-op without edits; the dimension check is the one
+    // extra guard, because an edited asset with no exif dimensions would otherwise scale every box
+    // by zero and collapse it to a point. A stored box is wrong-but-recognisable there, a collapsed
+    // one is not. The write twin refuses outright instead (F-17) — a read still has to render.
+    const canProject = dimensions.width > 0 && dimensions.height > 0;
+
+    return faces.map((face) => {
+      const box = {
+        boundingBoxX1: face.boundingBoxX1,
+        boundingBoxY1: face.boundingBoxY1,
+        boundingBoxX2: face.boundingBoxX2,
+        boundingBoxY2: face.boundingBoxY2,
+        imageWidth: face.imageWidth,
+        imageHeight: face.imageHeight,
+      };
+
+      return {
+        id: face.id,
+        ...(canProject ? transformFaceBoundingBox(box, edits, dimensions) : box),
+        spacePersonId: face.spacePersonId,
+        spacePersonName: face.spacePersonName,
+        isEditorDrawn: face.isEditorDrawn,
+      };
+    });
   }
 
   /**

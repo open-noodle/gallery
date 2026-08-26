@@ -4990,6 +4990,26 @@ export class SharedSpaceRepository {
               .select('shared_space_library.spaceId')
               .where('shared_space_member.userId', '=', userId),
           )
+          // The linked-album arm, which must exist here because it exists in
+          // `checkSpaceEditAccess`: every path that grants an edit has to resolve to the space that
+          // granted it, or the edit is made through a space the response never names — the face
+          // affordances switch themselves off (`resolvedSpaceId`) and the owner's activity feed
+          // loses the attribution row. Routed through `spaceAlbumAssetExists` rather than a
+          // hand-rolled join so this arm cannot drift from the album scoping every other surface
+          // uses; that helper covers cross-owner contributions (#764) in the same predicate.
+          .union(
+            this.db
+              .selectFrom('shared_space_member')
+              .innerJoin('asset', (join) => join.on('asset.id', '=', assetId).on('asset.deletedAt', 'is', null))
+              .select('shared_space_member.spaceId')
+              .where('shared_space_member.userId', '=', userId)
+              .where((eb) =>
+                spaceAlbumAssetExists(eb, {
+                  correlateAssetId: 'asset.id',
+                  scope: { spaceIdRef: 'shared_space_member.spaceId' },
+                }),
+              ),
+          )
           .as('combined'),
       )
       .select('combined.spaceId')

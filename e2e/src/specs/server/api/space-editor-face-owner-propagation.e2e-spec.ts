@@ -126,12 +126,16 @@ describe('Space editor face edits propagate to the asset owner (spec §6.3.1 rev
   });
 
   /**
-   * The guard that separates "propagate the editor's edit" from "let an editor wipe arbitrary
-   * owner tags". Detaching space person X must only clear the owner's tag when the owner's person
-   * is the SAME human; a face the owner named as someone else is left alone.
+   * The HTTP-level half of "an editor's detach does not reach beyond the face it names": a detach
+   * on one face leaves a tag Bob set on ANOTHER face untouched, end to end through the real stack.
    *
-   * Two faces are used so the surviving tag is observed while the editor actually detaches a
-   * DIFFERENT space person -- a single-face version could pass merely because nothing ran.
+   * It deliberately does NOT prove the same-human guard itself. Two faces are used here, and
+   * `setFaceOwnerPerson` is scoped to one `assetFaceId`, so the surviving tag would survive with or
+   * without the identity comparison -- the guard needs both people on ONE face, which the API
+   * cannot set up (an attach aligns the identities by design). That case is covered where it can be
+   * built directly, in `shared-space-face-assign.medium.spec.ts` ("leaves the owner's tag alone when
+   * the detached space person is a different human") and, for the compare-and-set underneath it, in
+   * `person.repository.spec.ts` ("setFaceOwnerPerson"). Both are mutation-proved.
    */
   it("leaves the owner's own unrelated tag alone when the editor detaches a different person", async () => {
     const ownTaggedFaceId = await utils.createUnassignedFace(ctx.spaceAssetId);
