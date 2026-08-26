@@ -1136,10 +1136,7 @@ describe(AuthService.name, () => {
         mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({ profile });
         mocks.user.getByOAuthId.mockResolvedValue(user);
         mocks.crypto.randomUUID.mockReturnValue(fileId);
-        mocks.oauth.getProfilePicture.mockResolvedValue({
-          contentType: 'image/jpeg',
-          data: new Uint8Array([1, 2, 3, 4, 5]).buffer,
-        });
+        mocks.oauth.getProfilePicture.mockResolvedValue(new Uint8Array([1, 2, 3, 4, 5]).buffer);
         mocks.user.update.mockResolvedValue(user);
         mocks.session.create.mockResolvedValue(SessionFactory.create());
 
@@ -1172,10 +1169,7 @@ describe(AuthService.name, () => {
         mocks.crypto.randomUUID.mockReturnValue(fileId);
         // Regardless of the OAuth picture mime, the S3 object mirrors the locally-generated
         // thumbnail, so content type is derived from the thumbnail file extension.
-        mocks.oauth.getProfilePicture.mockResolvedValue({
-          contentType: 'image/png',
-          data: new Uint8Array([1, 2, 3]).buffer,
-        });
+        mocks.oauth.getProfilePicture.mockResolvedValue(new Uint8Array([1, 2, 3]).buffer);
         mocks.user.update.mockResolvedValue(user);
         mocks.session.create.mockResolvedValue(SessionFactory.create());
 
@@ -1199,10 +1193,7 @@ describe(AuthService.name, () => {
         mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({ profile });
         mocks.user.getByOAuthId.mockResolvedValue(user);
         mocks.crypto.randomUUID.mockReturnValue(fileId);
-        mocks.oauth.getProfilePicture.mockResolvedValue({
-          contentType: 'image/jpeg',
-          data: new Uint8Array([1, 2, 3, 4, 5]).buffer,
-        });
+        mocks.oauth.getProfilePicture.mockResolvedValue(new Uint8Array([1, 2, 3, 4, 5]).buffer);
         mocks.user.update.mockResolvedValue(user);
         mocks.session.create.mockResolvedValue(SessionFactory.create());
 
@@ -1230,10 +1221,7 @@ describe(AuthService.name, () => {
         mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({ profile });
         mocks.user.getByOAuthId.mockResolvedValue(user);
         mocks.crypto.randomUUID.mockReturnValue(fileId);
-        mocks.oauth.getProfilePicture.mockResolvedValue({
-          contentType: 'image/jpeg',
-          data: new Uint8Array([1, 2, 3, 4, 5]).buffer,
-        });
+        mocks.oauth.getProfilePicture.mockResolvedValue(new Uint8Array([1, 2, 3, 4, 5]).buffer);
         mocks.user.update.mockResolvedValue(user);
         mocks.session.create.mockResolvedValue(SessionFactory.create());
 
@@ -1258,10 +1246,7 @@ describe(AuthService.name, () => {
         mocks.oauth.getProfileAndOAuthSid.mockResolvedValue({ profile });
         mocks.user.getByOAuthId.mockResolvedValue(user);
         mocks.crypto.randomUUID.mockReturnValue(fileId);
-        mocks.oauth.getProfilePicture.mockResolvedValue({
-          contentType: 'image/jpeg',
-          data: new Uint8Array([1, 2, 3, 4, 5]).buffer,
-        });
+        mocks.oauth.getProfilePicture.mockResolvedValue(new Uint8Array([1, 2, 3, 4, 5]).buffer);
         mocks.user.update.mockResolvedValue(user);
         mocks.session.create.mockResolvedValue(SessionFactory.create());
         mockS3Backend.put.mockRejectedValue(new Error('S3 upload failed'));
@@ -2118,10 +2103,7 @@ describe(AuthService.name, () => {
       });
       mocks.user.getByOAuthId.mockResolvedValue(userNoProfile);
       mocks.crypto.randomUUID.mockReturnValue(fileId);
-      mocks.oauth.getProfilePicture.mockResolvedValue({
-        contentType: 'image/jpeg',
-        data: new Uint8Array([1, 2, 3]).buffer,
-      });
+      mocks.oauth.getProfilePicture.mockResolvedValue(new Uint8Array([1, 2, 3]).buffer);
       mocks.user.update.mockResolvedValue(userNoProfile);
       mocks.session.create.mockResolvedValue(factory.session());
 
