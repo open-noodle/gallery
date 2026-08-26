@@ -136,6 +136,43 @@ function renderPage(people: SharedSpacePersonResponseDto[], peopleStatistics?: S
   });
 }
 
+/** Mirrors the page's own PAGE_SIZE — a short first page never offers a second one. */
+const PAGE_SIZE = 100;
+
+/**
+ * Renders the page with a full first page loaded (so the grid offers a next page) and hands back a
+ * trigger that reports the infinite-scroll sentinel as intersecting, so pagination can be driven
+ * deterministically. Mirrors the global people page's helper of the same name.
+ */
+function renderPaginatedPage(people: SharedSpacePersonResponseDto[]) {
+  let intersectionCallback: IntersectionObserverCallback | undefined;
+  let observedSentinel: Element | undefined;
+  vi.stubGlobal(
+    'IntersectionObserver',
+    vi.fn(function (callback: IntersectionObserverCallback) {
+      intersectionCallback = callback;
+      return {
+        observe: (element: Element) => (observedSentinel = element),
+        disconnect: vi.fn(),
+        unobserve: vi.fn(),
+        takeRecords: vi.fn(),
+      };
+    }),
+  );
+
+  const rendered = renderPage(people);
+
+  const intersect = async () => {
+    await waitFor(() => expect(observedSentinel).toBeDefined());
+    intersectionCallback?.(
+      [{ target: observedSentinel, isIntersecting: true } as IntersectionObserverEntry],
+      {} as IntersectionObserver,
+    );
+  };
+
+  return { ...rendered, intersect };
+}
+
 describe('Space people page', () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -236,5 +273,63 @@ describe('Space people page', () => {
     const updatedInputs = screen.getAllByPlaceholderText('add_a_name');
     expect(updatedInputs[0]).toHaveValue('Aaron');
     expect(updatedInputs[1]).toHaveValue('Bob');
+  });
+
+  // The space twin of the global people page's "server repeats a row across the page boundary"
+  // case. OFFSET pagination is not a snapshot: `getSpacePeople` orders by hidden state, name and
+  // asset count, and `recountPersons` runs on every face attach/detach — so an editor naming a
+  // face in this very space between the two requests shifts the window and re-emits a row page 1
+  // already returned. A repeated key throws `each_key_duplicate`, and the grid then stops
+  // rendering for the rest of the session while scrolling keeps firing requests.
+  it('renders each person once when the space read repeats a row across the page boundary', async () => {
+    const firstPage = Array.from({ length: PAGE_SIZE }, (_, index) =>
+      makeSpacePerson({
+        id: `space-person-${index}`,
+        name: `Person ${String(index).padStart(3, '0')}`,
+        assetCount: PAGE_SIZE - index,
+      }),
+    );
+    sdkMock.getSpacePeople.mockResolvedValue([
+      firstPage.at(-1)!,
+      makeSpacePerson({ id: 'space-person-new', name: 'Newcomer', assetCount: 1 }),
+    ]);
+
+    const { intersect } = renderPaginatedPage(firstPage);
+    await intersect();
+
+    await waitFor(() => expect(screen.getByDisplayValue('Newcomer')).toBeInTheDocument());
+    expect(screen.getAllByPlaceholderText('add_a_name')).toHaveLength(PAGE_SIZE + 1);
+  });
+
+  // The visibility manager pages the same read into a second keyed grid of its own, so it carries
+  // the same exposure as the page behind it — and it is the more likely of the two to be open while
+  // someone else edits, since hiding people is what a space editor does after a naming session.
+  it('renders each person once in the visibility manager when the read repeats a row', async () => {
+    const firstPage = Array.from({ length: PAGE_SIZE }, (_, index) =>
+      makeSpacePerson({
+        id: `space-person-${index}`,
+        name: `Person ${String(index).padStart(3, '0')}`,
+        assetCount: PAGE_SIZE - index,
+      }),
+    );
+    // Keyed off the request rather than call order: the page's own grid pages independently, so
+    // which of the two lists asks first is not something this test should depend on.
+    sdkMock.getSpacePeople.mockImplementation(({ withHidden, offset }) => {
+      if (!withHidden) {
+        return Promise.resolve([]);
+      }
+      return Promise.resolve(
+        offset ? [firstPage.at(-1)!, makeSpacePerson({ id: 'space-person-new', name: 'Newcomer' })] : firstPage,
+      );
+    });
+
+    const { intersect } = renderPaginatedPage(firstPage);
+    await userEvent.click(screen.getByText('show_and_hide_people'));
+    await waitFor(() => expect(screen.getByTestId('visibility-person-space-person-0')).toBeInTheDocument());
+
+    await intersect();
+
+    await waitFor(() => expect(screen.getByTestId('visibility-person-space-person-new')).toBeInTheDocument());
+    expect(screen.getAllByTestId(/^visibility-person-/)).toHaveLength(PAGE_SIZE + 1);
   });
 });

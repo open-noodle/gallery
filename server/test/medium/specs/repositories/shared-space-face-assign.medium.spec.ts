@@ -470,6 +470,34 @@ describe('getAssetFacesForSpace', () => {
     expect(drawn).toMatchObject({ isEditorDrawn: true });
     expect(detected).toMatchObject({ isEditorDrawn: false });
   });
+
+  // #992 field report: a face named in TWO spaces came back TWICE from this read -- one row per
+  // `shared_space_person_face` link, because that join is not space-scoped (only the
+  // `shared_space_person` join below it is, and it merely NULLs the other space's columns). The
+  // panel renders these in a keyed `{#each face.id}`, and Svelte throws `each_key_duplicate` on a
+  // repeated key, aborting the branch swap and leaving the loading spinner up for good (see
+  // `appendUniqueById`'s doc comment for the same failure mode on the people grid).
+  it('returns ONE row for a face also held by a space person in ANOTHER space', async () => {
+    const { ctx } = setup();
+    const spaceRepo = ctx.get(SharedSpaceRepository);
+    const { bob, space } = await newSpaceWithEditorAndMember(ctx);
+    const { space: otherSpace } = await ctx.newSharedSpace({ createdById: bob.id });
+    const { assetId } = await reachPathBuilders.direct(ctx, { spaceId: space.id, ownerId: bob.id });
+    await ctx.newSharedSpaceAsset({ spaceId: otherSpace.id, assetId });
+    const { result: faceId } = await ctx.newAssetFace({ assetId });
+
+    const here = await spaceRepo.createPerson({ spaceId: space.id, name: 'Aurelia' });
+    const there = await spaceRepo.createPerson({ spaceId: otherSpace.id, name: 'Aurelia elsewhere' });
+    await spaceRepo.addPersonFaces([
+      { personId: here.id, assetFaceId: faceId },
+      { personId: there.id, assetFaceId: faceId },
+    ]);
+
+    const faces = await spaceRepo.getAssetFacesForSpace(space.id, assetId);
+
+    expect(faces.map((face) => face.id)).toEqual([faceId]);
+    expect(faces[0]).toMatchObject({ spacePersonId: here.id, spacePersonName: 'Aurelia' });
+  });
 });
 
 // Slice 4, Task 1 (spec §6.4, §9.4): DELETE /shared-spaces/:id/people/:personId/faces/:assetFaceId.

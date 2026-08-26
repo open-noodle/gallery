@@ -1204,7 +1204,8 @@ where
     )
   )
 order by
-  "shared_space_activity"."createdAt" desc
+  "shared_space_activity"."createdAt" desc,
+  "shared_space_activity"."id" desc
 limit
   $4
 offset
@@ -3311,29 +3312,38 @@ select
   "asset_face"."imageWidth",
   "asset_face"."imageHeight",
   "asset_face"."createdBy",
-  "shared_space_person"."id" as "spacePersonId",
-  "shared_space_person"."name" as "spacePersonName"
+  "space_person"."id" as "spacePersonId",
+  "space_person"."name" as "spacePersonName"
 from
   "asset_face"
   inner join "asset" on "asset"."id" = "asset_face"."assetId"
   left join "person" on "person"."id" = "asset_face"."personId"
-  left join "shared_space_person_face" on "shared_space_person_face"."assetFaceId" = "asset_face"."id"
-  left join "shared_space_person" on "shared_space_person"."id" = "shared_space_person_face"."personId"
-  and "shared_space_person"."spaceId" = $1
+  left join (
+    select
+      "shared_space_person_face"."assetFaceId",
+      "shared_space_person"."id",
+      "shared_space_person"."name",
+      "shared_space_person"."isHidden"
+    from
+      "shared_space_person_face"
+      inner join "shared_space_person" on "shared_space_person"."id" = "shared_space_person_face"."personId"
+    where
+      "shared_space_person"."spaceId" = $1
+  ) as "space_person" on "space_person"."assetFaceId" = "asset_face"."id"
 where
-  "asset_face"."assetId" = $2
+  "asset"."visibility" in ($2, $3)
+  and "asset_face"."assetId" = $4
   and "asset_face"."deletedAt" is null
-  and "asset_face"."isVisible" = $3
+  and "asset_face"."isVisible" = $5
   and "asset"."deletedAt" is null
-  and "asset"."isOffline" = $4
-  and "asset"."visibility" in ($5, $6)
+  and "asset"."isOffline" = $6
   and (
     "person"."id" is null
     or "person"."isHidden" = $7
   )
   and (
-    "shared_space_person"."id" is null
-    or "shared_space_person"."isHidden" = $8
+    "space_person"."id" is null
+    or "space_person"."isHidden" = $8
   )
 order by
   "asset_face"."id"

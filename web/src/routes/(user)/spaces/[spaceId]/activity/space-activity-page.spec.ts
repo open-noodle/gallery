@@ -73,6 +73,24 @@ describe('Activity page', () => {
       await waitFor(() => expect(screen.getByTestId('activity-item-a-next')).toBeInTheDocument());
     });
 
+    // This feed grows at the head by design and pages by OFFSET over `createdAt desc`, so anything
+    // anyone does in the space while it is open pushes the boundary down and page 2 re-sends a row
+    // page 1 already showed. Items are keyed on the activity id, and a repeated key throws
+    // `each_key_duplicate` — which aborts the render and leaves the feed frozen mid-update.
+    it('renders each activity once when a new activity shifts the page boundary', async () => {
+      const initial = Array.from({ length: 20 }, (_, i) => activity({ id: `a${i}`, data: { count: i } }));
+      sdkMock.getSpaceActivities.mockResolvedValue([
+        initial.at(-1)!,
+        activity({ id: 'a-next', type: 'space_color_change', data: {} }),
+      ]);
+      renderPage({ activities: initial, hasMoreActivities: true });
+
+      await fireEvent.click(within(screen.getByTestId('load-more-button')).getByRole('button'));
+
+      await waitFor(() => expect(screen.getByTestId('activity-item-a-next')).toBeInTheDocument());
+      expect(screen.getAllByTestId(/^activity-item-/)).toHaveLength(21);
+    });
+
     it('keeps the feed and the load-more button when loading more fails', async () => {
       const initial = Array.from({ length: 20 }, (_, i) => activity({ id: `a${i}`, data: { count: i } }));
       sdkMock.getSpaceActivities.mockRejectedValueOnce(new Error('network'));
