@@ -31,6 +31,7 @@ describe(MemoryService.name, () => {
     ({ sut, mocks } = newTestService(MemoryService));
     mocks.memory.search.mockResolvedValue([]);
     mocks.memory.searchAccessible.mockResolvedValue([]);
+    mocks.memory.deleteOnThisDay.mockResolvedValue(void 0);
     mocks.user.getMetadata.mockResolvedValue([]);
   });
 
@@ -330,6 +331,98 @@ describe(MemoryService.name, () => {
       ]);
       expect(mocks.memory.create.mock.calls[0]?.[0].data).toMatchObject({ title: 'First', dedupeKey: 'k-1' });
       expect(mocks.memory.create.mock.calls[1]?.[0].data).toMatchObject({ title: 'Third', dedupeKey: 'k-3' });
+
+      vi.useRealTimers();
+    });
+
+    it('should delete the superseded on_this_day memory once the standing-in rule memory is created', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-04-23T12:00:00Z'));
+
+      const user = factory.userAdmin();
+      mocks.user.getList.mockResolvedValue([user]);
+      mocks.systemMetadata.get.mockResolvedValue({
+        lastOnThisDayDate: '2026-04-25T00:00:00.000Z',
+        lastRuleDate: '2026-04-22T00:00:00.000Z',
+      });
+      mocks.asset.getByDayOfYear.mockResolvedValue([]);
+      mocks.memory.hasRuleMemory.mockResolvedValue(false);
+      mocks.memory.create.mockResolvedValue(MemoryFactory.create() as any);
+
+      const rule = {
+        id: 'on_this_day_place',
+        evaluate: vi.fn().mockResolvedValue([
+          {
+            ruleId: 'on_this_day_place',
+            dedupeKey: 'place_day:2023-04-23:portugal:lisbon',
+            title: 'On this day in Lisbon',
+            score: 100,
+            assetIds: ['asset-1'],
+            memoryAt: DateTime.fromISO('2023-04-23T00:00:00Z'),
+            supersedesOnThisDayYears: [2021, 2023],
+          },
+          {
+            ruleId: 'on_this_day_place',
+            dedupeKey: 'place_day:2026-04-23:portugal:porto',
+            title: 'On this day in Porto',
+            score: 90,
+            assetIds: ['asset-2'],
+            memoryAt: DateTime.fromISO('2022-04-23T00:00:00Z'),
+            supersedesOnThisDayYears: [],
+          },
+        ]),
+      };
+
+      vi.spyOn(sut as never, 'getMemoryRules').mockReturnValue([rule] as never);
+
+      await sut.onMemoriesCreate();
+
+      expect(mocks.memory.create).toHaveBeenCalledTimes(2);
+      // Every year the candidate declared is removed, and only those years — the second
+      // candidate declared none, so it removes nothing. All on the one trigger day.
+      expect(mocks.memory.deleteOnThisDay.mock.calls).toEqual([
+        [{ ownerId: user.id, year: 2021, showAt: new Date('2026-04-23T00:00:00.000Z') }],
+        [{ ownerId: user.id, year: 2023, showAt: new Date('2026-04-23T00:00:00.000Z') }],
+      ]);
+
+      vi.useRealTimers();
+    });
+
+    it('should not delete an on_this_day memory when the superseding candidate was never created', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-04-23T12:00:00Z'));
+
+      const user = factory.userAdmin();
+      mocks.user.getList.mockResolvedValue([user]);
+      mocks.systemMetadata.get.mockResolvedValue({
+        lastOnThisDayDate: '2026-04-25T00:00:00.000Z',
+        lastRuleDate: '2026-04-22T00:00:00.000Z',
+      });
+      mocks.asset.getByDayOfYear.mockResolvedValue([]);
+      // The rule memory already exists from an earlier run, so the candidate is skipped.
+      mocks.memory.hasRuleMemory.mockResolvedValue(true);
+
+      const rule = {
+        id: 'on_this_day_place',
+        evaluate: vi.fn().mockResolvedValue([
+          {
+            ruleId: 'on_this_day_place',
+            dedupeKey: 'place_day:2026-04-23:portugal:lisbon',
+            title: 'On this day in Lisbon',
+            score: 100,
+            assetIds: ['asset-1'],
+            memoryAt: DateTime.fromISO('2023-04-23T00:00:00Z'),
+            supersedesOnThisDayYears: [2023],
+          },
+        ]),
+      };
+
+      vi.spyOn(sut as never, 'getMemoryRules').mockReturnValue([rule] as never);
+
+      await sut.onMemoriesCreate();
+
+      expect(mocks.memory.create).not.toHaveBeenCalled();
+      expect(mocks.memory.deleteOnThisDay).not.toHaveBeenCalled();
 
       vi.useRealTimers();
     });

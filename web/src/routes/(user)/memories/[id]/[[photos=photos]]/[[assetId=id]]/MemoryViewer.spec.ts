@@ -1,6 +1,6 @@
 import { AssetTypeEnum, MemoryType, type MemoryResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
-import { render, screen } from '@testing-library/svelte';
+import { render, screen, waitFor } from '@testing-library/svelte';
 import type { Component } from 'svelte';
 import TestWrapper from '$lib/components/TestWrapper.svelte';
 import { memoryManager } from '$lib/managers/memory-manager.svelte';
@@ -176,6 +176,25 @@ function memory(id: string, assetIds: string[]): MemoryResponseDto {
   };
 }
 
+/**
+ * A memory whose assets span several years, as an `on_this_day_place` card does. The plain
+ * `memory()` helper above dates every asset the same day, which cannot distinguish "the memory's
+ * first asset" from "the asset being viewed".
+ */
+function multiYearMemory(id: string, assets: { id: string; localDateTime: string }[]): MemoryResponseDto {
+  return {
+    ...memory(
+      id,
+      assets.map(({ id }) => id),
+    ),
+    assets: assets.map(({ id, localDateTime }) =>
+      assetFactory.build({ id, type: AssetTypeEnum.Image, localDateTime, fileCreatedAt: localDateTime }),
+    ),
+    type: MemoryType.Rule,
+    data: { ruleId: 'on_this_day_place', title: 'On this day in Berlin', context: { years: [2021, 2025] } },
+  };
+}
+
 function renderViewer() {
   return render(TestWrapper as Component<{ component: typeof MemoryViewer; componentProps: Record<string, never> }>, {
     component: MemoryViewer,
@@ -253,5 +272,90 @@ describe('MemoryViewer memory-scoped navigation (#790)', () => {
     for (const href of hrefs) {
       expect(href).toMatch(/^\/memories\/memory-2(\?|$)/);
     }
+  });
+});
+
+// Ported from the fork's #1029 regression suite, which was written against the fork's own memory
+// viewer (deleted with `memory-viewer-source.ts`). The bug it guards is live on the adopted
+// upstream viewer too: the date overlay used to read `current.memory.assets[0]`, so every asset in
+// a memory showed the FIRST asset's date. That is invisible for an `on_this_day` memory (one year,
+// one date) and wrong for an `on_this_day_place` memory, which covers every year the place recurs.
+//
+// `assetIndex` must stay memory-relative for the fix to hold -- memory-manager builds
+// `assetIndexes` per memory (`memory.assets.map((asset, assetIndex) => ...)`), so an index across
+// the concatenated viewer list would read another memory's asset or run off the end.
+describe('MemoryViewer date overlay for a memory spanning years (#1029)', () => {
+  const berlin = [
+    { id: 'berlin-2021', localDateTime: '2021-08-26T13:48:33.000Z' },
+    { id: 'berlin-2025', localDateTime: '2025-08-26T18:15:01.000Z' },
+  ];
+
+  const viewAsset = (memoryId: string, assetId: string) =>
+    mockPage.reset(`https://gallery.test/memories/${memoryId}?assetId=${assetId}`, {
+      routeId: '/(user)/memories/[id]/[[photos=photos]]/[[assetId=id]]',
+      params: { id: memoryId },
+    });
+
+  beforeEach(() => {
+    memoryManager.memories = [multiYearMemory('memory-1', berlin)];
+    mockGetAssetInfo.mockResolvedValue(memoryManager.memories[0].assets[0]);
+
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        observe = vi.fn();
+        disconnect = vi.fn();
+      },
+    );
+  });
+
+  it("shows the FIRST asset's date when it is the one being viewed", async () => {
+    viewAsset('memory-1', 'berlin-2021');
+
+    renderViewer();
+
+    expect(await screen.findByText(/August 26, 2021/)).toBeInTheDocument();
+    expect(screen.queryByText(/August 26, 2025/)).not.toBeInTheDocument();
+  });
+
+  it("shows the SECOND asset's own date, not the memory's first", async () => {
+    viewAsset('memory-1', 'berlin-2025');
+
+    renderViewer();
+
+    expect(await screen.findByText(/August 26, 2025/)).toBeInTheDocument();
+    expect(screen.queryByText(/August 26, 2021/)).not.toBeInTheDocument();
+  });
+
+  // `current` is `$derived.by()` off the reactive page mock, so reassigning the url is how the
+  // viewed asset changes in production. A fresh render cannot prove the overlay reacts.
+  it('updates the date when paging from the 2021 photo into the 2025 one', async () => {
+    viewAsset('memory-1', 'berlin-2021');
+    renderViewer();
+    expect(await screen.findByText(/August 26, 2021/)).toBeInTheDocument();
+
+    viewAsset('memory-1', 'berlin-2025');
+
+    expect(await screen.findByText(/August 26, 2025/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText(/August 26, 2021/)).not.toBeInTheDocument());
+  });
+
+  it('indexes within the current memory, not across the whole viewer', async () => {
+    // berlin-2025 is asset 1 of memory-2, but asset 3 counting from the start of the viewer.
+    // Reading [0] gives 2021; a viewer-wide index would run off the end of memory-2.
+    memoryManager.memories = [
+      multiYearMemory('memory-1', [
+        { id: 'paris-a', localDateTime: '2019-03-14T10:00:00.000Z' },
+        { id: 'paris-b', localDateTime: '2019-03-14T11:00:00.000Z' },
+      ]),
+      multiYearMemory('memory-2', berlin),
+    ];
+    viewAsset('memory-2', 'berlin-2025');
+
+    renderViewer();
+
+    expect(await screen.findByText(/August 26, 2025/)).toBeInTheDocument();
+    expect(screen.queryByText(/August 26, 2021/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/March 14, 2019/)).not.toBeInTheDocument();
   });
 });
