@@ -24,18 +24,10 @@ jobs:
       MAIN_MIGRATIONS: ${{ github.workspace }}/main/server/src/schema/migrations
       ORDER: ${{ github.workspace }}/server/src/schema/migrations/ORDER
     steps:
-      - id: token
-        uses: immich-app/devtools/actions/create-workflow-token@1af396ae134e4bc3b63d947e672bc68bf4ff9dc5 # create-workflow-token-action-v3.0.0
-        with:
-          client-id: ${{ secrets.PUSH_O_MATIC_APP_CLIENT_ID }}
-          private-key: ${{ secrets.PUSH_O_MATIC_APP_KEY }}
-          permission-contents: read
-
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          token: ${{ steps.token.outputs.token }}
 
       - name: Checkout base
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -43,28 +35,25 @@ jobs:
           ref: ${{ env.BASE_SHA }}
           path: base
           persist-credentials: false
-          token: ${{ steps.token.outputs.token }}
 
       - name: Setup Mise
         uses: immich-app/devtools/actions/use-mise@06a9ef925332c91be647d6256642b86b398592c8 # use-mise-action-v3.2.1
         with:
-          github_token: ${{ steps.token.outputs.token }}
+          github_token: ${{ github.token }}
 
       - name: Install dependencies
         run: mise //server:install
 
+      # Upstream's migrations/ folder keeps upstream's append-only invariant: the fork never adds
+      # files there, so a violation means a rebase dropped or reordered an upstream migration.
       - name: Verify migration ORDER
         run: mise //server:migrations verify-order --append-only-from "${BASELINE}"
 
-      - name: Checkout main
-        if: ${{ startsWith(github.base_ref, 'release/') || startsWith(github.ref_name, 'release/') }}
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: main
-          path: main
-          persist-credentials: false
-          token: ${{ steps.token.outputs.token }}
-
-      - name: Verify the release line does not diverge from main
-        if: ${{ startsWith(github.base_ref, 'release/') || startsWith(github.ref_name, 'release/') }}
-        run: mise //server:migrations verify-order --source-folder "${MAIN_MIGRATIONS}" --append-only-from "${ORDER}"
+      # The fork's own migrations-gallery/ folder is checked for consistency only, NOT append-only.
+      # Gallery migrations use hand-picked round timestamps and the server runs with
+      # allowUnorderedMigrations: true (see DatabaseRepository.createMigrator), so a feature branch
+      # landing with a lower timestamp than one merged meanwhile is safe here — unlike upstream,
+      # which only allows unordered migrations in dev. Consistency still forces two branches that
+      # both add a gallery migration to conflict in git on ORDER's tail, which is the point.
+      - name: Verify Gallery migration ORDER
+        run: mise //server:migrations-gallery verify-order
