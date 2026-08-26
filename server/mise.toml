@@ -46,6 +46,11 @@ env._.path = "./node_modules/.bin"
 run = "sql-tools -u ${DB_URL:-postgres://postgres:postgres@localhost:5432/immich} migrations"
 description = "Run database migration commands (create, generate, run, sync-order, verify-order, ...)"
 
+[tasks."migrations-gallery"]
+env._.path = "./node_modules/.bin"
+run = "sql-tools --source-folder src/schema/migrations-gallery -u ${DB_URL:-postgres://postgres:postgres@localhost:5432/immich} migrations"
+description = "Migration ORDER commands scoped to the fork-only migrations-gallery folder"
+
 [tasks."schema-drop"]
 run = { task = "migrations query 'DROP schema public cascade; CREATE schema public;'" }
 
@@ -82,4 +87,5 @@ run = [
   { task = ":ci-unit" },
   { task = ":ci-medium" },
   { task = ":migrations", args = ["verify-order"] },
+  { task = ":migrations-gallery", args = ["verify-order"] },
 ]
