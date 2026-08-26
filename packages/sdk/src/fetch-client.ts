@@ -688,6 +688,51 @@ export type FaceRepairScanDefaultsDto = {
     maxFlaggedFraction: number;
     minFaces: number;
 };
+export type FaceRepairScanStatusDto = {
+    createdAt: string;
+    error: string | null;
+    finishedAt: string | null;
+    id: string;
+    persons: {
+        eligible: number;
+        faceCount: number;
+        flagged: number;
+        flaggedFraction: number;
+        ownerId: string;
+        personId: string;
+        personName: string | null;
+        recommendation: Recommendation;
+        reviewReasons: string[];
+        suspectedOwners: {
+            count: number;
+            ownerFaceCount: number;
+            ownerMissing: boolean;
+            ownerName: string | null;
+            ownerPersonId: string;
+            thumbnailFaceId: string | null;
+        }[];
+        thumbnailFaceId: string | null;
+    }[];
+    progress: {
+        scanned: number;
+        total: number;
+    } | null;
+    startedAt: string | null;
+    status: Status;
+    totals: {
+        affectedPersons: number;
+        eligibleFaces: number;
+        flaggedFaces: number;
+        reviewOnlyByReason: {
+            badTarget: number;
+            overCap: number;
+            unAttributable: number;
+        };
+        reviewOnlyFaces: number;
+        reviewOnlyPersons: number;
+        toRepair: number;
+    } | null;
+};
 export type FaceRepairPersonFacesDto = {
     flaggedFaces: {
         assetFaceId: string;
@@ -5213,7 +5258,9 @@ export function getFaceRepairScanDefaults(opts?: Oazapfts.RequestOpts) {
 export function getLatestScan(opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchJson<{
         status: 200;
-        data: object;
+        data: FaceRepairScanStatusDto;
+    } | {
+        status: 204;
     }>("/admin/face-repair/scan/latest", {
         ...opts
     }));
@@ -10564,6 +10611,16 @@ export enum ReleaseChannel {
 export enum OAuthTokenEndpointAuthMethod {
     ClientSecretPost = "client_secret_post",
     ClientSecretBasic = "client_secret_basic"
+}
+export enum Recommendation {
+    Confident = "confident",
+    ReviewFirst = "review-first"
+}
+export enum Status {
+    Pending = "pending",
+    Running = "running",
+    Completed = "completed",
+    Failed = "failed"
 }
 export enum IntegrityReport {
     UntrackedFile = "untracked_file",
