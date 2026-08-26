@@ -194,7 +194,10 @@ cleanly. Separately, `ruff format --check .` at the ML repo root flags `test_mai
 - **Test branch**: `rebase/upstream-batch-170`
 - **Commit validated**: `80154b8eb93` — **10/10 workflows green, all first pass**, no re-runs, no flakes.
 - **Final tip**: `77b4afeca3a` adds only `.github/workflows/migration-order.yml`. `test.yml` was
-  re-dispatched on it because that workflow's `.github Files Formatting` job is gated on `.github/**`.
+  re-dispatched on it because that workflow's `.github Files Formatting` job is gated on `.github/**`
+  — run `33001191452`, **GREEN, 21/21 jobs** (21 rather than 20 precisely because that formatting job
+  joined the run). The last commit, `b16ba682f13`, is this report only; `specs/` is not format-gated
+  in CI and the file is prettier-clean.
 
 | Workflow                                  | Status | Run                      |
 | ----------------------------------------- | ------ | ------------------------ |
