@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/active_filter_chip.widget.dart';
+import 'package:immich_mobile/presentation/widgets/filter_sheet/sort_icon_button.widget.dart';
 import 'package:immich_mobile/providers/photos_filter/active_chips.dart';
 import 'package:immich_mobile/providers/photos_filter/filter_debounce.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/filter_suggestions.provider.dart';
@@ -11,12 +12,15 @@ import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dar
 
 /// Top-of-timeline active-filters summary. Returns a sliver that collapses to
 /// zero height when no filters are active, otherwise renders a single-line
-/// strip: a pinned leading Clear-all chip followed by horizontally scrollable
-/// active-filter chips that take the full remaining width. Taps on each chip's
-/// × remove that chip; Clear all wipes the entire filter. Sort lives in the
-/// app bar ([SortIconButton]) and the live match count in the filter-sheet
-/// footer — neither competes for room here. The filter sheet snap state is
-/// untouched — the user can interact with this bar with the sheet open or closed.
+/// strip: a pinned leading Clear-all chip, horizontally scrollable active-filter
+/// chips taking the remaining width, and a pinned trailing [SortIconButton].
+/// Taps on each chip's × remove that chip; Clear all wipes the entire filter.
+/// Sort sits here rather than in the app bar because it appears and disappears
+/// with the filter: as an app-bar action it changed how much width the title
+/// slot was offered, which resized the logo (#1030). Here it costs the app bar
+/// nothing and sits next to the chips it orders. The live match count stays in
+/// the filter-sheet footer. The filter sheet snap state is untouched — the user
+/// can interact with this bar with the sheet open or closed.
 class PhotosFilterSubheader extends ConsumerWidget {
   const PhotosFilterSubheader({super.key});
 
@@ -62,7 +66,9 @@ class PhotosFilterSubheader extends ConsumerWidget {
                 },
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 4),
+            const SortIconButton(),
+            const SizedBox(width: 4),
           ],
         ),
       ),
