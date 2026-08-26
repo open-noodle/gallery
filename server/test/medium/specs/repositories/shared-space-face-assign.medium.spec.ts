@@ -557,6 +557,59 @@ describe('detach', () => {
     expect(link).toBeDefined();
     expect(link?.identityId).toBe(identity.id);
   });
+
+  // §6.3.1's other half, and the one with teeth: the detach clears the OWNER's tag only when the
+  // space person being detached names the same human the owner's person does. Detaching a
+  // different human must leave Bob's tag exactly where it is -- an editor tidying up one name in a
+  // space has no business unpicking an unrelated tag in someone else's library.
+  //
+  // Both detaches run against the SAME face, so the survival below cannot be explained by the
+  // write having landed somewhere else; the second detach flips the same fixture to a clear.
+  it("leaves the owner's tag alone when the detached space person is a different human", async () => {
+    const { sut, ctx } = newMediumService(SharedSpaceService, {
+      database: defaultDatabase,
+      real: [
+        FacePersonVerdictRepository,
+        SharedSpaceRepository,
+        FaceIdentityRepository,
+        DatabaseRepository,
+        PersonRepository,
+      ],
+      mock: [LoggingRepository],
+    });
+    const spaceRepo = ctx.get(SharedSpaceRepository);
+    const { anna, bob, space } = await newSpaceWithEditorAndMember(ctx);
+    const { assetId } = await reachPathBuilders.direct(ctx, { spaceId: space.id, ownerId: bob.id });
+    const { result: faceId } = await ctx.newAssetFace({ assetId });
+    const auth = { user: { id: anna.id } } as AuthDto;
+
+    const ownerPersonIdOf = async () =>
+      defaultDatabase
+        .selectFrom('asset_face')
+        .select('personId')
+        .where('id', '=', faceId)
+        .executeTakeFirstOrThrow()
+        .then((row) => row.personId);
+
+    // Anna names the face, which files it under a person in Bob's own library (§6.3.1 revised).
+    const named = await spaceRepo.createPerson({ spaceId: space.id, name: 'Aurelia' });
+    await sut.attachFaceToSpacePerson(auth, space.id, named.id, faceId);
+    const ownerPersonId = await ownerPersonIdOf();
+    expect(ownerPersonId).not.toBeNull();
+
+    // A second space person -- a different human, with an identity of its own -- also holds this
+    // face's projection row. Given its own identity deliberately: with a null one the guard would
+    // short-circuit before ever comparing, and the test would pass without exercising the compare.
+    const other = await spaceRepo.createPerson({ spaceId: space.id, name: 'Someone Else' });
+    await ctx.get(FaceIdentityRepository).ensureSpacePersonIdentity(other.id);
+    await spaceRepo.addPersonFaces([{ personId: other.id, assetFaceId: faceId }]);
+
+    await sut.detachFaceFromSpacePerson(auth, space.id, other.id, faceId);
+    await expect(ownerPersonIdOf()).resolves.toBe(ownerPersonId);
+
+    await sut.detachFaceFromSpacePerson(auth, space.id, named.id, faceId);
+    await expect(ownerPersonIdOf()).resolves.toBeNull();
+  });
 });
 
 // Slice 4, Task 2 (spec §6.2, §9.4): POST /shared-spaces/:id/people — create a space person,
@@ -1057,6 +1110,130 @@ describe('createSpaceAssetFace', () => {
 
     const rows = await defaultDatabase.selectFrom('asset_face').selectAll().where('assetId', '=', asset.id).execute();
     expect(rows).toEqual([]);
+  });
+});
+
+// The READ twin of F-16, and the half that was missing: boxes are STORED against the original
+// bytes, while the client renders the edited preview and crops each face out of it. The owner's
+// own read projects them for exactly that reason (PersonService.getFacesById -> mapFaces ->
+// transformFaceBoundingBox), and createSpaceAssetFace above inverts the same transform on the way
+// in -- so a space read handing back raw stored coordinates would leave the two endpoints on
+// opposite conventions, and every crop in the editor's panel cut from the wrong region.
+describe('getSpaceAssetFaces coordinate space', () => {
+  const realRepos = [
+    FacePersonVerdictRepository,
+    SharedSpaceRepository,
+    FaceIdentityRepository,
+    DatabaseRepository,
+    PersonRepository,
+    AssetEditRepository,
+    AssetRepository,
+  ];
+
+  // The numbers are F-16's, read backwards: the stored ORIGINAL box (100,100)-(200,200) on a
+  // 1000x800 original must read back as (600,100)-(700,200) on the 800x1000 rotated preview --
+  // exactly the box F-16 accepts as input from a client drawing on that preview. Non-vacuous by
+  // construction: the same fixture is asserted before the edit exists, so the second assertion can
+  // only pass because the transform ran.
+  it('returns a stored box in EDITED-PREVIEW coordinates once the asset carries edits', async () => {
+    const { sut, ctx } = newMediumService(SharedSpaceService, {
+      database: defaultDatabase,
+      real: realRepos,
+      mock: [LoggingRepository],
+    });
+    const { anna, bob, space } = await newSpaceWithEditorAndMember(ctx);
+    const { asset } = await ctx.newAsset({
+      ownerId: bob.id,
+      visibility: AssetVisibility.Timeline,
+      width: 800,
+      height: 1000,
+    });
+    await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+    await ctx.newExif({ assetId: asset.id, exifImageWidth: 1000, exifImageHeight: 800 });
+    const { result: faceId } = await ctx.newAssetFace({
+      assetId: asset.id,
+      boundingBoxX1: 100,
+      boundingBoxY1: 100,
+      boundingBoxX2: 200,
+      boundingBoxY2: 200,
+      imageWidth: 1000,
+      imageHeight: 800,
+    });
+    const auth = { user: { id: anna.id } } as AuthDto;
+
+    // Unedited: the stored box already describes the image the client renders.
+    await expect(sut.getSpaceAssetFaces(auth, space.id, asset.id)).resolves.toMatchObject([
+      {
+        id: faceId,
+        boundingBoxX1: 100,
+        boundingBoxY1: 100,
+        boundingBoxX2: 200,
+        boundingBoxY2: 200,
+        imageWidth: 1000,
+        imageHeight: 800,
+      },
+    ]);
+
+    await ctx
+      .get(AssetEditRepository)
+      .replaceAll(asset.id, [{ action: AssetEditAction.Rotate, parameters: { angle: 90 } }]);
+
+    await expect(sut.getSpaceAssetFaces(auth, space.id, asset.id)).resolves.toMatchObject([
+      {
+        id: faceId,
+        boundingBoxX1: 600,
+        boundingBoxY1: 100,
+        boundingBoxX2: 700,
+        boundingBoxY2: 200,
+        imageWidth: 800,
+        imageHeight: 1000,
+      },
+    ]);
+  });
+
+  // An edited asset whose dimensions are unknown cannot be projected: the scale factor would be
+  // zero and every box would collapse to a point. The stored box is wrong-but-recognisable there,
+  // a collapsed one is not, so the transform is skipped rather than applied to garbage. (The write
+  // twin, F-17, refuses outright instead -- a read must still render.)
+  it('returns the stored box unchanged when an edited asset has no exif dimensions', async () => {
+    const { sut, ctx } = newMediumService(SharedSpaceService, {
+      database: defaultDatabase,
+      real: realRepos,
+      mock: [LoggingRepository],
+    });
+    const { anna, bob, space } = await newSpaceWithEditorAndMember(ctx);
+    const { asset } = await ctx.newAsset({
+      ownerId: bob.id,
+      visibility: AssetVisibility.Timeline,
+      width: 800,
+      height: 1000,
+    });
+    await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id });
+    const { result: faceId } = await ctx.newAssetFace({
+      assetId: asset.id,
+      boundingBoxX1: 100,
+      boundingBoxY1: 100,
+      boundingBoxX2: 200,
+      boundingBoxY2: 200,
+      imageWidth: 1000,
+      imageHeight: 800,
+    });
+    await ctx
+      .get(AssetEditRepository)
+      .replaceAll(asset.id, [{ action: AssetEditAction.Rotate, parameters: { angle: 90 } }]);
+    const auth = { user: { id: anna.id } } as AuthDto;
+
+    await expect(sut.getSpaceAssetFaces(auth, space.id, asset.id)).resolves.toMatchObject([
+      {
+        id: faceId,
+        boundingBoxX1: 100,
+        boundingBoxY1: 100,
+        boundingBoxX2: 200,
+        boundingBoxY2: 200,
+        imageWidth: 1000,
+        imageHeight: 800,
+      },
+    ]);
   });
 });
 

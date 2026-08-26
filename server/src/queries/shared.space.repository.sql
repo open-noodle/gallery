@@ -3428,6 +3428,42 @@ from
       and "asset"."isOffline" = $4
     where
       "shared_space_member"."userId" = $5
+    union
+    select
+      "shared_space_member"."spaceId"
+    from
+      "shared_space_member"
+      inner join "asset" on "asset"."id" = $6
+      and "asset"."deletedAt" is null
+    where
+      "shared_space_member"."userId" = $7
+      and (
+        exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_album"
+            inner join "album_asset" on "album_asset"."albumId" = "shared_space_album"."albumId"
+            inner join "album" on "album"."id" = "shared_space_album"."albumId"
+            and "album"."deletedAt" is null
+          where
+            "album_asset"."assetId" = "asset"."id"
+            and "shared_space_album"."spaceId" = "shared_space_member"."spaceId"
+        )
+        or exists (
+          select
+            1 as "exists"
+          from
+            "shared_space_album"
+            inner join "album_space_asset" on "album_space_asset"."albumId" = "shared_space_album"."albumId"
+            and "album_space_asset"."spaceId" = "shared_space_album"."spaceId"
+            inner join "album" on "album"."id" = "shared_space_album"."albumId"
+            and "album"."deletedAt" is null
+          where
+            "album_space_asset"."assetId" = "asset"."id"
+            and "shared_space_album"."spaceId" = "shared_space_member"."spaceId"
+        )
+      )
   ) as "combined"
 limit
-  $6
+  $8
