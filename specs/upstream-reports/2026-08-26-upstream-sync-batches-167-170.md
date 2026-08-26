@@ -192,23 +192,48 @@ cleanly. Separately, `ruff format --check .` at the ML repo root flags `test_mai
 ## Remote CI Verification
 
 - **Test branch**: `rebase/upstream-batch-170`
-- **Commit validated**: see the follow-up commit recording results
+- **Commit validated**: `80154b8eb93` — **10/10 workflows green, all first pass**, no re-runs, no flakes.
+- **Final tip**: `77b4afeca3a` adds only `.github/workflows/migration-order.yml`. `test.yml` was
+  re-dispatched on it because that workflow's `.github Files Formatting` job is gated on `.github/**`.
 
-| Workflow                                  | Status  |
-| ----------------------------------------- | ------- |
-| `test.yml`                                | pending |
-| `docker.yml`                              | pending |
-| `static_analysis.yml`                     | pending |
-| `gallery-build-mobile.yml`                | pending |
-| `gallery-rebase-smoke.yml`                | pending |
-| `storage-migration-tests.yml`             | pending |
-| `storage-migration-e2e.yml`               | pending |
-| `gallery-revert-to-immich-validation.yml` | pending |
-| `gallery-ml-smoke.yml`                    | pending |
-| `gallery-mobile-smoke.yml`                | pending |
+| Workflow                                  | Status | Run                      |
+| ----------------------------------------- | ------ | ------------------------ |
+| `test.yml`                                | GREEN  | 32998304410 (20/20 jobs) |
+| `docker.yml`                              | GREEN  | 32998311670              |
+| `static_analysis.yml`                     | GREEN  | 32998319168              |
+| `gallery-build-mobile.yml`                | GREEN  | 32998369052              |
+| `gallery-rebase-smoke.yml`                | GREEN  | 32998326326              |
+| `storage-migration-tests.yml`             | GREEN  | 32998333592              |
+| `storage-migration-e2e.yml`               | GREEN  | 32998361793              |
+| `gallery-revert-to-immich-validation.yml` | GREEN  | 32998340791              |
+| `gallery-ml-smoke.yml`                    | GREEN  | 32998347947              |
+| `gallery-mobile-smoke.yml`                | GREEN  | 32998354721              |
+
+- **Failures fixed**: none — nothing went red.
+- **Confirmed flakes**: none.
+
+### The sql-tools bump was validated end to end, not assumed
+
+`sql-tools` generates the schema from the fork's decorated tables, so a 0.5→0.6 behaviour change
+would surface as schema drift rather than a type error. Two dispatched gates cover it:
+
+- `test.yml` runs migration generation and `mise //:sql` against a real Postgres and fails if either
+  produces a diff. Both clean.
+- `gallery-revert-to-immich-validation` ran the full 4.5-minute boot cycle and emitted the genuine
+  runtime notices — `pre/gallery/post: /api/server/ping OK`, `26 SharedSpace migration row(s)`,
+  `post: no new schema drift compared to pre-phase baseline`, `revert-to-immich validation PASSED`.
+  Checked against the known trap where a ~30s run dies on a Docker rate limit and echoes the
+  workflow's own script with `${phase}` unexpanded — this run is the real form.
+
+### Not exercised this cycle
+
+`migration-order.yml` itself never ran: it triggers on `pull_request` / `push: main`, and
+`workflow_dispatch` only works once the file exists on the default branch. Its two commands were
+instead proven locally in both directions (see the fork-side section), and the guard was simulated
+in all three baseline states. First real execution will be when the branch reaches `main`.
 
 ## Post-Rebase Verification
 
-- Fork commits ahead of upstream: 1345
+- Fork commits ahead of upstream: 1347
 - Commits behind upstream: 0
 - Fork diff clean: YES
