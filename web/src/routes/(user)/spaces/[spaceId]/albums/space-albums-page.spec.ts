@@ -130,13 +130,17 @@ function renderPage(
     folderParam?: string;
     /** Simulates a failed folders fetch instead of resolving `options.folders`. */
     foldersRejects?: boolean;
+    /** Leaves the mount reload's folders fetch pending forever, so the test observes FIRST PAINT
+     * only — what the page renders from its LOAD data, before any refetch lands. That window is
+     * where the unscoped-flash bug lived, and there is otherwise no way to assert on it. */
+    foldersPending?: boolean;
     /** What the layout's initial (pre-mount-reload) linkedAlbums prop reports — defaults to
      * `albums`. Set this to something different from `albums` to prove that the mount reload
      * actually replaces it, rather than the assertion passing on the initial prop alone. */
     linkedAlbums?: SharedSpaceLinkedAlbumDto[];
   } = {},
 ) {
-  const { folders = [], folderParam, foldersRejects = false, linkedAlbums = albums } = options;
+  const { folders = [], folderParam, foldersRejects = false, foldersPending = false, linkedAlbums = albums } = options;
 
   pageMock.url = new URL(`http://localhost/spaces/space-1/albums${folderParam ? `?folder=${folderParam}` : ''}`);
 
@@ -145,6 +149,8 @@ function renderPage(
   sdkMock.getSharedSpaceAlbums.mockResolvedValue(albums);
   if (foldersRejects) {
     sdkMock.getSharedSpaceAlbumFolders.mockRejectedValue(new Error('network error'));
+  } else if (foldersPending) {
+    sdkMock.getSharedSpaceAlbumFolders.mockReturnValue(new Promise(() => {}));
   } else {
     sdkMock.getSharedSpaceAlbumFolders.mockResolvedValue(folders);
   }
@@ -153,6 +159,9 @@ function renderPage(
       space: BASE_SPACE,
       members: [makeMember(role)],
       linkedAlbums,
+      // The folder tree ships with the page load, exactly like linkedAlbums, so the first paint is
+      // already scoped. `null` is the load-failed signal.
+      folders: foldersRejects ? null : folders,
       meta: { title: 'Test Space - Albums' },
     },
   };
@@ -255,6 +264,69 @@ describe('Space albums page', () => {
   it('renders one card per album', () => {
     renderPage([makeAlbum({ id: 'a-1', albumName: 'Trip' }), makeAlbum({ id: 'a-2', albumName: 'Home' })]);
     expect(screen.getAllByTestId('space-album-card')).toHaveLength(2);
+  });
+
+  describe('first paint is already folder-scoped', () => {
+    // The folder tree used to be fetched only on mount, while getFolderContents promotes any album
+    // whose folderId it cannot resolve to the ROOT. With an empty tree every album in the space
+    // therefore looked like a root album, so for one full round-trip the page rendered the whole
+    // space unscoped — on every deep link, refresh, and back-navigation — and the albums shown were
+    // clickable. Shipping the tree with the page load removes the window rather than masking it
+    // with a spinner. These assert synchronously, BEFORE any refetch: that is the whole point.
+    it('scopes to the deep-linked folder on the very first paint', () => {
+      renderPage(
+        [
+          makeAlbum({ id: 'a-1', albumName: 'Trip', folderId: 'f-1' }),
+          makeAlbum({ id: 'a-2', albumName: 'Home', folderId: null }),
+        ],
+        SharedSpaceRole.Owner,
+        { foldersPending: true, folderParam: 'f-1', folders: [makeFolder('f-1', 'Trips')] },
+      );
+
+      expect(screen.getAllByTestId('space-album-card')).toHaveLength(1);
+      expect(screen.getByText('Trip')).toBeInTheDocument();
+      expect(screen.queryByText('Home')).not.toBeInTheDocument();
+    });
+
+    it('keeps a foldered album out of the root level on the very first paint', () => {
+      renderPage(
+        [
+          makeAlbum({ id: 'a-1', albumName: 'Trip', folderId: 'f-1' }),
+          makeAlbum({ id: 'a-2', albumName: 'Home', folderId: null }),
+        ],
+        SharedSpaceRole.Owner,
+        { foldersPending: true, folders: [makeFolder('f-1', 'Trips')] },
+      );
+
+      expect(screen.getAllByTestId('space-album-card')).toHaveLength(1);
+      expect(screen.getByText('Home')).toBeInTheDocument();
+    });
+
+    it('renders the breadcrumb on the very first paint, not one round-trip later', () => {
+      renderPage([makeAlbum({ id: 'a-1', albumName: 'Trip', folderId: 'f-1' })], SharedSpaceRole.Owner, {
+        foldersPending: true,
+        folderParam: 'f-1',
+        folders: [makeFolder('f-1', 'Trips')],
+      });
+
+      expect(screen.getByTestId('space-album-folder-breadcrumb')).toBeInTheDocument();
+    });
+
+    // A load failure has no tree to scope by, so it must still degrade to the flat list rather
+    // than hiding every foldered album. Without this the three tests above could be satisfied by
+    // a page that simply refuses to render whenever folders are missing.
+    it('falls back to the flat list when the page load could not fetch folders', () => {
+      renderPage(
+        [
+          makeAlbum({ id: 'a-1', albumName: 'Trip', folderId: 'f-1' }),
+          makeAlbum({ id: 'a-2', albumName: 'Home', folderId: null }),
+        ],
+        SharedSpaceRole.Owner,
+        { foldersRejects: true },
+      );
+
+      expect(screen.getAllByTestId('space-album-card')).toHaveLength(2);
+    });
   });
 
   it('renders the view toggle control', () => {
@@ -739,6 +811,62 @@ describe('Space albums page', () => {
 
       expect(screen.getByText('Rome')).toBeInTheDocument();
       expect(screen.getByTestId('space-album-folder-breadcrumb')).toBeInTheDocument();
+    });
+
+    // A search hides the breadcrumb AND every folder row, but leaves "New folder" and "Link album"
+    // enabled — and both still target `currentFolderId`. So creating a folder while searching
+    // inside "Trips" puts it under Trips, with nothing on screen saying so, and nothing visible
+    // afterwards because search hides folders. The user's only feedback is the name-conflict 400
+    // they get when they try again. Clearing the query on success is what makes the result appear
+    // where it actually landed.
+    it('clears an active search after creating a folder, so the new folder is visible', async () => {
+      modalManagerMock.show.mockResolvedValue('Rome 2026');
+      sdkMock.createSharedSpaceAlbumFolder.mockResolvedValue({} as SharedSpaceAlbumFolderDto);
+      renderPage([makeAlbum({ id: 'a1', albumName: 'Rome', folderId: 'trips' })], SharedSpaceRole.Editor, {
+        folders: [makeFolder('trips', 'Trips')],
+        folderParam: 'trips',
+      });
+
+      await screen.findByTestId('space-album-folder-breadcrumb');
+      const search = screen.getByTestId('space-albums-search');
+      await fireEvent.input(search, { target: { value: 'zzz' } });
+      expect(screen.queryByTestId('space-album-folder-breadcrumb')).not.toBeInTheDocument();
+
+      await fireEvent.click(screen.getByTestId('create-folder-button'));
+
+      // Back out of search: the breadcrumb returns, so the user can see the level the folder
+      // was created in.
+      await waitFor(() => expect(screen.getByTestId('space-album-folder-breadcrumb')).toBeInTheDocument());
+      expect((search as HTMLInputElement).value).toBe('');
+    });
+
+    it('clears an active search after linking an album', async () => {
+      modalManagerMock.show.mockResolvedValue(1);
+      renderPage([makeAlbum({ id: 'a1', albumName: 'Rome', folderId: 'trips' })], SharedSpaceRole.Editor, {
+        folders: [makeFolder('trips', 'Trips')],
+        folderParam: 'trips',
+      });
+
+      await screen.findByTestId('space-album-folder-breadcrumb');
+      const search = screen.getByTestId('space-albums-search');
+      await fireEvent.input(search, { target: { value: 'zzz' } });
+
+      await fireEvent.click(screen.getByTestId('link-album-button'));
+
+      await waitFor(() => expect((search as HTMLInputElement).value).toBe(''));
+    });
+
+    // The control: a create with no search active must not disturb anything, and in particular
+    // must not be the reason the two tests above pass.
+    it('leaves the search box alone when creating a folder with no search active', async () => {
+      modalManagerMock.show.mockResolvedValue('Rome 2026');
+      sdkMock.createSharedSpaceAlbumFolder.mockResolvedValue({} as SharedSpaceAlbumFolderDto);
+      renderPage([makeAlbum({ id: 'a1', albumName: 'Rome' })], SharedSpaceRole.Editor);
+
+      await fireEvent.click(screen.getByTestId('create-folder-button'));
+
+      await waitFor(() => expect(sdkMock.createSharedSpaceAlbumFolder).toHaveBeenCalled());
+      expect((screen.getByTestId('space-albums-search') as HTMLInputElement).value).toBe('');
     });
 
     // W-16: one request, not link-then-move.

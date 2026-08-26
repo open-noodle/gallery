@@ -20,9 +20,11 @@ SpaceAlbum album(
   DateTime? updatedAt,
   DateTime? endDate,
   bool hasCover = true,
+  String? description,
 }) => SpaceAlbum(
   id: id,
   name: name,
+  description: description,
   thumbnailAssetId: hasCover ? 'thumb-$id' : null,
   showInTimeline: true,
   assetCount: 0,
@@ -262,6 +264,29 @@ void main() {
       final hits = flattenForSearch(tripsTree(), [album('a3', 'Rome')], 'rome');
 
       expect(hits.single.path, isEmpty);
+    });
+
+    // Name OR description, matching web's flattenForSearch and the flat filterAndSortSpaceAlbums
+    // this path replaced when a query is active. Dropping the description silently narrowed search
+    // the moment folders shipped: an album named "2026" described "Iceland road trip" stopped
+    // matching "iceland", on mobile only. SpaceAlbum.description exists on the model for this and
+    // nothing else.
+    test('matches on description as well as name', () {
+      final albums = [
+        album('a1', '2026', folderId: 'y2026', description: 'Iceland road trip'),
+        album('a2', 'Rome', description: 'City break'),
+      ];
+
+      final hits = flattenForSearch(tripsTree(), albums, 'iceland');
+
+      expect(hits.map((h) => h.album.id).toList(), ['a1']);
+      expect(hits.single.path, ['Trips', '2026']);
+    });
+
+    test('a null description does not match, and does not throw', () {
+      final albums = [album('a1', 'Rome')];
+
+      expect(flattenForSearch(tripsTree(), albums, 'iceland'), isEmpty);
     });
 
     test('T-14: a blank or whitespace-only query returns nothing, not everything', () {

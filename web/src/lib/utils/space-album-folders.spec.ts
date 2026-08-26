@@ -278,7 +278,11 @@ describe('space-album-folders', () => {
 
     // U-11: an empty query means "search is inactive", not "match everything". The caller
     // uses a non-empty query as the signal to switch into flattened mode at all.
-    it.each([['', ' '.repeat(3)]])('U-11: returns nothing for a blank query (%p)', (query) => {
+    // Two cases, not one: `[['', '   ']]` is a SINGLE case with two arguments, so `query` bound to
+    // '' and the whitespace-only case never ran at all. It is the one that matters — it is what
+    // proves flattenForSearch trims, and therefore that typing a single space does not flip the
+    // page into flattened search mode with the folders and breadcrumb hidden.
+    it.each([[''], [' '.repeat(3)]])('U-11: returns nothing for a blank query (%p)', (query) => {
       expect(flattenForSearch(tripsTree(), [album('a1', 'Rome')], query)).toEqual([]);
     });
   });

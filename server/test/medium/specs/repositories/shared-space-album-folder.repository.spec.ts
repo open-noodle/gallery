@@ -562,9 +562,13 @@ describe('SharedSpaceRepository — album folder primitives', () => {
       createdById: user.id,
     });
 
+    // `reason: 'sibling'` is the classification that makes the 400 say "at the destination" — which
+    // is accurate HERE, where a pre-existing root "2026" is the thing being collided with. The
+    // other classification ('parent') is covered below.
     await expect(sut.deleteAlbumFolderPromotingChildren(space.id, trips.id)).resolves.toEqual({
       outcome: 'conflict',
       name: '2026',
+      reason: 'sibling',
     });
 
     // Rolled back: "Trips" still exists, its child is still nested under it, and the pre-existing
@@ -572,6 +576,34 @@ describe('SharedSpaceRepository — album folder primitives', () => {
     await expect(sut.getAlbumFolderById(space.id, trips.id)).resolves.toMatchObject({ id: trips.id });
     await expect(sut.getAlbumFolderById(space.id, nested2026.id)).resolves.toMatchObject({ parentId: trips.id });
     await expect(sut.getAlbumFolderById(space.id, root2026.id)).resolves.toMatchObject({ parentId: null });
+  });
+
+  // The OTHER collision, and the one that used to arrive nameless from the 23505 backstop: the
+  // child is named like the folder being deleted. Spec F-04 permits that pair (same name, different
+  // parents), so it is reachable — and the deleted folder still holds its own unique-index entry
+  // while its children are promoted past it, because the DELETE comes several statements later.
+  // Classifying it here is what lets the service say "rename it first" instead of blaming the
+  // destination, where nothing is wrong.
+  it('P-05: deleteAlbumFolderPromotingChildren reports a child colliding with the deleted folder itself', async () => {
+    const { ctx, sut } = setup();
+    const { user, space } = await seed(ctx);
+    const trips = await createFolder(sut, {
+      spaceId: space.id,
+      parentId: null,
+      name: 'Trips',
+      createdById: user.id,
+    });
+    // Same name as its parent, differing only by case — the indexes fold case, so this collides.
+    await createFolder(sut, { spaceId: space.id, parentId: trips.id, name: 'trips', createdById: user.id });
+
+    await expect(sut.deleteAlbumFolderPromotingChildren(space.id, trips.id)).resolves.toEqual({
+      outcome: 'conflict',
+      name: 'trips',
+      reason: 'parent',
+    });
+
+    // Rolled back, not half-promoted.
+    await expect(sut.getAlbumFolderById(space.id, trips.id)).resolves.toMatchObject({ id: trips.id });
   });
 
   // Non-colliding sibling: the delete must still succeed normally when there is no name clash —
@@ -923,9 +955,15 @@ describe('folder-tree traversal guards', () => {
     const { a } = await seedCycle(ctx, space.id);
     const loose = await insertFolder(ctx, { spaceId: space.id, name: 'Loose' });
 
+    // Terminating is the point of this test — hence the bomb. The verdict used to be 'ok' here,
+    // with the refusal left to the service's depth pre-check; now that the depth cap is re-checked
+    // under the lock the repository refuses it directly, which is what the sibling test above
+    // ("getAlbumFolderSubtree terminates on a cycle") already describes as the intended outcome:
+    // the bounded walk reports an over-cap depth, so a move into corrupt structure is refused
+    // rather than silently accepted.
     await expect(
       withinTimeout('moveAlbumFolderChecked', sut.moveAlbumFolderChecked(space.id, loose.id, a.id)),
-    ).resolves.toBe('ok');
+    ).resolves.toMatchObject({ depth: expect.any(Number) });
   });
 
   // And the case the guard must NOT break: a genuine descendant is still detected as a cycle.
@@ -963,6 +1001,79 @@ describe('SharedSpaceRepository — album folder moves', () => {
 
     await expect(sut.moveAlbumFolderChecked(space.id, trips.id, archive.id)).resolves.toBe('ok');
     await expect(sut.getAlbumFolderById(space.id, trips.id)).resolves.toMatchObject({ parentId: archive.id });
+  });
+
+  // The depth cap has to be re-checked HERE, under the advisory lock, not only in the service's
+  // optimistic pre-check. Two concurrent moves each pass their own pre-check against a tree that
+  // is still shallow, then serialise on the lock and compose:
+  //
+  //   T at depth 1, F at depth 1 with subtree height 8, U at depth 2
+  //   A: move F under T  -> pre-check 1 + 1 + 8 = 10, allowed
+  //   B: move T under U  -> pre-check 2 + 1 + 0 = 3,  allowed (T's height is still 0)
+  //   both commit        -> U(2) -> T(3) -> F(4) -> ... -> depth 12
+  //
+  // Calling the repository directly is the deterministic form of the same hole: it is the writer,
+  // so its verdict has to be authoritative for depth the way it already is for cycles.
+  it('moveAlbumFolderChecked refuses a move that would exceed the depth cap', async () => {
+    const { ctx, sut } = setup();
+    const { user, space } = await seed(ctx);
+
+    // A chain of 9: depth 1 (root) .. depth 9.
+    const chain = [];
+    let parentId: string | null = null;
+    for (let i = 0; i < 9; i++) {
+      const folder: { id: string } = await createFolder(sut, {
+        spaceId: space.id,
+        parentId,
+        name: `level-${i}`,
+        createdById: user.id,
+      });
+      chain.push(folder);
+      parentId = folder.id;
+    }
+    // A separate root folder with one child, so its subtree height is 1.
+    const loose = await createFolder(sut, {
+      spaceId: space.id,
+      parentId: null,
+      name: 'Loose',
+      createdById: user.id,
+    });
+    await createFolder(sut, { spaceId: space.id, parentId: loose.id, name: 'Child', createdById: user.id });
+
+    // Destination is depth 9, moved subtree has height 1 -> 9 + 1 + 1 = 11, over the cap of 10.
+    const destination = chain.at(-1)!;
+
+    await expect(sut.moveAlbumFolderChecked(space.id, loose.id, destination.id)).resolves.toMatchObject({ depth: 11 });
+    await expect(sut.getAlbumFolderById(space.id, loose.id)).resolves.toMatchObject({ parentId: null });
+  });
+
+  it('moveAlbumFolderChecked allows a move that lands exactly on the depth cap', async () => {
+    const { ctx, sut } = setup();
+    const { user, space } = await seed(ctx);
+
+    const chain = [];
+    let parentId: string | null = null;
+    for (let i = 0; i < 9; i++) {
+      const folder: { id: string } = await createFolder(sut, {
+        spaceId: space.id,
+        parentId,
+        name: `level-${i}`,
+        createdById: user.id,
+      });
+      chain.push(folder);
+      parentId = folder.id;
+    }
+    const loose = await createFolder(sut, {
+      spaceId: space.id,
+      parentId: null,
+      name: 'Loose',
+      createdById: user.id,
+    });
+
+    // Destination depth 9, subtree height 0 -> 9 + 1 + 0 = 10, exactly the cap. Inclusive, so ok.
+    const destination = chain.at(-1)!;
+
+    await expect(sut.moveAlbumFolderChecked(space.id, loose.id, destination.id)).resolves.toBe('ok');
   });
 
   it('moveAlbumFolderChecked reports a cycle when the target is a descendant', async () => {

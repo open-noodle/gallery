@@ -48,8 +48,21 @@ export interface TimelineHiddenScope {
 // normal Kysely rollback (rather than trying to return a value from an already-aborted Postgres
 // transaction) when a promote would collide with an existing folder name at the destination.
 // `folderName` is null for the raced-23505 backstop path, which has no name to report.
+/**
+ * [reason] distinguishes the two structurally different ways a promote collides, because they need
+ * different advice:
+ * - `sibling` — the child's name is already taken by another folder under the DESTINATION parent.
+ * - `parent` — the child is named like the folder being deleted, which is still alive when the
+ *   promote UPDATE runs (it is dropped a few statements later). Spec F-04 permits that name pair,
+ *   so this is reachable, and telling the user to look at the destination sends them somewhere
+ *   nothing is wrong.
+ * - `unknown` — the raced 23505 backstop, which has no name and no idea which of the two it was.
+ */
 class AlbumFolderPromotionConflictError extends Error {
-  constructor(readonly folderName: string | null) {
+  constructor(
+    readonly folderName: string | null,
+    readonly reason: 'sibling' | 'parent' | 'unknown',
+  ) {
     super('shared_space_album_folder promote conflict');
   }
 }
@@ -73,6 +86,20 @@ class AlbumFolderPromotionConflictError extends Error {
  * `shared-space-album-folder.repository.spec.ts` pins the ordering against the service's cap.
  */
 export const ALBUM_FOLDER_TRAVERSAL_LIMIT = 32;
+
+/**
+ * How deep a folder chain may nest, root counting as 1.
+ *
+ * Lives here rather than in the service because the WRITER has to be the one that enforces it.
+ * The service's pre-check runs outside the per-space advisory lock, so two concurrent moves can
+ * each pass it against a tree that is still shallow and then compose past the cap once both
+ * commit — the same reason the cycle check is re-run under the lock in moveAlbumFolderChecked.
+ * The service still pre-checks, because that is what produces the specific 400 message; this is
+ * the backstop that makes the cap an actual invariant rather than an advisory one.
+ *
+ * Re-exported from shared-space.service.ts, which is where callers have always imported it from.
+ */
+export const SHARED_SPACE_ALBUM_FOLDER_MAX_DEPTH = 10;
 
 type SpacePersonStatistics = {
   assets: number;
@@ -1584,7 +1611,11 @@ export class SharedSpaceRepository {
   deleteAlbumFolderPromotingChildren(
     spaceId: string,
     folderId: string,
-  ): Promise<{ outcome: 'ok' } | { outcome: 'notfound' } | { outcome: 'conflict'; name: string }> {
+  ): Promise<
+    | { outcome: 'ok' }
+    | { outcome: 'notfound' }
+    | { outcome: 'conflict'; name: string; reason: 'sibling' | 'parent' | 'unknown' }
+  > {
     return this.db
       .transaction()
       .execute(async (trx) => {
@@ -1603,7 +1634,7 @@ export class SharedSpaceRepository {
 
         const folder = await trx
           .selectFrom('shared_space_album_folder')
-          .select(['id', 'parentId'])
+          .select(['id', 'parentId', 'name'])
           .where('spaceId', '=', spaceId)
           .where('id', '=', folderId)
           .forUpdate()
@@ -1634,7 +1665,19 @@ export class SharedSpaceRepository {
           const siblingNames = new Set(siblings.map((sibling) => sibling.name.trim().toLowerCase()));
           const colliding = children.find((child) => siblingNames.has(child.name.trim().toLowerCase()));
           if (colliding) {
-            throw new AlbumFolderPromotionConflictError(colliding.name);
+            throw new AlbumFolderPromotionConflictError(colliding.name, 'sibling');
+          }
+
+          // The destination-sibling query above excludes this folder (`id != folderId`), because it
+          // is about to disappear. But it does not disappear until the DELETE several statements
+          // below — it is still present, and still holding its index entry, when the promote UPDATE
+          // runs. So a child named like its own parent violates the unique index even though no
+          // destination sibling collides. Catching it here is what lets the error say which folder
+          // to rename; left to the 23505 backstop it arrives nameless.
+          const parentName = folder.name.trim().toLowerCase();
+          const collidingWithParent = children.find((child) => child.name.trim().toLowerCase() === parentName);
+          if (collidingWithParent) {
+            throw new AlbumFolderPromotionConflictError(collidingWithParent.name, 'parent');
           }
         }
 
@@ -1646,7 +1689,7 @@ export class SharedSpaceRepository {
             .execute();
         } catch (error: unknown) {
           if ((error as { code?: string })?.code === '23505') {
-            throw new AlbumFolderPromotionConflictError(null);
+            throw new AlbumFolderPromotionConflictError(null, 'unknown');
           }
           throw error;
         }
@@ -1664,8 +1707,8 @@ export class SharedSpaceRepository {
       .catch((error: unknown) => {
         if (error instanceof AlbumFolderPromotionConflictError) {
           // A raced backstop hit (guard 2) has no name to report — the pre-check (guard 1) is the
-          // only path that knows which child collided.
-          return { outcome: 'conflict' as const, name: error.folderName ?? '' };
+          // only path that knows which child collided, and which of the two collisions it was.
+          return { outcome: 'conflict' as const, name: error.folderName ?? '', reason: error.reason };
         }
         throw error;
       });
@@ -1688,18 +1731,23 @@ export class SharedSpaceRepository {
   //
   // Everything below uses `trx` — a `this.db` query inside a transaction callback deadlocks (#595).
   //
-  // The verdict is authoritative for CYCLES only. Depth-cap and destination name-uniqueness are
-  // optimistic pre-checks the service runs before calling this — this method does not repeat
-  // them, so a concurrently-committed move could in principle still slip a depth or name
-  // violation past it. Only the cycle, which corrupts the tree structurally, is worth the
-  // transaction-scoped re-check.
+  // The verdict is authoritative for CYCLES and for the DEPTH CAP. Both are re-checked here,
+  // under the lock, because both are check-then-write races the service's optimistic pre-check
+  // cannot close: two moves that each pass their own pre-check against a still-shallow tree
+  // serialise on this lock and compose past the cap (destination depth 2 + a subtree whose height
+  // grew because the other move landed first). Returning `{ depth }` rather than a bare string
+  // lets the service report the depth it actually would have been, not the one it guessed.
+  //
+  // Destination name-uniqueness is still optimistic: a raced collision raises 23505 and the
+  // service maps it to the same 400 the pre-check produces, so the invariant holds via the index
+  // itself. Depth has no index to fall back on, which is why it needs the explicit re-check.
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID, DummyValue.UUID, 'Trips'] })
   moveAlbumFolderChecked(
     spaceId: string,
     folderId: string,
     newParentId: string | null,
     name?: string,
-  ): Promise<'ok' | 'cycle' | 'notfound'> {
+  ): Promise<'ok' | 'cycle' | 'notfound' | { depth: number }> {
     return this.db.transaction().execute(async (trx) => {
       await sql`SELECT pg_advisory_xact_lock(hashtext('shared-space-album-folder-move'), hashtext(${spaceId}))`.execute(
         trx,
@@ -1754,6 +1802,37 @@ export class SharedSpaceRepository {
 
         if (ancestors.some((a) => a.id === folderId)) {
           return 'cycle' as const;
+        }
+
+        // Same formula the service pre-checks with (destination depth + 1 + moved subtree height),
+        // but computed from rows read under the lock, so a concurrently-committed move is included.
+        // `ancestors` is self-first-then-parents, so its length IS the destination's depth with
+        // root = 1.
+        const subtree = await trx
+          .withRecursive('subtree', (qb) =>
+            qb
+              .selectFrom('shared_space_album_folder')
+              .select(['id', sql<number>`0`.as('depth')])
+              .where('id', '=', folderId)
+              .unionAll(
+                qb
+                  .selectFrom('shared_space_album_folder as f')
+                  .innerJoin('subtree as s', 's.id', 'f.parentId')
+                  .select(['f.id', sql<number>`s.depth + 1`.as('depth')])
+                  // Cycle stop — see ALBUM_FOLDER_TRAVERSAL_LIMIT. A cyclic subtree reports an
+                  // over-cap height and the move is refused, rather than spinning while holding
+                  // the per-space lock.
+                  .where(sql<boolean>`s.depth < ${ALBUM_FOLDER_TRAVERSAL_LIMIT}`),
+              ),
+          )
+          .selectFrom('subtree')
+          .select('depth')
+          .execute();
+
+        const height = Math.max(0, ...subtree.map((node) => node.depth));
+        const resultingDepth = ancestors.length + 1 + height;
+        if (resultingDepth > SHARED_SPACE_ALBUM_FOLDER_MAX_DEPTH) {
+          return { depth: resultingDepth };
         }
       }
 

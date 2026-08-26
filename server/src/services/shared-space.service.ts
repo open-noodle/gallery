@@ -69,7 +69,10 @@ import {
 import { AlbumAssetCount } from 'src/repositories/album.repository';
 import type { ArgOf } from 'src/repositories/event.repository';
 import type { SpaceFaceAssignment } from 'src/repositories/shared-space.repository';
-import { visibleSpaceAssetVisibilities } from 'src/repositories/shared-space.repository';
+import {
+  SHARED_SPACE_ALBUM_FOLDER_MAX_DEPTH,
+  visibleSpaceAssetVisibilities,
+} from 'src/repositories/shared-space.repository';
 import { DB } from 'src/schema';
 import {
   buildAutomaticReconciliationClaim,
@@ -110,8 +113,13 @@ const getNameSourcePrecedence = (nameSource: string) => NAME_SOURCE_PRECEDENCE[n
  */
 export const SHARED_SPACE_DEDUP_MAX_PASSES = 100;
 
-/** Root is depth 1; the cap is inclusive, so a folder at depth 10 cannot take a child. */
-export const SHARED_SPACE_ALBUM_FOLDER_MAX_DEPTH = 10;
+/**
+ * Root is depth 1; the cap is inclusive, so a folder at depth 10 cannot take a child.
+ *
+ * Defined in the repository — the writer enforces it under the advisory lock — and re-exported
+ * here, which is where every caller has always imported it from.
+ */
+export { SHARED_SPACE_ALBUM_FOLDER_MAX_DEPTH } from 'src/repositories/shared-space.repository';
 /** Bounds the whole-space folder fetch the web client uses to render the tree. */
 export const SHARED_SPACE_ALBUM_FOLDER_MAX_PER_SPACE = 500;
 
@@ -142,6 +150,34 @@ export const sharedSpaceAlbumFolderDepthMessage = (resultingDepth: number) =>
 export const SHARED_SPACE_ALBUM_FOLDER_CAP_MESSAGE = `A space is limited to ${SHARED_SPACE_ALBUM_FOLDER_MAX_PER_SPACE} folders`;
 
 /**
+ * Why a promote-on-delete was refused, worded per cause.
+ *
+ * The `parent` arm exists because the two collisions need opposite advice. A `sibling` collision is
+ * genuinely at the destination — the user should look there. A `parent` collision is with the
+ * folder being deleted itself, which still holds its unique-index entry while its children are
+ * promoted past it; pointing at "the destination" sends the user to a parent where nothing is
+ * wrong, and the actual fix is to rename the child. The old wording claimed `destination` for both,
+ * and for the nameless raced case too.
+ *
+ * Unlike the depth/cap/name-conflict messages, mobile does NOT map these onto a localized string —
+ * `space_album_folder_errors.dart` has no 'Cannot delete:' fragment, so all three surface as the
+ * generic "Unable to delete folder" there. That is a separate gap; the wording still has to be
+ * right for web, which shows the server message verbatim.
+ */
+export const sharedSpaceAlbumFolderPromotionConflictMessage = (
+  name: string,
+  reason: 'sibling' | 'parent' | 'unknown',
+): string => {
+  if (reason === 'parent' && name) {
+    return `Cannot delete: "${name}" has the same name as the folder you are deleting — rename it first`;
+  }
+  if (reason === 'sibling' && name) {
+    return `Cannot delete: "${name}" would collide with a folder that already exists at the destination`;
+  }
+  return 'Cannot delete: promoting a child folder would collide with an existing folder name';
+};
+
+/**
  * The foreign keys that point AT a folder row. Used by
  * {@link SharedSpaceService.withAlbumFolderConstraintsMapped} to recognise "the folder was
  * deleted underneath us" and nothing else.
@@ -156,6 +192,21 @@ const SHARED_SPACE_ALBUM_FOLDER_REFERENCE_CONSTRAINTS = new Set([
   'shared_space_album_folderId_fkey',
   // shared_space_album_folder.parentId -> shared_space_album_folder.id (self)
   'shared_space_album_folder_parentId_fkey',
+]);
+
+/**
+ * The partial unique indexes that enforce case-insensitive sibling-name uniqueness — the only two
+ * ways a folder write can legitimately raise 23505.
+ *
+ * Narrowed by name for the same reason {@link SHARED_SPACE_ALBUM_FOLDER_REFERENCE_CONSTRAINTS} is:
+ * the wrapped operations touch more than these indexes. `linkAlbum` wraps `addAlbum`, whose
+ * transaction also writes `shared_space_album` and `album_space_asset`, so a blanket 23505 →
+ * "A folder with that name already exists here" would report a re-linked album as a folder-name
+ * clash — naming a folder the caller never mentioned.
+ */
+const SHARED_SPACE_ALBUM_FOLDER_NAME_CONSTRAINTS = new Set([
+  'shared_space_album_folder_nested_name_key',
+  'shared_space_album_folder_root_name_key',
 ]);
 
 type SpacePersonMatchResult = {
@@ -1235,15 +1286,32 @@ export class SharedSpaceService extends BaseService {
       if (outcome === 'notfound') {
         throw new BadRequestException('Folder not found');
       }
+      // The locked re-check refused on depth. The pre-check above already passed, so this is the
+      // raced case: another move committed between the two and deepened either the destination or
+      // this folder's own subtree. The repository reports the depth it actually computed, which is
+      // the one worth showing — the pre-check's number is stale by definition here.
+      if (typeof outcome === 'object') {
+        throw new BadRequestException(sharedSpaceAlbumFolderDepthMessage(outcome.depth));
+      }
       return;
     }
 
     // A rename touches no foreign key, so the 23503 arm of the mapper is unreachable here; the
     // message is supplied for uniformity, not because a rename can hit it.
-    await this.withAlbumFolderConstraintsMapped(
+    //
+    // Which is exactly why the return value has to be checked. The rename is check-then-write like
+    // every other folder path, so another editor can delete the folder between the
+    // getAlbumFolderById above and this UPDATE — and because no foreign key is involved, that
+    // race raises nothing at all: the UPDATE simply matches zero rows. Discarding the boolean
+    // hands the caller a 204 for a rename that never happened. setAlbumFolder and the move branch
+    // both already 400 on their own version of this race.
+    const updated = await this.withAlbumFolderConstraintsMapped(
       () => this.sharedSpaceRepository.updateAlbumFolder(spaceId, folderId, { name }),
       'Folder not found',
     );
+    if (!updated) {
+      throw new BadRequestException('Folder not found');
+    }
   }
 
   async deleteAlbumFolder(auth: AuthDto, spaceId: string, folderId: string): Promise<void> {
@@ -1260,11 +1328,7 @@ export class SharedSpaceService extends BaseService {
       throw new BadRequestException('Folder not found');
     }
     if (result.outcome === 'conflict') {
-      throw new BadRequestException(
-        result.name
-          ? `Cannot delete: "${result.name}" would collide with a folder that already exists at the destination`
-          : 'Cannot delete: a child folder name collides with a folder that already exists at the destination',
-      );
+      throw new BadRequestException(sharedSpaceAlbumFolderPromotionConflictMessage(result.name, result.reason));
     }
   }
 
@@ -1323,9 +1387,6 @@ export class SharedSpaceService extends BaseService {
         constraint_name?: string;
         constraint?: string;
       };
-      if (code === '23505') {
-        throw new BadRequestException(SHARED_SPACE_ALBUM_FOLDER_NAME_CONFLICT_MESSAGE);
-      }
       // BOTH spellings, deliberately. Kysely's postgres.js dialect — what this server actually
       // runs on — names the field `constraint_name` (postgres/src/connection.js maps Postgres
       // error field 110 to it), while node-postgres calls the same field `constraint`. Reading
@@ -1333,6 +1394,12 @@ export class SharedSpaceService extends BaseService {
       // unit tests that hand-roll the error object still pass; the medium test C-03b is what
       // pins the real runtime shape.
       const violated = constraint_name ?? constraint;
+      // A 23505 with no constraint name still maps: the pre-check makes a name clash overwhelmingly
+      // the likeliest cause on these paths, and reporting it as a 500 would be worse. Only a
+      // NAMED, recognisably-unrelated constraint propagates.
+      if (code === '23505' && (!violated || SHARED_SPACE_ALBUM_FOLDER_NAME_CONSTRAINTS.has(violated))) {
+        throw new BadRequestException(SHARED_SPACE_ALBUM_FOLDER_NAME_CONFLICT_MESSAGE);
+      }
       if (code === '23503' && violated && SHARED_SPACE_ALBUM_FOLDER_REFERENCE_CONSTRAINTS.has(violated)) {
         throw new BadRequestException(missingMessage);
       }

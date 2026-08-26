@@ -13946,6 +13946,21 @@ describe(SharedSpaceService.name, () => {
         await expect(promise).rejects.toBeInstanceOf(BadRequestException);
         await expect(promise).rejects.toThrow(SHARED_SPACE_ALBUM_FOLDER_NAME_CONFLICT_MESSAGE);
       });
+
+      // The rename is check-then-write like every other folder path: another editor can delete the
+      // folder between getAlbumFolderById and the UPDATE. A rename touches no foreign key, so the
+      // 23503 arm never fires — the UPDATE simply matches zero rows. Without this the caller gets
+      // 204 for a rename that did not happen. setAlbumFolder and the move branch both already 400.
+      it('rejects a rename whose folder vanished before the UPDATE', async () => {
+        const { auth, space } = setupAlbumFolderEditor(mocks);
+        const folder = albumFolderRow({ spaceId: space.id });
+        mocks.sharedSpace.getAlbumFolderById.mockResolvedValue(folder);
+        mocks.sharedSpace.updateAlbumFolder.mockResolvedValue(false);
+
+        await expect(sut.updateAlbumFolder(auth, space.id, folder.id, { name: 'Travel' } as any)).rejects.toThrow(
+          BadRequestException,
+        );
+      });
     });
 
     describe('updateAlbumFolder (move)', () => {
@@ -14130,6 +14145,21 @@ describe(SharedSpaceService.name, () => {
         expect(mocks.sharedSpace.updateAlbumFolder).not.toHaveBeenCalled();
       });
 
+      // The depth cap is re-checked under the advisory lock, because the pre-check above runs
+      // outside it: two moves that each pass their own pre-check against a still-shallow tree can
+      // serialise on the lock and compose past the cap. When the locked re-check refuses, the
+      // service must report the depth the REPOSITORY computed — the pre-check's number is stale by
+      // definition in that race.
+      it('maps a locked-in depth refusal to a 400 quoting the repository’s depth', async () => {
+        const { auth, space, folder, target } = setupAlbumFolderMove(mocks);
+        mocks.sharedSpace.moveAlbumFolderChecked.mockResolvedValue({ depth: 12 });
+
+        const promise = sut.updateAlbumFolder(auth, space.id, folder.id, { parentId: target.id } as any);
+
+        await expect(promise).rejects.toBeInstanceOf(BadRequestException);
+        await expect(promise).rejects.toThrow(/this would be 12/);
+      });
+
       // Task 3 review, Part A (path 3/3): same race, but through the move path's final UPDATE
       // inside moveAlbumFolderChecked's own transaction — the rejection propagates out of
       // db.transaction().execute and must still map to the same 400, not escape as a raw 500.
@@ -14194,10 +14224,44 @@ describe(SharedSpaceService.name, () => {
         mocks.sharedSpace.deleteAlbumFolderPromotingChildren.mockResolvedValue({
           outcome: 'conflict',
           name: '2026',
+          reason: 'sibling',
         });
 
         await expect(sut.deleteAlbumFolder(auth, space.id, newUuid())).rejects.toBeInstanceOf(BadRequestException);
         await expect(sut.deleteAlbumFolder(auth, space.id, newUuid())).rejects.toThrow(/2026/);
+      });
+
+      // The other way a promote collides: the child is named like the folder being DELETED, which
+      // is still alive when the promote UPDATE runs (it is dropped a few statements later). Spec
+      // F-04 permits that name pair, so this is reachable. Reporting it as a collision "at the
+      // destination" sends the user to look at a parent where nothing is wrong — the fix is to
+      // rename the child, and the message has to say so.
+      it('maps a collision with the deleted folder itself to a 400 that names the real cause', async () => {
+        const { auth, space } = setupAlbumFolderEditor(mocks);
+        mocks.sharedSpace.deleteAlbumFolderPromotingChildren.mockResolvedValue({
+          outcome: 'conflict',
+          name: 'Trips',
+          reason: 'parent',
+        });
+
+        const promise = sut.deleteAlbumFolder(auth, space.id, newUuid());
+
+        await expect(promise).rejects.toBeInstanceOf(BadRequestException);
+        await expect(promise).rejects.toThrow(/same name as the folder you are deleting/);
+        await expect(promise).rejects.not.toThrow(/at the destination/);
+      });
+
+      // The raced 23505 backstop has no name to report. It must still not claim the collision is
+      // "at the destination" — it has no idea where it was.
+      it('does not blame the destination when the raced backstop reports no name', async () => {
+        const { auth, space } = setupAlbumFolderEditor(mocks);
+        mocks.sharedSpace.deleteAlbumFolderPromotingChildren.mockResolvedValue({
+          outcome: 'conflict',
+          name: '',
+          reason: 'unknown',
+        });
+
+        await expect(sut.deleteAlbumFolder(auth, space.id, newUuid())).rejects.not.toThrow(/at the destination/);
       });
 
       it('R-03: refuses a viewer', async () => {
@@ -14416,6 +14480,24 @@ describe(SharedSpaceService.name, () => {
         const error = Object.assign(new Error('violates foreign key constraint'), {
           code: '23503',
           constraint: 'shared_space_album_albumId_fkey',
+        });
+        mocks.sharedSpace.addAlbum.mockRejectedValue(error);
+
+        await expect(sut.linkAlbum(auth, space.id, albumId, folder.id)).rejects.toBe(error);
+      });
+
+      // The 23505 arm needs the SAME narrowing as the 23503 arm directly above, for the same
+      // reason: this insert's transaction touches more than the folder's two name indexes, so a
+      // unique violation from anywhere else in it must not be reported as a folder-name clash.
+      // Without the narrowing, re-linking an album reads as "A folder with that name already
+      // exists here" — a message about a folder the caller never named.
+      it('propagates a unique violation on an unrelated constraint unchanged', async () => {
+        const { auth, space, albumId } = setupAlbumLink(mocks);
+        const folder = albumFolderRow({ spaceId: space.id });
+        mocks.sharedSpace.getAlbumFolderById.mockResolvedValue(folder);
+        const error = Object.assign(new Error('duplicate key value violates unique constraint'), {
+          code: '23505',
+          constraint: 'shared_space_album_pkey',
         });
         mocks.sharedSpace.addAlbum.mockRejectedValue(error);
 

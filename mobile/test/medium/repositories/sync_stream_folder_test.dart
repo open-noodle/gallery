@@ -128,4 +128,43 @@ void main() {
       expect(await folderRows(), isEmpty);
     });
   });
+
+  group('SyncResetV1', () {
+    // reset() is the recovery path for a device that fell too far behind (the server sends
+    // SyncResetV1 past MAX_DAYS) or whose local DB is suspect. It wipes every remote table so the
+    // re-sync can rebuild from scratch — and it runs under `PRAGMA foreign_keys = OFF`, so the
+    // spaceId cascade that H-06 relies on does NOT fire here. A table missing from that block is
+    // therefore never cleared by anything:
+    //
+    //   - a folder deleted server-side while the device was away has had its tombstone pruned
+    //     (server prunes at MAX_DAYS + 1), so the delete is never re-delivered — the row becomes a
+    //     permanent phantom folder in the grid and in the move picker;
+    //   - folders for spaces the user was removed from stay on disk, with their names, while every
+    //     other space table is rebuilt from what the user can still access.
+    //
+    // No reset() test existed for ANY space table, which is why the omission was invisible.
+    test('clears shared space album folders, which no cascade can reach with FKs off', () async {
+      final user = await ctx.newUser();
+      final space = await ctx.newSharedSpace(createdById: user.id);
+      await ctx.insertSharedSpaceAlbumFolder(spaceId: space.id, id: 'f1', name: 'Divorce paperwork');
+
+      await repo.reset();
+
+      expect(await folderRows(), isEmpty);
+    });
+
+    // The control: reset() clears the neighbouring fork tables too. Without this, the test above
+    // could pass against a reset() that simply dropped everything indiscriminately, and it would
+    // not notice if a future table were added to the block but the folder line removed.
+    test('clears the space row alongside it', () async {
+      final user = await ctx.newUser();
+      final space = await ctx.newSharedSpace(createdById: user.id);
+      await ctx.insertSharedSpaceAlbumFolder(spaceId: space.id, id: 'f1', name: 'Trips');
+
+      await repo.reset();
+
+      final spaces = await ctx.db.customSelect('SELECT * FROM shared_space_entity').get();
+      expect(spaces, isEmpty);
+    });
+  });
 }

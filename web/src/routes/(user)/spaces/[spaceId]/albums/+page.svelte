@@ -49,14 +49,18 @@
   const space = $derived<SharedSpaceResponseDto>(data.space);
   const members = $derived<SharedSpaceMemberResponseDto[]>(data.members);
   let albums = $state<SharedSpaceLinkedAlbumDto[]>(data.linkedAlbums);
-  let folders = $state<SharedSpaceAlbumFolderDto[]>([]);
+  // Seeded from the page load, NOT empty-then-fetched-on-mount: an empty tree makes every album
+  // in the space resolve to the root (see getFolderContents), so a page that starts empty renders
+  // the whole space unscoped until its first fetch lands. `data.folders` is null only when the
+  // load's own fetch failed.
+  let folders = $state<SharedSpaceAlbumFolderDto[]>(data.folders ?? []);
   // True once a folders fetch has ever SUCCEEDED (even with an empty result) — distinct from
   // `folders.length > 0`, which can't tell "haven't loaded yet" apart from "genuinely zero
   // folders" and would otherwise never let the fallback effect below strip a dangling ?folder=
   // for a space that no longer has any folders at all.
-  let foldersLoaded = $state(false);
+  let foldersLoaded = $state(data.folders !== null);
   // True when the MOST RECENT folders fetch failed.
-  let foldersLoadFailed = $state(false);
+  let foldersLoadFailed = $state(data.folders === null);
   let groupIds = $state<string[]>([]);
   let searchQuery = $state('');
 
@@ -284,11 +288,27 @@
     // The modal returns how many albums it linked; only refresh when something changed.
     if (linkedCount) {
       eventManager.emit('SpaceLinkAlbum', { spaceId: space.id });
+      // See handleCreateFolder: a link made during a search lands in the hidden current folder and
+      // the results don't change unless the album happens to match the query.
+      clearSearchToRevealResult();
       await reload();
       // Refresh the [spaceId] layout's cached linkedAlbums so other tabs (and a re-mount of this
       // page on tab navigation) reflect the change without a full page refresh.
       await invalidateAll();
     }
+  }
+
+  /**
+   * Drops an active search so a just-created folder or newly-linked album becomes visible.
+   *
+   * Search flattens the whole space and hides both the breadcrumb and every folder row, but the
+   * create/link actions stay enabled and keep targeting `currentFolderId`. The result therefore
+   * lands somewhere the user can neither see nor is told about. Clearing the query is the smallest
+   * fix that keeps the capability (disabling the buttons mid-search would remove it) while making
+   * the outcome observable.
+   */
+  function clearSearchToRevealResult() {
+    searchQuery = '';
   }
 
   // showDialog resolves to a boolean, so it cannot collect a name — this uses the dedicated
@@ -305,6 +325,11 @@
         id: space.id,
         sharedSpaceAlbumFolderCreateDto: { name, parentId: currentFolderId },
       });
+      // A search hides the breadcrumb AND every folder row, so a folder created during one lands
+      // in `currentFolderId` with nothing on screen saying where, and stays invisible afterwards.
+      // The only feedback was the name-conflict 400 on the second attempt. Dropping the query puts
+      // the user back on the level the folder was actually created in, where they can see it.
+      clearSearchToRevealResult();
       await reload();
     } catch (error) {
       handleError(error, $t('space_album_folder_error_create'));

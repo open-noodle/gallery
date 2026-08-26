@@ -262,7 +262,13 @@ List<FolderSearchHit> flattenForSearch(List<SpaceAlbumFolder> folders, List<Spac
   if (needle.isEmpty) return const [];
 
   final index = _byId(folders);
-  return albums.where((a) => a.name.toLowerCase().contains(needle)).map((a) {
+  // Name OR description, matching web's flattenForSearch and the flat filterAndSortSpaceAlbums
+  // this path replaces while a query is active. SpaceAlbum.description is carried on the model for
+  // exactly this, so leaving it out here silently narrows search compared with both.
+  bool matches(SpaceAlbum a) =>
+      a.name.toLowerCase().contains(needle) || (a.description ?? '').toLowerCase().contains(needle);
+
+  return albums.where(matches).map((a) {
     final path = a.folderId == null ? <String>[] : _ancestors(index, a.folderId!).reversed.map((f) => f.name).toList();
     return FolderSearchHit(a, path);
   }).toList();

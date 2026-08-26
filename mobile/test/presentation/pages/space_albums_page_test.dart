@@ -1037,6 +1037,49 @@ void main() {
     expect(find.byType(SpaceAlbumsPage), findsOneWidget);
   });
 
+  // `isTopmost()` reads `context.router.stackData`, which tracks only AutoRoutePages. A dialog,
+  // bottom sheet or popup menu is an IMPERATIVE route pushed onto the same NavigatorState, so it
+  // does not appear there — `isTopmost()` stayed true with one open, and `context.maybePop()`
+  // therefore closed the DIALOG instead of the dead folder page. The page then survived as a
+  // folder view whose folder no longer exists: empty state, title fallen back to the space name,
+  // every action 400ing. The listener's immediate branch also popped without arming
+  // `pendingSelfPop`, so nothing retried and the user was stranded until they backed out by hand.
+  testWidgets('U-11: a folder vanishing while a dialog is open closes the page, not the dialog', (tester) async {
+    final controller = StreamController<List<SpaceAlbumFolder>>();
+    addTearDown(controller.close);
+    final router = await pumpStackedFolderPagesWithFolderStream(tester, controller.stream, folderIds: ['folder-a']);
+
+    controller.add([folder('folder-a', 'Folder A')]);
+    await tester.pumpAndSettle();
+    expect(router.stackData.length, 2);
+
+    // Stand in for the rename/delete dialogs this page opens from the folder-card kebab: what
+    // matters is that it is an imperative route above the page, not which one it is.
+    final pageContext = tester.element(find.byType(SpaceAlbumsPage));
+    unawaited(
+      showDialog<void>(context: pageContext, builder: (_) => const AlertDialog(content: Text('dialog-under-test'))),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('dialog-under-test'), findsOneWidget);
+
+    // The folder is deleted by another editor while the dialog is open.
+    controller.add([]);
+    await tester.pumpAndSettle();
+
+    // The dialog must be untouched — it is not what went stale.
+    expect(find.text('dialog-under-test'), findsOneWidget);
+    expect(router.stackData.length, 2);
+
+    // Once the dialog closes, the pending pop must still fire. Before the fix the pop had already
+    // been spent on the dialog and nothing rearmed it, so the page stayed forever.
+    Navigator.of(tester.element(find.text('dialog-under-test'))).pop();
+    await tester.pumpAndSettle();
+
+    expect(find.text('dialog-under-test'), findsNothing);
+    expect(router.stackData.length, 1);
+    expect(find.byType(SpaceAlbumsPage), findsNothing);
+  });
+
   // Task-2 review, Finding 1 — `navigationHistory`'s notifyListeners is URL-STRING based
   // (`onNewUrlState` only fires when the computed `UrlState` differs, and `UrlState.==` compares
   // route segments). Two stacked `SpaceAlbumsRoute`s sharing the SAME folderId produce IDENTICAL

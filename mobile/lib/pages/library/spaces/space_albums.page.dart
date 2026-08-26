@@ -203,7 +203,18 @@ class SpaceAlbumsPage extends HookConsumerWidget {
     // assert on via `router.stackData.last`.
     bool isTopmost() {
       final stack = context.router.stackData;
-      return stack.isNotEmpty && stack.last.matchId == context.routeData.matchId;
+      if (stack.isEmpty || stack.last.matchId != context.routeData.matchId) return false;
+      // `stackData` tracks only AutoRoutePages. A dialog (`showDialog`), bottom sheet
+      // (`showModalBottomSheet`) or popup menu is an IMPERATIVE route pushed onto the SAME
+      // NavigatorState — this is a root-level route, so `context.router` is the root StackRouter
+      // and `maybePop` bottoms out in `_navigatorKey.currentState.maybePop()`. None of those show
+      // up above, so without this check `isTopmost()` stays true with a dialog open and the pop
+      // closes the DIALOG, leaving the page alive on a folder that no longer exists.
+      //
+      // `ModalRoute.of` is null only when this page was pumped with no enclosing route at all
+      // (the single-widget test harness); `?? true` keeps that path behaving exactly as before,
+      // so this can never newly BLOCK a pop, only defer one.
+      return ModalRoute.of(context)?.isCurrent ?? true;
     }
 
     useEffect(() {
@@ -263,11 +274,15 @@ class SpaceAlbumsPage extends HookConsumerWidget {
       final list = next.valueOrNull;
       if (list == null) return;
       if (!list.any((f) => f.id == currentFolderId)) {
-        if (isTopmost()) {
-          unawaited(context.maybePop());
-        } else {
-          pendingSelfPop.value = true;
-        }
+        // ALWAYS go through the pending flag rather than popping inline, even when this page looks
+        // topmost right now. The effect above is what owns retrying: it re-checks on every
+        // navigation change and on every frame while a pop is outstanding, so a pop that cannot
+        // land yet (a dialog is open, a transition is mid-flight) is deferred instead of spent.
+        // Popping inline had no retry at all — if the conditions were wrong at exactly this
+        // moment, nothing tried again and the page stayed on a folder that no longer exists.
+        // Arming is idempotent: trySelfPop clears the flag synchronously before its first await,
+        // so this can never queue two pops.
+        pendingSelfPop.value = true;
       } else {
         // A transient false-vanish emission (folder momentarily
         // missing, then present again in a later sync batch) must not leave a stale pending pop
