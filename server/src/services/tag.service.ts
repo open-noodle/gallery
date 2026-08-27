@@ -116,7 +116,9 @@ export class TagService extends BaseService {
     const results = await addAssets(
       auth,
       { access: this.accessRepository, bulk: this.tagRepository },
-      { parentId: id, assetIds: dto.ids, permission: Permission.AssetUpdate },
+      // Gallery: owner-only — see the note in memory.service.ts. AssetUpdate admits space editors
+      // in this fork, which would let an editor tag another member's asset.
+      { parentId: id, assetIds: dto.ids, ownerOnly: true },
     );
 
     for (const { id: assetId, success } of results) {
