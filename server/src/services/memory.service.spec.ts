@@ -1094,6 +1094,30 @@ describe(MemoryService.name, () => {
   });
 
   describe('addAssets', () => {
+    // immich-28950 gates this on Permission.AssetUpdate and means "owner only" by it. In this fork
+    // AssetUpdate ALSO admits space editors, so adopting the constant verbatim let an editor pin
+    // another member's asset into their own memory — creating exactly the cross-owner memory_asset
+    // rows upstream's DeleteMismatchedMemoryAssets migration deletes, and which MemoryService.get
+    // keeps serving after the editor loses space access (it re-checks MemoryRead only, with no
+    // per-asset filter). Hence the explicit owner check.
+    it('should refuse an asset the caller only reaches as a space editor', async () => {
+      const assetId = newUuid();
+      const memory = MemoryFactory.create();
+
+      mocks.access.memory.checkOwnerAccess.mockResolvedValue(new Set([memory.id]));
+      mocks.memory.get.mockResolvedValue(getForMemory(memory));
+      mocks.memory.getAssetIds.mockResolvedValue(new Set());
+      // Not the owner, but an editor of a space containing the asset.
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set([assetId]));
+
+      await expect(sut.addAssets(factory.auth(), memory.id, { ids: [assetId] })).resolves.toEqual([
+        { error: 'no_permission', id: assetId, success: false },
+      ]);
+
+      expect(mocks.memory.addAssetIds).not.toHaveBeenCalled();
+    });
+
     it('should require memory access', async () => {
       const [memoryId, assetId] = newUuids();
 
