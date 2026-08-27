@@ -18,7 +18,7 @@ const FORK_LOCAL_SPECIFIER =
   '$lib/components/shared-components/LoadingSpinner.svelte';
 const GENERIC_SPECIFIER = '@immich/ui';
 
-// The fork's full 25-file "swapped set" — every call-site that must render the
+// The fork's full swapped set — every call-site that must render the
 // branded spinner, not the generic one. Paths are relative to `web/src`.
 const SWAPPED_SET = [
   'lib/modals/PeoplePickerModal.svelte',
@@ -46,6 +46,8 @@ const SWAPPED_SET = [
   'routes/(user)/utilities/geolocation/+page.svelte',
   'routes/(user)/map/[[photos=photos]]/[[assetId=id]]/+page.svelte',
   'routes/(user)/memories/+page.svelte',
+  'lib/modals/SpaceLinkAlbumModal.svelte',
+  'lib/modals/SpaceLinkLibraryModal.svelte',
 ];
 
 // Matches both import forms used in this codebase:
@@ -136,5 +138,28 @@ describe('branded LoadingSpinner swap', () => {
     }
 
     expect(offenders).toEqual([]);
+  });
+
+  // SWAPPED_SET is hand-maintained, so it drifts as the swap set GROWS: a new fork component that
+  // imports the branded spinner is protected by nothing until someone remembers to list it. That is
+  // how SpaceLinkAlbumModal and SpaceLinkLibraryModal sat unguarded. Derive the truth from the tree
+  // and fail on anything missing, so the list can only be wrong in the direction the other two tests
+  // already catch.
+  it('the swapped set lists every file that imports the fork-local spinner', () => {
+    const listed = new Set(SWAPPED_SET);
+    const unlisted: string[] = [];
+
+    for (const file of collectSvelteFiles(WEB_SRC)) {
+      const content = fs.readFileSync(file, 'utf8');
+      if (findLoadingSpinnerImport(content) !== 'fork-local') {
+        continue;
+      }
+      const rel = path.relative(WEB_SRC, file);
+      if (!listed.has(rel)) {
+        unlisted.push(rel);
+      }
+    }
+
+    expect(unlisted).toEqual([]);
   });
 });
