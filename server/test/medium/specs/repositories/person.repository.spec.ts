@@ -180,6 +180,38 @@ describe(PersonRepository.name, () => {
     });
   });
 
+  describe('mergePersonProfile', () => {
+    // Upstream's mergePerson sweeps the emptied group via removeAllPersonGroups -> deleteEmptyGroups.
+    // The fork routes merges through mergePersonProfile instead and that step was not carried, so
+    // every merge left an orphan person_group row behind until the nightly PersonCleanup collected
+    // it. Nothing asserted the linkage, which is why it went unnoticed.
+    it('should sweep the group the merged-away person vacated, and leave occupied groups alone', async () => {
+      const { ctx, sut } = setup(await getKyselyDB());
+      const { user } = await ctx.newUser();
+      const [targetGroup, sourceGroup] = await sut.createGroups([
+        { clusterGroupId: user.clusterGroupId },
+        { clusterGroupId: user.clusterGroupId },
+      ]);
+
+      const target = await sut.create({ ownerId: user.id, name: 'Alice', personGroupId: targetGroup.id });
+      const source = await sut.create({ ownerId: user.id, name: 'Alice A', personGroupId: sourceGroup.id });
+      const identity = await ctx.database
+        .insertInto('face_identity')
+        .values({ type: 'person' })
+        .returning('face_identity.id')
+        .executeTakeFirstOrThrow();
+
+      await sut.mergePersonProfile({
+        sourcePersonId: source.personGroupId,
+        targetPersonId: target.personGroupId,
+        targetIdentityId: identity.id,
+      });
+
+      const groups = await ctx.database.selectFrom('person_group').select('person_group.id').execute();
+      expect(groups.map(({ id }) => id)).toEqual([target.personGroupId]);
+    });
+  });
+
   describe('deleteOrphanedClusterGroups', () => {
     it('should delete cluster groups that no longer belong to a user, along with their people', async () => {
       const { ctx, sut } = setup(await getKyselyDB());
