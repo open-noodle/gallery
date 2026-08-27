@@ -32,7 +32,16 @@ jobs:
         with:
           persist-credentials: false
 
+      # `github.event.before` exists only on a `push` payload. On `workflow_dispatch` -- the only
+      # mode a branch sitting off `main` can use, and the reason the fork added that trigger at all --
+      # it renders EMPTY, and `actions/checkout` with an empty `ref` silently falls back to the
+      # TRIGGERING ref. `base/` then becomes a copy of the branch itself and
+      # `verify-order --append-only-from` compares ORDER against itself: trivially satisfied, no
+      # notice printed, invariant not enforced. Skip the checkout instead and let the
+      # `[ -f "${BASELINE}" ]` guard below degrade to the consistency check with a visible notice.
+      # The all-zeros SHA is a branch's first push, which has no base to compare against either.
       - name: Checkout base
+        if: ${{ env.BASE_SHA != '' && env.BASE_SHA != '0000000000000000000000000000000000000000' }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ env.BASE_SHA }}
