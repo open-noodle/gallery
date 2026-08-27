@@ -103,7 +103,10 @@ interface AssetBuilderOptions {
   albumSpaceIds?: string[];
   spaceId?: string;
   tagId?: string;
-  personId?: string;
+  // NOTE: no `personId?: string` here. timeline.service normalises the deprecated single-value DTO
+  // field into `personIds` before options reach this layer, so a `personId` on these options is
+  // never set by anything — it silently disabled upstream's person-scoped album widening for as
+  // long as it existed. Scope on `personIds`.
   spacePersonId?: string;
   personIds?: string[];
   spacePersonIds?: string[];
@@ -312,9 +315,13 @@ const addBucketInterval = (bucketStart: string, bucketSize: TimeBucketSize): str
 export function withTimeBucketAssetFilters<O>(
   qb: SelectQueryBuilder<DB, 'asset', O>,
   options: TimeBucketOptions,
-  // Upstream (#30739) widens the owner check for person-scoped timelines so a viewer also sees the
-  // person's faces on assets shared with them through an album. `getTimeBucketCovers` has no auth in
-  // hand and is fork-only, so it passes nothing and keeps the plain owner check.
+  // Upstream (immich-30739) widens the owner check for person-scoped timelines so a viewer also sees
+  // the person's faces on assets shared with them through an album. The fork normalises upstream's
+  // single `personId` to `personIds` in timeline.service (see "Normalize deprecated single-value
+  // fields"), so the scoping signal to test here is the ARRAY — testing `options.personId` made this
+  // branch permanently unreachable, because nothing ever sets it.
+  // `getTimeBucketCovers` has no auth in hand and is fork-only, so it passes nothing and keeps the
+  // plain owner check.
   viewerId?: string,
 ): SelectQueryBuilder<DB, 'asset', O> {
   return qb
@@ -479,7 +486,7 @@ export function withTimeBucketAssetFilters<O>(
     )
     .$if(!!options.userIds && !options.timelineSpaceIds, (qb) =>
       qb.where((eb) =>
-        options.personId && viewerId
+        options.personIds?.length && viewerId
           ? eb.or([eb('asset.ownerId', '=', anyUuid(options.userIds!)), inSharedAlbum(eb, viewerId)])
           : eb('asset.ownerId', '=', anyUuid(options.userIds!)),
       ),
@@ -488,7 +495,7 @@ export function withTimeBucketAssetFilters<O>(
       qb.where((eb) =>
         eb.or([
           // Caller's own (and partner) rows follow the resolved top-level visibility.
-          options.personId && viewerId
+          options.personIds?.length && viewerId
             ? eb.or([eb('asset.ownerId', '=', anyUuid(options.userIds!)), inSharedAlbum(eb, viewerId)])
             : eb('asset.ownerId', '=', anyUuid(options.userIds!)),
           // Fork RBAC (Fix A): other members' rows are constrained to Archive+Timeline via the
@@ -1658,6 +1665,7 @@ export class AssetRepository {
             .select('asset.id')
             .where(truncatedDate(options.orderBy, bucketSize), '=', timeBucket.replace(/^[+-]/, '')),
           options,
+          auth.user.id,
         ),
       )
       // Stage 2 — PROJECT: build the columnar row shape for the matched ids.
