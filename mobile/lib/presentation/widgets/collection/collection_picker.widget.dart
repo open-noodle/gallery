@@ -1,4 +1,3 @@
-import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/constants/enums.dart';
@@ -96,7 +95,7 @@ class _CollectionPickerState extends ConsumerState<CollectionPicker> {
 
     final notifier = ref.read(actionProvider.notifier);
     final ActionResult result;
-    final String? successMessage;
+    final _PickerSuccess? successMessage;
     switch (target) {
       case AlbumTarget(:final album):
         result = await notifier.addToAlbum(widget.source, album);
@@ -104,11 +103,11 @@ class _CollectionPickerState extends ConsumerState<CollectionPicker> {
       case SpacePoolTarget(:final space):
         result = await notifier.addToSpace(widget.source, space);
         // The pool endpoint is 204 with no body, so this count is the request length.
-        successMessage = 'added_to_space_count';
+        successMessage = _PickerSuccess.addedToSpace;
       case SpaceAlbumTarget(:final spaceId, :final album):
         result = await notifier.addToSpaceAlbum(widget.source, spaceId, album);
         // This one IS the server's count, so duplicates are already excluded.
-        successMessage = 'space_album_add_photos_success';
+        successMessage = _PickerSuccess.addedToSpaceAlbum;
     }
 
     if (!mounted) {
@@ -121,11 +120,16 @@ class _CollectionPickerState extends ConsumerState<CollectionPicker> {
       return;
     }
     if (successMessage != null) {
-      ImmichToast.show(
-        context: context,
-        msg: successMessage.tr(namedArgs: {'count': result.count.toString()}),
-        toastType: ToastType.success,
-      );
+      // Resolve through the generated accessors, NOT `'key'.tr(namedArgs:)`. Both keys are ICU
+      // plurals, and easy_localization's `tr` only does a literal `{count}` replaceAll — it neither
+      // selects a plural form nor substitutes anything inside `{count, plural, ...}`, so the raw ICU
+      // source string was being shown to the user. The fork's own `.t(...)` helper ran MessageFormat;
+      // the accessors do the same.
+      final message = switch (successMessage) {
+        _PickerSuccess.addedToSpace => context.t.added_to_space_count(count: result.count),
+        _PickerSuccess.addedToSpaceAlbum => context.t.space_album_add_photos_success(count: result.count),
+      };
+      ImmichToast.show(context: context, msg: message, toastType: ToastType.success);
     }
     widget.onCompleted?.call();
   }
@@ -177,3 +181,9 @@ class _CollectionPickerState extends ConsumerState<CollectionPicker> {
     );
   }
 }
+
+// Which success toast to show once the picker's target completes. Deliberately not the i18n key as
+// a String: both messages are ICU plurals, which must go through the generated accessors rather
+// than `'key'.tr(namedArgs:)` (that path does a literal `{count}` replaceAll and cannot handle
+// `{count, plural, ...}` at all).
+enum _PickerSuccess { addedToSpace, addedToSpaceAlbum }
