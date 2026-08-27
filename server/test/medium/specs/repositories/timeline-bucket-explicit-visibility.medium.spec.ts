@@ -443,29 +443,29 @@ describe('timeline bucket explicit-visibility — albumId arm', () => {
  * scrubber counts and the bucket contents were computed under different rules. The file's own
  * comment promises they cannot drift.
  */
-describe('person-scoped timeline — album-shared widening', () => {
-  const seed = async () => {
-    const { ctx, assetRepo } = setup();
-    const { user: owner } = await ctx.newUser();
-    const { user: viewer } = await ctx.newUser();
+const seedAlbumSharedPerson = async () => {
+  const { ctx, assetRepo } = setup();
+  const { user: owner } = await ctx.newUser();
+  const { user: viewer } = await ctx.newUser();
 
-    const sharedAssetId = await makeBucketAsset(ctx, owner.id, AssetVisibility.Timeline);
-    const { result: person } = await ctx.newPerson({ ownerId: owner.id, name: 'Album Person' });
-    await ctx.newAssetFace({ assetId: sharedAssetId, personGroupId: person.personGroupId });
+  const sharedAssetId = await makeBucketAsset(ctx, owner.id, AssetVisibility.Timeline);
+  const { result: person } = await ctx.newPerson({ ownerId: owner.id, name: 'Album Person' });
+  await ctx.newAssetFace({ assetId: sharedAssetId, personGroupId: person.personGroupId });
 
-    const { album } = await ctx.newAlbum({ ownerId: owner.id }, [sharedAssetId]);
-    await ctx.newAlbumUser({ albumId: album.id, userId: viewer.id });
+  const { album } = await ctx.newAlbum({ ownerId: owner.id }, [sharedAssetId]);
+  await ctx.newAlbumUser({ albumId: album.id, userId: viewer.id });
 
-    const options: TimeBucketOptions = {
-      personIds: [person.personGroupId],
-      userIds: [viewer.id],
-      bucketSize: TimeBucketSize.Year,
-    };
-    return { ctx, assetRepo, viewer, sharedAssetId, options };
+  const options: TimeBucketOptions = {
+    personIds: [person.personGroupId],
+    userIds: [viewer.id],
+    bucketSize: TimeBucketSize.Year,
   };
+  return { ctx, assetRepo, viewer, sharedAssetId, options };
+};
 
+describe('person-scoped timeline — album-shared widening', () => {
   it('returns an album-shared asset in the bucket for a person-scoped timeline', async () => {
-    const { assetRepo, viewer, sharedAssetId, options } = await seed();
+    const { assetRepo, viewer, sharedAssetId, options } = await seedAlbumSharedPerson();
 
     const ids = await bucketAssetIds(assetRepo, BUCKET, options, viewer.id);
 
@@ -473,7 +473,7 @@ describe('person-scoped timeline — album-shared widening', () => {
   });
 
   it('counts the same asset in the scrubber, so buckets and contents agree', async () => {
-    const { assetRepo, viewer, sharedAssetId, options } = await seed();
+    const { assetRepo, viewer, sharedAssetId, options } = await seedAlbumSharedPerson();
 
     const auth = { user: { id: viewer.id } } as any;
     const buckets = await assetRepo.getTimeBuckets(options, auth);
