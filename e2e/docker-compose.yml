@@ -15,10 +15,11 @@ services:
     build:
       context: ../
       dockerfile: server/Dockerfile
-      cache_from:
-        # hash is the sha256 of the build-args in docker.yml
-        - type=registry,ref=ghcr.io/immich-app/immich-server-build-cache:linux-amd64-cc099f297acd18c924b35ece3245215b53d106eb2518e3af6415931d055746cd-main
-        - type=registry,ref=ghcr.io/immich-app/immich-server-build-cache:linux-arm64-cc099f297acd18c924b35ece3245215b53d106eb2518e3af6415931d055746cd-main
+      # Gallery (#171): no `cache_from`. Upstream points it at its own GHCR build cache, which the
+      # fork must not read from — the tags 404 here, and if one ever resolves the fork's e2e image
+      # would silently import upstream-built layers. Because this rule is expressed as a DELETION,
+      # upstream re-adding the block produces no conflict and no gate notices: re-check it after a
+      # rebase that touches this file.
       args:
         - BUILD_ID=1234567890
         - BUILD_IMAGE=e2e
