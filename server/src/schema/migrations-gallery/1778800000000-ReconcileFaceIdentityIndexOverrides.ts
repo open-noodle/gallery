@@ -54,10 +54,17 @@ export async function up(db: Kysely<any>): Promise<void> {
 }
 
 export async function down(db: Kysely<any>): Promise<void> {
-  await sql`DROP INDEX "asset_face_personId_idx";`.execute(db);
-  await sql`CREATE INDEX "asset_face_personId_idx" ON "asset_face" ("personId") WHERE (("personId" IS NOT NULL));`.execute(
-    db,
-  );
+  // Same condition up() uses: on an Immich-to-Gallery database the fork's asset_face index was never
+  // created, and the column is `personGroupId`, so both statements below would throw
+  // (`column "personId" does not exist`). IF EXISTS on the drop because 1791's down() recreates this
+  // index name against the CURRENT column, so what is present here varies by path.
+  const hasForkAssetFaceIndex = !(await clusterGroupsApplied(db));
+  if (hasForkAssetFaceIndex) {
+    await sql`DROP INDEX IF EXISTS "asset_face_personId_idx";`.execute(db);
+    await sql`CREATE INDEX "asset_face_personId_idx" ON "asset_face" ("personId") WHERE (("personId" IS NOT NULL));`.execute(
+      db,
+    );
+  }
   await sql`DROP INDEX "face_identity_representativeFaceId_idx";`.execute(db);
   await sql`CREATE INDEX "face_identity_representativeFaceId_idx" ON "face_identity" ("representativeFaceId") WHERE (("representativeFaceId" IS NOT NULL));`.execute(
     db,
@@ -87,9 +94,11 @@ export async function down(db: Kysely<any>): Promise<void> {
   await sql`UPDATE "migration_overrides" SET "value" = '{"sql":"CREATE UNIQUE INDEX \\"person_ownerId_identityId_key\\" ON \\"person\\" (\\"ownerId\\", \\"identityId\\") WHERE \\"identityId\\" IS NOT NULL;","name":"person_ownerId_identityId_key","type":"index"}'::jsonb WHERE "name" = 'index_person_ownerId_identityId_key';`.execute(
     db,
   );
-  await sql`UPDATE "migration_overrides" SET "value" = '{"sql":"CREATE INDEX \\"asset_face_personId_idx\\" ON \\"asset_face\\" (\\"personId\\") WHERE \\"personId\\" IS NOT NULL;","name":"asset_face_personId_idx","type":"index"}'::jsonb WHERE "name" = 'index_asset_face_personId_idx';`.execute(
-    db,
-  );
+  if (hasForkAssetFaceIndex) {
+    await sql`UPDATE "migration_overrides" SET "value" = '{"sql":"CREATE INDEX \\"asset_face_personId_idx\\" ON \\"asset_face\\" (\\"personId\\") WHERE \\"personId\\" IS NOT NULL;","name":"asset_face_personId_idx","type":"index"}'::jsonb WHERE "name" = 'index_asset_face_personId_idx';`.execute(
+      db,
+    );
+  }
   await sql`UPDATE "migration_overrides" SET "value" = '{"sql":"CREATE UNIQUE INDEX \\"shared_space_person_spaceId_identityId_key\\" ON \\"shared_space_person\\" (\\"spaceId\\", \\"identityId\\") WHERE \\"identityId\\" IS NOT NULL;","name":"shared_space_person_spaceId_identityId_key","type":"index"}'::jsonb WHERE "name" = 'index_shared_space_person_spaceId_identityId_key';`.execute(
     db,
   );

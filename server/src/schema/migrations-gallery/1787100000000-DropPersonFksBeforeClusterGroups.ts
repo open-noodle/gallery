@@ -32,6 +32,16 @@ export async function up(db: Kysely<any>): Promise<void> {
 }
 
 export async function down(db: Kysely<any>): Promise<void> {
+  // Mirror up(). On an Immich-to-Gallery database up() dropped nothing (these keys already pointed
+  // at `person_group`), and `person.id` does not exist there — so re-adding FKs that reference it
+  // throws `column "id" referenced in foreign key constraint does not exist`. Because Kysely reverts
+  // in reverse execution order and ClusterGroups is recorded FIRST on that path, it is reverted last
+  // of all, so every fork down() runs while person.id is still gone. Without this guard the revert
+  // walk stops here permanently.
+  if (await clusterGroupsApplied(db)) {
+    return;
+  }
+
   await sql`ALTER TABLE "face_person_verdict" ADD CONSTRAINT "face_person_verdict_personId_fkey" FOREIGN KEY ("personId") REFERENCES "person" ("id") ON UPDATE CASCADE ON DELETE SET NULL;`.execute(
     db,
   );
