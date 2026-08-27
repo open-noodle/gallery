@@ -10,6 +10,13 @@ describe('pathToDeepLink', () => {
     [`/albums/${UUID}`, `immich://album?id=${UUID}`],
     [`/albums/${UUID}/${UUID2}`, `immich://asset?id=${UUID2}`],
     [`/people/${UUID}`, `immich://people?id=${UUID}`],
+    // The live memory routes since immich-28675. The /memory forms below are the retired ones,
+    // still served by a 307 shim; before this coverage existed the table matched ONLY those, so
+    // every real memory URL fell through to null and the banner silently never rendered.
+    [`/memories/${UUID}`, `immich://memory?id=${UUID}`],
+    [`/memories`, `immich://memory`],
+    [`/memories/${UUID}/photos/${UUID2}`, `immich://asset?id=${UUID2}`],
+    [`/memories/${UUID}/`, `immich://memory?id=${UUID}`],
     [`/memory/${UUID}`, `immich://memory?id=${UUID}`],
     [`/memory`, `immich://memory`],
     [`/spaces/${UUID}`, `immich://space?id=${UUID}`],
