@@ -3,7 +3,7 @@ import { AssetFileResponseDto, AssetFileSearchDto, mapAssetFile } from 'src/dtos
 import { AuthDto } from 'src/dtos/auth.dto';
 import { AssetFileType, CacheControl, JobName, Permission } from 'src/enum';
 import { BaseService } from 'src/services/base.service';
-import { getFilenameExtension, getFileNameWithoutExtension, ImmichFileResponse } from 'src/utils/file';
+import { getFilenameExtension, getFileNameWithoutExtension } from 'src/utils/file';
 import { mimeTypes } from 'src/utils/mime-types';
 import { findOrFail } from 'src/utils/misc';
 
@@ -37,12 +37,17 @@ export class AssetFileService extends BaseService {
     await this.requireAccess({ auth, permission: Permission.AssetFileDownload, ids: [id] });
     const file = await findOrFail(() => this.assetFileRepository.get(id), 'Asset file');
 
-    return new ImmichFileResponse({
-      path: file.path,
-      fileName: getFileNameWithoutExtension(file.path) + getFilenameExtension(file.path),
-      contentType: mimeTypes.lookup(file.path),
-      cacheControl: CacheControl.PrivateWithCache,
-    });
+    // Gallery: route through the storage backend, as every other file-serving surface does.
+    // `sendFile` only accepts ABSOLUTE paths (utils/file.ts throws 400 when resolve(p) !== p), and
+    // the fork stores S3 objects as RELATIVE keys — so building the file response directly
+    // from asset_file.path 400s for every file on an S3 install. Disk installs are unaffected and
+    // CI has no S3 backend, which is why upstream's shape looked fine here.
+    return this.serveFromBackend(
+      file.path,
+      mimeTypes.lookup(file.path),
+      CacheControl.PrivateWithCache,
+      getFileNameWithoutExtension(file.path) + getFilenameExtension(file.path),
+    );
   }
 
   async delete(auth: AuthDto, id: string) {
