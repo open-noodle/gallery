@@ -112,7 +112,10 @@ describe('runCiInvariantAudits — source-file invariants', () => {
     expect(result.ok).toBe(true);
   });
 
-  it('tolerates a named path that does not exist', () => {
+  // Was "tolerates a named path that does not exist", asserting ok === true. That tolerance is the
+  // bug: an invariant whose pinned file is relocated upstream then reads zero files and reports
+  // "passed", which is worse than having no invariant at all.
+  it('fails a named path that does not exist, rather than passing on zero files', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'preflight-'));
     const [result] = runCiInvariantAudits(
       {
@@ -129,6 +132,7 @@ describe('runCiInvariantAudits — source-file invariants', () => {
       dir,
     );
 
-    expect(result.ok).toBe(true);
+    expect(result.ok).toBe(false);
+    expect(result.details.join('\n')).toContain('does not exist');
   });
 });
