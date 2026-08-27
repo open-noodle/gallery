@@ -353,10 +353,10 @@ export class MemoryService extends BaseService {
     const results = await addAssets(auth, repos, {
       parentId: id,
       assetIds: dto.ids,
-    // Gallery: owner-only. immich-28950 passes Permission.AssetUpdate here and means "owner only"
-    // by it; in this fork AssetUpdate also admits space editors, so adopting the constant would let
-    // an editor pin another member's asset into their own memory/tag — exactly the cross-owner rows
-    // upstream's own DeleteMismatchedMemoryAssets migration deletes.
+      // Gallery: owner-only. immich-28950 passes Permission.AssetUpdate here and means "owner only"
+      // by it; in this fork AssetUpdate also admits space editors, so adopting the constant would let
+      // an editor pin another member's asset into their own memory/tag — exactly the cross-owner rows
+      // upstream's own DeleteMismatchedMemoryAssets migration deletes.
       ownerOnly: true,
     });
 
