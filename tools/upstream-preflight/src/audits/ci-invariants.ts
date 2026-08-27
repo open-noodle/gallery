@@ -50,12 +50,27 @@ export function runCiInvariantAudits(
         }))
     : [];
 
-  return (manifest.ci_invariants ?? []).map((invariant) =>
-    checkCiInvariantText(invariant, [
-      ...files,
-      ...readInvariantSourceFiles(invariant, cwd),
-    ]),
-  );
+  return (manifest.ci_invariants ?? []).map((invariant) => {
+    const { sources, missing } = readInvariantSourceFiles(invariant, cwd);
+
+    // A declared non-glob path that does not resolve means the invariant read ZERO files and would
+    // otherwise report "passed" — so an upstream relocation of the file it pins turns the gate green
+    // instead of red, which is the exact failure mode the gate exists to prevent. Fail this
+    // invariant (rather than throwing) so the remaining ones still report.
+    if (missing.length > 0) {
+      return {
+        ok: false,
+        title: invariant.title,
+        details: missing.map(
+          (candidate) =>
+            `declares path ${candidate}, which does not exist — update it in docs/fork/ownership.yml ` +
+            `(the file was probably moved upstream) or drop the invariant if it no longer applies`,
+        ),
+      };
+    }
+
+    return checkCiInvariantText(invariant, [...files, ...sources]);
+  });
 }
 
 /**
@@ -68,15 +83,21 @@ export function runCiInvariantAudits(
 function readInvariantSourceFiles(
   invariant: CiInvariant,
   cwd: string,
-): TextFile[] {
-  return invariant.paths
-    .filter((candidate) => !candidate.startsWith('.github/workflows'))
-    .filter((candidate) => !candidate.includes('*'))
-    .flatMap((candidate) => {
-      const absolute = path.join(cwd, candidate);
-      if (!fs.existsSync(absolute) || !fs.statSync(absolute).isFile()) {
-        return [];
-      }
-      return [{ path: candidate, text: fs.readFileSync(absolute, 'utf8') }];
-    });
+): { sources: TextFile[]; missing: string[] } {
+  const sources: TextFile[] = [];
+  const missing: string[] = [];
+
+  for (const candidate of invariant.paths) {
+    if (candidate.startsWith('.github/workflows') || candidate.includes('*')) {
+      continue;
+    }
+    const absolute = path.join(cwd, candidate);
+    if (!fs.existsSync(absolute) || !fs.statSync(absolute).isFile()) {
+      missing.push(candidate);
+      continue;
+    }
+    sources.push({ path: candidate, text: fs.readFileSync(absolute, 'utf8') });
+  }
+
+  return { sources, missing };
 }
