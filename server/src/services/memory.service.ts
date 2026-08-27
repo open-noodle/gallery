@@ -306,11 +306,12 @@ export class MemoryService extends BaseService {
     // TODO validate type/data combination
 
     const assetIds = dto.assetIds || [];
-    const allowedAssetIds = await this.checkAccess({
-      auth,
-      permission: Permission.AssetUpdate,
-      ids: assetIds,
-    });
+    // Gallery: owner-only, for the reason spelled out at the addAssets call below.
+    const allowedAssetIds = await this.accessRepository.asset.checkOwnerAccess(
+      auth.user.id,
+      new Set(assetIds),
+      auth.session?.hasElevatedPermission,
+    );
     const memory = await this.memoryRepository.create(
       {
         ownerId: auth.user.id,
@@ -352,7 +353,11 @@ export class MemoryService extends BaseService {
     const results = await addAssets(auth, repos, {
       parentId: id,
       assetIds: dto.ids,
-      permission: Permission.AssetUpdate,
+    // Gallery: owner-only. immich-28950 passes Permission.AssetUpdate here and means "owner only"
+    // by it; in this fork AssetUpdate also admits space editors, so adopting the constant would let
+    // an editor pin another member's asset into their own memory/tag — exactly the cross-owner rows
+    // upstream's own DeleteMismatchedMemoryAssets migration deletes.
+      ownerOnly: true,
     });
 
     const hasSuccess = results.some(({ success }) => success);
