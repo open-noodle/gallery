@@ -30,19 +30,37 @@ export const getAssetFiles = (files: AssetFile[]) => ({
   encodedVideoFile: getAssetFile(files, AssetFileType.EncodedVideo, { isEdited: false }),
 });
 
+/**
+ * How the caller wants the assets gated.
+ *
+ * `ownerOnly` exists because upstream expresses "only the asset's owner may do this" as
+ * `Permission.AssetUpdate`, and in this fork that permission ALSO admits space editors — see
+ * `utils/access.ts`. Adopting upstream's constant verbatim therefore widens the rule instead of
+ * applying it. Rather than mint a public `Permission` value for the narrow case (permissions are
+ * API-key scopes, so a new one is public surface), callers that mean owner-only say so directly.
+ */
+type AddAssetsAccess = { permission: Permission } | { ownerOnly: true };
+
 export const addAssets = async (
   auth: AuthDto,
   repositories: { access: AccessRepository; bulk: IBulkAsset },
-  dto: { parentId: string; assetIds: string[]; permission: Permission },
+  dto: { parentId: string; assetIds: string[] } & AddAssetsAccess,
 ) => {
   const { access, bulk } = repositories;
   const existingAssetIds = await bulk.getAssetIds(dto.parentId, dto.assetIds);
   const notPresentAssetIds = dto.assetIds.filter((id) => !existingAssetIds.has(id));
-  const allowedAssetIds = await checkAccess(access, {
-    auth,
-    permission: dto.permission,
-    ids: notPresentAssetIds,
-  });
+  const allowedAssetIds =
+    'ownerOnly' in dto
+      ? await access.asset.checkOwnerAccess(
+          auth.user.id,
+          new Set(notPresentAssetIds),
+          auth.session?.hasElevatedPermission,
+        )
+      : await checkAccess(access, {
+          auth,
+          permission: dto.permission,
+          ids: notPresentAssetIds,
+        });
 
   const results: BulkIdResponseDto[] = [];
   for (const assetId of dto.assetIds) {
