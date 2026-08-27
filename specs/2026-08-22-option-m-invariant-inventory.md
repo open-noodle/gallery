@@ -64,6 +64,25 @@ to decide _which_ group to join instead.
 `repositories/person.repository.ts:622`. Owner-agnostic person join for the face-repair console,
 which has no viewer to key on.
 
+### Keyed collections — 3 call sites
+
+Not primitives, but the same assumption in a different shape: code that builds a `Map`/dedupe keyed
+on the person id, which collapses to one entry per group only because a group holds one row. Under
+1:N each of these silently keeps an arbitrary member and drops the rest — with no compiler or test
+signal, because the types are identical either way.
+
+| File                                          | Line    | What it keys                                                                        |
+| --------------------------------------------- | ------- | ----------------------------------------------------------------------------------- |
+| `repositories/face-repair-scan.repository.ts` | 380-385 | admin report enrichment — **the query is not owner-scoped**, so under 1:N the `Map` keeps the last row and the report shows the wrong `ownerId`/name/thumbnail. Raw Kysely, so invisible to a `getByGroupIdOnly` grep |
+| `dtos/asset-response.dto.ts`                  | 174-175 | `peopleFromFaces` dedupes an asset's people by `personGroupId`                        |
+| `services/asset.service.ts`                   | 164-169 | `identityByPersonId` across faces that may span owners on a shared asset             |
+
+(`services/person.service.ts:388-393` builds the same shape but filters
+`face.person?.ownerId === auth.user.id` first, so it is 1:1 regardless of M and is **not** listed.)
+
+The cheapest hardening for the first is an owner predicate — `enrichReportPersons` already has the
+scan's owner in context.
+
 ## 2. The recurring shape — upstream code keyed on "the viewer's own row"
 
 This is the class that reaches production silently, and the one to grep on every rebase.
