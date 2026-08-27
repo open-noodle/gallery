@@ -76,6 +76,9 @@ jobs:
               - 'CLAUDE.md'
               - 'branding/scripts/gallery-branding-check.sh'
               - 'machine-learning/scripts/gallery-ml-smoke.sh'
+              # fork-deletions.spec.ts asserts paths the fork deleted on purpose stay deleted, so the
+              # job has to run on a PR that resurrects one.
+              - 'packages/**'
             .github:
               - '.github/**'
           force-filters: |
