@@ -288,6 +288,25 @@ export class PersonRepository {
       throw new Error('Person profile not found');
     }
 
+    // Sweep the group the source person just vacated. Upstream's mergePerson does this via
+    // removeAllPersonGroups -> deleteEmptyGroups; the fork routes merges through here instead and the
+    // step was not carried, so every merge left an orphan person_group row until the nightly
+    // PersonCleanup happened to collect it. Scoped to this group and conditional on it being empty,
+    // so it is correct under M (one person per group) and stays correct if that ever changes.
+    await db
+      .deleteFrom('person_group')
+      .where('id', '=', input.sourcePersonId)
+      .where(({ not, exists, selectFrom }) =>
+        not(
+          exists(
+            selectFrom('person')
+              .whereRef('person.personGroupId', '=', 'person_group.id')
+              .select('person.personGroupId'),
+          ),
+        ),
+      )
+      .execute();
+
     return { deletedThumbnailPath: source.thumbnailPath || null, targetNeedsFeatureFaceRepair };
   }
 
