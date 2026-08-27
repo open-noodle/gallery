@@ -232,9 +232,13 @@ The replay adopted upstream's rewritten file byte-identical, re-enabling
 ("align analysis with rebased sync models" — a pragmatic removal to make rebased code pass, not a
 style position). All current mobile code complies, so CI is green; the only cost is forward.
 
-**Decision — keep upstream's file and record the convergence in `docs/fork/ownership.yml`.** Matching
-upstream byte-for-byte on a config file is the cheapest thing to maintain, and the note stops a future
-reviewer re-flagging it as a lost fork change. **This is the exception, not the rule**: for the fork's
+**Decision — keep upstream's file, and let THIS document be the record.** Matching upstream
+byte-for-byte on a config file is the cheapest thing to maintain. Note the trap in recording it
+anywhere else: a marker comment inside `mobile/analysis_options.yaml` would break the very
+byte-identity that converging buys, and `docs/fork/ownership.yml` has no "deliberately converged"
+concept to extend without inventing manifest structure the tooling does not read. So the file
+carries no marker on purpose. **If you are diffing `analysis_options.yaml` against `origin/main` in
+a future cycle and find those two lines: this is why, and it was intentional.** **This is the exception, not the rule**: for the fork's
 deliberate _swaps_ — the branded-spinner set above all — byte-identical-to-upstream is the failure
 mode, not the goal.
 
