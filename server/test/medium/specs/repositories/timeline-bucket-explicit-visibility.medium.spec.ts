@@ -432,3 +432,55 @@ describe('timeline bucket explicit-visibility — albumId arm', () => {
     expect(ids.has(s.archive)).toBe(true);
   });
 });
+
+/**
+ * immich-30739 widened the person-scoped timeline so a viewer also sees the person's faces on assets
+ * shared with them through an album. The fork carried the branch but tested `options.personId`,
+ * which timeline.service normalises away into `personIds` before options reach the repository — so
+ * the branch was unreachable and the feature silently did nothing.
+ *
+ * The second half was an asymmetry: getTimeBuckets passed the viewer, getTimeBucket did not, so the
+ * scrubber counts and the bucket contents were computed under different rules. The file's own
+ * comment promises they cannot drift.
+ */
+describe('person-scoped timeline — album-shared widening', () => {
+  const seed = async () => {
+    const { ctx, assetRepo } = setup();
+    const { user: owner } = await ctx.newUser();
+    const { user: viewer } = await ctx.newUser();
+
+    const sharedAssetId = await makeBucketAsset(ctx, owner.id, AssetVisibility.Timeline);
+    const { result: person } = await ctx.newPerson({ ownerId: owner.id, name: 'Album Person' });
+    await ctx.newAssetFace({ assetId: sharedAssetId, personGroupId: person.personGroupId });
+
+    const { album } = await ctx.newAlbum({ ownerId: owner.id }, [sharedAssetId]);
+    await ctx.newAlbumUser({ albumId: album.id, userId: viewer.id });
+
+    const options: TimeBucketOptions = {
+      personIds: [person.personGroupId],
+      userIds: [viewer.id],
+      bucketSize: TimeBucketSize.Year,
+    };
+    return { ctx, assetRepo, viewer, sharedAssetId, options };
+  };
+
+  it('returns an album-shared asset in the bucket for a person-scoped timeline', async () => {
+    const { assetRepo, viewer, sharedAssetId, options } = await seed();
+
+    const ids = await bucketAssetIds(assetRepo, BUCKET, options, viewer.id);
+
+    expect(ids.has(sharedAssetId)).toBe(true);
+  });
+
+  it('counts the same asset in the scrubber, so buckets and contents agree', async () => {
+    const { assetRepo, viewer, sharedAssetId, options } = await seed();
+
+    const auth = { user: { id: viewer.id } } as any;
+    const buckets = await assetRepo.getTimeBuckets(options, auth);
+    const contents = await bucketAssetIds(assetRepo, BUCKET, options, viewer.id);
+
+    // The asymmetry this locks: a scrubber count with nothing behind it renders an empty bucket.
+    expect(countBuckets(buckets)).toBe(contents.size);
+    expect(contents.has(sharedAssetId)).toBe(true);
+  });
+});
