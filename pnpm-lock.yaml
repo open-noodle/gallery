@@ -390,28 +390,6 @@ importers:
         specifier: ^7.0.0
         version: 7.0.2
 
-  packages/scripts:
-    dependencies:
-      commander:
-        specifier: ^15.0.0
-        version: 15.0.0
-      semver:
-        specifier: ^7.8.1
-        version: 7.8.5
-    devDependencies:
-      '@types/node':
-        specifier: ^24.13.3
-        version: 24.13.3
-      '@types/semver':
-        specifier: ^7.7.1
-        version: 7.8.0
-      vite:
-        specifier: ^8.0.16
-        version: 8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.102.0)(terser@5.49.0)(tsx@4.23.12)(yaml@2.9.0)
-      vitest:
-        specifier: ^4.1.8
-        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/coverage-v8@4.1.11)(happy-dom@20.11.6)(jsdom@26.1.0(canvas@3.2.3))(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.102.0)(terser@5.49.0)(tsx@4.23.12)(yaml@2.9.0))
-
   packages/sdk:
     dependencies:
       '@oazapfts/runtime':
