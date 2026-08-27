@@ -4,11 +4,18 @@ const ROUTES: { regex: RegExp; build: (m: RegExpMatchArray) => string }[] = [
   // Sub-routes BEFORE parents — important for /spaces/:id/photos/:assetId vs /spaces/:id
   { regex: new RegExp(`^/spaces/${UUID}/photos/(${UUID})$`), build: (m) => `immich://asset?id=${m[1]}` },
   { regex: new RegExp(`^/albums/${UUID}/(${UUID})$`), build: (m) => `immich://asset?id=${m[1]}` },
+  { regex: new RegExp(`^/memories/${UUID}/photos/(${UUID})$`), build: (m) => `immich://asset?id=${m[1]}` },
   { regex: new RegExp(`^/photos/(${UUID})$`), build: (m) => `immich://asset?id=${m[1]}` },
   { regex: new RegExp(`^/albums/(${UUID})$`), build: (m) => `immich://album?id=${m[1]}` },
   { regex: new RegExp(`^/people/(${UUID})$`), build: (m) => `immich://people?id=${m[1]}` },
-  { regex: new RegExp(`^/memory/(${UUID})$`), build: (m) => `immich://memory?id=${m[1]}` },
+  { regex: new RegExp(`^/memories/(${UUID})$`), build: (m) => `immich://memory?id=${m[1]}` },
   { regex: new RegExp(`^/spaces/(${UUID})$`), build: (m) => `immich://space?id=${m[1]}` },
+  { regex: /^\/memories$/, build: () => `immich://memory` },
+  // immich-28675 moved the memory viewer from /memory?id= to /memories/:id. This table is
+  // fork-only, so upstream's move produced no conflict here and every real memory URL silently
+  // stopped matching — the banner just never rendered. The old paths stay because the 307 shim at
+  // routes/(user)/memory/ still resolves shared and bookmarked links.
+  { regex: new RegExp(`^/memory/(${UUID})$`), build: (m) => `immich://memory?id=${m[1]}` },
   { regex: /^\/memory$/, build: () => `immich://memory` },
 ];
 
