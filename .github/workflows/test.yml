@@ -63,6 +63,19 @@ jobs:
               - 'docs/docs/developer/upstream-rebase-process.md'
               - 'docs/docs/developer/fork-surface-guidelines.md'
               - 'Makefile'
+              # Everything below is READ BY the preflight specs. Without these the job is SKIPPED on a
+              # PR that reverts the branded-spinner swap or drops the migration compatibility alias --
+              # and a skipped job is indistinguishable from a passing one. Keep in sync with the
+              # `path.resolve(process.cwd(), '../../...')` targets in tools/upstream-preflight/src/**.
+              - 'web/src/**'
+              - 'mobile/lib/**'
+              - 'server/bin/sync-gallery-migrations.mjs'
+              - 'server/src/schema/migrations/**'
+              - 'server/src/schema/migrations-gallery/**'
+              - 'AGENTS.md'
+              - 'CLAUDE.md'
+              - 'branding/scripts/gallery-branding-check.sh'
+              - 'machine-learning/scripts/gallery-ml-smoke.sh'
             .github:
               - '.github/**'
           force-filters: |
@@ -98,6 +111,15 @@ jobs:
 
       - name: Run upstream-preflight tests
         run: pnpm --filter @gallery/upstream-preflight run test
+
+      # The fork's own CI invariants (no upstream-only app-token dependency, Gallery release image
+      # names, upstream docs-deploy stays dispatch-only, person joins prefer the viewer's row) were
+      # run by NO workflow -- they fired only when a human typed `make ci-invariants-check`. An
+      # invariant nobody runs is a comment.
+      # (Careful: the token invariant forbids its own literal token name in any workflow file, so do
+      # not spell it out here -- this comment tripped that gate once already.)
+      - name: Run fork CI invariant audits
+        run: pnpm --filter @gallery/upstream-preflight run ci-invariants-check
 
       - name: Run upstream-preflight type check
         run: pnpm --filter @gallery/upstream-preflight run check
@@ -730,8 +752,11 @@ jobs:
       # nullable-array-items invariant is actually exercised in CI.
       - name: Install upstream-preflight dependencies
         run: pnpm --filter @gallery/upstream-preflight install --frozen-lockfile
+      # NOT `pnpm ... test <file>`: that package's `test` script is `vitest --run --passWithNoTests`,
+      # so renaming or moving the spec would match nothing and exit 0 -- a check that cannot fail.
+      # Invoke vitest directly so a vanished spec reddens the job.
       - name: Run dart nullable array items regression test
-        run: pnpm --filter @gallery/upstream-preflight test dart-nullable-array-items.spec.ts
+        run: pnpm --filter @gallery/upstream-preflight exec vitest --run dart-nullable-array-items.spec.ts
 
       - name: Find file changes
         uses: tj-actions/verify-changed-files@a1c6acee9df209257a246f2cc6ae8cb6581c1edf # v20.0.4
@@ -793,9 +818,15 @@ jobs:
       - name: Test npm run schema:reset command works
         run: pnpm --filter immich schema:reset
 
+      # `--filter` selects PACKAGES, not scripts. Upstream's `pnpm --filter migrations:generate ...`
+      # matches no package (this one is named `immich`), so pnpm exited non-zero, `continue-on-error`
+      # swallowed it, and the verify-changed-files step below saw no diff and passed. The gate was
+      # inert. It is the only thing that catches a table definition drifting from what the migrations
+      # actually produce -- during the option-M landing it was the sole detector of the face-review
+      # tables still declaring `personId` with FKs to a deleted column while tsc sat at zero.
+      # Keep the package name, and let a genuine failure go red.
       - name: Generate new migrations
-        continue-on-error: true
-        run: pnpm --filter migrations:generate src/TestMigration
+        run: pnpm --filter immich migrations:generate src/TestMigration
 
       - name: Find file changes
         uses: tj-actions/verify-changed-files@a1c6acee9df209257a246f2cc6ae8cb6581c1edf # v20.0.4
