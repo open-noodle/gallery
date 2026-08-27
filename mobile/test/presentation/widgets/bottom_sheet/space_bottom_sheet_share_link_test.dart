@@ -17,6 +17,8 @@ import 'package:immich_mobile/infrastructure/repositories/settings.repository.da
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/models/albums/album_search.model.dart';
 import 'package:immich_mobile/presentation/actions/action.widget.dart';
+import 'package:immich_mobile/presentation/actions/download.action.dart';
+import 'package:immich_mobile/presentation/actions/share.action.dart';
 import 'package:immich_mobile/presentation/actions/share_link.action.dart';
 import 'package:immich_mobile/presentation/widgets/bottom_sheet/space_bottom_sheet.widget.dart';
 import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
@@ -66,6 +68,14 @@ class _StubRemoteAlbumNotifier extends RemoteAlbumNotifier {
 /// `ActionColumnButton` rather than a bespoke `ShareLinkActionButton` widget.
 Finder _shareLinkAction() =>
     find.byWidgetPredicate((widget) => widget is ActionColumnButton && widget.action is ShareLinkAction);
+
+/// Every action in this sheet must be an `ActionColumnButton`, like every other BaseBottomSheet.
+/// Adopting the action model briefly wrapped Share/Download/AssetDebug in `ActionMenuItem` — a
+/// left-aligned vertical menu row meant for the asset-viewer kebab menu — which rendered them
+/// inconsistently inside the horizontal action Row AND dropped Share's long-press affordance,
+/// because `ActionMenuItem` is the one `ActionWidget` subclass that never wires
+/// `onSecondaryAction`. Only ShareLink was asserted at the time, so nothing caught it.
+Finder _columnAction<T>() => find.byWidgetPredicate((widget) => widget is ActionColumnButton && widget.action is T);
 
 void main() {
   final user = UserStub.user1;
@@ -119,6 +129,15 @@ void main() {
     );
     await tester.pump();
   }
+
+  testWidgets('renders Share and Download as column buttons, not menu rows', (tester) async {
+    await pumpSheet(tester, SharedSpaceRole.owner);
+
+    expect(_columnAction<ShareAction>(), findsOneWidget);
+    expect(_columnAction<DownloadAction>(), findsOneWidget);
+    // An ActionMenuItem anywhere in this sheet is the regression.
+    expect(find.byType(ActionMenuItem), findsNothing);
+  });
 
   testWidgets('offers a share link to a space owner', (tester) async {
     await pumpSheet(tester, SharedSpaceRole.owner);
