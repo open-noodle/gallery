@@ -72,9 +72,15 @@ class _SpaceAlbumBottomSheetState extends ConsumerState<SpaceAlbumBottomSheet> {
       maxChildSize: 0.85,
       shouldCloseOnMinExtent: false,
       actions: [
-        const ActionMenuItem(action: AssetDebugAction(source: ActionSource.timeline)),
-        const ActionMenuItem(action: ShareAction(source: ActionSource.timeline)),
-        const ActionMenuItem(action: DownloadAction(source: ActionSource.timeline)),
+        // ActionColumnButton throughout, matching every other BaseBottomSheet. ActionMenuItem is a
+        // left-aligned vertical MENU row built for the asset-viewer kebab menu; placed in this
+        // horizontal action Row it renders inconsistently next to the column tiles below. It is also
+        // the one ActionWidget subclass that never wires onSecondaryAction, and ShareAction is the
+        // only action that defines one — so using it here silently killed the long-press
+        // share-quality prompt.
+        const ActionColumnButton(action: AssetDebugAction(source: ActionSource.timeline)),
+        const ActionColumnButton(action: ShareAction(source: ActionSource.timeline)),
+        const ActionColumnButton(action: DownloadAction(source: ActionSource.timeline)),
         if (widget.canEdit)
           RemoveFromAlbumActionButton(
             source: ActionSource.timeline,
