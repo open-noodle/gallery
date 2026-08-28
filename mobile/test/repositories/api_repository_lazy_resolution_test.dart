@@ -14,8 +14,8 @@ import 'package:immich_mobile/infrastructure/repositories/search_api.repository.
 import 'package:immich_mobile/infrastructure/repositories/tags_api.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/user_api.repository.dart';
 import 'package:immich_mobile/repositories/activity_api.repository.dart';
+import 'package:immich_mobile/repositories/album_api_repository.dart';
 import 'package:immich_mobile/repositories/asset_api.repository.dart';
-import 'package:immich_mobile/repositories/drift_album_api_repository.dart';
 import 'package:immich_mobile/repositories/folder_api.repository.dart';
 import 'package:immich_mobile/repositories/partner_api.repository.dart';
 import 'package:immich_mobile/repositories/sessions_api.repository.dart';
@@ -155,11 +155,11 @@ void main() {
     verifyNever(() => oldApi.getUniqueOriginalPathsWithHttpInfo());
   });
 
-  test('DriftAlbumApiRepository resolves albumsApi lazily', () async {
+  test('AlbumApiRepository resolves albumsApi lazily', () async {
     final oldApi = _MockAlbumsApi();
     final newApi = _MockAlbumsApi();
     when(() => apiService.albumsApi).thenReturn(oldApi);
-    final repo = DriftAlbumApiRepository(apiService);
+    final repo = AlbumApiRepository(apiService);
 
     when(() => apiService.albumsApi).thenReturn(newApi);
     registerFallbackValue(BulkIdsDto(ids: []));
