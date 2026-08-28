@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/domain/models/memory.model.dart';
-import 'package:immich_mobile/presentation/pages/drift_memory.page.dart' as drift_page;
+import 'package:immich_mobile/presentation/pages/memory.page.dart' as drift_page;
 import 'package:immich_mobile/presentation/widgets/memory/memory_lane.widget.dart' as memory_lane;
 import '../../widget_tester_extensions.dart';
 
@@ -21,7 +21,7 @@ void main() {
       ),
     );
 
-    final ruleMemory = DriftMemory(
+    final ruleMemory = Memory(
       id: 'memory-rule-1',
       createdAt: DateTime(2026, 4, 23),
       updatedAt: DateTime(2026, 4, 23),
@@ -35,7 +35,7 @@ void main() {
       assets: const [],
     );
 
-    final unknownRuleMemory = DriftMemory(
+    final unknownRuleMemory = Memory(
       id: 'memory-rule-2',
       createdAt: DateTime(2026, 4, 23),
       updatedAt: DateTime(2026, 4, 23),
