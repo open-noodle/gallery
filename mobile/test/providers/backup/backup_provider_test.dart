@@ -1,9 +1,6 @@
 import 'dart:async';
 
-import 'package:background_downloader/background_downloader.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:immich_mobile/constants/constants.dart';
 import 'package:immich_mobile/providers/backup/backup.provider.dart';
 import 'package:immich_mobile/services/background_upload.service.dart';
 import 'package:immich_mobile/services/foreground_upload.service.dart';
@@ -17,173 +14,96 @@ class MockBackgroundUploadService extends Mock implements BackgroundUploadServic
 void main() {
   late MockForegroundUploadService foregroundUploadService;
   late MockBackgroundUploadService backgroundUploadService;
-  late StreamController<TaskStatusUpdate> statusController;
-  late StreamController<TaskProgressUpdate> progressController;
-  late BackupNotifier sut;
+  late BackupNotifier notifier;
 
   setUpAll(() {
     registerFallbackValue(Completer<void>());
+    registerFallbackValue(const UploadCallbacks());
   });
 
   setUp(() {
     foregroundUploadService = MockForegroundUploadService();
     backgroundUploadService = MockBackgroundUploadService();
-    statusController = StreamController<TaskStatusUpdate>.broadcast();
-    progressController = StreamController<TaskProgressUpdate>.broadcast();
-
-    when(() => backgroundUploadService.taskStatusStream).thenAnswer((_) => statusController.stream);
-    when(() => backgroundUploadService.taskProgressStream).thenAnswer((_) => progressController.stream);
-
-    sut = BackupNotifier(foregroundUploadService, backgroundUploadService, UploadSpeedManager());
+    notifier = BackupNotifier(foregroundUploadService, backgroundUploadService, UploadSpeedManager());
+    addTearDown(() {
+      if (notifier.mounted) {
+        notifier.dispose();
+      }
+    });
   });
 
-  tearDown(() async {
-    sut.dispose();
-    await statusController.close();
-    await progressController.close();
-  });
-
-  test('tracks iOS URLSession backup progress in upload state', () async {
-    final task = UploadTask(
-      taskId: 'asset-1',
-      url: 'http://test-server.com/assets',
-      filename: 'asset.jpg',
-      displayName: 'asset.jpg',
-      baseDirectory: BaseDirectory.temporary,
-      group: kBackupGroup,
-    );
-
-    progressController.add(TaskProgressUpdate(task, 0.5, 1000, 0.25));
-    await pumpEventQueue();
-
-    expect(
-      sut.state.uploadItems['asset-1'],
-      isA<UploadStatus>()
-          .having((status) => status.filename, 'filename', 'asset.jpg')
-          .having((status) => status.progress, 'progress', 0.5)
-          .having((status) => status.fileSize, 'fileSize', 1000),
-    );
-  });
-
-  test('starts URLSession backup on iOS instead of foreground upload', () async {
-    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
-    addTearDown(() => debugDefaultTargetPlatformOverride = null);
-
-    when(() => backgroundUploadService.getActiveTasks(kBackupGroup)).thenAnswer((_) async => []);
-    when(() => backgroundUploadService.getActiveTasks(kBackupLivePhotoGroup)).thenAnswer((_) async => []);
-    when(() => backgroundUploadService.uploadBackupCandidates('user-1')).thenAnswer((_) async {});
-
-    await sut.startBackup('user-1');
-
-    verify(() => backgroundUploadService.uploadBackupCandidates('user-1')).called(1);
-    verifyNever(() => foregroundUploadService.uploadCandidates(any(), any()));
-  });
-
-  test('stops URLSession backup on iOS when backup is disabled', () async {
-    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
-    addTearDown(() => debugDefaultTargetPlatformOverride = null);
-
-    when(() => backgroundUploadService.cancel()).thenAnswer((_) async => 0);
-
-    await sut.stopBackup(reason: 'backup disabled');
-
-    verify(() => backgroundUploadService.cancel()).called(1);
-  });
-
-  test('resumes active Live Photo still tasks instead of starting duplicate candidates', () async {
-    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
-    addTearDown(() => debugDefaultTargetPlatformOverride = null);
-
-    final livePhotoStillTask = UploadTask(
-      taskId: 'asset-live',
-      url: 'http://test-server.com/assets',
-      filename: 'asset.heic',
-      displayName: 'asset.heic',
-      baseDirectory: BaseDirectory.temporary,
-      group: kBackupLivePhotoGroup,
-    );
-
-    when(() => backgroundUploadService.getActiveTasks(kBackupGroup)).thenAnswer((_) async => []);
-    when(
-      () => backgroundUploadService.getActiveTasks(kBackupLivePhotoGroup),
-    ).thenAnswer((_) async => [livePhotoStillTask]);
-    when(() => backgroundUploadService.resume('user-1')).thenAnswer((_) async {});
-
-    await sut.startBackup('user-1');
-
-    verify(() => backgroundUploadService.resume('user-1')).called(1);
-    verifyNever(() => backgroundUploadService.uploadBackupCandidates('user-1'));
-  });
-
-  test('tracks Live Photo still progress from the live photo group', () async {
-    final task = UploadTask(
-      taskId: 'asset-live',
-      url: 'http://test-server.com/assets',
-      filename: 'asset.heic',
-      displayName: 'asset.heic',
-      baseDirectory: BaseDirectory.temporary,
-      group: kBackupLivePhotoGroup,
-    );
-
-    progressController.add(TaskProgressUpdate(task, 0.75, 2000, 0.5));
-    await pumpEventQueue();
-
-    expect(
-      sut.state.uploadItems['asset-live'],
-      isA<DriftUploadStatus>()
-          .having((status) => status.filename, 'filename', 'asset.heic')
-          .having((status) => status.progress, 'progress', 0.75)
-          .having((status) => status.fileSize, 'fileSize', 2000),
-    );
-  });
-
-  test('does not count Live Photo motion completion as final backup completion', () async {
+  void mockCounts({required int total, required int remainder, int processing = 0}) {
     when(
       () => foregroundUploadService.getBackupCounts('user-1'),
-    ).thenAnswer((_) async => (total: 1, remainder: 1, processing: 0));
-    await sut.getBackupStatus('user-1');
+    ).thenAnswer((_) async => (total: total, remainder: remainder, processing: processing));
+  }
 
-    final motionMetadata = const UploadTaskMetadata(
-      localAssetId: 'asset-live',
-      isLivePhotos: true,
-      livePhotoVideoId: '',
-    ).toJson();
-    final motionTask = UploadTask(
-      taskId: 'asset-live',
-      url: 'http://test-server.com/assets',
-      filename: 'asset.mov',
-      displayName: 'asset.mov',
-      baseDirectory: BaseDirectory.temporary,
-      group: kBackupGroup,
-      metaData: motionMetadata,
-    );
+  // Drives a backup run so we can grab the onSuccess callback the notifier wires up.
+  Future<void Function(String, String)> startAndCaptureOnSuccess() async {
+    void Function(String, String)? onSuccess;
+    when(() => foregroundUploadService.uploadCandidates(any(), any(), callbacks: any(named: 'callbacks'))).thenAnswer((
+      invocation,
+    ) async {
+      onSuccess = (invocation.namedArguments[#callbacks] as UploadCallbacks).onSuccess;
+    });
+    await notifier.startForegroundBackup('user-1');
+    return onSuccess!;
+  }
 
-    statusController.add(TaskStatusUpdate(motionTask, TaskStatus.complete));
-    await pumpEventQueue();
+  group('foreground backup counts', () {
+    test('successes move one asset from remainder to backup', () async {
+      mockCounts(total: 25, remainder: 25);
+      final onSuccess = await startAndCaptureOnSuccess();
 
-    expect(sut.state.backupCount, 0);
-    expect(sut.state.remainderCount, 1);
-  });
+      for (var i = 0; i < 10; i++) {
+        onSuccess('asset-$i', 'remote-$i');
+      }
 
-  test('counts Live Photo still completion as final backup completion', () async {
-    when(
-      () => foregroundUploadService.getBackupCounts('user-1'),
-    ).thenAnswer((_) async => (total: 1, remainder: 1, processing: 0));
-    await sut.getBackupStatus('user-1');
+      expect(notifier.state.remainderCount, 15);
+      expect(notifier.state.backupCount, 10);
+      expect(notifier.state.backupCount + notifier.state.remainderCount, notifier.state.totalCount);
+    });
 
-    final stillTask = UploadTask(
-      taskId: 'asset-live',
-      url: 'http://test-server.com/assets',
-      filename: 'asset.heic',
-      displayName: 'asset.heic',
-      baseDirectory: BaseDirectory.temporary,
-      group: kBackupLivePhotoGroup,
-    );
+    test('a duplicate success after pause and resume cannot go below zero', () async {
+      // #26215: app pauses mid-backup, sync has not recorded the upload yet, so the
+      // resumed run re-uploads the same asset and the server answers 200 duplicate.
+      // The start of each run re-baselines the counters from the DB, so the duplicate
+      // success is counted against a baseline that includes the asset again.
+      mockCounts(total: 1, remainder: 1);
 
-    statusController.add(TaskStatusUpdate(stillTask, TaskStatus.complete));
-    await pumpEventQueue();
+      final firstRun = await startAndCaptureOnSuccess();
+      expect(notifier.state.remainderCount, 1);
+      firstRun('asset-1', 'remote-1');
+      expect(notifier.state.remainderCount, 0);
 
-    expect(sut.state.backupCount, 1);
-    expect(sut.state.remainderCount, 0);
+      notifier.stopForegroundBackup(reason: "test");
+
+      final resumedRun = await startAndCaptureOnSuccess();
+      expect(notifier.state.remainderCount, 1);
+      verify(() => foregroundUploadService.getBackupCounts('user-1')).called(2);
+
+      resumedRun('asset-1', 'remote-1');
+      expect(notifier.state.remainderCount, 0);
+      expect(notifier.state.backupCount, 1);
+    });
+
+    test('a drifted counter state heals at run start', () async {
+      mockCounts(total: 91, remainder: 7);
+      notifier.state = notifier.state.copyWith(totalCount: 91, backupCount: 103, remainderCount: -12);
+
+      await startAndCaptureOnSuccess();
+
+      expect(notifier.state.totalCount, 91);
+      expect(notifier.state.remainderCount, 7);
+      expect(notifier.state.backupCount, 84);
+    });
+
+    test('a late success after dispose does not throw', () async {
+      mockCounts(total: 2, remainder: 2);
+      final onSuccess = await startAndCaptureOnSuccess();
+      notifier.dispose();
+
+      onSuccess('asset-1', 'remote-1');
+    });
   });
 }
