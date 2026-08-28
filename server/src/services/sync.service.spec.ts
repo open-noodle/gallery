@@ -1,7 +1,7 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Writable } from 'node:stream';
 import { AlbumUserRole, AssetVisibility, MemoryType, SyncEntityType, SyncRequestType } from 'src/enum';
-import { send, SyncService } from 'src/services/sync.service';
+import { send, SYNC_TYPES_ORDER, SyncService } from 'src/services/sync.service';
 import { serialize, toAck } from 'src/utils/sync';
 import { authStub } from 'test/fixtures/auth.stub';
 import { newUuid } from 'test/small.factory';
@@ -1198,6 +1198,53 @@ describe(SyncService.name, () => {
         expect.objectContaining({ afterUpdateId: partialExtraId }),
         partnerId,
       );
+    });
+  });
+
+  // gallery-fork: mobile's `memory_asset_entity` carries real foreign keys — `assetId` →
+  // `remote_asset_entity.id` and `memoryId` → `memory_entity.id`. Drift inserts the whole
+  // MemoryToAssetV1 batch in one statement, so a single link row whose asset has not been
+  // streamed yet fails with SQLITE_CONSTRAINT_FOREIGNKEY (787), aborts the batch, and — because
+  // the batch is then never acked — leaves the sync stuck on the same checkpoint forever.
+  //
+  // Upstream keeps this safe by construction: every stream that carries an asset row
+  // (AssetsV*, PartnerAssetsV*, AlbumAssetsV*) is ordered before MemoryToAssetsV1, and a memory
+  // upstream can only ever reference the owner's own assets. The fork breaks that assumption in
+  // two ways: shared spaces, libraries and space albums deliver assets belonging to *other*
+  // owners, and a memory may legitimately reference them (MemoryRepository.search gates memory
+  // assets on visibility, not ownership). Those fork streams must therefore land before the
+  // memory link rows, exactly like AlbumAssetsV2 lands before AlbumToAssetsV1.
+  describe('SYNC_TYPES_ORDER', () => {
+    // Every request type whose mobile handler writes into `remote_asset_entity`.
+    const assetBearingTypes = [
+      SyncRequestType.AssetsV1,
+      SyncRequestType.AssetsV2,
+      SyncRequestType.PartnerAssetsV1,
+      SyncRequestType.PartnerAssetsV2,
+      SyncRequestType.AlbumAssetsV1,
+      SyncRequestType.AlbumAssetsV2,
+      SyncRequestType.SharedSpaceAssetsV1,
+      SyncRequestType.LibraryAssetsV1,
+      SyncRequestType.SharedSpaceAlbumAssetsV1,
+    ];
+
+    it('should stream every asset-bearing type before MemoryToAssetsV1', () => {
+      const linkIndex = SYNC_TYPES_ORDER.indexOf(SyncRequestType.MemoryToAssetsV1);
+      expect(linkIndex).toBeGreaterThan(-1);
+
+      const streamedAfter = assetBearingTypes.filter((type) => SYNC_TYPES_ORDER.indexOf(type) > linkIndex);
+      expect(streamedAfter).toEqual([]);
+    });
+
+    it('should stream MemoriesV1 before MemoryToAssetsV1', () => {
+      expect(SYNC_TYPES_ORDER.indexOf(SyncRequestType.MemoriesV1)).toBeLessThan(
+        SYNC_TYPES_ORDER.indexOf(SyncRequestType.MemoryToAssetsV1),
+      );
+    });
+
+    it('should order every asset-bearing type it names', () => {
+      const missing = assetBearingTypes.filter((type) => !SYNC_TYPES_ORDER.includes(type));
+      expect(missing).toEqual([]);
     });
   });
 

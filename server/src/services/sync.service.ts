@@ -87,8 +87,8 @@ export const SYNC_TYPES_ORDER = [
   SyncRequestType.AlbumAssetExifsV1,
   SyncRequestType.AssetOcrV1,
   SyncRequestType.PartnerAssetExifsV1,
-  SyncRequestType.MemoriesV1,
-  SyncRequestType.MemoryToAssetsV1,
+  // MemoriesV1 / MemoryToAssetsV1 used to sit here, upstream's position. They now stream LAST —
+  // see the note above the fork block at the end of this array.
   SyncRequestType.PeopleV1,
   SyncRequestType.AssetFacesV1,
   SyncRequestType.AssetFacesV2,
@@ -122,6 +122,24 @@ export const SYNC_TYPES_ORDER = [
   SyncRequestType.SharedSpaceAlbumToAssetsV1,
   SyncRequestType.SharedSpaceAlbumAssetsV1,
   SyncRequestType.SharedSpaceAlbumAssetExifsV1,
+  // Memories stream LAST, after every type that can deliver an asset row.
+  //
+  // Mobile's `memory_asset_entity` has real foreign keys (`assetId` → `remote_asset_entity.id`,
+  // `memoryId` → `memory_entity.id`) and inserts a MemoryToAssetV1 batch as one Drift statement.
+  // A link row whose asset has not arrived yet fails the batch with
+  // SQLITE_CONSTRAINT_FOREIGNKEY (787), which aborts the whole /sync/stream request; since the
+  // batch is never acked, the next sync replays the same checkpoint and fails identically —
+  // a permanently wedged client, not a transient error.
+  //
+  // Upstream is safe by construction: a memory can only reference its owner's own assets, and
+  // AssetsV*/PartnerAssetsV*/AlbumAssetsV* all precede MemoryToAssetsV1 (the same ordering that
+  // protects AlbumToAssetsV1). The fork breaks both halves of that assumption — shared spaces,
+  // libraries and space albums deliver assets owned by *other* users, and memory assets are
+  // gated on visibility rather than ownership (MemoryRepository.search), so a memory may
+  // legitimately point at one of them. Keeping the memory types after the fork's asset-bearing
+  // streams restores the invariant. `sync.service.spec.ts` guards it.
+  SyncRequestType.MemoriesV1,
+  SyncRequestType.MemoryToAssetsV1,
 ];
 
 const throwSessionRequired = () => {
