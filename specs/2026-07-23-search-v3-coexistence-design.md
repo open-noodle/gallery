@@ -126,3 +126,101 @@ Applied to: the V3 filter-schema block + `DEFAULT_SEARCH_ORDER` / `SearchOrderSc
 **Tracking:** this spec is the record. The rebase's `rebase-upstream-report` skill carries a note so
 future rolls keep the fork on legacy and re-flag any upstream commit that finishes V3 or removes the
 legacy builder. No separate GitHub issue (per maintainer).
+
+---
+
+## 2026-08-28 — the trigger fired; decision: pull it, but do not dispatch
+
+**`immich-30179` ("feat(server): new search API") wired V3 to live endpoints.** That is the
+switch-over trigger this spec anticipated. Pierre's call: **pull the commit, keep Gallery on the
+legacy path, and adopt V3 later once upstream's version has proven itself.**
+
+### What upstream actually shipped
+
+Not a new route. `searchMetadata`, `searchStatistics`, `searchRandom` and `searchSmart` each now
+open with:
+
+```ts
+if (isNewShapeRequest(dto)) {
+  return this.searchMetadataV3(auth, dto); // …StatisticsV3 / RandomV3 / SmartV3
+}
+```
+
+`isNewShapeRequest` is true when the body carries any of `filter`, `orderBy`, `cursor`
+(`NEW_SHAPE_FIELDS`). So V3 is reachable **through the existing endpoints, with no feature flag**.
+The flat fields still work and are marked `DEPRECATED_FLAT_FIELD`; upstream tags the legacy
+repository methods `TODO(v4): remove`.
+
+### Why we are not adopting it yet
+
+V3's `searchAssetBuilder(kysely, options, scope)` scopes the search entirely through
+
+```ts
+const ownershipPredicate = (eb) => eb("asset.ownerId", "=", anyUuid(scope.userIds));
+```
+
+plus a locked-visibility check — and on **album-confined** branches it drops that predicate
+altogether (`.$if(scopeGlobally, …)`), trusting the service's album access check. It has **no
+shared-space arm**, and none of the Archive+Timeline re-gating `searchAssetBuilderLegacy` performs.
+That album arm is exactly the one the `security-1` cases in `search.repository.spec.ts` exist for.
+
+Routing to V3 would therefore stand up a **second, live, un-gated search path** beside the gated
+one — reachable by any API client sending the new body shape, while Gallery's own web and mobile
+clients still send the flat shape and would see none of it.
+
+Note the blast radius is smaller than it first appears: **the FilterPanel does not use the search
+API at all.** `FilterState` → `buildPhotosTimelineOptions` / `buildMapTimelineOptions` / the album
+and space variants → `TimelineManager` → `getTimeBuckets`, which is `asset.repository.ts`. The
+search endpoints back the cmdk palette, the preview components, the legacy search page and the map's
+smart search.
+
+### What was built
+
+The four dispatch points **throw** instead of dispatching:
+
+```ts
+if (isNewShapeRequest(dto)) {
+  throw newShapeUnsupported(); // 400
+}
+```
+
+**Rejecting rather than falling through is the load-bearing part.** The legacy path ignores `filter`
+entirely, so a silent fallthrough would answer a filtered request with a **wider** result set than
+the caller asked for. A 400 is honest; a wider answer is a correctness bug.
+
+The shape of the guard deliberately mirrors upstream's dispatch — same `if`, same place, same three
+lines — so each future rebase resolves as a one-line swap rather than a structural divergence.
+
+Upstream's V3 service and repository methods, the V3 filter schemas, and `searchAssetBuilder` all
+stay present and unreachable, byte-compatible with upstream so its own changes keep auto-merging.
+This is the same dormancy policy already applied to the V3 builder (#28686) and the web search UI
+(#30279) — carry it, don't delete it.
+
+### Guards (both proved red before being trusted)
+
+1. **`search-v3-not-dispatched` ci-invariant** (`docs/fork/ownership.yml`) — forbids
+   `return this.<x>V3(auth, dto);` in `search.service.ts`. Verified: re-adding one dispatch turns it
+   red. This is the important one, because a rebase resolving toward upstream would re-enable V3
+   with **no conflict and no type error**.
+2. **The reworked `new shape routing` tests** — assert all four endpoints reject, that every
+   new-shape field (not just `filter`) is rejected, that no V3 repository method is reached, and
+   that a flat request still routes to legacy. Verified: re-adding one dispatch fails three of them.
+
+Upstream's own tests for that describe (V3 routing, cursor decoding, shared-link album confinement)
+were replaced rather than deleted, so a rebase that restores upstream's dispatch conflicts here
+visibly. They come back with the dispatch when we adopt V3.
+
+### The API-honesty trade-off, stated
+
+The DTOs still carry `filter` / `orderBy` / `cursor`, so the OpenAPI spec advertises fields the
+server rejects. That is deliberate: removing them would widen the fork's `search.dto.ts` divergence
+(already ~+670 lines) and make every future upstream change to those schemas conflict. Carrying them
+dormant is what buys the auto-merge, and the 400 names the reason.
+
+### Adopting V3 later — what the work actually is
+
+The mechanical steps above still stand. The real cost is not the call sites, it is that V3 composes
+**per-branch** predicates joined by `OR`, while the fork's gate is a flat option set applied once. So
+the shared-space arms have to be re-expressed per branch, and the album-confined shortcut has to be
+re-gated per branch. Budget it as design work plus re-proving the `security-1` cases, not as a
+translation. Deleting this section's guard (the invariant and the tests) belongs in that same change.
