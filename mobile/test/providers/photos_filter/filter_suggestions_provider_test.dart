@@ -6,7 +6,7 @@ import 'package:immich_mobile/providers/api.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/filter_suggestions.provider.dart';
 import 'package:immich_mobile/utils/option.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:openapi/api.dart';
+import 'package:openapi/api.dart' hide SearchFilter;
 
 import '../../service.mocks.dart';
 
