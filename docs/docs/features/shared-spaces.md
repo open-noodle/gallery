@@ -436,6 +436,10 @@ Library assets disappear from the space immediately. Any photos from that librar
 
 Space members can view, download, and browse library-linked assets just like manually added ones. Editors can update metadata on library-linked assets. The library owner retains full ownership of the underlying files.
 
+:::warning
+Editing metadata on a library-linked asset requires the library's folder to be mounted **read-write**. Gallery writes these edits to an `.xmp` sidecar next to the original file, so on a read-only (`:ro`) mount the change is applied and then reverted shortly afterwards, with no error shown. This affects date and time, location, description, star rating and tags. See [Mount Docker Volumes](/features/libraries#mount-docker-volumes).
+:::
+
 ### Limitations
 
 - **One-way only** — Photos added to the space by other members are not imported back into the library.
