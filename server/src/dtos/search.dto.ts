@@ -271,7 +271,7 @@ const FilterSuggestionsRequestBaseSchema = z.object({
   takenBefore: isoDatetimeToDate.optional().describe('Filter by taken date (before)'),
   albumId: z.uuidv4().optional().describe('Scope to a specific album'),
   spaceId: z.uuidv4().optional().describe('Scope to a specific shared space'),
-  withSharedSpaces: z.boolean().optional().describe('Include shared spaces the user is a member of'),
+  withSharedSpaces: stringToBool.optional().describe('Include shared spaces the user is a member of'),
 });
 
 const FilterSuggestionsRequestSchema = FilterSuggestionsRequestBaseSchema.pipe(
@@ -644,7 +644,8 @@ const SmartSearchSchema = withShapeExclusivity(
     // replacement, and neither of these has one (`order` here means relevance-vs-date on smart
     // search; `withSharedSpaces` has no V3 equivalent at all).
     order: AssetOrderSchema.optional().describe('Sort order (omit for relevance)'),
-    withSharedSpaces: stringToBool.optional().describe('Include shared spaces the user is a member of'),
+    // POST body, so a real boolean — stringToBool is for the query-string suggestion DTOs.
+    withSharedSpaces: z.boolean().optional().describe('Include shared spaces the user is a member of'),
     filter: filterField,
   }),
 ).meta({ id: 'SmartSearchDto' });
