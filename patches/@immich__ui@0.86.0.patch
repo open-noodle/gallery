@@ -1,16 +1,16 @@
-diff --git a/dist/components/ImageCarousel/ImageCarousel.svelte b/dist/components/ImageCarousel/ImageCarousel.svelte
-index 495db52198b1d133949fe11eb1bda0c030a9107d..ae0a81e9682149b79ee97af087f6fd8163fc6be3 100644
---- a/dist/components/ImageCarousel/ImageCarousel.svelte
-+++ b/dist/components/ImageCarousel/ImageCarousel.svelte
-@@ -45,7 +45,7 @@
-     <div
-       class="absolute start-0 top-0 h-full w-full rounded-xl bg-linear-to-t from-black/40 via-transparent to-transparent transition-all hover:bg-black/20"
-     ></div>
--    <p class="absolute start-4 bottom-2 text-lg text-white max-md:text-sm">
-+    <p class="absolute start-4 bottom-2 w-[calc(100%-2rem)] whitespace-normal text-lg text-white max-md:text-sm">
-       {item.title}
-     </p>
-   </a>
+diff --git a/dist/components/ImageCard/ImageCard.svelte b/dist/components/ImageCard/ImageCard.svelte
+index 3920100df9ac3e98746e81cd9b554d73f4278cc9..5cf5d36a162368cb1ee88dae0ac3c7e1574d5697 100644
+--- a/dist/components/ImageCard/ImageCard.svelte
++++ b/dist/components/ImageCard/ImageCard.svelte
+@@ -41,7 +41,7 @@
+   <div
+     class="absolute inset-s-0 top-0 h-full w-full rounded-xl bg-linear-to-t from-black/40 via-transparent to-transparent transition-all hover:bg-black/20"
+   ></div>
+-  <p class="absolute inset-s-4 bottom-2 text-lg text-white max-md:text-sm">
++  <p class="absolute inset-s-4 bottom-2 w-[calc(100%-2rem)] whitespace-normal text-lg text-white max-md:text-sm">
+     {item.title}
+   </p>
+ </a>
 diff --git a/dist/services/command-palette-manager.svelte.js b/dist/services/command-palette-manager.svelte.js
 index 064b6fa525cb3756d8dbd85c2d4338117037b38b..b68a350dc216282bf5a54e5432e0e07d8c59e3c6 100644
 --- a/dist/services/command-palette-manager.svelte.js
