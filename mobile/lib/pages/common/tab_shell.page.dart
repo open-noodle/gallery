@@ -99,7 +99,7 @@ class _TabShellPageState extends ConsumerState<TabShellPage> {
 
 /// A section of the fork's 3-tab legacy [TabShellPage] shell, whose
 /// `AutoTabsRouter` routes are `[MainTimelineRoute, SpacesRoute,
-/// DriftLibraryRoute]` — Photos = 0, Spaces = 1, Library = 2.
+/// LibraryRoute]` — Photos = 0, Spaces = 1, Library = 2.
 enum TabShellSection { photos, spaces, library, other }
 
 /// Maps a bottom-nav index to its [TabShellSection] for the fork's 3-tab

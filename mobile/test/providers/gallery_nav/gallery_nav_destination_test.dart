@@ -18,7 +18,7 @@ void main() {
     expect(d.labelKey, 'nav_albums');
     expect(d.idleIcon, Icons.photo_album_outlined);
     expect(d.activeIcon, Icons.photo_album);
-    expect(d.routeBuilder(), isA<DriftAlbumsRoute>());
+    expect(d.routeBuilder(), isA<AlbumsRoute>());
   });
 
   test('library destination', () {
@@ -26,6 +26,6 @@ void main() {
     expect(d.labelKey, 'nav_library');
     expect(d.idleIcon, Icons.space_dashboard_outlined);
     expect(d.activeIcon, Icons.space_dashboard_rounded);
-    expect(d.routeBuilder(), isA<DriftLibraryRoute>());
+    expect(d.routeBuilder(), isA<LibraryRoute>());
   });
 }

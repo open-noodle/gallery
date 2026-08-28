@@ -24,7 +24,7 @@ class MemoryApiRepository extends ApiRepository {
   /// owner-scoped, so the local sync DB can never hold another user's memory. This endpoint
   /// widens the set to anything the viewer can see, then filters each memory's assets down to
   /// the ones the viewer may view and drops the memories left empty. See issue #997.
-  Future<List<DriftMemory>> getMemoryLane() async {
+  Future<List<Memory>> getMemoryLane() async {
     final dtos = await _searchMemoriesFor(DateTime.now());
 
     return dtos
@@ -90,7 +90,7 @@ class MemoryApiRepository extends ApiRepository {
   /// serves this endpoint) passes `hideUnshownByDefault: false`, so omitting `isUpcoming`
   /// entirely would let not-yet-shown memories back in -- unlike [getMemoryLane], which keeps
   /// the hide-unshown default via `for`.
-  Future<List<DriftMemory>> getAllMemories({bool onlyFavorites = false}) async {
+  Future<List<Memory>> getAllMemories({bool onlyFavorites = false}) async {
     const pageSize = 100;
     // Backstop, not a product limit: a server that ignored `page` would otherwise loop here
     // forever. 50 pages is 5000 memories, far past any real library's retention window.
@@ -211,7 +211,7 @@ class MemoryApiRepository extends ApiRepository {
   static String formatDay(DateTime day) =>
       '${day.year.toString().padLeft(4, '0')}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}';
 
-  static DriftMemory _toDriftMemory(MemoryResponseDto dto) => DriftMemory(
+  static Memory _toDriftMemory(MemoryResponseDto dto) => Memory(
     id: dto.id,
     createdAt: dto.createdAt,
     updatedAt: dto.updatedAt,

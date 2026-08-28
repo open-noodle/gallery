@@ -72,7 +72,7 @@ void main() {
     await tester.pumpConsumerWidget(
       PeopleDetails(asset: asset),
       overrides: [
-        driftPeopleAssetProvider.overrideWith((ref, key) async => [person]),
+        peopleAssetProvider.overrideWith((ref, key) async => [person]),
         infra.userServiceProvider.overrideWithValue(userService),
         currentUserProvider.overrideWith(
           (ref) => _StubCurrentUserNotifier(

@@ -147,7 +147,7 @@ void main() {
         websocketProvider.overrideWith((ref) {
           return websocket = TestWebsocketNotifier(ref);
         }),
-        driftBackupProvider.overrideWith((_) => TestDriftBackupNotifier()),
+        backupProvider.overrideWith((_) => TestDriftBackupNotifier()),
         backgroundWorkerLockServiceProvider.overrideWithValue(lockService),
         backgroundSyncProvider.overrideWithValue(backgroundSync),
         appConfigProvider.overrideWithValue(defaultConfig),
