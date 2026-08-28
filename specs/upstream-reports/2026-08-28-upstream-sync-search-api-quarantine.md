@@ -209,8 +209,8 @@ resolves. Two fork behaviours were silently lost:
 
 Both re-derived against 0.86.0 and verified in the installed tree (`Gallery patch` present,
 shortcut registration absent, wrap classes present, and `web` resolving to the patched copy).
-**The gate gap is worth closing** — a check that the pinned patch version equals the resolved
-version would have caught this immediately.
+**The gate gap is closed in this cycle** — `fork-patches-check` now also asserts against the
+lockfile, so a bump that leaves a patch unapplied fails the check instead of passing it.
 
 **2. A both-sides-added conflict produced an unparseable spec file.**
 
@@ -296,5 +296,8 @@ verified byte-identical to their pre-run hashes.
 
 - **immich-30179 product decision** — the quarantine above. Blocks advancing
   `upstreamTargetHead` past `8b3d6b320bf`.
-- **Harden `fork-patches-check`** to compare the pinned patch version against the resolved
-  version, so a dependency bump cannot silently unpatch the fork again.
+- ~~**Harden `fork-patches-check`**~~ — **done this cycle.** The audit now reads
+  `pnpm-lock.yaml` and asserts, for every importer depending on a patched package, that the
+  resolved version matches the pinned one _and_ carries a `patch_hash`. Proved red against a
+  faithful reconstruction of the pre-fix state and green against the current tree; the tool's
+  suite is 253/253.
