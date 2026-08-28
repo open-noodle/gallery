@@ -10,7 +10,7 @@ import 'package:mocktail/mocktail.dart';
 
 import '../../../widget_tester_extensions.dart';
 
-class MockDriftPeopleService extends Mock implements DriftPeopleService {}
+class MockPeopleService extends Mock implements PeopleService {}
 
 // A mocktail Fake (not a real Person instance) for registerFallbackValue: Person
 // overrides == by field equality, and mocktail's any() matcher — when a type with custom
@@ -34,7 +34,7 @@ Person _person({String id = 'p1', String? spaceId}) =>
     Person(id: id, updatedAt: DateTime(2024, 1, 1), name: 'Alice', spaceId: spaceId);
 
 void main() {
-  late MockDriftPeopleService service;
+  late MockPeopleService service;
   // Counts real fetch executions of the server-backed list — an invalidate on a
   // watched provider re-runs the override, incrementing this. Asserting counts (not
   // list contents) is deliberate: a deleted invalidation cannot pass this test.
@@ -45,12 +45,12 @@ void main() {
   });
 
   setUp(() {
-    service = MockDriftPeopleService();
+    service = MockPeopleService();
     serverFetches = 0;
   });
 
   List<Override> overrides() => [
-    driftPeopleServiceProvider.overrideWithValue(service),
+    peopleServiceProvider.overrideWithValue(service),
     driftGetAllPeopleWithSharedSpacesProvider.overrideWith((ref, sortBy) async {
       serverFetches++;
       return <Person>[];
