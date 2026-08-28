@@ -25,7 +25,7 @@ RemoteAsset _videoAsset() {
 
 // These are construction-only assertions rather than `pumpWidget` tests.
 //
-// Mounting `DriftMemoryCard` under `flutter test` throws two unavoidable exceptions: its remote
+// Mounting `MemoryCard` under `flutter test` throws two unavoidable exceptions: its remote
 // image provider cannot resolve (it does not route through `dart:io`, so `MockHttpOverrides` does
 // not intercept it), and `NativeVideoViewer` opens a platform video controller in `initState`.
 // Both are environment limitations unrelated to this wiring, and suppressing them would make the

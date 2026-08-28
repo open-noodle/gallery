@@ -108,7 +108,7 @@ class _SpacePeoplePageState extends ConsumerState<SpacePeoplePage> {
             return PeopleGrid(
               people: filtered,
               editPolicy: FixedEditability(widget.canEdit),
-              onPersonTap: (person) => context.pushRoute(DriftPersonRoute(person: person)),
+              onPersonTap: (person) => context.pushRoute(PersonRoute(person: person)),
             );
           },
         ),

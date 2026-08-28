@@ -16,7 +16,7 @@ class MockSharedSpaceApiRepository extends Mock implements SharedSpaceApiReposit
 class MockSharedSpacePersonResponseDto extends Mock implements api.SharedSpacePersonResponseDto {}
 
 void main() {
-  late DriftPeopleService sut;
+  late PeopleService sut;
   late MockPeopleRepository mockRepository;
   late MockPersonApiRepository mockApiRepository;
   late MockSharedSpaceApiRepository mockSharedSpace;
@@ -32,7 +32,7 @@ void main() {
     mockRepository = MockPeopleRepository();
     mockApiRepository = MockPersonApiRepository();
     mockSharedSpace = MockSharedSpaceApiRepository();
-    sut = DriftPeopleService(mockRepository, mockApiRepository, mockSharedSpace);
+    sut = PeopleService(mockRepository, mockApiRepository, mockSharedSpace);
 
     // The local sync DB never receives faces for assets the viewer does not own, so the
     // drift query comes back empty for a Space-shared asset.

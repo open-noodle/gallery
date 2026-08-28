@@ -5,7 +5,7 @@ import 'package:immich_mobile/presentation/widgets/remote_album/album_option.wid
 import '../../../widget_tester_extensions.dart';
 
 void main() {
-  group('DriftRemoteAlbumOption', () {
+  group('RemoteAlbumOption', () {
     testWidgets('shows kebab menu icon button', (tester) async {
       await tester.pumpConsumerWidget(const RemoteAlbumOption());
 
@@ -174,7 +174,7 @@ void main() {
     testWidgets('shows link to space option when onLinkToSpace is provided', (tester) async {
       bool linkToSpaceCalled = false;
 
-      await tester.pumpConsumerWidget(DriftRemoteAlbumOption(onLinkToSpace: () => linkToSpaceCalled = true));
+      await tester.pumpConsumerWidget(RemoteAlbumOption(onLinkToSpace: () => linkToSpaceCalled = true));
 
       await tester.tap(find.byIcon(Icons.more_vert_rounded));
       await tester.pumpAndSettle();
@@ -188,7 +188,7 @@ void main() {
     });
 
     testWidgets('hides link to space option when onLinkToSpace is null', (tester) async {
-      await tester.pumpConsumerWidget(DriftRemoteAlbumOption(onEditAlbum: () {}));
+      await tester.pumpConsumerWidget(RemoteAlbumOption(onEditAlbum: () {}));
 
       await tester.tap(find.byIcon(Icons.more_vert_rounded));
       await tester.pumpAndSettle();
