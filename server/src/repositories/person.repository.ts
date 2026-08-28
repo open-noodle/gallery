@@ -660,9 +660,7 @@ export class PersonRepository {
         join
           .onRef('asset_face.personGroupId', '=', 'person.personGroupId')
           .on('asset_face.deletedAt', 'is', null)
-          .on((eb) =>
-            eb.or([eb('asset_face.isVisible', 'is', null), eb('asset_face.isVisible', '=', true)]),
-          ),
+          .on((eb) => eb.or([eb('asset_face.isVisible', 'is', null), eb('asset_face.isVisible', '=', true)])),
       )
       .groupBy(['person.ownerId', 'person.personGroupId'])
       .having((eb) => eb.fn.count('asset_face.assetId'), '=', 0)
