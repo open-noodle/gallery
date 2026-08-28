@@ -534,7 +534,7 @@ class _AlbumsCollectionCard extends ConsumerWidget {
         final size = context.width * widthFactor - 20.0;
 
         return GestureDetector(
-          onTap: () => context.pushRoute(const DriftAlbumsRoute()),
+          onTap: () => context.pushRoute(const AlbumsRoute()),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -630,7 +630,7 @@ class _QuickAccessButtonList extends ConsumerWidget {
       _QuickAccessItem(
         leading: const Icon(Icons.photo_album_outlined, size: 26),
         title: context.t.albums,
-        onTap: () => context.pushRoute(const DriftAlbumsRoute()),
+        onTap: () => context.pushRoute(const AlbumsRoute()),
       ),
       for (final partner in partners)
         _QuickAccessItem(

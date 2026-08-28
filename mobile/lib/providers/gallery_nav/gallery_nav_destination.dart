@@ -49,5 +49,5 @@ class GalleryNavDestination {
 }
 
 MainTimelineRoute _photosRoute() => const MainTimelineRoute();
-DriftAlbumsRoute _albumsRoute() => const DriftAlbumsRoute();
-DriftLibraryRoute _libraryRoute() => const DriftLibraryRoute();
+AlbumsRoute _albumsRoute() => const AlbumsRoute();
+LibraryRoute _libraryRoute() => const LibraryRoute();

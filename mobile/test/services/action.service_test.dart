@@ -21,7 +21,7 @@ void main() {
   late MockAssetApiRepository assetApiRepository;
   late MockRemoteAssetRepository remoteAssetRepository;
   late MockSharedSpaceApiRepository sharedSpaceApiRepository;
-  late MockDriftAlbumApiRepository albumApiRepository;
+  late MockAlbumApiRepository albumApiRepository;
   late MockRemoteAlbumRepository remoteAlbumRepository;
 
   late Drift db;
@@ -44,7 +44,7 @@ void main() {
     assetApiRepository = MockAssetApiRepository();
     remoteAssetRepository = MockRemoteAssetRepository();
     sharedSpaceApiRepository = MockSharedSpaceApiRepository();
-    albumApiRepository = MockDriftAlbumApiRepository();
+    albumApiRepository = MockAlbumApiRepository();
     remoteAlbumRepository = MockRemoteAlbumRepository();
 
     sut = ActionService(

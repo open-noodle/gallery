@@ -23,8 +23,8 @@ import 'package:immich_mobile/providers/infrastructure/user.provider.dart';
 import 'package:immich_mobile/providers/routes.provider.dart';
 import 'package:immich_mobile/providers/timeline/multiselect.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
+import 'package:immich_mobile/repositories/album_api_repository.dart';
 import 'package:immich_mobile/repositories/asset_media.repository.dart';
-import 'package:immich_mobile/repositories/drift_album_api_repository.dart';
 import 'package:immich_mobile/services/action.service.dart';
 import 'package:immich_mobile/services/cleanup.service.dart';
 import 'package:immich_mobile/services/foreground_upload.service.dart';
@@ -33,7 +33,6 @@ import 'package:immich_mobile/services/server_info.service.dart';
 import 'package:immich_mobile/utils/action_button.utils.dart';
 import 'package:immich_ui/immich_ui.dart';
 import 'package:mocktail/mocktail.dart';
-
 import '../../infrastructure/repository.mock.dart';
 import '../../unit/factories/remote_asset_factory.dart';
 import '../../unit/presentation/presentation_context.dart';
@@ -131,7 +130,7 @@ void main() {
     assetMediaRepositoryProvider.overrideWithValue(ctx.repository.assetMedia.api),
     // Dependencies of the REAL remoteAlbumServiceProvider (deliberately not overridden);
     // remoteAlbumRepository is stubbed on the mocked Drift above.
-    driftAlbumApiRepositoryProvider.overrideWithValue(ctx.repository.albumApi),
+    albumApiRepositoryProvider.overrideWithValue(ctx.repository.albumApi),
     spaceAlbumRepositoryProvider.overrideWithValue(spaceAlbumRepo),
     backgroundSyncProvider.overrideWithValue(ctx.service.backgroundSync),
     timelineStateProvider.overrideWith(TimelineStateNotifier.new),
