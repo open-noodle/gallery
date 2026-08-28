@@ -306,6 +306,11 @@ class SyncStreamService {
       // space-aware GC to drop remote_asset/remote_exif rows no longer reachable by
       // any path (owner/partner/classic-album/direct/space-album/space-library).
       case SyncEntityType.syncCompleteV1:
+        // Replay parked memory->asset links BEFORE the GC: every stream that can deliver an
+        // asset has now run, so a link whose asset arrived late can finally be written, and
+        // pruning afterwards keeps the existing semantics (a link to an unreachable asset is
+        // cascade-removed along with the asset).
+        await _syncStreamRepository.flushDeferredMemoryAssetsV1();
         return _syncStreamRepository.pruneAssets();
       // Request to reset the client state. Clear everything related to remote entities
       case SyncEntityType.syncResetV1:
