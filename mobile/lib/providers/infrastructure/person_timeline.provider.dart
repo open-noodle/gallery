@@ -12,7 +12,7 @@ import 'package:immich_mobile/providers/user.provider.dart';
 /// person's face→person links never sync, so the local person query is empty. See issue #727.
 final driftSharedSpacePersonAssetIdsProvider = FutureProvider.family<List<String>, ({String spaceId, String personId})>(
   (ref, key) async {
-    final service = ref.watch(driftPeopleServiceProvider);
+    final service = ref.watch(peopleServiceProvider);
     return service.getSharedSpacePersonAssetIds(key.spaceId, key.personId);
   },
 );

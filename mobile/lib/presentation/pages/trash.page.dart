@@ -55,7 +55,7 @@ class TrashPage extends StatelessWidget {
             );
           },
         ),
-        topSliverWidgetHeight: DriftTrashPage.trashInfoBannerTopSliverHeight,
+        topSliverWidgetHeight: TrashPage.trashInfoBannerTopSliverHeight,
         bottomSheet: const TrashBottomBar(),
       ),
     );
