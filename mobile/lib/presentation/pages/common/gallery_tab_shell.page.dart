@@ -45,7 +45,7 @@ class _GalleryTabShellPageState extends ConsumerState<GalleryTabShellPage> {
   Widget build(BuildContext context) {
     final isLandscape = context.orientation == Orientation.landscape;
     return AutoTabsRouter(
-      routes: const [MainTimelineRoute(), DriftAlbumsRoute(), DriftLibraryRoute()],
+      routes: const [MainTimelineRoute(), AlbumsRoute(), LibraryRoute()],
       duration: const Duration(milliseconds: 600),
       transitionBuilder: (_, child, animation) => FadeTransition(opacity: animation, child: child),
       builder: (context, child) {

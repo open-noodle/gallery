@@ -106,7 +106,7 @@ class _FirstRunEmptyState extends State<_FirstRunEmpty> with SingleTickerProvide
       ),
       const SizedBox(height: 28),
       FilledButton.icon(
-        onPressed: () => context.pushRoute(const DriftBackupRoute()),
+        onPressed: () => context.pushRoute(const BackupRoute()),
         icon: const Icon(Icons.cloud_upload_outlined),
         label: Text(context.t.enable_backup),
       ),
