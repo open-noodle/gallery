@@ -112,8 +112,11 @@ The `immich-server` container will need access to the gallery. Modify your docke
 ```
 
 :::tip
-The `ro` flag at the end only gives read-only access to the volumes.
-This will disallow the images from being deleted in the web UI, or adding metadata to the library ([XMP sidecars](/features/xmp-sidecars)).
+The `ro` flag at the end only gives read-only access to the volumes. This protects your originals: Gallery cannot delete them from the web UI, and cannot write [XMP sidecars](/features/xmp-sidecars) next to them.
+:::
+
+:::warning
+A read-only mount also means **metadata cannot be edited** for that library. Date and time, location, description, star rating and tags are all written to the sidecar, so an edit made in the web UI is applied and then reverted shortly afterwards, with no error shown. Mount the folder read-write if you plan to edit metadata in Gallery. See the [FAQ](/FAQ#why-are-my-edits-to-files-not-being-saved-in-read-only-external-libraries) for the full trade-off.
 :::
 
 :::info
