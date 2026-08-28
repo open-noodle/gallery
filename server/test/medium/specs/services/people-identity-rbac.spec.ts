@@ -623,6 +623,7 @@ describe('People identity RBAC projection', () => {
       personIds: [token],
     });
     const metadata = await fx.searchService.searchMetadata(auth, {
+      size: 250,
       withSharedSpaces: true,
       personIds: [token],
     });
@@ -659,6 +660,7 @@ describe('People identity RBAC projection', () => {
     } as any);
     const hiddenFilters = await fx.searchService.getFilterSuggestions(nonMemberAuth, { withSharedSpaces: true });
     const hiddenMetadata = await fx.searchService.searchMetadata(nonMemberAuth, {
+      size: 250,
       withSharedSpaces: true,
       personIds: [token],
     });
@@ -2376,7 +2378,11 @@ describe('People identity RBAC projection', () => {
       withSharedSpaces: true,
       personIds: [token],
     });
-    const globalAssets = await searchService.searchMetadata(auth, { withSharedSpaces: true, personIds: [token] });
+    const globalAssets = await searchService.searchMetadata(auth, {
+      size: 250,
+      withSharedSpaces: true,
+      personIds: [token],
+    });
     const globalMapMarkers = await sharedSpaceService.getFilteredMapMarkers(auth, {
       withSharedSpaces: true,
       personIds: [token],
@@ -2391,7 +2397,11 @@ describe('People identity RBAC projection', () => {
       albumId: album.id,
       personIds: [token],
     });
-    const albumAssets = await searchService.searchMetadata(auth, { albumIds: [album.id], personIds: [token] });
+    const albumAssets = await searchService.searchMetadata(auth, {
+      size: 250,
+      albumIds: [album.id],
+      personIds: [token],
+    });
 
     expect(globalPeople.people).toEqual([
       expect.objectContaining({
@@ -2501,7 +2511,11 @@ describe('People identity RBAC projection', () => {
       name: 'Legacy Library',
       withSharedSpaces: true,
     });
-    const globalAssets = await searchService.searchMetadata(auth, { withSharedSpaces: true, personIds: [token] });
+    const globalAssets = await searchService.searchMetadata(auth, {
+      size: 250,
+      withSharedSpaces: true,
+      personIds: [token],
+    });
     const globalMapMarkers = await sharedSpaceService.getFilteredMapMarkers(auth, {
       withSharedSpaces: true,
       personIds: [token],
@@ -2511,7 +2525,11 @@ describe('People identity RBAC projection', () => {
       personIds: [spacePerson.id],
     });
     const albumFilters = await searchService.getFilterSuggestions(auth, { albumId: album.id });
-    const albumAssets = await searchService.searchMetadata(auth, { albumIds: [album.id], personIds: [token] });
+    const albumAssets = await searchService.searchMetadata(auth, {
+      size: 250,
+      albumIds: [album.id],
+      personIds: [token],
+    });
 
     expect(globalPeople.people).toEqual([
       expect.objectContaining({
@@ -2564,6 +2582,7 @@ describe('People identity RBAC projection', () => {
     } as any);
     const hiddenFilters = await searchService.getFilterSuggestions(nonMemberAuth, { withSharedSpaces: true });
     const hiddenAssets = await searchService.searchMetadata(nonMemberAuth, {
+      size: 250,
       withSharedSpaces: true,
       personIds: [token],
     });
@@ -3155,12 +3174,12 @@ describe('People identity RBAC projection', () => {
       albumId: album.id,
       personIds: [`space-person:${spacePerson.id}`],
     });
-    const albumAssetsHidden = await sut.searchMetadata(auth, { albumIds: [album.id] });
+    const albumAssetsHidden = await sut.searchMetadata(auth, { size: 250, albumIds: [album.id] });
     const albumStatsHidden = await sut.searchStatistics(auth, { albumIds: [album.id] });
     const albumRandomHidden = await sut.searchRandom(auth, { albumIds: [album.id], size: 10 });
-    const albumLargeHidden = await sut.searchLargeAssets(auth, { albumIds: [album.id], minFileSize: 1 });
+    const albumLargeHidden = await sut.searchLargeAssets(auth, { size: 250, albumIds: [album.id], minFileSize: 1 });
     const explicitSpaceFilters = await sut.getFilterSuggestions(auth, { spaceId: space.id });
-    const explicitSpaceAssets = await sut.searchMetadata(auth, { spaceId: space.id });
+    const explicitSpaceAssets = await sut.searchMetadata(auth, { size: 250, spaceId: space.id });
 
     expect(albumFiltersHidden.people).toEqual([]);
     expect(albumCitiesHidden).toEqual([]);
@@ -3188,10 +3207,10 @@ describe('People identity RBAC projection', () => {
       albumId: album.id,
       personIds: [`space-person:${spacePerson.id}`],
     });
-    const albumAssetsVisible = await sut.searchMetadata(auth, { albumIds: [album.id] });
+    const albumAssetsVisible = await sut.searchMetadata(auth, { size: 250, albumIds: [album.id] });
     const albumStatsVisible = await sut.searchStatistics(auth, { albumIds: [album.id] });
     const albumRandomVisible = await sut.searchRandom(auth, { albumIds: [album.id], size: 10 });
-    const albumLargeVisible = await sut.searchLargeAssets(auth, { albumIds: [album.id], minFileSize: 1 });
+    const albumLargeVisible = await sut.searchLargeAssets(auth, { size: 250, albumIds: [album.id], minFileSize: 1 });
 
     expect(albumFiltersVisible.people).toEqual([
       {
@@ -3222,9 +3241,9 @@ describe('People identity RBAC projection', () => {
       albumId: album.id,
       personIds: [token],
     });
-    const assetsHidden = await fx.searchService.searchMetadata(auth, { albumIds: [album.id] });
+    const assetsHidden = await fx.searchService.searchMetadata(auth, { size: 250, albumIds: [album.id] });
     const statsHidden = await fx.searchService.searchStatistics(auth, { albumIds: [album.id] });
-    const explicitSpaceAssets = await fx.searchService.searchMetadata(auth, { spaceId: fx.space.id });
+    const explicitSpaceAssets = await fx.searchService.searchMetadata(auth, { size: 250, spaceId: fx.space.id });
 
     expect(filtersHidden.people).toEqual([]);
     expect(citiesHidden).toEqual([]);
@@ -3241,7 +3260,7 @@ describe('People identity RBAC projection', () => {
       albumId: album.id,
       personIds: [token],
     });
-    const assetsVisible = await fx.searchService.searchMetadata(auth, { albumIds: [album.id] });
+    const assetsVisible = await fx.searchService.searchMetadata(auth, { size: 250, albumIds: [album.id] });
     const statsVisible = await fx.searchService.searchStatistics(auth, { albumIds: [album.id] });
 
     expect(filtersVisible.people).toEqual([
@@ -3291,6 +3310,7 @@ describe('People identity RBAC projection', () => {
     await setSpaceTimeline(ctx, { spaceId: space.id, userId: member.id, showInTimeline: false });
 
     const hidden = await sut.searchMetadata(authFor(member), {
+      size: 250,
       albumIds: [album.id],
       personIds: [`space-person:${spacePerson.id}`],
     });
@@ -3340,7 +3360,7 @@ describe('People identity RBAC projection', () => {
       .execute();
 
     const filters = await sut.getFilterSuggestions(authFor(albumViewer), { albumId: album.id });
-    const metadata = await sut.searchMetadata(authFor(albumViewer), { albumIds: [album.id] });
+    const metadata = await sut.searchMetadata(authFor(albumViewer), { size: 250, albumIds: [album.id] });
     const cities = await sut.getSearchSuggestions(authFor(albumViewer), {
       type: SearchSuggestionType.CITY,
       albumId: album.id,
@@ -3369,7 +3389,7 @@ describe('People identity RBAC projection', () => {
     await ctx.newAlbumAsset({ albumId: album.id, assetId: asset.id });
     // member has NOT hidden the space from their timeline (default = shown)
 
-    const shown = await sut.searchMetadata(authFor(member), { albumIds: [album.id] });
+    const shown = await sut.searchMetadata(authFor(member), { size: 250, albumIds: [album.id] });
 
     expect(shown.assets.items).toHaveLength(1);
     expect(shown.assets.items[0].id).toBe(asset.id);
@@ -3443,6 +3463,7 @@ describe('People identity RBAC projection', () => {
     await sharedSpaceService.updateMemberTimeline(auth, space.id, { showInTimeline: false });
 
     const filtered = await searchService.searchMetadata(auth, {
+      size: 250,
       withSharedSpaces: true,
       personIds: [`person:${memberFace.person.personGroupId}`],
     });
