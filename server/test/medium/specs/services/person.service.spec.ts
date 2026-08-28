@@ -1074,8 +1074,7 @@ describe(PersonService.name, () => {
   // stood here deliberately put a second owner's person into an existing group, which is exactly the
   // state Gallery declines to support. Restoring them is part of turning cluster groups on; see
   // docs/superpowers/specs/2026-08-21-cluster-groups-m-landing-plan.md.
-  describe('mergePerson', () => {
-  });
+  describe('mergePerson', () => {});
 
   describe('createFace', () => {
     it('should store and retrieve the face as-is when there are no edits', async () => {
