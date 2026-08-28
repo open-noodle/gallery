@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/pages/common/tab_shell.page.dart';
 
 // Slice 7 (finding LOW #14): the fork converted the legacy TabShellPage to a
-// 3-tab layout ([MainTimelineRoute, SpacesRoute, DriftLibraryRoute] →
+// 3-tab layout ([MainTimelineRoute, SpacesRoute, LibraryRoute] →
 // Photos = 0, Spaces = 1, Library = 2) but left its tab-switch logic keyed on
 // the upstream 4-tab constants (kSpacesTabIndex = 2, kLibraryTabIndex = 3), so
 // tapping Spaces invalidated nothing and tapping Library invalidated Spaces.

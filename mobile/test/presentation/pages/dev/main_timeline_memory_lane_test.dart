@@ -66,7 +66,7 @@ final _testUser = UserDto(
   profileChangedAt: DateTime(2024, 1, 1),
 );
 
-DriftMemory _memory() => DriftMemory(
+Memory _memory() => Memory(
   id: 'memory-1',
   createdAt: DateTime(2024),
   updatedAt: DateTime(2024),
@@ -92,7 +92,7 @@ ProviderContainer _makeContainer({required SearchService search, required Drift 
       timelineUsersProvider.overrideWith((_) => Stream.value([_testUser.id])),
       photosFilterCountProvider.overrideWith((ref) => 0),
       featureMessageServiceProvider.overrideWithValue(_StubFeatureMessageService()),
-      driftMemoryLaneProvider.overrideWith((ref) async => [_memory()]),
+      memoryLaneProvider.overrideWith((ref) async => [_memory()]),
     ],
   );
 }
@@ -147,19 +147,19 @@ void main() {
     for (var i = 0; i < 10; i++) {
       await tester.pump(const Duration(milliseconds: 40));
     }
-    expect(find.byType(DriftMemoryLane), findsOneWidget, reason: 'browsing an unfiltered timeline shows memories');
+    expect(find.byType(MemoryLane), findsOneWidget, reason: 'browsing an unfiltered timeline shows memories');
 
     container.read(photosFilterProvider.notifier).setText('beach');
     for (var i = 0; i < 30; i++) {
       await tester.pump(const Duration(milliseconds: 40));
     }
-    expect(find.byType(DriftMemoryLane), findsNothing, reason: 'a search result set is not a place for memories');
+    expect(find.byType(MemoryLane), findsNothing, reason: 'a search result set is not a place for memories');
 
     container.read(photosFilterProvider.notifier).reset();
     for (var i = 0; i < 30; i++) {
       await tester.pump(const Duration(milliseconds: 40));
     }
-    expect(find.byType(DriftMemoryLane), findsOneWidget, reason: 'clearing the search restores the strip');
+    expect(find.byType(MemoryLane), findsOneWidget, reason: 'clearing the search restores the strip');
 
     await tester.pumpWidget(localizedForTest(const SizedBox.shrink()));
     await tester.pump(const Duration(seconds: 1));

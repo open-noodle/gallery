@@ -21,8 +21,8 @@ import 'package:immich_mobile/domain/services/user.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
-import 'package:immich_mobile/presentation/pages/drift_remote_album.page.dart';
-import 'package:immich_mobile/presentation/widgets/remote_album/drift_album_option.widget.dart';
+import 'package:immich_mobile/presentation/pages/remote_album.page.dart';
+import 'package:immich_mobile/presentation/widgets/remote_album/album_option.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_grouping_bottom_pill.widget.dart';
 import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
@@ -211,8 +211,8 @@ void main() {
     return albumService;
   }
 
-  DriftRemoteAlbumOption albumOption(WidgetTester tester) =>
-      tester.widget<DriftRemoteAlbumOption>(find.byType(DriftRemoteAlbumOption));
+  RemoteAlbumOption albumOption(WidgetTester tester) =>
+      tester.widget<RemoteAlbumOption>(find.byType(RemoteAlbumOption));
 
   Future<void> openEditDialog(WidgetTester tester) async {
     albumOption(tester).onEditAlbum!();

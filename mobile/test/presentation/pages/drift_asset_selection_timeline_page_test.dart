@@ -16,7 +16,7 @@ import 'package:immich_mobile/domain/services/user.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/models/cast/cast_manager_state.dart';
-import 'package:immich_mobile/presentation/pages/drift_asset_selection_timeline.page.dart';
+import 'package:immich_mobile/presentation/pages/asset_selection_timeline.page.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
 import 'package:immich_mobile/providers/cast.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/readonly_mode.provider.dart';
@@ -138,13 +138,13 @@ void main() {
             castProvider.overrideWith((ref) => _StubCastNotifier()),
             serverInfoServiceProvider.overrideWithValue(serverInfoService),
           ],
-          child: MaterialApp(home: withStubRouter(const DriftAssetSelectionTimelinePage())),
+          child: MaterialApp(home: withStubRouter(const AssetSelectionTimelinePage())),
         ),
       ),
     );
 
     verify(() => factory.main([], user.id, groupBy: GroupAssetsBy.day)).called(1);
-    expect(DriftAssetSelectionTimelinePage.forcedGroupBy, GroupAssetsBy.day);
+    expect(AssetSelectionTimelinePage.forcedGroupBy, GroupAssetsBy.day);
     expect(tester.widget<Timeline>(find.byType(Timeline)).groupBy, GroupAssetsBy.day);
   });
 }

@@ -1,9 +1,9 @@
 // M8: mobile album owners can't view/revoke space links. This pins the new
-// DriftAlbumApiRepository.getSharedSpaceLinks fetch — the owner-only
+// AlbumApiRepository.getSharedSpaceLinks fetch — the owner-only
 // AlbumResponseDto.sharedSpaceLinks field, not part of the Drift sync stream.
 //
 // Upstream added its own add-assets result-mapping suite to this same path; both
-// are kept below. The fork's DriftAlbumApiRepository takes an ApiService rather
+// are kept below. The fork's AlbumApiRepository takes an ApiService rather
 // than an AlbumsApi (so getSharedSpaceLinks can reach other APIs), so upstream's
 // cases construct it through the mocked ApiService.albumsApi getter.
 import 'package:flutter_test/flutter_test.dart';

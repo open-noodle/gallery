@@ -10,11 +10,11 @@ class MockMemoryRepository extends Mock implements MemoryRepository {}
 class MockMemoryApiRepository extends Mock implements MemoryApiRepository {}
 
 void main() {
-  late DriftMemoryService sut;
+  late MemoryService sut;
   late MockMemoryRepository mockRepository;
   late MockMemoryApiRepository mockApiRepository;
 
-  DriftMemory memory(String id, {String ownerId = 'user-1'}) => DriftMemory(
+  Memory memory(String id, {String ownerId = 'user-1'}) => Memory(
     id: id,
     createdAt: DateTime.utc(2026),
     updatedAt: DateTime.utc(2026),
@@ -29,7 +29,7 @@ void main() {
   setUp(() {
     mockRepository = MockMemoryRepository();
     mockApiRepository = MockMemoryApiRepository();
-    sut = DriftMemoryService(mockRepository, mockApiRepository);
+    sut = MemoryService(mockRepository, mockApiRepository);
 
     // The local sync DB is owner-scoped: `memory` / `memory_asset` only ever stream rows
     // whose ownerId is the viewer, so a Space-shared memory never reaches it.
@@ -73,20 +73,26 @@ void main() {
 
   group('getAll', () {
     test('reads from the server so shared-space memories appear', () async {
-      when(() => mockApiRepository.getAllMemories(onlyFavorites: any(named: 'onlyFavorites')))
-          .thenAnswer((_) async => [memory('from-server')]);
+      when(
+        () => mockApiRepository.getAllMemories(onlyFavorites: any(named: 'onlyFavorites')),
+      ).thenAnswer((_) async => [memory('from-server')]);
 
       final result = await sut.getAll('owner-1');
 
       expect(result.single.id, 'from-server');
       verifyNever(
-        () => mockRepository.getAll(any(), onlyToday: any(named: 'onlyToday'), onlyFavorites: any(named: 'onlyFavorites')),
+        () => mockRepository.getAll(
+          any(),
+          onlyToday: any(named: 'onlyToday'),
+          onlyFavorites: any(named: 'onlyFavorites'),
+        ),
       );
     });
 
     test('falls back to the owner-scoped local list when the server fails', () async {
-      when(() => mockApiRepository.getAllMemories(onlyFavorites: any(named: 'onlyFavorites')))
-          .thenThrow(Exception('offline'));
+      when(
+        () => mockApiRepository.getAllMemories(onlyFavorites: any(named: 'onlyFavorites')),
+      ).thenThrow(Exception('offline'));
       when(
         () => mockRepository.getAll('owner-1', onlyToday: false, onlyFavorites: false),
       ).thenAnswer((_) async => [memory('from-local')]);
@@ -95,11 +101,10 @@ void main() {
     });
 
     test('returns empty when the server fails and the local DB is empty', () async {
-      when(() => mockApiRepository.getAllMemories(onlyFavorites: any(named: 'onlyFavorites')))
-          .thenThrow(Exception('offline'));
       when(
-        () => mockRepository.getAll('owner-1', onlyToday: false, onlyFavorites: false),
-      ).thenAnswer((_) async => []);
+        () => mockApiRepository.getAllMemories(onlyFavorites: any(named: 'onlyFavorites')),
+      ).thenThrow(Exception('offline'));
+      when(() => mockRepository.getAll('owner-1', onlyToday: false, onlyFavorites: false)).thenAnswer((_) async => []);
 
       expect(await sut.getAll('owner-1'), isEmpty);
     });

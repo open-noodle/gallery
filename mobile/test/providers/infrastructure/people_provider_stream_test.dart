@@ -13,9 +13,9 @@ import 'package:mocktail/mocktail.dart';
 
 import '../../medium/repository_context.dart';
 
-class MockDriftPeopleService extends Mock implements DriftPeopleService {}
+class MockPeopleService extends Mock implements PeopleService {}
 
-/// DriftPeopleService also takes the two API repositories, which resolve the server endpoint
+/// PeopleService also takes the two API repositories, which resolve the server endpoint
 /// out of Store. The live-update test below exercises only the local Drift path, so the API
 /// half is stubbed rather than initialised — same idiom as the timeline provider tests.
 class _MockApiService extends Mock implements ApiService {}
@@ -52,7 +52,7 @@ void main() {
   });
 
   test('threads the minimumFaces preference and the requested sort into watch()', () async {
-    final service = MockDriftPeopleService();
+    final service = MockPeopleService();
     when(
       () => service.watch(
         minFaces: any(named: 'minFaces'),
@@ -61,7 +61,7 @@ void main() {
     ).thenAnswer((_) => Stream.value(const <Person>[]));
     final container = ProviderContainer(
       overrides: [
-        driftPeopleServiceProvider.overrideWithValue(service),
+        peopleServiceProvider.overrideWithValue(service),
         userMetadataPreferencesProvider.overrideWith((ref) async => const Preferences(minimumFaces: 7)),
       ],
     );
@@ -73,7 +73,7 @@ void main() {
   });
 
   test('falls back to a minimumFaces of 3 when there are no preferences', () async {
-    final service = MockDriftPeopleService();
+    final service = MockPeopleService();
     when(
       () => service.watch(
         minFaces: any(named: 'minFaces'),
@@ -82,7 +82,7 @@ void main() {
     ).thenAnswer((_) => Stream.value(const <Person>[]));
     final container = ProviderContainer(
       overrides: [
-        driftPeopleServiceProvider.overrideWithValue(service),
+        peopleServiceProvider.overrideWithValue(service),
         userMetadataPreferencesProvider.overrideWith((ref) async => null),
       ],
     );
