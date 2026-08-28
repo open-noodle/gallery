@@ -5,10 +5,10 @@ import { AuthDto } from 'src/dtos/auth.dto';
 import { SystemConfig } from 'src/dtos/config.dto';
 import { mapPerson, PersonResponseDto } from 'src/dtos/person.dto';
 import {
-  isFullyAlbumConfined,
-  isNewShapeRequest,
   FilterSuggestionsRequestDto,
   FilterSuggestionsResponseDto,
+  isFullyAlbumConfined,
+  isNewShapeRequest,
   LargeAssetSearchDto,
   mapPlaces,
   MetadataSearchDto,
@@ -75,6 +75,32 @@ type ScopedPersonFilterOptions = {
   timelineSpaceIds?: string[];
   visibility?: AssetVisibility | 'not-locked';
 };
+
+/**
+ * ─── UPSTREAM SEARCH V3 — DORMANT ───────────────────────────────
+ *
+ * immich-30179 made the four search endpoints dispatch to V3 whenever the request body carries the
+ * structured shape (`filter` / `orderBy` / `cursor`). Gallery stays on the legacy path for now:
+ * V3's `searchAssetBuilder` scopes only by `asset.ownerId`, and on album-confined branches it drops
+ * the ownership predicate entirely — so it has no shared-space arm and none of the Archive+Timeline
+ * re-gating that `searchAssetBuilderLegacy` applies. Routing to it would put a second, un-gated
+ * search path next to the gated one. Adopting V3 is a deliberate future project; the analysis and
+ * the switch-over plan live in specs/2026-07-23-search-v3-coexistence-design.md.
+ *
+ * We REJECT rather than fall through to legacy: the legacy path ignores `filter` completely, so a
+ * silent fallthrough would return a WIDER result set than the caller asked for.
+ *
+ * Upstream's V3 service and repository methods stay present and reachable only from here, so
+ * upstream's own changes to them keep auto-merging. To adopt V3, delete this helper and restore
+ * `return this.<x>V3(auth, dto)` at the four call sites.
+ *
+ * Guarded by the `search-v3-not-dispatched` ci-invariant in docs/fork/ownership.yml, so a careless
+ * rebase resolution cannot silently re-enable V3.
+ */
+const newShapeUnsupported = () =>
+  new BadRequestException(
+    'Structured search (filter/orderBy/cursor) is not supported on this server. Use the flat search fields.',
+  );
 
 @Injectable()
 export class SearchService extends BaseService {
@@ -162,7 +188,7 @@ export class SearchService extends BaseService {
 
   async searchMetadata(auth: AuthDto, dto: MetadataSearchDto): Promise<SearchResponseDto> {
     if (isNewShapeRequest(dto)) {
-      return this.searchMetadataV3(auth, dto);
+      throw newShapeUnsupported();
     }
     this.rejectTrashParamsForSpaceScope(dto);
 
@@ -219,7 +245,7 @@ export class SearchService extends BaseService {
 
   async searchStatistics(auth: AuthDto, dto: StatisticsSearchDto): Promise<SearchStatisticsResponseDto> {
     if (isNewShapeRequest(dto)) {
-      return this.searchStatisticsV3(auth, dto);
+      throw newShapeUnsupported();
     }
     this.rejectTrashParamsForSpaceScope(dto);
 
@@ -252,7 +278,7 @@ export class SearchService extends BaseService {
 
   async searchRandom(auth: AuthDto, dto: RandomSearchDto): Promise<AssetResponseDto[]> {
     if (isNewShapeRequest(dto)) {
-      return this.searchRandomV3(auth, dto);
+      throw newShapeUnsupported();
     }
     this.rejectTrashParamsForSpaceScope(dto);
 
@@ -317,7 +343,7 @@ export class SearchService extends BaseService {
 
   async searchSmart(auth: AuthDto, dto: SmartSearchDto): Promise<SearchResponseDto> {
     if (isNewShapeRequest(dto)) {
-      return this.searchSmartV3(auth, dto);
+      throw newShapeUnsupported();
     }
 
     const t0 = performance.now();
