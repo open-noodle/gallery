@@ -291,12 +291,33 @@ void main() {
 
     test("syncCompleteV1 triggers pruneAssets (mobile-3)", () async {
       when(() => mockSyncStreamRepo.pruneAssets()).thenAnswer((_) async {});
+      when(() => mockSyncStreamRepo.flushDeferredMemoryAssetsV1()).thenAnswer((_) async {});
 
       await simulateEvents([
         const SyncEvent(type: SyncEntityType.syncCompleteV1, data: 'complete', ack: 'ack-complete'),
       ]);
 
       verify(() => mockSyncStreamRepo.pruneAssets()).called(1);
+    });
+
+    // Memory -> asset links parked because their asset had not been streamed yet are replayed
+    // once the stream is done. It has to happen BEFORE the GC: pruneAssets drops assets that are
+    // no longer reachable and cascades the links away with them, so flushing afterwards would
+    // re-add links for assets the GC just decided to remove.
+    test("syncCompleteV1 replays deferred memory asset links before pruning", () async {
+      final calls = <String>[];
+      when(() => mockSyncStreamRepo.flushDeferredMemoryAssetsV1()).thenAnswer((_) async {
+        calls.add('flush');
+      });
+      when(() => mockSyncStreamRepo.pruneAssets()).thenAnswer((_) async {
+        calls.add('prune');
+      });
+
+      await simulateEvents([
+        const SyncEvent(type: SyncEntityType.syncCompleteV1, data: 'complete', ack: 'ack-complete'),
+      ]);
+
+      expect(calls, ['flush', 'prune']);
     });
 
     test("aborts and stops processing if cancelled during iteration", () async {
