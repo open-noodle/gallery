@@ -292,6 +292,41 @@ regenerated all 37 files and analyze went clean. `flutter pub get` rewrote `mobi
 dart constraint (`>=3.12.0` → `>=3.13.0`) as it always does — reverted. Both `mise.lock` files
 verified byte-identical to their pre-run hashes.
 
+## Remote CI Verification
+
+- **Test branch**: `rebase/upstream-batch-187`
+- **Rebase content validated on**: `968a7250c81`
+- **Final tip**: `0746a17a6c6` (adds only the preflight hardening + this report)
+
+| Workflow                                  | Status | Run         | Notes                              |
+| ----------------------------------------- | ------ | ----------- | ---------------------------------- |
+| `test.yml`                                | GREEN  | 33166478219 | 21/21 non-skipped jobs             |
+| `docker.yml`                              | GREEN  | 33166483536 |                                    |
+| `static_analysis.yml`                     | GREEN  | 33166488985 |                                    |
+| `gallery-build-mobile.yml`                | GREEN  | 33166514630 | iOS + Android compile              |
+| `gallery-rebase-smoke.yml`                | GREEN  | 33166494128 |                                    |
+| `storage-migration-tests.yml`             | GREEN  | 33166499320 |                                    |
+| `storage-migration-e2e.yml`               | GREEN  | 33166509514 |                                    |
+| `gallery-revert-to-immich-validation.yml` | GREEN  | 33166504296 | coverage grep + Docker boot        |
+| `gallery-ml-smoke.yml`                    | GREEN  | 33166519234 |                                    |
+| `gallery-mobile-smoke.yml`                | GREEN  | 33166523946 |                                    |
+| `test.yml` (re-dispatch on final tip)     | GREEN  | 33168142048 | 21/21; covers the preflight change |
+
+**10/10 green.** The nine workflows other than `test.yml` were validated on `968a7250c81`;
+the only commits after it touch `tools/upstream-preflight/` and `specs/`, which none of those
+nine build or test, so they were not re-dispatched. `test.yml` — the one workflow that does
+exercise the preflight tooling — was re-dispatched and is green on the final tip.
+
+- **Failures fixed**: none — every workflow was green first time.
+- **Confirmed flakes**: none.
+
+## Landing
+
+**Not landing.** The standing rule requires an upstream **tag** plus a thoroughly tested
+state. Upstream has cut `v3.2.0-rc.0` and `v3.2.0-rc.1`, but those are release candidates;
+the latest stable tag remains `v3.1.0`, which `branding/config.json` already carries. Green
+and level-to-the-boundary is the expected steady state for this branch.
+
 ## Follow-up work
 
 - **immich-30179 product decision** — the quarantine above. Blocks advancing
