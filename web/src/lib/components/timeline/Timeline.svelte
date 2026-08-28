@@ -319,7 +319,9 @@
     if (scrolled && scrollTarget) {
       await tick();
       focusAsset(scrollTarget);
-    } else {
+    } else if (!temporalAnchor) {
+      // A pending temporal anchor owns the scroll position; running the routing fallback here
+      // lands the user at lastVisibleScrollTop (0 on a fresh mount) before the anchor resolves.
       timelineManager.scrollTo(lastVisibleScrollTop);
     }
 
