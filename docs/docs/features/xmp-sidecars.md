@@ -53,7 +53,7 @@ If both `.jpg.xmp` and `.xmp` are present, Gallery uses the **`.jpg.xmp`** file.
 3. **Write-back** – If Gallery has **write access** to the mount, any future metadata edits (e.g., rating or tags) are also written back to the original `.xmp` file on disk.
 
 :::danger
-If the mount is **read-only**, Gallery cannot update either the sidecar **or** the database — **metadata edits will silently fail** with no warning see issue [#10538](https://github.com/immich-app/immich/issues/10538) for more details.
+If the mount is **read-only**, Gallery cannot write the sidecar and the edit is **silently reverted**: the new value is saved to the database, then overwritten again when the file is re-read. No error is shown. See issue [#10538](https://github.com/immich-app/immich/issues/10538) for more details.
 :::
 
 ## Admin Jobs
