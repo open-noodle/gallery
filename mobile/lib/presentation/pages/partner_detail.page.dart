@@ -31,7 +31,7 @@ class PartnerDetailPage extends StatelessWidget {
         withGroupingPill: true,
         appBar: MesmerizingSliverAppBar(title: partner.name),
         topSliverWidget: _InfoBox(partner: partner),
-        topSliverWidgetHeight: DriftPartnerDetailPage.partnerInfoBoxTopSliverHeight,
+        topSliverWidgetHeight: PartnerDetailPage.partnerInfoBoxTopSliverHeight,
         bottomSheet: const PartnerDetailBottomSheet(),
       ),
     );
