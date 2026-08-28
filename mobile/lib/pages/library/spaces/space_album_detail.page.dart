@@ -69,7 +69,7 @@ class _SpaceAlbumDetailPageState extends ConsumerState<SpaceAlbumDetailPage> {
   /// with no local `remote_album` row — does not hit the junction FK and
   /// surface a false "Failed to add photos" toast (mobile F1).
   Future<void> _addPhotos() async {
-    final newAssets = await context.pushRoute<Set<BaseAsset>>(DriftAssetSelectionTimelineRoute());
+    final newAssets = await context.pushRoute<Set<BaseAsset>>(AssetSelectionTimelineRoute());
     if (newAssets == null || newAssets.isEmpty) {
       return;
     }

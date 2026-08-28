@@ -1,11 +1,10 @@
 import 'dart:async';
-
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/infrastructure/repositories/remote_album.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/remote_asset.repository.dart';
 import 'package:immich_mobile/providers/infrastructure/db.provider.dart';
+import 'package:immich_mobile/repositories/album_api_repository.dart';
 import 'package:immich_mobile/repositories/asset_api.repository.dart';
-import 'package:immich_mobile/repositories/drift_album_api_repository.dart';
 import 'package:immich_mobile/repositories/shared_space_api.repository.dart';
 
 final actionServiceProvider = Provider<ActionService>(
@@ -13,7 +12,7 @@ final actionServiceProvider = Provider<ActionService>(
     ref.watch(assetApiRepositoryProvider),
     ref.watch(driftProvider).remoteAssetRepository,
     ref.watch(sharedSpaceApiRepositoryProvider),
-    ref.watch(driftAlbumApiRepositoryProvider),
+    ref.watch(albumApiRepositoryProvider),
     ref.watch(driftProvider).remoteAlbumRepository,
   ),
 );
@@ -22,7 +21,7 @@ class ActionService {
   final AssetApiRepository _assetApiRepository;
   final RemoteAssetRepository _remoteAssetRepository;
   final SharedSpaceApiRepository _sharedSpaceApiRepository;
-  final DriftAlbumApiRepository _albumApiRepository;
+  final AlbumApiRepository _albumApiRepository;
   final RemoteAlbumRepository _remoteAlbumRepository;
 
   const ActionService(

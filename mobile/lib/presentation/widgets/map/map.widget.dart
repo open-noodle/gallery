@@ -135,7 +135,7 @@ class _MapViewState extends ConsumerState<MapView> {
       return;
     }
 
-    // When the AssetViewer is open, the DriftMap route stays alive in the background.
+    // When the AssetViewer is open, the MapView route stays alive in the background.
     // If we continue to update bounds, the map-scoped timeline service gets recreated and the previous one disposed,
     // which can invalidate the TimelineService instance that was passed into AssetViewerRoute (causing "loading forever").
     if (ref.read(isAssetViewerOpenProvider)) {

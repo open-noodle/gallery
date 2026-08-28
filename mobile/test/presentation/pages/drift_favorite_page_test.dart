@@ -17,7 +17,7 @@ import 'package:immich_mobile/domain/services/user.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
-import 'package:immich_mobile/presentation/pages/drift_favorite.page.dart';
+import 'package:immich_mobile/presentation/pages/favorite.page.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/overview/overview_card.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_grouping_bottom_pill.widget.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
@@ -145,7 +145,7 @@ void main() {
           supportedLocales: const [Locale('en')],
           path: '../i18n',
           fallbackLocale: const Locale('en'),
-          child: MaterialApp(home: withStubRouter(const DriftFavoritePage())),
+          child: MaterialApp(home: withStubRouter(const FavoritePage())),
         ),
       ),
     );
