@@ -1,7 +1,7 @@
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/utils/background_sync.dart';
 import 'package:immich_mobile/providers/background_sync.provider.dart';
-import 'package:immich_mobile/repositories/drift_album_api_repository.dart';
+import 'package:immich_mobile/repositories/album_api_repository.dart';
 import 'package:immich_mobile/repositories/shared_space_api.repository.dart';
 
 /// Centralises the space-album mutation operations:
@@ -22,7 +22,7 @@ class SpaceAlbumActions {
   SpaceAlbumActions({required this._repo, required this._albumApiRepo, required this._syncManager});
 
   final SharedSpaceApiRepository _repo;
-  final DriftAlbumApiRepository _albumApiRepo;
+  final AlbumApiRepository _albumApiRepo;
   final BackgroundSyncManager _syncManager;
 
   /// Link one or more albums to a space.
@@ -59,7 +59,7 @@ class SpaceAlbumActions {
   /// A linked album may be "absorbed" — present only in `shared_space_album`
   /// with no local `remote_album` row — so the personal-album add path (which
   /// also writes the local `remote_album_asset` junction) would hit a foreign
-  /// key violation. This routes through [DriftAlbumApiRepository.addAssets]
+  /// key violation. This routes through [AlbumApiRepository.addAssets]
   /// (the REST add only) and then nudges sync; the server is the source of
   /// truth and `spaceAlbum()`'s Drift watch surfaces the new assets.
   ///
@@ -83,7 +83,7 @@ class SpaceAlbumActions {
 final spaceAlbumActionsProvider = Provider<SpaceAlbumActions>((ref) {
   return SpaceAlbumActions(
     repo: ref.watch(sharedSpaceApiRepositoryProvider),
-    albumApiRepo: ref.watch(driftAlbumApiRepositoryProvider),
+    albumApiRepo: ref.watch(albumApiRepositoryProvider),
     syncManager: ref.watch(backgroundSyncProvider),
   );
 });

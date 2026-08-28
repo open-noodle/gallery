@@ -50,7 +50,7 @@ final driftGetAllPeopleWithSharedSpacesProvider = FutureProvider.family<List<Per
   ref,
   sortBy,
 ) async {
-  final service = ref.watch(driftPeopleServiceProvider);
+  final service = ref.watch(peopleServiceProvider);
   final prefs = await ref.watch(userMetadataPreferencesProvider.future);
   return service.getAllPeopleWithSharedSpaces(minFaces: prefs?.minimumFaces ?? 3, sortBy: sortBy);
 });
@@ -58,7 +58,7 @@ final driftGetAllPeopleWithSharedSpacesProvider = FutureProvider.family<List<Per
 /// People scoped to one shared space, for [SpacePeoplePage] — the mobile equivalent of the web
 /// space People tab.
 ///
-/// Goes straight to [SharedSpaceApiRepository] rather than through [DriftPeopleService]: the
+/// Goes straight to [SharedSpaceApiRepository] rather than through [PeopleService]: the
 /// service layer exists to host the local-Drift fallback, and there is none here. Space people
 /// have no local rows at all (the person/asset_face sync streams are owner-scoped), and the
 /// owner-scoped local list contains people who are *not* in this space, so degrading to it

@@ -12,7 +12,7 @@ class MockForegroundUploadService extends Mock implements ForegroundUploadServic
 void main() {
   late SpaceSyncRemoteAlbumService sut;
   late MockRemoteAlbumRepository repository;
-  late MockDriftAlbumApiRepository albumApiRepository;
+  late MockAlbumApiRepository albumApiRepository;
   late MockForegroundUploadService uploadService;
   late List<String> nudged;
 
@@ -30,7 +30,7 @@ void main() {
 
   setUp(() {
     repository = MockRemoteAlbumRepository();
-    albumApiRepository = MockDriftAlbumApiRepository();
+    albumApiRepository = MockAlbumApiRepository();
     uploadService = MockForegroundUploadService();
     nudged = [];
     nudgeGate = null;

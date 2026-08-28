@@ -3,7 +3,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/utils/background_sync.dart';
 import 'package:immich_mobile/providers/background_sync.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/space_album_actions.dart';
-import 'package:immich_mobile/repositories/drift_album_api_repository.dart';
+import 'package:immich_mobile/repositories/album_api_repository.dart';
 import 'package:immich_mobile/repositories/shared_space_api.repository.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -15,7 +15,7 @@ class MockSharedSpaceApiRepository extends Mock implements SharedSpaceApiReposit
 
 class MockBackgroundSyncManager extends Mock implements BackgroundSyncManager {}
 
-class MockDriftAlbumApiRepository extends Mock implements DriftAlbumApiRepository {}
+class MockAlbumApiRepository extends Mock implements AlbumApiRepository {}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -28,13 +28,13 @@ const _album2 = 'album-2';
 ProviderContainer _makeContainer({
   required MockSharedSpaceApiRepository repo,
   required MockBackgroundSyncManager syncMgr,
-  required MockDriftAlbumApiRepository albumApiRepo,
+  required MockAlbumApiRepository albumApiRepo,
 }) {
   final c = ProviderContainer(
     overrides: [
       sharedSpaceApiRepositoryProvider.overrideWithValue(repo),
       backgroundSyncProvider.overrideWithValue(syncMgr),
-      driftAlbumApiRepositoryProvider.overrideWithValue(albumApiRepo),
+      albumApiRepositoryProvider.overrideWithValue(albumApiRepo),
     ],
   );
   addTearDown(c.dispose);
@@ -48,13 +48,13 @@ ProviderContainer _makeContainer({
 void main() {
   late MockSharedSpaceApiRepository repo;
   late MockBackgroundSyncManager syncMgr;
-  late MockDriftAlbumApiRepository albumApiRepo;
+  late MockAlbumApiRepository albumApiRepo;
   late ProviderContainer container;
 
   setUp(() {
     repo = MockSharedSpaceApiRepository();
     syncMgr = MockBackgroundSyncManager();
-    albumApiRepo = MockDriftAlbumApiRepository();
+    albumApiRepo = MockAlbumApiRepository();
 
     // Default stubs
     when(() => repo.linkAlbum(any(), any())).thenAnswer((_) async {});
