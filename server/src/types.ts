@@ -434,6 +434,8 @@ export interface IStorageMigrationQueueAllJob {
   };
   concurrency: number;
   batchId: string;
+}
+
 export interface IFacialRecognitionQueueAll extends INightlyJob {
   clusterGroupId?: string;
 }
