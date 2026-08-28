@@ -27,7 +27,7 @@ class _MockRemoteAlbumService extends Mock implements RemoteAlbumService {}
 
 class _MockDriftMemoryService extends Mock implements MemoryService {}
 
-class _MockDriftPeopleService extends Mock implements DriftPeopleService {}
+class _MockDriftPeopleService extends Mock implements PeopleService {}
 
 class _MockSharedSpaceApiRepository extends Mock implements SharedSpaceApiRepository {}
 
@@ -73,7 +73,6 @@ final _album = RemoteAlbum(
 );
 
 void main() {
-
   late DeepLinkService sut;
   late _MockTimelineFactory timelineFactory;
   late _MockBetaAssetService betaAssetService;

@@ -148,8 +148,8 @@ class AppRouter extends RootStackRouter {
       guards: [_authGuard, _duplicateGuard],
       children: [
         AutoRoute(page: MainTimelineRoute.page, guards: [_authGuard, _duplicateGuard]),
-        AutoRoute(page: DriftAlbumsRoute.page, guards: [_authGuard, _duplicateGuard]),
-        AutoRoute(page: DriftLibraryRoute.page, guards: [_authGuard, _duplicateGuard]),
+        AutoRoute(page: AlbumsRoute.page, guards: [_authGuard, _duplicateGuard]),
+        AutoRoute(page: LibraryRoute.page, guards: [_authGuard, _duplicateGuard]),
       ],
     ),
     // <<< fork-only gallery-bottom-nav

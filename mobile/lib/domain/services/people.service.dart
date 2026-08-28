@@ -11,7 +11,7 @@ class PeopleService {
   final PeopleRepository _repository;
   final PersonApiRepository _personApiRepository;
   final SharedSpaceApiRepository _sharedSpaceApiRepository;
-  final _log = Logger("DriftPeopleService");
+  final _log = Logger("PeopleService");
 
   PeopleService(this._repository, this._personApiRepository, this._sharedSpaceApiRepository);
 

@@ -16,18 +16,18 @@ import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/pages/library/spaces/space_detail.page.dart';
+import 'package:immich_mobile/presentation/pages/archive.page.dart';
 import 'package:immich_mobile/presentation/pages/dev/main_timeline.page.dart';
-import 'package:immich_mobile/presentation/pages/drift_archive.page.dart';
-import 'package:immich_mobile/presentation/pages/drift_favorite.page.dart';
-import 'package:immich_mobile/presentation/pages/drift_locked_folder.page.dart';
-import 'package:immich_mobile/presentation/pages/drift_partner_detail.page.dart';
-import 'package:immich_mobile/presentation/pages/drift_person.page.dart';
-import 'package:immich_mobile/presentation/pages/drift_place_detail.page.dart';
-import 'package:immich_mobile/presentation/pages/drift_recently_taken.page.dart';
-import 'package:immich_mobile/presentation/pages/drift_remote_album.page.dart';
-import 'package:immich_mobile/presentation/pages/drift_trash.page.dart';
-import 'package:immich_mobile/presentation/pages/drift_video.page.dart';
+import 'package:immich_mobile/presentation/pages/favorite.page.dart';
 import 'package:immich_mobile/presentation/pages/local_timeline.page.dart';
+import 'package:immich_mobile/presentation/pages/locked_folder.page.dart';
+import 'package:immich_mobile/presentation/pages/partner_detail.page.dart';
+import 'package:immich_mobile/presentation/pages/person.page.dart';
+import 'package:immich_mobile/presentation/pages/place_detail.page.dart';
+import 'package:immich_mobile/presentation/pages/recently_taken.page.dart';
+import 'package:immich_mobile/presentation/pages/remote_album.page.dart';
+import 'package:immich_mobile/presentation/pages/trash.page.dart';
+import 'package:immich_mobile/presentation/pages/video.page.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_grouping_selector.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_route_scope.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
@@ -147,22 +147,22 @@ void main() {
 
     test('all pill-adopting routes expose controls flag; composed pages expose extra-sliver heights', () {
       // Simple pages: header sliver replaced by withGroupingPill; no extra top sliver.
-      expect(DriftPersonPage.timelineOverviewControlsEnabled, isTrue);
+      expect(PersonPage.timelineOverviewControlsEnabled, isTrue);
       expect(RemoteAlbumPage.timelineOverviewControlsEnabled, isTrue);
       expect(LocalTimelinePage.timelineOverviewControlsEnabled, isTrue);
-      expect(DriftFavoritePage.timelineOverviewControlsEnabled, isTrue);
-      expect(DriftArchivePage.timelineOverviewControlsEnabled, isTrue);
-      expect(DriftLockedFolderPage.timelineOverviewControlsEnabled, isTrue);
-      expect(DriftVideoPage.timelineOverviewControlsEnabled, isTrue);
-      expect(DriftRecentlyTakenPage.timelineOverviewControlsEnabled, isTrue);
-      expect(DriftPlaceDetailPage.timelineOverviewControlsEnabled, isTrue);
+      expect(FavoritePage.timelineOverviewControlsEnabled, isTrue);
+      expect(ArchivePage.timelineOverviewControlsEnabled, isTrue);
+      expect(LockedFolderPage.timelineOverviewControlsEnabled, isTrue);
+      expect(VideoPage.timelineOverviewControlsEnabled, isTrue);
+      expect(RecentlyTakenPage.timelineOverviewControlsEnabled, isTrue);
+      expect(PlaceDetailPage.timelineOverviewControlsEnabled, isTrue);
 
       // Composed pages: keep a non-header extra sliver; the const now measures only that sliver.
-      expect(DriftTrashPage.timelineOverviewControlsEnabled, isTrue);
-      expect(DriftTrashPage.trashInfoBannerTopSliverHeight, 24.0);
+      expect(TrashPage.timelineOverviewControlsEnabled, isTrue);
+      expect(TrashPage.trashInfoBannerTopSliverHeight, 24.0);
 
-      expect(DriftPartnerDetailPage.timelineOverviewControlsEnabled, isTrue);
-      expect(DriftPartnerDetailPage.partnerInfoBoxTopSliverHeight, 110.0);
+      expect(PartnerDetailPage.timelineOverviewControlsEnabled, isTrue);
+      expect(PartnerDetailPage.partnerInfoBoxTopSliverHeight, 110.0);
 
       // Space detail: sync-banner height is dynamic; its contract is unchanged.
       expect(SpaceDetailPage.timelineOverviewControlsEnabled, isTrue);

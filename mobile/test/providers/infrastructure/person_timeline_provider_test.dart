@@ -18,7 +18,7 @@ import 'package:mocktail/mocktail.dart';
 
 class _MockFactory extends Mock implements TimelineFactory {}
 
-class _MockPeopleService extends Mock implements DriftPeopleService {}
+class _MockPeopleService extends Mock implements PeopleService {}
 
 class _MockUserService extends Mock implements UserService {}
 
@@ -40,11 +40,7 @@ class _StubCurrentUserNotifier extends CurrentUserProvider {
 Person _person(String id, {String? spaceId}) =>
     Person(id: id, updatedAt: DateTime(2020), name: 'Alice', spaceId: spaceId);
 
-ProviderContainer _container({
-  required TimelineFactory factory,
-  required DriftPeopleService peopleService,
-  UserDto? user,
-}) {
+ProviderContainer _container({required TimelineFactory factory, required PeopleService peopleService, UserDto? user}) {
   final mockUserSvc = _MockUserService();
   when(() => mockUserSvc.tryGetMyUser()).thenReturn(user);
   when(() => mockUserSvc.watchMyUser()).thenAnswer((_) => const Stream<UserDto?>.empty());
@@ -52,7 +48,7 @@ ProviderContainer _container({
   return ProviderContainer(
     overrides: [
       timelineFactoryProvider.overrideWithValue(factory),
-      driftPeopleServiceProvider.overrideWithValue(peopleService),
+      peopleServiceProvider.overrideWithValue(peopleService),
       infra.userServiceProvider.overrideWithValue(mockUserSvc),
       currentUserProvider.overrideWith((ref) => _StubCurrentUserNotifier(mockUserSvc, user)),
     ],
