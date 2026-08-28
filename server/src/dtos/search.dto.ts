@@ -280,24 +280,6 @@ const FilterSuggestionsRequestSchema = FilterSuggestionsRequestBaseSchema.pipe(
   .pipe(IsNotSiblingOf(FilterSuggestionsRequestBaseSchema, 'albumId', ['withSharedSpaces']))
   .meta({ id: 'FilterSuggestionsRequestDto' });
 
-export class RandomSearchDto extends createZodDto(RandomSearchSchema) {}
-export class LargeAssetSearchDto extends createZodDto(LargeAssetSearchSchema) {}
-export class MetadataSearchDto extends createZodDto(MetadataSearchSchema) {}
-export class StatisticsSearchDto extends createZodDto(StatisticsSearchSchema) {}
-export class SmartSearchDto extends createZodDto(SmartSearchSchema) {}
-export class SmartSearchFacetsDto extends createZodDto(SmartSearchFacetsSchema) {}
-export class SmartSearchFacetsResponseDto extends createZodDto(SmartSearchFacetsResponseSchema) {}
-export class SearchPlacesDto extends createZodDto(SearchPlacesSchema) {}
-export class SearchPeopleDto extends createZodDto(SearchPeopleSchema) {}
-export class PlacesResponseDto extends createZodDto(PlacesResponseSchema) {}
-export class SearchSuggestionRequestDto extends createZodDto(SearchSuggestionRequestSchema) {}
-export class TagSuggestionRequestDto extends createZodDto(TagSuggestionRequestSchema) {}
-export class TagSuggestionResponseDto extends createZodDto(TagSuggestionResponseSchema) {}
-export class FilterSuggestionsPersonDto extends createZodDto(FilterSuggestionsPersonSchema) {}
-export class FilterSuggestionsTagDto extends createZodDto(FilterSuggestionsTagSchema) {}
-export class FilterSuggestionsResponseDto extends createZodDto(FilterSuggestionsResponseSchema) {}
-export class FilterSuggestionsRequestDto extends createZodDto(FilterSuggestionsRequestSchema) {}
-
 export function mapPlaces(place: Place): PlacesResponseDto {
   return {
     name: place.name,
@@ -342,6 +324,9 @@ const SearchAssetResponseSchema = z
     items: z.array(AssetResponseSchema),
     facets: z.array(SearchFacetResponseSchema),
     nextPage: z.string().nullable().describe('Next page token'),
+    // immich-30179: emitted by the (dormant) V3 path's mapResponse. Kept on the schema so the
+    // V3 methods still type-check while they stay unreachable.
+    nextCursor: z.string().nullable().optional().describe('Opaque cursor for the next page'),
   })
   .meta({ id: 'SearchAssetResponseDto' });
 
@@ -694,3 +679,22 @@ const SmartSearchFacetsSchema = BaseSearchSchema.pick({
   })
   .meta({ id: 'SmartSearchFacetsDto' });
 
+// Declared last: every schema these wrap must exist at class-evaluation time, and the fork's
+// suggestion/facet schemas are interleaved with upstream's V3 block further down.
+export class RandomSearchDto extends createZodDto(RandomSearchSchema) {}
+export class LargeAssetSearchDto extends createZodDto(LargeAssetSearchSchema) {}
+export class MetadataSearchDto extends createZodDto(MetadataSearchSchema) {}
+export class StatisticsSearchDto extends createZodDto(StatisticsSearchSchema) {}
+export class SmartSearchDto extends createZodDto(SmartSearchSchema) {}
+export class SmartSearchFacetsDto extends createZodDto(SmartSearchFacetsSchema) {}
+export class SmartSearchFacetsResponseDto extends createZodDto(SmartSearchFacetsResponseSchema) {}
+export class SearchPlacesDto extends createZodDto(SearchPlacesSchema) {}
+export class SearchPeopleDto extends createZodDto(SearchPeopleSchema) {}
+export class PlacesResponseDto extends createZodDto(PlacesResponseSchema) {}
+export class SearchSuggestionRequestDto extends createZodDto(SearchSuggestionRequestSchema) {}
+export class TagSuggestionRequestDto extends createZodDto(TagSuggestionRequestSchema) {}
+export class TagSuggestionResponseDto extends createZodDto(TagSuggestionResponseSchema) {}
+export class FilterSuggestionsPersonDto extends createZodDto(FilterSuggestionsPersonSchema) {}
+export class FilterSuggestionsTagDto extends createZodDto(FilterSuggestionsTagSchema) {}
+export class FilterSuggestionsResponseDto extends createZodDto(FilterSuggestionsResponseSchema) {}
+export class FilterSuggestionsRequestDto extends createZodDto(FilterSuggestionsRequestSchema) {}
