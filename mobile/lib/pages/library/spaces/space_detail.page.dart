@@ -135,7 +135,7 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
   }
 
   Future<void> _addPhotos() async {
-    final newAssets = await context.pushRoute<Set<BaseAsset>>(DriftAssetSelectionTimelineRoute());
+    final newAssets = await context.pushRoute<Set<BaseAsset>>(AssetSelectionTimelineRoute());
 
     if (newAssets == null || newAssets.isEmpty) {
       return;
