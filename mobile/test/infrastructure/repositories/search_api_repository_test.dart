@@ -3,7 +3,7 @@ import 'package:immich_mobile/infrastructure/repositories/search_api.repository.
 import 'package:immich_mobile/models/search/search_filter.model.dart';
 import 'package:immich_mobile/services/api.service.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:openapi/api.dart';
+import 'package:openapi/api.dart' hide SearchFilter;
 
 class _MockApiService extends Mock implements ApiService {}
 
