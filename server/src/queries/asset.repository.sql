@@ -947,7 +947,8 @@ with
       inner join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
     order by
       (asset."localDateTime" AT TIME ZONE 'UTC')::date desc,
-      "asset"."fileCreatedAt" desc
+      "asset"."fileCreatedAt" desc,
+      "asset"."originalFileName" desc
   ),
   "agg" as (
     select
@@ -1030,7 +1031,8 @@ with
       inner join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
     order by
       (asset."localDateTime" AT TIME ZONE 'UTC')::date desc,
-      "asset"."fileCreatedAt" desc
+      "asset"."fileCreatedAt" desc,
+      "asset"."originalFileName" desc
   ),
   "agg" as (
     select
