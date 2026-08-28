@@ -166,9 +166,11 @@ const seedSpaceAssetWithFacets = async (
 const searchIds = async (
   sut: ReturnType<typeof setup>['sut'],
   auth: AuthDto,
-  dto: Parameters<SearchService['searchMetadata']>[1],
+  // immich-30179 gave `size` a zod .default, which surfaces as REQUIRED on the DTO's output type.
+  // Default it here so these cases stay about the filter under test rather than pagination.
+  dto: Omit<Parameters<SearchService['searchMetadata']>[1], 'size'> & { size?: number },
 ) => {
-  const response = await sut.searchMetadata(auth, dto);
+  const response = await sut.searchMetadata(auth, { size: 250, ...dto });
   return response.assets.items.map((asset) => asset.id);
 };
 
@@ -458,7 +460,7 @@ describe(SearchService.name, () => {
 
       const auth = factory.auth({ user: { id: member.id } });
 
-      const result = await sut.searchMetadata(auth, { spaceId: space.id });
+      const result = await sut.searchMetadata(auth, { size: 250, spaceId: space.id });
 
       expect(result.assets.items).toEqual([expect.objectContaining({ id: libraryAsset.id })]);
     });
@@ -479,7 +481,7 @@ describe(SearchService.name, () => {
 
       const auth = factory.auth({ user: { id: member.id } });
 
-      const result = await sut.searchLargeAssets(auth, { spaceId: space.id });
+      const result = await sut.searchLargeAssets(auth, { size: 250, spaceId: space.id });
 
       expect(result).toEqual([expect.objectContaining({ id: libraryAsset.id })]);
     });
@@ -733,7 +735,7 @@ describe(SearchService.name, () => {
       const s = await seedAlbumWithVisibilities(ctx);
       const auth = factory.auth({ user: { id: s.member.id } });
 
-      const response = await sut.searchMetadata(auth, { albumIds: [s.album.id] });
+      const response = await sut.searchMetadata(auth, { size: 250, albumIds: [s.album.id] });
       const ids = itemIds(response);
 
       expect(ids).toContain(s.timelineAsset.id);
@@ -747,7 +749,11 @@ describe(SearchService.name, () => {
       const s = await seedAlbumWithVisibilities(ctx);
       const auth = factory.auth({ user: { id: s.member.id } });
 
-      const response = await sut.searchMetadata(auth, { albumIds: [s.album.id], visibility: AssetVisibility.Hidden });
+      const response = await sut.searchMetadata(auth, {
+        size: 250,
+        albumIds: [s.album.id],
+        visibility: AssetVisibility.Hidden,
+      });
 
       expect(itemIds(response)).not.toContain(s.hiddenAsset.id);
     });
@@ -758,6 +764,7 @@ describe(SearchService.name, () => {
       const ownerAuth = factory.auth({ user: { id: s.owner.id } });
 
       const response = await sut.searchMetadata(ownerAuth, {
+        size: 250,
         albumIds: [s.album.id],
         visibility: AssetVisibility.Hidden,
       });
@@ -772,7 +779,7 @@ describe(SearchService.name, () => {
 
       // No albumIds -> userIds = [owner], scoped to ownerId + explicit Hidden. This path keeps its
       // own `own OR gate` and is untouched by the fix.
-      const response = await sut.searchMetadata(ownerAuth, { visibility: AssetVisibility.Hidden });
+      const response = await sut.searchMetadata(ownerAuth, { size: 250, visibility: AssetVisibility.Hidden });
 
       expect(itemIds(response)).toContain(s.hiddenAsset.id);
     });
@@ -798,7 +805,7 @@ describe(SearchService.name, () => {
       await ctx.newSharedSpaceAlbum({ spaceId: spaceB.id, albumId: album.id });
 
       const auth = factory.auth({ user: { id: member.id } });
-      const response = await sut.searchMetadata(auth, { albumIds: [album.id] });
+      const response = await sut.searchMetadata(auth, { size: 250, albumIds: [album.id] });
       const ids = itemIds(response);
 
       expect(ids).toContain(timelineAsset.id);
@@ -819,7 +826,7 @@ describe(SearchService.name, () => {
 
       const strangerAuth = factory.auth({ user: { id: stranger.id } });
 
-      await expect(sut.searchMetadata(strangerAuth, { albumIds: [album.id] })).rejects.toThrow(
+      await expect(sut.searchMetadata(strangerAuth, { size: 250, albumIds: [album.id] })).rejects.toThrow(
         'Not found or no album.read access',
       );
     });
@@ -837,7 +844,11 @@ describe(SearchService.name, () => {
       await ctx.newAssetFace({ assetId: s.hiddenAsset.id, personGroupId: person.personGroupId });
 
       const auth = factory.auth({ user: { id: s.owner.id } });
-      const response = await sut.searchMetadata(auth, { albumIds: [s.album.id], personIds: [person.personGroupId] });
+      const response = await sut.searchMetadata(auth, {
+        size: 250,
+        albumIds: [s.album.id],
+        personIds: [person.personGroupId],
+      });
       const ids = itemIds(response);
 
       expect(ids).toContain(s.timelineAsset.id);
@@ -851,7 +862,7 @@ describe(SearchService.name, () => {
       const s = await seedAlbumWithTrashedAsset(ctx);
       const auth = factory.auth({ user: { id: s.member.id } });
 
-      const response = await sut.searchMetadata(auth, { albumIds: [s.album.id], withDeleted: true });
+      const response = await sut.searchMetadata(auth, { size: 250, albumIds: [s.album.id], withDeleted: true });
       const ids = itemIds(response);
 
       expect(ids).toContain(s.liveAsset.id);
@@ -863,7 +874,7 @@ describe(SearchService.name, () => {
       const s = await seedAlbumWithTrashedAsset(ctx);
       const auth = factory.auth({ user: { id: s.member.id } });
 
-      const response = await sut.searchMetadata(auth, { albumIds: [s.album.id] });
+      const response = await sut.searchMetadata(auth, { size: 250, albumIds: [s.album.id] });
       const ids = itemIds(response);
 
       expect(ids).toContain(s.liveAsset.id);
@@ -876,6 +887,7 @@ describe(SearchService.name, () => {
       const auth = factory.auth({ user: { id: s.member.id } });
 
       const response = await sut.searchMetadata(auth, {
+        size: 250,
         albumIds: [s.album.id],
         trashedAfter: new Date('2000-01-01T00:00:00.000Z'),
         trashedBefore: new Date('2999-01-01T00:00:00.000Z'),
@@ -894,7 +906,7 @@ describe(SearchService.name, () => {
       const s = await seedAlbumWithTrashedAsset(ctx);
       const ownerAuth = factory.auth({ user: { id: s.owner.id } });
 
-      const response = await sut.searchMetadata(ownerAuth, { albumIds: [s.album.id], withDeleted: true });
+      const response = await sut.searchMetadata(ownerAuth, { size: 250, albumIds: [s.album.id], withDeleted: true });
 
       expect(itemIds(response)).not.toContain(s.trashedAsset.id);
     });
@@ -906,7 +918,7 @@ describe(SearchService.name, () => {
 
       // No albumIds -> userIds = [owner]; this path keeps its own withDeleted handling and is
       // untouched by the fix.
-      const response = await sut.searchMetadata(ownerAuth, { withDeleted: true });
+      const response = await sut.searchMetadata(ownerAuth, { size: 250, withDeleted: true });
 
       expect(itemIds(response)).toContain(s.trashedAsset.id);
     });
@@ -933,7 +945,7 @@ describe(SearchService.name, () => {
       await ctx.newSharedSpaceAlbum({ spaceId: spaceB.id, albumId: album.id });
 
       const auth = factory.auth({ user: { id: member.id } });
-      const response = await sut.searchMetadata(auth, { albumIds: [album.id], withDeleted: true });
+      const response = await sut.searchMetadata(auth, { size: 250, albumIds: [album.id], withDeleted: true });
       const ids = itemIds(response);
 
       expect(ids).toContain(liveAsset.id);
@@ -953,6 +965,7 @@ describe(SearchService.name, () => {
 
       const auth = factory.auth({ user: { id: s.owner.id } });
       const response = await sut.searchMetadata(auth, {
+        size: 250,
         albumIds: [s.album.id],
         personIds: [person.personGroupId],
         withDeleted: true,
@@ -969,7 +982,7 @@ describe(SearchService.name, () => {
       await ctx.softDeleteAsset(s.timelineAsset.id);
       const auth = factory.auth({ user: { id: s.member.id } });
 
-      const response = await sut.searchMetadata(auth, { albumIds: [s.album.id], withDeleted: true });
+      const response = await sut.searchMetadata(auth, { size: 250, albumIds: [s.album.id], withDeleted: true });
       const ids = itemIds(response);
 
       expect(ids).not.toContain(s.hiddenAsset.id); // visibility gate still holds
@@ -1232,6 +1245,9 @@ describe(SearchService.name, () => {
       const secondPage = await searchRepository.searchSmartV3({ take: 2, skip: 2 }, options, scope);
       expect(secondPage.items.length).toBe(1);
       expect(secondPage.hasNextPage).toBe(false);
+    });
+  });
+
   describe('getFilterSuggestions', () => {
     it('should return countries from the user assets', async () => {
       const { sut, ctx } = setup();
@@ -1553,7 +1569,7 @@ describe(SearchService.name, () => {
       const archived = await shareAsset(ctx, space.id, owner.id, AssetVisibility.Archive);
       const timeline = await shareAsset(ctx, space.id, owner.id, AssetVisibility.Timeline);
 
-      const result = await sut.searchMetadata(elevated(member.id), { spaceId: space.id });
+      const result = await sut.searchMetadata(elevated(member.id), { size: 250, spaceId: space.id });
       const ids = result.assets.items.map((a) => a.id);
 
       expect(ids).toContain(timeline.id);
@@ -1567,7 +1583,7 @@ describe(SearchService.name, () => {
       const locked = await shareAsset(ctx, space.id, owner.id, AssetVisibility.Locked);
       const timeline = await shareAsset(ctx, space.id, owner.id, AssetVisibility.Timeline);
 
-      const result = await sut.searchMetadata(elevated(member.id), { spaceId: space.id });
+      const result = await sut.searchMetadata(elevated(member.id), { size: 250, spaceId: space.id });
       const ids = result.assets.items.map((a) => a.id);
 
       expect(ids).toContain(timeline.id);
@@ -1580,7 +1596,7 @@ describe(SearchService.name, () => {
       const { member, space } = await setupSpace(ctx);
       const ownArchived = await shareAsset(ctx, space.id, member.id, AssetVisibility.Archive);
 
-      const result = await sut.searchMetadata(elevated(member.id), { spaceId: space.id });
+      const result = await sut.searchMetadata(elevated(member.id), { size: 250, spaceId: space.id });
       const ids = result.assets.items.map((a) => a.id);
 
       expect(ids).toContain(ownArchived.id);
@@ -1595,7 +1611,7 @@ describe(SearchService.name, () => {
       const timeline = await shareAsset(ctx, space.id, owner.id, AssetVisibility.Timeline);
 
       const auth = factory.auth({ user: { id: member.id } });
-      const result = await sut.searchMetadata(auth, { spaceId: space.id });
+      const result = await sut.searchMetadata(auth, { size: 250, spaceId: space.id });
       const ids = result.assets.items.map((a) => a.id);
 
       expect(ids).toContain(timeline.id);
@@ -1611,6 +1627,7 @@ describe(SearchService.name, () => {
       const ownArchived = await shareAsset(ctx, space.id, member.id, AssetVisibility.Archive);
 
       const result = await sut.searchMetadata(elevated(member.id), {
+        size: 250,
         spaceId: space.id,
         visibility: AssetVisibility.Archive,
       });
@@ -1626,7 +1643,7 @@ describe(SearchService.name, () => {
       const archived = await shareAsset(ctx, space.id, owner.id, AssetVisibility.Archive);
       const timeline = await shareAsset(ctx, space.id, owner.id, AssetVisibility.Timeline);
 
-      const result = await sut.searchMetadata(elevated(member.id), { withSharedSpaces: true });
+      const result = await sut.searchMetadata(elevated(member.id), { size: 250, withSharedSpaces: true });
       const ids = result.assets.items.map((a) => a.id);
 
       expect(ids).toContain(timeline.id);
@@ -1655,7 +1672,7 @@ describe(SearchService.name, () => {
       const archivedC = await shareAsset(ctx, space.id, secondOwner.id, AssetVisibility.Archive);
       const timelineA = await shareAsset(ctx, space.id, owner.id, AssetVisibility.Timeline);
 
-      const result = await sut.searchMetadata(elevated(member.id), { spaceId: space.id });
+      const result = await sut.searchMetadata(elevated(member.id), { size: 250, spaceId: space.id });
       const ids = result.assets.items.map((a) => a.id);
 
       expect(ids).toContain(timelineA.id);
@@ -1671,7 +1688,7 @@ describe(SearchService.name, () => {
       await ctx.newExif({ assetId: archived.id, fileSizeInByte: 999_999 });
 
       const auth = factory.auth({ user: { id: member.id } });
-      const result = await sut.searchLargeAssets(auth, { spaceId: space.id });
+      const result = await sut.searchLargeAssets(auth, { size: 250, spaceId: space.id });
 
       expect(result.map((a) => a.id)).toContain(archived.id);
     });
@@ -1683,7 +1700,7 @@ describe(SearchService.name, () => {
       await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: archived.id, addedById: owner.id });
       await ctx.newExif({ assetId: archived.id, fileSizeInByte: 999_999 });
 
-      const result = await sut.searchLargeAssets(elevated(member.id), { withSharedSpaces: true });
+      const result = await sut.searchLargeAssets(elevated(member.id), { size: 250, withSharedSpaces: true });
 
       expect(result.map((a) => a.id)).toContain(archived.id);
     });
@@ -1698,7 +1715,7 @@ describe(SearchService.name, () => {
       await ctx.newExif({ assetId: hidden.id, fileSizeInByte: 999_999 });
       await ctx.newExif({ assetId: locked.id, fileSizeInByte: 999_999 });
 
-      const result = await sut.searchLargeAssets(elevated(member.id), { spaceId: space.id });
+      const result = await sut.searchLargeAssets(elevated(member.id), { size: 250, spaceId: space.id });
       const ids = result.map((a) => a.id);
 
       expect(ids).not.toContain(hidden.id);
@@ -1848,7 +1865,7 @@ describe(SearchService.name, () => {
 
       const auth = factory.auth({ user: { id: member.id } });
 
-      const result = await sut.searchMetadata(auth, { spaceId: space.id });
+      const result = await sut.searchMetadata(auth, { size: 250, spaceId: space.id });
 
       expect(result.assets.items).toEqual([expect.objectContaining({ id: albumAsset.id })]);
     });
@@ -1869,7 +1886,7 @@ describe(SearchService.name, () => {
 
       const auth = factory.auth({ user: { id: member.id } });
 
-      const result = await sut.searchMetadata(auth, { spaceId: space.id });
+      const result = await sut.searchMetadata(auth, { size: 250, spaceId: space.id });
 
       expect(result.assets.items.find((a) => a.id === albumAsset.id)).toBeUndefined();
     });
