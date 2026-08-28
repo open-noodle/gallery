@@ -5,7 +5,7 @@ import 'package:immich_mobile/presentation/widgets/filter_sheet/filter_section_i
 import 'package:immich_mobile/providers/photos_filter/filter_debounce.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/filter_suggestions.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
-import 'package:openapi/api.dart';
+import 'package:openapi/api.dart' hide SearchFilter;
 
 /// Which deep-sheet sections can actually filter something right now (#910).
 ///
