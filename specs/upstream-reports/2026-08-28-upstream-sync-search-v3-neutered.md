@@ -167,6 +167,35 @@ mangled the generated `packages/sdk/src/fetch-client.ts` (regenerated, not hand-
 string — exactly backwards. Caught by existing fork tests, not by types: the OpenAPI spec renders
 either form as `boolean`, so there was no generated-artifact drift to notice.
 
+**6. immich-30296 also broke two branding gates — three workflows red from one defect each.**
+
+The translation update is the gift that keeps giving. Two separate gates, neither visible to any
+type-check or unit test:
+
+- **Persian author sign-off.** `version_announcement_closing` was retranslated to
+  `دوست شما، الکس`. `branding/config.json`'s `author_names` already carried `ایلکس`, but this is a
+  different spelling (it drops the ی), so `apply-branding` left the upstream author's name in a
+  user-facing string. Added the new spelling; verified by replaying `swap_author_name`'s own jq over
+  all 89 locales — 58 carry the key, all 58 now resolve to Pierre.
+- **Persian purchase CTA.** `fa` gained `buy` / `purchase_button_buy_immich` = `خرید Immich`. The
+  generic name swap would render that as _buy Noodle Gallery_ — an offer to sell a fork that is not
+  for sale, which `test-i18n-branding.sh` explicitly forbids. Added `branding/i18n/overrides-fa.json`
+  with `حمایت از Noodle Gallery`, matching fa's own register (its buttons are nominal — خرید,
+  فعال‌سازی, ذخیره — and it already renders support as `حمایت از پروژه`).
+
+The first reddened **three** workflows (ML smoke, mobile smoke, build-mobile) because they all run the
+`apply-branding` action — one defect, three red X's. **`branding/scripts/gallery-branding-check.sh`
+reproduces the whole pipeline locally against a throwaway worktree** (and prepends Homebrew GNU tools
+on macOS), so this class is cheap to verify without a CI round. Note it checks out `HEAD`, so changes
+must be committed before it sees them.
+
+**7. Upstream's V3 medium tests exercise the path we now reject.**
+
+`new search shape` in the medium spec drives V3 through `sut.searchMetadata(auth, { filter })`; 11 of
+its 13 cases now fail for exactly the reason the fork intends. Skipped rather than deleted, with a
+comment tying it to the coexistence spec — V3 is carried dormant, and these are the tests that will
+validate the builder when we adopt it. The reachable contract is covered in the small spec.
+
 ## Zero-Conflict Break Gate
 
 | Detector                                                            | Result                                                                                           |
@@ -177,6 +206,41 @@ either form as `boolean`, so there was no generated-artifact drift to notice.
 | Shape L — unresolvable mobile imports                               | clean                                                                                            |
 | i18n branding-override gap                                          | clean                                                                                            |
 | Shape K — fork-line audit on the four search files                  | clean; every missing line explained by upstream's own restructure, and no fork field/symbol lost |
+
+## Remote CI Verification
+
+- **Test branch**: `rebase/upstream-batch-197`
+- **Validated on**: `a03aab142e5` — all ten workflows green on this one commit
+
+| Workflow                                  | Status | Run                                  |
+| ----------------------------------------- | ------ | ------------------------------------ |
+| `test.yml`                                | GREEN  | 33178451811 (21/21 non-skipped jobs) |
+| `docker.yml`                              | GREEN  | 33180544108                          |
+| `static_analysis.yml`                     | GREEN  | 33180551911                          |
+| `gallery-build-mobile.yml`                | GREEN  | 33180600836                          |
+| `gallery-rebase-smoke.yml`                | GREEN  | 33180559526                          |
+| `storage-migration-tests.yml`             | GREEN  | 33180565837                          |
+| `storage-migration-e2e.yml`               | GREEN  | 33180594074                          |
+| `gallery-revert-to-immich-validation.yml` | GREEN  | 33180572997                          |
+| `gallery-ml-smoke.yml`                    | GREEN  | 33180580269                          |
+| `gallery-mobile-smoke.yml`                | GREEN  | 33180587333                          |
+
+**10/10 green.** Three CI rounds were needed, and both extra rounds were immich-30296's branding
+fallout rather than the search work: round 1 red on ML smoke / mobile smoke / build-mobile (one
+defect — the Persian author sign-off — surfacing in all three, since each runs `apply-branding`) plus
+`Test` red on the Persian purchase CTA and the V3 medium tests. Round 2 fixed branding; round 3
+confirmed everything on one commit.
+
+- **Failures fixed**: 4 (Persian author name, Persian purchase CTA, V3 medium tests, and the
+  `withSharedSpaces` validator swap caught locally before pushing).
+- **Confirmed flakes**: none.
+
+## Landing
+
+**Not landing.** The standing rule wants an upstream **tag** plus a thoroughly tested state. Upstream
+has `v3.2.0-rc.0` / `rc.1`, but those are release candidates; the latest stable tag is still `v3.1.0`,
+which `branding/config.json` carries. Level-with-upstream and green is the steady state for this
+branch.
 
 ## Local CI Verification
 
