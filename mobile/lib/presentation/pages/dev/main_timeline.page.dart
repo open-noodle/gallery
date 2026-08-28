@@ -19,7 +19,7 @@ import 'package:immich_mobile/providers/photos_filter/timeline_query.provider.da
 import 'package:immich_mobile/widgets/common/immich_sliver_app_bar.dart';
 
 /// Scroll offset the memories strip occupies at the top of the timeline —
-/// matches [DriftMemoryLane]'s own max height so the scrubber lines up.
+/// matches [MemoryLane]'s own max height so the scrubber lines up.
 const double _memoryLaneHeight = 200;
 
 @RoutePage()

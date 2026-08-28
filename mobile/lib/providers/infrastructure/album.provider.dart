@@ -46,7 +46,7 @@ final albumsContainingAssetProvider = FutureProvider.family<List<RemoteAlbum>, S
 
 /// M8: the shared spaces an OWNED album is linked into, fetched on demand (owner-only field,
 /// not in the Drift sync stream). Callers should only watch this for albums the current user
-/// owns — see [DriftAlbumApiRepository.getSharedSpaceLinks].
+/// owns — see [AlbumApiRepository.getSharedSpaceLinks].
 final albumSharedSpaceLinksProvider = FutureProvider.autoDispose.family<List<AlbumSharedSpaceLinkResponseDto>, String>(
-  (ref, albumId) => ref.watch(driftAlbumApiRepositoryProvider).getSharedSpaceLinks(albumId),
+  (ref, albumId) => ref.watch(albumApiRepositoryProvider).getSharedSpaceLinks(albumId),
 );
