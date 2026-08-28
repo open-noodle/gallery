@@ -6,7 +6,7 @@ import 'package:immich_mobile/presentation/widgets/memory/memory_bottom_info.wid
 void main() {
   group('memoryAssetForPage', () {
     final assets = [_asset('a0'), _asset('a1'), _asset('a2')];
-    final memory = DriftMemory(
+    final memory = Memory(
       id: 'm1',
       createdAt: DateTime(2026, 4, 3),
       updatedAt: DateTime(2026, 4, 3),
