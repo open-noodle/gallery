@@ -1,5 +1,13 @@
 import { Insertable, Kysely } from 'kysely';
-import { AssetFileType, AssetOrder, AssetOrderBy, AssetType, AssetVisibility, SharedSpaceRole, TimeBucketSize } from 'src/enum';
+import {
+  AssetFileType,
+  AssetOrder,
+  AssetOrderBy,
+  AssetType,
+  AssetVisibility,
+  SharedSpaceRole,
+  TimeBucketSize,
+} from 'src/enum';
 import { AssetRepository } from 'src/repositories/asset.repository';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
@@ -1654,6 +1662,8 @@ describe(AssetRepository.name, () => {
           id: [time1DSC0001Asset.id, time1DSC0002Asset.id, time2DSC0003Asset.id, time2DSC0004Asset.id],
         }),
       );
+    });
+
     it('filters bucket assets by description (accent/case-insensitive substring)', async () => {
       const { ctx, sut } = setup();
       const { user } = await ctx.newUser();
