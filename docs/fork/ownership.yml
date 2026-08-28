@@ -516,6 +516,24 @@ ci_invariants:
       - server/src/repositories/asset.repository.ts
     exceptions: []
 
+  # immich-30179 dispatches the four search endpoints to the dormant V3 builder whenever the request
+  # carries the structured shape. Gallery deliberately stays on searchAssetBuilderLegacy — V3 has no
+  # shared-space arm and drops the ownership predicate on album-confined branches — and rejects the
+  # new shape instead of falling through (legacy ignores `filter`, so a fallthrough would silently
+  # return a WIDER set than asked for). A rebase that resolves search.service.ts toward upstream
+  # would re-enable V3 with no conflict and no test failure; this catches that.
+  # Adopting V3 is a deliberate project: delete this invariant in the same change.
+  - id: search-v3-not-dispatched
+    title: Search V3 stays dormant; the flat path keeps the shared-space gate
+    forbidden_patterns:
+      - 'return this.searchMetadataV3(auth, dto);'
+      - 'return this.searchStatisticsV3(auth, dto);'
+      - 'return this.searchRandomV3(auth, dto);'
+      - 'return this.searchSmartV3(auth, dto);'
+    paths:
+      - server/src/services/search.service.ts
+    exceptions: []
+
 patches:
   - id: immich-ui-command-patch
     package: '@immich/ui'

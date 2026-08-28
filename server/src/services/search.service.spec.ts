@@ -2,7 +2,7 @@ import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { beforeEach, vitest } from 'vitest';
 import { mapAsset } from 'src/dtos/asset-response.dto.js';
 import { SearchSuggestionType } from 'src/dtos/search.dto.js';
-import { AssetOrder, AssetType, AssetVisibility } from 'src/enum.js';
+import { AssetOrder, AssetType, AssetVisibility, SearchOrderField } from 'src/enum.js';
 import { isActiveDistanceThreshold } from 'src/repositories/search.repository.js';
 import { SearchService } from 'src/services/search.service.js';
 import { clearConfigCache } from 'src/utils/config.js';
@@ -752,80 +752,60 @@ describe(SearchService.name, () => {
   });
 
   describe('new shape routing', () => {
-    it('should route a filter request to the V3 search and a flat request to the legacy search', async () => {
+    // Gallery keeps the four search endpoints on the legacy builder while upstream's V3 stays
+    // dormant, and REJECTS the structured shape rather than falling through to legacy: the legacy
+    // path ignores `filter` entirely, so a fallthrough would answer with a WIDER set than was asked
+    // for. Rationale and switch-over plan: specs/2026-07-23-search-v3-coexistence-design.md.
+    //
+    // Upstream's own tests for this describe exercise the V3 routing; they are replaced rather than
+    // deleted so a rebase that restores upstream's dispatch conflicts here visibly.
+    const rejected = new BadRequestException(
+      'Structured search (filter/orderBy/cursor) is not supported on this server. Use the flat search fields.',
+    );
+
+    it('rejects a structured request on every search endpoint', async () => {
       const auth = AuthFactory.create();
 
-      mocks.search.searchMetadataV3.mockResolvedValue({ hasNextPage: false, items: [] });
-      await sut.searchMetadata(auth, { size: 250, filter: {} });
-      expect(mocks.search.searchMetadataV3).toHaveBeenCalled();
-      expect(mocks.search.searchMetadata).not.toHaveBeenCalled();
-
-      mocks.search.searchMetadata.mockResolvedValue({ hasNextPage: false, items: [] });
-      await sut.searchMetadata(auth, { size: 250, city: 'Oslo' });
-      expect(mocks.search.searchMetadata).toHaveBeenCalled();
+      await expect(sut.searchMetadata(auth, { size: 250, filter: {} })).rejects.toThrowError(rejected);
+      await expect(sut.searchStatistics(auth, { filter: {} })).rejects.toThrowError(rejected);
+      await expect(sut.searchRandom(auth, { size: 250, filter: {} })).rejects.toThrowError(rejected);
+      await expect(sut.searchSmart(auth, { size: 100, filter: {}, query: 'test' })).rejects.toThrowError(rejected);
     });
 
-    it('should route statistics, random, and smart filter requests to their V3 search', async () => {
+    it('rejects every new-shape field, not just filter', async () => {
       const auth = AuthFactory.create();
 
-      mocks.search.searchStatisticsV3.mockResolvedValue({ total: 0 });
-      await expect(sut.searchStatistics(auth, { filter: {} })).resolves.toEqual({ total: 0 });
-
-      mocks.search.searchRandomV3.mockResolvedValue([]);
-      await expect(sut.searchRandom(auth, { size: 250, filter: {} })).resolves.toEqual([]);
-
-      mocks.search.searchSmartV3.mockResolvedValue({ hasNextPage: false, items: [] });
-      mocks.machineLearning.encodeText.mockResolvedValue('[1, 2, 3]');
-      await sut.searchSmart(auth, { size: 100, filter: {}, query: 'test' });
-      expect(mocks.search.searchSmartV3).toHaveBeenCalledWith(
-        { take: 100 },
-        expect.objectContaining({ embedding: '[1, 2, 3]' }),
-        expect.objectContaining({ lockedOwnerId: expect.any(String) }),
-      );
-    });
-
-    it('should reject an invalid cursor', async () => {
-      await expect(sut.searchMetadata(AuthFactory.create(), { size: 250, cursor: '???' })).rejects.toThrowError(
-        new BadRequestException('Invalid cursor'),
-      );
-    });
-
-    it('should reject an unelevated session whose filter could match locked assets', async () => {
-      const filter = { visibility: { in: [AssetVisibility.Locked, AssetVisibility.Timeline] } };
-      await expect(sut.searchMetadata(AuthFactory.create(), { size: 250, filter })).rejects.toBeInstanceOf(
-        UnauthorizedException,
-      );
-    });
-
-    it('should reject a shared link whose filter is not confined to albums everywhere', async () => {
-      const auth = AuthFactory.from().sharedLink().build();
-      const albumId = newUuid();
-
-      await expect(sut.searchMetadata(auth, { size: 250, filter: {} })).rejects.toThrowError(
-        new BadRequestException('Shared link access is only allowed in combination with an albumIds filter'),
-      );
-
+      await expect(sut.searchMetadata(auth, { size: 250, cursor: 'abc' })).rejects.toThrowError(rejected);
       await expect(
         sut.searchMetadata(auth, {
           size: 250,
-          filter: { or: [{ albumIds: { any: [albumId] } }, { city: { eq: 'Oslo' } }] },
+          orderBy: { field: SearchOrderField.FileCreatedAt, direction: AssetOrder.Desc },
         }),
-      ).rejects.toThrowError(
-        new BadRequestException('Shared link access is only allowed in combination with an albumIds filter'),
-      );
+      ).rejects.toThrowError(rejected);
     });
 
-    it('should allow a shared link when every branch is confined to a covered album', async () => {
-      const auth = AuthFactory.from().sharedLink().build();
-      const albumId = newUuid();
+    it('never reaches the dormant V3 repository methods', async () => {
+      const auth = AuthFactory.create();
 
-      mocks.access.album.checkSharedLinkAccess.mockResolvedValue(new Set([albumId]));
-      mocks.search.searchMetadataV3.mockResolvedValue({ hasNextPage: false, items: [] });
+      await expect(sut.searchMetadata(auth, { size: 250, filter: {} })).rejects.toThrow();
+      await expect(sut.searchStatistics(auth, { filter: {} })).rejects.toThrow();
+      await expect(sut.searchRandom(auth, { size: 250, filter: {} })).rejects.toThrow();
+      await expect(sut.searchSmart(auth, { size: 100, filter: {}, query: 'test' })).rejects.toThrow();
 
-      await expect(
-        sut.searchMetadata(auth, { size: 250, filter: { or: [{ albumIds: { any: [albumId] } }] } }),
-      ).resolves.toBeDefined();
-      expect(mocks.search.searchMetadataV3).toHaveBeenCalled();
+      expect(mocks.search.searchMetadataV3).not.toHaveBeenCalled();
+      expect(mocks.search.searchStatisticsV3).not.toHaveBeenCalled();
+      expect(mocks.search.searchRandomV3).not.toHaveBeenCalled();
+      expect(mocks.search.searchSmartV3).not.toHaveBeenCalled();
+    });
+
+    it('still routes a flat request to the legacy search', async () => {
+      const auth = AuthFactory.create();
+      mocks.search.searchMetadata.mockResolvedValue({ hasNextPage: false, items: [] });
+
+      await sut.searchMetadata(auth, { size: 250, city: 'Oslo' });
+
+      expect(mocks.search.searchMetadata).toHaveBeenCalled();
+      expect(mocks.search.searchMetadataV3).not.toHaveBeenCalled();
     });
   });
 
@@ -974,15 +954,15 @@ describe(SearchService.name, () => {
     });
 
     it('should cache embedding for the same query', async () => {
-      await sut.searchSmart(authStub.user1, { query: 'test' });
-      await sut.searchSmart(authStub.user1, { query: 'test' });
+      await sut.searchSmart(authStub.user1, { size: 100, query: 'test' });
+      await sut.searchSmart(authStub.user1, { size: 100, query: 'test' });
 
       expect(mocks.machineLearning.encodeText).toHaveBeenCalledTimes(1);
     });
 
     it('should not use cache for different queries', async () => {
-      await sut.searchSmart(authStub.user1, { query: 'test1' });
-      await sut.searchSmart(authStub.user1, { query: 'test2' });
+      await sut.searchSmart(authStub.user1, { size: 100, query: 'test1' });
+      await sut.searchSmart(authStub.user1, { size: 100, query: 'test2' });
 
       expect(mocks.machineLearning.encodeText).toHaveBeenCalledTimes(2);
     });
@@ -991,9 +971,9 @@ describe(SearchService.name, () => {
     // request. The uncached path runs class-transformer + class-validator over the
     // full nested SystemConfigDto and adds ~1-3s per call on slower CPUs.
     it('should read system config from cache across requests', async () => {
-      await sut.searchSmart(authStub.user1, { query: 'test1' });
-      await sut.searchSmart(authStub.user1, { query: 'test2' });
-      await sut.searchSmart(authStub.user1, { query: 'test3' });
+      await sut.searchSmart(authStub.user1, { size: 100, query: 'test1' });
+      await sut.searchSmart(authStub.user1, { size: 100, query: 'test2' });
+      await sut.searchSmart(authStub.user1, { size: 100, query: 'test3' });
 
       expect(mocks.systemMetadata.get).toHaveBeenCalledTimes(1);
     });
@@ -1003,7 +983,7 @@ describe(SearchService.name, () => {
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
       mocks.search.getEmbedding.mockResolvedValue('[4, 5, 6]');
 
-      await sut.searchSmart(authStub.user1, { queryAssetId: assetId });
+      await sut.searchSmart(authStub.user1, { size: 100, queryAssetId: assetId });
 
       expect(mocks.machineLearning.encodeText).not.toHaveBeenCalled();
       expect(mocks.search.getEmbedding).toHaveBeenCalledWith(assetId);
@@ -1018,19 +998,21 @@ describe(SearchService.name, () => {
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
       mocks.search.getEmbedding.mockResolvedValue(null);
 
-      await expect(sut.searchSmart(authStub.user1, { queryAssetId: assetId })).rejects.toThrow(
+      await expect(sut.searchSmart(authStub.user1, { size: 100, queryAssetId: assetId })).rejects.toThrow(
         `Asset ${assetId} has no embedding`,
       );
     });
 
     it('should throw if neither query nor queryAssetId is set', async () => {
-      await expect(sut.searchSmart(authStub.user1, {})).rejects.toThrow('Either `query` or `queryAssetId` must be set');
+      await expect(sut.searchSmart(authStub.user1, { size: 100 })).rejects.toThrow(
+        'Either `query` or `queryAssetId` must be set',
+      );
     });
 
     it('should return nextPage when there are more results', async () => {
       mocks.search.searchSmart.mockResolvedValue({ hasNextPage: true, items: [] });
 
-      const result = await sut.searchSmart(authStub.user1, { query: 'test', page: 1 });
+      const result = await sut.searchSmart(authStub.user1, { size: 100, query: 'test', page: 1 });
 
       expect(result.assets.nextPage).toEqual('2');
     });
@@ -1038,7 +1020,7 @@ describe(SearchService.name, () => {
     it('should return null nextPage when there are no more results', async () => {
       mocks.search.searchSmart.mockResolvedValue({ hasNextPage: false, items: [] });
 
-      const result = await sut.searchSmart(authStub.user1, { query: 'test' });
+      const result = await sut.searchSmart(authStub.user1, { size: 100, query: 'test' });
 
       expect(result.assets.nextPage).toBeNull();
     });
@@ -1056,7 +1038,7 @@ describe(SearchService.name, () => {
         mocks.access.album.checkSharedAlbumAccess.mockResolvedValue(new Set([albumId]));
         mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
 
-        await sut.searchSmart(authStub.user1, { query: 'test', albumIds: [albumId] });
+        await sut.searchSmart(authStub.user1, { size: 100, query: 'test', albumIds: [albumId] });
 
         expect(mocks.access.album.checkSharedAlbumAccess).toHaveBeenCalled();
       });
@@ -1069,9 +1051,9 @@ describe(SearchService.name, () => {
         // throws on an unstubbed repository method instead, and the assertion passes either way.
         mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
 
-        await expect(sut.searchSmart(authStub.user1, { query: 'test', albumIds: [albumId] })).rejects.toThrow(
-          BadRequestException,
-        );
+        await expect(
+          sut.searchSmart(authStub.user1, { size: 100, query: 'test', albumIds: [albumId] }),
+        ).rejects.toThrow(BadRequestException);
       });
 
       it('drops the owner scope so a shared album returns every member’s matching photos', async () => {
@@ -1080,7 +1062,7 @@ describe(SearchService.name, () => {
         mocks.access.album.checkSharedAlbumAccess.mockResolvedValue(new Set([albumId]));
         mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
 
-        await sut.searchSmart(authStub.user1, { query: 'test', albumIds: [albumId] });
+        await sut.searchSmart(authStub.user1, { size: 100, query: 'test', albumIds: [albumId] });
 
         const [, options] = mocks.search.searchSmart.mock.calls.at(-1)!;
         expect(options.albumIds).toEqual([albumId]);
@@ -1088,7 +1070,7 @@ describe(SearchService.name, () => {
       });
 
       it('keeps the owner scope when no album scope is given', async () => {
-        await sut.searchSmart(authStub.user1, { query: 'test' });
+        await sut.searchSmart(authStub.user1, { size: 100, query: 'test' });
 
         const [, options] = mocks.search.searchSmart.mock.calls.at(-1)!;
         expect(options.userIds).toEqual([authStub.user1.user.id]);
@@ -1103,7 +1085,7 @@ describe(SearchService.name, () => {
         mocks.access.album.checkSharedAlbumAccess.mockResolvedValue(new Set([albumId]));
         mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
 
-        await sut.searchSmart(authStub.user1, { query: 'test', albumIds: [albumId] });
+        await sut.searchSmart(authStub.user1, { size: 100, query: 'test', albumIds: [albumId] });
 
         const [, options] = mocks.search.searchSmart.mock.calls.at(-1)!;
         expect(options.callerId).toBe(authStub.user1.user.id);
@@ -1129,7 +1111,7 @@ describe(SearchService.name, () => {
         const spaceId = newUuid();
         mocks.access.sharedSpace.checkMemberAccess.mockResolvedValue(new Set([spaceId]));
 
-        await sut.searchSmart(authStub.user1, { query: 'test', spaceId });
+        await sut.searchSmart(authStub.user1, { size: 100, query: 'test', spaceId });
 
         expect(mocks.access.sharedSpace.checkMemberAccess).toHaveBeenCalledWith(
           authStub.user1.user.id,
@@ -1141,13 +1123,13 @@ describe(SearchService.name, () => {
         const spaceId = newUuid();
         mocks.access.sharedSpace.checkMemberAccess.mockResolvedValue(new Set([spaceId]));
 
-        await sut.searchSmart(authStub.user1, { query: 'test', spaceId });
+        await sut.searchSmart(authStub.user1, { size: 100, query: 'test', spaceId });
 
         expect(mocks.search.searchSmart).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ spaceId }));
       });
 
       it('should not check space access when spaceId is not provided', async () => {
-        await sut.searchSmart(authStub.user1, { query: 'test' });
+        await sut.searchSmart(authStub.user1, { size: 100, query: 'test' });
 
         expect(mocks.access.sharedSpace.checkMemberAccess).not.toHaveBeenCalled();
       });
@@ -1156,13 +1138,13 @@ describe(SearchService.name, () => {
         const spaceId = newUuid();
         mocks.access.sharedSpace.checkMemberAccess.mockResolvedValue(new Set());
 
-        await expect(sut.searchSmart(authStub.user1, { query: 'test', spaceId })).rejects.toThrow();
+        await expect(sut.searchSmart(authStub.user1, { size: 100, query: 'test', spaceId })).rejects.toThrow();
       });
 
       it('should reject spacePersonIds when spaceId is not set', async () => {
-        await expect(sut.searchSmart(authStub.user1, { query: 'test', spacePersonIds: [newUuid()] })).rejects.toThrow(
-          BadRequestException,
-        );
+        await expect(
+          sut.searchSmart(authStub.user1, { size: 100, query: 'test', spacePersonIds: [newUuid()] }),
+        ).rejects.toThrow(BadRequestException);
       });
 
       it('should pass spacePersonIds through to repository', async () => {
@@ -1170,7 +1152,7 @@ describe(SearchService.name, () => {
         const spacePersonIds = [newUuid(), newUuid()];
         mocks.access.sharedSpace.checkMemberAccess.mockResolvedValue(new Set([spaceId]));
 
-        await sut.searchSmart(authStub.user1, { query: 'test', spaceId, spacePersonIds });
+        await sut.searchSmart(authStub.user1, { size: 100, query: 'test', spaceId, spacePersonIds });
 
         expect(mocks.search.searchSmart).toHaveBeenCalledWith(
           expect.anything(),
@@ -1184,6 +1166,7 @@ describe(SearchService.name, () => {
         mocks.access.sharedSpace.checkMemberAccess.mockResolvedValue(new Set([spaceId]));
 
         await sut.searchSmart(authStub.user1, {
+          size: 100,
           query: 'test',
           spaceId,
           spacePersonIds,
@@ -1201,18 +1184,10 @@ describe(SearchService.name, () => {
     describe('withSharedSpaces', () => {
       it('should reject when both spaceId and withSharedSpaces are set', async () => {
         await expect(
-          sut.searchSmart(authStub.user1, {
-            query: 'test',
-            spaceId: newUuid(),
-            withSharedSpaces: true,
-          }),
+          sut.searchSmart(authStub.user1, { size: 100, query: 'test', spaceId: newUuid(), withSharedSpaces: true }),
         ).rejects.toBeInstanceOf(BadRequestException);
         await expect(
-          sut.searchSmart(authStub.user1, {
-            query: 'test',
-            spaceId: newUuid(),
-            withSharedSpaces: true,
-          }),
+          sut.searchSmart(authStub.user1, { size: 100, query: 'test', spaceId: newUuid(), withSharedSpaces: true }),
         ).rejects.toThrow('Cannot use both spaceId and withSharedSpaces');
       });
 
@@ -1221,7 +1196,7 @@ describe(SearchService.name, () => {
         const spaceId2 = newUuid();
         mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId: spaceId1 }, { spaceId: spaceId2 }]);
 
-        await sut.searchSmart(authStub.user1, { query: 'test', withSharedSpaces: true });
+        await sut.searchSmart(authStub.user1, { size: 100, query: 'test', withSharedSpaces: true });
 
         expect(mocks.sharedSpace.getSpaceIdsForTimeline).toHaveBeenCalledWith(authStub.user1.user.id);
         expect(mocks.search.searchSmart).toHaveBeenCalledWith(
@@ -1243,7 +1218,7 @@ describe(SearchService.name, () => {
         mocks.search.getEmbedding.mockResolvedValue('[4, 5, 6]');
         mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId }]);
 
-        await sut.searchSmart(authStub.user1, { queryAssetId: assetId, withSharedSpaces: true });
+        await sut.searchSmart(authStub.user1, { size: 100, queryAssetId: assetId, withSharedSpaces: true });
 
         expect(mocks.search.getEmbedding).toHaveBeenCalledWith(assetId);
         expect(mocks.search.searchSmart).toHaveBeenCalledWith(
@@ -1255,7 +1230,7 @@ describe(SearchService.name, () => {
       it('should fall back to owner-only when withSharedSpaces is true but user has no spaces', async () => {
         mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
 
-        await sut.searchSmart(authStub.user1, { query: 'test', withSharedSpaces: true });
+        await sut.searchSmart(authStub.user1, { size: 100, query: 'test', withSharedSpaces: true });
 
         expect(mocks.sharedSpace.getSpaceIdsForTimeline).toHaveBeenCalledWith(authStub.user1.user.id);
         expect(mocks.search.searchSmart).toHaveBeenCalledWith(
@@ -1265,13 +1240,13 @@ describe(SearchService.name, () => {
       });
 
       it('should not call getSpaceIdsForTimeline when withSharedSpaces is absent', async () => {
-        await sut.searchSmart(authStub.user1, { query: 'test' });
+        await sut.searchSmart(authStub.user1, { size: 100, query: 'test' });
 
         expect(mocks.sharedSpace.getSpaceIdsForTimeline).not.toHaveBeenCalled();
       });
 
       it('should not call getSpaceIdsForTimeline when withSharedSpaces is explicitly false', async () => {
-        await sut.searchSmart(authStub.user1, { query: 'test', withSharedSpaces: false });
+        await sut.searchSmart(authStub.user1, { size: 100, query: 'test', withSharedSpaces: false });
 
         expect(mocks.sharedSpace.getSpaceIdsForTimeline).not.toHaveBeenCalled();
       });
@@ -1280,7 +1255,7 @@ describe(SearchService.name, () => {
         const spaceId = newUuid();
         mocks.access.sharedSpace.checkMemberAccess.mockResolvedValue(new Set([spaceId]));
 
-        await sut.searchSmart(authStub.user1, { query: 'test', spaceId });
+        await sut.searchSmart(authStub.user1, { size: 100, query: 'test', spaceId });
 
         expect(mocks.sharedSpace.getSpaceIdsForTimeline).not.toHaveBeenCalled();
       });
@@ -1288,6 +1263,7 @@ describe(SearchService.name, () => {
       it('should still reject spacePersonIds without spaceId when withSharedSpaces is true', async () => {
         await expect(
           sut.searchSmart(authStub.user1, {
+            size: 100,
             query: 'test',
             withSharedSpaces: true,
             spacePersonIds: [newUuid()],
@@ -1306,7 +1282,7 @@ describe(SearchService.name, () => {
           hasInaccessibleToken: false,
         });
 
-        await sut.searchSmart(authStub.user1, { query: 'test', withSharedSpaces: true, personIds: [token] });
+        await sut.searchSmart(authStub.user1, { size: 100, query: 'test', withSharedSpaces: true, personIds: [token] });
 
         expect(mocks.search.searchSmart).toHaveBeenCalledWith(
           expect.anything(),
@@ -1324,7 +1300,7 @@ describe(SearchService.name, () => {
         // An albumIds scope is now AlbumRead-checked before anything else runs.
         mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set([albumId]));
 
-        await sut.searchSmart(authStub.user1, { query: 'test', albumIds: [albumId] });
+        await sut.searchSmart(authStub.user1, { size: 100, query: 'test', albumIds: [albumId] });
 
         expect(mocks.sharedSpace.getSpaceIdsForTimeline).toHaveBeenCalledWith(authStub.user1.user.id);
         expect(mocks.search.searchSmart).toHaveBeenCalledWith(
@@ -1335,7 +1311,7 @@ describe(SearchService.name, () => {
     });
 
     it('should pass orderDirection when order is set', async () => {
-      await sut.searchSmart(authStub.user1, { query: 'test', order: AssetOrder.Desc });
+      await sut.searchSmart(authStub.user1, { size: 100, query: 'test', order: AssetOrder.Desc });
 
       expect(mocks.search.searchSmart).toHaveBeenCalledWith(
         { page: 1, size: 100 },
@@ -1344,7 +1320,7 @@ describe(SearchService.name, () => {
     });
 
     it('should not pass orderDirection when order is not set', async () => {
-      await sut.searchSmart(authStub.user1, { query: 'test' });
+      await sut.searchSmart(authStub.user1, { size: 100, query: 'test' });
 
       expect(mocks.search.searchSmart).toHaveBeenCalledWith(
         { page: 1, size: 100 },
@@ -1357,7 +1333,7 @@ describe(SearchService.name, () => {
         machineLearning: { clip: { maxDistance: 0.75 } },
       });
 
-      await sut.searchSmart(authStub.user1, { query: 'test' });
+      await sut.searchSmart(authStub.user1, { size: 100, query: 'test' });
 
       expect(mocks.search.searchSmart).toHaveBeenCalledWith(
         expect.anything(),
@@ -1373,7 +1349,7 @@ describe(SearchService.name, () => {
         machineLearning: { clip: { maxDistance: 0.75 } },
       });
 
-      await sut.searchSmart(authStub.user1, { queryAssetId: assetId });
+      await sut.searchSmart(authStub.user1, { size: 100, queryAssetId: assetId });
 
       expect(mocks.search.searchSmart).toHaveBeenCalledWith(
         expect.anything(),
@@ -1382,7 +1358,7 @@ describe(SearchService.name, () => {
     });
 
     it('should pass maxDistance 0 (disabled) by default', async () => {
-      await sut.searchSmart(authStub.user1, { query: 'test' });
+      await sut.searchSmart(authStub.user1, { size: 100, query: 'test' });
 
       expect(mocks.search.searchSmart).toHaveBeenCalledWith(
         expect.anything(),
@@ -1395,7 +1371,7 @@ describe(SearchService.name, () => {
         machineLearning: { clip: { maxDistance: 2 } },
       });
 
-      await sut.searchSmart(authStub.user1, { query: 'test' });
+      await sut.searchSmart(authStub.user1, { size: 100, query: 'test' });
 
       expect(mocks.search.searchSmart).toHaveBeenCalledWith(
         expect.anything(),
@@ -1408,7 +1384,7 @@ describe(SearchService.name, () => {
         machineLearning: { clip: { maxDistance: 0.75 } },
       });
 
-      await sut.searchSmart(authStub.user1, { query: 'test', order: AssetOrder.Desc });
+      await sut.searchSmart(authStub.user1, { size: 100, query: 'test', order: AssetOrder.Desc });
 
       expect(mocks.search.searchSmart).toHaveBeenCalledWith(
         expect.anything(),
@@ -1476,7 +1452,7 @@ describe(SearchService.name, () => {
     it('reuses the text embedding cache across result and facet calls', async () => {
       mocks.search.searchSmart.mockResolvedValue({ hasNextPage: false, items: [] });
 
-      await sut.searchSmart(authStub.user1, { query: 'test' });
+      await sut.searchSmart(authStub.user1, { size: 100, query: 'test' });
       await sut.searchSmartFacets(authStub.user1, { query: 'test' });
 
       expect(mocks.machineLearning.encodeText).toHaveBeenCalledTimes(1);
@@ -1595,7 +1571,7 @@ describe(SearchService.name, () => {
     it('should search metadata with default pagination', async () => {
       mocks.search.searchMetadata.mockResolvedValue({ hasNextPage: false, items: [] });
 
-      const result = await sut.searchMetadata(authStub.user1, {});
+      const result = await sut.searchMetadata(authStub.user1, { size: 250 });
 
       expect(mocks.search.searchMetadata).toHaveBeenCalledWith(
         { page: 1, size: 250 },
@@ -1618,7 +1594,7 @@ describe(SearchService.name, () => {
     it('should return nextPage when there are more results', async () => {
       mocks.search.searchMetadata.mockResolvedValue({ hasNextPage: true, items: [] });
 
-      const result = await sut.searchMetadata(authStub.user1, { page: 2 });
+      const result = await sut.searchMetadata(authStub.user1, { size: 250, page: 2 });
 
       expect(result.assets.nextPage).toEqual('3');
     });
@@ -1627,7 +1603,7 @@ describe(SearchService.name, () => {
       mocks.search.searchMetadata.mockResolvedValue({ hasNextPage: false, items: [] });
       const hexChecksum = 'abcdef1234567890abcdef1234567890abcdef12';
 
-      await sut.searchMetadata(authStub.user1, { checksum: hexChecksum });
+      await sut.searchMetadata(authStub.user1, { size: 250, checksum: hexChecksum });
 
       expect(mocks.search.searchMetadata).toHaveBeenCalledWith(
         expect.anything(),
@@ -1640,7 +1616,7 @@ describe(SearchService.name, () => {
       // SHA1 hash in base64 is exactly 28 characters
       const base64Checksum = 'q83vEjRWeJCrze8SNFZ4kKvN7xI=';
 
-      await sut.searchMetadata(authStub.user1, { checksum: base64Checksum });
+      await sut.searchMetadata(authStub.user1, { size: 250, checksum: base64Checksum });
 
       expect(mocks.search.searchMetadata).toHaveBeenCalledWith(
         expect.anything(),
@@ -1651,7 +1627,7 @@ describe(SearchService.name, () => {
     it('should throw for locked visibility without elevated permission', async () => {
       const auth = AuthFactory.create();
 
-      await expect(sut.searchMetadata(auth, { visibility: AssetVisibility.Locked })).rejects.toThrow(
+      await expect(sut.searchMetadata(auth, { size: 250, visibility: AssetVisibility.Locked })).rejects.toThrow(
         'Elevated permission is required',
       );
     });
@@ -1662,7 +1638,7 @@ describe(SearchService.name, () => {
         mocks.access.sharedSpace.checkMemberAccess.mockResolvedValue(new Set([spaceId]));
         mocks.search.searchMetadata.mockResolvedValue({ hasNextPage: false, items: [] });
 
-        await sut.searchMetadata(authStub.user1, { spaceId });
+        await sut.searchMetadata(authStub.user1, { size: 250, spaceId });
 
         expect(mocks.access.sharedSpace.checkMemberAccess).toHaveBeenCalledWith(
           authStub.user1.user.id,
@@ -1675,7 +1651,7 @@ describe(SearchService.name, () => {
         mocks.access.sharedSpace.checkMemberAccess.mockResolvedValue(new Set([spaceId]));
         mocks.search.searchMetadata.mockResolvedValue({ hasNextPage: false, items: [] });
 
-        await sut.searchMetadata(authStub.user1, { spaceId });
+        await sut.searchMetadata(authStub.user1, { size: 250, spaceId });
 
         expect(mocks.search.searchMetadata).toHaveBeenCalledWith(
           expect.anything(),
@@ -1686,7 +1662,7 @@ describe(SearchService.name, () => {
       it('should not check space access when spaceId is not provided', async () => {
         mocks.search.searchMetadata.mockResolvedValue({ hasNextPage: false, items: [] });
 
-        await sut.searchMetadata(authStub.user1, {});
+        await sut.searchMetadata(authStub.user1, { size: 250 });
 
         expect(mocks.access.sharedSpace.checkMemberAccess).not.toHaveBeenCalled();
       });
@@ -1695,7 +1671,7 @@ describe(SearchService.name, () => {
         const spaceId = newUuid();
         mocks.access.sharedSpace.checkMemberAccess.mockResolvedValue(new Set());
 
-        await expect(sut.searchMetadata(authStub.user1, { spaceId })).rejects.toThrow();
+        await expect(sut.searchMetadata(authStub.user1, { size: 250, spaceId })).rejects.toThrow();
       });
     });
 
@@ -1706,7 +1682,7 @@ describe(SearchService.name, () => {
       mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId }]);
       mocks.search.searchMetadata.mockResolvedValue({ hasNextPage: false, items: [] });
 
-      await sut.searchMetadata(authStub.user1, { albumIds: [albumId] });
+      await sut.searchMetadata(authStub.user1, { size: 250, albumIds: [albumId] });
 
       expect(mocks.sharedSpace.getSpaceIdsForTimeline).toHaveBeenCalledWith(authStub.user1.user.id);
       expect(mocks.search.searchMetadata).toHaveBeenCalledWith(
@@ -1738,7 +1714,7 @@ describe(SearchService.name, () => {
         hasInaccessibleToken: true,
       });
 
-      await sut.searchMetadata(authStub.user1, { albumIds: [albumId], personIds: [personId] });
+      await sut.searchMetadata(authStub.user1, { size: 250, albumIds: [albumId], personIds: [personId] });
 
       expect(mocks.access.album.checkSharedAlbumAccess).toHaveBeenCalled();
       expect((mocks.faceIdentity as any).resolveScopedPersonTokens).toHaveBeenCalledWith({
@@ -1763,7 +1739,7 @@ describe(SearchService.name, () => {
         hasInaccessibleToken: false,
       });
 
-      await sut.searchMetadata(authStub.user1, { withSharedSpaces: true, personIds: [token, token] });
+      await sut.searchMetadata(authStub.user1, { size: 250, withSharedSpaces: true, personIds: [token, token] });
 
       expect(mocks.search.searchMetadata).toHaveBeenCalledWith(
         expect.anything(),
@@ -1783,7 +1759,7 @@ describe(SearchService.name, () => {
       const ownerId = newUuid();
       mocks.search.searchMetadata.mockResolvedValue({ hasNextPage: false, items: [] });
 
-      await sut.searchMetadata(authStub.user1, { ownerId });
+      await sut.searchMetadata(authStub.user1, { size: 250, ownerId });
 
       expect(mocks.search.searchMetadata).toHaveBeenCalledWith(
         expect.anything(),
@@ -1823,7 +1799,7 @@ describe(SearchService.name, () => {
       const asset = AssetFactory.from().build();
       mocks.search.searchRandom.mockResolvedValue([asset as any]);
 
-      const result = await sut.searchRandom(authStub.user1, {});
+      const result = await sut.searchRandom(authStub.user1, { size: 250 });
 
       expect(mocks.search.searchRandom).toHaveBeenCalledWith(
         250,
@@ -1847,7 +1823,7 @@ describe(SearchService.name, () => {
       const auth = AuthFactory.from().session().build();
       mocks.search.searchRandom.mockResolvedValue([]);
 
-      await sut.searchRandom(auth, {});
+      await sut.searchRandom(auth, { size: 250 });
 
       const opts = mocks.search.searchRandom.mock.calls[0][1];
       expect(opts.visibility).toBe('not-locked');
@@ -1857,7 +1833,7 @@ describe(SearchService.name, () => {
       const auth = AuthFactory.from().session({ hasElevatedPermission: true }).build();
       mocks.search.searchRandom.mockResolvedValue([]);
 
-      await sut.searchRandom(auth, {});
+      await sut.searchRandom(auth, { size: 250 });
 
       const opts = mocks.search.searchRandom.mock.calls[0][1];
       expect(opts).toHaveProperty('visibility');
@@ -1868,7 +1844,7 @@ describe(SearchService.name, () => {
       const auth = AuthFactory.from().session().build();
       mocks.search.searchRandom.mockResolvedValue([]);
 
-      await sut.searchRandom(auth, { visibility: AssetVisibility.Archive });
+      await sut.searchRandom(auth, { size: 250, visibility: AssetVisibility.Archive });
 
       const opts = mocks.search.searchRandom.mock.calls[0][1];
       expect(opts.visibility).toBe(AssetVisibility.Archive);
@@ -1878,7 +1854,7 @@ describe(SearchService.name, () => {
       const auth = AuthFactory.create();
       mocks.search.searchRandom.mockResolvedValue([]);
 
-      await sut.searchRandom(auth, {});
+      await sut.searchRandom(auth, { size: 250 });
 
       const opts = mocks.search.searchRandom.mock.calls[0][1];
       expect(opts.visibility).toBe('not-locked');
@@ -1887,7 +1863,7 @@ describe(SearchService.name, () => {
     it('should throw for locked visibility without elevated permission', async () => {
       const auth = AuthFactory.create();
 
-      await expect(sut.searchRandom(auth, { visibility: AssetVisibility.Locked })).rejects.toThrow(
+      await expect(sut.searchRandom(auth, { size: 250, visibility: AssetVisibility.Locked })).rejects.toThrow(
         'Elevated permission is required',
       );
     });
@@ -1898,7 +1874,7 @@ describe(SearchService.name, () => {
         mocks.access.sharedSpace.checkMemberAccess.mockResolvedValue(new Set([spaceId]));
         mocks.search.searchRandom.mockResolvedValue([]);
 
-        await sut.searchRandom(authStub.user1, { spaceId });
+        await sut.searchRandom(authStub.user1, { size: 250, spaceId });
 
         expect(mocks.access.sharedSpace.checkMemberAccess).toHaveBeenCalledWith(
           authStub.user1.user.id,
@@ -1910,7 +1886,7 @@ describe(SearchService.name, () => {
       it('should not check space access when spaceId is not provided', async () => {
         mocks.search.searchRandom.mockResolvedValue([]);
 
-        await sut.searchRandom(authStub.user1, {});
+        await sut.searchRandom(authStub.user1, { size: 250 });
 
         expect(mocks.access.sharedSpace.checkMemberAccess).not.toHaveBeenCalled();
       });
@@ -1919,7 +1895,7 @@ describe(SearchService.name, () => {
         const spaceId = newUuid();
         mocks.access.sharedSpace.checkMemberAccess.mockResolvedValue(new Set());
 
-        await expect(sut.searchRandom(authStub.user1, { spaceId })).rejects.toThrow();
+        await expect(sut.searchRandom(authStub.user1, { size: 250, spaceId })).rejects.toThrow();
       });
     });
 
@@ -1929,7 +1905,7 @@ describe(SearchService.name, () => {
       mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId }]);
       mocks.search.searchRandom.mockResolvedValue([]);
 
-      await sut.searchRandom(authStub.user1, { albumIds: [albumId] });
+      await sut.searchRandom(authStub.user1, { size: 250, albumIds: [albumId] });
 
       expect(mocks.search.searchRandom).toHaveBeenCalledWith(
         250,
@@ -1943,7 +1919,7 @@ describe(SearchService.name, () => {
       const asset = AssetFactory.from().build();
       mocks.search.searchLargeAssets.mockResolvedValue([asset as any]);
 
-      const result = await sut.searchLargeAssets(authStub.user1, {});
+      const result = await sut.searchLargeAssets(authStub.user1, { size: 250 });
 
       expect(mocks.search.searchLargeAssets).toHaveBeenCalledWith(
         250,
@@ -1966,7 +1942,7 @@ describe(SearchService.name, () => {
     it('should throw for locked visibility without elevated permission', async () => {
       const auth = AuthFactory.create();
 
-      await expect(sut.searchLargeAssets(auth, { visibility: AssetVisibility.Locked })).rejects.toThrow(
+      await expect(sut.searchLargeAssets(auth, { size: 250, visibility: AssetVisibility.Locked })).rejects.toThrow(
         'Elevated permission is required',
       );
     });
@@ -1977,7 +1953,7 @@ describe(SearchService.name, () => {
         mocks.access.sharedSpace.checkMemberAccess.mockResolvedValue(new Set([spaceId]));
         mocks.search.searchLargeAssets.mockResolvedValue([]);
 
-        await sut.searchLargeAssets(authStub.user1, { spaceId });
+        await sut.searchLargeAssets(authStub.user1, { size: 250, spaceId });
 
         expect(mocks.access.sharedSpace.checkMemberAccess).toHaveBeenCalledWith(
           authStub.user1.user.id,
@@ -1989,7 +1965,7 @@ describe(SearchService.name, () => {
       it('should not check space access when spaceId is not provided', async () => {
         mocks.search.searchLargeAssets.mockResolvedValue([]);
 
-        await sut.searchLargeAssets(authStub.user1, {});
+        await sut.searchLargeAssets(authStub.user1, { size: 250 });
 
         expect(mocks.access.sharedSpace.checkMemberAccess).not.toHaveBeenCalled();
       });
@@ -1998,7 +1974,7 @@ describe(SearchService.name, () => {
         const spaceId = newUuid();
         mocks.access.sharedSpace.checkMemberAccess.mockResolvedValue(new Set());
 
-        await expect(sut.searchLargeAssets(authStub.user1, { spaceId })).rejects.toThrow();
+        await expect(sut.searchLargeAssets(authStub.user1, { size: 250, spaceId })).rejects.toThrow();
       });
     });
 
@@ -2008,7 +1984,7 @@ describe(SearchService.name, () => {
       mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([{ spaceId }]);
       mocks.search.searchLargeAssets.mockResolvedValue([]);
 
-      await sut.searchLargeAssets(authStub.user1, { albumIds: [albumId] });
+      await sut.searchLargeAssets(authStub.user1, { size: 250, albumIds: [albumId] });
 
       expect(mocks.search.searchLargeAssets).toHaveBeenCalledWith(
         250,
@@ -2019,11 +1995,11 @@ describe(SearchService.name, () => {
 
   describe('H-1: trash / offline params rejected under a shared-space scope', () => {
     const runners: Array<{ name: string; run: (dto: Record<string, unknown>) => Promise<unknown> }> = [
-      { name: 'searchMetadata', run: (dto) => sut.searchMetadata(authStub.user1, dto) },
-      { name: 'searchRandom', run: (dto) => sut.searchRandom(authStub.user1, dto) },
-      { name: 'searchLargeAssets', run: (dto) => sut.searchLargeAssets(authStub.user1, dto) },
+      { name: 'searchMetadata', run: (dto) => sut.searchMetadata(authStub.user1, { size: 250, ...dto }) },
+      { name: 'searchRandom', run: (dto) => sut.searchRandom(authStub.user1, { size: 250, ...dto }) },
+      { name: 'searchLargeAssets', run: (dto) => sut.searchLargeAssets(authStub.user1, { size: 250, ...dto }) },
       { name: 'searchStatistics', run: (dto) => sut.searchStatistics(authStub.user1, dto) },
-      { name: 'searchSmart', run: (dto) => sut.searchSmart(authStub.user1, { query: 'test', ...dto }) },
+      { name: 'searchSmart', run: (dto) => sut.searchSmart(authStub.user1, { size: 100, query: 'test', ...dto }) },
     ];
 
     const trashParams: Array<{ label: string; param: Record<string, unknown>; needsWithDeleted?: boolean }> = [
@@ -2061,13 +2037,13 @@ describe(SearchService.name, () => {
       mocks.access.sharedSpace.checkMemberAccess.mockResolvedValue(new Set([spaceId]));
       mocks.search.searchMetadata.mockResolvedValue({ hasNextPage: false, items: [] });
 
-      await expect(sut.searchMetadata(authStub.user1, { spaceId })).resolves.toBeDefined();
+      await expect(sut.searchMetadata(authStub.user1, { size: 250, spaceId })).resolves.toBeDefined();
     });
 
     it('does not reject withDeleted outside a space scope (searchMetadata)', async () => {
       mocks.search.searchMetadata.mockResolvedValue({ hasNextPage: false, items: [] });
 
-      await expect(sut.searchMetadata(authStub.user1, { withDeleted: true })).resolves.toBeDefined();
+      await expect(sut.searchMetadata(authStub.user1, { size: 250, withDeleted: true })).resolves.toBeDefined();
     });
 
     it('does not over-block isOffline=false under a space scope (searchMetadata)', async () => {
@@ -2075,7 +2051,7 @@ describe(SearchService.name, () => {
       mocks.access.sharedSpace.checkMemberAccess.mockResolvedValue(new Set([spaceId]));
       mocks.search.searchMetadata.mockResolvedValue({ hasNextPage: false, items: [] });
 
-      await expect(sut.searchMetadata(authStub.user1, { spaceId, isOffline: false })).resolves.toBeDefined();
+      await expect(sut.searchMetadata(authStub.user1, { size: 250, spaceId, isOffline: false })).resolves.toBeDefined();
     });
   });
 
@@ -2486,7 +2462,7 @@ describe(SearchService.name, () => {
       ]);
       mocks.search.searchMetadata.mockResolvedValue({ hasNextPage: false, items: [] });
 
-      await sut.searchMetadata(authStub.user1, {});
+      await sut.searchMetadata(authStub.user1, { size: 250 });
 
       expect(mocks.search.searchMetadata).toHaveBeenCalledWith(
         expect.anything(),
