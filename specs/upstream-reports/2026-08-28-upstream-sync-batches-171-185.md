@@ -5,8 +5,10 @@
 - **Upstream commits pulled**: 17 (`093f5c070ad..8178a01522f`)
 - **Fork commits synced**: 2 (`bcb635ae28f..4b484696575` — #1029, #1030/#1032)
 - **Conflicts resolved**: 24 stops (4 auto-resolved by a proven rename resolver, 20 by hand)
+- **CI**: green on `fb66d3fe2dc`; the nine non-`Test` workflows green on `3a94ecfdc90`, which
+  differs only by the two fixes below (neither touches their inputs)
 - **Risk level**: MEDIUM-HIGH (a 92-file mobile mass rename + a cluster-groups extension)
-- **Recommendation**: PROCEED — every local gate is green; remote CI still to run
+- **Recommendation**: PROCEED — **10/10 gating workflows green** (`Test` 21/21)
 - **Landing**: NOT a cutover cycle. Latest upstream tag is still `v3.1.0`, which
   `branding/config.json` already carries, so the branch stays off `main`.
 
@@ -154,3 +156,43 @@ reads as an invalid workflow. Removed.
    resurrection — worth a file-must-not-exist invariant.
 4. **`test/providers/backup/` naming** — the fork now carries upstream's test at
    upstream's path, so the previous restoration commit's job is done.
+
+## Remote CI
+
+- **Test branch**: `rebase/upstream-batch-185`
+- **Commit validated**: `fb66d3fe2dc` (`Test`); `3a94ecfdc90` for the other nine
+
+| Workflow                                                                         | Status                                                 |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| `test.yml`                                                                       | GREEN — 21/21 jobs                                     |
+| `docker.yml`                                                                     | GREEN                                                  |
+| `static_analysis.yml`                                                            | GREEN                                                  |
+| `gallery-build-mobile.yml`                                                       | GREEN — iOS + Android compile after the 92-file rename |
+| `gallery-mobile-smoke.yml` · `gallery-ml-smoke.yml` · `gallery-rebase-smoke.yml` | GREEN                                                  |
+| `storage-migration-tests.yml` · `storage-migration-e2e.yml`                      | GREEN                                                  |
+| `gallery-revert-to-immich-validation.yml`                                        | GREEN                                                  |
+
+### Two defects CI caught that every local gate missed
+
+Both came from conflict resolutions, and both were invisible to `tsc`, lint and the unit suites:
+
+1. **SQL Schema Checks** — `server/src/queries/person.repository.sql` was stale. `@GenerateSql`
+   documents a method's _emitted SQL_, so editing the **body** of an already-decorated method
+   drifts the queries with no new method and no signature change. Three did:
+   `unassignFaces` gained the fork's `face_identity_face` prologue plus upstream's
+   `clusterGroupId`, `getAllFaces` inherited upstream's decorator, and the left join widened
+   `isVisible`. The old skip rule ("no repository method changed") is wrong; the right one is
+   _did any conflict touch `server/src/repositories/`?_
+2. **Medium Tests (Server)** — the option-M comment resolution re-added an empty
+   `describe('mergePerson')` beside the real block, and vitest fails a suite with no tests.
+
+Both fixed in `fb66d3fe2dc`; both jobs green on the re-run.
+
+### Local medium-suite note
+
+Run locally against a single Postgres the suite reported 124, then 101, then 11 failures — a
+_shifting_ set, i.e. contention (150 "too many clients" against 6 assertions), not regressions.
+Capping concurrency (`--poolOptions.threads.maxThreads=3`) settled it at 11, all in `exif/*`,
+`library.service` and `sync-partner`. Those five paths are **byte-identical** to the pre-batch tip
+that was 10/10 green last cycle, so the cycle cannot be their cause — and CI's Medium Tests job
+is green, which settles it.
