@@ -11,7 +11,7 @@ import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
-import 'package:immich_mobile/presentation/pages/drift_people_collection.page.dart';
+import 'package:immich_mobile/presentation/pages/people_collection.page.dart';
 import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
 import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
 
@@ -57,10 +57,10 @@ void main() {
     return dxOf(tester, a) < dxOf(tester, b);
   }
 
-  group('DriftPeopleCollectionPage', () {
+  group('PeopleCollectionPage', () {
     testWidgets('renders the sort-keyed provider order and re-queries when the setting changes', (tester) async {
       await tester.pumpConsumerWidget(
-        const DriftPeopleCollectionPage(),
+        const PeopleCollectionPage(),
         overrides: [
           driftGetAllPeopleWithSharedSpacesProvider.overrideWith(
             (ref, sortBy) async => sortBy == PeopleSortBy.photoCount
@@ -84,7 +84,7 @@ void main() {
 
     testWidgets('the in-page search filter preserves the provider order', (tester) async {
       await tester.pumpConsumerWidget(
-        const DriftPeopleCollectionPage(),
+        const PeopleCollectionPage(),
         overrides: [
           driftGetAllPeopleWithSharedSpacesProvider.overrideWith(
             (ref, sortBy) async => [_person('zo', 'Zora'), _person('al', 'Alora'), _person('bo', 'Bob')],
@@ -109,7 +109,7 @@ void main() {
     // an empty name; a viewer-only space person shows a read-only name and no add-a-name.
     testWidgets('shows the add-a-name affordance for an editable space person', (tester) async {
       await tester.pumpConsumerWidget(
-        const DriftPeopleCollectionPage(),
+        const PeopleCollectionPage(),
         overrides: [
           driftGetAllPeopleWithSharedSpacesProvider.overrideWith(
             (ref, sortBy) async => [_person('sp', '', spaceId: 'space-1')],
@@ -124,7 +124,7 @@ void main() {
 
     testWidgets('hides the add-a-name affordance for a viewer-only space person', (tester) async {
       await tester.pumpConsumerWidget(
-        const DriftPeopleCollectionPage(),
+        const PeopleCollectionPage(),
         overrides: [
           driftGetAllPeopleWithSharedSpacesProvider.overrideWith(
             (ref, sortBy) async => [_person('sp', '', spaceId: 'space-1')],
@@ -139,7 +139,7 @@ void main() {
 
     testWidgets('still renders a viewer-only space person\'s name read-only', (tester) async {
       await tester.pumpConsumerWidget(
-        const DriftPeopleCollectionPage(),
+        const PeopleCollectionPage(),
         overrides: [
           driftGetAllPeopleWithSharedSpacesProvider.overrideWith(
             (ref, sortBy) async => [_person('sp', 'Shared Sam', spaceId: 'space-1')],
@@ -165,7 +165,7 @@ void main() {
 
     testWidgets('builds a space person\'s avatar from the space thumbnail endpoint', (tester) async {
       await tester.pumpConsumerWidget(
-        const DriftPeopleCollectionPage(),
+        const PeopleCollectionPage(),
         overrides: [
           driftGetAllPeopleWithSharedSpacesProvider.overrideWith(
             (ref, sortBy) async => [_person('sp', 'Shared Sam', spaceId: 'space-1')],
@@ -182,7 +182,7 @@ void main() {
 
     testWidgets('builds a personal person\'s avatar from the owner thumbnail endpoint', (tester) async {
       await tester.pumpConsumerWidget(
-        const DriftPeopleCollectionPage(),
+        const PeopleCollectionPage(),
         overrides: [
           driftGetAllPeopleWithSharedSpacesProvider.overrideWith(
             (ref, sortBy) async => [_person('me', 'Personal Pat')],

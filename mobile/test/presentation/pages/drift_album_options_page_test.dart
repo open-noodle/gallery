@@ -17,11 +17,11 @@ import 'package:immich_mobile/domain/services/user.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/infrastructure/repositories/store.repository.dart';
 import 'package:immich_mobile/models/auth/auth_state.model.dart';
-import 'package:immich_mobile/presentation/pages/drift_album_options.page.dart';
+import 'package:immich_mobile/presentation/pages/album_options.page.dart';
 import 'package:immich_mobile/providers/auth.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
-import 'package:immich_mobile/repositories/drift_album_api_repository.dart';
+import 'package:immich_mobile/repositories/album_api_repository.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:openapi/api.dart' as api;
 // easy_localization initializes shared_preferences internally; tests need the mock initializer.
@@ -32,7 +32,7 @@ class _MockRemoteAlbumService extends Mock implements RemoteAlbumService {}
 
 class _MockUserService extends Mock implements UserService {}
 
-class _MockDriftAlbumApiRepository extends Mock implements DriftAlbumApiRepository {}
+class _MockDriftAlbumApiRepository extends Mock implements AlbumApiRepository {}
 
 class _MockAuthNotifier extends StateNotifier<AuthState> with Mock implements AuthNotifier {
   _MockAuthNotifier(String userId)
@@ -118,7 +118,7 @@ void main() {
           authProvider.overrideWith((ref) => _MockAuthNotifier(currentUserId)),
           remoteAlbumServiceProvider.overrideWithValue(albumService),
           currentUserProvider.overrideWith((ref) => _StubCurrentUserNotifier(userService, owner)),
-          driftAlbumApiRepositoryProvider.overrideWithValue(albumApiRepo),
+          albumApiRepositoryProvider.overrideWithValue(albumApiRepo),
         ],
         child: EasyLocalization(
           supportedLocales: const [Locale('en')],
@@ -127,7 +127,7 @@ void main() {
           startLocale: const Locale('en'),
           child: MaterialApp(
             locale: const Locale('en'),
-            home: DriftAlbumOptionsPage(album: album),
+            home: AlbumOptionsPage(album: album),
           ),
         ),
       ),
