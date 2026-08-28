@@ -986,7 +986,17 @@ describe(SearchService.name, () => {
     });
   });
 
-  describe('new search shape', () => {
+  // ─── UPSTREAM SEARCH V3 — DORMANT ───────────────────────────────
+  // These are upstream's own V3 tests (immich-30179). Gallery keeps the search endpoints on the
+  // legacy builder and rejects the structured shape, so the service-level cases here exercise a
+  // path that now 400s by design; the reachable contract is covered by the "new shape routing"
+  // describe in src/services/search.service.spec.ts.
+  //
+  // Skipped rather than deleted: V3 itself is carried dormant and byte-compatible with upstream so
+  // its changes keep auto-merging, and these tests are what will validate the builder when we adopt
+  // it. Re-enable in the same change that restores the dispatch.
+  // See specs/2026-07-23-search-v3-coexistence-design.md.
+  describe.skip('new search shape', () => {
     it('should filter by an exif field and return a cursor-less single page', async () => {
       const { sut, ctx } = setup();
       const { user } = await ctx.newUser();
