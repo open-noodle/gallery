@@ -18,7 +18,7 @@ import 'package:immich_mobile/utils/system_ui.utils.dart';
 import 'package:immich_mobile/widgets/memories/memory_epilogue.dart';
 import 'package:immich_mobile/widgets/memories/memory_progress_indicator.dart';
 
-String getMemoryTitle(BuildContext context, DriftMemory memory) {
+String getMemoryTitle(BuildContext context, Memory memory) {
   final serverTitle = memory.data.title;
   if (serverTitle != null && serverTitle.isNotEmpty) {
     return serverTitle;
