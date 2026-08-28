@@ -5,7 +5,7 @@ import 'package:immich_mobile/models/search/search_filter.model.dart';
 import 'package:immich_mobile/providers/photos_filter/active_chips.dart';
 import 'package:immich_mobile/providers/photos_filter/chip_id.dart';
 import 'package:immich_mobile/utils/option.dart';
-import 'package:openapi/api.dart';
+import 'package:openapi/api.dart' hide SearchFilter;
 
 FilterPerson _person(String id, String name) => FilterPerson(id: id, name: name);
 
