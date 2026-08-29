@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/domain/models/config/app_config.dart';
+import 'package:immich_mobile/domain/models/map.model.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/domain/models/timeline_temporal_scope.model.dart';
 import 'package:immich_mobile/domain/services/timeline.service.dart';
@@ -21,6 +22,10 @@ void main() {
   final mapOptions = TimelineMapOptions(
     bounds: LatLngBounds(southwest: const LatLng(-89, -179), northeast: const LatLng(89, 179)),
   );
+  // immich-29735 made the map query stream its options; hold both arguments in
+  // variables so mocktail's identity matching still lines up when/verify.
+  final TimelineMapOptions Function() mapCurrentOptions = () => mapOptions;
+  const Stream<TimelineMapOptions> mapOptionsStream = Stream.empty();
 
   late _MockTimelineRepository repo;
   late TimelineFactory sut;
@@ -71,7 +76,14 @@ void main() {
       () => repo.sharedSpacePerson(['a1', 'a2'], GroupAssetsBy.day, temporalScope: year),
     ).thenReturn(_query(TimelineOrigin.person));
     when(
-      () => repo.map(['user-1'], 'user-1', mapOptions, GroupAssetsBy.day, temporalScope: year),
+      () => repo.geographicMap(
+        ['user-1'],
+        'user-1',
+        mapCurrentOptions,
+        mapOptionsStream,
+        GroupAssetsBy.day,
+        temporalScope: year,
+      ),
     ).thenReturn(_query(TimelineOrigin.map));
 
     sut.main(['user-1'], 'user-1', temporalScope: year, groupBy: GroupAssetsBy.day);
@@ -87,7 +99,14 @@ void main() {
     sut.place('Paris', ['user-1'], 'user-1', temporalScope: year, groupBy: GroupAssetsBy.day);
     sut.person('user-1', 'person-1', temporalScope: year, groupBy: GroupAssetsBy.day);
     sut.sharedSpacePerson(['a1', 'a2'], temporalScope: year, groupBy: GroupAssetsBy.day);
-    sut.map(['user-1'], 'user-1', mapOptions, temporalScope: year, groupBy: GroupAssetsBy.day);
+    sut.geographicMap(
+      ['user-1'],
+      'user-1',
+      mapCurrentOptions,
+      mapOptionsStream,
+      temporalScope: year,
+      groupBy: GroupAssetsBy.day,
+    );
 
     verify(() => repo.main(['user-1'], 'user-1', GroupAssetsBy.day, temporalScope: year)).called(1);
     verify(() => repo.remote('user-1', GroupAssetsBy.day, temporalScope: year)).called(1);
@@ -102,6 +121,15 @@ void main() {
     verify(() => repo.place('Paris', ['user-1'], 'user-1', GroupAssetsBy.day, temporalScope: year)).called(1);
     verify(() => repo.person('user-1', 'person-1', GroupAssetsBy.day, temporalScope: year)).called(1);
     verify(() => repo.sharedSpacePerson(['a1', 'a2'], GroupAssetsBy.day, temporalScope: year)).called(1);
-    verify(() => repo.map(['user-1'], 'user-1', mapOptions, GroupAssetsBy.day, temporalScope: year)).called(1);
+    verify(
+      () => repo.geographicMap(
+        ['user-1'],
+        'user-1',
+        mapCurrentOptions,
+        mapOptionsStream,
+        GroupAssetsBy.day,
+        temporalScope: year,
+      ),
+    ).called(1);
   });
 }
