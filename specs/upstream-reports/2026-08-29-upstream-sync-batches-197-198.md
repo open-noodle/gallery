@@ -215,7 +215,30 @@ The delta from the previous **10/10-green** tip (`b96cb896ed3`) is 18 files: 8 `
 
 ## Remote CI Verification
 
-Filled in after the dispatch — see the follow-up commit.
+- **Test branch**: `rebase/upstream-batch-198`
+- **Commit validated**: `089302bceef3b098b84f9aff9a6e4b3b48fdfd11`
+- **Result**: **10/10 workflows green on one commit**, first try, no re-runs and no flakes.
+
+| Workflow                                  | Status | Run           | Notes                                                 |
+| ----------------------------------------- | ------ | ------------- | ----------------------------------------------------- |
+| `test.yml`                                | GREEN  | `33238240910` | **21/21 jobs**, incl. Unit Test Mobile and Lint Web   |
+| `docker.yml`                              | GREEN  | `33238244243` |                                                       |
+| `static_analysis.yml`                     | GREEN  | `33238246753` | `dart analyze` + `dart format` + `*.g.dart` freshness |
+| `gallery-build-mobile.yml`                | GREEN  | `33238266087` | iOS + Android compile                                 |
+| `gallery-rebase-smoke.yml`                | GREEN  | `33238249265` |                                                       |
+| `storage-migration-tests.yml`             | GREEN  | `33238252093` |                                                       |
+| `storage-migration-e2e.yml`               | GREEN  | `33238263031` |                                                       |
+| `gallery-revert-to-immich-validation.yml` | GREEN  | `33238254976` | coverage grep **and** the `:main` Docker-boot half    |
+| `gallery-ml-smoke.yml`                    | GREEN  | `33238257503` |                                                       |
+| `gallery-mobile-smoke.yml`                | GREEN  | `33238260010` |                                                       |
+
+- **Failures fixed**: none — nothing went red.
+- **Confirmed flakes**: none.
+
+Two jobs are worth calling out because they cover exactly this cycle's risk:
+`End-to-End Tests (Web)` exercises the timeline helper upstream changed and the fork
+extends, and `Unit Test Mobile` + `Gallery Build Mobile` cover the map-query reconcile
+beyond what `flutter test` alone proves.
 
 ## Landing
 
