@@ -5,6 +5,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/config/app_config.dart';
 import 'package:immich_mobile/domain/models/config/timeline_config.dart';
+import 'package:immich_mobile/domain/models/map.model.dart';
 import 'package:immich_mobile/domain/models/settings_key.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/domain/models/timeline_temporal_scope.model.dart';
@@ -56,7 +57,7 @@ class _MutableMapStateNotifier extends MapStateNotifier {
   MapState build() => _initial;
 
   // NOTE: MapState.== compares bounds only; tests update with changed bounds
-  // so the service rebuild is attributable to the simulated pan.
+  // so the simulated pan is the only thing that can reach the options stream.
   void update(MapState next) => state = next;
 }
 
@@ -97,7 +98,8 @@ Future<_Harness> _pumpMapTimeline(
   // A fresh service per call: TimelineRouteScope disposes the previous one on
   // every grouping/bounds rebuild.
   when(
-    () => factory.map(
+    () => factory.geographicMap(
+      any(),
       any(),
       any(),
       any(),
@@ -145,6 +147,12 @@ void main() {
         bounds: LatLngBounds(northeast: const LatLng(0, 0), southwest: const LatLng(0, 0)),
       ),
     );
+    registerFallbackValue<TimelineMapOptions Function()>(
+      () => TimelineMapOptions(
+        bounds: LatLngBounds(northeast: const LatLng(0, 0), southwest: const LatLng(0, 0)),
+      ),
+    );
+    registerFallbackValue<Stream<TimelineMapOptions>>(const Stream<TimelineMapOptions>.empty());
     registerFallbackValue(const TimelineTemporalScope.none());
     registerFallbackValue(GroupAssetsBy.day);
   });
@@ -153,9 +161,10 @@ void main() {
     final harness = await _pumpMapTimeline(tester);
 
     verify(
-      () => harness.factory.map(
+      () => harness.factory.geographicMap(
         ['user-1'],
         'user-1',
+        any(),
         any(),
         groupBy: GroupAssetsBy.day,
         temporalScope: const TimelineTemporalScope.none(),
@@ -174,9 +183,10 @@ void main() {
     await tester.pump(const Duration(milliseconds: 600));
 
     verify(
-      () => harness.factory.map(
+      () => harness.factory.geographicMap(
         ['user-1'],
         'user-1',
+        any(),
         any(),
         groupBy: GroupAssetsBy.month,
         temporalScope: any(named: 'temporalScope'),
@@ -201,9 +211,10 @@ void main() {
     // The first build may run before the users stream emits (falls back to
     // [user.id]); once it emits, the service must rebuild with both ids.
     verify(
-      () => harness.factory.map(
+      () => harness.factory.geographicMap(
         ['user-1', 'partner-1'],
         'user-1',
+        any(),
         any(),
         groupBy: GroupAssetsBy.day,
         temporalScope: any(named: 'temporalScope'),
@@ -211,42 +222,47 @@ void main() {
     ).called(1);
   });
 
-  testWidgets('grouping selection survives a map move', (tester) async {
+  testWidgets('a map move reaches the options stream without rebuilding the service', (tester) async {
     final harness = await _pumpMapTimeline(tester);
 
     await tester.tap(find.byKey(const Key('timeline-grouping-months')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
-    verify(
-      () => harness.factory.map(
+    final captured = verify(
+      () => harness.factory.geographicMap(
         any(),
         any(),
         any(),
+        captureAny(),
         groupBy: GroupAssetsBy.month,
         temporalScope: any(named: 'temporalScope'),
       ),
-    ).called(1);
+    ).captured;
+    expect(captured, hasLength(1));
 
-    // Pan the map: new bounds rebuild the service, but the route-local grouping
-    // must stay at month — a bounds change must not tear down the route scope.
-    harness.mapNotifier.update(
-      MapState(
-        bounds: LatLngBounds(northeast: const LatLng(2, 2), southwest: const LatLng(1, 1)),
-      ),
-    );
+    // Since immich-29735 the map query subscribes to an options stream, so new
+    // bounds travel down that stream instead of rebuilding the service. The
+    // route scope — and with it the route-local grouping — stays alive.
+    final emitted = <TimelineMapOptions>[];
+    final subscription = (captured.single as Stream<TimelineMapOptions>).listen(emitted.add);
+    addTearDown(subscription.cancel);
+
+    final pannedBounds = LatLngBounds(northeast: const LatLng(2, 2), southwest: const LatLng(1, 1));
+    harness.mapNotifier.update(MapState(bounds: pannedBounds));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
 
-    // The verify above consumed the tap-triggered call, so this counts only the
-    // bounds-triggered rebuild.
-    verify(
-      () => harness.factory.map(
+    expect(emitted.map((options) => options.bounds), [pannedBounds]);
+    // The verify above consumed the tap-triggered call; a pan must add none.
+    verifyNever(
+      () => harness.factory.geographicMap(
         any(),
         any(),
         any(),
-        groupBy: GroupAssetsBy.month,
+        any(),
+        groupBy: any(named: 'groupBy'),
         temporalScope: any(named: 'temporalScope'),
       ),
-    ).called(1);
+    );
   });
 }
