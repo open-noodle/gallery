@@ -1177,14 +1177,13 @@ class TimelineRepository extends DatabaseAccessor<Drift> with $TimelineRepositor
         .followedBy(optionsStream)
         .switchMap(
           // Any error would kill the stream for all options; make sure the stream stays alive
-          (options) =>
-              _watchMapBucket(
-                userIds,
-                currentUserId,
-                options,
-                groupBy: groupBy,
-                temporalScope: temporalScope,
-              ).handleError((_) {}),
+          (options) => _watchMapBucket(
+            userIds,
+            currentUserId,
+            options,
+            groupBy: groupBy,
+            temporalScope: temporalScope,
+          ).handleError((_) {}),
         ),
     assetSource: (offset, count) => _getMapBucketAssets(
       userIds,
