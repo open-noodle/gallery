@@ -8,6 +8,7 @@ import 'package:immich_mobile/data/db/main/table/user/partner.drift.dart';
 import 'package:immich_mobile/domain/models/album/album.model.dart';
 import 'package:immich_mobile/domain/models/album/local_album.model.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
+import 'package:immich_mobile/domain/models/map.model.dart';
 import 'package:immich_mobile/domain/models/timeline.model.dart';
 import 'package:immich_mobile/domain/models/timeline_temporal_scope.model.dart';
 import 'package:immich_mobile/domain/services/timeline.service.dart';
@@ -387,10 +388,11 @@ void main() {
     ]);
     expect(
       await assetIds(
-        sut.map(
+        sut.geographicMap(
           [user.id],
           user.id,
-          TimelineMapOptions(bounds: globeBounds(), onlyFavorites: true, includeArchived: true, relativeDays: 30),
+          () => TimelineMapOptions(bounds: globeBounds(), onlyFavorites: true, includeArchived: true, relativeDays: 30),
+          const Stream<TimelineMapOptions>.empty(),
           GroupAssetsBy.year,
           temporalScope: TimelineTemporalScope.year(DateTime.now().year),
         ),
