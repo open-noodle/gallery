@@ -13,7 +13,6 @@ import 'package:immich_mobile/domain/models/user.model.dart';
 import 'package:immich_mobile/domain/services/timeline.service.dart';
 import 'package:immich_mobile/domain/services/user.service.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
-import 'package:immich_mobile/infrastructure/repositories/timeline.repository.dart';
 import 'package:immich_mobile/presentation/widgets/bottom_sheet/map_bottom_sheet.widget.dart';
 import 'package:immich_mobile/presentation/widgets/map/map.state.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
@@ -147,12 +146,12 @@ void main() {
         bounds: LatLngBounds(northeast: const LatLng(0, 0), southwest: const LatLng(0, 0)),
       ),
     );
-    registerFallbackValue<TimelineMapOptions Function()>(
+    registerFallbackValue(
       () => TimelineMapOptions(
         bounds: LatLngBounds(northeast: const LatLng(0, 0), southwest: const LatLng(0, 0)),
       ),
     );
-    registerFallbackValue<Stream<TimelineMapOptions>>(const Stream<TimelineMapOptions>.empty());
+    registerFallbackValue(const Stream<TimelineMapOptions>.empty());
     registerFallbackValue(const TimelineTemporalScope.none());
     registerFallbackValue(GroupAssetsBy.day);
   });
@@ -228,6 +227,18 @@ void main() {
     await tester.tap(find.byKey(const Key('timeline-grouping-months')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
+    // Consume the initial All-grouping build as well, so the verifyNever below
+    // is only about what the pan itself triggered.
+    verify(
+      () => harness.factory.geographicMap(
+        any(),
+        any(),
+        any(),
+        any(),
+        groupBy: GroupAssetsBy.day,
+        temporalScope: any(named: 'temporalScope'),
+      ),
+    ).called(1);
     final captured = verify(
       () => harness.factory.geographicMap(
         any(),
