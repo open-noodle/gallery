@@ -24,7 +24,7 @@ void main() {
   );
   // immich-29735 made the map query stream its options; hold both arguments in
   // variables so mocktail's identity matching still lines up when/verify.
-  final TimelineMapOptions Function() mapCurrentOptions = () => mapOptions;
+  TimelineMapOptions mapCurrentOptions() => mapOptions;
   const Stream<TimelineMapOptions> mapOptionsStream = Stream.empty();
 
   late _MockTimelineRepository repo;
