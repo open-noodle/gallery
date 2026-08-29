@@ -617,7 +617,13 @@ void main() {
       await linkAssetToSpace('space1', 'a1');
 
       final buckets = await sut
-          .map(['viewer'], 'viewer', TimelineMapOptions(bounds: globeBounds(), relativeDays: 7), GroupAssetsBy.day)
+          .geographicMap(
+            ['viewer'],
+            'viewer',
+            () => TimelineMapOptions(bounds: globeBounds(), relativeDays: 7),
+            const Stream<TimelineMapOptions>.empty(),
+            GroupAssetsBy.day,
+          )
           .bucketSource()
           .first;
       expect(buckets, isEmpty);
@@ -637,7 +643,13 @@ void main() {
       await linkAssetToSpace('space1', 'a1');
 
       final assets = await sut
-          .map(['viewer'], 'viewer', TimelineMapOptions(bounds: europeBounds()), GroupAssetsBy.day)
+          .geographicMap(
+            ['viewer'],
+            'viewer',
+            () => TimelineMapOptions(bounds: europeBounds()),
+            const Stream<TimelineMapOptions>.empty(),
+            GroupAssetsBy.day,
+          )
           .assetSource(0, 100);
       expect(assets, hasLength(1));
       expect((assets.single as RemoteAsset).id, 'a1');
@@ -654,7 +666,13 @@ void main() {
 
       final emissions = <List<Bucket>>[];
       final sub = sut
-          .map(['viewer'], 'viewer', TimelineMapOptions(bounds: europeBounds()), GroupAssetsBy.day)
+          .geographicMap(
+            ['viewer'],
+            'viewer',
+            () => TimelineMapOptions(bounds: europeBounds()),
+            const Stream<TimelineMapOptions>.empty(),
+            GroupAssetsBy.day,
+          )
           .bucketSource()
           .listen(emissions.add);
 
@@ -702,7 +720,13 @@ void main() {
       }
 
       final monthBuckets = await sut
-          .map(['viewer'], 'viewer', TimelineMapOptions(bounds: europeBounds()), GroupAssetsBy.month)
+          .geographicMap(
+            ['viewer'],
+            'viewer',
+            () => TimelineMapOptions(bounds: europeBounds()),
+            const Stream<TimelineMapOptions>.empty(),
+            GroupAssetsBy.month,
+          )
           .bucketSource()
           .first;
       expect(monthBuckets, [
@@ -712,7 +736,13 @@ void main() {
       ]);
 
       final yearBuckets = await sut
-          .map(['viewer'], 'viewer', TimelineMapOptions(bounds: europeBounds()), GroupAssetsBy.year)
+          .geographicMap(
+            ['viewer'],
+            'viewer',
+            () => TimelineMapOptions(bounds: europeBounds()),
+            const Stream<TimelineMapOptions>.empty(),
+            GroupAssetsBy.year,
+          )
           .bucketSource()
           .first;
       expect(yearBuckets, [
