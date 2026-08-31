@@ -1758,6 +1758,7 @@
   "failed_to_load_assets": "Kan items niet laden",
   "failed_to_load_folder": "Laden van map mislukt",
   "failed_to_load_spaces": "Spaces laden mislukt",
+  "family_strip_relation_label": "Relatie: {relation}",
   "favorite": "Favoriet",
   "favorite_action_prompt": "{count, plural, one {# item} other {# items}} toegevoegd aan je favorieten",
   "favorite_or_unfavorite_photo": "Foto markeren als of verwijderen uit favorieten",

@@ -1758,6 +1758,7 @@
   "failed_to_load_assets": "Impossibile caricare le risorse",
   "failed_to_load_folder": "Impossibile caricare la cartella",
   "failed_to_load_spaces": "Impossibile caricare gli Space",
+  "family_strip_relation_label": "Relazione: {relation}",
   "favorite": "Preferito",
   "favorite_action_prompt": "{count} elementi aggiunti ai preferiti",
   "favorite_or_unfavorite_photo": "Aggiungi o rimuovi foto da preferiti",
