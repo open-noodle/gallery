@@ -100,6 +100,30 @@ describe(FamilyService.name, () => {
     });
   });
 
+  describe('read authority', () => {
+    // D2's capability gate for the Slice 5 read path: 'none' is refused, 'view' and
+    // 'contribute' both qualify — reading is the lower bar than writing.
+    it('refuses a read from a user with no family access', async () => {
+      sut['getConfig'] = () => Promise.resolve(makeFamilyConfig(true, 'none') as any);
+      mocks.family.getAccess.mockResolvedValue(undefined);
+
+      await expect(sut.requireFamilyRead(authStub.user1)).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    // Positive control for the refusal above — same access resolution, one grant apart.
+    it('accepts a read from a view-only user', async () => {
+      giveViewOnlyAccess(sut, mocks);
+
+      await expect(sut.requireFamilyRead(authStub.user1)).resolves.toBeUndefined();
+    });
+
+    it('accepts a read from a contribute user', async () => {
+      giveContributeAccess(sut, mocks);
+
+      await expect(sut.requireFamilyRead(authStub.user1)).resolves.toBeUndefined();
+    });
+  });
+
   describe('write authority', () => {
     // E21
     it('refuses a write from a view-only user', async () => {
