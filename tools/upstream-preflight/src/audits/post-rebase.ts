@@ -175,10 +175,72 @@ export function auditGeneratedArtifactSignals(
   };
 }
 
+/**
+ * Query blocks (`-- Repo.method`) that existed at the baseline must still exist.
+ *
+ * A `server/src/queries/*.sql` conflict during a replay is LOSSY in a way nothing else sees.
+ * Each replayed fork commit carries the file as generated at *its* point in history, so on a
+ * re-key (e.g. `personId` -> `personGroupId`) it conflicts at every such commit. Resolving each
+ * to the current generated form is the only sane per-conflict answer, and it silently drops the
+ * blocks contributed by fork commits later in the replay — while their `@GenerateSql` sources
+ * apply perfectly cleanly. Build, tsc, lint and the unit suites all stay green.
+ *
+ * Compared against a baseline rather than against the decorated sources on purpose: a source-derived
+ * check has ~31 false positives on a green tree, because namespaced repositories emit
+ * `AccessRepository.activity.checkOwnerAccess` and some decorated methods (e.g.
+ * `PersonRepository.updateVisibility`) emit no block at all. Both sides of a baseline diff use
+ * identical conventions, so those cancel out.
+ *
+ * A block legitimately disappears when upstream deletes the method; that shows up here and is
+ * confirmed by regenerating, not by deleting the expectation.
+ */
+export function auditGeneratedQueryBlocks(
+  baselineBlocksByFile: Record<string, string[]>,
+  currentBlocksByFile: Record<string, string[]>,
+): AuditResult {
+  const lost: string[] = [];
+
+  for (const [file, baselineBlocks] of Object.entries(baselineBlocksByFile)) {
+    const current = new Set(currentBlocksByFile[file] ?? []);
+    for (const block of baselineBlocks) {
+      if (!current.has(block)) {
+        lost.push(`${file}: lost query block ${block}`);
+      }
+    }
+  }
+
+  return {
+    ok: lost.length === 0,
+    title: 'Generated Query Block Survival',
+    details:
+      lost.length > 0
+        ? [
+            ...lost,
+            'Regenerate with `mise run //:sql` against a real Postgres, then re-check.',
+          ]
+        : ['No query block present at the baseline was lost'],
+  };
+}
+
+export function parseQueryBlocks(sql: string): string[] {
+  // A block header is a dotted identifier — `-- PersonRepository.reassignFaces`, or three segments
+  // for a namespaced repository (`-- AccessRepository.activity.checkOwnerAccess`). Anchoring on the
+  // dot is what excludes the generator's own `-- NOTE: This file is auto generated ...` banner.
+  return [
+    ...new Set(
+      sql
+        .split('\n')
+        .map((line) => line.trimEnd())
+        .filter((line) => /^-- [A-Za-z][\w$]*(\.[\w$]+)+$/.test(line)),
+    ),
+  ];
+}
+
 export function runPostRebaseAudits(
   manifest: Manifest,
   upstreamTouchedFiles: string[] = [],
   cwd = process.cwd(),
+  baselineQueryBlocks?: Record<string, string[]>,
 ): AuditResult[] {
   const currentFiles = listFiles(cwd);
   const migrationRoot = path.join(cwd, 'server/src/schema/migrations-gallery');
@@ -205,7 +267,7 @@ export function runPostRebaseAudits(
     'server/src/schema/migrations/**/*.ts',
   ]);
 
-  return [
+  const results = [
     auditForkOwnedFiles(manifest, currentFiles),
     auditExtensionSymbols(manifest, fileTextByPath),
     auditMigrationCount(migrations, expectedMigrations),
@@ -217,6 +279,19 @@ export function runPostRebaseAudits(
     ),
     auditGeneratedArtifactSignals(upstreamTouchedFiles),
   ];
+
+  if (baselineQueryBlocks) {
+    const currentBlocks: Record<string, string[]> = {};
+    for (const file of Object.keys(baselineQueryBlocks)) {
+      const fullPath = path.join(cwd, file);
+      currentBlocks[file] = fs.existsSync(fullPath)
+        ? parseQueryBlocks(fs.readFileSync(fullPath, 'utf8'))
+        : [];
+    }
+    results.push(auditGeneratedQueryBlocks(baselineQueryBlocks, currentBlocks));
+  }
+
+  return results;
 }
 
 export function renderPostRebaseAuditMarkdown(
