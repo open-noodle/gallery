@@ -48,6 +48,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Run storage migration e2e test
+        # Builds from e2e/docker-compose.yml, whose plugins stage fetches js-pdk from GitHub.
+        # Unauthenticated that is 60 requests/hour per runner IP and 403s surface as
+        # `extism-js: not found`. Export the token so the forwarded build secret is populated.
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: ./storage-migration.sh --cleanup --verbose
       - name: Capture Docker logs
         if: always()
