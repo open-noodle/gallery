@@ -1,7 +1,16 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { AuthDto } from 'src/dtos/auth.dto';
 import { FamilyAccessLevel } from 'src/enum';
+import { RawUnionRow, VisibilityParticipant, VisibleUnion } from 'src/repositories/family.repository';
 import { BaseService } from 'src/services/base.service';
+import {
+  FamilyGender,
+  FamilyUnionStatus,
+  ProjectedFamilyGraph,
+  ProjectedFamilyIdentity,
+  ProjectedFamilyParticipant,
+  ProjectedFamilyUnion,
+} from 'src/utils/family-labels';
 
 export type FamilyParticipantRole = 'partner' | 'child';
 
@@ -24,6 +33,25 @@ export interface AddParticipantDto {
   role: FamilyParticipantRole;
 }
 
+export interface FamilyCluster {
+  label: string;
+  size: number;
+  rootCandidateId: string;
+}
+
+/** A resolved identity's name and gender, keyed by identity id — the per-viewer product of
+ * Slice 5's redaction: an identity appears here iff the viewer can resolve it (`D3`). */
+type ResolvedIdentities = Map<string, { name: string; gender: FamilyGender }>;
+
+const toProjectedParticipant = (seat: VisibilityParticipant): ProjectedFamilyParticipant =>
+  'identityId' in seat ? { kind: 'known', identityId: seat.identityId } : { kind: 'anonymous' };
+
+// face_identity.gender is a free-form nullable varchar; family-labels.ts only ever wants the two
+// terms it knows a wording for. Anything else (never written today, but not schema-enforced)
+// falls back to the neutral term, same as unset.
+const normalizeGender = (value: string | null | undefined): FamilyGender =>
+  value === 'male' || value === 'female' ? value : null;
+
 // Gallery-fork: family relationships. Access comes from an admin-granted level, never from
 // a shared-space role — this file must never reference spaces, membership or roles.
 @Injectable()
@@ -43,6 +71,106 @@ export class FamilyService extends BaseService {
     if (level !== FamilyAccessLevel.Contribute) {
       throw new ForbiddenException();
     }
+  }
+
+  // Read is the lower bar: 'view' or 'contribute' both qualify, only 'none' is refused. D2's
+  // capability gate is independent of D3's content scoping below — a granted view-only user
+  // still only sees what they can resolve.
+  async requireFamilyRead(auth: AuthDto): Promise<void> {
+    const level = await this.resolveFamilyAccess(auth);
+    if (level === FamilyAccessLevel.None) {
+      throw new ForbiddenException();
+    }
+  }
+
+  // Slice 5 (D3): the read path. Returns every union the viewer can see — at least two
+  // resolvable participants — with everyone else in it reduced to an anonymous seat (`E27`-`E34`).
+  async getVisibleGraph(auth: AuthDto): Promise<ProjectedFamilyGraph> {
+    await this.requireFamilyRead(auth);
+
+    const { resolved, visibleUnions } = await this.buildVisibility(auth.user.id);
+
+    const unions: ProjectedFamilyUnion[] = visibleUnions.map((union) => ({
+      id: union.id,
+      status: union.status as FamilyUnionStatus,
+      partners: union.partners.map((seat) => toProjectedParticipant(seat)),
+      children: union.children.map((seat) => toProjectedParticipant(seat)),
+    }));
+
+    // `identities` is scoped to identities that actually appear as a known seat in `unions` —
+    // NOT every identity the viewer happens to resolve across the whole graph. An identity whose
+    // only unions were all redacted away must not still surface here: nothing in this response
+    // should exist that isn't backed by at least one visible union.
+    const identities: Record<string, ProjectedFamilyIdentity> = {};
+    for (const union of unions) {
+      for (const participant of [...union.partners, ...union.children]) {
+        if (participant.kind !== 'known' || identities[participant.identityId]) {
+          continue;
+        }
+        const info = resolved.get(participant.identityId);
+        if (info) {
+          identities[participant.identityId] = { name: info.name, gender: info.gender };
+        }
+      }
+    }
+
+    return { identities, unions };
+  }
+
+  // Slice 5 (D3/E63-E65): disconnected components over the SAME viewer-visible graph
+  // `getVisibleGraph` returns — never the full graph, or a cluster would reveal a connection
+  // through a union the viewer cannot see. Computed fresh every call; nothing is stored (`E64`).
+  // A person who belongs to no union is simply never a node in this graph, so they appear in no
+  // cluster (`E63`) without any special-casing.
+  async getClusters(auth: AuthDto): Promise<FamilyCluster[]> {
+    await this.requireFamilyRead(auth);
+
+    const { resolved, visibleUnions } = await this.buildVisibility(auth.user.id);
+    const rawClusters = this.familyRepository.computeClusters(visibleUnions);
+
+    return rawClusters.map((cluster) => {
+      // Deterministic, arbitrary tie-break — every visible union already guarantees at least two
+      // resolvable participants, so `knownIds` is never empty here.
+      const rootCandidateId = cluster.knownIds.toSorted()[0]!;
+      return {
+        rootCandidateId,
+        size: cluster.size,
+        label: resolved.get(rootCandidateId)?.name ?? '',
+      };
+    });
+  }
+
+  // Shared by getVisibleGraph and getClusters so the (potentially large) union graph is fetched
+  // and every participant identity resolved exactly ONCE per request, not once per caller. Both
+  // callers already required `requireFamilyRead`, so this never checks access itself.
+  private async buildVisibility(
+    userId: string,
+  ): Promise<{ resolved: ResolvedIdentities; visibleUnions: VisibleUnion[] }> {
+    const allUnions: RawUnionRow[] = await this.familyRepository.getAllUnionsWithParticipants();
+    if (allUnions.length === 0) {
+      return { resolved: new Map(), visibleUnions: [] };
+    }
+
+    const candidateIds = [...new Set(allUnions.flatMap((union) => [...union.partnerIds, ...union.childIds]))];
+
+    // The single reused resolution (`face-identity.repository.ts`) — one query for every
+    // participant across every union in the graph, never one per union (`E65`). A hidden profile
+    // never comes back here (`withHidden: false`), which is what makes it unresolvable (`E33`).
+    const names = await this.faceIdentityRepository.resolveAccessibleIdentityNames({
+      userId,
+      identityIds: candidateIds,
+      withHidden: false,
+    });
+
+    const genders = await this.familyRepository.getGenders(names.keys().toArray());
+
+    const resolved: ResolvedIdentities = new Map(
+      [...names].map(([identityId, name]) => [identityId, { name, gender: normalizeGender(genders.get(identityId)) }]),
+    );
+
+    const visibleUnions = this.familyRepository.computeVisibleUnions(allUnions, new Set(resolved.keys()));
+
+    return { resolved, visibleUnions };
   }
 
   // Authority comes from `requireFamilyWrite` alone (E21, E24, E25) — whoever created a union

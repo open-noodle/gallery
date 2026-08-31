@@ -8,6 +8,41 @@ from
 where
   "id" = $1
 
+-- FamilyRepository.getAllUnionsWithParticipants
+SELECT
+  family_union.id,
+  family_union.status,
+  COALESCE(partners.ids, ARRAY[]::uuid[]) AS "partnerIds",
+  COALESCE(children.ids, ARRAY[]::uuid[]) AS "childIds"
+FROM
+  family_union
+  LEFT JOIN LATERAL (
+    SELECT
+      array_agg(
+        family_union_partner."identityId"
+        ORDER BY
+          family_union_partner."identityId"
+      ) AS ids
+    FROM
+      family_union_partner
+    WHERE
+      family_union_partner."unionId" = family_union.id
+  ) partners ON true
+  LEFT JOIN LATERAL (
+    SELECT
+      array_agg(
+        family_union_child."identityId"
+        ORDER BY
+          family_union_child."identityId"
+      ) AS ids
+    FROM
+      family_union_child
+    WHERE
+      family_union_child."unionId" = family_union.id
+  ) children ON true
+ORDER BY
+  family_union.id
+
 -- FamilyRepository.deleteUnion
 delete from "family_union"
 where
@@ -42,6 +77,15 @@ from
   "face_identity"
 where
   "id" = $1
+
+-- FamilyRepository.getGenders
+select
+  "id",
+  "gender"
+from
+  "face_identity"
+where
+  "id" in ($1)
 
 -- FamilyRepository.isAncestor
 WITH RECURSIVE
