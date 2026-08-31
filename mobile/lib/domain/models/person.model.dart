@@ -141,6 +141,19 @@ class DriftPerson {
   /// never populate it, so the picker row hides the count gracefully rather than erroring.
   final int? numberOfAssets;
 
+  /// Whether the viewer has usable family-relationship access at all, sourced from whether
+  /// `PersonResponseDto.familyRelationLabel` was present in the server response (an absent
+  /// field means no access — the feature is off, or this viewer's grant is `none` — not merely
+  /// "no relationship known"). `false` means the asset-viewer people strip must render exactly
+  /// as it does today, with no relation line for this person at all (`A12`).
+  final bool hasFamilyAccess;
+
+  /// This person's relation to the viewer ("your sibling"), already derived server-side —
+  /// never computed on the client. Meaningful only when [hasFamilyAccess] is `true`: `null`
+  /// then means access is granted but no relationship is recorded, which the strip renders as
+  /// a neutral dash rather than a blank line.
+  final String? familyRelationLabel;
+
   const DriftPerson({
     required this.id,
     required this.createdAt,
@@ -154,6 +167,8 @@ class DriftPerson {
     this.birthDate,
     this.spaceId,
     this.numberOfAssets,
+    this.hasFamilyAccess = false,
+    this.familyRelationLabel,
   });
 
   DriftPerson copyWith({
@@ -169,6 +184,8 @@ class DriftPerson {
     DateTime? birthDate,
     String? spaceId,
     int? numberOfAssets,
+    bool? hasFamilyAccess,
+    String? familyRelationLabel,
   }) {
     return DriftPerson(
       id: id ?? this.id,
@@ -183,6 +200,8 @@ class DriftPerson {
       birthDate: birthDate ?? this.birthDate,
       spaceId: spaceId ?? this.spaceId,
       numberOfAssets: numberOfAssets ?? this.numberOfAssets,
+      hasFamilyAccess: hasFamilyAccess ?? this.hasFamilyAccess,
+      familyRelationLabel: familyRelationLabel ?? this.familyRelationLabel,
     );
   }
 
@@ -200,7 +219,9 @@ class DriftPerson {
     color: ${color ?? "<NA>"},
     birthDate: ${birthDate ?? "<NA>"},
     spaceId: ${spaceId ?? "<NA>"},
-    numberOfAssets: ${numberOfAssets ?? "<NA>"}
+    numberOfAssets: ${numberOfAssets ?? "<NA>"},
+    hasFamilyAccess: $hasFamilyAccess,
+    familyRelationLabel: ${familyRelationLabel ?? "<NA>"}
 }''';
   }
 
@@ -221,7 +242,9 @@ class DriftPerson {
         other.color == color &&
         other.birthDate == birthDate &&
         other.spaceId == spaceId &&
-        other.numberOfAssets == numberOfAssets;
+        other.numberOfAssets == numberOfAssets &&
+        other.hasFamilyAccess == hasFamilyAccess &&
+        other.familyRelationLabel == familyRelationLabel;
   }
 
   @override
@@ -237,7 +260,9 @@ class DriftPerson {
         color.hashCode ^
         birthDate.hashCode ^
         spaceId.hashCode ^
-        numberOfAssets.hashCode;
+        numberOfAssets.hashCode ^
+        hasFamilyAccess.hashCode ^
+        familyRelationLabel.hashCode;
   }
 }
 

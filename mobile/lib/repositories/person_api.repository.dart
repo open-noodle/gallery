@@ -108,6 +108,18 @@ class PersonApiRepository extends ApiRepository {
     // and null spaceId (owner-scoped local query + owner thumbnail). See issue #727.
     final spacePersonId = dto.spacePersonId.orElse(null);
     final isSpacePerson = spacePersonId != null && resolvedSpaceId != null;
+    // TODO(family-relationships): `PersonResponseDto.familyRelationLabel` is landing on the
+    // server (an `Optional<String?>`, absent when the viewer has no family access, present
+    // with `null` when access is granted but no relationship is recorded, present with a
+    // string otherwise — never computed client-side). The generated SDK on this branch does
+    // not have the field yet; once `make open-api-dart` picks it up, replace the two lines
+    // below with:
+    //   hasFamilyAccess: dto.familyRelationLabel.isPresent,
+    //   familyRelationLabel: dto.familyRelationLabel.orElse(null),
+    // Do not derive this by fetching `/family/unions` and joining client-side — the person id
+    // is deliberately not correlatable to a family identity for privacy reasons.
+    const hasFamilyAccess = false;
+    const familyRelationLabel = null;
     return DriftPerson(
       id: isSpacePerson ? spacePersonId : dto.id,
       createdAt: updatedAt,
@@ -119,6 +131,8 @@ class PersonApiRepository extends ApiRepository {
       color: dto.color.orElse(null),
       birthDate: dto.birthDate,
       spaceId: isSpacePerson ? resolvedSpaceId : null,
+      hasFamilyAccess: hasFamilyAccess,
+      familyRelationLabel: familyRelationLabel,
     );
   }
 
