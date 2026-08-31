@@ -4,6 +4,7 @@ import { SharedSpaceRepository } from 'src/repositories/shared-space.repository'
 import { DB } from 'src/schema';
 // Side-effect import: registers every decorated table so the schema exists to assert against.
 import 'src/schema';
+import { seedHiddenRowsFromSharedFlag } from 'src/schema/migrations-gallery/1793000000000-AddSharedSpaceAlbumHidden';
 import { BaseService } from 'src/services/base.service';
 import { newMediumService } from 'test/medium.factory';
 import { getKyselyDB } from 'test/utils';
@@ -152,10 +153,10 @@ describe('shared_space_album_hidden cleanup', () => {
   });
 });
 
-describe('shared_space_album_hidden delete audit', () => {
-  const auditRows = async (userId: string) =>
-    db.selectFrom('shared_space_album_hidden_audit').selectAll().where('userId', '=', userId).execute();
+const auditRows = async (userId: string) =>
+  db.selectFrom('shared_space_album_hidden_audit').selectAll().where('userId', '=', userId).execute();
 
+describe('shared_space_album_hidden delete audit', () => {
   it('writes an audit row when a member unhides an album', async () => {
     const { user, space, album } = await seedHiddenAlbum();
     expect(await auditRows(user.id)).toHaveLength(0);
@@ -197,5 +198,118 @@ describe('shared_space_album_hidden delete audit', () => {
     const rows = await auditRows(user.id);
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ spaceId: space.id, albumId: album.id });
+  });
+});
+
+// The seeding function takes the sql-tools Kysely<unknown> contract; the medium harness hands
+// out Kysely<DB>. Kysely's schema generic is invariant, so narrow once here.
+const seed = () => seedHiddenRowsFromSharedFlag(db as unknown as Kysely<unknown>);
+
+describe('migration seeding', () => {
+  it('E18: seeds a hidden row for every member of a space whose album is hidden by the shared flag', async () => {
+    const { ctx, spaceRepo } = setup();
+    const { user: owner } = await ctx.newUser();
+    const { user: second } = await ctx.newUser();
+    const { user: third } = await ctx.newUser();
+    const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+    for (const [u, role] of [
+      [owner, 'owner'],
+      [second, 'editor'],
+      [third, 'viewer'],
+    ] as const) {
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: u.id, role });
+    }
+    const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'SharedHidden' });
+    await spaceRepo.addAlbum({ spaceId: space.id, albumId: album.id, addedById: owner.id });
+    await spaceRepo.setAlbumShowInTimeline(space.id, album.id, false);
+
+    await seed();
+
+    const rows = await db
+      .selectFrom('shared_space_album_hidden')
+      .select('userId')
+      .where('spaceId', '=', space.id)
+      .where('albumId', '=', album.id)
+      .execute();
+    expect(rows.map((r) => r.userId).toSorted()).toEqual([owner.id, second.id, third.id].toSorted());
+  });
+
+  it('E18b: does not seed rows for an album that is shown', async () => {
+    const { ctx, spaceRepo } = setup();
+    const { user: owner } = await ctx.newUser();
+    const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: 'owner' });
+    const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'SharedShown' });
+    await spaceRepo.addAlbum({ spaceId: space.id, albumId: album.id, addedById: owner.id });
+
+    await seed();
+
+    const rows = await db
+      .selectFrom('shared_space_album_hidden')
+      .selectAll()
+      .where('spaceId', '=', space.id)
+      .where('albumId', '=', album.id)
+      .execute();
+    expect(rows).toHaveLength(0);
+  });
+
+  it('E19: is a no-op when there are no hidden albums', async () => {
+    const before = await db
+      .selectFrom('shared_space_album_hidden')
+      .select((eb) => eb.fn.countAll<number>().as('count'))
+      .execute();
+
+    await expect(seed()).resolves.not.toThrow();
+
+    const after = await db
+      .selectFrom('shared_space_album_hidden')
+      .select((eb) => eb.fn.countAll<number>().as('count'))
+      .execute();
+    expect(Number(after[0].count)).toBe(Number(before[0].count));
+  });
+
+  it('E20: a member who joins after the seeding gets no hidden row', async () => {
+    const { ctx, spaceRepo } = setup();
+    const { user: owner } = await ctx.newUser();
+    const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: 'owner' });
+    const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'LateJoin' });
+    await spaceRepo.addAlbum({ spaceId: space.id, albumId: album.id, addedById: owner.id });
+    await spaceRepo.setAlbumShowInTimeline(space.id, album.id, false);
+    await seed();
+
+    const { user: latecomer } = await ctx.newUser();
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: latecomer.id, role: 'viewer' });
+
+    const rows = await db
+      .selectFrom('shared_space_album_hidden')
+      .selectAll()
+      .where('spaceId', '=', space.id)
+      .where('userId', '=', latecomer.id)
+      .execute();
+    // Seeding is a ONE-TIME upgrade step, not an ongoing rule. A member joining later sees the
+    // album in their timeline until they hide it themselves.
+    expect(rows).toHaveLength(0);
+  });
+
+  it('is idempotent — running it twice does not error or duplicate', async () => {
+    const { ctx, spaceRepo } = setup();
+    const { user: owner } = await ctx.newUser();
+    const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: 'owner' });
+    const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'Twice' });
+    await spaceRepo.addAlbum({ spaceId: space.id, albumId: album.id, addedById: owner.id });
+    await spaceRepo.setAlbumShowInTimeline(space.id, album.id, false);
+
+    await seed();
+    await expect(seed()).resolves.not.toThrow();
+
+    const rows = await db
+      .selectFrom('shared_space_album_hidden')
+      .selectAll()
+      .where('spaceId', '=', space.id)
+      .where('albumId', '=', album.id)
+      .execute();
+    expect(rows).toHaveLength(1);
   });
 });
