@@ -1527,6 +1527,10 @@ export type FamilyGenderUpdateDto = {
     /** Gender ('male' or 'female'), or null to clear */
     gender: string | null;
 };
+export type FamilyMyRootResponseDto = {
+    /** The identity nominated as the caller, or null if never set */
+    identityId: string | null;
+};
 export type FamilyMyRootUpdateDto = {
     /** Identity ID to nominate as yourself, or null to clear */
     identityId: string | null;
@@ -1534,6 +1538,8 @@ export type FamilyMyRootUpdateDto = {
 export type FamilyIdentityDto = {
     /** Recorded gender ('male', 'female'), or null if unset */
     gender: string | null;
+    /** This identity's relation to the caller ("your sister"), or null */
+    label: string | null;
     /** Resolved display name */
     name: string;
 };
@@ -6359,6 +6365,17 @@ export function updateGender({ id, familyGenderUpdateDto }: {
         method: "PUT",
         body: familyGenderUpdateDto
     })));
+}
+/**
+ * Get the viewer's family root
+ */
+export function getMyRoot(opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: FamilyMyRootResponseDto;
+    }>("/family/me", {
+        ...opts
+    }));
 }
 /**
  * Set the viewer's family root

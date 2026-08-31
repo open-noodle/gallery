@@ -491,6 +491,8 @@ class ApiClient {
           return FamilyGraphResponseDto.fromJson(value);
         case 'FamilyIdentityDto':
           return FamilyIdentityDto.fromJson(value);
+        case 'FamilyMyRootResponseDto':
+          return FamilyMyRootResponseDto.fromJson(value);
         case 'FamilyMyRootUpdateDto':
           return FamilyMyRootUpdateDto.fromJson(value);
         case 'FamilyParticipantAddDto':

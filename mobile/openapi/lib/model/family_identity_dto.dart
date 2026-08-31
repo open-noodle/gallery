@@ -14,11 +14,15 @@ class FamilyIdentityDto {
   /// Returns a new [FamilyIdentityDto] instance.
   FamilyIdentityDto({
     required this.gender,
+    required this.label,
     required this.name,
   });
 
   /// Recorded gender ('male', 'female'), or null if unset
   String? gender;
+
+  /// This identity's relation to the caller (\"your sister\"), or null
+  String? label;
 
   /// Resolved display name
   String name;
@@ -26,16 +30,18 @@ class FamilyIdentityDto {
   @override
   bool operator ==(Object other) => identical(this, other) || other is FamilyIdentityDto &&
     other.gender == gender &&
+    other.label == label &&
     other.name == name;
 
   @override
   int get hashCode =>
     // ignore: unnecessary_parenthesis
     (gender == null ? 0 : gender!.hashCode) +
+    (label == null ? 0 : label!.hashCode) +
     (name.hashCode);
 
   @override
-  String toString() => 'FamilyIdentityDto[gender=$gender, name=$name]';
+  String toString() => 'FamilyIdentityDto[gender=$gender, label=$label, name=$name]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -43,6 +49,11 @@ class FamilyIdentityDto {
       json[r'gender'] = this.gender;
     } else {
       json[r'gender'] = null;
+    }
+    if (this.label != null) {
+      json[r'label'] = this.label;
+    } else {
+      json[r'label'] = null;
     }
       json[r'name'] = this.name;
     return json;
@@ -58,6 +69,7 @@ class FamilyIdentityDto {
 
       return FamilyIdentityDto(
         gender: mapValueOfType<String>(json, r'gender'),
+        label: mapValueOfType<String>(json, r'label'),
         name: mapValueOfType<String>(json, r'name')!,
       );
     }
@@ -107,6 +119,7 @@ class FamilyIdentityDto {
   /// The list of required keys that must be present in a JSON.
   static const requiredKeys = <String>{
     'gender',
+    'label',
     'name',
   };
 }

@@ -229,6 +229,7 @@ part 'model/family_cluster_response_dto.dart';
 part 'model/family_gender_update_dto.dart';
 part 'model/family_graph_response_dto.dart';
 part 'model/family_identity_dto.dart';
+part 'model/family_my_root_response_dto.dart';
 part 'model/family_my_root_update_dto.dart';
 part 'model/family_participant_add_dto.dart';
 part 'model/family_participant_dto.dart';

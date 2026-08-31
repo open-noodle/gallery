@@ -383,6 +383,30 @@ describe(FamilyService.name, () => {
     });
   });
 
+  describe('getMyRoot', () => {
+    it('returns the stored root identity id', async () => {
+      giveViewOnlyAccess(sut, mocks);
+      mocks.user.getMetadata.mockResolvedValue([{ key: 'family-root', value: { identityId: PARTNER_A } }] as any);
+
+      await expect(sut.getMyRoot(authStub.user1)).resolves.toBe(PARTNER_A);
+    });
+
+    it('returns null when no root has ever been set', async () => {
+      giveViewOnlyAccess(sut, mocks);
+      mocks.user.getMetadata.mockResolvedValue([]);
+
+      await expect(sut.getMyRoot(authStub.user1)).resolves.toBeNull();
+    });
+
+    it('refuses a caller with no family access at all', async () => {
+      mocks.family.getAccess.mockResolvedValue(undefined);
+      sut['getConfig'] = () => Promise.resolve({ familyTree: { enabled: true, defaultAccess: 'none' } } as any);
+
+      await expect(sut.getMyRoot(authStub.user1)).rejects.toBeInstanceOf(ForbiddenException);
+      expect(mocks.user.getMetadata).not.toHaveBeenCalled();
+    });
+  });
+
   describe('setMyRoot', () => {
     beforeEach(() => {
       mocks.family.getIdentityType.mockImplementation((id: string) => Promise.resolve(id === PET_A ? 'pet' : 'person'));

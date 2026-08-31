@@ -7532,6 +7532,50 @@
       }
     },
     "/family/me": {
+      "get": {
+        "description": "Retrieve the identity the caller previously nominated as themselves, or null if never set.",
+        "operationId": "getMyRoot",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FamilyMyRootResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Get the viewer's family root",
+        "tags": [
+          "Family"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "family.read",
+        "x-immich-state": "Beta"
+      },
       "put": {
         "description": "Nominate the identity that represents the caller, used to derive relative labels (\"your sister\"). Pass a null identityId to clear it.",
         "operationId": "setMyRoot",
@@ -28476,6 +28520,11 @@
             "nullable": true,
             "type": "string"
           },
+          "label": {
+            "description": "This identity's relation to the caller (\"your sister\"), or null",
+            "nullable": true,
+            "type": "string"
+          },
           "name": {
             "description": "Resolved display name",
             "type": "string"
@@ -28483,7 +28532,23 @@
         },
         "required": [
           "gender",
+          "label",
           "name"
+        ],
+        "type": "object"
+      },
+      "FamilyMyRootResponseDto": {
+        "properties": {
+          "identityId": {
+            "description": "The identity nominated as the caller, or null if never set",
+            "format": "uuid",
+            "nullable": true,
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "identityId"
         ],
         "type": "object"
       },
