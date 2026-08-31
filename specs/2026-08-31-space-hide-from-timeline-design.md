@@ -49,7 +49,7 @@ Not reproduced from code. `asset.repository.ts:432` gates a `spaceId` browse wit
 `requireShowInTimeline: true` and has no owner bypass (`userIds` is undefined for a space browse —
 `timeline.service.ts:201`). Two candidate explanations: the photos also reach the space by a
 directly-added `shared_space_asset` or a linked library (neither is gated by the album flag), or it is a
-separate bug. **Plan 0 reproduces this before any code is written.**
+separate bug. **Slice 0 reproduces this before any code is written.**
 
 ---
 
@@ -138,18 +138,18 @@ for that.
 Archive is the existing "hide from timeline" concept (`docs/docs/FAQ.mdx:114`): hidden from the main
 timeline and folder view, still present in search. Match it.
 
-| Surface                     | In scope  | Site                                                                              |
-| --------------------------- | --------- | --------------------------------------------------------------------------------- |
-| `/photos` web timeline      | ✅ plan 2 | `asset.repository.ts:475` **and** `:478` — both owner branches                    |
-| Timeline scrubber covers    | ✅ free   | `getTimeBucketCovers` (`asset.repository.ts:1545`) — note below                   |
-| Mobile timeline + scrubber  | ✅ plan 2 | `mobile/lib/infrastructure/entities/merged_asset.drift:63` and `:166`             |
-| Folder view                 | ✅ plan 2 | `view-repository.ts:60` `ownedOrSpaceAccessible`                                  |
-| Memories                    | ✅ plan 3 | `memory.repository.ts:133`, `:169`, `:315`, plus `assetRepository.getByDayOfYear` |
-| Search / smart search       | ❌        | unchanged, like Archive                                                           |
-| Map                         | ❌        | unchanged                                                                         |
-| People page counts          | ❌        | unchanged — deliberately, it is already the slowest query                         |
-| Tag explorer                | ❌        | see the name-collision warning below                                              |
-| The album/space page itself | ❌        | must always show its own contents                                                 |
+| Surface                     | In scope    | Site                                                                              |
+| --------------------------- | ----------- | --------------------------------------------------------------------------------- |
+| `/photos` web timeline      | ✅ slice 8  | `asset.repository.ts:475` **and** `:478` — both owner branches                    |
+| Timeline scrubber covers    | ✅ free     | `getTimeBucketCovers` (`asset.repository.ts:1545`) — note below                   |
+| Mobile timeline + scrubber  | ✅ slice 10 | `mobile/lib/infrastructure/entities/merged_asset.drift:63` and `:166`             |
+| Folder view                 | ✅ slice 9  | `view-repository.ts:60` `ownedOrSpaceAccessible`                                  |
+| Memories                    | ✅ slice 13 | `memory.repository.ts:133`, `:169`, `:315`, plus `assetRepository.getByDayOfYear` |
+| Search / smart search       | ❌          | unchanged, like Archive                                                           |
+| Map                         | ❌          | unchanged                                                                         |
+| People page counts          | ❌          | unchanged — deliberately, it is already the slowest query                         |
+| Tag explorer                | ❌          | see the name-collision warning below                                              |
+| The album/space page itself | ❌          | must always show its own contents                                                 |
 
 Three server timeline call sites, not two: `getTimeBuckets`, `getTimeBucket` and `getTimeBucketCovers`
 all route through `withTimeBucketAssetFilters`, so editing that one helper covers all three — which is
@@ -264,7 +264,7 @@ New entity, following `SharedSpaceAlbumLinkV1` exactly. Registration points:
 not the viewer's business and must never be synced — this is the one place the sparse table could leak a
 preference. Pinned by S16.
 
-OpenAPI regeneration (TypeScript SDK **and** Dart client) is required and is why plan 1 stands alone.
+OpenAPI regeneration (TypeScript SDK **and** Dart client) is required and is why slices 2–3 stand alone from the read path.
 Regen is `mise open-api` — `make open-api` was removed and `pnpm sync:open-api` does not exist, despite
 what `CLAUDE.md` still says.
 
@@ -272,7 +272,7 @@ what `CLAUDE.md` still says.
 
 ## 6. Resolution and query shape
 
-### 6.1 Splitting the gate — the highest-risk part of plan 2
+### 6.1 Splitting the gate — the highest-risk part of the whole change (slice 5)
 
 `requireShowInTimeline` currently means one thing. It now means two, and every gate must be classified:
 
@@ -293,7 +293,7 @@ albumTimelineGate: "space-tab" | "personal" | "none";
 
 Making it a required union rather than an optional boolean is deliberate: a defaulted boolean would let
 a missed site silently keep the old gate, which is precisely the class of bug that a green `tsc` cannot
-catch on a re-key. Triage of all 40 sites is a reviewable artifact of plan 2 — a table of site → chosen
+catch on a re-key. Triage of all 40 sites is a reviewable artifact of slice 5 — a table of site → chosen
 value → reason, in the PR description.
 
 ### 6.2 Service-side resolution
@@ -431,7 +431,7 @@ cost is small.
 Accepted: ≤165 ms scrubber, ≤47 ms per bucket, and only users who hid something pay.
 
 These figures predate the §6.4 owner-arm split, which adds one `OR` branch — a close approximation, not
-the final shape. **Re-measure at the end of plan 2** with the same scripts.
+the final shape. **Re-measure at the end of slice 8** with the same scripts.
 
 > Benchmark trap: `psql -U postgres` gets the cluster default `jit = on` and is ~5× slower than the app
 > (546 ms vs 113 ms). Always `SET jit = off;` first, or check `pg_db_role_setting`.
@@ -553,7 +553,7 @@ Edge cases:
 E10, E12, E13 and E18 are the ones most likely to be missed: E12 is a second code branch, E10 and E13
 are silent correctness bugs, E18 only manifests on upgrade.
 
-### 9.2 Gate-split triage (plan 2)
+### 9.2 Gate-split triage (slice 5)
 
 The ~40 gates in §6.1 are the highest-risk surface, and type-checking cannot validate the _choice_.
 
@@ -611,14 +611,14 @@ Standing failure modes in this repo; each has produced a false green before.
 Audit these **before** writing new ones; each is either still correct (proving we didn't over-reach) or
 needs updating with a recorded reason.
 
-| Test                                                                                          | Why at risk                                   | Expected                                                        |
-| --------------------------------------------------------------------------------------------- | --------------------------------------------- | --------------------------------------------------------------- |
-| `spaces-albums-timeline.e2e-spec.ts:181` — viewer toggling "show in my timeline"              | sits on the redefined surface                 | still passes; viewer doesn't own the photo, so only `V` applies |
-| `spaces-albums-timeline.e2e-spec.ts:150` — album toggle drops/re-adds in the space Photos tab | now governed by the shared flag alone         | still passes; a failure means plan 2 touched the space browse   |
-| `shared-space-visibility-matrix.medium.spec.ts`                                               | asserts today's "owner always sees their own" | **will need updating**                                          |
-| `accessible-timeline-asset-predicate.medium.spec.ts`                                          | collapsed vs expanded forms                   | new term must appear in both or neither                         |
-| `timeline-bucket-explicit-visibility.medium.spec.ts`                                          | interacts with the owner-arm split            | review                                                          |
-| `sync-shared-space-album.spec.ts`, `shared-space-album-link-sync.spec.ts`                     | new sibling stream                            | should be untouched                                             |
+| Test                                                                                          | Why at risk                                   | Expected                                                            |
+| --------------------------------------------------------------------------------------------- | --------------------------------------------- | ------------------------------------------------------------------- |
+| `spaces-albums-timeline.e2e-spec.ts:181` — viewer toggling "show in my timeline"              | sits on the redefined surface                 | still passes; viewer doesn't own the photo, so only `V` applies     |
+| `spaces-albums-timeline.e2e-spec.ts:150` — album toggle drops/re-adds in the space Photos tab | now governed by the shared flag alone         | still passes; a failure means slice 8 or 9 touched the space browse |
+| `shared-space-visibility-matrix.medium.spec.ts`                                               | asserts today's "owner always sees their own" | **will need updating**                                              |
+| `accessible-timeline-asset-predicate.medium.spec.ts`                                          | collapsed vs expanded forms                   | new term must appear in both or neither                             |
+| `timeline-bucket-explicit-visibility.medium.spec.ts`                                          | interacts with the owner-arm split            | review                                                              |
+| `sync-shared-space-album.spec.ts`, `shared-space-album-link-sync.spec.ts`                     | new sibling stream                            | should be untouched                                                 |
 
 ### 9.8 E2E
 
@@ -654,19 +654,80 @@ design and may not invalidate at all.
 
 ---
 
-## 10. Plans
+## 10. Slices
 
-| Plan  | Content                                                                                                                                                                                                                      | Gate                                      |
-| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| **0** | Reproduce the space-timeline half of #1041 on a real stack. Record the §9.7 tests' current state against unmodified code.                                                                                                    | before any code                           |
-| **1** | Foundation: table + audit + triggers + migration incl. seeding, sync stream both directions, hide/unhide API, OpenAPI/Dart regen, mobile Drift table + sync handler. **Nothing reads the flag yet.**                         | medium + sync + E18–E20 green             |
-| **2** | The fix: gate split (§6.1 triage), `getTimelineHiddenScope`, `hiddenFromOwnTimeline`, owner-arm split, `/photos` both branches, folder view, mobile timeline predicate, copy split, E2E. S1–S16, E1–E17 incl. E7b/E11b/E14b. | medium + Drift + e2e green; re-measure §7 |
-| **3** | Memories: three projections + `assetRepository.getByDayOfYear`.                                                                                                                                                              | medium green                              |
-| **4** | Preview endpoints + counts in all three dialogs.                                                                                                                                                                             | web + api specs green                     |
+Fourteen slices, each producing working, testable software. Ordering is chosen so that **every
+behaviour-changing slice is preceded by mechanical, zero-behaviour-change ones** — if a timeline
+regression appears at slice 8, slices 1–7 are already proven inert and the cause is unambiguous.
 
-Plan 1 lands doing nothing visible on purpose: it gets schema, sync and codegen churn out of the way so
-that if plan 2 misbehaves, the cause is unambiguous. Within plan 2 the owner-arm split goes first — it
-changes `TimeBucketOptions`, which the other call sites depend on.
+### Slice 0 — Recon (no code, no commit)
+
+Not an implementation slice; a gate before slice 1. Two outputs:
+
+1. Reproduce the space-timeline half of #1041 on a real stack (§1). If it reproduces, it is a **separate
+   bug** — file it and fix it independently of this work.
+2. Run the §9.7 at-risk tests against unmodified `main` and record their current state, so a later
+   failure can be attributed.
+
+### Foundation — slices 1–4 (nothing reads the flag)
+
+| #     | Goal                                                                                                                                                                                          | Tests                                                                                                         | Done when                                                     |
+| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| **1** | `shared_space_album_hidden` + `_audit` tables, delete trigger, composite FK to `shared_space_album` (§5.1); fork migration `1793000000000-AddSharedSpaceAlbumHidden.ts` with the §5.3 seeding | E11 (row gone on unlink), E11b (re-link not hidden), E14 (rows remain on member removal), E14b, E18, E19, E20 | migration runs on a seeded DB; schema-drift medium test green |
+| **2** | `SharedSpaceRepository.hideAlbumForUser` / `unhideAlbumForUser` / `getTimelineHiddenScope`; controller + DTOs; membership-gated, own-row-only                                                 | resolution rules 1–5 (§6.2) incl. A1 and the `MINUS`; own-row-only rejection                                  | API specs green; OpenAPI + Dart regen committed               |
+| **3** | Server sync stream `SharedSpaceAlbumHiddenV1` (+ delete + backfill), all six registration points (§5.4)                                                                                       | S16 (never receive another member's rows), delete emits audit, cold backfill                                  | sync medium specs green                                       |
+| **4** | Mobile Drift table + sync handler; **no predicate change**                                                                                                                                    | Drift: rows land, unhide removes them, another member's rows never arrive                                     | `flutter test` green on the `mobile/mise.toml` pin            |
+
+### Mechanical — slices 5–7 (still zero behaviour change)
+
+| #     | Goal                                                                                                                                                                                | Tests                                                                                                | Done when                                                                        |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| **5** | Replace `requireShowInTimeline?: boolean` with the required union `albumTimelineGate` (§6.1). **Every one of the 18 + 22 sites maps to `'space-tab'`** — today's behaviour, exactly | **no test changes at all.** The entire existing suite green, unmodified, is the proof                | triage table (site → value → reason) in the PR; a new call site fails to compile |
+| **6** | `hiddenFromOwnTimeline` predicate builder (§6.3), deliberately **not wired** to any query                                                                                           | unit + medium on the builder: each arm, the `NULL` library guard (E13), collapse-when-empty (E5, E6) | helper covered; still no behaviour change                                        |
+| **7** | Split the caller's own id from `userIds` in `TimeBucketOptions` + `timeline.service.ts` (§6.4)                                                                                      | E10 — partner assets unaffected (trivially true now; pins the shape before it can break)             | existing timeline suite green, unmodified                                        |
+
+### Behaviour — slices 8–10
+
+| #      | Goal                                                                                                 | Tests                                                                           | Done when                                                      |
+| ------ | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| **8**  | Wire the subtraction into `/photos`; flip personal-timeline sites from `'space-tab'` to `'personal'` | S1–S16, E1–E4, E7, E7b, E8, E9, E12, E15, E16, E17. §9.7 audit reviewed         | medium green; **§7 perf re-measured** on the personal instance |
+| **9**  | Folder view (`view-repository.ts:60`) — **not** `tag.repository.ts:88` (§4)                          | folder-view equivalents of S2, S5, S6                                           | medium green                                                   |
+| **10** | Mobile timeline predicate: `merged_asset.drift:63` and `:166`, regenerate `merged_asset.drift.dart`  | Drift copies of S1–S8, S15, E5, E6, E9, E13 — a server test proves nothing here | `flutter test` green                                           |
+
+### Polish — slices 11–14
+
+| #      | Goal                                                                                                                    | Tests                                                                                                               | Done when                      |
+| ------ | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| **11** | Copy split: three switch names + two badges (§8), nine locales, docs incl. the "not a privacy feature" sentence         | web component specs: three distinct strings, editor-only items hidden from viewers                                  | i18n prettier gate green       |
+| **12** | Preview endpoints (§8.1) + all three confirm dialogs with counts + the editor "also hide from my own timeline" checkbox | API specs (403 for non-member, count matches, zero case); web specs incl. the checkbox writing only the actor's row | OpenAPI + Dart regen committed |
+| **13** | Memories: three projections + `assetRepository.getByDayOfYear`                                                          | memory equivalents of S2 and S5; hidden photos leave immediately, not overnight                                     | medium green                   |
+| **14** | E2E on `spaces-albums-timeline.e2e-spec.ts` (§9.8)                                                                      | all six E2E scenarios                                                                                               | e2e green                      |
+
+### Per-slice verification — run these, do not trust a narrow local check
+
+Every one of these has produced a false green in a previous `/impl-loop` on this repo. A subagent
+reporting "green" from the gate its own slice touched is **necessary but not sufficient**.
+
+| Gate                                        | Command                                                                                                                                                                                                                                                                     | Applies to           |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| Server types, **uncached**                  | `pnpm -C server exec tsc --noEmit` — `make check-server` reuses `.tsbuildinfo` and masks spec-file TS errors that CI's fresh `tsc` catches                                                                                                                                  | every server slice   |
+| Web lint (separate CI job from `check-web`) | `pnpm -C web exec eslint <files> --max-warnings 0` — `make check-web` is svelte-check + tsc only                                                                                                                                                                            | 11, 12               |
+| SQL query docs                              | `make sql` — required whenever **anything** under `server/src/repositories/` changes, body-only edits included                                                                                                                                                              | 2, 3, 5, 6, 8, 9, 13 |
+| OpenAPI incl. **Dart**                      | `mise open-api` (not `make open-api`, which was removed; `pnpm sync:open-api` does not exist). Reproduce CI with `pnpm --filter immich build && (cd open-api && ./bin/generate-open-api.sh) && git status --porcelain open-api/ mobile/openapi/`, then commit **all** of it | 2, 3, 12             |
+| i18n sort + format                          | `pnpm --filter=immich-i18n format:fix` — CI runs prettier on `i18n/` and fails on any diff; appended keys land unsorted                                                                                                                                                     | 11                   |
+| Prettier everywhere                         | `pnpm -C server exec prettier --check "src/**/*.ts"`, plus `npx prettier --check` on any touched markdown — CI's `prettier --cache --check .` catches files `make format-*` missed                                                                                          | every slice          |
+| Mobile                                      | `flutter test` on the pin in `mobile/mise.toml` — **read the pin**. `dart analyze` is not a substitute: generated-code compile errors only surface when a test compiles                                                                                                     | 4, 10                |
+
+Two mock idioms that fight each other: `mockResolvedValue()` trips TS2554, `mockResolvedValue(undefined)`
+trips `unicorn/no-useless-undefined`. The codebase idiom is **`mockResolvedValue(void 0)`**.
+
+### TDD stance for every slice
+
+Red → green → refactor, with the red observed **for the stated reason**. Slices 5 and 7 invert this:
+their proof is that the **existing** suite stays green with no test edits, so any test change in those
+slices is itself a finding. §9.6's honesty requirements apply throughout — in particular, every scenario
+in slice 8 must give the viewer a second, visible space, or the §6.2 collapse silently runs the wrong
+code path and the test proves nothing.
 
 ## 11. Out of scope
 
