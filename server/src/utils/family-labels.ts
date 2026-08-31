@@ -57,6 +57,10 @@ export interface ProjectedFamilyIdentity {
 export interface ProjectedFamilyUnion {
   readonly id: string;
   readonly status: FamilyUnionStatus;
+  /** Display-only — never consulted by any relation computation in this module (only `status`
+   * is, via `statusOf`, for the ex-partner distinction). */
+  readonly startDate?: string | null;
+  readonly endDate?: string | null;
   readonly partners: readonly ProjectedFamilyParticipant[];
   readonly children: readonly ProjectedFamilyParticipant[];
 }
@@ -595,4 +599,78 @@ export function deriveRelationLabel(
     return null;
   }
   return `${anchor.name}'s ${anchor.term}`;
+}
+
+/**
+ * One direct relation `subjectId` has to another seat in the graph — the shape a person's OWN
+ * relations panel needs (D4 read as "root = the person being viewed" rather than "root = the
+ * viewer"). Never includes the anchored "X's Y" form `deriveRelationLabel` falls back to for a
+ * DISTANT viewer with no path of their own — on a person's own page every listed relation is, by
+ * definition, directly reachable from that person, so the fallback phrasing never applies here.
+ */
+export interface FamilyDirectRelation {
+  /** The other seat. `kind: 'known'` carries an `identityId`; `kind: 'anonymous'` carries none —
+   * see `anonymousSlot` for how to reference it instead. */
+  readonly participant: ProjectedFamilyParticipant;
+  /** The seat's position within its own union+role participant array — only meaningful when
+   * `participant.kind === 'anonymous'`, `null` otherwise. Mirrors the "position in the array IS
+   * the slot" convention used everywhere else an anonymous seat needs referencing (`E30`): it is
+   * never a global id, so it carries nothing that could correlate this seat with another. */
+  readonly anonymousSlot: number | null;
+  /** The plain relation term (no "your " prefix — the caller decides how to render it relative
+   * to whoever is asking). */
+  readonly relation: string;
+}
+
+/**
+ * Every relation `subjectId` has directly to someone else in the graph: parents, partners,
+ * children, siblings/half-siblings, step-relations, in-laws, and blood relatives at any
+ * resolvable degree — reusing the exact same candidate collection and wording
+ * (`collectCandidates`/`genderedTerm`/`bloodTerm`) `deriveRelationLabel` uses for rule 3, just
+ * entered from `subjectId` instead of a viewer's root, and never falling through to rule 4's
+ * anchored phrasing (see `FamilyDirectRelation`'s doc for why). `subjectId` is never included in
+ * its own relations.
+ *
+ * One entry per (union, role, seat): a known identity occupying two structurally different seats
+ * relative to `subjectId` (e.g. a co-parent who is ALSO, through a separate union, a step-parent)
+ * is a genuine, if unusual, distinct fact — the caller decides whether to deduplicate by
+ * identity. Every anonymous seat is unique by construction (`anonymousSlot` above), so those
+ * never need deduplication either way.
+ */
+export function deriveDirectRelations(graph: ProjectedFamilyGraph, subjectId: string): FamilyDirectRelation[] {
+  const model = buildModel(graph);
+  const results: FamilyDirectRelation[] = [];
+
+  for (const identityId of Object.keys(graph.identities)) {
+    if (identityId === subjectId) {
+      continue;
+    }
+    const direct = directRelation(model, graph, subjectId, identityId);
+    if (direct) {
+      results.push({ participant: { kind: 'known', identityId }, anonymousSlot: null, relation: direct.term });
+    }
+  }
+
+  for (const union of graph.unions) {
+    const roleSeats: ReadonlyArray<{ role: 'partner' | 'child'; participants: readonly ProjectedFamilyParticipant[] }> =
+      [
+        { role: 'partner', participants: union.partners },
+        { role: 'child', participants: union.children },
+      ];
+
+    for (const { role, participants } of roleSeats) {
+      for (const [index, participant] of participants.entries()) {
+        if (participant.kind !== 'anonymous') {
+          continue;
+        }
+        const targetKey = anonymousKey(union.id, role, index);
+        const direct = directRelation(model, graph, subjectId, targetKey);
+        if (direct) {
+          results.push({ participant, anonymousSlot: index, relation: direct.term });
+        }
+      }
+    }
+  }
+
+  return results;
 }

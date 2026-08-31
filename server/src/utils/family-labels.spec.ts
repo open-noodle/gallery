@@ -1,4 +1,5 @@
 import {
+  deriveDirectRelations,
   deriveRelationLabel,
   FamilyGender,
   ProjectedFamilyGraph,
@@ -313,3 +314,83 @@ function parentFixture(gender: FamilyGender): ProjectedFamilyGraph {
     unions: [{ id: 'u1', status: 'married', partners: [anonymous(), known('parent')], children: [known('root')] }],
   };
 }
+
+describe('deriveDirectRelations', () => {
+  it("lists every direct relation for the subject, relative to the SUBJECT (no 'your ' prefix)", () => {
+    const relations = deriveDirectRelations(familyGraph, 'root');
+    const byId = new Map(
+      relations
+        .filter((entry) => entry.participant.kind === 'known')
+        .map((entry) => [(entry.participant as { identityId: string }).identityId, entry.relation]),
+    );
+
+    expect(byId.get('dad')).toBe('parent');
+    expect(byId.get('mom')).toBe('mother');
+    expect(byId.get('sam')).toBe('brother');
+    expect(byId.get('zack')).toBe('half-brother');
+    expect(byId.get('jess')).toBe('wife');
+    expect(byId.get('exWife')).toBe('ex-wife');
+    expect(byId.get('separatedPartner')).toBe('former partner');
+  });
+
+  it('never includes the subject in their own relations', () => {
+    const relations = deriveDirectRelations(familyGraph, 'root');
+    const knownIds = relations
+      .filter((entry) => entry.participant.kind === 'known')
+      .map((entry) => (entry.participant as { identityId: string }).identityId);
+
+    expect(knownIds).not.toContain('root');
+  });
+
+  it('includes an anonymous participant as a null-identity seat with its per-union slot index', () => {
+    // `u-greatgp`'s sole partner is anonymous, and is root's great-grandparent via mom -> mgp1.
+    const relations = deriveDirectRelations(familyGraph, 'root');
+    const anonymousEntry = relations.find((entry) => entry.participant.kind === 'anonymous');
+
+    expect(anonymousEntry).toBeDefined();
+    expect(anonymousEntry?.participant).toEqual({ kind: 'anonymous' });
+    expect(anonymousEntry?.anonymousSlot).toBe(0);
+    expect(typeof anonymousEntry?.relation).toBe('string');
+  });
+
+  it('sets anonymousSlot to null for a known participant', () => {
+    const relations = deriveDirectRelations(familyGraph, 'root');
+    const knownEntry = relations.find(
+      (entry) => entry.participant.kind === 'known' && entry.participant.identityId === 'dad',
+    );
+
+    expect(knownEntry?.anonymousSlot).toBeNull();
+  });
+
+  it('excludes a person with no path to the subject at all — never the anchored "X\'s Y" form', () => {
+    // Two disconnected clusters: `root` only relates to `partner`; `target` only relates to
+    // `spouse`. Nothing connects the two clusters, so `target` must not appear in `root`'s
+    // relations — not even via the "nearest anchor" phrasing `deriveRelationLabel` would use for
+    // a distant VIEWER, since that phrasing never belongs on a person's own relations panel.
+    const graph: ProjectedFamilyGraph = {
+      identities: {
+        root: { name: 'Root', gender: null },
+        partner: { name: 'Partner', gender: null },
+        target: { name: 'Target', gender: null },
+        spouse: { name: 'Spouse', gender: null },
+      },
+      unions: [
+        { id: 'u-root', status: 'married', partners: [known('root'), known('partner')], children: [] },
+        { id: 'u-target', status: 'married', partners: [known('target'), known('spouse')], children: [] },
+      ],
+    };
+
+    const relations = deriveDirectRelations(graph, 'root');
+    const relatedIds = relations
+      .filter((entry) => entry.participant.kind === 'known')
+      .map((entry) => (entry.participant as { identityId: string }).identityId);
+
+    expect(relatedIds).toEqual(['partner']);
+    expect(relatedIds).not.toContain('target');
+    expect(relatedIds).not.toContain('spouse');
+  });
+
+  it('returns an empty list for a subject with no unions at all', () => {
+    expect(deriveDirectRelations(familyGraph, 'unknownPerson')).toEqual([]);
+  });
+});

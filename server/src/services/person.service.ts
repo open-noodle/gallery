@@ -45,6 +45,7 @@ import {
 import {
   AssetVisibility,
   CacheControl,
+  FamilyAccessLevel,
   ImmichWorker,
   JobName,
   JobStatus,
@@ -69,6 +70,7 @@ import { BaseService } from 'src/services/base.service.js';
 import { convertFaceBoxToOriginalImageSpace, getDimensions } from 'src/utils/asset.util.js';
 import { asDateTimeString } from 'src/utils/date.js';
 import { isSuggestionScanTarget } from 'src/utils/face-repair.js';
+import { FamilyLabelRepositories, FamilyLabelSet, resolveFamilyLabelSet } from 'src/utils/family-graph.js';
 import { ImmichMediaResponse } from 'src/utils/file.js';
 import { isHttpException } from 'src/utils/logger.js';
 import { createCrossOwnerMergeAuthorizer } from 'src/utils/merge-policy.js';
@@ -117,6 +119,26 @@ const assertOwnRecord = (auth: AuthDto, userId: string | undefined) => {
 
 @Injectable()
 export class PersonService extends BaseService {
+  // Gallery-fork: family relationships (`familyRelationLabel`). `this.familyRepository`/etc. are
+  // `protected` (from `BaseService`), so TS refuses to widen `this` itself to the (structurally
+  // public) `FamilyLabelRepositories` shape used by `resolveFamilyLabelSet` — this object literal
+  // is the fix, same as `FamilyService`'s own `repos` getter.
+  private get familyRepos(): FamilyLabelRepositories {
+    return {
+      familyRepository: this.familyRepository,
+      faceIdentityRepository: this.faceIdentityRepository,
+      userRepository: this.userRepository,
+    };
+  }
+
+  // Loads the projected graph and the viewer's root AT MOST once (nothing when access is
+  // `none`) — call this ONCE per request (`getAll`/`getById` below), then reuse `.label()` for
+  // every person in that response. Never call this once per person.
+  private async getFamilyLabelSet(auth: AuthDto): Promise<FamilyLabelSet> {
+    const { familyTree } = await this.getConfig({ withCache: false });
+    return resolveFamilyLabelSet(this.familyRepos, familyTree, auth.user.id);
+  }
+
   private async crossOwnerMergeAuthorizer(dto: { confirmCrossOwner?: boolean }): Promise<MergeAuthorizer> {
     // Resolve the toggle here, BEFORE the merge transaction opens. The authorizer runs inside that transaction
     // while it holds the instance-wide advisory lock; reading config there would query a second pool connection
@@ -257,8 +279,19 @@ export class PersonService extends BaseService {
       type,
     });
 
+    // Gallery-fork: family relationships. ONE graph load for the whole list (however many
+    // hundreds of people it holds), never one per person — see `getFamilyLabelSet`.
+    const labelSet = await this.getFamilyLabelSet(auth);
+    const people = items.map((person) => {
+      const response = mapPerson(person);
+      if (labelSet.level !== FamilyAccessLevel.None) {
+        response.familyRelationLabel = labelSet.label(person.identityId);
+      }
+      return response;
+    });
+
     return {
-      people: items.map((person) => mapPerson(person)),
+      people,
       hasNextPage,
       total,
       hidden,
@@ -464,6 +497,14 @@ export class PersonService extends BaseService {
           response.birthDate = resolved.birthDate;
         }
       }
+
+      // Gallery-fork: family relationships. A single-person fetch, so one graph load here is
+      // proportionate — see `getAll` for the "many people" case this same helper is built for.
+      const labelSet = await this.getFamilyLabelSet(auth);
+      if (labelSet.level !== FamilyAccessLevel.None) {
+        response.familyRelationLabel = labelSet.label(person.identityId);
+      }
+
       return response;
     }
 

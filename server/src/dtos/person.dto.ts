@@ -205,6 +205,17 @@ export const PersonResponseSchema = z
     otherPeople: z.array(PersonOtherResponseSchema),
     sharedBy: z.array(PeopleUserResponseSchema).describe('Users that gave the current user access to this person'),
     sharedWith: z.array(PeopleUserResponseSchema).describe('Users the current user gave access to this person'),
+    // Gallery-fork: family relationships. Populated server-side only when the viewer's effective
+    // family access is 'view' or 'contribute' — absent entirely otherwise, so a user without
+    // access sees exactly today's payload. Derived from the SAME projected graph and label
+    // engine `GET /family/unions` uses (never a second derivation path) — see
+    // `src/utils/family-graph.ts`. Deliberately never carries an identityId: this field, not the
+    // identity behind it, is what a client is allowed to see.
+    familyRelationLabel: z
+      .string()
+      .nullable()
+      .optional()
+      .describe('How this person relates to the viewer ("your niece"), present only when the viewer has family access'),
   })
   .meta({ id: 'PersonResponseDto' });
 

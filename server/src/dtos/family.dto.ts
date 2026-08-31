@@ -1,4 +1,5 @@
 import { createZodDto } from 'nestjs-zod';
+import { PersonResponseSchema } from 'src/dtos/person.dto';
 import { FamilyAccessLevel } from 'src/enum';
 import z from 'zod';
 
@@ -12,6 +13,10 @@ import z from 'zod';
 const FamilyUnionStatusSchema = z
   .enum(['married', 'partnered', 'separated', 'divorced', 'widowed'])
   .meta({ id: 'FamilyUnionStatus' });
+
+const FamilyAccessLevelSchema = z.enum(FamilyAccessLevel).meta({ id: 'FamilyAccessLevel' });
+
+const FamilyDateSchema = z.string().meta({ format: 'date' }).nullable();
 
 // Deliberately NOT `z.enum([...]).nullable()`, and NOT `z.union([z.enum([...]), z.null()])`
 // either — nestjs-zod's OpenAPI-3.0 conversion flattens BOTH of those into the same
@@ -31,14 +36,30 @@ const FamilyGenderSchema = z
 
 const FamilyParticipantRoleSchema = z.enum(['partner', 'child']).meta({ id: 'FamilyParticipantRole' });
 
-// Mirrors `ProjectedFamilyParticipant` (`src/utils/family-labels.ts`) exactly: the `anonymous`
-// variant carries no `identityId` at all, not an optional one — see `E30` in the design spec.
-// Never widen this to give the anonymous branch an id field, even an optional one.
+const FamilyParticipantKindSchema = z
+  .enum(['known', 'anonymous'])
+  .describe('Whether this seat is a resolvable identity or unresolvable to the viewer')
+  .meta({ id: 'FamilyParticipantKind' });
+
+// Deliberately a FLAT object with a nullable `identityId`, not a `z.discriminatedUnion` —
+// `z.discriminatedUnion` emits an OpenAPI `oneOf`, and the Dart client generator collapses that
+// `oneOf`'s two branches into ONE class that merges their `required` arrays: the shipped Dart
+// model ended up with `identityId` marked non-nullable AND REQUIRED while `kind`'s generated enum
+// only carried the 'anonymous' literal — meaning it threw deserializing every 'known' participant
+// (and, separately, 'kind' could never decode to 'known' at all). That is a real, previously
+// shipped bug, not a hypothetical: verify any future change to this schema by decoding a payload
+// through the actual generated Dart model, not by inspecting the JSON schema. A flat nullable
+// field is the standard, well-supported pattern every generator here already handles correctly
+// (see `PersonResponseSchema`'s own `person: PersonResponseSchema.nullable()` on
+// `AssetFaceResponseDto`). `identityId: null` for an anonymous seat carries zero information —
+// every anonymous seat has the exact same `null` — so it preserves `E30`'s non-correlation
+// guarantee exactly as well as an absent field would; the guarantee was never about `null` vs.
+// "absent", only about never sending a REAL id for an unresolvable participant.
 const FamilyParticipantSchema = z
-  .discriminatedUnion('kind', [
-    z.object({ kind: z.literal('known'), identityId: z.uuidv4().describe('Identity ID') }),
-    z.object({ kind: z.literal('anonymous') }),
-  ])
+  .object({
+    kind: FamilyParticipantKindSchema,
+    identityId: z.uuidv4().nullable().describe("Identity ID when kind is 'known'; null when 'anonymous'"),
+  })
   .meta({ id: 'FamilyParticipantDto' });
 
 // `label` is derived server-side ONLY, from the projected graph and the caller's own root
@@ -58,6 +79,8 @@ const FamilyUnionSchema = z
   .object({
     id: z.uuidv4().describe('Union ID'),
     status: FamilyUnionStatusSchema.describe('Union status'),
+    startDate: FamilyDateSchema.describe('Union start date'),
+    endDate: FamilyDateSchema.describe('Union end date'),
     partners: z.array(FamilyParticipantSchema).describe('Partners in this union (0, 1 or 2)'),
     children: z.array(FamilyParticipantSchema).describe('Children in this union'),
   })
@@ -89,8 +112,6 @@ const FamilyClusterSchema = z
     rootCandidateId: z.uuidv4().describe('A resolvable identity id in this cluster, usable as a default root'),
   })
   .meta({ id: 'FamilyClusterResponseDto' });
-
-const FamilyDateSchema = z.string().meta({ format: 'date' }).nullable();
 
 const FamilyUnionCreateSchema = z
   .object({
@@ -139,9 +160,14 @@ const FamilyMyRootUpdateSchema = z
   })
   .meta({ id: 'FamilyMyRootUpdateDto' });
 
+// `access` lets a client learn, in the SAME call, both who it said it is and what it may do —
+// resolved through the exact same `FamilyService.resolveFamilyAccess` path as every other
+// endpoint (never a second derivation), and never cached across requests: a grant revoked a
+// moment ago must already read back as 'none' here.
 const FamilyMyRootResponseSchema = z
   .object({
-    identityId: z.uuidv4().nullable().describe('The identity nominated as the caller, or null if never set'),
+    rootIdentityId: z.uuidv4().nullable().describe('The identity nominated as the caller, or null if never set'),
+    access: FamilyAccessLevelSchema.describe("The caller's own effective family access level"),
   })
   .meta({ id: 'FamilyMyRootResponseDto' });
 
@@ -150,8 +176,6 @@ const FamilyGenderUpdateSchema = z
     gender: FamilyGenderSchema.describe("Gender ('male' or 'female'), or null to clear"),
   })
   .meta({ id: 'FamilyGenderUpdateDto' });
-
-const FamilyAccessLevelSchema = z.enum(FamilyAccessLevel).meta({ id: 'FamilyAccessLevel' });
 
 const FamilyAccessGrantResponseSchema = z
   .object({
@@ -172,6 +196,29 @@ const FamilyAccessUserParamSchema = z.object({
   userId: z.uuidv4(),
 });
 
+// One row of a PERSON's own relations panel — relative to that person, not the viewer (a
+// different query from `PersonResponseDto.familyRelationLabel`, which is always relative to the
+// viewer). `person` is populated for a participant the viewer can resolve; `null` for one they
+// cannot, in which case `anonymousSlot` carries the opaque per-union index instead — never an
+// identity id, same discipline as `FamilyParticipantDto`.
+const FamilyPersonRelationSchema = z
+  .object({
+    person: PersonResponseSchema.nullable().describe('The related person, or null if the viewer cannot resolve them'),
+    anonymousSlot: z.int().min(0).nullable().describe('Opaque per-union slot index, only present when person is null'),
+    relation: z.string().describe("How this participant relates to the requested person (e.g. 'parent')"),
+  })
+  .meta({ id: 'FamilyPersonRelationDto' });
+
+const FamilyPersonRelationsResponseSchema = z
+  .object({
+    relations: z.array(FamilyPersonRelationSchema),
+  })
+  .meta({ id: 'FamilyPersonRelationsResponseDto' });
+
+const FamilyPersonParamSchema = z.object({
+  personId: z.uuidv4(),
+});
+
 export class FamilyUnionsQueryDto extends createZodDto(FamilyUnionsQuerySchema) {}
 export class FamilyGraphResponseDto extends createZodDto(FamilyGraphResponseSchema) {}
 export class FamilyClusterResponseDto extends createZodDto(FamilyClusterSchema) {}
@@ -188,3 +235,5 @@ export class FamilyGenderUpdateDto extends createZodDto(FamilyGenderUpdateSchema
 export class FamilyAccessGrantResponseDto extends createZodDto(FamilyAccessGrantResponseSchema) {}
 export class FamilyAccessUpdateDto extends createZodDto(FamilyAccessUpdateSchema) {}
 export class FamilyAccessUserParamDto extends createZodDto(FamilyAccessUserParamSchema) {}
+export class FamilyPersonRelationsResponseDto extends createZodDto(FamilyPersonRelationsResponseSchema) {}
+export class FamilyPersonParamDto extends createZodDto(FamilyPersonParamSchema) {}
