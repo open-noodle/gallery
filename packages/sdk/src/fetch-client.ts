@@ -1553,10 +1553,14 @@ export type FamilyParticipantDto = {
 export type FamilyUnionDto = {
     /** Children in this union */
     children: FamilyParticipantDto[];
+    /** Union end date */
+    endDate: string | null;
     /** Union ID */
     id: string;
     /** Partners in this union (0, 1 or 2) */
     partners: FamilyParticipantDto[];
+    /** Union start date */
+    startDate: string | null;
     /** Union status */
     status: FamilyUnionStatus;
 };

@@ -105,6 +105,8 @@ export class FamilyService extends BaseService {
     const unions: ProjectedFamilyUnion[] = visibleUnions.map((union) => ({
       id: union.id,
       status: union.status as FamilyUnionStatus,
+      startDate: union.startDate,
+      endDate: union.endDate,
       partners: union.partners.map((seat) => toProjectedParticipant(seat)),
       children: union.children.map((seat) => toProjectedParticipant(seat)),
     }));

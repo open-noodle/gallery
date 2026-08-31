@@ -31,6 +31,8 @@ where
 SELECT
   family_union.id,
   family_union.status,
+  family_union."startDate",
+  family_union."endDate",
   COALESCE(partners.ids, ARRAY[]::uuid[]) AS "partnerIds",
   COALESCE(children.ids, ARRAY[]::uuid[]) AS "childIds"
 FROM

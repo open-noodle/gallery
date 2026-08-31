@@ -28694,6 +28694,12 @@
             },
             "type": "array"
           },
+          "endDate": {
+            "description": "Union end date",
+            "format": "date",
+            "nullable": true,
+            "type": "string"
+          },
           "id": {
             "description": "Union ID",
             "format": "uuid",
@@ -28707,6 +28713,12 @@
             },
             "type": "array"
           },
+          "startDate": {
+            "description": "Union start date",
+            "format": "date",
+            "nullable": true,
+            "type": "string"
+          },
           "status": {
             "$ref": "#/components/schemas/FamilyUnionStatus",
             "description": "Union status"
@@ -28714,8 +28726,10 @@
         },
         "required": [
           "children",
+          "endDate",
           "id",
           "partners",
+          "startDate",
           "status"
         ],
         "type": "object"

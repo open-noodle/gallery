@@ -57,6 +57,13 @@ export interface ProjectedFamilyIdentity {
 export interface ProjectedFamilyUnion {
   readonly id: string;
   readonly status: FamilyUnionStatus;
+  // Optional, not required: the label engine below never reads either field (a relation label
+  // never depends on a union's dates), so the many `ProjectedFamilyUnion` fixtures in this file's
+  // own spec — none of which existed to test dates — are left alone. Only the read path
+  // (`FamilyService.getVisibleGraph` -> `GET /family/unions`, slice 10's union-connector pill,
+  // `A7`) actually populates these.
+  readonly startDate?: string | null;
+  readonly endDate?: string | null;
   readonly partners: readonly ProjectedFamilyParticipant[];
   readonly children: readonly ProjectedFamilyParticipant[];
 }

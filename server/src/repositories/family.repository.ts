@@ -32,6 +32,8 @@ export interface UpdateUnionFields {
 export interface RawUnionRow {
   id: string;
   status: string;
+  startDate: string | null;
+  endDate: string | null;
   partnerIds: string[];
   childIds: string[];
 }
@@ -48,6 +50,8 @@ export type VisibilityParticipant = { readonly identityId: string } | { readonly
 export interface VisibleUnion {
   readonly id: string;
   readonly status: string;
+  readonly startDate: string | null;
+  readonly endDate: string | null;
   readonly partners: readonly VisibilityParticipant[];
   readonly children: readonly VisibilityParticipant[];
 }
@@ -146,6 +150,8 @@ export class FamilyRepository {
       SELECT
         family_union.id,
         family_union.status,
+        family_union."startDate",
+        family_union."endDate",
         COALESCE(partners.ids, ARRAY[]::uuid[]) AS "partnerIds",
         COALESCE(children.ids, ARRAY[]::uuid[]) AS "childIds"
       FROM family_union
@@ -190,7 +196,14 @@ export class FamilyRepository {
         continue;
       }
 
-      visible.push({ id: union.id, status: union.status, partners, children });
+      visible.push({
+        id: union.id,
+        status: union.status,
+        startDate: union.startDate,
+        endDate: union.endDate,
+        partners,
+        children,
+      });
     }
 
     return visible;

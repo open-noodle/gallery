@@ -31,6 +31,8 @@ const FamilyGenderSchema = z
 
 const FamilyParticipantRoleSchema = z.enum(['partner', 'child']).meta({ id: 'FamilyParticipantRole' });
 
+const FamilyDateSchema = z.string().meta({ format: 'date' }).nullable();
+
 // Mirrors `ProjectedFamilyParticipant` (`src/utils/family-labels.ts`) exactly: the `anonymous`
 // variant carries no `identityId` at all, not an optional one — see `E30` in the design spec.
 // Never widen this to give the anonymous branch an id field, even an optional one.
@@ -58,6 +60,8 @@ const FamilyUnionSchema = z
   .object({
     id: z.uuidv4().describe('Union ID'),
     status: FamilyUnionStatusSchema.describe('Union status'),
+    startDate: FamilyDateSchema.describe('Union start date'),
+    endDate: FamilyDateSchema.describe('Union end date'),
     partners: z.array(FamilyParticipantSchema).describe('Partners in this union (0, 1 or 2)'),
     children: z.array(FamilyParticipantSchema).describe('Children in this union'),
   })
@@ -89,8 +93,6 @@ const FamilyClusterSchema = z
     rootCandidateId: z.uuidv4().describe('A resolvable identity id in this cluster, usable as a default root'),
   })
   .meta({ id: 'FamilyClusterResponseDto' });
-
-const FamilyDateSchema = z.string().meta({ format: 'date' }).nullable();
 
 const FamilyUnionCreateSchema = z
   .object({

@@ -90,6 +90,11 @@ export class FamilyController {
     const unions = page.map((union) => ({
       id: union.id,
       status: union.status,
+      // A7 (slice 10): the canvas's union-connector pill needs both dates to render "1988 – 2007
+      // · divorced". `?? null` guards fixtures/older callers that never set these on
+      // `ProjectedFamilyUnion` (they are optional there — see the type's own comment).
+      startDate: union.startDate ?? null,
+      endDate: union.endDate ?? null,
       partners: union.partners.map((participant) => ({ ...participant })),
       children: union.children.map((participant) => ({ ...participant })),
     }));
