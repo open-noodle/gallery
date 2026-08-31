@@ -22,6 +22,59 @@ export interface UpdateUnionFields {
   endDate?: string | null;
 }
 
+/**
+ * One union's full participant lists, before any per-viewer redaction. `partnerIds`/`childIds`
+ * are ordered by identity id — a fixed, arbitrary-but-deterministic order — so that the same
+ * union always assigns the same anonymous slot index to the same identity across repeated reads
+ * (`E30`'s "stable slot" property depends on this: query results are not otherwise guaranteed to
+ * come back in the same row order twice).
+ */
+export interface RawUnionRow {
+  id: string;
+  status: string;
+  partnerIds: string[];
+  childIds: string[];
+}
+
+/** One seat in a union as the visibility query has resolved it: an identity the caller already
+ * knows the viewer can resolve, or a placeholder for one they cannot. The placeholder carries
+ * nothing at all — not even a slot number — because its position in the `partners`/`children`
+ * array IS the slot: the caller never needs a separate index to keep two anonymous seats in the
+ * same union apart. Never confuse this with a `ProjectedFamilyParticipant`: this is the
+ * repository-internal shape (`identityId`, not `kind: 'known'`); `FamilyService` maps it to the
+ * public one. */
+export type VisibilityParticipant = { readonly identityId: string } | { readonly anonymous: true };
+
+export interface VisibleUnion {
+  readonly id: string;
+  readonly status: string;
+  readonly partners: readonly VisibilityParticipant[];
+  readonly children: readonly VisibilityParticipant[];
+}
+
+/** A node in the connected-components graph over visible unions: a resolvable identity, or an
+ * anonymous seat scoped to one union+role+index so it can never be mistaken for "the same"
+ * anonymous seat elsewhere. */
+type ClusterNode = { readonly kind: 'known'; readonly identityId: string } | { readonly kind: 'anonymous' };
+
+/** The connected-components node key for one seat: a known identity's real id, or a synthetic
+ * key scoped to its own union+role+index. Pure — no closure over `computeClusters`' state — so
+ * it lives at module scope rather than being re-created on every call. */
+const clusterNodeKey = (
+  unionId: string,
+  role: 'partner' | 'child',
+  index: number,
+  seat: VisibilityParticipant,
+): string => ('identityId' in seat ? seat.identityId : `anon:${unionId}:${role}:${index}`);
+
+export interface RawCluster {
+  /** Every resolvable identity in this cluster. Always at least 2 — every visible union already
+   * guarantees 2+ resolvable participants, and a cluster is built from at least one such union. */
+  readonly knownIds: readonly string[];
+  /** Total distinct people in the cluster, resolvable or not. */
+  readonly size: number;
+}
+
 // See family-union.table.ts: a partial unique index on partnerKey, NULL below two partners.
 const PARTNER_KEY_UNIQUE_INDEX = 'family_union_partner_key_uq';
 
@@ -56,6 +109,154 @@ export class FamilyRepository {
   @GenerateSql({ params: [DummyValue.UUID] })
   getUnion(unionId: string, db: Kysely<DB> | Transaction<DB> = this.db) {
     return db.selectFrom('family_union').selectAll().where('id', '=', unionId).executeTakeFirst();
+  }
+
+  // Slice 5 (D3): every union with its full, unredacted participant lists, in ONE query
+  // regardless of how many unions exist (`E65`) — a LATERAL array_agg per role rather than a
+  // join that would multiply rows (and therefore round trips scaling with union size) per
+  // partner/child. This is deliberately viewer-agnostic: redaction is layered on top by
+  // `FamilyService`, which is also why this never takes a userId. Each array is ordered by
+  // identity id so that repeated calls (e.g. successive reads by different viewers) assign the
+  // same anonymous slot index to the same identity — see `RawUnionRow`.
+  @GenerateSql()
+  async getAllUnionsWithParticipants(db: Kysely<DB> | Transaction<DB> = this.db): Promise<RawUnionRow[]> {
+    const result = await sql<RawUnionRow>`
+      SELECT
+        family_union.id,
+        family_union.status,
+        COALESCE(partners.ids, ARRAY[]::uuid[]) AS "partnerIds",
+        COALESCE(children.ids, ARRAY[]::uuid[]) AS "childIds"
+      FROM family_union
+      LEFT JOIN LATERAL (
+        SELECT array_agg(family_union_partner."identityId" ORDER BY family_union_partner."identityId") AS ids
+        FROM family_union_partner
+        WHERE family_union_partner."unionId" = family_union.id
+      ) partners ON true
+      LEFT JOIN LATERAL (
+        SELECT array_agg(family_union_child."identityId" ORDER BY family_union_child."identityId") AS ids
+        FROM family_union_child
+        WHERE family_union_child."unionId" = family_union.id
+      ) children ON true
+      ORDER BY family_union.id
+    `.execute(db);
+
+    return result.rows;
+  }
+
+  // Slice 5 (D3): applies the visibility rule — a union is visible iff the viewer can resolve at
+  // least two of its participants — and shapes every participant into either a known seat or an
+  // opaque anonymous one. Pure in-memory work over `getAllUnionsWithParticipants`'s single query;
+  // no further DB access, so this scales with the number of unions in the graph, not with the
+  // number of round trips (`E65`).
+  computeVisibleUnions(unions: RawUnionRow[], resolvableIds: ReadonlySet<string>): VisibleUnion[] {
+    const visible: VisibleUnion[] = [];
+
+    for (const union of unions) {
+      const partners = union.partnerIds.map((identityId): VisibilityParticipant =>
+        resolvableIds.has(identityId) ? { identityId } : { anonymous: true },
+      );
+      const children = union.childIds.map((identityId): VisibilityParticipant =>
+        resolvableIds.has(identityId) ? { identityId } : { anonymous: true },
+      );
+
+      const resolvedCount =
+        partners.filter((seat) => 'identityId' in seat).length + children.filter((seat) => 'identityId' in seat).length;
+
+      // E27/E28/E29: below two resolvable participants the union conveys nothing and still
+      // leaks a headcount, so it is omitted entirely rather than redacted.
+      if (resolvedCount < 2) {
+        continue;
+      }
+
+      visible.push({ id: union.id, status: union.status, partners, children });
+    }
+
+    return visible;
+  }
+
+  // Slice 5 (D3/E63/E64): connected components over the VIEWER-VISIBLE graph only — never the
+  // full graph, or a cluster could reveal that two people are related through a union the viewer
+  // is not allowed to see. Computed fresh from `visibleUnions` every call; nothing here is
+  // stored (`E64`). Anonymous seats are nodes too, scoped to their own union+role+index, so two
+  // anonymous seats in different unions are never merged into one node — the same non-correlation
+  // guarantee `E30` requires of the projected graph.
+  computeClusters(visibleUnions: readonly VisibleUnion[]): RawCluster[] {
+    const parent = new Map<string, string>();
+    const nodeInfo = new Map<string, ClusterNode>();
+
+    const find = (key: string): string => {
+      let root = key;
+      while (parent.get(root) !== root) {
+        const next = parent.get(root);
+        if (next === undefined) {
+          break;
+        }
+        root = next;
+      }
+      let cursor = key;
+      while (parent.get(cursor) !== root) {
+        const next = parent.get(cursor)!;
+        parent.set(cursor, root);
+        cursor = next;
+      }
+      return root;
+    };
+
+    const ensureNode = (key: string, info: ClusterNode) => {
+      if (parent.has(key)) {
+        return;
+      }
+      parent.set(key, key);
+      nodeInfo.set(key, info);
+    };
+
+    const union = (a: string, b: string) => {
+      const rootA = find(a);
+      const rootB = find(b);
+      if (rootA !== rootB) {
+        parent.set(rootA, rootB);
+      }
+    };
+
+    for (const familyUnion of visibleUnions) {
+      const keys: string[] = [];
+
+      for (const [index, seat] of familyUnion.partners.entries()) {
+        const key = clusterNodeKey(familyUnion.id, 'partner', index, seat);
+        ensureNode(key, 'identityId' in seat ? { kind: 'known', identityId: seat.identityId } : { kind: 'anonymous' });
+        keys.push(key);
+      }
+      for (const [index, seat] of familyUnion.children.entries()) {
+        const key = clusterNodeKey(familyUnion.id, 'child', index, seat);
+        ensureNode(key, 'identityId' in seat ? { kind: 'known', identityId: seat.identityId } : { kind: 'anonymous' });
+        keys.push(key);
+      }
+
+      // Every participant of a union belongs to the same family unit — union them all together.
+      for (let i = 1; i < keys.length; i++) {
+        union(keys[0]!, keys[i]!);
+      }
+    }
+
+    const groups = new Map<string, string[]>();
+    for (const key of parent.keys()) {
+      const root = find(key);
+      const group = groups.get(root) ?? [];
+      group.push(key);
+      groups.set(root, group);
+    }
+
+    const clusters: RawCluster[] = [];
+    for (const group of groups.values()) {
+      const knownIds = group
+        .map((key) => nodeInfo.get(key)!)
+        .filter((info): info is { kind: 'known'; identityId: string } => info.kind === 'known')
+        .map((info) => info.identityId);
+
+      clusters.push({ knownIds, size: group.length });
+    }
+
+    return clusters;
   }
 
   // Creates the union row and its initial membership in one transaction — a union with
@@ -230,6 +431,20 @@ export class FamilyRepository {
   async getIdentityType(identityId: string, db: Kysely<DB> | Transaction<DB> = this.db): Promise<string | undefined> {
     const row = await db.selectFrom('face_identity').select('type').where('id', '=', identityId).executeTakeFirst();
     return row?.type;
+  }
+
+  // Slice 5: gender is stored on face_identity, never on person/shared_space_person, so it needs
+  // its own lookup — one query for the whole batch (`E65`), never one per participant.
+  @GenerateSql({ params: [[DummyValue.UUID]] })
+  async getGenders(
+    identityIds: string[],
+    db: Kysely<DB> | Transaction<DB> = this.db,
+  ): Promise<Map<string, string | null>> {
+    if (identityIds.length === 0) {
+      return new Map();
+    }
+    const rows = await db.selectFrom('face_identity').select(['id', 'gender']).where('id', 'in', identityIds).execute();
+    return new Map(rows.map((row) => [row.id, row.gender]));
   }
 
   // Walks the WHOLE ancestor chain, not one hop: candidateId is a parent, grandparent,
