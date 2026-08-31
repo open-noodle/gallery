@@ -106,6 +106,28 @@ export class FamilyRepository {
     return this.db.selectFrom('family_access').select('level').where('userId', '=', userId).executeTakeFirst();
   }
 
+  // Slice 7: every explicit grant on the instance, for the admin grants table. Users with no
+  // row here simply inherit `familyTree.defaultAccess` — the caller renders that distinction,
+  // this just returns what is actually stored.
+  @GenerateSql()
+  getAllAccess(db: Kysely<DB> | Transaction<DB> = this.db) {
+    return db.selectFrom('family_access').selectAll().execute();
+  }
+
+  // Slice 7: admin grant administration is independent of the caller's own family access level
+  // (D2) — this never checks or touches `requireFamilyWrite`. `grantedAt` is set explicitly on
+  // every call (insert AND re-grant) because, unlike `family_union`, this table has no
+  // updated-at trigger to refresh it for us.
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.STRING, DummyValue.UUID_1] })
+  setAccess(userId: string, level: string, grantedById: string, db: Kysely<DB> | Transaction<DB> = this.db) {
+    return db
+      .insertInto('family_access')
+      .values({ userId, level, grantedById, grantedAt: new Date() })
+      .onConflict((oc) => oc.column('userId').doUpdateSet({ level, grantedById, grantedAt: new Date() }))
+      .returningAll()
+      .executeTakeFirstOrThrow();
+  }
+
   @GenerateSql({ params: [DummyValue.UUID] })
   getUnion(unionId: string, db: Kysely<DB> | Transaction<DB> = this.db) {
     return db.selectFrom('family_union').selectAll().where('id', '=', unionId).executeTakeFirst();
@@ -445,6 +467,13 @@ export class FamilyRepository {
     }
     const rows = await db.selectFrom('face_identity').select(['id', 'gender']).where('id', 'in', identityIds).execute();
     return new Map(rows.map((row) => [row.id, row.gender]));
+  }
+
+  // Slice 7: gender is shared data (it changes the label every viewer reads), so it lives on
+  // `face_identity` itself rather than anywhere per-user — see `getGenders` above.
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.STRING] })
+  async setGender(identityId: string, gender: string | null, db: Kysely<DB> | Transaction<DB> = this.db) {
+    await db.updateTable('face_identity').set({ gender }).where('id', '=', identityId).execute();
   }
 
   // Walks the WHOLE ancestor chain, not one hop: candidateId is a parent, grandparent,

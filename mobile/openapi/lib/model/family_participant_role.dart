@@ -10,16 +10,14 @@
 
 part of openapi.api;
 
-/// User metadata key
-enum UserMetadataKey {
-  preferences._(r'preferences'),
-  license._(r'license'),
-  onboarding._(r'onboarding'),
-  familyRoot._(r'family-root'),
+
+enum FamilyParticipantRole {
+  partner._(r'partner'),
+  child._(r'child'),
   ;
 
   /// Instantiate a new enum with the provided value.
-  const UserMetadataKey._(this._value);
+  const FamilyParticipantRole._(this._value);
 
   /// The underlying value of this enum member.
   final String _value;
@@ -30,17 +28,17 @@ enum UserMetadataKey {
   /// Encodes this enum as a value suitable for JSON.
   String toJson() => _value;
 
-  /// Returns the instance of [UserMetadataKey] that was successfully decoded
+  /// Returns the instance of [FamilyParticipantRole] that was successfully decoded
   /// from the passed [value] on success, null otherwise.
-  static UserMetadataKey? fromJson(dynamic value) => UserMetadataKeyTypeTransformer().decode(value);
+  static FamilyParticipantRole? fromJson(dynamic value) => FamilyParticipantRoleTypeTransformer().decode(value);
 
-  /// Returns a [List] containing instances of [UserMetadataKey]
+  /// Returns a [List] containing instances of [FamilyParticipantRole]
   /// that were successfully decoded from the passed [JSON][json].
-  static List<UserMetadataKey> listFromJson(dynamic json, {bool growable = false,}) {
-    final result = <UserMetadataKey>[];
+  static List<FamilyParticipantRole> listFromJson(dynamic json, {bool growable = false,}) {
+    final result = <FamilyParticipantRole>[];
     if (json is List && json.isNotEmpty) {
       for (final row in json) {
-        final value = UserMetadataKey.fromJson(row);
+        final value = FamilyParticipantRole.fromJson(row);
         if (value != null) {
           result.add(value);
         }
@@ -50,17 +48,17 @@ enum UserMetadataKey {
   }
 }
 
-/// Transformation class that can [encode] an instance of [UserMetadataKey] to String,
-/// and [decode] dynamic data back to [UserMetadataKey].
-class UserMetadataKeyTypeTransformer {
-  factory UserMetadataKeyTypeTransformer() => _instance ??= const UserMetadataKeyTypeTransformer._();
+/// Transformation class that can [encode] an instance of [FamilyParticipantRole] to String,
+/// and [decode] dynamic data back to [FamilyParticipantRole].
+class FamilyParticipantRoleTypeTransformer {
+  factory FamilyParticipantRoleTypeTransformer() => _instance ??= const FamilyParticipantRoleTypeTransformer._();
 
-  const UserMetadataKeyTypeTransformer._();
+  const FamilyParticipantRoleTypeTransformer._();
 
   /// Encodes this enum as a value suitable for JSON.
-  String encode(UserMetadataKey data) => data._value;
+  String encode(FamilyParticipantRole data) => data._value;
 
-  /// Returns the instance of [UserMetadataKey] that was successfully decoded
+  /// Returns the instance of [FamilyParticipantRole] that was successfully decoded
   /// from the passed [data] value on success, null otherwise.
   ///
   /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
@@ -69,16 +67,14 @@ class UserMetadataKeyTypeTransformer {
   ///
   /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
   /// and users are still using an old app with the old code.
-  UserMetadataKey? decode(dynamic data, {bool allowNull = true}) {
-    if (data is UserMetadataKey) {
+  FamilyParticipantRole? decode(dynamic data, {bool allowNull = true}) {
+    if (data is FamilyParticipantRole) {
       return data;
     }
     if (data != null) {
       switch (data) {
-        case r'preferences': return UserMetadataKey.preferences;
-        case r'license': return UserMetadataKey.license;
-        case r'onboarding': return UserMetadataKey.onboarding;
-        case r'family-root': return UserMetadataKey.familyRoot;
+        case r'partner': return FamilyParticipantRole.partner;
+        case r'child': return FamilyParticipantRole.child;
         default:
           if (!allowNull) {
             throw ArgumentError('Unknown enum value to decode: $data');
@@ -89,6 +85,6 @@ class UserMetadataKeyTypeTransformer {
   }
 
   /// The singleton instance of this transformer.
-  static UserMetadataKeyTypeTransformer? _instance;
+  static FamilyParticipantRoleTypeTransformer? _instance;
 }
 

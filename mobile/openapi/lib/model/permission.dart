@@ -60,6 +60,8 @@ enum Permission {
   facePeriodRead._(r'face.read'),
   facePeriodUpdate._(r'face.update'),
   facePeriodDelete._(r'face.delete'),
+  familyPeriodRead._(r'family.read'),
+  familyPeriodWrite._(r'family.write'),
   folderPeriodRead._(r'folder.read'),
   jobPeriodCreate._(r'job.create'),
   jobPeriodRead._(r'job.read'),
@@ -293,6 +295,8 @@ class PermissionTypeTransformer {
         case r'face.read': return Permission.facePeriodRead;
         case r'face.update': return Permission.facePeriodUpdate;
         case r'face.delete': return Permission.facePeriodDelete;
+        case r'family.read': return Permission.familyPeriodRead;
+        case r'family.write': return Permission.familyPeriodWrite;
         case r'folder.read': return Permission.folderPeriodRead;
         case r'job.create': return Permission.jobPeriodCreate;
         case r'job.read': return Permission.jobPeriodRead;

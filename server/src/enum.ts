@@ -426,6 +426,11 @@ export enum UserMetadataKey {
   Preferences = 'preferences',
   License = 'license',
   Onboarding = 'onboarding',
+  // Gallery-fork: the identity id a user nominated as themselves for family-relationship
+  // labels (D4 in the family-relationships design). A dedicated key rather than a field on
+  // `preferences` — it keeps the shared preferences default/merge machinery (`getPreferences`,
+  // `getPreferencesPartial`) untouched, since this value is a graph pointer, not a UI setting.
+  FamilyRoot = 'family-root',
 }
 
 export const UserMetadataKeySchema = z
@@ -1397,6 +1402,7 @@ export enum ApiTag {
   Download = 'Download',
   Duplicates = 'Duplicates',
   Faces = 'Faces',
+  Family = 'Family',
   Integrity = 'Integrity (admin)',
   Jobs = 'Jobs',
   Libraries = 'Libraries',

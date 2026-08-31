@@ -811,6 +811,9 @@ export interface UserMetadata extends Record<UserMetadataKey, Record<string, any
   [UserMetadataKey.Preferences]: DeepPartial<UserPreferences>;
   [UserMetadataKey.License]: { licenseKey: string; activationKey: string; activatedAt: string };
   [UserMetadataKey.Onboarding]: { isOnboarded: boolean };
+  // Gallery-fork: family relationships (D4) — the identity id this user nominated as
+  // themselves, or null if never set / cleared.
+  [UserMetadataKey.FamilyRoot]: { identityId: string | null };
 }
 
 export type MaybeDehydrated<T> = T | ShallowDehydrateObject<T>;

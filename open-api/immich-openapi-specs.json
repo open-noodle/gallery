@@ -7306,6 +7306,633 @@
         "x-immich-state": "Stable"
       }
     },
+    "/family/access": {
+      "get": {
+        "description": "Retrieve every explicit family access grant on the instance, for admin management.",
+        "operationId": "getAllAccess",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FamilyAccessGrantResponseDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Get all family access grants",
+        "tags": [
+          "Family"
+        ],
+        "x-immich-admin-only": true,
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-state": "Beta"
+      }
+    },
+    "/family/access/{userId}": {
+      "put": {
+        "description": "Grant a user an explicit family access level, overriding the instance default.",
+        "operationId": "setAccess",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FamilyAccessUpdateDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FamilyAccessGrantResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Set a user's family access grant",
+        "tags": [
+          "Family"
+        ],
+        "x-immich-admin-only": true,
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-state": "Beta"
+      }
+    },
+    "/family/clusters": {
+      "get": {
+        "description": "Retrieve the disconnected components of the family graph the caller can see — how \"multiple family trees\" surfaces without a tree object.",
+        "operationId": "getClusters",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FamilyClusterResponseDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Get family clusters",
+        "tags": [
+          "Family"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "family.read",
+        "x-immich-state": "Beta"
+      }
+    },
+    "/family/identities/{id}/gender": {
+      "put": {
+        "description": "Set or clear the gender recorded for an identity, used only to pick relation-label wording.",
+        "operationId": "updateGender",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FamilyGenderUpdateDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Set an identity's gender",
+        "tags": [
+          "Family"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "family.write",
+        "x-immich-state": "Beta"
+      }
+    },
+    "/family/me": {
+      "put": {
+        "description": "Nominate the identity that represents the caller, used to derive relative labels (\"your sister\"). Pass a null identityId to clear it.",
+        "operationId": "setMyRoot",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FamilyMyRootUpdateDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Set the viewer's family root",
+        "tags": [
+          "Family"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "family.read",
+        "x-immich-state": "Beta"
+      }
+    },
+    "/family/unions": {
+      "get": {
+        "description": "Retrieve the family unions the caller can see, as a flat, paginated collection.",
+        "operationId": "getUnions",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Page number",
+            "schema": {
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "default": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "size",
+            "required": false,
+            "in": "query",
+            "description": "Number of unions per page",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FamilyGraphResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Get family unions",
+        "tags": [
+          "Family"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "family.read",
+        "x-immich-state": "Beta"
+      },
+      "post": {
+        "description": "Create a new family union (a partnership and/or parent-child relationship).",
+        "operationId": "createUnion",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FamilyUnionCreateDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FamilyUnionCreateResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Create a family union",
+        "tags": [
+          "Family"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "family.write",
+        "x-immich-state": "Beta"
+      }
+    },
+    "/family/unions/{id}": {
+      "delete": {
+        "description": "Permanently delete a family union.",
+        "operationId": "deleteUnion",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Delete a family union",
+        "tags": [
+          "Family"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "family.write",
+        "x-immich-state": "Beta"
+      },
+      "put": {
+        "description": "Update the status or dates of a family union.",
+        "operationId": "updateUnion",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FamilyUnionUpdateDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Update a family union",
+        "tags": [
+          "Family"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "family.write",
+        "x-immich-state": "Beta"
+      }
+    },
+    "/family/unions/{id}/participants": {
+      "put": {
+        "description": "Add an identity to a family union as a partner or a child.",
+        "operationId": "addParticipant",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FamilyParticipantAddDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Add a participant to a family union",
+        "tags": [
+          "Family"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "family.write",
+        "x-immich-state": "Beta"
+      }
+    },
+    "/family/unions/{id}/participants/{identityId}": {
+      "delete": {
+        "description": "Remove an identity from a family union, whichever role it holds.",
+        "operationId": "removeParticipant",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "identityId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Remove a participant from a family union",
+        "tags": [
+          "Family"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "family.write",
+        "x-immich-state": "Beta"
+      }
+    },
     "/gallery/map/markers": {
       "get": {
         "description": "Retrieve map markers with rich content filtering (people, camera, tags, etc.)",
@@ -23804,6 +24431,10 @@
       "description": "A face is a detected human face within an asset, which can be associated with a person. Faces are normally detected via machine learning, but can also be created manually."
     },
     {
+      "name": "Family",
+      "description": "Family relationships between people, expressed as a graph of unions rather than a single tree. Access is granted per user by an admin and scoped to what each viewer can already resolve."
+    },
+    {
       "name": "Integrity (admin)",
       "description": "Endpoints for viewing and managing integrity reports."
     },
@@ -27721,6 +28352,340 @@
         ],
         "type": "object"
       },
+      "FamilyAccessGrantResponseDto": {
+        "properties": {
+          "grantedAt": {
+            "description": "When this grant was last set",
+            "format": "date-time",
+            "type": "string"
+          },
+          "grantedById": {
+            "description": "Admin who last set this grant, if known",
+            "format": "uuid",
+            "nullable": true,
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
+          "level": {
+            "$ref": "#/components/schemas/FamilyAccessLevel",
+            "description": "Explicitly granted access level"
+          },
+          "userId": {
+            "description": "User ID this grant applies to",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "grantedAt",
+          "grantedById",
+          "level",
+          "userId"
+        ],
+        "type": "object"
+      },
+      "FamilyAccessLevel": {
+        "enum": [
+          "none",
+          "view",
+          "contribute"
+        ],
+        "type": "string"
+      },
+      "FamilyAccessUpdateDto": {
+        "properties": {
+          "level": {
+            "$ref": "#/components/schemas/FamilyAccessLevel",
+            "description": "Access level to grant"
+          }
+        },
+        "required": [
+          "level"
+        ],
+        "type": "object"
+      },
+      "FamilyClusterResponseDto": {
+        "properties": {
+          "label": {
+            "description": "Display name of the cluster",
+            "type": "string"
+          },
+          "rootCandidateId": {
+            "description": "A resolvable identity id in this cluster, usable as a default root",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
+          "size": {
+            "description": "Total people in the cluster, resolvable or not",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "label",
+          "rootCandidateId",
+          "size"
+        ],
+        "type": "object"
+      },
+      "FamilyGenderUpdateDto": {
+        "properties": {
+          "gender": {
+            "description": "Gender ('male' or 'female'), or null to clear",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "gender"
+        ],
+        "type": "object"
+      },
+      "FamilyGraphResponseDto": {
+        "properties": {
+          "hasNextPage": {
+            "type": "boolean"
+          },
+          "identities": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/FamilyIdentityDto"
+            },
+            "type": "object"
+          },
+          "unions": {
+            "items": {
+              "$ref": "#/components/schemas/FamilyUnionDto"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "hasNextPage",
+          "identities",
+          "unions"
+        ],
+        "type": "object"
+      },
+      "FamilyIdentityDto": {
+        "properties": {
+          "gender": {
+            "description": "Recorded gender ('male', 'female'), or null if unset",
+            "nullable": true,
+            "type": "string"
+          },
+          "name": {
+            "description": "Resolved display name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "gender",
+          "name"
+        ],
+        "type": "object"
+      },
+      "FamilyMyRootUpdateDto": {
+        "properties": {
+          "identityId": {
+            "description": "Identity ID to nominate as yourself, or null to clear",
+            "format": "uuid",
+            "nullable": true,
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "identityId"
+        ],
+        "type": "object"
+      },
+      "FamilyParticipantAddDto": {
+        "properties": {
+          "identityId": {
+            "description": "Identity ID to add to the union",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/FamilyParticipantRole",
+            "description": "Role to add the identity as"
+          }
+        },
+        "required": [
+          "identityId",
+          "role"
+        ],
+        "type": "object"
+      },
+      "FamilyParticipantDto": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "known"
+                ]
+              },
+              "identityId": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+                "description": "Identity ID"
+              }
+            },
+            "required": [
+              "kind",
+              "identityId"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "anonymous"
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          }
+        ]
+      },
+      "FamilyParticipantRole": {
+        "enum": [
+          "partner",
+          "child"
+        ],
+        "type": "string"
+      },
+      "FamilyUnionCreateDto": {
+        "properties": {
+          "childIds": {
+            "description": "Child identity IDs",
+            "items": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "endDate": {
+            "description": "Union end date",
+            "format": "date",
+            "nullable": true,
+            "type": "string"
+          },
+          "partnerIds": {
+            "description": "Partner identity IDs (at most two)",
+            "items": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            },
+            "maxItems": 2,
+            "type": "array"
+          },
+          "startDate": {
+            "description": "Union start date",
+            "format": "date",
+            "nullable": true,
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/FamilyUnionStatus",
+            "description": "Union status"
+          }
+        },
+        "type": "object"
+      },
+      "FamilyUnionCreateResponseDto": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "FamilyUnionDto": {
+        "properties": {
+          "children": {
+            "description": "Children in this union",
+            "items": {
+              "$ref": "#/components/schemas/FamilyParticipantDto"
+            },
+            "type": "array"
+          },
+          "id": {
+            "description": "Union ID",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
+          "partners": {
+            "description": "Partners in this union (0, 1 or 2)",
+            "items": {
+              "$ref": "#/components/schemas/FamilyParticipantDto"
+            },
+            "type": "array"
+          },
+          "status": {
+            "$ref": "#/components/schemas/FamilyUnionStatus",
+            "description": "Union status"
+          }
+        },
+        "required": [
+          "children",
+          "id",
+          "partners",
+          "status"
+        ],
+        "type": "object"
+      },
+      "FamilyUnionStatus": {
+        "enum": [
+          "married",
+          "partnered",
+          "separated",
+          "divorced",
+          "widowed"
+        ],
+        "type": "string"
+      },
+      "FamilyUnionUpdateDto": {
+        "properties": {
+          "endDate": {
+            "description": "Union end date",
+            "format": "date",
+            "nullable": true,
+            "type": "string"
+          },
+          "startDate": {
+            "description": "Union start date",
+            "format": "date",
+            "nullable": true,
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/FamilyUnionStatus",
+            "description": "Union status"
+          }
+        },
+        "type": "object"
+      },
       "FilterSuggestionsPersonDto": {
         "properties": {
           "id": {
@@ -29982,6 +30947,8 @@
           "face.read",
           "face.update",
           "face.delete",
+          "family.read",
+          "family.write",
           "folder.read",
           "job.create",
           "job.read",
@@ -36786,6 +37753,9 @@
           "classification": {
             "$ref": "#/components/schemas/SystemConfigClassificationDto"
           },
+          "familyTree": {
+            "$ref": "#/components/schemas/SystemConfigFamilyTreeDto"
+          },
           "ffmpeg": {
             "$ref": "#/components/schemas/SystemConfigFFmpegDto"
           },
@@ -36859,6 +37829,7 @@
         "required": [
           "backup",
           "classification",
+          "familyTree",
           "ffmpeg",
           "image",
           "integrityChecks",
@@ -37051,6 +38022,28 @@
         },
         "required": [
           "import"
+        ],
+        "type": "object"
+      },
+      "SystemConfigFamilyTreeDto": {
+        "properties": {
+          "defaultAccess": {
+            "description": "Family tree access for users without an explicit grant",
+            "enum": [
+              "none",
+              "view",
+              "contribute"
+            ],
+            "type": "string"
+          },
+          "enabled": {
+            "description": "Enable family relationships",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "defaultAccess",
+          "enabled"
         ],
         "type": "object"
       },
@@ -39085,7 +40078,8 @@
         "enum": [
           "preferences",
           "license",
-          "onboarding"
+          "onboarding",
+          "family-root"
         ],
         "type": "string"
       },
