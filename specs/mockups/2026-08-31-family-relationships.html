@@ -1,0 +1,828 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Family relationships — UI mockups</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=DM+Sans:opsz,wght@9..40,300..700&display=swap" rel="stylesheet">
+<style>
+/* ─────────────────────────────────────────────────────────────────────────
+   Tokens copied from web/src/styles/gallery-theme.css.
+   Component shapes copied from the real components:
+     DetailPanelPeople.svelte  — grid-cols-3 gap-3, ImageThumbnail curve+shadow
+     ImageThumbnail.svelte     — curve = rounded-xl, shadow = shadow-lg, object-cover
+     people/[personId]/+page   — header avatar: circle, 3.375rem
+     UserSidebar.svelte        — nav item list
+   ───────────────────────────────────────────────────────────────────────── */
+:root{
+  --accent:#0b57d0; --accent-600:#0a4dba; --accent-100:#d3e3fd; --accent-50:#eaf1fc;
+  --page:#f0f4f9; --surface:#ffffff; --fg:#1f1f1f; --muted:#5f6368;
+  --border:#dde3ea; --gray-50:#f8fafd; --gray-100:#f0f4f9; --gray-200:#e9eef6; --gray-300:#dde3ea;
+  --gray-500:#9aa0a6;
+  --ok:#0f7b3f; --ok-bg:#e6f4ec; --warn:#8a5300; --warn-bg:#fdf1dd;
+  --r-sm:.5rem; --r-md:.75rem; --r-lg:1rem; --r-xl:1.375rem; --r-2xl:1.75rem;
+  --shadow-lg:0 10px 15px -3px rgba(31,31,31,.1), 0 4px 6px -4px rgba(31,31,31,.1);
+  --shadow:0 1px 2px rgba(31,31,31,.06), 0 4px 16px rgba(31,31,31,.06);
+  --font:'DM Sans',ui-sans-serif,system-ui,sans-serif;
+  --display:'Bricolage Grotesque',ui-sans-serif,system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --accent:#a8c7fa; --accent-600:#b0ccfb; --accent-100:#08409a; --accent-50:#001d35;
+    --page:#0d0d0e; --surface:#131314; --fg:#e3e3e3; --muted:#9aa0a6;
+    --border:#3c3f43; --gray-50:#1a1b1d; --gray-100:#151517; --gray-200:#212225; --gray-300:#2a2b2e;
+    --gray-500:#9aa0a6;
+    --ok:#7dd6a3; --ok-bg:#10281b; --warn:#f0c07a; --warn-bg:#2c2110;
+    --shadow-lg:0 10px 15px -3px rgba(0,0,0,.5), 0 4px 6px -4px rgba(0,0,0,.4);
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 4px 20px rgba(0,0,0,.35);
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--fg);font-family:var(--font);font-size:15px;
+  line-height:1.6;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1240px;margin:0 auto;padding:0 24px 96px}
+h1,h2,h3,h4{font-family:var(--display);font-weight:600;letter-spacing:-.02em;margin:0}
+code{font-family:ui-monospace,monospace;font-size:.86em;background:var(--gray-200);
+  padding:.12em .38em;border-radius:6px;border:1px solid var(--border)}
+
+.hero{padding:46px 0 24px;border-bottom:1px solid var(--border)}
+.hero .eyebrow{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);font-weight:600}
+.hero h1{font-size:clamp(28px,4.2vw,40px);line-height:1.08;margin:10px 0 14px}
+.hero p{margin:0 0 10px;max-width:74ch;color:var(--muted);font-size:16px}
+.toc{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+.toc a{font-size:13px;text-decoration:none;color:var(--fg);background:var(--surface);
+  border:1px solid var(--border);border-radius:999px;padding:5px 13px}
+.toc a:hover{border-color:var(--accent);color:var(--accent)}
+
+.banner{border:1px solid; border-radius:var(--r-md);padding:13px 17px;font-size:13.5px;margin-top:18px;
+  background:var(--warn-bg);border-color:color-mix(in srgb,var(--warn) 32%,transparent)}
+.banner b{font-family:var(--display)}
+
+section{margin-top:56px;scroll-margin-top:20px}
+.sechead{display:flex;gap:13px;align-items:baseline;flex-wrap:wrap;margin-bottom:4px}
+.snum{font-family:var(--display);font-size:12.5px;font-weight:700;color:var(--accent);
+  background:var(--accent-50);border:1px solid var(--accent-100);border-radius:999px;padding:2px 11px;flex:none}
+.sechead h2{font-size:24px}
+.slice{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);
+  border:1px solid var(--border);border-radius:999px;padding:2px 9px}
+.lede{color:var(--muted);max-width:80ch;margin:8px 0 20px}
+.cap{font-size:13px;color:var(--muted);margin-top:11px;max-width:86ch}
+.cap b{color:var(--fg);font-family:var(--display)}
+
+/* ── real app shell ─────────────────────────────────────────────────────── */
+.shell{border:1px solid var(--border);border-radius:var(--r-xl);overflow:hidden;background:var(--surface);
+  box-shadow:var(--shadow)}
+.topbar{display:flex;align-items:center;gap:14px;padding:10px 16px;border-bottom:1px solid var(--border);
+  background:var(--surface)}
+.logo{display:flex;align-items:center;gap:9px;font-family:var(--display);font-weight:700;font-size:16px}
+.logodot{width:22px;height:22px;border-radius:7px;background:var(--accent)}
+.searchbar{flex:1;max-width:420px;background:var(--gray-100);border:1px solid var(--border);
+  border-radius:999px;padding:7px 16px;font-size:13.5px;color:var(--muted)}
+.topspacer{flex:1}
+.userdot{width:30px;height:30px;border-radius:999px;background:var(--accent-100);color:var(--accent);
+  display:grid;place-items:center;font-family:var(--display);font-weight:700;font-size:12px}
+.shellbody{display:grid;grid-template-columns:210px minmax(0,1fr)}
+@media (max-width:900px){.shellbody{grid-template-columns:minmax(0,1fr)}
+  .nav{display:none}}
+.nav{border-right:1px solid var(--border);padding:12px 10px;background:var(--surface)}
+.navitem{display:flex;align-items:center;gap:11px;padding:8px 13px;border-radius:999px;font-size:13.5px;
+  color:var(--fg);white-space:nowrap}
+.navitem .ic{width:17px;height:17px;border-radius:5px;background:var(--gray-300);flex:none}
+.navitem.on{background:var(--accent-100);color:var(--accent);font-weight:600}
+.navitem.on .ic{background:var(--accent)}
+.navitem.new{outline:2px dashed var(--accent);outline-offset:-2px}
+.navsep{height:1px;background:var(--border);margin:9px 12px}
+.content{min-width:0;background:var(--page)}
+
+/* ── page header inside content ─────────────────────────────────────────── */
+.pagehead{padding:18px 22px 0}
+.pagehead h3{font-size:22px}
+.pagesub{color:var(--muted);font-size:13.5px;margin-top:2px}
+.clusters{display:flex;gap:8px;padding:14px 22px 0;overflow-x:auto;align-items:center}
+.chip{font-size:13px;border-radius:999px;padding:5px 14px;border:1px solid var(--border);
+  background:var(--surface);white-space:nowrap;color:var(--muted)}
+.chip b{color:var(--fg);font-family:var(--display);font-weight:600}
+.chip.on{background:var(--accent-100);border-color:transparent;color:var(--accent)}
+.chip.on b{color:var(--accent)}
+.toolbar{display:flex;gap:9px;align-items:center;padding:14px 22px;flex-wrap:wrap}
+.btn{font:inherit;font-size:13.5px;font-weight:500;border-radius:999px;padding:7px 16px;
+  border:1px solid var(--border);background:var(--surface);color:var(--fg);cursor:default;white-space:nowrap}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+@media (prefers-color-scheme:dark){.btn.primary{color:#001d35}}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--muted)}
+.spacer{flex:1 1 auto;min-width:6px}
+
+.editor{display:grid;grid-template-columns:196px minmax(0,1fr);border-top:1px solid var(--border);
+  background:var(--surface)}
+@media (max-width:900px){.editor{grid-template-columns:minmax(0,1fr)}}
+.tray{border-right:1px solid var(--border);background:var(--gray-50);padding:14px;min-width:0}
+.tray h4{font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:9px}
+.search{border:1px solid var(--border);background:var(--surface);border-radius:999px;padding:6px 12px;
+  font-size:12.5px;color:var(--muted);margin-bottom:12px}
+.traygrid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.tface{text-align:center;min-width:0}
+.tface span{display:block;font-size:10.5px;color:var(--muted);margin-top:4px;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.traynote{margin-top:16px;border-top:1px dashed var(--border);padding-top:11px;font-size:11.5px;
+  color:var(--muted);line-height:1.5}
+.canvas{overflow-x:auto;background:radial-gradient(circle at 1px 1px,var(--border) 1px,transparent 0) 0 0/22px 22px;
+  background-color:var(--surface)}
+
+/* ── avatars: real thumbnails, with initials showing through if absent ──── */
+.ph{position:relative;overflow:hidden;background:var(--gray-300);display:grid;place-items:center;
+  font-family:var(--display);font-weight:600;color:var(--muted);flex:none}
+.ph img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.circle{border-radius:999px}
+.curve{border-radius:var(--r-xl)}
+.sh{box-shadow:var(--shadow-lg)}
+.s26{width:26px;height:26px;font-size:9px}
+.s34{width:34px;height:34px;font-size:11px}
+.s44{width:44px;height:44px;font-size:13px}
+.s54{width:3.375rem;height:3.375rem;font-size:16px}
+.anon{background:var(--gray-200);border:1px dashed var(--border);color:var(--gray-500);font-size:14px}
+
+/* ── tree ───────────────────────────────────────────────────────────────── */
+.tree{position:relative;width:1260px;height:552px}
+.tree svg{position:absolute;inset:0;pointer-events:none}
+.pcard{position:absolute;width:158px;height:76px;background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--r-lg);display:flex;align-items:center;gap:11px;padding:0 12px;
+  box-shadow:0 1px 3px rgba(31,31,31,.08)}
+@media (prefers-color-scheme:dark){.pcard{box-shadow:0 1px 3px rgba(0,0,0,.55)}}
+.pcard .txt{min-width:0}
+.pcard .nm{font-weight:500;font-size:13.5px;line-height:1.25;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap}
+.pcard .rel{font-size:11.5px;color:var(--gray-500);margin-top:1px;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap}
+.pcard.me{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-50),0 1px 3px rgba(31,31,31,.08)}
+.pcard.empty{border:2px dashed var(--border);background:transparent;box-shadow:none;justify-content:center;
+  color:var(--muted);font-size:12.5px;font-weight:500}
+.pcard.drop{border:2px dashed var(--accent);background:var(--accent-50);box-shadow:none;
+  justify-content:center;text-align:center;color:var(--accent);font-size:12px;font-weight:600;line-height:1.25}
+.ubar{position:absolute;transform:translateX(-50%);font-size:10.5px;font-weight:500;color:var(--muted);
+  background:var(--surface);padding:2px 10px;border:1px solid var(--border);border-radius:999px;
+  white-space:nowrap}
+.ubar.ended{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 35%,transparent);background:var(--warn-bg)}
+.tag{position:absolute;font-size:10px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;
+  color:var(--accent);background:var(--accent-100);padding:1px 8px;border-radius:999px;white-space:nowrap}
+.genlabel{position:absolute;left:6px;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--gray-500);font-weight:600}
+
+/* ── detail panel (real shape) ──────────────────────────────────────────── */
+.dpanel{width:360px;border:1px solid var(--border);border-radius:var(--r-lg);background:var(--surface);
+  overflow:hidden}
+.dpsec{padding:16px}
+.dphead{display:flex;height:2.5rem;width:100%;align-items:center;justify-content:space-between;
+  font-size:14px}
+.dphead .t{font-weight:500}
+.dpgrid{margin-top:8px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.dpperson{min-width:0}
+.dpperson .pnm{margin-top:4px;font-size:13.5px;font-weight:500;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap}
+.dpperson .prel{font-size:12.5px;font-weight:300;color:var(--accent);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.dpperson .prel.none{color:var(--gray-500)}
+/* The existing age line, kept — relation is an ADDED line, not a replacement. */
+.dpperson .page{font-size:12.5px;font-weight:300;color:var(--gray-500);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.dpdiv{height:1px;background:var(--border)}
+
+/* ── person page header (real shape) ────────────────────────────────────── */
+.pph{display:flex;align-items:center;gap:0;padding:20px 22px}
+.pphtext{display:flex;flex-direction:column;justify-content:center;padding:0 16px;color:var(--accent)}
+.pphtext .n{width:10rem;font-weight:500;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pphtext .m{font-size:13.5px;color:var(--gray-500)}
+
+/* ── generic panels ─────────────────────────────────────────────────────── */
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(340px,100%),1fr));gap:18px}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(285px,100%),1fr));gap:18px}
+.panel{border:1px solid var(--border);border-radius:var(--r-lg);background:var(--surface);overflow:hidden}
+.panelhead{padding:12px 16px;border-bottom:1px solid var(--border);background:var(--gray-100);
+  font-family:var(--display);font-weight:600;font-size:13.5px;display:flex;gap:9px;align-items:center}
+.relrow{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--border)}
+.relrow:last-child{border-bottom:none}
+.relrow .txt{min-width:0;flex:1}
+.relrow .nm{font-weight:500;font-size:14px}
+.relrow .sub{font-size:12.5px;color:var(--gray-500)}
+.relrow.anon .nm{color:var(--gray-500);font-style:italic}
+.mini{font-size:10.5px;color:var(--muted);border:1px solid var(--border);border-radius:999px;padding:1px 8px;
+  white-space:nowrap}
+.addrow{padding:11px 16px;font-size:13px;color:var(--accent);border-top:1px dashed var(--border)}
+.emptystate{padding:26px 20px;text-align:center;color:var(--muted);font-size:13.5px}
+.emptystate .big{font-family:var(--display);font-weight:600;font-size:15px;color:var(--fg);margin-bottom:5px}
+
+/* ── union editor ───────────────────────────────────────────────────────── */
+.pop{width:296px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--shadow-lg);overflow:hidden}
+.pophead{padding:12px 15px;border-bottom:1px solid var(--border);background:var(--gray-100);
+  display:flex;align-items:center;gap:8px}
+.pophead .t{font-family:var(--display);font-weight:600;font-size:14px;margin-left:4px}
+.popbody{padding:14px 15px;display:grid;gap:12px}
+.field{display:grid;gap:5px}
+.field label{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.control{border:1px solid var(--border);background:var(--gray-50);border-radius:var(--r-sm);padding:7px 11px;
+  font-size:13.5px;display:flex;align-items:center;justify-content:space-between}
+.control .ca{color:var(--muted);font-size:11px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.popfoot{padding:11px 15px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:center}
+.danger{color:#a52121;font-size:12.5px}
+@media (prefers-color-scheme:dark){.danger{color:#f2a2a2}}
+
+/* ── gestures ───────────────────────────────────────────────────────────── */
+.dz{position:relative;width:300px;height:226px;margin:0 auto}
+.dzcard{position:absolute;left:71px;top:74px;width:158px;height:76px;background:var(--surface);
+  border:1px solid var(--fg);border-radius:var(--r-lg);display:flex;align-items:center;gap:11px;
+  padding:0 12px;z-index:2}
+.zone{position:absolute;border:2px dashed var(--accent);background:var(--accent-50);border-radius:var(--r-sm);
+  display:grid;place-items:center;font-size:11px;font-weight:600;color:var(--accent);text-align:center;
+  line-height:1.2;padding:3px}
+.zone.top{left:71px;top:6px;width:158px;height:58px}
+.zone.bot{left:71px;top:160px;width:158px;height:58px}
+.zone.lft{left:0;top:83px;width:63px;height:58px}
+.zone.rgt{left:237px;top:83px;width:63px;height:58px}
+
+/* ── admin ──────────────────────────────────────────────────────────────── */
+.settingrow{display:flex;align-items:center;gap:14px;padding:14px 18px;border-bottom:1px solid var(--border)}
+.settingrow .st{flex:1;min-width:0}
+.settingrow .st .l{font-weight:500;font-size:14px}
+.settingrow .st .d{font-size:12.5px;color:var(--gray-500)}
+.toggle{width:42px;height:24px;border-radius:999px;background:var(--accent);position:relative;flex:none}
+.toggle i{position:absolute;top:3px;left:21px;width:18px;height:18px;border-radius:999px;background:#fff}
+.sel{border:1px solid var(--border);background:var(--gray-50);border-radius:var(--r-sm);padding:6px 12px;
+  font-size:13px;white-space:nowrap}
+.utable{width:100%;border-collapse:collapse;font-size:13.5px}
+.utable th{text-align:left;font-family:var(--display);font-size:11px;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--muted);padding:10px 18px;border-bottom:1px solid var(--border);background:var(--gray-50)}
+.utable td{padding:10px 18px;border-bottom:1px solid var(--border);vertical-align:middle}
+.utable tr:last-child td{border-bottom:none}
+.uname{display:flex;align-items:center;gap:9px}
+.inherit{color:var(--gray-500);font-style:italic}
+
+/* ── mobile ─────────────────────────────────────────────────────────────── */
+.phone{width:262px;margin:0 auto;border:9px solid var(--gray-300);border-radius:32px;overflow:hidden;
+  background:var(--surface)}
+@media (prefers-color-scheme:dark){.phone{border-color:#2a2b2e}}
+.phonebar{padding:11px 15px;background:var(--surface);border-bottom:1px solid var(--border);
+  font-weight:500;font-size:14px;display:flex;align-items:center;gap:9px}
+.focus{padding:15px 11px;display:grid;gap:9px;justify-items:center;background:var(--page)}
+.frow{display:flex;gap:8px;justify-content:center;width:100%}
+.fcard{border:1px solid var(--border);border-radius:12px;padding:6px 9px;font-size:11.5px;display:flex;
+  align-items:center;gap:7px;background:var(--surface);min-width:0}
+.fcard.me{border-color:var(--accent);background:var(--accent-50)}
+.fcard b{font-weight:500;display:block}
+.fcard i{font-style:normal;color:var(--gray-500);font-size:10.5px}
+.fcard.anon b{color:var(--gray-500);font-style:italic}
+.hint{font-size:11px;color:var(--gray-500);text-align:center;padding:0 14px 14px;background:var(--page)}
+
+.note{border-radius:var(--r-md);padding:14px 18px;font-size:14px;border:1px solid;margin:18px 0}
+.note.key{background:var(--accent-50);border-color:var(--accent-100)}
+.note b{font-family:var(--display)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <div class="eyebrow">Mockups · specs/2026-08-31-family-relationships-design-and-slices.md</div>
+  <h1>Family relationships — UI</h1>
+  <p>Drawn against the real components, not just the colour tokens: the detail panel is
+  <code>grid-cols-3</code> with <code>ImageThumbnail curve shadow</code> exactly as
+  <code>DetailPanelPeople.svelte</code> renders it; the person header is the 3.375rem
+  <code>circle</code> from the person page; the sidebar is the real nav list from
+  <code>UserSidebar.svelte</code> with one item added.</p>
+  <p>Layout and density were validated against a real library — the thumbnails below are those real
+  photographs reduced to 4×4 pixels and blurred, so tile sizing, tonal weight and how a grid of faces
+  actually reads are all true to life, while no individual is identifiable.</p>
+  <div class="banner">
+    <b>Nothing here is real personal data.</b> <code>open-noodle/gallery</code> is public, so the
+    committed mockup carries no identifiable faces and no real names — the images in
+    <code>family-placeholder/</code> are unidentifiable colour fields, and every name is invented, as
+    are all the relationships between them. Regenerate against live data locally if you need to
+    re-check fidelity; keep it out of the commit.
+  </div>
+  <div class="toc">
+    <a href="#canvas">1 · Canvas</a><a href="#union">2 · Union editor</a><a href="#gestures">3 · Gestures</a>
+    <a href="#person">4 · Person page</a><a href="#detail">5 · Detail panel</a><a href="#gender">6 · Labels</a>
+    <a href="#redaction">7 · Redaction</a><a href="#admin">8 · Admin</a><a href="#mobile">9 · Mobile</a>
+    <a href="#states">10 · States</a>
+  </div>
+</header>
+
+<!-- 1 CANVAS -->
+<section id="canvas">
+  <div class="sechead"><span class="snum">01</span><h2>The canvas, in the app shell</h2><span class="slice">slices 10–11</span></div>
+  <p class="lede">A new sidebar item under People. Cluster chips are the answer to "multiple family
+  trees" — disconnected components of the graph, computed per request and never stored.</p>
+
+  <div class="shell">
+    <div class="topbar">
+      <div class="logo"><span class="logodot"></span>Gallery</div>
+      <div class="searchbar">Search your photos</div>
+      <span class="topspacer"></span>
+      <div class="userdot">AL</div>
+    </div>
+    <div class="shellbody">
+      <nav class="nav">
+        <div class="navitem"><span class="ic"></span>Photos</div>
+        <div class="navitem"><span class="ic"></span>Spaces</div>
+        <div class="navitem"><span class="ic"></span>Explore</div>
+        <div class="navitem"><span class="ic"></span>Map</div>
+        <div class="navitem"><span class="ic"></span>People</div>
+        <div class="navitem on new"><span class="ic"></span>Family</div>
+        <div class="navsep"></div>
+        <div class="navitem"><span class="ic"></span>Favorites</div>
+        <div class="navitem"><span class="ic"></span>Memories</div>
+        <div class="navitem"><span class="ic"></span>Albums</div>
+        <div class="navitem"><span class="ic"></span>Utilities</div>
+        <div class="navsep"></div>
+        <div class="navitem"><span class="ic"></span>Trash</div>
+      </nav>
+      <div class="content">
+        <div class="pagehead"><h3>Family</h3>
+          <div class="pagesub">How the people in your photos are related</div></div>
+        <div class="clusters">
+          <span class="chip on"><b>Around you</b> · 11 people</span>
+          <span class="chip"><b>Casper</b> · 4 people</span>
+          <span class="chip"><b>Unconnected</b> · 2 people</span>
+        </div>
+        <div class="toolbar">
+          <button class="btn">You are <b>Alex</b></button>
+          <button class="btn ghost">Fit to view</button>
+          <span class="spacer"></span>
+          <button class="btn primary">Done</button>
+        </div>
+
+        <div class="editor">
+          <aside class="tray">
+            <h4>People you can see</h4>
+            <div class="search">Search people…</div>
+            <div class="traygrid">
+              <div class="tface"><div class="ph circle s44"><img src="family-placeholder/bram.jpg" alt="">BR</div><span>Bram</span></div>
+              <div class="tface"><div class="ph circle s44"><img src="family-placeholder/juno.jpg" alt="">JU</div><span>Juno</span></div>
+              <div class="tface"><div class="ph circle s44"><img src="family-placeholder/vera.jpg" alt="">VE</div><span>Vera</span></div>
+              <div class="tface"><div class="ph circle s44"><img src="family-placeholder/oskar.jpg" alt="">OS</div><span>Oskar</span></div>
+              <div class="tface"><div class="ph circle s44"><img src="family-placeholder/nico.jpg" alt="">NI</div><span>Nico</span></div>
+              <div class="tface"><div class="ph circle s44"><img src="family-placeholder/theo.jpg" alt="">TH</div><span>Theo</span></div>
+            </div>
+            <div class="traynote">Only people already recognised in your photos can be added. Someone with
+            no photos can't be a card — but a union can hold their seat.</div>
+          </aside>
+
+          <div class="canvas">
+            <div class="tree">
+              <svg width="1260" height="552" aria-hidden="true">
+                <g stroke="var(--border)" stroke-width="2" fill="none" stroke-linecap="round">
+                  <path d="M394 79 L414 79"/>
+                  <path d="M974 79 L994 79"/>
+                  <path d="M228 79 L228 180 M120 180 L720 180 M120 180 L120 230 M720 180 L720 230"/>
+                  <path d="M404 79 L404 150 M404 150 L510 150 M510 150 L510 230"/>
+                  <path d="M984 79 L984 180 M896 180 L984 180 M896 180 L896 230"/>
+                  <path d="M198 269 L218 269"/>
+                  <path d="M798 269 L818 269"/>
+                  <path d="M208 269 L208 420"/>
+                  <path d="M808 269 L808 360 M730 360 L890 360 M730 360 L730 420 M890 360 L890 420"/>
+                </g>
+                <g stroke="var(--warn)" stroke-width="2" fill="none" stroke-dasharray="5 4">
+                  <path d="M218 79 L238 79"/>
+                </g>
+                <g stroke="var(--accent)" stroke-width="2" fill="none" stroke-dasharray="5 4" opacity=".85">
+                  <path d="M510 306 L510 420"/>
+                </g>
+              </svg>
+
+              <div class="genlabel" style="top:8px">Gen −1</div>
+              <div class="genlabel" style="top:200px">Gen 0</div>
+              <div class="genlabel" style="top:392px">Gen +1</div>
+
+              <div class="pcard" style="left:60px;top:40px">
+                <div class="ph circle s44"><img src="family-placeholder/ruth.jpg" alt="">RU</div>
+                <div class="txt"><div class="nm">Ruth</div><div class="rel">your parent</div></div></div>
+              <div class="pcard" style="left:238px;top:40px">
+                <div class="ph circle s44"><img src="family-placeholder/anton.jpg" alt="">AN</div>
+                <div class="txt"><div class="nm">Anton</div><div class="rel">your parent</div></div></div>
+              <div class="pcard" style="left:414px;top:40px">
+                <div class="ph circle s44"><img src="family-placeholder/vera.jpg" alt="">VE</div>
+                <div class="txt"><div class="nm">Vera</div><div class="rel">your step-parent</div></div></div>
+              <div class="pcard empty" style="left:818px;top:40px">+ Add a parent</div>
+              <div class="pcard" style="left:994px;top:40px">
+                <div class="ph circle s44"><img src="family-placeholder/bram.jpg" alt="">BR</div>
+                <div class="txt"><div class="nm">Bram</div><div class="rel">partner's parent</div></div></div>
+
+              <div class="ubar ended" style="left:228px;top:124px">1988 – 2007 · divorced</div>
+              <div class="ubar" style="left:404px;top:124px">married 2010</div>
+              <div class="ubar" style="left:984px;top:124px">married 1985</div>
+
+              <div class="pcard" style="left:40px;top:230px">
+                <div class="ph circle s44"><img src="family-placeholder/lena.jpg" alt="">LE</div>
+                <div class="txt"><div class="nm">Lena</div><div class="rel">your sibling</div></div></div>
+              <div class="pcard" style="left:218px;top:230px">
+                <div class="ph circle s44"><img src="family-placeholder/oskar.jpg" alt="">OS</div>
+                <div class="txt"><div class="nm">Oskar</div><div class="rel">sibling's partner</div></div></div>
+              <div class="pcard" style="left:432px;top:230px">
+                <div class="ph circle s44"><img src="family-placeholder/nico.jpg" alt="">NI</div>
+                <div class="txt"><div class="nm">Nico</div><div class="rel">your half-sibling</div></div></div>
+              <div class="pcard me" style="left:642px;top:230px">
+                <div class="ph circle s44"><img src="family-placeholder/alex.jpg" alt="">AL</div>
+                <div class="txt"><div class="nm">Alex</div><div class="rel">that's you</div></div></div>
+              <div class="tag" style="left:642px;top:216px">you are here</div>
+              <div class="pcard" style="left:818px;top:230px">
+                <div class="ph circle s44"><img src="family-placeholder/mia.jpg" alt="">MI</div>
+                <div class="txt"><div class="nm">Mia</div><div class="rel">your partner</div></div></div>
+
+              <div class="ubar" style="left:208px;top:314px">partners since 2018</div>
+              <div class="ubar" style="left:808px;top:314px">married 2016</div>
+
+              <div class="pcard" style="left:130px;top:420px">
+                <div class="ph circle s44"><img src="family-placeholder/juno.jpg" alt="">JU</div>
+                <div class="txt"><div class="nm">Juno</div><div class="rel">sibling's child</div></div></div>
+              <div class="pcard drop" style="left:432px;top:420px">release to add<br>as Nico's child</div>
+              <div class="pcard" style="left:652px;top:420px">
+                <div class="ph circle s44"><img src="family-placeholder/iris.jpg" alt="">IR</div>
+                <div class="txt"><div class="nm">Iris</div><div class="rel">your child</div></div></div>
+              <div class="pcard" style="left:812px;top:420px">
+                <div class="ph circle s44"><img src="family-placeholder/theo.jpg" alt="">TH</div>
+                <div class="txt"><div class="nm">Theo</div><div class="rel">your child</div></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="cap"><b>Every subtitle is derived, and every one of them is neutral</b> — "your parent", not
+  "your father". That is the honest out-of-the-box state: gender is optional, opt-in per person, and
+  never inferred from a name or a face. §6 shows what changes when it is set. Note also that Mia's
+  second parent was never recorded, so the seat is an <em>empty</em> dashed slot and the union works
+  with one partner.</p>
+</section>
+
+<!-- 2 UNION EDITOR -->
+<section id="union">
+  <div class="sechead"><span class="snum">02</span><h2>Union editor</h2><span class="slice">slice 11</span></div>
+  <p class="lede">Opens from the pill between two partners — the only place status and dates can be set,
+  which is why it reads as a control rather than a connector.</p>
+  <div class="grid2">
+    <div class="pop">
+      <div class="pophead">
+        <div class="ph circle s26"><img src="family-placeholder/anton.jpg" alt="">AN</div>
+        <div class="ph circle s26" style="margin-left:-12px"><img src="family-placeholder/ruth.jpg" alt="">RU</div>
+        <div class="t">Anton &amp; Ruth</div>
+      </div>
+      <div class="popbody">
+        <div class="field"><label>Relationship</label>
+          <div class="control"><span>Divorced</span><span class="ca">▾</span></div></div>
+        <div class="two">
+          <div class="field"><label>From</label><div class="control"><span>1988</span></div></div>
+          <div class="field"><label>Until</label><div class="control"><span>2007</span></div></div>
+        </div>
+        <div class="field"><label>Children</label>
+          <div class="control"><span>Lena, Alex</span><span class="ca">2</span></div></div>
+      </div>
+      <div class="popfoot">
+        <button class="btn primary">Save</button><button class="btn ghost">Cancel</button>
+        <span class="spacer"></span><span class="danger">Remove</span>
+      </div>
+    </div>
+    <div>
+      <div class="panel">
+        <div class="panelhead">Status vocabulary</div>
+        <div class="relrow"><div class="txt"><div class="nm">Married</div><div class="sub">spouse, or husband / wife when gender is set</div></div></div>
+        <div class="relrow"><div class="txt"><div class="nm">Partnered</div><div class="sub">Default — partner</div></div></div>
+        <div class="relrow"><div class="txt"><div class="nm">Separated</div><div class="sub">Gains "former"; the connector draws dashed</div></div></div>
+        <div class="relrow"><div class="txt"><div class="nm">Divorced</div><div class="sub">Gains "ex-"; dashed amber connector</div></div></div>
+        <div class="relrow"><div class="txt"><div class="nm">Widowed</div><div class="sub">Keeps the present term</div></div></div>
+      </div>
+      <p class="cap">Both dates optional — a divorce with no end date is legal, because the date is often
+      simply unknown. An end date before the start is rejected.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 3 GESTURES -->
+<section id="gestures">
+  <div class="sechead"><span class="snum">03</span><h2>The three gestures</h2><span class="slice">slice 11</span></div>
+  <div class="grid2">
+    <div class="panel" style="padding:20px">
+      <div class="dz">
+        <div class="zone top">drop above =<br>join the union<br>they're a child of</div>
+        <div class="zone lft">new<br>union</div>
+        <div class="dzcard">
+          <div class="ph circle s44"><img src="family-placeholder/alex.jpg" alt="">AL</div>
+          <div class="txt"><div class="nm">Alex</div><div class="rel">focused</div></div>
+        </div>
+        <div class="zone rgt">new<br>union</div>
+        <div class="zone bot">drop below =<br>child of their union</div>
+      </div>
+    </div>
+    <div>
+      <div class="panel">
+        <div class="panelhead">What each drop writes</div>
+        <div class="relrow"><div class="txt"><div class="nm">Above</div><div class="sub">Adds a partner to
+          the union they're a child of, creating it if absent. A second parent <em>joins</em> the
+          existing union rather than starting a rival one.</div></div></div>
+        <div class="relrow"><div class="txt"><div class="nm">Beside</div><div class="sub">New union with
+          the two of them as partners.</div></div></div>
+        <div class="relrow"><div class="txt"><div class="nm">Below</div><div class="sub">Adds a child;
+          creates a one-partner union if they have none.</div></div></div>
+      </div>
+      <p class="cap">A sibling needs no gesture of its own — it's "drop below the parent".
+      <b>A view-only user sees no zones at all:</b> readable, inert.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 4 PERSON PAGE -->
+<section id="person">
+  <div class="sechead"><span class="snum">04</span><h2>Person page</h2><span class="slice">slice 8</span></div>
+  <p class="lede">The header is the existing one — 3.375rem circle, name, then grey meta lines. Relations
+  become one more meta section beneath it.</p>
+  <div class="grid2">
+    <div class="panel">
+      <div class="pph">
+        <div class="ph circle s54 sh"><img src="family-placeholder/lena.jpg" alt="">LE</div>
+        <div class="pphtext"><div class="n">Lena</div>
+          <div class="m">412 assets</div><div class="m">1,208 faces</div></div>
+      </div>
+      <div class="dpdiv"></div>
+      <div class="panelhead" style="background:transparent;border-bottom:none;padding-bottom:4px">Family</div>
+      <div class="relrow"><div class="ph circle s34"><img src="family-placeholder/anton.jpg" alt="">AN</div>
+        <div class="txt"><div class="nm">Anton</div><div class="sub">parent</div></div></div>
+      <div class="relrow"><div class="ph circle s34"><img src="family-placeholder/ruth.jpg" alt="">RU</div>
+        <div class="txt"><div class="nm">Ruth</div><div class="sub">parent</div></div></div>
+      <div class="relrow"><div class="ph circle s34"><img src="family-placeholder/oskar.jpg" alt="">OS</div>
+        <div class="txt"><div class="nm">Oskar</div><div class="sub">partner · since 2018</div></div></div>
+      <div class="relrow"><div class="ph circle s34"><img src="family-placeholder/juno.jpg" alt="">JU</div>
+        <div class="txt"><div class="nm">Juno</div><div class="sub">child</div></div></div>
+      <div class="relrow"><div class="ph circle s34"><img src="family-placeholder/nico.jpg" alt="">NI</div>
+        <div class="txt"><div class="nm">Nico</div><div class="sub">half-sibling</div></div></div>
+      <div class="addrow">+ Add a relationship</div>
+    </div>
+    <div>
+      <div class="panel">
+        <div class="pph">
+          <div class="ph circle s54 sh"><img src="family-placeholder/nico.jpg" alt="">NI</div>
+          <div class="pphtext"><div class="n">Nico</div><div class="m">96 assets</div></div>
+        </div>
+        <div class="dpdiv"></div>
+        <div class="panelhead" style="background:transparent;border-bottom:none;padding-bottom:4px">
+          Family<span class="spacer"></span><span class="mini">view only</span></div>
+        <div class="relrow"><div class="ph circle s34"><img src="family-placeholder/anton.jpg" alt="">AN</div>
+          <div class="txt"><div class="nm">Anton</div><div class="sub">parent</div></div></div>
+        <div class="relrow anon"><div class="ph circle s34 anon">?</div>
+          <div class="txt"><div class="nm">Someone</div><div class="sub">parent</div></div></div>
+      </div>
+      <p class="cap"><b>Two different blanks, drawn deliberately unalike.</b> The dashed
+      "+ Add a parent" slot on the canvas means nobody was recorded. This solid grey "Someone" row means
+      a person <em>is</em> recorded and this viewer can't resolve them. Conflating them would make
+      redaction look like missing data. Note also there is no "Add a relationship" row — this viewer has
+      <code>view</code>, not <code>contribute</code>.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 5 DETAIL PANEL -->
+<section id="detail">
+  <div class="sechead"><span class="snum">05</span><h2>Asset viewer — detail panel</h2><span class="slice">slice 9</span></div>
+  <p class="lede">The real component: a 3-column grid of <code>rounded-xl</code> thumbnails with
+  <code>shadow-lg</code>, name in <code>font-medium</code> beneath. The relation line takes the slot the
+  age currently occupies, in the same <code>font-light</code> weight.</p>
+  <div class="grid2">
+    <div class="dpanel">
+      <div class="dpsec">
+        <div class="dphead"><span class="t">People</span><span class="mini">6</span></div>
+        <div class="dpgrid">
+          <div class="dpperson"><div class="ph curve sh" style="width:100%;aspect-ratio:1;font-size:18px"><img src="family-placeholder/lena.jpg" alt="">LE</div>
+            <div class="pnm">Lena</div><div class="prel">your sibling</div><div class="page">34 years old</div></div>
+          <div class="dpperson"><div class="ph curve sh" style="width:100%;aspect-ratio:1;font-size:18px"><img src="family-placeholder/oskar.jpg" alt="">OS</div>
+            <div class="pnm">Oskar</div><div class="prel">sibling's partner</div></div>
+          <div class="dpperson"><div class="ph curve sh" style="width:100%;aspect-ratio:1;font-size:18px"><img src="family-placeholder/nico.jpg" alt="">NI</div>
+            <div class="pnm">Nico</div><div class="prel">half-sibling</div><div class="page">28 years old</div></div>
+          <div class="dpperson"><div class="ph curve sh" style="width:100%;aspect-ratio:1;font-size:18px"><img src="family-placeholder/juno.jpg" alt="">JU</div>
+            <div class="pnm">Juno</div><div class="prel">sibling's child</div><div class="page">6 years old</div></div>
+          <div class="dpperson"><div class="ph curve sh" style="width:100%;aspect-ratio:1;font-size:18px"><img src="family-placeholder/casper.jpg" alt="">CA</div>
+            <div class="pnm">Casper</div><div class="prel none">—</div><div class="page">41 years old</div></div>
+          <div class="dpperson"><div class="ph curve sh anon" style="width:100%;aspect-ratio:1;font-size:20px">?</div>
+            <div class="pnm" style="color:var(--gray-500);font-style:italic">Unknown</div><div class="prel none">—</div></div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <p class="cap"><b>This is the surface that does the actual orientation job.</b> Open a photo of
+      half-familiar faces and read how each one relates to you, without navigating anywhere.</p>
+      <p class="cap">Casper is a known person with no recorded relationship, so the line is a neutral
+      dash rather than blank — a blank makes the grid ragged and reads as a loading state.</p>
+      <p class="cap"><b>Relation is an added line, not a replacement</b> — the existing age line stays.
+      Lena, Nico and Juno show both; Oskar has no birthdate; Casper has a birthdate but no recorded
+      relationship. That mix is the normal case, and it means <b>rows will differ in height</b>. CSS
+      grid equalises tiles within a row so it reads as variation rather than breakage — and reserving
+      an empty line to force uniformity would cost every tile the height whether it uses it or not.</p>
+      <p class="cap">At more than six people the real component switches to
+      <code>grid-cols-4 gap-2</code> and drops the sub-lines to <code>text-xs</code>. Four lines at four
+      columns in a ~360px panel is tight, so the relation truncates with an ellipsis there — that
+      crowded case is the one worth testing, not the roomy one shown here.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 6 GENDER -->
+<section id="gender">
+  <div class="sechead"><span class="snum">06</span><h2>Neutral by default, gendered when set</h2><span class="slice">slice 6</span></div>
+  <p class="lede">Gender is optional per person and never inferred. Everything above shows the default
+  state; this is the same three people after someone fills it in.</p>
+  <div class="grid2">
+    <div class="panel">
+      <div class="panelhead">Default — no gender recorded</div>
+      <div class="relrow"><div class="ph circle s34"><img src="family-placeholder/ruth.jpg" alt="">RU</div>
+        <div class="txt"><div class="nm">Ruth</div><div class="sub">your parent</div></div></div>
+      <div class="relrow"><div class="ph circle s34"><img src="family-placeholder/nico.jpg" alt="">NI</div>
+        <div class="txt"><div class="nm">Nico</div><div class="sub">your half-sibling</div></div></div>
+      <div class="relrow"><div class="ph circle s34"><img src="family-placeholder/juno.jpg" alt="">JU</div>
+        <div class="txt"><div class="nm">Juno</div><div class="sub">your sibling's child</div></div></div>
+    </div>
+    <div class="panel">
+      <div class="panelhead">After gender is set on those three</div>
+      <div class="relrow"><div class="ph circle s34"><img src="family-placeholder/ruth.jpg" alt="">RU</div>
+        <div class="txt"><div class="nm">Ruth</div><div class="sub">your mother</div></div></div>
+      <div class="relrow"><div class="ph circle s34"><img src="family-placeholder/nico.jpg" alt="">NI</div>
+        <div class="txt"><div class="nm">Nico</div><div class="sub">your half-brother</div></div></div>
+      <div class="relrow"><div class="ph circle s34"><img src="family-placeholder/juno.jpg" alt="">JU</div>
+        <div class="txt"><div class="nm">Juno</div><div class="sub">your nephew</div></div></div>
+    </div>
+  </div>
+  <p class="cap">Worth deciding where the control lives. It is an attribute of the person, not of a
+  relationship, so the person page edit sheet is the natural home — next to birthdate, which already
+  works that way.</p>
+</section>
+
+<!-- 7 REDACTION -->
+<section id="redaction">
+  <div class="sechead"><span class="snum">07</span><h2>The same union, three viewers</h2><span class="slice">slice 5</span></div>
+  <p class="lede">Redaction isn't configured — it falls out of who each viewer can already resolve.</p>
+  <div class="grid3">
+    <div class="panel">
+      <div class="panelhead">Alex — resolves everyone</div>
+      <div class="relrow"><div class="ph circle s34"><img src="family-placeholder/anton.jpg" alt="">AN</div>
+        <div class="txt"><div class="nm">Anton</div><div class="sub">partner</div></div></div>
+      <div class="relrow"><div class="ph circle s34"><img src="family-placeholder/ruth.jpg" alt="">RU</div>
+        <div class="txt"><div class="nm">Ruth</div><div class="sub">partner</div></div></div>
+      <div class="relrow"><div class="ph circle s34"><img src="family-placeholder/lena.jpg" alt="">LE</div>
+        <div class="txt"><div class="nm">Lena</div><div class="sub">child</div></div></div>
+      <div class="relrow"><div class="ph circle s34"><img src="family-placeholder/alex.jpg" alt="">AL</div>
+        <div class="txt"><div class="nm">Alex</div><div class="sub">child</div></div></div>
+    </div>
+    <div class="panel">
+      <div class="panelhead">Oskar — resolves two</div>
+      <div class="relrow anon"><div class="ph circle s34 anon">?</div>
+        <div class="txt"><div class="nm">Someone</div><div class="sub">partner</div></div></div>
+      <div class="relrow anon"><div class="ph circle s34 anon">?</div>
+        <div class="txt"><div class="nm">Someone</div><div class="sub">partner</div></div></div>
+      <div class="relrow"><div class="ph circle s34"><img src="family-placeholder/lena.jpg" alt="">LE</div>
+        <div class="txt"><div class="nm">Lena</div><div class="sub">child</div></div></div>
+      <div class="relrow"><div class="ph circle s34"><img src="family-placeholder/alex.jpg" alt="">AL</div>
+        <div class="txt"><div class="nm">Alex</div><div class="sub">child</div></div></div>
+    </div>
+    <div class="panel">
+      <div class="panelhead">Casper — resolves one</div>
+      <div class="emptystate"><div class="big">Nothing to show</div>
+        The union is omitted entirely, not redacted. One resolvable participant conveys nothing and
+        would still disclose how many people are in it.</div>
+    </div>
+  </div>
+  <p class="cap">Oskar learns Lena and Alex are siblings and that they have two parents. He learns
+  nothing about who those parents are. <b>Redaction hides identities, not structure</b> — the accepted
+  trade.</p>
+</section>
+
+<!-- 8 ADMIN -->
+<section id="admin">
+  <div class="sechead"><span class="snum">08</span><h2>Admin settings</h2><span class="slice">slice 12</span></div>
+  <div class="panel">
+    <div class="panelhead">Family relationships</div>
+    <div class="settingrow">
+      <div class="st"><div class="l">Enable family relationships</div>
+        <div class="d">When off, every endpoint refuses and the UI disappears — including for users with
+        an explicit grant.</div></div>
+      <div class="toggle"><i></i></div>
+    </div>
+    <div class="settingrow">
+      <div class="st"><div class="l">Default access</div>
+        <div class="d">Applies to anyone without an explicit grant. Changing it never overwrites one.</div></div>
+      <div class="sel">Contribute ▾</div>
+    </div>
+    <table class="utable">
+      <thead><tr><th>User</th><th>Access</th><th>Granted by</th></tr></thead>
+      <tbody>
+        <tr><td><div class="uname"><div class="ph circle s26"><img src="family-placeholder/alex.jpg" alt="">AL</div>Alex</div></td>
+          <td><span class="sel">Contribute ▾</span></td><td class="inherit">—</td></tr>
+        <tr><td><div class="uname"><div class="ph circle s26"><img src="family-placeholder/mia.jpg" alt="">MI</div>Mia</div></td>
+          <td><span class="sel">Contribute ▾</span></td><td>Alex · 12 Aug</td></tr>
+        <tr><td><div class="uname"><div class="ph circle s26"><img src="family-placeholder/lena.jpg" alt="">LE</div>Lena</div></td>
+          <td><span class="sel">View ▾</span></td><td>Alex · 12 Aug</td></tr>
+        <tr><td><div class="uname"><div class="ph circle s26"><img src="family-placeholder/casper.jpg" alt="">CA</div>Casper</div></td>
+          <td><span class="sel inherit">Inherits default ▾</span></td><td class="inherit">—</td></tr>
+        <tr><td><div class="uname"><div class="ph circle s26 anon">?</div>Lodger</div></td>
+          <td><span class="sel">None ▾</span></td><td>Alex · 3 Sep</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="cap"><b>"Inherits default" is a distinct state and the table has to show it</b> — otherwise
+  changing the default silently appears to change individual users. "Lodger" holds an explicit
+  <em>None</em> that survives a permissive default. Admins get no implicit access.</p>
+</section>
+
+<!-- 9 MOBILE -->
+<section id="mobile">
+  <div class="sechead"><span class="snum">09</span><h2>Mobile</h2><span class="slice">slices 13–14</span></div>
+  <p class="lede">Read-only. The canvas doesn't fit a phone and shouldn't try.</p>
+  <div class="grid3">
+    <div>
+      <div class="phone">
+        <div class="phonebar"><div class="ph circle s26"><img src="family-placeholder/lena.jpg" alt="">LE</div>Lena</div>
+        <div class="focus">
+          <div class="frow">
+            <div class="fcard"><div class="ph circle s26"><img src="family-placeholder/ruth.jpg" alt="">RU</div><div><b>Ruth</b><i>parent</i></div></div>
+            <div class="fcard"><div class="ph circle s26"><img src="family-placeholder/anton.jpg" alt="">AN</div><div><b>Anton</b><i>parent</i></div></div>
+          </div>
+          <div class="frow">
+            <div class="fcard me"><div class="ph circle s26"><img src="family-placeholder/lena.jpg" alt="">LE</div><div><b>Lena</b><i>your sibling</i></div></div>
+            <div class="fcard"><div class="ph circle s26"><img src="family-placeholder/oskar.jpg" alt="">OS</div><div><b>Oskar</b><i>partner</i></div></div>
+          </div>
+          <div class="frow">
+            <div class="fcard"><div class="ph circle s26"><img src="family-placeholder/juno.jpg" alt="">JU</div><div><b>Juno</b><i>child</i></div></div>
+          </div>
+        </div>
+        <div class="hint">Tap anyone to centre on them</div>
+      </div>
+      <p class="cap">Focus card — parents above, partner beside, children below.</p>
+    </div>
+    <div>
+      <div class="phone">
+        <div class="phonebar"><div class="ph circle s26"><img src="family-placeholder/nico.jpg" alt="">NI</div>Nico</div>
+        <div class="focus">
+          <div class="frow">
+            <div class="fcard anon"><div class="ph circle s26 anon">?</div><div><b>Someone</b><i>parent</i></div></div>
+            <div class="fcard"><div class="ph circle s26"><img src="family-placeholder/anton.jpg" alt="">AN</div><div><b>Anton</b><i>parent</i></div></div>
+          </div>
+          <div class="frow">
+            <div class="fcard me"><div class="ph circle s26"><img src="family-placeholder/nico.jpg" alt="">NI</div><div><b>Nico</b><i>half-sibling</i></div></div>
+          </div>
+        </div>
+        <div class="hint">Redaction renders identically to web</div>
+      </div>
+      <p class="cap">Same two-kinds-of-blank rule.</p>
+    </div>
+    <div>
+      <div class="phone">
+        <div class="phonebar"><div class="ph circle s26"><img src="family-placeholder/theo.jpg" alt="">TH</div>Theo</div>
+        <div class="emptystate" style="padding:34px 16px;background:var(--page)">
+          <div class="big">Can't load relationships</div>
+          You're offline. Relationships load from the server and aren't stored on this device yet.
+        </div>
+      </div>
+      <p class="cap">Offline. Relations are server-sourced and deliberately not synced to Drift, so the
+      empty state must say so rather than implying there are none.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 10 STATES -->
+<section id="states">
+  <div class="sechead"><span class="snum">10</span><h2>States that are easy to forget</h2></div>
+  <div class="grid3">
+    <div class="panel">
+      <div class="panelhead">Nothing recorded yet</div>
+      <div class="emptystate"><div class="big">Start with yourself</div>
+        Pick which person is you, then drag your family in from the left.
+        <div style="margin-top:14px"><button class="btn primary">Choose who you are</button></div></div>
+    </div>
+    <div class="panel">
+      <div class="panelhead">No root set</div>
+      <div class="relrow"><div class="ph circle s34"><img src="family-placeholder/anton.jpg" alt="">AN</div>
+        <div class="txt"><div class="nm">Anton</div><div class="sub">—</div></div></div>
+      <div class="relrow"><div class="ph circle s34"><img src="family-placeholder/ruth.jpg" alt="">RU</div>
+        <div class="txt"><div class="nm">Ruth</div><div class="sub">—</div></div></div>
+      <div class="addrow" style="color:var(--muted)">Tell us who you are to see how people relate to you</div>
+    </div>
+    <div class="panel">
+      <div class="panelhead">No path to you</div>
+      <div class="relrow"><div class="ph circle s34"><img src="family-placeholder/bram.jpg" alt="">BR</div>
+        <div class="txt"><div class="nm">Bram</div><div class="sub">Mia's parent</div></div></div>
+      <div class="relrow"><div class="ph circle s34"><img src="family-placeholder/juno.jpg" alt="">JU</div>
+        <div class="txt"><div class="nm">Juno</div><div class="sub">Lena's child</div></div></div>
+    </div>
+  </div>
+  <p class="cap"><b>The third is what stops the feature feeling broken.</b> With no path from your root to
+  someone, describe them relative to the nearest person you <em>do</em> reach — "Mia's parent" — rather
+  than showing a blank.</p>
+  <div class="note key">
+    <b>One state deliberately has no design:</b> a user whose effective access is <code>none</code> sees
+    no relations section, no detail-panel lines, and no Family item in the sidebar at all — not a locked
+    or empty version. An empty state would advertise a feature they cannot use and imply relationships
+    exist.
+  </div>
+</section>
+
+</div>
+</body>
+</html>
