@@ -250,6 +250,10 @@ const updatedConfig = Object.freeze<SystemConfig>({
   storageUsage: {
     includeDerivatives: false,
   },
+  familyTree: {
+    enabled: false,
+    defaultAccess: 'none',
+  },
   image: {
     thumbnail: {
       size: 250,
