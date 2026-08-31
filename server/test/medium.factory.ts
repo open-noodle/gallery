@@ -728,7 +728,6 @@ const newMockRepository = <T>(key: ClassConstructor<T>) => {
     case CryptoRepository:
     case FaceIdentityRepository:
     case FacePersonVerdictRepository:
-    case FamilyRepository:
     case LibraryRepository:
     case MemoryRepository:
     case IntegrityRepository:
@@ -767,6 +766,10 @@ const newMockRepository = <T>(key: ClassConstructor<T>) => {
 
     case EmailRepository: {
       return automock(EmailRepository, { args: [{ setContext: () => {} }] });
+    }
+
+    case FamilyRepository: {
+      return automock(FamilyRepository, { args: [undefined, { setContext: () => {} }] });
     }
 
     case EventRepository: {

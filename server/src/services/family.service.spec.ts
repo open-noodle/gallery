@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { FamilyAccessLevel, SharedSpaceRole } from 'src/enum';
 import { FamilyService } from 'src/services/family.service';
 import { authStub } from 'test/fixtures/auth.stub';
@@ -8,6 +8,27 @@ import { beforeEach, describe, expect, it } from 'vitest';
 const makeFamilyConfig = (enabled: boolean, defaultAccess: 'none' | 'view' | 'contribute' = 'none') => ({
   familyTree: { enabled, defaultAccess },
 });
+
+const PARTNER_A = '00000000-0000-4000-a000-000000000101';
+const PARTNER_B = '00000000-0000-4000-a000-000000000102';
+const PARTNER_C = '00000000-0000-4000-a000-000000000103';
+const CHILD_A = '00000000-0000-4000-a000-000000000201';
+const CHILD_B = '00000000-0000-4000-a000-000000000202';
+const PET_A = '00000000-0000-4000-a000-000000000301';
+const UNION_ID = '00000000-0000-4000-a000-000000000401';
+const UNION_ID_2 = '00000000-0000-4000-a000-000000000402';
+
+// Grants contribute access unconditionally, so each test using it exercises only the
+// validation rule it names rather than re-proving write authority (already covered above).
+const giveContributeAccess = (sut: FamilyService, mocks: ServiceMocks) => {
+  sut['getConfig'] = () => Promise.resolve(makeFamilyConfig(true, 'none') as any);
+  mocks.family.getAccess.mockResolvedValue({ level: 'contribute' } as any);
+};
+
+const giveViewOnlyAccess = (sut: FamilyService, mocks: ServiceMocks) => {
+  sut['getConfig'] = () => Promise.resolve(makeFamilyConfig(true, 'none') as any);
+  mocks.family.getAccess.mockResolvedValue({ level: 'view' } as any);
+};
 
 describe(FamilyService.name, () => {
   let sut: FamilyService;
@@ -112,6 +133,229 @@ describe(FamilyService.name, () => {
 
       await expect(sut.requireFamilyWrite(authStub.user1)).resolves.toBeUndefined();
       expect(mocks.sharedSpace.getMember).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('union write path', () => {
+    beforeEach(() => {
+      mocks.family.getIdentityType.mockImplementation((id: string) => Promise.resolve(id === PET_A ? 'pet' : 'person'));
+      mocks.family.isAncestor.mockResolvedValue(false);
+      mocks.family.getPartnerIds.mockResolvedValue([]);
+      mocks.family.getChildIds.mockResolvedValue([]);
+    });
+
+    // E1
+    it('creates a union with no partners so two children can be siblings', async () => {
+      giveContributeAccess(sut, mocks);
+      mocks.family.createUnion.mockResolvedValue({ id: UNION_ID } as any);
+
+      await expect(sut.createUnion(authStub.user1, { childIds: [CHILD_A, CHILD_B] })).resolves.toEqual({
+        id: UNION_ID,
+      });
+
+      expect(mocks.family.createUnion).toHaveBeenCalledWith(
+        expect.objectContaining({ partnerIds: [], childIds: [CHILD_A, CHILD_B] }),
+      );
+    });
+
+    // E2
+    it('creates a union with a single known parent', async () => {
+      giveContributeAccess(sut, mocks);
+      mocks.family.createUnion.mockResolvedValue({ id: UNION_ID } as any);
+
+      await expect(sut.createUnion(authStub.user1, { partnerIds: [PARTNER_A] })).resolves.toEqual({
+        id: UNION_ID,
+      });
+
+      expect(mocks.family.createUnion).toHaveBeenCalledWith(
+        expect.objectContaining({ partnerIds: [PARTNER_A], childIds: [] }),
+      );
+    });
+
+    // E3
+    it('lets one person be a partner in several unions', async () => {
+      giveContributeAccess(sut, mocks);
+      mocks.family.createUnion
+        .mockResolvedValueOnce({ id: UNION_ID } as any)
+        .mockResolvedValueOnce({ id: UNION_ID_2 } as any);
+
+      await expect(sut.createUnion(authStub.user1, { partnerIds: [PARTNER_A, PARTNER_B] })).resolves.toEqual({
+        id: UNION_ID,
+      });
+      await expect(sut.createUnion(authStub.user1, { partnerIds: [PARTNER_A, PARTNER_C] })).resolves.toEqual({
+        id: UNION_ID_2,
+      });
+
+      expect(mocks.family.createUnion).toHaveBeenCalledTimes(2);
+    });
+
+    // E6
+    it('lets a child belong to two unions', async () => {
+      giveContributeAccess(sut, mocks);
+      mocks.family.getUnion.mockImplementation((unionId: string) => Promise.resolve({ id: unionId } as any));
+
+      await sut.addParticipant(authStub.user1, UNION_ID, { identityId: CHILD_A, role: 'child' });
+      await sut.addParticipant(authStub.user1, UNION_ID_2, { identityId: CHILD_A, role: 'child' });
+
+      expect(mocks.family.addChild).toHaveBeenCalledWith(UNION_ID, CHILD_A);
+      expect(mocks.family.addChild).toHaveBeenCalledWith(UNION_ID_2, CHILD_A);
+    });
+
+    // E9
+    it('refuses to make someone their own partner', async () => {
+      giveContributeAccess(sut, mocks);
+
+      await expect(sut.createUnion(authStub.user1, { partnerIds: [PARTNER_A, PARTNER_A] })).rejects.toThrow(
+        BadRequestException,
+      );
+
+      expect(mocks.family.createUnion).not.toHaveBeenCalled();
+    });
+
+    // E10
+    it('refuses a person who is both partner and child of one union', async () => {
+      giveContributeAccess(sut, mocks);
+
+      await expect(sut.createUnion(authStub.user1, { partnerIds: [PARTNER_A], childIds: [PARTNER_A] })).rejects.toThrow(
+        'A person cannot be both a partner and a child of the same union',
+      );
+
+      expect(mocks.family.createUnion).not.toHaveBeenCalled();
+    });
+
+    // E11
+    it('refuses a third partner', async () => {
+      giveContributeAccess(sut, mocks);
+
+      await expect(sut.createUnion(authStub.user1, { partnerIds: [PARTNER_A, PARTNER_B, PARTNER_C] })).rejects.toThrow(
+        'A union may have at most two partners',
+      );
+
+      expect(mocks.family.createUnion).not.toHaveBeenCalled();
+    });
+
+    // E11 via addParticipant — a union that already has two partners refuses a third.
+    it('refuses a third partner added to an already-full union', async () => {
+      giveContributeAccess(sut, mocks);
+      mocks.family.getUnion.mockResolvedValue({ id: UNION_ID } as any);
+      mocks.family.getPartnerIds.mockResolvedValue([PARTNER_A, PARTNER_B]);
+
+      await expect(
+        sut.addParticipant(authStub.user1, UNION_ID, { identityId: PARTNER_C, role: 'partner' }),
+      ).rejects.toThrow('A union may have at most two partners');
+
+      expect(mocks.family.addPartner).not.toHaveBeenCalled();
+    });
+
+    // E12
+    it('refuses a pet identity as a participant', async () => {
+      giveContributeAccess(sut, mocks);
+
+      await expect(sut.createUnion(authStub.user1, { partnerIds: [PET_A] })).rejects.toThrow(
+        'Pets cannot participate in family relationships',
+      );
+
+      expect(mocks.family.createUnion).not.toHaveBeenCalled();
+    });
+
+    // E15
+    it('refuses an end date earlier than the start date', async () => {
+      giveContributeAccess(sut, mocks);
+
+      await expect(sut.createUnion(authStub.user1, { startDate: '2020-06-01', endDate: '2019-01-01' })).rejects.toThrow(
+        'endDate cannot be earlier than startDate',
+      );
+
+      expect(mocks.family.createUnion).not.toHaveBeenCalled();
+    });
+
+    // E16
+    it('accepts a divorced union with no end date', async () => {
+      giveContributeAccess(sut, mocks);
+      mocks.family.createUnion.mockResolvedValue({ id: UNION_ID } as any);
+
+      await expect(
+        sut.createUnion(authStub.user1, {
+          partnerIds: [PARTNER_A, PARTNER_B],
+          status: 'divorced',
+          startDate: '2020-01-01',
+          endDate: null,
+        }),
+      ).resolves.toEqual({ id: UNION_ID });
+
+      expect(mocks.family.createUnion).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'divorced', startDate: '2020-01-01', endDate: null }),
+      );
+    });
+
+    // E24
+    it('lets a contributor edit a union another user created', async () => {
+      giveContributeAccess(sut, mocks);
+      mocks.family.getUnion.mockResolvedValue({
+        id: UNION_ID,
+        createdById: authStub.user2.user.id,
+        startDate: null,
+        endDate: null,
+      } as any);
+
+      await expect(sut.updateUnion(authStub.user1, UNION_ID, { status: 'divorced' })).resolves.toBeUndefined();
+
+      expect(mocks.family.updateUnion).toHaveBeenCalledWith(UNION_ID, { status: 'divorced' });
+    });
+
+    // E25
+    it('lets a contributor delete a union another user created', async () => {
+      giveContributeAccess(sut, mocks);
+      mocks.family.getUnion.mockResolvedValue({
+        id: UNION_ID,
+        createdById: authStub.user2.user.id,
+        startDate: null,
+        endDate: null,
+      } as any);
+
+      await expect(sut.deleteUnion(authStub.user1, UNION_ID)).resolves.toBeUndefined();
+
+      expect(mocks.family.deleteUnion).toHaveBeenCalledWith(UNION_ID);
+    });
+
+    // E21 write half — every write method must refuse a view-only caller before touching
+    // the repository's write methods.
+    it('refuses every write from a view-only caller', async () => {
+      giveViewOnlyAccess(sut, mocks);
+
+      await expect(sut.createUnion(authStub.user1, { partnerIds: [PARTNER_A] })).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+      await expect(sut.updateUnion(authStub.user1, UNION_ID, { status: 'divorced' })).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+      await expect(sut.deleteUnion(authStub.user1, UNION_ID)).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(
+        sut.addParticipant(authStub.user1, UNION_ID, { identityId: PARTNER_A, role: 'partner' }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(sut.removeParticipant(authStub.user1, UNION_ID, PARTNER_A)).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+
+      expect(mocks.family.createUnion).not.toHaveBeenCalled();
+      expect(mocks.family.updateUnion).not.toHaveBeenCalled();
+      expect(mocks.family.deleteUnion).not.toHaveBeenCalled();
+      expect(mocks.family.addPartner).not.toHaveBeenCalled();
+      expect(mocks.family.removeParticipant).not.toHaveBeenCalled();
+      expect(mocks.family.getUnion).not.toHaveBeenCalled();
+    });
+
+    it('refuses to update or delete a union that does not exist', async () => {
+      giveContributeAccess(sut, mocks);
+      mocks.family.getUnion.mockResolvedValue(undefined);
+
+      await expect(sut.updateUnion(authStub.user1, UNION_ID, { status: 'divorced' })).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      await expect(sut.deleteUnion(authStub.user1, UNION_ID)).rejects.toBeInstanceOf(NotFoundException);
+
+      expect(mocks.family.updateUnion).not.toHaveBeenCalled();
+      expect(mocks.family.deleteUnion).not.toHaveBeenCalled();
     });
   });
 });
