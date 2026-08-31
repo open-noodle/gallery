@@ -4,12 +4,14 @@
     createUnion,
     FamilyParticipantRole,
     Kind,
+    updateUnion,
     type FamilyIdentityDto,
     type FamilyParticipantDto,
     type FamilyUnionCreateDto,
     type FamilyUnionDto,
     type FamilyUnionStatus,
   } from '@immich/sdk';
+  import FamilyUnionEditor, { type FamilyUnionEditorSave } from '$lib/components/family/FamilyUnionEditor.svelte';
   import { planFamilyDrop, type FamilyDropPosition } from '$lib/utils/family-editing';
   import { buildFamilyLayout, type FamilyLayoutUnion } from '$lib/utils/family-layout';
   import { t, type Translations } from 'svelte-i18n';
@@ -21,8 +23,8 @@
      * otherwise the cluster's `rootCandidateId` (D6: layout is computed per viewer, never
      * stored, so there is always some anchor to lay the graph out around). */
     rootId: string;
-    /** A6: gates the dashed "+ Add a parent" affordance and the drag/drop zones. A view-only
-     * viewer sees none of it at all — not a disabled version of it. */
+    /** A6: gates the dashed "+ Add a parent" affordance, the drag/drop zones and the union editor.
+     * A view-only viewer sees none of it at all — not a disabled version of it. */
     canContribute: boolean;
   }
 
@@ -160,6 +162,32 @@
       // slice.
     }
   }
+
+  // ── Union editor (Task 2: A7) ──────────────────────────────────────────────────────────────
+
+  let editingUnionId = $state<string | null>(null);
+
+  const toggleEditor = (unionId: string) => {
+    editingUnionId = editingUnionId === unionId ? null : unionId;
+  };
+
+  async function handleUnionSave(unionId: string, payload: FamilyUnionEditorSave) {
+    try {
+      await updateUnion({
+        id: unionId,
+        familyUnionUpdateDto: { status: payload.status, startDate: payload.startDate, endDate: payload.endDate },
+      });
+      workingUnions = workingUnions.map((union) =>
+        union.id === unionId
+          ? { ...union, status: payload.status, startDate: payload.startDate, endDate: payload.endDate }
+          : union,
+      );
+      editingUnionId = null;
+    } catch {
+      // Left open on failure so the viewer's edits aren't silently discarded; a future slice can
+      // surface the server's validation message (e.g. the same end/start ordering check) here.
+    }
+  }
 </script>
 
 <div data-testid="family-canvas" class="flex flex-col gap-6 overflow-auto p-4">
@@ -273,25 +301,62 @@
           {#each unionsForGeneration(row.generation) as familyUnion (familyUnion.unionId)}
             {@const startYear = toYear(familyUnion.startDate)}
             {@const endYear = toYear(familyUnion.endDate)}
-            <span
-              data-testid="family-union-bar"
-              data-status={familyUnion.status}
-              data-ended={isEnded(familyUnion.status)}
-              class="rounded-full border px-3 py-0.5 text-xs font-medium"
-              class:border-gray-300={!isEnded(familyUnion.status)}
-              class:text-gray-500={!isEnded(familyUnion.status)}
-              class:border-warning={isEnded(familyUnion.status)}
-              class:text-warning={isEnded(familyUnion.status)}
-              class:border-dashed={isEnded(familyUnion.status)}
-            >
-              {#if startYear && endYear}
-                {startYear} – {endYear} · {$t(statusKey(familyUnion.status))}
-              {:else if startYear}
-                {$t(statusKey(familyUnion.status))} {startYear}
+            <div class="flex flex-col gap-2">
+              {#if canContribute}
+                <button
+                  type="button"
+                  data-testid="family-union-bar"
+                  data-status={familyUnion.status}
+                  data-ended={isEnded(familyUnion.status)}
+                  aria-label={$t('family_edit_union_edit_button_label')}
+                  class="rounded-full border px-3 py-0.5 text-xs font-medium"
+                  class:border-gray-300={!isEnded(familyUnion.status)}
+                  class:text-gray-500={!isEnded(familyUnion.status)}
+                  class:border-warning={isEnded(familyUnion.status)}
+                  class:text-warning={isEnded(familyUnion.status)}
+                  class:border-dashed={isEnded(familyUnion.status)}
+                  onclick={() => toggleEditor(familyUnion.unionId)}
+                >
+                  {#if startYear && endYear}
+                    {startYear} – {endYear} · {$t(statusKey(familyUnion.status))}
+                  {:else if startYear}
+                    {$t(statusKey(familyUnion.status))} {startYear}
+                  {:else}
+                    {$t(statusKey(familyUnion.status))}
+                  {/if}
+                </button>
               {:else}
-                {$t(statusKey(familyUnion.status))}
+                <span
+                  data-testid="family-union-bar"
+                  data-status={familyUnion.status}
+                  data-ended={isEnded(familyUnion.status)}
+                  class="rounded-full border px-3 py-0.5 text-xs font-medium"
+                  class:border-gray-300={!isEnded(familyUnion.status)}
+                  class:text-gray-500={!isEnded(familyUnion.status)}
+                  class:border-warning={isEnded(familyUnion.status)}
+                  class:text-warning={isEnded(familyUnion.status)}
+                  class:border-dashed={isEnded(familyUnion.status)}
+                >
+                  {#if startYear && endYear}
+                    {startYear} – {endYear} · {$t(statusKey(familyUnion.status))}
+                  {:else if startYear}
+                    {$t(statusKey(familyUnion.status))} {startYear}
+                  {:else}
+                    {$t(statusKey(familyUnion.status))}
+                  {/if}
+                </span>
               {/if}
-            </span>
+
+              {#if canContribute && editingUnionId === familyUnion.unionId}
+                <FamilyUnionEditor
+                  status={familyUnion.status as FamilyUnionStatus}
+                  startDate={familyUnion.startDate}
+                  endDate={familyUnion.endDate}
+                  onSave={(payload) => handleUnionSave(familyUnion.unionId, payload)}
+                  onCancel={() => (editingUnionId = null)}
+                />
+              {/if}
+            </div>
           {/each}
         </div>
       {/if}
