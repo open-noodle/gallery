@@ -411,3 +411,74 @@ describe('FamilyCanvas drag-and-drop editing', () => {
     expect(screen.getAllByTestId('family-drop-zone').length).toBeGreaterThan(0);
   });
 });
+
+// Slice 11, Task 2: the union editor opens from the connector pill — the only place status and
+// dates can be set (A7) — and only for a contributor (A6).
+describe('FamilyCanvas union editor', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('does not open the editor for a view-only viewer', async () => {
+    const unions: FamilyUnionDto[] = [
+      union({ id: 'u1', status: FamilyUnionStatus.Married, partners: [known('root'), known('spouse')] }),
+    ];
+    const identities = { root: identity('Root'), spouse: identity('Spouse') };
+
+    renderCanvas({ unions, identities, rootId: 'root', canContribute: false });
+    // A view-only bar is a plain `<span>`, not a button — clicking it must do nothing.
+    await fireEvent.click(screen.getByTestId('family-union-bar'));
+
+    expect(screen.queryByTestId('family-union-editor')).not.toBeInTheDocument();
+  });
+
+  // Paired control for A6: the identical fixture, but a contributor can open the editor.
+  it('opens the editor for a contributor', async () => {
+    const unions: FamilyUnionDto[] = [
+      union({ id: 'u1', status: FamilyUnionStatus.Married, partners: [known('root'), known('spouse')] }),
+    ];
+    const identities = { root: identity('Root'), spouse: identity('Spouse') };
+
+    renderCanvas({ unions, identities, rootId: 'root', canContribute: true });
+    await fireEvent.click(screen.getByTestId('family-union-bar'));
+
+    expect(screen.getByTestId('family-union-editor')).toBeInTheDocument();
+  });
+
+  it('draws an ended union differently from a current one', async () => {
+    // Exercises the FULL edit → save → re-render path (slice 10 already covers the static-props
+    // case of this in its own like-named test) — changing status to divorced through the editor
+    // must flip the SAME bar's ended styling, not just a freshly-mounted one.
+    const unions: FamilyUnionDto[] = [
+      union({
+        id: 'u1',
+        status: FamilyUnionStatus.Married,
+        startDate: '1985-01-01',
+        partners: [known('root'), known('spouse')],
+      }),
+    ];
+    const identities = { root: identity('Root'), spouse: identity('Spouse') };
+    sdkMock.updateUnion.mockResolvedValue(undefined as never);
+
+    renderCanvas({ unions, identities, rootId: 'root', canContribute: true });
+
+    const barBefore = screen.getByTestId('family-union-bar');
+    expect(barBefore).toHaveAttribute('data-ended', 'false');
+    const currentClassName = barBefore.className;
+
+    await fireEvent.click(barBefore);
+    const divorcedOption = screen
+      .getAllByTestId('family-union-status-option')
+      .find((element) => element.dataset.value === FamilyUnionStatus.Divorced)!;
+    await fireEvent.click(divorcedOption);
+    await fireEvent.click(screen.getByTestId('family-union-editor-save'));
+
+    const barAfter = await screen.findByTestId('family-union-bar');
+    expect(barAfter).toHaveAttribute('data-ended', 'true');
+    expect(barAfter.className).not.toBe(currentClassName);
+    expect(sdkMock.updateUnion).toHaveBeenCalledWith({
+      id: 'u1',
+      familyUnionUpdateDto: { status: FamilyUnionStatus.Divorced, startDate: '1985-01-01', endDate: null },
+    });
+  });
+});
