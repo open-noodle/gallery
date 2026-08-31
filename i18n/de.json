@@ -1741,6 +1741,7 @@
   "failed_to_load_assets": "Laden der Assets fehlgeschlagen",
   "failed_to_load_folder": "Fehler beim Laden des Ordners",
   "failed_to_load_spaces": "Spaces konnten nicht geladen werden",
+  "family_mobile_relation_none": "—",
   "favorite": "Favorit",
   "favorite_action_prompt": "{count} zu den Favoriten hinzugefügt",
   "favorite_or_unfavorite_photo": "Favorisiertes oder nicht favorisiertes Foto",

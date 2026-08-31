@@ -1741,6 +1741,7 @@
   "failed_to_load_assets": "Error al cargar los recursos",
   "failed_to_load_folder": "No se pudo cargar la carpeta",
   "failed_to_load_spaces": "Error al cargar los Spaces",
+  "family_mobile_relation_none": "—",
   "favorite": "Favorito",
   "favorite_action_prompt": "{count} añadido(s) a Favoritos",
   "favorite_or_unfavorite_photo": "Foto favorita o no favorita",

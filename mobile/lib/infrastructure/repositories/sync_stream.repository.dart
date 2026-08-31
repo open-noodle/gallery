@@ -1567,6 +1567,7 @@ extension on api.UserMetadataKey {
     api.UserMetadataKey.onboarding => UserMetadataKey.onboarding,
     api.UserMetadataKey.preferences => UserMetadataKey.preferences,
     api.UserMetadataKey.license => UserMetadataKey.license,
+    api.UserMetadataKey.familyRoot => UserMetadataKey.familyRoot,
   };
 }
 

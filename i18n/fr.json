@@ -1741,6 +1741,7 @@
   "failed_to_load_assets": "Échec du chargement des ressources",
   "failed_to_load_folder": "Échec de chargement du dossier",
   "failed_to_load_spaces": "Échec du chargement des espaces",
+  "family_mobile_relation_none": "—",
   "favorite": "Favori",
   "favorite_action_prompt": "{count} ajouté(s) aux Favoris",
   "favorite_or_unfavorite_photo": "Ajouter ou supprimer des favoris",

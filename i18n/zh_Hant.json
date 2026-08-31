@@ -1741,6 +1741,7 @@
   "failed_to_load_assets": "項目載入失敗",
   "failed_to_load_folder": "無法載入資料夾",
   "failed_to_load_spaces": "載入 Spaces 失敗",
+  "family_mobile_relation_none": "—",
   "favorite": "收藏",
   "favorite_action_prompt": "已將 {count} 個項目加入收藏",
   "favorite_or_unfavorite_photo": "收藏或取消收藏相片",

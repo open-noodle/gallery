@@ -1741,6 +1741,7 @@
   "failed_to_load_assets": "Не удалось загрузить объекты",
   "failed_to_load_folder": "Ошибка при загрузке папки",
   "failed_to_load_spaces": "Не удалось загрузить Spaces",
+  "family_mobile_relation_none": "—",
   "favorite": "Избранное",
   "favorite_action_prompt": "Объекты добавлены в Избранное ({count} шт.)",
   "favorite_or_unfavorite_photo": "Добавить или удалить фотографию из избранного",

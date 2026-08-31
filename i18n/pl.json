@@ -1741,6 +1741,7 @@
   "failed_to_load_assets": "Nie udało się załadować zasobów",
   "failed_to_load_folder": "Nie udało się załadować folderu",
   "failed_to_load_spaces": "Nie udało się wczytać Spaces",
+  "family_mobile_relation_none": "—",
   "favorite": "Ulubione",
   "favorite_action_prompt": "{count} dodane do ulubionych",
   "favorite_or_unfavorite_photo": "Dodaj lub usuń z ulubionych",
