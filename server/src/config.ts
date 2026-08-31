@@ -250,6 +250,13 @@ export type SystemConfig = {
   storageUsage: {
     includeDerivatives: boolean;
   };
+  // Gallery-fork: family relationships. `enabled` gates the whole feature; `defaultAccess`
+  // applies to users with no explicit family_access row. Off by default so an upgrade
+  // behaves exactly as it did before.
+  familyTree: {
+    enabled: boolean;
+    defaultAccess: 'none' | 'view' | 'contribute';
+  };
   user: {
     deleteDelay: number;
   };
@@ -518,6 +525,10 @@ export const defaults = Object.freeze<SystemConfig>({
   // and counts original files only.
   storageUsage: {
     includeDerivatives: false,
+  },
+  familyTree: {
+    enabled: false,
+    defaultAccess: 'none',
   },
   user: {
     deleteDelay: 7,
