@@ -36031,6 +36031,9 @@
           "SharedSpaceAlbumLinkV1",
           "SharedSpaceAlbumLinkDeleteV1",
           "SharedSpaceAlbumLinkBackfillV1",
+          "SharedSpaceAlbumHiddenV1",
+          "SharedSpaceAlbumHiddenDeleteV1",
+          "SharedSpaceAlbumHiddenBackfillV1",
           "SharedSpaceAlbumToAssetV1",
           "SharedSpaceAlbumToAssetDeleteV1",
           "SharedSpaceAlbumToAssetBackfillV1",
@@ -36437,12 +36440,57 @@
           "SharedSpaceAlbumLinksV1",
           "SharedSpaceAlbumToAssetsV1",
           "SharedSpaceAlbumAssetsV1",
-          "SharedSpaceAlbumAssetExifsV1"
+          "SharedSpaceAlbumAssetExifsV1",
+          "SharedSpaceAlbumHiddensV1"
         ],
         "type": "string"
       },
       "SyncResetV1": {
         "properties": {},
+        "type": "object"
+      },
+      "SyncSharedSpaceAlbumHiddenDeleteV1": {
+        "properties": {
+          "albumId": {
+            "description": "Album ID",
+            "type": "string"
+          },
+          "spaceId": {
+            "description": "Shared space ID",
+            "type": "string"
+          },
+          "userId": {
+            "description": "User ID",
+            "type": "string"
+          }
+        },
+        "required": [
+          "albumId",
+          "spaceId",
+          "userId"
+        ],
+        "type": "object"
+      },
+      "SyncSharedSpaceAlbumHiddenV1": {
+        "properties": {
+          "albumId": {
+            "description": "Album ID",
+            "type": "string"
+          },
+          "spaceId": {
+            "description": "Shared space ID",
+            "type": "string"
+          },
+          "userId": {
+            "description": "User ID",
+            "type": "string"
+          }
+        },
+        "required": [
+          "albumId",
+          "spaceId",
+          "userId"
+        ],
         "type": "object"
       },
       "SyncSharedSpaceAlbumLinkDeleteV1": {

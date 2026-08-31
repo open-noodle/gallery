@@ -53,6 +53,7 @@ enum SyncRequestType {
   sharedSpaceAlbumToAssetsV1._(r'SharedSpaceAlbumToAssetsV1'),
   sharedSpaceAlbumAssetsV1._(r'SharedSpaceAlbumAssetsV1'),
   sharedSpaceAlbumAssetExifsV1._(r'SharedSpaceAlbumAssetExifsV1'),
+  sharedSpaceAlbumHiddensV1._(r'SharedSpaceAlbumHiddensV1'),
   ;
 
   /// Instantiate a new enum with the provided value.
@@ -153,6 +154,7 @@ class SyncRequestTypeTypeTransformer {
         case r'SharedSpaceAlbumToAssetsV1': return SyncRequestType.sharedSpaceAlbumToAssetsV1;
         case r'SharedSpaceAlbumAssetsV1': return SyncRequestType.sharedSpaceAlbumAssetsV1;
         case r'SharedSpaceAlbumAssetExifsV1': return SyncRequestType.sharedSpaceAlbumAssetExifsV1;
+        case r'SharedSpaceAlbumHiddensV1': return SyncRequestType.sharedSpaceAlbumHiddensV1;
         default:
           if (!allowNull) {
             throw ArgumentError('Unknown enum value to decode: $data');

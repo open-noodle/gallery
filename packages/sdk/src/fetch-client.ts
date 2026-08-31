@@ -4365,6 +4365,22 @@ export type SyncPersonV1 = {
     updatedAt: string;
 };
 export type SyncResetV1 = {};
+export type SyncSharedSpaceAlbumHiddenDeleteV1 = {
+    /** Album ID */
+    albumId: string;
+    /** Shared space ID */
+    spaceId: string;
+    /** User ID */
+    userId: string;
+};
+export type SyncSharedSpaceAlbumHiddenV1 = {
+    /** Album ID */
+    albumId: string;
+    /** Shared space ID */
+    spaceId: string;
+    /** User ID */
+    userId: string;
+};
 export type SyncSharedSpaceAlbumLinkDeleteV1 = {
     /** Album ID */
     albumId: string;
@@ -10578,6 +10594,9 @@ export enum SyncEntityType {
     SharedSpaceAlbumLinkV1 = "SharedSpaceAlbumLinkV1",
     SharedSpaceAlbumLinkDeleteV1 = "SharedSpaceAlbumLinkDeleteV1",
     SharedSpaceAlbumLinkBackfillV1 = "SharedSpaceAlbumLinkBackfillV1",
+    SharedSpaceAlbumHiddenV1 = "SharedSpaceAlbumHiddenV1",
+    SharedSpaceAlbumHiddenDeleteV1 = "SharedSpaceAlbumHiddenDeleteV1",
+    SharedSpaceAlbumHiddenBackfillV1 = "SharedSpaceAlbumHiddenBackfillV1",
     SharedSpaceAlbumToAssetV1 = "SharedSpaceAlbumToAssetV1",
     SharedSpaceAlbumToAssetDeleteV1 = "SharedSpaceAlbumToAssetDeleteV1",
     SharedSpaceAlbumToAssetBackfillV1 = "SharedSpaceAlbumToAssetBackfillV1",
@@ -10632,7 +10651,8 @@ export enum SyncRequestType {
     SharedSpaceAlbumLinksV1 = "SharedSpaceAlbumLinksV1",
     SharedSpaceAlbumToAssetsV1 = "SharedSpaceAlbumToAssetsV1",
     SharedSpaceAlbumAssetsV1 = "SharedSpaceAlbumAssetsV1",
-    SharedSpaceAlbumAssetExifsV1 = "SharedSpaceAlbumAssetExifsV1"
+    SharedSpaceAlbumAssetExifsV1 = "SharedSpaceAlbumAssetExifsV1",
+    SharedSpaceAlbumHiddensV1 = "SharedSpaceAlbumHiddensV1"
 }
 export enum Action {
     Tag = "tag",
