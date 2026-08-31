@@ -57,6 +57,10 @@ import { FaceRepairDeclineTable } from 'src/schema/tables/face-repair-decline.ta
 import { FaceRepairScanFlaggedFaceTable } from 'src/schema/tables/face-repair-scan-flagged-face.table';
 import { FaceRepairScanTable } from 'src/schema/tables/face-repair-scan.table';
 import { FaceSearchTable } from 'src/schema/tables/face-search.table';
+import { FamilyAccessTable } from 'src/schema/tables/family-access.table';
+import { FamilyUnionChildTable } from 'src/schema/tables/family-union-child.table';
+import { FamilyUnionPartnerTable } from 'src/schema/tables/family-union-partner.table';
+import { FamilyUnionTable } from 'src/schema/tables/family-union.table';
 import { GeodataPlacesTable } from 'src/schema/tables/geodata-places.table';
 import { IntegrityReportTable } from 'src/schema/tables/integrity-report.table';
 import { LibraryAssetAuditTable } from 'src/schema/tables/library-asset-audit.table';
@@ -157,6 +161,10 @@ export class ImmichDatabase {
     FaceRepairScanFlaggedFaceTable,
     FaceRepairScanTable,
     FaceSearchTable,
+    FamilyUnionTable,
+    FamilyUnionPartnerTable,
+    FamilyUnionChildTable,
+    FamilyAccessTable,
     GeodataPlacesTable,
     IntegrityReportTable,
     LibraryTable,
@@ -294,6 +302,11 @@ export interface DB {
   face_repair_decline: FaceRepairDeclineTable;
   face_repair_scan_flagged_face: FaceRepairScanFlaggedFaceTable;
   face_repair_scan: FaceRepairScanTable;
+
+  family_union: FamilyUnionTable;
+  family_union_partner: FamilyUnionPartnerTable;
+  family_union_child: FamilyUnionChildTable;
+  family_access: FamilyAccessTable;
 
   geodata_places: GeodataPlacesTable;
 
