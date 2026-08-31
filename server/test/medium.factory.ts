@@ -358,7 +358,7 @@ export class MediumTestContext<S extends BaseService = BaseService> {
     return { space: result, result };
   }
 
-  async newSharedSpaceMember(dto: { spaceId: string; userId: string; role?: string }) {
+  async newSharedSpaceMember(dto: { spaceId: string; userId: string; role?: string; showInTimeline?: boolean }) {
     const member = mediumFactory.sharedSpaceMemberInsert(dto);
     const result = await this.database
       .insertInto('shared_space_member')
@@ -987,12 +987,12 @@ const sharedSpaceInsert = (
   };
 };
 
-const sharedSpaceMemberInsert = (dto: { spaceId: string; userId: string; role?: string }) => {
+const sharedSpaceMemberInsert = (dto: { spaceId: string; userId: string; role?: string; showInTimeline?: boolean }) => {
   return {
     spaceId: dto.spaceId,
     userId: dto.userId,
     role: dto.role ?? 'viewer',
-    showInTimeline: true,
+    showInTimeline: dto.showInTimeline ?? true,
   };
 };
 
