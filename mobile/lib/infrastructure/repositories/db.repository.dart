@@ -30,6 +30,7 @@ import 'package:immich_mobile/infrastructure/entities/settings.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space_album.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space_album_asset.entity.dart';
+import 'package:immich_mobile/infrastructure/entities/shared_space_album_hidden.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space_album_link.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space_asset.entity.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space_library.entity.dart';
@@ -73,6 +74,7 @@ import 'package:sqlite_async/sqlite_async.dart';
     SharedSpaceAlbumEntity,
     SharedSpaceAlbumLinkEntity,
     SharedSpaceAlbumAssetEntity,
+    SharedSpaceAlbumHiddenEntity,
     MemoryEntity,
     MemoryAssetEntity,
     StackEntity,
@@ -136,7 +138,7 @@ class Drift extends $Drift {
   }
 
   @override
-  int get schemaVersion => 36;
+  int get schemaVersion => 37;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -376,6 +378,11 @@ class Drift extends $Drift {
                 await m.createIndex(v36.idxSharedSpaceAlbumLinkAlbumSpace);
                 await m.createIndex(v36.idxSharedSpaceAlbumAssetAlbum);
                 await m.createIndex(v36.idxSharedSpaceAlbumAssetAssetAlbum);
+              },
+              // gallery-fork (#1041): per-member "hidden from my timeline" album rows.
+              from36To37: (m, v37) async {
+                await m.createTable(v37.sharedSpaceAlbumHiddenEntity);
+                await m.createIndex(v37.idxSharedSpaceAlbumHiddenAlbumSpace);
               },
             ),
           ),

@@ -21339,6 +21339,814 @@ i1.GeneratedColumn<int> _column_252(String aliasedName) =>
       $customConstraints: 'NOT NULL DEFAULT 0',
       defaultValue: const i1.CustomExpression('0'),
     );
+
+final class Schema37 extends i0.VersionedSchema {
+  Schema37({required super.database}) : super(version: 37);
+  @override
+  late final List<i1.DatabaseSchemaEntity> entities = [
+    userEntity,
+    remoteAssetEntity,
+    stackEntity,
+    localAssetEntity,
+    sharedSpaceEntity,
+    sharedSpaceAssetEntity,
+    sharedSpaceMemberEntity,
+    sharedSpaceLibraryEntity,
+    sharedSpaceAlbumAssetEntity,
+    sharedSpaceAlbumLinkEntity,
+    remoteAlbumEntity,
+    localAlbumEntity,
+    localAlbumAssetEntity,
+    idxSharedSpaceAlbumLinkSpace,
+    idxSharedSpaceAlbumLinkAlbumSpace,
+    idxSharedSpaceCreatedById,
+    idxSharedSpaceAlbumAssetAlbum,
+    idxSharedSpaceAlbumAssetAssetAlbum,
+    idxSharedSpaceLibrarySpaceId,
+    idxSharedSpaceLibraryLibrarySpace,
+    idxSharedSpaceAssetSpaceAsset,
+    idxSharedSpaceAssetAssetSpace,
+    idxLocalAlbumAssetAlbumAsset,
+    idxLocalAssetChecksum,
+    idxLocalAssetCloudId,
+    idxLocalAssetCreatedAt,
+    idxStackPrimaryAssetId,
+    uQRemoteAssetsOwnerChecksum,
+    uQRemoteAssetsOwnerLibraryChecksum,
+    idxRemoteAssetChecksum,
+    idxRemoteAssetStackId,
+    idxRemoteAssetOwnerVisibilityDeletedCreated,
+    idxRemoteAssetLibraryCreated,
+    idxRemoteAssetUploaded,
+    authUserEntity,
+    userMetadataEntity,
+    partnerEntity,
+    remoteExifEntity,
+    remoteAlbumAssetEntity,
+    remoteAlbumUserEntity,
+    remoteAssetCloudIdEntity,
+    libraryEntity,
+    sharedSpaceAlbumEntity,
+    sharedSpaceAlbumHiddenEntity,
+    memoryEntity,
+    memoryAssetEntity,
+    personEntity,
+    assetFaceEntity,
+    storeEntity,
+    trashedLocalAssetEntity,
+    assetEditEntity,
+    settings,
+    assetOcrEntity,
+    idxPartnerSharedWithId,
+    idxLatLng,
+    idxRemoteExifCity,
+    idxRemoteAlbumAssetAlbumAsset,
+    idxRemoteAssetCloudId,
+    idxSharedSpaceAlbumHiddenAlbumSpace,
+    idxPersonOwnerId,
+    idxAssetFacePersonId,
+    idxAssetFaceAssetId,
+    idxAssetFaceVisiblePerson,
+    idxTrashedLocalAssetChecksum,
+    idxTrashedLocalAssetAlbum,
+    idxAssetEditAssetId,
+    idxAssetOcrAssetId,
+  ];
+  late final Shape38 userEntity = Shape38(
+    source: i0.VersionedTable(
+      entityName: 'user_entity',
+      withoutRowId: true,
+      isStrict: true,
+      tableConstraints: ['PRIMARY KEY(id)'],
+      columns: [
+        _column_120,
+        _column_121,
+        _column_122,
+        _column_123,
+        _column_124,
+        _column_125,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape62 remoteAssetEntity = Shape62(
+    source: i0.VersionedTable(
+      entityName: 'remote_asset_entity',
+      withoutRowId: true,
+      isStrict: true,
+      tableConstraints: ['PRIMARY KEY(id)'],
+      columns: [
+        _column_121,
+        _column_126,
+        _column_127,
+        _column_128,
+        _column_129,
+        _column_130,
+        _column_236,
+        _column_120,
+        _column_132,
+        _column_133,
+        _column_134,
+        _column_135,
+        _column_136,
+        _column_137,
+        _column_239,
+        _column_138,
+        _column_139,
+        _column_140,
+        _column_141,
+        _column_142,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape40 stackEntity = Shape40(
+    source: i0.VersionedTable(
+      entityName: 'stack_entity',
+      withoutRowId: true,
+      isStrict: true,
+      tableConstraints: ['PRIMARY KEY(id)'],
+      columns: [
+        _column_120,
+        _column_127,
+        _column_128,
+        _column_134,
+        _column_143,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape58 localAssetEntity = Shape58(
+    source: i0.VersionedTable(
+      entityName: 'local_asset_entity',
+      withoutRowId: true,
+      isStrict: true,
+      tableConstraints: ['PRIMARY KEY(id)'],
+      columns: [
+        _column_121,
+        _column_126,
+        _column_127,
+        _column_128,
+        _column_129,
+        _column_130,
+        _column_236,
+        _column_120,
+        _column_144,
+        _column_133,
+        _column_145,
+        _column_146,
+        _column_147,
+        _column_148,
+        _column_149,
+        _column_150,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape42 sharedSpaceEntity = Shape42(
+    source: i0.VersionedTable(
+      entityName: 'shared_space_entity',
+      withoutRowId: true,
+      isStrict: true,
+      tableConstraints: ['PRIMARY KEY(id)'],
+      columns: [
+        _column_120,
+        _column_121,
+        _column_151,
+        _column_152,
+        _column_153,
+        _column_154,
+        _column_155,
+        _column_156,
+        _column_157,
+        _column_158,
+        _column_127,
+        _column_128,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape35 sharedSpaceAssetEntity = Shape35(
+    source: i0.VersionedTable(
+      entityName: 'shared_space_asset_entity',
+      withoutRowId: true,
+      isStrict: true,
+      tableConstraints: ['PRIMARY KEY(space_id, asset_id)'],
+      columns: [_column_159, _column_160],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape43 sharedSpaceMemberEntity = Shape43(
+    source: i0.VersionedTable(
+      entityName: 'shared_space_member_entity',
+      withoutRowId: true,
+      isStrict: true,
+      tableConstraints: ['PRIMARY KEY(space_id, user_id)'],
+      columns: [
+        _column_159,
+        _column_161,
+        _column_162,
+        _column_163,
+        _column_164,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape44 sharedSpaceLibraryEntity = Shape44(
+    source: i0.VersionedTable(
+      entityName: 'shared_space_library_entity',
+      withoutRowId: true,
+      isStrict: true,
+      tableConstraints: ['PRIMARY KEY(space_id, library_id)'],
+      columns: [_column_159, _column_165, _column_166, _column_127],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape7 sharedSpaceAlbumAssetEntity = Shape7(
+    source: i0.VersionedTable(
+      entityName: 'shared_space_album_asset_entity',
+      withoutRowId: true,
+      isStrict: true,
+      tableConstraints: ['PRIMARY KEY(album_id, asset_id)'],
+      columns: [_column_231, _column_160],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape64 sharedSpaceAlbumLinkEntity = Shape64(
+    source: i0.VersionedTable(
+      entityName: 'shared_space_album_link_entity',
+      withoutRowId: true,
+      isStrict: true,
+      tableConstraints: ['PRIMARY KEY(space_id, album_id)'],
+      columns: [
+        _column_159,
+        _column_231,
+        _column_164,
+        _column_166,
+        _column_127,
+        _column_128,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape60 remoteAlbumEntity = Shape60(
+    source: i0.VersionedTable(
+      entityName: 'remote_album_entity',
+      withoutRowId: true,
+      isStrict: true,
+      tableConstraints: ['PRIMARY KEY(id)'],
+      columns: [
+        _column_120,
+        _column_121,
+        _column_167,
+        _column_127,
+        _column_128,
+        _column_168,
+        _column_169,
+        _column_170,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape46 localAlbumEntity = Shape46(
+    source: i0.VersionedTable(
+      entityName: 'local_album_entity',
+      withoutRowId: true,
+      isStrict: true,
+      tableConstraints: ['PRIMARY KEY(id)'],
+      columns: [
+        _column_120,
+        _column_121,
+        _column_128,
+        _column_171,
+        _column_172,
+        _column_173,
+        _column_174,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape47 localAlbumAssetEntity = Shape47(
+    source: i0.VersionedTable(
+      entityName: 'local_album_asset_entity',
+      withoutRowId: true,
+      isStrict: true,
+      tableConstraints: ['PRIMARY KEY(asset_id, album_id)'],
+      columns: [_column_175, _column_176, _column_174],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  final i1.Index idxSharedSpaceAlbumLinkSpace = i1.Index(
+    'idx_shared_space_album_link_space',
+    'CREATE INDEX IF NOT EXISTS idx_shared_space_album_link_space ON shared_space_album_link_entity (space_id)',
+  );
+  final i1.Index idxSharedSpaceAlbumLinkAlbumSpace = i1.Index(
+    'idx_shared_space_album_link_album_space',
+    'CREATE INDEX IF NOT EXISTS idx_shared_space_album_link_album_space ON shared_space_album_link_entity (album_id, space_id)',
+  );
+  final i1.Index idxSharedSpaceCreatedById = i1.Index(
+    'idx_shared_space_created_by_id',
+    'CREATE INDEX IF NOT EXISTS idx_shared_space_created_by_id ON shared_space_entity (created_by_id)',
+  );
+  final i1.Index idxSharedSpaceAlbumAssetAlbum = i1.Index(
+    'idx_shared_space_album_asset_album',
+    'CREATE INDEX IF NOT EXISTS idx_shared_space_album_asset_album ON shared_space_album_asset_entity (album_id)',
+  );
+  final i1.Index idxSharedSpaceAlbumAssetAssetAlbum = i1.Index(
+    'idx_shared_space_album_asset_asset_album',
+    'CREATE INDEX IF NOT EXISTS idx_shared_space_album_asset_asset_album ON shared_space_album_asset_entity (asset_id, album_id)',
+  );
+  final i1.Index idxSharedSpaceLibrarySpaceId = i1.Index(
+    'idx_shared_space_library_space_id',
+    'CREATE INDEX IF NOT EXISTS idx_shared_space_library_space_id ON shared_space_library_entity (space_id)',
+  );
+  final i1.Index idxSharedSpaceLibraryLibrarySpace = i1.Index(
+    'idx_shared_space_library_library_space',
+    'CREATE INDEX IF NOT EXISTS idx_shared_space_library_library_space ON shared_space_library_entity (library_id, space_id)',
+  );
+  final i1.Index idxSharedSpaceAssetSpaceAsset = i1.Index(
+    'idx_shared_space_asset_space_asset',
+    'CREATE INDEX IF NOT EXISTS idx_shared_space_asset_space_asset ON shared_space_asset_entity (space_id, asset_id)',
+  );
+  final i1.Index idxSharedSpaceAssetAssetSpace = i1.Index(
+    'idx_shared_space_asset_asset_space',
+    'CREATE INDEX IF NOT EXISTS idx_shared_space_asset_asset_space ON shared_space_asset_entity (asset_id, space_id)',
+  );
+  final i1.Index idxLocalAlbumAssetAlbumAsset = i1.Index(
+    'idx_local_album_asset_album_asset',
+    'CREATE INDEX IF NOT EXISTS idx_local_album_asset_album_asset ON local_album_asset_entity (album_id, asset_id)',
+  );
+  final i1.Index idxLocalAssetChecksum = i1.Index(
+    'idx_local_asset_checksum',
+    'CREATE INDEX IF NOT EXISTS idx_local_asset_checksum ON local_asset_entity (checksum)',
+  );
+  final i1.Index idxLocalAssetCloudId = i1.Index(
+    'idx_local_asset_cloud_id',
+    'CREATE INDEX IF NOT EXISTS idx_local_asset_cloud_id ON local_asset_entity (i_cloud_id)',
+  );
+  final i1.Index idxLocalAssetCreatedAt = i1.Index(
+    'idx_local_asset_created_at',
+    'CREATE INDEX IF NOT EXISTS idx_local_asset_created_at ON local_asset_entity (created_at)',
+  );
+  final i1.Index idxStackPrimaryAssetId = i1.Index(
+    'idx_stack_primary_asset_id',
+    'CREATE INDEX IF NOT EXISTS idx_stack_primary_asset_id ON stack_entity (primary_asset_id)',
+  );
+  final i1.Index uQRemoteAssetsOwnerChecksum = i1.Index(
+    'UQ_remote_assets_owner_checksum',
+    'CREATE UNIQUE INDEX IF NOT EXISTS UQ_remote_assets_owner_checksum ON remote_asset_entity (owner_id, checksum) WHERE(library_id IS NULL)',
+  );
+  final i1.Index uQRemoteAssetsOwnerLibraryChecksum = i1.Index(
+    'UQ_remote_assets_owner_library_checksum',
+    'CREATE UNIQUE INDEX IF NOT EXISTS UQ_remote_assets_owner_library_checksum ON remote_asset_entity (owner_id, library_id, checksum) WHERE(library_id IS NOT NULL)',
+  );
+  final i1.Index idxRemoteAssetChecksum = i1.Index(
+    'idx_remote_asset_checksum',
+    'CREATE INDEX IF NOT EXISTS idx_remote_asset_checksum ON remote_asset_entity (checksum)',
+  );
+  final i1.Index idxRemoteAssetStackId = i1.Index(
+    'idx_remote_asset_stack_id',
+    'CREATE INDEX IF NOT EXISTS idx_remote_asset_stack_id ON remote_asset_entity (stack_id)',
+  );
+  final i1.Index idxRemoteAssetOwnerVisibilityDeletedCreated = i1.Index(
+    'idx_remote_asset_owner_visibility_deleted_created',
+    'CREATE INDEX IF NOT EXISTS idx_remote_asset_owner_visibility_deleted_created ON remote_asset_entity (owner_id, visibility, deleted_at, created_at DESC)',
+  );
+  final i1.Index idxRemoteAssetLibraryCreated = i1.Index(
+    'idx_remote_asset_library_created',
+    'CREATE INDEX IF NOT EXISTS idx_remote_asset_library_created ON remote_asset_entity (library_id, created_at DESC)',
+  );
+  final i1.Index idxRemoteAssetUploaded = i1.Index(
+    'idx_remote_asset_uploaded',
+    'CREATE INDEX IF NOT EXISTS idx_remote_asset_uploaded ON remote_asset_entity (uploaded_at)',
+  );
+  late final Shape48 authUserEntity = Shape48(
+    source: i0.VersionedTable(
+      entityName: 'auth_user_entity',
+      withoutRowId: true,
+      isStrict: true,
+      tableConstraints: ['PRIMARY KEY(id)'],
+      columns: [
+        _column_120,
+        _column_121,
+        _column_122,
+        _column_177,
+        _column_123,
+        _column_124,
+        _column_178,
+        _column_179,
+        _column_180,
+        _column_181,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape4 userMetadataEntity = Shape4(
+    source: i0.VersionedTable(
+      entityName: 'user_metadata_entity',
+      withoutRowId: true,
+      isStrict: true,
+      tableConstraints: ['PRIMARY KEY(user_id, "key")'],
+      columns: [_column_161, _column_182, _column_183],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape49 partnerEntity = Shape49(
+    source: i0.VersionedTable(
+      entityName: 'partner_entity',
+      withoutRowId: true,
+      isStrict: true,
+      tableConstraints: ['PRIMARY KEY(shared_by_id, shared_with_id)'],
+      columns: [_column_184, _column_185, _column_186],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape50 remoteExifEntity = Shape50(
+    source: i0.VersionedTable(
+      entityName: 'remote_exif_entity',
+      withoutRowId: true,
+      isStrict: true,
+      tableConstraints: ['PRIMARY KEY(asset_id)'],
+      columns: [
+        _column_187,
+        _column_188,
+        _column_189,
+        _column_190,
+        _column_191,
+        _column_151,
+        _column_130,
+        _column_129,
+        _column_192,
+        _column_193,
+        _column_194,
+        _column_195,
+        _column_148,
+        _column_149,
+        _column_196,
+        _column_197,
+        _column_198,
+        _column_199,
+        _column_200,
+        _column_201,
+        _column_202,
+        _column_203,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape7 remoteAlbumAssetEntity = Shape7(
+    source: i0.VersionedTable(
+      entityName: 'remote_album_asset_entity',
+      withoutRowId: true,
+      isStrict: true,
+      tableConstraints: ['PRIMARY KEY(asset_id, album_id)'],
+      columns: [_column_187, _column_204],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape10 remoteAlbumUserEntity = Shape10(
+    source: i0.VersionedTable(
+      entityName: 'remote_album_user_entity',
+      withoutRowId: true,
+      isStrict: true,
+      tableConstraints: ['PRIMARY KEY(album_id, user_id)'],
+      columns: [_column_204, _column_161, _column_205],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape51 remoteAssetCloudIdEntity = Shape51(
+    source: i0.VersionedTable(
+      entityName: 'remote_asset_cloud_id_entity',
+      withoutRowId: true,
+      isStrict: true,
+      tableConstraints: ['PRIMARY KEY(asset_id)'],
+      columns: [
+        _column_187,
+        _column_206,
+        _column_207,
+        _column_147,
+        _column_148,
+        _column_149,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape52 libraryEntity = Shape52(
+    source: i0.VersionedTable(
+      entityName: 'library_entity',
+      withoutRowId: true,
+      isStrict: true,
+      tableConstraints: ['PRIMARY KEY(id)'],
+      columns: [
+        _column_120,
+        _column_121,
+        _column_134,
+        _column_127,
+        _column_128,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape60 sharedSpaceAlbumEntity = Shape60(
+    source: i0.VersionedTable(
+      entityName: 'shared_space_album_entity',
+      withoutRowId: true,
+      isStrict: true,
+      tableConstraints: ['PRIMARY KEY(id)'],
+      columns: [
+        _column_120,
+        _column_121,
+        _column_151,
+        _column_154,
+        _column_127,
+        _column_128,
+        _column_169,
+        _column_252,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape65 sharedSpaceAlbumHiddenEntity = Shape65(
+    source: i0.VersionedTable(
+      entityName: 'shared_space_album_hidden_entity',
+      withoutRowId: true,
+      isStrict: true,
+      tableConstraints: ['PRIMARY KEY(space_id, album_id, user_id)'],
+      columns: [_column_159, _column_231, _column_253],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape53 memoryEntity = Shape53(
+    source: i0.VersionedTable(
+      entityName: 'memory_entity',
+      withoutRowId: true,
+      isStrict: true,
+      tableConstraints: ['PRIMARY KEY(id)'],
+      columns: [
+        _column_120,
+        _column_127,
+        _column_128,
+        _column_137,
+        _column_134,
+        _column_126,
+        _column_208,
+        _column_209,
+        _column_210,
+        _column_211,
+        _column_212,
+        _column_213,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape12 memoryAssetEntity = Shape12(
+    source: i0.VersionedTable(
+      entityName: 'memory_asset_entity',
+      withoutRowId: true,
+      isStrict: true,
+      tableConstraints: ['PRIMARY KEY(asset_id, memory_id)'],
+      columns: [_column_187, _column_214],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape54 personEntity = Shape54(
+    source: i0.VersionedTable(
+      entityName: 'person_entity',
+      withoutRowId: true,
+      isStrict: true,
+      tableConstraints: ['PRIMARY KEY(id)'],
+      columns: [
+        _column_120,
+        _column_127,
+        _column_128,
+        _column_134,
+        _column_121,
+        _column_215,
+        _column_216,
+        _column_217,
+        _column_152,
+        _column_218,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape55 assetFaceEntity = Shape55(
+    source: i0.VersionedTable(
+      entityName: 'asset_face_entity',
+      withoutRowId: true,
+      isStrict: true,
+      tableConstraints: ['PRIMARY KEY(id)'],
+      columns: [
+        _column_120,
+        _column_187,
+        _column_219,
+        _column_220,
+        _column_221,
+        _column_222,
+        _column_223,
+        _column_224,
+        _column_225,
+        _column_226,
+        _column_227,
+        _column_137,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape18 storeEntity = Shape18(
+    source: i0.VersionedTable(
+      entityName: 'store_entity',
+      withoutRowId: true,
+      isStrict: true,
+      tableConstraints: ['PRIMARY KEY(id)'],
+      columns: [_column_228, _column_229, _column_230],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape59 trashedLocalAssetEntity = Shape59(
+    source: i0.VersionedTable(
+      entityName: 'trashed_local_asset_entity',
+      withoutRowId: true,
+      isStrict: true,
+      tableConstraints: ['PRIMARY KEY(id, album_id)'],
+      columns: [
+        _column_121,
+        _column_126,
+        _column_127,
+        _column_128,
+        _column_129,
+        _column_130,
+        _column_236,
+        _column_120,
+        _column_231,
+        _column_144,
+        _column_133,
+        _column_145,
+        _column_232,
+        _column_150,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape32 assetEditEntity = Shape32(
+    source: i0.VersionedTable(
+      entityName: 'asset_edit_entity',
+      withoutRowId: true,
+      isStrict: true,
+      tableConstraints: ['PRIMARY KEY(id)'],
+      columns: [
+        _column_120,
+        _column_187,
+        _column_233,
+        _column_234,
+        _column_235,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape61 settings = Shape61(
+    source: i0.VersionedTable(
+      entityName: 'settings',
+      withoutRowId: true,
+      isStrict: true,
+      tableConstraints: ['PRIMARY KEY("key")'],
+      columns: [_column_237, _column_251, _column_128],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape63 assetOcrEntity = Shape63(
+    source: i0.VersionedTable(
+      entityName: 'asset_ocr_entity',
+      withoutRowId: true,
+      isStrict: true,
+      tableConstraints: ['PRIMARY KEY(id)'],
+      columns: [
+        _column_120,
+        _column_187,
+        _column_240,
+        _column_241,
+        _column_242,
+        _column_243,
+        _column_244,
+        _column_245,
+        _column_246,
+        _column_247,
+        _column_248,
+        _column_249,
+        _column_250,
+        _column_227,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  final i1.Index idxPartnerSharedWithId = i1.Index(
+    'idx_partner_shared_with_id',
+    'CREATE INDEX IF NOT EXISTS idx_partner_shared_with_id ON partner_entity (shared_with_id)',
+  );
+  final i1.Index idxLatLng = i1.Index(
+    'idx_lat_lng',
+    'CREATE INDEX IF NOT EXISTS idx_lat_lng ON remote_exif_entity (latitude, longitude)',
+  );
+  final i1.Index idxRemoteExifCity = i1.Index(
+    'idx_remote_exif_city',
+    'CREATE INDEX IF NOT EXISTS idx_remote_exif_city ON remote_exif_entity (city) WHERE city IS NOT NULL',
+  );
+  final i1.Index idxRemoteAlbumAssetAlbumAsset = i1.Index(
+    'idx_remote_album_asset_album_asset',
+    'CREATE INDEX IF NOT EXISTS idx_remote_album_asset_album_asset ON remote_album_asset_entity (album_id, asset_id)',
+  );
+  final i1.Index idxRemoteAssetCloudId = i1.Index(
+    'idx_remote_asset_cloud_id',
+    'CREATE INDEX IF NOT EXISTS idx_remote_asset_cloud_id ON remote_asset_cloud_id_entity (cloud_id)',
+  );
+  final i1.Index idxSharedSpaceAlbumHiddenAlbumSpace = i1.Index(
+    'idx_shared_space_album_hidden_album_space',
+    'CREATE INDEX IF NOT EXISTS idx_shared_space_album_hidden_album_space ON shared_space_album_hidden_entity (album_id, space_id)',
+  );
+  final i1.Index idxPersonOwnerId = i1.Index(
+    'idx_person_owner_id',
+    'CREATE INDEX IF NOT EXISTS idx_person_owner_id ON person_entity (owner_id)',
+  );
+  final i1.Index idxAssetFacePersonId = i1.Index(
+    'idx_asset_face_person_id',
+    'CREATE INDEX IF NOT EXISTS idx_asset_face_person_id ON asset_face_entity (person_id)',
+  );
+  final i1.Index idxAssetFaceAssetId = i1.Index(
+    'idx_asset_face_asset_id',
+    'CREATE INDEX IF NOT EXISTS idx_asset_face_asset_id ON asset_face_entity (asset_id)',
+  );
+  final i1.Index idxAssetFaceVisiblePerson = i1.Index(
+    'idx_asset_face_visible_person',
+    'CREATE INDEX IF NOT EXISTS idx_asset_face_visible_person ON asset_face_entity (person_id, asset_id) WHERE is_visible = 1 AND deleted_at IS NULL',
+  );
+  final i1.Index idxTrashedLocalAssetChecksum = i1.Index(
+    'idx_trashed_local_asset_checksum',
+    'CREATE INDEX IF NOT EXISTS idx_trashed_local_asset_checksum ON trashed_local_asset_entity (checksum)',
+  );
+  final i1.Index idxTrashedLocalAssetAlbum = i1.Index(
+    'idx_trashed_local_asset_album',
+    'CREATE INDEX IF NOT EXISTS idx_trashed_local_asset_album ON trashed_local_asset_entity (album_id)',
+  );
+  final i1.Index idxAssetEditAssetId = i1.Index(
+    'idx_asset_edit_asset_id',
+    'CREATE INDEX IF NOT EXISTS idx_asset_edit_asset_id ON asset_edit_entity (asset_id)',
+  );
+  final i1.Index idxAssetOcrAssetId = i1.Index(
+    'idx_asset_ocr_asset_id',
+    'CREATE INDEX IF NOT EXISTS idx_asset_ocr_asset_id ON asset_ocr_entity (asset_id)',
+  );
+}
+
+class Shape65 extends i0.VersionedTable {
+  Shape65({required super.source, required super.alias}) : super.aliased();
+  i1.GeneratedColumn<String> get spaceId =>
+      columnsByName['space_id']! as i1.GeneratedColumn<String>;
+  i1.GeneratedColumn<String> get albumId =>
+      columnsByName['album_id']! as i1.GeneratedColumn<String>;
+  i1.GeneratedColumn<String> get userId =>
+      columnsByName['user_id']! as i1.GeneratedColumn<String>;
+}
+
+i1.GeneratedColumn<String> _column_253(String aliasedName) =>
+    i1.GeneratedColumn<String>(
+      'user_id',
+      aliasedName,
+      false,
+      type: i1.DriftSqlType.string,
+      $customConstraints: 'NOT NULL',
+    );
 i0.MigrationStepWithVersion migrationSteps({
   required Future<void> Function(i1.Migrator m, Schema2 schema) from1To2,
   required Future<void> Function(i1.Migrator m, Schema3 schema) from2To3,
@@ -21375,6 +22183,7 @@ i0.MigrationStepWithVersion migrationSteps({
   required Future<void> Function(i1.Migrator m, Schema34 schema) from33To34,
   required Future<void> Function(i1.Migrator m, Schema35 schema) from34To35,
   required Future<void> Function(i1.Migrator m, Schema36 schema) from35To36,
+  required Future<void> Function(i1.Migrator m, Schema37 schema) from36To37,
 }) {
   return (currentVersion, database) async {
     switch (currentVersion) {
@@ -21553,6 +22362,11 @@ i0.MigrationStepWithVersion migrationSteps({
         final migrator = i1.Migrator(database, schema);
         await from35To36(migrator, schema);
         return 36;
+      case 36:
+        final schema = Schema37(database: database);
+        final migrator = i1.Migrator(database, schema);
+        await from36To37(migrator, schema);
+        return 37;
       default:
         throw ArgumentError.value('Unknown migration from $currentVersion');
     }
@@ -21595,6 +22409,7 @@ i1.OnUpgrade stepByStep({
   required Future<void> Function(i1.Migrator m, Schema34 schema) from33To34,
   required Future<void> Function(i1.Migrator m, Schema35 schema) from34To35,
   required Future<void> Function(i1.Migrator m, Schema36 schema) from35To36,
+  required Future<void> Function(i1.Migrator m, Schema37 schema) from36To37,
 }) => i0.VersionedSchema.stepByStepHelper(
   step: migrationSteps(
     from1To2: from1To2,
@@ -21632,5 +22447,6 @@ i1.OnUpgrade stepByStep({
     from33To34: from33To34,
     from34To35: from34To35,
     from35To36: from35To36,
+    from36To37: from36To37,
   ),
 );
