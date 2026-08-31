@@ -100,6 +100,7 @@ import { newMetadataRepositoryMock } from 'test/repositories/metadata.repository
 import { newStorageRepositoryMock } from 'test/repositories/storage.repository.mock.js';
 import { newSystemMetadataRepositoryMock } from 'test/repositories/system-metadata.repository.mock.js';
 import { ITelemetryRepositoryMock, newTelemetryRepositoryMock } from 'test/repositories/telemetry.repository.mock.js';
+import { FamilyRepository } from 'src/repositories/family.repository.js';
 
 export type ControllerContext = {
   authenticate: Mock;
@@ -312,6 +313,7 @@ export type ServiceOverrides = {
   view: ViewRepository;
   websocket: WebsocketRepository;
   workflow: WorkflowRepository;
+  family: FamilyRepository;
 };
 
 type As<T> = T extends RepositoryInterface<infer U> ? U : never;
@@ -419,6 +421,8 @@ export const getMocks = () => {
     // eslint-disable-next-line no-sparse-arrays
     websocket: automock(WebsocketRepository, { args: [, loggerMock], strict: false }),
     workflow: automock(WorkflowRepository, { strict: true }),
+    // eslint-disable-next-line no-sparse-arrays
+    family: automock(FamilyRepository, { args: [, loggerMock], strict: false }),
   };
 
   // every new user gets a cluster group, which is incidental to most tests
@@ -500,6 +504,7 @@ export const newTestService = <T extends BaseService>(
     overrides.view || (mocks.view as As<ViewRepository>),
     overrides.websocket || (mocks.websocket as As<WebsocketRepository>),
     overrides.workflow || (mocks.workflow as As<WorkflowRepository>),
+    overrides.family || (mocks.family as As<FamilyRepository>),
   );
 
   return {
