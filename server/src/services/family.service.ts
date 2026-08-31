@@ -3,6 +3,7 @@ import { AuthDto } from 'src/dtos/auth.dto';
 import { FamilyAccessLevel, UserMetadataKey } from 'src/enum';
 import { RawUnionRow, VisibilityParticipant, VisibleUnion } from 'src/repositories/family.repository';
 import { BaseService } from 'src/services/base.service';
+import { UserMetadataItem } from 'src/types';
 import { asDateTimeString } from 'src/utils/date';
 import {
   FamilyGender,
@@ -149,6 +150,19 @@ export class FamilyService extends BaseService {
         label: resolved.get(rootCandidateId)?.name ?? '',
       };
     });
+  }
+
+  // Slice 7 (D4): reads back the identity the caller nominated as themselves, or null if never
+  // set. `view` is sufficient — same authority as `setMyRoot` below.
+  async getMyRoot(auth: AuthDto): Promise<string | null> {
+    await this.requireFamilyRead(auth);
+
+    const metadata = await this.userRepository.getMetadata(auth.user.id);
+    const entry = metadata.find(
+      (item): item is UserMetadataItem<UserMetadataKey.FamilyRoot> => item.key === UserMetadataKey.FamilyRoot,
+    );
+
+    return entry?.value.identityId ?? null;
   }
 
   // Slice 7 (D4): stores which identity the caller means when a relative label says "your ...".

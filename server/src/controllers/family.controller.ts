@@ -10,6 +10,7 @@ import {
   FamilyGenderUpdateDto,
   FamilyGraphResponseDto,
   FamilyIdentityParamDto,
+  FamilyMyRootResponseDto,
   FamilyMyRootUpdateDto,
   FamilyParticipantAddDto,
   FamilyUnionCreateDto,
@@ -23,7 +24,7 @@ import { ApiTag, Permission } from 'src/enum';
 import { Auth, Authenticated } from 'src/middleware/auth.guard';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { FamilyService } from 'src/services/family.service';
-import { FamilyGender, ProjectedFamilyIdentity } from 'src/utils/family-labels';
+import { deriveRelationLabel, FamilyGender } from 'src/utils/family-labels';
 
 // Gallery-fork: family relationships. Thin controller over `FamilyService` — every access
 // decision (view/contribute for reads/writes, admin-independent-of-family-level for the two
@@ -46,6 +47,13 @@ export class FamilyController {
   // method itself is unpaginated, since slices 5/6 already fetch and redact the whole graph in a
   // single pass (`E65`) and re-deriving a partial redaction per page would be more work, not
   // less.
+  //
+  // D4: `deriveRelationLabel` is called on the FULL projected `graph` (never the paginated
+  // subset) for every identity that ends up in the response — a path to a person on page 2 can
+  // run through a union that only appears on page 1, so labelling off the page alone would miss
+  // or mislabel it. Only the OUTPUT (which identities/unions are included) is paginated; the
+  // graph handed to the label engine is exactly what slice 5 returned for this viewer, which is
+  // what keeps this safe (see the module docs on `family-labels.ts`).
   @Get('unions')
   @Authenticated({ permission: Permission.FamilyRead })
   @Endpoint({
@@ -54,14 +62,14 @@ export class FamilyController {
     history: new HistoryBuilder().added('v1').beta('v1'),
   })
   async getUnions(@Auth() auth: AuthDto, @Query() query: FamilyUnionsQueryDto): Promise<FamilyGraphResponseDto> {
-    const graph = await this.service.getVisibleGraph(auth);
+    const [graph, rootId] = await Promise.all([this.service.getVisibleGraph(auth), this.service.getMyRoot(auth)]);
 
     const sorted = [...graph.unions].sort((a, b) => a.id.localeCompare(b.id));
     const start = (query.page - 1) * query.size;
     const page = sorted.slice(start, start + query.size);
     const hasNextPage = start + query.size < sorted.length;
 
-    const identities: Record<string, ProjectedFamilyIdentity> = {};
+    const identities: FamilyGraphResponseDto['identities'] = {};
     for (const union of page) {
       for (const participant of [...union.partners, ...union.children]) {
         if (participant.kind !== 'known' || identities[participant.identityId]) {
@@ -70,7 +78,11 @@ export class FamilyController {
 
         const info = graph.identities[participant.identityId];
         if (info) {
-          identities[participant.identityId] = info;
+          identities[participant.identityId] = {
+            name: info.name,
+            gender: info.gender,
+            label: deriveRelationLabel(graph, rootId, participant.identityId),
+          };
         }
       }
     }
@@ -162,6 +174,18 @@ export class FamilyController {
   })
   getClusters(@Auth() auth: AuthDto): Promise<FamilyClusterResponseDto[]> {
     return this.service.getClusters(auth);
+  }
+
+  // D4: requires only `view` — reading back your own root discloses nothing about anyone else.
+  @Get('me')
+  @Authenticated({ permission: Permission.FamilyRead })
+  @Endpoint({
+    summary: "Get the viewer's family root",
+    description: 'Retrieve the identity the caller previously nominated as themselves, or null if never set.',
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  async getMyRoot(@Auth() auth: AuthDto): Promise<FamilyMyRootResponseDto> {
+    return { identityId: await this.service.getMyRoot(auth) };
   }
 
   // D4: requires only `view` — nominating yourself as the root changes nothing anyone else can
