@@ -45,7 +45,7 @@ export const load = (async ({ url }) => {
   try {
     const [clusterList, rootResponse] = await Promise.all([getClusters(), getMyRoot()]);
     clusters = clusterList;
-    rootId = rootResponse.identityId;
+    rootId = rootResponse.rootIdentityId;
     graph = await loadFullGraph();
   } catch {
     // A1/A12: `GET /family/clusters` and `GET /family/me` both require `FamilyRead` and 403 for

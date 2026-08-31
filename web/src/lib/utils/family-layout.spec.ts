@@ -1,8 +1,8 @@
-import { FamilyUnionStatus, Kind, Kind2, type FamilyUnionDto } from '@immich/sdk';
+import { FamilyParticipantKind, FamilyUnionStatus, type FamilyUnionDto } from '@immich/sdk';
 import { buildFamilyLayout } from '$lib/utils/family-layout';
 
-const known = (identityId: string) => ({ kind: Kind.Known, identityId });
-const anonymous = () => ({ kind: Kind2.Anonymous });
+const known = (identityId: string) => ({ kind: FamilyParticipantKind.Known, identityId });
+const anonymous = () => ({ kind: FamilyParticipantKind.Anonymous, identityId: null });
 
 const union = (overrides: Partial<FamilyUnionDto> & Pick<FamilyUnionDto, 'id'>): FamilyUnionDto => ({
   status: FamilyUnionStatus.Partnered,

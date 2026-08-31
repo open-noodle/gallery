@@ -50,9 +50,8 @@ export interface FamilyLayout {
   unions: FamilyLayoutUnion[];
 }
 
-const isKnown = (
-  participant: FamilyParticipantDto,
-): participant is Extract<FamilyParticipantDto, { identityId: string }> => participant.kind === 'known';
+const isKnown = (participant: FamilyParticipantDto): participant is FamilyParticipantDto & { identityId: string } =>
+  participant.identityId !== null;
 
 interface Edge {
   identityId: string;
