@@ -49,8 +49,10 @@ describe('PersonPickerGrid', () => {
     renderGrid({ candidates: [candidate({ id: 'sp-1', name: 'Bob' }), candidate({ id: 'sp-2', name: 'Carol' })] });
 
     // The card carries the name on both the image and its caption, so pick the image out by tag.
-    const thumbnailFor = async (name: string) =>
-      (await screen.findAllByTitle(name)).find((element) => element.tagName === 'IMG');
+    const thumbnailFor = async (name: string) => {
+      const labelled = await screen.findAllByTitle(name);
+      return labelled.find((element) => element.tagName === 'IMG');
+    };
 
     expect(await thumbnailFor('Bob')).toHaveAttribute('loading', 'lazy');
     expect(await thumbnailFor('Carol')).toHaveAttribute('loading', 'lazy');
