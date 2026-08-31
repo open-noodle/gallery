@@ -152,6 +152,10 @@ DROP TABLE IF EXISTS "shared_space_person" CASCADE;
 DROP TABLE IF EXISTS "shared_space_face_match_backfill_target" CASCADE;
 DROP TABLE IF EXISTS "shared_space_library_asset_audit" CASCADE;
 DROP TABLE IF EXISTS "shared_space_album_asset_audit" CASCADE;
+DROP TABLE IF EXISTS "family_access" CASCADE;
+DROP TABLE IF EXISTS "family_union_child" CASCADE;
+DROP TABLE IF EXISTS "family_union_partner" CASCADE;
+DROP TABLE IF EXISTS "family_union" CASCADE;
 DROP TABLE IF EXISTS "face_person_verdict" CASCADE;
 DROP TABLE IF EXISTS "shared_space_asset_audit" CASCADE;
 DROP TABLE IF EXISTS "shared_space_member_audit" CASCADE;
@@ -562,6 +566,7 @@ DELETE FROM "kysely_migrations"
   -- 1784000000000 was already taken by FixFaceRepairScanInFlightIndexOverride above.
   '1794000000000-AddAssetFavoriteTables',
   '1794100000000-DropAssetIsFavoriteColumn',
+  '1795000000000-AddFamilyRelationships',
   '1796000000000-AddAssetFaceCreatedBy',
   '1797000000000-AddAssetLocalDateTimeIndex',
   -- Build-time compatibility alias (server/bin/sync-gallery-migrations.mjs): this migration was
