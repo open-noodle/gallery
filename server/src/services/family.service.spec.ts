@@ -382,4 +382,139 @@ describe(FamilyService.name, () => {
       expect(mocks.family.deleteUnion).not.toHaveBeenCalled();
     });
   });
+
+  describe('setMyRoot', () => {
+    beforeEach(() => {
+      mocks.family.getIdentityType.mockImplementation((id: string) => Promise.resolve(id === PET_A ? 'pet' : 'person'));
+    });
+
+    // D4: nominating yourself needs only `view`, never `contribute`.
+    it('lets a view-only caller set their own root', async () => {
+      giveViewOnlyAccess(sut, mocks);
+
+      await expect(sut.setMyRoot(authStub.user1, PARTNER_A)).resolves.toBeUndefined();
+
+      expect(mocks.user.upsertMetadata).toHaveBeenCalledWith(authStub.user1.user.id, {
+        key: 'family-root',
+        value: { identityId: PARTNER_A },
+      });
+    });
+
+    it('lets a caller clear their root with null', async () => {
+      giveViewOnlyAccess(sut, mocks);
+
+      await expect(sut.setMyRoot(authStub.user1, null)).resolves.toBeUndefined();
+
+      expect(mocks.family.getIdentityType).not.toHaveBeenCalled();
+      expect(mocks.user.upsertMetadata).toHaveBeenCalledWith(authStub.user1.user.id, {
+        key: 'family-root',
+        value: { identityId: null },
+      });
+    });
+
+    it('refuses a caller with no family access at all', async () => {
+      mocks.family.getAccess.mockResolvedValue(undefined);
+      sut['getConfig'] = () => Promise.resolve({ familyTree: { enabled: true, defaultAccess: 'none' } } as any);
+
+      await expect(sut.setMyRoot(authStub.user1, PARTNER_A)).rejects.toBeInstanceOf(ForbiddenException);
+      expect(mocks.user.upsertMetadata).not.toHaveBeenCalled();
+    });
+
+    it('refuses a pet identity as a root', async () => {
+      giveViewOnlyAccess(sut, mocks);
+
+      await expect(sut.setMyRoot(authStub.user1, PET_A)).rejects.toThrow(
+        'Pets cannot participate in family relationships',
+      );
+      expect(mocks.user.upsertMetadata).not.toHaveBeenCalled();
+    });
+
+    it('refuses an identity that does not exist', async () => {
+      giveViewOnlyAccess(sut, mocks);
+      mocks.family.getIdentityType.mockResolvedValue(undefined);
+
+      await expect(sut.setMyRoot(authStub.user1, PARTNER_A)).rejects.toBeInstanceOf(NotFoundException);
+      expect(mocks.user.upsertMetadata).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('updateGender', () => {
+    beforeEach(() => {
+      mocks.family.getIdentityType.mockImplementation((id: string) => Promise.resolve(id === PET_A ? 'pet' : 'person'));
+    });
+
+    // D4: gender is shared data, so it requires `contribute`, unlike the viewer's own root.
+    it('refuses a view-only caller', async () => {
+      giveViewOnlyAccess(sut, mocks);
+
+      await expect(sut.updateGender(authStub.user1, PARTNER_A, 'female')).rejects.toBeInstanceOf(ForbiddenException);
+      expect(mocks.family.setGender).not.toHaveBeenCalled();
+    });
+
+    it('lets a contributor set a gender', async () => {
+      giveContributeAccess(sut, mocks);
+
+      await expect(sut.updateGender(authStub.user1, PARTNER_A, 'male')).resolves.toBeUndefined();
+
+      expect(mocks.family.setGender).toHaveBeenCalledWith(PARTNER_A, 'male');
+    });
+
+    it('lets a contributor clear a gender with null', async () => {
+      giveContributeAccess(sut, mocks);
+
+      await expect(sut.updateGender(authStub.user1, PARTNER_A, null)).resolves.toBeUndefined();
+
+      expect(mocks.family.setGender).toHaveBeenCalledWith(PARTNER_A, null);
+    });
+
+    it('refuses a pet identity', async () => {
+      giveContributeAccess(sut, mocks);
+
+      await expect(sut.updateGender(authStub.user1, PET_A, 'male')).rejects.toThrow(
+        'Pets cannot participate in family relationships',
+      );
+      expect(mocks.family.setGender).not.toHaveBeenCalled();
+    });
+  });
+
+  // Slice 7: grant administration is deliberately independent of the caller's own family
+  // access level — these two methods never call `resolveFamilyAccess`/`requireFamilyRead`/
+  // `requireFamilyWrite` at all. Authority is the controller's `admin: true` gate alone.
+  describe('access grant administration', () => {
+    it("lists every explicit grant without consulting the caller's own family access", async () => {
+      mocks.family.getAllAccess.mockResolvedValue([
+        { userId: 'user-a', level: 'contribute', grantedById: 'admin_id', grantedAt: new Date('2026-01-01T00:00:00Z') },
+      ] as any);
+
+      await expect(sut.getAllAccessGrants()).resolves.toEqual([
+        {
+          userId: 'user-a',
+          level: 'contribute',
+          grantedById: 'admin_id',
+          grantedAt: '2026-01-01T00:00:00.000Z',
+        },
+      ]);
+
+      expect(mocks.family.getAccess).not.toHaveBeenCalled();
+    });
+
+    it('sets a grant, recording the caller as grantedBy', async () => {
+      mocks.family.setAccess.mockResolvedValue({
+        userId: 'user-a',
+        level: 'view',
+        grantedById: authStub.admin.user.id,
+        grantedAt: new Date('2026-02-01T00:00:00Z'),
+      } as any);
+
+      await expect(sut.setAccessGrant(authStub.admin, 'user-a', FamilyAccessLevel.View)).resolves.toEqual({
+        userId: 'user-a',
+        level: 'view',
+        grantedById: authStub.admin.user.id,
+        grantedAt: '2026-02-01T00:00:00.000Z',
+      });
+
+      expect(mocks.family.setAccess).toHaveBeenCalledWith('user-a', FamilyAccessLevel.View, authStub.admin.user.id);
+      expect(mocks.family.getAccess).not.toHaveBeenCalled();
+    });
+  });
 });
