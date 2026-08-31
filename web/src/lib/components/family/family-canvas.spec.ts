@@ -1,10 +1,10 @@
-import { FamilyUnionStatus, Kind, Kind2, type FamilyIdentityDto, type FamilyUnionDto } from '@immich/sdk';
+import { FamilyParticipantKind, FamilyUnionStatus, type FamilyIdentityDto, type FamilyUnionDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/svelte';
 import FamilyCanvas from '$lib/components/family/FamilyCanvas.svelte';
 
-const known = (identityId: string) => ({ kind: Kind.Known, identityId });
-const anonymous = () => ({ kind: Kind2.Anonymous });
+const known = (identityId: string) => ({ kind: FamilyParticipantKind.Known, identityId });
+const anonymous = () => ({ kind: FamilyParticipantKind.Anonymous, identityId: null });
 
 const union = (overrides: Partial<FamilyUnionDto> & Pick<FamilyUnionDto, 'id'>): FamilyUnionDto => ({
   status: FamilyUnionStatus.Partnered,
