@@ -161,6 +161,7 @@ export const BASE_SERVICE_DEPENDENCIES = [
   ViewRepository,
   WebsocketRepository,
   WorkflowRepository,
+  FamilyRepository,
 ];
 
 @Injectable()
