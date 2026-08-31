@@ -399,6 +399,37 @@ void main() {
       expect(await db.sharedSpaceAlbumAssetEntity.select().get(), isEmpty);
       expect(await db.libraryEntity.select().get(), isEmpty);
     });
+
+    // gallery-fork (#1041): a full sync reset must also wipe each member's own
+    // hidden-album rows, or a stale hide survives a SyncResetV1 re-sync.
+    test('reset() clears the hidden-album table (mobile-4, #1041)', () async {
+      await sut.updateUsersV1([_createUser()]);
+      await sut.updateSharedSpacesV1([
+        SyncSharedSpaceV1(
+          id: 'space-1',
+          name: 'Space',
+          description: null,
+          color: null,
+          createdById: 'user-1',
+          thumbnailAssetId: null,
+          thumbnailCropY: null,
+          faceRecognitionEnabled: true,
+          petsEnabled: false,
+          lastActivityAt: null,
+          createdAt: DateTime(2026, 4, 6),
+          updatedAt: DateTime(2026, 4, 6),
+        ),
+      ]);
+      await sut.updateSharedSpaceAlbumHiddenV1([
+        SyncSharedSpaceAlbumHiddenV1(spaceId: 'space-1', albumId: 'album-1', userId: 'user-1'),
+      ]);
+
+      expect(await db.sharedSpaceAlbumHiddenEntity.select().get(), isNotEmpty);
+
+      await sut.reset();
+
+      expect(await db.sharedSpaceAlbumHiddenEntity.select().get(), isEmpty);
+    });
   });
 
   group('SyncStreamRepository - Live photos', () {
@@ -1951,6 +1982,53 @@ void main() {
         final remaining = await db.sharedSpaceAlbumAssetEntity.select().get();
         expect(remaining, hasLength(1));
         expect(remaining.first.assetId, 'asset-2');
+      });
+    });
+
+    // gallery-fork (#1041): per-member "hidden from my timeline" album rows.
+    group('updateSharedSpaceAlbumHiddenV1', () {
+      test('upserts a hidden row (spaceId/albumId/userId)', () async {
+        await sut.updateUsersV1([_createUser()]);
+        await sut.updateSharedSpacesV1([makeSpace()]);
+        await sut.updateSharedSpaceAlbumHiddenV1([
+          SyncSharedSpaceAlbumHiddenV1(spaceId: 'space-1', albumId: 'album-1', userId: 'user-1'),
+        ]);
+
+        final rows = await db.sharedSpaceAlbumHiddenEntity.select().get();
+        expect(rows, hasLength(1));
+        expect(rows.first.spaceId, 'space-1');
+        expect(rows.first.albumId, 'album-1');
+        expect(rows.first.userId, 'user-1');
+      });
+
+      test('upsert is idempotent — re-inserting does not duplicate the row', () async {
+        await sut.updateUsersV1([_createUser()]);
+        await sut.updateSharedSpacesV1([makeSpace()]);
+        final hidden = SyncSharedSpaceAlbumHiddenV1(spaceId: 'space-1', albumId: 'album-1', userId: 'user-1');
+        await sut.updateSharedSpaceAlbumHiddenV1([hidden]);
+        await sut.updateSharedSpaceAlbumHiddenV1([hidden]);
+
+        final rows = await db.sharedSpaceAlbumHiddenEntity.select().get();
+        expect(rows, hasLength(1));
+      });
+    });
+
+    group('deleteSharedSpaceAlbumHiddenV1', () {
+      test('removes only the (spaceId, albumId, userId) hidden row', () async {
+        await sut.updateUsersV1([_createUser()]);
+        await sut.updateSharedSpacesV1([makeSpace()]);
+        await sut.updateSharedSpaceAlbumHiddenV1([
+          SyncSharedSpaceAlbumHiddenV1(spaceId: 'space-1', albumId: 'album-1', userId: 'user-1'),
+          SyncSharedSpaceAlbumHiddenV1(spaceId: 'space-1', albumId: 'album-2', userId: 'user-1'),
+        ]);
+
+        await sut.deleteSharedSpaceAlbumHiddenV1([
+          SyncSharedSpaceAlbumHiddenDeleteV1(spaceId: 'space-1', albumId: 'album-1', userId: 'user-1'),
+        ]);
+
+        final remaining = await db.sharedSpaceAlbumHiddenEntity.select().get();
+        expect(remaining, hasLength(1));
+        expect(remaining.first.albumId, 'album-2');
       });
     });
 

@@ -29,6 +29,7 @@ import 'package:immich_mobile/infrastructure/entities/remote_asset_cloud_id.enti
 import 'package:immich_mobile/infrastructure/entities/shared_space.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space_album.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space_album_asset.entity.drift.dart';
+import 'package:immich_mobile/infrastructure/entities/shared_space_album_hidden.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space_album_link.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space_asset.entity.drift.dart';
 import 'package:immich_mobile/infrastructure/entities/shared_space_library.entity.drift.dart';
@@ -93,6 +94,8 @@ class SyncStreamRepository extends DriftDatabaseRepository {
             // PRAGMA foreign_keys = OFF (see reset() preamble), so ordering is free;
             // children-before-parents kept for readability.
             await _db.sharedSpaceAlbumAssetEntity.deleteAll();
+            // gallery-fork (#1041): per-member "hidden from my timeline" album rows.
+            await _db.sharedSpaceAlbumHiddenEntity.deleteAll();
             await _db.sharedSpaceAlbumLinkEntity.deleteAll();
             await _db.sharedSpaceAlbumEntity.deleteAll();
             await _db.sharedSpaceAssetEntity.deleteAll();
@@ -997,6 +1000,47 @@ class SyncStreamRepository extends DriftDatabaseRepository {
       });
     } catch (error, stack) {
       _logger.severe('Error: deleteSharedSpaceAlbumLinksV1', error, stack);
+      rethrow;
+    }
+  }
+
+  // gallery-fork (#1041): per-member "hidden from my timeline" album rows.
+  // SPARSE — a row exists only when this device's user has hidden that album.
+  // Clone of updateSharedSpaceAlbumLinksV1 / deleteSharedSpaceAlbumLinksV1.
+  Future<void> updateSharedSpaceAlbumHiddenV1(Iterable<SyncSharedSpaceAlbumHiddenV1> data) async {
+    try {
+      await _db.batch((batch) {
+        for (final hidden in data) {
+          final companion = SharedSpaceAlbumHiddenEntityCompanion(
+            spaceId: Value(hidden.spaceId),
+            albumId: Value(hidden.albumId),
+            userId: Value(hidden.userId),
+          );
+          batch.insert(_db.sharedSpaceAlbumHiddenEntity, companion, onConflict: DoUpdate((_) => companion));
+        }
+      });
+    } catch (error, stack) {
+      _logger.severe('Error: updateSharedSpaceAlbumHiddenV1', error, stack);
+      rethrow;
+    }
+  }
+
+  Future<void> deleteSharedSpaceAlbumHiddenV1(Iterable<SyncSharedSpaceAlbumHiddenDeleteV1> data) async {
+    try {
+      await _db.batch((batch) {
+        for (final hidden in data) {
+          batch.delete(
+            _db.sharedSpaceAlbumHiddenEntity,
+            SharedSpaceAlbumHiddenEntityCompanion(
+              spaceId: Value(hidden.spaceId),
+              albumId: Value(hidden.albumId),
+              userId: Value(hidden.userId),
+            ),
+          );
+        }
+      });
+    } catch (error, stack) {
+      _logger.severe('Error: deleteSharedSpaceAlbumHiddenV1', error, stack);
       rethrow;
     }
   }
