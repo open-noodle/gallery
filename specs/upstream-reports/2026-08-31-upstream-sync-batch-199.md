@@ -43,6 +43,27 @@ content. Checks run:
   `docs/static/.nojekyll`, `docs/static/CNAME`), unchanged from the green tip.
 - **i18n branding-override detector**: not applicable, `i18n/` tree is byte-identical.
 
+### Shape H probe — what the fork uses that upstream does not
+
+A base-image bump is a shared-dependency change, so the question that matters is which base-image
+features the fork relies on that upstream itself does not. In `server/Dockerfile` that is the
+plugins stage's fork-only `apt-get install -y binaryen` (upstream supplies `wasm-opt` via
+`mise install --locked`, which the fork deliberately does not run — it has failed the build on
+GitHub API rate limits). A `binaryen` package that vanished or moved suite would break the Gallery
+plugin build with no conflict, no type error and no fork gate firing.
+
+Both base images were pulled and compared directly:
+
+|                             | old `202608251107` | new `202608300913`             |
+| --------------------------- | ------------------ | ------------------------------ |
+| OS                          | Debian 13 (trixie) | Debian 13 (trixie)             |
+| node                        | v24.18.0           | v24.18.1                       |
+| npm                         | 11.16.0            | 11.16.0                        |
+| `apt-cache policy binaryen` | —                  | candidate `120-4`, installable |
+
+The bump is a Node **patch** release on an unchanged Debian suite, and `binaryen` remains
+installable. No fork-side action needed. `docker.yml` remains the authoritative gate.
+
 ## Conflict Resolutions
 
 None — the rebase replayed all 1395 fork commits with zero conflicts.
@@ -141,20 +162,27 @@ validated remotely by `docker.yml`, which is where the real risk of a base-image
 ## Remote CI Verification
 
 - **Test branch**: `rebase/upstream-batch-199`
-- **Commit validated**: (filled in below)
+- **Commit validated**: `4dcac22eca01de2419e9767d5b78664dd04539cb`
+- **Result**: **10/10 green, first try** — no re-runs, no flakes, no non-success job in any run.
 
-| Workflow                                  | Status  | Notes                                |
-| ----------------------------------------- | ------- | ------------------------------------ |
-| `test.yml`                                | pending |                                      |
-| `docker.yml`                              | pending | the load-bearing gate for this batch |
-| `static_analysis.yml`                     | pending |                                      |
-| `gallery-build-mobile.yml`                | pending |                                      |
-| `gallery-rebase-smoke.yml`                | pending |                                      |
-| `storage-migration-tests.yml`             | pending |                                      |
-| `storage-migration-e2e.yml`               | pending |                                      |
-| `gallery-revert-to-immich-validation.yml` | pending |                                      |
-| `gallery-ml-smoke.yml`                    | pending |                                      |
-| `gallery-mobile-smoke.yml`                | pending |                                      |
+| Workflow                                  | Status | Run                                                |
+| ----------------------------------------- | ------ | -------------------------------------------------- |
+| `test.yml`                                | GREEN  | 33393810348 (21/21 non-skipped jobs)               |
+| `docker.yml`                              | GREEN  | 33393815823 — the load-bearing gate for this batch |
+| `static_analysis.yml`                     | GREEN  | 33393820871                                        |
+| `gallery-build-mobile.yml`                | GREEN  | 33393857563                                        |
+| `gallery-rebase-smoke.yml`                | GREEN  | 33393825338                                        |
+| `storage-migration-tests.yml`             | GREEN  | 33393830785                                        |
+| `storage-migration-e2e.yml`               | GREEN  | 33393852037                                        |
+| `gallery-revert-to-immich-validation.yml` | GREEN  | 33393836131                                        |
+| `gallery-ml-smoke.yml`                    | GREEN  | 33393842039                                        |
+| `gallery-mobile-smoke.yml`                | GREEN  | 33393847023                                        |
+
+Runs were read filtered by `headSha`, not by branch name — the branch was force-pushed over an
+earlier run, and a branch-scoped read would have served the stale result.
+
+- **Failures fixed**: none
+- **Confirmed flakes**: none
 
 ## Post-Rebase Verification
 
