@@ -135,6 +135,15 @@ const SharedSpaceAlbumLinkUpdateSchema = z
   })
   .meta({ id: 'SharedSpaceAlbumLinkUpdateDto' });
 
+// #1041: the per-member "hide this album from MY timeline" preference — distinct from
+// SharedSpaceAlbumLinkUpdateSchema above, which is the shared, editor-only flag governing the
+// space's own Photos tab. See specs/2026-08-31-space-hide-from-timeline-design.md §2.
+const SharedSpaceAlbumMemberTimelineSchema = z
+  .object({
+    showInTimeline: z.boolean().describe("Show this album's assets in your own personal timeline"),
+  })
+  .meta({ id: 'SharedSpaceAlbumMemberTimelineDto' });
+
 const SharedSpaceAlbumParamSchema = z.object({
   id: z.uuidv4(),
   albumId: z.uuidv4(),
@@ -231,6 +240,7 @@ export class SharedSpaceMemberMetadataContributionDto extends createZodDto(
 ) {}
 export class SharedSpaceLibraryLinkDto extends createZodDto(SharedSpaceLibraryLinkSchema) {}
 export class SharedSpaceAlbumLinkUpdateDto extends createZodDto(SharedSpaceAlbumLinkUpdateSchema) {}
+export class SharedSpaceAlbumMemberTimelineDto extends createZodDto(SharedSpaceAlbumMemberTimelineSchema) {}
 export class SharedSpaceAlbumParamDto extends createZodDto(SharedSpaceAlbumParamSchema) {}
 export class SharedSpaceMemberParamDto extends createZodDto(SharedSpaceMemberParamSchema) {}
 export class SharedSpacePersonParamDto extends createZodDto(SharedSpacePersonParamSchema) {}

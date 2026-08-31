@@ -31,6 +31,7 @@ import {
   AlbumUserRole,
   AssetMediaResponseDto,
   AssetVisibility,
+  getSharedSpaceAlbums,
   LoginResponseDto,
   removeAssets,
   restoreAssets,
@@ -112,6 +113,19 @@ const setMemberShowInTimeline = (token: string, spaceId: string, showInTimeline:
     { id: spaceId, sharedSpaceMemberTimelineDto: { showInTimeline } },
     { headers: asBearerAuth(token) },
   );
+
+/**
+ * PATCH the per-member ALBUM-level timeline preference (#1041 slice 2). No `@immich/sdk` function
+ * exists for this endpoint yet (the OpenAPI/Dart regen is a separate, later task), so this goes
+ * through raw supertest. `token: undefined` sends the request unauthenticated.
+ */
+const patchAlbumTimeline = (token: string | undefined, spaceId: string, albumId: string, showInTimeline: boolean) => {
+  const req = request(app).patch(`/shared-spaces/${spaceId}/albums/${albumId}/me/timeline`);
+  if (token) {
+    req.set('Authorization', `Bearer ${token}`);
+  }
+  return req.send({ showInTimeline });
+};
 
 const PIN_CODE = '123456';
 
@@ -577,6 +591,103 @@ describe('shared-space album <-> timeline behavioral matrix (S4a)', () => {
 
       expect(await mainTimelineWithSpacesIds(viewer.accessToken)).not.toContain(assets[0].id);
       expect(await spaceTimelineIds(viewer.accessToken, spaceId)).toContain(assets[0].id);
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // 9. PATCH /shared-spaces/:id/albums/:albumId/me/timeline (#1041 slice 2).
+  //
+  // No `@immich/sdk` function exists for this endpoint yet — the OpenAPI/Dart regen is a
+  // separate, later task (slice 2 Task 3) — so every call below goes through raw supertest.
+  //
+  // The resolved "what have I hidden" scope (Task 1's getTimelineHiddenScope) is deliberately
+  // NOT wired into any read path yet (global constraint of this slice), so these tests can only
+  // assert HTTP-level behaviour (status codes, and that the shared album-level flag is
+  // untouched) — NOT that a hidden album's assets actually leave anyone's timeline. Full
+  // per-member isolation (only the calling member's row is written) is proven at the repository
+  // level in shared-space-album-hidden.repository.spec.ts ("hides an album for one member only").
+  // ─────────────────────────────────────────────────────────────────────────
+
+  describe('9. PATCH .../albums/:albumId/me/timeline — own-row-only personal preference', () => {
+    it('hides the album for the calling member only', async () => {
+      const { spaceId, album } = await freshLinkedFixture('s4a-9-hide-own-row', 1);
+
+      const hideAsViewer = await patchAlbumTimeline(viewer.accessToken, spaceId, album.id, false);
+      expect(hideAsViewer.status).toBe(204);
+
+      // A second, independent member (owner) can hide/unhide the SAME album without interference
+      // — no shared/global row is being written, and no unique-constraint collision across users.
+      const hideAsOwner = await patchAlbumTimeline(owner.accessToken, spaceId, album.id, false);
+      expect(hideAsOwner.status).toBe(204);
+      const unhideAsOwner = await patchAlbumTimeline(owner.accessToken, spaceId, album.id, true);
+      expect(unhideAsOwner.status).toBe(204);
+
+      // the viewer's own hide is unaffected by the owner's independent hide/unhide round-trip —
+      // re-hiding (still hidden) is idempotent, not an error.
+      const reHideAsViewer = await patchAlbumTimeline(viewer.accessToken, spaceId, album.id, false);
+      expect(reHideAsViewer.status).toBe(204);
+    });
+
+    it('a non-member gets 403', async () => {
+      const { spaceId, album } = await freshLinkedFixture('s4a-9-nonmember', 1);
+
+      const res = await patchAlbumTimeline(nonMember.accessToken, spaceId, album.id, false);
+      expect(res.status).toBe(403);
+    });
+
+    it('an unauthenticated request gets 401', async () => {
+      const { spaceId, album } = await freshLinkedFixture('s4a-9-unauthenticated', 1);
+
+      const res = await patchAlbumTimeline(undefined, spaceId, album.id, false);
+      expect(res.status).toBe(401);
+    });
+
+    it('a viewer (not editor) may hide for themselves', async () => {
+      // Proves this is NOT gated on edit rights — a Viewer has no album-edit permission at all,
+      // so a 403 here would mean the endpoint was wrongly wired to Permission.SharedSpaceAlbumUpdate
+      // instead of Permission.SharedSpaceRead.
+      const { spaceId, album } = await freshLinkedFixture('s4a-9-viewer-may-hide', 1);
+
+      const res = await patchAlbumTimeline(viewer.accessToken, spaceId, album.id, false);
+      expect(res.status).toBe(204);
+    });
+
+    it('does not alter shared_space_album.showInTimeline', async () => {
+      const { spaceId, album } = await freshLinkedFixture('s4a-9-independent-of-shared-flag', 1);
+
+      const before = await getSharedSpaceAlbums({ id: spaceId }, { headers: asBearerAuth(owner.accessToken) });
+      const beforeFlag = before.find((a) => a.id === album.id)?.showInTimeline;
+      expect(beforeFlag).toBe(true);
+
+      const res = await patchAlbumTimeline(viewer.accessToken, spaceId, album.id, false);
+      expect(res.status).toBe(204);
+
+      const after = await getSharedSpaceAlbums({ id: spaceId }, { headers: asBearerAuth(owner.accessToken) });
+      const afterFlag = after.find((a) => a.id === album.id)?.showInTimeline;
+      expect(afterFlag).toBe(true);
+    });
+
+    // The plan's own test list names this "404 when the album is not linked to that space", but
+    // the prescribed guard (requireAlbumLinked, shared-space.service.ts) explicitly throws
+    // BadRequestException — a clean 400, not a 404 — because our write path INSERTs against
+    // slice 1's composite FK to shared_space_album(spaceId, albumId): without the guard, an
+    // unlinked album would surface as a raw Postgres FK-violation 500 instead.
+    it('400 when the album is not linked to that space', async () => {
+      const spaceId = await freshSpace('s4a-9-not-linked-space');
+      const { album: unlinkedAlbum } = await freshAlbum('s4a-9-not-linked-album', 1);
+
+      const res = await patchAlbumTimeline(owner.accessToken, spaceId, unlinkedAlbum.id, false);
+      expect(res.status).toBe(400);
+    });
+
+    it('unhiding restores it', async () => {
+      const { spaceId, album } = await freshLinkedFixture('s4a-9-unhide-restores', 1);
+
+      const hide = await patchAlbumTimeline(viewer.accessToken, spaceId, album.id, false);
+      expect(hide.status).toBe(204);
+
+      const unhide = await patchAlbumTimeline(viewer.accessToken, spaceId, album.id, true);
+      expect(unhide.status).toBe(204);
     });
   });
 });

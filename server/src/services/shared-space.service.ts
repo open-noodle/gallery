@@ -26,6 +26,7 @@ import {
 import {
   SharedSpaceActivityResponseDto,
   SharedSpaceAlbumLinkUpdateDto,
+  SharedSpaceAlbumMemberTimelineDto,
   SharedSpaceAssetAddDto,
   SharedSpaceAssetLinkedAlbumDto,
   SharedSpaceAssetRemoveDto,
@@ -551,6 +552,27 @@ export class SharedSpaceService extends BaseService {
     }
 
     return this.mapMember(member);
+  }
+
+  // The per-member half of "hide from timeline" (#1041). Deliberately gated on MEMBERSHIP, not on
+  // album-edit rights: this is the caller's own viewing preference and changes nothing anyone else
+  // sees. The shared shared_space_album.showInTimeline flag — which does affect everyone, and is
+  // editor-gated — is a different switch, updated by updateAlbumLink.
+  //
+  // There is no userId parameter anywhere on this path: writing another member's row is
+  // unrepresentable, not merely forbidden.
+  async updateAlbumTimelineForMember(
+    auth: AuthDto,
+    spaceId: string,
+    albumId: string,
+    dto: SharedSpaceAlbumMemberTimelineDto,
+  ): Promise<void> {
+    await this.requireMembership(auth, spaceId);
+    await this.requireAlbumLinked(spaceId, albumId);
+
+    await (dto.showInTimeline
+      ? this.sharedSpaceRepository.unhideAlbumForUser(spaceId, albumId, auth.user.id)
+      : this.sharedSpaceRepository.hideAlbumForUser(spaceId, albumId, auth.user.id));
   }
 
   async updateMemberMetadataContribution(
@@ -3490,6 +3512,18 @@ export class SharedSpaceService extends BaseService {
       throw new ForbiddenException('Insufficient role');
     }
     return member;
+  }
+
+  // #1041: our write path INSERTs into shared_space_album_hidden, which carries a composite FK to
+  // shared_space_album(spaceId, albumId) (slice 1). Without this guard an unlinked album would
+  // surface as a raw Postgres FK-violation 500 instead of a clean 400. Reuses the existing
+  // hasAlbumLink helper (shared-space.repository.ts) rather than adding a new query for the same
+  // check updateAlbumLink's sibling, updateSharedSpaceAlbum, already relies on indirectly.
+  private async requireAlbumLinked(spaceId: string, albumId: string): Promise<void> {
+    const linked = await this.sharedSpaceRepository.hasAlbumLink(spaceId, albumId);
+    if (!linked) {
+      throw new BadRequestException('Album is not linked to this space');
+    }
   }
 
   private async requireSpacePersonInSpace(spaceId: string, personId: string): Promise<SharedSpacePerson> {

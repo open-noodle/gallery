@@ -42,6 +42,7 @@ import {
   SharedSpaceActivityQueryDto,
   SharedSpaceActivityResponseDto,
   SharedSpaceAlbumLinkUpdateDto,
+  SharedSpaceAlbumMemberTimelineDto,
   SharedSpaceAlbumParamDto,
   SharedSpaceAssetAddDto,
   SharedSpaceAssetLinkedAlbumDto,
@@ -705,6 +706,23 @@ export class SharedSpaceController {
     @Body() dto: SharedSpaceAlbumLinkUpdateDto,
   ): Promise<void> {
     return this.service.updateAlbumLink(auth, id, albumId, dto);
+  }
+
+  @Patch(':id/albums/:albumId/me/timeline')
+  @Authenticated({ permission: Permission.SharedSpaceRead })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Endpoint({
+    summary: "Hide or show a linked album in the caller's own timeline",
+    description:
+      "Per-member preference. Does not change what other members see, and does not change whether the album appears in the space's own photos.",
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  updateAlbumTimelineForMember(
+    @Auth() auth: AuthDto,
+    @Param() { id, albumId }: SharedSpaceAlbumParamDto,
+    @Body() dto: SharedSpaceAlbumMemberTimelineDto,
+  ): Promise<void> {
+    return this.service.updateAlbumTimelineForMember(auth, id, albumId, dto);
   }
 
   @Delete(':id/albums/:albumId')
