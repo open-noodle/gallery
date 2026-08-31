@@ -26,6 +26,21 @@ abstract class Person with _$Person {
     /// client-side by `comparePeople`. The local Drift query sorts favorites in SQL instead, and
     /// paths that cannot know the flag (offline fallback, the asset-viewer strip) leave it false.
     @Default(false) bool isFavorite,
+
+    /// Gallery-fork (family relationships): whether the viewer has usable family-relationship
+    /// access at all, sourced from whether `PersonResponseDto.familyRelationLabel` was present
+    /// in the server response (an absent field means no access — the feature is off, or this
+    /// viewer's grant is `none` — not merely "no relationship known"). `false` means the
+    /// asset-viewer people strip must render exactly as it does today, with no relation line
+    /// for this person at all (`A12`).
+    @Default(false) bool hasFamilyAccess,
+
+    /// Gallery-fork (family relationships): this person's relation to the viewer ("your
+    /// sibling"), already derived server-side — never computed on the client. Meaningful only
+    /// when [hasFamilyAccess] is `true`: `null` then means access is granted but no
+    /// relationship is recorded, which the strip renders as a neutral dash rather than a blank
+    /// line.
+    String? familyRelationLabel,
   }) = _Person;
 }
 
