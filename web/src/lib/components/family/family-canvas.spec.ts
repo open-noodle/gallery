@@ -1,6 +1,17 @@
-import { FamilyParticipantKind, FamilyUnionStatus, type FamilyIdentityDto, type FamilyUnionDto } from '@immich/sdk';
+import {
+  FamilyParticipantKind,
+  FamilyParticipantRole,
+  FamilyUnionStatus,
+  type FamilyIdentityDto,
+  type FamilyUnionDto,
+} from '@immich/sdk';
 import '@testing-library/jest-dom';
-import { render, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen } from '@testing-library/svelte';
+// Must be imported BEFORE `FamilyCanvas.svelte` below: importing `sdk.mock` is what calls
+// `vi.mock('@immich/sdk', ...)`, and that has to register before the component's own static
+// import of `createUnion`/`addParticipant`/`updateUnion` resolves — otherwise the component binds
+// to the real (network-calling) implementations instead of the mocks.
+import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import FamilyCanvas from '$lib/components/family/FamilyCanvas.svelte';
 
 const known = (identityId: string) => ({ kind: FamilyParticipantKind.Known, identityId });
@@ -29,6 +40,45 @@ function renderCanvas(props: {
     rootId: props.rootId,
     canContribute: props.canContribute ?? false,
   });
+}
+
+// Slice 11 (Task 1): a minimal fake DataTransfer — happy-dom doesn't implement the real one, and
+// the component only ever calls `setData`/`getData` on it, so a tiny Map-backed stand-in is
+// enough to carry the dragged identityId from `dragstart` to `drop` exactly as a browser would.
+function fakeDataTransfer() {
+  const store = new Map<string, string>();
+  return {
+    setData: (format: string, value: string) => store.set(format, value),
+    getData: (format: string) => store.get(format) ?? '',
+    effectAllowed: 'move',
+    dropEffect: 'move',
+  } as unknown as DataTransfer;
+}
+
+function cardFor(name: string): HTMLElement {
+  const node = screen.getByText(name).closest('[data-testid="family-node"]');
+  if (!node) {
+    throw new Error(`No family-node card for "${name}"`);
+  }
+  return node as HTMLElement;
+}
+
+function dropZone(targetId: string, position: 'above' | 'beside' | 'below'): HTMLElement {
+  const zone = screen
+    .getAllByTestId('family-drop-zone')
+    .find((element) => element.dataset.targetId === targetId && element.dataset.position === position);
+  if (!zone) {
+    throw new Error(`No "${position}" drop zone for target "${targetId}"`);
+  }
+  return zone;
+}
+
+/** Drags the card named `sourceName` and drops it on `targetId`'s `position` zone — the same
+ * `dragstart` → `drop` sequence a real drag performs, just with a synthetic `DataTransfer`. */
+async function dragOnto(sourceName: string, targetId: string, position: 'above' | 'beside' | 'below') {
+  const dataTransfer = fakeDataTransfer();
+  await fireEvent.dragStart(cardFor(sourceName), { dataTransfer });
+  await fireEvent.drop(dropZone(targetId, position), { dataTransfer });
 }
 
 describe('FamilyCanvas', () => {
@@ -191,5 +241,173 @@ describe('FamilyCanvas', () => {
     expect(screen.getByText('Root Person')).toBeInTheDocument();
     expect(screen.getByText('Spouse')).toBeInTheDocument();
     expect(screen.queryByText("that's you")).not.toBeInTheDocument();
+  });
+});
+
+// Slice 11, Task 1: drag a face onto a card and the relationship is implied by where it's
+// dropped, with no dialog. `E52` is the load-bearing case — see its own test below.
+describe('FamilyCanvas drag-and-drop editing', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('creates a parent relationship when a person is dropped above a card', async () => {
+    // `root` has a union it is a PARTNER in (with `spouse`), but no union it is a CHILD of —
+    // dropping `spouse` above `root` must therefore create a brand new union rather than
+    // attaching to the existing one (that one is not the "child-of" union at all).
+    const unions: FamilyUnionDto[] = [union({ id: 'u-root-spouse', partners: [known('root'), known('spouse')] })];
+    const identities = { root: identity('Root'), spouse: identity('Spouse') };
+    sdkMock.createUnion.mockResolvedValue({ id: 'new-union' });
+
+    renderCanvas({ unions, identities, rootId: 'root', canContribute: true });
+    await dragOnto('Spouse', 'root', 'above');
+
+    expect(sdkMock.createUnion).toHaveBeenCalledWith({
+      familyUnionCreateDto: { partnerIds: ['spouse'], childIds: ['root'] },
+    });
+    expect(sdkMock.addParticipant).not.toHaveBeenCalled();
+    const bars = await screen.findAllByTestId('family-union-bar');
+    expect(bars).toHaveLength(2);
+  });
+
+  it('creates a partnership when a person is dropped beside a card', async () => {
+    const unions: FamilyUnionDto[] = [
+      union({ id: 'u-parent', partners: [known('mom')], children: [known('root'), known('sibling')] }),
+    ];
+    const identities = { mom: identity('Mom'), root: identity('Root'), sibling: identity('Sibling') };
+    sdkMock.createUnion.mockResolvedValue({ id: 'new-union' });
+
+    renderCanvas({ unions, identities, rootId: 'root', canContribute: true });
+    await dragOnto('Sibling', 'root', 'beside');
+
+    expect(sdkMock.createUnion).toHaveBeenCalledWith({
+      familyUnionCreateDto: { partnerIds: ['sibling', 'root'] },
+    });
+    expect(sdkMock.addParticipant).not.toHaveBeenCalled();
+  });
+
+  it('creates a child relationship when a person is dropped below a card', async () => {
+    // `kid` (the root) has no union it is a PARTNER in — dropping `other` below it must create a
+    // one-partner union rather than joining anything.
+    const unions: FamilyUnionDto[] = [
+      union({ id: 'u-parent', partners: [known('mom')], children: [known('kid'), known('other')] }),
+    ];
+    const identities = { mom: identity('Mom'), kid: identity('Kid'), other: identity('Other') };
+    sdkMock.createUnion.mockResolvedValue({ id: 'new-union' });
+
+    renderCanvas({ unions, identities, rootId: 'kid', canContribute: true });
+    await dragOnto('Other', 'kid', 'below');
+
+    expect(sdkMock.createUnion).toHaveBeenCalledWith({
+      familyUnionCreateDto: { partnerIds: ['kid'], childIds: ['other'] },
+    });
+    expect(sdkMock.addParticipant).not.toHaveBeenCalled();
+  });
+
+  it('joins the existing union when a second parent is dropped above a card (E52)', async () => {
+    // `root` is already a child of `u-existing` (one partner, `mom`). Dropping a second parent
+    // above `root` must JOIN that union — not start a rival one. This is the behaviour that
+    // stops two parents silently describing two separate families for the same child.
+    const unions: FamilyUnionDto[] = [
+      union({ id: 'u-existing', partners: [known('mom')], children: [known('root'), known('sib')] }),
+      union({ id: 'u-sib', partners: [known('sib'), known('newParent')] }),
+    ];
+    const identities = {
+      mom: identity('Mom'),
+      root: identity('Root'),
+      sib: identity('Sib'),
+      newParent: identity('New Parent'),
+    };
+    sdkMock.addParticipant.mockResolvedValue(undefined as never);
+
+    renderCanvas({ unions, identities, rootId: 'root', canContribute: true });
+    await dragOnto('New Parent', 'root', 'above');
+
+    expect(sdkMock.addParticipant).toHaveBeenCalledWith({
+      id: 'u-existing',
+      familyParticipantAddDto: { identityId: 'newParent', role: FamilyParticipantRole.Partner },
+    });
+    expect(sdkMock.createUnion).not.toHaveBeenCalled();
+    // The load-bearing assertion: still exactly the two unions this fixture started with — one
+    // union with two partners, never a second, rival union with one partner each.
+    const bars = await screen.findAllByTestId('family-union-bar');
+    expect(bars).toHaveLength(2);
+  });
+
+  it('makes a sibling when a person is dropped below the parent', async () => {
+    // Proves the design claim that there is no fourth gesture: a sibling is produced by the same
+    // "drop below the parent" gesture that creates a first child, joining the parent's existing
+    // union instead of creating a new one.
+    const unions: FamilyUnionDto[] = [
+      union({ id: 'u-grandparent', partners: [known('granny')], children: [known('mom'), known('auntie')] }),
+      union({ id: 'u-family', partners: [known('mom')], children: [known('kid1')] }),
+    ];
+    const identities = {
+      granny: identity('Granny'),
+      mom: identity('Mom'),
+      auntie: identity('Auntie'),
+      kid1: identity('Kid One'),
+    };
+    sdkMock.addParticipant.mockResolvedValue(undefined as never);
+
+    renderCanvas({ unions, identities, rootId: 'kid1', canContribute: true });
+    await dragOnto('Auntie', 'mom', 'below');
+
+    expect(sdkMock.addParticipant).toHaveBeenCalledWith({
+      id: 'u-family',
+      familyParticipantAddDto: { identityId: 'auntie', role: FamilyParticipantRole.Child },
+    });
+    expect(sdkMock.createUnion).not.toHaveBeenCalled();
+    const bars = await screen.findAllByTestId('family-union-bar');
+    expect(bars).toHaveLength(2);
+  });
+
+  it('moves a person already on the canvas instead of duplicating them (E53)', async () => {
+    // `sam` already participates in `u-existing` as root's partner. Dropping `sam` as a child of
+    // `granny` elsewhere on the canvas must reuse that SAME identity — never spawn a second card
+    // or a second identity for the same person, and never remove the first relationship.
+    const unions: FamilyUnionDto[] = [
+      union({ id: 'u-existing', partners: [known('root'), known('sam')] }),
+      union({ id: 'u-grandparent', partners: [known('granny')], children: [known('root')] }),
+    ];
+    const identities = { root: identity('Root'), sam: identity('Sam'), granny: identity('Granny') };
+    sdkMock.addParticipant.mockResolvedValue(undefined as never);
+
+    renderCanvas({ unions, identities, rootId: 'root', canContribute: true });
+    await dragOnto('Sam', 'granny', 'below');
+
+    expect(sdkMock.addParticipant).toHaveBeenCalledWith({
+      id: 'u-grandparent',
+      familyParticipantAddDto: { identityId: 'sam', role: FamilyParticipantRole.Child },
+    });
+    expect(sdkMock.createUnion).not.toHaveBeenCalled();
+    // Reused, not duplicated: still exactly one card for Sam...
+    const samCards = await screen.findAllByText('Sam');
+    expect(samCards).toHaveLength(1);
+    // ...and the original partnership with Root is still there, not replaced by the new one.
+    expect(screen.getByText('Root')).toBeInTheDocument();
+    const bars = await screen.findAllByTestId('family-union-bar');
+    expect(bars).toHaveLength(2);
+  });
+
+  it('offers no drop targets to a view-only viewer', async () => {
+    const unions: FamilyUnionDto[] = [union({ id: 'u1', partners: [known('root'), known('other')] })];
+    const identities = { root: identity('Root'), other: identity('Other') };
+
+    renderCanvas({ unions, identities, rootId: 'root', canContribute: false });
+    await fireEvent.dragStart(cardFor('Other'), { dataTransfer: fakeDataTransfer() });
+
+    expect(screen.queryAllByTestId('family-drop-zone')).toHaveLength(0);
+  });
+
+  // Paired control for A6: the identical fixture, but a contributor sees the zones appear.
+  it('offers them to a contributor', async () => {
+    const unions: FamilyUnionDto[] = [union({ id: 'u1', partners: [known('root'), known('other')] })];
+    const identities = { root: identity('Root'), other: identity('Other') };
+
+    renderCanvas({ unions, identities, rootId: 'root', canContribute: true });
+    await fireEvent.dragStart(cardFor('Other'), { dataTransfer: fakeDataTransfer() });
+
+    expect(screen.getAllByTestId('family-drop-zone').length).toBeGreaterThan(0);
   });
 });
