@@ -1,8 +1,9 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { AuthDto } from 'src/dtos/auth.dto';
-import { FamilyAccessLevel } from 'src/enum';
+import { FamilyAccessLevel, UserMetadataKey } from 'src/enum';
 import { RawUnionRow, VisibilityParticipant, VisibleUnion } from 'src/repositories/family.repository';
 import { BaseService } from 'src/services/base.service';
+import { asDateTimeString } from 'src/utils/date';
 import {
   FamilyGender,
   FamilyUnionStatus,
@@ -37,6 +38,16 @@ export interface FamilyCluster {
   label: string;
   size: number;
   rootCandidateId: string;
+}
+
+// Slice 7: one row of the admin grants table. A user with no explicit grant simply has no row
+// here — this never synthesizes one for the instance default, so the caller can tell "explicit
+// none" apart from "inherits default" (D5.1's "two kinds of blank", applied to access).
+export interface FamilyAccessGrant {
+  userId: string;
+  level: FamilyAccessLevel;
+  grantedById: string | null;
+  grantedAt: string;
 }
 
 /** A resolved identity's name and gender, keyed by identity id — the per-viewer product of
@@ -138,6 +149,68 @@ export class FamilyService extends BaseService {
         label: resolved.get(rootCandidateId)?.name ?? '',
       };
     });
+  }
+
+  // Slice 7 (D4): stores which identity the caller means when a relative label says "your ...".
+  // Requires only `view` — nominating yourself changes nothing anyone else can see, so it does
+  // not need `contribute`. Stored as its own user-metadata key (never a `preferences` field) so
+  // this never touches the shared preferences default/merge machinery. `null` clears it.
+  async setMyRoot(auth: AuthDto, identityId: string | null): Promise<void> {
+    await this.requireFamilyRead(auth);
+
+    if (identityId !== null) {
+      await this.assertPersonIdentity(identityId);
+    }
+
+    await this.userRepository.upsertMetadata(auth.user.id, {
+      key: UserMetadataKey.FamilyRoot,
+      value: { identityId },
+    });
+  }
+
+  // Slice 7 (D4/E37/E38): gender requires `contribute`, not `view` — unlike the viewer's own
+  // root, it is shared data that changes the label every OTHER viewer reads for this identity.
+  async updateGender(auth: AuthDto, identityId: string, gender: FamilyGender): Promise<void> {
+    await this.requireFamilyWrite(auth);
+    await this.assertPersonIdentity(identityId);
+    await this.familyRepository.setGender(identityId, gender);
+  }
+
+  // Slice 7: grant administration for every user on the instance. Deliberately NOT gated by
+  // `requireFamilyRead`/`requireFamilyWrite` — the controller enforces `admin` instead, so an
+  // admin with no family grant of their own can still administer everyone else's (D2, and the
+  // spec's explicit "an admin with no grant must still be able to administer other people's").
+  async getAllAccessGrants(): Promise<FamilyAccessGrant[]> {
+    const rows = await this.familyRepository.getAllAccess();
+    return rows.map((row) => ({
+      userId: row.userId,
+      level: row.level as FamilyAccessLevel,
+      grantedById: row.grantedById,
+      grantedAt: asDateTimeString(row.grantedAt),
+    }));
+  }
+
+  async setAccessGrant(auth: AuthDto, userId: string, level: FamilyAccessLevel): Promise<FamilyAccessGrant> {
+    const row = await this.familyRepository.setAccess(userId, level, auth.user.id);
+    return {
+      userId: row.userId,
+      level: row.level as FamilyAccessLevel,
+      grantedById: row.grantedById,
+      grantedAt: asDateTimeString(row.grantedAt),
+    };
+  }
+
+  // Pets are never part of the graph (E12), and that includes being nominated as a root or
+  // having a gender recorded for family purposes — reused by both `setMyRoot` and
+  // `updateGender` rather than duplicating the not-found/type check twice.
+  private async assertPersonIdentity(identityId: string): Promise<void> {
+    const type = await this.familyRepository.getIdentityType(identityId);
+    if (!type) {
+      throw new NotFoundException(`Identity ${identityId} not found`);
+    }
+    if (type !== 'person') {
+      throw new BadRequestException('Pets cannot participate in family relationships');
+    }
   }
 
   // Shared by getVisibleGraph and getClusters so the (potentially large) union graph is fetched
