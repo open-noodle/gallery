@@ -49,6 +49,12 @@ const newAuth = async (): Promise<AuthDto> => {
   return { user: { id: userId } } as AuthDto;
 };
 
+const getUnionRow = async (unionId: string) =>
+  db.selectFrom('family_union').where('id', '=', unionId).selectAll().executeTakeFirstOrThrow();
+
+const countByPartnerKey = async (partnerKey: string | null) =>
+  db.selectFrom('family_union').where('partnerKey', '=', partnerKey).selectAll().execute();
+
 describe('family relationships — union write path (real SQL)', () => {
   // GIVEN Anton is a parent of Alex
   // WHEN an editor tries to make Alex a parent of Anton
@@ -90,5 +96,112 @@ describe('family relationships — union write path (real SQL)', () => {
     await expect(
       sut.createUnion(auth, { partnerIds: [unrelatedPartner], childIds: [unrelatedChild] }),
     ).resolves.toBeDefined();
+  });
+});
+
+describe('family relationships — partnerKey maintenance and deduplication (real SQL)', () => {
+  // E4, E61
+  it('returns the existing union when the same two partners and start date are added again', async () => {
+    const { sut } = setup();
+    const auth = await newAuth();
+    const [a, b] = [await newIdentity(), await newIdentity()];
+
+    const first = await sut.createUnion(auth, { partnerIds: [a, b], startDate: '1998-06-12' });
+    const second = await sut.createUnion(auth, { partnerIds: [a, b], startDate: '1998-06-12' });
+    // Same pair, order swapped — partnerKey sorts the pair, so this must collapse too.
+    const third = await sut.createUnion(auth, { partnerIds: [b, a], startDate: '1998-06-12' });
+
+    expect(second.id).toBe(first.id);
+    expect(third.id).toBe(first.id);
+
+    const firstRow = await getUnionRow(first.id);
+    expect(firstRow.partnerKey).not.toBeNull();
+
+    // Exactly one row on disk for this pair/date — the duplicate writes never created a
+    // second row (the point of E4/E61), not merely that the returned ids happen to match.
+    const matching = await countByPartnerKey(firstRow.partnerKey);
+    expect(matching).toHaveLength(1);
+  });
+
+  // E5
+  it('creates two independent unions when neither has two partners', async () => {
+    const { sut } = setup();
+    const auth = await newAuth();
+    const a = await newIdentity();
+
+    const first = await sut.createUnion(auth, { partnerIds: [a] });
+    const second = await sut.createUnion(auth, { partnerIds: [a] });
+
+    expect(second.id).not.toBe(first.id);
+
+    const rows = await db.selectFrom('family_union').where('id', 'in', [first.id, second.id]).selectAll().execute();
+    expect(rows).toHaveLength(2);
+    expect(rows.every((row) => row.partnerKey === null)).toBe(true);
+  });
+
+  // E17
+  it('clears partnerKey when a union drops to one partner', async () => {
+    const { sut } = setup();
+    const auth = await newAuth();
+    const [a, b] = [await newIdentity(), await newIdentity()];
+
+    const { id: unionId } = await sut.createUnion(auth, { partnerIds: [a, b] });
+    const before = await getUnionRow(unionId);
+    expect(before.partnerKey).not.toBeNull();
+
+    await sut.removeParticipant(auth, unionId, b);
+
+    const after = await getUnionRow(unionId);
+    expect(after.partnerKey).toBeNull();
+  });
+
+  // E60
+  it('lets the same two partners marry again on a different date', async () => {
+    const { sut } = setup();
+    const auth = await newAuth();
+    const [a, b] = [await newIdentity(), await newIdentity()];
+
+    const first = await sut.createUnion(auth, { partnerIds: [a, b], startDate: '1998-06-12' });
+    const second = await sut.createUnion(auth, { partnerIds: [a, b], startDate: '2011-09-04' });
+
+    expect(second.id).not.toBe(first.id);
+
+    const rows = await db.selectFrom('family_union').where('id', 'in', [first.id, second.id]).selectAll().execute();
+    expect(rows).toHaveLength(2);
+    expect(new Set(rows.map((row) => row.partnerKey)).size).toBe(2);
+  });
+
+  // E62
+  it('recomputes partnerKey when a union start date is edited', async () => {
+    const { sut } = setup();
+    const auth = await newAuth();
+    const [a, b] = [await newIdentity(), await newIdentity()];
+
+    const { id: unionId } = await sut.createUnion(auth, { partnerIds: [a, b], startDate: '1998-06-12' });
+    const before = await getUnionRow(unionId);
+
+    await sut.updateUnion(auth, unionId, { startDate: '2011-09-04' });
+
+    const after = await getUnionRow(unionId);
+    const [sortedA, sortedB] = [a, b].sort();
+    expect(after.partnerKey).not.toBe(before.partnerKey);
+    expect(after.partnerKey).toBe(`${sortedA}:${sortedB}:2011-09-04`);
+  });
+
+  // E4 under concurrency
+  it('resolves two concurrent creations of the same union to one row', async () => {
+    const { sut } = setup();
+    const auth = await newAuth();
+    const [a, b] = [await newIdentity(), await newIdentity()];
+
+    const [first, second] = await Promise.all([
+      sut.createUnion(auth, { partnerIds: [a, b], startDate: '1998-06-12' }),
+      sut.createUnion(auth, { partnerIds: [a, b], startDate: '1998-06-12' }),
+    ]);
+
+    expect(second.id).toBe(first.id);
+
+    const rows = await db.selectFrom('family_union').where('id', '=', first.id).selectAll().execute();
+    expect(rows).toHaveLength(1);
   });
 });
