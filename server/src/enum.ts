@@ -76,6 +76,14 @@ export enum SharedSpaceRole {
   Viewer = 'viewer',
 }
 
+// Gallery-fork: family relationships. Access comes from an admin-granted level (or the
+// instance default) — never from a shared-space role. See FamilyService.
+export enum FamilyAccessLevel {
+  None = 'none',
+  View = 'view',
+  Contribute = 'contribute',
+}
+
 export enum SharedSpaceActivityType {
   AssetAdd = 'asset_add',
   AssetRemove = 'asset_remove',
@@ -203,6 +211,9 @@ export enum Permission {
   FaceRead = 'face.read',
   FaceUpdate = 'face.update',
   FaceDelete = 'face.delete',
+
+  FamilyRead = 'family.read',
+  FamilyWrite = 'family.write',
 
   FolderRead = 'folder.read',
 

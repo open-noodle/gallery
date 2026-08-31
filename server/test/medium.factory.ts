@@ -39,6 +39,7 @@ import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdic
 import { FaceRepairDeclineRepository } from 'src/repositories/face-repair-decline.repository';
 import { FaceRepairScanRepository } from 'src/repositories/face-repair-scan.repository';
 import { FaceRepairRepository } from 'src/repositories/face-repair.repository';
+import { FamilyRepository } from 'src/repositories/family.repository';
 import { IntegrityRepository } from 'src/repositories/integrity.repository';
 import { JobRepository } from 'src/repositories/job.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
@@ -630,6 +631,7 @@ const newRealRepository = <T>(key: ClassConstructor<T>, db: Kysely<DB>): T => {
     }
 
     case ClassificationRepository:
+    case FamilyRepository:
     case TagRepository: {
       return new key(db, LoggingRepository.create());
     }
@@ -659,6 +661,7 @@ const newMockRepository = <T>(key: ClassConstructor<T>) => {
     case CryptoRepository:
     case FaceIdentityRepository:
     case FacePersonVerdictRepository:
+    case FamilyRepository:
     case MemoryRepository:
     case IntegrityRepository:
     case NotificationRepository:
