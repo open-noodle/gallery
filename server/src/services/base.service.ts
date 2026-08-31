@@ -271,6 +271,7 @@ export class BaseService {
     this.identityMergePropagationService = new IdentityMergePropagationService({
       databaseRepository,
       faceIdentityRepository,
+      familyRepository,
       jobRepository,
       logger: this.logger,
       personRepository,
