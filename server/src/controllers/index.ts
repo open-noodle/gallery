@@ -60,6 +60,7 @@ import { UserController } from 'src/controllers/user.controller.js';
 import { VideoStreamController } from 'src/controllers/video-stream.controller.js';
 import { ViewController } from 'src/controllers/view.controller.js';
 import { WorkflowController } from 'src/controllers/workflow.controller.js';
+import { FamilyController } from 'src/controllers/family.controller.js';
 
 export const controllers = [
   ApiKeyController,
@@ -82,6 +83,7 @@ export const controllers = [
   FaceController,
   FaceRepairAdminController,
   FaceSuggestionController,
+  FamilyController,
   GalleryMapController,
   IntegrityAdminController,
   JobController,
