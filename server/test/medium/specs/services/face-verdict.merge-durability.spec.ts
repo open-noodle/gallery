@@ -10,6 +10,7 @@ import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.
 import { DB } from 'src/schema/index.js';
 import { BaseService } from 'src/services/base.service.js';
 import { IdentityMergePropagationService, MergeAuthorizer } from 'src/services/identity-merge-propagation.service.js';
+import { FamilyRepository } from 'src/repositories/family.repository.js';
 import {
   rekeyVerdictIdentity,
   retargetVerdictPersonId,
@@ -33,6 +34,7 @@ const setup = (db: Kysely<DB> = defaultDatabase) => {
     real: [
       DatabaseRepository,
       FaceIdentityRepository,
+      FamilyRepository,
       PersonRepository,
       SharedSpaceRepository,
       FacePersonVerdictRepository,
@@ -44,6 +46,7 @@ const setup = (db: Kysely<DB> = defaultDatabase) => {
   const sut = new IdentityMergePropagationService({
     databaseRepository: ctx.get(DatabaseRepository),
     faceIdentityRepository: ctx.get(FaceIdentityRepository),
+    familyRepository: ctx.get(FamilyRepository),
     jobRepository,
     logger: ctx.getMock(LoggingRepository),
     personRepository: ctx.get(PersonRepository),

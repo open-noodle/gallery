@@ -13,6 +13,7 @@ import { SharedSpaceRepository } from 'src/repositories/shared-space.repository.
 import { DB } from 'src/schema/index.js';
 import { IPersonJob } from 'src/types.js';
 import { MERGE_ERROR_CODE } from 'src/utils/merge-error-code.js';
+import { FamilyRepository } from 'src/repositories/family.repository.js';
 
 export type MergeProfileKind = 'person' | 'space-person';
 
@@ -116,6 +117,9 @@ export type IdentityMergePropagationPlan = {
 type IdentityMergePropagationDependencies = {
   databaseRepository: DatabaseRepository;
   faceIdentityRepository: FaceIdentityRepository;
+  // Gallery-fork: family relationships (D1.6). Every table keyed on identityId must participate
+  // in a merge, and family_union_partner/family_union_child are not exempt — see repointIdentities.
+  familyRepository: FamilyRepository;
   jobRepository: JobRepository;
   logger: LoggingRepository;
   personRepository: PersonRepository;
@@ -370,6 +374,14 @@ export class IdentityMergePropagationService {
             db,
           ));
     }
+
+    // Gallery-fork (D1.6): re-point family_union_partner/family_union_child from the merged-away
+    // identities to the survivor BEFORE mergeIdentitiesAfterProfileResolution below can delete the
+    // source face_identity rows — those FKs are ON DELETE CASCADE, so a source row deleted first
+    // would silently take its family memberships with it (E56). repointIdentities is self-contained
+    // and never throws: a merge is a user correcting recognition, not asserting a family fact, and
+    // must never fail — or lose data — because of it.
+    await this.deps.familyRepository.repointIdentities(plan.sourceIdentityIds, plan.targetIdentityId, db);
 
     await this.deps.faceIdentityRepository.mergeIdentitiesAfterProfileResolution(
       {

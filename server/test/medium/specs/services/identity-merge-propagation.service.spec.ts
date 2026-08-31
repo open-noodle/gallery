@@ -14,13 +14,14 @@ import { asDateString } from 'src/utils/date.js';
 import { newMediumService } from 'test/medium.factory.js';
 import { factory } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
+import { FamilyRepository } from 'src/repositories/family.repository.js';
 
 let defaultDatabase: Kysely<DB>;
 
 const setup = (db: Kysely<DB> = defaultDatabase) => {
   const { ctx } = newMediumService(BaseService, {
     database: db,
-    real: [DatabaseRepository, FaceIdentityRepository, PersonRepository, SharedSpaceRepository],
+    real: [DatabaseRepository, FaceIdentityRepository, FamilyRepository, PersonRepository, SharedSpaceRepository],
     mock: [JobRepository, LoggingRepository],
   });
   const jobRepository = ctx.getMock(JobRepository);
@@ -29,6 +30,7 @@ const setup = (db: Kysely<DB> = defaultDatabase) => {
   const sut = new IdentityMergePropagationService({
     databaseRepository: ctx.get(DatabaseRepository),
     faceIdentityRepository: ctx.get(FaceIdentityRepository),
+    familyRepository: ctx.get(FamilyRepository),
     jobRepository,
     logger: ctx.getMock(LoggingRepository),
     personRepository: ctx.get(PersonRepository),

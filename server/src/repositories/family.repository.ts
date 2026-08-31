@@ -260,4 +260,272 @@ export class FamilyRepository {
 
     return result.rows[0]?.exists ?? false;
   }
+
+  // Gallery-fork identity-merge participation (D1.6). Re-points family_union_partner and
+  // family_union_child from every merged-away identity to the survivor, then repairs whatever the
+  // merge could have broken: duplicate memberships, self-unions, partnerKey collisions, and any
+  // closed parent cycle. Must be called BEFORE mergeIdentitiesAfterProfileResolution deletes the
+  // source face_identity rows, or their ON DELETE CASCADE would silently take the memberships
+  // with them (E56).
+  //
+  // The whole operation runs inside a SQL SAVEPOINT so that even an unanticipated failure here
+  // can never abort the caller's face merge: a merge is a user correcting recognition, not
+  // asserting a family fact, and family data must never be the reason it fails or is lost.
+  // Verified empirically (this driver stack — kysely-postgres-js over postgres.js — has no
+  // built-in savepoint API on a callback-style Transaction<DB>, so this uses raw SQL) that
+  // SAVEPOINT / ROLLBACK TO SAVEPOINT / RELEASE SAVEPOINT recover cleanly from a mid-transaction
+  // error without poisoning the outer transaction.
+  async repointIdentities(sourceIds: string[], targetId: string, db: Transaction<DB>): Promise<void> {
+    const sources = [...new Set(sourceIds)].filter((id) => id !== targetId);
+    if (sources.length === 0) {
+      return;
+    }
+
+    await sql`SAVEPOINT family_repoint`.execute(db);
+    try {
+      await this.repointIdentitiesUnsafe(sources, targetId, db);
+      await sql`RELEASE SAVEPOINT family_repoint`.execute(db);
+    } catch (error) {
+      await sql`ROLLBACK TO SAVEPOINT family_repoint`.execute(db);
+      await sql`RELEASE SAVEPOINT family_repoint`.execute(db);
+      this.logger.error(
+        `Family relationship repointing failed during an identity merge (target=${targetId}, ` +
+          `sources=${sources.join(',')}) — family data for this merge was left untouched, but the ` +
+          `merge itself proceeds: ${error}`,
+      );
+    }
+  }
+
+  private async repointIdentitiesUnsafe(sources: string[], targetId: string, db: Transaction<DB>): Promise<void> {
+    const allIds = [targetId, ...sources];
+
+    const partnerRows = await db
+      .selectFrom('family_union_partner')
+      .select(['unionId', 'identityId'])
+      .where('identityId', 'in', allIds)
+      .execute();
+    const childRows = await db
+      .selectFrom('family_union_child')
+      .select(['unionId', 'identityId'])
+      .where('identityId', 'in', allIds)
+      .execute();
+
+    const touchedUnionIds = [
+      ...new Set([...partnerRows.map((row) => row.unionId), ...childRows.map((row) => row.unionId)]),
+    ];
+    if (touchedUnionIds.length === 0) {
+      return;
+    }
+
+    // Full partner rows (not just rows for our ids) for every touched union — needed to detect
+    // self-unions: a union collapses to a single distinct partner once mapped through the merge.
+    const touchedPartnerRows = await db
+      .selectFrom('family_union_partner')
+      .select(['unionId', 'identityId'])
+      .where('unionId', 'in', touchedUnionIds)
+      .execute();
+
+    const mapId = (id: string) => (sources.includes(id) ? targetId : id);
+
+    const partnersByUnion = new Map<string, string[]>();
+    for (const row of touchedPartnerRows) {
+      const list = partnersByUnion.get(row.unionId) ?? [];
+      list.push(row.identityId);
+      partnersByUnion.set(row.unionId, list);
+    }
+
+    // Step 2 (self-unions, E58): a union that had exactly two DISTINCT partners collapses to one
+    // identity once mapped through the merge. It no longer represents a partnership and is
+    // deleted outright — its own partner/child rows cascade away with it.
+    const selfUnionIds: string[] = [];
+    for (const [unionId, partners] of partnersByUnion) {
+      if (partners.length === 2 && new Set(partners.map((id) => mapId(id))).size === 1) {
+        selfUnionIds.push(unionId);
+      }
+    }
+    if (selfUnionIds.length > 0) {
+      await db.deleteFrom('family_union').where('id', 'in', selfUnionIds).execute();
+    }
+
+    // Step 1 (collapse duplicate memberships): if a union already lists the survivor as a child
+    // AND a merged-away identity as a child too, the merged-away row is now redundant. Drop it
+    // before the blind re-point below, or the re-point would try to insert a second
+    // (unionId, targetId) row and violate the primary key.
+    await db
+      .deleteFrom('family_union_child')
+      .where('identityId', 'in', sources)
+      .where('unionId', 'in', (eb) =>
+        eb.selectFrom('family_union_child').select('unionId').where('identityId', '=', targetId),
+      )
+      .execute();
+
+    // Re-point everything else. Both re-points are now guaranteed collision-free: self-unions
+    // were deleted above (the only possible family_union_partner PK collision, since arity is
+    // capped at two by the write path), and duplicate child rows were dropped above (the only
+    // possible family_union_child PK collision).
+    await db
+      .updateTable('family_union_partner')
+      .set({ identityId: targetId })
+      .where('identityId', 'in', sources)
+      .execute();
+    await db
+      .updateTable('family_union_child')
+      .set({ identityId: targetId })
+      .where('identityId', 'in', sources)
+      .execute();
+
+    // Defensive: not a named edge case, but the same invariant E10 protects on the write path,
+    // which the merge never validates. If repointing left the survivor as BOTH a partner and a
+    // child of the same union, the child edge loses — the same remedy used for a cycle below.
+    await db
+      .deleteFrom('family_union_child')
+      .where('identityId', '=', targetId)
+      .where('unionId', 'in', (eb) =>
+        eb.selectFrom('family_union_partner').select('unionId').where('identityId', '=', targetId),
+      )
+      .execute();
+
+    // Step 3 (fold partnerKey collisions, E57): every union where the survivor is now a
+    // partner — including ones it already held before this merge — grouped by the FINAL
+    // (post-repoint) partnerKey. A collision here can only be produced by this merge: the write
+    // path and Task 2's createUnion already guarantee no duplicate existed beforehand.
+    const survivorPartnerRows = await db
+      .selectFrom('family_union_partner')
+      .select('unionId')
+      .where('identityId', '=', targetId)
+      .execute();
+    const candidateUnionIds = [...new Set(survivorPartnerRows.map((row) => row.unionId))];
+
+    const foldedAwayUnionIds = new Set<string>();
+    if (candidateUnionIds.length > 0) {
+      const candidateUnions = await db
+        .selectFrom('family_union')
+        .select(['id', 'startDate', 'status'])
+        .where('id', 'in', candidateUnionIds)
+        .execute();
+      const candidatePartnerRows = await db
+        .selectFrom('family_union_partner')
+        .select(['unionId', 'identityId'])
+        .where('unionId', 'in', candidateUnionIds)
+        .execute();
+      const partnersByCandidateUnion = new Map<string, string[]>();
+      for (const row of candidatePartnerRows) {
+        const list = partnersByCandidateUnion.get(row.unionId) ?? [];
+        list.push(row.identityId);
+        partnersByCandidateUnion.set(row.unionId, list);
+      }
+
+      const groupsByKey = new Map<string, typeof candidateUnions>();
+      for (const union of candidateUnions) {
+        const partners = partnersByCandidateUnion.get(union.id) ?? [];
+        if (partners.length !== 2) {
+          continue;
+        }
+        const key = computePartnerKey(partners, union.startDate);
+        if (!key) {
+          continue;
+        }
+        const group = groupsByKey.get(key) ?? [];
+        group.push(union);
+        groupsByKey.set(key, group);
+      }
+
+      for (const group of groupsByKey.values()) {
+        if (group.length < 2) {
+          continue;
+        }
+
+        // A colliding group's members share an identical partnerKey by definition, which means
+        // their startDate values are already equal (both dates equal, or both null) — otherwise
+        // their keys would differ and there would be no collision to fold. "Keep the earliest
+        // startDate" is therefore satisfied trivially by keeping the winner's; the ordering below
+        // exists to pick a deterministic winner (id, as a stable final tiebreak) rather than to
+        // compare genuinely different dates.
+        const [winner, ...losers] = [...group].sort((a, b) => a.id.localeCompare(b.id));
+
+        for (const loser of losers) {
+          const loserChildren = await db
+            .selectFrom('family_union_child')
+            .select('identityId')
+            .where('unionId', '=', loser.id)
+            .execute();
+          if (loserChildren.length > 0) {
+            const winnerChildren = await db
+              .selectFrom('family_union_child')
+              .select('identityId')
+              .where('unionId', '=', winner.id)
+              .execute();
+            const existingChildIds = new Set(winnerChildren.map((row) => row.identityId));
+            const toMove = loserChildren.map((row) => row.identityId).filter((id) => !existingChildIds.has(id));
+            if (toMove.length > 0) {
+              await db
+                .insertInto('family_union_child')
+                .values(toMove.map((identityId) => ({ unionId: winner.id, identityId })))
+                .execute();
+            }
+          }
+
+          foldedAwayUnionIds.add(loser.id);
+        }
+
+        // "Keep the non-null status": `status` is never SQL NULL on this table (schema default
+        // 'partnered'), so this is read as "prefer a deliberately-set, more specific status over
+        // the anonymous default" — a loser's non-default status survives over the winner's
+        // default one.
+        const nonDefaultLoserStatus = losers.find((loser) => loser.status !== 'partnered')?.status;
+        const finalStatus =
+          winner.status === 'partnered' && nonDefaultLoserStatus ? nonDefaultLoserStatus : winner.status;
+        if (finalStatus !== winner.status) {
+          await db.updateTable('family_union').set({ status: finalStatus }).where('id', '=', winner.id).execute();
+        }
+      }
+
+      if (foldedAwayUnionIds.size > 0) {
+        await db
+          .deleteFrom('family_union')
+          .where('id', 'in', [...foldedAwayUnionIds])
+          .execute();
+      }
+    }
+
+    // Step 4 (break closed cycles, E58): only unions the merge actually touched, or that just
+    // received folded-in children, can possibly contain a fresh cycle. Any new cycle must pass
+    // through the survivor identity — every OTHER edge in the graph was already validated
+    // acyclic by the write path and is untouched by this merge — so every edge newly incident to
+    // it lives in one of these unions.
+    const cycleCheckUnionIds = [...new Set([...touchedUnionIds, ...candidateUnionIds])].filter(
+      (unionId) => !selfUnionIds.includes(unionId) && !foldedAwayUnionIds.has(unionId),
+    );
+
+    for (const unionId of cycleCheckUnionIds) {
+      const partners = await this.getPartnerIds(unionId, db);
+      const children = await this.getChildIds(unionId, db);
+      for (const partnerId of partners) {
+        for (const childId of children) {
+          if (await this.isAncestor(childId, partnerId, db)) {
+            await db
+              .deleteFrom('family_union_child')
+              .where('unionId', '=', unionId)
+              .where('identityId', '=', childId)
+              .execute();
+          }
+        }
+      }
+    }
+
+    // Step 5: recompute partnerKey for every union still standing that this merge touched.
+    for (const unionId of cycleCheckUnionIds) {
+      const union = await db
+        .selectFrom('family_union')
+        .select('startDate')
+        .where('id', '=', unionId)
+        .executeTakeFirst();
+      if (!union) {
+        continue;
+      }
+      const partners = await this.getPartnerIds(unionId, db);
+      const partnerKey = computePartnerKey(partners, union.startDate);
+      await db.updateTable('family_union').set({ partnerKey }).where('id', '=', unionId).execute();
+    }
+  }
 }
