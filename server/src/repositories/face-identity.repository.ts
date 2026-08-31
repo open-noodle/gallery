@@ -1894,12 +1894,15 @@ export class FaceIdentityRepository {
     return result.rows;
   }
 
-  @GenerateSql({
-    // As above: documents the shared-space form, which is also the uncounted path (the counted
-    // path emits no accessibility predicate at all).
-    params: [{ userId: DummyValue.UUID, identityIds: [DummyValue.UUID], withHidden: true, hasTimelineSpaces: true }],
-  })
-  async hydrateAccessiblePeople(input: {
+  /**
+   * The shared query behind {@link hydrateAccessiblePeople} and
+   * {@link resolveAccessibleIdentityNames}: the same accessibility predicate and the same
+   * display-name resolution, keyed additionally by `identityId` so a caller that needs to know
+   * WHICH candidate identity resolved (not just its display shape) can — `PersonResponseDto`
+   * deliberately never carries a raw `identityId`, so that correlation has to happen before the
+   * public DTO mapping, not after.
+   */
+  private async queryAccessibleProfiles(input: {
     userId: string;
     identityIds: string[];
     withHidden: boolean;
@@ -1922,7 +1925,7 @@ export class FaceIdentityRepository {
     assetCounts?: ReadonlyMap<string, number>;
     /** Resolved by the caller when it runs several of these queries, to avoid repeating the lookup. */
     hasTimelineSpaces?: boolean;
-  }): Promise<PersonResponseDto[]> {
+  }): Promise<(HydratedAccessiblePersonRow & { identityId: string })[]> {
     const countedIdentities = input.assetCounts
       ? input.identityIds
           .map((identityId) => [identityId, input.assetCounts?.get(identityId)] as const)
@@ -1996,7 +1999,7 @@ export class FaceIdentityRepository {
       ? sql``
       : sql`LEFT JOIN asset_counts ON asset_counts."identityId" = requested_identities."identityId"`;
 
-    const result = await sql<HydratedAccessiblePersonRow>`
+    const result = await sql<HydratedAccessiblePersonRow & { identityId: string }>`
       WITH requested_identities AS (${requestedIdentities}),
       timeline_spaces AS (
         SELECT "spaceId"
@@ -2104,6 +2107,7 @@ export class FaceIdentityRepository {
         ${accessibilityFilter}
       )
       SELECT
+        requested_identities."identityId",
         primary_profiles."profileType",
         primary_profiles."profileId",
         primary_profiles."spaceId",
@@ -2131,7 +2135,48 @@ export class FaceIdentityRepository {
       ORDER BY requested_identities.ord
     `.execute(this.db);
 
-    return result.rows.map((row) => this.mapAccessiblePerson(row));
+    return result.rows;
+  }
+
+  @GenerateSql({
+    // As above: documents the shared-space form, which is also the uncounted path (the counted
+    // path emits no accessibility predicate at all).
+    params: [{ userId: DummyValue.UUID, identityIds: [DummyValue.UUID], withHidden: true, hasTimelineSpaces: true }],
+  })
+  async hydrateAccessiblePeople(input: {
+    userId: string;
+    identityIds: string[];
+    withHidden: boolean;
+    assetCounts?: ReadonlyMap<string, number>;
+    hasTimelineSpaces?: boolean;
+  }): Promise<PersonResponseDto[]> {
+    const rows = await this.queryAccessibleProfiles(input);
+    return rows.map((row) => this.mapAccessiblePerson(row));
+  }
+
+  /**
+   * Narrower sibling of {@link hydrateAccessiblePeople}, for a caller that needs to know WHICH
+   * candidate identities resolved for this viewer and under what display name — not the full
+   * `PersonResponseDto` shape, and never a raw `identityId` leaked through that DTO.
+   *
+   * Used by family relationships (`FamilyService.getVisibleGraph`/`getClusters`) to turn a batch
+   * of union participant identities into the subset the viewer can actually resolve, in one query
+   * regardless of how many unions reference them — see `E65`. `withHidden` should normally be
+   * `false`: a hidden profile must not count as resolvable (`E33`).
+   *
+   * This is the SAME accessibility predicate as {@link hydrateAccessiblePeople} — both are thin
+   * wrappers over {@link queryAccessibleProfiles} — so there is exactly one definition of
+   * "resolvable" for this viewer, not two that could drift apart.
+   */
+  @GenerateSql({ params: [{ userId: DummyValue.UUID, identityIds: [DummyValue.UUID], withHidden: false }] })
+  async resolveAccessibleIdentityNames(input: {
+    userId: string;
+    identityIds: string[];
+    withHidden: boolean;
+    hasTimelineSpaces?: boolean;
+  }): Promise<Map<string, string>> {
+    const rows = await this.queryAccessibleProfiles(input);
+    return new Map(rows.map((row) => [row.identityId, row.name ?? '']));
   }
 
   private mapAccessiblePerson(row: HydratedAccessiblePersonRow): PersonResponseDto {
