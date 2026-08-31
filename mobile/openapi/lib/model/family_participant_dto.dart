@@ -13,33 +13,37 @@ part of openapi.api;
 class FamilyParticipantDto {
   /// Returns a new [FamilyParticipantDto] instance.
   FamilyParticipantDto({
-    required this.kind,
     required this.identityId,
+    required this.kind,
   });
 
-  FamilyParticipantDtoKindEnum kind;
+  /// Identity ID when kind is 'known'; null when 'anonymous'
+  String? identityId;
 
-  /// Identity ID
-  String identityId;
+  FamilyParticipantKind kind;
 
   @override
   bool operator ==(Object other) => identical(this, other) || other is FamilyParticipantDto &&
-    other.kind == kind &&
-    other.identityId == identityId;
+    other.identityId == identityId &&
+    other.kind == kind;
 
   @override
   int get hashCode =>
     // ignore: unnecessary_parenthesis
-    (kind.hashCode) +
-    (identityId.hashCode);
+    (identityId == null ? 0 : identityId!.hashCode) +
+    (kind.hashCode);
 
   @override
-  String toString() => 'FamilyParticipantDto[kind=$kind, identityId=$identityId]';
+  String toString() => 'FamilyParticipantDto[identityId=$identityId, kind=$kind]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-      json[r'kind'] = this.kind;
+    if (this.identityId != null) {
       json[r'identityId'] = this.identityId;
+    } else {
+      json[r'identityId'] = null;
+    }
+      json[r'kind'] = this.kind;
     return json;
   }
 
@@ -52,8 +56,8 @@ class FamilyParticipantDto {
       final json = value.cast<String, dynamic>();
 
       return FamilyParticipantDto(
-        kind: FamilyParticipantDtoKindEnum.fromJson(json[r'kind'])!,
-        identityId: mapValueOfType<String>(json, r'identityId')!,
+        identityId: mapValueOfType<String>(json, r'identityId'),
+        kind: FamilyParticipantKind.fromJson(json[r'kind'])!,
       );
     }
     return null;
@@ -101,84 +105,8 @@ class FamilyParticipantDto {
 
   /// The list of required keys that must be present in a JSON.
   static const requiredKeys = <String>{
-    'kind',
     'identityId',
+    'kind',
   };
 }
-
-
-enum FamilyParticipantDtoKindEnum {
-  anonymous._(r'anonymous'),
-  ;
-
-  /// Instantiate a new enum with the provided value.
-  const FamilyParticipantDtoKindEnum._(this._value);
-
-  /// The underlying value of this enum member.
-  final String _value;
-
-  @override
-  String toString() => _value;
-
-  /// Encodes this enum as a value suitable for JSON.
-  String toJson() => _value;
-
-  /// Returns the instance of [FamilyParticipantDtoKindEnum] that was successfully decoded
-  /// from the passed [value] on success, null otherwise.
-  static FamilyParticipantDtoKindEnum? fromJson(dynamic value) => FamilyParticipantDtoKindEnumTypeTransformer().decode(value);
-
-  /// Returns a [List] containing instances of [FamilyParticipantDtoKindEnum]
-  /// that were successfully decoded from the passed [JSON][json].
-  static List<FamilyParticipantDtoKindEnum> listFromJson(dynamic json, {bool growable = false,}) {
-    final result = <FamilyParticipantDtoKindEnum>[];
-    if (json is List && json.isNotEmpty) {
-      for (final row in json) {
-        final value = FamilyParticipantDtoKindEnum.fromJson(row);
-        if (value != null) {
-          result.add(value);
-        }
-      }
-    }
-    return result.toList(growable: growable);
-  }
-}
-
-/// Transformation class that can [encode] an instance of [FamilyParticipantDtoKindEnum] to String,
-/// and [decode] dynamic data back to [FamilyParticipantDtoKindEnum].
-class FamilyParticipantDtoKindEnumTypeTransformer {
-  factory FamilyParticipantDtoKindEnumTypeTransformer() => _instance ??= const FamilyParticipantDtoKindEnumTypeTransformer._();
-
-  const FamilyParticipantDtoKindEnumTypeTransformer._();
-
-  String encode(FamilyParticipantDtoKindEnum data) => data._value;
-
-  /// Returns the instance of [FamilyParticipantDtoKindEnum] that was successfully decoded
-  /// from the passed [data] value on success, null otherwise.
-  ///
-  /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
-  /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
-  /// cannot be decoded successfully, then an [UnimplementedError] is thrown.
-  ///
-  /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
-  /// and users are still using an old app with the old code.
-  FamilyParticipantDtoKindEnum? decode(dynamic data, {bool allowNull = true}) {
-    if (data is FamilyParticipantDtoKindEnum) {
-      return data;
-    }
-    if (data != null) {
-      switch (data) {
-        case r'anonymous': return FamilyParticipantDtoKindEnum.anonymous;
-        default:
-          if (!allowNull) {
-            throw ArgumentError('Unknown enum value to decode: $data');
-          }
-      }
-    }
-    return null;
-  }
-
-  /// The singleton instance of this transformer.
-  static FamilyParticipantDtoKindEnumTypeTransformer? _instance;
-}
-
 

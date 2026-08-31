@@ -32,6 +32,8 @@ export interface UpdateUnionFields {
 export interface RawUnionRow {
   id: string;
   status: string;
+  startDate: string | null;
+  endDate: string | null;
   partnerIds: string[];
   childIds: string[];
 }
@@ -48,6 +50,8 @@ export type VisibilityParticipant = { readonly identityId: string } | { readonly
 export interface VisibleUnion {
   readonly id: string;
   readonly status: string;
+  readonly startDate: string | null;
+  readonly endDate: string | null;
   readonly partners: readonly VisibilityParticipant[];
   readonly children: readonly VisibilityParticipant[];
 }
@@ -128,6 +132,15 @@ export class FamilyRepository {
       .executeTakeFirstOrThrow();
   }
 
+  // Slice 7 (new): removes the row entirely, reverting the user to `familyTree.defaultAccess` —
+  // NOT an update to a matching value, which would leave "explicit grant" state behind (D5.1's
+  // "inherits default" vs an explicit value must stay a real distinction). Deleting a row that
+  // doesn't exist is a no-op, not an error — the caller never needs to check first.
+  @GenerateSql({ params: [DummyValue.UUID] })
+  deleteAccess(userId: string, db: Kysely<DB> | Transaction<DB> = this.db) {
+    return db.deleteFrom('family_access').where('userId', '=', userId).execute();
+  }
+
   @GenerateSql({ params: [DummyValue.UUID] })
   getUnion(unionId: string, db: Kysely<DB> | Transaction<DB> = this.db) {
     return db.selectFrom('family_union').selectAll().where('id', '=', unionId).executeTakeFirst();
@@ -146,6 +159,8 @@ export class FamilyRepository {
       SELECT
         family_union.id,
         family_union.status,
+        family_union."startDate",
+        family_union."endDate",
         COALESCE(partners.ids, ARRAY[]::uuid[]) AS "partnerIds",
         COALESCE(children.ids, ARRAY[]::uuid[]) AS "childIds"
       FROM family_union
@@ -190,7 +205,14 @@ export class FamilyRepository {
         continue;
       }
 
-      visible.push({ id: union.id, status: union.status, partners, children });
+      visible.push({
+        id: union.id,
+        status: union.status,
+        startDate: union.startDate,
+        endDate: union.endDate,
+        partners,
+        children,
+      });
     }
 
     return visible;

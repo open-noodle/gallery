@@ -13,30 +13,36 @@ part of openapi.api;
 class FamilyMyRootResponseDto {
   /// Returns a new [FamilyMyRootResponseDto] instance.
   FamilyMyRootResponseDto({
-    required this.identityId,
+    required this.access,
+    required this.rootIdentityId,
   });
 
+  FamilyAccessLevel access;
+
   /// The identity nominated as the caller, or null if never set
-  String? identityId;
+  String? rootIdentityId;
 
   @override
   bool operator ==(Object other) => identical(this, other) || other is FamilyMyRootResponseDto &&
-    other.identityId == identityId;
+    other.access == access &&
+    other.rootIdentityId == rootIdentityId;
 
   @override
   int get hashCode =>
     // ignore: unnecessary_parenthesis
-    (identityId == null ? 0 : identityId!.hashCode);
+    (access.hashCode) +
+    (rootIdentityId == null ? 0 : rootIdentityId!.hashCode);
 
   @override
-  String toString() => 'FamilyMyRootResponseDto[identityId=$identityId]';
+  String toString() => 'FamilyMyRootResponseDto[access=$access, rootIdentityId=$rootIdentityId]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-    if (this.identityId != null) {
-      json[r'identityId'] = this.identityId;
+      json[r'access'] = this.access;
+    if (this.rootIdentityId != null) {
+      json[r'rootIdentityId'] = this.rootIdentityId;
     } else {
-      json[r'identityId'] = null;
+      json[r'rootIdentityId'] = null;
     }
     return json;
   }
@@ -50,7 +56,8 @@ class FamilyMyRootResponseDto {
       final json = value.cast<String, dynamic>();
 
       return FamilyMyRootResponseDto(
-        identityId: mapValueOfType<String>(json, r'identityId'),
+        access: FamilyAccessLevel.fromJson(json[r'access'])!,
+        rootIdentityId: mapValueOfType<String>(json, r'rootIdentityId'),
       );
     }
     return null;
@@ -98,7 +105,8 @@ class FamilyMyRootResponseDto {
 
   /// The list of required keys that must be present in a JSON.
   static const requiredKeys = <String>{
-    'identityId',
+    'access',
+    'rootIdentityId',
   };
 }
 

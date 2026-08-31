@@ -14,13 +14,18 @@ class FamilyUnionDto {
   /// Returns a new [FamilyUnionDto] instance.
   FamilyUnionDto({
     this.children = const [],
+    required this.endDate,
     required this.id,
     this.partners = const [],
+    required this.startDate,
     required this.status,
   });
 
   /// Children in this union
   List<FamilyParticipantDto> children;
+
+  /// Union end date
+  DateTime? endDate;
 
   /// Union ID
   String id;
@@ -28,31 +33,48 @@ class FamilyUnionDto {
   /// Partners in this union (0, 1 or 2)
   List<FamilyParticipantDto> partners;
 
+  /// Union start date
+  DateTime? startDate;
+
   FamilyUnionStatus status;
 
   @override
   bool operator ==(Object other) => identical(this, other) || other is FamilyUnionDto &&
     _deepEquality.equals(other.children, children) &&
+    other.endDate == endDate &&
     other.id == id &&
     _deepEquality.equals(other.partners, partners) &&
+    other.startDate == startDate &&
     other.status == status;
 
   @override
   int get hashCode =>
     // ignore: unnecessary_parenthesis
     (children.hashCode) +
+    (endDate == null ? 0 : endDate!.hashCode) +
     (id.hashCode) +
     (partners.hashCode) +
+    (startDate == null ? 0 : startDate!.hashCode) +
     (status.hashCode);
 
   @override
-  String toString() => 'FamilyUnionDto[children=$children, id=$id, partners=$partners, status=$status]';
+  String toString() => 'FamilyUnionDto[children=$children, endDate=$endDate, id=$id, partners=$partners, startDate=$startDate, status=$status]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
       json[r'children'] = this.children;
+    if (this.endDate != null) {
+      json[r'endDate'] = _dateFormatter.format(this.endDate!);
+    } else {
+      json[r'endDate'] = null;
+    }
       json[r'id'] = this.id;
       json[r'partners'] = this.partners;
+    if (this.startDate != null) {
+      json[r'startDate'] = _dateFormatter.format(this.startDate!);
+    } else {
+      json[r'startDate'] = null;
+    }
       json[r'status'] = this.status;
     return json;
   }
@@ -67,8 +89,10 @@ class FamilyUnionDto {
 
       return FamilyUnionDto(
         children: FamilyParticipantDto.listFromJson(json[r'children']),
+        endDate: mapDateTime(json, r'endDate', r''),
         id: mapValueOfType<String>(json, r'id')!,
         partners: FamilyParticipantDto.listFromJson(json[r'partners']),
+        startDate: mapDateTime(json, r'startDate', r''),
         status: FamilyUnionStatus.fromJson(json[r'status'])!,
       );
     }
@@ -118,8 +142,10 @@ class FamilyUnionDto {
   /// The list of required keys that must be present in a JSON.
   static const requiredKeys = <String>{
     'children',
+    'endDate',
     'id',
     'partners',
+    'startDate',
     'status',
   };
 }

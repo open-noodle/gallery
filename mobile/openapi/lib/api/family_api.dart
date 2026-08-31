@@ -127,6 +127,56 @@ class FamilyApi {
     return null;
   }
 
+  /// Remove a user's family access grant
+  ///
+  /// Remove a user's explicit family access grant, reverting them to the instance default.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [String] userId (required):
+  Future<Response> deleteAccessWithHttpInfo(String userId, { Future<void>? abortTrigger, }) async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/family/access/{userId}'
+      .replaceAll('{userId}', userId);
+
+    // ignore: prefer_final_locals
+    Object? postBody;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    const contentTypes = <String>[];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'DELETE',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
+    );
+  }
+
+  /// Remove a user's family access grant
+  ///
+  /// Remove a user's explicit family access grant, reverting them to the instance default.
+  ///
+  /// Parameters:
+  ///
+  /// * [String] userId (required):
+  Future<void> deleteAccess(String userId, { Future<void>? abortTrigger, }) async {
+    final response = await deleteAccessWithHttpInfo(userId, abortTrigger: abortTrigger,);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+  }
+
   /// Delete a family union
   ///
   /// Permanently delete a family union.
@@ -281,9 +331,9 @@ class FamilyApi {
     return null;
   }
 
-  /// Get the viewer's family root
+  /// Get the viewer's family root and access level
   ///
-  /// Retrieve the identity the caller previously nominated as themselves, or null if never set.
+  /// Retrieve the identity the caller previously nominated as themselves (or null if never set) and their own effective family access level, so a client can decide what to render in one call.
   ///
   /// Note: This method returns the HTTP [Response].
   Future<Response> getMyRootWithHttpInfo({ Future<void>? abortTrigger, }) async {
@@ -312,9 +362,9 @@ class FamilyApi {
     );
   }
 
-  /// Get the viewer's family root
+  /// Get the viewer's family root and access level
   ///
-  /// Retrieve the identity the caller previously nominated as themselves, or null if never set.
+  /// Retrieve the identity the caller previously nominated as themselves (or null if never set) and their own effective family access level, so a client can decide what to render in one call.
   Future<FamilyMyRootResponseDto?> getMyRoot({ Future<void>? abortTrigger, }) async {
     final response = await getMyRootWithHttpInfo(abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
@@ -325,6 +375,64 @@ class FamilyApi {
     // FormatException when trying to decode an empty string.
     if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
       return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'FamilyMyRootResponseDto',) as FamilyMyRootResponseDto;
+    
+    }
+    return null;
+  }
+
+  /// Get a person's own family relations
+  ///
+  /// Retrieve a person's direct relations (parents, partners, children, siblings, etc.), each labelled relative to that person rather than the caller.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [String] personId (required):
+  Future<Response> getPersonRelationsWithHttpInfo(String personId, { Future<void>? abortTrigger, }) async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/family/people/{personId}/relations'
+      .replaceAll('{personId}', personId);
+
+    // ignore: prefer_final_locals
+    Object? postBody;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    const contentTypes = <String>[];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'GET',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
+    );
+  }
+
+  /// Get a person's own family relations
+  ///
+  /// Retrieve a person's direct relations (parents, partners, children, siblings, etc.), each labelled relative to that person rather than the caller.
+  ///
+  /// Parameters:
+  ///
+  /// * [String] personId (required):
+  Future<FamilyPersonRelationsResponseDto?> getPersonRelations(String personId, { Future<void>? abortTrigger, }) async {
+    final response = await getPersonRelationsWithHttpInfo(personId, abortTrigger: abortTrigger,);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+    // When a remote server returns no body with a status of 204, we shall not decode it.
+    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
+    // FormatException when trying to decode an empty string.
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'FamilyPersonRelationsResponseDto',) as FamilyPersonRelationsResponseDto;
     
     }
     return null;

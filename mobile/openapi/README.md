@@ -193,10 +193,12 @@ Class | Method | HTTP request | Description
 *FacesApi* | [**unconfirmFaceRepairFaces**](doc//FacesApi.md#unconfirmfacerepairfaces) | **POST** /admin/face-repair/unconfirm | Un-confirm human-placed faces so a re-scan may flag them again
 *FamilyApi* | [**addParticipant**](doc//FamilyApi.md#addparticipant) | **PUT** /family/unions/{id}/participants | Add a participant to a family union
 *FamilyApi* | [**createUnion**](doc//FamilyApi.md#createunion) | **POST** /family/unions | Create a family union
+*FamilyApi* | [**deleteAccess**](doc//FamilyApi.md#deleteaccess) | **DELETE** /family/access/{userId} | Remove a user's family access grant
 *FamilyApi* | [**deleteUnion**](doc//FamilyApi.md#deleteunion) | **DELETE** /family/unions/{id} | Delete a family union
 *FamilyApi* | [**getAllAccess**](doc//FamilyApi.md#getallaccess) | **GET** /family/access | Get all family access grants
 *FamilyApi* | [**getClusters**](doc//FamilyApi.md#getclusters) | **GET** /family/clusters | Get family clusters
-*FamilyApi* | [**getMyRoot**](doc//FamilyApi.md#getmyroot) | **GET** /family/me | Get the viewer's family root
+*FamilyApi* | [**getMyRoot**](doc//FamilyApi.md#getmyroot) | **GET** /family/me | Get the viewer's family root and access level
+*FamilyApi* | [**getPersonRelations**](doc//FamilyApi.md#getpersonrelations) | **GET** /family/people/{personId}/relations | Get a person's own family relations
 *FamilyApi* | [**getUnions**](doc//FamilyApi.md#getunions) | **GET** /family/unions | Get family unions
 *FamilyApi* | [**removeParticipant**](doc//FamilyApi.md#removeparticipant) | **DELETE** /family/unions/{id}/participants/{identityId} | Remove a participant from a family union
 *FamilyApi* | [**setAccess**](doc//FamilyApi.md#setaccess) | **PUT** /family/access/{userId} | Set a user's family access grant
@@ -612,9 +614,10 @@ Class | Method | HTTP request | Description
  - [FamilyMyRootUpdateDto](doc//FamilyMyRootUpdateDto.md)
  - [FamilyParticipantAddDto](doc//FamilyParticipantAddDto.md)
  - [FamilyParticipantDto](doc//FamilyParticipantDto.md)
- - [FamilyParticipantDtoOneOf](doc//FamilyParticipantDtoOneOf.md)
- - [FamilyParticipantDtoOneOf1](doc//FamilyParticipantDtoOneOf1.md)
+ - [FamilyParticipantKind](doc//FamilyParticipantKind.md)
  - [FamilyParticipantRole](doc//FamilyParticipantRole.md)
+ - [FamilyPersonRelationDto](doc//FamilyPersonRelationDto.md)
+ - [FamilyPersonRelationsResponseDto](doc//FamilyPersonRelationsResponseDto.md)
  - [FamilyUnionCreateDto](doc//FamilyUnionCreateDto.md)
  - [FamilyUnionCreateResponseDto](doc//FamilyUnionCreateResponseDto.md)
  - [FamilyUnionDto](doc//FamilyUnionDto.md)

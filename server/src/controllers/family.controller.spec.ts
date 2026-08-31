@@ -83,6 +83,87 @@ describe(FamilyController.name, () => {
       expect(body.tree).toBeUndefined();
     });
 
+    // A previously shipped bug: `FamilyParticipantDto` used to be a `z.discriminatedUnion`,
+    // which the generated Dart client collapsed into one class requiring `identityId` on EVERY
+    // participant — crashing on exactly this case (an anonymous seat has no identity at all).
+    // The wire shape is now flat with a nullable `identityId`; this asserts the SERVER side of
+    // that contract actually serializes an anonymous participant as `{ kind: 'anonymous',
+    // identityId: null }` rather than omitting the key (which a required-but-nullable Zod field
+    // would reject) or throwing.
+    it('serializes an anonymous participant with a null identityId, not an omitted one', async () => {
+      service.getVisibleGraph.mockResolvedValue({
+        identities: {},
+        unions: [
+          {
+            id: UNION_ID,
+            status: 'partnered',
+            partners: [{ kind: 'anonymous' }],
+            children: [],
+          },
+        ],
+      });
+      service.getMyRoot.mockResolvedValue(null);
+
+      const { status, body } = await request(ctx.getHttpServer())
+        .get('/family/unions')
+        .set('Authorization', 'Bearer token');
+
+      expect(status).toBe(200);
+      expect(body.unions[0].partners).toEqual([{ kind: 'anonymous', identityId: null }]);
+    });
+
+    // A previously shipped bug: `getAllUnionsWithParticipants`'s SQL never selected
+    // `startDate`/`endDate`, so the API silently dropped them — a response missing the fields
+    // looked identical to one where they were legitimately null, which is exactly why a
+    // structural assertion alone ("the union has an id") never caught it. Assert the VALUES.
+    it('returns the actual startDate and endDate values for a union that has them', async () => {
+      service.getVisibleGraph.mockResolvedValue({
+        identities: { [IDENTITY_A]: { name: 'Alex', gender: null } },
+        unions: [
+          {
+            id: UNION_ID,
+            status: 'divorced',
+            startDate: '1988-06-01',
+            endDate: '2007-03-15',
+            partners: [knownParticipant(IDENTITY_A)],
+            children: [],
+          },
+        ],
+      });
+      service.getMyRoot.mockResolvedValue(null);
+
+      const { status, body } = await request(ctx.getHttpServer())
+        .get('/family/unions')
+        .set('Authorization', 'Bearer token');
+
+      expect(status).toBe(200);
+      expect(body.unions[0].startDate).toBe('1988-06-01');
+      expect(body.unions[0].endDate).toBe('2007-03-15');
+    });
+
+    it('returns null dates for a union with none, rather than omitting the fields', async () => {
+      service.getVisibleGraph.mockResolvedValue({
+        identities: { [IDENTITY_A]: { name: 'Alex', gender: null } },
+        unions: [
+          {
+            id: UNION_ID,
+            status: 'partnered',
+            partners: [knownParticipant(IDENTITY_A)],
+            children: [],
+          },
+        ],
+      });
+      service.getMyRoot.mockResolvedValue(null);
+
+      const { status, body } = await request(ctx.getHttpServer())
+        .get('/family/unions')
+        .set('Authorization', 'Bearer token');
+
+      expect(status).toBe(200);
+      expect(body.unions[0]).toHaveProperty('startDate', null);
+      expect(body.unions[0]).toHaveProperty('endDate', null);
+    });
+
     // E49 — a large graph is paginated with a stable order across pages. The mock deliberately
     // returns unions in a scrambled order (C, A, B) so this test fails if the controller merely
     // passes the service's order through instead of imposing its own stable (by-id) order.
@@ -276,30 +357,33 @@ describe(FamilyController.name, () => {
   describe('GET /family/me', () => {
     it('should be an authenticated route', async () => {
       service.getMyRoot.mockResolvedValue(null);
+      service.resolveFamilyAccess.mockResolvedValue(FamilyAccessLevel.None);
       await request(ctx.getHttpServer()).get('/family/me');
       expect(ctx.authenticate).toHaveBeenCalled();
     });
 
-    it('returns the currently set root', async () => {
+    it('returns the currently set root and effective access level', async () => {
       service.getMyRoot.mockResolvedValue(IDENTITY_A);
+      service.resolveFamilyAccess.mockResolvedValue(FamilyAccessLevel.Contribute);
 
       const { status, body } = await request(ctx.getHttpServer())
         .get('/family/me')
         .set('Authorization', 'Bearer token');
 
       expect(status).toBe(200);
-      expect(body).toEqual({ identityId: IDENTITY_A });
+      expect(body).toEqual({ rootIdentityId: IDENTITY_A, access: 'contribute' });
     });
 
-    it('returns a null identityId when no root has ever been set', async () => {
+    it('returns a null rootIdentityId when no root has ever been set', async () => {
       service.getMyRoot.mockResolvedValue(null);
+      service.resolveFamilyAccess.mockResolvedValue(FamilyAccessLevel.View);
 
       const { status, body } = await request(ctx.getHttpServer())
         .get('/family/me')
         .set('Authorization', 'Bearer token');
 
       expect(status).toBe(200);
-      expect(body).toEqual({ identityId: null });
+      expect(body).toEqual({ rootIdentityId: null, access: 'view' });
     });
   });
 
@@ -483,8 +567,11 @@ describe(FamilyController.name, () => {
       service.deleteUnion.mockImplementation(forbidden);
       service.addParticipant.mockImplementation(forbidden);
       service.removeParticipant.mockImplementation(forbidden);
+      service.getMyRoot.mockImplementation(forbidden);
+      service.resolveFamilyAccess.mockImplementation(forbidden);
       service.setMyRoot.mockImplementation(forbidden);
       service.updateGender.mockImplementation(forbidden);
+      service.getPersonRelations.mockImplementation(forbidden);
 
       const server = ctx.getHttpServer();
       const bearer = 'Bearer token';
@@ -505,12 +592,14 @@ describe(FamilyController.name, () => {
             .set('Authorization', bearer),
         () =>
           request(server).delete(`/family/unions/${UNION_ID}/participants/${IDENTITY_A}`).set('Authorization', bearer),
+        () => request(server).get('/family/me').set('Authorization', bearer),
         () => request(server).put('/family/me').send({ identityId: null }).set('Authorization', bearer),
         () =>
           request(server)
             .put(`/family/identities/${IDENTITY_A}/gender`)
             .send({ gender: null })
             .set('Authorization', bearer),
+        () => request(server).get(`/family/people/${IDENTITY_A}/relations`).set('Authorization', bearer),
       ];
 
       for (const makeRequest of requests) {
@@ -610,6 +699,60 @@ describe(FamilyController.name, () => {
       expect(service.resolveFamilyAccess).not.toHaveBeenCalled();
       expect(service.requireFamilyRead).not.toHaveBeenCalled();
       expect(service.requireFamilyWrite).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('DELETE /family/access/:userId', () => {
+    it('should be an authenticated route', async () => {
+      await request(ctx.getHttpServer()).delete(`/family/access/${USER_ID}`);
+      expect(ctx.authenticate).toHaveBeenCalled();
+    });
+
+    it('rejects a non-admin caller, even one with contribute', async () => {
+      ctx.authenticate.mockRejectedValue(new ForbiddenException());
+
+      const { status } = await request(ctx.getHttpServer())
+        .delete(`/family/access/${USER_ID}`)
+        .set('Authorization', 'Bearer token');
+
+      expect(status).toBe(403);
+      expect(service.deleteAccessGrant).not.toHaveBeenCalled();
+    });
+
+    // Paired positive control, same shape as the other two grant endpoints: an admin with no
+    // family access mock configured at all still succeeds.
+    it('accepts a deletion from an admin who has no family access of their own', async () => {
+      ctx.authenticate.mockResolvedValue(authStub.admin);
+
+      const { status } = await request(ctx.getHttpServer())
+        .delete(`/family/access/${USER_ID}`)
+        .set('Authorization', 'Bearer token');
+
+      expect(status).toBe(204);
+      expect(service.deleteAccessGrant).toHaveBeenCalledWith(USER_ID);
+      expect(service.resolveFamilyAccess).not.toHaveBeenCalled();
+      expect(service.requireFamilyRead).not.toHaveBeenCalled();
+      expect(service.requireFamilyWrite).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('GET /family/people/:personId/relations', () => {
+    it('should be an authenticated route', async () => {
+      service.getPersonRelations.mockResolvedValue([]);
+      await request(ctx.getHttpServer()).get(`/family/people/${IDENTITY_A}/relations`);
+      expect(ctx.authenticate).toHaveBeenCalled();
+    });
+
+    it('wraps the relations in a { relations } envelope', async () => {
+      service.getPersonRelations.mockResolvedValue([{ person: null, anonymousSlot: 2, relation: 'parent' }] as any);
+
+      const { status, body } = await request(ctx.getHttpServer())
+        .get(`/family/people/${IDENTITY_A}/relations`)
+        .set('Authorization', 'Bearer token');
+
+      expect(status).toBe(200);
+      expect(body).toEqual({ relations: [{ person: null, anonymousSlot: 2, relation: 'parent' }] });
+      expect(service.getPersonRelations).toHaveBeenCalledWith(undefined, IDENTITY_A);
     });
   });
 

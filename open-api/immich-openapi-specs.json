@@ -7356,6 +7356,54 @@
       }
     },
     "/family/access/{userId}": {
+      "delete": {
+        "description": "Remove a user's explicit family access grant, reverting them to the instance default.",
+        "operationId": "deleteAccess",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Remove a user's family access grant",
+        "tags": [
+          "Family"
+        ],
+        "x-immich-admin-only": true,
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-state": "Beta"
+      },
       "put": {
         "description": "Grant a user an explicit family access level, overriding the instance default.",
         "operationId": "setAccess",
@@ -7533,7 +7581,7 @@
     },
     "/family/me": {
       "get": {
-        "description": "Retrieve the identity the caller previously nominated as themselves, or null if never set.",
+        "description": "Retrieve the identity the caller previously nominated as themselves (or null if never set) and their own effective family access level, so a client can decide what to render in one call.",
         "operationId": "getMyRoot",
         "parameters": [],
         "responses": {
@@ -7559,7 +7607,7 @@
             "api_key": []
           }
         ],
-        "summary": "Get the viewer's family root",
+        "summary": "Get the viewer's family root and access level",
         "tags": [
           "Family"
         ],
@@ -7607,6 +7655,63 @@
           }
         ],
         "summary": "Set the viewer's family root",
+        "tags": [
+          "Family"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "family.read",
+        "x-immich-state": "Beta"
+      }
+    },
+    "/family/people/{personId}/relations": {
+      "get": {
+        "description": "Retrieve a person's direct relations (parents, partners, children, siblings, etc.), each labelled relative to that person rather than the caller.",
+        "operationId": "getPersonRelations",
+        "parameters": [
+          {
+            "name": "personId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FamilyPersonRelationsResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Get a person's own family relations",
         "tags": [
           "Family"
         ],
@@ -28539,7 +28644,11 @@
       },
       "FamilyMyRootResponseDto": {
         "properties": {
-          "identityId": {
+          "access": {
+            "$ref": "#/components/schemas/FamilyAccessLevel",
+            "description": "The caller's own effective family access level"
+          },
+          "rootIdentityId": {
             "description": "The identity nominated as the caller, or null if never set",
             "format": "uuid",
             "nullable": true,
@@ -28548,7 +28657,8 @@
           }
         },
         "required": [
-          "identityId"
+          "access",
+          "rootIdentityId"
         ],
         "type": "object"
       },
@@ -28587,43 +28697,31 @@
         "type": "object"
       },
       "FamilyParticipantDto": {
-        "oneOf": [
-          {
-            "type": "object",
-            "properties": {
-              "kind": {
-                "type": "string",
-                "enum": [
-                  "known"
-                ]
-              },
-              "identityId": {
-                "type": "string",
-                "format": "uuid",
-                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
-                "description": "Identity ID"
-              }
-            },
-            "required": [
-              "kind",
-              "identityId"
-            ]
+        "properties": {
+          "identityId": {
+            "description": "Identity ID when kind is 'known'; null when 'anonymous'",
+            "format": "uuid",
+            "nullable": true,
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
           },
-          {
-            "type": "object",
-            "properties": {
-              "kind": {
-                "type": "string",
-                "enum": [
-                  "anonymous"
-                ]
-              }
-            },
-            "required": [
-              "kind"
-            ]
+          "kind": {
+            "$ref": "#/components/schemas/FamilyParticipantKind"
           }
-        ]
+        },
+        "required": [
+          "identityId",
+          "kind"
+        ],
+        "type": "object"
+      },
+      "FamilyParticipantKind": {
+        "description": "Whether this seat is a resolvable identity or unresolvable to the viewer",
+        "enum": [
+          "known",
+          "anonymous"
+        ],
+        "type": "string"
       },
       "FamilyParticipantRole": {
         "enum": [
@@ -28631,6 +28729,50 @@
           "child"
         ],
         "type": "string"
+      },
+      "FamilyPersonRelationDto": {
+        "properties": {
+          "anonymousSlot": {
+            "description": "Opaque per-union slot index, only present when person is null",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "nullable": true,
+            "type": "integer"
+          },
+          "person": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PersonResponseDto"
+              }
+            ],
+            "description": "The related person, or null if the viewer cannot resolve them",
+            "nullable": true
+          },
+          "relation": {
+            "description": "How this participant relates to the requested person (e.g. 'parent')",
+            "type": "string"
+          }
+        },
+        "required": [
+          "anonymousSlot",
+          "person",
+          "relation"
+        ],
+        "type": "object"
+      },
+      "FamilyPersonRelationsResponseDto": {
+        "properties": {
+          "relations": {
+            "items": {
+              "$ref": "#/components/schemas/FamilyPersonRelationDto"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "relations"
+        ],
+        "type": "object"
       },
       "FamilyUnionCreateDto": {
         "properties": {
@@ -28694,6 +28836,12 @@
             },
             "type": "array"
           },
+          "endDate": {
+            "description": "Union end date",
+            "format": "date",
+            "nullable": true,
+            "type": "string"
+          },
           "id": {
             "description": "Union ID",
             "format": "uuid",
@@ -28707,6 +28855,12 @@
             },
             "type": "array"
           },
+          "startDate": {
+            "description": "Union start date",
+            "format": "date",
+            "nullable": true,
+            "type": "string"
+          },
           "status": {
             "$ref": "#/components/schemas/FamilyUnionStatus",
             "description": "Union status"
@@ -28714,8 +28868,10 @@
         },
         "required": [
           "children",
+          "endDate",
           "id",
           "partners",
+          "startDate",
           "status"
         ],
         "type": "object"
@@ -31383,6 +31539,11 @@
               }
             ],
             "x-immich-state": "Stable"
+          },
+          "familyRelationLabel": {
+            "description": "How this person relates to the viewer (\"your niece\"), present only when the viewer has family access",
+            "nullable": true,
+            "type": "string"
           },
           "filterId": {
             "description": "Scoped identity filter token",

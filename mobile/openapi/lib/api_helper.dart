@@ -112,6 +112,9 @@ String parameterToString(dynamic value) {
   if (value is FamilyAccessLevel) {
     return FamilyAccessLevelTypeTransformer().encode(value).toString();
   }
+  if (value is FamilyParticipantKind) {
+    return FamilyParticipantKindTypeTransformer().encode(value).toString();
+  }
   if (value is FamilyParticipantRole) {
     return FamilyParticipantRoleTypeTransformer().encode(value).toString();
   }

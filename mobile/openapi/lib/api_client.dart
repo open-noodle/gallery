@@ -499,12 +499,14 @@ class ApiClient {
           return FamilyParticipantAddDto.fromJson(value);
         case 'FamilyParticipantDto':
           return FamilyParticipantDto.fromJson(value);
-        case 'FamilyParticipantDtoOneOf':
-          return FamilyParticipantDtoOneOf.fromJson(value);
-        case 'FamilyParticipantDtoOneOf1':
-          return FamilyParticipantDtoOneOf1.fromJson(value);
+        case 'FamilyParticipantKind':
+          return FamilyParticipantKindTypeTransformer().decode(value);
         case 'FamilyParticipantRole':
           return FamilyParticipantRoleTypeTransformer().decode(value);
+        case 'FamilyPersonRelationDto':
+          return FamilyPersonRelationDto.fromJson(value);
+        case 'FamilyPersonRelationsResponseDto':
+          return FamilyPersonRelationsResponseDto.fromJson(value);
         case 'FamilyUnionCreateDto':
           return FamilyUnionCreateDto.fromJson(value);
         case 'FamilyUnionCreateResponseDto':

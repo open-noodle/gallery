@@ -1110,6 +1110,8 @@ export type PersonResponseDto = {
     birthDate: string | null;
     /** Person color (hex) */
     color?: string;
+    /** How this person relates to the viewer ("your niece"), present only when the viewer has family access */
+    familyRelationLabel?: string | null;
     /** Scoped identity filter token */
     filterId?: string;
     /** Person ID */
@@ -1528,12 +1530,25 @@ export type FamilyGenderUpdateDto = {
     gender: string | null;
 };
 export type FamilyMyRootResponseDto = {
+    /** The caller's own effective family access level */
+    access: FamilyAccessLevel;
     /** The identity nominated as the caller, or null if never set */
-    identityId: string | null;
+    rootIdentityId: string | null;
 };
 export type FamilyMyRootUpdateDto = {
     /** Identity ID to nominate as yourself, or null to clear */
     identityId: string | null;
+};
+export type FamilyPersonRelationDto = {
+    /** Opaque per-union slot index, only present when person is null */
+    anonymousSlot: number | null;
+    /** The related person, or null if the viewer cannot resolve them */
+    person: (PersonResponseDto) | null;
+    /** How this participant relates to the requested person (e.g. 'parent') */
+    relation: string;
+};
+export type FamilyPersonRelationsResponseDto = {
+    relations: FamilyPersonRelationDto[];
 };
 export type FamilyIdentityDto = {
     /** Recorded gender ('male', 'female'), or null if unset */
@@ -1544,19 +1559,21 @@ export type FamilyIdentityDto = {
     name: string;
 };
 export type FamilyParticipantDto = {
-    kind: Kind;
-    /** Identity ID */
-    identityId: string;
-} | {
-    kind: Kind2;
+    /** Identity ID when kind is 'known'; null when 'anonymous' */
+    identityId: string | null;
+    kind: FamilyParticipantKind;
 };
 export type FamilyUnionDto = {
     /** Children in this union */
     children: FamilyParticipantDto[];
+    /** Union end date */
+    endDate: string | null;
     /** Union ID */
     id: string;
     /** Partners in this union (0, 1 or 2) */
     partners: FamilyParticipantDto[];
+    /** Union start date */
+    startDate: string | null;
     /** Union status */
     status: FamilyUnionStatus;
 };
@@ -6327,6 +6344,17 @@ export function getAllAccess(opts?: Oazapfts.RequestOpts) {
     }));
 }
 /**
+ * Remove a user's family access grant
+ */
+export function deleteAccess({ userId }: {
+    userId: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/family/access/${encodeURIComponent(userId)}`, {
+        ...opts,
+        method: "DELETE"
+    }));
+}
+/**
  * Set a user's family access grant
  */
 export function setAccess({ userId, familyAccessUpdateDto }: {
@@ -6367,7 +6395,7 @@ export function updateGender({ id, familyGenderUpdateDto }: {
     })));
 }
 /**
- * Get the viewer's family root
+ * Get the viewer's family root and access level
  */
 export function getMyRoot(opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchJson<{
@@ -6388,6 +6416,19 @@ export function setMyRoot({ familyMyRootUpdateDto }: {
         method: "PUT",
         body: familyMyRootUpdateDto
     })));
+}
+/**
+ * Get a person's own family relations
+ */
+export function getPersonRelations({ personId }: {
+    personId: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: FamilyPersonRelationsResponseDto;
+    }>(`/family/people/${encodeURIComponent(personId)}/relations`, {
+        ...opts
+    }));
 }
 /**
  * Get family unions
@@ -10480,10 +10521,8 @@ export enum FamilyAccessLevel {
     View = "view",
     Contribute = "contribute"
 }
-export enum Kind {
-    Known = "known"
-}
-export enum Kind2 {
+export enum FamilyParticipantKind {
+    Known = "known",
     Anonymous = "anonymous"
 }
 export enum FamilyUnionStatus {
