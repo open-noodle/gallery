@@ -541,4 +541,174 @@ describe(FamilyService.name, () => {
       expect(mocks.family.getAccess).not.toHaveBeenCalled();
     });
   });
+
+  describe('deleteAccessGrant', () => {
+    it("deletes the grant, independent of the caller's own family access", async () => {
+      await expect(sut.deleteAccessGrant('user-a')).resolves.toBeUndefined();
+
+      expect(mocks.family.deleteAccess).toHaveBeenCalledWith('user-a');
+      expect(mocks.family.getAccess).not.toHaveBeenCalled();
+    });
+
+    it('is not an error when the grant does not exist', async () => {
+      mocks.family.deleteAccess.mockResolvedValue({ numDeletedRows: 0n } as any);
+
+      await expect(sut.deleteAccessGrant('user-a')).resolves.toBeUndefined();
+    });
+  });
+
+  describe('getPersonRelations', () => {
+    const LENA_PERSON_ID = '00000000-0000-4000-a000-000000000701';
+    const LENA_ID = '00000000-0000-4000-a000-000000000702';
+    const ANTON_ID = '00000000-0000-4000-a000-000000000703';
+    const RUTH_ID = '00000000-0000-4000-a000-000000000704';
+    const OSKAR_ID = '00000000-0000-4000-a000-000000000705';
+    const JUNO_ID = '00000000-0000-4000-a000-000000000706';
+    const NICO_ID = '00000000-0000-4000-a000-000000000707';
+    const OTHER_PARENT_ID = '00000000-0000-4000-a000-000000000708';
+    const UNRESOLVABLE_CHILD_ID = '00000000-0000-4000-a000-000000000709';
+    const STRANGER_ID = '00000000-0000-4000-a000-000000000710';
+    const U_PARENTS = '00000000-0000-4000-a000-000000000801';
+    const U_LENA_OSKAR = '00000000-0000-4000-a000-000000000802';
+    const U_HALF = '00000000-0000-4000-a000-000000000803';
+    const U_HIDDEN = '00000000-0000-4000-a000-000000000804';
+
+    const rawUnions = [
+      { id: U_PARENTS, status: 'married', partnerIds: [ANTON_ID, RUTH_ID], childIds: [LENA_ID] },
+      {
+        id: U_LENA_OSKAR,
+        status: 'married',
+        partnerIds: [LENA_ID, OSKAR_ID],
+        childIds: [JUNO_ID, UNRESOLVABLE_CHILD_ID],
+      },
+      { id: U_HALF, status: 'married', partnerIds: [ANTON_ID, OTHER_PARENT_ID], childIds: [NICO_ID] },
+      // Only LENA is resolvable here (< 2) — this union must never appear in
+      // `computeVisibleUnions`'s output, which is exactly what "a union the viewer cannot see
+      // contributes nothing" means for `getPersonRelations`.
+      { id: U_HIDDEN, status: 'married', partnerIds: [LENA_ID, STRANGER_ID], childIds: [] },
+    ];
+
+    const resolvableNames = new Map([
+      [LENA_ID, 'Lena'],
+      [ANTON_ID, 'Anton'],
+      [RUTH_ID, 'Ruth'],
+      [OSKAR_ID, 'Oskar'],
+      [JUNO_ID, 'Juno'],
+      [NICO_ID, 'Nico'],
+      [OTHER_PARENT_ID, 'Other'],
+    ]);
+
+    // What the REAL `FamilyRepository.computeVisibleUnions` would produce for the raw unions and
+    // resolvable set above — `computeVisibleUnions` itself is mocked, so this is asserted by
+    // configuration, not exercised, but it must stay a faithful projection of `rawUnions` for
+    // these tests to mean anything.
+    const visibleUnions = [
+      {
+        id: U_PARENTS,
+        status: 'married',
+        partners: [{ identityId: ANTON_ID }, { identityId: RUTH_ID }],
+        children: [{ identityId: LENA_ID }],
+      },
+      {
+        id: U_LENA_OSKAR,
+        status: 'married',
+        partners: [{ identityId: LENA_ID }, { identityId: OSKAR_ID }],
+        children: [{ identityId: JUNO_ID }, { anonymous: true }],
+      },
+      {
+        id: U_HALF,
+        status: 'married',
+        partners: [{ identityId: ANTON_ID }, { identityId: OTHER_PARENT_ID }],
+        children: [{ identityId: NICO_ID }],
+      },
+    ];
+
+    const setUpGraphMocks = () => {
+      mocks.family.getAllUnionsWithParticipants.mockResolvedValue(rawUnions as any);
+      mocks.faceIdentity.resolveAccessibleIdentityNames.mockResolvedValue(resolvableNames as any);
+      mocks.family.getGenders.mockResolvedValue(new Map());
+      mocks.family.computeVisibleUnions.mockReturnValue(visibleUnions as any);
+      mocks.faceIdentity.getResolvedPersonByIdentityId.mockImplementation((_userId: string, identityId: string) =>
+        Promise.resolve({ id: `person-${identityId}`, name: identityId } as any),
+      );
+    };
+
+    it("labels relations relative to the SUBJECT, never the viewer's own root", async () => {
+      giveViewOnlyAccess(sut, mocks);
+      setUpGraphMocks();
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([LENA_PERSON_ID]));
+      mocks.person.getById.mockResolvedValue({ id: LENA_PERSON_ID, identityId: LENA_ID } as any);
+
+      const relations = await sut.getPersonRelations(authStub.user1, LENA_PERSON_ID);
+      const byPersonId = new Map(relations.filter((entry) => entry.person).map((entry) => [entry.person!.id, entry]));
+
+      expect(byPersonId.get(`person-${ANTON_ID}`)?.relation).toBe('parent');
+      expect(byPersonId.get(`person-${RUTH_ID}`)?.relation).toBe('parent');
+      expect(byPersonId.get(`person-${OSKAR_ID}`)?.relation).toBe('partner');
+      expect(byPersonId.get(`person-${JUNO_ID}`)?.relation).toBe('child');
+      expect(byPersonId.get(`person-${NICO_ID}`)?.relation).toBe('half-sibling');
+      expect(byPersonId.get(`person-${OTHER_PARENT_ID}`)?.relation).toBe('step-parent');
+      // The viewer's OWN root is never even looked up — proof this is relative to the requested
+      // person, not to whoever is asking (the "different query from familyRelationLabel" split).
+      expect(mocks.user.getMetadata).not.toHaveBeenCalled();
+    });
+
+    it('yields a null person with an opaque slot and no identity id for an unresolvable participant', async () => {
+      giveViewOnlyAccess(sut, mocks);
+      setUpGraphMocks();
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([LENA_PERSON_ID]));
+      mocks.person.getById.mockResolvedValue({ id: LENA_PERSON_ID, identityId: LENA_ID } as any);
+
+      const relations = await sut.getPersonRelations(authStub.user1, LENA_PERSON_ID);
+      const anonymousEntry = relations.find((entry) => entry.person === null);
+
+      expect(anonymousEntry).toBeDefined();
+      expect(anonymousEntry?.anonymousSlot).toBe(1);
+      expect(anonymousEntry?.relation).toBe('child');
+      expect(JSON.stringify(anonymousEntry)).not.toContain(UNRESOLVABLE_CHILD_ID);
+    });
+
+    it('excludes everything from a union the viewer cannot see', async () => {
+      giveViewOnlyAccess(sut, mocks);
+      setUpGraphMocks();
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([LENA_PERSON_ID]));
+      mocks.person.getById.mockResolvedValue({ id: LENA_PERSON_ID, identityId: LENA_ID } as any);
+
+      const relations = await sut.getPersonRelations(authStub.user1, LENA_PERSON_ID);
+
+      // Exactly what `u-parents`/`u-lena-oskar`/`u-half` produce (Anton and Ruth as parents,
+      // Oskar as partner, Juno as child, the anonymous child seat, Nico as half-sibling, and
+      // Other — Anton's OTHER partner from a different union — as a step-parent) — nothing at
+      // all from `u-hidden`.
+      expect(relations).toHaveLength(7);
+      expect(JSON.stringify(relations)).not.toContain(STRANGER_ID);
+    });
+
+    it('returns no relations for an accessible person never linked to a family identity', async () => {
+      giveViewOnlyAccess(sut, mocks);
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([LENA_PERSON_ID]));
+      mocks.person.getById.mockResolvedValue({ id: LENA_PERSON_ID, identityId: null } as any);
+
+      await expect(sut.getPersonRelations(authStub.user1, LENA_PERSON_ID)).resolves.toEqual([]);
+      expect(mocks.family.getAllUnionsWithParticipants).not.toHaveBeenCalled();
+    });
+
+    it('throws not found when the person is not accessible at all', async () => {
+      giveViewOnlyAccess(sut, mocks);
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.faceIdentity.getAccessibleProfileIdentityId.mockResolvedValue(undefined);
+
+      await expect(sut.getPersonRelations(authStub.user1, LENA_PERSON_ID)).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    // Paired with the positive control above (`giveViewOnlyAccess` succeeding): a caller with no
+    // family access at all is refused before any person-access lookup even happens.
+    it('refuses a caller with no family access at all', async () => {
+      mocks.family.getAccess.mockResolvedValue(undefined);
+      sut['getConfig'] = () => Promise.resolve(makeFamilyConfig(true, 'none') as any);
+
+      await expect(sut.getPersonRelations(authStub.user1, LENA_PERSON_ID)).rejects.toBeInstanceOf(ForbiddenException);
+      expect(mocks.access.person.checkOwnerAccess).not.toHaveBeenCalled();
+    });
+  });
 });

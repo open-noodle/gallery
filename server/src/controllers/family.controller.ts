@@ -13,6 +13,8 @@ import {
   FamilyMyRootResponseDto,
   FamilyMyRootUpdateDto,
   FamilyParticipantAddDto,
+  FamilyPersonParamDto,
+  FamilyPersonRelationsResponseDto,
   FamilyUnionCreateDto,
   FamilyUnionCreateResponseDto,
   FamilyUnionParamDto,
@@ -24,7 +26,20 @@ import { ApiTag, Permission } from 'src/enum';
 import { Auth, Authenticated } from 'src/middleware/auth.guard';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { FamilyService } from 'src/services/family.service';
-import { deriveRelationLabel, FamilyGender } from 'src/utils/family-labels';
+import { asDateString } from 'src/utils/date';
+import { deriveRelationLabel, FamilyGender, ProjectedFamilyParticipant } from 'src/utils/family-labels';
+
+// The internal `ProjectedFamilyParticipant` (slice 6) is `{kind:'known', identityId}` OR
+// `{kind:'anonymous'}` with NO `identityId` key at all. The wire DTO is a flat
+// `{kind, identityId: string | null}` instead (see `family.dto.ts` for why: a `oneOf`
+// discriminated union broke the generated Dart client on exactly the anonymous case). This is
+// the one place that bridges the two — never spread a participant straight onto the response.
+const toParticipantDto = (
+  participant: ProjectedFamilyParticipant,
+): { kind: 'known' | 'anonymous'; identityId: string | null } =>
+  participant.kind === 'known'
+    ? { kind: 'known', identityId: participant.identityId }
+    : { kind: 'anonymous', identityId: null };
 
 // Gallery-fork: family relationships. Thin controller over `FamilyService` — every access
 // decision (view/contribute for reads/writes, admin-independent-of-family-level for the two
@@ -90,8 +105,10 @@ export class FamilyController {
     const unions = page.map((union) => ({
       id: union.id,
       status: union.status,
-      partners: union.partners.map((participant) => ({ ...participant })),
-      children: union.children.map((participant) => ({ ...participant })),
+      startDate: asDateString(union.startDate ?? null),
+      endDate: asDateString(union.endDate ?? null),
+      partners: union.partners.map((participant) => toParticipantDto(participant)),
+      children: union.children.map((participant) => toParticipantDto(participant)),
     }));
 
     return { unions, identities, hasNextPage };
@@ -176,16 +193,42 @@ export class FamilyController {
     return this.service.getClusters(auth);
   }
 
-  // D4: requires only `view` — reading back your own root discloses nothing about anyone else.
+  // A genuinely different query from `PersonResponseDto.familyRelationLabel`: THAT field answers
+  // "how does this person relate to the VIEWER" (one label on an already-fetched person); this
+  // endpoint answers "what are THIS PERSON's own relations", each labelled relative to that
+  // person. Same engine (`deriveDirectRelations`), same graph, different root — see
+  // `FamilyService.getPersonRelations`.
+  @Get('people/:personId/relations')
+  @Authenticated({ permission: Permission.FamilyRead })
+  @Endpoint({
+    summary: "Get a person's own family relations",
+    description:
+      "Retrieve a person's direct relations (parents, partners, children, siblings, etc.), each labelled relative to that person rather than the caller.",
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  async getPersonRelations(
+    @Auth() auth: AuthDto,
+    @Param() { personId }: FamilyPersonParamDto,
+  ): Promise<FamilyPersonRelationsResponseDto> {
+    return { relations: await this.service.getPersonRelations(auth, personId) };
+  }
+
+  // D4: requires only `view` — reading back your own root and access level discloses nothing
+  // about anyone else.
   @Get('me')
   @Authenticated({ permission: Permission.FamilyRead })
   @Endpoint({
-    summary: "Get the viewer's family root",
-    description: 'Retrieve the identity the caller previously nominated as themselves, or null if never set.',
+    summary: "Get the viewer's family root and access level",
+    description:
+      'Retrieve the identity the caller previously nominated as themselves (or null if never set) and their own effective family access level, so a client can decide what to render in one call.',
     history: new HistoryBuilder().added('v1').beta('v1'),
   })
   async getMyRoot(@Auth() auth: AuthDto): Promise<FamilyMyRootResponseDto> {
-    return { identityId: await this.service.getMyRoot(auth) };
+    const [rootIdentityId, access] = await Promise.all([
+      this.service.getMyRoot(auth),
+      this.service.resolveFamilyAccess(auth),
+    ]);
+    return { rootIdentityId, access };
   }
 
   // D4: requires only `view` — nominating yourself as the root changes nothing anyone else can
@@ -252,5 +295,22 @@ export class FamilyController {
     @Body() dto: FamilyAccessUpdateDto,
   ): Promise<FamilyAccessGrantResponseDto> {
     return this.service.setAccessGrant(auth, userId, dto.level);
+  }
+
+  // Reverts a user to the instance default by removing their explicit grant entirely — the ONLY
+  // way back to "inherits default" once a user has one (setting a value that happens to MATCH
+  // the default still leaves the row, and therefore the explicit grant, behind). Deleting a
+  // grant that never existed is not an error. Same admin-independent-of-family-level authority
+  // as the other two grant endpoints.
+  @Delete('access/:userId')
+  @Authenticated({ admin: true })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Endpoint({
+    summary: "Remove a user's family access grant",
+    description: "Remove a user's explicit family access grant, reverting them to the instance default.",
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  deleteAccess(@Param() { userId }: FamilyAccessUserParamDto): Promise<void> {
+    return this.service.deleteAccessGrant(userId);
   }
 }
