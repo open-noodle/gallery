@@ -41,10 +41,16 @@ const FamilyParticipantSchema = z
   ])
   .meta({ id: 'FamilyParticipantDto' });
 
+// `label` is derived server-side ONLY, from the projected graph and the caller's own root
+// (`deriveRelationLabel`, D4) — never computed by a client, since a client only ever sees the
+// already-redacted graph and correctly deriving "your niece" requires knowing the FULL set of
+// unions a viewer can resolve, not just the ones on the current page. null when no root is set,
+// or when the caller has no path to this identity at all (`E36`/`E45`).
 const FamilyIdentitySchema = z
   .object({
     name: z.string().describe('Resolved display name'),
     gender: FamilyGenderSchema.describe("Recorded gender ('male', 'female'), or null if unset"),
+    label: z.string().nullable().describe('This identity\'s relation to the caller ("your sister"), or null'),
   })
   .meta({ id: 'FamilyIdentityDto' });
 
@@ -133,6 +139,12 @@ const FamilyMyRootUpdateSchema = z
   })
   .meta({ id: 'FamilyMyRootUpdateDto' });
 
+const FamilyMyRootResponseSchema = z
+  .object({
+    identityId: z.uuidv4().nullable().describe('The identity nominated as the caller, or null if never set'),
+  })
+  .meta({ id: 'FamilyMyRootResponseDto' });
+
 const FamilyGenderUpdateSchema = z
   .object({
     gender: FamilyGenderSchema.describe("Gender ('male' or 'female'), or null to clear"),
@@ -171,6 +183,7 @@ export class FamilyUnionParamDto extends createZodDto(FamilyUnionParamSchema) {}
 export class FamilyUnionParticipantParamDto extends createZodDto(FamilyUnionParticipantParamSchema) {}
 export class FamilyIdentityParamDto extends createZodDto(FamilyIdentityParamSchema) {}
 export class FamilyMyRootUpdateDto extends createZodDto(FamilyMyRootUpdateSchema) {}
+export class FamilyMyRootResponseDto extends createZodDto(FamilyMyRootResponseSchema) {}
 export class FamilyGenderUpdateDto extends createZodDto(FamilyGenderUpdateSchema) {}
 export class FamilyAccessGrantResponseDto extends createZodDto(FamilyAccessGrantResponseSchema) {}
 export class FamilyAccessUpdateDto extends createZodDto(FamilyAccessUpdateSchema) {}
