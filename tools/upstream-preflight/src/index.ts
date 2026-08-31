@@ -8,6 +8,7 @@ import { runCommitAutolinkAudit } from './audits/commit-autolinks';
 import { runMobileDriftAudit } from './audits/mobile-drift';
 import { runPatchAudits } from './audits/patches';
 import {
+  parseQueryBlocks,
   runPostRebaseAudits,
   writePostRebaseAuditReport,
 } from './audits/post-rebase';
@@ -27,7 +28,13 @@ import {
   findUncoveredFiles,
   validateManifestForkHead,
 } from './coverage';
-import { collectGitRange, getGitPath, getMergeBase, revParse } from './git';
+import {
+  collectGitRange,
+  getGitPath,
+  getMergeBase,
+  revParse,
+  runGit,
+} from './git';
 import { defaultManifestPath, loadManifest } from './manifest';
 import {
   evaluateReadiness,
@@ -582,12 +589,17 @@ program
   .option('--batch <id>', 'upstream batch id')
   .option('--plan-dir <path>', 'persisted batch plan directory')
   .option('--output-dir <path>', 'post-rebase audit output directory')
+  .option(
+    '--base <ref>',
+    'baseline ref for generated-query-block survival (default: newest backup/rolling-pre-* branch)',
+  )
   .action(
     (options: {
       manifest: string;
       batch?: string;
       planDir?: string;
       outputDir?: string;
+      base?: string;
     }) => {
       const batch = options.batch ?? process.env.BATCH;
       const auditInput = batch
@@ -613,6 +625,7 @@ program
         auditInput.manifest,
         auditInput.auditScope.upstreamTouchedFiles,
         repoRoot(),
+        readBaselineQueryBlocks(repoRoot(), options.base),
       );
       for (const result of results) {
         console.log(`${result.ok ? 'OK' : 'ISSUE'}: ${result.title}`);
@@ -639,6 +652,56 @@ program
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * Query blocks in `server/src/queries/*.sql` as of the baseline, for the survival check.
+ *
+ * Defaults to the newest `backup/rolling-pre-*` branch, which the rolling flow creates before every
+ * cycle. Returns undefined when there is no baseline to compare against, which skips the check
+ * rather than inventing one — a wrong baseline is worse than none.
+ */
+function readBaselineQueryBlocks(
+  cwd: string,
+  base?: string,
+): Record<string, string[]> | undefined {
+  let ref = base;
+  if (!ref) {
+    const branches = runGit(cwd, [
+      'for-each-ref',
+      '--format=%(refname:short)',
+      '--sort=-committerdate',
+      'refs/heads/backup/rolling-pre-*',
+    ])
+      .split('\n')
+      .filter(Boolean);
+    ref = branches[0];
+  }
+  if (!ref) return undefined;
+
+  try {
+    const files = runGit(cwd, [
+      'ls-tree',
+      '-r',
+      '--name-only',
+      ref,
+      '--',
+      'server/src/queries',
+    ])
+      .split('\n')
+      .filter((file) => file.endsWith('.sql'));
+    if (files.length === 0) return undefined;
+
+    return Object.fromEntries(
+      files.map((file) => [
+        file,
+        parseQueryBlocks(runGit(cwd, ['show', `${ref}:${file}`])),
+      ]),
+    );
+  } catch {
+    // An unreadable baseline (pruned backup branch, shallow clone) must not fail the audit.
+    return undefined;
+  }
 }
 
 program.parse(process.argv);
