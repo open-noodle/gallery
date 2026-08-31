@@ -11,6 +11,16 @@ where
   and "asset_face"."personGroupId" = $2
 
 -- PersonRepository.unassignFaces
+delete from "face_identity_face"
+where
+  "assetFaceId" in (
+    select
+      "id"
+    from
+      "asset_face"
+    where
+      "asset_face"."sourceType" = $1
+  )
 update "asset_face"
 set
   "personGroupId" = $1
@@ -77,7 +87,7 @@ where
 
 -- PersonRepository.getBirthdaysForDay
 select
-  "id",
+  "personGroupId",
   "name",
   "birthDate"
 from
@@ -192,7 +202,7 @@ order by
   CASE
     WHEN NULLIF(BTRIM(person.name), '') IS NULL THEN COUNT("asset_face"."assetId")
   END desc nulls last,
-  "person"."id"
+  "person"."personGroupId"
 limit
   $5
 offset
@@ -204,8 +214,7 @@ select
 from
   "person"
   left join "asset_face" on "asset_face"."personGroupId" = "person"."personGroupId"
-where
-  "asset_face"."deletedAt" is null
+  and "asset_face"."deletedAt" is null
   and (
     "asset_face"."isVisible" is null
     or "asset_face"."isVisible" = $1
@@ -230,15 +239,21 @@ select
           "person"
         where
           "person"."personGroupId" = "asset_face"."personGroupId"
-          and "person"."ownerId" = $1
+        order by
+          case
+            when "person"."ownerId" = $1 then 0
+            else 1
+          end
+        limit
+          $2
       ) as obj
   ) as "person"
 from
   "asset_face"
 where
-  "asset_face"."assetId" = $2
+  "asset_face"."assetId" = $3
   and "asset_face"."deletedAt" is null
-  and "asset_face"."isVisible" = $3
+  and "asset_face"."isVisible" = $4
 order by
   "asset_face"."boundingBoxX1" asc
 
@@ -256,13 +271,19 @@ select
           "person"
         where
           "person"."personGroupId" = "asset_face"."personGroupId"
-          and "person"."ownerId" = $1
+        order by
+          case
+            when "person"."ownerId" = $1 then 0
+            else 1
+          end
+        limit
+          $2
       ) as obj
   ) as "person"
 from
   "asset_face"
 where
-  "asset_face"."id" = $2
+  "asset_face"."id" = $3
   and "asset_face"."deletedAt" is null
 
 -- PersonRepository.getFaceByIdIncludingTombstoned
@@ -278,7 +299,7 @@ select
         from
           "person"
         where
-          "person"."id" = "asset_face"."personId"
+          "person"."personGroupId" = "asset_face"."personGroupId"
       ) as obj
   ) as "person"
 from
@@ -296,7 +317,7 @@ select
 from
   "person"
   inner join "asset_face" on (
-    "asset_face"."personId" = "person"."id"
+    "asset_face"."personGroupId" = "person"."personGroupId"
     or exists (
       select
         "face_identity_face"."assetFaceId"
@@ -309,7 +330,7 @@ from
   )
   inner join "asset" on "asset"."id" = "asset_face"."assetId"
 where
-  "person"."id" = $1
+  "person"."personGroupId" = $1
   and "asset_face"."deletedAt" is null
   and "asset_face"."isVisible" = $2
   and "asset"."deletedAt" is null
@@ -338,7 +359,7 @@ select
 from
   "person"
   inner join "asset_face" on (
-    "asset_face"."personId" = "person"."id"
+    "asset_face"."personGroupId" = "person"."personGroupId"
     or exists (
       select
         "face_identity_face"."assetFaceId"
@@ -351,7 +372,7 @@ from
   )
   inner join "asset" on "asset"."id" = "asset_face"."assetId"
 where
-  "person"."id" = $1
+  "person"."personGroupId" = $1
   and "asset_face"."id" = $2
   and "asset_face"."deletedAt" is null
   and "asset_face"."isVisible" = $3
@@ -370,6 +391,7 @@ where
 -- PersonRepository.getFaceForFacialRecognitionJob
 select
   "asset_face"."id",
+  "asset_face"."assetId",
   "asset_face"."personGroupId",
   "asset_face"."sourceType",
   (
@@ -456,6 +478,14 @@ where
   "person"."personGroupId" = $1
   and "person"."ownerId" = $2
 
+-- PersonRepository.getByGroupIdOnly
+select
+  "person".*
+from
+  "person"
+where
+  "person"."personGroupId" = $1
+
 -- PersonRepository.getByName
 with
   "similarity_threshold" as (
@@ -481,7 +511,7 @@ where
         "asset_face"
         inner join "asset" on "asset"."id" = "asset_face"."assetId"
       where
-        "asset_face"."personId" = "person"."id"
+        "asset_face"."personGroupId" = "person"."personGroupId"
         and "asset_face"."deletedAt" is null
         and "asset_face"."isVisible" is true
         and "asset"."visibility" = $4
@@ -493,7 +523,7 @@ where
         "asset_face"
         inner join "asset" on "asset"."id" = "asset_face"."assetId"
       where
-        "asset_face"."personId" = "person"."id"
+        "asset_face"."personGroupId" = "person"."personGroupId"
         and "asset_face"."deletedAt" is null
         and "asset_face"."isVisible" is true
         and "asset"."visibility" != $5
@@ -518,14 +548,17 @@ where
 
 -- PersonRepository.getStatistics
 select
-  count(distinct ("asset"."id")) as "count"
+  count(distinct ("asset"."id")) as "assets",
+  count(distinct ("asset_face"."id")) as "faces"
 from
   "asset_face"
-  left join "asset" on "asset"."id" = "asset_face"."assetId"
-  and "asset"."visibility" = 'timeline'
+  inner join "asset" on "asset"."id" = "asset_face"."assetId"
+where
+  "asset"."visibility" = 'timeline'
   and "asset"."deletedAt" is null
+  and "asset"."isOffline" = $1
   and (
-    "asset"."ownerId" = $1::uuid
+    "asset"."ownerId" = $2::uuid
     or exists (
       select
         1 as "exists"
@@ -534,15 +567,14 @@ from
         inner join "album" on "album"."id" = "album_asset"."albumId"
         and "album"."deletedAt" is null
         inner join "album_user" on "album_user"."albumId" = "album"."id"
-        and "album_user"."userId" = $2::uuid
+        and "album_user"."userId" = $3::uuid
       where
         "album_asset"."assetId" = "asset"."id"
     )
   )
-where
-  "asset_face"."deletedAt" is null
+  and "asset_face"."deletedAt" is null
   and "asset_face"."isVisible" is true
-  and "asset_face"."personGroupId" = $3
+  and "asset_face"."personGroupId" = $4
 
 -- PersonRepository.getStatistics
 select
@@ -555,18 +587,28 @@ where
   "asset"."visibility" = 'timeline'
   and "asset"."deletedAt" is null
   and "asset"."isOffline" = $1
-  and "asset_face"."deletedAt" is null
-  and "asset_face"."isVisible" is true
-  and "asset_face"."personId" = $2
   and (
-    exists (
+    "asset"."ownerId" = $2::uuid
+    or exists (
+      select
+        1 as "exists"
+      from
+        "album_asset"
+        inner join "album" on "album"."id" = "album_asset"."albumId"
+        and "album"."deletedAt" is null
+        inner join "album_user" on "album_user"."albumId" = "album"."id"
+        and "album_user"."userId" = $3::uuid
+      where
+        "album_asset"."assetId" = "asset"."id"
+    )
+    or exists (
       select
         1 as "exists"
       from
         "shared_space_asset"
         inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_asset"."spaceId"
       where
-        "shared_space_member"."userId" = $3::uuid
+        "shared_space_member"."userId" = $4::uuid
         and "shared_space_asset"."assetId" = "asset"."id"
     )
     or exists (
@@ -576,7 +618,7 @@ where
         "shared_space_library"
         inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_library"."spaceId"
       where
-        "shared_space_member"."userId" = $4::uuid
+        "shared_space_member"."userId" = $5::uuid
         and "shared_space_library"."libraryId" = "asset"."libraryId"
     )
     or (
@@ -590,7 +632,7 @@ where
           and "album"."deletedAt" is null
           inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_album"."spaceId"
         where
-          "shared_space_member"."userId" = $5::uuid
+          "shared_space_member"."userId" = $6::uuid
           and "album_asset"."assetId" = "asset"."id"
       )
       or exists (
@@ -604,44 +646,163 @@ where
           and "album"."deletedAt" is null
           inner join "shared_space_member" on "shared_space_member"."spaceId" = "shared_space_album"."spaceId"
         where
-          "shared_space_member"."userId" = $6::uuid
+          "shared_space_member"."userId" = $7::uuid
           and "album_space_asset"."assetId" = "asset"."id"
       )
     )
   )
+  and "asset_face"."deletedAt" is null
+  and "asset_face"."isVisible" is true
+  and "asset_face"."personGroupId" = $8
 
 -- PersonRepository.getNumberOfPeople
-select
-  coalesce(count(*), 0) as "total",
-  coalesce(
-    count(*) filter (
-      where
-        "isHidden" = $1
-    ),
-    0
-  ) as "hidden"
-from
-  "person"
-where
-  exists (
-    select
-    from
-      "asset_face"
-    where
-      "asset_face"."personGroupId" = "person"."personGroupId"
-      and "asset_face"."deletedAt" is null
-      and "asset_face"."isVisible" = $2
-      and exists (
-        select
-        from
-          "asset"
-        where
-          "asset"."id" = "asset_face"."assetId"
-          and "asset"."visibility" = 'timeline'
-          and "asset"."deletedAt" is null
-      )
+WITH
+  "eligible_people" AS (
+    SELECT
+      "person"."personGroupId",
+      "person"."isHidden"
+    FROM
+      "person"
+      INNER JOIN "asset_face" ON "asset_face"."personGroupId" = "person"."personGroupId"
+      INNER JOIN "asset" ON "asset"."id" = "asset_face"."assetId"
+    WHERE
+      "person"."ownerId" = $1
+      AND "asset"."visibility" = $2
+      AND "asset"."deletedAt" IS NULL
+      AND "asset_face"."deletedAt" IS NULL
+      AND "asset_face"."isVisible" = true
+      -- see getPeopleOverviewStatistics: group by the composite PRIMARY KEY, not the unique index
+    GROUP BY
+      "person"."ownerId",
+      "person"."personGroupId"
+    HAVING
+      NULLIF(BTRIM("person"."name"), '') IS NOT NULL
+      OR COUNT("asset_face"."assetId") >= $3
   )
-  and "person"."ownerId" = $3
+SELECT
+  COUNT(*)::int AS "total",
+  COUNT(*) FILTER (
+    WHERE
+      "isHidden" = true
+  )::int AS "hidden"
+FROM
+  "eligible_people"
+
+-- PersonRepository.getPeopleOverviewStatistics
+WITH
+  "eligible_faces" AS (
+    SELECT
+      "asset_face"."id" AS "assetFaceId",
+      "asset_face"."personGroupId"
+    FROM
+      "asset_face"
+      INNER JOIN "asset" ON "asset"."id" = "asset_face"."assetId"
+    WHERE
+      "asset"."ownerId" = $1
+      AND "asset"."deletedAt" IS NULL
+      AND "asset"."isOffline" = false
+      AND "asset"."visibility" IN ($2, $3)
+      AND "asset_face"."deletedAt" IS NULL
+      AND "asset_face"."isVisible" = true
+  ),
+  "eligible_people" AS (
+    SELECT
+      "person"."personGroupId",
+      "person"."isHidden"
+    FROM
+      "person"
+      INNER JOIN "eligible_faces" ON "eligible_faces"."personGroupId" = "person"."personGroupId"
+    WHERE
+      "person"."ownerId" = $4
+      -- group by the table's PRIMARY KEY, which #30739 made composite. Postgres only infers
+      -- functional dependency from a primary key, never from a unique index, so grouping by
+      -- "personGroupId" alone leaves "isHidden" and "name" ungrouped and the query fails to plan.
+    GROUP BY
+      "person"."ownerId",
+      "person"."personGroupId"
+    HAVING
+      NULLIF(BTRIM("person"."name"), '') IS NOT NULL
+      OR COUNT(DISTINCT "eligible_faces"."assetFaceId") >= $5
+  )
+SELECT
+  COUNT(DISTINCT "eligible_people"."personGroupId")::int AS "total",
+  COUNT(DISTINCT "eligible_people"."personGroupId") FILTER (
+    WHERE
+      "eligible_people"."isHidden" = true
+  )::int AS "hidden",
+  COUNT(DISTINCT "eligible_faces"."assetFaceId")::int AS "detectedFaceCount"
+FROM
+  "eligible_faces"
+  LEFT JOIN "eligible_people" ON "eligible_people"."personGroupId" = "eligible_faces"."personGroupId"
+
+-- PersonRepository.getPeopleFaceStatistics
+WITH
+  "eligible_faces" AS (
+    SELECT
+      "asset_face"."id" AS "assetFaceId",
+      "asset_face"."personGroupId"
+    FROM
+      "asset_face"
+      INNER JOIN "asset" ON "asset"."id" = "asset_face"."assetId"
+    WHERE
+      "asset"."ownerId" = $1
+      AND "asset"."deletedAt" IS NULL
+      AND "asset"."isOffline" = false
+      AND "asset"."visibility" IN ($2, $3)
+      AND "asset_face"."deletedAt" IS NULL
+      AND "asset_face"."isVisible" = true
+  ),
+  "person_face_counts" AS (
+    SELECT
+      "personGroupId" AS "personId",
+      COUNT(DISTINCT "assetFaceId")::int AS "assetCount"
+    FROM
+      "eligible_faces"
+    WHERE
+      "personGroupId" IS NOT NULL
+    GROUP BY
+      "personGroupId"
+  ),
+  "detected_faces" AS (
+    SELECT
+      "eligible_faces"."assetFaceId",
+      "person"."personGroupId" AS "personId",
+      NULLIF(BTRIM("person"."name"), '') IS NOT NULL AS "isNamed",
+      CASE
+        WHEN "person"."personGroupId" IS NOT NULL
+        AND (
+          NULLIF(BTRIM("person"."name"), '') IS NOT NULL
+          OR "person_face_counts"."assetCount" >= $4
+        ) THEN "person"."isHidden"
+        ELSE NULL
+      END AS "isHidden"
+    FROM
+      "eligible_faces"
+      LEFT JOIN "person" ON "person"."personGroupId" = "eligible_faces"."personGroupId"
+      AND "person"."ownerId" = $5
+      LEFT JOIN "person_face_counts" ON "person_face_counts"."personId" = "person"."personGroupId"
+  )
+SELECT
+  COUNT(DISTINCT "assetFaceId")::int AS "detectedFaceCount",
+  COUNT(DISTINCT "assetFaceId") FILTER (
+    WHERE
+      "isHidden" = false
+  )::int AS "assignedVisibleFaceCount",
+  COUNT(DISTINCT "personId") FILTER (
+    WHERE
+      "isHidden" = false
+      AND "isNamed" = true
+  )::int AS "namedVisiblePersonCount",
+  COUNT(DISTINCT "assetFaceId") FILTER (
+    WHERE
+      "isHidden" = true
+  )::int AS "assignedHiddenFaceCount",
+  COUNT(DISTINCT "assetFaceId") FILTER (
+    WHERE
+      "isHidden" IS NULL
+  )::int AS "unassignedFaceCount"
+FROM
+  "detected_faces"
 
 -- PersonRepository.createGroup
 insert into
@@ -830,14 +991,20 @@ select
           "person"
         where
           "person"."personGroupId" = "asset_face"."personGroupId"
-          and "person"."ownerId" = $1
+        order by
+          case
+            when "person"."ownerId" = $1 then 0
+            else 1
+          end
+        limit
+          $2
       ) as obj
   ) as "person"
 from
   "asset_face"
 where
-  "asset_face"."assetId" in ($2)
-  and "asset_face"."personGroupId" in ($3)
+  "asset_face"."assetId" in ($3)
+  and "asset_face"."personGroupId" in ($4)
   and "asset_face"."deletedAt" is null
 
 -- PersonRepository.getAssignedFaceEmbeddings
@@ -847,7 +1014,7 @@ from
   "asset_face"
   inner join "face_search" on "face_search"."faceId" = "asset_face"."id"
 where
-  "asset_face"."personId" = $1
+  "asset_face"."personGroupId" = $1
   and "asset_face"."deletedAt" is null
   and "asset_face"."isVisible" is true
 order by
