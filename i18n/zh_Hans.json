@@ -1775,6 +1775,7 @@
   "family_canvas_union_status_widowed": "已丧偶",
   "family_mobile_offline_message": "您已离线。家庭关系数据从服务器加载，目前尚未保存在此设备上。",
   "family_mobile_offline_title": "无法加载家庭关系",
+  "family_mobile_relation_none": "—",
   "family_mobile_someone": "某人",
   "family_person_add_relationship": "添加关系",
   "family_person_anonymous_name": "某人",

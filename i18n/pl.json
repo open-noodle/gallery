@@ -1775,6 +1775,7 @@
   "family_canvas_union_status_widowed": "owdowiali",
   "family_mobile_offline_message": "Jesteś offline. Relacje są wczytywane z serwera i nie są jeszcze zapisane na tym urządzeniu.",
   "family_mobile_offline_title": "Nie można wczytać relacji",
+  "family_mobile_relation_none": "—",
   "family_mobile_someone": "Ktoś",
   "family_person_add_relationship": "Dodaj relację",
   "family_person_anonymous_name": "Ktoś",

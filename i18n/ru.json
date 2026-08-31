@@ -1775,6 +1775,7 @@
   "family_canvas_union_status_widowed": "вдовец/вдова",
   "family_mobile_offline_message": "Вы не в сети. Родственные связи загружаются с сервера и пока не сохраняются на этом устройстве.",
   "family_mobile_offline_title": "Не удалось загрузить родственные связи",
+  "family_mobile_relation_none": "—",
   "family_mobile_someone": "Кто-то",
   "family_person_add_relationship": "Добавить родство",
   "family_person_anonymous_name": "Кто-то",

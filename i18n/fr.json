@@ -1775,6 +1775,7 @@
   "family_canvas_union_status_widowed": "veufs",
   "family_mobile_offline_message": "Vous êtes hors ligne. Les relations sont chargées depuis le serveur et ne sont pas encore stockées sur cet appareil.",
   "family_mobile_offline_title": "Impossible de charger les relations",
+  "family_mobile_relation_none": "—",
   "family_mobile_someone": "Quelqu'un",
   "family_person_add_relationship": "Ajouter une relation",
   "family_person_anonymous_name": "Quelqu'un",

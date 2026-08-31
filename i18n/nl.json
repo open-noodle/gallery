@@ -1775,6 +1775,7 @@
   "family_canvas_union_status_widowed": "verweduwd",
   "family_mobile_offline_message": "Je bent offline. Relaties worden van de server geladen en zijn nog niet op dit apparaat opgeslagen.",
   "family_mobile_offline_title": "Relaties kunnen niet worden geladen",
+  "family_mobile_relation_none": "—",
   "family_mobile_someone": "Iemand",
   "family_person_add_relationship": "Relatie toevoegen",
   "family_person_anonymous_name": "Iemand",

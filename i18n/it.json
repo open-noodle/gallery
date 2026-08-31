@@ -1775,6 +1775,7 @@
   "family_canvas_union_status_widowed": "vedovi",
   "family_mobile_offline_message": "Sei offline. Le relazioni vengono caricate dal server e non sono ancora memorizzate su questo dispositivo.",
   "family_mobile_offline_title": "Impossibile caricare le relazioni",
+  "family_mobile_relation_none": "—",
   "family_mobile_someone": "Qualcuno",
   "family_person_add_relationship": "Aggiungi una relazione",
   "family_person_anonymous_name": "Qualcuno",

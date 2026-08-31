@@ -1777,6 +1777,7 @@
   "family_canvas_union_status_widowed": "widowed",
   "family_mobile_offline_message": "You're offline. Relationships load from the server and aren't stored on this device yet.",
   "family_mobile_offline_title": "Can't load relationships",
+  "family_mobile_relation_none": "—",
   "family_mobile_someone": "Someone",
   "family_person_add_relationship": "Add a relationship",
   "family_person_anonymous_name": "Someone",

@@ -1775,6 +1775,7 @@
   "family_canvas_union_status_widowed": "verwitwet",
   "family_mobile_offline_message": "Du bist offline. Beziehungen werden vom Server geladen und sind noch nicht auf diesem Gerät gespeichert.",
   "family_mobile_offline_title": "Beziehungen können nicht geladen werden",
+  "family_mobile_relation_none": "—",
   "family_mobile_someone": "Jemand",
   "family_person_add_relationship": "Beziehung hinzufügen",
   "family_person_anonymous_name": "Jemand",
