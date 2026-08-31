@@ -186,3 +186,93 @@ See the conflict entry above.
 
 No broad upstream refactor in this batch — the eight commits are six bugfixes, a chore and a CI
 change. Nothing to propagate.
+
+## Local CI Verification
+
+| Check                                      | Status | Notes                                                        |
+| ------------------------------------------ | ------ | ------------------------------------------------------------ |
+| `server pnpm build` (+ migration sync)     | PASS   | Synced 62 Gallery migrations + 1 compatibility alias         |
+| `server pnpm check` (tsc)                  | PASS   |                                                              |
+| `server pnpm lint`                         | PASS   |                                                              |
+| `server prettier --check`                  | PASS   |                                                              |
+| Server unit tests                          | PASS   | 198 files, 6125 passed / 12 skipped                          |
+| `web check:typescript`                     | PASS   |                                                              |
+| `web check:svelte`                         | PASS   | 627 files, 0 errors, 0 warnings                              |
+| web eslint (`tscompat` off)                | PASS   | 0 errors. 13 warnings, all "unused eslint-disable directive" |
+| `web prettier --check`                     | PASS   |                                                              |
+| Web unit tests                             | PASS   | 373 files, 5970 passed                                       |
+| `e2e pnpm check` (tsc)                     | PASS   |                                                              |
+| mobile `drift_dev make-migrations`         | PASS   | Regenerated without refusing (Shape L clear)                 |
+| mobile `dart analyze --fatal-infos`        | PASS   | No issues found (lib + test)                                 |
+| mobile `dart format --set-exit-if-changed` | PASS   | Only the two gitignored `lib/generated/*.g.dart` differ      |
+| `flutter test`                             | PASS   | 3494 passed / 1 skipped                                      |
+| `.github` prettier                         | PASS   | Its own separate gate                                        |
+| `make commit-autolink-check`               | PASS   | 1396 messages scanned, no cross-repo autolink                |
+
+The 13 web eslint warnings are an artifact of the local workaround, not a finding: disabling
+`tscompat/tscompat` (the plugin crashes locally with `TypeError: ... reading 'Class'`) makes each of
+its `eslint-disable` comments read as unused. `web/src` contains **exactly 13** such directives, so
+the counts match one-for-one, and none is in a file this cycle touched. CI's Lint Web runs the rule
+normally and passed.
+
+## Remote CI Verification
+
+- **Test branch**: `rebase/upstream-batch-203`
+- **Commit validated**: `023eb70a1dd`
+- **Result**: **10/10 green.** Two runs needed a re-run first — see below.
+
+| Workflow                                  | Status | Run                               |
+| ----------------------------------------- | ------ | --------------------------------- |
+| `test.yml`                                | GREEN  | 33427396361 (21 non-skipped jobs) |
+| `docker.yml`                              | GREEN  | 33427399323 (green on re-run)     |
+| `static_analysis.yml`                     | GREEN  | 33427401724                       |
+| `gallery-build-mobile.yml`                | GREEN  | 33427420487                       |
+| `gallery-rebase-smoke.yml`                | GREEN  | 33427404061 (green on re-run)     |
+| `storage-migration-tests.yml`             | GREEN  | 33427407030                       |
+| `storage-migration-e2e.yml`               | GREEN  | 33427417725 (green on re-run)     |
+| `gallery-revert-to-immich-validation.yml` | GREEN  | 33427409749                       |
+| `gallery-ml-smoke.yml`                    | GREEN  | 33427412638                       |
+| `gallery-mobile-smoke.yml`                | GREEN  | 33427415351                       |
+
+Runs were read filtered by `headSha`, not by branch name — the branch is reused and force-pushed, and
+a branch-scoped read served two stale `Test` successes from an earlier push.
+
+### The `extism-js: not found` failures — transient, and a real fork-CI gap behind them
+
+`gallery-rebase-smoke`, `storage-migration-e2e` and `docker` all failed first time on the **same**
+line of `server/Dockerfile`'s plugins stage:
+
+```
+mise exec --no-deps --jobs=1 github:extism/js-pdk@1.6.0 -- pnpm ... build
+  -> sh: 1: extism-js: not found
+```
+
+**Not caused by this rebase.** Every input to that stage — `server/Dockerfile`, `pnpm-lock.yaml`,
+`pnpm-workspace.yaml`, `mise.toml`, `mise.lock` and the whole `packages/` tree — is byte-identical to
+the batch-199 tip, where all three of these workflows were green this morning (runs 33393825338 /
+33393852037 / 33393815823). All three passed on re-run against the identical tree, which is what
+settles it: an anonymous GitHub API rate limit (60 requests/hour per runner IP), whose 403 surfaces
+as the far less obvious "binary not found".
+
+**The gap it exposed, fixed in `09122b20c65`:** `e2e/docker-compose.yml` already forwards
+`GITHUB_TOKEN` as the `github_token` build secret and its comment names this exact failure — but the
+secret is only populated if the workflow exports the variable. `test.yml` does, on both of its
+compose-build steps. The two fork-only workflows that build the same stack never did, so they had
+been running the fetch anonymously since they were written. Both now export
+`GITHUB_TOKEN: ${{ github.token }}`.
+
+**Still exposed, deliberately not patched here:** `docker.yml` cannot take the same fix. Its
+`password:` lines are GHCR _login_, not a build secret, and it delegates the build to
+`immich-app/devtools/.github/workflows/multi-runner-build.yml`, whose only secret input is
+`GITHUB_APP_TOKEN` — there is no way to pass a `github_token` build secret without forking that
+reusable workflow or changing the Dockerfile. That is upstream's design and a fork-CI decision in its
+own right, not a rebase reconciliation, so it is flagged rather than patched mid-cycle.
+
+## Final State
+
+- Rolling branch `rebase/upstream-rolling-v3.1.1` is **level with `upstream/main`** (0 behind).
+- `upstreamTargetHead` = `5666d57f15a`; `integratedForkHead` = `9c31bc01655` (unchanged).
+- Skill Sync Anchor stays at `9c31bc01655` — `git log 9c31bc01655..origin/main` is empty, so
+  `fork-surface.md` needs no new rows.
+- **Not landing on `main`**: upstream has released no new tag (`branding/config.json` still reads
+  `v3.1.0`), so the standing rule keeps the branch off `main`.
