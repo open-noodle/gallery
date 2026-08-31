@@ -1264,11 +1264,18 @@ class SyncStreamRepository extends DriftDatabaseRepository {
     try {
       await _db.batch((batch) {
         for (final userMetadata in data) {
+          // See the `toUserMetadataKey` extension: a key with no local counterpart (currently
+          // only `familyRoot`) is intentionally not persisted locally.
+          final key = userMetadata.key.toUserMetadataKey();
+          if (key == null) {
+            continue;
+          }
+
           final companion = UserMetadataEntityCompanion(value: Value(userMetadata.value as Map<String, Object?>));
 
           batch.insert(
             _db.userMetadataEntity,
-            companion.copyWith(userId: Value(userMetadata.userId), key: Value(userMetadata.key.toUserMetadataKey())),
+            companion.copyWith(userId: Value(userMetadata.userId), key: Value(key)),
             onConflict: DoUpdate((_) => companion),
           );
         }
@@ -1283,12 +1290,14 @@ class SyncStreamRepository extends DriftDatabaseRepository {
     try {
       await _db.batch((batch) {
         for (final userMetadata in data) {
+          final key = userMetadata.key.toUserMetadataKey();
+          if (key == null) {
+            continue;
+          }
+
           batch.delete(
             _db.userMetadataEntity,
-            UserMetadataEntityCompanion(
-              userId: Value(userMetadata.userId),
-              key: Value(userMetadata.key.toUserMetadataKey()),
-            ),
+            UserMetadataEntityCompanion(userId: Value(userMetadata.userId), key: Value(key)),
           );
         }
       });
@@ -1563,10 +1572,16 @@ extension on api.AssetVisibility {
 }
 
 extension on api.UserMetadataKey {
-  UserMetadataKey toUserMetadataKey() => switch (this) {
+  // Gallery-fork: family relationships. `familyRoot` (the viewer's nominated "that's me"
+  // identity) has no local `UserMetadataKey` counterpart and returns null here on purpose —
+  // relations are server-sourced and deliberately never synced to Drift (see
+  // `family_api.repository.dart`), and the root nomination is the same kind of fact. Callers
+  // must skip a null result rather than store it under some other key.
+  UserMetadataKey? toUserMetadataKey() => switch (this) {
     api.UserMetadataKey.onboarding => UserMetadataKey.onboarding,
     api.UserMetadataKey.preferences => UserMetadataKey.preferences,
     api.UserMetadataKey.license => UserMetadataKey.license,
+    api.UserMetadataKey.familyRoot => null,
   };
 }
 
