@@ -8,13 +8,6 @@ from
 where
   "id" = $1
 
--- FamilyRepository.updateUnion
-update "family_union"
-set
-  "status" = $1
-where
-  "id" = $2
-
 -- FamilyRepository.deleteUnion
 delete from "family_union"
 where
@@ -35,12 +28,6 @@ from
   "family_union_child"
 where
   "unionId" = $1
-
--- FamilyRepository.addPartner
-insert into
-  "family_union_partner" ("unionId", "identityId")
-values
-  ($1, $2)
 
 -- FamilyRepository.addChild
 insert into
