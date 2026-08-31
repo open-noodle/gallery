@@ -61,7 +61,6 @@ import { MergeAuthorizer } from 'src/services/identity-merge-propagation.service
 import { JobItem, JobOf } from 'src/types';
 import { getDimensions } from 'src/utils/asset.util';
 import { asDateTimeString } from 'src/utils/date';
-import { FamilyLabelRepositories, FamilyLabelSet, resolveFamilyLabelSet } from 'src/utils/family-graph';
 import { ImmichMediaResponse } from 'src/utils/file';
 import { createCrossOwnerMergeAuthorizer } from 'src/utils/merge-policy';
 import { mimeTypes } from 'src/utils/mime-types';
@@ -92,25 +91,10 @@ export const FACE_IDENTITY_BACKFILL_MAX_CONTINUATIONS = 5;
 
 @Injectable()
 export class PersonService extends BaseService {
-  // Gallery-fork: family relationships (`familyRelationLabel`). `this.familyRepository`/etc. are
-  // `protected` (from `BaseService`), so TS refuses to widen `this` itself to the (structurally
-  // public) `FamilyLabelRepositories` shape used by `resolveFamilyLabelSet` — this object literal
-  // is the fix, same as `FamilyService`'s own `repos` getter.
-  private get familyRepos(): FamilyLabelRepositories {
-    return {
-      familyRepository: this.familyRepository,
-      faceIdentityRepository: this.faceIdentityRepository,
-      userRepository: this.userRepository,
-    };
-  }
-
-  // Loads the projected graph and the viewer's root AT MOST once (nothing when access is
-  // `none`) — call this ONCE per request (`getAll`/`getById` below), then reuse `.label()` for
-  // every person in that response. Never call this once per person.
-  private async getFamilyLabelSet(auth: AuthDto): Promise<FamilyLabelSet> {
-    const { familyTree } = await this.getConfig({ withCache: false });
-    return resolveFamilyLabelSet(this.familyRepos, familyTree, auth.user.id);
-  }
+  // Gallery-fork: family relationships. `getAll`/`getById` below call the shared
+  // `BaseService.getFamilyLabelSet(auth)` to attach `familyRelationLabel` — `AssetService` needs
+  // the exact same composition for the people embedded in an asset response, so it lives on
+  // `BaseService` rather than being duplicated per service.
 
   private async crossOwnerMergeAuthorizer(dto: { confirmCrossOwner?: boolean }): Promise<MergeAuthorizer> {
     // Resolve the toggle here, BEFORE the merge transaction opens. The authorizer runs inside that transaction

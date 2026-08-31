@@ -9,6 +9,7 @@ import { SystemConfig } from 'src/config';
 import { FACE_THUMBNAIL_SIZE, SALT_ROUNDS } from 'src/constants';
 import { StorageCore } from 'src/cores/storage.core';
 import { AssetFace, UserAdmin } from 'src/database';
+import { AuthDto } from 'src/dtos/auth.dto';
 import { AssetEditAction, type CropParameters } from 'src/dtos/editing.dto';
 import { AssetFileType, CacheControl, ImageFormat } from 'src/enum';
 import { computePhysicalUsage } from 'src/gallery/storage-usage';
@@ -82,6 +83,7 @@ import { IdentityMergePropagationService } from 'src/services/identity-merge-pro
 import { ClassConstructor, GenerateThumbnailOptions, ImageDimensions } from 'src/types';
 import { AccessRequest, checkAccess, requireAccess } from 'src/utils/access';
 import { getConfig, updateConfig } from 'src/utils/config';
+import { FamilyLabelRepositories, FamilyLabelSet, resolveFamilyLabelSet } from 'src/utils/family-graph';
 import {
   ContentDisposition,
   ImmichFileResponse,
@@ -352,6 +354,27 @@ export class BaseService {
 
   updateConfig(newConfig: SystemConfig) {
     return updateConfig(this.configRepos, newConfig);
+  }
+
+  // Gallery-fork: family relationships. The single entry point every service uses to attach a
+  // `familyRelationLabel` to a person it is about to return — `PersonService` (getAll/getById)
+  // and `AssetService` (the embedded `people` on a returned asset) both call this rather than
+  // each re-deriving access/graph logic, so there is exactly one composition of
+  // `resolveFamilyAccessLevel`/`buildFamilyGraph`/`resolveFamilyRootId`
+  // (`src/utils/family-graph.ts`) for the whole app, not one per caller.
+  //
+  // `this.familyRepository`/etc. are `protected`, so TS refuses to widen `this` itself to the
+  // (structurally public) `FamilyLabelRepositories` shape — this object literal is the fix:
+  // accessing protected members from inside a `BaseService` method is fine, and the literal's
+  // own properties are ordinary public ones.
+  protected async getFamilyLabelSet(auth: AuthDto): Promise<FamilyLabelSet> {
+    const { familyTree } = await this.getConfig({ withCache: false });
+    const repos: FamilyLabelRepositories = {
+      familyRepository: this.familyRepository,
+      faceIdentityRepository: this.faceIdentityRepository,
+      userRepository: this.userRepository,
+    };
+    return resolveFamilyLabelSet(repos, familyTree, auth.user.id);
   }
 
   requireAccess(request: AccessRequest) {

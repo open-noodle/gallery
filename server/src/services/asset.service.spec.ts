@@ -28,6 +28,12 @@ const statResponse: AssetStatsResponseDto = {
   total: 33,
 };
 
+// Gallery-fork: family relationships. Enables the feature for `familyRelationLabel` tests —
+// `sut['getConfig']` is overridden directly, matching the sibling spec files' convention.
+const enableFamilyFeature = (sut: AssetService) => {
+  sut['getConfig'] = () => Promise.resolve({ familyTree: { enabled: true, defaultAccess: 'none' } } as any);
+};
+
 describe(AssetService.name, () => {
   let sut: AssetService;
   let mocks: ServiceMocks;
@@ -632,6 +638,148 @@ describe(AssetService.name, () => {
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
 
       await expect(sut.get(authStub.admin, asset.id)).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    // Gallery-fork: family relationships. `familyRelationLabel` on the people embedded in an
+    // asset response — the asset viewer's people panel and the mobile people strip get their
+    // faces from HERE, not from `PersonService`, so this is where the label actually pays off.
+    describe('familyRelationLabel', () => {
+      const VIEWER_ROOT_ID = 'viewer-root-identity';
+      const PERSON_IDENTITY_ID = 'person-identity-1';
+
+      // A one-union graph making PERSON_IDENTITY_ID the viewer's root's child — enough for
+      // `deriveRelationLabel` to produce a real, non-null label rather than a stub value.
+      const setUpGraph = () => {
+        mocks.family.getAllUnionsWithParticipants.mockResolvedValue([
+          {
+            id: 'u1',
+            status: 'married',
+            startDate: null,
+            endDate: null,
+            partnerIds: [VIEWER_ROOT_ID],
+            childIds: [PERSON_IDENTITY_ID],
+          },
+        ] as any);
+        mocks.faceIdentity.resolveAccessibleIdentityNames.mockResolvedValue(
+          new Map([
+            [VIEWER_ROOT_ID, 'Root'],
+            [PERSON_IDENTITY_ID, 'Kid'],
+          ]) as any,
+        );
+        mocks.family.getGenders.mockResolvedValue(new Map());
+        mocks.family.computeVisibleUnions.mockReturnValue([
+          {
+            id: 'u1',
+            status: 'married',
+            startDate: null,
+            endDate: null,
+            partners: [{ identityId: VIEWER_ROOT_ID }],
+            children: [{ identityId: PERSON_IDENTITY_ID }],
+          },
+        ] as any);
+        mocks.user.getMetadata.mockResolvedValue([
+          { key: 'family-root', value: { identityId: VIEWER_ROOT_ID } },
+        ] as any);
+      };
+
+      it('carries a label for a person embedded in the asset response', async () => {
+        const asset = AssetFactory.from({ ownerId: authStub.admin.user.id })
+          .exif()
+          .face({}, (f) => f.person({ id: 'person-1', name: 'Kid', identityId: PERSON_IDENTITY_ID }))
+          .build();
+        mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+        mocks.asset.getById.mockResolvedValue(asset as any);
+        enableFamilyFeature(sut);
+        setUpGraph();
+        mocks.family.getAccess.mockResolvedValue({ level: 'view' } as any);
+
+        const result = (await sut.get(authStub.admin, asset.id)) as AssetResponseDto;
+
+        expect(result.people).toHaveLength(1);
+        expect(result.people![0].familyRelationLabel).toBe('your child');
+      });
+
+      // Paired negative/positive control: SAME fixture, only the access level differs.
+      it('omits the field entirely for a viewer with no family access', async () => {
+        const asset = AssetFactory.from({ ownerId: authStub.admin.user.id })
+          .exif()
+          .face({}, (f) => f.person({ id: 'person-1', name: 'Kid', identityId: PERSON_IDENTITY_ID }))
+          .build();
+        mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+        mocks.asset.getById.mockResolvedValue(asset as any);
+        enableFamilyFeature(sut);
+        mocks.family.getAccess.mockResolvedValue({ level: 'none' } as any);
+
+        const result = (await sut.get(authStub.admin, asset.id)) as AssetResponseDto;
+
+        expect(result.people).toHaveLength(1);
+        expect('familyRelationLabel' in result.people![0]).toBe(false);
+        expect(mocks.family.getAllUnionsWithParticipants).not.toHaveBeenCalled();
+      });
+
+      // The point of this feature: access comes from the family grant alone, never from a space
+      // role, so a person reached through a shared space must not silently lose its label.
+      it('still labels a person reached through a shared space', async () => {
+        const asset = AssetFactory.from({ ownerId: newUuid() })
+          .exif()
+          .face({}, (f) => f.person({ id: 'person-1', name: 'Kid', identityId: PERSON_IDENTITY_ID }))
+          .build();
+        mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set([asset.id]));
+        mocks.asset.getById.mockResolvedValue(asset as any);
+        mocks.sharedSpace.getMember.mockResolvedValue({ userId: authStub.admin.user.id } as any);
+        mocks.access.asset.checkSpaceAccessForSpace.mockResolvedValue(new Set([asset.id]));
+        mocks.sharedSpace.findSpacePersonsByLinkedPersonIds.mockResolvedValue(
+          new Map([['person-1', { id: 'space-person-1', isHidden: false }]]),
+        );
+        enableFamilyFeature(sut);
+        setUpGraph();
+        mocks.family.getAccess.mockResolvedValue({ level: 'contribute' } as any);
+
+        const result = (await sut.get(authStub.admin, asset.id, 'space-id')) as AssetResponseDto;
+
+        expect(result.people).toHaveLength(1);
+        expect(result.people![0].spacePersonId).toBe('space-person-1');
+        expect(result.people![0].familyRelationLabel).toBe('your child');
+      });
+
+      it('reports no label when the viewer has access but no root set', async () => {
+        const asset = AssetFactory.from({ ownerId: authStub.admin.user.id })
+          .exif()
+          .face({}, (f) => f.person({ id: 'person-1', name: 'Kid', identityId: PERSON_IDENTITY_ID }))
+          .build();
+        mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+        mocks.asset.getById.mockResolvedValue(asset as any);
+        enableFamilyFeature(sut);
+        setUpGraph();
+        mocks.user.getMetadata.mockResolvedValue([]);
+        mocks.family.getAccess.mockResolvedValue({ level: 'view' } as any);
+
+        const result = (await sut.get(authStub.admin, asset.id)) as AssetResponseDto;
+
+        expect(result.people![0].familyRelationLabel).toBeNull();
+      });
+
+      // The perf-critical property: however many people ONE asset carries, the (potentially
+      // large) union graph is fetched exactly ONCE, never once per person.
+      it('issues one graph load for an asset with several people, not one per person', async () => {
+        const asset = AssetFactory.from({ ownerId: authStub.admin.user.id })
+          .exif()
+          .face({}, (f) => f.person({ id: 'person-1', name: 'Kid 1', identityId: PERSON_IDENTITY_ID }))
+          .face({}, (f) => f.person({ id: 'person-2', name: 'Kid 2', identityId: 'person-identity-2' }))
+          .face({}, (f) => f.person({ id: 'person-3', name: 'Kid 3', identityId: 'person-identity-3' }))
+          .build();
+        mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+        mocks.asset.getById.mockResolvedValue(asset as any);
+        enableFamilyFeature(sut);
+        setUpGraph();
+        mocks.family.getAccess.mockResolvedValue({ level: 'view' } as any);
+
+        const result = (await sut.get(authStub.admin, asset.id)) as AssetResponseDto;
+
+        expect(result.people).toHaveLength(3);
+        expect(mocks.family.getAllUnionsWithParticipants).toHaveBeenCalledTimes(1);
+        expect(mocks.faceIdentity.resolveAccessibleIdentityNames).toHaveBeenCalledTimes(1);
+      });
     });
   });
 
