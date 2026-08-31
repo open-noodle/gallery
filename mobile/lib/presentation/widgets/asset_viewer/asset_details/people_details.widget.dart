@@ -8,7 +8,6 @@ import 'package:immich_mobile/extensions/theme_extensions.dart';
 import 'package:immich_mobile/extensions/translate_extensions.dart';
 import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
 import 'package:immich_mobile/presentation/widgets/people/person_edit_name_modal.widget.dart';
-import 'package:immich_mobile/providers/infrastructure/family_relations.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/people.provider.dart';
 import 'package:immich_mobile/providers/routes.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
@@ -33,10 +32,6 @@ class PeopleDetails extends ConsumerWidget {
     final assetKey = (id: asset.id, ownerId: asset.ownerId);
 
     final peopleFuture = ref.watch(driftPeopleAssetProvider(assetKey));
-    // A12: `null` (no access, or still loading) renders the strip exactly as it does today —
-    // no relation line for anyone. A non-null map renders one, falling back to a neutral dash
-    // for a face with no recorded relationship.
-    final relationLabels = ref.watch(assetFamilyRelationLabelsProvider(assetKey)).valueOrNull;
 
     Future<void> showNameEditModal(DriftPerson person) async {
       await showDialog(
@@ -75,8 +70,6 @@ class PeopleDetails extends ConsumerWidget {
                         person: person,
                         assetFileCreatedAt: asset.createdAt,
                         ownedByCurrentUser: ownedByCurrentUser,
-                        hasFamilyAccess: relationLabels != null,
-                        relationLabel: relationLabels?[person.id],
                         onTap: () {
                           final previousRouteData = ref.read(previousRouteDataProvider);
                           final previousRouteArgs = previousRouteData?.arguments;
@@ -114,23 +107,12 @@ class _Avatar extends StatelessWidget {
   final VoidCallback? onNameTap;
   final double imageSize = 96;
 
-  /// Whether the viewer has any usable family access. `false` renders the strip exactly as it
-  /// does today — no relation line for this face, or any other (`A12`).
-  final bool hasFamilyAccess;
-
-  /// This person's relation to the viewer ("your sibling"), or `null` when access is granted
-  /// but no relationship is recorded — rendered as a neutral dash rather than left blank.
-  /// Ignored entirely when [hasFamilyAccess] is `false`.
-  final String? relationLabel;
-
   const _Avatar({
     required this.person,
     required this.assetFileCreatedAt,
     required this.ownedByCurrentUser,
     this.onTap,
     this.onNameTap,
-    this.hasFamilyAccess = false,
-    this.relationLabel,
   });
 
   @override
@@ -187,11 +169,16 @@ class _Avatar extends StatelessWidget {
                     style: context.textTheme.labelLarge,
                     maxLines: 1,
                   ),
-                  if (hasFamilyAccess)
+                  // A12: `hasFamilyAccess` is false whenever the server omitted
+                  // `familyRelationLabel` entirely (no access at all) — render exactly as
+                  // today, with no line. When true, a `null` label means access is granted
+                  // but no relationship is recorded, shown as a neutral dash rather than left
+                  // blank (a blank line reads as a loading state, not "nothing recorded").
+                  if (person.hasFamilyAccess)
                     FittedBox(
                       fit: BoxFit.scaleDown,
                       child: Text(
-                        relationLabel ?? "family_mobile_relation_none".t(context: context),
+                        person.familyRelationLabel ?? "family_mobile_relation_none".t(context: context),
                         key: Key('family-relation-label-${person.id}'),
                         textAlign: TextAlign.center,
                         overflow: TextOverflow.ellipsis,
