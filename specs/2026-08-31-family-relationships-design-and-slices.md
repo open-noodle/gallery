@@ -317,7 +317,15 @@ A future "define a subset of people and call them a family" must be **purely add
 - **New tables and indexes must be added to `scripts/revert-to-immich.sql`.** This spec adds four tables and one index. **Do not add an `ALTER TABLE "face_identity" DROP COLUMN "gender"`** — that script already drops `face_identity` wholesale with `CASCADE` (`:145`), so an `ALTER` against it would run after the table is gone and fail. The script is executed by the `gallery-revert-to-immich-validation.yml` CI job, so this is a red build, not a latent bug.
 - **`mise sql` after any change under `server/src/repositories/`.** `@GenerateSql` tracks the _emitted SQL_, so editing a method body drifts the checked-in query files even when no method is added. The skip condition is "did anything touch `server/src/repositories/`?", not "did I add a method".
   - **`make sql` is removed** — `Makefile:140` is a stub that exits 1 and redirects to `mise sql`. Same for `make dev`, `make prod`, `make clean`, `make open-api`. `make e2e-web-dev` and the other `e2e-*-dev` targets _do_ still work. **`make lint-all`, `make format-all` and `make check-all` do not exist at all** — CLAUDE.md documents them but the Makefile has no such targets. Use the per-package tasks (`mise //web:check`, `mise //web:lint`, `mise //server:test`) or the explicit `pnpm exec` forms below.
-- **A new repository must be registered with `BaseService`.** Adding `FamilyRepository` under `server/src/repositories/` is not enough: `BaseService` takes a **positional** constructor list of ~40 repositories, and the test factory (`newTestService()` in `server/test/utils.ts`) has its own list that must stay in sync. Miss either and you get a runtime `undefined` repository or a whole spec file failing to construct — neither of which `tsc` catches cleanly. Medium tests need the repository registered in the medium factory too.
+- **A new repository must be registered in FIVE places.** The most error-prone mechanical step in the feature. An earlier version of this list said four — the fifth was found by a reviewer, after the slice that introduced it had already passed its own tests:
+  1. `server/src/repositories/index.ts` — the import and the exported providers array.
+  2. `server/src/services/base.service.ts` — a **positional** constructor parameter (63 and counting; position matters, names do not).
+  3. `server/src/services/base.service.ts` again — the exported **`BASE_SERVICE_DEPENDENCIES`** array (`:101-159`), hand-maintained and consumed by the medium factory. **This one drifts silently:** it is not derived from the constructor, nothing typechecks the two against each other, and a mismatch surfaces only the first time a medium test constructs the service — potentially slices after the mistake.
+  4. `server/test/utils.ts` — `newTestService()`'s own positional list (from `:401`), which must stay in the same order as (2).
+  5. `server/test/medium.factory.ts` — a case in `newMockRepository`. **Do not copy `ClassificationRepository`'s placement:** it sits in the plain `automock(key)` group with no constructor args, which throws `Cannot read properties of undefined (reading 'setContext')` for any repository whose constructor calls `this.logger.setContext(...)`. That is a latent bug in the sibling, not a pattern to follow.
+
+  Miss (2) or (4) and every argument after the insertion point silently shifts by one, so services receive the **wrong repositories** — `tsc` cannot catch it because they are all object types. Miss (3) or (5) and medium tests fail with `Mocked repository X is not a valid dependency`.
+
 - **OpenAPI regen after any controller or DTO change**: run **`mise open-api`** from the repo root. It chains `//server:sync-open-api`, `:open-api-typescript` and `:open-api-dart` (`mise.toml:75-83`). Commit the generated TypeScript SDK and Dart client with the change.
   - **`make open-api` no longer exists** — `Makefile:136` errors out and redirects here. `pnpm sync:open-api` is not a server script either. CLAUDE.md is stale on both; trust `mise.toml`.
   - **Worktree trap:** a `//`-prefixed mise target (`mise //:open-api`) runs in the **main checkout**, not this worktree. Run the bare `mise open-api` from the worktree root, and check `git status` in the worktree afterwards to confirm the generated files actually landed here.
@@ -337,11 +345,12 @@ Everything not listed here is independent and may be done in any order or in par
 - **Slice 1 before 4, 5** — they need the tables.
 - **Slice 2 before 3** — access resolution reads the config block.
 - **Slice 3 before 4, 5, 7** — every read and write path is gated on effective access.
-- **Slice 5 before 6** — added after review. `deriveRelationLabel` takes slice 5's **projected** graph, not a repository (`D4`, `E59`). Building the label engine first invites a signature that accepts the full graph, which is the `E59` leak baked into the type system.
+- **Slice 6 may run in parallel with slices 4 and 5** — revised during execution. The label engine is a pure function in `server/src/utils/family-labels.ts` with a literal-fixture spec; it shares no file with the repository or service slices. **Slice 6 defines the projected-graph type it consumes, and slice 5 conforms to that type.** The original "slice 5 before 6" constraint existed only so the signature would be forced to take a projected graph rather than a repository — writing the type in slice 6 achieves the same guarantee without serialising the two.
+- **Whichever of 5 or 6 lands second must verify the type actually matches**, since they are developed against a shared contract rather than a shared file. That check is cheap and belongs in slice 7, which composes them.
+- **Slice 12 after slice 7**, not after 3 — revised during execution. The admin grants table needs the two grant endpoints, which live in slice 7.
 - **Slices 5 and 6 before 7** — the controller composes the visibility query and the label engine.
 - **Slice 7 before 8, 9, 10, 13, 14** — all clients need the API and the generated SDK.
 - **Slice 10 before 11** — the editor builds on the renderer.
-- **Slice 12 after 2 and 3** — the admin UI edits what those slices define.
 - **Slice 15 last** — e2e asserts the assembled feature.
 - **Phase 1 (slices 1–7) is independently shippable.** It delivers a working, tested, access-gated API with no UI. If the release gets tight, it is the natural cut line.
 
@@ -645,6 +654,9 @@ The last two are the load-bearing pair: together they prove authority comes from
 
 - [ ] **Step 2: Run to verify they fail.**
 - [ ] **Step 3: Implement** `resolveFamilyAccess(auth)` on a new `FamilyService` extending `BaseService`, plus a `FamilyAccess` permission the controller layer can require. Do not cache across requests (`E26`).
+
+**This slice creates `FamilyRepository`, not slice 4.** Resolving a grant means reading the `family_access` row, which needs a repository — so the repository is born here with a single method (read one user's grant), and slice 4 extends it with the union write methods. Register it in all four places named in the Global Constraints. An earlier draft of this spec put the repository in slice 4, which would have left slice 3 with no way to read the table it depends on.
+
 - [ ] **Step 4: Verify green.**
 
 ---
@@ -691,9 +703,7 @@ it('refuses a cycle that closes three generations up', async () => { … });
 ```
 
 - [ ] **Step 2: Run to verify they fail.**
-- [ ] **Step 3: Implement** the write methods on `FamilyService` and a `FamilyRepository` under `server/src/repositories/`. `partnerKey` is recomputed inside the same transaction as any membership **or `startDate`** change.
-
-**Register the new repository in all three places** (see Global Constraints): `BaseService`'s positional constructor list, `newTestService()` in `server/test/utils.ts`, and the medium-test factory. Missing one produces an `undefined` repository at runtime or a spec file that fails to construct — and `tsc` will not point you at it.
+- [ ] **Step 3: Implement** the write methods on `FamilyService`, **extending the `FamilyRepository` that slice 3 created** (it is already registered in all four places; do not re-register it). `partnerKey` is recomputed inside the same transaction as any membership **or `startDate`** change.
 
 - [ ] **Step 4: Write the failing merge tests** — `D1.6`, and the part most likely to be skipped.
 
@@ -824,7 +834,9 @@ describe('cluster detection', () => {
   - `it('refuses every family endpoint with 403 when the feature is disabled')` (E50)
   - `it('rejects a write from a view-only caller')`
 - [ ] **Step 2: Run to verify they fail.**
-- [ ] **Step 3: Implement** `family.controller.ts` and `family.dto.ts` (Zod). Endpoints: list unions, create/update/delete union, add/remove participant, set the viewer's root, set an identity's gender.
+- [ ] **Step 3: Implement** `family.controller.ts` and `family.dto.ts` (Zod). Endpoints: list unions, create/update/delete union, add/remove participant, set the viewer's root, set an identity's gender, **list the per-user access grants, and set one user's grant**.
+
+The last two were missing from an earlier draft of this spec, which left slice 12 (the admin UI for grants) with no API to call. They are admin-only: require an admin caller, independent of `familyTree` access level — an admin with no grant of their own must still be able to administer other people's.
 
 Authority per endpoint: everything except "set the viewer's root" requires `contribute`; setting your own root requires only `view`, since it changes nothing anyone else can see. Setting an identity's `gender` requires `contribute` — it is shared data that alters the labels every viewer reads, not a personal preference.
 
