@@ -43,13 +43,48 @@ The `showInTimeline` gate only ever sits on the **space arm**. The ownership arm
 **no space-level or album-level flag can subtract a photo from its own owner's timeline.** The reporter
 owns those photos. Working as built; not what the label promises.
 
-### The space-timeline half of the report
+### The space-timeline half of the report — RESOLVED in slice 0: not a bug
 
-Not reproduced from code. `asset.repository.ts:432` gates a `spaceId` browse with
-`requireShowInTimeline: true` and has no owner bypass (`userIds` is undefined for a space browse —
-`timeline.service.ts:201`). Two candidate explanations: the photos also reach the space by a
-directly-added `shared_space_asset` or a linked library (neither is gated by the album flag), or it is a
-separate bug. **Slice 0 reproduces this before any code is written.**
+`asset.repository.ts:432` gates a `spaceId` browse with `requireShowInTimeline: true` and has no owner
+bypass (`userIds` is undefined for a space browse — `timeline.service.ts:201`).
+
+Slice 0 confirmed this empirically, twice over:
+
+1. **An existing passing test already asserts it.**
+   `shared-space-visibility-matrix.medium.spec.ts:1176` seeds an album with `showInTimeline = false`,
+   links it to a space, and asserts the space timeline total is `2` — excluding the hidden album's
+   asset. Green on unmodified `main`.
+2. **A throwaway probe confirmed the actual cause.** Two owned assets, both in the same hidden album,
+   one of them **also added to the space directly**:
+
+   | Surface           | Result                                                                          |
+   | ----------------- | ------------------------------------------------------------------------------- |
+   | Space timeline    | **1** — only the directly-added asset; the album-only asset is correctly hidden |
+   | Owner's `/photos` | **2** — both, because the owner arm is unconditional                            |
+
+So the reporter's photos reach their space by a **second path** — a directly-added
+`shared_space_asset`, or a linked library — neither of which the album flag gates. That is the
+"any visible path wins" rule of §3 working as designed, not a defect. **No separate issue to file.**
+
+The `/photos` half is the real bug, and the probe reproduces it exactly: the owner sees both assets,
+including the one reachable only through an album they hid. Slices 1–10 fix that.
+
+> Worth saying to the reporter directly: hiding an album cannot hide photos that are _also_ in the
+> space by another route, and — until this work lands — cannot hide their owner's own photos at all.
+
+### Slice 0 baseline — at-risk tests on unmodified `main`
+
+All green, recorded so a later failure can be attributed (§9.7):
+
+| Spec                                                      | Tests  |
+| --------------------------------------------------------- | ------ |
+| `shared-space-visibility-matrix.medium.spec.ts`           | 47     |
+| `timeline-bucket-explicit-visibility.medium.spec.ts`      | 12     |
+| `sync-shared-space-album.spec.ts`                         | 14     |
+| `shared-space-album-link-sync.spec.ts`                    | 11     |
+| `accessible-timeline-asset-predicate.medium.spec.ts`      | 4      |
+| `accessible-timeline-asset-predicate-gate.medium.spec.ts` | 2      |
+| **Total**                                                 | **90** |
 
 ---
 
@@ -708,18 +743,60 @@ Not an implementation slice; a gate before slice 1. Two outputs:
 Every one of these has produced a false green in a previous `/impl-loop` on this repo. A subagent
 reporting "green" from the gate its own slice touched is **necessary but not sufficient**.
 
-| Gate                                        | Command                                                                                                                                                                                                                                                                     | Applies to           |
-| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
-| Server types, **uncached**                  | `pnpm -C server exec tsc --noEmit` — `make check-server` reuses `.tsbuildinfo` and masks spec-file TS errors that CI's fresh `tsc` catches                                                                                                                                  | every server slice   |
-| Web lint (separate CI job from `check-web`) | `pnpm -C web exec eslint <files> --max-warnings 0` — `make check-web` is svelte-check + tsc only                                                                                                                                                                            | 11, 12               |
-| SQL query docs                              | `make sql` — required whenever **anything** under `server/src/repositories/` changes, body-only edits included                                                                                                                                                              | 2, 3, 5, 6, 8, 9, 13 |
-| OpenAPI incl. **Dart**                      | `mise open-api` (not `make open-api`, which was removed; `pnpm sync:open-api` does not exist). Reproduce CI with `pnpm --filter immich build && (cd open-api && ./bin/generate-open-api.sh) && git status --porcelain open-api/ mobile/openapi/`, then commit **all** of it | 2, 3, 12             |
-| i18n sort + format                          | `pnpm --filter=immich-i18n format:fix` — CI runs prettier on `i18n/` and fails on any diff; appended keys land unsorted                                                                                                                                                     | 11                   |
-| Prettier everywhere                         | `pnpm -C server exec prettier --check "src/**/*.ts"`, plus `npx prettier --check` on any touched markdown — CI's `prettier --cache --check .` catches files `make format-*` missed                                                                                          | every slice          |
-| Mobile                                      | `flutter test` on the pin in `mobile/mise.toml` — **read the pin**. `dart analyze` is not a substitute: generated-code compile errors only surface when a test compiles                                                                                                     | 4, 10                |
+> **`make` targets do not exist.** `CLAUDE.md` documents `make check-server`, `make sql`,
+> `make open-api`, `make lint-*`, `make format-*` — the root Makefile has only "moved to mise" stubs,
+> and a **catch-all swallows any unknown target into `dev`**, so a wrong target prints
+> `This command has been removed. Please use: mise dev` then `make: *** [dev] Error 1`. That reads like
+> a broken toolchain but means only that the target name is wrong. Use the commands below.
+
+| Gate                                       | Command                                                                                                                                                                                                                                                                                                                                                                                                                                  | Applies to           |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| Server types                               | `cd server && npx tsc --noEmit` — vitest does **not** typecheck; three slice agents have previously reported "all green" from vitest while leaving `tsc` errors                                                                                                                                                                                                                                                                          | every server slice   |
+| Server unit tests                          | `cd server && pnpm test --run <path>` — **never** `pnpm test -- --run <path>`, which silently drops the filter and runs everything. Bare `pnpm exec vitest run <path>` loads no config and dies with `describe is not defined` (a false red)                                                                                                                                                                                             | every server slice   |
+| Server medium tests                        | `cd server && npx vitest --config test/vitest.config.medium.mjs run test/medium/specs/<path>` — `pnpm test:medium -- --run <path>` silently drops the filter too. Needs Docker                                                                                                                                                                                                                                                           | 1, 2, 3, 6, 8, 9, 13 |
+| Server lint                                | `cd server && pnpm lint` (eslint `--max-warnings 0`)                                                                                                                                                                                                                                                                                                                                                                                     | every server slice   |
+| SQL query docs — **destructive if misrun** | See the boxed recipe below. Required whenever **anything** under `server/src/repositories/` changes, body-only edits included                                                                                                                                                                                                                                                                                                            | 2, 3, 5, 6, 8, 9, 13 |
+| Web checks + lint                          | `cd web && pnpm check:typescript && pnpm check:svelte`, then `pnpm lint` — CI's **Lint Web** is a separate job running eslint → prettier → svelte-check sequentially, so one push can fail three different ways in turn. Local `check:svelte` can scan **0 files**                                                                                                                                                                       | 11, 12               |
+| OpenAPI incl. **Dart**                     | **Do not** run mise's top-level `open-api` task from a worktree — it hardcodes `//server:…`, which resolves to the **main checkout**, silently generating clients from the wrong source. Run in-worktree: `cd server && pnpm build && node ./dist/bin/sync-open-api.js`, then the oazapfts step, then `cd open-api && bash ./bin/generate-dart-sdk.sh` (needs JDK 21). Verify by regenerating **twice**: a correct run is byte-identical | 2, 3, 12             |
+| Dart client diffs are opaque               | `.gitattributes` marks `mobile/openapi/**/*.dart` `-diff -merge`, so git shows `Bin N -> M bytes` with no textual diff. **Verify content with `grep`, not `git diff`**                                                                                                                                                                                                                                                                   | 2, 3, 12             |
+| i18n sort + format                         | `pnpm --filter=immich-i18n format:fix` — CI runs prettier on `i18n/` (not `web/src/lib/i18n/`) and fails on any diff; appended keys land unsorted                                                                                                                                                                                                                                                                                        | 11                   |
+| Prettier everywhere                        | `cd server && npx prettier --check "src/**/*.ts"`, plus `npx prettier --check` on touched markdown — CI's `prettier --cache --check .` catches files a local format pass missed                                                                                                                                                                                                                                                          | every slice          |
+| Mobile format (CI scope is **narrower**)   | `mise //mobile:format` covers `lib` only; running `dart format` over `test` too is stricter than CI and injects unrelated churn. Format only your own files: `dart format --set-exit-if-changed --output=none <file>`                                                                                                                                                                                                                    | 4, 10                |
+| Mobile tests                               | `flutter test` on the pin in `mobile/mise.toml` — **read the pin**. Export `PATH` _first_, don't chain `cd x && export …` (the Bash tool persists cwd, the second `cd` fails, `&&` short-circuits and the export never runs). `dart analyze` is not a substitute                                                                                                                                                                         | 4, 10                |
+| E2E                                        | `cd e2e && pnpm test <path>` — **no** `--run`; `e2e`'s own script already carries it and passing it again crashes with `Expected a single value for option "--run"`                                                                                                                                                                                                                                                                      | 14                   |
 
 Two mock idioms that fight each other: `mockResolvedValue()` trips TS2554, `mockResolvedValue(undefined)`
 trips `unicorn/no-useless-undefined`. The codebase idiom is **`mockResolvedValue(void 0)`**.
+
+#### The SQL regen recipe — read before running it
+
+`sync-sql.ts` does an unconditional `rm -rf server/src/queries/` in `setup()` **before it connects**. If
+the connection then fails it writes nothing, leaving zero query files and a ~7,500-line deletion diff
+that looks like a catastrophic refactor. If that happens: `git checkout -- server/src/queries/`.
+
+It also reads **`dist/`, not `src/`** — repositories are imported from the build — so a regen without an
+immediately preceding build silently reflects stale code.
+
+This work **adds a migration in slice 1**, so from slice 1 onward the shared dev-stack DB has the wrong
+schema and a scratch DB is required (matching CI's `sql-schema-up-to-date` job):
+
+```bash
+# 1. scratch DB on a free port, pinned to the image CI uses
+docker run -d --name sql-regen -p 55432:5432 \
+  -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=immich \
+  ghcr.io/immich-app/postgres:14-vectorchord0.4.3   # use the exact sha from CI
+
+# 2. build FIRST, then migrate, then regen — all three, in this order
+cd server && pnpm build
+DB_URL=postgres://postgres:postgres@localhost:55432/immich pnpm migrations:run
+DB_URL=postgres://postgres:postgres@localhost:55432/immich node ./dist/bin/sync-sql.js
+
+# 3. confirm ONLY the expected files moved, and that the change you made is actually in them
+git diff --stat -- server/src/queries/
+```
+
+Step 3 is not optional: a stale-`dist` regen produces a plausible-looking diff that is missing the very
+gate you just added.
 
 ### TDD stance for every slice
 
