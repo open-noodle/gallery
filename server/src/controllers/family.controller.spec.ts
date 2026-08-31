@@ -16,6 +16,17 @@ const IDENTITY_A = '00000000-0000-4000-a000-000000000101';
 const IDENTITY_B = '00000000-0000-4000-a000-000000000102';
 const USER_ID = '00000000-0000-4000-a000-000000000901';
 
+// Fixtures for the D4 label tests below.
+const ROOT_ID = '00000000-0000-4000-a000-000000000501';
+const CHILD_ID = '00000000-0000-4000-a000-000000000502';
+const GRANDPARENT_ID = '00000000-0000-4000-a000-000000000503';
+const TARGET_ID = '00000000-0000-4000-a000-000000000504';
+const TARGET_SPOUSE_ID = '00000000-0000-4000-a000-000000000505';
+const UNION_ROOT_CHILD = '00000000-0000-4000-a000-000000000601';
+const UNION_ROOT_PARENT = '00000000-0000-4000-a000-000000000602';
+const UNION_TARGET_PARENT = '00000000-0000-4000-a000-000000000603';
+const UNION_TARGET_SPOUSE = '00000000-0000-4000-a000-000000000604';
+
 const knownParticipant = (identityId: string) => ({ kind: 'known' as const, identityId });
 const forbidden = () => Promise.reject(new ForbiddenException());
 
@@ -39,6 +50,7 @@ describe(FamilyController.name, () => {
   describe('GET /family/unions', () => {
     it('should be an authenticated route', async () => {
       service.getVisibleGraph.mockResolvedValue({ identities: {}, unions: [] });
+      service.getMyRoot.mockResolvedValue(null);
       await request(ctx.getHttpServer()).get('/family/unions');
       expect(ctx.authenticate).toHaveBeenCalled();
     });
@@ -58,6 +70,7 @@ describe(FamilyController.name, () => {
           },
         ],
       });
+      service.getMyRoot.mockResolvedValue(null);
 
       const { status, body } = await request(ctx.getHttpServer())
         .get('/family/unions')
@@ -85,6 +98,7 @@ describe(FamilyController.name, () => {
           { id: UNION_B, status: 'partnered', partners: [knownParticipant(IDENTITY_B)], children: [] },
         ],
       });
+      service.getMyRoot.mockResolvedValue(null);
 
       const page1 = await request(ctx.getHttpServer())
         .get('/family/unions')
@@ -114,6 +128,7 @@ describe(FamilyController.name, () => {
           { id: UNION_B, status: 'partnered', partners: [knownParticipant(IDENTITY_B)], children: [] },
         ],
       });
+      service.getMyRoot.mockResolvedValue(null);
 
       const { status, body } = await request(ctx.getHttpServer())
         .get('/family/unions')
@@ -122,6 +137,169 @@ describe(FamilyController.name, () => {
 
       expect(status).toBe(200);
       expect(Object.keys(body.identities)).toEqual([IDENTITY_A]);
+    });
+
+    // D4 — labels are derived server-side from the projected graph and the caller's root.
+    describe('relation labels', () => {
+      it("labels a reachable person relative to the caller's root", async () => {
+        service.getVisibleGraph.mockResolvedValue({
+          identities: {
+            [ROOT_ID]: { name: 'Root', gender: null },
+            [CHILD_ID]: { name: 'Kid', gender: null },
+          },
+          unions: [
+            {
+              id: UNION_ROOT_CHILD,
+              status: 'partnered',
+              partners: [knownParticipant(ROOT_ID)],
+              children: [knownParticipant(CHILD_ID)],
+            },
+          ],
+        });
+        service.getMyRoot.mockResolvedValue(ROOT_ID);
+
+        const { status, body } = await request(ctx.getHttpServer())
+          .get('/family/unions')
+          .set('Authorization', 'Bearer token');
+
+        expect(status).toBe(200);
+        expect(body.identities[CHILD_ID].label).toBe('your child');
+      });
+
+      it('shows no label when no root is set', async () => {
+        service.getVisibleGraph.mockResolvedValue({
+          identities: {
+            [ROOT_ID]: { name: 'Root', gender: null },
+            [CHILD_ID]: { name: 'Kid', gender: null },
+          },
+          unions: [
+            {
+              id: UNION_ROOT_CHILD,
+              status: 'partnered',
+              partners: [knownParticipant(ROOT_ID)],
+              children: [knownParticipant(CHILD_ID)],
+            },
+          ],
+        });
+        service.getMyRoot.mockResolvedValue(null);
+
+        const { status, body } = await request(ctx.getHttpServer())
+          .get('/family/unions')
+          .set('Authorization', 'Bearer token');
+
+        expect(status).toBe(200);
+        expect(body.identities[CHILD_ID].label).toBeNull();
+      });
+
+      // The pair that matters: the SAME two people (ROOT_ID, TARGET_ID), each independently
+      // visible via their own union, are related only through GRANDPARENT_ID's two parent
+      // unions. When the union that makes GRANDPARENT_ID the TARGET's parent is absent from the
+      // projected graph (as it would be if slice 5 withheld it from this viewer), the two
+      // people's clusters are disconnected and no label is produced — a negative that would pass
+      // just as well against an endpoint that never labels anything. The positive control below,
+      // with that one union added back, is what proves the negative actually means something.
+      it('shows no label when the only path runs through a union the viewer cannot see', async () => {
+        service.getVisibleGraph.mockResolvedValue({
+          identities: {
+            [ROOT_ID]: { name: 'Root', gender: null },
+            [GRANDPARENT_ID]: { name: 'Gramps', gender: null },
+            [TARGET_ID]: { name: 'Target', gender: null },
+            [TARGET_SPOUSE_ID]: { name: 'Spouse', gender: null },
+          },
+          unions: [
+            {
+              id: UNION_ROOT_PARENT,
+              status: 'partnered',
+              partners: [knownParticipant(GRANDPARENT_ID)],
+              children: [knownParticipant(ROOT_ID)],
+            },
+            // UNION_TARGET_PARENT (GRANDPARENT_ID -> TARGET_ID) is deliberately OMITTED here.
+            {
+              id: UNION_TARGET_SPOUSE,
+              status: 'partnered',
+              partners: [knownParticipant(TARGET_ID), knownParticipant(TARGET_SPOUSE_ID)],
+              children: [],
+            },
+          ],
+        });
+        service.getMyRoot.mockResolvedValue(ROOT_ID);
+
+        const { status, body } = await request(ctx.getHttpServer())
+          .get('/family/unions')
+          .set('Authorization', 'Bearer token');
+
+        expect(status).toBe(200);
+        expect(body.identities[TARGET_ID].label).toBeNull();
+      });
+
+      it('labels the same person once the connecting union becomes visible', async () => {
+        service.getVisibleGraph.mockResolvedValue({
+          identities: {
+            [ROOT_ID]: { name: 'Root', gender: null },
+            [GRANDPARENT_ID]: { name: 'Gramps', gender: null },
+            [TARGET_ID]: { name: 'Target', gender: null },
+            [TARGET_SPOUSE_ID]: { name: 'Spouse', gender: null },
+          },
+          unions: [
+            {
+              id: UNION_ROOT_PARENT,
+              status: 'partnered',
+              partners: [knownParticipant(GRANDPARENT_ID)],
+              children: [knownParticipant(ROOT_ID)],
+            },
+            {
+              id: UNION_TARGET_PARENT,
+              status: 'partnered',
+              partners: [knownParticipant(GRANDPARENT_ID)],
+              children: [knownParticipant(TARGET_ID)],
+            },
+            {
+              id: UNION_TARGET_SPOUSE,
+              status: 'partnered',
+              partners: [knownParticipant(TARGET_ID), knownParticipant(TARGET_SPOUSE_ID)],
+              children: [],
+            },
+          ],
+        });
+        service.getMyRoot.mockResolvedValue(ROOT_ID);
+
+        const { status, body } = await request(ctx.getHttpServer())
+          .get('/family/unions')
+          .set('Authorization', 'Bearer token');
+
+        expect(status).toBe(200);
+        expect(body.identities[TARGET_ID].label).toBe('your half-sibling');
+      });
+    });
+  });
+
+  describe('GET /family/me', () => {
+    it('should be an authenticated route', async () => {
+      service.getMyRoot.mockResolvedValue(null);
+      await request(ctx.getHttpServer()).get('/family/me');
+      expect(ctx.authenticate).toHaveBeenCalled();
+    });
+
+    it('returns the currently set root', async () => {
+      service.getMyRoot.mockResolvedValue(IDENTITY_A);
+
+      const { status, body } = await request(ctx.getHttpServer())
+        .get('/family/me')
+        .set('Authorization', 'Bearer token');
+
+      expect(status).toBe(200);
+      expect(body).toEqual({ identityId: IDENTITY_A });
+    });
+
+    it('returns a null identityId when no root has ever been set', async () => {
+      service.getMyRoot.mockResolvedValue(null);
+
+      const { status, body } = await request(ctx.getHttpServer())
+        .get('/family/me')
+        .set('Authorization', 'Bearer token');
+
+      expect(status).toBe(200);
+      expect(body).toEqual({ identityId: null });
     });
   });
 
