@@ -793,6 +793,8 @@ class ApiClient {
           return SharedSpaceActivityResponseDto.fromJson(value);
         case 'SharedSpaceAlbumLinkUpdateDto':
           return SharedSpaceAlbumLinkUpdateDto.fromJson(value);
+        case 'SharedSpaceAlbumMemberTimelineDto':
+          return SharedSpaceAlbumMemberTimelineDto.fromJson(value);
         case 'SharedSpaceAssetAddDto':
           return SharedSpaceAssetAddDto.fromJson(value);
         case 'SharedSpaceAssetLinkedAlbumDto':

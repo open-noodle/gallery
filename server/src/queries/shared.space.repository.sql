@@ -162,6 +162,15 @@ where
   "userId" = $1
   and "showInTimeline" = $2
 
+-- SharedSpaceRepository.getTimelineHiddenScope
+select
+  "spaceId",
+  "showInTimeline"
+from
+  "shared_space_member"
+where
+  "userId" = $1::uuid
+
 -- SharedSpaceRepository.getSpaceIdsWithFaceRecognitionEnabled
 select
   "id"

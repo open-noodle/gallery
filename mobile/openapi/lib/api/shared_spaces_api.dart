@@ -2518,6 +2518,65 @@ class SharedSpacesApi {
     }
   }
 
+  /// Hide or show a linked album in the caller's own timeline
+  ///
+  /// Per-member preference. Does not change what other members see, and does not change whether the album appears in the space's own photos.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [String] albumId (required):
+  ///
+  /// * [String] id (required):
+  ///
+  /// * [SharedSpaceAlbumMemberTimelineDto] sharedSpaceAlbumMemberTimelineDto (required):
+  Future<Response> updateAlbumTimelineForMemberWithHttpInfo(String albumId, String id, SharedSpaceAlbumMemberTimelineDto sharedSpaceAlbumMemberTimelineDto, { Future<void>? abortTrigger, }) async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/shared-spaces/{id}/albums/{albumId}/me/timeline'
+      .replaceAll('{albumId}', albumId)
+      .replaceAll('{id}', id);
+
+    // ignore: prefer_final_locals
+    Object? postBody = sharedSpaceAlbumMemberTimelineDto;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    const contentTypes = <String>['application/json'];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'PATCH',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
+    );
+  }
+
+  /// Hide or show a linked album in the caller's own timeline
+  ///
+  /// Per-member preference. Does not change what other members see, and does not change whether the album appears in the space's own photos.
+  ///
+  /// Parameters:
+  ///
+  /// * [String] albumId (required):
+  ///
+  /// * [String] id (required):
+  ///
+  /// * [SharedSpaceAlbumMemberTimelineDto] sharedSpaceAlbumMemberTimelineDto (required):
+  Future<void> updateAlbumTimelineForMember(String albumId, String id, SharedSpaceAlbumMemberTimelineDto sharedSpaceAlbumMemberTimelineDto, { Future<void>? abortTrigger, }) async {
+    final response = await updateAlbumTimelineForMemberWithHttpInfo(albumId, id, sharedSpaceAlbumMemberTimelineDto, abortTrigger: abortTrigger,);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+  }
+
   /// Update a member in a shared space
   ///
   /// Update a member's role in a shared space.

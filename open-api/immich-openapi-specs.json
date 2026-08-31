@@ -16151,6 +16151,76 @@
         "x-immich-state": "Beta"
       }
     },
+    "/shared-spaces/{id}/albums/{albumId}/me/timeline": {
+      "patch": {
+        "description": "Per-member preference. Does not change what other members see, and does not change whether the album appears in the space's own photos.",
+        "operationId": "updateAlbumTimelineForMember",
+        "parameters": [
+          {
+            "name": "albumId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SharedSpaceAlbumMemberTimelineDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Hide or show a linked album in the caller's own timeline",
+        "tags": [
+          "Shared Spaces"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "sharedSpace.read",
+        "x-immich-state": "Beta"
+      }
+    },
     "/shared-spaces/{id}/assets": {
       "delete": {
         "description": "Remove one or more assets from a shared space. Returns the ids that were actually removed (a selected asset that is only present via a linked album, not a direct member, is a no-op and is not returned).",
@@ -32974,6 +33044,18 @@
         "properties": {
           "showInTimeline": {
             "description": "Include this album in the space timeline",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "showInTimeline"
+        ],
+        "type": "object"
+      },
+      "SharedSpaceAlbumMemberTimelineDto": {
+        "properties": {
+          "showInTimeline": {
+            "description": "Show this album's assets in your own personal timeline",
             "type": "boolean"
           }
         },

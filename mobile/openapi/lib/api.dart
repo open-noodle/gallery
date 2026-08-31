@@ -379,6 +379,7 @@ part 'model/shared_links_response.dart';
 part 'model/shared_links_update.dart';
 part 'model/shared_space_activity_response_dto.dart';
 part 'model/shared_space_album_link_update_dto.dart';
+part 'model/shared_space_album_member_timeline_dto.dart';
 part 'model/shared_space_asset_add_dto.dart';
 part 'model/shared_space_asset_linked_album_dto.dart';
 part 'model/shared_space_asset_remove_dto.dart';

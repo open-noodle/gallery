@@ -3044,6 +3044,10 @@ export type SharedSpaceAlbumLinkUpdateDto = {
     /** Include this album in the space timeline */
     showInTimeline: boolean;
 };
+export type SharedSpaceAlbumMemberTimelineDto = {
+    /** Show this album's assets in your own personal timeline */
+    showInTimeline: boolean;
+};
 export type SharedSpaceAssetRemoveDto = {
     /** Asset IDs */
     assetIds: string[];
@@ -8250,6 +8254,20 @@ export function linkAlbum({ albumId, id }: {
         ...opts,
         method: "PUT"
     }));
+}
+/**
+ * Hide or show a linked album in the caller's own timeline
+ */
+export function updateAlbumTimelineForMember({ albumId, id, sharedSpaceAlbumMemberTimelineDto }: {
+    albumId: string;
+    id: string;
+    sharedSpaceAlbumMemberTimelineDto: SharedSpaceAlbumMemberTimelineDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/albums/${encodeURIComponent(albumId)}/me/timeline`, oazapfts.json({
+        ...opts,
+        method: "PATCH",
+        body: sharedSpaceAlbumMemberTimelineDto
+    })));
 }
 /**
  * Remove assets from a shared space

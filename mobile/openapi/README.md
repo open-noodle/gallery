@@ -350,6 +350,7 @@ Class | Method | HTTP request | Description
 *SharedSpacesApi* | [**setSpacePersonAlias**](doc//SharedSpacesApi.md#setspacepersonalias) | **PUT** /shared-spaces/{id}/people/{personId}/alias | Set a person alias in a shared space
 *SharedSpacesApi* | [**unlinkAlbum**](doc//SharedSpacesApi.md#unlinkalbum) | **DELETE** /shared-spaces/{id}/albums/{albumId} | Unlink an album from a shared space
 *SharedSpacesApi* | [**unlinkLibrary**](doc//SharedSpacesApi.md#unlinklibrary) | **DELETE** /shared-spaces/{id}/libraries/{libraryId} | Unlink a library from a shared space
+*SharedSpacesApi* | [**updateAlbumTimelineForMember**](doc//SharedSpacesApi.md#updatealbumtimelineformember) | **PATCH** /shared-spaces/{id}/albums/{albumId}/me/timeline | Hide or show a linked album in the caller's own timeline
 *SharedSpacesApi* | [**updateMember**](doc//SharedSpacesApi.md#updatemember) | **PATCH** /shared-spaces/{id}/members/{userId} | Update a member in a shared space
 *SharedSpacesApi* | [**updateMemberMetadataContribution**](doc//SharedSpacesApi.md#updatemembermetadatacontribution) | **PATCH** /shared-spaces/{id}/members/{userId}/metadata-contribution | Disable member person metadata contribution
 *SharedSpacesApi* | [**updateMemberPreferences**](doc//SharedSpacesApi.md#updatememberpreferences) | **PATCH** /shared-spaces/{id}/members/me/preferences | Update current member preferences
@@ -748,6 +749,7 @@ Class | Method | HTTP request | Description
  - [SharedLinksUpdate](doc//SharedLinksUpdate.md)
  - [SharedSpaceActivityResponseDto](doc//SharedSpaceActivityResponseDto.md)
  - [SharedSpaceAlbumLinkUpdateDto](doc//SharedSpaceAlbumLinkUpdateDto.md)
+ - [SharedSpaceAlbumMemberTimelineDto](doc//SharedSpaceAlbumMemberTimelineDto.md)
  - [SharedSpaceAssetAddDto](doc//SharedSpaceAssetAddDto.md)
  - [SharedSpaceAssetLinkedAlbumDto](doc//SharedSpaceAssetLinkedAlbumDto.md)
  - [SharedSpaceAssetRemoveDto](doc//SharedSpaceAssetRemoveDto.md)
