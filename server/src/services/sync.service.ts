@@ -113,6 +113,9 @@ export const SYNC_TYPES_ORDER = [
   // then membership rows (album_asset join), then asset blobs and exif.
   SyncRequestType.SharedSpaceAlbumsV1,
   SyncRequestType.SharedSpaceAlbumLinksV1,
+  // #1041: hidden rows key off (spaceId, albumId) like the link row above, so it belongs
+  // immediately after the link stream — before any asset-bearing stream, same reasoning.
+  SyncRequestType.SharedSpaceAlbumHiddensV1,
   SyncRequestType.SharedSpaceAlbumToAssetsV1,
   SyncRequestType.SharedSpaceAlbumAssetsV1,
   SyncRequestType.SharedSpaceAlbumAssetExifsV1,
@@ -277,6 +280,8 @@ export class SyncService extends BaseService {
       [SyncRequestType.SharedSpaceAlbumsV1]: () => this.syncSharedSpaceAlbumsV1(options, response, checkpointMap),
       [SyncRequestType.SharedSpaceAlbumLinksV1]: () =>
         this.syncSharedSpaceAlbumLinksV1(options, response, checkpointMap, session.id),
+      [SyncRequestType.SharedSpaceAlbumHiddensV1]: () =>
+        this.syncSharedSpaceAlbumHiddensV1(options, response, checkpointMap, session.id),
       [SyncRequestType.SharedSpaceAlbumToAssetsV1]: () =>
         this.syncSharedSpaceAlbumToAssetsV1(options, response, checkpointMap, session.id),
       [SyncRequestType.SharedSpaceAlbumAssetsV1]: () =>
@@ -326,6 +331,7 @@ export class SyncService extends BaseService {
     await this.syncRepository.sharedSpaceLibrary.cleanupAuditTable(pruneThreshold);
     await this.syncRepository.sharedSpaceAlbum.cleanupAuditTable(pruneThreshold);
     await this.syncRepository.sharedSpaceAlbumLink.cleanupAuditTable(pruneThreshold);
+    await this.syncRepository.sharedSpaceAlbumHidden.cleanupAuditTable(pruneThreshold);
     await this.syncRepository.sharedSpaceAlbumToAsset.cleanupAuditTable(pruneThreshold);
   }
 
@@ -1121,6 +1127,72 @@ export class SyncService extends BaseService {
     }
 
     const upserts = this.syncRepository.sharedSpaceAlbumLink.getUpserts({
+      ...options,
+      ack: checkpointMap[upsertType],
+    });
+    for await (const { updateId, ...data } of upserts) {
+      send(response, { type: upsertType, ids: [updateId], data });
+    }
+  }
+
+  // #1041: per-member "album hidden from MY timeline" rows — mirrors syncSharedSpaceAlbumLinksV1
+  // exactly, substituting syncRepository.sharedSpaceAlbumHidden and the Hidden entity types. Backfill
+  // is driven by the same sharedSpace.getCreatedAfter watermark as the link stream: a member starts
+  // receiving their own hidden rows for a space when that space first syncs.
+  private async syncSharedSpaceAlbumHiddensV1(
+    options: SyncQueryOptions,
+    response: Writable,
+    checkpointMap: CheckpointMap,
+    sessionId: string,
+  ) {
+    const deleteType = SyncEntityType.SharedSpaceAlbumHiddenDeleteV1;
+    const deletes = this.syncRepository.sharedSpaceAlbumHidden.getDeletes({
+      ...options,
+      ack: checkpointMap[deleteType],
+    });
+    for await (const { id, ...data } of deletes) {
+      send(response, { type: deleteType, ids: [id], data });
+    }
+
+    const backfillType = SyncEntityType.SharedSpaceAlbumHiddenBackfillV1;
+    const backfillCheckpoint = checkpointMap[backfillType];
+    const spaces = await this.syncRepository.sharedSpace.getCreatedAfter({
+      ...options,
+      afterCreateId: backfillCheckpoint?.updateId,
+    });
+    const upsertType = SyncEntityType.SharedSpaceAlbumHiddenV1;
+    const upsertCheckpoint = checkpointMap[upsertType];
+    if (upsertCheckpoint) {
+      const endId = upsertCheckpoint.updateId;
+
+      for (const space of spaces) {
+        const createId = space.createId;
+        if (isEntityBackfillComplete(createId, backfillCheckpoint)) {
+          continue;
+        }
+
+        const startId = getStartId(createId, backfillCheckpoint);
+        const backfill = this.syncRepository.sharedSpaceAlbumHidden.getBackfill(
+          { ...options, afterUpdateId: startId, beforeUpdateId: endId },
+          space.id,
+          options.userId,
+        );
+
+        for await (const { updateId, ...data } of backfill) {
+          send(response, { type: backfillType, ids: [createId, updateId], data });
+        }
+
+        sendEntityBackfillCompleteAck(response, backfillType, createId);
+      }
+    } else if (spaces.length > 0) {
+      await this.upsertBackfillCheckpoint({
+        type: backfillType,
+        sessionId,
+        createId: spaces.at(-1)!.createId,
+      });
+    }
+
+    const upserts = this.syncRepository.sharedSpaceAlbumHidden.getUpserts({
       ...options,
       ack: checkpointMap[upsertType],
     });
