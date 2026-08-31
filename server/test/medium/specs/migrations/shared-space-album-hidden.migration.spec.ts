@@ -151,3 +151,51 @@ describe('shared_space_album_hidden cleanup', () => {
     expect(await hiddenCount(space.id, album.id, user.id)).toBe(0);
   });
 });
+
+describe('shared_space_album_hidden delete audit', () => {
+  const auditRows = async (userId: string) =>
+    db.selectFrom('shared_space_album_hidden_audit').selectAll().where('userId', '=', userId).execute();
+
+  it('writes an audit row when a member unhides an album', async () => {
+    const { user, space, album } = await seedHiddenAlbum();
+    expect(await auditRows(user.id)).toHaveLength(0);
+
+    await db
+      .deleteFrom('shared_space_album_hidden')
+      .where('spaceId', '=', space.id)
+      .where('albumId', '=', album.id)
+      .where('userId', '=', user.id)
+      .execute();
+
+    const rows = await auditRows(user.id);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ spaceId: space.id, albumId: album.id, userId: user.id });
+  });
+
+  it('writes one audit row per deleted row for a multi-row statement', async () => {
+    // The trigger is statement-level with a transition table; a per-row trigger would also pass
+    // the single-row test above, so this is the case that distinguishes them.
+    const { ctx, spaceRepo, user, space } = await seedHiddenAlbum();
+    const { result: second } = await ctx.newAlbum({ ownerId: user.id, albumName: 'Hidden2' });
+    await spaceRepo.addAlbum({ spaceId: space.id, albumId: second.id, addedById: user.id });
+    await db
+      .insertInto('shared_space_album_hidden')
+      .values({ spaceId: space.id, albumId: second.id, userId: user.id })
+      .execute();
+
+    await db.deleteFrom('shared_space_album_hidden').where('userId', '=', user.id).execute();
+
+    expect(await auditRows(user.id)).toHaveLength(2);
+  });
+
+  it('writes an audit row when the row disappears via the unlink cascade', async () => {
+    // Mobile must learn about the unhide however it happened, not only via an explicit delete.
+    const { spaceRepo, user, space, album } = await seedHiddenAlbum();
+
+    await spaceRepo.removeAlbum(space.id, album.id);
+
+    const rows = await auditRows(user.id);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ spaceId: space.id, albumId: album.id });
+  });
+});
