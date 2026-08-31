@@ -25,6 +25,10 @@ The reporter used the album one. Both render the identical i18n key:
 
 "Hide from timeline" in both places, two different scopes. That alone explains a large part of the report.
 
+This is not a new discovery — `e2e/src/specs/web/spaces-albums-timeline.e2e-spec.ts:19-23` already
+documents both toggles and notes explicitly that their menu items "share the same" name. It was known
+and worked around in tests; #1041 is a user hitting it.
+
 ### Why nothing hides
 
 Every personal-timeline query is shaped:
@@ -35,7 +39,7 @@ asset."ownerId" = <viewer>
 ```
 
 `server/src/utils/shared-space-album-scope.ts:389` (`accessibleTimelineAssetPredicate`), and the Kysely
-twin at `server/src/repositories/asset.repository.ts:474`.
+twin at `server/src/repositories/asset.repository.ts:478`.
 
 The `showInTimeline` gate only ever sits on the **space arm**. The ownership arm is unconditional, so
 **no space-level or album-level flag can subtract a photo from its own owner's timeline.** The reporter
@@ -116,7 +120,8 @@ timeline and folder view, still present in search. Match it.
 
 | Surface                     | In scope   | Site                                                                  |
 | --------------------------- | ---------- | --------------------------------------------------------------------- |
-| `/photos` web timeline      | ✅ slice 1 | `asset.repository.ts:472` **and** `:474` — both owner branches        |
+| `/photos` web timeline      | ✅ slice 1 | `asset.repository.ts:475` **and** `:478` — both owner branches        |
+| Timeline scrubber covers    | ✅ free    | `getTimeBucketCovers` (`asset.repository.ts:1545`) — see note below   |
 | Mobile timeline + scrubber  | ✅ slice 1 | `mobile/lib/infrastructure/entities/merged_asset.drift:63` and `:166` |
 | Folder view                 | ✅ slice 1 | `view-repository.ts:60` `ownedOrSpaceAccessible`                      |
 | Memories                    | ✅ slice 2 | `memory.repository.ts:133`, `:169`, `:315`, plus `getByDayOfYear`     |
@@ -125,7 +130,12 @@ timeline and folder view, still present in search. Match it.
 | People page counts          | ❌         | unchanged — deliberately, it is already the slowest query             |
 | The album/space page itself | ❌         | must always show its own contents                                     |
 
-`asset.repository.ts:472` is easy to miss: it is the `!timelineSpaceIds` branch (`userIds` set, shared
+Three server call sites, not two. `getTimeBuckets`, `getTimeBucket` and `getTimeBucketCovers` all route
+through `withTimeBucketAssetFilters`, so editing that one helper covers all three — but the scrubber
+counts and the asset list would drift apart if a future change touched only one, which is exactly why
+they share the helper today (`asset.repository.ts:1626`).
+
+`asset.repository.ts:475` is easy to miss: it is the `!timelineSpaceIds` branch (`userIds` set, shared
 spaces off). A user with `withSharedSpaces=false` must still get the subtraction, so **both** branches
 change.
 
@@ -141,21 +151,38 @@ Resolve once per request, service-side, alongside the existing `getSpaceIdsForTi
 ```ts
 // SharedSpaceRepository — new, sibling to getSpaceIdsForTimeline (shared-space.repository.ts:360)
 getTimelineHiddenScope(userId): Promise<{
-  hiddenSpaceIds: string[];   // member rows with showInTimeline = false
-  hiddenAlbumIds: string[];   // albums linked to a hidden space, ∪ albums with
-                              // shared_space_album.showInTimeline = false in a shown space,
-                              // MINUS albums also linked visibly to a shown space
-  hiddenLibraryIds: string[]; // libraries linked to a hidden space (usually empty)
+  hiddenSpaceIds: string[];       // my member rows with showInTimeline = false
+  hiddenAlbumIds: string[];       // for the album_asset arm — see resolution rules
+  hiddenAlbumSpacePairs: Array<{ albumId: string; spaceId: string }>;
+                                  // for the album_space_asset arm, which MUST carry the space
+  hiddenLibraryIds: string[];     // libraries linked to a hidden space (usually empty)
 }>
 ```
 
-The `MINUS` implements "a visible linked album cancels it" as **set arithmetic on album ids** — a tiny
-set — so it never reaches SQL. Resolving album ids in the service (rather than joining
-`shared_space_album` inside the hot query) is a measured requirement, not a style preference: see §5.
+**Resolution rules — all four are load-bearing:**
 
-**Collapse when empty.** If all three lists are empty — the overwhelmingly common case — emit no extra
+1. **Scope to my memberships.** Every set is derived from `shared_space_member` rows for `userId`. A
+   space creator always has one: `shared-space.service.ts:136` inserts an `Owner` member row at
+   creation, so `getSpaceIdsForTimeline`'s member-table-only read has no creator gap, and neither does
+   this.
+2. **`hiddenAlbumIds`** = albums linked to a space in `hiddenSpaceIds`, ∪ albums with
+   `shared_space_album.showInTimeline = false` in a space I show, **MINUS** albums also linked _visibly_
+   to a space I show. The `MINUS` implements "a visible linked album cancels it" as set arithmetic on a
+   tiny set, so it never reaches SQL.
+3. **A1 invariant.** Both the hidden set and the cancelling set join `album` and require
+   `album.deletedAt IS NULL`. Without this on the hidden side a trashed album keeps hiding photos;
+   without it on the cancelling side a trashed album keeps re-admitting them. This is the same
+   invariant the whole `shared-space-album-scope.ts` family encodes (`requireAlbumNotDeleted`, default
+   true) — pinned by edge case E1.
+4. **Contributions carry their space.** `album_space_asset` rows are only ever visible through the
+   single space they were contributed to — `spaceContributedAssetExists` correlates
+   `album_space_asset.spaceId = shared_space_album.spaceId` for exactly that reason (#764, #1018).
+   The hidden side must preserve that dimension, hence `hiddenAlbumSpacePairs` rather than bare album
+   ids: hiding album X in space S must **not** hide a contribution made to X in space T.
+
+**Collapse when empty.** If all four are empty — the overwhelmingly common case — emit no extra
 predicate at all. This mirrors the existing `hasTimelineSpaces` collapse in
-`accessibleTimelineAssetPredicate` (`shared-space-album-scope.ts:394`) and keeps the change free for
+`accessibleTimelineAssetPredicate` (`shared-space-album-scope.ts:393`) and keeps the change free for
 every user who has hidden nothing.
 
 ---
@@ -165,25 +192,51 @@ every user who has hidden nothing.
 New fork-owned helper beside the existing family in `src/utils/shared-space-album-scope.ts`:
 
 ```ts
-export function hiddenFromOwnTimeline(eb: ExpressionBuilder<DB, keyof DB>, scope: { hiddenSpaceIds: string[]; hiddenAlbumIds: string[]; hiddenLibraryIds: string[] }): Expression<SqlBool> | undefined; // undefined ⇒ caller emits nothing
+export function hiddenFromOwnTimeline(eb: ExpressionBuilder<DB, keyof DB>, scope: TimelineHiddenScope): Expression<SqlBool> | undefined; // undefined ⇒ caller emits nothing
 ```
 
-emitting, for a non-empty scope:
+emitting, for a non-empty scope (each arm emitted **only** when its own list is non-empty):
 
 ```sql
-NOT EXISTS (SELECT 1 FROM shared_space_asset
-             WHERE "spaceId" = ANY(:hiddenSpaceIds) AND "assetId" = asset.id)
+    NOT EXISTS (SELECT 1 FROM shared_space_asset
+                 WHERE "spaceId" = ANY(:hiddenSpaceIds) AND "assetId" = asset.id)
 AND NOT EXISTS (SELECT 1 FROM album_asset
-             WHERE "albumId" = ANY(:hiddenAlbumIds) AND "assetId" = asset.id)
+                 WHERE "albumId" = ANY(:hiddenAlbumIds) AND "assetId" = asset.id)
 AND NOT EXISTS (SELECT 1 FROM album_space_asset          -- cross-owner contributions (#764)
-             WHERE "albumId" = ANY(:hiddenAlbumIds) AND "assetId" = asset.id)
--- library arm emitted only when hiddenLibraryIds is non-empty
-AND NOT EXISTS (SELECT 1 FROM shared_space_library
-             WHERE "libraryId" = ANY(:hiddenLibraryIds) AND "libraryId" = asset."libraryId")
+                 WHERE ("albumId", "spaceId") = ANY(:hiddenAlbumSpacePairs)
+                   AND "assetId" = asset.id)
+AND (asset."libraryId" IS NULL OR asset."libraryId" <> ALL(:hiddenLibraryIds))
 ```
 
-AND-ed onto the owner arm; the existing space arms (`V`) are untouched and provide the re-admission for
-free, because an asset with a visible path is admitted by the second arm of the same `OR`.
+Three things in there are deliberate and were each wrong in an earlier draft of this spec:
+
+- **The library arm is not an `EXISTS`.** Once the service has resolved `hiddenLibraryIds`, a subquery
+  buys nothing. More importantly `asset.libraryId` is **nullable**, and `NULL <> ALL (…)` evaluates to
+  `NULL`, not `true` — so the bare `<> ALL` form silently subtracts every asset that has no library,
+  i.e. most of the timeline. The `IS NULL OR` guard is mandatory. Pinned by edge case E13.
+- **The contribution arm keys on `(albumId, spaceId)`**, per resolution rule 4. Pinned by E7b.
+- **It attaches to the caller's own id, never to `userIds`.** See below.
+
+### Where it attaches — the partner trap
+
+The owner arm at `asset.repository.ts:478` is `asset.ownerId = anyUuid(options.userIds!)`, and
+`userIds` **includes partner ids** (`timeline.service.ts:76-80` pushes `getMyPartnerIds` into it). AND-ing
+the subtraction onto that arm would remove a **partner's** photos from my timeline based on **my**
+flags — a real access/correctness bug, and one no happy-path test would catch.
+
+The owner arm must therefore be split:
+
+```
+(asset."ownerId" = :callerId AND <hiddenFromOwnTimeline>)
+OR asset."ownerId" = ANY(:partnerIds)          -- unchanged, no subtraction
+OR (visibility gate AND <existing space arms V>)
+```
+
+`TimeBucketOptions` needs the caller's own id distinguished from `userIds` for this; today the service
+flattens both into one list. Pinned by edge case E10.
+
+The existing space arms (`V`) are untouched and provide the re-admission for free, because an asset with
+a visible path is admitted by the last arm of the same `OR`.
 
 Postgres compiles each `NOT EXISTS` to a **hashed SubPlan** — one index scan, `loops=1`, then an O(1)
 hash probe per row. Verified in the plan:
@@ -194,7 +247,10 @@ Filter: ... AND (NOT (ANY (id = (hashed SubPlan 2).col1)))
     ->  Index Only Scan using album_asset_pkey  (rows=1091 loops=1, 0.134 ms)
 ```
 
-Cost is O(hidden set) once plus O(1) per row — **independent of library size**.
+Cost is O(hidden set) once plus O(1) per row — **independent of library size, but linear in hidden-set
+size.** The largest hidden set measured was 8.4k asset paths; a user hiding a 50k-photo space builds a
+proportionally larger hash. Still one build per query, not per row, so it stays bounded — but it is the
+untested end of the curve.
 
 ### Forms that were measured and rejected
 
@@ -253,15 +309,15 @@ actually hidden something pay anything.
 
 The shared label is part of the bug. Split it, and say what will happen.
 
-| Key                                             | Now                    | Proposed                                                                                                                                             |
-| ----------------------------------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `spaces_hide_from_timeline`                     | "Hide from timeline"   | **space** kebab only → "Hide all space photos from timeline"                                                                                         |
-| _new_ `space_albums_hide_from_timeline`         | —                      | **album** kebab → "Hide this album from timeline"                                                                                                    |
-| `spaces_show_on_timeline`                       | "Show on timeline"     | "Show all space photos in timeline"                                                                                                                  |
-| `spaces_linked_albums_show_in_timeline`         | "Show in timeline"     | "Show this album in timeline"                                                                                                                        |
-| `space_albums_hidden_from_timeline`             | "Hidden from timeline" | unchanged (a badge, scope is clear from placement)                                                                                                   |
-| _new_ `spaces_hide_from_timeline_confirm`       | —                      | "Hide all photos in **{space}** from your timeline? This removes **{count}** photos from your timeline. They stay in the space and in search."       |
-| _new_ `space_albums_hide_from_timeline_confirm` | —                      | "Hide **{album}** from timelines? This removes **{count}** photos from the timelines of everyone in **{space}**, including the people who own them." |
+| Key                                             | Now                    | Proposed                                                                                                                                       |
+| ----------------------------------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `spaces_hide_from_timeline`                     | "Hide from timeline"   | **space** kebab only → "Hide all space photos from timeline"                                                                                   |
+| _new_ `space_albums_hide_from_timeline`         | —                      | **album** kebab → "Hide this album from timeline"                                                                                              |
+| `spaces_show_on_timeline`                       | "Show on timeline"     | "Show all space photos in timeline"                                                                                                            |
+| `spaces_linked_albums_show_in_timeline`         | "Show in timeline"     | "Show this album in timeline"                                                                                                                  |
+| `space_albums_hidden_from_timeline`             | "Hidden from timeline" | unchanged (a badge, scope is clear from placement)                                                                                             |
+| _new_ `spaces_hide_from_timeline_confirm`       | —                      | "Hide all photos in **{space}** from your timeline? This removes **{count}** photos from your timeline. They stay in the space and in search." |
+| _new_ `space_albums_hide_from_timeline_confirm` | —                      | see the reworded copy below the table                                                                                                          |
 
 The album dialog names the hazard explicitly — that flag is shared and editor-settable.
 
@@ -271,6 +327,16 @@ The album dialog names the hazard explicitly — that flag is shared and editor-
 `{ hiddenAssetCount: number }`, computed by counting rows the §5 predicate would subtract **if** that
 flag were flipped. Read-only, membership-gated like the toggle it precedes; it changes no state, so the
 dialog can be opened and cancelled freely.
+
+**`{count}` is always scoped to the caller, never to "everyone".** Each member's count genuinely
+differs, because it depends on their _other_ space memberships — an asset I reach only through this
+album may be reachable by you through a space I'm not in. Computing a number for "everyone" would be
+both expensive and meaningless. The album copy above is therefore reworded to:
+
+> "Hide **{album}** from timelines? This removes **{count}** photos from your timeline. It also hides
+> the album from everyone else in **{space}**, including from the people who own those photos."
+
+— which states the hazard without pretending to a cross-member number we are not computing.
 
 A count of 0 is worth showing too: it tells a user with a "dump everything" space _why_ nothing will
 change — which is exactly the confusion behind #1041. On the personal instance, hiding all 21 albums
@@ -320,20 +386,26 @@ The truth table from §2, as Given/When/Then:
 
 Edge cases that have bitten this codebase before:
 
-| #   | Given                                                                                  | Then                                                                                                                        |
-| --- | -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| E1  | the linked album is soft-deleted (`album.deletedAt` set)                               | the A1 invariant still holds; a deleted album neither hides nor re-admits                                                   |
-| E2  | the asset is in a hidden album **and** trashed                                         | still absent from the timeline; trash is unaffected                                                                         |
-| E3  | the asset is `visibility = archive`                                                    | unaffected — it was never on the timeline                                                                                   |
-| E4  | the asset is `visibility = hidden` / `locked`                                          | unaffected; no new leak path                                                                                                |
-| E5  | the viewer belongs to **no** space                                                     | the predicate collapses; SQL contains no `NOT EXISTS` (assert on the generated SQL, not just the rows)                      |
-| E6  | the viewer has spaces but has hidden **nothing**                                       | same collapse — this is the free-for-everyone claim, so assert it                                                           |
-| E7  | the asset arrived via `album_space_asset` (cross-owner contribution, #764)             | the contributor's own timeline honours the hide                                                                             |
-| E8  | a stacked asset whose primary is hidden but a sibling is not                           | the stack behaves as the existing `withStacked` filter dictates; no orphan rows                                             |
-| E9  | album linked to two spaces, hidden in both                                             | absent                                                                                                                      |
-| E10 | `withPartners = true`, partner owns an asset in an album I hid                         | my flag must not subtract my **partner's** assets from my timeline — the subtraction applies to the `ownerId = me` arm only |
-| E11 | the album is unlinked from the space entirely                                          | asset returns to the timeline                                                                                               |
-| E12 | `withSharedSpaces = false` (the `!timelineSpaceIds` branch, `asset.repository.ts:472`) | the subtraction still applies                                                                                               |
+| #   | Given                                                                                                 | Then                                                                                                                                                    |
+| --- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| E1  | the linked album is soft-deleted (`album.deletedAt` set)                                              | the A1 invariant still holds; a deleted album neither hides nor re-admits                                                                               |
+| E2  | the asset is in a hidden album **and** trashed                                                        | still absent from the timeline; trash is unaffected                                                                                                     |
+| E3  | the asset is `visibility = archive`                                                                   | unaffected — it was never on the timeline                                                                                                               |
+| E4  | the asset is `visibility = hidden` / `locked`                                                         | unaffected; no new leak path                                                                                                                            |
+| E5  | the viewer belongs to **no** space                                                                    | the predicate collapses; SQL contains no `NOT EXISTS` (assert on the generated SQL, not just the rows)                                                  |
+| E6  | the viewer has spaces but has hidden **nothing**                                                      | same collapse — this is the free-for-everyone claim, so assert it                                                                                       |
+| E7  | the asset arrived via `album_space_asset` (cross-owner contribution, #764)                            | the contributor's own timeline honours the hide                                                                                                         |
+| E8  | a stacked asset whose primary is hidden but a sibling is not                                          | the stack behaves as the existing `withStacked` filter dictates; no orphan rows                                                                         |
+| E9  | album linked to two spaces, hidden in both                                                            | absent                                                                                                                                                  |
+| E10 | `withPartners = true`, partner owns an asset in an album I hid                                        | my flag must not subtract my **partner's** assets from my timeline — the subtraction applies to the `ownerId = me` arm only                             |
+| E7b | album X linked to hidden space S **and** shown space T; a contribution was made to X **in T**         | the contribution still shows — the hidden side keys on `(albumId, spaceId)`, so hiding X in S must not reach T's contribution (§4 rule 4)               |
+| E11 | the album is unlinked from the space entirely                                                         | asset returns to the timeline                                                                                                                           |
+| E12 | `withSharedSpaces = false` (the `!timelineSpaceIds` branch, `asset.repository.ts:475`)                | the subtraction still applies                                                                                                                           |
+| E13 | I own assets with `libraryId IS NULL` (the normal case) and have a hidden space with a linked library | they still show. Guards the `NULL <> ALL(…)` trap in §5 — the naive form subtracts the entire timeline                                                  |
+| E14 | my membership of the hidden space is revoked while the flag is set                                    | the space leaves `hiddenSpaceIds`; the assets return                                                                                                    |
+| E15 | I am the space **creator**                                                                            | resolution still finds me — `shared-space.service.ts:136` guarantees an Owner member row                                                                |
+| E16 | I own an asset in an album that is linked to a space I am **not** a member of                         | not hidden — every set is membership-scoped (§4 rule 1)                                                                                                 |
+| E17 | a hidden space containing ~50k assets                                                                 | perf smoke only: assert the hash is built once (`loops=1`), not per row. §5's cost is linear in hidden-set size and this end of the curve is unmeasured |
 
 E10 and E12 are the two most likely to be missed — E12 is a second code branch, E10 is a real correctness
 bug if the predicate is attached to `ownerId = ANY(userIds)` rather than to the caller's own id.
@@ -376,22 +448,85 @@ Standing failure modes in this repo; each has produced a false green before.
   test. Assert on the generated SQL where the distinction matters.
 - **`tsc` green means nothing on a re-key.** Type checks do not see raw SQL or Drift strings.
 
-### 8.5 Web
+### 8.5 Existing tests that this change puts at risk
+
+A semantics change breaks tests that encoded the old semantics. Audit these **before** writing new ones;
+each is either still correct (and proves we didn't over-reach) or needs updating with a recorded reason.
+
+| Test                                                                                                                                                               | Why it is at risk                                                                                                                                                                                                  |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `e2e/src/specs/web/spaces-albums-timeline.e2e-spec.ts:181` — _"viewer toggling 'show in my timeline' gains/loses the linked photo on their main /photos timeline"_ | sits exactly on the redefined surface. Should still pass: the viewer does **not** own the photo, so only the `V` arm applies and that is unchanged. If it fails, the subtraction has leaked onto non-owned assets. |
+| `spaces-albums-timeline.e2e-spec.ts:150` — album toggle drops/re-adds in the space Photos tab                                                                      | space-timeline behaviour, unchanged by this work. A failure here means slice 1 touched the `spaceId` browse it should not have.                                                                                    |
+| `server/test/medium/specs/repositories/shared-space-visibility-matrix.medium.spec.ts`                                                                              | the matrix asserts today's "owner always sees their own" rule in several rows                                                                                                                                      |
+| `accessible-timeline-asset-predicate.medium.spec.ts`                                                                                                               | compares collapsed vs expanded predicate forms; the new term must appear in both or neither                                                                                                                        |
+| `timeline-bucket-explicit-visibility.medium.spec.ts`                                                                                                               | explicit-visibility rows interact with the new owner-arm split                                                                                                                                                     |
+
+### 8.6 E2E
+
+`e2e/src/specs/web/spaces-albums-timeline.e2e-spec.ts` already exists and is the right home — it is
+built around exactly these two toggles. Add:
+
+- **member toggle, owner's own photos**: owner links their album into a space, hides the space from
+  their timeline, asserts their own photos leave `/photos` and return on unhide. This is #1041's
+  headline scenario and there is no API-level test that substitutes for it.
+- **album toggle, owner's own photos**: same shape at album granularity (assumes the §2 open question
+  resolves to _yes_; drop this one if it resolves to _no_).
+- **cancellation is visible to the user**: a photo in a hidden album that is also added to the space
+  directly stays on `/photos`. This is the scenario most likely to generate a follow-up bug report, so
+  it should be demonstrably intentional.
+- **the confirm dialog states a count**, and cancelling it changes nothing.
+
+API-level specs under `e2e/src/specs/api/` for the two new preview endpoints: membership gating (a
+non-member gets 403), the count matches what the timeline actually drops, and the zero case.
+
+### 8.7 Sync
+
+Flipping either flag must reach mobile, and must **not** purge local rows.
+
+`sync-shared-space-album-visibility-purge.spec.ts` purges on **asset visibility** transitions
+(Timeline/Archive → Hidden), not on `showInTimeline`. That is the behaviour we want and rely on: hiding
+leaves the local `remote_asset_entity` rows in place and the Drift predicate filters them, so the asset
+stays available to search and returns instantly on unhide. Nothing currently pins that, so add:
+
+- flipping `shared_space_member.showInTimeline` emits the member row on `SharedSpaceMemberSync` and
+  emits **no** asset deletions;
+- flipping `shared_space_album.showInTimeline` emits the link row on `SharedSpaceAlbumLinkSync` and
+  emits **no** asset deletions.
+
+### 8.8 Web
 
 Component tests for the split copy and the confirm dialogs
 (`space-album-card.spec.ts`, `space-albums-table.spec.ts`, `space-layout.spec.ts` all exist), asserting
 the space and album menu items no longer render the same string, and that each dialog surfaces its count.
 
+**Cache invalidation.** `+layout.svelte:129` calls `invalidateAll()` after the member toggle, which
+reloads route data but does not reach the `/photos` `TimelineManager` — a different, currently unmounted
+route that refetches on mount. That is very likely fine, but it is an assumption: assert that navigating
+to `/photos` after a toggle shows the new result rather than a cached bucket. Check the **album**
+toggle's handler too; it was not audited during this design and may not invalidate at all.
+
+### 8.9 Shared links
+
+`auth.sharedLink` resolves its own scope (`timeline.service.ts:101`, #1018) and never carries a member
+`showInTimeline`. **Decision: the subtraction does not apply to shared-link viewers.** A link is an
+explicit act of publishing a specific album or space; a member's private timeline preference is not the
+link viewer's preference, and applying it would make link contents vary by who created the link. Add one
+API-level test pinning that a link to a hidden album still serves its assets.
+
 ---
 
 ## 9. Slices
 
-| Slice | Content                                                                                                                                                                  | Gate                 |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------- |
-| **0** | Reproduce the space-timeline half of #1041 on a real stack. If it reproduces, it is a separate bug — file it and fix independently.                                      | before any code      |
-| **1** | Predicate + service resolution + `/photos` (both branches) + folder view + mobile Drift. S1–S12, E1–E12.                                                                 | medium + Drift green |
-| **2** | Memories (`memory.repository.ts` ×3 projections + `getByDayOfYear`). Includes "a memory whose assets are now all hidden" — decide empty-memory handling there, not here. | medium green         |
-| **3** | Copy split, both confirm dialogs with counts, nine locales, docs, release-note text.                                                                                     | web tests + prettier |
+| Slice | Content                                                                                                                                                                                                                                                         | Gate                 |
+| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| **0** | Reproduce the space-timeline half of #1041 on a real stack. If it reproduces, it is a separate bug — file it and fix independently. Also run the §8.5 audit of at-risk tests against unmodified code, so their current state is recorded before anything moves. | before any code      |
+| **1** | Predicate + service resolution + owner-arm split (§5 partner trap) + `/photos` (both branches) + folder view + mobile Drift. S1–S12, E1–E17, §8.7 sync tests.                                                                                                   | medium + Drift green |
+| **2** | Memories (`memory.repository.ts` ×3 projections + `getByDayOfYear`). Includes "a memory whose assets are now all hidden" — decide empty-memory handling there, not here.                                                                                        | medium green         |
+| **3** | The two preview endpoints + their API specs (§8.6), copy split, both confirm dialogs with counts, nine locales, docs, release-note text.                                                                                                                        | web tests + prettier |
+| **4** | E2E (§8.6) on `spaces-albums-timeline.e2e-spec.ts`, including the cancellation scenario and the shared-link pin (§8.9).                                                                                                                                         | e2e green            |
+
+The owner-arm split in slice 1 changes `TimeBucketOptions` (the caller's own id must be separable from
+`userIds`), so it lands first within that slice — the other call sites depend on its shape.
 
 ## 10. Out of scope
 
