@@ -6,6 +6,7 @@
   import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
   import { handleError } from '$lib/utils/handle-error';
   import { appendUniqueById, getSpacePersonThumbnailUrl, zoomImageToBase64 } from '$lib/utils/people-utils';
+  import { normalizeSearchString } from '$lib/utils/string-utils';
   import {
     attachSpacePersonFace,
     createSpacePerson,
@@ -48,8 +49,17 @@
   let spaceCandidates: SharedSpacePersonResponseDto[] = $state([]);
   let candidatesLoaded = $state(false);
   let isLoadingCandidates = $state(false);
-  let newPersonName = $state('');
+  /**
+   * One field, two jobs: it filters the candidate list below AND names the person the create
+   * button makes. The picker used to offer only the create half, so typing a name that already
+   * existed matched nothing and the only way to reach that person was to scroll the whole space
+   * -- reported on #992 as "assigning to an existing person is broken". Its two siblings both
+   * search (the owner's `AssignFaceSidePanel` via `PeopleSearch`, `SpaceFaceEditor` over its own
+   * loaded candidates), and the panel is too narrow to carry two text inputs.
+   */
+  let personQuery = $state('');
   let isSavingNewPerson = $state(false);
+  let isAttaching = $state(false);
 
   const thumbnailWidth = '90px';
 
@@ -88,20 +98,25 @@
 
   const openPicker = (faceId: string) => {
     pickerFaceId = faceId;
-    newPersonName = '';
+    personQuery = '';
     void loadCandidatesOnce();
   };
 
   const closePicker = () => {
     pickerFaceId = undefined;
-    newPersonName = '';
+    personQuery = '';
   };
 
   const updateFaceRow = (assetFaceId: string, spacePersonId: string | null, spacePersonName: string | null) => {
     faces = faces?.map((f) => (f.id === assetFaceId ? { ...f, spacePersonId, spacePersonName } : f));
   };
 
+  // `isAttaching` swaps the grid for its spinner while the PUT is in flight. Without it a slow
+  // write leaves the card sitting there unchanged, which is indistinguishable from a tap that
+  // never registered -- how this presented on #992 -- and nothing stops a second impatient tap
+  // firing a second attach.
   const attachToPerson = async (face: SpaceAssetFaceResponseDto, candidate: PickerCandidate) => {
+    isAttaching = true;
     try {
       await attachSpacePersonFace({ id: spaceId, personId: candidate.id, assetFaceId: face.id });
       updateFaceRow(face.id, candidate.id, candidate.name);
@@ -109,11 +124,13 @@
       onRefresh();
     } catch (error) {
       handleError(error, $t('errors.cant_apply_changes'));
+    } finally {
+      isAttaching = false;
     }
   };
 
   const createAndAttach = async (face: SpaceAssetFaceResponseDto) => {
-    const name = newPersonName.trim();
+    const name = personQuery.trim();
     if (!name) {
       return;
     }
@@ -168,6 +185,18 @@
       thumbnailUrl: getSpacePersonThumbnailUrl(spaceId, person.id, person.updatedAt),
     })),
   );
+
+  // Filtered here rather than through the endpoint's own `name` parameter: `loadCandidatesOnce`
+  // already holds every candidate the space has, so a round trip per keystroke would buy nothing
+  // and cost a request on each one. Same matcher as `SpaceFaceEditor`, so "angela" finds
+  // "Ángela".
+  let visibleCandidates: PickerCandidate[] = $derived.by(() => {
+    const query = normalizeSearchString(personQuery.trim());
+    if (!query) {
+      return pickerCandidates;
+    }
+    return pickerCandidates.filter((candidate) => normalizeSearchString(candidate.name).includes(query));
+  });
 </script>
 
 <svelte:document
@@ -296,10 +325,10 @@
       </div>
       <div class="p-4 text-sm">
         <div class="mb-4 flex gap-2">
-          <Input placeholder={$t('create_person')} bind:value={newPersonName} size="tiny" />
+          <Input placeholder={$t('search_people')} bind:value={personQuery} size="tiny" />
           <Button
             size="small"
-            disabled={!newPersonName.trim() || isSavingNewPerson}
+            disabled={!personQuery.trim() || isSavingNewPerson}
             onclick={() => createAndAttach(activeFace)}
           >
             {$t('create_person')}
@@ -307,8 +336,8 @@
         </div>
         <h2 class="mt-4 mb-8">{$t('all_people')}</h2>
         <PersonPickerGrid
-          candidates={pickerCandidates}
-          isLoading={isLoadingCandidates}
+          candidates={visibleCandidates}
+          isLoading={isLoadingCandidates || isAttaching}
           emptyLabel={$t('no_people_found')}
           onSelect={(candidate) => attachToPerson(activeFace, candidate)}
         />

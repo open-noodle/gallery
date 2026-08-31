@@ -173,6 +173,133 @@ describe('SpacePersonSidePanel', () => {
     expect(await screen.findByText('Bob')).toBeInTheDocument();
   });
 
+  // Field report on #992 (pr-992-rc.3): the picker's only text field was the CREATE-person name
+  // box, so typing a name filtered nothing and scrolling was the only way to reach anyone in a
+  // space with hundreds of people -- which read as "assigning to an existing person is broken".
+  // Both siblings of this picker already search: the owner's AssignFaceSidePanel (PeopleSearch)
+  // and the space-flavoured SpaceFaceEditor (normalizeSearchString over its loaded candidates).
+  // The one field now does both, so the name you type either finds the person or creates them.
+  it('narrows the candidate list to the typed name', async () => {
+    getSpaceAssetFacesMock.mockResolvedValue([face({ id: 'face-1' })]);
+    getSpacePeopleMock.mockResolvedValue([
+      spacePerson({ id: 'sp-1', name: 'Alejandra' }),
+      spacePerson({ id: 'sp-2', name: 'Alexandra' }),
+      spacePerson({ id: 'sp-3', name: 'Bob' }),
+    ]);
+
+    renderPanel();
+    await waitFor(() => expect(getSpaceAssetFacesMock).toHaveBeenCalled());
+    await userEvent.click(screen.getByRole('button', { name: 'select_new_face' }));
+    expect(await screen.findByRole('button', { name: /Alejandra/ })).toBeInTheDocument();
+
+    await userEvent.type(screen.getByRole('textbox'), 'alej');
+
+    expect(screen.getByRole('button', { name: /Alejandra/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Alexandra/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Bob/ })).not.toBeInTheDocument();
+  });
+
+  it('matches candidate names regardless of case and accents', async () => {
+    getSpaceAssetFacesMock.mockResolvedValue([face({ id: 'face-1' })]);
+    getSpacePeopleMock.mockResolvedValue([
+      spacePerson({ id: 'sp-1', name: 'Ángela Groß' }),
+      spacePerson({ id: 'sp-2', name: 'Bob' }),
+    ]);
+
+    renderPanel();
+    await waitFor(() => expect(getSpaceAssetFacesMock).toHaveBeenCalled());
+    await userEvent.click(screen.getByRole('button', { name: 'select_new_face' }));
+    expect(await screen.findByRole('button', { name: /Ángela/ })).toBeInTheDocument();
+
+    await userEvent.type(screen.getByRole('textbox'), 'angela');
+
+    expect(screen.getByRole('button', { name: /Ángela/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Bob/ })).not.toBeInTheDocument();
+  });
+
+  it('restores the full candidate list when the search is cleared', async () => {
+    getSpaceAssetFacesMock.mockResolvedValue([face({ id: 'face-1' })]);
+    getSpacePeopleMock.mockResolvedValue([
+      spacePerson({ id: 'sp-1', name: 'Alejandra' }),
+      spacePerson({ id: 'sp-3', name: 'Bob' }),
+    ]);
+
+    renderPanel();
+    await waitFor(() => expect(getSpaceAssetFacesMock).toHaveBeenCalled());
+    await userEvent.click(screen.getByRole('button', { name: 'select_new_face' }));
+    expect(await screen.findByRole('button', { name: /Bob/ })).toBeInTheDocument();
+
+    await userEvent.type(screen.getByRole('textbox'), 'alej');
+    expect(screen.queryByRole('button', { name: /Bob/ })).not.toBeInTheDocument();
+
+    await userEvent.clear(screen.getByRole('textbox'));
+
+    expect(screen.getByRole('button', { name: /Bob/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Alejandra/ })).toBeInTheDocument();
+  });
+
+  it('attaches the person picked out of a filtered list', async () => {
+    getSpaceAssetFacesMock.mockResolvedValue([face({ id: 'face-1' })]);
+    getSpacePeopleMock.mockResolvedValue([
+      spacePerson({ id: 'sp-1', name: 'Alejandra' }),
+      spacePerson({ id: 'sp-3', name: 'Bob' }),
+    ]);
+    attachSpacePersonFaceMock.mockResolvedValue({ acted: true });
+
+    renderPanel();
+    await waitFor(() => expect(getSpaceAssetFacesMock).toHaveBeenCalled());
+    await userEvent.click(screen.getByRole('button', { name: 'select_new_face' }));
+    expect(await screen.findByRole('button', { name: /Alejandra/ })).toBeInTheDocument();
+
+    await userEvent.type(screen.getByRole('textbox'), 'alej');
+    await userEvent.click(screen.getByRole('button', { name: /Alejandra/ }));
+
+    await waitFor(() =>
+      expect(attachSpacePersonFaceMock).toHaveBeenCalledWith({
+        id: 'space-1',
+        personId: 'sp-1',
+        assetFaceId: 'face-1',
+      }),
+    );
+  });
+
+  // The attach had no in-flight state at all: a slow PUT left the card sitting there unchanged,
+  // which is indistinguishable from a tap that never registered -- and that is exactly how it was
+  // reported on #992.
+  it('shows the picker as busy while the attach is in flight', async () => {
+    getSpaceAssetFacesMock.mockResolvedValue([face({ id: 'face-1' })]);
+    getSpacePeopleMock.mockResolvedValue([spacePerson({ id: 'sp-1', name: 'Bob' })]);
+    let settleAttach: (value: unknown) => void = () => {};
+    attachSpacePersonFaceMock.mockReturnValue(new Promise((resolve) => (settleAttach = resolve)));
+
+    renderPanel();
+    await waitFor(() => expect(getSpaceAssetFacesMock).toHaveBeenCalled());
+    await userEvent.click(screen.getByRole('button', { name: 'select_new_face' }));
+    await userEvent.click(await screen.findByRole('button', { name: /Bob/ }));
+
+    expect(await screen.findByTestId('loading-spinner')).toBeInTheDocument();
+    // And the card is gone with it, so a second impatient tap cannot fire a second attach.
+    expect(screen.queryByRole('button', { name: /Bob/ })).not.toBeInTheDocument();
+
+    settleAttach({ acted: true });
+
+    await waitFor(() => expect(screen.queryByTestId('loading-spinner')).not.toBeInTheDocument());
+  });
+
+  it('says so when the typed name matches nobody, rather than showing an empty grid', async () => {
+    getSpaceAssetFacesMock.mockResolvedValue([face({ id: 'face-1' })]);
+    getSpacePeopleMock.mockResolvedValue([spacePerson({ id: 'sp-1', name: 'Alejandra' })]);
+
+    renderPanel();
+    await waitFor(() => expect(getSpaceAssetFacesMock).toHaveBeenCalled());
+    await userEvent.click(screen.getByRole('button', { name: 'select_new_face' }));
+    expect(await screen.findByRole('button', { name: /Alejandra/ })).toBeInTheDocument();
+
+    await userEvent.type(screen.getByRole('textbox'), 'zzz');
+
+    expect(screen.getByText('no_people_found')).toBeInTheDocument();
+  });
+
   it('creates a new space person from a face and attaches it in one call', async () => {
     getSpaceAssetFacesMock.mockResolvedValue([face({ id: 'face-1' })]);
     getSpacePeopleMock.mockResolvedValue([]);
