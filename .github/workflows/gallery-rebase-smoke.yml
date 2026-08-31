@@ -26,6 +26,11 @@ jobs:
         run: pnpm exec playwright install chromium --only-shell
       - name: Start e2e stack
         working-directory: e2e
+        # The plugins stage fetches js-pdk from GitHub; unauthenticated that is 60 requests/hour per
+        # runner IP and 403s surface as `extism-js: not found`. e2e/docker-compose.yml forwards this
+        # as the github_token build secret, but only if the workflow exports it — same as test.yml.
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: docker compose up -d --build --wait
       - name: Run rebase-smoke project
         working-directory: e2e
