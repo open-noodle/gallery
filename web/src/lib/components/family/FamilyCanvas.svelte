@@ -1,5 +1,16 @@
 <script lang="ts">
-  import type { FamilyIdentityDto, FamilyUnionDto } from '@immich/sdk';
+  import {
+    addParticipant,
+    createUnion,
+    FamilyParticipantRole,
+    Kind,
+    type FamilyIdentityDto,
+    type FamilyParticipantDto,
+    type FamilyUnionCreateDto,
+    type FamilyUnionDto,
+    type FamilyUnionStatus,
+  } from '@immich/sdk';
+  import { planFamilyDrop, type FamilyDropPosition } from '$lib/utils/family-editing';
   import { buildFamilyLayout, type FamilyLayoutUnion } from '$lib/utils/family-layout';
   import { t, type Translations } from 'svelte-i18n';
 
@@ -10,14 +21,21 @@
      * otherwise the cluster's `rootCandidateId` (D6: layout is computed per viewer, never
      * stored, so there is always some anchor to lay the graph out around). */
     rootId: string;
-    /** A6: gates the dashed "+ Add a parent" affordance for a missing partner seat. A view-only
-     * viewer sees no affordance at all — not a disabled version of it. */
+    /** A6: gates the dashed "+ Add a parent" affordance and the drag/drop zones. A view-only
+     * viewer sees none of it at all — not a disabled version of it. */
     canContribute: boolean;
   }
 
   let { unions, identities, rootId, canContribute }: Props = $props();
 
-  const layout = $derived(buildFamilyLayout(unions, rootId, canContribute));
+  // Slice 11 (D6/E52/E53): the canvas mutates its OWN local copy of the graph so a drop can
+  // re-render immediately, without waiting on a full page reload of `+page.ts`'s data. `unions`
+  // itself is never mutated — only ever read again if the prop identity changes (a fresh page
+  // load), which is why this is a plain `$state` snapshot rather than something kept in sync via
+  // an `$effect`.
+  let workingUnions = $state<FamilyUnionDto[]>(unions);
+
+  const layout = $derived(buildFamilyLayout(workingUnions, rootId, canContribute));
 
   // A7: "ended" governs the dashed-amber connector styling — a union that is no longer ongoing.
   // Widowed counts as ended for this purpose even though its relationship TERM stays present
@@ -53,6 +71,95 @@
       .toUpperCase();
 
   const displayName = (identityId: string) => identities[identityId]?.label ?? identities[identityId]?.name ?? '';
+
+  // ── Drag and drop (Task 1: A6, E52, E53) ──────────────────────────────────────────────────
+  //
+  // Drop zones are discrete DOM elements per known card — not a single card region split by
+  // pointer coordinates — because that is the only reliably testable shape under happy-dom
+  // (and it also makes the affordance's hit area exact rather than approximate). A card is only
+  // ever dragged from ITS OWN rendered seat (E53): the identity payload is nothing more than the
+  // dragged identityId as plain text, since the identity is always already present in
+  // `identities` — there is no "new person" branch here for this slice (see the slice 11 report
+  // for why: no tray/search surface exists yet to originate a drag for someone not already on
+  // the canvas).
+  const DRAG_MIME = 'text/plain';
+
+  let draggingIdentityId = $state<string | null>(null);
+
+  const showZonesFor = (identityId: string) =>
+    canContribute && draggingIdentityId !== null && draggingIdentityId !== identityId;
+
+  function handleDragStart(event: DragEvent, identityId: string) {
+    event.dataTransfer?.setData(DRAG_MIME, identityId);
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = 'move';
+    }
+    draggingIdentityId = identityId;
+  }
+
+  function handleDragEnd() {
+    draggingIdentityId = null;
+  }
+
+  function handleDragOver(event: DragEvent) {
+    // Required so the browser treats this element as a valid drop target at all.
+    event.preventDefault();
+  }
+
+  function applyJoinLocally(unionId: string, role: FamilyParticipantRole, draggedId: string) {
+    const participant: FamilyParticipantDto = { kind: Kind.Known, identityId: draggedId };
+    workingUnions = workingUnions.map((union) => {
+      if (union.id !== unionId) {
+        return union;
+      }
+      return role === FamilyParticipantRole.Partner
+        ? { ...union, partners: [...union.partners, participant] }
+        : { ...union, children: [...union.children, participant] };
+    });
+  }
+
+  function applyCreateLocally(newUnionId: string, create: FamilyUnionCreateDto) {
+    const toParticipants = (ids: string[] | undefined): FamilyParticipantDto[] =>
+      (ids ?? []).map((identityId) => ({ kind: Kind.Known, identityId }));
+    workingUnions = [
+      ...workingUnions,
+      {
+        id: newUnionId,
+        status: (create.status ?? 'partnered') as FamilyUnionStatus,
+        startDate: create.startDate ?? null,
+        endDate: create.endDate ?? null,
+        partners: toParticipants(create.partnerIds),
+        children: toParticipants(create.childIds),
+      },
+    ];
+  }
+
+  async function handleDrop(event: DragEvent, position: FamilyDropPosition, targetId: string) {
+    event.preventDefault();
+    const draggedId = event.dataTransfer?.getData(DRAG_MIME);
+    draggingIdentityId = null;
+    if (!draggedId || draggedId === targetId) {
+      return;
+    }
+
+    const mutation = planFamilyDrop(workingUnions, position, draggedId, targetId);
+    try {
+      if (mutation.kind === 'join') {
+        await addParticipant({
+          id: mutation.unionId,
+          familyParticipantAddDto: { identityId: draggedId, role: mutation.role },
+        });
+        applyJoinLocally(mutation.unionId, mutation.role, draggedId);
+      } else {
+        const response = await createUnion({ familyUnionCreateDto: mutation.create });
+        applyCreateLocally(response.id, mutation.create);
+      }
+    } catch {
+      // A rejected mutation (arity/cycle/etc. validation on the server) simply leaves the canvas
+      // unchanged rather than crashing the page — surfacing this as a toast is left to a future
+      // slice.
+    }
+  }
 </script>
 
 <div data-testid="family-canvas" class="flex flex-col gap-6 overflow-auto p-4">
@@ -65,19 +172,74 @@
       <div class="flex flex-wrap items-stretch gap-3">
         {#each row.seats as seat (seat.key)}
           {#if seat.kind === 'known'}
-            <div
-              data-testid="family-node"
-              class="bg-surface flex w-40 items-center gap-2 rounded-lg border border-gray-300 p-2 shadow-sm dark:border-gray-700"
-              class:border-primary={seat.identityId === rootId}
-            >
-              <div
-                class="flex size-9 shrink-0 items-center justify-center rounded-full bg-gray-300 text-xs font-semibold text-gray-700 dark:bg-gray-600 dark:text-gray-100"
-              >
-                {initials(identities[seat.identityId!]?.name)}
+            {@const identityId = seat.identityId!}
+            <div class="flex flex-col items-stretch gap-1">
+              {#if showZonesFor(identityId)}
+                <div
+                  data-testid="family-drop-zone"
+                  data-position="above"
+                  data-target-id={identityId}
+                  role="button"
+                  tabindex="-1"
+                  class="flex h-6 w-40 items-center justify-center rounded-sm border-2 border-dashed border-primary text-[10px] font-medium text-primary"
+                  ondragover={handleDragOver}
+                  ondrop={(event) => handleDrop(event, 'above', identityId)}
+                >
+                  {$t('family_edit_drop_above')}
+                </div>
+              {/if}
+
+              <div class="flex items-stretch gap-1">
+                <div
+                  data-testid="family-node"
+                  role="button"
+                  tabindex={canContribute ? 0 : -1}
+                  class="bg-surface flex w-40 items-center gap-2 rounded-lg border border-gray-300 p-2 shadow-sm dark:border-gray-700"
+                  class:border-primary={identityId === rootId}
+                  draggable={canContribute}
+                  ondragstart={(event) => handleDragStart(event, identityId)}
+                  ondragend={handleDragEnd}
+                >
+                  <div
+                    class="flex size-9 shrink-0 items-center justify-center rounded-full bg-gray-300 text-xs font-semibold text-gray-700 dark:bg-gray-600 dark:text-gray-100"
+                  >
+                    {initials(identities[identityId]?.name)}
+                  </div>
+                  <div class="min-w-0">
+                    <div class="truncate text-sm font-medium">{displayName(identityId)}</div>
+                  </div>
+                </div>
+
+                {#if showZonesFor(identityId)}
+                  <div
+                    data-testid="family-drop-zone"
+                    data-position="beside"
+                    data-target-id={identityId}
+                    role="button"
+                    tabindex="-1"
+                    class="flex w-10 items-center justify-center rounded-sm border-2 border-dashed border-primary text-center text-[10px] font-medium text-primary"
+                    ondragover={handleDragOver}
+                    ondrop={(event) => handleDrop(event, 'beside', identityId)}
+                  >
+                    {$t('family_edit_drop_beside')}
+                  </div>
+                {/if}
               </div>
-              <div class="min-w-0">
-                <div class="truncate text-sm font-medium">{displayName(seat.identityId!)}</div>
-              </div>
+
+              {#if showZonesFor(identityId)}
+                <div
+                  data-testid="family-drop-zone"
+                  data-position="below"
+                  data-target-id={identityId}
+                  role="button"
+                  tabindex="-1"
+                  class="flex h-6 w-40 items-center justify-center rounded-sm border-2 border-dashed border-primary text-[10px] font-medium text-primary"
+                  ondragover={handleDragOver}
+                  ondrop={(event) => handleDrop(event, 'below', identityId)}
+                >
+                  {$t('family_edit_drop_below')}
+                </div>
+              {/if}
             </div>
           {:else if seat.kind === 'anonymous'}
             <div
