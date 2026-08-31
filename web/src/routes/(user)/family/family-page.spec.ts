@@ -1,0 +1,99 @@
+import '@testing-library/jest-dom';
+import { render, screen } from '@testing-library/svelte';
+import type { Component } from 'svelte';
+import TestWrapper from '$lib/components/TestWrapper.svelte';
+import FamilyPage from './+page.svelte';
+
+const { gotoMock } = vi.hoisted(() => ({ gotoMock: vi.fn() }));
+vi.mock('$app/navigation', () => ({ goto: gotoMock }));
+
+vi.mock('$lib/components/layouts/UserPageLayout.svelte', async () => {
+  const { default: MockComponent } = await import('$lib/components/spaces/mock-user-page-layout.test-wrapper.svelte');
+  return { default: MockComponent };
+});
+
+vi.mock('$lib/components/family/FamilyCanvas.svelte', async () => {
+  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+  return { default: MockComponent };
+});
+
+function renderPage(data: {
+  granted: boolean;
+  clusters: Array<{ label: string; size: number; rootCandidateId: string }>;
+  rootId: string | null;
+  unions: unknown[];
+  identities: Record<string, unknown>;
+}) {
+  const props = { data: { ...data, meta: { title: 'Family' } } };
+
+  return render(TestWrapper as Component<{ component: typeof FamilyPage; componentProps: typeof props }>, {
+    component: FamilyPage,
+    componentProps: props,
+  });
+}
+
+describe('Family page', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    gotoMock.mockResolvedValue(undefined);
+  });
+
+  it('redirects away when the viewer has no family access (A12)', () => {
+    renderPage({ granted: false, clusters: [], rootId: null, unions: [], identities: {} });
+
+    expect(gotoMock).toHaveBeenCalledWith('/photos');
+  });
+
+  it('lists each disconnected family as a separate cluster chip (A8)', () => {
+    renderPage({
+      granted: true,
+      clusters: [
+        { label: 'Alex', size: 4, rootCandidateId: 'alex' },
+        { label: 'Casper', size: 2, rootCandidateId: 'casper' },
+      ],
+      rootId: null,
+      unions: [],
+      identities: {},
+    });
+
+    expect(screen.getAllByTestId('family-cluster-chip')).toHaveLength(2);
+    expect(gotoMock).not.toHaveBeenCalled();
+  });
+
+  it('opens on the cluster containing the viewer root', () => {
+    const unions = [
+      {
+        id: 'u1',
+        status: 'partnered',
+        startDate: null,
+        endDate: null,
+        partners: [{ kind: 'known', identityId: 'alex' }],
+        children: [],
+      },
+    ];
+
+    renderPage({
+      granted: true,
+      clusters: [
+        { label: 'Casper', size: 2, rootCandidateId: 'casper' },
+        { label: 'Alex', size: 1, rootCandidateId: 'alex' },
+      ],
+      rootId: 'alex',
+      unions,
+      identities: { alex: { name: 'Alex', gender: null, label: "that's you" } },
+    });
+
+    const chips = screen.getAllByTestId('family-cluster-chip');
+    // The chip containing the viewer's root (the second cluster, "Alex") is the active one —
+    // rendered with the accent treatment, not the first cluster in server order.
+    expect(chips[1]).toHaveAttribute('data-active', 'true');
+    expect(chips[0]).toHaveAttribute('data-active', 'false');
+  });
+
+  it('shows an empty state when the viewer has no relationships yet', () => {
+    renderPage({ granted: true, clusters: [], rootId: null, unions: [], identities: {} });
+
+    expect(screen.getByText('family_canvas_empty_title')).toBeInTheDocument();
+    expect(screen.queryByTestId('family-cluster-chip')).not.toBeInTheDocument();
+  });
+});
