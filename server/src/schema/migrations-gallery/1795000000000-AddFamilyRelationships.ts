@@ -61,6 +61,7 @@ export async function up(db: Kysely<any>): Promise<void> {
   `.execute(db);
 
   await sql`CREATE INDEX "family_union_updateId_idx" ON "family_union" ("updateId")`.execute(db);
+  await sql`CREATE INDEX "family_union_createdById_idx" ON "family_union" ("createdById")`.execute(db);
   await sql`CREATE INDEX "family_union_partner_identityId_idx" ON "family_union_partner" ("identityId")`.execute(db);
   await sql`CREATE INDEX "family_union_child_identityId_idx" ON "family_union_child" ("identityId")`.execute(db);
   await sql`CREATE INDEX "family_access_grantedById_idx" ON "family_access" ("grantedById")`.execute(db);
@@ -69,11 +70,16 @@ export async function up(db: Kysely<any>): Promise<void> {
     db,
   );
 
+  await sql`INSERT INTO "migration_overrides" ("name", "value") VALUES ('index_family_union_partner_key_uq', '{"type":"index","name":"family_union_partner_key_uq","sql":"CREATE UNIQUE INDEX \\"family_union_partner_key_uq\\" ON \\"family_union\\" (\\"partnerKey\\") WHERE (\\"partnerKey\\" IS NOT NULL);"}'::jsonb) ON CONFLICT ("name") DO NOTHING;`.execute(
+    db,
+  );
+
   await sql`ALTER TABLE "face_identity" ADD "gender" character varying`.execute(db);
 }
 
 export async function down(db: Kysely<any>): Promise<void> {
   await sql`ALTER TABLE "face_identity" DROP COLUMN "gender"`.execute(db);
+  await sql`DELETE FROM "migration_overrides" WHERE "name" = 'index_family_union_partner_key_uq';`.execute(db);
   await sql`DELETE FROM "migration_overrides" WHERE "name" = 'trigger_family_union_updatedAt';`.execute(db);
   await sql`DROP TRIGGER "family_union_updatedAt" ON "family_union"`.execute(db);
   await sql`DROP TABLE "family_access"`.execute(db);
