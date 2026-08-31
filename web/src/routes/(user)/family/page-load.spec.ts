@@ -1,4 +1,4 @@
-import { FamilyUnionStatus } from '@immich/sdk';
+import { FamilyAccessLevel, FamilyUnionStatus } from '@immich/sdk';
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import { load } from './+page';
 
@@ -21,7 +21,7 @@ describe('family page load', () => {
   it('authenticates and returns the cluster list, root and full graph when granted', async () => {
     const url = new URL('https://gallery.test/family');
     sdkMock.getClusters.mockResolvedValue([{ label: 'Alex', size: 4, rootCandidateId: 'alex' }]);
-    sdkMock.getMyRoot.mockResolvedValue({ identityId: 'alex' });
+    sdkMock.getMyRoot.mockResolvedValue({ access: FamilyAccessLevel.Contribute, rootIdentityId: 'alex' });
     sdkMock.getUnions.mockResolvedValue({
       unions: [
         { id: 'u1', status: FamilyUnionStatus.Partnered, startDate: null, endDate: null, partners: [], children: [] },
@@ -44,7 +44,7 @@ describe('family page load', () => {
   it('aggregates every page of the union graph before returning', async () => {
     const url = new URL('https://gallery.test/family');
     sdkMock.getClusters.mockResolvedValue([]);
-    sdkMock.getMyRoot.mockResolvedValue({ identityId: null });
+    sdkMock.getMyRoot.mockResolvedValue({ access: FamilyAccessLevel.View, rootIdentityId: null });
     sdkMock.getUnions
       .mockResolvedValueOnce({
         unions: [
