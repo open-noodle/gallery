@@ -1741,6 +1741,7 @@
   "failed_to_load_assets": "照片/视频加载失败",
   "failed_to_load_folder": "文件夹加载失败",
   "failed_to_load_spaces": "加载 Spaces 失败",
+  "family_strip_relation_label": "关系：{relation}",
   "favorite": "收藏",
   "favorite_action_prompt": "已添加 {count} 个到收藏夹",
   "favorite_or_unfavorite_photo": "收藏或取消收藏照片",
