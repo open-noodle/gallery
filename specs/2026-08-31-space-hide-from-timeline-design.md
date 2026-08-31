@@ -213,14 +213,24 @@ dense table would be members × albums and would need the trigger fan-out that
 // server/src/schema/tables/shared-space-album-hidden.table.ts
 @Table("shared_space_album_hidden")
 @UpdatedAtTrigger("shared_space_album_hidden_updatedAt")
-@AfterDeleteTrigger({ scope: "statement", function: shared_space_album_hidden_delete_audit, referencingOldTableAs: "old" })
+// Unlink cleanup: cascades when the (space, album) LINK goes away — which also covers space
+// deletion and album deletion, since both cascade into shared_space_album first.
+@ForeignKeyConstraint({
+  columns: ["spaceId", "albumId"],
+  referenceTable: () => SharedSpaceAlbumTable,
+  referenceColumns: ["spaceId", "albumId"],
+  onUpdate: "NO ACTION",
+  onDelete: "CASCADE",
+})
+@AfterDeleteTrigger({
+  scope: "statement",
+  function: shared_space_album_hidden_delete_audit,
+  referencingOldTableAs: "old",
+})
 export class SharedSpaceAlbumHiddenTable {
-  @ForeignKeyColumn(() => SharedSpaceTable, { onDelete: "CASCADE", primary: true, index: false })
-  spaceId!: string;
-  @ForeignKeyColumn(() => AlbumTable, { onDelete: "CASCADE", primary: true })
-  albumId!: string;
-  @ForeignKeyColumn(() => UserTable, { onDelete: "CASCADE", primary: true })
-  userId!: string;
+  @Column({ type: "uuid", primary: true }) spaceId!: string;
+  @Column({ type: "uuid", primary: true, index: true }) albumId!: string;
+  @ForeignKeyColumn(() => UserTable, { onDelete: "CASCADE", primary: true }) userId!: string;
   @CreateDateColumn() createdAt!: Generated<Timestamp>;
   @UpdateDateColumn() updatedAt!: Generated<Timestamp>;
   @CreateIdColumn({ index: true }) createId!: Generated<string>;
@@ -230,24 +240,21 @@ export class SharedSpaceAlbumHiddenTable {
 
 Plus `shared_space_album_hidden_audit` and its delete trigger, mirroring
 `shared-space-album-user-audit.table.ts` — mobile learns about **unhiding** from the audit row, since
-unhiding is a row delete.
+unhiding is a row delete. Give it the same `(userId, id)` composite index that
+`shared_space_album_user_audit` carries, for the same reason: the delete stream scans by `userId` plus
+an `id` range.
 
 `spaceId` is part of the key: the same album can be linked to two spaces and hidden in only one.
 
-**Cleanup on unlink needs an explicit composite FK.** The three column-level FKs above cascade when the
-space, album, or user is deleted — but **not** when the album is merely _unlinked_ from the space, which
-deletes the `shared_space_album` row while both the space and the album survive. Without handling, the
-hidden rows outlive the link and would re-apply if the album were ever re-linked. Add:
+**Why the composite FK and not three column-level ones.** The hidden row is meaningful only as long as
+the **link** exists. `@ForeignKeyConstraint` (already used this way in `activity.table.ts:32` for
+`album_asset(albumId, assetId)`) references `shared_space_album`'s `(spaceId, albumId)` primary key, so
+one constraint covers all three cases: unlinking the album, deleting the space, and deleting the album
+— the latter two cascade into `shared_space_album` first, which then cascades here.
 
-```
-FOREIGN KEY ("spaceId", "albumId")
-  REFERENCES shared_space_album ("spaceId", "albumId") ON DELETE CASCADE
-```
-
-`shared_space_album`'s primary key is `(spaceId, albumId)`, so this is a valid composite reference. If
-the `@immich/sql-tools` decorators cannot express a composite FK, fall back to extending the existing
-`shared_space_album` delete trigger to clear matching hidden rows — but the FK is preferred, because a
-trigger can be bypassed by a cascade path that does not fire it. Pinned by E11.
+That makes separate `@ForeignKeyColumn`s to `SharedSpaceTable` and `AlbumTable` redundant, so `spaceId`
+and `albumId` are plain `@Column`s. Only `userId` needs its own FK, since no path from the link row
+reaches it. Pinned by E11 (row gone on unlink) and E11b (re-link is not still hidden).
 
 **Membership removal does not cascade** and deliberately is not made to. There is no FK to
 `shared_space_member` (the table keys on `userId`, not on a membership row). A removed member's rows are
