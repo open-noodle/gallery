@@ -58,7 +58,10 @@ const FamilyParticipantKindSchema = z
 const FamilyParticipantSchema = z
   .object({
     kind: FamilyParticipantKindSchema,
-    identityId: z.uuidv4().nullable().describe("Identity ID when kind is 'known'; null when 'anonymous'"),
+    // z.uuid() (version-agnostic), NOT z.uuidv4(): face_identity.id is a UUID **v7**
+    // (@PrimaryGeneratedUuidV7Column). z.uuidv4() enforces the version nibble == 4 and 400s on
+    // every real identity id — see the same fix already applied in face-repair.dto.ts.
+    identityId: z.uuid().nullable().describe("Identity ID when kind is 'known'; null when 'anonymous'"),
   })
   .meta({ id: 'FamilyParticipantDto' });
 
@@ -109,14 +112,16 @@ const FamilyClusterSchema = z
   .object({
     label: z.string().describe('Display name of the cluster'),
     size: z.int().min(0).describe('Total people in the cluster, resolvable or not'),
-    rootCandidateId: z.uuidv4().describe('A resolvable identity id in this cluster, usable as a default root'),
+    // face_identity.id is UUID v7 — see the note on FamilyParticipantSchema.identityId above.
+    rootCandidateId: z.uuid().describe('A resolvable identity id in this cluster, usable as a default root'),
   })
   .meta({ id: 'FamilyClusterResponseDto' });
 
 const FamilyUnionCreateSchema = z
   .object({
-    partnerIds: z.array(z.uuidv4()).max(2).optional().describe('Partner identity IDs (at most two)'),
-    childIds: z.array(z.uuidv4()).optional().describe('Child identity IDs'),
+    // face_identity.id is UUID v7 — see the note on FamilyParticipantSchema.identityId above.
+    partnerIds: z.array(z.uuid()).max(2).optional().describe('Partner identity IDs (at most two)'),
+    childIds: z.array(z.uuid()).optional().describe('Child identity IDs'),
     status: FamilyUnionStatusSchema.optional().describe('Union status'),
     startDate: FamilyDateSchema.optional().describe('Union start date'),
     endDate: FamilyDateSchema.optional().describe('Union end date'),
@@ -135,7 +140,8 @@ const FamilyUnionUpdateSchema = z
 
 const FamilyParticipantAddSchema = z
   .object({
-    identityId: z.uuidv4().describe('Identity ID to add to the union'),
+    // face_identity.id is UUID v7 — see the note on FamilyParticipantSchema.identityId above.
+    identityId: z.uuid().describe('Identity ID to add to the union'),
     role: FamilyParticipantRoleSchema.describe('Role to add the identity as'),
   })
   .meta({ id: 'FamilyParticipantAddDto' });
@@ -146,17 +152,21 @@ const FamilyUnionParamSchema = z.object({
 
 const FamilyUnionParticipantParamSchema = z.object({
   id: z.uuidv4(),
-  identityId: z.uuidv4(),
+  // face_identity.id is UUID v7 — see the note on FamilyParticipantSchema.identityId above.
+  identityId: z.uuid(),
 });
 
+// The route param on PUT /family/identities/:id/gender — a face_identity.id (UUID v7), not a
+// union id. See the note on FamilyParticipantSchema.identityId above.
 const FamilyIdentityParamSchema = z.object({
-  id: z.uuidv4(),
+  id: z.uuid(),
 });
 
 // D4: `null` clears the viewer's root, reverting to plain names.
 const FamilyMyRootUpdateSchema = z
   .object({
-    identityId: z.uuidv4().nullable().describe('Identity ID to nominate as yourself, or null to clear'),
+    // face_identity.id is UUID v7 — see the note on FamilyParticipantSchema.identityId above.
+    identityId: z.uuid().nullable().describe('Identity ID to nominate as yourself, or null to clear'),
   })
   .meta({ id: 'FamilyMyRootUpdateDto' });
 
@@ -166,7 +176,8 @@ const FamilyMyRootUpdateSchema = z
 // moment ago must already read back as 'none' here.
 const FamilyMyRootResponseSchema = z
   .object({
-    rootIdentityId: z.uuidv4().nullable().describe('The identity nominated as the caller, or null if never set'),
+    // face_identity.id is UUID v7 — see the note on FamilyParticipantSchema.identityId above.
+    rootIdentityId: z.uuid().nullable().describe('The identity nominated as the caller, or null if never set'),
     access: FamilyAccessLevelSchema.describe("The caller's own effective family access level"),
   })
   .meta({ id: 'FamilyMyRootResponseDto' });
