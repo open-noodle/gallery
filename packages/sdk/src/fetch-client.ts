@@ -6403,6 +6403,19 @@ export function updateGender({ id, familyGenderUpdateDto }: {
     })));
 }
 /**
+ * Get the person behind a family identity
+ */
+export function getIdentityPerson({ id }: {
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: PersonResponseDto;
+    }>(`/family/identities/${encodeURIComponent(id)}/person`, {
+        ...opts
+    }));
+}
+/**
  * Get a family identity's thumbnail
  */
 export function getIdentityThumbnail({ id }: {

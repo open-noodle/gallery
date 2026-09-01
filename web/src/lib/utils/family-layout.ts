@@ -232,10 +232,15 @@ export function buildFamilyLayout(unions: FamilyUnionDto[], rootId: string, canC
 // exactly the reason a generation assignment isn't: an arrangement centred on one person's root
 // is wrong for anyone rooted elsewhere.
 
-/** Mockup §1: `.pcard{width:158px;height:76px}`. Exported so the canvas draws cards at the size
- * the connector maths assumes — a mismatch here shows up as lines that miss the card edge. */
-export const FAMILY_CARD_WIDTH = 158;
-export const FAMILY_CARD_HEIGHT = 76;
+/** The mockup's `.pcard` is 158×76, sized around labels as short as "your parent". Real ones are
+ * not: "Gudrin's partner" and "your niece's child" are what the label engine actually derives, and
+ * at 158px they were cut off mid-word. Wider, and tall enough for the relation to take a second
+ * line, so the derived label — the whole point of the feature — is legible.
+ *
+ * Exported so the canvas draws cards at the size the connector maths assumes; a mismatch here
+ * shows up as lines that miss the card edge. */
+export const FAMILY_CARD_WIDTH = 210;
+export const FAMILY_CARD_HEIGHT = 88;
 
 const GAP_X = 22;
 /** Mockup: gen rows at y=40 / 230 / 420. */

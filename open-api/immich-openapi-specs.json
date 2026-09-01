@@ -7579,6 +7579,63 @@
         "x-immich-state": "Beta"
       }
     },
+    "/family/identities/{id}/person": {
+      "get": {
+        "description": "Retrieve the caller's own accessible person profile for an identity they can resolve, so a family client can show and edit that person.",
+        "operationId": "getIdentityPerson",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonResponseDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Get the person behind a family identity",
+        "tags": [
+          "Family"
+        ],
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          },
+          {
+            "version": "v1",
+            "state": "Beta"
+          }
+        ],
+        "x-immich-permission": "family.read",
+        "x-immich-state": "Beta"
+      }
+    },
     "/family/identities/{id}/thumbnail": {
       "get": {
         "description": "Retrieve the face thumbnail for an identity the caller can resolve, for the family canvas.",

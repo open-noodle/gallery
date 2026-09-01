@@ -197,6 +197,8 @@ Class | Method | HTTP request | Description
 *FamilyApi* | [**deleteUnion**](doc//FamilyApi.md#deleteunion) | **DELETE** /family/unions/{id} | Delete a family union
 *FamilyApi* | [**getAllAccess**](doc//FamilyApi.md#getallaccess) | **GET** /family/access | Get all family access grants
 *FamilyApi* | [**getClusters**](doc//FamilyApi.md#getclusters) | **GET** /family/clusters | Get family clusters
+*FamilyApi* | [**getIdentityPerson**](doc//FamilyApi.md#getidentityperson) | **GET** /family/identities/{id}/person | Get the person behind a family identity
+*FamilyApi* | [**getIdentityThumbnail**](doc//FamilyApi.md#getidentitythumbnail) | **GET** /family/identities/{id}/thumbnail | Get a family identity's thumbnail
 *FamilyApi* | [**getMyRoot**](doc//FamilyApi.md#getmyroot) | **GET** /family/me | Get the viewer's family root and access level
 *FamilyApi* | [**getPersonRelations**](doc//FamilyApi.md#getpersonrelations) | **GET** /family/people/{personId}/relations | Get a person's own family relations
 *FamilyApi* | [**getUnions**](doc//FamilyApi.md#getunions) | **GET** /family/unions | Get family unions
