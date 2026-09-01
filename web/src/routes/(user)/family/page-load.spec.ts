@@ -36,6 +36,7 @@ describe('family page load', () => {
     expect(result.granted).toBe(true);
     expect(result.clusters).toEqual([{ label: 'Alex', size: 4, rootCandidateId: 'alex' }]);
     expect(result.rootId).toBe('alex');
+    expect(result.canContribute).toBe(true);
     expect(result.unions).toHaveLength(1);
     expect(result.identities).toEqual({ alex: { name: 'Alex', gender: null, label: "that's you" } });
     expect(result.meta).toEqual({ title: 'family_canvas_title' });
@@ -63,6 +64,8 @@ describe('family page load', () => {
 
     const result = await runLoad(url);
 
+    // A6: `view` is read-only — the canvas's editing affordances stay off.
+    expect(result.canContribute).toBe(false);
     expect(sdkMock.getUnions).toHaveBeenCalledTimes(2);
     expect(result.unions.map((u) => u.id)).toEqual(['u1', 'u2']);
     expect(result.identities).toEqual({
@@ -81,6 +84,7 @@ describe('family page load', () => {
     const result = await runLoad(url);
 
     expect(result.granted).toBe(false);
+    expect(result.canContribute).toBe(false);
     expect(result.clusters).toEqual([]);
     expect(result.unions).toEqual([]);
     expect(result.identities).toEqual({});

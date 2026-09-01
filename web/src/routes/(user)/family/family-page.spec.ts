@@ -13,12 +13,13 @@ vi.mock('$lib/components/layouts/UserPageLayout.svelte', async () => {
 });
 
 vi.mock('$lib/components/family/FamilyCanvas.svelte', async () => {
-  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
+  const { default: MockComponent } = await import('$lib/components/family/mock-family-canvas.test-wrapper.svelte');
   return { default: MockComponent };
 });
 
 function renderPage(data: {
   granted: boolean;
+  canContribute: boolean;
   clusters: Array<{ label: string; size: number; rootCandidateId: string }>;
   rootId: string | null;
   unions: unknown[];
@@ -39,7 +40,7 @@ describe('Family page', () => {
   });
 
   it('redirects away when the viewer has no family access (A12)', () => {
-    renderPage({ granted: false, clusters: [], rootId: null, unions: [], identities: {} });
+    renderPage({ granted: false, canContribute: false, clusters: [], rootId: null, unions: [], identities: {} });
 
     expect(gotoMock).toHaveBeenCalledWith('/photos');
   });
@@ -47,6 +48,7 @@ describe('Family page', () => {
   it('lists each disconnected family as a separate cluster chip (A8)', () => {
     renderPage({
       granted: true,
+      canContribute: false,
       clusters: [
         { label: 'Alex', size: 4, rootCandidateId: 'alex' },
         { label: 'Casper', size: 2, rootCandidateId: 'casper' },
@@ -74,6 +76,7 @@ describe('Family page', () => {
 
     renderPage({
       granted: true,
+      canContribute: false,
       clusters: [
         { label: 'Casper', size: 2, rootCandidateId: 'casper' },
         { label: 'Alex', size: 1, rootCandidateId: 'alex' },
@@ -91,9 +94,38 @@ describe('Family page', () => {
   });
 
   it('shows an empty state when the viewer has no relationships yet', () => {
-    renderPage({ granted: true, clusters: [], rootId: null, unions: [], identities: {} });
+    renderPage({ granted: true, canContribute: false, clusters: [], rootId: null, unions: [], identities: {} });
 
     expect(screen.getByText('family_canvas_empty_title')).toBeInTheDocument();
     expect(screen.queryByTestId('family-cluster-chip')).not.toBeInTheDocument();
+  });
+
+  // A6: the canvas's editing affordances (drop zones, the union editor) are gated on this one
+  // prop. Both directions matter: asserting only the `false` case would pass just as well
+  // against a page that never renders the canvas at all.
+  it('lets a contributor edit the canvas (A6)', () => {
+    renderPage({
+      granted: true,
+      canContribute: true,
+      clusters: [{ label: 'Alex', size: 1, rootCandidateId: 'alex' }],
+      rootId: 'alex',
+      unions: [],
+      identities: {},
+    });
+
+    expect(screen.getByTestId('family-canvas')).toHaveAttribute('data-can-contribute', 'true');
+  });
+
+  it('keeps the canvas read-only for a view-only viewer (A6)', () => {
+    renderPage({
+      granted: true,
+      canContribute: false,
+      clusters: [{ label: 'Alex', size: 1, rootCandidateId: 'alex' }],
+      rootId: 'alex',
+      unions: [],
+      identities: {},
+    });
+
+    expect(screen.getByTestId('family-canvas')).toHaveAttribute('data-can-contribute', 'false');
   });
 });

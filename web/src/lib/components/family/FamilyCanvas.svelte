@@ -2,8 +2,8 @@
   import {
     addParticipant,
     createUnion,
+    FamilyParticipantKind,
     FamilyParticipantRole,
-    Kind,
     updateUnion,
     type FamilyIdentityDto,
     type FamilyParticipantDto,
@@ -109,7 +109,7 @@
   }
 
   function applyJoinLocally(unionId: string, role: FamilyParticipantRole, draggedId: string) {
-    const participant: FamilyParticipantDto = { kind: Kind.Known, identityId: draggedId };
+    const participant: FamilyParticipantDto = { kind: FamilyParticipantKind.Known, identityId: draggedId };
     workingUnions = workingUnions.map((union) => {
       if (union.id !== unionId) {
         return union;
@@ -122,7 +122,7 @@
 
   function applyCreateLocally(newUnionId: string, create: FamilyUnionCreateDto) {
     const toParticipants = (ids: string[] | undefined): FamilyParticipantDto[] =>
-      (ids ?? []).map((identityId) => ({ kind: Kind.Known, identityId }));
+      (ids ?? []).map((identityId) => ({ kind: FamilyParticipantKind.Known, identityId }));
     workingUnions = [
       ...workingUnions,
       {
