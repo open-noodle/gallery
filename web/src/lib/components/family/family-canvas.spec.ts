@@ -32,12 +32,16 @@ function renderCanvas(props: {
   unions: FamilyUnionDto[];
   identities: Record<string, FamilyIdentityDto>;
   rootId: string;
+  /** The viewer's OWN root — distinct from the layout anchor, and left unset by default so a
+   * test only opts in to the "you are here" treatment when it is what's under test. */
+  viewerRootId?: string | null;
   canContribute?: boolean;
 }) {
   return render(FamilyCanvas, {
     unions: props.unions,
     identities: props.identities,
     rootId: props.rootId,
+    viewerRootId: props.viewerRootId ?? null,
     canContribute: props.canContribute ?? false,
   });
 }
@@ -241,6 +245,85 @@ describe('FamilyCanvas', () => {
     expect(screen.getByText('Root Person')).toBeInTheDocument();
     expect(screen.getByText('Spouse')).toBeInTheDocument();
     expect(screen.queryByText("that's you")).not.toBeInTheDocument();
+  });
+
+  // The card's title is the NAME and the derived label is the sub-line beneath it. Rendering the
+  // label INSTEAD of the name is a real regression this feature shipped with: every card on a
+  // rooted canvas read "your parent" / "your partner" and no name appeared anywhere, which is
+  // unreadable the moment two people share a relation.
+  it('titles a card with the name and puts the derived relation beneath it', () => {
+    const unions: FamilyUnionDto[] = [union({ id: 'u1', partners: [known('root'), known('mia')], children: [] })];
+    const identities = {
+      root: identity('Alex', "that's you"),
+      mia: identity('Mia', 'your partner'),
+    };
+
+    renderCanvas({ unions, identities, rootId: 'root' });
+
+    expect(screen.getByText('Mia')).toBeInTheDocument();
+    const relation = screen.getByText('your partner');
+    expect(relation).toHaveAttribute('data-testid', 'family-node-relation');
+    // Name and relation are two separate lines of the same card, not one standing in for the other.
+    expect(relation.closest('[data-testid="family-node"]')).toContainElement(screen.getByText('Mia'));
+  });
+
+  // Two people can share a relation ("your parent" twice over); the name is what tells them apart.
+  it('keeps both cards distinguishable when two people share one relation', () => {
+    const unions: FamilyUnionDto[] = [
+      union({ id: 'u1', partners: [known('ruth'), known('anton')], children: [known('root')] }),
+    ];
+    const identities = {
+      ruth: identity('Ruth', 'your parent'),
+      anton: identity('Anton', 'your parent'),
+      root: identity('Alex', "that's you"),
+    };
+
+    renderCanvas({ unions, identities, rootId: 'root' });
+
+    expect(screen.getByText('Ruth')).toBeInTheDocument();
+    expect(screen.getByText('Anton')).toBeInTheDocument();
+    expect(screen.getAllByText('your parent')).toHaveLength(2);
+  });
+
+  it('marks the viewer own card and leaves every other card unmarked', () => {
+    const unions: FamilyUnionDto[] = [union({ id: 'u1', partners: [known('root'), known('mia')], children: [] })];
+    const identities = { root: identity('Alex', "that's you"), mia: identity('Mia', 'your partner') };
+
+    renderCanvas({ unions, identities, rootId: 'root', viewerRootId: 'root' });
+
+    expect(screen.getAllByText('family_canvas_you_are_here')).toHaveLength(1);
+  });
+
+  it('marks nobody when the viewer is not part of this cluster', () => {
+    // The negative control: a cluster laid out around its own `rootCandidateId` still has an
+    // anchor, but nobody in it is the viewer.
+    const unions: FamilyUnionDto[] = [union({ id: 'u1', partners: [known('casper'), known('nell')], children: [] })];
+    const identities = { casper: identity('Casper'), nell: identity('Nell') };
+
+    renderCanvas({ unions, identities, rootId: 'casper', viewerRootId: null });
+
+    expect(screen.queryByText('family_canvas_you_are_here')).not.toBeInTheDocument();
+  });
+
+  // Mockup §1: the tray is the drag SOURCE for anyone not already on the canvas. Without it a
+  // contributor is stuck with whoever was in the first union forever, because the drag gestures
+  // can only rearrange people the canvas already draws.
+  it('offers a contributor a tray to bring new people in from', () => {
+    const unions: FamilyUnionDto[] = [union({ id: 'u1', partners: [known('root'), known('mia')], children: [] })];
+    const identities = { root: identity('Alex'), mia: identity('Mia') };
+
+    renderCanvas({ unions, identities, rootId: 'root', canContribute: true });
+
+    expect(screen.getByTestId('family-tray')).toBeInTheDocument();
+  });
+
+  it('offers no tray to a view-only viewer', () => {
+    const unions: FamilyUnionDto[] = [union({ id: 'u1', partners: [known('root'), known('mia')], children: [] })];
+    const identities = { root: identity('Alex'), mia: identity('Mia') };
+
+    renderCanvas({ unions, identities, rootId: 'root', canContribute: false });
+
+    expect(screen.queryByTestId('family-tray')).not.toBeInTheDocument();
   });
 });
 
