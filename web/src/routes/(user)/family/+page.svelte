@@ -85,8 +85,12 @@
       {/if}
     {:else}
       <!-- Cluster chips: the answer to "multiple family trees" — disconnected components of the
-           graph, computed per request and never stored (D8.3). -->
-      <div class="flex gap-2 overflow-x-auto pb-1">
+           graph, computed per request and never stored (D8.3).
+           The trailing action is how a NEW one gets started. The canvas tray can only drop someone
+           onto a card that is already drawn, which by definition joins them to the tree on screen;
+           a family with no connection to it needs a union created from two people at once, which
+           is exactly what the link dialog does. -->
+      <div class="flex items-center gap-2 overflow-x-auto pb-1">
         {#each data.clusters as cluster, index (cluster.rootCandidateId)}
           {@const active = index === selectedClusterIndex}
           <button
@@ -105,6 +109,17 @@
             · {$t('family_canvas_people_count', { values: { count: cluster.size } })}
           </button>
         {/each}
+
+        {#if data.canContribute}
+          <button
+            type="button"
+            data-testid="family-new-cluster"
+            class="flex-none rounded-full border border-dashed border-gray-400 px-3.5 py-1.5 text-[13px] whitespace-nowrap text-gray-500 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800"
+            onclick={() => (linking = true)}
+          >
+            {$t('family_canvas_new_family_action')}
+          </button>
+        {/if}
       </div>
 
       {#if layoutRootId}
