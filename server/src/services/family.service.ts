@@ -235,6 +235,31 @@ export class FamilyService extends BaseService {
     );
   }
 
+  // The person behind a canvas card, resolved FOR THIS VIEWER. A card carries an identity id and
+  // nothing else, so without this there is no way to show anyone's birthday, or to rename them,
+  // from the surface where their name is on screen.
+  //
+  // This does not weaken `E30`. What that rule withholds is the identity id behind a person, so
+  // the same real person cannot be correlated across users; the mapping here runs the other way
+  // and yields the profile THIS caller already has — their own `person` row, or a
+  // `shared_space_person` in a space they belong to — which is per-viewer by construction and
+  // already reachable from every other people surface. Same predicate, and so the same 404, as
+  // `getIdentityThumbnail` above.
+  //
+  // Returning the whole `PersonResponseDto` rather than a bare id is deliberate: `primaryProfile`
+  // is what tells a client whether a write belongs on the owner endpoint or the shared-space one,
+  // and getting that wrong is a silent 404 on someone else's person.
+  async getIdentityPerson(auth: AuthDto, identityId: string): Promise<PersonResponseDto> {
+    await this.requireFamilyRead(auth);
+
+    const person = await this.faceIdentityRepository.getResolvedPersonByIdentityId(auth.user.id, identityId);
+    if (!person) {
+      throw new NotFoundException();
+    }
+
+    return person;
+  }
+
   // Slice 7 (D4): stores which identity the caller means when a relative label says "your ...".
   // Requires only `view` — nominating yourself changes nothing anyone else can see, so it does
   // not need `contribute`. Stored as its own user-metadata key (never a `preferences` field) so

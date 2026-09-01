@@ -36,6 +36,7 @@ import {
   FamilyUnionsQueryDto,
   FamilyUnionUpdateDto,
 } from 'src/dtos/family.dto';
+import { PersonResponseDto } from 'src/dtos/person.dto';
 import { ApiTag, Permission } from 'src/enum';
 import { Auth, Authenticated, FileResponse } from 'src/middleware/auth.guard';
 import { LoggingRepository } from 'src/repositories/logging.repository';
@@ -285,6 +286,21 @@ export class FamilyController {
     @Param() { id }: FamilyIdentityParamDto,
   ) {
     await sendFile(res, next, () => this.service.getIdentityThumbnail(auth, id), this.logger);
+  }
+
+  // Lets the canvas show and edit the person behind a card — birthday, name — from the surface
+  // their name is already on. `view` is sufficient to READ it; the write endpoints this feeds
+  // enforce their own permissions, so family access never becomes a back door to renaming people.
+  @Get('identities/:id/person')
+  @Authenticated({ permission: Permission.FamilyRead })
+  @Endpoint({
+    summary: 'Get the person behind a family identity',
+    description:
+      "Retrieve the caller's own accessible person profile for an identity they can resolve, so a family client can show and edit that person.",
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  getIdentityPerson(@Auth() auth: AuthDto, @Param() { id }: FamilyIdentityParamDto): Promise<PersonResponseDto> {
+    return this.service.getIdentityPerson(auth, id);
   }
 
   // D4: gender requires `contribute`, not `view` — it is shared data that alters the label every
