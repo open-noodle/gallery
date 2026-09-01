@@ -2,7 +2,7 @@ import { Kysely } from 'kysely';
 import type { AssetResponseDto } from 'src/dtos/asset-response.dto.js';
 import { StorageCore } from 'src/cores/storage.core.js';
 import { AssetEditAction } from 'src/dtos/editing.dto.js';
-import { AssetFileType, AssetMetadataKey, AssetStatus, AssetVisibility, JobName, SharedLinkType } from 'src/enum.js';
+import { AssetFileType, AssetMetadataKey, AssetStatus, AssetVisibility, JobName, SharedLinkType, SystemMetadataKey } from 'src/enum.js';
 import { AccessRepository } from 'src/repositories/access.repository.js';
 import { AlbumRepository } from 'src/repositories/album.repository.js';
 import { AssetEditRepository } from 'src/repositories/asset-edit.repository.js';
@@ -27,11 +27,14 @@ import { AssetService } from 'src/services/asset.service.js';
 import { newMediumService } from 'test/medium.factory.js';
 import { factory } from 'test/small.factory.js';
 import { getKyselyDB } from 'test/utils.js';
+import { ConfigRepository } from 'src/repositories/config.repository.js';
+import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository.js';
+import { Mocked } from 'vitest';
 
 let defaultDatabase: Kysely<DB>;
 
 const setup = (db?: Kysely<DB>) => {
-  const result = newMediumService(AssetService, {
+  const { sut, ctx } = newMediumService(AssetService, {
     database: db || defaultDatabase,
     real: [
       AssetRepository,
@@ -40,6 +43,7 @@ const setup = (db?: Kysely<DB>) => {
       AssetJobRepository,
       AlbumRepository,
       AccessRepository,
+      ConfigRepository,
       PersonRepository,
       SharedLinkAssetRepository,
       SharedSpaceRepository,
@@ -54,11 +58,23 @@ const setup = (db?: Kysely<DB>) => {
       OcrRepository,
       MapRepository,
       WebsocketRepository,
+      SystemMetadataRepository,
     ],
   });
   // immich-31777 pushes on_asset_update when updateAll writes no metadata (a visibility-only change).
-  result.ctx.getMock(WebsocketRepository).clientSend.mockReturnValue();
-  return result;
+  ctx.getMock(WebsocketRepository).clientSend.mockReturnValue();
+
+  // Gallery-fork: `AssetService.get` attaches `familyRelationLabel` to the people it embeds, and
+  // that path calls `getConfig()` before anything else — so the config plumbing has to be present
+  // even though every test here leaves the feature off. A bare `{}` yields all defaults, which
+  // means `familyTree.enabled === false` and `resolveFamilyAccessLevel` short-circuits to `none`
+  // without ever touching `familyRepository`/`faceIdentityRepository`. Enabling the feature in a
+  // test here would need those two added to `real` as well. Same shape as `person.service.spec.ts`.
+  ctx
+    .getMock<SystemMetadataRepository, Mocked<SystemMetadataRepository>>(SystemMetadataRepository)
+    .get.mockImplementation((key) => (key === SystemMetadataKey.SystemConfig ? ({} as any) : (undefined as any)));
+
+  return { sut, ctx };
 };
 
 beforeAll(async () => {
