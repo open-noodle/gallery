@@ -61,6 +61,7 @@
 </script>
 
 <section
+  data-testid="person-picker-panel"
   transition:fly={{ x: 360, duration: 100, easing: linear }}
   class="absolute top-0 h-full w-90 overflow-x-hidden bg-light p-2 dark:text-immich-dark-fg"
 >
