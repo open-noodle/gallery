@@ -169,6 +169,38 @@ describe('Family page', () => {
     expect(screen.getByTestId('family-canvas')).toHaveAttribute('data-can-contribute', 'true');
   });
 
+  // A second, disconnected family needs its own entry point. The canvas tray only drops someone
+  // onto a card that is already drawn, so everything it can do JOINS the tree on screen — leaving
+  // no way at all to record a family that has no connection to it. The dialog creates a union from
+  // two people at once, which is what starts a fresh cluster.
+  it('lets a contributor start a family disconnected from the one on screen', async () => {
+    renderPage({
+      granted: true,
+      canContribute: true,
+      clusters: [{ label: 'Alex', size: 3, rootCandidateId: 'alex' }],
+      rootId: 'alex',
+      unions: [],
+      identities: {},
+    });
+
+    await userEvent.click(screen.getByTestId('family-new-cluster'));
+
+    expect(screen.getByTestId('noop-component')).toBeInTheDocument();
+  });
+
+  it('offers a view-only viewer no way to start one', () => {
+    renderPage({
+      granted: true,
+      canContribute: false,
+      clusters: [{ label: 'Alex', size: 3, rootCandidateId: 'alex' }],
+      rootId: 'alex',
+      unions: [],
+      identities: {},
+    });
+
+    expect(screen.queryByTestId('family-new-cluster')).not.toBeInTheDocument();
+  });
+
   // The negative control for the test above. Asserted on the flag the canvas actually receives,
   // not on the absence of a testid — an assertion against a testid nothing renders any more would
   // pass whatever the page did.

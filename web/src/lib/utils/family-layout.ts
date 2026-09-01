@@ -257,6 +257,11 @@ export interface PositionedFamilySeat {
   key: string;
   kind: FamilySeatKind;
   identityId?: string;
+  /** The union this seat belongs to, for the seats that belong to exactly one: an `empty` slot is
+   * an invitation to add a partner to THAT union, so the canvas needs to know which. A `known`
+   * seat is deliberately without one — the same person can sit in several unions (E51) and is
+   * drawn once. */
+  unionId?: string;
   generation: number;
   /** Top-left of the card, in canvas coordinates. */
   x: number;
@@ -560,11 +565,21 @@ export function buildPositionedFamilyLayout(
 
   const yOfGeneration = (generation: number) => PADDING_Y + rowIndexOf.get(generation)! * ROW_PITCH;
 
+  // Only the union-scoped seats: a known seat's key is a bare identity id, shared across every
+  // union that person sits in.
+  const unionOfSeat = new Map<string, string>();
+  for (const membership of memberships) {
+    if (membership.seatKey.includes(':')) {
+      unionOfSeat.set(membership.seatKey, membership.unionId);
+    }
+  }
+
   const seats: PositionedFamilySeat[] = base.rows.flatMap((row) =>
     row.seats.map((seat) => ({
       key: seat.key,
       kind: seat.kind,
       identityId: seat.identityId,
+      unionId: unionOfSeat.get(seat.key),
       generation: row.generation,
       x: centreX.get(seat.key)! - FAMILY_CARD_WIDTH / 2,
       y: yOfGeneration(row.generation),
@@ -598,9 +613,19 @@ export function buildPositionedFamilyLayout(
       const childRowY = yOfGeneration(union.partnerGeneration + 1);
       const busY = childRowY - CHILD_BUS_OFFSET;
       const childCentres = children.map((key) => centreX.get(key)!);
+
+      // The bus has to reach the ANCHOR, not just span the children. Drawing it across
+      // `min(children)..max(children)` leaves the drop from the union hanging in mid-air whenever
+      // the anchor sits outside that span — which is most of the time: a lone child is rarely
+      // directly beneath its parents' midpoint, and a couple offset from their children's centre
+      // puts the anchor past one end. On screen that reads as connectors that simply do not join
+      // up. Including `anchorX` in the span is what makes the path a single connected run.
+      const busFrom = Math.min(anchorX, ...childCentres);
+      const busTo = Math.max(anchorX, ...childCentres);
+
       const segments = [`M${anchorX} ${midY} L${anchorX} ${busY}`];
-      if (childCentres.length > 1) {
-        segments.push(`M${Math.min(...childCentres)} ${busY} L${Math.max(...childCentres)} ${busY}`);
+      if (busTo > busFrom) {
+        segments.push(`M${busFrom} ${busY} L${busTo} ${busY}`);
       }
       for (const childCentre of childCentres) {
         segments.push(`M${childCentre} ${busY} L${childCentre} ${childRowY}`);
