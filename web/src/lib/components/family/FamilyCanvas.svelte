@@ -5,6 +5,7 @@
     FamilyParticipantKind,
     FamilyParticipantRole,
     getAllPeople,
+    getIdentityPerson,
     removeParticipant,
     searchPerson,
     setMyRoot,
@@ -18,6 +19,7 @@
     type PersonResponseDto,
   } from '@immich/sdk';
   import FamilyUnionEditor, { type FamilyUnionEditorSave } from '$lib/components/family/FamilyUnionEditor.svelte';
+  import { handleUpdatePersonBirthDate, updatePersonName } from '$lib/services/person.service';
   import { getFamilyIdentityThumbnailUrl, getPeopleThumbnailUrl } from '$lib/utils';
   import { planFamilyDrop, type FamilyDragKind, type FamilyDropPosition } from '$lib/utils/family-editing';
   import {
@@ -106,7 +108,9 @@
   // sub-line beneath it. Never the other way round, and never one standing in for the other —
   // a canvas of nothing but "your parent" / "your partner" is unreadable the moment two people
   // share a relation, and the label is null anyway for anyone the viewer has no path to (E36).
-  const displayName = (identityId: string) => identities[identityId]?.name ?? '';
+  // Plenty of recognised people have no name yet. Falling through to an empty string left those
+  // cards showing a relation and nothing else — a face with no title at all.
+  const displayName = (identityId: string) => identities[identityId]?.name || $t('family_person_anonymous_name');
   const relationLabel = (identityId: string) => identities[identityId]?.label ?? null;
 
   // A thumbnail that 404s (an identity with no face crop yet) falls back to the initials already
@@ -446,10 +450,87 @@
   let personBusy = $state(false);
   let personError = $state(false);
 
+  /** The person behind the open card, fetched on demand. The graph only carries a name, a gender
+   * and a derived label — a birthday, and the profile routing a rename needs, live on the person. */
+  let openPerson = $state<PersonResponseDto | null>(null);
+  let personLoading = $state(false);
+  let draftName = $state('');
+  let draftBirthDate = $state('');
+
+  let personToken = 0;
+
+  async function loadPerson(identityId: string) {
+    const token = ++personToken;
+    personLoading = true;
+    openPerson = null;
+    try {
+      const person = await getIdentityPerson({ id: identityId });
+      if (token === personToken) {
+        openPerson = person;
+        draftName = person.name;
+        draftBirthDate = person.birthDate ?? '';
+      }
+    } catch {
+      if (token === personToken) {
+        // The card still works for gender and removal, which need only the identity.
+        openPerson = null;
+      }
+    } finally {
+      if (token === personToken) {
+        personLoading = false;
+      }
+    }
+  }
+
   const togglePerson = (identityId: string) => {
     personError = false;
-    openPersonId = openPersonId === identityId ? null : identityId;
+    if (openPersonId === identityId) {
+      openPersonId = null;
+      openPerson = null;
+      return;
+    }
+    openPersonId = identityId;
+    void loadPerson(identityId);
   };
+
+  // Renaming and birthdays go through the shared person service, not a family endpoint of their
+  // own: it already routes an owner's person to `updatePerson` and a shared-space profile to the
+  // space endpoint, and getting that split wrong is a silent 404 on someone else's person.
+  async function saveName() {
+    if (!openPerson || personBusy || draftName === openPerson.name) {
+      return;
+    }
+    personBusy = true;
+    personError = false;
+    try {
+      openPerson = await updatePersonName(openPerson, draftName);
+      onGraphChanged?.();
+    } catch {
+      personError = true;
+    } finally {
+      personBusy = false;
+    }
+  }
+
+  async function saveBirthDate() {
+    if (!openPerson || personBusy) {
+      return;
+    }
+    const next = draftBirthDate === '' ? null : draftBirthDate;
+    if (next === (openPerson.birthDate ?? null)) {
+      return;
+    }
+    personBusy = true;
+    personError = false;
+    try {
+      await handleUpdatePersonBirthDate(openPerson, next);
+      openPerson = { ...openPerson, birthDate: next };
+    } catch {
+      personError = true;
+    } finally {
+      personBusy = false;
+    }
+  }
 
   const unionsContaining = (identityId: string) =>
     workingUnions.filter((union) =>
@@ -465,6 +546,7 @@
     try {
       await updateGender({ id: identityId, familyGenderUpdateDto: { gender } });
       openPersonId = null;
+      openPerson = null;
       onGraphChanged?.();
     } catch {
       personError = true;
@@ -484,6 +566,7 @@
         await removeParticipant({ id: union.id, identityId });
       }
       openPersonId = null;
+      openPerson = null;
       onGraphChanged?.();
     } catch {
       personError = true;
@@ -755,9 +838,19 @@
               </div>
 
               <div class="min-w-0">
-                <div class="truncate text-[13.5px] leading-tight font-medium">{displayName(identityId)}</div>
+                <div class="truncate text-[13.5px] leading-tight font-medium" title={displayName(identityId)}>
+                  {displayName(identityId)}
+                </div>
                 {#if label}
-                  <div class="truncate text-[11.5px] text-gray-500" data-testid="family-node-relation">{label}</div>
+                  <!-- Two lines before it clips, and the full text on hover: derived labels run to
+                       "your niece's partner", which no single line of a card will ever hold. -->
+                  <div
+                    class="line-clamp-2 text-[11.5px] leading-snug text-gray-500"
+                    data-testid="family-node-relation"
+                    title={label}
+                  >
+                    {label}
+                  </div>
                 {/if}
               </div>
             </div>
@@ -766,10 +859,49 @@
               <div
                 data-testid="family-person-menu"
                 data-family-interactive
-                class="absolute z-40 flex w-56 flex-col gap-3 rounded-xl border border-gray-300 bg-light p-3 shadow-lg dark:border-gray-700"
+                class="absolute z-40 flex w-64 flex-col gap-3 rounded-xl border border-gray-300 bg-light p-3 shadow-lg dark:border-gray-700"
                 style="left:{seat.x}px;top:{seat.y + FAMILY_CARD_HEIGHT + 8}px"
               >
-                <div class="truncate text-sm font-medium">{displayName(identityId)}</div>
+                <div class="flex flex-col gap-1">
+                  <span class="text-[10px] font-semibold tracking-wide text-gray-500 uppercase">
+                    {$t('family_canvas_person_name_label')}
+                  </span>
+                  {#if personLoading}
+                    <span class="text-[11px] text-gray-500">{$t('family_canvas_person_loading')}</span>
+                  {:else if openPerson}
+                    <input
+                      data-testid="family-person-name"
+                      class="rounded-lg border border-gray-300 bg-light px-2 py-1 text-[12px] dark:border-gray-700"
+                      aria-label={$t('family_canvas_person_name_label')}
+                      bind:value={draftName}
+                      disabled={personBusy}
+                      onblur={() => void saveName()}
+                    />
+                  {:else}
+                    <span class="text-[12px] font-medium">{displayName(identityId)}</span>
+                  {/if}
+                </div>
+
+                {#if openPerson}
+                  <div class="flex flex-col gap-1">
+                    <span class="text-[10px] font-semibold tracking-wide text-gray-500 uppercase">
+                      {$t('family_canvas_person_birthdate_label')}
+                    </span>
+                    <input
+                      type="date"
+                      data-testid="family-person-birthdate"
+                      class="rounded-lg border border-gray-300 bg-light px-2 py-1 text-[12px] dark:border-gray-700"
+                      aria-label={$t('family_canvas_person_birthdate_label')}
+                      bind:value={draftBirthDate}
+                      disabled={personBusy}
+                      onchange={() => void saveBirthDate()}
+                    />
+                  </div>
+                {/if}
+
+                {#if relationLabel(identityId)}
+                  <div class="text-[11px] text-gray-500">{relationLabel(identityId)}</div>
+                {/if}
 
                 <div class="flex flex-col gap-1">
                   <span class="text-[10px] font-semibold tracking-wide text-gray-500 uppercase">

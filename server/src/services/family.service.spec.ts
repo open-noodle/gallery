@@ -515,6 +515,46 @@ describe(FamilyService.name, () => {
     });
   });
 
+  // A canvas card holds an identity id and nothing else, so this is what lets it show a birthday
+  // or rename someone from the surface their name is already on.
+  describe('getIdentityPerson', () => {
+    it('refuses a viewer with no family access', async () => {
+      sut['getConfig'] = () => Promise.resolve(makeFamilyConfig(true, 'none') as any);
+      mocks.family.getAccess.mockResolvedValue(undefined);
+
+      await expect(sut.getIdentityPerson(authStub.user1, 'identity-1')).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    // The same redaction boundary as the thumbnail: an identity reduced to an anonymous seat in
+    // the graph must not become resolvable through a side door.
+    it('refuses an identity the viewer cannot resolve', async () => {
+      giveViewOnlyAccess(sut, mocks);
+      mocks.faceIdentity.getResolvedPersonByIdentityId.mockResolvedValue(void 0);
+
+      await expect(sut.getIdentityPerson(authStub.user1, 'identity-1')).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    // Resolved AGAINST THE CALLER — handing back anyone else's profile would leak a person they
+    // have no access to. `primaryProfile` rides along because it is what tells a client whether a
+    // later write belongs on the owner endpoint or the shared-space one.
+    it('returns the caller own accessible profile for an identity they can resolve', async () => {
+      giveViewOnlyAccess(sut, mocks);
+      const person = {
+        id: 'person-1',
+        name: 'Gudrin',
+        birthDate: '1954-03-02',
+        primaryProfile: { type: 'space-person', id: 'profile-1', spaceId: 'space-1' },
+      };
+      mocks.faceIdentity.getResolvedPersonByIdentityId.mockResolvedValue(person as any);
+
+      await expect(sut.getIdentityPerson(authStub.user1, 'identity-1')).resolves.toEqual(person);
+      expect(mocks.faceIdentity.getResolvedPersonByIdentityId).toHaveBeenCalledWith(
+        authStub.user1.user.id,
+        'identity-1',
+      );
+    });
+  });
+
   describe('updateGender', () => {
     beforeEach(() => {
       mocks.family.getIdentityType.mockImplementation((id: string) => Promise.resolve(id === PET_A ? 'pet' : 'person'));
