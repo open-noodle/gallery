@@ -233,7 +233,29 @@ None outstanding. Two recurrences worth noting, both mechanically repaired in-cy
 ## Remote CI Verification
 
 - **Test branch**: `rebase/upstream-batch-213`
-- **Commit validated**: _(filled in after dispatch)_
+- **Commit validated**: `04ebbdd4836`
+- **Result: 10/10 GREEN on the first pass — zero re-runs, zero flakes.** No non-success job in any
+  run (56 jobs total).
+
+| Workflow                                  | Status | Jobs  | Run         |
+| ----------------------------------------- | ------ | ----- | ----------- |
+| `test.yml`                                | GREEN  | 21/21 | 33552356499 |
+| `docker.yml`                              | GREEN  | 25/25 | 33552360274 |
+| `static_analysis.yml`                     | GREEN  | 2/2   | 33552363292 |
+| `gallery-build-mobile.yml`                | GREEN  | 2/2   | 33552384692 |
+| `gallery-rebase-smoke.yml`                | GREEN  | 1/1   | 33552366114 |
+| `storage-migration-tests.yml`             | GREEN  | 1/1   | 33552369227 |
+| `storage-migration-e2e.yml`               | GREEN  | 1/1   | 33552381629 |
+| `gallery-revert-to-immich-validation.yml` | GREEN  | 1/1   | 33552371934 |
+| `gallery-ml-smoke.yml`                    | GREEN  | 1/1   | 33552374961 |
+| `gallery-mobile-smoke.yml`                | GREEN  | 1/1   | 33552378248 |
+
+- **Failures fixed**: none
+- **Confirmed flakes**: none
+
+Worth noting given the batch content: `Docker` (25 jobs) went green first try despite both the
+pnpm 11.24 bump and the `ghcr.io/jdx/mise` image bump landing in the plugins stage, and
+`gallery-revert-to-immich-validation` passed through its Docker-boot half, not just the coverage grep.
 
 ## Post-Rebase Verification
 
