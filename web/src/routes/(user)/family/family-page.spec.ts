@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/svelte';
+import userEvent from '@testing-library/user-event';
 import type { Component } from 'svelte';
 import TestWrapper from '$lib/components/TestWrapper.svelte';
 import FamilyPage from './+page.svelte';
@@ -9,6 +10,11 @@ vi.mock('$app/navigation', () => ({ goto: gotoMock }));
 
 vi.mock('$lib/components/layouts/UserPageLayout.svelte', async () => {
   const { default: MockComponent } = await import('$lib/components/spaces/mock-user-page-layout.test-wrapper.svelte');
+  return { default: MockComponent };
+});
+
+vi.mock('$lib/components/family/FamilyLinkDialog.svelte', async () => {
+  const { default: MockComponent } = await import('@test-data/mocks/noop-component.svelte');
   return { default: MockComponent };
 });
 
@@ -127,5 +133,53 @@ describe('Family page', () => {
     });
 
     expect(screen.getByTestId('family-canvas')).toHaveAttribute('data-can-contribute', 'false');
+  });
+
+  // The defect this fixes: with zero unions the page rendered a dead-end placeholder. Clusters
+  // are derived purely from unions, so a cold start has no cards to drag and therefore no way to
+  // create the first union — the whole feature was unreachable.
+  it('offers a way to start when the graph is empty and the viewer may contribute', async () => {
+    renderPage({ granted: true, canContribute: true, clusters: [], rootId: null, unions: [], identities: {} });
+
+    await userEvent.click(screen.getByTestId('family-first-run-action'));
+
+    expect(screen.getByTestId('noop-component')).toBeInTheDocument();
+  });
+
+  it('offers no way to start for a view-only viewer', () => {
+    renderPage({ granted: true, canContribute: false, clusters: [], rootId: null, unions: [], identities: {} });
+
+    expect(screen.getByText('family_canvas_empty_title')).toBeInTheDocument();
+    expect(screen.queryByTestId('family-first-run-action')).not.toBeInTheDocument();
+  });
+
+  // Without this a contributor is stuck with whoever was in the first union forever: the drag
+  // gestures can only rearrange people already on the canvas, never introduce a new one.
+  it('lets a contributor add someone to a graph that already has people', async () => {
+    renderPage({
+      granted: true,
+      canContribute: true,
+      clusters: [{ label: 'Alex', size: 1, rootCandidateId: 'alex' }],
+      rootId: 'alex',
+      unions: [],
+      identities: {},
+    });
+
+    await userEvent.click(screen.getByTestId('family-add-person'));
+
+    expect(screen.getByTestId('noop-component')).toBeInTheDocument();
+  });
+
+  it('shows no add-someone action to a view-only viewer', () => {
+    renderPage({
+      granted: true,
+      canContribute: false,
+      clusters: [{ label: 'Alex', size: 1, rootCandidateId: 'alex' }],
+      rootId: 'alex',
+      unions: [],
+      identities: {},
+    });
+
+    expect(screen.queryByTestId('family-add-person')).not.toBeInTheDocument();
   });
 });

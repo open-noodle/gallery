@@ -13,30 +13,45 @@ part of openapi.api;
 class FamilyMyRootUpdateDto {
   /// Returns a new [FamilyMyRootUpdateDto] instance.
   FamilyMyRootUpdateDto({
-    required this.identityId,
+    this.identityId = const Optional.absent(),
+    this.personId = const Optional.absent(),
   });
 
   /// Identity ID to nominate as yourself, or null to clear
-  String? identityId;
+  Optional<String?> identityId;
+
+  /// Person ID to nominate as yourself, resolved to its identity
+  ///
+  /// Please note: This property should have been non-nullable! Since the specification file
+  /// does not include a default value (using the "default:" property), however, the generated
+  /// source code must fall back to having a nullable type.
+  /// Consider adding a "default:" property in the specification file to hide this note.
+  ///
+  Optional<String?> personId;
 
   @override
   bool operator ==(Object other) => identical(this, other) || other is FamilyMyRootUpdateDto &&
-    other.identityId == identityId;
+    other.identityId == identityId &&
+    other.personId == personId;
 
   @override
   int get hashCode =>
     // ignore: unnecessary_parenthesis
-    (identityId == null ? 0 : identityId!.hashCode);
+    (identityId == null ? 0 : identityId!.hashCode) +
+    (personId == null ? 0 : personId!.hashCode);
 
   @override
-  String toString() => 'FamilyMyRootUpdateDto[identityId=$identityId]';
+  String toString() => 'FamilyMyRootUpdateDto[identityId=$identityId, personId=$personId]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
-    if (this.identityId != null) {
-      json[r'identityId'] = this.identityId;
-    } else {
-      json[r'identityId'] = null;
+    if (this.identityId.isPresent) {
+      final value = this.identityId.value;
+      json[r'identityId'] = value;
+    }
+    if (this.personId.isPresent) {
+      final value = this.personId.value;
+      json[r'personId'] = value;
     }
     return json;
   }
@@ -50,7 +65,8 @@ class FamilyMyRootUpdateDto {
       final json = value.cast<String, dynamic>();
 
       return FamilyMyRootUpdateDto(
-        identityId: mapValueOfType<String>(json, r'identityId'),
+        identityId: json.containsKey(r'identityId') ? Optional.present(mapValueOfType<String>(json, r'identityId')) : const Optional.absent(),
+        personId: json.containsKey(r'personId') ? Optional.present(mapValueOfType<String>(json, r'personId')) : const Optional.absent(),
       );
     }
     return null;
@@ -98,7 +114,6 @@ class FamilyMyRootUpdateDto {
 
   /// The list of required keys that must be present in a JSON.
   static const requiredKeys = <String>{
-    'identityId',
   };
 }
 

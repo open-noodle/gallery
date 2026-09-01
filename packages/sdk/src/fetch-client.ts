@@ -1537,7 +1537,9 @@ export type FamilyMyRootResponseDto = {
 };
 export type FamilyMyRootUpdateDto = {
     /** Identity ID to nominate as yourself, or null to clear */
-    identityId: string | null;
+    identityId?: string | null;
+    /** Person ID to nominate as yourself, resolved to its identity */
+    personId?: string;
 };
 export type FamilyPersonRelationDto = {
     /** Opaque per-union slot index, only present when person is null */
@@ -1587,10 +1589,14 @@ export type FamilyGraphResponseDto = {
 export type FamilyUnionCreateDto = {
     /** Child identity IDs */
     childIds?: string[];
+    /** Child person IDs, resolved to identities */
+    childPersonIds?: string[];
     /** Union end date */
     endDate?: string | null;
     /** Partner identity IDs (at most two) */
     partnerIds?: string[];
+    /** Partner person IDs, resolved to identities */
+    partnerPersonIds?: string[];
     /** Union start date */
     startDate?: string | null;
     /** Union status */
@@ -1609,7 +1615,9 @@ export type FamilyUnionUpdateDto = {
 };
 export type FamilyParticipantAddDto = {
     /** Identity ID to add to the union */
-    identityId: string;
+    identityId?: string;
+    /** Person ID to add, resolved to its identity */
+    personId?: string;
     /** Role to add the identity as */
     role: FamilyParticipantRole;
 };
