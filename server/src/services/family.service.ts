@@ -18,6 +18,9 @@ export type FamilyParticipantRole = 'partner' | 'child';
 export interface CreateUnionDto {
   partnerIds?: string[];
   childIds?: string[];
+  // Person-id forms for clients that never see an identity id — see `FamilyUnionCreateDto`.
+  partnerPersonIds?: string[];
+  childPersonIds?: string[];
   status?: string;
   startDate?: string | null;
   endDate?: string | null;
@@ -30,7 +33,9 @@ export interface UpdateUnionDto {
 }
 
 export interface AddParticipantDto {
-  identityId: string;
+  // Exactly one of these — the DTO schema enforces it. `personId` is what a people picker has.
+  identityId?: string;
+  personId?: string;
   role: FamilyParticipantRole;
 }
 
@@ -219,6 +224,14 @@ export class FamilyService extends BaseService {
     });
   }
 
+  // The first-run picker on /family only ever knows a person id (see `FamilyMyRootUpdateDto`).
+  // Delegates to `setMyRoot` so the access rule and the metadata write stay in one place.
+  async setMyRootByPerson(auth: AuthDto, personId: string): Promise<void> {
+    await this.requireFamilyRead(auth);
+    const [identityId] = await this.resolvePersonIdsToIdentityIds(auth, [personId]);
+    await this.setMyRoot(auth, identityId);
+  }
+
   // Slice 7 (D4/E37/E38): gender requires `contribute`, not `view` — unlike the viewer's own
   // root, it is shared data that changes the label every OTHER viewer reads for this identity.
   async updateGender(auth: AuthDto, identityId: string, gender: FamilyGender): Promise<void> {
@@ -298,14 +311,38 @@ export class FamilyService extends BaseService {
     throw new NotFoundException(`Not found or no ${Permission.PersonRead} access`);
   }
 
+  // Resolves person ids for the write paths a people picker can reach. A person the caller can
+  // see but who has no face identity yet is a 400, never a silent drop: dropping them would leave
+  // the union below the two-resolvable threshold `computeVisibleUnions` enforces, so the caller
+  // would get a 201 for a union that is invisible to everyone including themselves.
+  private async resolvePersonIdsToIdentityIds(auth: AuthDto, personIds: string[]): Promise<string[]> {
+    const identityIds: string[] = [];
+    for (const personId of personIds) {
+      const identityId = await this.resolvePersonIdentityId(auth, personId);
+      if (!identityId) {
+        throw new BadRequestException(
+          `Person ${personId} is not linked to a face identity yet, so they cannot be part of a family relationship`,
+        );
+      }
+      identityIds.push(identityId);
+    }
+    return identityIds;
+  }
+
   // Authority comes from `requireFamilyWrite` alone (E21, E24, E25) — whoever created a union
   // is recorded for audit purposes only (`createdById`), and is never consulted for authority.
   // Any contributor may edit or delete any union.
   async createUnion(auth: AuthDto, dto: CreateUnionDto): Promise<{ id: string }> {
     await this.requireFamilyWrite(auth);
 
-    const partnerIds = dto.partnerIds ?? [];
-    const childIds = dto.childIds ?? [];
+    const partnerIds = [
+      ...(dto.partnerIds ?? []),
+      ...(await this.resolvePersonIdsToIdentityIds(auth, dto.partnerPersonIds ?? [])),
+    ];
+    const childIds = [
+      ...(dto.childIds ?? []),
+      ...(await this.resolvePersonIdsToIdentityIds(auth, dto.childPersonIds ?? [])),
+    ];
     const startDate = dto.startDate ?? null;
     const endDate = dto.endDate ?? null;
 
@@ -373,7 +410,12 @@ export class FamilyService extends BaseService {
       throw new NotFoundException('Union not found');
     }
 
-    await this.validateParticipantTypes([dto.identityId]);
+    const [resolvedFromPerson] = dto.identityId
+      ? [undefined]
+      : await this.resolvePersonIdsToIdentityIds(auth, [dto.personId!]);
+    const identityId = dto.identityId ?? resolvedFromPerson!;
+
+    await this.validateParticipantTypes([identityId]);
 
     const [partnerIds, childIds] = await Promise.all([
       this.familyRepository.getPartnerIds(unionId),
@@ -381,10 +423,10 @@ export class FamilyService extends BaseService {
     ]);
 
     if (dto.role === 'partner') {
-      if (childIds.includes(dto.identityId)) {
+      if (childIds.includes(identityId)) {
         throw new BadRequestException('A person cannot be both a partner and a child of the same union');
       }
-      if (partnerIds.includes(dto.identityId)) {
+      if (partnerIds.includes(identityId)) {
         throw new BadRequestException('A person cannot be their own partner');
       }
       if (partnerIds.length + 1 > 2) {
@@ -392,26 +434,26 @@ export class FamilyService extends BaseService {
       }
 
       for (const childId of childIds) {
-        if (await this.familyRepository.isAncestor(childId, dto.identityId)) {
+        if (await this.familyRepository.isAncestor(childId, identityId)) {
           throw new BadRequestException('This would create a cycle in the family graph');
         }
       }
 
-      await this.familyRepository.addPartner(unionId, dto.identityId);
+      await this.familyRepository.addPartner(unionId, identityId);
       return;
     }
 
-    if (partnerIds.includes(dto.identityId)) {
+    if (partnerIds.includes(identityId)) {
       throw new BadRequestException('A person cannot be both a partner and a child of the same union');
     }
 
     for (const partnerId of partnerIds) {
-      if (await this.familyRepository.isAncestor(dto.identityId, partnerId)) {
+      if (await this.familyRepository.isAncestor(identityId, partnerId)) {
         throw new BadRequestException('This would create a cycle in the family graph');
       }
     }
 
-    await this.familyRepository.addChild(unionId, dto.identityId);
+    await this.familyRepository.addChild(unionId, identityId);
   }
 
   async removeParticipant(auth: AuthDto, unionId: string, identityId: string): Promise<void> {
