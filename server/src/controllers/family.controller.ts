@@ -243,7 +243,11 @@ export class FamilyController {
     history: new HistoryBuilder().added('v1').beta('v1'),
   })
   setMyRoot(@Auth() auth: AuthDto, @Body() dto: FamilyMyRootUpdateDto): Promise<void> {
-    return this.service.setMyRoot(auth, dto.identityId);
+    // `personId` is the form the /family first-run picker can supply; `identityId` (including an
+    // explicit null, which clears the root) stays the form the canvas already uses.
+    return dto.personId === undefined
+      ? this.service.setMyRoot(auth, dto.identityId ?? null)
+      : this.service.setMyRootByPerson(auth, dto.personId);
   }
 
   // D4: gender requires `contribute`, not `view` — it is shared data that alters the label every

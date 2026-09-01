@@ -122,6 +122,12 @@ const FamilyUnionCreateSchema = z
     // face_identity.id is UUID v7 — see the note on FamilyParticipantSchema.identityId above.
     partnerIds: z.array(z.uuid()).max(2).optional().describe('Partner identity IDs (at most two)'),
     childIds: z.array(z.uuid()).optional().describe('Child identity IDs'),
+    // A client never learns an identity id — `PersonResponseDto` deliberately withholds it so the
+    // same real person cannot be correlated across users. These person-id forms are what a people
+    // picker can actually supply; the server resolves them to identities. Merged with the identity
+    // arrays above, so a caller may mix the two.
+    partnerPersonIds: z.array(z.uuid()).max(2).optional().describe('Partner person IDs, resolved to identities'),
+    childPersonIds: z.array(z.uuid()).optional().describe('Child person IDs, resolved to identities'),
     status: FamilyUnionStatusSchema.optional().describe('Union status'),
     startDate: FamilyDateSchema.optional().describe('Union start date'),
     endDate: FamilyDateSchema.optional().describe('Union end date'),
@@ -141,8 +147,13 @@ const FamilyUnionUpdateSchema = z
 const FamilyParticipantAddSchema = z
   .object({
     // face_identity.id is UUID v7 — see the note on FamilyParticipantSchema.identityId above.
-    identityId: z.uuid().describe('Identity ID to add to the union'),
+    identityId: z.uuid().optional().describe('Identity ID to add to the union'),
+    // See FamilyUnionCreateSchema: a picker only ever knows a person id.
+    personId: z.uuid().optional().describe('Person ID to add, resolved to its identity'),
     role: FamilyParticipantRoleSchema.describe('Role to add the identity as'),
+  })
+  .refine((value) => (value.identityId === undefined) !== (value.personId === undefined), {
+    message: 'Provide exactly one of identityId or personId',
   })
   .meta({ id: 'FamilyParticipantAddDto' });
 
@@ -166,7 +177,13 @@ const FamilyIdentityParamSchema = z.object({
 const FamilyMyRootUpdateSchema = z
   .object({
     // face_identity.id is UUID v7 — see the note on FamilyParticipantSchema.identityId above.
-    identityId: z.uuid().nullable().describe('Identity ID to nominate as yourself, or null to clear'),
+    identityId: z.uuid().nullable().optional().describe('Identity ID to nominate as yourself, or null to clear'),
+    // See FamilyUnionCreateSchema: the first-run picker on /family only knows a person id, and
+    // nominating yourself is what makes every derived label read "your aunt" rather than a name.
+    personId: z.uuid().optional().describe('Person ID to nominate as yourself, resolved to its identity'),
+  })
+  .refine((value) => value.identityId === undefined || value.personId === undefined, {
+    message: 'Provide identityId or personId, not both',
   })
   .meta({ id: 'FamilyMyRootUpdateDto' });
 
