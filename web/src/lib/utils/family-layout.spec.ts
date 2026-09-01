@@ -223,6 +223,104 @@ describe('buildPositionedFamilyLayout', () => {
     expect(childless.unions[0]!.childPath).toBeNull();
   });
 
+  // Connector paths are only worth drawing if they actually meet. Asserting a path merely EXISTS
+  // (`childPath` is non-null) passed happily while the tree rendered with lines hanging in mid-air,
+  // so these walk the segments and check the joins.
+  const segmentsOf = (path: string) =>
+    path
+      .split('M')
+      .filter(Boolean)
+      .map((run) => {
+        const [from, to] = run.trim().split('L', 2);
+        const [x1, y1] = from.trim().split(/\s+/).map(Number) as [number, number];
+        const [x2, y2] = to.trim().split(/\s+/).map(Number) as [number, number];
+        return { x1, y1, x2, y2 };
+      });
+
+  type Segment = { x1: number; y1: number; x2: number; y2: number };
+
+  /** Whether an axis-aligned segment passes through a point — anywhere along it, not just at its
+   * ends. A vertical meeting the middle of the bus is a T-junction, which is a perfectly good
+   * join; only requiring shared ENDPOINTS would reject it. */
+  const passesThrough = (segment: Segment, x: number, y: number) => {
+    const within = (value: number, a: number, b: number) =>
+      value >= Math.min(a, b) - 0.5 && value <= Math.max(a, b) + 0.5;
+    return (
+      within(x, segment.x1, segment.x2) &&
+      within(y, segment.y1, segment.y2) &&
+      // On the line itself: one axis must be constant and match.
+      ((Math.abs(segment.x1 - segment.x2) < 0.5 && Math.abs(x - segment.x1) < 0.5) ||
+        (Math.abs(segment.y1 - segment.y2) < 0.5 && Math.abs(y - segment.y1) < 0.5))
+    );
+  };
+
+  /** Every endpoint of every segment must meet another segment, or be a real terminus: the union
+   * anchor it descends from, or the top of a child card it lands on. A connector that fails this
+   * is drawn hanging in mid-air. */
+  const assertConnected = (layout: PositionedFamilyLayout) => {
+    for (const union of layout.unions) {
+      if (!union.childPath) {
+        continue;
+      }
+      const segments = segmentsOf(union.childPath);
+
+      for (const [index, segment] of segments.entries()) {
+        const endpoints = [
+          { x: segment.x1, y: segment.y1 },
+          { x: segment.x2, y: segment.y2 },
+        ];
+
+        for (const point of endpoints) {
+          const isAnchorTop = Math.abs(point.x - union.x) < 0.5 && point.y < union.y;
+          const landsOnACard = layout.seats.some(
+            (seat) => Math.abs(seat.x + FAMILY_CARD_WIDTH / 2 - point.x) < 0.5 && Math.abs(seat.y - point.y) < 0.5,
+          );
+          if (isAnchorTop || landsOnACard) {
+            continue;
+          }
+
+          const joined = segments.some(
+            (other, otherIndex) => otherIndex !== index && passesThrough(other, point.x, point.y),
+          );
+          expect(joined, `union ${union.unionId}: (${Math.round(point.x)}, ${Math.round(point.y)}) joins nothing`).toBe(
+            true,
+          );
+        }
+      }
+    }
+  };
+
+  // The bus used to span only min(children)..max(children). A lone child is rarely directly under
+  // its parents midpoint, so the drop from the union ended in mid-air with a visible gap.
+  it('joins a union to its only child even when the child is not directly below it', () => {
+    const unions: FamilyUnionDto[] = [
+      // Two grandparents whose single child is also partnered, which drags the child sideways and
+      // leaves the anchor well outside the child span.
+      union({ id: 'u-gp', partners: [known('gp1'), known('gp2')], children: [known('ivan')] }),
+      union({ id: 'u-ivan', partners: [known('ivan'), known('nell')], children: [known('kid')] }),
+    ];
+
+    const layout = buildPositionedFamilyLayout(unions, 'ivan', false);
+
+    assertConnected(layout);
+  });
+
+  it('joins a union to children that sit entirely to one side of it', () => {
+    const unions: FamilyUnionDto[] = [
+      union({ id: 'u-a', partners: [known('p1'), known('p2')], children: [known('c1'), known('c2')] }),
+      // c1 is partnered far to the left, dragging both children off the parents centre.
+      union({ id: 'u-b', partners: [known('c1'), known('spouse')], children: [] }),
+    ];
+
+    const layout = buildPositionedFamilyLayout(unions, 'c1', true);
+
+    assertConnected(layout);
+  });
+
+  it('joins every connector in the mockup family', () => {
+    assertConnected(buildPositionedFamilyLayout(mockupFamily(), 'alex', false));
+  });
+
   it('sizes the canvas to hold every card it laid out', () => {
     const unions: FamilyUnionDto[] = [
       union({ id: 'u1', partners: [known('a'), known('b')], children: [known('c'), known('d')] }),
