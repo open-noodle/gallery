@@ -59,9 +59,11 @@
   }
 </script>
 
+<!-- `bg-light`, not `bg-surface`: the latter is not a utility in this theme, so this panel
+     rendered fully transparent and the cards behind it showed straight through it. -->
 <div
   data-testid="family-union-editor"
-  class="bg-surface flex flex-col gap-3 rounded-lg border border-gray-300 p-3 dark:border-gray-700"
+  class="flex flex-col gap-3 rounded-lg border border-gray-300 bg-light p-3 shadow-lg dark:border-gray-700"
 >
   <div class="flex flex-col gap-1 text-xs">
     <span class="font-semibold text-gray-500 uppercase">{$t('family_edit_union_status_label')}</span>

@@ -5,8 +5,10 @@
     FamilyParticipantKind,
     FamilyParticipantRole,
     getAllPeople,
+    removeParticipant,
     searchPerson,
     setMyRoot,
+    updateGender,
     updateUnion,
     type FamilyIdentityDto,
     type FamilyParticipantDto,
@@ -53,7 +55,12 @@
   // itself is never mutated — only ever read again if the prop identity changes (a fresh page
   // load), which is why this is a plain `$state` snapshot rather than something kept in sync via
   // an `$effect`.
-  let workingUnions = $state<FamilyUnionDto[]>(unions);
+  // A WRITABLE `$derived`, which is exactly the two behaviours this needs at once: a drop assigns
+  // to it directly so the canvas re-renders without waiting on the server, and it re-seeds from the
+  // prop whenever `+page.ts` hands over a fresh graph. `invalidateAll()` swaps that prop but does
+  // NOT recreate this component, so a plain `$state` snapshot went stale — a face dragged in from
+  // the tray only appeared after a manual page reload.
+  let workingUnions = $derived(unions);
 
   const layout = $derived(buildPositionedFamilyLayout(workingUnions, rootId, canContribute));
 
@@ -373,6 +380,67 @@
     }
   }
 
+  // ── Person actions ─────────────────────────────────────────────────────────────────────────
+  //
+  // A card is not just a label: it is the only place on this surface where you can say who someone
+  // IS. Gender is what turns "your parent" into "your mother" (§6) — it belongs to the person, not
+  // to a relationship, which is why it hangs off the card rather than off a union pill. Removing
+  // takes them out of every union they appear in, since a person half-detached from their family
+  // is not a state worth being able to reach by accident.
+  //
+  // Both reload rather than patching locally: every label on the canvas is derived SERVER-side
+  // from the whole graph (D4), so one gender change can reword cards far away from the one edited.
+
+  let openPersonId = $state<string | null>(null);
+  let personBusy = $state(false);
+  let personError = $state(false);
+
+  const togglePerson = (identityId: string) => {
+    personError = false;
+    openPersonId = openPersonId === identityId ? null : identityId;
+  };
+
+  const unionsContaining = (identityId: string) =>
+    workingUnions.filter((union) =>
+      [...union.partners, ...union.children].some((participant) => participant.identityId === identityId),
+    );
+
+  async function applyGender(identityId: string, gender: string | null) {
+    if (personBusy) {
+      return;
+    }
+    personBusy = true;
+    personError = false;
+    try {
+      await updateGender({ id: identityId, familyGenderUpdateDto: { gender } });
+      openPersonId = null;
+      onGraphChanged?.();
+    } catch {
+      personError = true;
+    } finally {
+      personBusy = false;
+    }
+  }
+
+  async function removePerson(identityId: string) {
+    if (personBusy) {
+      return;
+    }
+    personBusy = true;
+    personError = false;
+    try {
+      for (const union of unionsContaining(identityId)) {
+        await removeParticipant({ id: union.id, identityId });
+      }
+      openPersonId = null;
+      onGraphChanged?.();
+    } catch {
+      personError = true;
+    } finally {
+      personBusy = false;
+    }
+  }
+
   // ── Union editor (A7) ──────────────────────────────────────────────────────────────────────
 
   let editingUnionId = $state<string | null>(null);
@@ -509,12 +577,13 @@
       </aside>
     {/if}
 
-    <!-- Canvas -->
+    <!-- Canvas. Its height fills what the page layout leaves below the header and cluster chips,
+         rather than the fixed 32rem that left most of the screen empty. -->
     <div
       bind:this={viewport}
       data-testid="family-canvas"
       role="presentation"
-      class="relative h-128 touch-none overflow-hidden select-none"
+      class="relative h-[calc(100dvh-var(--navbar-height)-12rem)] min-h-96 touch-none overflow-hidden select-none"
       class:cursor-grabbing={panning}
       onwheel={handleWheel}
       onpointerdown={handlePointerDown}
@@ -602,6 +671,14 @@
               class:cursor-grab={canContribute}
               style="left:{seat.x}px;top:{seat.y}px;width:{FAMILY_CARD_WIDTH}px;height:{FAMILY_CARD_HEIGHT}px"
               draggable={canContribute}
+              onclick={() => canContribute && togglePerson(identityId)}
+              onkeydown={(event) => {
+                if (!canContribute || (event.key !== 'Enter' && event.key !== ' ')) {
+                  return;
+                }
+                event.preventDefault();
+                togglePerson(identityId);
+              }}
               ondragstart={(event) => handleDragStart(event, { kind: 'identity', id: identityId })}
               ondragend={handleDragEnd}
             >
@@ -627,6 +704,59 @@
                 {/if}
               </div>
             </div>
+
+            {#if canContribute && openPersonId === identityId}
+              <div
+                data-testid="family-person-menu"
+                data-family-interactive
+                class="absolute z-40 flex w-56 flex-col gap-3 rounded-xl border border-gray-300 bg-light p-3 shadow-lg dark:border-gray-700"
+                style="left:{seat.x}px;top:{seat.y + FAMILY_CARD_HEIGHT + 8}px"
+              >
+                <div class="truncate text-sm font-medium">{displayName(identityId)}</div>
+
+                <div class="flex flex-col gap-1">
+                  <span class="text-[10px] font-semibold tracking-wide text-gray-500 uppercase">
+                    {$t('family_canvas_gender_label')}
+                  </span>
+                  <div class="flex flex-wrap gap-1">
+                    {#each [{ value: null, key: 'family_canvas_gender_unset' }, { value: 'male', key: 'family_canvas_gender_male' }, { value: 'female', key: 'family_canvas_gender_female' }] as option (option.key)}
+                      {@const selected = (identities[identityId]?.gender ?? null) === option.value}
+                      <button
+                        type="button"
+                        data-testid="family-person-gender-option"
+                        data-selected={selected}
+                        class="rounded-full border px-2.5 py-0.5 text-[11px]"
+                        class:border-primary={selected}
+                        class:text-primary={selected}
+                        class:border-gray-300={!selected}
+                        class:dark:border-gray-600={!selected}
+                        disabled={personBusy}
+                        onclick={() => void applyGender(identityId, option.value)}
+                      >
+                        {$t(option.key as Translations)}
+                      </button>
+                    {/each}
+                  </div>
+                  <p class="text-[10.5px] leading-snug text-gray-500">{$t('family_canvas_gender_hint')}</p>
+                </div>
+
+                <button
+                  type="button"
+                  data-testid="family-person-remove"
+                  class="rounded-lg border border-red-300 px-2.5 py-1 text-[11px] font-medium text-red-500 dark:border-red-500/50"
+                  disabled={personBusy}
+                  onclick={() => void removePerson(identityId)}
+                >
+                  {$t('family_canvas_remove_person')}
+                </button>
+
+                {#if personError}
+                  <p class="text-[11px] text-red-500" data-testid="family-person-error">
+                    {$t('family_canvas_person_error')}
+                  </p>
+                {/if}
+              </div>
+            {/if}
 
             {#if showZonesFor(identityId)}
               <div
@@ -701,7 +831,11 @@
         <!-- Union pills, sitting on the connector between the partners -->
         {#each layout.unions as union (union.unionId)}
           {@const ended = isEnded(union.status)}
-          <div class="absolute -translate-x-1/2" style="left:{union.x}px;top:{union.y}px">
+          <div
+            class="absolute -translate-x-1/2"
+            class:z-30={editingUnionId === union.unionId}
+            style="left:{union.x}px;top:{union.y}px"
+          >
             {#if canContribute}
               <button
                 type="button"

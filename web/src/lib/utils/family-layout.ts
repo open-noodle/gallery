@@ -382,27 +382,68 @@ export function buildPositionedFamilyLayout(
     for (const partners of unionPartners.values()) {
       const local = partners.filter((key) => inGeneration.has(key));
       for (const key of local) {
-        mates.set(key, [...(mates.get(key) ?? []), ...local.filter((other) => other !== key)]);
+        const existing = mates.get(key) ?? [];
+        mates.set(key, [...existing, ...local.filter((other) => other !== key && !existing.includes(other))]);
       }
     }
 
+    // A block is a whole CHAIN of partners, not just a pair. Someone in two unions (Anton married
+    // Ruth, then Vera) can only be adjacent to one of them if blocks cap at two — the other partner
+    // is cast adrift, a stranger drifts into the gap, and the second union's pill, which hangs at
+    // the midpoint of its partners, lands on top of that stranger and of any other union whose
+    // midpoint happens to agree. Seating the chain Ruth-Anton-Vera keeps every pill over the two
+    // people it actually joins.
+    //
+    // Walking from an endpoint (someone with a single partner) is what makes a chain come out in
+    // path order rather than starting in the middle. A hub with three or more partners has no path
+    // order to find; it leads, and its partners follow.
+    const degree = (key: string) => (mates.get(key) ?? []).length;
     const taken = new Set<string>();
     const blocks: string[][] = [];
-    for (const key of keys) {
-      if (taken.has(key)) {
+
+    for (const seed of keys) {
+      if (taken.has(seed)) {
         continue;
       }
-      taken.add(key);
-      const block = [key];
-      for (const mate of mates.get(key) ?? []) {
-        if (taken.has(mate)) {
+
+      // Collect the connected component first, so the walk can start at one of its ends.
+      const component: string[] = [];
+      const queue = [seed];
+      const seen = new Set([seed]);
+      while (queue.length > 0) {
+        const current = queue.shift()!;
+        component.push(current);
+        for (const mate of mates.get(current) ?? []) {
+          if (seen.has(mate)) {
+            continue;
+          }
+          seen.add(mate);
+          queue.push(mate);
+        }
+      }
+
+      const start = component.find((key) => degree(key) === 1) ?? component[0]!;
+      const block: string[] = [];
+      const stack = [start];
+      const emitted = new Set<string>();
+      while (stack.length > 0) {
+        const current = stack.pop()!;
+        if (emitted.has(current)) {
           continue;
         }
-        taken.add(mate);
-        block.push(mate);
+        emitted.add(current);
+        taken.add(current);
+        block.push(current);
+        // Lowest degree first: a chain's continuation before a hub's other spokes.
+        const next = [...(mates.get(current) ?? [])]
+          .filter((mate) => !emitted.has(mate))
+          .sort((a, b) => degree(b) - degree(a));
+        stack.push(...next);
       }
+
       blocks.push(block);
     }
+
     return blocks;
   };
 
@@ -423,72 +464,89 @@ export function buildPositionedFamilyLayout(
     }
   }
 
-  /** Re-seats every couple side by side around wherever the relaxation has drifted them. The
-   * barycentre sweeps move people one at a time — a partner who is also somebody's child gets
-   * pulled towards their own parents — so without this a couple slowly separates and the pill
-   * that hangs at their midpoint ends up over whoever is standing between them. */
-  const collapseBlocks = (generation: number) => {
-    for (const block of blocksByGeneration.get(generation) ?? []) {
-      if (block.length < 2) {
+  const PITCH = FAMILY_CARD_WIDTH + GAP_X;
+
+  const blockWidth = (block: string[]) => block.length * FAMILY_CARD_WIDTH + (block.length - 1) * GAP_X;
+  const blockCentre = (block: string[]) => mean(block.map((key) => centreX.get(key)!));
+
+  /** Seats a block's members side by side around `centre`, which is what keeps a couple together:
+   * the pill hangs at their midpoint, so a couple that drifts apart puts its pill over whoever is
+   * standing in the gap. */
+  const setBlockCentre = (block: string[], centre: number) => {
+    const start = centre - ((block.length - 1) * PITCH) / 2;
+    for (const [index, key] of block.entries()) {
+      centreX.set(key, start + index * PITCH);
+    }
+  };
+
+  /**
+   * Where a block would sit if nothing were in its way: the average of every pull on it — the
+   * anchor of each union its members are a CHILD of, and the centre of the children of each union
+   * they are a PARTNER in. A person who is both (most people, once a tree has three generations)
+   * is drawn between their parents and their own children rather than being claimed by whichever
+   * was processed last.
+   */
+  const desiredCentre = (block: string[]): number => {
+    const members = new Set(block);
+    const pulls: number[] = [];
+
+    for (const union of base.unions) {
+      const partners = unionPartners.get(union.unionId) ?? [];
+      const children = unionChildren.get(union.unionId) ?? [];
+      if (partners.length === 0 || children.length === 0) {
         continue;
       }
-      const centre = mean(block.map((key) => centreX.get(key)!));
-      const pitch = FAMILY_CARD_WIDTH + GAP_X;
-      const start = centre - ((block.length - 1) * pitch) / 2;
-      for (const [index, key] of block.entries()) {
-        centreX.set(key, start + index * pitch);
+      if (partners.some((key) => members.has(key))) {
+        pulls.push(mean(children.map((key) => centreX.get(key)!)));
+      }
+      if (children.some((key) => members.has(key))) {
+        pulls.push(mean(partners.map((key) => centreX.get(key)!)));
       }
     }
+
+    return pulls.length > 0 ? mean(pulls) : blockCentre(block);
   };
 
-  const shift = (keys: string[], desired: number) => {
-    const delta = desired - mean(keys.map((key) => centreX.get(key)!));
-    for (const key of keys) {
-      centreX.set(key, centreX.get(key)! + delta);
+  /**
+   * Re-packs one generation from scratch: every block starts at the position it actually wants and
+   * is pushed right only as far as its left neighbour forces it.
+   *
+   * Recomputing rather than nudging is the whole point. An earlier version shifted blocks by a
+   * delta each sweep and then pushed apart whatever collided — but the push only ever moved things
+   * RIGHT, so each sweep inherited the last one's drift and the tree widened monotonically. Two
+   * siblings ended up a thousand pixels apart with a connector sprawling between them, because
+   * one of them was also somebody's partner and got dragged away every pass. Starting from the
+   * desired position each time means a pass can give space back, not just take it.
+   */
+  const packGeneration = (generation: number) => {
+    const blocks = blocksByGeneration.get(generation) ?? [];
+    if (blocks.length === 0) {
+      return;
     }
-  };
 
-  const separate = (generation: number) => {
-    const keys = [...(keysByGeneration.get(generation) ?? [])].sort((a, b) => centreX.get(a)! - centreX.get(b)!);
-    for (let index = 1; index < keys.length; index++) {
-      const minimum = centreX.get(keys[index - 1]!)! + FAMILY_CARD_WIDTH + GAP_X;
-      if (centreX.get(keys[index]!)! < minimum) {
-        centreX.set(keys[index]!, minimum);
-      }
+    const targets = blocks.map((block) => ({ block, desired: desiredCentre(block) }));
+    targets.sort((a, b) => a.desired - b.desired);
+
+    let cursor = -Infinity;
+    for (const { block, desired } of targets) {
+      const half = blockWidth(block) / 2;
+      const centre = Math.max(desired, cursor + half);
+      setBlockCentre(block, centre);
+      cursor = centre + half + GAP_X;
     }
   };
 
   const generations = base.rows.map((row) => row.generation);
 
+  // Sweep down then up: descendants settle under their parents, then parents re-centre over the
+  // descendants that just moved. Repeating both directions is what lets a change at one end of the
+  // tree reach the other.
   for (let pass = 0; pass < RELAX_PASSES; pass++) {
     for (const generation of generations) {
-      for (const union of base.unions) {
-        if (union.partnerGeneration + 1 !== generation) {
-          continue;
-        }
-        const partners = unionPartners.get(union.unionId) ?? [];
-        const children = unionChildren.get(union.unionId) ?? [];
-        if (partners.length > 0 && children.length > 0) {
-          shift(children, mean(partners.map((key) => centreX.get(key)!)));
-        }
-      }
-      collapseBlocks(generation);
-      separate(generation);
+      packGeneration(generation);
     }
-
     for (const generation of [...generations].reverse()) {
-      for (const union of base.unions) {
-        if (union.partnerGeneration !== generation) {
-          continue;
-        }
-        const partners = unionPartners.get(union.unionId) ?? [];
-        const children = unionChildren.get(union.unionId) ?? [];
-        if (partners.length > 0 && children.length > 0) {
-          shift(partners, mean(children.map((key) => centreX.get(key)!)));
-        }
-      }
-      collapseBlocks(generation);
-      separate(generation);
+      packGeneration(generation);
     }
   }
 
