@@ -712,3 +712,99 @@ describe(FamilyService.name, () => {
     });
   });
 });
+
+// First-run entry point: the web client is never given an `identityId` (PersonResponseDto
+// deliberately withholds it), so every write path a picker can reach has to accept a `person.id`
+// and resolve it server-side. Without this the /family page cannot create its own first union at
+// all — the canvas only ever learns identity ids from unions that already exist.
+describe('creating relationships from person ids', () => {
+  let sut: FamilyService;
+  let mocks: ServiceMocks;
+
+  const ANNA_PERSON = '00000000-0000-4000-a000-000000000801';
+  const ANNA_IDENTITY = '00000000-0000-4000-a000-000000000802';
+  const BEN_PERSON = '00000000-0000-4000-a000-000000000803';
+  const BEN_IDENTITY = '00000000-0000-4000-a000-000000000804';
+  const UNLINKED_PERSON = '00000000-0000-4000-a000-000000000805';
+  const FIRST_UNION = '00000000-0000-4000-a000-000000000806';
+
+  beforeEach(() => {
+    ({ sut, mocks } = newTestService(FamilyService));
+    sut['getConfig'] = () => Promise.resolve(makeFamilyConfig(true, 'none') as any);
+    mocks.family.getAccess.mockResolvedValue({ level: 'contribute' } as any);
+    mocks.family.getIdentityType.mockResolvedValue('person' as any);
+    mocks.family.isAncestor.mockResolvedValue(false);
+    mocks.family.getPartnerIds.mockResolvedValue([]);
+    mocks.family.getChildIds.mockResolvedValue([]);
+    mocks.access.person.checkOwnerAccess.mockImplementation((_userId: string, ids: Set<string>) =>
+      Promise.resolve(new Set(ids)),
+    );
+    mocks.person.getById.mockImplementation((id: string) =>
+      Promise.resolve(
+        (
+          {
+            [ANNA_PERSON]: { id: ANNA_PERSON, identityId: ANNA_IDENTITY },
+            [BEN_PERSON]: { id: BEN_PERSON, identityId: BEN_IDENTITY },
+            [UNLINKED_PERSON]: { id: UNLINKED_PERSON, identityId: null },
+          } as Record<string, unknown>
+        )[id] as any,
+      ),
+    );
+  });
+
+  it('creates the first union from two person ids', async () => {
+    mocks.family.createUnion.mockResolvedValue({ id: FIRST_UNION } as any);
+
+    await expect(sut.createUnion(authStub.user1, { partnerPersonIds: [ANNA_PERSON, BEN_PERSON] })).resolves.toEqual({
+      id: FIRST_UNION,
+    });
+
+    expect(mocks.family.createUnion).toHaveBeenCalledWith(
+      expect.objectContaining({ partnerIds: [ANNA_IDENTITY, BEN_IDENTITY], childIds: [] }),
+    );
+  });
+
+  it('creates a parent/child union from person ids', async () => {
+    mocks.family.createUnion.mockResolvedValue({ id: FIRST_UNION } as any);
+
+    await expect(
+      sut.createUnion(authStub.user1, { partnerPersonIds: [ANNA_PERSON], childPersonIds: [BEN_PERSON] }),
+    ).resolves.toEqual({ id: FIRST_UNION });
+
+    expect(mocks.family.createUnion).toHaveBeenCalledWith(
+      expect.objectContaining({ partnerIds: [ANNA_IDENTITY], childIds: [BEN_IDENTITY] }),
+    );
+  });
+
+  // A person recognised in photos but never linked to a face identity cannot take part. That is a
+  // plain user-facing state, not a server fault, so it must be a 400 rather than a 500 or — worse —
+  // a silently dropped participant that leaves the union below the two-resolvable threshold and
+  // therefore invisible.
+  it('rejects a person who has no family identity yet', async () => {
+    await expect(sut.createUnion(authStub.user1, { partnerPersonIds: [UNLINKED_PERSON] })).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(mocks.family.createUnion).not.toHaveBeenCalled();
+  });
+
+  it('adds a participant to an existing union from a person id', async () => {
+    mocks.family.getUnion.mockResolvedValue({ id: FIRST_UNION } as any);
+
+    await expect(
+      sut.addParticipant(authStub.user1, FIRST_UNION, { personId: BEN_PERSON, role: 'partner' as any }),
+    ).resolves.toBeUndefined();
+
+    expect(mocks.family.addPartner).toHaveBeenCalledWith(FIRST_UNION, BEN_IDENTITY);
+  });
+
+  // D4: nominating yourself is what makes every derived label read "your aunt" instead of a bare
+  // name, and the picker only ever knows a person id.
+  it('nominates the viewer root from a person id', async () => {
+    await expect(sut.setMyRootByPerson(authStub.user1, ANNA_PERSON)).resolves.toBeUndefined();
+
+    expect(mocks.user.upsertMetadata).toHaveBeenCalledWith(authStub.user1.user.id, {
+      key: 'family-root',
+      value: { identityId: ANNA_IDENTITY },
+    });
+  });
+});

@@ -1,6 +1,7 @@
 import type { PersonResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/svelte';
+import userEvent from '@testing-library/user-event';
 import FamilyRelationsPanel from './FamilyRelationsPanel.svelte';
 import type { FamilyRelationEntry } from './family-relations';
 
@@ -143,5 +144,19 @@ describe('FamilyRelationsPanel', () => {
     });
 
     expect(screen.getByTestId('family-add-relationship')).toBeInTheDocument();
+  });
+
+  // This button shipped inert: `onAddRelationship` is an optional prop and the person page never
+  // passed one, so `onclick={undefined}` rendered a control that did nothing. Asserting the
+  // button EXISTS (as the two tests above do) cannot catch that — only invoking it can.
+  it('invokes its handler when clicked', async () => {
+    const onAddRelationship = vi.fn();
+    render(FamilyRelationsPanel, {
+      props: { isPet: false, access: 'contribute', relations: knownRelations, onAddRelationship },
+    });
+
+    await userEvent.click(screen.getByTestId('family-add-relationship'));
+
+    expect(onAddRelationship).toHaveBeenCalledTimes(1);
   });
 });

@@ -1,6 +1,7 @@
 <script lang="ts">
-  import { goto } from '$app/navigation';
+  import { goto, invalidateAll } from '$app/navigation';
   import FamilyCanvas from '$lib/components/family/FamilyCanvas.svelte';
+  import FamilyLinkDialog from '$lib/components/family/FamilyLinkDialog.svelte';
   import UserPageLayout from '$lib/components/layouts/UserPageLayout.svelte';
   import EmptyPlaceholder from '$lib/components/shared-components/EmptyPlaceholder.svelte';
   import { Route } from '$lib/route';
@@ -49,6 +50,18 @@
       : null,
   );
 
+  // The canvas can only rearrange people it already renders, and it only renders people who are
+  // in a union — so without this dialog a cold start has no way to create its first union, and a
+  // populated graph has no way to admit anyone new. Both entry points open the same dialog.
+  let linking = $state(false);
+
+  const closeLinkDialog = (created: boolean) => {
+    linking = false;
+    if (created) {
+      handlePromiseError(invalidateAll());
+    }
+  };
+
   const clusterChipLabel = (cluster: (typeof data.clusters)[number]) =>
     clusterContainsRoot(cluster.rootCandidateId) ? $t('family_canvas_cluster_around_you') : cluster.label;
 </script>
@@ -57,7 +70,32 @@
   <div data-testid="family-page" class="flex flex-col gap-2">
     {#if data.clusters.length === 0}
       <EmptyPlaceholder title={$t('family_canvas_empty_title')} text={$t('family_canvas_empty_text')} fullWidth />
+      {#if data.canContribute}
+        <div class="flex flex-col items-center gap-3 pb-6 text-center">
+          <p class="max-w-md text-sm text-gray-500 dark:text-gray-400">{$t('family_first_run_text')}</p>
+          <button
+            type="button"
+            data-testid="family-first-run-action"
+            class="rounded-full bg-primary px-4 py-2 text-sm text-white"
+            onclick={() => (linking = true)}
+          >
+            {$t('family_first_run_action')}
+          </button>
+        </div>
+      {/if}
     {:else}
+      {#if data.canContribute}
+        <div class="flex justify-end px-1">
+          <button
+            type="button"
+            data-testid="family-add-person"
+            class="rounded-full border border-gray-300 px-3 py-1 text-sm dark:border-gray-600"
+            onclick={() => (linking = true)}
+          >
+            {$t('family_link_add_action')}
+          </button>
+        </div>
+      {/if}
       <div class="flex gap-2 overflow-x-auto px-1 pb-1">
         {#each data.clusters as cluster, index (cluster.rootCandidateId)}
           <button
@@ -82,6 +120,10 @@
           canContribute={data.canContribute}
         />
       {/if}
+    {/if}
+
+    {#if linking}
+      <FamilyLinkDialog onClose={closeLinkDialog} />
     {/if}
   </div>
 </UserPageLayout>
