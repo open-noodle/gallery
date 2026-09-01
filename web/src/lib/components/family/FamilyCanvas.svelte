@@ -217,7 +217,45 @@
   /** Turns the tray into a root picker: the same list, but a click nominates rather than nothing.
    * Reuses one search rather than growing a second people picker somewhere else. */
   let pickingSelf = $state(false);
+  /** The union whose free partner seat is being filled — set by clicking a dashed "+ Add a parent"
+   * card, which otherwise had nothing behind it. Steers the same tray list a third way, so the
+   * dashed seat is an invitation that can actually be accepted rather than decoration. */
+  let fillingUnionId = $state<string | null>(null);
   let rootError = $state(false);
+
+  const trayTitle = $derived(
+    pickingSelf
+      ? $t('family_link_step_self')
+      : fillingUnionId
+        ? $t('family_canvas_tray_pick_parent')
+        : $t('family_canvas_tray_title'),
+  );
+
+  const startFillingSeat = (unionId: string | undefined) => {
+    if (!unionId) {
+      return;
+    }
+    pickingSelf = false;
+    rootError = false;
+    fillingUnionId = fillingUnionId === unionId ? null : unionId;
+  };
+
+  async function fillSeat(person: PersonResponseDto) {
+    if (!fillingUnionId) {
+      return;
+    }
+    rootError = false;
+    try {
+      await addParticipant({
+        id: fillingUnionId,
+        familyParticipantAddDto: { personId: person.id, role: FamilyParticipantRole.Partner },
+      });
+      fillingUnionId = null;
+      onGraphChanged?.();
+    } catch {
+      rootError = true;
+    }
+  }
 
   let trayToken = 0;
 
@@ -293,9 +331,23 @@
   };
 
   let dragged = $state<DraggedRef | null>(null);
+  /** The card the pointer is currently over during a drag. Only that card offers its gestures.
+   * Showing all three zones on every card at once tiled the canvas with boxes that overlapped each
+   * other and the neighbouring cards — the mockup puts the gestures around ONE focused card. */
+  let hoverTargetId = $state<string | null>(null);
 
   const showZonesFor = (identityId: string) =>
-    canContribute && dragged !== null && !(dragged.kind === 'identity' && dragged.id === identityId);
+    canContribute &&
+    dragged !== null &&
+    hoverTargetId === identityId &&
+    !(dragged.kind === 'identity' && dragged.id === identityId);
+
+  /** Kept on `dragover` rather than `dragenter` alone: the zones sit outside the card, so moving
+   * onto one would otherwise count as leaving the card and hide the very target being aimed at. */
+  const focusTarget = (event: DragEvent, identityId: string) => {
+    event.preventDefault();
+    hoverTargetId = identityId;
+  };
 
   function handleDragStart(event: DragEvent, ref: DraggedRef) {
     event.dataTransfer?.setData(DRAG_MIME, encodeDrag(ref));
@@ -305,12 +357,10 @@
     dragged = ref;
   }
 
-  const handleDragEnd = () => (dragged = null);
-
-  function handleDragOver(event: DragEvent) {
-    // Required so the browser treats this element as a valid drop target at all.
-    event.preventDefault();
-  }
+  const handleDragEnd = () => {
+    dragged = null;
+    hoverTargetId = null;
+  };
 
   function applyJoinLocally(unionId: string, role: FamilyParticipantRole, draggedId: string) {
     const participant: FamilyParticipantDto = { kind: FamilyParticipantKind.Known, identityId: draggedId };
@@ -344,6 +394,7 @@
     event.preventDefault();
     const ref = decodeDrag(event.dataTransfer?.getData(DRAG_MIME));
     dragged = null;
+    hoverTargetId = null;
     if (!ref || (ref.kind === 'identity' && ref.id === targetId)) {
       return;
     }
@@ -520,9 +571,7 @@
         data-testid="family-tray"
         class="flex min-w-0 flex-col gap-3 border-b border-gray-200 bg-gray-50 p-3 md:border-r md:border-b-0 dark:border-gray-800 dark:bg-gray-900/40"
       >
-        <h4 class="text-xs font-semibold tracking-wide text-gray-500 uppercase">
-          {pickingSelf ? $t('family_link_step_self') : $t('family_canvas_tray_title')}
-        </h4>
+        <h4 class="text-xs font-semibold tracking-wide text-gray-500 uppercase">{trayTitle}</h4>
 
         <input
           class="rounded-lg border border-gray-300 bg-light px-2.5 py-1.5 text-xs dark:border-gray-700"
@@ -542,9 +591,15 @@
               data-testid="family-tray-person"
               data-person-id={person.id}
               class="min-w-0 text-center"
-              class:cursor-grab={!pickingSelf}
-              draggable={!pickingSelf}
-              onclick={() => (pickingSelf ? void nominateSelf(person) : undefined)}
+              class:cursor-grab={!pickingSelf && !fillingUnionId}
+              draggable={!pickingSelf && !fillingUnionId}
+              onclick={() => {
+                if (pickingSelf) {
+                  void nominateSelf(person);
+                } else if (fillingUnionId) {
+                  void fillSeat(person);
+                }
+              }}
               ondragstart={(event) => handleDragStart(event, { kind: 'person', id: person.id })}
               ondragend={handleDragEnd}
             >
@@ -660,6 +715,7 @@
             <div
               data-testid="family-node"
               data-family-interactive
+              data-identity-id={identityId}
               role="button"
               tabindex={canContribute ? 0 : -1}
               class="absolute flex items-center gap-3 rounded-2xl border bg-light px-3 shadow-sm"
@@ -681,6 +737,7 @@
               }}
               ondragstart={(event) => handleDragStart(event, { kind: 'identity', id: identityId })}
               ondragend={handleDragEnd}
+              ondragover={(event) => focusTarget(event, identityId)}
             >
               <div
                 class="relative grid size-11 shrink-0 place-items-center overflow-hidden rounded-full bg-gray-200 text-[13px] font-semibold text-gray-500 dark:bg-gray-700 dark:text-gray-300"
@@ -766,9 +823,9 @@
                 data-target-id={identityId}
                 role="button"
                 tabindex="-1"
-                class="absolute z-10 flex items-center justify-center rounded-lg border-2 border-dashed border-primary bg-primary/10 p-1 text-center text-[10px] leading-tight font-semibold text-primary"
+                class="absolute z-20 flex items-center justify-center rounded-lg border-2 border-dashed border-primary bg-light/95 p-1 text-center text-[10px] leading-tight font-semibold text-primary shadow-md"
                 style="left:{seat.x}px;top:{seat.y - 62}px;width:{FAMILY_CARD_WIDTH}px;height:56px"
-                ondragover={handleDragOver}
+                ondragover={(event) => focusTarget(event, identityId)}
                 ondrop={(event) => handleDrop(event, 'above', identityId)}
               >
                 {$t('family_edit_drop_above')}
@@ -780,9 +837,9 @@
                 data-target-id={identityId}
                 role="button"
                 tabindex="-1"
-                class="absolute z-10 flex items-center justify-center rounded-lg border-2 border-dashed border-primary bg-primary/10 p-1 text-center text-[10px] leading-tight font-semibold text-primary"
+                class="absolute z-20 flex items-center justify-center rounded-lg border-2 border-dashed border-primary bg-light/95 p-1 text-center text-[10px] leading-tight font-semibold text-primary shadow-md"
                 style="left:{seat.x}px;top:{seat.y + FAMILY_CARD_HEIGHT + 6}px;width:{FAMILY_CARD_WIDTH}px;height:56px"
-                ondragover={handleDragOver}
+                ondragover={(event) => focusTarget(event, identityId)}
                 ondrop={(event) => handleDrop(event, 'below', identityId)}
               >
                 {$t('family_edit_drop_below')}
@@ -794,9 +851,9 @@
                 data-target-id={identityId}
                 role="button"
                 tabindex="-1"
-                class="absolute z-10 flex items-center justify-center rounded-lg border-2 border-dashed border-primary bg-primary/10 p-1 text-center text-[10px] leading-tight font-semibold text-primary"
+                class="absolute z-20 flex items-center justify-center rounded-lg border-2 border-dashed border-primary bg-light/95 p-1 text-center text-[10px] leading-tight font-semibold text-primary shadow-md"
                 style="left:{seat.x + FAMILY_CARD_WIDTH + 6}px;top:{seat.y + 10}px;width:62px;height:56px"
-                ondragover={handleDragOver}
+                ondragover={(event) => focusTarget(event, identityId)}
                 ondrop={(event) => handleDrop(event, 'beside', identityId)}
               >
                 {$t('family_edit_drop_beside')}
@@ -818,13 +875,23 @@
               </div>
             </div>
           {:else}
-            <div
+            <button
+              type="button"
               data-testid="family-empty-seat"
-              class="absolute flex items-center justify-center rounded-2xl border-2 border-dashed border-gray-300 text-center text-[12.5px] font-medium text-gray-500 dark:border-gray-600"
+              data-family-interactive
+              data-union-id={seat.unionId}
+              data-active={fillingUnionId === seat.unionId}
+              class="absolute flex items-center justify-center rounded-2xl border-2 border-dashed text-center text-[12.5px] font-medium transition-colors"
+              class:border-primary={fillingUnionId === seat.unionId}
+              class:text-primary={fillingUnionId === seat.unionId}
+              class:border-gray-300={fillingUnionId !== seat.unionId}
+              class:text-gray-500={fillingUnionId !== seat.unionId}
+              class:dark:border-gray-600={fillingUnionId !== seat.unionId}
               style="left:{seat.x}px;top:{seat.y}px;width:{FAMILY_CARD_WIDTH}px;height:{FAMILY_CARD_HEIGHT}px"
+              onclick={() => startFillingSeat(seat.unionId)}
             >
               <span aria-hidden="true">+</span>&nbsp;{$t('family_canvas_add_parent')}
-            </div>
+            </button>
           {/if}
         {/each}
 

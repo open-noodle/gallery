@@ -77,11 +77,24 @@ function dropZone(targetId: string, position: 'above' | 'beside' | 'below'): HTM
   return zone;
 }
 
+function cardById(identityId: string): HTMLElement {
+  const card = document.querySelector<HTMLElement>(
+    `[data-testid="family-node"][data-identity-id="${CSS.escape(identityId)}"]`,
+  );
+  if (!card) {
+    throw new Error(`No family-node card for identity "${identityId}"`);
+  }
+  return card;
+}
+
 /** Drags the card named `sourceName` and drops it on `targetId`'s `position` zone — the same
- * `dragstart` → `drop` sequence a real drag performs, just with a synthetic `DataTransfer`. */
+ * `dragstart` → `dragover` → `drop` sequence a real drag performs, just with a synthetic
+ * `DataTransfer`. The `dragover` is what reveals the zones: only the card under the pointer offers
+ * its gestures, so that every card on the canvas isn't tiled with overlapping boxes. */
 async function dragOnto(sourceName: string, targetId: string, position: 'above' | 'beside' | 'below') {
   const dataTransfer = fakeDataTransfer();
   await fireEvent.dragStart(cardFor(sourceName), { dataTransfer });
+  await fireEvent.dragOver(cardById(targetId), { dataTransfer });
   await fireEvent.drop(dropZone(targetId, position), { dataTransfer });
 }
 
@@ -494,9 +507,11 @@ describe('FamilyCanvas drag-and-drop editing', () => {
   it('offers no drop targets to a view-only viewer', async () => {
     const unions: FamilyUnionDto[] = [union({ id: 'u1', partners: [known('root'), known('other')] })];
     const identities = { root: identity('Root'), other: identity('Other') };
+    const dataTransfer = fakeDataTransfer();
 
     renderCanvas({ unions, identities, rootId: 'root', canContribute: false });
-    await fireEvent.dragStart(cardFor('Other'), { dataTransfer: fakeDataTransfer() });
+    await fireEvent.dragStart(cardFor('Other'), { dataTransfer });
+    await fireEvent.dragOver(cardById('root'), { dataTransfer });
 
     expect(screen.queryAllByTestId('family-drop-zone')).toHaveLength(0);
   });
@@ -505,11 +520,39 @@ describe('FamilyCanvas drag-and-drop editing', () => {
   it('offers them to a contributor', async () => {
     const unions: FamilyUnionDto[] = [union({ id: 'u1', partners: [known('root'), known('other')] })];
     const identities = { root: identity('Root'), other: identity('Other') };
+    const dataTransfer = fakeDataTransfer();
 
     renderCanvas({ unions, identities, rootId: 'root', canContribute: true });
-    await fireEvent.dragStart(cardFor('Other'), { dataTransfer: fakeDataTransfer() });
+    await fireEvent.dragStart(cardFor('Other'), { dataTransfer });
+    await fireEvent.dragOver(cardById('root'), { dataTransfer });
 
     expect(screen.getAllByTestId('family-drop-zone').length).toBeGreaterThan(0);
+  });
+
+  // Every card showing its own three zones tiled the canvas with boxes that overlapped each other
+  // and the neighbouring cards. Only the card actually being aimed at offers its gestures.
+  it('offers gestures on the card under the pointer and no other', async () => {
+    const unions: FamilyUnionDto[] = [
+      union({ id: 'u1', partners: [known('root'), known('other')], children: [known('kid')] }),
+    ];
+    const identities = { root: identity('Root'), other: identity('Other'), kid: identity('Kid') };
+    const dataTransfer = fakeDataTransfer();
+
+    renderCanvas({ unions, identities, rootId: 'root', canContribute: true });
+    await fireEvent.dragStart(cardFor('Other'), { dataTransfer });
+
+    // Nothing is offered until a card is actually hovered.
+    expect(screen.queryAllByTestId('family-drop-zone')).toHaveLength(0);
+
+    await fireEvent.dragOver(cardById('root'), { dataTransfer });
+    const zones = screen.getAllByTestId('family-drop-zone');
+    expect(zones.length).toBeGreaterThan(0);
+    expect(zones.every((zone) => zone.dataset.targetId === 'root')).toBe(true);
+
+    // Moving to another card hands the gestures over rather than adding a second set.
+    await fireEvent.dragOver(cardById('kid'), { dataTransfer });
+    const moved = screen.getAllByTestId('family-drop-zone');
+    expect(moved.every((zone) => zone.dataset.targetId === 'kid')).toBe(true);
   });
 });
 
@@ -653,6 +696,50 @@ describe('FamilyCanvas person actions', () => {
 
     expect(sdkMock.removeParticipant).toHaveBeenCalledWith({ id: 'u1', identityId: 'mia' });
     expect(sdkMock.removeParticipant).toHaveBeenCalledWith({ id: 'u2', identityId: 'mia' });
+  });
+});
+
+// A6's dashed "+ Add a parent" card looked like a button from the day it shipped and did nothing
+// when clicked. It fills the free partner seat of the union it belongs to.
+describe('FamilyCanvas empty seats', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  const withFreeSeat = () => ({
+    unions: [union({ id: 'u-solo', partners: [known('mom')], children: [known('root')] })],
+    identities: { mom: identity('Mom'), root: identity('Root') },
+  });
+
+  it('turns the tray into a parent picker when the dashed seat is clicked', async () => {
+    const { unions, identities } = withFreeSeat();
+    sdkMock.getAllPeople.mockResolvedValue({ people: [], hasNextPage: false, total: 0 } as never);
+
+    renderCanvas({ unions, identities, rootId: 'root', canContribute: true });
+    await fireEvent.click(screen.getByTestId('family-empty-seat'));
+
+    expect(screen.getByTestId('family-empty-seat')).toHaveAttribute('data-active', 'true');
+    expect(screen.getByText('family_canvas_tray_pick_parent')).toBeInTheDocument();
+  });
+
+  it('adds the chosen person to that union as a partner', async () => {
+    const { unions, identities } = withFreeSeat();
+    sdkMock.getAllPeople.mockResolvedValue({
+      people: [{ id: 'person-9', name: 'Dad', thumbnailPath: '', isHidden: false, birthDate: null }],
+      hasNextPage: false,
+      total: 1,
+    } as never);
+    sdkMock.addParticipant.mockResolvedValue(undefined as never);
+
+    renderCanvas({ unions, identities, rootId: 'root', canContribute: true });
+    await fireEvent.click(screen.getByTestId('family-empty-seat'));
+    await vi.waitFor(() => expect(screen.getAllByTestId('family-tray-person').length).toBeGreaterThan(0));
+    await fireEvent.click(screen.getAllByTestId('family-tray-person')[0]!);
+
+    expect(sdkMock.addParticipant).toHaveBeenCalledWith({
+      id: 'u-solo',
+      familyParticipantAddDto: { personId: 'person-9', role: FamilyParticipantRole.Partner },
+    });
   });
 });
 
