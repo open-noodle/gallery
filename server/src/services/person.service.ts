@@ -402,6 +402,22 @@ export class PersonService extends BaseService {
       resolve: (identityId) => this.faceIdentityRepository.getResolvedPersonByIdentityId(auth.user.id, identityId),
     });
 
+    // Gallery-fork: family relationships. This is the asset-viewer people strip's OWN data
+    // source for the common (non-space) case — `DetailPanelPeople.svelte` reads `faceManager
+    // .people`, which comes from THIS endpoint, not from `getAssetInfo`'s `asset.people` (that
+    // one only backs the space-member branch, and already gets `familyRelationLabel` via
+    // `AssetService.applyFamilyRelationLabels`). Missing this left every owner viewing their own
+    // photos with no relation label at all — exactly the surface slice 9 exists for. Same
+    // discipline as everywhere else: one graph load for the whole face list, never one per face.
+    const labelSet = await this.getFamilyLabelSet(auth);
+    if (labelSet.level !== FamilyAccessLevel.None) {
+      for (const face of response) {
+        if (face.person) {
+          face.person.familyRelationLabel = labelSet.label(identityByPersonId.get(face.person.id));
+        }
+      }
+    }
+
     return response;
   }
 
