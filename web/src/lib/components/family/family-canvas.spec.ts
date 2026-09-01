@@ -317,6 +317,24 @@ describe('FamilyCanvas', () => {
     expect(screen.getByTestId('family-tray')).toBeInTheDocument();
   });
 
+  // `invalidateAll()` swaps the `unions` prop but does NOT recreate this component, so a canvas
+  // that only read the prop once kept showing the old graph — a face dragged in from the tray
+  // appeared solely after a manual page reload.
+  it('picks up a graph the page reloads underneath it', async () => {
+    const identities = { root: identity('Alex'), mia: identity('Mia'), iris: identity('Iris') };
+    const before: FamilyUnionDto[] = [union({ id: 'u1', partners: [known('root'), known('mia')], children: [] })];
+    const after: FamilyUnionDto[] = [
+      union({ id: 'u1', partners: [known('root'), known('mia')], children: [known('iris')] }),
+    ];
+
+    const { rerender } = renderCanvas({ unions: before, identities, rootId: 'root' });
+    expect(screen.queryByText('Iris')).not.toBeInTheDocument();
+
+    await rerender({ unions: after, identities, rootId: 'root', viewerRootId: null, canContribute: false });
+
+    expect(screen.getByText('Iris')).toBeInTheDocument();
+  });
+
   it('offers no tray to a view-only viewer', () => {
     const unions: FamilyUnionDto[] = [union({ id: 'u1', partners: [known('root'), known('mia')], children: [] })];
     const identities = { root: identity('Alex'), mia: identity('Mia') };
@@ -563,5 +581,120 @@ describe('FamilyCanvas union editor', () => {
       id: 'u1',
       familyUnionUpdateDto: { status: FamilyUnionStatus.Divorced, startDate: '1985-01-01', endDate: null },
     });
+  });
+});
+
+// A card is the only surface that can say who someone IS, rather than how they are related.
+describe('FamilyCanvas person actions', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  const partnered = (): { unions: FamilyUnionDto[]; identities: Record<string, FamilyIdentityDto> } => ({
+    unions: [union({ id: 'u1', partners: [known('root'), known('mia')], children: [known('iris')] })],
+    identities: { root: identity('Alex'), mia: identity('Mia'), iris: identity('Iris') },
+  });
+
+  it('opens a menu on a card for a contributor', async () => {
+    const { unions, identities } = partnered();
+    renderCanvas({ unions, identities, rootId: 'root', canContribute: true });
+
+    await fireEvent.click(cardFor('Mia'));
+
+    expect(screen.getByTestId('family-person-menu')).toBeInTheDocument();
+  });
+
+  it('opens no menu for a view-only viewer', async () => {
+    const { unions, identities } = partnered();
+    renderCanvas({ unions, identities, rootId: 'root', canContribute: false });
+
+    await fireEvent.click(cardFor('Mia'));
+
+    expect(screen.queryByTestId('family-person-menu')).not.toBeInTheDocument();
+  });
+
+  // §6: gender is what turns "your parent" into "your mother". It is an attribute of the PERSON,
+  // so it is set from their card, never from a union.
+  it('records a gender against the identity', async () => {
+    const { unions, identities } = partnered();
+    sdkMock.updateGender.mockResolvedValue(undefined as never);
+
+    renderCanvas({ unions, identities, rootId: 'root', canContribute: true });
+    await fireEvent.click(cardFor('Mia'));
+    const female = screen
+      .getAllByTestId('family-person-gender-option')
+      .find((option) => option.textContent?.includes('family_canvas_gender_female'))!;
+    await fireEvent.click(female);
+
+    expect(sdkMock.updateGender).toHaveBeenCalledWith({
+      id: 'mia',
+      familyGenderUpdateDto: { gender: 'female' },
+    });
+  });
+
+  // Half-removing someone — out of one union but still in another — is not a state worth being
+  // able to reach by accident, so removal takes them out of every union they appear in.
+  it('removes a person from every union they appear in', async () => {
+    const unions: FamilyUnionDto[] = [
+      union({ id: 'u1', partners: [known('root'), known('mia')], children: [] }),
+      union({ id: 'u2', partners: [known('mia'), known('other')], children: [known('kid')] }),
+    ];
+    const identities = {
+      root: identity('Alex'),
+      mia: identity('Mia'),
+      other: identity('Other'),
+      kid: identity('Kid'),
+    };
+    sdkMock.removeParticipant.mockResolvedValue(undefined as never);
+
+    renderCanvas({ unions, identities, rootId: 'root', canContribute: true });
+    await fireEvent.click(cardFor('Mia'));
+    await fireEvent.click(screen.getByTestId('family-person-remove'));
+
+    expect(sdkMock.removeParticipant).toHaveBeenCalledWith({ id: 'u1', identityId: 'mia' });
+    expect(sdkMock.removeParticipant).toHaveBeenCalledWith({ id: 'u2', identityId: 'mia' });
+  });
+});
+
+// E52 for partners, the mirror of the `above` rule: a union holds at most two partners, and the
+// canvas draws a dashed "+ Add a parent" in a free seat. Dropping someone into that seat must FILL
+// it, not open a second union alongside — otherwise partnering two people who already share a
+// child leaves the child's union half-empty and the couple drawn twice.
+describe('FamilyCanvas partner drops', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('fills the free partner seat of the union the target is already in', async () => {
+    const unions: FamilyUnionDto[] = [union({ id: 'u-solo', partners: [known('stan')], children: [known('claire')] })];
+    const identities = { stan: identity('Stanley'), claire: identity('Claire'), gudrin: identity('Gudrin') };
+    // Gudrin is on the canvas as a partner in her own union, so she can be dragged from a card.
+    unions.push(union({ id: 'u-gudrin', partners: [known('gudrin'), known('claire')], children: [] }));
+    sdkMock.addParticipant.mockResolvedValue(undefined as never);
+
+    renderCanvas({ unions, identities, rootId: 'claire', canContribute: true });
+    await dragOnto('Gudrin', 'stan', 'beside');
+
+    expect(sdkMock.addParticipant).toHaveBeenCalledWith({
+      id: 'u-solo',
+      familyParticipantAddDto: { identityId: 'gudrin', role: FamilyParticipantRole.Partner },
+    });
+    expect(sdkMock.createUnion).not.toHaveBeenCalled();
+  });
+
+  // The negative control: with both seats taken there is nothing to fill, so a drop beside starts
+  // a genuinely separate relationship.
+  it('starts a new union when the target already has two partners', async () => {
+    const unions: FamilyUnionDto[] = [
+      union({ id: 'u-full', partners: [known('stan'), known('nell')], children: [known('claire')] }),
+    ];
+    const identities = { stan: identity('Stanley'), nell: identity('Nell'), claire: identity('Claire') };
+    sdkMock.createUnion.mockResolvedValue({ id: 'new-union' });
+
+    renderCanvas({ unions, identities, rootId: 'claire', canContribute: true });
+    await dragOnto('Claire', 'stan', 'beside');
+
+    expect(sdkMock.createUnion).toHaveBeenCalled();
+    expect(sdkMock.addParticipant).not.toHaveBeenCalled();
   });
 });

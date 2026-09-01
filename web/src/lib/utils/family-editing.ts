@@ -37,6 +37,16 @@ export function findUnionAsPartner(unions: FamilyUnionDto[], identityId: string)
   return unions.find((union) => union.partners.some((participant) => participantIs(participant, identityId)));
 }
 
+/** A union `identityId` is a partner in that still has a free partner seat — the dashed
+ * "+ Add a parent" the canvas draws next to them. A union holds at most two partners, so this is
+ * the one the `beside` gesture should fill rather than starting a rival. */
+export function findUnionWithFreePartnerSeat(unions: FamilyUnionDto[], identityId: string): FamilyUnionDto | undefined {
+  return unions.find(
+    (union) =>
+      union.partners.length < 2 && union.partners.some((participant) => participantIs(participant, identityId)),
+  );
+}
+
 export type FamilyDropMutation =
   { kind: 'join'; unionId: string; role: FamilyParticipantRole } | { kind: 'create'; create: FamilyUnionCreateDto };
 
@@ -74,6 +84,15 @@ export function planFamilyDrop(
   const asChild = (id: string) => (isPerson ? { childPersonIds: [id] } : { childIds: [id] });
 
   if (position === 'beside') {
+    // E52 applies here too, not just to parents: when the target already sits in a union with an
+    // empty partner seat, the drop FILLS that seat instead of opening a second union beside it.
+    // Without this, partnering two people who already share a child leaves the child's union
+    // half-empty — the canvas keeps offering "+ Add a parent" for a parent who is standing right
+    // there, and the couple is drawn twice, once as a partnership and once as a lone parent.
+    const halfEmpty = findUnionWithFreePartnerSeat(unions, targetId);
+    if (halfEmpty) {
+      return { kind: 'join', unionId: halfEmpty.id, role: FamilyParticipantRole.Partner };
+    }
     return isPerson
       ? { kind: 'create', create: { partnerIds: [targetId], partnerPersonIds: [draggedId] } }
       : { kind: 'create', create: { partnerIds: [draggedId, targetId] } };
