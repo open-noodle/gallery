@@ -6403,6 +6403,19 @@ export function updateGender({ id, familyGenderUpdateDto }: {
     })));
 }
 /**
+ * Get a family identity's thumbnail
+ */
+export function getIdentityThumbnail({ id }: {
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchBlob<{
+        status: 200;
+        data: Blob;
+    }>(`/family/identities/${encodeURIComponent(id)}/thumbnail`, {
+        ...opts
+    }));
+}
+/**
  * Get the viewer's family root and access level
  */
 export function getMyRoot(opts?: Oazapfts.RequestOpts) {

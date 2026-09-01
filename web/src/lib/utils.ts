@@ -7,6 +7,7 @@ import {
   getAssetPlaybackPath,
   getAssetThumbnailPath,
   getBaseUrl,
+  getFamilyIdentityThumbnailPath,
   getPeopleThumbnailPath,
   getUserProfileImagePath,
   linkOAuthAccount,
@@ -270,6 +271,12 @@ export const getProfileImageUrl = (user: UserResponseDto) =>
 
 export const getPeopleThumbnailUrl = (person: PersonResponseDto, updatedAt?: string) =>
   createUrl(getPeopleThumbnailPath(person.id), { updatedAt: updatedAt ?? person.updatedAt });
+
+// Gallery-fork: family relationships. The canvas addresses faces by IDENTITY id — it never holds
+// a person id for them, and for an identity resolved through a shared space the owner-only people
+// thumbnail route 404s.
+export const getFamilyIdentityThumbnailUrl = (identityId: string) =>
+  createUrl(getFamilyIdentityThumbnailPath(identityId));
 
 export const copyToClipboard = async (secret: string | unknown) => {
   const $t = get(t);

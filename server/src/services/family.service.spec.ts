@@ -462,6 +462,59 @@ describe(FamilyService.name, () => {
     });
   });
 
+  // Canvas node avatars. The canvas holds identity ids and nothing else, so the face has to be
+  // addressable by identity — but only for an identity this viewer can already resolve, which is
+  // the same predicate that let them see its name in the graph at all.
+  describe('getIdentityThumbnail', () => {
+    it('refuses a viewer with no family access', async () => {
+      sut['getConfig'] = () => Promise.resolve(makeFamilyConfig(true, 'none') as any);
+      mocks.family.getAccess.mockResolvedValue(undefined);
+
+      await expect(sut.getIdentityThumbnail(authStub.user1, 'identity-1')).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    // E30/D3: an identity the viewer cannot resolve is already reduced to an anonymous seat in
+    // the graph. Its face must be just as unreachable — otherwise the thumbnail route becomes a
+    // side channel that undoes the redaction.
+    it('refuses an identity the viewer cannot resolve', async () => {
+      giveViewOnlyAccess(sut, mocks);
+      mocks.faceIdentity.getResolvedPersonByIdentityId.mockResolvedValue(void 0);
+
+      await expect(sut.getIdentityThumbnail(authStub.user1, 'identity-1')).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('refuses an identity resolvable but with no thumbnail yet', async () => {
+      giveViewOnlyAccess(sut, mocks);
+      mocks.faceIdentity.getResolvedPersonByIdentityId.mockResolvedValue({ id: 'p1', thumbnailPath: '' } as any);
+
+      await expect(sut.getIdentityThumbnail(authStub.user1, 'identity-1')).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    // The positive control for all three refusals above: view-only access is enough, and the
+    // identity is resolved AGAINST THE CALLER — passing anyone else's user id here would hand out
+    // faces this viewer cannot see. Stops short of asserting the served bytes: handing a resolved
+    // path to storage is `BaseService.serveFromBackend`'s job, and `PersonService.getThumbnail`'s
+    // own spec draws the line in exactly the same place. Asserting on the settled error rather
+    // than on `.rejects` is what keeps this able to FAIL: either gate firing is a different
+    // exception type, so both are checked by name.
+    it('gets a view-only viewer past both gates and resolves the identity against the caller', async () => {
+      giveViewOnlyAccess(sut, mocks);
+      mocks.faceIdentity.getResolvedPersonByIdentityId.mockResolvedValue({
+        id: 'p1',
+        thumbnailPath: '/data/thumbs/p1.jpeg',
+      } as any);
+
+      const outcome = await sut.getIdentityThumbnail(authStub.user1, 'identity-1').catch((error: unknown) => error);
+
+      expect(outcome).not.toBeInstanceOf(ForbiddenException);
+      expect(outcome).not.toBeInstanceOf(NotFoundException);
+      expect(mocks.faceIdentity.getResolvedPersonByIdentityId).toHaveBeenCalledWith(
+        authStub.user1.user.id,
+        'identity-1',
+      );
+    });
+  });
+
   describe('updateGender', () => {
     beforeEach(() => {
       mocks.family.getIdentityType.mockImplementation((id: string) => Promise.resolve(id === PET_A ? 'pet' : 'person'));
