@@ -176,7 +176,7 @@ describe('SpacePersonSidePanel', () => {
   // Field report on #992 (pr-992-rc.3): the picker's only text field was the CREATE-person name
   // box, so typing a name filtered nothing and scrolling was the only way to reach anyone in a
   // space with hundreds of people -- which read as "assigning to an existing person is broken".
-  // Both siblings of this picker already search: the owner's AssignFaceSidePanel (PeopleSearch)
+  // Both siblings of this picker search too: the owner's AssignFaceSidePanel (against the server)
   // and the space-flavoured SpaceFaceEditor (normalizeSearchString over its loaded candidates).
   // The one field now does both, so the name you type either finds the person or creates them.
   it('narrows the candidate list to the typed name', async () => {
