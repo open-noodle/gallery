@@ -41,7 +41,7 @@
 {:else if candidates.length === 0}
   <p class="text-center text-sm text-gray-500">{emptyLabel}</p>
 {:else}
-  <div class="mt-4 flex immich-scrollbar flex-wrap gap-2 overflow-y-auto">
+  <div data-testid="person-picker-grid" class="mt-4 flex immich-scrollbar flex-wrap gap-2 overflow-y-auto">
     {#each candidates as candidate (candidate.id)}
       <div class="w-fit">
         <button type="button" class="w-22.5" onclick={() => onSelect(candidate)}>

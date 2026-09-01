@@ -111,6 +111,29 @@ export const getSpacePersonFaceThumbnailUrl = (spaceId: string, personId: string
 export const getSpacePersonThumbnailUrl = (spaceId: string, personId: string, updatedAt?: string) =>
   createUrl(`/shared-spaces/${spaceId}/people/${personId}/thumbnail`, { updatedAt });
 
+/**
+ * Order face-picker candidates so the people who have a name come first.
+ *
+ * Both pickers behind `PersonPickerPanel` list unnamed clusters alongside named people, because
+ * attaching a face to an existing unnamed cluster is a real move (it merges two sightings of the
+ * same stranger). But a library holds far more unnamed clusters than named people, so leaving them
+ * interleaved buries every name — reported on #992 as "an unstructured list of unlabeled faces
+ * instead of the named people list".
+ *
+ * The partition is STABLE, so whatever order the caller arrived with survives inside each group.
+ * That matters most for the owner's picker, whose `closestAssetId` order is "looks most like this
+ * face": the likeliest named person stays first, and the clusters simply move below. The space
+ * picker already arrives named-first alphabetical (`getPersonsBySpaceId`), so this is a no-op there.
+ */
+export function orderPickerCandidates<T extends { name: string }>(candidates: T[]): T[] {
+  const named: T[] = [];
+  const unnamed: T[] = [];
+  for (const candidate of candidates) {
+    (candidate.name.trim() ? named : unnamed).push(candidate);
+  }
+  return [...named, ...unnamed];
+}
+
 // Admin cleanup + resolutions surfaces render clusters the admin does not own — the person-scoped
 // thumbnail routes above 404/403 for those. Face-keyed, admin-gated, no person join required.
 export const getAdminFaceThumbnailUrl = (assetFaceId: string, updatedAt?: string) =>

@@ -455,6 +455,30 @@ so this adds:
 Extract the shared presentation (crop rendering, drag geometry, the people search list) rather than
 copying it; only the API calls and the gating differ.
 
+#### 7.2.1 One picker, two sources (added 2026-09-01)
+
+Field testing of pr-992-rc.5 read the owner/space split as a defect, and the report was fair. Because
+`canEditSpacePeople` is narrowed to `!isOwner` (§7.1), the picker you get on one photo in one space
+turns on whether you OWN it: the editor got `SpacePersonSidePanel`'s short, named, alphabetical,
+searchable list, while the owner got upstream's `AssignFaceSidePanel` — the whole library including
+every unnamed cluster, ordered by resemblance, with the search behind a magnifier icon. On a real
+library that reads as "an unstructured list of unlabeled faces instead of the named people list".
+
+**Decision: unify the presentation, not the taxonomy.** `PersonPickerPanel.svelte` now owns the panel
+chrome, the search field, the candidate ordering and the grid for both; `AssignFaceSidePanel` and
+`SpacePersonSidePanel` supply only where candidates come from and what a click writes.
+`orderPickerCandidates` (a stable partition, named people first) is what actually answers the report —
+it is a no-op on the space list, which `getPersonsBySpaceId` already serves named-first, and it keeps
+the owner list's `closestAssetId` resemblance order inside each group.
+
+**What was deliberately NOT done: merging the two candidate lists.** They are different tables reached
+through different endpoints (`person`/`reassignFacesById` vs `shared_space_person`/§6.3), so a merged
+grid would hold two id namespaces and dispatch each click to a different endpoint, directly on top of
+the §5.1/§6.3.1 propagation rules. The live consequence of leaving them separate: a space person named
+only on ANOTHER member's assets has no owner-layer `person` for this owner, so the owner's picker
+cannot reach them and "create person" makes a second identity. That is the residual duplicate-person
+hole, and closing it is a change to this section's model, not to its presentation.
+
 ### 7.3 Fallback
 
 None. Unlike #992's `canEditAsset`, there is no client-side derivation to fall back to: the space role
