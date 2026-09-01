@@ -68,9 +68,6 @@ describe('family relationships i18n completeness', () => {
     const messages = read(`${code}.json`);
     const missing = familyKeys.filter((key) => !Object.hasOwn(messages, key));
 
-    expect(
-      missing,
-      `${code}.json is missing ${missing.length} family key(s):\n  ${missing.join('\n  ')}`,
-    ).toEqual([]);
+    expect(missing, `${code}.json is missing ${missing.length} family key(s):\n  ${missing.join('\n  ')}`).toEqual([]);
   });
 });
