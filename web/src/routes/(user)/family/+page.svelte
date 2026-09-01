@@ -75,14 +75,12 @@
       </div>
 
       {#if layoutRootId}
-        <!-- Slice 11 checked again: `GET /family/me` (`FamilyMyRootResponseDto`) still carries
-             only `identityId`, no `access` field — the fix that would let the caller's own
-             `view`/`contribute` level be resolved from a real signal has not landed on this
-             branch. `canContribute` stays wired to the same `false` placeholder slice 10 used
-             (see its report) rather than inventing a second way to guess the level; the drop
-             zones and union editor added in slice 11 are gated on this exact prop, so wiring a
-             real signal here is the one change slice 12+ needs to make to turn them on. -->
-        <FamilyCanvas unions={data.unions} identities={data.identities} rootId={layoutRootId} canContribute={false} />
+        <FamilyCanvas
+          unions={data.unions}
+          identities={data.identities}
+          rootId={layoutRootId}
+          canContribute={data.canContribute}
+        />
       {/if}
     {/if}
   </div>

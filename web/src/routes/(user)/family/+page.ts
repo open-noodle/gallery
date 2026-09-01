@@ -1,4 +1,5 @@
 import {
+  FamilyAccessLevel,
   getClusters,
   getMyRoot,
   getUnions,
@@ -41,12 +42,19 @@ export const load = (async ({ url }) => {
   let rootId: string | null = null;
   let graph: FamilyGraph = { unions: [], identities: {} };
   let granted = true;
+  // A6: `GET /family/me` reports the caller's OWN effective access level, which is the only
+  // signal that says whether they may write. `view` is read-only; the canvas hides its editing
+  // affordances entirely rather than disabling them.
+  let canContribute = false;
 
   try {
+    // Nothing above is assigned until every call has succeeded, so a failure part-way through
+    // leaves the page with its "no access" defaults rather than a half-loaded graph.
     const [clusterList, rootResponse] = await Promise.all([getClusters(), getMyRoot()]);
+    graph = await loadFullGraph();
     clusters = clusterList;
     rootId = rootResponse.rootIdentityId;
-    graph = await loadFullGraph();
+    canContribute = rootResponse.access === FamilyAccessLevel.Contribute;
   } catch {
     // A1/A12: `GET /family/clusters` and `GET /family/me` both require `FamilyRead` and 403 for
     // a viewer whose effective access is `none`. The page renders no surface at all for them
@@ -56,6 +64,7 @@ export const load = (async ({ url }) => {
 
   return {
     granted,
+    canContribute,
     clusters,
     rootId,
     unions: graph.unions,

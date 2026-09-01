@@ -13,9 +13,12 @@ import {
 
 export type FamilyDropPosition = 'above' | 'beside' | 'below';
 
+// `FamilyParticipantDto` is a flat object with a nullable `identityId`, not a discriminated
+// union — narrowing on `kind` yields `never`, so the null-check on `identityId` is the real
+// invariant (same as `family-layout.ts`).
 const isKnownParticipant = (
   participant: FamilyParticipantDto,
-): participant is Extract<FamilyParticipantDto, { identityId: string }> => participant.kind === 'known';
+): participant is FamilyParticipantDto & { identityId: string } => participant.identityId !== null;
 
 const participantIs = (participant: FamilyParticipantDto, identityId: string): boolean =>
   isKnownParticipant(participant) && participant.identityId === identityId;
