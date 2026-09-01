@@ -1,11 +1,17 @@
 <script lang="ts">
   import { shortcut } from '$lib/actions/shortcut';
   import ImageThumbnail from '$lib/components/assets/thumbnail/ImageThumbnail.svelte';
-  import PersonPickerGrid, { type PickerCandidate } from '$lib/components/faces-page/PersonPickerGrid.svelte';
+  import { type PickerCandidate } from '$lib/components/faces-page/PersonPickerGrid.svelte';
+  import PersonPickerPanel from '$lib/components/faces-page/PersonPickerPanel.svelte';
   import LoadingSpinner from '$lib/components/shared-components/LoadingSpinner.svelte';
   import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
   import { handleError } from '$lib/utils/handle-error';
-  import { appendUniqueById, getSpacePersonThumbnailUrl, zoomImageToBase64 } from '$lib/utils/people-utils';
+  import {
+    appendUniqueById,
+    getSpacePersonThumbnailUrl,
+    orderPickerCandidates,
+    zoomImageToBase64,
+  } from '$lib/utils/people-utils';
   import { normalizeSearchString } from '$lib/utils/string-utils';
   import {
     attachSpacePersonFace,
@@ -18,7 +24,7 @@
     type SharedSpacePersonResponseDto,
     type SpaceAssetFaceResponseDto,
   } from '@immich/sdk';
-  import { Button, IconButton, Input } from '@immich/ui';
+  import { Button, IconButton } from '@immich/ui';
   import { mdiArrowLeftThin, mdiCloseCircle, mdiPencil, mdiTrashCan } from '@mdi/js';
   import { onMount } from 'svelte';
   import { t } from 'svelte-i18n';
@@ -54,8 +60,11 @@
    * button makes. The picker used to offer only the create half, so typing a name that already
    * existed matched nothing and the only way to reach that person was to scroll the whole space
    * -- reported on #992 as "assigning to an existing person is broken". Its two siblings both
-   * search (the owner's `AssignFaceSidePanel` via `PeopleSearch`, `SpaceFaceEditor` over its own
-   * loaded candidates), and the panel is too narrow to carry two text inputs.
+   * search too (the owner's `AssignFaceSidePanel` against the server, `SpaceFaceEditor` over its
+   * own loaded candidates), and the panel is too narrow to carry two text inputs.
+   *
+   * The field itself belongs to `PersonPickerPanel`, which is why this is bound rather than local:
+   * the owner's picker needs the same field, and the create half is what only this one does with it.
    */
   let personQuery = $state('');
   let isSavingNewPerson = $state(false);
@@ -177,13 +186,17 @@
     }
   };
 
+  // `getSpacePeople` already serves named people first, but ordering here too keeps this picker and
+  // the owner's reading identically off one helper rather than off the endpoint's ordering holding.
   let pickerCandidates: PickerCandidate[] = $derived(
-    spaceCandidates.map((person) => ({
-      id: person.id,
-      name: person.name,
-      isHidden: person.isHidden,
-      thumbnailUrl: getSpacePersonThumbnailUrl(spaceId, person.id, person.updatedAt),
-    })),
+    orderPickerCandidates(
+      spaceCandidates.map((person) => ({
+        id: person.id,
+        name: person.name,
+        isHidden: person.isHidden,
+        thumbnailUrl: getSpacePersonThumbnailUrl(spaceId, person.id, person.updatedAt),
+      })),
+    ),
   );
 
   // Filtered here rather than through the endpoint's own `name` parameter: `loadCandidatesOnce`
@@ -308,40 +321,23 @@
 {#if pickerFaceId && faces}
   {@const activeFace = faces.find((f) => f.id === pickerFaceId)}
   {#if activeFace}
-    <section
-      transition:fly={{ x: 360, duration: 100, easing: linear }}
-      class="absolute top-0 h-full w-90 overflow-x-hidden bg-light p-2 dark:text-immich-dark-fg"
+    <PersonPickerPanel
+      candidates={visibleCandidates}
+      isLoading={isLoadingCandidates || isAttaching}
+      emptyLabel={$t('no_people_found')}
+      onSelect={(candidate) => attachToPerson(activeFace, candidate)}
+      onClose={closePicker}
+      bind:query={personQuery}
     >
-      <div class="flex place-items-center gap-2">
-        <IconButton
-          shape="round"
-          color="secondary"
-          variant="ghost"
-          icon={mdiArrowLeftThin}
-          aria-label={$t('back')}
-          onclick={closePicker}
-        />
-        <p class="flex text-lg text-immich-fg dark:text-immich-dark-fg">{$t('select_face')}</p>
-      </div>
-      <div class="p-4 text-sm">
-        <div class="mb-4 flex gap-2">
-          <Input placeholder={$t('search_people')} bind:value={personQuery} size="tiny" />
-          <Button
-            size="small"
-            disabled={!personQuery.trim() || isSavingNewPerson}
-            onclick={() => createAndAttach(activeFace)}
-          >
-            {$t('create_person')}
-          </Button>
-        </div>
-        <h2 class="mt-4 mb-8">{$t('all_people')}</h2>
-        <PersonPickerGrid
-          candidates={visibleCandidates}
-          isLoading={isLoadingCandidates || isAttaching}
-          emptyLabel={$t('no_people_found')}
-          onSelect={(candidate) => attachToPerson(activeFace, candidate)}
-        />
-      </div>
-    </section>
+      {#snippet searchActions()}
+        <Button
+          size="small"
+          disabled={!personQuery.trim() || isSavingNewPerson}
+          onclick={() => createAndAttach(activeFace)}
+        >
+          {$t('create_person')}
+        </Button>
+      {/snippet}
+    </PersonPickerPanel>
   {/if}
 {/if}
