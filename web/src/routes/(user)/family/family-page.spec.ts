@@ -153,9 +153,10 @@ describe('Family page', () => {
     expect(screen.queryByTestId('family-first-run-action')).not.toBeInTheDocument();
   });
 
-  // Without this a contributor is stuck with whoever was in the first union forever: the drag
-  // gestures can only rearrange people already on the canvas, never introduce a new one.
-  it('lets a contributor add someone to a graph that already has people', async () => {
+  // Once the graph has people, introducing a NEW one is the canvas tray's job (mockup §1) — you
+  // drag a face onto the canvas — so the page hands the canvas the contribute flag and owns no
+  // add-someone action of its own. The tray itself is covered in `family-canvas.spec.ts`.
+  it('lets the canvas offer authoring once the graph has people', () => {
     renderPage({
       granted: true,
       canContribute: true,
@@ -165,12 +166,13 @@ describe('Family page', () => {
       identities: {},
     });
 
-    await userEvent.click(screen.getByTestId('family-add-person'));
-
-    expect(screen.getByTestId('noop-component')).toBeInTheDocument();
+    expect(screen.getByTestId('family-canvas')).toHaveAttribute('data-can-contribute', 'true');
   });
 
-  it('shows no add-someone action to a view-only viewer', () => {
+  // The negative control for the test above. Asserted on the flag the canvas actually receives,
+  // not on the absence of a testid — an assertion against a testid nothing renders any more would
+  // pass whatever the page did.
+  it('tells the canvas a view-only viewer may not author', () => {
     renderPage({
       granted: true,
       canContribute: false,
@@ -180,6 +182,23 @@ describe('Family page', () => {
       identities: {},
     });
 
-    expect(screen.queryByTestId('family-add-person')).not.toBeInTheDocument();
+    expect(screen.getByTestId('family-canvas')).toHaveAttribute('data-can-contribute', 'false');
+  });
+
+  // D6: the layout anchor and the viewer's own root are different values — on a cluster the
+  // viewer isn't part of, the canvas still needs an anchor but has nobody to mark as "you".
+  it('passes the viewer own root to the canvas alongside the layout anchor', () => {
+    renderPage({
+      granted: true,
+      canContribute: true,
+      clusters: [{ label: 'Casper', size: 2, rootCandidateId: 'casper' }],
+      rootId: null,
+      unions: [],
+      identities: {},
+    });
+
+    const canvas = screen.getByTestId('family-canvas');
+    expect(canvas).toHaveAttribute('data-root-id', 'casper');
+    expect(canvas).toHaveAttribute('data-viewer-root-id', '');
   });
 });

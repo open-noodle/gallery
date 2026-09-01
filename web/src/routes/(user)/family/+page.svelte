@@ -67,7 +67,7 @@
 </script>
 
 <UserPageLayout title={data.meta.title} description={$t('family_canvas_subtitle')}>
-  <div data-testid="family-page" class="flex flex-col gap-2">
+  <div data-testid="family-page" class="flex flex-col gap-3">
     {#if data.clusters.length === 0}
       <EmptyPlaceholder title={$t('family_canvas_empty_title')} text={$t('family_canvas_empty_text')} fullWidth />
       {#if data.canContribute}
@@ -84,30 +84,25 @@
         </div>
       {/if}
     {:else}
-      {#if data.canContribute}
-        <div class="flex justify-end px-1">
-          <button
-            type="button"
-            data-testid="family-add-person"
-            class="rounded-full border border-gray-300 px-3 py-1 text-sm dark:border-gray-600"
-            onclick={() => (linking = true)}
-          >
-            {$t('family_link_add_action')}
-          </button>
-        </div>
-      {/if}
-      <div class="flex gap-2 overflow-x-auto px-1 pb-1">
+      <!-- Cluster chips: the answer to "multiple family trees" — disconnected components of the
+           graph, computed per request and never stored (D8.3). -->
+      <div class="flex gap-2 overflow-x-auto pb-1">
         {#each data.clusters as cluster, index (cluster.rootCandidateId)}
+          {@const active = index === selectedClusterIndex}
           <button
             type="button"
             data-testid="family-cluster-chip"
-            data-active={index === selectedClusterIndex}
-            class="flex-none rounded-full border border-gray-300 px-3 py-1 text-sm whitespace-nowrap dark:border-gray-600"
-            class:bg-primary={index === selectedClusterIndex}
-            class:text-white={index === selectedClusterIndex}
+            data-active={active}
+            class={[
+              'flex-none rounded-full border px-3.5 py-1.5 text-[13px] whitespace-nowrap transition-colors',
+              active
+                ? 'border-transparent bg-primary/15 text-primary'
+                : 'border-gray-300 text-gray-500 hover:bg-gray-100 dark:border-gray-700 dark:hover:bg-gray-800',
+            ]}
             onclick={() => (selectedClusterIndex = index)}
           >
-            {clusterChipLabel(cluster)} · {$t('family_canvas_people_count', { values: { count: cluster.size } })}
+            <b class="font-semibold">{clusterChipLabel(cluster)}</b>
+            · {$t('family_canvas_people_count', { values: { count: cluster.size } })}
           </button>
         {/each}
       </div>
@@ -117,7 +112,9 @@
           unions={data.unions}
           identities={data.identities}
           rootId={layoutRootId}
+          viewerRootId={data.rootId}
           canContribute={data.canContribute}
+          onGraphChanged={() => handlePromiseError(invalidateAll())}
         />
       {/if}
     {/if}
