@@ -1,7 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { AuthDto } from 'src/dtos/auth.dto';
 import { PersonResponseDto } from 'src/dtos/person.dto';
-import { FamilyAccessLevel, Permission, UserMetadataKey } from 'src/enum';
+import { CacheControl, FamilyAccessLevel, Permission, UserMetadataKey } from 'src/enum';
 import { BaseService } from 'src/services/base.service';
 import { asDateTimeString } from 'src/utils/date';
 import {
@@ -12,6 +12,8 @@ import {
   resolveFamilyVisibility,
 } from 'src/utils/family-graph';
 import { deriveDirectRelations, FamilyGender, ProjectedFamilyGraph } from 'src/utils/family-labels';
+import { ImmichMediaResponse } from 'src/utils/file';
+import { mimeTypes } from 'src/utils/mime-types';
 
 export type FamilyParticipantRole = 'partner' | 'child';
 
@@ -205,6 +207,32 @@ export class FamilyService extends BaseService {
     }
 
     return relations;
+  }
+
+  // Canvas node avatars (`A`-row "Canvas node avatars: `ImageThumbnail` `circle`"). A client on
+  // the canvas holds identity ids and NOTHING else — `PersonResponseDto` deliberately withholds
+  // `identityId` (E30), so there is no person id to point `GET /people/:id/thumbnail` at, and for
+  // a space-resolved identity that owner-only route would 404 anyway. Hence an identity-addressed
+  // thumbnail, in the same shape as the shared-space one.
+  //
+  // Discloses nothing new: `getResolvedPersonByIdentityId` applies the SAME accessibility
+  // predicate (`hydrateAccessiblePeople`, `withHidden: false`) as the
+  // `resolveAccessibleIdentityNames` call that decided the viewer could see this identity's NAME
+  // in the graph at all. An identity the viewer cannot resolve has no row here and 404s, exactly
+  // as it is already reduced to an anonymous seat by `D3`'s redaction.
+  async getIdentityThumbnail(auth: AuthDto, identityId: string): Promise<ImmichMediaResponse> {
+    await this.requireFamilyRead(auth);
+
+    const person = await this.faceIdentityRepository.getResolvedPersonByIdentityId(auth.user.id, identityId);
+    if (!person?.thumbnailPath) {
+      throw new NotFoundException();
+    }
+
+    return this.serveFromBackend(
+      person.thumbnailPath,
+      mimeTypes.lookup(person.thumbnailPath),
+      CacheControl.PrivateWithoutCache,
+    );
   }
 
   // Slice 7 (D4): stores which identity the caller means when a relative label says "your ...".

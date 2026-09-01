@@ -40,13 +40,19 @@ export function findUnionAsPartner(unions: FamilyUnionDto[], identityId: string)
 export type FamilyDropMutation =
   { kind: 'join'; unionId: string; role: FamilyParticipantRole } | { kind: 'create'; create: FamilyUnionCreateDto };
 
+/** Where the dragged id came from. A card already on the canvas is dragged by IDENTITY id; a face
+ * dragged in from the tray is only ever a PERSON id, because a people picker never learns an
+ * identity id (`PersonResponseDto` withholds it, E30) and the server resolves the person id
+ * itself. Only the create branches care — `addParticipant` takes either. */
+export type FamilyDragKind = 'identity' | 'person';
+
 /**
- * Decides how dropping `draggedId` at `position` relative to `targetId` should mutate the graph.
+ * Decides how dropping `dragged` at `position` relative to `targetId` should mutate the graph.
  *
- * `draggedId` is always an identity already known to the canvas (E53) — the canvas only ever
- * lets you drag a card that is already rendered somewhere, so there is never a "the dragged
- * person doesn't exist yet" branch here; the same identityId is simply attached to a new union
- * or a new participant role, never re-created.
+ * A card dragged from the canvas is an identity already rendered somewhere (E53): it is attached
+ * to a new union or a new participant role, never re-created. A face dragged from the tray is a
+ * person the canvas has never drawn, carried as a person id — the one case where the dragged
+ * side is genuinely new to the graph.
  *
  * E52 is decided entirely in the `above`/`below` branches: when the target card already belongs
  * to a union in the relevant role, the dragged person JOINS that union (`addParticipant`) rather
@@ -59,9 +65,18 @@ export function planFamilyDrop(
   position: FamilyDropPosition,
   draggedId: string,
   targetId: string,
+  draggedKind: FamilyDragKind = 'identity',
 ): FamilyDropMutation {
+  const isPerson = draggedKind === 'person';
+  // The create DTO merges its identity and person arrays server-side, so the dragged side can be
+  // a person id while the target — always a card already on the canvas — stays an identity id.
+  const asPartner = (id: string) => (isPerson ? { partnerPersonIds: [id] } : { partnerIds: [id] });
+  const asChild = (id: string) => (isPerson ? { childPersonIds: [id] } : { childIds: [id] });
+
   if (position === 'beside') {
-    return { kind: 'create', create: { partnerIds: [draggedId, targetId] } };
+    return isPerson
+      ? { kind: 'create', create: { partnerIds: [targetId], partnerPersonIds: [draggedId] } }
+      : { kind: 'create', create: { partnerIds: [draggedId, targetId] } };
   }
 
   if (position === 'above') {
@@ -69,7 +84,7 @@ export function planFamilyDrop(
     if (existingUnion) {
       return { kind: 'join', unionId: existingUnion.id, role: FamilyParticipantRole.Partner };
     }
-    return { kind: 'create', create: { partnerIds: [draggedId], childIds: [targetId] } };
+    return { kind: 'create', create: { ...asPartner(draggedId), childIds: [targetId] } };
   }
 
   // position === 'below'
@@ -77,5 +92,5 @@ export function planFamilyDrop(
   if (existingUnion) {
     return { kind: 'join', unionId: existingUnion.id, role: FamilyParticipantRole.Child };
   }
-  return { kind: 'create', create: { partnerIds: [targetId], childIds: [draggedId] } };
+  return { kind: 'create', create: { partnerIds: [targetId], ...asChild(draggedId) } };
 }

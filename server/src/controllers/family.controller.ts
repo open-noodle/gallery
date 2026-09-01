@@ -1,5 +1,19 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Put, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Next,
+  Param,
+  Post,
+  Put,
+  Query,
+  Res,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { NextFunction, Response } from 'express';
 import { Endpoint, HistoryBuilder } from 'src/decorators';
 import { AuthDto } from 'src/dtos/auth.dto';
 import {
@@ -23,11 +37,12 @@ import {
   FamilyUnionUpdateDto,
 } from 'src/dtos/family.dto';
 import { ApiTag, Permission } from 'src/enum';
-import { Auth, Authenticated } from 'src/middleware/auth.guard';
+import { Auth, Authenticated, FileResponse } from 'src/middleware/auth.guard';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { FamilyService } from 'src/services/family.service';
 import { asDateString } from 'src/utils/date';
 import { deriveRelationLabel, FamilyGender, ProjectedFamilyParticipant } from 'src/utils/family-labels';
+import { sendFile } from 'src/utils/file';
 
 // The internal `ProjectedFamilyParticipant` (slice 6) is `{kind:'known', identityId}` OR
 // `{kind:'anonymous'}` with NO `identityId` key at all. The wire DTO is a flat
@@ -248,6 +263,28 @@ export class FamilyController {
     return dto.personId === undefined
       ? this.service.setMyRoot(auth, dto.identityId ?? null)
       : this.service.setMyRootByPerson(auth, dto.personId);
+  }
+
+  // Canvas node avatars. Addressed by IDENTITY id, not person id: a canvas client only ever
+  // holds identity ids (`PersonResponseDto` withholds `identityId` by design, E30), and for an
+  // identity resolved through a shared space the owner-only `GET /people/:id/thumbnail` 404s.
+  // `view` is sufficient — the same predicate already decided this viewer may see the identity's
+  // name, so the face discloses nothing further (see `FamilyService.getIdentityThumbnail`).
+  @Get('identities/:id/thumbnail')
+  @FileResponse()
+  @Authenticated({ permission: Permission.FamilyRead })
+  @Endpoint({
+    summary: "Get a family identity's thumbnail",
+    description: 'Retrieve the face thumbnail for an identity the caller can resolve, for the family canvas.',
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  async getIdentityThumbnail(
+    @Res() res: Response,
+    @Next() next: NextFunction,
+    @Auth() auth: AuthDto,
+    @Param() { id }: FamilyIdentityParamDto,
+  ) {
+    await sendFile(res, next, () => this.service.getIdentityThumbnail(auth, id), this.logger);
   }
 
   // D4: gender requires `contribute`, not `view` — it is shared data that alters the label every

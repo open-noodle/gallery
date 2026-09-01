@@ -4,17 +4,28 @@
     createUnion,
     FamilyParticipantKind,
     FamilyParticipantRole,
+    getAllPeople,
+    searchPerson,
+    setMyRoot,
     updateUnion,
     type FamilyIdentityDto,
     type FamilyParticipantDto,
     type FamilyUnionCreateDto,
     type FamilyUnionDto,
     type FamilyUnionStatus,
+    type PersonResponseDto,
   } from '@immich/sdk';
   import FamilyUnionEditor, { type FamilyUnionEditorSave } from '$lib/components/family/FamilyUnionEditor.svelte';
-  import { planFamilyDrop, type FamilyDropPosition } from '$lib/utils/family-editing';
-  import { buildFamilyLayout, type FamilyLayoutUnion } from '$lib/utils/family-layout';
+  import { getFamilyIdentityThumbnailUrl, getPeopleThumbnailUrl } from '$lib/utils';
+  import { planFamilyDrop, type FamilyDragKind, type FamilyDropPosition } from '$lib/utils/family-editing';
+  import {
+    buildPositionedFamilyLayout,
+    FAMILY_CARD_HEIGHT,
+    FAMILY_CARD_WIDTH,
+    type PositionedFamilyUnion,
+  } from '$lib/utils/family-layout';
   import { t, type Translations } from 'svelte-i18n';
+  import { SvelteSet } from 'svelte/reactivity';
 
   interface Props {
     unions: FamilyUnionDto[];
@@ -23,12 +34,19 @@
      * otherwise the cluster's `rootCandidateId` (D6: layout is computed per viewer, never
      * stored, so there is always some anchor to lay the graph out around). */
     rootId: string;
-    /** A6: gates the dashed "+ Add a parent" affordance, the drag/drop zones and the union editor.
-     * A view-only viewer sees none of it at all — not a disabled version of it. */
+    /** The viewer's OWN root, or null if they have never nominated themselves. Distinct from
+     * `rootId`: on a cluster the viewer isn't part of, the layout still has an anchor but there
+     * is nobody in it to mark as "you are here". */
+    viewerRootId: string | null;
+    /** A6: gates the dashed "+ Add a parent" affordance, the drag/drop zones, the tray and the
+     * union editor. A view-only viewer sees none of it at all — not a disabled version of it. */
     canContribute: boolean;
+    /** Called after a mutation the canvas cannot apply locally — a tray drop creates an identity
+     * whose id only the server knows, so the page reloads the graph rather than guessing it. */
+    onGraphChanged?: () => void;
   }
 
-  let { unions, identities, rootId, canContribute }: Props = $props();
+  let { unions, identities, rootId, viewerRootId, canContribute, onGraphChanged }: Props = $props();
 
   // Slice 11 (D6/E52/E53): the canvas mutates its OWN local copy of the graph so a drop can
   // re-render immediately, without waiting on a full page reload of `+page.ts`'s data. `unions`
@@ -37,7 +55,7 @@
   // an `$effect`.
   let workingUnions = $state<FamilyUnionDto[]>(unions);
 
-  const layout = $derived(buildFamilyLayout(workingUnions, rootId, canContribute));
+  const layout = $derived(buildPositionedFamilyLayout(workingUnions, rootId, canContribute));
 
   // A7: "ended" governs the dashed-amber connector styling — a union that is no longer ongoing.
   // Widowed counts as ended for this purpose even though its relationship TERM stays present
@@ -57,10 +75,15 @@
 
   const toYear = (date: string | null) => (date ? date.slice(0, 4) : null);
 
-  // `layout.unions` is already sorted by `partnerGeneration` (see `buildFamilyLayout`), so a
-  // plain filter per row is enough — no need for a Map to group them by.
-  const unionsForGeneration = (generation: number): FamilyLayoutUnion[] =>
-    layout.unions.filter((union) => union.partnerGeneration === generation);
+  const unionText = (union: PositionedFamilyUnion) => {
+    const startYear = toYear(union.startDate);
+    const endYear = toYear(union.endDate);
+    const status = $t(statusKey(union.status));
+    if (startYear && endYear) {
+      return `${startYear} – ${endYear} · ${status}`;
+    }
+    return startYear ? `${status} ${startYear}` : status;
+  };
 
   const initials = (name: string | undefined) =>
     (name ?? '')
@@ -72,36 +95,210 @@
       .join('')
       .toUpperCase();
 
-  const displayName = (identityId: string) => identities[identityId]?.label ?? identities[identityId]?.name ?? '';
+  // The card's TITLE is the person's name; the derived relation ("your aunt") is the grey
+  // sub-line beneath it. Never the other way round, and never one standing in for the other —
+  // a canvas of nothing but "your parent" / "your partner" is unreadable the moment two people
+  // share a relation, and the label is null anyway for anyone the viewer has no path to (E36).
+  const displayName = (identityId: string) => identities[identityId]?.name ?? '';
+  const relationLabel = (identityId: string) => identities[identityId]?.label ?? null;
 
-  // ── Drag and drop (Task 1: A6, E52, E53) ──────────────────────────────────────────────────
+  // A thumbnail that 404s (an identity with no face crop yet) falls back to the initials already
+  // painted underneath, rather than a broken-image glyph.
+  const brokenThumbnails = new SvelteSet<string>();
+
+  // ── Pan and zoom (slice 10) ────────────────────────────────────────────────────────────────
+
+  const MIN_SCALE = 0.35;
+  const MAX_SCALE = 2;
+
+  let viewport = $state<HTMLDivElement | undefined>();
+  let scale = $state(1);
+  let panX = $state(0);
+  let panY = $state(0);
+  let hasFitted = false;
+
+  const clampScale = (value: number) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, value));
+
+  function fitToView() {
+    if (!viewport || layout.width === 0 || layout.height === 0) {
+      return;
+    }
+    const { clientWidth, clientHeight } = viewport;
+    // Never scales UP to fill — a two-person tree blown up to fill a desktop viewport looks
+    // broken, not fitted.
+    scale = clampScale(Math.min(clientWidth / layout.width, clientHeight / layout.height, 1));
+    panX = (clientWidth - layout.width * scale) / 2;
+    panY = (clientHeight - layout.height * scale) / 2;
+  }
+
+  // Fit once, on the first render that actually has a measured viewport and a laid-out graph.
+  // Re-fitting on every layout change would yank the canvas out from under someone who has just
+  // panned somewhere deliberately.
+  $effect(() => {
+    if (hasFitted || !viewport || layout.width === 0) {
+      return;
+    }
+    hasFitted = true;
+    fitToView();
+  });
+
+  const zoomBy = (factor: number) => {
+    if (!viewport) {
+      return;
+    }
+    const { clientWidth, clientHeight } = viewport;
+    const next = clampScale(scale * factor);
+    // Keep the viewport centre fixed, so zooming doesn't drift the tree off-screen.
+    panX = clientWidth / 2 - ((clientWidth / 2 - panX) * next) / scale;
+    panY = clientHeight / 2 - ((clientHeight / 2 - panY) * next) / scale;
+    scale = next;
+  };
+
+  function handleWheel(event: WheelEvent) {
+    if (!viewport) {
+      return;
+    }
+    event.preventDefault();
+    const next = clampScale(scale * (event.deltaY < 0 ? 1.1 : 1 / 1.1));
+    const rect = viewport.getBoundingClientRect();
+    const pointerX = event.clientX - rect.left;
+    const pointerY = event.clientY - rect.top;
+    panX = pointerX - ((pointerX - panX) * next) / scale;
+    panY = pointerY - ((pointerY - panY) * next) / scale;
+    scale = next;
+  }
+
+  let panning = $state(false);
+  let panOrigin = { x: 0, y: 0, panX: 0, panY: 0 };
+
+  function handlePointerDown(event: PointerEvent) {
+    // Only the empty canvas pans. A pointerdown that lands on a card must be left alone or it
+    // would swallow the HTML5 drag that authoring depends on.
+    if ((event.target as HTMLElement).closest('[data-family-interactive]')) {
+      return;
+    }
+    panning = true;
+    panOrigin = { x: event.clientX, y: event.clientY, panX, panY };
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+  }
+
+  function handlePointerMove(event: PointerEvent) {
+    if (!panning) {
+      return;
+    }
+    panX = panOrigin.panX + (event.clientX - panOrigin.x);
+    panY = panOrigin.panY + (event.clientY - panOrigin.y);
+  }
+
+  function handlePointerUp(event: PointerEvent) {
+    if (!panning) {
+      return;
+    }
+    panning = false;
+    (event.currentTarget as HTMLElement).releasePointerCapture(event.pointerId);
+  }
+
+  // ── The tray (mockup §1) ───────────────────────────────────────────────────────────────────
+  //
+  // The drag SOURCE for anyone not already on the canvas. Everything here speaks in `person.id`,
+  // never `identityId` — `PersonResponseDto` deliberately withholds the identity id, so a person
+  // dragged from here is carried as a person id and resolved server-side (see `FamilyDragKind`).
+
+  let trayQuery = $state('');
+  let trayPeople = $state<PersonResponseDto[]>([]);
+  let trayLoading = $state(true);
+  /** Turns the tray into a root picker: the same list, but a click nominates rather than nothing.
+   * Reuses one search rather than growing a second people picker somewhere else. */
+  let pickingSelf = $state(false);
+  let rootError = $state(false);
+
+  let trayToken = 0;
+
+  const loadTray = async (rawQuery: string) => {
+    const token = ++trayToken;
+    trayLoading = true;
+    try {
+      let result: PersonResponseDto[];
+      if (rawQuery) {
+        result = await searchPerson({ name: rawQuery, withHidden: false, withSharedSpaces: true });
+      } else {
+        const all = await getAllPeople({ size: 60, withSharedSpaces: true });
+        result = all.people;
+      }
+      if (token === trayToken) {
+        trayPeople = result;
+      }
+    } catch {
+      if (token === trayToken) {
+        trayPeople = [];
+      }
+    } finally {
+      if (token === trayToken) {
+        trayLoading = false;
+      }
+    }
+  };
+
+  if (canContribute) {
+    void loadTray('');
+  }
+
+  const onTrayInput = () => void loadTray(trayQuery.trim());
+
+  async function nominateSelf(person: PersonResponseDto) {
+    rootError = false;
+    try {
+      await setMyRoot({ familyMyRootUpdateDto: { personId: person.id } });
+      pickingSelf = false;
+      onGraphChanged?.();
+    } catch {
+      rootError = true;
+    }
+  }
+
+  const viewerName = $derived(viewerRootId ? displayName(viewerRootId) : '');
+
+  // ── Drag and drop (A6, E52, E53) ───────────────────────────────────────────────────────────
   //
   // Drop zones are discrete DOM elements per known card — not a single card region split by
-  // pointer coordinates — because that is the only reliably testable shape under happy-dom
-  // (and it also makes the affordance's hit area exact rather than approximate). A card is only
-  // ever dragged from ITS OWN rendered seat (E53): the identity payload is nothing more than the
-  // dragged identityId as plain text, since the identity is always already present in
-  // `identities` — there is no "new person" branch here for this slice (see the slice 11 report
-  // for why: no tray/search surface exists yet to originate a drag for someone not already on
-  // the canvas).
+  // pointer coordinates — because that is the only reliably testable shape under happy-dom (and
+  // it also makes the affordance's hit area exact rather than approximate). The payload is
+  // `identity:<id>` for a card already on the canvas (E53: the same identity moves, it is never
+  // re-created) or `person:<id>` for a face dragged in from the tray.
+
   const DRAG_MIME = 'text/plain';
 
-  let draggingIdentityId = $state<string | null>(null);
+  type DraggedRef = { kind: FamilyDragKind; id: string };
+
+  const encodeDrag = (ref: DraggedRef) => `${ref.kind}:${ref.id}`;
+  const decodeDrag = (raw: string | undefined): DraggedRef | null => {
+    if (!raw) {
+      return null;
+    }
+    const separator = raw.indexOf(':');
+    // A bare id is an identity: the shape earlier drags used, and what a synthetic DataTransfer
+    // in a test is most likely to carry.
+    if (separator === -1) {
+      return { kind: 'identity', id: raw };
+    }
+    const kind = raw.slice(0, separator);
+    return kind === 'person' || kind === 'identity' ? { kind, id: raw.slice(separator + 1) } : null;
+  };
+
+  let dragged = $state<DraggedRef | null>(null);
 
   const showZonesFor = (identityId: string) =>
-    canContribute && draggingIdentityId !== null && draggingIdentityId !== identityId;
+    canContribute && dragged !== null && !(dragged.kind === 'identity' && dragged.id === identityId);
 
-  function handleDragStart(event: DragEvent, identityId: string) {
-    event.dataTransfer?.setData(DRAG_MIME, identityId);
+  function handleDragStart(event: DragEvent, ref: DraggedRef) {
+    event.dataTransfer?.setData(DRAG_MIME, encodeDrag(ref));
     if (event.dataTransfer) {
       event.dataTransfer.effectAllowed = 'move';
     }
-    draggingIdentityId = identityId;
+    dragged = ref;
   }
 
-  function handleDragEnd() {
-    draggingIdentityId = null;
-  }
+  const handleDragEnd = () => (dragged = null);
 
   function handleDragOver(event: DragEvent) {
     // Required so the browser treats this element as a valid drop target at all.
@@ -138,23 +335,36 @@
 
   async function handleDrop(event: DragEvent, position: FamilyDropPosition, targetId: string) {
     event.preventDefault();
-    const draggedId = event.dataTransfer?.getData(DRAG_MIME);
-    draggingIdentityId = null;
-    if (!draggedId || draggedId === targetId) {
+    const ref = decodeDrag(event.dataTransfer?.getData(DRAG_MIME));
+    dragged = null;
+    if (!ref || (ref.kind === 'identity' && ref.id === targetId)) {
       return;
     }
 
-    const mutation = planFamilyDrop(workingUnions, position, draggedId, targetId);
+    const mutation = planFamilyDrop(workingUnions, position, ref.id, targetId, ref.kind);
     try {
       if (mutation.kind === 'join') {
         await addParticipant({
           id: mutation.unionId,
-          familyParticipantAddDto: { identityId: draggedId, role: mutation.role },
+          familyParticipantAddDto:
+            ref.kind === 'person'
+              ? { personId: ref.id, role: mutation.role }
+              : { identityId: ref.id, role: mutation.role },
         });
-        applyJoinLocally(mutation.unionId, mutation.role, draggedId);
+        if (ref.kind === 'identity') {
+          applyJoinLocally(mutation.unionId, mutation.role, ref.id);
+        }
       } else {
         const response = await createUnion({ familyUnionCreateDto: mutation.create });
-        applyCreateLocally(response.id, mutation.create);
+        if (ref.kind === 'identity') {
+          applyCreateLocally(response.id, mutation.create);
+        }
+      }
+
+      // A person drop mints an identity only the server can name, so the local graph cannot be
+      // patched honestly — reload it instead of inventing an id.
+      if (ref.kind === 'person') {
+        onGraphChanged?.();
       }
     } catch {
       // A rejected mutation (arity/cycle/etc. validation on the server) simply leaves the canvas
@@ -163,7 +373,7 @@
     }
   }
 
-  // ── Union editor (Task 2: A7) ──────────────────────────────────────────────────────────────
+  // ── Union editor (A7) ──────────────────────────────────────────────────────────────────────
 
   let editingUnionId = $state<string | null>(null);
 
@@ -190,176 +400,360 @@
   }
 </script>
 
-<div data-testid="family-canvas" class="flex flex-col gap-6 overflow-auto p-4">
-  {#each layout.rows as row (row.generation)}
-    <div class="flex flex-col gap-2">
-      <div class="text-xs font-semibold tracking-wide text-gray-500 uppercase">
-        {$t('family_canvas_generation_label', { values: { offset: row.generation } })}
-      </div>
+<div class="flex flex-col overflow-hidden rounded-2xl border border-gray-200 bg-light dark:border-gray-800">
+  <!-- Toolbar (mockup §1) -->
+  <div class="flex flex-wrap items-center gap-2 px-4 py-3">
+    {#if canContribute}
+      <button
+        type="button"
+        data-testid="family-root-button"
+        class="rounded-full border border-gray-300 px-3 py-1.5 text-xs font-medium transition-colors hover:bg-gray-100 dark:border-gray-700 dark:hover:bg-gray-800"
+        class:border-primary={pickingSelf}
+        class:text-primary={pickingSelf}
+        onclick={() => (pickingSelf = !pickingSelf)}
+      >
+        {viewerName ? $t('family_canvas_you_are', { values: { name: viewerName } }) : $t('family_canvas_set_root')}
+      </button>
+    {/if}
 
-      <div class="flex flex-wrap items-stretch gap-3">
-        {#each row.seats as seat (seat.key)}
+    <button
+      type="button"
+      data-testid="family-fit-to-view"
+      class="rounded-full border border-gray-300 px-3 py-1.5 text-xs font-medium transition-colors hover:bg-gray-100 dark:border-gray-700 dark:hover:bg-gray-800"
+      onclick={fitToView}
+    >
+      {$t('family_canvas_fit_to_view')}
+    </button>
+
+    <div class="flex items-center gap-1">
+      <button
+        type="button"
+        aria-label={$t('family_canvas_zoom_out')}
+        class="size-7 rounded-full border border-gray-300 text-sm leading-none transition-colors hover:bg-gray-100 dark:border-gray-700 dark:hover:bg-gray-800"
+        onclick={() => zoomBy(1 / 1.2)}
+      >
+        −
+      </button>
+      <button
+        type="button"
+        aria-label={$t('family_canvas_zoom_in')}
+        class="size-7 rounded-full border border-gray-300 text-sm leading-none transition-colors hover:bg-gray-100 dark:border-gray-700 dark:hover:bg-gray-800"
+        onclick={() => zoomBy(1.2)}
+      >
+        +
+      </button>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 border-t border-gray-200 md:grid-cols-[13rem_minmax(0,1fr)] dark:border-gray-800">
+    {#if canContribute}
+      <!-- Tray: the drag source for anyone not already on the canvas (mockup §1) -->
+      <aside
+        data-testid="family-tray"
+        class="flex min-w-0 flex-col gap-3 border-b border-gray-200 bg-gray-50 p-3 md:border-r md:border-b-0 dark:border-gray-800 dark:bg-gray-900/40"
+      >
+        <h4 class="text-xs font-semibold tracking-wide text-gray-500 uppercase">
+          {pickingSelf ? $t('family_link_step_self') : $t('family_canvas_tray_title')}
+        </h4>
+
+        <input
+          class="rounded-lg border border-gray-300 bg-light px-2.5 py-1.5 text-xs dark:border-gray-700"
+          placeholder={$t('family_link_search_placeholder')}
+          aria-label={$t('family_link_search_placeholder')}
+          bind:value={trayQuery}
+          oninput={onTrayInput}
+        />
+
+        <div class="grid max-h-72 grid-cols-3 gap-2 overflow-y-auto md:max-h-104">
+          {#each trayPeople as person (person.id)}
+            <!-- One element for both modes: dragging it places the person on the canvas, and
+                 while the tray is picking a root a click nominates them instead. A button rather
+                 than a div so the drag handle is focusable and announced. -->
+            <button
+              type="button"
+              data-testid="family-tray-person"
+              data-person-id={person.id}
+              class="min-w-0 text-center"
+              class:cursor-grab={!pickingSelf}
+              draggable={!pickingSelf}
+              onclick={() => (pickingSelf ? void nominateSelf(person) : undefined)}
+              ondragstart={(event) => handleDragStart(event, { kind: 'person', id: person.id })}
+              ondragend={handleDragEnd}
+            >
+              <img
+                class="mx-auto size-11 rounded-full object-cover"
+                src={getPeopleThumbnailUrl(person)}
+                alt=""
+                draggable="false"
+              />
+              <span class="mt-1 block truncate text-[10px] text-gray-500">
+                {person.name || $t('family_person_anonymous_name')}
+              </span>
+            </button>
+          {/each}
+        </div>
+
+        {#if !trayLoading && trayPeople.length === 0}
+          <p class="text-xs text-gray-500">{$t('family_link_no_matches')}</p>
+        {/if}
+
+        {#if rootError}
+          <p class="text-xs text-red-500" data-testid="family-root-error">{$t('family_canvas_root_error')}</p>
+        {/if}
+
+        <p
+          class="border-t border-dashed border-gray-300 pt-2 text-[11px] leading-snug text-gray-500 dark:border-gray-700"
+        >
+          {$t('family_canvas_tray_note')}
+        </p>
+      </aside>
+    {/if}
+
+    <!-- Canvas -->
+    <div
+      bind:this={viewport}
+      data-testid="family-canvas"
+      role="presentation"
+      class="relative h-128 touch-none overflow-hidden select-none"
+      class:cursor-grabbing={panning}
+      onwheel={handleWheel}
+      onpointerdown={handlePointerDown}
+      onpointermove={handlePointerMove}
+      onpointerup={handlePointerUp}
+      onpointercancel={handlePointerUp}
+    >
+      <!-- Dot grid, drawn as a pattern so it inherits the theme through `currentColor` rather
+           than hard-coding two background images. -->
+      <svg class="pointer-events-none absolute inset-0 size-full text-gray-300 dark:text-gray-700" aria-hidden="true">
+        <defs>
+          <pattern id="family-dots" width="22" height="22" patternUnits="userSpaceOnUse">
+            <circle cx="1" cy="1" r="1" fill="currentColor" />
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#family-dots)" />
+      </svg>
+
+      <div
+        class="absolute top-0 left-0 origin-top-left"
+        style="width:{layout.width}px;height:{layout.height}px;transform:translate({panX}px,{panY}px) scale({scale})"
+      >
+        <!-- Connectors. Behind the cards, so a line may start under a card edge without showing. -->
+        <svg
+          class="pointer-events-none absolute inset-0"
+          width={layout.width}
+          height={layout.height}
+          aria-hidden="true"
+        >
+          <g fill="none" stroke-width="2" stroke-linecap="round">
+            {#each layout.unions as union (union.unionId)}
+              {#if union.childPath}
+                <path class="stroke-gray-300 dark:stroke-gray-600" d={union.childPath} />
+              {/if}
+              {#if union.partnerPath}
+                <path
+                  class={isEnded(union.status)
+                    ? 'stroke-amber-600 dark:stroke-amber-400'
+                    : 'stroke-gray-300 dark:stroke-gray-600'}
+                  stroke-dasharray={isEnded(union.status) ? '5 4' : undefined}
+                  d={union.partnerPath}
+                />
+              {/if}
+            {/each}
+          </g>
+        </svg>
+
+        <!-- Generation gutter labels -->
+        {#each layout.generations as generation (generation.generation)}
+          <div
+            class="pointer-events-none absolute text-[10px] font-semibold tracking-widest text-gray-400 uppercase dark:text-gray-500"
+            style="left:6px;top:{generation.y}px"
+          >
+            {$t('family_canvas_generation_label', { values: { offset: generation.generation } })}
+          </div>
+        {/each}
+
+        <!-- Cards -->
+        {#each layout.seats as seat (seat.key)}
           {#if seat.kind === 'known'}
             {@const identityId = seat.identityId!}
-            <div class="flex flex-col items-stretch gap-1">
-              {#if showZonesFor(identityId)}
-                <div
-                  data-testid="family-drop-zone"
-                  data-position="above"
-                  data-target-id={identityId}
-                  role="button"
-                  tabindex="-1"
-                  class="flex h-6 w-40 items-center justify-center rounded-sm border-2 border-dashed border-primary text-[10px] font-medium text-primary"
-                  ondragover={handleDragOver}
-                  ondrop={(event) => handleDrop(event, 'above', identityId)}
-                >
-                  {$t('family_edit_drop_above')}
-                </div>
-              {/if}
+            {@const label = relationLabel(identityId)}
+            {@const isRoot = identityId === viewerRootId}
 
-              <div class="flex items-stretch gap-1">
-                <div
-                  data-testid="family-node"
-                  role="button"
-                  tabindex={canContribute ? 0 : -1}
-                  class="bg-surface flex w-40 items-center gap-2 rounded-lg border border-gray-300 p-2 shadow-sm dark:border-gray-700"
-                  class:border-primary={identityId === rootId}
-                  draggable={canContribute}
-                  ondragstart={(event) => handleDragStart(event, identityId)}
-                  ondragend={handleDragEnd}
-                >
-                  <div
-                    class="flex size-9 shrink-0 items-center justify-center rounded-full bg-gray-300 text-xs font-semibold text-gray-700 dark:bg-gray-600 dark:text-gray-100"
-                  >
-                    {initials(identities[identityId]?.name)}
-                  </div>
-                  <div class="min-w-0">
-                    <div class="truncate text-sm font-medium">{displayName(identityId)}</div>
-                  </div>
-                </div>
+            {#if isRoot}
+              <div
+                class="pointer-events-none absolute rounded-full bg-primary/15 px-2 py-px text-[10px] font-semibold tracking-wide text-primary uppercase"
+                style="left:{seat.x}px;top:{seat.y - 15}px"
+              >
+                {$t('family_canvas_you_are_here')}
+              </div>
+            {/if}
 
-                {#if showZonesFor(identityId)}
-                  <div
-                    data-testid="family-drop-zone"
-                    data-position="beside"
-                    data-target-id={identityId}
-                    role="button"
-                    tabindex="-1"
-                    class="flex w-10 items-center justify-center rounded-sm border-2 border-dashed border-primary text-center text-[10px] font-medium text-primary"
-                    ondragover={handleDragOver}
-                    ondrop={(event) => handleDrop(event, 'beside', identityId)}
-                  >
-                    {$t('family_edit_drop_beside')}
-                  </div>
+            <div
+              data-testid="family-node"
+              data-family-interactive
+              role="button"
+              tabindex={canContribute ? 0 : -1}
+              class="absolute flex items-center gap-3 rounded-2xl border bg-light px-3 shadow-sm"
+              class:border-primary={isRoot}
+              class:ring-3={isRoot}
+              class:ring-primary-100={isRoot}
+              class:border-gray-200={!isRoot}
+              class:dark:border-gray-700={!isRoot}
+              class:cursor-grab={canContribute}
+              style="left:{seat.x}px;top:{seat.y}px;width:{FAMILY_CARD_WIDTH}px;height:{FAMILY_CARD_HEIGHT}px"
+              draggable={canContribute}
+              ondragstart={(event) => handleDragStart(event, { kind: 'identity', id: identityId })}
+              ondragend={handleDragEnd}
+            >
+              <div
+                class="relative grid size-11 shrink-0 place-items-center overflow-hidden rounded-full bg-gray-200 text-[13px] font-semibold text-gray-500 dark:bg-gray-700 dark:text-gray-300"
+              >
+                {initials(identities[identityId]?.name)}
+                {#if !brokenThumbnails.has(identityId)}
+                  <img
+                    class="absolute inset-0 size-full object-cover"
+                    src={getFamilyIdentityThumbnailUrl(identityId)}
+                    alt=""
+                    draggable="false"
+                    onerror={() => brokenThumbnails.add(identityId)}
+                  />
                 {/if}
               </div>
 
-              {#if showZonesFor(identityId)}
-                <div
-                  data-testid="family-drop-zone"
-                  data-position="below"
-                  data-target-id={identityId}
-                  role="button"
-                  tabindex="-1"
-                  class="flex h-6 w-40 items-center justify-center rounded-sm border-2 border-dashed border-primary text-[10px] font-medium text-primary"
-                  ondragover={handleDragOver}
-                  ondrop={(event) => handleDrop(event, 'below', identityId)}
-                >
-                  {$t('family_edit_drop_below')}
-                </div>
-              {/if}
+              <div class="min-w-0">
+                <div class="truncate text-[13.5px] leading-tight font-medium">{displayName(identityId)}</div>
+                {#if label}
+                  <div class="truncate text-[11.5px] text-gray-500" data-testid="family-node-relation">{label}</div>
+                {/if}
+              </div>
             </div>
+
+            {#if showZonesFor(identityId)}
+              <div
+                data-testid="family-drop-zone"
+                data-family-interactive
+                data-position="above"
+                data-target-id={identityId}
+                role="button"
+                tabindex="-1"
+                class="absolute z-10 flex items-center justify-center rounded-lg border-2 border-dashed border-primary bg-primary/10 p-1 text-center text-[10px] leading-tight font-semibold text-primary"
+                style="left:{seat.x}px;top:{seat.y - 62}px;width:{FAMILY_CARD_WIDTH}px;height:56px"
+                ondragover={handleDragOver}
+                ondrop={(event) => handleDrop(event, 'above', identityId)}
+              >
+                {$t('family_edit_drop_above')}
+              </div>
+              <div
+                data-testid="family-drop-zone"
+                data-family-interactive
+                data-position="below"
+                data-target-id={identityId}
+                role="button"
+                tabindex="-1"
+                class="absolute z-10 flex items-center justify-center rounded-lg border-2 border-dashed border-primary bg-primary/10 p-1 text-center text-[10px] leading-tight font-semibold text-primary"
+                style="left:{seat.x}px;top:{seat.y + FAMILY_CARD_HEIGHT + 6}px;width:{FAMILY_CARD_WIDTH}px;height:56px"
+                ondragover={handleDragOver}
+                ondrop={(event) => handleDrop(event, 'below', identityId)}
+              >
+                {$t('family_edit_drop_below')}
+              </div>
+              <div
+                data-testid="family-drop-zone"
+                data-family-interactive
+                data-position="beside"
+                data-target-id={identityId}
+                role="button"
+                tabindex="-1"
+                class="absolute z-10 flex items-center justify-center rounded-lg border-2 border-dashed border-primary bg-primary/10 p-1 text-center text-[10px] leading-tight font-semibold text-primary"
+                style="left:{seat.x + FAMILY_CARD_WIDTH + 6}px;top:{seat.y + 10}px;width:62px;height:56px"
+                ondragover={handleDragOver}
+                ondrop={(event) => handleDrop(event, 'beside', identityId)}
+              >
+                {$t('family_edit_drop_beside')}
+              </div>
+            {/if}
           {:else if seat.kind === 'anonymous'}
             <div
               data-testid="family-anonymous-seat"
-              class="flex w-40 items-center gap-2 rounded-lg border border-gray-300 bg-gray-100 p-2 dark:border-gray-700 dark:bg-gray-800"
+              class="absolute flex items-center gap-3 rounded-2xl border border-gray-200 bg-gray-100 px-3 dark:border-gray-700 dark:bg-gray-800"
+              style="left:{seat.x}px;top:{seat.y}px;width:{FAMILY_CARD_WIDTH}px;height:{FAMILY_CARD_HEIGHT}px"
             >
               <div
-                class="flex size-9 shrink-0 items-center justify-center rounded-full border border-dashed bg-gray-200 text-sm text-gray-500 dark:bg-gray-700 dark:text-gray-400"
+                class="grid size-11 shrink-0 place-items-center rounded-full border border-dashed border-gray-400 bg-gray-200 text-sm text-gray-500 dark:bg-gray-700 dark:text-gray-400"
               >
                 ?
               </div>
               <div class="min-w-0">
-                <div class="truncate text-sm font-medium text-gray-500 italic">
-                  {$t('family_canvas_anonymous_name')}
-                </div>
+                <div class="truncate text-[13.5px] text-gray-500 italic">{$t('family_canvas_anonymous_name')}</div>
               </div>
             </div>
           {:else}
             <div
               data-testid="family-empty-seat"
-              class="flex w-40 items-center justify-center rounded-lg border-2 border-dashed border-gray-300 p-2 text-center text-xs font-medium text-gray-500 dark:border-gray-600"
+              class="absolute flex items-center justify-center rounded-2xl border-2 border-dashed border-gray-300 text-center text-[12.5px] font-medium text-gray-500 dark:border-gray-600"
+              style="left:{seat.x}px;top:{seat.y}px;width:{FAMILY_CARD_WIDTH}px;height:{FAMILY_CARD_HEIGHT}px"
             >
               <span aria-hidden="true">+</span>&nbsp;{$t('family_canvas_add_parent')}
             </div>
           {/if}
         {/each}
-      </div>
 
-      {#if unionsForGeneration(row.generation).length > 0}
-        <div class="flex flex-wrap gap-2">
-          {#each unionsForGeneration(row.generation) as familyUnion (familyUnion.unionId)}
-            {@const startYear = toYear(familyUnion.startDate)}
-            {@const endYear = toYear(familyUnion.endDate)}
-            <div class="flex flex-col gap-2">
-              {#if canContribute}
-                <button
-                  type="button"
-                  data-testid="family-union-bar"
-                  data-status={familyUnion.status}
-                  data-ended={isEnded(familyUnion.status)}
-                  aria-label={$t('family_edit_union_edit_button_label')}
-                  class="rounded-full border px-3 py-0.5 text-xs font-medium"
-                  class:border-gray-300={!isEnded(familyUnion.status)}
-                  class:text-gray-500={!isEnded(familyUnion.status)}
-                  class:border-warning={isEnded(familyUnion.status)}
-                  class:text-warning={isEnded(familyUnion.status)}
-                  class:border-dashed={isEnded(familyUnion.status)}
-                  onclick={() => toggleEditor(familyUnion.unionId)}
-                >
-                  {#if startYear && endYear}
-                    {startYear} – {endYear} · {$t(statusKey(familyUnion.status))}
-                  {:else if startYear}
-                    {$t(statusKey(familyUnion.status))} {startYear}
-                  {:else}
-                    {$t(statusKey(familyUnion.status))}
-                  {/if}
-                </button>
-              {:else}
-                <span
-                  data-testid="family-union-bar"
-                  data-status={familyUnion.status}
-                  data-ended={isEnded(familyUnion.status)}
-                  class="rounded-full border px-3 py-0.5 text-xs font-medium"
-                  class:border-gray-300={!isEnded(familyUnion.status)}
-                  class:text-gray-500={!isEnded(familyUnion.status)}
-                  class:border-warning={isEnded(familyUnion.status)}
-                  class:text-warning={isEnded(familyUnion.status)}
-                  class:border-dashed={isEnded(familyUnion.status)}
-                >
-                  {#if startYear && endYear}
-                    {startYear} – {endYear} · {$t(statusKey(familyUnion.status))}
-                  {:else if startYear}
-                    {$t(statusKey(familyUnion.status))} {startYear}
-                  {:else}
-                    {$t(statusKey(familyUnion.status))}
-                  {/if}
-                </span>
-              {/if}
+        <!-- Union pills, sitting on the connector between the partners -->
+        {#each layout.unions as union (union.unionId)}
+          {@const ended = isEnded(union.status)}
+          <div class="absolute -translate-x-1/2" style="left:{union.x}px;top:{union.y}px">
+            {#if canContribute}
+              <button
+                type="button"
+                data-testid="family-union-bar"
+                data-family-interactive
+                data-status={union.status}
+                data-ended={ended}
+                aria-label={$t('family_edit_union_edit_button_label')}
+                class="rounded-full border bg-light px-2.5 py-0.5 text-[10.5px] font-medium whitespace-nowrap"
+                class:border-gray-300={!ended}
+                class:text-gray-500={!ended}
+                class:dark:border-gray-600={!ended}
+                class:border-amber-600={ended}
+                class:text-amber-700={ended}
+                class:dark:border-amber-400={ended}
+                class:dark:text-amber-300={ended}
+                onclick={() => toggleEditor(union.unionId)}
+              >
+                {unionText(union)}
+              </button>
+            {:else}
+              <span
+                data-testid="family-union-bar"
+                data-status={union.status}
+                data-ended={ended}
+                class="rounded-full border bg-light px-2.5 py-0.5 text-[10.5px] font-medium whitespace-nowrap"
+                class:border-gray-300={!ended}
+                class:text-gray-500={!ended}
+                class:dark:border-gray-600={!ended}
+                class:border-amber-600={ended}
+                class:text-amber-700={ended}
+                class:dark:border-amber-400={ended}
+                class:dark:text-amber-300={ended}
+              >
+                {unionText(union)}
+              </span>
+            {/if}
 
-              {#if canContribute && editingUnionId === familyUnion.unionId}
+            {#if canContribute && editingUnionId === union.unionId}
+              <div data-family-interactive class="absolute top-8 left-1/2 z-20 -translate-x-1/2">
                 <FamilyUnionEditor
-                  status={familyUnion.status as FamilyUnionStatus}
-                  startDate={familyUnion.startDate}
-                  endDate={familyUnion.endDate}
-                  onSave={(payload) => handleUnionSave(familyUnion.unionId, payload)}
+                  status={union.status as FamilyUnionStatus}
+                  startDate={union.startDate}
+                  endDate={union.endDate}
+                  onSave={(payload) => handleUnionSave(union.unionId, payload)}
                   onCancel={() => (editingUnionId = null)}
                 />
-              {/if}
-            </div>
-          {/each}
-        </div>
-      {/if}
+              </div>
+            {/if}
+          </div>
+        {/each}
+      </div>
     </div>
-  {/each}
+  </div>
 </div>
