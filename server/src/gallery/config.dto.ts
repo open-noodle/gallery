@@ -63,6 +63,7 @@ export const GalleryMemoriesSchema = z
     types: z.record(z.string(), z.boolean()).default({}).describe('Per-type memory availability overrides'),
     themeMaxDistance: z.coerce
       .number()
+      .meta({ format: 'double' })
       .min(0)
       .max(2)
       .default(0.75)

@@ -50,8 +50,8 @@ const MirrorParametersSchema = z
 
 const TrimParametersSchema = z
   .object({
-    startTime: z.number().min(0).describe('Start time in seconds'),
-    endTime: z.number().min(0).describe('End time in seconds'),
+    startTime: z.number().meta({ format: 'double' }).min(0).describe('Start time in seconds'),
+    endTime: z.number().meta({ format: 'double' }).min(0).describe('End time in seconds'),
   })
   .refine((params) => params.endTime > params.startTime, {
     error: 'endTime must be greater than startTime',
