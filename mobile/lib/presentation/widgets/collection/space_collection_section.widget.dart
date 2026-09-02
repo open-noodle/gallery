@@ -155,10 +155,10 @@ class _SpaceCollectionSectionState extends ConsumerState<SpaceCollectionSection>
   }
 
   List<Widget> _rowsFor(SharedSpaceResponseDto space) {
-    // albumCount is Optional<num?> and is the ONLY way to know a row is expandable without
+    // albumCount is Optional<int?> and is the ONLY way to know a row is expandable without
     // subscribing to its Drift stream. An absent count reads as 0 -- a plain row, which
     // still reaches the pool.
-    final albumCount = (space.albumCount.orElse(null) ?? 0).toInt();
+    final albumCount = space.albumCount.orElse(null) ?? 0;
     final expandable = albumCount > 0;
     final expanded = _expandedSpaceId == space.id;
 

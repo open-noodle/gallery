@@ -140,7 +140,7 @@ class SharedSpaceApiRepository extends ApiRepository {
       name: dto.name,
       birthDate: dto.birthDate.orElse(null),
       spaceId: dto.spaceId,
-      numberOfAssets: dto.assetCount.toInt(),
+      numberOfAssets: dto.assetCount,
     );
   }
 
