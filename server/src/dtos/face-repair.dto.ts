@@ -6,12 +6,12 @@ export const FaceRepairRequestSchema = z
     dryRun: z.boolean().default(true),
     ownerId: z.uuidv4().optional(),
     personId: z.uuidv4().optional(),
-    maxDistance: z.number().gt(0).max(2).optional(),
+    maxDistance: z.number().meta({ format: 'double' }).gt(0).max(2).optional(),
     minFaces: z.number().int().min(1).optional(),
     voteWindow: z.number().int().min(1).optional(),
     voteMargin: z.number().int().min(0).optional(),
-    maxAttributionDistance: z.number().gt(0).max(2).optional(),
-    maxFlaggedFraction: z.number().min(0).max(1).optional(),
+    maxAttributionDistance: z.number().meta({ format: 'double' }).gt(0).max(2).optional(),
+    maxFlaggedFraction: z.number().meta({ format: 'double' }).min(0).max(1).optional(),
   })
   .meta({ id: 'FaceRepairRequestDto' });
 
@@ -72,9 +72,9 @@ export class FaceRepairScanTriggerRequestDto extends createZodDto(FaceRepairScan
 
 export const FaceRepairScanDefaultsSchema = z
   .object({
-    maxDistance: z.number(),
+    maxDistance: z.number().meta({ format: 'double' }),
     minFaces: z.number().int(),
-    maxFlaggedFraction: z.number(),
+    maxFlaggedFraction: z.number().meta({ format: 'double' }),
   })
   .meta({ id: 'FaceRepairScanDefaultsDto' });
 export class FaceRepairScanDefaultsDto extends createZodDto(FaceRepairScanDefaultsSchema) {}
@@ -183,7 +183,7 @@ export const FaceRepairDeclineRequestSchema = z
 export class FaceRepairDeclineRequestDto extends createZodDto(FaceRepairDeclineRequestSchema) {}
 
 export const FaceRepairDeclineCreatedSchema = z
-  .object({ created: z.number() })
+  .object({ created: z.int() })
   .meta({ id: 'FaceRepairDeclineCreatedDto' });
 export class FaceRepairDeclineCreatedDto extends createZodDto(FaceRepairDeclineCreatedSchema) {}
 
@@ -222,7 +222,7 @@ export const FaceRepairDeclineRemoveRequestSchema = z
 export class FaceRepairDeclineRemoveRequestDto extends createZodDto(FaceRepairDeclineRemoveRequestSchema) {}
 
 export const FaceRepairDeclineRemovedSchema = z
-  .object({ removed: z.number() })
+  .object({ removed: z.int() })
   .meta({ id: 'FaceRepairDeclineRemovedDto' });
 export class FaceRepairDeclineRemovedDto extends createZodDto(FaceRepairDeclineRemovedSchema) {}
 
@@ -288,7 +288,7 @@ export const FaceRepairUnconfirmRequestSchema = z
 export class FaceRepairUnconfirmRequestDto extends createZodDto(FaceRepairUnconfirmRequestSchema) {}
 
 export const FaceRepairResolutionsRemovedSchema = z
-  .object({ removed: z.number() })
+  .object({ removed: z.int() })
   .meta({ id: 'FaceRepairResolutionsRemovedDto' });
 export class FaceRepairResolutionsRemovedDto extends createZodDto(FaceRepairResolutionsRemovedSchema) {}
 
@@ -304,7 +304,7 @@ export class FaceRepairClusterFacesRequestDto extends createZodDto(FaceRepairClu
 export const FaceRepairClusterFacesResponseSchema = z
   .object({
     faces: z.array(z.object({ assetFaceId: z.string() })),
-    total: z.number(),
+    total: z.int(),
     hasMore: z.boolean(),
   })
   .meta({ id: 'FaceRepairClusterFacesResponseDto' });
@@ -345,15 +345,15 @@ export type FaceRepairResolveRequest = z.infer<typeof FaceRepairResolveRequestSc
 
 export const FaceRepairResolveResponseSchema = z
   .object({
-    moved: z.number(),
-    declined: z.number(),
-    locked: z.number(),
-    detached: z.number(),
+    moved: z.int(),
+    declined: z.int(),
+    locked: z.int(),
+    detached: z.int(),
     // Faces parked in a fresh unnamed cluster of their own. Counted separately from `moved` (they never pass
     // through the moveToPerson buckets) and from `locked` (they are locked, but reporting them in both would
     // double-count them in the apply summary).
-    unknown: z.number(),
-    skipped: z.number(),
+    unknown: z.int(),
+    skipped: z.int(),
   })
   .meta({ id: 'FaceRepairResolveResponseDto' });
 export class FaceRepairResolveResponseDto extends createZodDto(FaceRepairResolveResponseSchema) {}
@@ -380,7 +380,7 @@ const FaceRepairOwnerPersonRowSchema = z.object({
 export const FaceRepairOwnerPeopleResponseSchema = z
   .object({
     people: z.array(FaceRepairOwnerPersonRowSchema),
-    total: z.number(),
+    total: z.int(),
     hasMore: z.boolean(),
   })
   .meta({ id: 'FaceRepairOwnerPeopleResponseDto' });
@@ -404,7 +404,7 @@ export const FaceRepairPersonMetadataResponseSchema = z
     id: z.string(),
     name: z.string(),
     ownerId: z.string(),
-    faceCount: z.number(),
+    faceCount: z.int(),
     thumbnailFaceId: z.string().nullable(),
   })
   .meta({ id: 'FaceRepairPersonMetadataResponseDto' });
