@@ -94,7 +94,8 @@ test.describe("Owner's face picker — named people first, search in plain sight
 
     const { captions } = await openFacePicker(page, assetId);
 
-    const { people } = await (await servedPeople).json();
+    const peopleResponse = await servedPeople;
+    const { people } = await peopleResponse.json();
     expect(people.map((person: { name: string }) => person.name)).toEqual(['', firstAlphabetically, namedPerson]);
 
     // Alphabetical among the named, cluster last — and note the named pair arrives already sorted,
