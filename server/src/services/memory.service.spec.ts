@@ -1046,6 +1046,33 @@ describe(MemoryService.name, () => {
       expect(mocks.memory.delete).not.toHaveBeenCalled();
     });
 
+    // Pins the claim-order guarantee spec §5.2 is built on: a rule memory must claim ahead of a
+    // plain on_this_day card. Both sides get enough unshared assets to clear their own floor no
+    // matter who claims first, so an inverted RANK_ON_THIS_DAY/RANK_RULE ordering changes the
+    // outcome (which memory gets stripped) rather than being masked by an under-floor delete.
+    it('pins claim order: a rule memory claims ahead of on_this_day', async () => {
+      const shared = ids('x', 2);
+      mocks.memory.getForOverlapReconcile.mockResolvedValue([
+        overlapRow({
+          id: 'season',
+          assets: [...shared, ...ids('s', 10)],
+          data: { ruleId: 'season_recap', score: 130 },
+        }),
+        overlapRow({
+          id: 'otd',
+          assets: [...shared, ...ids('o', 3)],
+          type: MemoryType.OnThisDay,
+          data: { year: 2025 },
+        }),
+      ] as any);
+
+      await runJob();
+
+      expect(mocks.memory.removeAssetIds).toHaveBeenCalledExactlyOnceWith('otd', shared);
+      expect(mocks.memory.removeAssetIds).not.toHaveBeenCalledWith('season', expect.anything());
+      expect(mocks.memory.delete).not.toHaveBeenCalled();
+    });
+
     it('S9: deletes a memory whose assets are all archived, trashed or hidden', async () => {
       // The repository query already filtered them out, so the service simply sees an empty list.
       mocks.memory.getForOverlapReconcile.mockResolvedValue([
