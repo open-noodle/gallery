@@ -6,7 +6,7 @@ const AlbumNameSchema = z
     id: z.string(),
     albumName: z.string(),
     albumThumbnailAssetId: z.string().nullable(),
-    assetCount: z.number(),
+    assetCount: z.int(),
     startDate: z.string().optional(),
     endDate: z.string().optional(),
     shared: z.boolean(),
