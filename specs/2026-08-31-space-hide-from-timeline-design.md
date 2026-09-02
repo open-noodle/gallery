@@ -878,8 +878,13 @@ personal-timeline surfaces. The `'none'` rows are reachability/RBAC checks and m
 
 No site required guessing: each `'none'` either carries a doc comment stating it is reachability-only,
 or is plainly not a browse surface (RBAC checks, face-cleanup anti-joins, representative-face validity).
-The **empty `server/src/queries/` diff** after the refactor is the independent proof that none were
-mis-mapped — a wrong value changes emitted SQL even on surfaces no test covers.
+
+The **empty `server/src/queries/` diff** after the refactor is strong independent evidence that none were
+mis-mapped: a wrong value changes emitted SQL, and that shows up whether or not a test exercises the
+surface. **Its limit, stated precisely:** `sync-sql` only captures queries reachable from
+`@GenerateSql`-decorated repository methods. A site inside an undecorated helper contributes only via
+its decorated callers, so the check is broad but not provably total. It is a very good check, not a
+proof — pair it with the triage table rather than treating either as sufficient alone.
 
 ## 12. Out of scope
 
