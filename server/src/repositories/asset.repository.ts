@@ -146,6 +146,13 @@ export interface TimeBucketOptions extends AssetBuilderOptions {
   bucketSize?: TimeBucketSize;
   /** Consumed by getTimeBucketCovers only; ignored by getTimeBuckets. */
   timeBuckets?: string[];
+  /**
+   * #1041: the REQUESTING user's own id, distinct from `userIds` (which also carries partner ids
+   * — timeline.service.ts pushes `getMyPartnerIds` into it). Not yet consumed by this repository;
+   * a future subtraction that must apply only to the caller's own assets — never a partner's —
+   * needs this to distinguish the two. See §6.4 of the hide-from-timeline design doc.
+   */
+  callerId?: string;
 }
 
 export interface TimeBucketItem {

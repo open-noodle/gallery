@@ -67,9 +67,13 @@ export class TimelineService extends BaseService {
 
     let userIds: string[] | undefined;
     let timelineSpaceIds: string[] | undefined;
+    // #1041: the REQUESTING user's own id, distinct from `userIds` below (which also carries
+    // partner ids). Not yet consumed by the repository — see TimeBucketOptions.callerId.
+    let callerId: string | undefined;
 
     if (userId) {
       userIds = [userId];
+      callerId = auth.user.id;
       if (dto.withPartners) {
         const partnerIds = await getMyPartnerIds({
           userId: auth.user.id,
@@ -96,7 +100,7 @@ export class TimelineService extends BaseService {
 
     const scopedOptions = await this.resolveScopedPersonFilters(auth, { ...options, timelineSpaceIds });
 
-    return { ...scopedOptions, bucketSize: dto.bucketSize ?? TimeBucketSize.Month, userIds, albumSpaceIds };
+    return { ...scopedOptions, bucketSize: dto.bucketSize ?? TimeBucketSize.Month, userIds, albumSpaceIds, callerId };
   }
 
   private async resolveScopedPersonFilters(auth: AuthDto, options: TimeBucketOptions): Promise<TimeBucketOptions> {
