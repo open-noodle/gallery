@@ -2,6 +2,7 @@
   import {
     addParticipant,
     createUnion,
+    deleteUnion,
     FamilyParticipantKind,
     FamilyParticipantRole,
     getAllPeople,
@@ -583,6 +584,20 @@
     editingUnionId = editingUnionId === unionId ? null : unionId;
   };
 
+  // Deletes the RELATIONSHIP, not the people — they stay in the library and in every other union
+  // they belong to. Reloads rather than patching locally: dropping a union can strand people the
+  // graph reached only through it, which changes labels well beyond the pill that was clicked.
+  async function handleUnionDelete(unionId: string) {
+    try {
+      await deleteUnion({ id: unionId });
+      editingUnionId = null;
+      workingUnions = workingUnions.filter((union) => union.id !== unionId);
+      onGraphChanged?.();
+    } catch {
+      // Leaves the editor open rather than closing as though it had worked.
+    }
+  }
+
   async function handleUnionSave(unionId: string, payload: FamilyUnionEditorSave) {
     try {
       await updateUnion({
@@ -647,12 +662,14 @@
     </div>
   </div>
 
-  <div class="grid grid-cols-1 border-t border-gray-200 md:grid-cols-[13rem_minmax(0,1fr)] dark:border-gray-800">
+  <div
+    class="grid min-h-0 grid-cols-1 border-t border-gray-200 md:grid-cols-[13rem_minmax(0,1fr)] dark:border-gray-800"
+  >
     {#if canContribute}
       <!-- Tray: the drag source for anyone not already on the canvas (mockup §1) -->
       <aside
         data-testid="family-tray"
-        class="flex min-w-0 flex-col gap-3 border-b border-gray-200 bg-gray-50 p-3 md:border-r md:border-b-0 dark:border-gray-800 dark:bg-gray-900/40"
+        class="flex min-h-0 min-w-0 flex-col gap-3 border-b border-gray-200 bg-gray-50 p-3 md:border-r md:border-b-0 dark:border-gray-800 dark:bg-gray-900/40"
       >
         <h4 class="text-xs font-semibold tracking-wide text-gray-500 uppercase">{trayTitle}</h4>
 
@@ -664,7 +681,7 @@
           oninput={onTrayInput}
         />
 
-        <div class="grid max-h-72 grid-cols-3 gap-2 overflow-y-auto md:max-h-104">
+        <div class="grid max-h-72 min-h-0 flex-1 grid-cols-3 content-start gap-2 overflow-y-auto md:max-h-none">
           {#each trayPeople as person (person.id)}
             <!-- One element for both modes: dragging it places the person on the canvas, and
                  while the tray is picking a root a click nominates them instead. A button rather
@@ -708,7 +725,7 @@
         {/if}
 
         <p
-          class="border-t border-dashed border-gray-300 pt-2 text-[11px] leading-snug text-gray-500 dark:border-gray-700"
+          class="mt-auto border-t border-dashed border-gray-300 pt-2 text-[11px] leading-snug text-gray-500 dark:border-gray-700"
         >
           {$t('family_canvas_tray_note')}
         </p>
@@ -1081,6 +1098,7 @@
                   endDate={union.endDate}
                   onSave={(payload) => handleUnionSave(union.unionId, payload)}
                   onCancel={() => (editingUnionId = null)}
+                  onDelete={() => void handleUnionDelete(union.unionId)}
                 />
               </div>
             {/if}
