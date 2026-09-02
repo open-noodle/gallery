@@ -27,6 +27,12 @@
     total?: number;
     /** Re-runs the current search — used to restore results after an undone delete. */
     onReload?: () => void;
+    /**
+     * Reports the scroll offset of the results grid. This section is the only scrolling element on
+     * the surface, so a host that shrinks its chrome as the reader scrolls — the space shell
+     * collapsing its cover — has no other way to hear about it (#1028). Mirrors `Timeline`'s prop.
+     */
+    onScroll?: (scrollTop: number) => void;
   }
 
   let {
@@ -41,6 +47,7 @@
     sortMode,
     total,
     onReload,
+    onScroll,
   }: Props = $props();
 
   let isViewerOpen = $state(false);
@@ -120,6 +127,8 @@
   bind:this={scrollContainer}
   bind:clientHeight={viewport.height}
   class="flex-1 immich-scrollbar overflow-y-auto p-4"
+  data-testid="search-results-scroller"
+  onscroll={() => onScroll?.(scrollContainer?.scrollTop ?? 0)}
 >
   {#if isLoading && results.length === 0}
     <div class="flex justify-center py-8" data-testid="search-loading">
