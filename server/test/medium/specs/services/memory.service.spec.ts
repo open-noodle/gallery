@@ -1569,6 +1569,141 @@ describe(MemoryService.name, () => {
     });
   });
 
+  describe('onMemoriesCreate — overlap reconciliation (end-to-end)', () => {
+    it('drops the thin overlapping cards on a modest library', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+
+      // ~30 photos across September 2025, two of them on the 2nd.
+      for (let index = 0; index < 30; index++) {
+        await seedRuleAsset(ctx, {
+          ownerId: user.id,
+          localDateTime: `2025-09-${String((index % 28) + 1).padStart(2, '0')}T12:00:00Z`,
+        });
+      }
+
+      vi.setSystemTime(new Date('2026-09-01T02:00:00Z'));
+      await sut.onMemoriesCreate();
+
+      const memories = await sut.search(factory.auth({ user }), {});
+      const titles = memories.map((memory) => memory.title);
+
+      // The season recap claims first; the month recap starves out (it can only ever pick a
+      // subset of the same September pool, and the season recap already claims the lot).
+      expect(titles).toContain('Autumn 2025');
+      expect(titles).not.toContain('September 2025');
+    });
+
+    it('keeps all three cards on a large library, with disjoint photos and different covers', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+
+      for (let index = 0; index < 600; index++) {
+        const month = 9 + Math.floor(index / 200);
+        const day = (index % 28) + 1;
+        await seedRuleAsset(ctx, {
+          ownerId: user.id,
+          localDateTime: `2025-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T12:00:00Z`,
+        });
+      }
+
+      vi.setSystemTime(new Date('2026-09-01T02:00:00Z'));
+      await sut.onMemoriesCreate();
+
+      const memories = await sut.search(factory.auth({ user }), {});
+
+      // All three of the reporter's cards survive: the season recap, the month recap (with
+      // enough of the September pool left over after the season recap claims first), and the
+      // plain on_this_day card (untitled — title is only set for MemoryType.Rule).
+      const titles = memories.map((memory) => memory.title);
+      expect(titles).toContain('Autumn 2025');
+      expect(titles).toContain('September 2025');
+      expect(memories).toHaveLength(3);
+
+      const assetIdSets = memories.map((memory) => memory.assets.map((asset) => asset.id));
+
+      // No photo appears in two memories.
+      const all = assetIdSets.flat();
+      expect(new Set(all).size).toBe(all.length);
+
+      // Every cover is distinct — this is the reported symptom.
+      const covers = assetIdSets.map((ids) => ids[0]);
+      expect(new Set(covers).size).toBe(covers.length);
+    });
+
+    it('makes no further changes on a second run', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+
+      for (let index = 0; index < 120; index++) {
+        await seedRuleAsset(ctx, {
+          ownerId: user.id,
+          localDateTime: `2025-09-${String((index % 28) + 1).padStart(2, '0')}T12:00:00Z`,
+        });
+      }
+
+      vi.setSystemTime(new Date('2026-09-01T02:00:00Z'));
+      await sut.onMemoriesCreate();
+
+      const snapshot = await ctx.database
+        .selectFrom('memory_asset')
+        .select(['memoriesId', 'assetId'])
+        .orderBy('memoriesId')
+        .orderBy('assetId')
+        .execute();
+
+      // Non-empty, so the equality below isn't vacuously true of two empty result sets.
+      expect(snapshot.length).toBeGreaterThan(0);
+
+      await sut.onMemoriesCreate();
+
+      const after = await ctx.database
+        .selectFrom('memory_asset')
+        .select(['memoriesId', 'assetId'])
+        .orderBy('memoriesId')
+        .orderBy('assetId')
+        .execute();
+
+      expect(after).toEqual(snapshot);
+    });
+
+    it('never deletes a memory created through the API', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+
+      const { asset: first } = await ctx.newAsset({ ownerId: user.id, localDateTime: '2025-09-02T12:00:00Z' });
+      const { asset: second } = await ctx.newAsset({ ownerId: user.id, localDateTime: '2025-09-02T12:01:00Z' });
+
+      const manual = await sut.create(factory.auth({ user }), {
+        type: MemoryType.OnThisDay,
+        data: { year: 2025 },
+        memoryAt: new Date('2025-09-02T12:00:00Z'),
+        assetIds: [first.id, second.id],
+        isSaved: false,
+      });
+
+      vi.setSystemTime(new Date('2026-09-01T02:00:00Z'));
+      await sut.onMemoriesCreate();
+
+      const stillThere = await ctx.database
+        .selectFrom('memory')
+        .select('id')
+        .where('id', '=', manual.id)
+        .executeTakeFirst();
+
+      expect(stillThere).toBeDefined();
+
+      // Untouched, not merely un-deleted: both assets are still attached, neither stripped away
+      // by the reconciliation sweep despite carrying the same MemoryType as a generated on_this_day.
+      const attachedAssetIds = await ctx.database
+        .selectFrom('memory_asset')
+        .select('assetId')
+        .where('memoriesId', '=', manual.id)
+        .execute();
+      expect(attachedAssetIds.map((row) => row.assetId).toSorted()).toEqual([first.id, second.id].toSorted());
+    });
+  });
+
   describe('onMemoriesCleanup', () => {
     it('should run without error', async () => {
       const { sut } = setup();
