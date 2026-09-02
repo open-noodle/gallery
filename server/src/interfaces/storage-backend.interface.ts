@@ -35,7 +35,31 @@ export type ServeStrategy =
   /** `contentRange` is set only when the backend honored a requested range, and drives the 206 response. */
   | { type: 'stream'; stream: Readable; length?: number; contentRange?: string };
 
+/**
+ * S3 server-side encryption configuration. Only SSE-C ("mode: 'sse-c'") is implemented today.
+ * The type is a discriminated union so a future SSE-KMS mode can be added without reshaping
+ * the config that already exists. See specs/2026-09-02-s3-sse-c-encryption-design.md.
+ */
+export type S3SseConfig =
+  | { mode: 'none' }
+  | {
+      mode: 'sse-c';
+      /** Raw 32-byte AES-256 key, decoded from IMMICH_S3_SSE_C_KEY (base64). */
+      key: Buffer;
+      /** MD5 digest of `key`, precomputed once so it isn't recomputed per-request. */
+      keyMd5: Buffer;
+    };
+
 export interface StorageBackend {
+  /**
+   * Whether `getReadableUrl` returns something a browser or a bare `ffprobe <url>` invocation can
+   * fetch on its own. False for an S3 backend with SSE-C active: a presigned URL cannot carry the
+   * `x-amz-server-side-encryption-customer-key*` headers S3 requires to decrypt the object, so
+   * callers must fall back to `downloadToTemp` instead. Always true for disk and for S3 with no
+   * server-side encryption (or, in the future, SSE-KMS, which needs no such headers on GET).
+   */
+  readonly supportsReadableUrl: boolean;
+
   /** Write content to the given key */
   put(key: string, source: Readable | Buffer, metadata?: { contentType?: string }): Promise<void>;
 

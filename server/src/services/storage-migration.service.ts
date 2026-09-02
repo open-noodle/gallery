@@ -339,6 +339,207 @@ export class StorageMigrationService extends BaseService {
     return { rolledBack, failed, total };
   }
 
+  // --- S3 enable-encryption-in-place migration ---
+  //
+  // Distinct from disk<->S3 migration above: the object's key never changes here, only its
+  // encryption state, so there is no DB path update and no rollback-by-path-swap. Progress is
+  // tracked via the same storage_migration_log table (direction='s3EnableEncryption'), which
+  // doubles as the idempotency check since reencryptInPlace itself is not safely re-runnable
+  // against an object it already encrypted (see isS3EncryptionLogged).
+
+  private static readonly S3_ENABLE_ENCRYPTION_DIRECTION = 's3EnableEncryption';
+
+  private getEnabledS3EncryptionFileTypes(fileTypes: StorageMigrationFileTypes): AssetFileType[] {
+    const types: AssetFileType[] = [];
+    if (fileTypes.thumbnails) {
+      types.push(AssetFileType.Thumbnail);
+    }
+    if (fileTypes.previews) {
+      types.push(AssetFileType.Preview);
+    }
+    if (fileTypes.fullsize) {
+      types.push(AssetFileType.FullSize);
+    }
+    if (fileTypes.sidecars) {
+      types.push(AssetFileType.Sidecar);
+    }
+    return types;
+  }
+
+  private validateS3EncryptionConfig(): void {
+    if (this.configRepository.getEnv().storage.s3.sse.mode !== 'sse-c') {
+      throw new BadRequestException('IMMICH_S3_SSE_MODE must be set to sse-c to enable S3 encryption');
+    }
+  }
+
+  async getS3EncryptionEstimate() {
+    const fileCounts = await this.storageMigrationRepository.getS3FileCounts();
+    const total =
+      fileCounts.originals +
+      fileCounts.thumbnails +
+      fileCounts.previews +
+      fileCounts.fullsize +
+      fileCounts.sidecars +
+      fileCounts.encodedVideos +
+      fileCounts.personThumbnails +
+      fileCounts.profileImages;
+
+    return { fileCounts: { ...fileCounts, total } };
+  }
+
+  async startS3Encryption(options: { fileTypes: StorageMigrationFileTypes; concurrency: number }) {
+    this.validateS3EncryptionConfig();
+    await this.validateS3Connection();
+
+    const fileCounts = await this.storageMigrationRepository.getS3FileCounts();
+    const total =
+      fileCounts.originals +
+      fileCounts.thumbnails +
+      fileCounts.previews +
+      fileCounts.fullsize +
+      fileCounts.sidecars +
+      fileCounts.encodedVideos +
+      fileCounts.personThumbnails +
+      fileCounts.profileImages;
+    if (total === 0) {
+      throw new BadRequestException('No S3 files to encrypt');
+    }
+
+    const isActive = await this.jobRepository.isActive(QueueName.StorageBackendMigration);
+    if (isActive) {
+      throw new BadRequestException('A storage migration is already in progress');
+    }
+
+    const batchId = randomUUID();
+
+    await this.jobRepository.queue({
+      name: JobName.S3EnableEncryptionQueueAll,
+      data: { ...options, batchId },
+    });
+
+    return { batchId };
+  }
+
+  async getS3EncryptionStatus() {
+    const [isActive, counts] = await Promise.all([
+      this.jobRepository.isActive(QueueName.StorageBackendMigration),
+      this.jobRepository.getJobCounts(QueueName.StorageBackendMigration),
+    ]);
+
+    return { isActive, ...counts };
+  }
+
+  @OnJob({ name: JobName.S3EnableEncryptionQueueAll, queue: QueueName.StorageBackendMigration })
+  async handleS3EnableEncryptionQueueAll(job: JobOf<JobName.S3EnableEncryptionQueueAll>): Promise<JobStatus> {
+    const { fileTypes, concurrency, batchId } = job;
+
+    this.validateS3EncryptionConfig();
+    this.jobRepository.setConcurrency(QueueName.StorageBackendMigration, concurrency);
+
+    let totalQueued = 0;
+    const batch: Array<{
+      name: JobName.S3EnableEncryptionSingle;
+      data: JobOf<JobName.S3EnableEncryptionSingle>;
+    }> = [];
+
+    const flushBatch = async () => {
+      if (batch.length === 0) {
+        return;
+      }
+      await this.jobRepository.queueAll([...batch]);
+      totalQueued += batch.length;
+      this.logger.log(`Queued ${totalQueued} S3 files for encryption`);
+      batch.length = 0;
+    };
+
+    const enqueue = async (data: JobOf<JobName.S3EnableEncryptionSingle>) => {
+      batch.push({ name: JobName.S3EnableEncryptionSingle, data });
+      if (batch.length >= 1000) {
+        await flushBatch();
+      }
+    };
+
+    if (fileTypes.originals) {
+      for await (const row of this.storageMigrationRepository.streamS3Originals()) {
+        await enqueue({ entityType: 'asset', entityId: row.id, fileType: 'original', key: row.originalPath, batchId });
+      }
+    }
+
+    const assetFileTypes = this.getEnabledS3EncryptionFileTypes(fileTypes);
+    if (assetFileTypes.length > 0) {
+      for await (const row of this.storageMigrationRepository.streamS3AssetFiles(assetFileTypes)) {
+        await enqueue({ entityType: 'assetFile', entityId: row.id, fileType: row.type, key: row.path, batchId });
+      }
+    }
+
+    if (fileTypes.encodedVideos) {
+      for await (const row of this.storageMigrationRepository.streamS3EncodedVideos()) {
+        await enqueue({ entityType: 'asset', entityId: row.assetId, fileType: 'encodedVideo', key: row.path, batchId });
+      }
+    }
+
+    if (fileTypes.personThumbnails) {
+      for await (const row of this.storageMigrationRepository.streamS3PersonThumbnails()) {
+        await enqueue({ entityType: 'person', entityId: row.id, fileType: null, key: row.thumbnailPath, batchId });
+      }
+    }
+
+    if (fileTypes.profileImages) {
+      for await (const row of this.storageMigrationRepository.streamS3ProfileImages()) {
+        await enqueue({ entityType: 'user', entityId: row.id, fileType: null, key: row.profileImagePath, batchId });
+      }
+    }
+
+    await flushBatch();
+
+    this.logger.log(`Finished queueing ${totalQueued} S3 files for encryption (batchId=${batchId})`);
+    return JobStatus.Success;
+  }
+
+  @OnJob({ name: JobName.S3EnableEncryptionSingle, queue: QueueName.StorageBackendMigration })
+  async handleS3EnableEncryptionSingle(job: JobOf<JobName.S3EnableEncryptionSingle>): Promise<JobStatus> {
+    const { entityType, entityId, fileType, key, batchId } = job;
+    const direction = StorageMigrationService.S3_ENABLE_ENCRYPTION_DIRECTION;
+
+    try {
+      const s3Backend = StorageService.getS3Backend();
+      if (!s3Backend) {
+        throw new BadRequestException('S3 storage backend is not configured');
+      }
+
+      // Idempotency: reencryptInPlace is not safely re-runnable against an object it already
+      // encrypted (S3 would need CopySource decrypt headers this call deliberately omits), so
+      // completion is tracked via the migration log rather than by probing object state.
+      const alreadyDone = await this.storageMigrationRepository.isS3EncryptionLogged(direction, key);
+      if (alreadyDone) {
+        return JobStatus.Skipped;
+      }
+
+      const exists = await s3Backend.exists(key);
+      if (!exists) {
+        this.logger.warn(`Source file not found, skipping: ${key}`);
+        return JobStatus.Skipped;
+      }
+
+      await s3Backend.reencryptInPlace(key);
+
+      await this.storageMigrationRepository.createLogEntry({
+        entityType,
+        entityId,
+        fileType,
+        oldPath: key,
+        newPath: key,
+        direction,
+        batchId,
+      });
+
+      return JobStatus.Success;
+    } catch (error: any) {
+      this.logger.error(`Failed to encrypt file ${key}: ${error.message}`, error.stack);
+      return JobStatus.Failed;
+    }
+  }
+
   private resolveSourceBackend(direction: StorageMigrationDirection) {
     if (direction === 'toS3') {
       return StorageService.getDiskBackend();

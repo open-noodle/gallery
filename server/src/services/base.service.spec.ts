@@ -57,4 +57,37 @@ describe(BaseService.name, () => {
       await expect((sut as any).ensureLocalFile('upload/user/abc.jpg')).rejects.toThrow('S3 unavailable');
     });
   });
+
+  describe('getProbeInput', () => {
+    it('returns the path as-is for absolute paths', async () => {
+      const result = await (sut as any).getProbeInput('/var/lib/immich/upload/video.mp4');
+      expect(result).toBe('/var/lib/immich/upload/video.mp4');
+    });
+
+    it('returns a presigned url when the backend supports readable urls', async () => {
+      const getReadableUrl = vi.fn().mockResolvedValue('https://bucket.s3/key?X-Amz-Signature=abc');
+      const backend = { supportsReadableUrl: true, getReadableUrl };
+      const { StorageService } = await import('src/services/storage.service.js');
+      vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue(backend as any);
+
+      const result = await (sut as any).getProbeInput('upload/user/video.mp4');
+
+      expect(result).toBe('https://bucket.s3/key?X-Amz-Signature=abc');
+      expect(getReadableUrl).toHaveBeenCalledWith('upload/user/video.mp4');
+    });
+
+    it('falls back to downloadToTemp when the backend does not support readable urls (SSE-C)', async () => {
+      const getReadableUrl = vi.fn();
+      const downloadToTemp = vi.fn().mockResolvedValue({ tempPath: '/tmp/video.mp4', cleanup: vi.fn() });
+      const backend = { supportsReadableUrl: false, getReadableUrl, downloadToTemp };
+      const { StorageService } = await import('src/services/storage.service.js');
+      vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue(backend as any);
+
+      const result = await (sut as any).getProbeInput('upload/user/video.mp4');
+
+      expect(result).toBe('/tmp/video.mp4');
+      expect(downloadToTemp).toHaveBeenCalledWith('upload/user/video.mp4');
+      expect(getReadableUrl).not.toHaveBeenCalled();
+    });
+  });
 });

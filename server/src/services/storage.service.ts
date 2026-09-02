@@ -15,7 +15,7 @@ import {
   StorageFolder,
   SystemMetadataKey,
 } from 'src/enum';
-import { StorageBackend } from 'src/interfaces/storage-backend.interface';
+import { S3SseConfig, StorageBackend } from 'src/interfaces/storage-backend.interface';
 import { BaseService } from 'src/services/base.service';
 import { JobOf, SystemFlags } from 'src/types';
 import { ImmichStartupError } from 'src/utils/misc';
@@ -73,6 +73,22 @@ export class StorageService extends BaseService {
     return '/usr/src/app/upload';
   }
 
+  /**
+   * SSE-C requires 32 raw bytes for AES-256. Validated here (not in the zod env schema) so the
+   * error message can name the env var directly, matching how the S3-bucket-missing check below
+   * is also deferred to this fail-fast startup path rather than schema validation.
+   */
+  private validateS3Encryption(sse: S3SseConfig) {
+    if (sse.mode !== 'sse-c') {
+      return;
+    }
+    if (sse.key.length !== 32) {
+      throw new ImmichStartupError(
+        `IMMICH_S3_SSE_C_KEY must decode (base64) to exactly 32 bytes for AES-256, got ${sse.key.length}`,
+      );
+    }
+  }
+
   @OnEvent({ name: 'AppBootstrap', priority: BootstrapEventPriority.StorageService })
   async onBootstrap() {
     StorageCore.setMediaLocation(this.detectMediaLocation());
@@ -82,9 +98,26 @@ export class StorageService extends BaseService {
     StorageService.diskBackend = new DiskStorageBackend(StorageCore.getMediaLocation());
     StorageService.writeBackendType = envData.storage.backend;
 
+    this.validateS3Encryption(envData.storage.s3.sse);
+
+    // SSE-C objects cannot be served via a presigned redirect URL (S3 has no way to receive the
+    // customer-key headers on a bare browser fetch), so serveMode=redirect + SSE-C is a hard
+    // startup failure rather than a silent fallback to proxy — see
+    // specs/2026-09-02-s3-sse-c-encryption-design.md for why a silent override was rejected.
+    if (envData.storage.s3.sse.mode === 'sse-c' && envData.storage.s3.serveMode === 'redirect') {
+      throw new ImmichStartupError(
+        'IMMICH_S3_SSE_MODE=sse-c requires IMMICH_S3_SERVE_MODE=proxy: a presigned redirect URL ' +
+          'cannot carry the SSE-C decryption headers S3 requires, so redirect-mode serving is ' +
+          'incompatible with SSE-C. Set IMMICH_S3_SERVE_MODE=proxy explicitly to proceed.',
+      );
+    }
+
     if (envData.storage.s3.bucket) {
       StorageService.s3Backend = new S3StorageBackend(envData.storage.s3);
       this.logger.log(`S3 storage backend configured (bucket: ${envData.storage.s3.bucket})`);
+      if (envData.storage.s3.sse.mode === 'sse-c') {
+        this.logger.log('S3 server-side encryption with customer-provided keys (SSE-C) is active');
+      }
     }
 
     if (envData.storage.backend === 's3' && !StorageService.s3Backend) {

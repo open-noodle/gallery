@@ -95,6 +95,7 @@ export const envData: EnvData = {
       secretAccessKey: undefined,
       presignedUrlExpiry: 3600,
       serveMode: 'redirect',
+      sse: { mode: 'none' },
     },
   },
 
@@ -119,13 +120,17 @@ export const envData: EnvData = {
 };
 
 type MockEnvOverrides = Omit<Partial<EnvData>, 'storage'> & {
-  storage?: Partial<EnvData['storage']>;
+  storage?: Omit<Partial<EnvData['storage']>, 's3'> & { s3?: Partial<EnvData['storage']['s3']> };
 };
 
 export const mockEnvData = (config: MockEnvOverrides): EnvData => ({
   ...envData,
   ...config,
-  storage: { ...envData.storage, ...config.storage },
+  storage: {
+    ...envData.storage,
+    ...config.storage,
+    s3: { ...envData.storage.s3, ...config.storage?.s3 },
+  },
 });
 export const newConfigRepositoryMock = (): Mocked<RepositoryInterface<ConfigRepository>> => {
   return {

@@ -458,6 +458,34 @@ export interface IStorageMigrationQueueAllJob {
   batchId: string;
 }
 
+/**
+ * Re-encrypts an already-existing S3 object in place with the currently-configured SSE-C key,
+ * via CopyObject self-copy (see S3StorageBackend.reencryptInPlace) — no DB path change, unlike
+ * IStorageMigrationJob, since the key doesn't move, only its encryption state changes.
+ */
+export interface IS3EnableEncryptionJob {
+  entityType: 'asset' | 'assetFile' | 'person' | 'user';
+  entityId: string;
+  fileType: string | null;
+  key: string;
+  batchId: string;
+}
+
+export interface IS3EnableEncryptionQueueAllJob {
+  fileTypes: {
+    originals: boolean;
+    thumbnails: boolean;
+    previews: boolean;
+    fullsize: boolean;
+    encodedVideos: boolean;
+    sidecars: boolean;
+    personThumbnails: boolean;
+    profileImages: boolean;
+  };
+  concurrency: number;
+  batchId: string;
+}
+
 export interface JobCounts {
   active: number;
   completed: number;
@@ -606,6 +634,10 @@ export type JobItem =
   // Storage Backend Migration
   | { name: JobName.StorageBackendMigrationQueueAll; data: IStorageMigrationQueueAllJob }
   | { name: JobName.StorageBackendMigrationSingle; data: IStorageMigrationJob }
+
+  // S3 SSE-C Encryption (enable-encryption-in-place migration)
+  | { name: JobName.S3EnableEncryptionQueueAll; data: IS3EnableEncryptionQueueAllJob }
+  | { name: JobName.S3EnableEncryptionSingle; data: IS3EnableEncryptionJob }
 
   // Shared Space Face Recognition
   | { name: JobName.SharedSpaceFaceMatch; data: ISharedSpaceFaceMatchJob }

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { ImmichTelemetry } from 'src/enum';
 import { clearEnvCache, ConfigRepository } from 'src/repositories/config.repository';
 
@@ -48,6 +49,8 @@ const resetEnv = () => {
     'IMMICH_S3_SECRET_ACCESS_KEY',
     'IMMICH_S3_PRESIGNED_URL_EXPIRY',
     'IMMICH_S3_SERVE_MODE',
+    'IMMICH_S3_SSE_MODE',
+    'IMMICH_S3_SSE_C_KEY',
   ]) {
     delete process.env[env];
   }
@@ -374,6 +377,7 @@ describe('getEnv', () => {
         secretAccessKey: 'minioadmin',
         presignedUrlExpiry: 7200,
         serveMode: 'proxy',
+        sse: { mode: 'none' },
       });
     });
 
@@ -391,6 +395,39 @@ describe('getEnv', () => {
         secretAccessKey: undefined,
         presignedUrlExpiry: 3600,
         serveMode: 'redirect',
+        sse: { mode: 'none' },
+      });
+    });
+
+    describe('sse-c', () => {
+      it('should default to no encryption', () => {
+        const { storage } = getEnv();
+        expect(storage.s3.sse).toEqual({ mode: 'none' });
+      });
+
+      it('should ignore an SSE-C key when SSE mode is not set to sse-c', () => {
+        process.env.IMMICH_S3_SSE_C_KEY = Buffer.alloc(32, 7).toString('base64');
+        const { storage } = getEnv();
+        expect(storage.s3.sse).toEqual({ mode: 'none' });
+      });
+
+      it('should parse and decode a base64 SSE-C key once at config-load time', () => {
+        const rawKey = Buffer.alloc(32, 7);
+        process.env.IMMICH_S3_SSE_MODE = 'sse-c';
+        process.env.IMMICH_S3_SSE_C_KEY = rawKey.toString('base64');
+
+        const { storage } = getEnv();
+
+        expect(storage.s3.sse.mode).toBe('sse-c');
+        if (storage.s3.sse.mode === 'sse-c') {
+          expect(storage.s3.sse.key).toEqual(rawKey);
+          expect(storage.s3.sse.keyMd5).toEqual(createHash('md5').update(rawKey).digest());
+        }
+      });
+
+      it('should reject an SSE mode that is not none or sse-c', () => {
+        process.env.IMMICH_S3_SSE_MODE = 'sse-kms';
+        expect(() => getEnv()).toThrow(/Invalid environment variables/);
       });
     });
   });

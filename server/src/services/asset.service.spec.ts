@@ -2741,7 +2741,10 @@ describe(AssetService.name, () => {
       const assetId = newUuid();
       const getReadableUrl = vi.fn().mockResolvedValue('https://bucket.s3/key?X-Amz-Signature=abc');
       const { StorageService } = await import('src/services/storage.service.js');
-      vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue({ getReadableUrl } as any);
+      vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue({
+        getReadableUrl,
+        supportsReadableUrl: true,
+      } as any);
 
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
       mocks.asset.getForEdit.mockResolvedValue({
@@ -2782,7 +2785,10 @@ describe(AssetService.name, () => {
       const assetId = newUuid();
       const getReadableUrl = vi.fn().mockResolvedValue('https://bucket.s3/key?X-Amz-Signature=SECRET');
       const { StorageService } = await import('src/services/storage.service.js');
-      vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue({ getReadableUrl } as any);
+      vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue({
+        getReadableUrl,
+        supportsReadableUrl: true,
+      } as any);
 
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
       mocks.asset.getForEdit.mockResolvedValue({
@@ -2838,7 +2844,10 @@ describe(AssetService.name, () => {
       const assetId = newUuid();
       const getReadableUrl = vi.fn().mockResolvedValue('https://bucket.s3/key?X-Amz-Signature=abc');
       const { StorageService } = await import('src/services/storage.service.js');
-      vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue({ getReadableUrl } as any);
+      vi.spyOn(StorageService, 'resolveBackendForKey').mockReturnValue({
+        getReadableUrl,
+        supportsReadableUrl: true,
+      } as any);
 
       mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([assetId]));
       mocks.asset.getForEdit.mockResolvedValue({

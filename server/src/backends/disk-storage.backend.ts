@@ -6,6 +6,8 @@ import { pipeline } from 'node:stream/promises';
 import { ServeOptions, ServeStrategy, StorageBackend } from 'src/interfaces/storage-backend.interface';
 
 export class DiskStorageBackend implements StorageBackend {
+  readonly supportsReadableUrl = true;
+
   constructor(private mediaLocation: string) {}
 
   private resolvePath(key: string): string {

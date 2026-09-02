@@ -75,6 +75,108 @@ export class StorageMigrationRepository {
       .stream();
   }
 
+  // --- S3-only streaming queries (enable-encryption-in-place migration) ---
+  //
+  // These are written as their own queries, not `streamOriginals('toDisk')` etc. (which happen
+  // to use the same `not like '/%'` filter, since a relative key means "currently on S3"),
+  // because reusing the disk<->S3 migration's direction parameter to mean "give me S3 keys" here
+  // would be a confusing, easily-broken coupling if that filter's meaning ever changes.
+
+  streamS3Originals() {
+    return this.db.selectFrom('asset').select(['id', 'originalPath']).where('originalPath', 'not like', '/%').stream();
+  }
+
+  streamS3AssetFiles(fileTypes: AssetFileType[]) {
+    return this.db
+      .selectFrom('asset_file')
+      .select(['id', 'assetId', 'path', 'type'])
+      .where('type', 'in', fileTypes)
+      .where('path', 'not like', '/%')
+      .stream();
+  }
+
+  streamS3EncodedVideos() {
+    return this.db
+      .selectFrom('asset_file')
+      .select(['id', 'assetId', 'path', 'type'])
+      .where('type', '=', AssetFileType.EncodedVideo)
+      .where('path', 'not like', '/%')
+      .stream();
+  }
+
+  streamS3PersonThumbnails() {
+    return this.db
+      .selectFrom('person')
+      .select(['id', 'thumbnailPath'])
+      .where('thumbnailPath', '!=', '')
+      .where('thumbnailPath', 'not like', '/%')
+      .stream();
+  }
+
+  streamS3ProfileImages() {
+    return this.db
+      .selectFrom('user')
+      .select(['id', 'profileImagePath'])
+      .where('profileImagePath', '!=', '')
+      .where('profileImagePath', 'not like', '/%')
+      .stream();
+  }
+
+  async getS3FileCounts(): Promise<StorageMigrationFileCounts> {
+    const pathPattern = '/%';
+
+    const [originals, assetFiles, encodedVideos, personThumbnails, profileImages] = await Promise.all([
+      this.db
+        .selectFrom('asset')
+        .select((eb) => eb.fn.countAll<number>().as('count'))
+        .where('originalPath', 'not like', pathPattern)
+        .executeTakeFirstOrThrow(),
+
+      this.db
+        .selectFrom('asset_file')
+        .select((eb) => [
+          eb.fn.countAll<number>().filterWhere('type', '=', AssetFileType.Thumbnail).as('thumbnails'),
+          eb.fn.countAll<number>().filterWhere('type', '=', AssetFileType.Preview).as('previews'),
+          eb.fn.countAll<number>().filterWhere('type', '=', AssetFileType.FullSize).as('fullsize'),
+          eb.fn.countAll<number>().filterWhere('type', '=', AssetFileType.Sidecar).as('sidecars'),
+        ])
+        .where('path', 'not like', pathPattern)
+        .executeTakeFirstOrThrow(),
+
+      this.db
+        .selectFrom('asset_file')
+        .select((eb) => eb.fn.countAll<number>().as('count'))
+        .where('type', '=', AssetFileType.EncodedVideo)
+        .where('path', 'not like', pathPattern)
+        .executeTakeFirstOrThrow(),
+
+      this.db
+        .selectFrom('person')
+        .select((eb) => eb.fn.countAll<number>().as('count'))
+        .where('thumbnailPath', '!=', '')
+        .where('thumbnailPath', 'not like', pathPattern)
+        .executeTakeFirstOrThrow(),
+
+      this.db
+        .selectFrom('user')
+        .select((eb) => eb.fn.countAll<number>().as('count'))
+        .where('profileImagePath', '!=', '')
+        .where('profileImagePath', 'not like', pathPattern)
+        .executeTakeFirstOrThrow(),
+    ]);
+
+    return {
+      originals: originals.count,
+      thumbnails: assetFiles.thumbnails,
+      previews: assetFiles.previews,
+      fullsize: assetFiles.fullsize,
+      sidecars: assetFiles.sidecars,
+      encodedVideos: encodedVideos.count,
+      personThumbnails: personThumbnails.count,
+      profileImages: profileImages.count,
+    };
+  }
+
   // --- Estimate queries ---
 
   async getOriginalsSizeEstimate(direction: StorageMigrationDirection): Promise<number> {
@@ -215,5 +317,23 @@ export class StorageMigrationRepository {
 
   async deleteLogEntriesByBatch(batchId: string) {
     return this.db.deleteFrom('storage_migration_log').where('batchId', '=', batchId).execute();
+  }
+
+  /**
+   * Idempotency check for the enable-encryption migration: unlike the disk<->S3 migration
+   * (idempotent via `targetBackend.exists(targetPath)`, since the object moves to a new
+   * location), reencryptInPlace's source and destination key are the same, and re-running
+   * CopyObject on an object that's already SSE-C encrypted fails (S3 needs decrypt headers for
+   * an encrypted source, which reencryptInPlace deliberately does not send). So completion is
+   * tracked via this log table instead of by querying object state.
+   */
+  async isS3EncryptionLogged(direction: string, key: string): Promise<boolean> {
+    const row = await this.db
+      .selectFrom('storage_migration_log')
+      .select('id')
+      .where('direction', '=', direction)
+      .where('newPath', '=', key)
+      .executeTakeFirst();
+    return !!row;
   }
 }

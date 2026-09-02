@@ -451,6 +451,11 @@ export class BaseService {
    * Returns something ffmpeg/ffprobe can read directly: an absolute path as-is,
    * or a presigned URL for a storage-backend key. Unlike ensureLocalFile this
    * does NOT download the object, so it is safe to call inside a request handler.
+   *
+   * Exception: when the resolved backend has SSE-C active, a presigned URL cannot carry the
+   * customer-key headers S3 needs to decrypt the object (see StorageBackend.supportsReadableUrl),
+   * so this falls back to ensureLocalFile's download-to-temp bracket instead, losing the
+   * skip-the-download optimization in that case only.
    */
   protected async getProbeInput(filePath: string): Promise<string> {
     if (isAbsolute(filePath)) {
@@ -458,7 +463,12 @@ export class BaseService {
     }
     // lazy import to avoid circular dependency (StorageService extends BaseService)
     const { StorageService } = await import('./storage.service.js');
-    return StorageService.resolveBackendForKey(filePath).getReadableUrl(filePath);
+    const backend = StorageService.resolveBackendForKey(filePath);
+    if (!backend.supportsReadableUrl) {
+      const { localPath } = await this.ensureLocalFile(filePath);
+      return localPath;
+    }
+    return backend.getReadableUrl(filePath);
   }
 
   protected async getFaceThumbnailSource(assetId: string): Promise<string | null> {

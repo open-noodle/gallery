@@ -7,6 +7,7 @@ import { HelmetOptions } from 'helmet';
 import { RedisOptions } from 'ioredis';
 import { CLS_ID, ClsModuleOptions } from 'nestjs-cls';
 import { OpenTelemetryModuleOptions } from 'nestjs-otel/lib/interfaces';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { citiesFile, IWorker } from 'src/constants';
@@ -22,6 +23,7 @@ import {
   LogLevel,
   QueueName,
 } from 'src/enum';
+import { S3SseConfig } from 'src/interfaces/storage-backend.interface';
 import { VectorExtension } from 'src/types';
 import { setDifference } from 'src/utils/set';
 
@@ -125,6 +127,7 @@ export interface EnvData {
       secretAccessKey?: string;
       presignedUrlExpiry: number;
       serveMode: 'redirect' | 'proxy';
+      sse: S3SseConfig;
     };
   };
 
@@ -161,6 +164,24 @@ const TELEMETRY_TYPES = new Set(Object.values(ImmichTelemetry));
 const asSet = <T>(value: string | undefined, defaults: T[]) => {
   const values = (value || '').replaceAll(/\s/g, '').split(',').filter(Boolean);
   return new Set(values.length === 0 ? defaults : (values as T[]));
+};
+
+/**
+ * Parses the SSE-C key once at config-load time rather than per-request. Length validation
+ * (must decode to exactly 32 raw bytes for AES-256) happens in StorageService.onBootstrap, not
+ * here, so a bad key produces the fail-fast ImmichStartupError message instead of a generic
+ * "Invalid environment variables" one raised before any service has a chance to log context.
+ */
+const parseS3SseConfig = (mode: string | undefined, base64Key: string | undefined): S3SseConfig => {
+  if (mode !== 'sse-c') {
+    return { mode: 'none' };
+  }
+
+  // Decoded here (not just validated) so callers never touch the raw env var again; StorageService
+  // still re-validates the length before this config is trusted for real S3 calls.
+  const key = Buffer.from(base64Key || '', 'base64');
+  const keyMd5 = createHash('md5').update(key).digest();
+  return { mode: 'sse-c', key, keyMd5 };
 };
 
 const resolveHelmetFile = (helmetFile: 'true' | 'false' | string | undefined) => {
@@ -381,6 +402,7 @@ const getEnv = (): EnvData => {
         secretAccessKey: dto.IMMICH_S3_SECRET_ACCESS_KEY,
         presignedUrlExpiry: dto.IMMICH_S3_PRESIGNED_URL_EXPIRY || 3600,
         serveMode: (dto.IMMICH_S3_SERVE_MODE as 'redirect' | 'proxy') || 'redirect',
+        sse: parseS3SseConfig(dto.IMMICH_S3_SSE_MODE, dto.IMMICH_S3_SSE_C_KEY),
       },
     },
 

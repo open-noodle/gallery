@@ -454,6 +454,7 @@ describe(StorageService.name, () => {
               secretAccessKey: undefined,
               presignedUrlExpiry: 3600,
               serveMode: 'redirect',
+              sse: { mode: 'none' },
             },
           },
         }),
@@ -462,6 +463,111 @@ describe(StorageService.name, () => {
       await expect(sut.onBootstrap()).rejects.toThrow(
         'IMMICH_STORAGE_BACKEND is set to s3 but IMMICH_S3_BUCKET is not configured',
       );
+    });
+
+    describe('S3 SSE-C', () => {
+      const rawKey32 = Buffer.alloc(32, 9);
+
+      it('should throw ImmichStartupError when the SSE-C key does not decode to 32 bytes', async () => {
+        mocks.config.getEnv.mockReturnValue(
+          mockEnvData({
+            storage: {
+              backend: 's3' as any,
+              mediaLocation: '/data',
+              s3: {
+                bucket: 'test-bucket',
+                region: 'us-east-1',
+                endpoint: undefined,
+                accessKeyId: undefined,
+                secretAccessKey: undefined,
+                presignedUrlExpiry: 3600,
+                serveMode: 'proxy',
+                sse: { mode: 'sse-c', key: Buffer.alloc(16, 1), keyMd5: Buffer.alloc(16, 2) },
+              },
+            },
+          }),
+        );
+
+        await expect(sut.onBootstrap()).rejects.toThrow(
+          'IMMICH_S3_SSE_C_KEY must decode (base64) to exactly 32 bytes for AES-256, got 16',
+        );
+      });
+
+      it('should hard-fail when SSE-C is configured with serveMode redirect', async () => {
+        mocks.config.getEnv.mockReturnValue(
+          mockEnvData({
+            storage: {
+              backend: 's3' as any,
+              mediaLocation: '/data',
+              s3: {
+                bucket: 'test-bucket',
+                region: 'us-east-1',
+                endpoint: undefined,
+                accessKeyId: undefined,
+                secretAccessKey: undefined,
+                presignedUrlExpiry: 3600,
+                serveMode: 'redirect',
+                sse: { mode: 'sse-c', key: rawKey32, keyMd5: Buffer.alloc(16, 2) },
+              },
+            },
+          }),
+        );
+
+        await expect(sut.onBootstrap()).rejects.toThrow('IMMICH_S3_SSE_MODE=sse-c requires IMMICH_S3_SERVE_MODE=proxy');
+      });
+
+      it('should start successfully when SSE-C is configured with serveMode proxy', async () => {
+        mocks.systemMetadata.get.mockResolvedValue({ mountChecks: { upload: true } });
+        mocks.asset.getFileSamples.mockResolvedValue([]);
+        mocks.config.getEnv.mockReturnValue(
+          mockEnvData({
+            storage: {
+              backend: 's3' as any,
+              mediaLocation: '/data',
+              ignoreMountCheckErrors: false,
+              s3: {
+                bucket: 'test-bucket',
+                region: 'us-east-1',
+                endpoint: undefined,
+                accessKeyId: undefined,
+                secretAccessKey: undefined,
+                presignedUrlExpiry: 3600,
+                serveMode: 'proxy',
+                sse: { mode: 'sse-c', key: rawKey32, keyMd5: Buffer.alloc(16, 2) },
+              },
+            },
+          }),
+        );
+
+        await expect(sut.onBootstrap()).resolves.toBeUndefined();
+        expect(StorageService.getS3Backend()).toBeDefined();
+      });
+
+      it('should start successfully with no SSE and serveMode redirect (unaffected by the new checks)', async () => {
+        mocks.systemMetadata.get.mockResolvedValue({ mountChecks: { upload: true } });
+        mocks.asset.getFileSamples.mockResolvedValue([]);
+        mocks.config.getEnv.mockReturnValue(
+          mockEnvData({
+            storage: {
+              backend: 's3' as any,
+              mediaLocation: '/data',
+              ignoreMountCheckErrors: false,
+              s3: {
+                bucket: 'test-bucket',
+                region: 'us-east-1',
+                endpoint: undefined,
+                accessKeyId: undefined,
+                secretAccessKey: undefined,
+                presignedUrlExpiry: 3600,
+                serveMode: 'redirect',
+                sse: { mode: 'none' },
+              },
+            },
+          }),
+        );
+
+        await expect(sut.onBootstrap()).resolves.toBeUndefined();
+      });
     });
 
     it('should not skip mount checks when all flags are already set', async () => {

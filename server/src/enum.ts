@@ -1005,6 +1005,10 @@ export enum JobName {
   StorageBackendMigrationQueueAll = 'StorageBackendMigrationQueueAll',
   StorageBackendMigrationSingle = 'StorageBackendMigrationSingle',
 
+  // S3 SSE-C Encryption (enable-encryption-in-place migration)
+  S3EnableEncryptionQueueAll = 'S3EnableEncryptionQueueAll',
+  S3EnableEncryptionSingle = 'S3EnableEncryptionSingle',
+
   // Shared Space Face Recognition
   SharedSpaceFaceMatch = 'SharedSpaceFaceMatch',
   SharedSpaceFaceMatchAll = 'SharedSpaceFaceMatchAll',

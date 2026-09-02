@@ -707,4 +707,274 @@ describe(StorageMigrationService.name, () => {
       expect(mocks.storageMigration.deleteLogEntriesByBatch).not.toHaveBeenCalled();
     });
   });
+
+  describe('S3 enable-encryption-in-place migration', () => {
+    const nonZeroS3FileCounts = {
+      originals: 10,
+      thumbnails: 0,
+      previews: 0,
+      fullsize: 0,
+      sidecars: 0,
+      encodedVideos: 0,
+      personThumbnails: 0,
+      profileImages: 0,
+    };
+
+    const zeroS3FileCounts = {
+      originals: 0,
+      thumbnails: 0,
+      previews: 0,
+      fullsize: 0,
+      sidecars: 0,
+      encodedVideos: 0,
+      personThumbnails: 0,
+      profileImages: 0,
+    };
+
+    const allFileTypes = {
+      originals: true,
+      thumbnails: true,
+      previews: true,
+      fullsize: true,
+      encodedVideos: true,
+      sidecars: true,
+      personThumbnails: true,
+      profileImages: true,
+    };
+
+    const sseCConfig = { mode: 'sse-c' as const, key: Buffer.alloc(32, 1), keyMd5: Buffer.alloc(16, 2) };
+
+    describe('getS3EncryptionEstimate', () => {
+      it('should return file counts and total from repository', async () => {
+        mocks.storageMigration.getS3FileCounts.mockResolvedValue(nonZeroS3FileCounts);
+
+        const result = await sut.getS3EncryptionEstimate();
+
+        expect(result).toEqual({ fileCounts: { ...nonZeroS3FileCounts, total: 10 } });
+      });
+    });
+
+    describe('startS3Encryption', () => {
+      const options = { fileTypes: allFileTypes, concurrency: 4 };
+
+      it('should validate SSE-C config, check no active migration, queue orchestrator, and return batchId', async () => {
+        mocks.config.getEnv.mockReturnValue(mockEnvData({ storage: { s3: { sse: sseCConfig } } }));
+        mocks.job.isActive.mockResolvedValue(false);
+        mockS3Backend.exists.mockResolvedValue(true);
+        mocks.storageMigration.getS3FileCounts.mockResolvedValue(nonZeroS3FileCounts);
+
+        const result = await sut.startS3Encryption(options);
+
+        expect(result).toHaveProperty('batchId');
+        expect(mocks.job.isActive).toHaveBeenCalledWith(QueueName.StorageBackendMigration);
+        expect(mocks.job.queue).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: JobName.S3EnableEncryptionQueueAll,
+            data: expect.objectContaining({ fileTypes: allFileTypes, batchId: result.batchId }),
+          }),
+        );
+      });
+
+      it('should throw if SSE-C is not configured', async () => {
+        mocks.config.getEnv.mockReturnValue(mockEnvData({ storage: { s3: { sse: { mode: 'none' } } } }));
+
+        await expect(sut.startS3Encryption(options)).rejects.toThrow(
+          'IMMICH_S3_SSE_MODE must be set to sse-c to enable S3 encryption',
+        );
+        expect(mocks.job.queue).not.toHaveBeenCalled();
+      });
+
+      it('should throw if a migration is already active', async () => {
+        mocks.config.getEnv.mockReturnValue(mockEnvData({ storage: { s3: { sse: sseCConfig } } }));
+        mocks.job.isActive.mockResolvedValue(true);
+        mockS3Backend.exists.mockResolvedValue(true);
+        mocks.storageMigration.getS3FileCounts.mockResolvedValue(nonZeroS3FileCounts);
+
+        await expect(sut.startS3Encryption(options)).rejects.toThrow('A storage migration is already in progress');
+      });
+
+      it('should throw if there are no S3 files to encrypt', async () => {
+        mocks.config.getEnv.mockReturnValue(mockEnvData({ storage: { s3: { sse: sseCConfig } } }));
+        mockS3Backend.exists.mockResolvedValue(true);
+        mocks.storageMigration.getS3FileCounts.mockResolvedValue(zeroS3FileCounts);
+
+        await expect(sut.startS3Encryption(options)).rejects.toThrow('No S3 files to encrypt');
+        expect(mocks.job.queue).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('getS3EncryptionStatus', () => {
+      it('should return active state and job counts', async () => {
+        mocks.job.isActive.mockResolvedValue(true);
+        mocks.job.getJobCounts.mockResolvedValue({ active: 1 } as any);
+
+        const result = await sut.getS3EncryptionStatus();
+
+        expect(result).toEqual({ isActive: true, active: 1 });
+        expect(mocks.job.isActive).toHaveBeenCalledWith(QueueName.StorageBackendMigration);
+      });
+    });
+
+    describe('handleS3EnableEncryptionQueueAll', () => {
+      const baseJob = { batchId: 'batch-1', concurrency: 4 };
+
+      beforeEach(() => {
+        mocks.config.getEnv.mockReturnValue(mockEnvData({ storage: { s3: { sse: sseCConfig } } }));
+      });
+
+      it('should stream S3-only files based on fileTypes flags and queue worker jobs', async () => {
+        mocks.storageMigration.streamS3Originals.mockReturnValue(
+          makeStream([{ id: 'asset-1', originalPath: 'library/user/ab/cd/file.jpg' }]),
+        );
+        mocks.storageMigration.streamS3AssetFiles.mockReturnValue(
+          makeStream([
+            { id: 'file-1', assetId: 'asset-1', path: 'thumbs/user/ab/cd/thumb.webp', type: AssetFileType.Thumbnail },
+          ]),
+        );
+        mocks.storageMigration.streamS3EncodedVideos.mockReturnValue(
+          makeStream([
+            {
+              id: 'file-2',
+              assetId: 'asset-2',
+              path: 'encoded-video/user/ab/cd/video.mp4',
+              type: AssetFileType.EncodedVideo,
+            },
+          ]),
+        );
+        mocks.storageMigration.streamS3PersonThumbnails.mockReturnValue(
+          makeStream([{ id: 'person-1', thumbnailPath: 'thumbs/user/ab/cd/person.jpeg' }]),
+        );
+        mocks.storageMigration.streamS3ProfileImages.mockReturnValue(
+          makeStream([{ id: 'user-1', profileImagePath: 'profile/user/ab/cd/profile.jpg' }]),
+        );
+
+        const result = await sut.handleS3EnableEncryptionQueueAll({ ...baseJob, fileTypes: allFileTypes });
+
+        expect(result).toBe(JobStatus.Success);
+        const queuedJobs = mocks.job.queueAll.mock.calls.flat().flat();
+        expect(queuedJobs).toHaveLength(5);
+        expect(queuedJobs[0]).toEqual(
+          expect.objectContaining({
+            name: JobName.S3EnableEncryptionSingle,
+            data: expect.objectContaining({
+              entityType: 'asset',
+              entityId: 'asset-1',
+              fileType: 'original',
+              key: 'library/user/ab/cd/file.jpg',
+              batchId: 'batch-1',
+            }),
+          }),
+        );
+      });
+
+      it('should throw if SSE-C is not configured', async () => {
+        mocks.config.getEnv.mockReturnValue(mockEnvData({ storage: { s3: { sse: { mode: 'none' } } } }));
+
+        await expect(sut.handleS3EnableEncryptionQueueAll({ ...baseJob, fileTypes: allFileTypes })).rejects.toThrow(
+          'IMMICH_S3_SSE_MODE must be set to sse-c to enable S3 encryption',
+        );
+      });
+
+      it('should only queue enabled file types', async () => {
+        mocks.storageMigration.streamS3Originals.mockReturnValue(
+          makeStream([{ id: 'asset-1', originalPath: 'library/user/ab/cd/file.jpg' }]),
+        );
+        mocks.storageMigration.streamS3AssetFiles.mockReturnValue(makeStream([]));
+        mocks.storageMigration.streamS3EncodedVideos.mockReturnValue(makeStream([]));
+        mocks.storageMigration.streamS3PersonThumbnails.mockReturnValue(makeStream([]));
+        mocks.storageMigration.streamS3ProfileImages.mockReturnValue(makeStream([]));
+
+        const fileTypes = {
+          originals: true,
+          thumbnails: false,
+          previews: false,
+          fullsize: false,
+          encodedVideos: false,
+          sidecars: false,
+          personThumbnails: false,
+          profileImages: false,
+        };
+
+        await sut.handleS3EnableEncryptionQueueAll({ ...baseJob, fileTypes });
+
+        expect(mocks.storageMigration.streamS3Originals).toHaveBeenCalled();
+        expect(mocks.storageMigration.streamS3AssetFiles).not.toHaveBeenCalled();
+        expect(mocks.storageMigration.streamS3EncodedVideos).not.toHaveBeenCalled();
+        expect(mocks.storageMigration.streamS3PersonThumbnails).not.toHaveBeenCalled();
+        expect(mocks.storageMigration.streamS3ProfileImages).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('handleS3EnableEncryptionSingle', () => {
+      const baseJob = {
+        entityType: 'asset' as const,
+        entityId: 'asset-1',
+        fileType: 'original' as string | null,
+        key: 'library/user/ab/cd/file.jpg',
+        batchId: 'batch-1',
+      };
+
+      it('should reencrypt in place and write a migration log entry, returning Success', async () => {
+        mocks.storageMigration.isS3EncryptionLogged.mockResolvedValue(false);
+        mockS3Backend.exists.mockResolvedValue(true);
+        (mockS3Backend as any).reencryptInPlace = vi.fn().mockResolvedValue(void 0);
+        mocks.storageMigration.createLogEntry.mockResolvedValue({} as any);
+
+        const result = await sut.handleS3EnableEncryptionSingle(baseJob);
+
+        expect(result).toBe(JobStatus.Success);
+        expect(mocks.storageMigration.isS3EncryptionLogged).toHaveBeenCalledWith('s3EnableEncryption', baseJob.key);
+        expect((mockS3Backend as any).reencryptInPlace).toHaveBeenCalledWith(baseJob.key);
+        expect(mocks.storageMigration.createLogEntry).toHaveBeenCalledWith({
+          entityType: 'asset',
+          entityId: 'asset-1',
+          fileType: 'original',
+          oldPath: baseJob.key,
+          newPath: baseJob.key,
+          direction: 's3EnableEncryption',
+          batchId: 'batch-1',
+        });
+      });
+
+      it('should skip when already logged as encrypted (idempotency)', async () => {
+        mocks.storageMigration.isS3EncryptionLogged.mockResolvedValue(true);
+        (mockS3Backend as any).reencryptInPlace = vi.fn();
+
+        const result = await sut.handleS3EnableEncryptionSingle(baseJob);
+
+        expect(result).toBe(JobStatus.Skipped);
+        expect((mockS3Backend as any).reencryptInPlace).not.toHaveBeenCalled();
+      });
+
+      it('should skip when the source key no longer exists', async () => {
+        mocks.storageMigration.isS3EncryptionLogged.mockResolvedValue(false);
+        mockS3Backend.exists.mockResolvedValue(false);
+        (mockS3Backend as any).reencryptInPlace = vi.fn();
+
+        const result = await sut.handleS3EnableEncryptionSingle(baseJob);
+
+        expect(result).toBe(JobStatus.Skipped);
+        expect((mockS3Backend as any).reencryptInPlace).not.toHaveBeenCalled();
+      });
+
+      it('should return Failed when reencryptInPlace throws', async () => {
+        mocks.storageMigration.isS3EncryptionLogged.mockResolvedValue(false);
+        mockS3Backend.exists.mockResolvedValue(true);
+        (mockS3Backend as any).reencryptInPlace = vi.fn().mockRejectedValue(new Error('S3 error'));
+
+        const result = await sut.handleS3EnableEncryptionSingle(baseJob);
+
+        expect(result).toBe(JobStatus.Failed);
+        expect(mocks.storageMigration.createLogEntry).not.toHaveBeenCalled();
+      });
+
+      it('should return Failed when S3 backend is not configured', async () => {
+        vi.spyOn(StorageService, 'getS3Backend').mockReturnValue(undefined);
+
+        const result = await sut.handleS3EnableEncryptionSingle(baseJob);
+
+        expect(result).toBe(JobStatus.Failed);
+      });
+    });
+  });
 });

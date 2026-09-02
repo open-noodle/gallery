@@ -58,6 +58,12 @@ export const EnvSchema = z
     IMMICH_S3_SECRET_ACCESS_KEY: z.string().optional(),
     IMMICH_S3_PRESIGNED_URL_EXPIRY: z.coerce.number().int().optional(),
     IMMICH_S3_SERVE_MODE: z.enum(['redirect', 'proxy']).optional(),
+    // 'sse-kms' is a reserved value for a future SSE-KMS mode; only 'none' and 'sse-c' are
+    // implemented today. See specs/2026-09-02-s3-sse-c-encryption-design.md.
+    IMMICH_S3_SSE_MODE: z.enum(['none', 'sse-c']).optional(),
+    // Base64-encoded, must decode to exactly 32 raw bytes (AES-256). Validated at startup in
+    // StorageService.onBootstrap, not here, so the error message can reference the env var name.
+    IMMICH_S3_SSE_C_KEY: z.string().optional(),
     IMMICH_MICROSERVICES_METRICS_PORT: z.coerce.number().int().optional(),
     IMMICH_ALLOW_EXTERNAL_PLUGINS: stringBool.optional(),
     IMMICH_PLUGINS_INSTALL_FOLDER: absolutePath,

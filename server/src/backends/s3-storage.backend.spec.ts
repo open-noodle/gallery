@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { Readable } from 'node:stream';
@@ -14,6 +15,7 @@ vi.mock('@aws-sdk/client-s3', () => {
     DeleteObjectCommand: vi.fn((input: any) => ({ input, _type: 'DeleteObjectCommand' })),
     ListObjectsV2Command: vi.fn((input: any) => ({ input, _type: 'ListObjectsV2Command' })),
     DeleteObjectsCommand: vi.fn((input: any) => ({ input, _type: 'DeleteObjectsCommand' })),
+    CopyObjectCommand: vi.fn((input: any) => ({ input, _type: 'CopyObjectCommand' })),
   };
 });
 
@@ -31,7 +33,12 @@ import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { S3StorageBackend } from 'src/backends/s3-storage.backend';
 import { CacheControl } from 'src/enum';
-import { RangeNotSatisfiableError } from 'src/interfaces/storage-backend.interface';
+import { RangeNotSatisfiableError, S3SseConfig } from 'src/interfaces/storage-backend.interface';
+
+const sseCConfig = (rawKeyByte = 7): Extract<S3SseConfig, { mode: 'sse-c' }> => {
+  const key = Buffer.alloc(32, rawKeyByte);
+  return { mode: 'sse-c', key, keyMd5: createHash('md5').update(key).digest() };
+};
 
 describe('S3StorageBackend', () => {
   let backend: S3StorageBackend;
@@ -657,6 +664,149 @@ describe('S3StorageBackend', () => {
       });
 
       await expect(backend.getPrefixUsage('thumbs/user-a/', (filename) => filename !== 'skip.webp')).resolves.toBe(10);
+    });
+  });
+
+  describe('SSE-C', () => {
+    let sseBackend: S3StorageBackend;
+    let sseSend: ReturnType<typeof vi.fn>;
+    const sse = sseCConfig();
+    const expectedHeaders = {
+      SSECustomerAlgorithm: 'AES256',
+      SSECustomerKey: sse.key.toString('base64'),
+      SSECustomerKeyMD5: sse.keyMd5.toString('base64'),
+    };
+
+    beforeEach(() => {
+      sseBackend = new S3StorageBackend({
+        bucket: 'test-bucket',
+        region: 'us-east-1',
+        presignedUrlExpiry: 3600,
+        // serveMode is deliberately 'proxy': StorageService.onBootstrap is what actually
+        // enforces the redirect+SSE-C hard-fail; this backend-level test only needs a valid,
+        // self-consistent config to exercise put/get/exists/reencryptInPlace in isolation.
+        serveMode: 'proxy',
+        sse,
+      });
+      const client = (S3Client as unknown as ReturnType<typeof vi.fn>).mock.results.at(-1)?.value;
+      sseSend = client?.send;
+    });
+
+    it('reports supportsReadableUrl as false', () => {
+      expect(sseBackend.supportsReadableUrl).toBe(false);
+    });
+
+    it('reports supportsReadableUrl as true when SSE is not configured', () => {
+      expect(backend.supportsReadableUrl).toBe(true);
+    });
+
+    it('attaches SSE-C headers to put (via Upload params)', async () => {
+      const { Upload } = await import('@aws-sdk/lib-storage');
+      await sseBackend.put('upload/user1/ab/cd/file.jpg', Buffer.from('data'), { contentType: 'image/jpeg' });
+
+      expect(Upload).toHaveBeenCalledWith(
+        expect.objectContaining({
+          params: expect.objectContaining({
+            Bucket: 'test-bucket',
+            Key: 'upload/user1/ab/cd/file.jpg',
+            ...expectedHeaders,
+          }),
+        }),
+      );
+    });
+
+    it('attaches SSE-C headers to get (GetObjectCommand)', async () => {
+      sseSend.mockResolvedValueOnce({ Body: Readable.from([Buffer.from('data')]), ContentLength: 4 });
+
+      await sseBackend.get('upload/user1/ab/cd/file.jpg');
+
+      expect(GetObjectCommand).toHaveBeenCalledWith(
+        expect.objectContaining({ Bucket: 'test-bucket', Key: 'upload/user1/ab/cd/file.jpg', ...expectedHeaders }),
+      );
+    });
+
+    it('attaches SSE-C headers to exists (HeadObjectCommand)', async () => {
+      sseSend.mockResolvedValueOnce({});
+
+      await sseBackend.exists('upload/user1/ab/cd/file.jpg');
+
+      const headCalls = sseSend.mock.calls.filter(([cmd]) => cmd._type === 'HeadObjectCommand');
+      expect(headCalls).toEqual([[expect.objectContaining({ input: expect.objectContaining(expectedHeaders) })]]);
+    });
+
+    it('does not attach SSE-C headers to deletePrefix (ListObjectsV2/DeleteObjects)', async () => {
+      sseSend
+        .mockResolvedValueOnce({ Contents: [{ Key: 'upload/u/a.jpg' }], IsTruncated: false })
+        .mockResolvedValueOnce({ Deleted: [{}] });
+
+      await sseBackend.deletePrefix('upload/u/');
+
+      for (const [cmd] of sseSend.mock.calls) {
+        expect(cmd.input).not.toMatchObject(expectedHeaders);
+      }
+    });
+
+    it('does not attach SSE-C headers to getPrefixUsage (ListObjectsV2)', async () => {
+      sseSend.mockResolvedValueOnce({ Contents: [{ Size: 5 }], IsTruncated: false });
+
+      await sseBackend.getPrefixUsage('upload/u/');
+
+      const [[cmd]] = sseSend.mock.calls;
+      expect(cmd.input).not.toMatchObject(expectedHeaders);
+    });
+
+    it('always uses the proxy/stream serve strategy, ignoring serveMode', async () => {
+      sseSend.mockResolvedValueOnce({ Body: Readable.from([Buffer.from('data')]), ContentLength: 4 });
+
+      const strategy = await sseBackend.getServeStrategy('upload/user1/photo.jpg', {
+        contentType: 'image/jpeg',
+        cacheControl: CacheControl.PrivateWithCache,
+      });
+
+      expect(strategy.type).toBe('stream');
+      expect(getSignedUrl).not.toHaveBeenCalled();
+      expect(GetObjectCommand).toHaveBeenCalledWith(expect.objectContaining(expectedHeaders));
+    });
+
+    describe('reencryptInPlace', () => {
+      it('self-copies the object with only destination SSE-C headers set', async () => {
+        const { CopyObjectCommand } = await import('@aws-sdk/client-s3');
+        sseSend.mockResolvedValueOnce({});
+
+        await sseBackend.reencryptInPlace('library/user1/ab/cd/photo.jpg');
+
+        expect(CopyObjectCommand).toHaveBeenCalledWith(
+          expect.objectContaining({
+            Bucket: 'test-bucket',
+            Key: 'library/user1/ab/cd/photo.jpg',
+            CopySource: 'test-bucket/library/user1/ab/cd/photo.jpg',
+            MetadataDirective: 'COPY',
+            ...expectedHeaders,
+          }),
+        );
+        // no CopySourceSSECustomerKey* headers: the source object is assumed unencrypted
+        const [[cmd]] = sseSend.mock.calls;
+        expect(cmd.input).not.toHaveProperty('CopySourceSSECustomerKey');
+      });
+
+      it('URI-encodes each path segment of the key without encoding slashes', async () => {
+        const { CopyObjectCommand } = await import('@aws-sdk/client-s3');
+        sseSend.mockResolvedValueOnce({});
+
+        await sseBackend.reencryptInPlace('library/user 1/a b/photo #1.jpg');
+
+        expect(CopyObjectCommand).toHaveBeenCalledWith(
+          expect.objectContaining({
+            CopySource: 'test-bucket/library/user%201/a%20b/photo%20%231.jpg',
+          }),
+        );
+      });
+
+      it('throws when SSE-C is not configured on this backend', async () => {
+        await expect(backend.reencryptInPlace('library/user1/photo.jpg')).rejects.toThrow(
+          'reencryptInPlace requires SSE-C to be configured on this backend',
+        );
+      });
     });
   });
 });

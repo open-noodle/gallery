@@ -41,3 +41,12 @@ export class StorageMigrationFileTypesDto extends createZodDto(StorageMigrationF
 export class StorageMigrationStartDto extends createZodDto(StorageMigrationStartSchema) {}
 export class StorageMigrationEstimateQueryDto extends createZodDto(StorageMigrationEstimateQuerySchema) {}
 export class StorageMigrationBatchParamDto extends createZodDto(StorageMigrationBatchParamSchema) {}
+
+const S3EnableEncryptionStartSchema = z
+  .object({
+    fileTypes: StorageMigrationFileTypesSchema.describe('File types to encrypt'),
+    concurrency: z.int().min(1).max(20).default(5).describe('Concurrency level'),
+  })
+  .meta({ id: 'S3EnableEncryptionStartDto' });
+
+export class S3EnableEncryptionStartDto extends createZodDto(S3EnableEncryptionStartSchema) {}

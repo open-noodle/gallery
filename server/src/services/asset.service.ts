@@ -896,7 +896,9 @@ export class AssetService extends BaseService {
 
       // Audio-only file check. getProbeInput hands ffprobe an absolute path (disk) or a
       // presigned URL (S3) — it does NOT download the video, which matters here because
-      // this runs inside the request.
+      // this runs inside the request. Exception: an SSE-C encrypted S3 original has no usable
+      // presigned URL (see StorageBackend.supportsReadableUrl), so getProbeInput downloads it
+      // to a temp file in that case instead.
       let probeResult: Awaited<ReturnType<typeof this.mediaRepository.probe>>;
       try {
         probeResult = await this.mediaRepository.probe(await this.getProbeInput(asset.originalPath));
