@@ -5,13 +5,15 @@
 - **Upstream commits pulled**: 4 (`7211efa6cb9` → `fa8a191aaa7`)
 - **Fork commits synced from `origin/main`**: 2 (#1044, #1031)
 - **Conflicts resolved**: 1
-- **Fork-side repairs bundled**: 3 commits (OpenAPI number formats, the branding
-  app-download patcher, the mobile fallout of the retyped Dart client)
+- **Fork-side repairs bundled**: 4 commits (OpenAPI number formats, the branding
+  app-download patcher, the mobile fallout of the retyped Dart client, and the
+  preflight guard that models openapi-generator's type mapping)
 - **Risk level**: MEDIUM
 - **Recommendation**: PROCEED
 
-Two of the four upstream commits broke fork code with **zero conflicts**, and both
-were found by the pre-rebase gates rather than by CI. Neither needed a product
+Two of the four upstream commits broke fork code with **zero conflicts**. Both
+were found by the pre-rebase gates; immich-31222 then reached two further fork
+surfaces that only the mobile gates and CI could see. Neither needed a product
 decision; both are the "the fork depends on upstream by reference, not by text
 overlap" shape, and both were repaired in this cycle.
 
@@ -234,20 +236,52 @@ the fork's own schemas plus this cycle's 32 format additions.
 ## Remote CI Verification
 
 - **Test branch**: `rebase/upstream-rolling-v3.1.1-b216`
-- **Commit validated**: `f704dcda1869a9c641a7afb6f42ae3d2f51f960b`
+- **Commits validated**: nine workflows at `5f0539ad099`; `test.yml` at
+  `bcbdbb144da` after the fix below. The intervening `70652b897bc` differs from
+  `5f0539ad099` only by prose in this report file, so the nine results hold for
+  the tip.
+- **Result: 10/10 GREEN**, one real failure fixed, no flakes.
 
-| Workflow                                  | Status  | Run | Notes |
-| ----------------------------------------- | ------- | --- | ----- |
-| `test.yml`                                | PENDING |     |       |
-| `docker.yml`                              | PENDING |     |       |
-| `static_analysis.yml`                     | PENDING |     |       |
-| `gallery-build-mobile.yml`                | PENDING |     |       |
-| `gallery-rebase-smoke.yml`                | PENDING |     |       |
-| `storage-migration-tests.yml`             | PENDING |     |       |
-| `storage-migration-e2e.yml`               | PENDING |     |       |
-| `gallery-revert-to-immich-validation.yml` | PENDING |     |       |
-| `gallery-ml-smoke.yml`                    | PENDING |     |       |
-| `gallery-mobile-smoke.yml`                | PENDING |     |       |
+| Workflow                                  | Status | Run         | Notes                                                                      |
+| ----------------------------------------- | ------ | ----------- | -------------------------------------------------------------------------- |
+| `test.yml`                                | GREEN  | 33690285096 | 21 jobs. First run (33684545858) failed on **OpenAPI Clients** — see below |
+| `docker.yml`                              | GREEN  | 33684549243 |                                                                            |
+| `static_analysis.yml`                     | GREEN  | 33684552065 | The gate that would have caught the mobile `num`→`int` fallout             |
+| `gallery-build-mobile.yml`                | GREEN  | 33684573015 | iOS + Android compile                                                      |
+| `gallery-rebase-smoke.yml`                | GREEN  | 33684554509 |                                                                            |
+| `storage-migration-tests.yml`             | GREEN  | 33684557958 |                                                                            |
+| `storage-migration-e2e.yml`               | GREEN  | 33684570069 |                                                                            |
+| `gallery-revert-to-immich-validation.yml` | GREEN  | 33684560816 | Coverage grep and Docker boot both                                         |
+| `gallery-ml-smoke.yml`                    | GREEN  | 33684563338 |                                                                            |
+| `gallery-mobile-smoke.yml`                | GREEN  | 33684566561 |                                                                            |
+
+### The one real failure: a fork-only guard invalidated at a distance
+
+`tools/upstream-preflight/src/dart-nullable-array-items.spec.ts` enforces issue
+#743's invariant that an `items.nullable: true` array generates as `List<T?>`. To
+do that it **re-implements openapi-generator's spec-type → Dart-type mapping**,
+and that mapping sent every `type: number` to `num`. openapi-generator actually
+keys on the format too: `double`/`float` produce `double`, and only a formatless
+number produces `num`.
+
+immich-31222 makes a format mandatory, so `TimeBucketAssetResponseDto.latitude`
+and `.longitude` are now `double`. The client generated exactly right —
+`Optional<List<double?>?>` — and the guard flagged both against its own stale
+expectation. Fixed in `bcbdbb144da`; red before and green after against the same
+generated model.
+
+**This is the third fork-only gate immich-31222 invalidated without touching it**,
+after the 32 DTO properties and the mobile call sites. The through-line is worth
+keeping: a single upstream rule change reached three fork surfaces that share no
+code and no text with it.
+
+**Why local gates missed it.** `tools/upstream-preflight` has its own vitest suite
+that nothing in the documented local gate list runs, and a clean `git diff` after
+regeneration does not cover it because the Dart client is gitignored. The suite is
+~11s for 24 files / 257 tests and would have caught this before the round. The
+rebase skill's step 9 now carries it as step 8, generalised: any fork-only code
+that re-implements a third-party tool's behaviour is a gate upstream can
+invalidate from a distance.
 
 ## Post-Rebase Verification
 
