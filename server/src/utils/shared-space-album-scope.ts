@@ -67,20 +67,19 @@ export type SpaceScope =
 /**
  * Which album-visibility gate a space-scoped query wants.
  *
- * Deliberately a REQUIRED union rather than an optional boolean: after #1041 there are two distinct
+ * Deliberately a REQUIRED union rather than an optional boolean: after #1041 there are three distinct
  * gates, and an optional flag would let a new call site silently inherit the wrong one — the class of
  * mistake a green `tsc` cannot catch on a re-key.
  *
  *  - 'space-tab' : shared_space_album.showInTimeline = true. Governs the SPACE's own Photos tab, which
  *                  is the same for every member. This is exactly the old `requireShowInTimeline: true`.
+ *  - 'personal'  : NOT EXISTS a shared_space_album_hidden row for THIS viewer, this (space, album).
+ *                  Governs a personal-timeline surface (the /photos timeline, folder view, memories) —
+ *                  each member's own preference, never the shared flag. Requires `viewerId`.
  *  - 'none'      : no album gate at all (the album page itself, grant surfaces, sync streams). Exactly
  *                  the old absent/false.
- *
- * Slice 8 adds 'personal' (the per-member shared_space_album_hidden rows). When it does, every switch
- * over this type becomes non-exhaustive and the compiler will demand each site be reconsidered. That
- * is intentional.
  */
-export type AlbumTimelineGate = 'space-tab' | 'none';
+export type AlbumTimelineGate = 'space-tab' | 'personal' | 'none';
 
 export interface SpaceAlbumAssetOptions {
   /** Outer column the album's asset must match, e.g. 'asset.id' / 'asset_face.assetId'. */
@@ -96,6 +95,11 @@ export interface SpaceAlbumAssetOptions {
   requireAlbumNotDeleted?: boolean;
   /** Exclude a specific linked album (the "other album" self-exclusion at getAlbumAssetIdsWithoutOtherSpacePath). */
   excludeAlbumId?: string;
+  /**
+   * The viewer whose personal hide preference gates this album arm. REQUIRED when
+   * `albumTimelineGate === 'personal'` — every other gate ignores it.
+   */
+  viewerId?: string;
 }
 
 /**
@@ -150,6 +154,30 @@ export function spaceAlbumAssetExists(
   return eb.or([linkedAlbumAssetExists(eb, options), spaceContributedAssetExists(eb, options)]);
 }
 
+/**
+ * The 'personal' gate: NOT EXISTS a `shared_space_album_hidden` row for THIS viewer, keyed on the
+ * `shared_space_album` row already in scope (`(spaceId, albumId)`). Correlated, not a pre-resolved id
+ * list — this governs a single album arm for a single viewer, not the caller's-own-timeline
+ * subtraction (see `hiddenFromOwnTimeline`, which IS list-based for the reasons in §6.5 of the design
+ * doc). Requires `options.viewerId`; throws if missing rather than silently emitting `userId = NULL`
+ * (always-false, i.e. an unconditionally-passing NOT EXISTS — a silent "show everything" bug).
+ */
+function notHiddenByViewer(eb: ExpressionBuilder<DB, keyof DB>, options: SpaceAlbumAssetOptions): Expression<SqlBool> {
+  if (!options.viewerId) {
+    throw new Error("spaceAlbumAssetExists: albumTimelineGate 'personal' requires viewerId");
+  }
+  return eb.not(
+    eb.exists(
+      eb
+        .selectFrom('shared_space_album_hidden')
+        .select(eb.lit(1).as('exists'))
+        .whereRef('shared_space_album_hidden.spaceId', '=', 'shared_space_album.spaceId')
+        .whereRef('shared_space_album_hidden.albumId', '=', 'shared_space_album.albumId')
+        .where('shared_space_album_hidden.userId', '=', asUuid(options.viewerId)),
+    ),
+  );
+}
+
 /** The `album_asset` arm — the album owner's own contents (unchanged pre-#764 behavior). */
 function linkedAlbumAssetExists(
   eb: ExpressionBuilder<DB, keyof DB>,
@@ -199,6 +227,9 @@ function linkedAlbumAssetExists(
         switch (options.albumTimelineGate) {
           case 'space-tab': {
             return qb.where('shared_space_album.showInTimeline', '=', true);
+          }
+          case 'personal': {
+            return qb.where((eb) => notHiddenByViewer(eb, options));
           }
           case 'none': {
             return qb;
@@ -265,6 +296,9 @@ export function spaceContributedAssetExists(
           case 'space-tab': {
             return qb.where('shared_space_album.showInTimeline', '=', true);
           }
+          case 'personal': {
+            return qb.where((eb) => notHiddenByViewer(eb, options));
+          }
           case 'none': {
             return qb;
           }
@@ -282,6 +316,8 @@ export interface SpacePathBranchOptions {
   scope: SpaceScope;
   /** Which album-visibility gate this query wants. See {@link AlbumTimelineGate}. */
   albumTimelineGate: AlbumTimelineGate;
+  /** The viewer whose personal hide preference gates the album arm. REQUIRED when `albumTimelineGate === 'personal'`. */
+  viewerId?: string;
 }
 
 /** The directly-added-asset arm (`shared_space_asset`), matching the clean asset-outer sites. */
@@ -372,6 +408,7 @@ export function spaceAssetPathBranches(
       correlateAssetId: options.correlateAssetId,
       scope: options.scope,
       albumTimelineGate: options.albumTimelineGate,
+      viewerId: options.viewerId,
     }),
   ];
 }
@@ -396,6 +433,8 @@ export interface SpaceAlbumAssetSqlOptions {
   requireAlbumNotDeleted?: boolean;
   /** Which album-visibility gate this query wants. See {@link AlbumTimelineGate}. */
   albumTimelineGate: AlbumTimelineGate;
+  /** The viewer whose personal hide preference gates the album arm. REQUIRED when `albumTimelineGate === 'personal'`. */
+  viewerId?: string;
 }
 
 /**
@@ -467,6 +506,23 @@ export interface TimelineHiddenScope {
 }
 
 /**
+ * True when every arm of the scope is empty — the common case (a viewer who has hidden nothing).
+ * Callers use this to decide whether to emit the caller's-own-arm subtraction at all, so that case
+ * costs nothing beyond the four already-required `getTimelineHiddenScope` lookups. Mirrors the
+ * internal check inside {@link hiddenFromOwnTimeline}; exported so callers that branch on SQL SHAPE
+ * (not just the returned predicate) — e.g. to skip `.where(...)` entirely rather than pass a
+ * trivially-true one — can make the same decision without duplicating the four-list check.
+ */
+export function timelineHiddenScopeIsEmpty(scope: TimelineHiddenScope): boolean {
+  return (
+    scope.hiddenSpaceIds.length === 0 &&
+    scope.hiddenAlbumIds.length === 0 &&
+    scope.hiddenAlbumSpacePairs.length === 0 &&
+    scope.hiddenLibraryIds.length === 0
+  );
+}
+
+/**
  * #1041: the subtraction applied to the caller's OWN assets — "I have hidden every way this photo
  * reaches a space, so keep it off my timeline".
  *
@@ -477,8 +533,6 @@ export interface TimelineHiddenScope {
  * Attach ONLY to the caller's own-id arm — never to `userIds`, which includes partners. See §6.4 of
  * the design doc: AND-ing this into the shared owner arm would remove a PARTNER's photos based on the
  * CALLER's flags.
- *
- * Deliberately NOT wired into any query yet (slice 6) — slice 8 does that.
  */
 export function hiddenFromOwnTimeline(
   eb: ExpressionBuilder<DB, keyof DB>,
@@ -559,6 +613,18 @@ export function spaceAlbumAssetExistsSql(options: SpaceAlbumAssetSqlOptions): Ra
   switch (options.albumTimelineGate) {
     case 'space-tab': {
       timelineGate = sql`AND "shared_space_album"."showInTimeline" = true`;
+      break;
+    }
+    case 'personal': {
+      if (!options.viewerId) {
+        throw new Error("spaceAlbumAssetExistsSql: albumTimelineGate 'personal' requires viewerId");
+      }
+      timelineGate = sql`AND NOT EXISTS (
+                SELECT 1 FROM shared_space_album_hidden
+                WHERE shared_space_album_hidden."spaceId" = shared_space_album."spaceId"
+                  AND shared_space_album_hidden."albumId" = shared_space_album."albumId"
+                  AND shared_space_album_hidden."userId" = ${options.viewerId}::uuid
+              )`;
       break;
     }
     case 'none': {

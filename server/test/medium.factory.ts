@@ -428,6 +428,19 @@ export class MediumTestContext<S extends BaseService = BaseService> {
     return { spaceAlbum: result, result };
   }
 
+  // #1041: the PER-USER "hide this album from my own timeline" row — sibling to
+  // newSharedSpaceAlbum's `showInTimeline` (the SHARED, editor-settable flag governing the space's
+  // own Photos tab). Do not confuse the two in a test: this one is what `albumTimelineGate: 'personal'`
+  // reads.
+  async newSharedSpaceAlbumHidden(dto: { spaceId: string; albumId: string; userId: string }) {
+    const result = await this.database
+      .insertInto('shared_space_album_hidden')
+      .values({ spaceId: dto.spaceId, albumId: dto.albumId, userId: dto.userId })
+      .returningAll()
+      .executeTakeFirstOrThrow();
+    return { spaceAlbumHidden: result, result };
+  }
+
   async newSharedLink(dto: {
     userId: string;
     type: SharedLinkType;

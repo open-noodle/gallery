@@ -68,8 +68,9 @@ export class TimelineService extends BaseService {
     let userIds: string[] | undefined;
     let timelineSpaceIds: string[] | undefined;
     // #1041: the REQUESTING user's own id, distinct from `userIds` below (which also carries
-    // partner ids). Not yet consumed by the repository — see TimeBucketOptions.callerId.
+    // partner ids). See TimeBucketOptions.callerId — the subtraction below attaches ONLY here.
     let callerId: string | undefined;
+    let hiddenScope: TimeBucketOptions['hiddenScope'];
 
     if (userId) {
       userIds = [userId];
@@ -89,6 +90,11 @@ export class TimelineService extends BaseService {
           timelineSpaceIds = spaceRows.map((row) => row.spaceId);
         }
       }
+
+      // #1041 §6.2: resolved ONCE per request, beside getSpaceIdsForTimeline above — never
+      // per-bucket. Independent of `withSharedSpaces`: E12 requires the subtraction to still
+      // apply when the caller has shared spaces disabled for this browse.
+      hiddenScope = await this.sharedSpaceRepository.getTimelineHiddenScope(auth.user.id);
     }
 
     // #752 P0-2: album browse — resolve the viewer's live member-spaces linking this album so the
@@ -100,7 +106,14 @@ export class TimelineService extends BaseService {
 
     const scopedOptions = await this.resolveScopedPersonFilters(auth, { ...options, timelineSpaceIds });
 
-    return { ...scopedOptions, bucketSize: dto.bucketSize ?? TimeBucketSize.Month, userIds, albumSpaceIds, callerId };
+    return {
+      ...scopedOptions,
+      bucketSize: dto.bucketSize ?? TimeBucketSize.Month,
+      userIds,
+      albumSpaceIds,
+      callerId,
+      hiddenScope,
+    };
   }
 
   private async resolveScopedPersonFilters(auth: AuthDto, options: TimeBucketOptions): Promise<TimeBucketOptions> {
