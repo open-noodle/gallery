@@ -461,4 +461,89 @@ describe('DownloadRepository.downloadSpaceId — cross-owner contributions', () 
     expect(ids.has(ownAsset.id)).toBe(false);
     expect(ids.has(contributed.id)).toBe(false);
   });
+
+  it('excludes an OFFLINE contribution and an OFFLINE album asset, but keeps a directly-added one', async () => {
+    // Deliberate asymmetry, mirrored from `checkSpaceAccess`: its album and contributed arms gate
+    // `isOffline = false`, its directly-added arm does not. The download manifest must match the
+    // gate arm for arm — a row the gate rejects 400s the whole download, not just that row.
+    const { ctx, sut, spaceRepo } = setup();
+    const { user: owner } = await ctx.newUser();
+    const { user: contributor } = await ctx.newUser();
+    const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+    const { library } = await ctx.newLibrary({ ownerId: owner.id });
+
+    const seedOffline = async (ownerId: string) => {
+      const { asset } = await ctx.newAsset({ ownerId, libraryId: library.id, isOffline: true });
+      await ctx.newExif({ assetId: asset.id, fileSizeInByte: 1024 });
+      return asset;
+    };
+
+    const offlineDirect = await seedOffline(owner.id);
+    await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: offlineDirect.id });
+
+    const offlineAlbumAsset = await seedOffline(owner.id);
+    const offlineContribution = await seedOffline(contributor.id);
+    const { asset: online } = await ctx.newAsset({ ownerId: owner.id });
+    await ctx.newExif({ assetId: online.id, fileSizeInByte: 1024 });
+    const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'Offline mix' }, [
+      online.id,
+      offlineAlbumAsset.id,
+    ]);
+    await spaceRepo.addAlbum({ spaceId: space.id, albumId: album.id, addedById: owner.id });
+    await ctx.newAlbumSpaceAsset({ albumId: album.id, assetId: offlineContribution.id, spaceId: space.id });
+
+    const ids = await collectIds(sut.downloadSpaceId(space.id));
+
+    expect(ids.has(online.id)).toBe(true);
+    expect(ids.has(offlineDirect.id)).toBe(true);
+    expect(ids.has(offlineAlbumAsset.id)).toBe(false);
+    expect(ids.has(offlineContribution.id)).toBe(false);
+  });
+
+  it('excludes a contribution to a linked album that has since been trashed', async () => {
+    const { ctx, sut, spaceRepo } = setup();
+    const { user: owner } = await ctx.newUser();
+    const { user: contributor } = await ctx.newUser();
+    const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+
+    const { asset: ownAsset } = await ctx.newAsset({ ownerId: owner.id });
+    await ctx.newExif({ assetId: ownAsset.id, fileSizeInByte: 1024 });
+    const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'Trashed' }, [ownAsset.id]);
+    await spaceRepo.addAlbum({ spaceId: space.id, albumId: album.id, addedById: owner.id });
+
+    const { asset: contributed } = await ctx.newAsset({ ownerId: contributor.id });
+    await ctx.newExif({ assetId: contributed.id, fileSizeInByte: 2048 });
+    await ctx.newAlbumSpaceAsset({ albumId: album.id, assetId: contributed.id, spaceId: space.id });
+
+    await ctx.softDeleteAlbum(album.id);
+
+    const ids = await collectIds(sut.downloadSpaceId(space.id));
+
+    expect(ids.has(ownAsset.id)).toBe(false);
+    expect(ids.has(contributed.id)).toBe(false);
+  });
+
+  it('yields an asset once when it is reachable both directly and as a contribution', async () => {
+    const { ctx, sut, spaceRepo } = setup();
+    const { user: owner } = await ctx.newUser();
+    const { user: contributor } = await ctx.newUser();
+    const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+
+    const { asset: ownAsset } = await ctx.newAsset({ ownerId: owner.id });
+    await ctx.newExif({ assetId: ownAsset.id, fileSizeInByte: 1024 });
+    const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'Both paths' }, [ownAsset.id]);
+    await spaceRepo.addAlbum({ spaceId: space.id, albumId: album.id, addedById: owner.id });
+
+    const { asset: contributed } = await ctx.newAsset({ ownerId: contributor.id });
+    await ctx.newExif({ assetId: contributed.id, fileSizeInByte: 2048 });
+    await ctx.newAlbumSpaceAsset({ albumId: album.id, assetId: contributed.id, spaceId: space.id });
+    await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: contributed.id });
+
+    const rows: string[] = [];
+    for await (const row of sut.downloadSpaceId(space.id)) {
+      rows.push(row.id);
+    }
+
+    expect(rows.filter((id) => id === contributed.id)).toHaveLength(1);
+  });
 });
