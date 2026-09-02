@@ -371,6 +371,20 @@ describe('SmartSearchResults', () => {
       expect(searchSmartMock).toHaveBeenCalledTimes(1);
     });
 
+    // The blanked grid must show the spinner, not the empty state. Every searchable page resets its
+    // own `isLoading` to false in the same block that commits the new query, so the component has to
+    // re-assert loading afterwards — otherwise a new search flashes "no results" before it resolves,
+    // which reads as a worse bug than the stale results #1052 is about.
+    it('shows the loading state, not the empty state, when the host commits a search from the URL', async () => {
+      await renderHost();
+
+      await fireEvent.click(screen.getByTestId('host-commit-url-search'));
+
+      expect(resultIds()).toBe('');
+      expect(screen.getByTestId('search-loading')).toBeInTheDocument();
+      expect(screen.queryByTestId('search-empty')).not.toBeInTheDocument();
+    });
+
     it('keeps the current results on screen while a reload re-runs the same search', async () => {
       await renderHost();
 
