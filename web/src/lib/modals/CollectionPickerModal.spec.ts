@@ -1,5 +1,5 @@
 // CollectionPickerModal.spec.ts — follows the house pattern (sdk.mock + Modal global stubs)
-import { type AlbumResponseDto, type SharedSpaceResponseDto } from '@immich/sdk';
+import { SharedSpaceRole, type AlbumResponseDto, type SharedSpaceResponseDto } from '@immich/sdk';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import { getAnimateMock } from '$lib/__mocks__/animate.mock';
 import { getIntersectionObserverMock } from '$lib/__mocks__/intersection-observer.mock';
@@ -45,6 +45,16 @@ const space = (id: string, name: string): SharedSpaceResponseDto =>
     assetCount: 1,
     recentAssetIds: [],
   }) as unknown as SharedSpaceResponseDto;
+/** An album owned by someone else that the caller is a member of — `getAllAlbums` returns these too. */
+const albumSharedWithMe = (id: string, name: string): AlbumResponseDto =>
+  ({ ...album(id, name), ownerId: 'someone-else', shared: true }) as unknown as AlbumResponseDto;
+/** A space created by someone else, with the caller holding `role` (or not a member at all). */
+const spaceWhereIAm = (id: string, name: string, role: SharedSpaceRole | null): SharedSpaceResponseDto =>
+  ({
+    ...space(id, name),
+    createdById: 'someone-else',
+    members: role === null ? [] : [{ userId: 'me', role }],
+  }) as unknown as SharedSpaceResponseDto;
 const withAlbum = () =>
   sdkMock.getAllAlbums.mockImplementation(({ isShared }: { isShared?: boolean }) =>
     Promise.resolve(isShared ? [] : [album('a1', 'Trip')]),
@@ -56,7 +66,7 @@ beforeEach(() => {
   Element.prototype.animate = getAnimateMock();
   vi.resetAllMocks();
   mockUser.current = { id: 'me', isAdmin: false };
-  sdkMock.getAllAlbums.mockResolvedValue([]); // both shared:false and shared:true resolve to []
+  sdkMock.getAllAlbums.mockResolvedValue([]); // no albums, whatever the picker asks for
   sdkMock.getAllSpaces.mockResolvedValue([]);
 });
 
@@ -115,6 +125,76 @@ describe('CollectionPickerModal', () => {
     await waitFor(() => expect(screen.getByTestId('spaces-hidden-notice')).toBeTruthy());
     expect(screen.queryByTestId('row-space-s1')).toBeNull();
     expect(screen.queryByTestId('new-space-row')).toBeNull();
+  });
+
+  // #1043: an album you own and have shared with someone matches every album query the picker
+  // could make — owned, shared, unfiltered — so a picker that concatenates two of them listed
+  // it twice, same thumbnail, same count. Adding an editor to an album must not clone its row.
+  it('lists an album that is both owned and shared only once', async () => {
+    sdkMock.getAllAlbums.mockImplementation(() => Promise.resolve([album('a1', 'Trip')]));
+    render(CollectionPickerModal, { assetCount: 3, onClose: vi.fn() });
+    await waitFor(() => expect(screen.getAllByTestId('row-album-a1').length).toBeGreaterThan(0));
+    // Exactly two rows: once under RECENT, once under All — never twice within a section.
+    expect(screen.getAllByTestId('row-album-a1')).toHaveLength(2);
+  });
+
+  // The fetch this replaced pulled albums the caller does *not* own in through its second,
+  // `isShared` query. The single unfiltered query has to carry them, or a member loses every
+  // album they were invited to — the exact set the two queries used to return, minus the double.
+  it('lists albums shared with the user alongside the ones they own', async () => {
+    // Server semantics: `isOwned` keeps only albums the caller owns, `isShared` only shared
+    // ones, and no filter returns both. Narrowing the query back down has to fail this test.
+    sdkMock.getAllAlbums.mockImplementation(({ isOwned, isShared }: { isOwned?: boolean; isShared?: boolean }) => {
+      const mine = album('a1', 'Trip');
+      const theirs = albumSharedWithMe('a2', 'Familie');
+      if (isOwned === true) {
+        return Promise.resolve([mine]);
+      }
+      return Promise.resolve(isShared === true ? [theirs] : [mine, theirs]);
+    });
+    render(CollectionPickerModal, { assetCount: 3, onClose: vi.fn() });
+
+    await waitFor(() => expect(screen.getAllByTestId('row-album-a1').length).toBeGreaterThan(0));
+    expect(screen.getAllByTestId('row-album-a2').length).toBeGreaterThan(0);
+  });
+
+  it('asks for albums once, unfiltered — two filtered queries is what double-listed them', async () => {
+    withAlbum();
+    render(CollectionPickerModal, { assetCount: 3, onClose: vi.fn() });
+
+    await waitFor(() => expect(screen.getAllByTestId('row-album-a1').length).toBeGreaterThan(0));
+    expect(sdkMock.getAllAlbums).toHaveBeenCalledTimes(1);
+    expect(sdkMock.getAllAlbums).toHaveBeenCalledWith({});
+  });
+
+  it('shows an owned-and-shared album once when searching, where there is no RECENT section', async () => {
+    sdkMock.getAllAlbums.mockImplementation(() => Promise.resolve([album('a1', 'Trip')]));
+    render(CollectionPickerModal, { assetCount: 3, onClose: vi.fn() });
+    await waitFor(() => expect(screen.getAllByTestId('row-album-a1').length).toBeGreaterThan(0));
+
+    await fireEvent.input(screen.getByPlaceholderText('search'), { target: { value: 'Tri' } });
+
+    // Searching drops the RECENT section, so All is the only section left: exactly one row.
+    await waitFor(() => expect(screen.getAllByTestId('row-album-a1')).toHaveLength(1));
+  });
+
+  // Space write access is decided here, not by the server's rejection after the fact: a space
+  // the caller can only view is never a destination, so it must not appear as a row at all.
+  it('offers only spaces the user owns or can edit', async () => {
+    sdkMock.getAllSpaces.mockResolvedValue([
+      space('s1', 'Mine'), // created by me
+      spaceWhereIAm('s2', 'Editing', SharedSpaceRole.Editor),
+      spaceWhereIAm('s3', 'Co-owned', SharedSpaceRole.Owner),
+      spaceWhereIAm('s4', 'Viewing', SharedSpaceRole.Viewer),
+      spaceWhereIAm('s5', 'Stranger', null),
+    ]);
+    render(CollectionPickerModal, { assetCount: 3, onClose: vi.fn() });
+
+    await waitFor(() => expect(screen.getAllByTestId('row-space-s1').length).toBeGreaterThan(0));
+    expect(screen.getAllByTestId('row-space-s2').length).toBeGreaterThan(0);
+    expect(screen.getAllByTestId('row-space-s3').length).toBeGreaterThan(0);
+    expect(screen.queryByTestId('row-space-s4')).toBeNull();
+    expect(screen.queryByTestId('row-space-s5')).toBeNull();
   });
 
   it('reports an error and still renders albums when spaces fail to load', async () => {
