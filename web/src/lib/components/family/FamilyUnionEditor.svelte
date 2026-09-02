@@ -18,9 +18,11 @@
     endDate: string | null;
     onSave: (payload: FamilyUnionEditorSave) => void;
     onCancel: () => void;
+    /** Mockup §2's danger action. Deletes the relationship, never the people in it. */
+    onDelete: () => void;
   }
 
-  let { status, startDate, endDate, onSave, onCancel }: Props = $props();
+  let { status, startDate, endDate, onSave, onCancel, onDelete }: Props = $props();
 
   let draftStatus = $state<FamilyUnionStatus>(status);
   let draftStartDate = $state(startDate ?? '');
@@ -120,7 +122,7 @@
     <p data-testid="family-union-editor-error" class="text-xs text-warning">{dateError}</p>
   {/if}
 
-  <div class="flex gap-2">
+  <div class="flex items-center gap-2">
     <button
       type="button"
       data-testid="family-union-editor-save"
@@ -136,6 +138,17 @@
       onclick={onCancel}
     >
       {$t('family_edit_union_cancel')}
+    </button>
+
+    <span class="flex-1"></span>
+
+    <button
+      type="button"
+      data-testid="family-union-delete"
+      class="rounded-full px-2 py-1 text-xs font-medium text-red-500"
+      onclick={onDelete}
+    >
+      {$t('family_edit_union_delete')}
     </button>
   </div>
 </div>
