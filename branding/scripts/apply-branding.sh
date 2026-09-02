@@ -354,13 +354,20 @@ patch_app_download_modal() {
   sed -i "s|https://apps\.apple\.com/us/app/immich/id1613945652|${APP_STORE_URL}|g" "$modal"
 
   # Replace the F-Droid badge (no Noodle F-Droid app) with a GitHub releases
-  # link. Mirrors patch_help_modal's awk block-rewrite: swap the <a id="fdroid-link">
-  # ...</a> anchor for a text link styled like the adjacent Obtainium link.
+  # link. Mirrors patch_help_modal's awk block-rewrite: swap the element carrying
+  # id="fdroid-link" for a text link styled like the adjacent Obtainium link.
+  #
+  # The terminator must cover every element upstream has used for this link, not
+  # just the one in the tree today. Upstream flip-flops: #30527 shipped an <a>
+  # badge, immich-31219 replaced it with a <Button>. Matching only </a> meant the
+  # block ran on past the Button to the NEXT </a> -- the Play Store anchor's --
+  # and swallowed that badge, shipping a branded modal with no Play Store link.
+  # The assertion at the end of this function is the backstop if it drifts again.
   local tmp
   tmp=$(mktemp)
   awk -v url="$REPO_RELEASES_URL" '
     /id="fdroid-link"/ { skip = 1 }
-    skip && /<\/a>/ {
+    skip && (/<\/a>/ || /<\/Button>/) {
       skip = 0
       print "    <a"
       print "      href=\"" url "\""
@@ -379,15 +386,41 @@ patch_app_download_modal() {
   chmod 644 "$tmp"
   mv "$tmp" "$modal"
 
-  # fdroidBadge import is now unused — drop it to keep the build lint-clean
-  # regardless of where it sits in the destructured import list.
-  sed -i "s/, fdroidBadge//g; s/fdroidBadge, //g" "$modal"
+  # Drop the imports the rewrites above just made dead, so the branded build stays
+  # lint-clean under its zero-warning policy. Each is guarded on the symbol no
+  # longer being REFERENCED IN THE MARKUP (everything after </script>) rather than
+  # absent from the file, so an upstream change that starts using one for
+  # something else keeps its import.
+  local body
+  body=$(sed -n '/<\/script>/,$p' "$modal")
 
-  # Same for Constants once every href above became a literal. Guard on it still
-  # being referenced so an upstream change that uses Constants for something else
-  # in this modal doesn't get its import stripped out from under it.
-  if ! grep -q "Constants\." "$modal"; then
-    sed -i "s/, Constants//g; s/Constants, //g" "$modal"
+  # fdroidBadge: the badge <img> it fed is gone.
+  grep -q 'fdroidBadge' <<<"$body" || sed -i "s/, fdroidBadge//g; s/fdroidBadge, //g" "$modal"
+
+  # Button + mdiOpenInNew: immich-31219's <Button> form of the F-Droid link. The
+  # rewrite above replaces it with a plain <a>, so both go dead together.
+  grep -q '<Button' <<<"$body" || sed -i "s/, Button//g; s/Button, //g" "$modal"
+  if ! grep -q 'mdiOpenInNew' <<<"$body"; then
+    sed -i "s/, mdiOpenInNew//g; s/mdiOpenInNew, //g" "$modal"
+    sed -i "\|^[[:space:]]*import { mdiOpenInNew } from '@mdi/js';[[:space:]]*$|d" "$modal"
+  fi
+
+  # Constants, once every href above became a literal.
+  grep -q "Constants\." <<<"$body" || sed -i "s/, Constants//g; s/Constants, //g" "$modal"
+
+  # Fail the branding pass rather than ship a half-rewritten modal. Every rewrite
+  # above matches markup UPSTREAM owns, so any of them can quietly become a no-op
+  # (or, for the block rewrite, over-consume) when upstream restructures this
+  # file. Asserting the three links survive turns that from a silently wrong
+  # branded image into a build failure.
+  local missing=""
+  [[ -n "$PLAY_STORE_URL" ]] && grep -qF "$PLAY_STORE_URL" "$modal" || missing="$missing play-store"
+  [[ -n "$APP_STORE_URL" ]] && grep -qF "$APP_STORE_URL" "$modal" || missing="$missing app-store"
+  [[ -n "$REPO_RELEASES_URL" ]] && grep -qF "$REPO_RELEASES_URL" "$modal" || missing="$missing github-releases"
+  if [[ -n "$missing" ]]; then
+    echo "  ERROR: AppDownloadModal.svelte is missing link(s):$missing" >&2
+    echo "  patch_app_download_modal no longer matches this file's markup — upstream restructured it." >&2
+    return 1
   fi
 
   echo "  Patched AppDownloadModal.svelte"
