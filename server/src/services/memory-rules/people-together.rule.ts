@@ -1,12 +1,6 @@
 import { DateTime } from 'luxon';
 import { AssetRepository, MemoryPeriodFace } from 'src/repositories/asset.repository';
-import {
-  medianTime,
-  monthName,
-  pairCounts,
-  recencyBonus,
-  sampleAssetsByTime,
-} from 'src/services/memory-rules/curation.util';
+import { medianTime, pairCounts, recencyBonus, sampleAssetsByTime } from 'src/services/memory-rules/curation.util';
 import { MemoryRule, MemoryRuleCandidate, MemoryRuleContext } from 'src/services/memory-rules/memory-rule.interface';
 
 /** "Anna & Ben" — a pair often photographed together in a past year's copy of this month. */
@@ -57,13 +51,19 @@ export class PeopleTogetherMemoryRule implements MemoryRule {
       candidates.push({
         ruleId: this.id,
         dedupeKey: `people_together:${top.a.id}:${top.b.id}:${year}-${mm}`,
-        title: `${top.a.name} & ${top.b.name}`,
-        subtitle: `${count} photos together · ${monthName(target.month)} ${year}`,
         score: 100 + count * 3 + recencyBonus(year, target.year),
         assetIds: sampleAssetsByTime(top.assets, PeopleTogetherMemoryRule.ASSET_CAP),
         memoryAt: DateTime.fromJSDate(medianTime(top.assets), { zone: 'utc' }),
         visibleForDays: 7,
-        context: { year, personAId: top.a.id, personBId: top.b.id, count },
+        context: {
+          year,
+          month: target.month,
+          personAId: top.a.id,
+          personAName: top.a.name,
+          personBId: top.b.id,
+          personBName: top.b.name,
+          count,
+        },
       });
     }
 

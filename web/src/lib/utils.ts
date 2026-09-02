@@ -1,7 +1,6 @@
 import {
   AssetMediaSize,
   AssetTypeEnum,
-  MemoryType,
   finishOAuth,
   getAssetOriginalPath,
   getAssetPlaybackPath,
@@ -21,14 +20,15 @@ import {
 } from '@immich/sdk';
 import { toastManager, type ActionItem, type IfLike } from '@immich/ui';
 import { init, register, t } from 'svelte-i18n';
-import { derived, get, type Readable } from 'svelte/store';
+import { derived, get } from 'svelte/store';
 import { defaultLang, locales } from '$lib/constants';
 import { authManager } from '$lib/managers/auth-manager.svelte';
 import { downloadManager } from '$lib/managers/download-manager.svelte';
-import { alwaysLoadOriginalFile, lang } from '$lib/stores/preferences.store';
+import { alwaysLoadOriginalFile, lang, locale } from '$lib/stores/preferences.store';
 import { isWebCompatibleImage } from '$lib/utils/asset-utils';
 import { handleError } from '$lib/utils/handle-error';
 import { convertBCP47, langs } from '$lib/utils/i18n';
+import { getMemoryTitle } from '$lib/utils/memory-card';
 
 interface DownloadRequestOptions<T = unknown> {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
@@ -43,8 +43,6 @@ interface DateFormatter {
   formatTime: (date: Date) => string;
   formatDateTime: (date: Date) => string;
 }
-
-type MessageFormatter = typeof t extends Readable<infer Formatter> ? Formatter : never;
 
 export const initLanguage = async () => {
   const preferenceLang = get(lang);
@@ -377,54 +375,10 @@ export const handlePromiseError = <T>(promise: Promise<T>): void => {
   promise.catch((error) => console.error(`[utils.ts]:handlePromiseError ${error}`, error));
 };
 
-const getRuleContextValue = (memory: MemoryResponseDto, ruleId: string, key: string) => {
-  const data = memory.data as Record<string, unknown>;
-  if (memory.type !== MemoryType.Rule || data.ruleId !== ruleId) {
-    return undefined;
-  }
+export { getMemorySubtitle, getMemoryTitle } from '$lib/utils/memory-card';
 
-  const context = data.context as Record<string, unknown> | undefined;
-  return context?.[key];
-};
-
-export const getMemoryTitle = (memory: MemoryResponseDto, translate: MessageFormatter, now = new Date()) => {
-  if (memory.title) {
-    return memory.title;
-  }
-
-  if (memory.type === MemoryType.OnThisDay) {
-    const year =
-      typeof (memory.data as Record<string, unknown>).year === 'number' ? (memory.data.year as number) : undefined;
-
-    if (year !== undefined) {
-      return translate('years_ago', { values: { years: now.getFullYear() - year } });
-    }
-  }
-
-  const location = getRuleContextValue(memory, 'recent_trip', 'placeLabel');
-  if (typeof location === 'string') {
-    return translate('recent_trip_title', { values: { location } });
-  }
-
-  return translate('unknown');
-};
-
-export const getMemorySubtitle = (memory: MemoryResponseDto, translate: MessageFormatter) => {
-  if (memory.subtitle) {
-    return memory.subtitle;
-  }
-
-  const assetCount = getRuleContextValue(memory, 'recent_trip', 'assetCount');
-  const dayCount = getRuleContextValue(memory, 'recent_trip', 'dayCount');
-  if (typeof assetCount === 'number' && typeof dayCount === 'number') {
-    return translate('recent_trip_subtitle', { values: { assetCount, dayCount } });
-  }
-
-  return '';
-};
-
-export const memoryLaneTitle = derived(t, ($t) => {
-  return (memory: MemoryResponseDto) => getMemoryTitle(memory, $t);
+export const memoryLaneTitle = derived([t, locale], ([$t, $locale]) => {
+  return (memory: MemoryResponseDto) => getMemoryTitle(memory, $t, new Date(), $locale);
 });
 
 export const withError = async <T>(fn: () => Promise<T>): Promise<[undefined, T] | [unknown, undefined]> => {
