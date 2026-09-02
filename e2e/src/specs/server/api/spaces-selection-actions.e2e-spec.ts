@@ -22,14 +22,17 @@
  *    (bulk update) checks `Permission.AssetUpdate`, which is `isOwner ∪ checkSpaceEditAccess`
  *    (server/src/utils/access.ts:155-159). `checkSpaceEditAccess` (access.repository.ts:488-527)
  *    grants any space member with role Editor/Owner write access to every asset directly in that
- *    space's pool (`shared_space_asset`) — REGARDLESS of who owns the specific asset. The only
+ *    space's pool (`shared_space_asset`) — PROVIDED the asset's owner is themselves a member of
+ *    that space (#734 spec §2.3; access.repository.ts's `owner_member` EXISTS clause). The only
  *    restriction is a dedicated guard for `visibility`/`livePhotoVideoId` (asset.service.ts:214-224,
  *    "rbac-3"), whose own comment says explicitly: "other metadata (description/rating/…) stays
  *    editor-allowed." `isFavorite` is not part of that guard either (asset.service.ts:298-329).
  *    So for spaceAssetId (owned by spaceOwner, direct-add to the space): spaceOwner AND spaceEditor
  *    both succeed; spaceViewer (role below Editor) and spaceNonMember (no membership) are rejected.
- *    This is corroborated by shared-space.service.ts:668-671's own comment describing exactly this
- *    escalation path ("gaining AssetUpdate over the owner's assets via checkSpaceEditAccess").
+ *    (spaceOwner satisfies the owner-membership condition trivially here — `createSpace` auto-adds
+ *    its creator as an Owner member, so spaceAssetId's owner is always a space member in this
+ *    fixture; see access-space-edit.repository.spec.ts for the case where the owner is NOT a
+ *    member, which denies regardless of the actor's role.)
  *    Delete is unaffected — `Permission.AssetDelete` is pure `checkOwnerAccess` with no space arm
  *    (access.ts:161-163), so Delete really is owner-only, matching the design doc there.
  *

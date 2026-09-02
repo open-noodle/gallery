@@ -1737,6 +1737,14 @@ set
 returning
   *
 
+-- FaceIdentityRepository.getIdentityIdForFace
+select
+  "identityId"
+from
+  "face_identity_face"
+where
+  "assetFaceId" = $1
+
 -- FaceIdentityRepository.getManualLinkedFaceIds
 select
   "assetFaceId"

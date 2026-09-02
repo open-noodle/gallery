@@ -79,6 +79,7 @@ export enum SharedSpaceRole {
 export enum SharedSpaceActivityType {
   AssetAdd = 'asset_add',
   AssetRemove = 'asset_remove',
+  AssetEdit = 'asset_edit',
   MemberJoin = 'member_join',
   MemberLeave = 'member_leave',
   MemberRemove = 'member_remove',
@@ -89,6 +90,8 @@ export enum SharedSpaceActivityType {
   PersonUpdate = 'person_update',
   PersonDelete = 'person_delete',
   PersonMerge = 'person_merge',
+  PersonFaceAssign = 'person_face_assign',
+  PersonFaceDetach = 'person_face_detach',
   AlbumLink = 'album_link',
   AlbumUnlink = 'album_unlink',
 }

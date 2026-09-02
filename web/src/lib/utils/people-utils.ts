@@ -105,6 +105,39 @@ export const getPersonFaceThumbnailUrl = (personId: string, faceId: string, upda
 export const getSpacePersonFaceThumbnailUrl = (spaceId: string, personId: string, faceId: string, updatedAt?: string) =>
   createUrl(`/shared-spaces/${spaceId}/people/${personId}/faces/${faceId}/thumbnail`, { updatedAt });
 
+// Slice 8, Task 2 -- the space-person equivalent of getPeopleThumbnailUrl, for rendering a space
+// person as a face-assignment PICKER candidate (SpacePersonSidePanel / SpaceFaceEditor), where only
+// the id/updatedAt pair is on hand rather than a full PersonResponseDto.
+export const getSpacePersonThumbnailUrl = (spaceId: string, personId: string, updatedAt?: string) =>
+  createUrl(`/shared-spaces/${spaceId}/people/${personId}/thumbnail`, { updatedAt });
+
+/**
+ * Order face-picker candidates so the people who have a name come first.
+ *
+ * Both pickers behind `PersonPickerPanel` list unnamed clusters alongside named people, because
+ * attaching a face to an existing unnamed cluster is a real move (it merges two sightings of the
+ * same stranger). But a library holds far more unnamed clusters than named people, so leaving them
+ * interleaved buries every name — reported on #992 as "an unstructured list of unlabeled faces
+ * instead of the named people list".
+ *
+ * A BACKSTOP rather than the mechanism: all three sources now arrive named-first on their own — the
+ * owner's list (`getAllForUser`, alphabetical), the space list (`getPersonsBySpaceId`) and a name
+ * search (every result has a name by construction). This keeps the invariant the picker rests on
+ * true at the point of rendering rather than depending on three separate queries continuing to
+ * agree about it.
+ *
+ * The partition is STABLE, so whatever order the caller arrived with survives inside each group —
+ * alphabetical stays alphabetical.
+ */
+export function orderPickerCandidates<T extends { name: string }>(candidates: T[]): T[] {
+  const named: T[] = [];
+  const unnamed: T[] = [];
+  for (const candidate of candidates) {
+    (candidate.name.trim() ? named : unnamed).push(candidate);
+  }
+  return [...named, ...unnamed];
+}
+
 // Admin cleanup + resolutions surfaces render clusters the admin does not own — the person-scoped
 // thumbnail routes above 404/403 for those. Face-keyed, admin-gated, no person join required.
 export const getAdminFaceThumbnailUrl = (assetFaceId: string, updatedAt?: string) =>

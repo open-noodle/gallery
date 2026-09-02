@@ -23,6 +23,16 @@
   type Props = {
     asset: AssetResponseDto;
     isOwner: boolean;
+    /**
+     * #734-style sibling of `isOwner`, never a widening of it (see DetailPanelTags' `canEdit`).
+     * True iff the viewer is Owner/Editor of the space this asset is being viewed through AND is
+     * not the asset's owner. The owner path keeps rendering the owner's own people through the
+     * owner components regardless of this prop — these are two different code paths that merely
+     * look similar. The hidden-people toggle inside the affordance block stays gated on `isOwner`
+     * alone: a space editor has no business toggling the owner's hidden people, and the server
+     * refuses it.
+     */
+    canEditSpacePeople?: boolean;
     previousRoute: string;
     /**
      * R4/E2 — false on a shared link. (People are already shared-link-suppressed by the section gate
@@ -32,7 +42,7 @@
     spaceId?: string;
   };
 
-  const { asset, isOwner, previousRoute, canFilter = false, spaceId }: Props = $props();
+  const { asset, isOwner, canEditSpacePeople = false, previousRoute, canFilter = false, spaceId }: Props = $props();
 
   type AssetPerson = NonNullable<AssetResponseDto['people']>[number];
 
@@ -138,7 +148,7 @@
     class="outline-offset-2 outline-immich-primary group-focus-visible:outline-2 dark:outline-immich-dark-primary"
   />
 {/snippet}
-{#if !authManager.isSharedLink && (isOwner || visiblePeople.length > 0)}
+{#if !authManager.isSharedLink && (isOwner || canEditSpacePeople || visiblePeople.length > 0)}
   <section class="px-4 pt-4 text-sm" data-testid="detail-panel-people">
     <div class="flex h-10 w-full items-center justify-between">
       <Text size="small" color="muted">{$t('people')}</Text>
@@ -154,8 +164,8 @@
             onclick={() => cropFacesFromAsset.set(!$cropFacesFromAsset)}
           />
         {/if}
-        {#if isOwner}
-          {#if people.some((person) => person.isHidden)}
+        {#if isOwner || canEditSpacePeople}
+          {#if isOwner && people.some((person) => person.isHidden)}
             <IconButton
               aria-label={$t('show_hidden_people')}
               icon={assetViewerManager.isShowingHiddenPeople ? mdiEyeOff : mdiEye}

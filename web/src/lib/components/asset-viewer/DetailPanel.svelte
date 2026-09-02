@@ -10,10 +10,12 @@
   import { timeToLoadTheMap } from '$lib/constants';
   import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
   import { authManager } from '$lib/managers/auth-manager.svelte';
+  import { refreshAssetPeople } from '$lib/utils/refresh-asset-people';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import { Route } from '$lib/route';
   import { locale } from '$lib/stores/preferences.store';
   import { getAssetMediaUrl } from '$lib/utils';
+  import { canEditAsset, canEditSpacePeople as resolveCanEditSpacePeople } from '$lib/utils/asset-editability';
   import { delay, getDimensions } from '$lib/utils/asset-utils';
   import { getByteUnitString } from '$lib/utils/byte-units';
   import { getMapProviderLinks } from '$lib/utils/exif-utils';
@@ -41,6 +43,7 @@
   import { t } from 'svelte-i18n';
   import { slide } from 'svelte/transition';
   import PersonSidePanel from '../faces-page/PersonSidePanel.svelte';
+  import SpacePersonSidePanel from './SpacePersonSidePanel.svelte';
   import OnEvents from '../OnEvents.svelte';
   import UserAvatar from '../shared-components/UserAvatar.svelte';
   import AlbumListItemDetails from './AlbumListItemDetails.svelte';
@@ -58,6 +61,31 @@
   let effectiveSpaceId = $derived(spaceId || asset.resolvedSpaceId);
 
   let isOwner = $derived(authManager.authenticated && authManager.user.id === asset.ownerId);
+  // #734: a space Owner/Editor may edit a member's asset. Server-authoritative via `asset.canEdit`
+  // on a single-asset read; falls back to ownership otherwise (see `canEditAsset`). Tags is the one
+  // row that needs BOTH values: it widens only the "add tag" affordance to `canEdit`, but keeps
+  // per-tag remove on the real `isOwner` — tag removal resolves to tag ownership, which also has
+  // no space-edit arm (see `DetailPanelTags.svelte`).
+  let canEdit = $derived(canEditAsset(asset, { userId: authManager.authenticated ? authManager.user.id : undefined }));
+
+  // Slice 8: the People row's own sibling of `canEdit`, gating the space-flavoured face
+  // affordances (name/correct/draw) added by the shared-space face endpoints. `canEdit` is already
+  // true for the owner, so this is explicitly narrowed to `!isOwner` — the owner path keeps
+  // rendering the owner's own people through the owner components, unwidened, exactly like #734
+  // did for `DetailPanelTags`' `canEdit`. See `DetailPanelPeople.svelte`'s `canEditSpacePeople` doc.
+  //
+  // Unlike `canEdit`, this ALSO requires `effectiveSpaceId` explicitly (W-18 in detail-panel.spec.ts
+  // pins this): `canEdit` can be true with no space context at all (e.g. a partner/album share
+  // whose single-asset read still sets `asset.canEdit`), and the people affordances must stay
+  // read-only there — there is no space for the space-flavoured panels to write into.
+  //
+  // Factored into `resolveCanEditSpacePeople` (asset-editability.ts) so the side-panel swap below
+  // and the face-editor swap in PhotoViewer.svelte/VideoNativeViewer.svelte (Slice 8 gap closure)
+  // compute the SAME value for the SAME asset — they must never disagree about which endpoints a
+  // given viewer is allowed to hit.
+  let canEditSpacePeople = $derived(
+    resolveCanEditSpacePeople(asset, { userId: authManager.authenticated ? authManager.user.id : undefined, spaceId }),
+  );
 
   // R4/E2 — shared links get NO filter affordance at all (they have no /photos to land on).
   // Threaded down to child rows the same way `isOwner` is; camera/lens live inline here.
@@ -175,10 +203,11 @@
   };
 
   const handleRefreshPeople = async () => {
-    asset = await getAssetInfo({ id: asset.id, spaceId: effectiveSpaceId });
+    // Shared with the on-photo face editor (SpaceFaceEditor) so the two cannot drift on what
+    // "people changed" means -- see refreshAssetPeople for why both the asset and faceManager
+    // have to be refreshed, and why assigning `asset` here is not enough.
+    await refreshAssetPeople(asset.id, effectiveSpaceId);
     assetViewerManager.closeEditFacesPanel();
-    faceManager.clear();
-    await faceManager.getAssetFaces(asset.id);
   };
 
   const getAssetFolderHref = (asset: AssetResponseDto) => {
@@ -233,9 +262,9 @@
       </section>
     {/if}
 
-    <DetailPanelDescription {asset} {isOwner} {canFilter} />
-    <DetailPanelRating {asset} {isOwner} {canFilter} />
-    <DetailPanelPeople {asset} {isOwner} {canFilter} {previousRoute} spaceId={effectiveSpaceId} />
+    <DetailPanelDescription {asset} isOwner={canEdit} {canFilter} />
+    <DetailPanelRating {asset} isOwner={canEdit} {canFilter} />
+    <DetailPanelPeople {asset} {isOwner} {canEditSpacePeople} {canFilter} {previousRoute} spaceId={effectiveSpaceId} />
 
     <div class="p-4">
       {#if asset.exifInfo}
@@ -246,7 +275,7 @@
         <Text size="small" color="muted">{$t('no_exif_info_available')}</Text>
       {/if}
 
-      <DetailPanelDate {asset} {isOwner} {canFilter} />
+      <DetailPanelDate {asset} isOwner={canEdit} {canFilter} />
 
       <div class="flex gap-4 py-4" data-testid="detail-panel-filename">
         <div><Icon icon={mdiImageOutline} size="24" /></div>
@@ -397,7 +426,7 @@
         </div>
       {/if}
 
-      <DetailPanelLocation {isOwner} {canFilter} {asset} />
+      <DetailPanelLocation isOwner={canEdit} {canFilter} {asset} />
     </div>
   </section>
 
@@ -535,16 +564,32 @@
 
   {#if authManager.authenticated && authManager.preferences.tags.enabled}
     <section class="relative px-2 pb-12 dark:bg-immich-dark-bg dark:text-immich-dark-fg">
-      <DetailPanelTags {asset} {isOwner} {canFilter} spaceId={effectiveSpaceId} />
+      <DetailPanelTags {asset} {isOwner} {canEdit} {canFilter} spaceId={effectiveSpaceId} />
     </section>
   {/if}
 {/if}
 
 {#if assetViewerManager.isEditFacesPanelOpen}
-  <PersonSidePanel
-    assetId={asset.id}
-    assetType={asset.type}
-    onClose={() => assetViewerManager.closeEditFacesPanel()}
-    onRefresh={handleRefreshPeople}
-  />
+  <!--
+    Slice 8 gap closure: the People-row edit affordances are visible whenever `isOwner ||
+    canEditSpacePeople` (DetailPanelPeople.svelte), but the two panels below call DIFFERENT
+    endpoints (owner-only vs shared-space) — they must be mutually exclusive, and the
+    space-flavoured panel additionally needs a real space id to write into.
+  -->
+  {#if canEditSpacePeople && effectiveSpaceId}
+    <SpacePersonSidePanel
+      spaceId={effectiveSpaceId}
+      assetId={asset.id}
+      assetType={asset.type}
+      onClose={() => assetViewerManager.closeEditFacesPanel()}
+      onRefresh={handleRefreshPeople}
+    />
+  {:else}
+    <PersonSidePanel
+      assetId={asset.id}
+      assetType={asset.type}
+      onClose={() => assetViewerManager.closeEditFacesPanel()}
+      onRefresh={handleRefreshPeople}
+    />
+  {/if}
 {/if}

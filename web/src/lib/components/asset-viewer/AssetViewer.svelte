@@ -25,6 +25,10 @@
   import { navigateToAsset } from '$lib/utils/asset-utils';
   import { handleError } from '$lib/utils/handle-error';
   import { navigate } from '$lib/utils/navigation';
+  import {
+    canEditSpacePeople as resolveCanEditSpacePeople,
+    resolveEffectiveSpaceId,
+  } from '$lib/utils/asset-editability';
   import { InvocationTracker } from '$lib/utils/invocationTracker';
   import { SlideshowHistory } from '$lib/utils/slideshow-history';
   import { toTimelineAsset } from '$lib/utils/timeline-util';
@@ -114,6 +118,14 @@
   const asset = $derived(previewStackedAsset ?? cursor.current);
   const nextAsset = $derived(cursor.nextAsset);
   const previousAsset = $derived(cursor.previousAsset);
+  // Slice 8 gap closure: the SAME rule DetailPanel.svelte's People row uses for `asset` — see
+  // `resolveCanEditSpacePeople`'s doc. Threaded into PhotoViewer/VideoViewer's `FaceEditorPanel`
+  // so the face-draw affordance opens the matching endpoint family, never the owner's when a
+  // non-owner space editor triggered it.
+  const canEditSpacePeople = $derived(
+    resolveCanEditSpacePeople(asset, { userId: authManager.authenticated ? authManager.user.id : undefined, spaceId }),
+  );
+  const effectiveSpaceId = $derived(resolveEffectiveSpaceId(asset, spaceId));
   let sharedLink = getSharedLink();
   let fullscreenElement = $state<Element>();
 
@@ -563,6 +575,8 @@
         onVideoEnded={() => navigateAsset()}
         onVideoStarted={handleVideoStarted}
         playOriginalVideo={isPlayingOriginalVideo}
+        spaceId={effectiveSpaceId}
+        {canEditSpacePeople}
       />
     {:else if viewerKind === 'LiveVideoViewer'}
       <VideoViewer
@@ -575,6 +589,8 @@
         onNextAsset={() => navigateAsset('next')}
         onVideoEnded={() => (assetViewerManager.isPlayingMotionPhoto = false)}
         playOriginalVideo={isPlayingOriginalVideo}
+        spaceId={effectiveSpaceId}
+        {canEditSpacePeople}
       />
     {:else if viewerKind === 'ImagePanaramaViewer'}
       <ImagePanoramaViewer {asset} />
@@ -583,7 +599,13 @@
     {:else if viewerKind === 'CropArea'}
       <CropArea {asset} />
     {:else if viewerKind === 'PhotoViewer'}
-      <PhotoViewer cursor={{ ...cursor, current: asset }} {sharedLink} {onSwipe} />
+      <PhotoViewer
+        cursor={{ ...cursor, current: asset }}
+        {sharedLink}
+        {onSwipe}
+        spaceId={effectiveSpaceId}
+        {canEditSpacePeople}
+      />
     {:else if viewerKind === 'VideoViewer'}
       <VideoViewer
         {asset}
@@ -597,6 +619,8 @@
         onVideoEnded={() => navigateAsset()}
         onVideoStarted={handleVideoStarted}
         playOriginalVideo={isPlayingOriginalVideo}
+        spaceId={effectiveSpaceId}
+        {canEditSpacePeople}
       />
     {/if}
 

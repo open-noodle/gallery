@@ -170,6 +170,18 @@ const AssetDownloadOriginalSchema = z
   })
   .meta({ id: 'AssetDownloadOriginalDto' });
 
+const AssetEditableSchema = z
+  .object({
+    assetIds: z.array(z.uuidv4()).describe('Asset IDs to resolve editability for'),
+  })
+  .meta({ id: 'AssetEditableDto' });
+
+const AssetEditableResponseSchema = z
+  .object({
+    editableAssetIds: z.array(z.string()).describe('Subset of the requested IDs the caller may edit'),
+  })
+  .meta({ id: 'AssetEditableResponseDto' });
+
 export const mapStats = (stats: AssetStats): AssetStatsResponseDto => {
   return {
     images: stats[AssetType.Image],
@@ -193,3 +205,5 @@ export class AssetMetadataResponseDto extends createZodDto(AssetMetadataResponse
 export class AssetMetadataBulkResponseDto extends createZodDto(AssetMetadataBulkResponseSchema) {}
 export class AssetCopyDto extends createZodDto(AssetCopySchema) {}
 export class AssetDownloadOriginalDto extends createZodDto(AssetDownloadOriginalSchema) {}
+export class AssetEditableDto extends createZodDto(AssetEditableSchema) {}
+export class AssetEditableResponseDto extends createZodDto(AssetEditableResponseSchema) {}

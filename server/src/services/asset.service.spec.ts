@@ -2,10 +2,19 @@ import { BadRequestException, ForbiddenException, UnauthorizedException } from '
 import { DateTime } from 'luxon';
 import path from 'node:path';
 import { Readable } from 'node:stream';
-import { AssetResponseDto } from 'src/dtos/asset-response.dto';
+import { AssetResponseDto, mapAsset } from 'src/dtos/asset-response.dto';
 import { AssetJobName, AssetStatsResponseDto } from 'src/dtos/asset.dto';
-import { AssetEditAction } from 'src/dtos/editing.dto';
-import { AssetFileType, AssetMetadataKey, AssetStatus, AssetType, AssetVisibility, JobName, JobStatus } from 'src/enum';
+import { AssetEditAction, AssetEditsCreateDto } from 'src/dtos/editing.dto';
+import {
+  AssetFileType,
+  AssetMetadataKey,
+  AssetStatus,
+  AssetType,
+  AssetVisibility,
+  JobName,
+  JobStatus,
+  SharedSpaceActivityType,
+} from 'src/enum';
 import { AssetStats } from 'src/repositories/asset.repository';
 import { AssetService } from 'src/services/asset.service';
 import { AssetFactory } from 'test/factories/asset.factory';
@@ -558,6 +567,29 @@ describe(AssetService.name, () => {
       const result = await sut.get(authStub.admin, asset.id, 'space-id');
 
       expect(result).toHaveProperty('people', []);
+    });
+
+    // The explicit-spaceId branch must report the SAME `resolvedSpaceId` the inferred branch below
+    // does. It used to omit it, so a client re-reading an asset WITH the space id got a response
+    // whose resolved space had vanished -- and `canEditSpacePeople` falls back to that field when
+    // the route carries no space, so the People-row edit controls turned themselves off after a
+    // face edit on /photos/:id until the panel was closed and reopened.
+    it('should report resolvedSpaceId when the space is given explicitly', async () => {
+      const asset = AssetFactory.from()
+        .exif()
+        .face({}, (f) => f.person({ id: 'person-1', name: 'Test Person' }))
+        .build();
+      mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getById.mockResolvedValue(asset as any);
+      mocks.sharedSpace.getMember.mockResolvedValue({ userId: authStub.admin.user.id } as any);
+      mocks.access.asset.checkSpaceAccessForSpace.mockResolvedValue(new Set([asset.id]));
+      mocks.sharedSpace.findSpacePersonsByLinkedPersonIds.mockResolvedValue(
+        new Map([['person-1', { id: 'sp-1', isHidden: false }]]),
+      );
+
+      const result = await sut.get(authStub.admin, asset.id, 'space-1');
+
+      expect((result as any).resolvedSpaceId).toBe('space-1');
     });
 
     it('should keep people for space member without spaceId (fallback)', async () => {
@@ -3099,6 +3131,329 @@ describe(AssetService.name, () => {
       await sut.removeAssetEdits(authStub.admin, asset.id);
 
       expect(mocks.asset.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('asset edits — space editor access (#734)', () => {
+    it('S-15: a space member can read the edits of a member asset (via AssetRead, not AssetEditGet)', async () => {
+      // getAssetEdits gates per-asset on Permission.AssetRead, not AssetEditGet — AssetRead's
+      // space arm is checkSpaceAccess, which admits any space member regardless of role. This
+      // does NOT exercise the AssetEditGet widening above (that case is unreachable from any
+      // current call site); do not "fix" this back to mocking checkSpaceEditAccess.
+      const auth = AuthFactory.create();
+      const asset = AssetFactory.create();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.assetEdit.getAll.mockResolvedValue([]);
+
+      await expect(sut.getAssetEdits(auth, asset.id)).resolves.toEqual({ assetId: asset.id, edits: [] });
+    });
+
+    it('S-16: allows a space editor to WRITE edits on a member asset', async () => {
+      const auth = AuthFactory.create();
+      const asset = AssetFactory.create({ type: AssetType.Image });
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getForEdit.mockResolvedValue({
+        type: AssetType.Image,
+        livePhotoVideoId: null,
+        originalPath: asset.originalPath,
+        originalFileName: asset.originalFileName,
+        duration: null,
+        exifImageWidth: 1920,
+        exifImageHeight: 1080,
+        orientation: null,
+        projectionType: null,
+      });
+      mocks.assetEdit.replaceAll.mockResolvedValue([]);
+
+      await sut.editAsset(auth, asset.id, {
+        edits: [{ action: AssetEditAction.Rotate, parameters: { angle: 90 } }],
+      } as AssetEditsCreateDto);
+
+      expect(mocks.assetEdit.replaceAll).toHaveBeenCalled();
+    });
+
+    it('S-18: allows a space editor to REVERT edits on a member asset', async () => {
+      const auth = AuthFactory.create();
+      const asset = AssetFactory.create();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getById.mockResolvedValue(getForAsset(asset));
+      mocks.assetEdit.getAll.mockResolvedValue([]);
+      mocks.assetEdit.replaceAll.mockResolvedValue([]);
+
+      await expect(sut.removeAssetEdits(auth, asset.id)).resolves.not.toThrow();
+    });
+
+    it('S-19: still rejects an asset the caller has no space-edit access to', async () => {
+      const auth = AuthFactory.create();
+      const asset = AssetFactory.create();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set());
+
+      await expect(sut.editAsset(auth, asset.id, { edits: [] } as AssetEditsCreateDto)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+    });
+
+    it('S-45: allows a space editor to upsert asset metadata on a member asset', async () => {
+      const auth = AuthFactory.create();
+      const asset = AssetFactory.create();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.upsertMetadata.mockResolvedValue([]);
+
+      await expect(sut.upsertMetadata(auth, asset.id, { items: [] })).resolves.not.toThrow();
+    });
+  });
+
+  describe('canEdit / editable (#734)', () => {
+    it('S-29: sets canEdit true for a space editor viewing a member asset', async () => {
+      const auth = AuthFactory.create();
+      const asset = AssetFactory.create();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
+      // AssetRead's space arm is checkSpaceAccess (any space member, not just editors) — this is what
+      // lets a space editor read the asset at all before the AssetUpdate check below decides canEdit.
+      // The brief's original mock omitted this and the test 400ed on the read gate before ever reaching
+      // canEdit; see also S-15's comment on the same checkSpaceAccess-vs-checkSpaceEditAccess split.
+      mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getById.mockResolvedValue(getForAsset(asset));
+      mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue(void 0 as any);
+
+      const result = (await sut.get(auth, asset.id)) as AssetResponseDto;
+
+      expect(result.canEdit).toBe(true);
+    });
+
+    it('S-30: sets canEdit false when the caller has no edit access', async () => {
+      const auth = AuthFactory.create();
+      const asset = AssetFactory.create();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
+      // Read access via space membership (see S-29's comment), but no edit access — the caller can see
+      // the asset but canEdit must resolve false.
+      mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set());
+      mocks.asset.getById.mockResolvedValue(getForAsset(asset));
+      mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue(void 0 as any);
+
+      const result = (await sut.get(auth, asset.id)) as AssetResponseDto;
+
+      expect(result.canEdit).toBe(false);
+    });
+
+    it('S-32: mapAsset (the list-endpoint mapper) never carries a canEdit key — the N+1 guard', () => {
+      // canEdit is resolved once in get(), never inside mapAsset itself (see the comment above the
+      // call site in asset.service.ts): mapAsset has no AuthDto and feeds list endpoints, where
+      // resolving edit access per asset would be an N+1 access check. `in`, not `.toBe(false)` — see
+      // S-14's comment on why absence and `false` are different signals to the client.
+      const result = mapAsset(getForAsset(AssetFactory.create()));
+
+      expect('canEdit' in result).toBe(false);
+    });
+
+    it('S-14: never sets canEdit for a shared-link caller (showExif: true)', async () => {
+      // showExif: true takes the non-stripMetadata path through mapAsset, so this exercises the
+      // `if (!auth.sharedLink)` guard directly — showExif: false would return early via the
+      // stripMetadata branch and never reach the guard, proving less. Absence is asserted with
+      // `in`, not `.toBe(false)`: `canEdit: false` and "no canEdit" are different signals to the
+      // client (the web falls back to its own derivation only when the field is absent), so a
+      // `=== false` assertion would pass even if the guard were deleted and canEdit resolved false
+      // by accident.
+      const asset = AssetFactory.create();
+      mocks.access.asset.checkSharedLinkAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getById.mockResolvedValue(getForAsset(asset));
+
+      const result = await sut.get(
+        { ...authStub.adminSharedLink, sharedLink: { ...authStub.adminSharedLink.sharedLink!, showExif: true } },
+        asset.id,
+      );
+
+      expect('canEdit' in result).toBe(false);
+    });
+
+    it('S-33: returns only the editable subset', async () => {
+      const auth = AuthFactory.create();
+      const mine = newUuid();
+      const editable = newUuid();
+      const forbidden = newUuid();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([mine]));
+      mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set([editable]));
+
+      const result = await sut.getEditable(auth, { assetIds: [mine, editable, forbidden] });
+
+      expect(new Set(result.editableAssetIds)).toEqual(new Set([mine, editable]));
+    });
+
+    it('S-34: handles an empty request without error', async () => {
+      const auth = AuthFactory.create();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set());
+
+      await expect(sut.getEditable(auth, { assetIds: [] })).resolves.toEqual({ editableAssetIds: [] });
+    });
+
+    it('S-35: silently excludes an unknown id rather than 404ing', async () => {
+      const auth = AuthFactory.create();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set());
+
+      await expect(sut.getEditable(auth, { assetIds: [newUuid()] })).resolves.toEqual({ editableAssetIds: [] });
+    });
+  });
+
+  describe('cross-owner edit attribution (#734)', () => {
+    it('S-37: logs one activity row when an editor edits a member asset', async () => {
+      const auth = AuthFactory.create();
+      const asset = AssetFactory.create();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getById.mockResolvedValue(getForAsset(asset));
+      mocks.asset.update.mockResolvedValue(getForAsset(asset));
+      mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue({ spaceId: 'space-1' } as any);
+
+      await sut.update(auth, asset.id, { description: 'fixed' });
+
+      expect(mocks.sharedSpace.logActivity).toHaveBeenCalledWith(
+        expect.objectContaining({ spaceId: 'space-1', userId: auth.user.id, type: SharedSpaceActivityType.AssetEdit }),
+      );
+    });
+
+    it('S-38: logs nothing when the owner edits their own asset', async () => {
+      const asset = AssetFactory.create();
+      const auth = AuthFactory.create({ id: asset.ownerId });
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getById.mockResolvedValue(getForAsset(asset));
+      mocks.asset.update.mockResolvedValue(getForAsset(asset));
+      // Deliberately mocked to resolve a real space, even though the correct implementation never
+      // reaches this call for an owned asset: findSpaceForAssetAndUser is a strict automock, so
+      // leaving it unconfigured would let a mutant that skips the ownership gate throw its way into
+      // the same silent catch this test is trying to prove doesn't fire — passing for the wrong
+      // reason. Mocking it to succeed makes the assertion below actually exercise the gate.
+      mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue({ spaceId: 'space-1' } as any);
+
+      await sut.update(auth, asset.id, { description: 'mine' });
+
+      expect(mocks.sharedSpace.logActivity).not.toHaveBeenCalled();
+    });
+
+    it('S-40: logs nothing, and does not throw, when no space contains the asset', async () => {
+      const auth = AuthFactory.create();
+      const asset = AssetFactory.create();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getById.mockResolvedValue(getForAsset(asset));
+      mocks.asset.update.mockResolvedValue(getForAsset(asset));
+      mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue(null as any);
+
+      await expect(sut.update(auth, asset.id, { description: 'x' })).resolves.toBeDefined();
+      expect(mocks.sharedSpace.logActivity).not.toHaveBeenCalled();
+    });
+
+    it('S-41: a failing logActivity must not fail the edit', async () => {
+      const auth = AuthFactory.create();
+      const asset = AssetFactory.create();
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getById.mockResolvedValue(getForAsset(asset));
+      mocks.asset.update.mockResolvedValue(getForAsset(asset));
+      mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue({ spaceId: 'space-1' } as any);
+      mocks.sharedSpace.logActivity.mockRejectedValue(new Error('activity insert failed'));
+
+      await expect(sut.update(auth, asset.id, { description: 'x' })).resolves.toBeDefined();
+    });
+
+    it('S-46: groups a bulk edit by space — one row per space, none for spaceless assets', async () => {
+      const auth = AuthFactory.create();
+      const inA1 = newUuid();
+      const inA2 = newUuid();
+      const inB = newUuid();
+      const nowhere = newUuid();
+      const ids = [inA1, inA2, inB, nowhere];
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set(ids));
+      // No getByIds mock: logCrossOwnerEdit derives cross-owner from the pure owner arm
+      // (checkOwnerAccess above returning empty) rather than fetching asset rows.
+      mocks.sharedSpace.findSpaceForAssetAndUser.mockImplementation((assetId: string) =>
+        Promise.resolve(
+          (assetId === inB ? { spaceId: 'space-b' } : assetId === nowhere ? null : { spaceId: 'space-a' }) as any,
+        ),
+      );
+      // logActivity is a strict automock: without a resolved value, the first call throws and
+      // (correctly, per logCrossOwnerEdit's single whole-method try/catch) aborts the loop before
+      // the second space's row is ever written, which masks the very grouping behaviour this test
+      // exists to prove. Configure it to succeed like every other repository call here.
+      mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
+
+      await sut.updateAll(auth, { ids, description: 'bulk' });
+
+      expect(mocks.sharedSpace.logActivity).toHaveBeenCalledTimes(2);
+      expect(mocks.sharedSpace.logActivity).toHaveBeenCalledWith(
+        expect.objectContaining({ spaceId: 'space-a', data: expect.objectContaining({ count: 2 }) }),
+      );
+      expect(mocks.sharedSpace.logActivity).toHaveBeenCalledWith(
+        expect.objectContaining({ spaceId: 'space-b', data: expect.objectContaining({ count: 1 }) }),
+      );
+    });
+
+    it('S-52: caps space resolution at MAX_ATTRIBUTION_ASSETS cross-owner ids and marks the row truncated', async () => {
+      const auth = AuthFactory.create();
+      // Mirrors MAX_ATTRIBUTION_ASSETS in asset.service.ts — this pins the cap's VALUE together
+      // with its enforcement, so a change to the constant must update this test too.
+      const CAP = 500;
+      const ids = Array.from({ length: CAP + 1 }, () => newUuid());
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set(ids));
+      mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue({ spaceId: 'space-1' } as any);
+      mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
+
+      await sut.updateAll(auth, { ids, description: 'bulk' });
+
+      // At most CAP queries — one over the cap would mean the amplification this fix closes is back.
+      expect(mocks.sharedSpace.findSpaceForAssetAndUser).toHaveBeenCalledTimes(CAP);
+      expect(mocks.sharedSpace.logActivity).toHaveBeenCalledWith(
+        expect.objectContaining({ spaceId: 'space-1', data: expect.objectContaining({ count: CAP, truncated: true }) }),
+      );
+    });
+
+    it('S-53: a bulk edit under the cap resolves every cross-owner id and never sets truncated', async () => {
+      const auth = AuthFactory.create();
+      const ids = Array.from({ length: 10 }, () => newUuid());
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set(ids));
+      mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue({ spaceId: 'space-1' } as any);
+      mocks.sharedSpace.logActivity.mockResolvedValue(void 0);
+
+      await sut.updateAll(auth, { ids, description: 'bulk' });
+
+      expect(mocks.sharedSpace.findSpaceForAssetAndUser).toHaveBeenCalledTimes(10);
+      expect(mocks.sharedSpace.logActivity).toHaveBeenCalledTimes(1);
+      const [[{ data }]] = mocks.sharedSpace.logActivity.mock.calls;
+      expect(data).toMatchObject({ count: 10 });
+      expect(Object.hasOwn(data as object, 'truncated')).toBe(false);
+    });
+
+    it('S-47: an owner locking their own space asset does not log a cross-owner edit', async () => {
+      // Pins the review-caught #734 regression: checkOwnerAccess filters out a Locked row when
+      // hasElevatedPermission is falsy (e.g. any API-key session). The rbac-3 guard runs BEFORE the
+      // write, on the still-Timeline row, so it correctly sees the caller as owner (calls #1 and #2
+      // below). If logCrossOwnerEdit ran unguarded AFTER the write, its OWN checkOwnerAccess call
+      // would read the now-Locked row back as not-owned (call #3) and misclassify the owner's own
+      // lock as a cross-owner edit — this is what the skip in update() must prevent.
+      const asset = AssetFactory.create();
+      const auth = AuthFactory.create({ id: asset.ownerId });
+      mocks.access.asset.checkOwnerAccess
+        .mockResolvedValueOnce(new Set([asset.id])) // requireAccess(AssetUpdate): Timeline, owned
+        .mockResolvedValueOnce(new Set([asset.id])) // rbac-3 guard: Timeline, owned
+        .mockResolvedValueOnce(new Set()); // would-be post-write logCrossOwnerEdit check: Locked, not-owned
+      mocks.asset.getById.mockResolvedValue(getForAsset(asset));
+      mocks.asset.update.mockResolvedValue({ ...getForAsset(asset), visibility: AssetVisibility.Locked });
+      mocks.sharedSpace.findSpaceForAssetAndUser.mockResolvedValue({ spaceId: 'space-1' } as any);
+
+      await sut.update(auth, asset.id, { visibility: AssetVisibility.Locked });
+
+      expect(mocks.sharedSpace.logActivity).not.toHaveBeenCalled();
     });
   });
 });

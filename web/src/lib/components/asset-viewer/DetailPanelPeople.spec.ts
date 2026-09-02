@@ -65,6 +65,7 @@ const asset = (overrides: Partial<AssetResponseDto> = {}) =>
 
 const renderPanel = (props: {
   isOwner: boolean;
+  canEditSpacePeople?: boolean;
   spaceId?: string;
   people?: PersonResponseDto[];
   sharedLink?: boolean;
@@ -77,6 +78,7 @@ const renderPanel = (props: {
       ...(props.assetType && { type: props.assetType }),
     }),
     isOwner: props.isOwner,
+    canEditSpacePeople: props.canEditSpacePeople,
     previousRoute: '/photos',
     spaceId: props.spaceId,
   });
@@ -558,6 +560,50 @@ describe('DetailPanelPeople', () => {
 
       expect(toggle()).not.toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'tag_people' })).toBeInTheDocument();
+    });
+  });
+
+  // Slice 8, Task 1 — `canEditSpacePeople` is a SIBLING of `isOwner`, never a widening of it (#734
+  // precedent for DetailPanelTags' `canEdit`). F-28/F-29 are the security half: written with
+  // queryBy + .toBeNull(), and each gives the section a non-empty people list so the assertion
+  // proves the AFFORDANCE gate specifically, not merely that the whole section stayed hidden.
+  describe('canEditSpacePeople (space editor affordances)', () => {
+    it('F-27: shows the tag-people affordance to a space editor on a member photo', () => {
+      renderPanel({ isOwner: false, canEditSpacePeople: true, spaceId: 'space-1', people: [] });
+
+      expect(screen.getByRole('button', { name: 'tag_people' })).toBeInTheDocument();
+    });
+
+    it('F-28: hides the affordance when there is no space context, even with people present', () => {
+      faceManagerMock.people = [person('Alice')];
+
+      renderPanel({ isOwner: false, canEditSpacePeople: false, spaceId: undefined });
+
+      expect(screen.queryByRole('button', { name: 'tag_people' })).toBeNull();
+    });
+
+    it('F-29: hides the affordance from a space viewer, even with people present', () => {
+      const bob = spacePerson('Bob', 'space-person-1');
+
+      renderPanel({ isOwner: false, canEditSpacePeople: false, spaceId: 'space-1', people: [bob] });
+
+      expect(screen.queryByRole('button', { name: 'tag_people' })).toBeNull();
+    });
+
+    it('F-30: the owner path is unchanged — owner still sees their own affordance', () => {
+      renderPanel({ isOwner: true, canEditSpacePeople: false });
+
+      expect(screen.getByRole('button', { name: 'tag_people' })).toBeInTheDocument();
+    });
+
+    it('keeps the hidden-people toggle gated on isOwner alone, never on canEditSpacePeople', () => {
+      const bob = spacePerson('Bob', 'space-person-1');
+      const hiddenBob = { ...bob, isHidden: true } as unknown as PersonResponseDto;
+
+      renderPanel({ isOwner: false, canEditSpacePeople: true, spaceId: 'space-1', people: [hiddenBob] });
+
+      // A space editor has no business toggling the owner's hidden people; the server refuses it.
+      expect(screen.queryByRole('button', { name: 'show_hidden_people' })).toBeNull();
     });
   });
 });

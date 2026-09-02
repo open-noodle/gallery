@@ -1,5 +1,5 @@
 <script lang="ts">
-  import FaceEditor from '$lib/components/asset-viewer/face-editor/FaceEditor.svelte';
+  import FaceEditorPanel from '$lib/components/asset-viewer/face-editor/FaceEditorPanel.svelte';
   import VideoRemoteViewer from '$lib/components/asset-viewer/VideoRemoteViewer.svelte';
   import { assetViewerFadeDuration } from '$lib/constants';
   import { assetViewerManager } from '$lib/managers/asset-viewer-manager.svelte';
@@ -65,6 +65,14 @@
     onVideoEnded?: () => void;
     onVideoStarted?: () => void;
     onClose?: () => void;
+    /**
+     * Slice 8 gap closure — the same rule DetailPanel.svelte's People row and PhotoViewer.svelte's
+     * FaceEditorPanel use for THIS same asset (`resolveCanEditSpacePeople`). See
+     * `FaceEditorPanel.svelte` for how these two decide between the owner `FaceEditor` and the
+     * space-flavoured `SpaceFaceEditor`.
+     */
+    spaceId?: string;
+    canEditSpacePeople?: boolean;
   }
 
   let {
@@ -77,6 +85,8 @@
     onPreviousAsset = () => {},
     onNextAsset = () => {},
     onVideoEnded = () => {},
+    spaceId,
+    canEditSpacePeople = false,
     onVideoStarted = () => {},
     onClose = () => {},
   }: Props = $props();
@@ -523,7 +533,15 @@
       {/if}
 
       {#if assetViewerManager.isFaceEditMode && videoPlayer}
-        <FaceEditor htmlElement={videoPlayer} {containerWidth} {containerHeight} {assetId} />
+        <FaceEditorPanel
+          htmlElement={videoPlayer}
+          {containerWidth}
+          {containerHeight}
+          {assetId}
+          {spaceId}
+          {canEditSpacePeople}
+          onClose={() => assetViewerManager.closeFaceEditMode()}
+        />
       {/if}
     {/if}
   </div>

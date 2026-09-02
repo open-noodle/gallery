@@ -132,6 +132,80 @@ class SharedSpacesApi {
     return null;
   }
 
+  /// Assign a face to a person in a shared space
+  ///
+  /// Attach the face to the space person. Idempotent — the response reports whether it acted.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [String] assetFaceId (required):
+  ///   Asset face ID
+  ///
+  /// * [String] id (required):
+  ///   Shared space ID
+  ///
+  /// * [String] personId (required):
+  ///   Space person ID
+  Future<Response> attachSpacePersonFaceWithHttpInfo(String assetFaceId, String id, String personId, { Future<void>? abortTrigger, }) async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/shared-spaces/{id}/people/{personId}/faces/{assetFaceId}'
+      .replaceAll('{assetFaceId}', assetFaceId)
+      .replaceAll('{id}', id)
+      .replaceAll('{personId}', personId);
+
+    // ignore: prefer_final_locals
+    Object? postBody;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    const contentTypes = <String>[];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'PUT',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
+    );
+  }
+
+  /// Assign a face to a person in a shared space
+  ///
+  /// Attach the face to the space person. Idempotent — the response reports whether it acted.
+  ///
+  /// Parameters:
+  ///
+  /// * [String] assetFaceId (required):
+  ///   Asset face ID
+  ///
+  /// * [String] id (required):
+  ///   Shared space ID
+  ///
+  /// * [String] personId (required):
+  ///   Space person ID
+  Future<FaceSuggestionActionResponseDto?> attachSpacePersonFace(String assetFaceId, String id, String personId, { Future<void>? abortTrigger, }) async {
+    final response = await attachSpacePersonFaceWithHttpInfo(assetFaceId, id, personId, abortTrigger: abortTrigger,);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+    // When a remote server returns no body with a status of 204, we shall not decode it.
+    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
+    // FormatException when trying to decode an empty string.
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'FaceSuggestionActionResponseDto',) as FaceSuggestionActionResponseDto;
+    
+    }
+    return null;
+  }
+
   /// Add all user assets to a shared space
   ///
   /// Queues a background job to add all assets owned by the authenticated user to the space.
@@ -313,6 +387,139 @@ class SharedSpacesApi {
     return null;
   }
 
+  /// Draw a face box on an asset, space-scoped
+  ///
+  /// Create a face box on an asset for a shared space and attach it to a space person. Coordinates are given in the (possibly edited) preview image the client rendered and are converted to original-image space.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [String] assetId (required):
+  ///   Asset ID
+  ///
+  /// * [String] id (required):
+  ///   Shared space ID
+  ///
+  /// * [SpaceAssetFaceCreateDto] spaceAssetFaceCreateDto (required):
+  Future<Response> createSpaceAssetFaceWithHttpInfo(String assetId, String id, SpaceAssetFaceCreateDto spaceAssetFaceCreateDto, { Future<void>? abortTrigger, }) async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/shared-spaces/{id}/assets/{assetId}/faces'
+      .replaceAll('{assetId}', assetId)
+      .replaceAll('{id}', id);
+
+    // ignore: prefer_final_locals
+    Object? postBody = spaceAssetFaceCreateDto;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    const contentTypes = <String>['application/json'];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'POST',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
+    );
+  }
+
+  /// Draw a face box on an asset, space-scoped
+  ///
+  /// Create a face box on an asset for a shared space and attach it to a space person. Coordinates are given in the (possibly edited) preview image the client rendered and are converted to original-image space.
+  ///
+  /// Parameters:
+  ///
+  /// * [String] assetId (required):
+  ///   Asset ID
+  ///
+  /// * [String] id (required):
+  ///   Shared space ID
+  ///
+  /// * [SpaceAssetFaceCreateDto] spaceAssetFaceCreateDto (required):
+  Future<SpaceAssetFaceResponseDto?> createSpaceAssetFace(String assetId, String id, SpaceAssetFaceCreateDto spaceAssetFaceCreateDto, { Future<void>? abortTrigger, }) async {
+    final response = await createSpaceAssetFaceWithHttpInfo(assetId, id, spaceAssetFaceCreateDto, abortTrigger: abortTrigger,);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+    // When a remote server returns no body with a status of 204, we shall not decode it.
+    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
+    // FormatException when trying to decode an empty string.
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'SpaceAssetFaceResponseDto',) as SpaceAssetFaceResponseDto;
+    
+    }
+    return null;
+  }
+
+  /// Create a person in a shared space
+  ///
+  /// Create a new space person, optionally attaching a seed face. When the seed face already carries an identity shared by an existing space person, the existing person is returned instead.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [String] id (required):
+  ///
+  /// * [SharedSpacePersonCreateDto] sharedSpacePersonCreateDto (required):
+  Future<Response> createSpacePersonWithHttpInfo(String id, SharedSpacePersonCreateDto sharedSpacePersonCreateDto, { Future<void>? abortTrigger, }) async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/shared-spaces/{id}/people'
+      .replaceAll('{id}', id);
+
+    // ignore: prefer_final_locals
+    Object? postBody = sharedSpacePersonCreateDto;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    const contentTypes = <String>['application/json'];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'POST',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
+    );
+  }
+
+  /// Create a person in a shared space
+  ///
+  /// Create a new space person, optionally attaching a seed face. When the seed face already carries an identity shared by an existing space person, the existing person is returned instead.
+  ///
+  /// Parameters:
+  ///
+  /// * [String] id (required):
+  ///
+  /// * [SharedSpacePersonCreateDto] sharedSpacePersonCreateDto (required):
+  Future<SharedSpacePersonResponseDto?> createSpacePerson(String id, SharedSpacePersonCreateDto sharedSpacePersonCreateDto, { Future<void>? abortTrigger, }) async {
+    final response = await createSpacePersonWithHttpInfo(id, sharedSpacePersonCreateDto, abortTrigger: abortTrigger,);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+    // When a remote server returns no body with a status of 204, we shall not decode it.
+    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
+    // FormatException when trying to decode an empty string.
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'SharedSpacePersonResponseDto',) as SharedSpacePersonResponseDto;
+    
+    }
+    return null;
+  }
+
   /// Deduplicate people in a shared space
   ///
   /// Queue a background job to find and merge duplicate people in a shared space.
@@ -358,6 +565,65 @@ class SharedSpacesApi {
   /// * [String] id (required):
   Future<void> deduplicateSpacePeople(String id, { Future<void>? abortTrigger, }) async {
     final response = await deduplicateSpacePeopleWithHttpInfo(id, abortTrigger: abortTrigger,);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+  }
+
+  /// Delete a face box an editor drew in a shared space
+  ///
+  /// Permanently delete a face box drawn by a space Owner/Editor. Refused for a detected face -- FaceDelete stays owner-only for those.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [String] assetFaceId (required):
+  ///   Asset face ID
+  ///
+  /// * [String] id (required):
+  ///   Shared space ID
+  Future<Response> deleteSpaceAssetFaceWithHttpInfo(String assetFaceId, String id, { Future<void>? abortTrigger, }) async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/shared-spaces/{id}/faces/{assetFaceId}'
+      .replaceAll('{assetFaceId}', assetFaceId)
+      .replaceAll('{id}', id);
+
+    // ignore: prefer_final_locals
+    Object? postBody;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    const contentTypes = <String>[];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'DELETE',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
+    );
+  }
+
+  /// Delete a face box an editor drew in a shared space
+  ///
+  /// Permanently delete a face box drawn by a space Owner/Editor. Refused for a detected face -- FaceDelete stays owner-only for those.
+  ///
+  /// Parameters:
+  ///
+  /// * [String] assetFaceId (required):
+  ///   Asset face ID
+  ///
+  /// * [String] id (required):
+  ///   Shared space ID
+  Future<void> deleteSpaceAssetFace(String assetFaceId, String id, { Future<void>? abortTrigger, }) async {
+    final response = await deleteSpaceAssetFaceWithHttpInfo(assetFaceId, id, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -471,6 +737,80 @@ class SharedSpacesApi {
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
+  }
+
+  /// Detach a face from a person in a shared space
+  ///
+  /// Remove the face from the space person. Only the space projection row is removed -- the face's global identity is left untouched. Response reports whether it acted.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [String] assetFaceId (required):
+  ///   Asset face ID
+  ///
+  /// * [String] id (required):
+  ///   Shared space ID
+  ///
+  /// * [String] personId (required):
+  ///   Space person ID
+  Future<Response> detachSpacePersonFaceWithHttpInfo(String assetFaceId, String id, String personId, { Future<void>? abortTrigger, }) async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/shared-spaces/{id}/people/{personId}/faces/{assetFaceId}'
+      .replaceAll('{assetFaceId}', assetFaceId)
+      .replaceAll('{id}', id)
+      .replaceAll('{personId}', personId);
+
+    // ignore: prefer_final_locals
+    Object? postBody;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    const contentTypes = <String>[];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'DELETE',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
+    );
+  }
+
+  /// Detach a face from a person in a shared space
+  ///
+  /// Remove the face from the space person. Only the space projection row is removed -- the face's global identity is left untouched. Response reports whether it acted.
+  ///
+  /// Parameters:
+  ///
+  /// * [String] assetFaceId (required):
+  ///   Asset face ID
+  ///
+  /// * [String] id (required):
+  ///   Shared space ID
+  ///
+  /// * [String] personId (required):
+  ///   Space person ID
+  Future<FaceSuggestionActionResponseDto?> detachSpacePersonFace(String assetFaceId, String id, String personId, { Future<void>? abortTrigger, }) async {
+    final response = await detachSpacePersonFaceWithHttpInfo(assetFaceId, id, personId, abortTrigger: abortTrigger,);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+    // When a remote server returns no body with a status of 204, we shall not decode it.
+    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
+    // FormatException when trying to decode an empty string.
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
+      return await apiClient.deserializeAsync(await _decodeBodyBytes(response), 'FaceSuggestionActionResponseDto',) as FaceSuggestionActionResponseDto;
+    
+    }
+    return null;
   }
 
   /// Dismiss a face suggestion for a person in a shared space
@@ -910,6 +1250,76 @@ class SharedSpacesApi {
       final responseBody = await _decodeBodyBytes(response);
       return (await apiClient.deserializeAsync(responseBody, 'List<SharedSpaceActivityResponseDto>') as List)
         .cast<SharedSpaceActivityResponseDto>()
+        .toList(growable: false);
+
+    }
+    return null;
+  }
+
+  /// Get the faces on an asset, space-scoped
+  ///
+  /// Retrieve the face boxes on an asset for a shared space, joined to the space person holding each one, if any.
+  ///
+  /// Note: This method returns the HTTP [Response].
+  ///
+  /// Parameters:
+  ///
+  /// * [String] assetId (required):
+  ///   Asset ID
+  ///
+  /// * [String] id (required):
+  ///   Shared space ID
+  Future<Response> getSpaceAssetFacesWithHttpInfo(String assetId, String id, { Future<void>? abortTrigger, }) async {
+    // ignore: prefer_const_declarations
+    final apiPath = r'/shared-spaces/{id}/assets/{assetId}/faces'
+      .replaceAll('{assetId}', assetId)
+      .replaceAll('{id}', id);
+
+    // ignore: prefer_final_locals
+    Object? postBody;
+
+    final queryParams = <QueryParam>[];
+    final headerParams = <String, String>{};
+    final formParams = <String, String>{};
+
+    const contentTypes = <String>[];
+
+
+    return apiClient.invokeAPI(
+      apiPath,
+      'GET',
+      queryParams,
+      postBody,
+      headerParams,
+      formParams,
+      contentTypes.isEmpty ? null : contentTypes.first,
+      abortTrigger: abortTrigger,
+    );
+  }
+
+  /// Get the faces on an asset, space-scoped
+  ///
+  /// Retrieve the face boxes on an asset for a shared space, joined to the space person holding each one, if any.
+  ///
+  /// Parameters:
+  ///
+  /// * [String] assetId (required):
+  ///   Asset ID
+  ///
+  /// * [String] id (required):
+  ///   Shared space ID
+  Future<List<SpaceAssetFaceResponseDto>?> getSpaceAssetFaces(String assetId, String id, { Future<void>? abortTrigger, }) async {
+    final response = await getSpaceAssetFacesWithHttpInfo(assetId, id, abortTrigger: abortTrigger,);
+    if (response.statusCode >= HttpStatus.badRequest) {
+      throw ApiException(response.statusCode, await _decodeBodyBytes(response));
+    }
+    // When a remote server returns no body with a status of 204, we shall not decode it.
+    // At the time of writing this, `dart:convert` will throw an "Unexpected end of input"
+    // FormatException when trying to decode an empty string.
+    if (response.body.isNotEmpty && response.statusCode != HttpStatus.noContent) {
+      final responseBody = await _decodeBodyBytes(response);
+      return (await apiClient.deserializeAsync(responseBody, 'List<SpaceAssetFaceResponseDto>') as List)
+        .cast<SpaceAssetFaceResponseDto>()
         .toList(growable: false);
 
     }

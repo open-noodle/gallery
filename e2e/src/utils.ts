@@ -576,6 +576,71 @@ export const utils = {
     return result.rows[0].id as string;
   },
 
+  /**
+   * Seeds a bare, UNASSIGNED asset_face (`personId IS NULL`) directly via SQL — there is no HTTP
+   * path that leaves a face unassigned: `POST /faces` (owner) requires `personId`, and the space
+   * draw endpoint (`POST /shared-spaces/:id/assets/:assetId/faces`) always attaches on creation.
+   * In production an unassigned face comes from ML detection, which does not run in this stack.
+   * Used by the space-editor face-assign journey to seed the "unrecognised face" an editor names.
+   */
+  createUnassignedFace: async (assetId: string): Promise<string> => {
+    if (!client) {
+      throw new Error('Database client not connected');
+    }
+
+    const result = await client.query(
+      `INSERT INTO asset_face ("assetId", "personId", "sourceType") VALUES ($1, NULL, 'machine-learning') RETURNING id`,
+      [assetId],
+    );
+    return result.rows[0].id as string;
+  },
+
+  /**
+   * Spec §6.3.1: `face_identity_face`'s `identityId` for one face, or `undefined` if the face
+   * has no identity link yet. No SDK/HTTP surface exposes this directly (space-person reads go
+   * through `shared_space_person_face`, not the identity layer), so the space-editor face-assign
+   * journey reads it straight from the DB to prove the identity-write-vs-skip behaviour that
+   * `writeIdentity` gates -- without asserting on internal repository calls.
+   */
+  getFaceIdentityId: async (assetFaceId: string): Promise<string | undefined> => {
+    if (!client) {
+      throw new Error('Database client not connected');
+    }
+
+    const result = await client.query(`SELECT "identityId" FROM "face_identity_face" WHERE "assetFaceId" = $1`, [
+      assetFaceId,
+    ]);
+    return result.rows[0]?.identityId as string | undefined;
+  },
+
+  /**
+   * Spec §6.3.1 (revised): the OWNER-side `asset_face.personId` for one face, plus the owning
+   * `person`'s name when it is set.
+   *
+   * This is the column a space-editor face edit now propagates onto, and it is the column the
+   * asset-detail People row is seeded from -- so reading it directly is the sharpest available
+   * proof that an editor's attach/detach reached the owner's own layer rather than stopping at
+   * the space projection. The owner-facing `GET /assets/:id` assertion in the same spec proves the
+   * user-visible half; this proves which column moved.
+   */
+  getFaceOwnerPerson: async (assetFaceId: string): Promise<{ personId: string | null; name: string | null }> => {
+    if (!client) {
+      throw new Error('Database client not connected');
+    }
+
+    const result = await client.query(
+      `SELECT af."personId", p."name"
+         FROM "asset_face" af
+         LEFT JOIN "person" p ON p."id" = af."personId"
+        WHERE af."id" = $1`,
+      [assetFaceId],
+    );
+    return {
+      personId: (result.rows[0]?.personId as string | null) ?? null,
+      name: (result.rows[0]?.name as string | null) ?? null,
+    };
+  },
+
   // Slice 3 — M2: PersonResponseDto does not expose `faceAssetId` (only `thumbnailPath`, which is
   // populated asynchronously via the PersonGenerateThumbnail job). Representative-face write-scope
   // specs need to assert "left unchanged" / "changed to X" directly, so read the column via SQL.

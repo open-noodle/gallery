@@ -60,6 +60,7 @@ import { SlideshowState, slideshowStore } from '$lib/stores/slideshow.store';
 import { waitForWebsocketEvent } from '$lib/stores/websocket';
 import { getAssetMediaUrl, getSharedLink, sleep } from '$lib/utils';
 import { downloadUrl } from '$lib/utils';
+import { canEditAsset } from '$lib/utils/asset-editability';
 import { handleError } from '$lib/utils/handle-error';
 import { getFormatter } from '$lib/utils/i18n';
 
@@ -281,9 +282,13 @@ export const getAssetActions = (
     shortcuts: { key: 't' },
   };
 
+  // Server-authoritative on a single-asset read (`asset.canEdit`); falls back to ownership when
+  // the field was never resolved (e.g. bulk/list surfaces). See `canEditAsset` (#734).
+  const isEditable = () => canEditAsset(asset, { userId: authUser?.id });
+
   const canEditImage = () =>
     !sharedLink &&
-    isOwner &&
+    isEditable() &&
     asset.type === AssetTypeEnum.Image &&
     !asset.livePhotoVideoId &&
     asset.exifInfo?.projectionType !== ProjectionType.EQUIRECTANGULAR &&
@@ -292,7 +297,7 @@ export const getAssetActions = (
     !asset.originalPath.toLowerCase().endsWith('.svg');
 
   const canEditVideo = () => {
-    if (sharedLink || !isOwner || asset.type !== AssetTypeEnum.Video || asset.livePhotoVideoId) {
+    if (sharedLink || !isEditable() || asset.type !== AssetTypeEnum.Video || asset.livePhotoVideoId) {
       return false;
     }
     // Duration must be known and >= 2 seconds

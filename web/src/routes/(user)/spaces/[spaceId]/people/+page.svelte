@@ -19,7 +19,7 @@
   import { createCrossOwnerMergeHandlers, runMergeWithCrossOwnerConfirmation } from '$lib/utils/cross-owner-merge';
   import { handleError } from '$lib/utils/handle-error';
   import { clearQueryParam } from '$lib/utils/navigation';
-  import { sortPeople } from '$lib/utils/people-utils';
+  import { appendUniqueById, sortPeople } from '$lib/utils/people-utils';
   import { formatPeopleHeaderDescription } from '$lib/utils/people-statistics';
   import {
     getSpacePeople,
@@ -61,6 +61,13 @@
   const space: SharedSpaceResponseDto = $derived(data.space);
   const members: SharedSpaceMemberResponseDto[] = $derived(data.members);
   let people = $state<SharedSpacePersonResponseDto[]>([]);
+  // How many rows the SERVER has served, which is what OFFSET counts -- not `people.length`, which
+  // is what survived `appendUniqueById`. The two diverge the moment a shifted window repeats a row,
+  // and paging on the kept count would then re-request every dropped row (and, for a page that is
+  // all duplicates, re-request the same window forever). Same reasoning as the activity feed's
+  // `activityOffset`. One counter per list, since the two page independently.
+  let peopleOffset = $state(0);
+  let visibilityOffset = $state(0);
   let peopleStatistics = $state<SharedSpacePeopleStatisticsResponseDto | null>(null);
   let loadedSpaceId = $state('');
   let loading = $state(false);
@@ -130,6 +137,7 @@
     }
 
     people = data.people;
+    peopleOffset = data.people.length;
     peopleStatistics = data.peopleStatistics;
     statisticsSearchName = null;
     hasMore = data.people.length >= PAGE_SIZE;
@@ -230,6 +238,7 @@
       }
 
       people = newPeople;
+      peopleOffset = newPeople.length;
       peopleStatistics = newStatistics;
       statisticsSearchName = requestSearchName || null;
       hasMore = people.length >= PAGE_SIZE;
@@ -277,6 +286,7 @@
       }
 
       people = newPeople;
+      peopleOffset = newPeople.length;
       peopleStatistics = newStatistics;
       statisticsSearchName = requestSearchName || null;
       hasMore = people.length >= PAGE_SIZE;
@@ -310,8 +320,13 @@
     }
     loading = true;
     try {
-      const more = await getSpacePeople(getPeopleQuery({ limit: PAGE_SIZE, offset: people.length }));
-      people = [...people, ...more];
+      const more = await getSpacePeople(getPeopleQuery({ limit: PAGE_SIZE, offset: peopleOffset }));
+      peopleOffset += more.length;
+      // Merged by id, not concatenated: the ordering this pages over keys on hidden state, name and
+      // asset count, and every face attach/detach recounts those -- so a shifted window can re-emit
+      // a row page 1 already returned, and a repeated key kills the keyed grid outright. Same
+      // reasoning, same helper, as the global people page.
+      people = appendUniqueById(people, more);
       hasMore = more.length >= PAGE_SIZE;
     } catch (error) {
       handleError(error, $t('spaces_error_loading_people'));
@@ -323,6 +338,7 @@
   async function openVisibilityModal() {
     try {
       allPeople = await getSpacePeople({ id: space.id, withHidden: true, limit: PAGE_SIZE });
+      visibilityOffset = allPeople.length;
     } catch (error) {
       handleError(error, $t('spaces_error_loading_people'));
       return;
@@ -344,9 +360,11 @@
         id: space.id,
         withHidden: true,
         limit: PAGE_SIZE,
-        offset: allPeople.length,
+        offset: visibilityOffset,
       });
-      allPeople = [...allPeople, ...more];
+      visibilityOffset += more.length;
+      // Same merge, same reason, as loadMore above -- this grid is keyed on the person id too.
+      allPeople = appendUniqueById(allPeople, more);
       hasMoreVisibility = more.length >= PAGE_SIZE;
     } catch (error) {
       handleError(error, $t('spaces_error_loading_people'));

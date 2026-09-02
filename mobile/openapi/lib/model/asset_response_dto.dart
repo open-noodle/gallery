@@ -13,6 +13,7 @@ part of openapi.api;
 class AssetResponseDto {
   /// Returns a new [AssetResponseDto] instance.
   AssetResponseDto({
+    this.canEdit = const Optional.absent(),
     required this.checksum,
     required this.createdAt,
     this.duplicateId = const Optional.absent(),
@@ -47,6 +48,15 @@ class AssetResponseDto {
     required this.visibility,
     required this.width,
   });
+
+  /// Whether the caller may edit this asset (owner, or Owner/Editor of a space whose member owns it). Present only on single-asset reads; absent from list responses, where resolving it per asset would be an N+1 access check.
+  ///
+  /// Please note: This property should have been non-nullable! Since the specification file
+  /// does not include a default value (using the "default:" property), however, the generated
+  /// source code must fall back to having a nullable type.
+  /// Consider adding a "default:" property in the specification file to hide this note.
+  ///
+  Optional<bool?> canEdit;
 
   /// Base64 encoded SHA1 hash
   String checksum;
@@ -181,6 +191,7 @@ class AssetResponseDto {
 
   @override
   bool operator ==(Object other) => identical(this, other) || other is AssetResponseDto &&
+    other.canEdit == canEdit &&
     other.checksum == checksum &&
     other.createdAt == createdAt &&
     other.duplicateId == duplicateId &&
@@ -218,6 +229,7 @@ class AssetResponseDto {
   @override
   int get hashCode =>
     // ignore: unnecessary_parenthesis
+    (canEdit == null ? 0 : canEdit!.hashCode) +
     (checksum.hashCode) +
     (createdAt.hashCode) +
     (duplicateId == null ? 0 : duplicateId!.hashCode) +
@@ -253,10 +265,14 @@ class AssetResponseDto {
     (width == null ? 0 : width!.hashCode);
 
   @override
-  String toString() => 'AssetResponseDto[checksum=$checksum, createdAt=$createdAt, duplicateId=$duplicateId, duration=$duration, exifInfo=$exifInfo, fileCreatedAt=$fileCreatedAt, fileModifiedAt=$fileModifiedAt, hasMetadata=$hasMetadata, height=$height, id=$id, isArchived=$isArchived, isEdited=$isEdited, isFavorite=$isFavorite, isOffline=$isOffline, isTrashed=$isTrashed, libraryId=$libraryId, livePhotoVideoId=$livePhotoVideoId, localDateTime=$localDateTime, originalFileName=$originalFileName, originalMimeType=$originalMimeType, originalPath=$originalPath, owner=$owner, ownerId=$ownerId, people=$people, resized=$resized, resolvedSpaceId=$resolvedSpaceId, stack=$stack, tags=$tags, thumbhash=$thumbhash, type=$type, updatedAt=$updatedAt, visibility=$visibility, width=$width]';
+  String toString() => 'AssetResponseDto[canEdit=$canEdit, checksum=$checksum, createdAt=$createdAt, duplicateId=$duplicateId, duration=$duration, exifInfo=$exifInfo, fileCreatedAt=$fileCreatedAt, fileModifiedAt=$fileModifiedAt, hasMetadata=$hasMetadata, height=$height, id=$id, isArchived=$isArchived, isEdited=$isEdited, isFavorite=$isFavorite, isOffline=$isOffline, isTrashed=$isTrashed, libraryId=$libraryId, livePhotoVideoId=$livePhotoVideoId, localDateTime=$localDateTime, originalFileName=$originalFileName, originalMimeType=$originalMimeType, originalPath=$originalPath, owner=$owner, ownerId=$ownerId, people=$people, resized=$resized, resolvedSpaceId=$resolvedSpaceId, stack=$stack, tags=$tags, thumbhash=$thumbhash, type=$type, updatedAt=$updatedAt, visibility=$visibility, width=$width]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
+    if (this.canEdit.isPresent) {
+      final value = this.canEdit.value;
+      json[r'canEdit'] = value;
+    }
       json[r'checksum'] = this.checksum;
       json[r'createdAt'] = this.createdAt.toUtc().toIso8601String();
     if (this.duplicateId.isPresent) {
@@ -351,6 +367,7 @@ class AssetResponseDto {
       final json = value.cast<String, dynamic>();
 
       return AssetResponseDto(
+        canEdit: json.containsKey(r'canEdit') ? Optional.present(mapValueOfType<bool>(json, r'canEdit')) : const Optional.absent(),
         checksum: mapValueOfType<String>(json, r'checksum')!,
         createdAt: mapDateTime(json, r'createdAt', r'')!,
         duplicateId: json.containsKey(r'duplicateId') ? Optional.present(mapValueOfType<String>(json, r'duplicateId')) : const Optional.absent(),

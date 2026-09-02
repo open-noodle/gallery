@@ -341,6 +341,7 @@ describe(MediaRepository.name, () => {
       updatedAt: new Date(),
       deletedAt: null,
       updateId: '',
+      createdBy: null,
     };
 
     const assetDimensions = { width: 1000, height: 800 };

@@ -111,6 +111,7 @@ Class | Method | HTTP request | Description
 *AssetsApi* | [**getAssetMetadataByKey**](doc//AssetsApi.md#getassetmetadatabykey) | **GET** /assets/{id}/metadata/{key} | Retrieve asset metadata by key
 *AssetsApi* | [**getAssetOcr**](doc//AssetsApi.md#getassetocr) | **GET** /assets/{id}/ocr | Retrieve asset OCR data
 *AssetsApi* | [**getAssetStatistics**](doc//AssetsApi.md#getassetstatistics) | **GET** /assets/statistics | Get asset statistics
+*AssetsApi* | [**getEditableAssets**](doc//AssetsApi.md#geteditableassets) | **POST** /assets/editable | Resolve which of the given assets the caller may edit
 *AssetsApi* | [**getMainPlaylist**](doc//AssetsApi.md#getmainplaylist) | **GET** /assets/{id}/video/stream/main.m3u8 | Get HLS main playlist
 *AssetsApi* | [**getMediaPlaylist**](doc//AssetsApi.md#getmediaplaylist) | **GET** /assets/{id}/video/stream/{sessionId}/{variantIndex}/playlist.m3u8 | Get HLS media playlist
 *AssetsApi* | [**getSegment**](doc//AssetsApi.md#getsegment) | **GET** /assets/{id}/video/stream/{sessionId}/{variantIndex}/{filename} | Get HLS segment or init file
@@ -313,12 +314,17 @@ Class | Method | HTTP request | Description
 *SharedLinksApi* | [**updateSharedLink**](doc//SharedLinksApi.md#updatesharedlink) | **PATCH** /shared-links/{id} | Update a shared link
 *SharedSpacesApi* | [**addAssets**](doc//SharedSpacesApi.md#addassets) | **POST** /shared-spaces/{id}/assets | Add assets to a shared space
 *SharedSpacesApi* | [**addMember**](doc//SharedSpacesApi.md#addmember) | **POST** /shared-spaces/{id}/members | Add a member to a shared space
+*SharedSpacesApi* | [**attachSpacePersonFace**](doc//SharedSpacesApi.md#attachspacepersonface) | **PUT** /shared-spaces/{id}/people/{personId}/faces/{assetFaceId} | Assign a face to a person in a shared space
 *SharedSpacesApi* | [**bulkAddAssets**](doc//SharedSpacesApi.md#bulkaddassets) | **POST** /shared-spaces/{id}/assets/bulk-add | Add all user assets to a shared space
 *SharedSpacesApi* | [**confirmSpacePersonFaceSuggestion**](doc//SharedSpacesApi.md#confirmspacepersonfacesuggestion) | **POST** /shared-spaces/{id}/people/{personId}/face-suggestions/{assetFaceId}/confirm | Confirm a face suggestion for a person in a shared space
 *SharedSpacesApi* | [**createSpace**](doc//SharedSpacesApi.md#createspace) | **POST** /shared-spaces | Create a shared space
+*SharedSpacesApi* | [**createSpaceAssetFace**](doc//SharedSpacesApi.md#createspaceassetface) | **POST** /shared-spaces/{id}/assets/{assetId}/faces | Draw a face box on an asset, space-scoped
+*SharedSpacesApi* | [**createSpacePerson**](doc//SharedSpacesApi.md#createspaceperson) | **POST** /shared-spaces/{id}/people | Create a person in a shared space
 *SharedSpacesApi* | [**deduplicateSpacePeople**](doc//SharedSpacesApi.md#deduplicatespacepeople) | **POST** /shared-spaces/{id}/people/deduplicate | Deduplicate people in a shared space
+*SharedSpacesApi* | [**deleteSpaceAssetFace**](doc//SharedSpacesApi.md#deletespaceassetface) | **DELETE** /shared-spaces/{id}/faces/{assetFaceId} | Delete a face box an editor drew in a shared space
 *SharedSpacesApi* | [**deleteSpacePerson**](doc//SharedSpacesApi.md#deletespaceperson) | **DELETE** /shared-spaces/{id}/people/{personId} | Delete a person from a shared space
 *SharedSpacesApi* | [**deleteSpacePersonAlias**](doc//SharedSpacesApi.md#deletespacepersonalias) | **DELETE** /shared-spaces/{id}/people/{personId}/alias | Delete a person alias in a shared space
+*SharedSpacesApi* | [**detachSpacePersonFace**](doc//SharedSpacesApi.md#detachspacepersonface) | **DELETE** /shared-spaces/{id}/people/{personId}/faces/{assetFaceId} | Detach a face from a person in a shared space
 *SharedSpacesApi* | [**dismissSpacePersonFaceSuggestion**](doc//SharedSpacesApi.md#dismissspacepersonfacesuggestion) | **POST** /shared-spaces/{id}/people/{personId}/face-suggestions/{assetFaceId}/dismiss | Dismiss a face suggestion for a person in a shared space
 *SharedSpacesApi* | [**getAllSpaces**](doc//SharedSpacesApi.md#getallspaces) | **GET** /shared-spaces | Get all shared spaces
 *SharedSpacesApi* | [**getMembers**](doc//SharedSpacesApi.md#getmembers) | **GET** /shared-spaces/{id}/members | Get members of a shared space
@@ -326,6 +332,7 @@ Class | Method | HTTP request | Description
 *SharedSpacesApi* | [**getSharedSpaceAssetLinkedAlbums**](doc//SharedSpacesApi.md#getsharedspaceassetlinkedalbums) | **POST** /shared-spaces/{id}/assets/linked-albums | List linked albums that contain the given assets
 *SharedSpacesApi* | [**getSpace**](doc//SharedSpacesApi.md#getspace) | **GET** /shared-spaces/{id} | Get a shared space
 *SharedSpacesApi* | [**getSpaceActivities**](doc//SharedSpacesApi.md#getspaceactivities) | **GET** /shared-spaces/{id}/activities | Get space activity feed
+*SharedSpacesApi* | [**getSpaceAssetFaces**](doc//SharedSpacesApi.md#getspaceassetfaces) | **GET** /shared-spaces/{id}/assets/{assetId}/faces | Get the faces on an asset, space-scoped
 *SharedSpacesApi* | [**getSpaceMapMarkers**](doc//SharedSpacesApi.md#getspacemapmarkers) | **GET** /shared-spaces/{id}/map-markers | Get map markers for a shared space
 *SharedSpacesApi* | [**getSpacePeople**](doc//SharedSpacesApi.md#getspacepeople) | **GET** /shared-spaces/{id}/people | Get people in a shared space
 *SharedSpacesApi* | [**getSpacePeopleFaceStatistics**](doc//SharedSpacesApi.md#getspacepeoplefacestatistics) | **GET** /shared-spaces/{id}/people/face-statistics | Get people face statistics in a shared space
@@ -474,6 +481,8 @@ Class | Method | HTTP request | Description
  - [AssetEditActionItemDto](doc//AssetEditActionItemDto.md)
  - [AssetEditActionItemDtoParameters](doc//AssetEditActionItemDtoParameters.md)
  - [AssetEditActionItemResponseDto](doc//AssetEditActionItemResponseDto.md)
+ - [AssetEditableDto](doc//AssetEditableDto.md)
+ - [AssetEditableResponseDto](doc//AssetEditableResponseDto.md)
  - [AssetEditsCreateDto](doc//AssetEditsCreateDto.md)
  - [AssetEditsResponseDto](doc//AssetEditsResponseDto.md)
  - [AssetFaceCreateDto](doc//AssetFaceCreateDto.md)
@@ -761,6 +770,7 @@ Class | Method | HTTP request | Description
  - [SharedSpaceMemberUpdateDto](doc//SharedSpaceMemberUpdateDto.md)
  - [SharedSpacePeopleStatisticsResponseDto](doc//SharedSpacePeopleStatisticsResponseDto.md)
  - [SharedSpacePersonAliasDto](doc//SharedSpacePersonAliasDto.md)
+ - [SharedSpacePersonCreateDto](doc//SharedSpacePersonCreateDto.md)
  - [SharedSpacePersonMergeDto](doc//SharedSpacePersonMergeDto.md)
  - [SharedSpacePersonResponseDto](doc//SharedSpacePersonResponseDto.md)
  - [SharedSpacePersonUpdateDto](doc//SharedSpacePersonUpdateDto.md)
@@ -773,6 +783,8 @@ Class | Method | HTTP request | Description
  - [SmartSearchFacetsDto](doc//SmartSearchFacetsDto.md)
  - [SmartSearchFacetsResponseDto](doc//SmartSearchFacetsResponseDto.md)
  - [SourceType](doc//SourceType.md)
+ - [SpaceAssetFaceCreateDto](doc//SpaceAssetFaceCreateDto.md)
+ - [SpaceAssetFaceResponseDto](doc//SpaceAssetFaceResponseDto.md)
  - [SpaceRepresentativeFaceUpdateDto](doc//SpaceRepresentativeFaceUpdateDto.md)
  - [StackCreateDto](doc//StackCreateDto.md)
  - [StackResponseDto](doc//StackResponseDto.md)

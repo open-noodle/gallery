@@ -375,15 +375,18 @@ export class FacePersonVerdictRepository {
     return this.recordPersonalVerdict({ personId, assetFaceId, status: 'ignored', ...opts });
   }
 
-  private async recordSpacePersonVerdict(input: {
-    spacePersonId: string;
-    assetFaceId: string;
-    status: 'rejected' | 'ignored';
-    identityId?: string | null;
-    source?: FacePersonVerdictSource;
-    actorId?: string | null;
-  }): Promise<number> {
-    const result = await this.db
+  private async recordSpacePersonVerdict(
+    input: {
+      spacePersonId: string;
+      assetFaceId: string;
+      status: 'rejected' | 'ignored';
+      identityId?: string | null;
+      source?: FacePersonVerdictSource;
+      actorId?: string | null;
+    },
+    db: Kysely<DB> | Transaction<DB> = this.db,
+  ): Promise<number> {
+    const result = await db
       .insertInto('face_person_verdict')
       .values({
         spacePersonId: input.spacePersonId,
@@ -412,13 +415,19 @@ export class FacePersonVerdictRepository {
     return Number(result.numInsertedOrUpdatedRows ?? 0n);
   }
 
+  // §6.3.1/F-13: `db` defaults to `this.db`, but `attachFaceToSpacePerson` (Slice 2) is the first caller
+  // that passes its own `trx` — the negative verdict it writes must land in the SAME transaction as the
+  // reassign/override it accompanies, or a mid-transaction failure could leave the projection write rolled
+  // back while the verdict survives (or vice versa), reopening the suggestion re-offer this call exists to
+  // close.
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID, { source: 'cleanup' }] })
   async markRejectedForSpacePerson(
     spacePersonId: string,
     assetFaceId: string,
     opts?: { identityId?: string | null; source?: FacePersonVerdictSource; actorId?: string | null },
+    db: Kysely<DB> | Transaction<DB> = this.db,
   ): Promise<number> {
-    return this.recordSpacePersonVerdict({ spacePersonId, assetFaceId, status: 'rejected', ...opts });
+    return this.recordSpacePersonVerdict({ spacePersonId, assetFaceId, status: 'rejected', ...opts }, db);
   }
 
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID, { source: 'suggestion' }] })
@@ -426,8 +435,9 @@ export class FacePersonVerdictRepository {
     spacePersonId: string,
     assetFaceId: string,
     opts?: { identityId?: string | null; source?: FacePersonVerdictSource; actorId?: string | null },
+    db: Kysely<DB> | Transaction<DB> = this.db,
   ): Promise<number> {
-    return this.recordSpacePersonVerdict({ spacePersonId, assetFaceId, status: 'ignored', ...opts });
+    return this.recordSpacePersonVerdict({ spacePersonId, assetFaceId, status: 'ignored', ...opts }, db);
   }
 
   // The shared negative-verdict read, identity-first with target fallback. Both engines call this: the
@@ -893,5 +903,100 @@ export class FacePersonVerdictRepository {
       )
       .executeTakeFirst();
     return row !== undefined;
+  }
+
+  /**
+   * "May an editor assign this face in this space?" — `isFaceReachableInSpace` plus the
+   * hidden-person exclusion (spec §6.1).
+   *
+   * The exclusion is here, not at the call site, so the read (§6.1) and the write (§6.3)
+   * cannot disagree: an editor must never be able to attach a face the list would not show
+   * them by guessing its id (F-8/F-9).
+   *
+   * Scoped to the OWNER's `person.isHidden`. A space person's own `isHidden` is a separate
+   * concern handled by the read's projection filter.
+   */
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
+  async isFaceAssignableInSpace(spaceId: string, assetFaceId: string): Promise<boolean> {
+    const row = await this.db
+      .selectFrom('asset_face')
+      .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+      .leftJoin('person', 'person.id', 'asset_face.personId')
+      .select('asset_face.id')
+      .where('asset_face.id', '=', assetFaceId)
+      .where('asset_face.deletedAt', 'is', null)
+      .where('asset_face.isVisible', 'is', true)
+      .where('asset.deletedAt', 'is', null)
+      .where('asset.isOffline', 'is', false)
+      .where((eb) => reviewableAssetVisibility(eb))
+      .where((eb) => eb.or([eb('person.id', 'is', null), eb('person.isHidden', '=', false)]))
+      .where((eb) =>
+        eb.or(
+          spaceAssetPathBranches(eb as unknown as ExpressionBuilder<DB, keyof DB>, {
+            correlateAssetId: 'asset.id',
+            correlateLibraryId: 'asset.libraryId',
+            scope: { spaceId },
+          }),
+        ),
+      )
+      .executeTakeFirst();
+    return row !== undefined;
+  }
+
+  /**
+   * §6.3.1: the face's own `personId`, plus — when it is set — that OWNER `person`'s
+   * `identityId`. This is the pair `attachFaceToSpacePerson` needs to decide whether the face
+   * already belongs to one of the owner's own people, and if so, whether that person's identity
+   * already matches the space person being attached to (row 2) or differs (row 3, where the
+   * identity write must be skipped).
+   *
+   * Also carries `assetOwnerId` — the asset (not the space role) that §6.7's owner-self
+   * attribution rule keys off. Piggybacking it here avoids a second round-trip in the same
+   * attach/detach transaction that already calls this method.
+   *
+   * Never throws for a missing face: callers reach this only after `isFaceAssignableInSpace`
+   * has already confirmed the face exists, but a null-safe read here costs nothing and avoids a
+   * second implicit contract on call order.
+   */
+  @GenerateSql({ params: [DummyValue.UUID] })
+  async getFaceOwnerLink(
+    assetFaceId: string,
+    db: Kysely<DB> | Transaction<DB> = this.db,
+  ): Promise<{ personId: string | null; identityId: string | null; assetOwnerId: string } | undefined> {
+    return db
+      .selectFrom('asset_face')
+      .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+      .leftJoin('person', 'person.id', 'asset_face.personId')
+      .select(['asset_face.personId as personId', 'person.identityId as identityId', 'asset.ownerId as assetOwnerId'])
+      .where('asset_face.id', '=', assetFaceId)
+      .executeTakeFirst();
+  }
+
+  /**
+   * F-37: serializes concurrent `attachFaceToSpacePerson` calls that target the SAME face.
+   * `shared_space_person_face`'s primary key is `(personId, assetFaceId)`, not `assetFaceId`
+   * alone, so nothing at the schema level stops two different target space people from each
+   * inserting their own row for the same face if their transactions interleave. Taking this lock
+   * as the FIRST statement in the attach transaction forces a second concurrent attach on the
+   * same face to wait for the first to commit, then see its result (via the reassign read) rather
+   * than race past it — the loser becomes an ordinary sequential reassign, never a duplicate row.
+   */
+  @GenerateSql({ params: [DummyValue.UUID] })
+  async lockFaceForAssignment(assetFaceId: string, db: Kysely<DB> | Transaction<DB> = this.db): Promise<void> {
+    await db.selectFrom('asset_face').select('id').where('id', '=', assetFaceId).forUpdate().executeTakeFirst();
+  }
+
+  /**
+   * Spec §6.6: who drew this box by hand, if anyone. NEVER `sourceType` — `PersonService.createFace`
+   * already writes `SourceType.Manual` for an OWNER-drawn box too, so `sourceType` cannot tell the
+   * two apart. `undefined` means the face row does not exist; `null` means it exists but was not
+   * editor-drawn (a detection, or an existing row from before this column existed).
+   */
+  async getFaceCreatedBy(
+    assetFaceId: string,
+    db: Kysely<DB> | Transaction<DB> = this.db,
+  ): Promise<string | null | undefined> {
+    const row = await db.selectFrom('asset_face').select('createdBy').where('id', '=', assetFaceId).executeTakeFirst();
+    return row?.createdBy;
   }
 }

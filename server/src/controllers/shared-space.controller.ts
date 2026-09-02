@@ -30,10 +30,16 @@ import {
 import {
   SharedSpacePeopleStatisticsResponseDto,
   SharedSpacePersonAliasDto,
+  SharedSpacePersonCreateDto,
   SharedSpacePersonMergeDto,
   SharedSpacePersonResponseDto,
   SharedSpacePersonUpdateDto,
+  SpaceAssetFaceCreateDto,
+  SpaceAssetFaceResponseDto,
+  SpaceAssetFacesParamsDto,
+  SpaceFaceParamsDto,
   SpacePeopleQueryDto,
+  SpacePersonFaceParamsDto,
   SpacePersonFaceSuggestionParamsDto,
   SpacePersonParamsDto,
   SpaceRepresentativeFaceUpdateDto,
@@ -332,6 +338,25 @@ export class SharedSpaceController {
     return this.service.getActivities(auth, id, query);
   }
 
+  // Spec §6.2 (Slice 4, Task 2): create-and-attach is one transaction when assetFaceId is
+  // present; the real authority (Editor role) is enforced in the service.
+  @Post(':id/people')
+  @Authenticated({ permission: Permission.SharedSpaceUpdate })
+  @Endpoint({
+    summary: 'Create a person in a shared space',
+    description:
+      'Create a new space person, optionally attaching a seed face. When the seed face already ' +
+      'carries an identity shared by an existing space person, the existing person is returned instead.',
+    history: new HistoryBuilder().added('v2').stable('v2'),
+  })
+  createSpacePerson(
+    @Auth() auth: AuthDto,
+    @Param() { id }: UUIDParamDto,
+    @Body() dto: SharedSpacePersonCreateDto,
+  ): Promise<SharedSpacePersonResponseDto> {
+    return this.service.createSpacePerson(auth, id, dto);
+  }
+
   @Get(':id/people')
   @Authenticated({ permission: Permission.SharedSpaceRead })
   @Endpoint({
@@ -530,6 +555,97 @@ export class SharedSpaceController {
     @Param() { id, personId, assetFaceId }: SpacePersonFaceSuggestionParamsDto,
   ): Promise<FaceSuggestionActionResponseDto> {
     return { acted: await this.service.dismissSpacePersonFaceSuggestion(auth, id, personId, assetFaceId) };
+  }
+
+  // Spec §6.3. The decorator carries the API-key SCOPE, matching the sibling writes; the real
+  // authority (Editor role + face reachability) is enforced in the service.
+  @Put(':id/people/:personId/faces/:assetFaceId')
+  @Authenticated({ permission: Permission.SharedSpaceUpdate })
+  @HttpCode(HttpStatus.OK)
+  @Endpoint({
+    summary: 'Assign a face to a person in a shared space',
+    description: 'Attach the face to the space person. Idempotent — the response reports whether it acted.',
+    history: new HistoryBuilder().added('v2').stable('v2'),
+  })
+  async attachSpacePersonFace(
+    @Auth() auth: AuthDto,
+    @Param() { id, personId, assetFaceId }: SpacePersonFaceParamsDto,
+  ): Promise<FaceSuggestionActionResponseDto> {
+    return { acted: await this.service.attachFaceToSpacePerson(auth, id, personId, assetFaceId) };
+  }
+
+  // Spec §6.4. Same API-key scope as the attach route; the real authority (Editor role +
+  // isFaceAssignableInSpace, re-checked at write time) is enforced in the service.
+  @Delete(':id/people/:personId/faces/:assetFaceId')
+  @Authenticated({ permission: Permission.SharedSpaceUpdate })
+  @HttpCode(HttpStatus.OK)
+  @Endpoint({
+    summary: 'Detach a face from a person in a shared space',
+    description:
+      'Remove the face from the space person. Only the space projection row is removed -- the ' +
+      "face's global identity is left untouched. Response reports whether it acted.",
+    history: new HistoryBuilder().added('v2').stable('v2'),
+  })
+  async detachSpacePersonFace(
+    @Auth() auth: AuthDto,
+    @Param() { id, personId, assetFaceId }: SpacePersonFaceParamsDto,
+  ): Promise<FaceSuggestionActionResponseDto> {
+    return { acted: await this.service.detachFaceFromSpacePerson(auth, id, personId, assetFaceId) };
+  }
+
+  // Spec §6.1. The decorator carries the API-key SCOPE, matching the sibling read
+  // (GET :id/people/:personId/faces above) — the real authority (Editor role, since this exposes
+  // unnamed faces) is enforced in the service via requireRole.
+  @Get(':id/assets/:assetId/faces')
+  @Authenticated({ permission: Permission.SharedSpaceRead })
+  @Endpoint({
+    summary: 'Get the faces on an asset, space-scoped',
+    description:
+      'Retrieve the face boxes on an asset for a shared space, joined to the space person holding each one, if any.',
+    history: new HistoryBuilder().added('v2').stable('v2'),
+  })
+  getSpaceAssetFaces(
+    @Auth() auth: AuthDto,
+    @Param() { id, assetId }: SpaceAssetFacesParamsDto,
+  ): Promise<SpaceAssetFaceResponseDto[]> {
+    return this.service.getSpaceAssetFaces(auth, id, assetId);
+  }
+
+  // Spec §6.5 (Slice 6, Task 2). The decorator carries the API-key SCOPE, matching the sibling
+  // writes (e.g. the attach route above) — the real authority (Editor role + asset/person
+  // reachability) is enforced in the service.
+  @Post(':id/assets/:assetId/faces')
+  @Authenticated({ permission: Permission.SharedSpaceUpdate })
+  @Endpoint({
+    summary: 'Draw a face box on an asset, space-scoped',
+    description:
+      'Create a face box on an asset for a shared space and attach it to a space person. Coordinates are given ' +
+      'in the (possibly edited) preview image the client rendered and are converted to original-image space.',
+    history: new HistoryBuilder().added('v2').stable('v2'),
+  })
+  createSpaceAssetFace(
+    @Auth() auth: AuthDto,
+    @Param() { id, assetId }: SpaceAssetFacesParamsDto,
+    @Body() dto: SpaceAssetFaceCreateDto,
+  ): Promise<SpaceAssetFaceResponseDto> {
+    return this.service.createSpaceAssetFace(auth, id, assetId, dto);
+  }
+
+  // Spec §6.6 (Slice 6, Task 3). Same API-key scope as the sibling writes -- the real authority
+  // (Editor role + reachability + createdBy IS NOT NULL, never sourceType) is enforced in the
+  // service. Detected faces stay refused; FaceDelete remains owner-only for those.
+  @Delete(':id/faces/:assetFaceId')
+  @Authenticated({ permission: Permission.SharedSpaceUpdate })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Endpoint({
+    summary: 'Delete a face box an editor drew in a shared space',
+    description:
+      'Permanently delete a face box drawn by a space Owner/Editor. Refused for a detected face -- FaceDelete ' +
+      'stays owner-only for those.',
+    history: new HistoryBuilder().added('v2').stable('v2'),
+  })
+  deleteSpaceAssetFace(@Auth() auth: AuthDto, @Param() { id, assetFaceId }: SpaceFaceParamsDto): Promise<void> {
+    return this.service.deleteSpaceAssetFace(auth, id, assetFaceId);
   }
 
   @Get(':id/people/:personId')

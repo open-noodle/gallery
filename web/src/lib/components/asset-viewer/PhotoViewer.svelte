@@ -2,7 +2,7 @@
   import { shortcuts } from '$lib/actions/shortcut';
   import { zoomImageAction } from '$lib/actions/zoom-image';
   import AdaptiveImage from '$lib/components/AdaptiveImage.svelte';
-  import FaceEditor from '$lib/components/asset-viewer/face-editor/FaceEditor.svelte';
+  import FaceEditorPanel from '$lib/components/asset-viewer/face-editor/FaceEditorPanel.svelte';
   import Thumbhash from '$lib/components/Thumbhash.svelte';
   import OcrBoundingBox from '$lib/components/asset-viewer/OcrBoundingBox.svelte';
   import AssetViewerEvents from '$lib/components/AssetViewerEvents.svelte';
@@ -31,9 +31,26 @@
     onReady?: () => void;
     onError?: () => void;
     onSwipe?: (event: SwipeCustomEvent) => void;
+    /**
+     * Slice 8 gap closure: `spaceId`/`canEditSpacePeople` come from AssetViewer.svelte
+     * (`resolveCanEditSpacePeople`, the same rule DetailPanel.svelte uses for the People row on
+     * this SAME asset), and are forwarded to `FaceEditorPanel` below, which decides between the
+     * owner `FaceEditor` and the space-flavoured `SpaceFaceEditor`.
+     */
+    spaceId?: string;
+    canEditSpacePeople?: boolean;
   };
 
-  let { cursor, element = $bindable(), sharedLink, onReady, onError, onSwipe }: Props = $props();
+  let {
+    cursor,
+    element = $bindable(),
+    sharedLink,
+    onReady,
+    onError,
+    onSwipe,
+    spaceId,
+    canEditSpacePeople = false,
+  }: Props = $props();
 
   const { slideshowState, slideshowLook } = slideshowStore;
   const asset = $derived(cursor.current);
@@ -288,6 +305,14 @@
   </AdaptiveImage>
 
   {#if assetViewerManager.isFaceEditMode && assetViewerManager.imgRef}
-    <FaceEditor htmlElement={assetViewerManager.imgRef} {containerWidth} {containerHeight} assetId={asset.id} />
+    <FaceEditorPanel
+      htmlElement={assetViewerManager.imgRef}
+      {containerWidth}
+      {containerHeight}
+      assetId={asset.id}
+      {spaceId}
+      {canEditSpacePeople}
+      onClose={() => assetViewerManager.closeFaceEditMode()}
+    />
   {/if}
 </div>

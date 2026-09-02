@@ -1013,6 +1013,14 @@ export type AssetCopyDto = {
     /** Target asset ID */
     targetId: string;
 };
+export type AssetEditableDto = {
+    /** Asset IDs to resolve editability for */
+    assetIds: string[];
+};
+export type AssetEditableResponseDto = {
+    /** Subset of the requested IDs the caller may edit */
+    editableAssetIds: string[];
+};
 export type AssetJobsDto = {
     /** Asset IDs */
     assetIds: string[];
@@ -1160,6 +1168,8 @@ export type TagResponseDto = {
     value: string;
 };
 export type AssetResponseDto = {
+    /** Whether the caller may edit this asset (owner, or Owner/Editor of a space whose member owns it). Present only on single-asset reads; absent from list responses, where resolving it per asset would be an N+1 access check. */
+    canEdit?: boolean;
     /** Base64 encoded SHA1 hash */
     checksum: string;
     /** The UTC timestamp when the asset was originally uploaded to Immich. */
@@ -3043,6 +3053,44 @@ export type SharedSpaceAssetLinkedAlbumDto = {
     /** Album name */
     albumName: string;
 };
+export type SpaceAssetFaceResponseDto = {
+    /** Bounding box X1 */
+    boundingBoxX1: number;
+    /** Bounding box X2 */
+    boundingBoxX2: number;
+    /** Bounding box Y1 */
+    boundingBoxY1: number;
+    /** Bounding box Y2 */
+    boundingBoxY2: number;
+    /** Asset face ID */
+    id: string;
+    /** Original image height */
+    imageHeight: number;
+    /** Original image width */
+    imageWidth: number;
+    /** Whether this face box was drawn by a space Owner/Editor, and so may be deleted by one */
+    isEditorDrawn: boolean;
+    /** Space person ID this face is attached to, if any */
+    spacePersonId: string | null;
+    /** Space person name this face is attached to, if any */
+    spacePersonName: string | null;
+};
+export type SpaceAssetFaceCreateDto = {
+    /** Face bounding box height */
+    height: number;
+    /** Image height in pixels (of the preview the box was drawn on) */
+    imageHeight: number;
+    /** Image width in pixels (of the preview the box was drawn on) */
+    imageWidth: number;
+    /** Space person ID this face will be attached to */
+    spacePersonId: string;
+    /** Face bounding box width */
+    width: number;
+    /** Face bounding box X coordinate */
+    x: number;
+    /** Face bounding box Y coordinate */
+    y: number;
+};
 export type SharedSpaceLibraryLinkDto = {
     /** Library ID */
     libraryId: string;
@@ -3100,6 +3148,12 @@ export type SharedSpacePersonResponseDto = {
     "type"?: string;
     /** Last update date */
     updatedAt: string;
+};
+export type SharedSpacePersonCreateDto = {
+    /** Seed face to attach to the new person */
+    assetFaceId?: string;
+    /** Person name */
+    name?: string;
 };
 export type SharedSpacePeopleStatisticsResponseDto = {
     /** Number of detected faces in the shared-space people scope */
@@ -5572,6 +5626,21 @@ export function copyAsset({ assetCopyDto }: {
         ...opts,
         method: "PUT",
         body: assetCopyDto
+    })));
+}
+/**
+ * Resolve which of the given assets the caller may edit
+ */
+export function getEditableAssets({ assetEditableDto }: {
+    assetEditableDto: AssetEditableDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: AssetEditableResponseDto;
+    }>("/assets/editable", oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: assetEditableDto
     })));
 }
 /**
@@ -8267,6 +8336,49 @@ export function getSharedSpaceAssetLinkedAlbums({ id, sharedSpaceAssetRemoveDto 
     })));
 }
 /**
+ * Get the faces on an asset, space-scoped
+ */
+export function getSpaceAssetFaces({ assetId, id }: {
+    assetId: string;
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: SpaceAssetFaceResponseDto[];
+    }>(`/shared-spaces/${encodeURIComponent(id)}/assets/${encodeURIComponent(assetId)}/faces`, {
+        ...opts
+    }));
+}
+/**
+ * Draw a face box on an asset, space-scoped
+ */
+export function createSpaceAssetFace({ assetId, id, spaceAssetFaceCreateDto }: {
+    assetId: string;
+    id: string;
+    spaceAssetFaceCreateDto: SpaceAssetFaceCreateDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 201;
+        data: SpaceAssetFaceResponseDto;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/assets/${encodeURIComponent(assetId)}/faces`, oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: spaceAssetFaceCreateDto
+    })));
+}
+/**
+ * Delete a face box an editor drew in a shared space
+ */
+export function deleteSpaceAssetFace({ assetFaceId, id }: {
+    assetFaceId: string;
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchText(`/shared-spaces/${encodeURIComponent(id)}/faces/${encodeURIComponent(assetFaceId)}`, {
+        ...opts,
+        method: "DELETE"
+    }));
+}
+/**
  * Link a library to a shared space
  */
 export function linkLibrary({ id, sharedSpaceLibraryLinkDto }: {
@@ -8438,6 +8550,22 @@ export function getSpacePeople({ id, limit, name, named, offset, takenAfter, tak
     }))}`, {
         ...opts
     }));
+}
+/**
+ * Create a person in a shared space
+ */
+export function createSpacePerson({ id, sharedSpacePersonCreateDto }: {
+    id: string;
+    sharedSpacePersonCreateDto: SharedSpacePersonCreateDto;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 201;
+        data: SharedSpacePersonResponseDto;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/people`, oazapfts.json({
+        ...opts,
+        method: "POST",
+        body: sharedSpacePersonCreateDto
+    })));
 }
 /**
  * Deduplicate people in a shared space
@@ -8689,6 +8817,38 @@ export function getSpacePersonFaces({ id, page, personId, size }: {
         size
     }))}`, {
         ...opts
+    }));
+}
+/**
+ * Detach a face from a person in a shared space
+ */
+export function detachSpacePersonFace({ assetFaceId, id, personId }: {
+    assetFaceId: string;
+    id: string;
+    personId: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: FaceSuggestionActionResponseDto;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}/faces/${encodeURIComponent(assetFaceId)}`, {
+        ...opts,
+        method: "DELETE"
+    }));
+}
+/**
+ * Assign a face to a person in a shared space
+ */
+export function attachSpacePersonFace({ assetFaceId, id, personId }: {
+    assetFaceId: string;
+    id: string;
+    personId: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: FaceSuggestionActionResponseDto;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}/faces/${encodeURIComponent(assetFaceId)}`, {
+        ...opts,
+        method: "PUT"
     }));
 }
 /**

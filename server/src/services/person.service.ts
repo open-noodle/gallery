@@ -58,7 +58,7 @@ import {
 import { BaseService } from 'src/services/base.service';
 import { MergeAuthorizer } from 'src/services/identity-merge-propagation.service';
 import { JobItem, JobOf } from 'src/types';
-import { getDimensions } from 'src/utils/asset.util';
+import { convertFaceBoxToOriginalImageSpace, getDimensions } from 'src/utils/asset.util';
 import { asDateTimeString } from 'src/utils/date';
 import { ImmichMediaResponse } from 'src/utils/file';
 import { createCrossOwnerMergeAuthorizer } from 'src/utils/merge-policy';
@@ -66,7 +66,6 @@ import { mimeTypes } from 'src/utils/mime-types';
 import { isFaceSuggestionEnabled, isFacialRecognitionEnabled } from 'src/utils/misc';
 import { applyResolvedIdentityMetadata } from 'src/utils/person-identity';
 import { getPreferences } from 'src/utils/preferences';
-import { Point, transformPoints } from 'src/utils/transform';
 
 const FACE_IDENTITY_BACKFILL_CHUNK_SIZE = 1000;
 
@@ -1515,51 +1514,16 @@ export class PersonService extends BaseService {
       throw new NotFoundException('Asset not found');
     }
 
-    const edits = asset.edits || [];
-
-    let topLeft: Point = { x: dto.x, y: dto.y };
-    let bottomRight: Point = { x: dto.x + dto.width, y: dto.y + dto.height };
-
-    // the coordinates received from the client are based on the edited preview image
-    // we need to convert them to the coordinate space of the original unedited image
-    if (edits.length > 0) {
-      if (!asset.width || !asset.height || !asset.exifInfo?.exifImageWidth || !asset.exifInfo?.exifImageHeight) {
-        throw new BadRequestException('Asset does not have valid dimensions');
-      }
-
-      // convert from preview to full dimensions
-      const scaleFactor = asset.width / dto.imageWidth;
-      topLeft = { x: topLeft.x * scaleFactor, y: topLeft.y * scaleFactor };
-      bottomRight = { x: bottomRight.x * scaleFactor, y: bottomRight.y * scaleFactor };
-
-      const [invertedTopLeft, invertedBottomRight] = transformPoints(
-        [topLeft, bottomRight],
-        edits,
-        { width: asset.width, height: asset.height },
-        { inverse: true },
-      ).points;
-
-      // make sure topLeft is top-left and bottomRight is bottom-right
-      topLeft = {
-        x: Math.min(invertedTopLeft.x, invertedBottomRight.x),
-        y: Math.min(invertedTopLeft.y, invertedBottomRight.y),
-      };
-      bottomRight = {
-        x: Math.max(invertedTopLeft.x, invertedBottomRight.x),
-        y: Math.max(invertedTopLeft.y, invertedBottomRight.y),
-      };
-
-      // now coordinates are in original image space
-      const originalDimensions = getDimensions(asset.exifInfo);
-      dto.imageWidth = originalDimensions.width;
-      dto.imageHeight = originalDimensions.height;
-    }
+    // the coordinates received from the client are based on the edited preview image; convert
+    // them to the coordinate space of the original unedited image. Shared with the space
+    // face-assign endpoint (SharedSpaceService.createSpaceAssetFace) so the two can never drift.
+    const { topLeft, bottomRight, imageWidth, imageHeight } = convertFaceBoxToOriginalImageSpace(dto, asset);
 
     const faceId = await this.personRepository.createAssetFace({
       personId: dto.personId,
       assetId: dto.assetId,
-      imageHeight: dto.imageHeight,
-      imageWidth: dto.imageWidth,
+      imageHeight,
+      imageWidth,
       boundingBoxX1: Math.round(topLeft.x),
       boundingBoxX2: Math.round(bottomRight.x),
       boundingBoxY1: Math.round(topLeft.y),

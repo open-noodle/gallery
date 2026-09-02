@@ -7,6 +7,7 @@ import { FaceIdentityRepository } from 'src/repositories/face-identity.repositor
 import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository';
 import { JobRepository } from 'src/repositories/job.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
+import { PersonRepository } from 'src/repositories/person.repository';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
 import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository';
 import { DB } from 'src/schema';
@@ -35,6 +36,10 @@ const setup = (db?: Kysely<DB>) =>
       // this.databaseRepository.transaction(...) — without this, databaseRepository is undefined on the sut
       // and every confirm call throws.
       DatabaseRepository,
+      // Spec §6.3.1 (REVISED 2026-08-25): attach/detach now propagate into the OWNER's layer via
+      // personRepository.getOrCreateOwnerPersonForIdentity / setFaceOwnerPerson — without this the
+      // repository is undefined on the sut and every attach throws.
+      PersonRepository,
     ],
     mock: [LoggingRepository, JobRepository],
   });
@@ -149,7 +154,7 @@ describe('SharedSpaceService space face suggestions', () => {
     expect(person.identityId).toBeNull();
   });
 
-  it('confirm creates a missing space identity, links the candidate face, and keeps asset_face ownership unchanged (edges 26 and 31)', async () => {
+  it('confirm creates a missing space identity, links the candidate face, and propagates to the owner without changing asset ownership (edges 26 and 31)', async () => {
     const { ctx, sut } = setup();
     const fx = await createSuggestionFixture(ctx);
 
@@ -175,8 +180,20 @@ describe('SharedSpaceService space face suggestions', () => {
       .select(['asset_face.personId', 'asset.ownerId'])
       .where('asset_face.id', '=', fx.assetFace.id)
       .executeTakeFirstOrThrow();
-    expect(face.personId).toBeNull();
+    // Since §6.3.1 was revised (2026-08-25) a confirm propagates into the owner's layer, so personId
+    // is now SET -- to a person in the asset owner's own library carrying the space person's name.
+    // Edge 31 is unchanged and is the point of the ownerId assertion: propagating a face never
+    // transfers the ASSET.
+    expect(face.personId).not.toBeNull();
     expect(face.ownerId).toBe(fx.assetOwner.id);
+
+    const ownerPerson = await ctx.database
+      .selectFrom('person')
+      .selectAll()
+      .where('id', '=', face.personId!)
+      .executeTakeFirstOrThrow();
+    expect(ownerPerson.ownerId).toBe(fx.assetOwner.id);
+    expect(ownerPerson.name).toBe('Alice');
   });
 
   it('confirm clears other pending personal and space suggestions for the same face (edge 28)', async () => {

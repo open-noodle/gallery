@@ -152,7 +152,20 @@ const checkOtherAccess = async (access: AccessRepository, request: OtherAccessRe
       return setUnion(isOwner, isAlbum, isPartner, isSpace);
     }
 
-    case Permission.AssetUpdate: {
+    case Permission.AssetUpdate:
+    case Permission.AssetEditGet:
+    case Permission.AssetEditCreate:
+    case Permission.AssetEditDelete: {
+      // #734: asset edits (rotate/crop/trim and revert) follow the same rule as AssetUpdate —
+      // owner OR space Owner/Editor over a member's asset. Folded into one case: the two used to
+      // be separate, byte-identical blocks, which is two places the rule could silently drift.
+      //
+      // AssetEditGet is included for consistency, not because a call site needs it today:
+      // AssetService.getAssetEdits gates per-asset on AssetRead (which already admits space
+      // members via checkSpaceAccess), and AssetEditGet currently reaches only the controller's
+      // route-scope decorator, never checkAccess. Leaving it owner-only here would make it
+      // narrower than the read path it names, so a future call site routed through it would
+      // silently disagree with Create and Delete.
       const isOwner = await access.asset.checkOwnerAccess(auth.user.id, ids, auth.session?.hasElevatedPermission);
       const isSpaceEditor = await access.asset.checkSpaceEditAccess(auth.user.id, setDifference(ids, isOwner));
       return setUnion(isOwner, isSpaceEditor);
@@ -163,18 +176,6 @@ const checkOtherAccess = async (access: AccessRepository, request: OtherAccessRe
     }
 
     case Permission.AssetCopy: {
-      return await access.asset.checkOwnerAccess(auth.user.id, ids, auth.session?.hasElevatedPermission);
-    }
-
-    case Permission.AssetEditGet: {
-      return await access.asset.checkOwnerAccess(auth.user.id, ids, auth.session?.hasElevatedPermission);
-    }
-
-    case Permission.AssetEditCreate: {
-      return await access.asset.checkOwnerAccess(auth.user.id, ids, auth.session?.hasElevatedPermission);
-    }
-
-    case Permission.AssetEditDelete: {
       return await access.asset.checkOwnerAccess(auth.user.id, ids, auth.session?.hasElevatedPermission);
     }
 

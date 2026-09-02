@@ -16,6 +16,7 @@ import { asset_face_source_type } from 'src/schema/enums';
 import { asset_face_audit } from 'src/schema/functions';
 import { AssetTable } from 'src/schema/tables/asset.table';
 import { PersonTable } from 'src/schema/tables/person.table';
+import { UserTable } from 'src/schema/tables/user.table';
 
 @Table({ name: 'asset_face' })
 @UpdatedAtTrigger('asset_face_updatedAt')
@@ -87,4 +88,10 @@ export class AssetFaceTable {
 
   @Column({ type: 'boolean', default: true })
   isVisible!: Generated<boolean>;
+
+  // Who drew this box by hand, via the space face-assign endpoint. NULL for every existing row
+  // and for everything the detector produces -- deletability of a hand-drawn box is decided by
+  // this column, never by sourceType (see 2026-08-23-space-editor-face-assignment-design.md §6.6).
+  @ForeignKeyColumn(() => UserTable, { onDelete: 'SET NULL', nullable: true })
+  createdBy!: string | null;
 }

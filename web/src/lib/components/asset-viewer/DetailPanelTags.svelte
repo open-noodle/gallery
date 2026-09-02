@@ -16,6 +16,18 @@
     asset: AssetResponseDto;
     isOwner: boolean;
     /**
+     * #734: widens the ADD-tag affordance to a space editor. Per-tag REMOVE stays gated on the
+     * real `isOwner` below — not because removal always 403s for an editor (it doesn't:
+     * `TagService.removeAssets` passes `canAlwaysRemove: Permission.TagDelete`, and
+     * `asset.util.ts:81-85` short-circuits the per-asset check for the caller's OWN tags, so an
+     * editor removing a tag they added themselves succeeds today). The real reason is that
+     * `TagResponseDto` carries no `userId`, so the client cannot tell which tags on this asset are
+     * the caller's own versus the owner's, and offering remove on all of them would fail on the
+     * owner's. Defaults to `isOwner` so every call site keeps today's behavior unless it
+     * explicitly widens editability.
+     */
+    canEdit?: boolean;
+    /**
      * R4/E2 — false on a shared link, where there is no timeline to filter. Threaded from
      * DetailPanel exactly like `isOwner`. (Tags are already shared-link-suppressed by the section
      * gate below; this is belt-and-braces.)
@@ -24,7 +36,7 @@
     spaceId?: string;
   }
 
-  let { asset = $bindable(), isOwner, canFilter = false, spaceId }: Props = $props();
+  let { asset = $bindable(), isOwner, canEdit = isOwner, canFilter = false, spaceId }: Props = $props();
   let effectiveSpaceId = $derived(spaceId || asset.resolvedSpaceId);
 
   let tags = $derived(asset.tags || []);
@@ -48,11 +60,12 @@
 <OnEvents {onAssetsTag} />
 
 <!--
-  Tags are read-only metadata: anyone with read access to the asset sees them (#796). Only the
-  edit affordances below (per-tag remove, "add tag") stay owner-gated. Non-owners with no tags to
-  show get no empty section; the owner keeps it so the "add tag" affordance is always reachable.
+  Tags are read-only metadata: anyone with read access to the asset sees them (#796). Per-tag
+  remove stays owner-gated below; "add tag" is gated on `canEdit` (#734: a space editor can add).
+  Non-owner non-editors with no tags to show get no empty section; an owner or editor keeps it so
+  the "add tag" affordance is always reachable.
 -->
-{#if !authManager.isSharedLink && (isOwner || tags.length > 0)}
+{#if !authManager.isSharedLink && (isOwner || canEdit || tags.length > 0)}
   <section class="mt-4 px-4">
     <div class="flex h-10 w-full items-center justify-between text-sm">
       <Text color="muted">{$t('tags')}</Text>
@@ -97,7 +110,7 @@
           {/if}
         </Badge>
       {/each}
-      {#if isOwner}
+      {#if canEdit}
         <HeaderActionButton action={Tag} />
       {/if}
     </section>

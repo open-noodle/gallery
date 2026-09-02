@@ -88,11 +88,13 @@ make check-all
 ### Code Generation
 
 ```bash
-make open-api              # Regenerate all OpenAPI clients (Dart + TypeScript)
-make open-api-typescript   # Regenerate TypeScript SDK only
-make open-api-dart         # Regenerate Dart client only
-make sql                   # Sync SQL query documentation from decorated repositories
+mise run open-api              # Regenerate all OpenAPI clients (Dart + TypeScript) -- see OpenAPI Workflow below
+mise run open-api-typescript   # Regenerate TypeScript SDK only
+mise run open-api-dart         # Regenerate Dart client only
+make sql                       # Sync SQL query documentation from decorated repositories
 ```
+
+The `make open-api*` targets have been removed; `make open-api` now just prints a pointer to `mise run open-api`.
 
 ### Database Migrations (server/)
 
@@ -233,8 +235,8 @@ form GitHub honours; it reaches `main` at the next upstream cutover.
 When server API endpoints change:
 
 1. Build server: `cd server && pnpm build`
-2. Regenerate specs: `pnpm sync:open-api`
-3. Regenerate clients: `make open-api` (generates both TypeScript SDK and Dart client)
+2. Regenerate specs: `mise run //server:sync-open-api`
+3. Regenerate clients: `mise run open-api-typescript` and `mise run open-api-dart` (or `mise run open-api` from the repo root to do both, plus steps 1–2, in one go)
 
 The TypeScript SDK uses `oazapfts` for generation. The Dart client uses OpenAPI Generator with custom mustache templates and patches (Java required — see `feedback_openapi_dart_generation`).
 

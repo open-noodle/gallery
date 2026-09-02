@@ -149,6 +149,10 @@ const setupSpace = () =>
       // this.databaseRepository.transaction(...) — without this, databaseRepository is undefined on the sut
       // and every confirm call throws.
       DatabaseRepository,
+      // Spec §6.3.1 (REVISED 2026-08-25): attach/detach now propagate into the OWNER's layer via
+      // personRepository.getOrCreateOwnerPersonForIdentity / setFaceOwnerPerson — without this the
+      // repository is undefined on the sut and every attach throws.
+      PersonRepository,
     ],
     mock: [LoggingRepository, JobRepository],
   });
@@ -377,6 +381,17 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
         .executeTakeFirst();
       expect(sspfAfterConfirm).toBeDefined(); // positive control: the confirm actually wrote the projection row
 
+      // Since §6.3.1 was revised (2026-08-25) the confirm ALSO propagates into the owner's layer, so
+      // asset_face.personId is set before recognition even runs. Capture it here: what this case pins
+      // is that the recognition pass does not disturb it, which is no longer expressible as "still
+      // null".
+      const { personId: personIdAfterConfirm } = await ctx.database
+        .selectFrom('asset_face')
+        .select('personId')
+        .where('id', '=', face.id)
+        .executeTakeFirstOrThrow();
+      expect(personIdAfterConfirm).not.toBeNull();
+
       // When: a non-forced handleQueueRecognizeFaces runs and every queued handleRecognizeFaces job is
       // executed.
       const jobMock = ctx.getMock<JobRepository, Mocked<JobRepository>>(JobRepository);
@@ -439,13 +454,14 @@ describe('face review cross-flow: a decision in one engine is honoured by the ot
         .executeTakeFirstOrThrow();
       expect(linkAfter).toEqual({ identityId: confirmedIdentityId, source: 'manual' });
 
-      // F itself was never touched by recognition at all.
+      // F itself was never touched by recognition at all: the owner-side person the CONFIRM
+      // propagated is still exactly the one it wrote, neither cleared nor re-pointed by the pass.
       const faceAfter = await ctx.database
         .selectFrom('asset_face')
         .select('personId')
         .where('id', '=', face.id)
         .executeTakeFirstOrThrow();
-      expect(faceAfter.personId).toBeNull();
+      expect(faceAfter.personId).toBe(personIdAfterConfirm);
     });
 
     it('S5.6 — a face carrying an ml/owner-person/backfill link is still queued by non-forced recognition (control for S5.1)', async () => {

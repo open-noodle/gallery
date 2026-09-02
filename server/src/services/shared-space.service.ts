@@ -1,4 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { Transaction } from 'kysely';
 import { AssetFace, SharedSpacePerson } from 'src/database';
 import { OnEvent, OnJob } from 'src/decorators';
 import { MapAlbumDto, mapAlbum } from 'src/dtos/album.dto';
@@ -20,6 +21,7 @@ import {
   SharedSpacePersonMergeDto,
   SharedSpacePersonResponseDto,
   SharedSpacePersonUpdateDto,
+  SpaceAssetFaceResponseDto,
   SpacePeopleQueryDto,
   SpaceRepresentativeFaceUpdateDto,
 } from 'src/dtos/shared-space-person.dto';
@@ -55,6 +57,7 @@ import {
   QueueName,
   SharedSpaceActivityType,
   SharedSpaceRole,
+  SourceType,
   SystemMetadataKey,
   UserAvatarColor,
 } from 'src/enum';
@@ -62,6 +65,7 @@ import { AlbumAssetCount } from 'src/repositories/album.repository';
 import type { ArgOf } from 'src/repositories/event.repository';
 import type { SpaceFaceAssignment } from 'src/repositories/shared-space.repository';
 import { visibleSpaceAssetVisibilities } from 'src/repositories/shared-space.repository';
+import { DB } from 'src/schema';
 import {
   buildAutomaticReconciliationClaim,
   chooseAutomaticTargetIdentity,
@@ -70,11 +74,13 @@ import {
 } from 'src/services/accessible-identity-reconciliation';
 import { BaseService } from 'src/services/base.service';
 import { JobOf } from 'src/types';
+import { convertFaceBoxToOriginalImageSpace, getDimensions } from 'src/utils/asset.util';
 import { asDateString, asDateTimeString } from 'src/utils/date';
 import { ImmichMediaResponse } from 'src/utils/file';
 import { createCrossOwnerMergeAuthorizer } from 'src/utils/merge-policy';
 import { mimeTypes } from 'src/utils/mime-types';
 import { isFaceSuggestionEnabled } from 'src/utils/misc';
+import { transformFaceBoundingBox } from 'src/utils/transform';
 
 const ROLE_HIERARCHY: Record<SharedSpaceRole, number> = {
   [SharedSpaceRole.Viewer]: 0,
@@ -1415,9 +1421,12 @@ export class SharedSpaceService extends BaseService {
     // transaction makes the whole confirm all-or-nothing, mirroring the personal confirm path. Every call
     // below threads `trx` — never `this.db` inside this callback (issue #595).
     const claimed = await this.databaseRepository.transaction(async (trx) => {
-      const identity = await this.faceIdentityRepository.ensureSpacePersonIdentity(person.id, trx);
+      // Ensured up front, before the claim, so claimPendingForSpacePerson's own negative-verdict
+      // exclusion (matched by identityId as well as spacePersonId) has a non-null identityId to join
+      // against even when this confirm turns out to be a no-op below.
+      await this.faceIdentityRepository.ensureSpacePersonIdentity(person.id, trx);
       // Claim the queue row first so a double-submit resolves exactly once. No 'confirmed' status is written:
-      // the durable positive verdict is the manual identity link set immediately below.
+      // the durable positive verdict is the manual identity link set inside linkFaceToSpacePerson below.
       // Slice 3 (F5): pass the SAME band `hasPendingForSpacePerson` just checked, so the claim itself is gated
       // by the identical eligibility — not just the read that preceded it.
       const claimed = await this.facePersonVerdictRepository.claimPendingForSpacePerson(
@@ -1430,11 +1439,42 @@ export class SharedSpaceService extends BaseService {
         return claimed;
       }
 
+      // The suggestion confirm only ever handles an unassigned face (that is what made it pending in the
+      // first place), so it always writes the identity — see linkFaceToSpacePerson's doc comment for the one
+      // caller that passes false. ensureSpacePersonIdentity above already created it; this re-fetches the
+      // same row (idempotent) so linkFaceToSpacePerson stays the single implementation of the write.
+      await this.linkFaceToSpacePerson(trx, person, assetFaceId, { writeIdentity: true });
+      return claimed;
+    });
+    return claimed > 0;
+  }
+
+  /**
+   * The single implementation of "this face belongs to this space person" (spec §6.3).
+   *
+   * `writeIdentity: false` is §6.3.1 row 3 — the face already belongs to an owner `person`
+   * carrying a different identity. Writing the identity there would re-point an identity the
+   * OWNER's person depends on, and `applyResolvedPersonMetadata` resolves the owner's own view
+   * of names and ages through exactly that identity. Space-person reads go through
+   * `shared_space_person_face`, not the identity layer, so the projection alone is enough for
+   * the space to show the new name while the owner's library stays untouched.
+   */
+  private async linkFaceToSpacePerson(
+    trx: Transaction<DB>,
+    person: SharedSpacePerson,
+    assetFaceId: string,
+    { writeIdentity }: { writeIdentity: boolean },
+  ): Promise<void> {
+    // §6.3.1 (revised): the identity is now resolved on BOTH paths, not just the writeIdentity one.
+    // Propagating the edit to the owner's `asset_face.personId` needs an identity to bridge the space
+    // person onto a person the owner owns, so a space person that has never carried one gets it here.
+    const identity = await this.faceIdentityRepository.ensureSpacePersonIdentity(person.id, trx);
+
+    if (writeIdentity) {
       await this.faceIdentityRepository.replaceFaceIdentity(
         { assetFaceId, identityId: identity.id, source: 'manual' },
         trx,
       );
-      await this.facePersonVerdictRepository.resolveAssignedFace(assetFaceId, trx);
       // Slice 8 (F15): the editor just stated a fact ("this face IS this space person") that contradicts
       // any durable rejected/ignored row for this SAME target. As with the personal confirm,
       // claimPendingForSpacePerson's own eligibility gate already refuses the claim whenever such a row
@@ -1445,13 +1485,431 @@ export class SharedSpaceService extends BaseService {
         [assetFaceId],
         trx,
       );
-      // D3: write the space projection so getAssignedFaceIdsForSpace excludes this face from the same space's
-      // next scan, for every space person — not just this one. addPersonFaces is onConflict().doNothing(), so
-      // this is idempotent if a concurrent face-match backfill already wrote the same row.
-      await this.sharedSpaceRepository.addPersonFaces([{ personId: person.id, assetFaceId }], undefined, trx);
-      return claimed;
+    }
+    await this.facePersonVerdictRepository.resolveAssignedFace(assetFaceId, trx);
+    // D3: write the space projection so getAssignedFaceIdsForSpace excludes this face from the same space's
+    // next scan, for every space person — not just this one. addPersonFaces is onConflict().doNothing(), so
+    // this is idempotent if a concurrent face-match backfill already wrote the same row.
+    await this.sharedSpaceRepository.addPersonFaces([{ personId: person.id, assetFaceId }], undefined, trx);
+
+    // §6.3.1 (revised): propagate the attach into the OWNER's layer so the space and the owner's own
+    // library agree about who is in the photo. This deliberately reverses the original decision to
+    // keep `asset_face.personId` untouched -- see the section for why the insulated model was
+    // dropped. The owner may have never named this human, in which case a person row is created for
+    // them (an editor naming a face can therefore add a person to the owner's People page).
+    const ownerLink = await this.facePersonVerdictRepository.getFaceOwnerLink(assetFaceId, trx);
+    if (ownerLink) {
+      const ownerPerson = await this.personRepository.getOrCreateOwnerPersonForIdentity(
+        {
+          ownerId: ownerLink.assetOwnerId,
+          identityId: identity.id,
+          name: person.name,
+          type: person.type,
+        },
+        trx,
+      );
+      await this.personRepository.setFaceOwnerPerson({ assetFaceId, personId: ownerPerson.id }, trx);
+    }
+  }
+
+  /**
+   * #734 follow-up (spec §6.3): attach a space person to a face directly — no pending ML
+   * suggestion required, unlike `confirmSpacePersonFaceSuggestion` above.
+   *
+   * The transaction below shares `linkFaceToSpacePerson` with that method (Slice 2), so the two
+   * can never drift on what "this face belongs to this space person" means.
+   *
+   * Idempotent: `addPersonFaces` is onConflict-doNothing and `replaceFaceIdentity` upserts, so
+   * a double-submit is a no-op. Returns whether it acted, matching the S11 convention on the
+   * sibling confirm/reject routes (a 200-vs-204 status signal is unreadable through
+   * @oazapfts/runtime's ok()).
+   */
+  async attachFaceToSpacePerson(
+    auth: AuthDto,
+    spaceId: string,
+    personId: string,
+    assetFaceId: string,
+  ): Promise<boolean> {
+    await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
+    const person = await this.requireSpacePersonInSpace(spaceId, personId);
+
+    if (!(await this.facePersonVerdictRepository.isFaceAssignableInSpace(spaceId, assetFaceId))) {
+      throw new BadRequestException('Face not found');
+    }
+
+    return this.databaseRepository.transaction(async (trx) => {
+      // F-37: lock first, before any read below, so a second concurrent attach on this SAME face
+      // waits for this transaction to commit rather than racing its own read of who holds the
+      // face right now.
+      await this.facePersonVerdictRepository.lockFaceForAssignment(assetFaceId, trx);
+
+      // §6.3.1: does this face already belong to one of the OWNER's own people? If so, and that
+      // person's identity differs from (or is absent, and so can never equal) the target space
+      // person's own identity, the attach is still granted but must NOT rewrite the face's global
+      // identity — see linkFaceToSpacePerson's doc comment for why the projection alone suffices.
+      const ownerLink = await this.facePersonVerdictRepository.getFaceOwnerLink(assetFaceId, trx);
+      // §6.3.1 (revised): row 3 -- "the owner already named this face as someone else" -- no longer
+      // skips the identity write. Propagating only `asset_face.personId` while pinning the identity
+      // would leave the owner's OWN two layers disagreeing about one face: the person row would say
+      // "Uncle Tom" while `face_identity_face` still said "Dad", and applyResolvedPersonMetadata
+      // resolves the owner's names and birthdays through the identity. That split is precisely what
+      // the original §6.3.1 existed to prevent, so the editor's edit now moves both layers together.
+      // The negative-verdict write that row 3 needed goes with it: linkFaceToSpacePerson's
+      // clearNegativeForTarget is the correct verdict once the identity actually matches.
+
+      // F-13 (spec §6.3): reassign — attaching a face already held by a DIFFERENT space person in
+      // this same space moves it. Remove every current holder's projection row (a plain re-attach
+      // to the SAME person is a harmless no-op here, since linkFaceToSpacePerson re-adds it below),
+      // recount the ones that actually changed (§6.4), and record a negative verdict for each so
+      // the suggestion pipeline does not immediately re-offer the face back to them.
+      const allRemovedPersonIds = await this.sharedSpaceRepository.removePersonFaceAssignmentsForSpaceFace(
+        spaceId,
+        assetFaceId,
+        trx,
+      );
+      const removedPersonIds = allRemovedPersonIds.filter((removedPersonId) => removedPersonId !== person.id);
+      if (removedPersonIds.length > 0) {
+        await this.sharedSpaceRepository.recountPersons(removedPersonIds, trx);
+        for (const removedPersonId of removedPersonIds) {
+          await this.facePersonVerdictRepository.markRejectedForSpacePerson(
+            removedPersonId,
+            assetFaceId,
+            { source: 'suggestion', actorId: auth.user.id },
+            trx,
+          );
+        }
+      }
+
+      await this.linkFaceToSpacePerson(trx, person, assetFaceId, { writeIdentity: true });
+
+      // §6.7 (F-24/F-26): attribute the attach in the space's activity feed, unless the actor
+      // owns the asset -- an owner naming their own photos should not flood their own feed,
+      // matching #992's asset_edit rule. Ownership comes from the ASSET (ownerLink.assetOwnerId
+      // above), never from the actor's space role. Written inside this same transaction so a row
+      // can never describe a link that then rolled back.
+      if (ownerLink?.assetOwnerId !== auth.user.id) {
+        await this.sharedSpaceRepository.logActivity(
+          {
+            spaceId,
+            userId: auth.user.id,
+            type: SharedSpaceActivityType.PersonFaceAssign,
+            data: { personId: person.id, personName: person.name, count: 1 },
+          },
+          trx,
+        );
+      }
+
+      return true;
     });
-    return claimed > 0;
+  }
+
+  /**
+   * Spec §6.4 (Slice 4): detach a face from a space person. Removes only the space's own
+   * `shared_space_person_face` projection row — deliberately leaves `face_identity_face` alone,
+   * or the face's global identity would be blanked for every other space sharing it (§5.1, F-22).
+   *
+   * Writes a negative verdict first so the suggestion pipeline does not immediately re-offer the
+   * face back to this same person, mirroring the reassign arm of `attachFaceToSpacePerson`.
+   *
+   * F-38: `isFaceAssignableInSpace` is re-checked here at write time, never trusted from the
+   * §6.1 read — a face the read returned a moment ago may have left the space since.
+   */
+  async detachFaceFromSpacePerson(
+    auth: AuthDto,
+    spaceId: string,
+    personId: string,
+    assetFaceId: string,
+  ): Promise<boolean> {
+    await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
+    const person = await this.requireSpacePersonInSpace(spaceId, personId);
+
+    if (!(await this.facePersonVerdictRepository.isFaceAssignableInSpace(spaceId, assetFaceId))) {
+      throw new BadRequestException('Face not found');
+    }
+
+    return this.databaseRepository.transaction(async (trx) => {
+      // §6.7: read before the face's projection row is removed below, for the asset owner id it
+      // carries. Since §6.3.1 was revised the personId/identityId half is used too -- see the
+      // owner-layer clear at the end of this transaction.
+      const ownerLink = await this.facePersonVerdictRepository.getFaceOwnerLink(assetFaceId, trx);
+
+      await this.facePersonVerdictRepository.markRejectedForSpacePerson(
+        person.id,
+        assetFaceId,
+        { source: 'suggestion', actorId: auth.user.id },
+        trx,
+      );
+      await this.sharedSpaceRepository.removePersonFace(person.id, assetFaceId, trx);
+
+      // §6.3.1 (revised): propagate the detach into the OWNER's layer, so a face unassigned in the
+      // space also stops being tagged on the owner's own copy of the photo. Without this the space
+      // projection and `asset_face.personId` disagree, and the asset-detail People row -- which is
+      // seeded from `asset_face.personId` -- keeps showing the person the editor just removed.
+      //
+      // The identity comparison is the guard: it clears the tag ONLY when the owner's person is the
+      // same human as the space person being detached. An editor detaching "Uncle Tom" must never
+      // null out the owner's unrelated "Dad" tag on that face, so a mismatch is left alone.
+      if (ownerLink?.personId && person.identityId && ownerLink.identityId === person.identityId) {
+        await this.personRepository.setFaceOwnerPerson(
+          { assetFaceId, personId: null, expectedPersonId: ownerLink.personId },
+          trx,
+        );
+      }
+
+      // §6.7 (F-25/F-26): the detach twin of attachFaceToSpacePerson's attribution above --
+      // same owner-self exemption, same in-transaction write.
+      if (ownerLink?.assetOwnerId !== auth.user.id) {
+        await this.sharedSpaceRepository.logActivity(
+          {
+            spaceId,
+            userId: auth.user.id,
+            type: SharedSpaceActivityType.PersonFaceDetach,
+            data: { personId: person.id, personName: person.name, count: 1 },
+          },
+          trx,
+        );
+      }
+
+      return true;
+    });
+  }
+
+  /**
+   * Spec §6.2 (Slice 4): create a space person, optionally attaching a seed face ("add a name").
+   *
+   * When `assetFaceId` is present this is create-and-attach, and it runs as ONE transaction
+   * (F-15) — a crash between the create and the attach would leave a nameless orphan person in
+   * the space's people list, the same failure mode `confirmSpacePersonFaceSuggestion` guards
+   * against for the suggestion path.
+   *
+   * F-33: the `(spaceId, identityId)` unique index is the trap. A face left over from an earlier
+   * attach/detach cycle (Task 1 deliberately never touches `face_identity_face`) or from ML
+   * backfill may already resolve to an identity that some OTHER space person here already holds.
+   * `createOrGetPersonForIdentity` is used whenever the seed face already carries an identity, so
+   * that case returns the existing person instead of racing a plain insert into a duplicate key.
+   */
+  async createSpacePerson(
+    auth: AuthDto,
+    spaceId: string,
+    dto: { name?: string; assetFaceId?: string },
+  ): Promise<SharedSpacePersonResponseDto> {
+    await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
+
+    if (!dto.assetFaceId) {
+      const created = await this.sharedSpaceRepository.createPerson({ spaceId, name: dto.name ?? '' });
+      return this.mapSpacePerson(created, null);
+    }
+
+    const assetFaceId = dto.assetFaceId;
+    if (!(await this.facePersonVerdictRepository.isFaceAssignableInSpace(spaceId, assetFaceId))) {
+      throw new BadRequestException('Face not found');
+    }
+
+    const person = await this.databaseRepository.transaction(async (trx) => {
+      // Mirrors attachFaceToSpacePerson's F-37 lock: two concurrent creates seeded from the SAME
+      // face must not both succeed with two different new people each holding a projection row.
+      await this.facePersonVerdictRepository.lockFaceForAssignment(assetFaceId, trx);
+
+      const existingIdentityId = await this.faceIdentityRepository.getIdentityIdForFace(assetFaceId, trx);
+      const created = existingIdentityId
+        ? await this.sharedSpaceRepository.createOrGetPersonForIdentity(
+            { spaceId, identityId: existingIdentityId, name: dto.name ?? '' },
+            trx,
+          )
+        : await this.sharedSpaceRepository.createPerson({ spaceId, name: dto.name ?? '' }, trx);
+
+      await this.linkFaceToSpacePerson(trx, created, assetFaceId, { writeIdentity: true });
+      return created;
+    });
+
+    const alias = await this.sharedSpaceRepository.getAlias(person.id, auth.user.id);
+    return this.mapSpacePerson(person, alias?.alias ?? null);
+  }
+
+  /**
+   * Spec §6.1 (Slice 3): the face boxes on one asset, space-scoped. Editor-only — the response
+   * exposes faces nobody has named yet, which a Viewer has no business seeing.
+   *
+   * The hidden-person exclusion lives in the repository read (`getAssetFacesForSpace`) so it
+   * cannot drift from `isFaceAssignableInSpace`'s write-side exclusion — an editor must never be
+   * able to attach a face this list would not show them (F-8/F-9).
+   *
+   * Boxes are STORED against the original bytes, and the client renders the edited preview and
+   * crops each face out of it, so they are projected on the way out — the same transform the
+   * owner's twin read applies (`PersonService.getFacesById` → `mapFaces`), and the exact inverse of
+   * the one `createSpaceAssetFace` applies on the way in. Returning them raw put this endpoint on
+   * the opposite convention from its own write, so every crop in the editor's panel was cut from
+   * the wrong region of an edited asset — and #992 is what makes editing a MEMBER's asset possible,
+   * so an edited member asset is an ordinary case here, not an exotic one.
+   */
+  async getSpaceAssetFaces(auth: AuthDto, spaceId: string, assetId: string): Promise<SpaceAssetFaceResponseDto[]> {
+    await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
+
+    if (!(await this.sharedSpaceRepository.isAssetInSpace(spaceId, assetId))) {
+      // Deliberate non-disclosure, matching attachFaceToSpacePerson's 'Face not found' — an editor
+      // probing ids learns nothing about whether the asset exists at all.
+      throw new BadRequestException('Asset not found');
+    }
+
+    const faces = await this.sharedSpaceRepository.getAssetFacesForSpace(spaceId, assetId);
+    if (faces.length === 0) {
+      return [];
+    }
+
+    const asset = await this.assetRepository.getById(assetId, { edits: true, exifInfo: true });
+    const edits = asset?.edits ?? [];
+    const dimensions = asset?.exifInfo ? getDimensions(asset.exifInfo) : { width: 0, height: 0 };
+    // `transformFaceBoundingBox` is already a no-op without edits; the dimension check is the one
+    // extra guard, because an edited asset with no exif dimensions would otherwise scale every box
+    // by zero and collapse it to a point. A stored box is wrong-but-recognisable there, a collapsed
+    // one is not. The write twin refuses outright instead (F-17) — a read still has to render.
+    const canProject = dimensions.width > 0 && dimensions.height > 0;
+
+    return faces.map((face) => {
+      const box = {
+        boundingBoxX1: face.boundingBoxX1,
+        boundingBoxY1: face.boundingBoxY1,
+        boundingBoxX2: face.boundingBoxX2,
+        boundingBoxY2: face.boundingBoxY2,
+        imageWidth: face.imageWidth,
+        imageHeight: face.imageHeight,
+      };
+
+      return {
+        id: face.id,
+        ...(canProject ? transformFaceBoundingBox(box, edits, dimensions) : box),
+        spacePersonId: face.spacePersonId,
+        spacePersonName: face.spacePersonName,
+        isEditorDrawn: face.isEditorDrawn,
+      };
+    });
+  }
+
+  /**
+   * Spec §6.5 (Slice 6, Task 2): draw a face box on a member's asset.
+   *
+   * Coordinates arrive in the (possibly edited) PREVIEW image's space — #992 lets an editor
+   * rotate a member's asset, so a rotated preview is a likely path, not an exotic one (F-16).
+   * `convertFaceBoxToOriginalImageSpace` is the SAME transform `PersonService.createFace` uses
+   * for the owner path, so the two can never drift on this geometry (a drift here silently
+   * misplaces boxes).
+   *
+   * The created face gets `personId = NULL` (never the owner's), `sourceType = Manual`, and
+   * `createdBy = auth.user.id` — the column §6.6 uses to decide whether the editor may later
+   * delete it, never `sourceType` (see that section's doc comment for why). It is then attached
+   * to the target space person through `linkFaceToSpacePerson`, always with `writeIdentity:
+   * true`: a face this call just created cannot already belong to one of the owner's own people
+   * (§6.3.1), so the identity-skip override case never applies here.
+   */
+  async createSpaceAssetFace(
+    auth: AuthDto,
+    spaceId: string,
+    assetId: string,
+    dto: {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      imageWidth: number;
+      imageHeight: number;
+      spacePersonId: string;
+    },
+  ): Promise<SpaceAssetFaceResponseDto> {
+    await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
+
+    if (!(await this.sharedSpaceRepository.isAssetInSpace(spaceId, assetId))) {
+      // Deliberate non-disclosure, matching getSpaceAssetFaces/attachFaceToSpacePerson's
+      // 'Asset not found' / 'Face not found' — an editor probing ids learns nothing about
+      // whether the asset exists at all.
+      throw new BadRequestException('Asset not found');
+    }
+    const person = await this.requireSpacePersonInSpace(spaceId, dto.spacePersonId);
+
+    const asset = await this.assetRepository.getById(assetId, { edits: true, exifInfo: true });
+    if (!asset) {
+      throw new NotFoundException('Asset not found');
+    }
+
+    const { topLeft, bottomRight, imageWidth, imageHeight } = convertFaceBoxToOriginalImageSpace(dto, asset);
+    const boundingBoxX1 = Math.round(topLeft.x);
+    const boundingBoxY1 = Math.round(topLeft.y);
+    const boundingBoxX2 = Math.round(bottomRight.x);
+    const boundingBoxY2 = Math.round(bottomRight.y);
+
+    const faceId = await this.databaseRepository.transaction(async (trx) => {
+      const faceId = await this.personRepository.createAssetFace(
+        {
+          assetId,
+          personId: null,
+          imageHeight,
+          imageWidth,
+          boundingBoxX1,
+          boundingBoxX2,
+          boundingBoxY1,
+          boundingBoxY2,
+          sourceType: SourceType.Manual,
+          createdBy: auth.user.id,
+        },
+        trx,
+      );
+
+      await this.linkFaceToSpacePerson(trx, person, faceId, { writeIdentity: true });
+      return faceId;
+    });
+
+    return {
+      id: faceId,
+      boundingBoxX1,
+      boundingBoxY1,
+      boundingBoxX2,
+      boundingBoxY2,
+      imageWidth,
+      imageHeight,
+      spacePersonId: person.id,
+      spacePersonName: person.name,
+      // This call is the only writer of a face with createdBy set to the caller (§6.5) — always
+      // editor-drawn, never a detection.
+      isEditorDrawn: true,
+    };
+  }
+
+  /**
+   * Spec §6.6 (Slice 6, Task 3): delete a face box an EDITOR of this space drew (§6.5).
+   *
+   * Deletable iff `asset_face.createdBy IS NOT NULL` AND the face is reachable in a space where
+   * the actor is Owner/Editor — NEVER `sourceType`. `PersonService.createFace` already writes
+   * `SourceType.Manual` for an OWNER-drawn box too, so gating on `sourceType === Manual` would let
+   * a space editor delete boxes the owner drew by hand — the exact regression this whole design
+   * exists to avoid. A detected face (`createdBy IS NULL`) is refused: `FaceDelete` stays
+   * owner-only for those.
+   *
+   * Hard-deletes the row. `shared_space_person_face` and `face_identity_face` both cascade away
+   * (`ON DELETE CASCADE`) in EVERY space holding this face, not just this one — the box itself is
+   * being destroyed, not merely detached here — but the cascade does not recount, so every
+   * affected space person is snapshotted first and recounted afterward (mirrors §6.4's detach).
+   */
+  async deleteSpaceAssetFace(auth: AuthDto, spaceId: string, assetFaceId: string): Promise<void> {
+    await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
+
+    if (!(await this.facePersonVerdictRepository.isFaceReachableInSpace(spaceId, assetFaceId))) {
+      // Deliberate non-disclosure, matching the sibling attach/detach/draw routes.
+      throw new BadRequestException('Face not found');
+    }
+
+    const createdBy = await this.facePersonVerdictRepository.getFaceCreatedBy(assetFaceId);
+    if (!createdBy) {
+      // Not editor-drawn (a detection, or an existing pre-Slice-6 row) — refused, same message as
+      // above so an editor cannot distinguish "wrong space" from "not deletable" by probing ids.
+      throw new BadRequestException('Face not found');
+    }
+
+    await this.databaseRepository.transaction(async (trx) => {
+      const personIds = await this.sharedSpaceRepository.getPersonIdsHoldingFace(assetFaceId, trx);
+      await this.personRepository.deleteAssetFace(assetFaceId, trx);
+      if (personIds.length > 0) {
+        await this.sharedSpaceRepository.recountPersons(personIds, trx);
+      }
+    });
   }
 
   // D9/D2: reachability (RBAC — is this face's asset in the space at all), not pendingness, gates a space

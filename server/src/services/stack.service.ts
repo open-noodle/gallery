@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { BulkIdsDto } from 'src/dtos/asset-ids.response.dto';
 import { AuthDto } from 'src/dtos/auth.dto';
 import { StackCreateDto, StackResponseDto, StackSearchDto, StackUpdateDto, mapStack } from 'src/dtos/stack.dto';
@@ -19,6 +19,17 @@ export class StackService extends BaseService {
 
   async create(auth: AuthDto, dto: StackCreateDto): Promise<StackResponseDto> {
     await this.requireAccess({ auth, permission: Permission.AssetUpdate, ids: dto.assetIds });
+
+    // #734: AssetUpdate now grants a space Owner/Editor write access over other members'
+    // assets, but stacking is owner-only filing — and StackUpdate/StackDelete are
+    // stack-owner-only, so a stack created over someone else's assets would leave the
+    // asset owner unable to manage it. AssetDelete is the pure owner arm (checkOwnerAccess,
+    // same hasElevatedPermission as the AssetUpdate gate's isOwner sub-check). Mirrors the
+    // rbac-3 shape in asset.service.ts.
+    const ownedIds = await this.checkAccess({ auth, permission: Permission.AssetDelete, ids: dto.assetIds });
+    if (ownedIds.size !== new Set(dto.assetIds).size) {
+      throw new ForbiddenException('Stacks can only be created from assets you own');
+    }
 
     const stack = await this.stackRepository.create({ ownerId: auth.user.id }, dto.assetIds);
 

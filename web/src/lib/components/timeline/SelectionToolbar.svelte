@@ -27,8 +27,14 @@
   import { getSelectionCapabilities } from '$lib/managers/selection-capabilities';
   import { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
   import { getAssetBulkActions } from '$lib/services/asset.service';
+  import { resolveEditableAssetIds } from '$lib/utils/asset-editability';
   import type { OnArchive, OnDelete, OnFavorite, OnSetVisibility, OnUndoDelete } from '$lib/utils/actions';
-  import { AlbumUserRole, type AlbumResponseDto, type SharedSpaceResponseDto } from '@immich/sdk';
+  import {
+    AlbumUserRole,
+    type AlbumResponseDto,
+    type SharedSpaceMemberResponseDto,
+    type SharedSpaceResponseDto,
+  } from '@immich/sdk';
   import { ActionButton, CommandPaletteDefaultProvider } from '@immich/ui';
   import { mdiDotsVertical, mdiImageOutline } from '@mdi/js';
   import { t } from 'svelte-i18n';
@@ -53,8 +59,12 @@
     onSelectAll?: () => void;
     /** Present on album surfaces (regular album OR space album). */
     album?: AlbumResponseDto;
-    /** Present on space surfaces (direct space OR space album). */
-    space?: { id: string; canWrite: boolean };
+    /**
+     * Present on space surfaces (direct space OR space album). `members` drives the #734
+     * editable-subset fallback (`canEditAsset`'s space derivation) when `POST /assets/editable`
+     * is unreachable — absent it, the fallback narrows to the owned subset, same as pre-#734.
+     */
+    space?: { id: string; canWrite: boolean; members?: SharedSpaceMemberResponseDto[] };
     downloadFilename?: string;
     /** Remove-from-album / remove-from-space result handler. */
     onRemove?: (assetIds: string[]) => void;
@@ -135,8 +145,51 @@
       isMember: true,
       canWrite: space.canWrite,
       raw: {} as SharedSpaceResponseDto,
-      members: [],
+      members: space.members ?? [],
     };
+  });
+
+  // #734: which of the selection the caller may edit. `undefined` means unresolved — the
+  // canEditMetadata-gated actions below stay hidden until it resolves, rather than popping in
+  // late (there's no `disabled` affordance on MenuOption to render a pending state instead).
+  // An all-owned selection resolves synchronously, without a request.
+  let editableSelectedAssetIds = $state<string[] | undefined>(undefined);
+
+  $effect(() => {
+    const assets = assetInteraction.assets;
+    const isAllUserOwned = assetInteraction.isAllUserOwned;
+    const uid = currentUserId;
+    const spaceForFallback = space ? { canWrite: space.canWrite, members: space.members ?? [] } : null;
+
+    if (assets.length === 0) {
+      editableSelectedAssetIds = undefined;
+      return;
+    }
+
+    if (isAllUserOwned) {
+      editableSelectedAssetIds = assets.map((asset) => asset.id);
+      return;
+    }
+
+    // A new (non-all-owned) selection is unresolved until the debounced request lands, or the
+    // request rejects and the canEditAsset fallback runs.
+    editableSelectedAssetIds = undefined;
+    const requestedIds = assets.map((asset) => asset.id);
+
+    const timeoutId = setTimeout(() => {
+      void resolveEditableAssetIds(assets, { userId: uid ?? undefined, space: spaceForFallback }).then((ids) => {
+        // W-14: the selection may have changed while the request was in flight — apply the
+        // response only if it hasn't.
+        const currentIds = new Set(assetInteraction.assets.map((asset) => asset.id));
+        const selectionUnchanged =
+          currentIds.size === requestedIds.length && requestedIds.every((id) => currentIds.has(id));
+        if (selectionUnchanged) {
+          editableSelectedAssetIds = ids;
+        }
+      });
+    }, 250);
+
+    return () => clearTimeout(timeoutId);
   });
 
   const selectionCtx = $derived.by((): SelectionCommandContext | null => {
@@ -157,6 +210,7 @@
       isAllFavorite: assetInteraction.isAllFavorite,
       isAllArchived: assetInteraction.isAllArchived,
       isAllTrashed: false,
+      editableSelectedAssetIds,
       clearSelection: () => {},
     };
   });
@@ -212,10 +266,15 @@
         <DownloadAction menuItem filename={downloadFilename} />
       {/if}
       {#if caps.canEditMetadata}
-        <RotateAction />
-        <ChangeDate menuItem />
-        <ChangeDescription menuItem />
-        <ChangeLocation menuItem />
+        <!-- #734: editableSelectedAssetIds is never undefined here — canEditMetadata (hasEditable)
+             requires either an all-owned (synchronously resolved) selection or a resolved,
+             non-empty editable subset. The `?? []` is defensive only. -->
+        <RotateAction editableSelectedAssetIds={editableSelectedAssetIds ?? []} />
+        <ChangeDate menuItem editableSelectedAssetIds={editableSelectedAssetIds ?? []} />
+        <ChangeDescription menuItem editableSelectedAssetIds={editableSelectedAssetIds ?? []} />
+        <ChangeLocation menuItem editableSelectedAssetIds={editableSelectedAssetIds ?? []} />
+      {/if}
+      {#if caps.canSetVisibility}
         <ArchiveAction menuItem unarchive={assetInteraction.isAllArchived} {onArchive} />
         {#if onVisibilitySet}
           <SetVisibilityAction menuItem {onVisibilitySet} />
@@ -229,7 +288,7 @@
         {/if}
       {/if}
       {#if caps.canTag}
-        <TagAction menuItem />
+        <TagAction menuItem editableSelectedAssetIds={editableSelectedAssetIds ?? []} />
       {/if}
       {#if caps.canRemoveFromAlbum && album}
         <RemoveFromAlbum menuItem bind:album={localAlbum} {onRemove} />

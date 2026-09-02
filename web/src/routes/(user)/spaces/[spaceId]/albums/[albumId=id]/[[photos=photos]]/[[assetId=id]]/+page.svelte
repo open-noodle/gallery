@@ -791,25 +791,28 @@
      <SelectionToolbar> — the same component the regular album page and the direct-space/space-person
      timelines use — instead of the stripped Download+Remove-only bar it originally shipped with. Two
      RBAC facts make the reversal safe:
-       - Owner-gated mutations (Share/Add-to-album/Favorite/Rotate/ChangeDate/ChangeDescription/
-         ChangeLocation/Archive/SetVisibility/Tag/Delete) are gated by `sel.isAllUserOwned` in
-         getSelectionCapabilities, and the server's AssetUpdate access check (access.ts:155-159) checks
-         asset OWNERSHIP first, before any album/space role: `isOwner = checkOwnerAccess(...)` is unioned
-         with the space-editor arm, so an owner editing their own asset is NEVER blocked by the album
-         path. Exposing these actions here for an all-owned selection is exactly as safe as on the
-         regular album page.
+       - Owner-gated mutations (Share/Add-to-album/Favorite/Archive/SetVisibility/Delete) are gated
+         by `sel.isAllUserOwned` in getSelectionCapabilities, and the server's AssetUpdate access check
+         (access.ts:155-159) checks asset OWNERSHIP first, before any album/space role: `isOwner =
+         checkOwnerAccess(...)` is unioned with the space-editor arm, so an owner editing their own asset
+         is NEVER blocked by the album path. Exposing these actions here for an all-owned selection is
+         exactly as safe as on the regular album page.
        - `canRemoveFromAlbum` stays `canManage`-only (space.canWrite || album.isEditor) — ownership alone
          never grants it — because the server's `AlbumAssetDelete` is role-gated
          (shared-space-album-scope.guard.spec.ts pins this): a non-manager can't remove even their own
          asset from the album (decision C).
-     Space-editor cross-owner metadata edits are still never offered on a mixed/not-owned selection:
-     `isAllUserOwned` gates the whole metadata-edit block, matching the merged direct-space timeline. -->
+     #734: Rotate/ChangeDate/ChangeDescription/ChangeLocation (`canEditMetadata`) and Tag (`canTag`)
+     are no longer all-or-nothing ownership — a space Owner/Editor can now bulk-edit/tag the
+     *editable subset* of a mixed selection too (resolved via `POST /assets/editable`, same access
+     rule as the single-asset viewer's `canEditAsset`). Archive/SetVisibility split out into
+     `canSetVisibility`, which DID stay `isAllUserOwned`-only: rbac-3 restricts visibility changes
+     to owned assets regardless of space role. -->
 {#if mode === 'browse' && assetMultiSelectManager.selectionActive}
   <SelectionToolbar
     timelineManager={showSearchResults ? undefined : timelineManager}
     assetInteraction={assetMultiSelectManager}
     {album}
-    space={{ id: space.id, canWrite: isSpaceEditor }}
+    space={{ id: space.id, canWrite: isSpaceEditor, members }}
     downloadFilename={`${album.albumName}.zip`}
     onSelectAll={showSearchResults ? () => selectAllSearchResults(searchResults, assetMultiSelectManager) : undefined}
     onRemove={handleRemoveAssets}

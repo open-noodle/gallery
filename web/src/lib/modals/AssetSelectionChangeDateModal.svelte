@@ -2,10 +2,9 @@
   import Combobox from '$lib/components/shared-components/Combobox.svelte';
   import DateInput from '$lib/elements/DateInput.svelte';
   import DurationInput from '$lib/elements/DurationInput.svelte';
-  import { authManager } from '$lib/managers/auth-manager.svelte';
   import type { TimelineAsset } from '$lib/managers/timeline-manager/types';
   import { getPreferredTimeZone, getTimezones, toIsoDate, type ZoneOption } from '$lib/modals/timezone-utils';
-  import { getOwnedAssetsWithWarning } from '$lib/utils/asset-utils';
+  import { getEditableAssetsWithWarning } from '$lib/utils/asset-utils';
   import { handleError } from '$lib/utils/handle-error';
   import { updateAssets } from '@immich/sdk';
   import { Field, FormModal, Label, Switch } from '@immich/ui';
@@ -17,9 +16,11 @@
     initialDate?: DateTime;
     initialTimeZone?: string;
     assets: TimelineAsset[];
+    /** #734: which of `assets` the caller may edit — send only these. */
+    editableAssetIds: string[];
     onClose: (success: boolean) => void;
   }
-  let { initialDate = DateTime.now(), initialTimeZone, assets, onClose }: Props = $props();
+  let { initialDate = DateTime.now(), initialTimeZone, assets, editableAssetIds, onClose }: Props = $props();
 
   let showRelative = $state(false);
   let selectedDuration = $state(0);
@@ -31,7 +32,7 @@
   let selectedOption = $derived(getPreferredTimeZone(initialDate, initialTimeZone, timezones, lastSelectedTimezone));
 
   const onSubmit = async () => {
-    const ids = getOwnedAssetsWithWarning(assets, authManager.user);
+    const ids = getEditableAssetsWithWarning(assets, editableAssetIds);
     try {
       if (showRelative && (selectedDuration || selectedOption)) {
         await updateAssets({

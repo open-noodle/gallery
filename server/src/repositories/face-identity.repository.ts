@@ -2335,6 +2335,25 @@ export class FaceIdentityRepository {
     return this.replaceFaceIdentity(input);
   }
 
+  // Spec §6.2 (Slice 4): does this face already carry an identity? `createSpacePerson` needs this
+  // BEFORE deciding whether a plain `createPerson` is safe, or whether it must route through
+  // `createOrGetPersonForIdentity` instead — a face left over from an earlier attach/detach cycle
+  // (or ML backfill) may already resolve to an identity that a space person here already holds,
+  // and a plain insert would violate `shared_space_person_spaceId_identityId_key` (F-33).
+  // `assetFaceId` is `face_identity_face`'s primary key, so at most one row can match.
+  @GenerateSql({ params: [DummyValue.UUID] })
+  async getIdentityIdForFace(
+    assetFaceId: string,
+    db: Kysely<DB> | Transaction<DB> = this.db,
+  ): Promise<string | undefined> {
+    const row = await db
+      .selectFrom('face_identity_face')
+      .select('identityId')
+      .where('assetFaceId', '=', assetFaceId)
+      .executeTakeFirst();
+    return row?.identityId;
+  }
+
   // The positive verdict read, scoped to a bounded set of faces. `source='manual'` is the durable record
   // that a human placed a face on a person — written by every human reassignment, keyed by identity so it
   // survives merges, and replaced (never accumulated) by the next human reassignment. Both face engines

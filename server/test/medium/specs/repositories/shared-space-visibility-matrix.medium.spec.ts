@@ -501,7 +501,9 @@ describe('matrix: checkSpaceAccessForSpace', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 // SURFACE 5: checkSpaceEditAccess
 // Same visibility rules; only editor (not viewer) gets the grant.
-// NO album arm (known RBAC gap) — but visibility gate IS applied (Slice 10).
+// Has an album arm (including the #764 cross-owner contribution leg) — see the full reach-path
+// x role x owner-membership matrix in access-space-edit.repository.spec.ts. This file only
+// exercises the direct path; the visibility gate IS applied here too (Slice 10).
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('matrix: checkSpaceEditAccess', () => {

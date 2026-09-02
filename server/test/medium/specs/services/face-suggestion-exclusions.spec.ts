@@ -105,6 +105,10 @@ const setupSpace = () =>
       // this.databaseRepository.transaction(...) — without this, databaseRepository is undefined on the sut
       // and every confirm call throws.
       DatabaseRepository,
+      // Spec §6.3.1 (REVISED 2026-08-25): attach/detach now propagate into the OWNER's layer via
+      // personRepository.getOrCreateOwnerPersonForIdentity / setFaceOwnerPerson — without this the
+      // repository is undefined on the sut and every attach throws.
+      PersonRepository,
     ],
     mock: [LoggingRepository, JobRepository],
   });

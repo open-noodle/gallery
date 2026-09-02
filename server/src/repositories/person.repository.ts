@@ -290,6 +290,77 @@ export class PersonRepository {
     await db.updateTable('person').set({ identityId: input.identityId }).where('id', '=', input.personId).execute();
   }
 
+  /**
+   * Spec §6.3.1 (revised): resolve the ASSET OWNER's own `person` for a face identity, creating it
+   * when the owner has never named this human themselves.
+   *
+   * Space-editor face edits propagate to `asset_face.personId`, which lives in the owner's layer, so
+   * the editor's space person has to be mapped onto a person row the OWNER owns.
+   * `shared_space_person.identityId` and `person.identityId` hold the same value for the same human,
+   * and that is the join used here.
+   *
+   * The insert races `person_ownerId_identityId_key` (partial unique, `identityId IS NOT NULL`): two
+   * editors attaching two faces of the same not-yet-named human concurrently would both miss the
+   * initial select. `doNothing` plus a re-select makes the loser adopt the winner's row rather than
+   * fail on the duplicate key.
+   */
+  async getOrCreateOwnerPersonForIdentity(
+    input: { ownerId: string; identityId: string; name: string; type: string },
+    db: Kysely<DB> | Transaction<DB> = this.db,
+  ): Promise<{ id: string }> {
+    const find = () =>
+      db
+        .selectFrom('person')
+        .select('id')
+        .where('ownerId', '=', input.ownerId)
+        .where('identityId', '=', input.identityId)
+        .executeTakeFirst();
+
+    const existing = await find();
+    if (existing) {
+      return existing;
+    }
+
+    const inserted = await db
+      .insertInto('person')
+      .values({
+        ownerId: input.ownerId,
+        identityId: input.identityId,
+        name: input.name,
+        type: input.type,
+      })
+      .onConflict((oc) => oc.doNothing())
+      .returning('id')
+      .executeTakeFirst();
+
+    return inserted ?? ((await find()) as { id: string });
+  }
+
+  /**
+   * Spec §6.3.1 (revised): the owner-layer half of a space-editor face edit. `personId` is the
+   * owner's person id on attach, or `null` on detach.
+   *
+   * The `expectedPersonId` guard is what keeps a detach from clearing a tag that was never about
+   * this human: an editor detaching space person "Uncle Tom" must not null out the owner's
+   * unrelated "Dad" tag on the same face. The caller passes the owner person it resolved from the
+   * space person's identity, and the update is a no-op if the face has since moved.
+   */
+  async setFaceOwnerPerson(
+    input: { assetFaceId: string; personId: string | null; expectedPersonId?: string | null },
+    db: Kysely<DB> | Transaction<DB> = this.db,
+  ): Promise<void> {
+    let query = db.updateTable('asset_face').set({ personId: input.personId }).where('id', '=', input.assetFaceId);
+
+    if (input.expectedPersonId !== undefined) {
+      query =
+        input.expectedPersonId === null
+          ? query.where('personId', 'is', null)
+          : query.where('personId', '=', input.expectedPersonId);
+    }
+
+    await query.execute();
+  }
+
   async unassignFaces({ sourceType }: UnassignFacesOptions): Promise<void> {
     // "Reset all people" bulk-nulls personId across the whole library. It must also clear the human-placement
     // record (face_identity_face.source='manual'); otherwise every previously-confirmed face keeps a stale
@@ -480,21 +551,34 @@ export class PersonRepository {
       )
       .groupBy('person.id')
       .$if(!!options?.closestFaceAssetId, (qb) =>
-        qb.orderBy((eb) =>
-          eb(
-            (eb) =>
-              eb
-                .selectFrom('face_search')
-                .select('face_search.embedding')
-                .whereRef('face_search.faceId', '=', 'person.faceAssetId'),
-            '<=>',
-            (eb) =>
-              eb
-                .selectFrom('face_search')
-                .select('face_search.embedding')
-                .where('face_search.faceId', '=', options!.closestFaceAssetId!),
-          ),
-        ),
+        qb
+          // Named people first, exactly as the branch below does. This is NOT cosmetic here: the
+          // ordering runs BEFORE the LIMIT, and this page is 500 rows by default. A library with
+          // more people than that (unnamed clusters dominate the count) would otherwise have its
+          // named people truncated away by resemblance alone -- and which ones survived changed
+          // per face, because resemblance is the only thing that changed. Reported on #992: the
+          // same picker, on the same photo, listed ten named people for one face and two for the
+          // next. No amount of client-side re-ordering can recover a row the page never contained.
+          .orderBy(sql`NULLIF(BTRIM(person.name), '') is null`, 'asc')
+          .orderBy((eb) =>
+            eb(
+              (eb) =>
+                eb
+                  .selectFrom('face_search')
+                  .select('face_search.embedding')
+                  .whereRef('face_search.faceId', '=', 'person.faceAssetId'),
+              '<=>',
+              (eb) =>
+                eb
+                  .selectFrom('face_search')
+                  .select('face_search.embedding')
+                  .where('face_search.faceId', '=', options!.closestFaceAssetId!),
+            ),
+          )
+          // Resemblance is NULL for every person whose representative face has no embedding, and
+          // NULL for all of them when the edited face has none — leaving the order unspecified
+          // and OFFSET paging free to repeat or skip a row. The id makes it total.
+          .orderBy('person.id'),
       )
       .$if(!options?.closestFaceAssetId, (qb) =>
         qb
@@ -1178,14 +1262,14 @@ export class PersonRepository {
       .executeTakeFirst();
   }
 
-  async createAssetFace(face: Insertable<AssetFaceTable>): Promise<string> {
-    const result = await this.db.insertInto('asset_face').values(face).returning('id').executeTakeFirstOrThrow();
+  async createAssetFace(face: Insertable<AssetFaceTable>, db: Kysely<DB> | Transaction<DB> = this.db): Promise<string> {
+    const result = await db.insertInto('asset_face').values(face).returning('id').executeTakeFirstOrThrow();
     return result.id;
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })
-  async deleteAssetFace(id: string): Promise<void> {
-    await this.db.deleteFrom('asset_face').where('asset_face.id', '=', id).execute();
+  async deleteAssetFace(id: string, db: Kysely<DB> | Transaction<DB> = this.db): Promise<void> {
+    await db.deleteFrom('asset_face').where('asset_face.id', '=', id).execute();
   }
 
   @GenerateSql({ params: [DummyValue.UUID] })
