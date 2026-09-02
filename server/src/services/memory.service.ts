@@ -136,6 +136,8 @@ export class MemoryService extends BaseService {
           users.map(({ id }) => id),
           today,
           nextState,
+          availableTypes,
+          userTypesById,
         );
       } catch (error) {
         this.logger.error(`Failed to backfill memory overlap: ${error}`);
@@ -144,7 +146,13 @@ export class MemoryService extends BaseService {
       const reconcileTo = today.plus({ days: DAYS });
       for (const owner of users) {
         try {
-          await this.reconcileMemoryOverlap(owner.id, today, reconcileTo);
+          await this.reconcileMemoryOverlap(
+            owner.id,
+            today,
+            reconcileTo,
+            availableTypes,
+            userTypesById.get(owner.id) ?? {},
+          );
         } catch (error) {
           this.logger.error(`Failed to reconcile memory overlap for ${owner.id}: ${error}`);
         }
@@ -188,7 +196,11 @@ export class MemoryService extends BaseService {
     const alreadyStripped = stripped.get(row.id);
     const assetIds = row.assets.map(({ id }) => id).filter((id) => !alreadyStripped?.has(id));
 
-    const score = (row.data as RuleMemoryData | null | undefined)?.score ?? 0;
+    // `data` is untyped JSON from storage — a corrupt/foreign row's `score` need not be a number.
+    // Without the `Number.isFinite` guard a non-numeric value yields NaN, which poisons `priority`
+    // and makes the comparator degrade silently (NaN comparisons are always false).
+    const rawScore = (row.data as RuleMemoryData | null | undefined)?.score;
+    const score = typeof rawScore === 'number' && Number.isFinite(rawScore) ? rawScore : 0;
 
     return {
       id: row.id,
@@ -205,7 +217,13 @@ export class MemoryService extends BaseService {
    * would survive until retention expired them. Days outer / users inner, so one cursor makes it
    * resumable — the same shape as `lastOnThisDayDate`.
    */
-  private async backfillMemoryOverlap(ownerIds: string[], today: DateTime, state: MemoriesState) {
+  private async backfillMemoryOverlap(
+    ownerIds: string[],
+    today: DateTime,
+    state: MemoriesState,
+    availableTypes: Set<string>,
+    userTypesById: Map<string, Record<string, boolean>>,
+  ) {
     if (
       state.overlapBackfilledAt &&
       DateTime.fromISO(state.overlapBackfilledAt, { zone: 'utc' }).startOf('day') >= today
@@ -230,7 +248,7 @@ export class MemoryService extends BaseService {
     for (let target = start; target <= today; target = target.plus({ days: 1 })) {
       for (const ownerId of ownerIds) {
         try {
-          await this.reconcileMemoryOverlap(ownerId, target, target);
+          await this.reconcileMemoryOverlap(ownerId, target, target, availableTypes, userTypesById.get(ownerId) ?? {});
         } catch (error) {
           this.logger.error(`Failed to backfill memory overlap for ${ownerId} on ${target.toISO()}: ${error}`);
         }
@@ -246,11 +264,31 @@ export class MemoryService extends BaseService {
    * day's memories, and a generated memory left under its floor is deleted. Resolving per day is
    * what keeps it exact — two memories whose windows never overlap are never forced apart.
    */
-  private async reconcileMemoryOverlap(ownerId: string, from: DateTime, to: DateTime) {
-    const rows = (await this.memoryRepository.getForOverlapReconcile(ownerId, {
+  private async reconcileMemoryOverlap(
+    ownerId: string,
+    from: DateTime,
+    to: DateTime,
+    availableTypes: Set<string>,
+    userTypes: Record<string, boolean>,
+  ) {
+    const allRows = (await this.memoryRepository.getForOverlapReconcile(ownerId, {
       from: from.startOf('day').toJSDate(),
       to: to.endOf('day').toJSDate(),
     })) as MemoryOverlapRow[];
+
+    // A memory whose type is currently invisible to this owner (admin-disabled or user-disabled)
+    // must be dropped from consideration entirely — it can neither claim assets nor be stripped
+    // or deleted itself. `search` hides these rows but nothing deletes them, so without this
+    // filter an invisible memory still ranks and claims, and can end up deleting a *visible*
+    // lower-ranked card that lost its assets to something the user can't even see. See spec F1.
+    // Reuses `isMemoryTypeVisible` (used by `search`) rather than a second copy that can drift.
+    const rows = allRows.filter((row) =>
+      this.isMemoryTypeVisible(
+        { type: row.type as MemoryType, data: row.data, isSaved: row.isSaved },
+        availableTypes,
+        userTypes,
+      ),
+    );
 
     if (rows.length === 0) {
       return;

@@ -101,6 +101,12 @@ describe(MemoryService.name, () => {
     mocks.memory.searchAccessible.mockResolvedValue([]);
     mocks.memory.deleteOnThisDay.mockResolvedValue(void 0);
     mocks.user.getMetadata.mockResolvedValue([]);
+    // Without these, every `onMemoriesCreate` test outside the `reconcileMemoryOverlap` /
+    // `overlap backfill` describe blocks hits an unstubbed mock, `rows.length` throws a
+    // TypeError inside the reconcile try/catch, and the whole reconcile+backfill code path runs
+    // dead (see F3). Stubbing to a no-op here keeps that path live everywhere.
+    mocks.memory.getForOverlapReconcile.mockResolvedValue([]);
+    mocks.memory.getOldestMemoryDate.mockResolvedValue(null);
   });
 
   it('should be defined', () => {
@@ -1005,7 +1011,7 @@ describe(MemoryService.name, () => {
       expect(mocks.memory.delete).toHaveBeenCalledExactlyOnceWith('otd-ahead');
     });
 
-    it("S6: reconciles rule memories regardless of the owner's memory-type preferences", async () => {
+    it('S6: reconciles rule memories unaffected by a DIFFERENT disabled memory-type preference', async () => {
       const user = factory.userAdmin();
       user.metadata = [
         { key: UserMetadataKey.Preferences, value: { memories: { types: { on_this_day: false } } } },
@@ -1021,8 +1027,10 @@ describe(MemoryService.name, () => {
 
       await sut.onMemoriesCreate();
 
-      // Reconciliation is deliberately preference-independent: preferences gate generation and what
-      // `search` returns, never what is stored.
+      // Neither row here is `on_this_day`, so disabling that unrelated type does not exempt these
+      // two rule memories from reconciliation. This is NOT proof that reconciliation is
+      // preference-independent in general — see F1: a row whose OWN type is disabled is dropped
+      // from consideration entirely (`isMemoryTypeVisible`, ~memory.service.ts:249).
       expect(mocks.memory.removeAssetIds).toHaveBeenCalledExactlyOnceWith('month', [shared]);
     });
 
@@ -1094,6 +1102,39 @@ describe(MemoryService.name, () => {
       expect(mocks.memory.delete).not.toHaveBeenCalled();
     });
 
+    // F4: `data.score` is untyped JSON — a non-numeric value must not poison the comparator.
+    // Both memories clear their own floor (2) on their own-only assets alone, so whichever one
+    // claims the shared asset merely gets STRIPPED of it rather than deleted — that keeps the two
+    // possible outcomes ('bad' stripped vs. 'good' stripped) cleanly distinguishable instead of
+    // both collapsing to "deleted". `bad` is listed FIRST: an unguarded `RANK_RULE + score`
+    // string-concatenates ("1000000oops"), and comparing that against `good`'s numeric priority
+    // coerces to NaN in the sort comparator, which (verified empirically on Node's engine) leaves
+    // the pre-sort array order untouched — so pre-fix, `bad` wrongly keeps top claim order and
+    // strips `good`, exactly backwards from the intended "non-numeric sorts as 0" behaviour.
+    it('F4: a non-numeric score sorts as 0, below every scored rule memory', async () => {
+      const shared = 'shared-0';
+      mocks.memory.getForOverlapReconcile.mockResolvedValue([
+        overlapRow({
+          id: 'bad',
+          assets: [shared, ...ids('bad-only-', 2)],
+          data: { ruleId: 'recent_trip', dedupeKey: 'bad', score: 'oops' as unknown as number },
+        }),
+        overlapRow({
+          id: 'good',
+          assets: [shared, ...ids('good-only-', 2)],
+          data: { ruleId: 'trip_anniversary', dedupeKey: 'good', score: 200 },
+        }),
+      ] as any);
+
+      await runJob();
+
+      // `good` (score 200) outranks `bad` (non-numeric -> treated as 0), claims the shared asset,
+      // and keeps everything (no strip needed). `bad` loses the shared asset but still clears its
+      // own floor of 2 on its two own-only assets, so it survives, stripped, rather than deleted.
+      expect(mocks.memory.removeAssetIds).toHaveBeenCalledExactlyOnceWith('bad', [shared]);
+      expect(mocks.memory.delete).not.toHaveBeenCalled();
+    });
+
     it('S9: deletes a memory whose assets are all archived, trashed or hidden', async () => {
       // The repository query already filtered them out, so the service simply sees an empty list.
       mocks.memory.getForOverlapReconcile.mockResolvedValue([
@@ -1122,7 +1163,11 @@ describe(MemoryService.name, () => {
 
       await expect(runJob()).resolves.not.toThrow();
 
-      expect(mocks.logger.error).toHaveBeenCalled();
+      // Matched on message text, not just "an error happened somewhere": `onMemoriesCreate` has
+      // several independently try/caught phases, so an unqualified `toHaveBeenCalled()` would
+      // also pass for an unrelated failure (e.g. on_this_day/rule generation) and prove nothing
+      // about reconciliation specifically.
+      expect(mocks.logger.error).toHaveBeenCalledWith(expect.stringContaining('Failed to reconcile memory overlap'));
     });
 
     it('S12: reserves strictly per owner', async () => {
@@ -1152,6 +1197,44 @@ describe(MemoryService.name, () => {
       expect(mocks.memory.delete).not.toHaveBeenCalled();
       expect(mocks.memory.removeAssetIds).not.toHaveBeenCalled();
     });
+
+    // F1: a memory whose type the owner has DISABLED is invisible in `search` (memory.service.ts
+    // isMemoryTypeVisible), but before this fix nothing stopped it from claiming assets in the
+    // sweep — including outranking and sinking a lower-ranked, VISIBLE card below its floor. This
+    // reproduces the exact concrete failure from the review finding: the user disables
+    // `month_recap` (the reporter's own workaround), the existing month_recap memory stays in the
+    // table invisibly, and the nightly sweep still let it claim shared assets from the `on_this_day`
+    // card, deleting a card the user could actually see. Must fail against pre-fix code.
+    it('F1: a memory whose type is disabled for the owner does not claim, and does not sink a visible lower-ranked card below its floor', async () => {
+      const user = factory.userAdmin();
+      user.metadata = [
+        { key: UserMetadataKey.Preferences, value: { memories: { types: { month_recap: false } } } },
+      ] as any;
+      mocks.user.getList.mockResolvedValue([user]);
+      stubMetadata();
+
+      const shared = ids('x', 2);
+      mocks.memory.getForOverlapReconcile.mockResolvedValue([
+        // Clears its own floor (8) on its own if it were allowed to claim: shared(2) + own(6) = 8.
+        overlapRow({ id: 'month', assets: [...shared, ...ids('m', 6)], data: { ruleId: 'month_recap', score: 119 } }),
+        // Floor 3; without the shared pair it would drop to 2 and be deleted under the bug.
+        overlapRow({
+          id: 'otd',
+          assets: [...shared, ...ids('o', 2)],
+          type: MemoryType.OnThisDay,
+          data: { year: 2025 },
+        }),
+      ] as any);
+
+      await sut.onMemoriesCreate();
+
+      // `month` is invisible to this owner, so it must be dropped entirely — it neither claims
+      // (no strip on `otd`) nor is itself touched (no strip/delete on `month`, even though 8 of
+      // its own assets would clear its floor and 3 of `otd`'s would not clear its own if the two
+      // ever competed). `otd` keeps every one of its 4 assets and survives untouched.
+      expect(mocks.memory.removeAssetIds).not.toHaveBeenCalled();
+      expect(mocks.memory.delete).not.toHaveBeenCalled();
+    });
   });
 
   describe('overlap backfill', () => {
@@ -1180,7 +1263,11 @@ describe(MemoryService.name, () => {
       );
     });
 
-    it('B2: does nothing at all once the cursor has reached today', async () => {
+    // The guard is `overlapBackfilledAt >= today`, so this is only a no-op WITHIN the same UTC
+    // day the cursor already reached — not "once and never again". The next night `today`
+    // advances past the recorded cursor, the guard fails, and the backfill runs its cheap
+    // one-day catch-up slice (`cursor+1 .. today`) again — see B3 and spec §6.9.
+    it('B2: does no backfill work when the cursor has already reached today (same UTC day)', async () => {
       mocks.memory.getOldestMemoryDate.mockResolvedValue(new Date('2026-01-01T00:00:00Z'));
 
       await runWithState({ overlapBackfilledAt: '2026-09-03T00:00:00.000Z' });
