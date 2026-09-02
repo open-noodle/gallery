@@ -14,7 +14,11 @@ const offlineKysely = () =>
 
 describe(ViewRepository.name, () => {
   describe('ownedOrSpaceAccessible', () => {
-    it('album arm requires showInTimeline on folder-view projection surfaces', () => {
+    // #1041 (slice 9): folder view is a personal-timeline surface now — the album arm gates on the
+    // VIEWER's own per-user hide (a shared_space_album_hidden NOT EXISTS), not the shared
+    // showInTimeline flag, which governs only the space's own Photos tab (§3). This test used to
+    // assert the OPPOSITE (`"showInTimeline" = `) — that assertion described exactly the #1041 bug.
+    it('album arm gates on the viewer\'s personal hide (shared_space_album_hidden), not the shared showInTimeline flag', () => {
       const db = offlineKysely();
       const sut = new ViewRepository(db as never);
       const query = db
@@ -22,7 +26,8 @@ describe(ViewRepository.name, () => {
         .where((eb) => (sut as any).ownedOrSpaceAccessible(eb, '00000000-0000-0000-0000-000000000000'))
         .selectAll('asset')
         .compile();
-      expect(query.sql).toContain('"showInTimeline" = ');
+      expect(query.sql).toContain('shared_space_album_hidden');
+      expect(query.sql).not.toContain('"showInTimeline" = ');
     });
   });
 });
