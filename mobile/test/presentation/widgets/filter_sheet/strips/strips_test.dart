@@ -74,6 +74,9 @@ FilterSuggestionsResponseDto _suggestions({
   List<String> cameraMakes = const [],
 }) => FilterSuggestionsResponseDto(
   hasUnnamedPeople: false,
+  hasFavorites: true,
+  hasAssetsInAlbum: true,
+  hasAssetsNotInAlbum: true,
   people: people,
   tags: tags,
   countries: countries,
@@ -338,7 +341,9 @@ void main() {
     testWidgets('caps to 10 chips + a trailing "+N" tile when there are more than 10 tags', (tester) async {
       await tester.binding.setSurfaceSize(const Size(2400, 200));
       addTearDown(() => tester.binding.setSurfaceSize(null));
-      final s = _suggestions(tags: [for (var i = 0; i < 15; i++) FilterSuggestionsTagDto(id: 't$i', value: 'Tag$i')]);
+      final s = _suggestions(
+        tags: [for (var i = 0; i < 15; i++) FilterSuggestionsTagDto(id: 't$i', value: 'Tag$i')],
+      );
       await tester.pumpConsumerWidget(const TagsStrip(), overrides: _overrideSuggestions(s));
       await tester.pumpAndSettle();
 
@@ -359,7 +364,9 @@ void main() {
     testWidgets('no "+N" tile when there are 10 or fewer tags', (tester) async {
       await tester.binding.setSurfaceSize(const Size(2400, 200));
       addTearDown(() => tester.binding.setSurfaceSize(null));
-      final s = _suggestions(tags: [for (var i = 0; i < 10; i++) FilterSuggestionsTagDto(id: 't$i', value: 'Tag$i')]);
+      final s = _suggestions(
+        tags: [for (var i = 0; i < 10; i++) FilterSuggestionsTagDto(id: 't$i', value: 'Tag$i')],
+      );
       await tester.pumpConsumerWidget(const TagsStrip(), overrides: _overrideSuggestions(s));
       await tester.pumpAndSettle();
 
@@ -372,7 +379,9 @@ void main() {
     testWidgets('tapping the "+N" tile navigates to the tags picker', (tester) async {
       await tester.binding.setSurfaceSize(const Size(2400, 200));
       addTearDown(() => tester.binding.setSurfaceSize(null));
-      final s = _suggestions(tags: [for (var i = 0; i < 15; i++) FilterSuggestionsTagDto(id: 't$i', value: 'Tag$i')]);
+      final s = _suggestions(
+        tags: [for (var i = 0; i < 15; i++) FilterSuggestionsTagDto(id: 't$i', value: 'Tag$i')],
+      );
       final router = _TagsStripTestRouter();
       await tester.pumpWidget(
         EasyLocalization(

@@ -28527,6 +28527,18 @@
             },
             "type": "array"
           },
+          "hasAssetsInAlbum": {
+            "description": "Whether any filtered asset belongs to an album",
+            "type": "boolean"
+          },
+          "hasAssetsNotInAlbum": {
+            "description": "Whether any filtered asset belongs to no album",
+            "type": "boolean"
+          },
+          "hasFavorites": {
+            "description": "Whether any favourite exists in the filtered set, ignoring isFavorite",
+            "type": "boolean"
+          },
           "hasUnnamedPeople": {
             "description": "Whether unnamed people exist in the filtered set",
             "type": "boolean"
@@ -28563,6 +28575,9 @@
         "required": [
           "cameraMakes",
           "countries",
+          "hasAssetsInAlbum",
+          "hasAssetsNotInAlbum",
+          "hasFavorites",
           "hasUnnamedPeople",
           "mediaTypes",
           "people",
@@ -34022,6 +34037,12 @@
             "nullable": true,
             "type": "string"
           },
+          "spaceId": {
+            "description": "Shared space this link is created from. Lets the link cover assets contributed by other members, which requires the caller to be an Owner or Editor of the space.",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
           "type": {
             "$ref": "#/components/schemas/SharedLinkType"
           }
@@ -35301,6 +35322,15 @@
       },
       "SmartSearchFacetsDto": {
         "properties": {
+          "albumIds": {
+            "description": "Filter by album IDs",
+            "items": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+              "type": "string"
+            },
+            "type": "array"
+          },
           "city": {
             "description": "Filter by city name",
             "nullable": true,
@@ -35463,6 +35493,18 @@
             },
             "type": "array"
           },
+          "hasAssetsInAlbum": {
+            "description": "Whether any filtered asset belongs to an album",
+            "type": "boolean"
+          },
+          "hasAssetsNotInAlbum": {
+            "description": "Whether any filtered asset belongs to no album",
+            "type": "boolean"
+          },
+          "hasFavorites": {
+            "description": "Whether any favourite exists in the filtered set, ignoring isFavorite",
+            "type": "boolean"
+          },
           "hasUnnamedPeople": {
             "description": "Whether unnamed people exist in the filtered smart-search set",
             "type": "boolean"
@@ -35514,6 +35556,9 @@
           "cameraModels",
           "cities",
           "countries",
+          "hasAssetsInAlbum",
+          "hasAssetsNotInAlbum",
+          "hasFavorites",
           "hasUnnamedPeople",
           "mediaTypes",
           "people",
@@ -38852,6 +38897,13 @@
             "description": "Birthday memories",
             "type": "boolean"
           },
+          "personThrowbackDormancyMonths": {
+            "default": 6,
+            "description": "Months a person must be absent from photos before person_throwback resurfaces them",
+            "maximum": 120,
+            "minimum": 1,
+            "type": "integer"
+          },
           "recentTrips": {
             "description": "Recent trip memories",
             "type": "boolean"
@@ -38861,6 +38913,13 @@
             "maximum": 9007199254740991,
             "minimum": 0,
             "type": "integer"
+          },
+          "themeMaxDistance": {
+            "default": 0.75,
+            "description": "Max CLIP cosine distance for themed memories",
+            "maximum": 2,
+            "minimum": 0,
+            "type": "number"
           },
           "types": {
             "additionalProperties": {
@@ -39898,6 +39957,13 @@
             "description": "Album thumbnail asset ID",
             "format": "uuid",
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
+          "createdAt": {
+            "description": "Album creation date. Must include a timezone designator (Z or ±HH:MM).",
+            "example": "2024-01-01T00:00:00.000Z",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
             "type": "string"
           },
           "description": {

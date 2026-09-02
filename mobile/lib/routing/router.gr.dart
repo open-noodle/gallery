@@ -1915,6 +1915,8 @@ class SharedLinkEditRoute extends PageRouteInfo<SharedLinkEditRouteArgs> {
     SharedLink? existingLink,
     List<String>? assetsList,
     String? albumId,
+    String? spaceId,
+    int contributedCount = 0,
     List<PageRouteInfo>? children,
   }) : super(
          SharedLinkEditRoute.name,
@@ -1923,6 +1925,8 @@ class SharedLinkEditRoute extends PageRouteInfo<SharedLinkEditRouteArgs> {
            existingLink: existingLink,
            assetsList: assetsList,
            albumId: albumId,
+           spaceId: spaceId,
+           contributedCount: contributedCount,
          ),
          initialChildren: children,
        );
@@ -1940,6 +1944,8 @@ class SharedLinkEditRoute extends PageRouteInfo<SharedLinkEditRouteArgs> {
         existingLink: args.existingLink,
         assetsList: args.assetsList,
         albumId: args.albumId,
+        spaceId: args.spaceId,
+        contributedCount: args.contributedCount,
       );
     },
   );
@@ -1951,6 +1957,8 @@ class SharedLinkEditRouteArgs {
     this.existingLink,
     this.assetsList,
     this.albumId,
+    this.spaceId,
+    this.contributedCount = 0,
   });
 
   final Key? key;
@@ -1961,9 +1969,13 @@ class SharedLinkEditRouteArgs {
 
   final String? albumId;
 
+  final String? spaceId;
+
+  final int contributedCount;
+
   @override
   String toString() {
-    return 'SharedLinkEditRouteArgs{key: $key, existingLink: $existingLink, assetsList: $assetsList, albumId: $albumId}';
+    return 'SharedLinkEditRouteArgs{key: $key, existingLink: $existingLink, assetsList: $assetsList, albumId: $albumId, spaceId: $spaceId, contributedCount: $contributedCount}';
   }
 
   @override
@@ -1973,7 +1985,9 @@ class SharedLinkEditRouteArgs {
     return key == other.key &&
         existingLink == other.existingLink &&
         const ListEquality<String>().equals(assetsList, other.assetsList) &&
-        albumId == other.albumId;
+        albumId == other.albumId &&
+        spaceId == other.spaceId &&
+        contributedCount == other.contributedCount;
   }
 
   @override
@@ -1981,7 +1995,9 @@ class SharedLinkEditRouteArgs {
       key.hashCode ^
       existingLink.hashCode ^
       const ListEquality<String>().hash(assetsList) ^
-      albumId.hashCode;
+      albumId.hashCode ^
+      spaceId.hashCode ^
+      contributedCount.hashCode;
 }
 
 /// generated route for

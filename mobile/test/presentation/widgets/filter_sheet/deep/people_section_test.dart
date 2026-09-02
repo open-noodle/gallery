@@ -18,8 +18,13 @@ import 'package:openapi/api.dart';
 
 import '../../../../widget_tester_extensions.dart';
 
-FilterSuggestionsResponseDto _sugg({List<FilterSuggestionsPersonDto>? people}) =>
-    FilterSuggestionsResponseDto(hasUnnamedPeople: false, people: people ?? const []);
+FilterSuggestionsResponseDto _sugg({List<FilterSuggestionsPersonDto>? people}) => FilterSuggestionsResponseDto(
+  hasUnnamedPeople: false,
+  hasFavorites: true,
+  hasAssetsInAlbum: true,
+  hasAssetsNotInAlbum: true,
+  people: people ?? const [],
+);
 
 void main() {
   late Drift db;
@@ -200,9 +205,7 @@ void main() {
       final people = [for (var i = 0; i < 10; i++) FilterSuggestionsPersonDto(id: 'p$i', name: 'P$i')];
       await tester.pumpConsumerWidget(
         const Material(child: PeopleSectionDeep(onOpenPicker: null)),
-        overrides: [
-          photosFilterSuggestionsProvider.overrideWith((ref, filter) => Future.value(_sugg(people: people))),
-        ],
+        overrides: [photosFilterSuggestionsProvider.overrideWith((ref, filter) => Future.value(_sugg(people: people)))],
       );
       await tester.pumpAndSettle();
 
@@ -233,16 +236,14 @@ void main() {
       final people = [for (var i = 0; i < 10; i++) FilterSuggestionsPersonDto(id: 'p$i', name: 'P$i')];
       await tester.pumpConsumerWidget(
         const Material(child: PeopleSectionDeep(onOpenPicker: null)),
-        overrides: [
-          photosFilterSuggestionsProvider.overrideWith((ref, filter) => Future.value(_sugg(people: people))),
-        ],
+        overrides: [photosFilterSuggestionsProvider.overrideWith((ref, filter) => Future.value(_sugg(people: people)))],
       );
       await tester.pumpAndSettle();
 
       final container = ProviderScope.containerOf(tester.element(find.byType(PeopleSectionDeep)));
-      container.read(photosFilterProvider.notifier).togglePerson(
-        const PersonDto(id: 'p7', name: 'P7', isHidden: false, thumbnailPath: ''),
-      );
+      container
+          .read(photosFilterProvider.notifier)
+          .togglePerson(const PersonDto(id: 'p7', name: 'P7', isHidden: false, thumbnailPath: ''));
       await tester.pumpAndSettle();
 
       // Pinned beyond the cap because it's selected.
@@ -260,9 +261,7 @@ void main() {
       final people = [for (var i = 0; i < 4; i++) FilterSuggestionsPersonDto(id: 'p$i', name: 'P$i')];
       await tester.pumpConsumerWidget(
         const Material(child: PeopleSectionDeep(onOpenPicker: null)),
-        overrides: [
-          photosFilterSuggestionsProvider.overrideWith((ref, filter) => Future.value(_sugg(people: people))),
-        ],
+        overrides: [photosFilterSuggestionsProvider.overrideWith((ref, filter) => Future.value(_sugg(people: people)))],
       );
       await tester.pumpAndSettle();
 

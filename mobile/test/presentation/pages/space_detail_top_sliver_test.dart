@@ -6,10 +6,14 @@
 /// shelf's presence/absence logic.
 library;
 
+import 'package:drift/drift.dart' as drift;
+import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/space_album.model.dart';
+import 'package:immich_mobile/infrastructure/repositories/db.repository.dart';
+import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
 import 'package:immich_mobile/presentation/widgets/games/daily_challenge_card.widget.dart';
 import 'package:immich_mobile/presentation/widgets/spaces/space_top_sliver.widget.dart';
 import 'package:immich_mobile/providers/game/game.provider.dart';
@@ -97,6 +101,22 @@ class _FakeSyncStatusNotifier extends SyncStatusNotifier {
 // ---------------------------------------------------------------------------
 
 void main() {
+  late Drift db;
+
+  // The shelf sorts its albums by the persisted `AppConfig.spaceAlbums`, so it
+  // reads `appConfigProvider` -> SettingsRepository.instance, which throws when
+  // uninitialized. Production initializes it in `bootstrap.dart` long before
+  // any space UI mounts; these tests need the same guarantee.
+  setUpAll(() async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    db = Drift(drift.DatabaseConnection(NativeDatabase.memory(), closeStreamsSynchronously: true));
+    await SettingsRepository.ensureInitialized(db);
+  });
+
+  tearDownAll(() async {
+    await db.close();
+  });
+
   testWidgets('editor + 1 album: shelf is present inside the top sliver', (tester) async {
     await tester.pumpWidget(_wrap(spaceId: 'space-1', canEdit: true, albums: [_album('a1')]));
     await tester.pump(); // stream emit

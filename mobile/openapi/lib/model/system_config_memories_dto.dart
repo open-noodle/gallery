@@ -14,13 +14,21 @@ class SystemConfigMemoriesDto {
   /// Returns a new [SystemConfigMemoriesDto] instance.
   SystemConfigMemoriesDto({
     required this.birthday,
+    this.personThrowbackDormancyMonths = const Optional.present(6),
     required this.recentTrips,
     required this.retentionDays,
+    this.themeMaxDistance = const Optional.present(0.75),
     this.types = const Optional.present(const {}),
   });
 
   /// Birthday memories
   bool birthday;
+
+  /// Months a person must be absent from photos before person_throwback resurfaces them
+  ///
+  /// Minimum value: 1
+  /// Maximum value: 120
+  Optional<int?> personThrowbackDormancyMonths;
 
   /// Recent trip memories
   bool recentTrips;
@@ -31,32 +39,50 @@ class SystemConfigMemoriesDto {
   /// Maximum value: 9007199254740991
   int retentionDays;
 
+  /// Max CLIP cosine distance for themed memories
+  ///
+  /// Minimum value: 0
+  /// Maximum value: 2
+  Optional<num?> themeMaxDistance;
+
   /// Per-type memory availability overrides
   Optional<Map<String, bool>?> types;
 
   @override
   bool operator ==(Object other) => identical(this, other) || other is SystemConfigMemoriesDto &&
     other.birthday == birthday &&
+    other.personThrowbackDormancyMonths == personThrowbackDormancyMonths &&
     other.recentTrips == recentTrips &&
     other.retentionDays == retentionDays &&
+    other.themeMaxDistance == themeMaxDistance &&
     _deepEquality.equals(other.types, types);
 
   @override
   int get hashCode =>
     // ignore: unnecessary_parenthesis
     (birthday.hashCode) +
+    (personThrowbackDormancyMonths.hashCode) +
     (recentTrips.hashCode) +
     (retentionDays.hashCode) +
+    (themeMaxDistance.hashCode) +
     (types.hashCode);
 
   @override
-  String toString() => 'SystemConfigMemoriesDto[birthday=$birthday, recentTrips=$recentTrips, retentionDays=$retentionDays, types=$types]';
+  String toString() => 'SystemConfigMemoriesDto[birthday=$birthday, personThrowbackDormancyMonths=$personThrowbackDormancyMonths, recentTrips=$recentTrips, retentionDays=$retentionDays, themeMaxDistance=$themeMaxDistance, types=$types]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
       json[r'birthday'] = this.birthday;
+    if (this.personThrowbackDormancyMonths.isPresent) {
+      final value = this.personThrowbackDormancyMonths.value;
+      json[r'personThrowbackDormancyMonths'] = value;
+    }
       json[r'recentTrips'] = this.recentTrips;
       json[r'retentionDays'] = this.retentionDays;
+    if (this.themeMaxDistance.isPresent) {
+      final value = this.themeMaxDistance.value;
+      json[r'themeMaxDistance'] = value;
+    }
     if (this.types.isPresent) {
       final value = this.types.value;
       json[r'types'] = value;
@@ -74,8 +100,10 @@ class SystemConfigMemoriesDto {
 
       return SystemConfigMemoriesDto(
         birthday: mapValueOfType<bool>(json, r'birthday')!,
+        personThrowbackDormancyMonths: json.containsKey(r'personThrowbackDormancyMonths') ? Optional.present(json[r'personThrowbackDormancyMonths'] == null ? null : int.parse('${json[r'personThrowbackDormancyMonths']}')) : const Optional.absent(),
         recentTrips: mapValueOfType<bool>(json, r'recentTrips')!,
         retentionDays: mapValueOfType<int>(json, r'retentionDays')!,
+        themeMaxDistance: json.containsKey(r'themeMaxDistance') ? Optional.present(json[r'themeMaxDistance'] == null ? null : num.parse('${json[r'themeMaxDistance']}')) : const Optional.absent(),
         types: json.containsKey(r'types') ? Optional.present(mapCastOfType<String, bool>(json, r'types')) : const Optional.absent(),
       );
     }

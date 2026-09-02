@@ -129,6 +129,11 @@ const SmartSearchFacetsSchema = BaseSearchSchema.pick({
   personIds: true,
   tagIds: true,
   rating: true,
+  // An album detail page runs its page-aware search scoped to its own album, so the facets that
+  // drive that page's result count and time-bucket rail have to carry the same scope. Omitting it
+  // here does not merely lose a filter: zod strips the field, so the facets would silently describe
+  // the whole library beside a result grid showing one album.
+  albumIds: true,
   spaceId: true,
   spacePersonIds: true,
 })
@@ -262,6 +267,9 @@ const FilterSuggestionsResponseSchema = z
     ratings: z.array(z.number()).describe('Available ratings'),
     mediaTypes: z.array(z.string()).describe('Available media types'),
     hasUnnamedPeople: z.boolean().describe('Whether unnamed people exist in the filtered set'),
+    hasFavorites: z.boolean().describe('Whether any favourite exists in the filtered set, ignoring isFavorite'),
+    hasAssetsInAlbum: z.boolean().describe('Whether any filtered asset belongs to an album'),
+    hasAssetsNotInAlbum: z.boolean().describe('Whether any filtered asset belongs to no album'),
   })
   .meta({ id: 'FilterSuggestionsResponseDto' });
 
@@ -280,6 +288,9 @@ const SmartSearchFacetsResponseSchema = z
     ratings: z.array(z.number()).describe('Available ratings'),
     mediaTypes: z.array(AssetTypeSchema).describe('Available media types'),
     hasUnnamedPeople: z.boolean().describe('Whether unnamed people exist in the filtered smart-search set'),
+    hasFavorites: z.boolean().describe('Whether any favourite exists in the filtered set, ignoring isFavorite'),
+    hasAssetsInAlbum: z.boolean().describe('Whether any filtered asset belongs to an album'),
+    hasAssetsNotInAlbum: z.boolean().describe('Whether any filtered asset belongs to no album'),
   })
   .meta({ id: 'SmartSearchFacetsResponseDto' });
 
@@ -419,7 +430,7 @@ export class SearchExploreResponseDto extends createZodDto(SearchExploreResponse
 // ─── UPSTREAM SEARCH V3 — DORMANT ───────────────────────────────
 // Not wired to any controller/service. The fork's live search runs on the legacy
 // path (searchAssetBuilderLegacy in search.repository.ts). Do not call from fork code.
-// Switch-over plan: docs/superpowers/specs/2026-07-23-search-v3-coexistence-design.md
+// Switch-over plan: specs/2026-07-23-search-v3-coexistence-design.md
 const IdFilterSchema = nonEmptyPartial({
   eq: z.uuidv4(),
   ne: z.uuidv4(),

@@ -71,6 +71,7 @@ COPY --from=ghcr.io/jdx/mise:2026.7.11@sha256:6599c81b0da6206cbf5151df97a36794d7
 WORKDIR /app
 COPY ./packages/sdk ./packages/sdk/
 COPY ./packages/plugin-core ./packages/plugin-core/
+COPY ./packages/plugin-gallery ./packages/plugin-gallery/
 COPY ./packages/plugin-sdk ./packages/plugin-sdk/
 ENV MISE_DATA_DIR=/buildcache/mise
 
@@ -88,9 +89,9 @@ RUN --mount=type=cache,id=pnpm-packages,target=/buildcache/pnpm-store \
   --mount=type=bind,source=patches,target=patches \
   pnpm --filter @immich/sdk install --frozen-lockfile && \
   pnpm --filter @immich/sdk build && \
-  pnpm --filter @immich/sdk --filter @immich/plugin-sdk --filter @immich/plugin-core install --frozen-lockfile && \
+  pnpm --filter @immich/sdk --filter @immich/plugin-sdk --filter @immich/plugin-core --filter @immich/plugin-gallery install --frozen-lockfile && \
   mise exec --no-deps --jobs=1 github:extism/js-pdk@1.6.0 -- \
-    pnpm --filter @immich/plugin-sdk --filter @immich/plugin-core build
+    pnpm --filter @immich/plugin-sdk --filter @immich/plugin-core --filter @immich/plugin-gallery build
 
 FROM ghcr.io/immich-app/base-server-prod:202607211135@sha256:ced131da7523544fe975cfd25abd67386e712e39496340b437cd95a08d0a18f3
 
@@ -104,6 +105,8 @@ COPY --from=web /usr/src/app/web/build /build/www
 COPY --from=cli /output/cli-pruned ./cli
 COPY --from=plugins /app/packages/plugin-core/dist /build/plugins/immich-plugin-core/dist
 COPY --from=plugins /app/packages/plugin-core/manifest.json /build/plugins/immich-plugin-core/manifest.json
+COPY --from=plugins /app/packages/plugin-gallery/dist /build/plugins/gallery-core/dist
+COPY --from=plugins /app/packages/plugin-gallery/manifest.json /build/plugins/gallery-core/manifest.json
 RUN ln -s ../../cli/bin/immich server/bin/immich
 COPY LICENSE /licenses/LICENSE.txt
 COPY LICENSE /LICENSE

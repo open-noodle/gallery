@@ -56,6 +56,27 @@ export const ALL_FILTER_SECTIONS: readonly FilterSection[] = [
   'text',
 ] as const;
 
+/**
+ * The sections a browser could already have recorded before #447 replaced the stored
+ * `string[]` of visible sections with a `{ selected, known }` ledger — a frozen historical
+ * fact, not a list to keep in step with `ALL_FILTER_SECTIONS`.
+ *
+ * Legacy storage carries no `known` list, so on upgrade every section outside this baseline
+ * counts as introduced-since and is revealed. Deriving that from the baseline rather than
+ * naming the newer sections explicitly is what keeps it correct: the old list named `favorites`
+ * and `albums` but was never extended with `text` when #722 added it, so browsers still holding
+ * legacy storage lost that section for good (#797).
+ */
+export const PRE_LEDGER_FILTER_SECTIONS: readonly FilterSection[] = [
+  'timeline',
+  'people',
+  'location',
+  'camera',
+  'tags',
+  'rating',
+  'media',
+] as const;
+
 export interface PersonOption {
   id: string;
   name: string;
@@ -87,11 +108,25 @@ export interface FilterSuggestionsResponse {
   ratings: number[];
   mediaTypes: string[];
   hasUnnamedPeople: boolean;
+  hasFavorites: boolean;
+  hasAssetsInAlbum: boolean;
+  hasAssetsNotInAlbum: boolean;
 }
 
 export interface FilterPanelConfig {
   sections: FilterSection[];
   suggestionsProvider?: (filters: FilterState) => Promise<FilterSuggestionsResponse>;
+  /**
+   * Facets for this surface's scope with no filters applied (#910). The panel only calls this when it
+   * mounts with filters already active — otherwise the ordinary response is already the baseline.
+   *
+   * Resolving `undefined` means "no cheap baseline here", and the panel then never hides a section.
+   * The three query-mode surfaces return `undefined` deliberately: their `smartFacetInFlight` slot is
+   * single-entry and their `smartFacets` state feeds the timeline and the result count, so a second
+   * concurrent facet request would abort the first and then overwrite the page's own data. See spec
+   * §4.5 — this hook exists because `suggestionsProvider(createFilterState())` cannot be used.
+   */
+  baselineProvider?: () => Promise<FilterSuggestionsResponse | undefined>;
   providers?: {
     people?: (context?: FilterContext) => Promise<PersonOption[]>;
     allPeople?: () => Promise<PersonOption[]>;

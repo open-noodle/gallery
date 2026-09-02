@@ -226,6 +226,7 @@ Duplicate checking only exists for upload libraries, using the file hash. Furthe
 Images in read-write external libraries (the default) can be edited as normal.
 In read-only libraries (`:ro` in the `docker-compose.yml`), Gallery is unable to create the `.xmp` sidecar files to store edited file metadata.
 For this reason, the metadata (timestamp, location, description, star rating, etc.) cannot be edited for files in read-only external libraries.
+The edit is not rejected up front: it is applied, then reverted when the file is re-read, with no error shown.
 
 ### How are deletions of files handled in external libraries?
 

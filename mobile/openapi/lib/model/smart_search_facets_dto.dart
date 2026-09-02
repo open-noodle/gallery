@@ -13,6 +13,7 @@ part of openapi.api;
 class SmartSearchFacetsDto {
   /// Returns a new [SmartSearchFacetsDto] instance.
   SmartSearchFacetsDto({
+    this.albumIds = const Optional.present(const []),
     this.city = const Optional.absent(),
     this.country = const Optional.absent(),
     this.isFavorite = const Optional.absent(),
@@ -33,6 +34,9 @@ class SmartSearchFacetsDto {
     this.type = const Optional.absent(),
     this.withSharedSpaces = const Optional.absent(),
   });
+
+  /// Filter by album IDs
+  Optional<List<String>?> albumIds;
 
   /// Filter by city name
   Optional<String?> city;
@@ -161,6 +165,7 @@ class SmartSearchFacetsDto {
 
   @override
   bool operator ==(Object other) => identical(this, other) || other is SmartSearchFacetsDto &&
+    _deepEquality.equals(other.albumIds, albumIds) &&
     other.city == city &&
     other.country == country &&
     other.isFavorite == isFavorite &&
@@ -184,6 +189,7 @@ class SmartSearchFacetsDto {
   @override
   int get hashCode =>
     // ignore: unnecessary_parenthesis
+    (albumIds.hashCode) +
     (city == null ? 0 : city!.hashCode) +
     (country == null ? 0 : country!.hashCode) +
     (isFavorite == null ? 0 : isFavorite!.hashCode) +
@@ -205,10 +211,14 @@ class SmartSearchFacetsDto {
     (withSharedSpaces == null ? 0 : withSharedSpaces!.hashCode);
 
   @override
-  String toString() => 'SmartSearchFacetsDto[city=$city, country=$country, isFavorite=$isFavorite, isInAlbum=$isInAlbum, isNotInAlbum=$isNotInAlbum, language=$language, make=$make, model=$model, personIds=$personIds, query=$query, queryAssetId=$queryAssetId, rating=$rating, spaceId=$spaceId, spacePersonIds=$spacePersonIds, tagIds=$tagIds, takenAfter=$takenAfter, takenBefore=$takenBefore, type=$type, withSharedSpaces=$withSharedSpaces]';
+  String toString() => 'SmartSearchFacetsDto[albumIds=$albumIds, city=$city, country=$country, isFavorite=$isFavorite, isInAlbum=$isInAlbum, isNotInAlbum=$isNotInAlbum, language=$language, make=$make, model=$model, personIds=$personIds, query=$query, queryAssetId=$queryAssetId, rating=$rating, spaceId=$spaceId, spacePersonIds=$spacePersonIds, tagIds=$tagIds, takenAfter=$takenAfter, takenBefore=$takenBefore, type=$type, withSharedSpaces=$withSharedSpaces]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
+    if (this.albumIds.isPresent) {
+      final value = this.albumIds.value;
+      json[r'albumIds'] = value;
+    }
     if (this.city.isPresent) {
       final value = this.city.value;
       json[r'city'] = value;
@@ -301,6 +311,9 @@ class SmartSearchFacetsDto {
       final json = value.cast<String, dynamic>();
 
       return SmartSearchFacetsDto(
+        albumIds: json.containsKey(r'albumIds') ? Optional.present(json[r'albumIds'] is Iterable
+            ? (json[r'albumIds'] as Iterable).cast<String>().toList(growable: false)
+            : const []) : const Optional.absent(),
         city: json.containsKey(r'city') ? Optional.present(mapValueOfType<String>(json, r'city')) : const Optional.absent(),
         country: json.containsKey(r'country') ? Optional.present(mapValueOfType<String>(json, r'country')) : const Optional.absent(),
         isFavorite: json.containsKey(r'isFavorite') ? Optional.present(mapValueOfType<bool>(json, r'isFavorite')) : const Optional.absent(),

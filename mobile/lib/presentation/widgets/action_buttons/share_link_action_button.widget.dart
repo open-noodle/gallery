@@ -10,14 +10,25 @@ class ShareLinkActionButton extends ConsumerWidget {
   final bool iconOnly;
   final bool menuItem;
 
-  const ShareLinkActionButton({super.key, required this.source, this.iconOnly = false, this.menuItem = false});
+  /// #1018: set when the button is opened from inside a Space by an Owner/Editor. The link is then
+  /// authorized against the space, so it covers photos other members contributed rather than only
+  /// the caller's own. Null everywhere else, which keeps the plain owner-only link.
+  final String? spaceId;
+
+  const ShareLinkActionButton({
+    super.key,
+    required this.source,
+    this.iconOnly = false,
+    this.menuItem = false,
+    this.spaceId,
+  });
 
   _onTap(BuildContext context, WidgetRef ref) async {
     if (!context.mounted) {
       return;
     }
 
-    await ref.read(actionProvider.notifier).shareLink(source, context);
+    await ref.read(actionProvider.notifier).shareLink(source, context, spaceId: spaceId);
   }
 
   @override

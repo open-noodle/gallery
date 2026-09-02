@@ -7,6 +7,37 @@ const makeAsset = (id: string, localDateTime: string) => ({
   localDateTime: new Date(localDateTime),
 });
 
+/** A rule whose only qualifying trip is a Paris cluster of `dayCount` days, away from a Berlin home. */
+const ruleForTripOf = (dayCount: number) => {
+  const assetRepository = {
+    getMemoryLocationClusters: vi
+      .fn()
+      .mockResolvedValueOnce([
+        {
+          country: 'Germany',
+          city: 'Berlin',
+          assetCount: 20,
+          dayCount: 12,
+          firstDate: new Date('2026-01-01T00:00:00Z'),
+          lastDate: new Date('2026-03-20T00:00:00Z'),
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          country: 'France',
+          city: 'Paris',
+          assetCount: 9,
+          dayCount,
+          firstDate: new Date('2026-04-15T00:00:00Z'),
+          lastDate: new Date('2026-04-17T00:00:00Z'),
+        },
+      ]),
+    getMemoryAssetsForLocation: vi.fn().mockResolvedValue([makeAsset('asset-1', '2026-04-15T09:00:00Z')]),
+  };
+  const memoryRepository = { search: vi.fn().mockResolvedValue([]) };
+  return new RecentTripMemoryRule(assetRepository as never, memoryRepository as never);
+};
+
 describe(RecentTripMemoryRule.name, () => {
   it('creates a recent-trip candidate for a strong non-home cluster', async () => {
     const assetRepository = {
@@ -62,10 +93,29 @@ describe(RecentTripMemoryRule.name, () => {
     expect(candidate).toMatchObject({
       ruleId: 'recent_trip',
       dedupeKey: 'recent_trip:france:paris:2026-04-23',
-      title: 'Recent trip to Paris, France',
-      subtitle: '9 photos over 3 days',
       assetIds: ['asset-1', 'asset-2', 'asset-3', 'asset-4', 'asset-5', 'asset-6', 'asset-7'],
+      visibleForDays: 3,
+      context: {
+        placeLabel: 'Paris, France',
+        country: 'France',
+        city: 'Paris',
+        assetCount: 9,
+        dayCount: 3,
+      },
     });
+    expect(candidate?.title).toBeUndefined();
+    expect(candidate?.subtitle).toBeUndefined();
+  });
+
+  it('scales the visibility window with trip length, clamped to 3–7 days', async () => {
+    const target = DateTime.fromISO('2026-04-23', { zone: 'utc' });
+
+    // the shortest qualifying trip (2 days) is floored to 3, a long one is capped at 7
+    const [weekend] = await ruleForTripOf(2).evaluate({ ownerId: 'user-1', target });
+    const [holiday] = await ruleForTripOf(21).evaluate({ ownerId: 'user-1', target });
+
+    expect(weekend.visibleForDays).toBe(3);
+    expect(holiday.visibleForDays).toBe(7);
   });
 
   it('skips clusters that are too small or still inside the same-place cooldown', async () => {
@@ -159,9 +209,16 @@ describe(RecentTripMemoryRule.name, () => {
 
     expect(candidate).toMatchObject({
       ruleId: 'recent_trip',
-      title: 'Recent trip to France',
-      subtitle: '8 photos over 2 days',
+      context: {
+        placeLabel: 'France',
+        country: 'France',
+        city: null,
+        assetCount: 8,
+        dayCount: 2,
+      },
     });
+    expect(candidate?.title).toBeUndefined();
+    expect(candidate?.subtitle).toBeUndefined();
   });
 
   it('skips same-country clusters when city metadata is missing or not trustworthy', async () => {
@@ -296,10 +353,15 @@ describe(RecentTripMemoryRule.name, () => {
     });
 
     expect(candidate).toMatchObject({
-      title: 'Recent trip to Paris, France',
-      subtitle: '12 photos over 3 days',
+      context: {
+        placeLabel: 'Paris, France',
+        assetCount: 12,
+        dayCount: 3,
+      },
       assetIds: ['a-1', 'a-3', 'a-5', 'a-6', 'a-9', 'a-11', 'a-12'],
     });
+    expect(candidate?.title).toBeUndefined();
+    expect(candidate?.subtitle).toBeUndefined();
   });
 
   it('collapses adjacent assets inside the two-minute burst window', async () => {

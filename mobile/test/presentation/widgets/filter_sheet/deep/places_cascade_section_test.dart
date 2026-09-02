@@ -23,8 +23,13 @@ class _FakePrefs implements FilterSectionPrefs {
 
 Override _noCollapsed() => filterSectionPrefsProvider.overrideWithValue(_FakePrefs({}));
 
-FilterSuggestionsResponseDto _sugg({List<String>? countries}) =>
-    FilterSuggestionsResponseDto(hasUnnamedPeople: false, countries: countries ?? const []);
+FilterSuggestionsResponseDto _sugg({List<String>? countries}) => FilterSuggestionsResponseDto(
+  hasUnnamedPeople: false,
+  hasFavorites: true,
+  hasAssetsInAlbum: true,
+  hasAssetsNotInAlbum: true,
+  countries: countries ?? const [],
+);
 
 void main() {
   group('PlacesCascadeSection', () {

@@ -7,6 +7,7 @@
 // than an AlbumsApi (so getSharedSpaceLinks can reach other APIs), so upstream's
 // cases construct it through the mocked ApiService.albumsApi getter.
 import 'package:flutter_test/flutter_test.dart';
+import 'package:immich_mobile/domain/models/user.model.dart';
 import 'package:immich_mobile/repositories/drift_album_api_repository.dart';
 import 'package:immich_mobile/services/api.service.dart';
 import 'package:mocktail/mocktail.dart';
@@ -42,6 +43,7 @@ void main() {
 
   setUpAll(() {
     registerFallbackValue(api.BulkIdsDto(ids: const []));
+    registerFallbackValue(api.UpdateAlbumDto());
   });
 
   setUp(() {
@@ -191,6 +193,37 @@ void main() {
       when(() => mockApi.getAlbumInfo('album-1')).thenAnswer((_) async => null);
 
       expect(() => repository.getSharedSpaceLinks('album-1'), throwsA(isA<Exception>()));
+    });
+  });
+
+  group('updateAlbum', () {
+    final owner = UserDto(id: 'u1', email: 'u1@example.com', name: 'u1', profileChangedAt: DateTime(2024));
+
+    test('sends createdAt as Optional.present and serializes it as UTC', () async {
+      when(() => mockApi.updateAlbumInfo(any(), any())).thenAnswer((_) async => _album(id: 'a1'));
+      final createdAt = DateTime.utc(1996, 6, 15, 14, 30);
+
+      await repository.updateAlbum('a1', owner, createdAt: createdAt);
+
+      final dto = verify(() => mockApi.updateAlbumInfo('a1', captureAny())).captured.single as api.UpdateAlbumDto;
+      expect(dto.createdAt.isPresent, isTrue);
+      expect(dto.createdAt.value, createdAt);
+      // The generated toJson branches on _isEpochMarker(pattern) — it emits a raw
+      // millisecondsSinceEpoch *number* when a field's OpenAPI pattern is the literal
+      // 'epoch' (mobile/openapi/lib/api.dart:576,583), and value.toUtc().toIso8601String()
+      // otherwise. createdAt carries the long ISO regex, so it takes the string branch and
+      // satisfies the server's required timezone designator whatever zone the picker used.
+      // Assert it rather than trust it: this is invisible generated code.
+      expect(dto.toJson()['createdAt'], endsWith('Z'));
+    });
+
+    test('omits createdAt when it is not supplied', () async {
+      when(() => mockApi.updateAlbumInfo(any(), any())).thenAnswer((_) async => _album(id: 'a1'));
+
+      await repository.updateAlbum('a1', owner, name: 'Renamed');
+
+      final dto = verify(() => mockApi.updateAlbumInfo('a1', captureAny())).captured.single as api.UpdateAlbumDto;
+      expect(dto.createdAt.isPresent, isFalse);
     });
   });
 }

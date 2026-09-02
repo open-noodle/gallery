@@ -181,18 +181,6 @@
       }
     | undefined;
 
-  const emptyFilterSuggestions = () => ({
-    countries: [],
-    cities: [],
-    cameraMakes: [],
-    cameraModels: [],
-    tags: [],
-    people: [],
-    ratings: [],
-    mediaTypes: [],
-    hasUnnamedPeople: false,
-  });
-
   const loadSpaceFilterSuggestions = async (nextFilters: FilterState) => {
     const context = buildFilterContext(nextFilters);
     const response = await getFilterSuggestions({
@@ -238,6 +226,9 @@
       ratings: response.ratings,
       mediaTypes: response.mediaTypes,
       hasUnnamedPeople: response.hasUnnamedPeople,
+      hasFavorites: response.hasFavorites,
+      hasAssetsInAlbum: response.hasAssetsInAlbum,
+      hasAssetsNotInAlbum: response.hasAssetsNotInAlbum,
     };
   };
 
@@ -318,7 +309,10 @@
 
       const facets = await loadSpaceSmartFacets(nextFilters);
       if (!facets) {
-        return emptyFilterSuggestions();
+        // #910: never resolve with a fabricated empty response — the panel cannot tell it apart from a
+        // genuinely empty library and would hide every section. Rejecting lets the panel keep the last
+        // good facets.
+        throw new Error('smart-search facets unavailable');
       }
 
       for (const p of facets.people) {
@@ -329,6 +323,10 @@
       }
       return mapSmartSearchFacetsToFilterSuggestions(facets, { spaceId: space.id });
     },
+    // #910: no baseline in query mode. A second concurrent facet request would abort the in-flight
+    // one (single `smartFacetInFlight` slot) and then clobber `smartFacets`, which feeds the
+    // timeline and the result count. `undefined` means "don't hide anything here" — see spec §4.5.
+    baselineProvider: async () => (showSearchResults ? undefined : loadSpaceFilterSuggestions(createFilterState())),
     providers: {
       ...normalProviders,
       cities: async (country, context) => {
@@ -664,6 +662,14 @@
   const smartFacetBuckets = $derived(showSearchResults ? (smartFacets?.timeBuckets ?? []) : timelineBuckets);
   const smartFacetTotal = $derived(showSearchResults ? smartFacets?.total : undefined);
 
+  // Collapse the shell's cover once the reader scrolls past it. Both surfaces this tab can show —
+  // the browse timeline and the search results grid — scroll independently, so both report here;
+  // wiring only the timeline left the cover pinned open over search results, which on a phone is
+  // most of the screen (#1028).
+  const COVER_COLLAPSE_SCROLL_THRESHOLD = 64;
+  const handleSurfaceScroll = (scrollTop: number) =>
+    spaceUiManager.setCoverCollapsed(scrollTop > COVER_COLLAPSE_SCROLL_THRESHOLD);
+
   const clearSearch = () => {
     isLoading = false;
     const nextUrl = buildSearchablePageUrl(page.url, '', filters.sortOrder, filters);
@@ -763,6 +769,10 @@
         smartFacets = undefined;
         smartFacetKey = '';
         smartFacetInFlight = undefined;
+        // Committing or clearing the query swaps the timeline for the results grid and back, and
+        // the incoming surface mounts at the top — so a collapse inherited from the outgoing one
+        // would hide the cover with nothing scrolled under it.
+        spaceUiManager.setCoverCollapsed(false);
       }
       lastHandledSearchState = nextToken;
     });
@@ -882,6 +892,7 @@
         space={{ id: space.id, canWrite: isEditor }}
         isShared={true}
         total={smartFacetTotal}
+        onScroll={handleSurfaceScroll}
       />
     {/if}
 
@@ -909,7 +920,7 @@
           onTemporalAnchorResolved={() => (temporalAnchor = undefined)}
           grouping={timelineGrouping}
           onGroupingChange={handleTimelineGroupingChange}
-          onScroll={(scrollTop) => spaceUiManager.setCoverCollapsed(scrollTop > 64)}
+          onScroll={handleSurfaceScroll}
         >
           {#if viewMode === 'view'}
             {#if isOwner}

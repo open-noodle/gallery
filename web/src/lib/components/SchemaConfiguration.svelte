@@ -1,6 +1,8 @@
 <script lang="ts">
   import SchemaAlbumPicker from '$lib/components/SchemaAlbumPicker.svelte';
   import Self from '$lib/components/SchemaConfiguration.svelte';
+  import SchemaSpaceAlbumPicker from '$lib/components/SchemaSpaceAlbumPicker.svelte';
+  import SchemaSpacePicker from '$lib/components/SchemaSpacePicker.svelte';
   import type { JSONSchemaProperty, SchemaConfig } from '$lib/types';
   import {
     CodeBlock,
@@ -80,6 +82,17 @@
   </div>
 {:else if schema.uiHint?.type === 'AlbumId'}
   <SchemaAlbumPicker {label} {description} array={schema.array} bind:albumIds={getUiHintValue, setUiHintValue} />
+{:else if schema.uiHint?.type === 'SpaceId'}
+  <SchemaSpacePicker {label} {description} array={schema.array} bind:spaceIds={getUiHintValue, setUiHintValue} />
+  <!-- `config` here is the parent object, so a sibling `SpaceId` property is readable by name and
+       reactive: choosing a space re-scopes this field's album list. -->
+{:else if schema.uiHint?.type === 'SpaceAlbumName'}
+  <SchemaSpaceAlbumPicker
+    {label}
+    {description}
+    spaceId={config?.spaceId}
+    bind:albumName={() => getString() ?? '', setValue}
+  />
 {:else if schema.enum && schema.array}
   <Field {label} {description}>
     <MultiSelect options={schema.enum} bind:values={getEnum, setValue} />

@@ -204,6 +204,9 @@ DROP INDEX IF EXISTS "asset_face_personId_idx";
 DROP INDEX IF EXISTS "person_ownerId_identityId_key";
 DROP INDEX IF EXISTS "person_identityId_idx";
 ALTER TABLE "person"            DROP COLUMN IF EXISTS "identityId";
+-- #1018: the space a share link was created from. Dropping it implicitly drops
+-- shared_link_spaceId_idx; the links themselves survive as owner-only links.
+ALTER TABLE "shared_link"       DROP COLUMN IF EXISTS "spaceId";
 
 -- -----------------------------------------------------------------------------
 -- 5. Strip Gallery's merged 'classification' key out of system_metadata's
@@ -297,6 +300,31 @@ DELETE FROM "migration_overrides"
  );
 
 -- -----------------------------------------------------------------------------
+-- 6b. Delete Gallery's own workflow plugin.
+--
+-- Plugins are stored IN THE DATABASE (`plugin.wasmBytes`), not just on disk, and the server loads
+-- every row from `getForLoad()` at boot. Gallery ships `gallery-core`, whose wasm imports the
+-- fork-only `gallery` host function. Upstream Immich does not register that function, so leaving
+-- the row behind makes its microservices worker die on startup with
+--
+--   cannot resolve import "extism:host/user" "gallery"
+--
+-- and the server never answers /api/server/ping. Unlike the migration_overrides cleanup above, this
+-- one is load-bearing: skip it and upstream Immich does not boot at all.
+--
+-- `plugin_method` cascades from `plugin`, and `workflow_step.pluginMethodId` cascades from
+-- `plugin_method`, so this also removes any workflow step wired to a Gallery action. Those steps
+-- could never run on upstream anyway. The parent `workflow` rows survive.
+--
+-- Upstream's own `immich-plugin-core` is deliberately left alone.
+-- -----------------------------------------------------------------------------
+DO $$
+BEGIN
+  IF to_regclass('public.plugin') IS NOT NULL THEN
+    DELETE FROM public."plugin" WHERE "name" = 'gallery-core';
+  END IF;
+END $$;
+
 -- 7. Undo post-v3.0.1 upstream migrations that Gallery pulled in via rebase.
 --
 -- Gallery regularly rebases onto `upstream/main`, which sits ahead of the
@@ -428,6 +456,7 @@ DELETE FROM "kysely_migrations"
    '1790000000000-FixFaceRepairScanInFlightIndex',
    '1791000000000-AddPhotoGuessingGame',
    '1792000000000-AddDailyGameChallenge',
+   '1792123120451-AddSharedLinkSpaceId',
    '1793000000000-AddSpaceDailyChallengeEnabled',
    '1794000000000-AddSoloGameChallenge',
 

@@ -21,8 +21,10 @@ import 'package:immich_mobile/providers/infrastructure/space_album_actions.dart'
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:immich_mobile/routing/router.dart';
+import 'package:immich_mobile/widgets/common/date_time_picker.dart';
 import 'package:immich_mobile/widgets/common/immich_toast.dart';
 import 'package:immich_mobile/widgets/common/remote_album_sliver_app_bar.dart';
+import 'package:intl/intl.dart';
 
 @RoutePage()
 class RemoteAlbumPage extends ConsumerStatefulWidget {
@@ -151,7 +153,7 @@ class _RemoteAlbumPageState extends ConsumerState<RemoteAlbumPage> {
     }
   }
 
-  Future<void> showEditTitleAndDescription(BuildContext context) async {
+  Future<void> showEditAlbum(BuildContext context) async {
     final result = await showDialog<_EditAlbumData?>(
       context: context,
       barrierDismissible: true,
@@ -160,7 +162,7 @@ class _RemoteAlbumPageState extends ConsumerState<RemoteAlbumPage> {
 
     if (result != null && context.mounted) {
       setState(() {
-        _album = _album.copyWith(name: result.name, description: result.description ?? '');
+        _album = _album.copyWith(name: result.name, description: result.description ?? '', createdAt: result.createdAt);
       });
       unawaited(HapticFeedback.mediumImpact());
     }
@@ -218,12 +220,12 @@ class _RemoteAlbumPageState extends ConsumerState<RemoteAlbumPage> {
             onAddUsers: () => addUsers(context),
             onAddPhotos: () => addAssets(context),
             onToggleAlbumOrder: () => toggleAlbumOrder(),
-            onEditAlbum: () => showEditTitleAndDescription(context),
+            onEditAlbum: () => showEditAlbum(context),
             onCreateSharedLink: () => unawaited(context.pushRoute(SharedLinkEditRoute(albumId: _album.id))),
             onShowOptions: () => context.pushRoute(DriftAlbumOptionsRoute(album: _album)),
             onLinkToSpace: () => unawaited(linkToSpace(context)),
           ),
-          onEditTitle: isOwner ? () => showEditTitleAndDescription(context) : null,
+          onEditTitle: isOwner ? () => showEditAlbum(context) : null,
           onActivity: () => showActivity(context),
         ),
         bottomSheet: RemoteAlbumBottomSheet(album: _album),
@@ -235,8 +237,9 @@ class _RemoteAlbumPageState extends ConsumerState<RemoteAlbumPage> {
 class _EditAlbumData {
   final String name;
   final String? description;
+  final DateTime createdAt;
 
-  const _EditAlbumData({required this.name, this.description});
+  const _EditAlbumData({required this.name, this.description, required this.createdAt});
 }
 
 class _EditAlbumDialog extends ConsumerStatefulWidget {
@@ -252,6 +255,7 @@ class _EditAlbumDialogState extends ConsumerState<_EditAlbumDialog> {
   late final TextEditingController titleController;
   late final TextEditingController descriptionController;
   final formKey = GlobalKey<FormState>();
+  late DateTime createdAt;
 
   @override
   void initState() {
@@ -260,6 +264,7 @@ class _EditAlbumDialogState extends ConsumerState<_EditAlbumDialog> {
     descriptionController = TextEditingController(
       text: widget.album.description.isEmpty ? '' : widget.album.description,
     );
+    createdAt = widget.album.createdAt;
   }
 
   @override
@@ -267,6 +272,16 @@ class _EditAlbumDialogState extends ConsumerState<_EditAlbumDialog> {
     titleController.dispose();
     descriptionController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickCreatedAt() async {
+    // Returns an ISO string with a +HH:MM offset, or null when dismissed —
+    // same contract action.service.dart:202-219 consumes for asset dates.
+    final picked = await showDateTimePicker(context: context, initialDateTime: createdAt);
+    if (picked == null) {
+      return;
+    }
+    setState(() => createdAt = DateTime.parse(picked).toLocal());
   }
 
   Future<void> _handleSave() async {
@@ -280,12 +295,16 @@ class _EditAlbumDialogState extends ConsumerState<_EditAlbumDialog> {
 
       await ref
           .read(remoteAlbumProvider.notifier)
-          .updateAlbum(widget.album.id, name: newTitle, description: newDescription);
+          .updateAlbum(widget.album.id, name: newTitle, description: newDescription, createdAt: createdAt);
 
       if (mounted) {
-        Navigator.of(
-          context,
-        ).pop(_EditAlbumData(name: newTitle, description: newDescription.isEmpty ? null : newDescription));
+        Navigator.of(context).pop(
+          _EditAlbumData(
+            name: newTitle,
+            description: newDescription.isEmpty ? null : newDescription,
+            createdAt: createdAt,
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -363,6 +382,22 @@ class _EditAlbumDialogState extends ConsumerState<_EditAlbumDialog> {
                     fillColor: context.colorScheme.surface,
                   ),
                 ),
+                const SizedBox(height: 18),
+
+                // Created date
+                Text(
+                  'date_created'.t(context: context).toUpperCase(),
+                  style: context.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 4),
+                ListTile(
+                  key: const Key('album-edit-created-at'),
+                  tileColor: context.colorScheme.surface,
+                  shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
+                  title: Text(DateFormat.yMMMd().format(createdAt), style: context.textTheme.bodyMedium),
+                  trailing: Icon(Icons.edit_outlined, size: 18, color: context.colorScheme.primary),
+                  onTap: _pickCreatedAt,
+                ),
                 const SizedBox(height: 24),
 
                 // Action Buttons
@@ -375,6 +410,7 @@ class _EditAlbumDialogState extends ConsumerState<_EditAlbumDialog> {
                     ),
                     const SizedBox(width: 12),
                     FilledButton(
+                      key: const Key('album-edit-save'),
                       onPressed: _handleSave,
                       child: Text('save'.t(context: context)),
                     ),
@@ -456,7 +492,7 @@ class _AlbumKebabMenu extends ConsumerWidget {
           onAddUsers: isOwner ? onAddUsers : null,
           onAddPhotos: isOwner || canAddPhotos ? onAddPhotos : null,
           onToggleAlbumOrder: isOwner ? onToggleAlbumOrder : null,
-          onEditAlbum: isOwner ? onEditAlbum : null,
+          onEditAlbum: isOwner || canAddPhotos ? onEditAlbum : null,
           onCreateSharedLink: isOwner ? onCreateSharedLink : null,
           onShowOptions: onShowOptions,
           // L15: gated to owned albums (mirrors web's isOwned gate on the same affordance).

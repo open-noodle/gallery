@@ -1,5 +1,10 @@
 import { AssetTypeEnum, AssetVisibility, MemoryType, type AssetResponseDto, type MemoryResponseDto } from '@immich/sdk';
-import { findMemoryAsset, getMemoryViewerExitRoute, removeAssetsFromMemoryList } from '$lib/utils/memory-viewer-source';
+import {
+  buildMemoryAssets,
+  findMemoryAsset,
+  getMemoryViewerExitRoute,
+  removeAssetsFromMemoryList,
+} from '$lib/utils/memory-viewer-source';
 
 const asset = (id: string): AssetResponseDto => ({
   id,
@@ -138,5 +143,31 @@ describe('memory viewer source', () => {
 
       expect(selected?.memory.id).toBe('birthday');
     });
+  });
+});
+
+describe('buildMemoryAssets assetIndex contract', () => {
+  it('indexes into its OWN memory.assets, not the concatenated viewer list', () => {
+    // MemoryViewer renders the date overlay from `current.memory.assets[current.assetIndex]`.
+    // That is only correct while assetIndex stays memory-relative; if it ever became an index
+    // across all memories, the overlay would read another memory's asset or run off the end.
+    const memories = [
+      memory('memory-1', ['a1', 'a2']),
+      memory('memory-2', ['b1', 'b2', 'b3']),
+      memory('memory-3', ['c1']),
+    ];
+
+    const sources = buildMemoryAssets(memories);
+
+    expect(sources).toHaveLength(6);
+    for (const source of sources) {
+      expect(source.memory.assets[source.assetIndex]).toBeDefined();
+      expect(source.memory.assets[source.assetIndex].id).toBe(source.asset.id);
+    }
+    // spelled out for the boundary case the loop above would also cover
+    const firstOfSecondMemory = sources[2];
+    expect(firstOfSecondMemory.memory.id).toBe('memory-2');
+    expect(firstOfSecondMemory.assetIndex).toBe(0);
+    expect(firstOfSecondMemory.memory.assets[firstOfSecondMemory.assetIndex].id).toBe('b1');
   });
 });

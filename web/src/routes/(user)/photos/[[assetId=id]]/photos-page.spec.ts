@@ -2,6 +2,7 @@ import { AssetTypeEnum } from '@immich/sdk';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { tick, type Component } from 'svelte';
+import { SvelteURL } from 'svelte/reactivity';
 import { goto } from '$app/navigation';
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import TestWrapper from '$lib/components/TestWrapper.svelte';
@@ -264,6 +265,9 @@ describe('Photos page search URL state', () => {
       ratings: [],
       mediaTypes: [],
       hasUnnamedPeople: false,
+      hasFavorites: false,
+      hasAssetsInAlbum: false,
+      hasAssetsNotInAlbum: false,
     });
     sdkMock.searchSmartFacets.mockResolvedValue({
       total: 12,
@@ -277,6 +281,9 @@ describe('Photos page search URL state', () => {
       ratings: [4],
       mediaTypes: [AssetTypeEnum.Image],
       hasUnnamedPeople: false,
+      hasFavorites: true,
+      hasAssetsInAlbum: true,
+      hasAssetsNotInAlbum: true,
     });
     sdkMock.getSearchSuggestions.mockResolvedValue([]);
   });
@@ -651,6 +658,64 @@ describe('Photos page search URL state', () => {
     await vi.waitFor(() => expect(sdkMock.getFilterSuggestions).toHaveBeenCalled());
   });
 
+  it('offers a browse-mode baseline computed with no filters (#910)', async () => {
+    mockPage.url = new URL('https://gallery.test/photos');
+
+    renderPage();
+    await waitFor(() => expect(sdkMock.getFilterSuggestions).toHaveBeenCalled());
+
+    // The whole point: the baseline ignores whatever filters are active.
+    await fireEvent.click(screen.getByTestId('select-favorites-filter'));
+    await waitFor(() =>
+      expect(sdkMock.getFilterSuggestions).toHaveBeenCalledWith(expect.objectContaining({ isFavorite: true })),
+    );
+    sdkMock.getFilterSuggestions.mockClear();
+
+    await fireEvent.click(screen.getByTestId('load-baseline'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('filter-panel-stub')).not.toHaveAttribute('data-baseline', 'undefined');
+    });
+    expect(sdkMock.getFilterSuggestions).toHaveBeenCalledWith(
+      expect.objectContaining({ rating: undefined, personIds: undefined, isFavorite: undefined }),
+    );
+  });
+
+  it('offers no baseline in query mode, and leaves the page facets alone (#910)', async () => {
+    renderPage();
+    await vi.waitFor(() => expect(sdkMock.searchSmartFacets).toHaveBeenCalledTimes(1));
+    sdkMock.searchSmartFacets.mockClear();
+
+    await fireEvent.click(screen.getByTestId('load-baseline'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-baseline', 'undefined');
+    });
+    // Regression guard for spec §4.5: a baseline request here would abort the in-flight facet
+    // fetch and then overwrite smartFacets, corrupting the timeline and the result count.
+    expect(sdkMock.searchSmartFacets).not.toHaveBeenCalled();
+  });
+
+  it('remounts the filter panel on the browse-to-query transition, dropping the stale baseline (#910)', async () => {
+    mockPage.url = new SvelteURL('https://gallery.test/photos');
+
+    renderPage();
+    await waitFor(() => expect(sdkMock.getFilterSuggestions).toHaveBeenCalled());
+    await fireEvent.click(screen.getByTestId('load-baseline'));
+    await waitFor(() => {
+      expect(screen.getByTestId('filter-panel-stub')).not.toHaveAttribute('data-baseline', 'not-loaded');
+    });
+
+    // Commit a query without unmounting the page: the panel's {#key} must remount it so the
+    // browse-mode baseline (cached on the stub for the component's lifetime) doesn't survive into
+    // query mode, where §4.5 says the baseline provider must return undefined.
+    mockPage.url.search = '?q=beach';
+
+    await waitFor(() => {
+      expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-baseline', 'not-loaded');
+    });
+  });
+
   it('does not include sort order in the smart facet payload', async () => {
     mockPage.url = new URL('https://gallery.test/photos?q=nature&sort=asc');
 
@@ -677,6 +742,21 @@ describe('Photos page search URL state', () => {
 
     await vi.waitFor(() => expect(sdkMock.searchSmartFacets).toHaveBeenCalled());
     expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-search-query', 'nature');
+  });
+
+  it('rejects rather than reporting an empty library when the facet fetch fails (#910)', async () => {
+    sdkMock.searchSmartFacets.mockRejectedValue(new Error('boom'));
+
+    renderPage();
+
+    await vi.waitFor(() => expect(sdkMock.searchSmartFacets).toHaveBeenCalled());
+    // The stub's suggestionsProvider effect sets data-suggestions to 'error' on rejection, and to a
+    // JSON dump of the resolved value otherwise — an empty-sentinel resolution would show up here as
+    // JSON, not 'error'. #910: on a first-ever failure (no previous smartFacets to fall back to),
+    // the provider must reject rather than resolve with a fabricated empty response.
+    await waitFor(() => {
+      expect(screen.getByTestId('filter-panel-stub')).toHaveAttribute('data-suggestions', 'error');
+    });
   });
 
   it('preserves previous facet total and buckets when a later facet fetch fails', async () => {

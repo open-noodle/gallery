@@ -226,6 +226,29 @@ export class MemoryRepository implements IBulkAsset {
     await this.db.deleteFrom('memory').where('id', '=', id).execute();
   }
 
+  /**
+   * Remove the plain `on_this_day` memory a rule memory has just superseded. Scoped to one
+   * owner, one trigger day and one year, and never touches a saved memory.
+   *
+   * Written as an unconditional DELETE ... WHERE rather than a read-then-delete: when the
+   * owner has `on_this_day` disabled, or retention already removed the row, there is simply
+   * nothing to match. That keeps correctness independent of whether the on-this-day loop has
+   * run for the day — it only decides whether this has any effect. (In practice it always
+   * has: the on-this-day loop writes up to 3 days ahead and runs first inside the same lock,
+   * so the row exists before any rule for that day is evaluated.)
+   */
+  @GenerateSql({ params: [{ ownerId: DummyValue.UUID, year: DummyValue.NUMBER, showAt: DummyValue.DATE }] })
+  async deleteOnThisDay({ ownerId, year, showAt }: { ownerId: string; year: number; showAt: Date }) {
+    await this.db
+      .deleteFrom('memory')
+      .where('ownerId', '=', ownerId)
+      .where('type', '=', MemoryType.OnThisDay)
+      .where('isSaved', '=', false)
+      .where('showAt', '=', showAt)
+      .where(sql<string>`memory.data->>'year'`, '=', String(year))
+      .execute();
+  }
+
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.STRING, DummyValue.STRING] })
   async hasRuleMemory(ownerId: string, ruleId: string, dedupeKey: string) {
     const result = await this.db

@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
+import { tick } from 'svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
 import type { FilterPanelConfig, FilterSection } from '../filter-panel';
 import { ALL_FILTER_SECTIONS, createFilterState } from '../filter-panel';
@@ -988,6 +989,80 @@ describe('Section Selector', () => {
     });
   });
 
+  // #797: two people on the same version saw different filter category lists. Which sections a
+  // user sees is a per-browser ledger, and it could silently diverge from the app's section list.
+  describe('#797 stored-ledger divergence', () => {
+    // What a browser stored before #447 replaced the bare array with { selected, known }: the
+    // sections that existed at the time. Everything added since must still be revealed.
+    const PRE_LEDGER_STORED: FilterSection[] = ['timeline', 'people', 'location', 'camera', 'tags', 'rating', 'media'];
+
+    it('reveals every section added since the ledger format to a browser on legacy storage', () => {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(PRE_LEDGER_STORED));
+
+      renderPanel([...ALL_FILTER_SECTIONS]);
+
+      for (const section of ALL_FILTER_SECTIONS) {
+        expect(screen.getByTestId(`filter-section-${section}`)).toBeTruthy();
+      }
+    });
+
+    it('reveals sections added since the ledger without un-hiding ones hidden back then', () => {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(['timeline', 'people']));
+
+      renderPanel([...ALL_FILTER_SECTIONS]);
+
+      expect(screen.getByTestId('filter-section-favorites')).toBeTruthy();
+      expect(screen.getByTestId('filter-section-albums')).toBeTruthy();
+      expect(screen.getByTestId('filter-section-text')).toBeTruthy();
+      expect(screen.queryByTestId('filter-section-camera')).toBeNull();
+      expect(screen.queryByTestId('filter-section-rating')).toBeNull();
+    });
+
+    // Album detail and the album asset picker share one storage key but offer different section
+    // lists (detail drops 'albums'). Visiting detail must not erase the picker's record.
+    it('keeps a hidden section hidden after a surface that does not offer it rewrites the ledger', async () => {
+      const picker = renderPanel([...ALL_FILTER_SECTIONS]);
+      await openSectionMenu();
+      await fireEvent.click(screen.getByTestId('section-toggle-albums'));
+      picker.unmount();
+
+      const detail = renderPanel(ALL_FILTER_SECTIONS.filter((section) => section !== 'albums'));
+      await tick();
+      detail.unmount();
+
+      renderPanel([...ALL_FILTER_SECTIONS]);
+
+      expect(screen.queryByTestId('filter-section-albums')).toBeNull();
+    });
+
+    it('keeps a visible section visible after a surface that does not offer it rewrites the ledger', async () => {
+      const detail = renderPanel(ALL_FILTER_SECTIONS.filter((section) => section !== 'albums'));
+      await openSectionMenu();
+      await fireEvent.click(screen.getByTestId('section-toggle-camera'));
+      detail.unmount();
+
+      renderPanel([...ALL_FILTER_SECTIONS]);
+
+      expect(screen.getByTestId('filter-section-albums')).toBeTruthy();
+      expect(screen.queryByTestId('filter-section-camera')).toBeNull();
+    });
+
+    it('offers to show all sections when every section this surface renders is hidden', async () => {
+      const picker = renderPanel([...ALL_FILTER_SECTIONS]);
+      await openSectionMenu();
+      for (const section of ALL_FILTER_SECTIONS) {
+        if (section !== 'albums') {
+          await fireEvent.click(screen.getByTestId(`section-toggle-${section}`));
+        }
+      }
+      picker.unmount();
+
+      renderPanel(ALL_FILTER_SECTIONS.filter((section) => section !== 'albums'));
+
+      expect(screen.getByTestId('show-all-sections')).toBeTruthy();
+    });
+  });
+
   // Test 23
   it('should show only stored sections when localStorage has partial list', () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(['people']));
@@ -1223,5 +1298,284 @@ describe('Section Accordion Persistence', () => {
         vi.useRealTimers();
       }
     });
+  });
+});
+
+const availableEverything = {
+  countries: ['Germany'],
+  cameraMakes: ['Canon'],
+  tags: [{ id: 't', name: 'Tag' }],
+  people: [{ id: 'p', name: 'Alice' }],
+  ratings: [5],
+  mediaTypes: ['IMAGE', 'VIDEO'],
+  hasUnnamedPeople: false,
+  hasFavorites: true,
+  hasAssetsInAlbum: true,
+  hasAssetsNotInAlbum: true,
+};
+
+describe('section availability (#910)', () => {
+  // Real timers race the unified effect's setTimeout debounce against `render`/`rerender`'s
+  // microtask-only flush (`Svelte.tick()`): a rerender can synchronously cancel-and-reschedule a
+  // pending 0ms fetch before it ever gets a macrotask turn to fire, silently dropping it. Fake timers
+  // plus an explicit `advanceTimersByTimeAsync` after every render/rerender make each fetch
+  // deterministic, matching every sibling test in unified-suggestions.spec.ts. Note `waitFor` does NOT
+  // self-advance Vitest's fake clock, so the state must already be correct before a `waitFor` runs —
+  // it is kept below only as a defensive assertion wrapper, not as the thing doing the waiting.
+  beforeEach(() => {
+    vi.useFakeTimers();
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('hides a structurally unavailable section and its toggle', async () => {
+    const config = {
+      sections: ['rating', 'media'] as FilterSection[],
+      suggestionsProvider: vi.fn().mockResolvedValue({ ...availableEverything, ratings: [] }),
+    };
+
+    render(FilterPanel, { props: { config, timeBuckets: [] } });
+    await vi.advanceTimersByTimeAsync(0);
+
+    // The sibling assertion matters: without it a panel that rendered nothing would pass.
+    await waitFor(() => expect(screen.getByTestId('filter-section-media')).toBeInTheDocument());
+    expect(screen.queryByTestId('filter-section-rating')).not.toBeInTheDocument();
+
+    // The section toggles live inside the cog's popover, so it has to be opened to see them.
+    await fireEvent.click(screen.getByTestId('section-menu-btn'));
+    expect(screen.queryByTestId('section-toggle-rating')).not.toBeInTheDocument();
+    expect(screen.getByTestId('section-toggle-media')).toBeInTheDocument();
+  });
+
+  it('greys a section the current filters emptied, rather than hiding it', async () => {
+    // `favorites` (not `tags`, despite the brief's literal example — see task-2-report.md): `tags`
+    // already has a *pre-#910* legacy count formula (`filterContext ? ... tags.length ...` a few
+    // lines down) that reads the same `tags` state this fetch also updates, and `filterContext`
+    // includes `personIds`. So rerendering with a person filter would grey the tags section via that
+    // OLD #858 code path too, passing this test even against pre-#910 code and defeating it as a
+    // regression guard. `favorites` has no such legacy formula, so greying it can only come from the
+    // new `availability`-driven `count` branch.
+    const suggestionsProvider = vi
+      .fn()
+      .mockResolvedValueOnce(availableEverything)
+      .mockResolvedValue({ ...availableEverything, hasFavorites: false });
+    const config = { sections: ['favorites', 'media'] as FilterSection[], suggestionsProvider };
+    const filters = { ...createFilterState() };
+
+    const { rerender } = render(FilterPanel, { props: { config, timeBuckets: [], filters } });
+    await vi.advanceTimersByTimeAsync(0);
+    await waitFor(() => expect(suggestionsProvider).toHaveBeenCalledTimes(1));
+
+    await rerender({ config, timeBuckets: [], filters: { ...filters, personIds: ['p'] } });
+    // Discrete (non-temporal) filter changes debounce at 50ms.
+    await vi.advanceTimersByTimeAsync(50);
+
+    await waitFor(() => {
+      // getAllByRole, not getByRole: the section was open before this fetch, so its collapse plays
+      // an outro transition — the now-stale content (with its own buttons) can still be in the DOM,
+      // marked inert, at the instant this assertion runs. The header button is always rendered first.
+      const [button] = within(screen.getByTestId('filter-section-favorites')).getAllByRole('button');
+      expect(button).toBeDisabled();
+      expect(button.textContent).toContain('(0)');
+    });
+  });
+
+  it('never writes availability into the stored ledger', async () => {
+    const config = {
+      sections: ['rating', 'media'] as FilterSection[],
+      suggestionsProvider: vi.fn().mockResolvedValue({ ...availableEverything, ratings: [] }),
+    };
+
+    render(FilterPanel, { props: { config, timeBuckets: [], storageKey: 'test-key' } });
+    await vi.advanceTimersByTimeAsync(0);
+    await waitFor(() => expect(screen.getByTestId('filter-section-media')).toBeInTheDocument());
+
+    const stored = JSON.parse(localStorage.getItem('test-key')!);
+    // Both halves matter: `selected` keeps it un-hidden, `known` keeps PR #926 from re-introducing it
+    // as a brand-new section on the next load.
+    expect(stored.selected).toContain('rating');
+    expect(stored.known).toContain('rating');
+  });
+
+  it('shows a section again once its facet comes back', async () => {
+    const suggestionsProvider = vi
+      .fn()
+      .mockResolvedValueOnce({ ...availableEverything, ratings: [] })
+      .mockResolvedValue(availableEverything);
+    const config = { sections: ['rating', 'media'] as FilterSection[], suggestionsProvider };
+    const filters = { ...createFilterState() };
+
+    const { rerender } = render(FilterPanel, { props: { config, timeBuckets: [], filters } });
+    await vi.advanceTimersByTimeAsync(0);
+    await waitFor(() => expect(screen.queryByTestId('filter-section-rating')).not.toBeInTheDocument());
+
+    await rerender({ config, timeBuckets: [], filters: { ...filters, personIds: ['p'] } });
+    await vi.advanceTimersByTimeAsync(50);
+
+    await waitFor(() => expect(screen.getByTestId('filter-section-rating')).toBeInTheDocument());
+  });
+
+  it('calls baselineProvider once when it mounts with filters applied', async () => {
+    const suggestionsProvider = vi.fn().mockResolvedValue(availableEverything);
+    const baselineProvider = vi.fn().mockResolvedValue(availableEverything);
+    const config = { sections: ['rating'] as FilterSection[], suggestionsProvider, baselineProvider };
+
+    render(FilterPanel, { props: { config, timeBuckets: [], filters: { ...createFilterState(), rating: 5 } } });
+    await vi.advanceTimersByTimeAsync(0);
+
+    await waitFor(() => expect(baselineProvider).toHaveBeenCalledTimes(1));
+    // The baseline is a SEPARATE hook, never a second suggestionsProvider call: spec §4.5 explains
+    // why reusing the provider corrupts the query-mode pages.
+    expect(suggestionsProvider).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls no baseline provider when it mounts clean', async () => {
+    const suggestionsProvider = vi.fn().mockResolvedValue(availableEverything);
+    const baselineProvider = vi.fn().mockResolvedValue(availableEverything);
+    const config = { sections: ['rating'] as FilterSection[], suggestionsProvider, baselineProvider };
+
+    render(FilterPanel, { props: { config, timeBuckets: [] } });
+    await vi.advanceTimersByTimeAsync(0);
+
+    await waitFor(() => expect(suggestionsProvider).toHaveBeenCalledTimes(1));
+    // Give any stray request time to land before asserting it did not. The clean-mount response IS
+    // the baseline, so a second call would be pure waste.
+    await vi.advanceTimersByTimeAsync(100);
+    expect(baselineProvider).not.toHaveBeenCalled();
+  });
+
+  // The filter is on `people`, NOT on `rating`. That distinction is the whole test: with the filter
+  // on the section under assertion, hasActiveFilter short-circuits to 'available' before the code
+  // ever reads `baseline`, and the test passes whether or not the failure path works at all.
+  it.each([
+    ['rejects', () => Promise.reject(new Error('baseline failed'))],
+    ['resolves undefined', () => Promise.resolve(undefined)],
+  ])('hides nothing when the baseline provider %s', async (_label, baseline) => {
+    const config = {
+      sections: ['rating', 'media'] as FilterSection[],
+      suggestionsProvider: vi.fn().mockResolvedValue({ ...availableEverything, ratings: [] }),
+      baselineProvider: vi.fn().mockImplementation(baseline),
+    };
+
+    render(FilterPanel, {
+      props: { config, timeBuckets: [], filters: { ...createFilterState(), personIds: ['p'] } },
+    });
+    await vi.advanceTimersByTimeAsync(0);
+
+    await waitFor(() => expect(screen.getByTestId('filter-section-media')).toBeInTheDocument());
+    expect(screen.getByTestId('filter-section-rating')).toBeInTheDocument();
+  });
+
+  it('hides nothing when no baselineProvider is configured at all', async () => {
+    const config = {
+      sections: ['rating', 'media'] as FilterSection[],
+      suggestionsProvider: vi.fn().mockResolvedValue({ ...availableEverything, ratings: [] }),
+    };
+
+    render(FilterPanel, {
+      props: { config, timeBuckets: [], filters: { ...createFilterState(), personIds: ['p'] } },
+    });
+    await vi.advanceTimersByTimeAsync(0);
+
+    await waitFor(() => expect(screen.getByTestId('filter-section-media')).toBeInTheDocument());
+    expect(screen.getByTestId('filter-section-rating')).toBeInTheDocument();
+  });
+
+  it('keeps the previous facets when a later refetch rejects', async () => {
+    const suggestionsProvider = vi
+      .fn()
+      .mockResolvedValueOnce(availableEverything)
+      .mockRejectedValue(new Error('network blip'));
+    const config = { sections: ['rating', 'media'] as FilterSection[], suggestionsProvider };
+    const filters = { ...createFilterState() };
+
+    const { rerender } = render(FilterPanel, { props: { config, timeBuckets: [], filters } });
+    await vi.advanceTimersByTimeAsync(0);
+    await waitFor(() => expect(screen.getByTestId('filter-section-rating')).toBeInTheDocument());
+
+    await rerender({ config, timeBuckets: [], filters: { ...filters, personIds: ['p'] } });
+    await vi.advanceTimersByTimeAsync(50);
+    await waitFor(() => expect(suggestionsProvider).toHaveBeenCalledTimes(2));
+
+    // §4.6 at panel level: a rejection must leave `current` and `baseline` untouched, not blank the
+    // panel. Slice 4 made the surfaces reject instead of resolving empty precisely so this holds.
+    expect(screen.getByTestId('filter-section-rating')).toBeInTheDocument();
+    expect(screen.getByTestId('filter-section-media')).toBeInTheDocument();
+  });
+
+  it('greys the timeline while it has no buckets, and restores it when they arrive', async () => {
+    const config = {
+      sections: ['timeline', 'media'] as FilterSection[],
+      suggestionsProvider: vi.fn().mockResolvedValue(availableEverything),
+    };
+
+    // Every query-mode surface passes through timeBuckets: [] before its first facet response.
+    const { rerender } = render(FilterPanel, { props: { config, timeBuckets: [] } });
+    await vi.advanceTimersByTimeAsync(0);
+
+    await waitFor(() => {
+      // getAllByRole, not getByRole: while disabled the section is collapsed (one button, the
+      // header), but once it re-enables below its content expands and the year-grid buttons join
+      // it, so a single-match query would throw. The header is always rendered first.
+      const [button] = within(screen.getByTestId('filter-section-timeline')).getAllByRole('button');
+      expect(button).toBeDisabled();
+      expect(button.textContent).toContain('(0)');
+    });
+
+    await rerender({ config, timeBuckets: [{ timeBucket: '2024-01-01', count: 3 }] });
+
+    // `isOpen` is derived, not stored, so it must recover on its own. No provider round-trip is
+    // involved here — availability recomputes synchronously off the new `timeBuckets` prop — so no
+    // further timer advance is needed.
+    await waitFor(() => {
+      const [button] = within(screen.getByTestId('filter-section-timeline')).getAllByRole('button');
+      expect(button).toBeEnabled();
+    });
+  });
+
+  it('keeps a section with an active filter visible even when its facet is empty', async () => {
+    const config = {
+      sections: ['rating'] as FilterSection[],
+      suggestionsProvider: vi.fn().mockResolvedValue({ ...availableEverything, ratings: [] }),
+    };
+
+    render(FilterPanel, { props: { config, timeBuckets: [], filters: { ...createFilterState(), rating: 5 } } });
+    await vi.advanceTimersByTimeAsync(0);
+
+    await waitFor(() => expect(screen.getByTestId('filter-section-rating')).toBeInTheDocument());
+  });
+
+  it('offers the show-all hint when every AVAILABLE section is user-hidden', async () => {
+    // The user hid `media`; `rating` is unavailable. Nothing renders, so the hint must appear —
+    // but `visibleSections` still contains `rating`, so a `.size === 0` check would miss it.
+    localStorage.setItem('test-key', JSON.stringify({ selected: ['rating'], known: ['rating', 'media'] }));
+    const config = {
+      sections: ['rating', 'media'] as FilterSection[],
+      suggestionsProvider: vi.fn().mockResolvedValue({ ...availableEverything, ratings: [] }),
+    };
+
+    render(FilterPanel, { props: { config, timeBuckets: [], storageKey: 'test-key' } });
+    await vi.advanceTimersByTimeAsync(0);
+
+    // This file's top-level `beforeAll` loads the real en-US locale (unlike specs that skip that
+    // bootstrap and get raw i18n keys back from `$t()`), so the hint's actual text is "Show all" —
+    // asserting on the stable testid instead of either string keeps this immune to copy changes.
+    await waitFor(() => expect(screen.getByTestId('show-all-sections')).toBeInTheDocument());
+  });
+
+  it('leaves the legacy providers path ungated', async () => {
+    const config = {
+      sections: ['people', 'camera'] as FilterSection[],
+      providers: { people: vi.fn().mockResolvedValue([]), cameras: vi.fn().mockResolvedValue([]) },
+    };
+
+    render(FilterPanel, { props: { config, timeBuckets: [] } });
+    await vi.advanceTimersByTimeAsync(0);
+
+    await waitFor(() => expect(screen.getByTestId('filter-section-people')).toBeInTheDocument());
+    expect(screen.getByTestId('filter-section-camera')).toBeInTheDocument();
   });
 });

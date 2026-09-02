@@ -6,13 +6,14 @@ import 'package:immich_mobile/domain/services/memory.service.dart';
 import 'package:immich_mobile/infrastructure/repositories/memory.repository.dart';
 import 'package:immich_mobile/providers/infrastructure/db.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
+import 'package:immich_mobile/repositories/memory_api.repository.dart';
 
 final driftMemoryRepositoryProvider = Provider<DriftMemoryRepository>(
   (ref) => DriftMemoryRepository(ref.watch(driftProvider)),
 );
 
 final driftMemoryServiceProvider = Provider<DriftMemoryService>(
-  (ref) => DriftMemoryService(ref.watch(driftMemoryRepositoryProvider)),
+  (ref) => DriftMemoryService(ref.watch(driftMemoryRepositoryProvider), ref.watch(memoryApiRepositoryProvider)),
 );
 
 final driftMemoryFutureProvider = FutureProvider.autoDispose<List<DriftMemory>>((ref) {

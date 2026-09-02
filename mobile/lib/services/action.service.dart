@@ -68,8 +68,17 @@ class ActionService {
     this._sharedSpaceApiRepository,
   );
 
-  Future<void> shareLink(List<String> remoteIds, BuildContext context) async {
-    unawaited(context.pushRoute(SharedLinkEditRoute(assetsList: remoteIds)));
+  Future<void> shareLink(
+    List<String> remoteIds,
+    BuildContext context, {
+    String? spaceId,
+    int contributedCount = 0,
+  }) async {
+    unawaited(
+      context.pushRoute(
+        SharedLinkEditRoute(assetsList: remoteIds, spaceId: spaceId, contributedCount: contributedCount),
+      ),
+    );
   }
 
   Future<void> favorite(List<String> remoteIds) async {

@@ -2,13 +2,21 @@ import { MemoryType, type MemoryResponseDto } from '@immich/sdk';
 import type { MessageFormatter } from 'svelte-i18n';
 import { buildMemoryIndexItems, filterMemoryIndexItems, groupMemoryIndexItems } from './memory-index-utils';
 
-const translate = ((key: string, payload?: { values?: Record<string, number> }) => {
+const translate = ((key: string, payload?: { values?: Record<string, number | string> }) => {
   if (key === 'years_ago') {
     return `${payload?.values?.years} years ago`;
   }
 
   if (key === 'memory_type_on_this_day') {
     return 'On this day';
+  }
+
+  if (key === 'recent_trip_title') {
+    return `Recent trip to ${payload?.values?.location}`;
+  }
+
+  if (key === 'recent_trip_subtitle') {
+    return `${payload?.values?.assetCount} photos over ${payload?.values?.dayCount} days`;
   }
 
   return key;
@@ -168,5 +176,22 @@ describe('memory index utilities', () => {
     expect(filterMemoryIndexItems(items, { query: MemoryType.OnThisDay }).map((item) => item.memory.id)).toEqual([
       'type-match',
     ]);
+  });
+
+  it('builds a localized title and subtitle for a recent-trip memory with no server-supplied text', () => {
+    const items = buildMemoryIndexItems(
+      [
+        memory({
+          id: 'recent-trip',
+          data: { ruleId: 'recent_trip', context: { placeLabel: 'Paris, France', assetCount: 9, dayCount: 3 } },
+        }),
+      ],
+      options,
+    );
+
+    expect(items[0]).toMatchObject({
+      title: 'Recent trip to Paris, France',
+      subtitle: '9 photos over 3 days',
+    });
   });
 });

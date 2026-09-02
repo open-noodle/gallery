@@ -188,6 +188,8 @@ export type SystemConfig = {
     recentTrips: boolean;
     /** sparse admin availability overrides, memory-type key -> enabled */
     types: Record<string, boolean>;
+    themeMaxDistance: number;
+    personThrowbackDormancyMonths: number;
   };
   trash: {
     enabled: boolean;
@@ -457,6 +459,12 @@ export const defaults = Object.freeze<SystemConfig>({
     birthday: true,
     recentTrips: true,
     types: {},
+    // CLIP text->image distances sit far higher than the image->image thresholds used elsewhere
+    // (duplicateDetection 0.01, facialRecognition 0.5) because of the modality gap: even a perfect
+    // textual match rarely drops below ~0.6. Matches the 0.75 the admin UI recommends for
+    // `machineLearning.clip.maxDistance`, the same metric over the same embeddings.
+    themeMaxDistance: 0.75,
+    personThrowbackDormancyMonths: 6,
   },
   trash: {
     enabled: true,

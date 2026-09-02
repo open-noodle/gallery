@@ -677,9 +677,15 @@
 
             <div class="absolute inset-s-8 top-4 text-sm font-medium text-white">
               <p>
-                {fromISODateTimeUTC(current.memory.assets[0].localDateTime).toLocaleString(DateTime.DATE_FULL, {
-                  locale: $locale,
-                })}
+                <!-- The asset being shown, not the memory's first: a memory can span years (an
+                     `on_this_day_place` card covers every year the place recurs), and the city and
+                     country below already track the current asset. -->
+                {fromISODateTimeUTC(current.memory.assets[current.assetIndex].localDateTime).toLocaleString(
+                  DateTime.DATE_FULL,
+                  {
+                    locale: $locale,
+                  },
+                )}
               </p>
               <p>
                 {#await currentMemoryAssetFull then asset}

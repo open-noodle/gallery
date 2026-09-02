@@ -848,6 +848,8 @@ export type UpdateAlbumDto = {
     albumName?: string;
     /** Album thumbnail asset ID */
     albumThumbnailAssetId?: string;
+    /** Album creation date. Must include a timezone designator (Z or ±HH:MM). */
+    createdAt?: string;
     /** Album description */
     description?: string;
     /** Enable activity feed */
@@ -2544,6 +2546,8 @@ export type SmartSearchDto = {
     withSharedSpaces?: boolean;
 };
 export type SmartSearchFacetsDto = {
+    /** Filter by album IDs */
+    albumIds?: string[];
     /** Filter by city name */
     city?: string | null;
     /** Filter by country name */
@@ -2611,6 +2615,12 @@ export type SmartSearchFacetsResponseDto = {
     cities: string[];
     /** Available countries */
     countries: string[];
+    /** Whether any filtered asset belongs to an album */
+    hasAssetsInAlbum: boolean;
+    /** Whether any filtered asset belongs to no album */
+    hasAssetsNotInAlbum: boolean;
+    /** Whether any favourite exists in the filtered set, ignoring isFavorite */
+    hasFavorites: boolean;
     /** Whether unnamed people exist in the filtered smart-search set */
     hasUnnamedPeople: boolean;
     /** Available media types */
@@ -2701,6 +2711,12 @@ export type FilterSuggestionsResponseDto = {
     cameraMakes: string[];
     /** Available countries */
     countries: string[];
+    /** Whether any filtered asset belongs to an album */
+    hasAssetsInAlbum: boolean;
+    /** Whether any filtered asset belongs to no album */
+    hasAssetsNotInAlbum: boolean;
+    /** Whether any favourite exists in the filtered set, ignoring isFavorite */
+    hasFavorites: boolean;
     /** Whether unnamed people exist in the filtered set */
     hasUnnamedPeople: boolean;
     /** Available media types */
@@ -3013,6 +3029,8 @@ export type SharedLinkCreateDto = {
     showMetadata?: boolean;
     /** Custom URL slug */
     slug?: string | null;
+    /** Shared space this link is created from. Lets the link cover assets contributed by other members, which requires the caller to be an Owner or Editor of the space. */
+    spaceId?: string;
     "type": SharedLinkType;
 };
 export type SharedLinkLoginDto = {
@@ -3662,10 +3680,14 @@ export type SystemConfigMapDto = {
 export type SystemConfigMemoriesDto = {
     /** Birthday memories */
     birthday: boolean;
+    /** Months a person must be absent from photos before person_throwback resurfaces them */
+    personThrowbackDormancyMonths?: number;
     /** Recent trip memories */
     recentTrips: boolean;
     /** Retention days */
     retentionDays: number;
+    /** Max CLIP cosine distance for themed memories */
+    themeMaxDistance?: number;
     /** Per-type memory availability overrides */
     types?: {
         [key: string]: boolean;

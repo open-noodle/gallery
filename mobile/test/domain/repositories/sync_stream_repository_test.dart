@@ -1612,6 +1612,144 @@ void main() {
     });
   });
 
+  // ---------------------------------------------------------------------------
+  // memory -> asset links (issue: SqliteException(787) wedging the whole sync)
+  // ---------------------------------------------------------------------------
+  //
+  // memory_asset_entity has real foreign keys on BOTH ids. A link row whose asset has
+  // not been streamed yet used to fail the entire Drift batch, abort /sync/stream, and —
+  // because the batch is never acked — leave the client replaying the same failing
+  // checkpoint forever. The server now streams memories last (SYNC_TYPES_ORDER), but the
+  // app must survive an older fork server too: park what it cannot write yet and replay
+  // it once every asset stream has landed.
+  group('SyncStreamRepository - memory to asset links', () {
+    SyncMemoryV1 makeMemory({String id = 'memory-1', String ownerId = 'user-1'}) => SyncMemoryV1(
+      createdAt: DateTime(2026, 4, 23),
+      data: const {'title': 'A memory'},
+      deletedAt: null,
+      hideAt: null,
+      id: id,
+      isSaved: false,
+      memoryAt: DateTime(2026, 4, 23),
+      ownerId: ownerId,
+      seenAt: null,
+      showAt: null,
+      type: MemoryType.onThisDay,
+      updatedAt: DateTime(2026, 4, 23),
+    );
+
+    setUp(() async {
+      await sut.updateUsersV1([_createUser()]);
+      await sut.updateMemoriesV1([makeMemory()]);
+    });
+
+    test('does not throw when the asset has not been streamed yet', () async {
+      await expectLater(
+        sut.updateMemoryAssetsV1([SyncMemoryAssetV1(memoryId: 'memory-1', assetId: 'not-here-yet')]),
+        completes,
+      );
+
+      expect(await db.memoryAssetEntity.select().get(), isEmpty);
+    });
+
+    test('still writes the valid links in a batch that also carries an orphan', () async {
+      await sut.updateAssetsV1([_createAsset(id: 'asset-1', checksum: 'c1', fileName: 'a.jpg')]);
+
+      await sut.updateMemoryAssetsV1([
+        SyncMemoryAssetV1(memoryId: 'memory-1', assetId: 'asset-1'),
+        SyncMemoryAssetV1(memoryId: 'memory-1', assetId: 'not-here-yet'),
+      ]);
+
+      final rows = await db.memoryAssetEntity.select().get();
+      expect(rows.map((r) => r.assetId), ['asset-1']);
+    });
+
+    test('replays a parked link once its asset arrives later in the stream', () async {
+      await sut.updateMemoryAssetsV1([SyncMemoryAssetV1(memoryId: 'memory-1', assetId: 'asset-late')]);
+      expect(await db.memoryAssetEntity.select().get(), isEmpty);
+
+      // The shared-space asset stream (or any other) delivers the asset afterwards.
+      await sut.updateSharedSpaceAssetsV1([
+        _createAsset(id: 'asset-late', checksum: 'c2', fileName: 'late.jpg', ownerId: 'user-1'),
+      ]);
+      await sut.flushDeferredMemoryAssetsV1();
+
+      final rows = await db.memoryAssetEntity.select().get();
+      expect(rows.map((r) => r.assetId), ['asset-late']);
+      expect(rows.single.memoryId, 'memory-1');
+    });
+
+    test('parks a link whose memory has not been streamed yet', () async {
+      await sut.updateAssetsV1([_createAsset(id: 'asset-1', checksum: 'c1', fileName: 'a.jpg')]);
+
+      await sut.updateMemoryAssetsV1([SyncMemoryAssetV1(memoryId: 'memory-unknown', assetId: 'asset-1')]);
+      expect(await db.memoryAssetEntity.select().get(), isEmpty);
+
+      await sut.updateMemoriesV1([makeMemory(id: 'memory-unknown')]);
+      await sut.flushDeferredMemoryAssetsV1();
+
+      expect((await db.memoryAssetEntity.select().get()).single.memoryId, 'memory-unknown');
+    });
+
+    test('drops a link that is still unresolvable at sync completion, without throwing', () async {
+      await sut.updateMemoryAssetsV1([SyncMemoryAssetV1(memoryId: 'memory-1', assetId: 'never-arrives')]);
+
+      await expectLater(sut.flushDeferredMemoryAssetsV1(), completes);
+      expect(await db.memoryAssetEntity.select().get(), isEmpty);
+
+      // The parked row is not retained across sync passes.
+      await sut.updateAssetsV1([_createAsset(id: 'never-arrives', checksum: 'c3', fileName: 'n.jpg')]);
+      await sut.flushDeferredMemoryAssetsV1();
+      expect(await db.memoryAssetEntity.select().get(), isEmpty);
+    });
+
+    test('forgets a parked link that is deleted before it can be replayed', () async {
+      await sut.updateMemoryAssetsV1([SyncMemoryAssetV1(memoryId: 'memory-1', assetId: 'asset-1')]);
+      await sut.deleteMemoryAssetsV1([SyncMemoryAssetDeleteV1(memoryId: 'memory-1', assetId: 'asset-1')]);
+
+      await sut.updateAssetsV1([_createAsset(id: 'asset-1', checksum: 'c1', fileName: 'a.jpg')]);
+      await sut.flushDeferredMemoryAssetsV1();
+
+      expect(await db.memoryAssetEntity.select().get(), isEmpty);
+    });
+
+    // The parent lookups bind one variable per id, so they are chunked. Cross the chunk boundary
+    // with a mix of resolvable and orphan links to prove the chunking keeps both sides straight.
+    test('handles a batch larger than one lookup chunk', () async {
+      const present = 600;
+      const orphans = 300;
+
+      await sut.updateAssetsV1([
+        for (var i = 0; i < present; i++) _createAsset(id: 'bulk-$i', checksum: 'bulk-c$i', fileName: 'bulk-$i.jpg'),
+      ]);
+
+      await sut.updateMemoryAssetsV1([
+        for (var i = 0; i < present; i++) SyncMemoryAssetV1(memoryId: 'memory-1', assetId: 'bulk-$i'),
+        for (var i = 0; i < orphans; i++) SyncMemoryAssetV1(memoryId: 'memory-1', assetId: 'missing-$i'),
+      ]);
+
+      expect(await db.memoryAssetEntity.select().get(), hasLength(present));
+
+      // The orphans were parked, not written and not lost.
+      await sut.updateAssetsV1([
+        for (var i = 0; i < orphans; i++) _createAsset(id: 'missing-$i', checksum: 'late-c$i', fileName: 'late-$i.jpg'),
+      ]);
+      await sut.flushDeferredMemoryAssetsV1();
+
+      expect(await db.memoryAssetEntity.select().get(), hasLength(present + orphans));
+    });
+
+    test('writes links normally when both parents are already present', () async {
+      await sut.updateAssetsV1([_createAsset(id: 'asset-1', checksum: 'c1', fileName: 'a.jpg')]);
+
+      await sut.updateMemoryAssetsV1([SyncMemoryAssetV1(memoryId: 'memory-1', assetId: 'asset-1')]);
+      // Re-delivery of the same link must stay a no-op (composite PK).
+      await sut.updateMemoryAssetsV1([SyncMemoryAssetV1(memoryId: 'memory-1', assetId: 'asset-1')]);
+
+      expect(await db.memoryAssetEntity.select().get(), hasLength(1));
+    });
+  });
+
   test('stores rule memories from sync without requiring year data', () async {
     await sut.updateUsersV1([_createUser()]);
 

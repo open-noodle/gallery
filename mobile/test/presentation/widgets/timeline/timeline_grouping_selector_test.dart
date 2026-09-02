@@ -329,11 +329,31 @@ void main() {
       expect(find.byKey(const Key('timeline-grouping-years')), findsNothing);
       expect(find.byKey(const Key('timeline-grouping-months')), findsNothing);
       expect(find.byKey(const Key('timeline-grouping-all')), findsNothing);
-      expect(find.text('All'), findsOneWidget);
+      // The chip paints the localized initial only. Spelling the mode out cost 98px of a bar that
+      // has ~155px to spare before the logo starts shrinking (#1030); the word stays in the
+      // long-press menu and in the accessibility value.
+      expect(find.text('A'), findsOneWidget);
+      expect(find.text('All'), findsNothing);
       expect(find.text('Day'), findsNothing);
       expect(find.text('Days'), findsNothing);
       expect(find.byIcon(Icons.expand_more_rounded), findsNothing);
-      expect(tester.getSize(find.byKey(const Key('timeline-grouping-compact-selector'))).width, lessThanOrEqualTo(120));
+      expectTapTargetMin(tester, find.byKey(const Key('timeline-grouping-compact-selector')), min: 40);
+      expect(tester.getSize(find.byKey(const Key('timeline-grouping-compact-selector'))).width, lessThanOrEqualTo(48));
+    });
+
+    testWidgets('compact chip keeps the full mode name as its accessibility value', (tester) async {
+      final semantics = tester.ensureSemantics();
+      try {
+        await tester.pumpConsumerWidget(const TimelineGroupingSelector.compact());
+        await tester.pumpAndSettle();
+        await setGrouping(tester, TimelineOverviewMode.months);
+
+        final chip = tester.getSemantics(find.byKey(const Key('timeline-grouping-compact-selector')));
+        expect(chip.label, 'Timeline grouping');
+        expect(chip.value, 'Months', reason: 'the abbreviation is visual only; screen readers get the word');
+      } finally {
+        semantics.dispose();
+      }
     });
 
     testWidgets('compact mode tapping Day zooms out to Month', (tester) async {
@@ -344,7 +364,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(grouping(tester), TimelineOverviewMode.months);
-      expect(find.text('Months'), findsOneWidget);
+      expect(find.text('M'), findsOneWidget);
     });
 
     testWidgets('compact mode bounces between extremes', (tester) async {
@@ -416,12 +436,18 @@ void main() {
 
       await tester.longPress(find.byKey(const Key('timeline-grouping-compact-selector')));
       await tester.pumpAndSettle();
+
+      // The menu is where the abbreviated chip spells its options out in full.
+      expect(find.text('Years'), findsOneWidget);
+      expect(find.text('Months'), findsOneWidget);
+      expect(find.text('All'), findsOneWidget);
+      expect(find.text('Month'), findsNothing);
+
       await tester.tap(find.byKey(const Key('timeline-grouping-menu-months')));
       await tester.pumpAndSettle();
 
       expect(grouping(tester), TimelineOverviewMode.months);
-      expect(find.text('Months'), findsOneWidget);
-      expect(find.text('Month'), findsNothing);
+      expect(find.text('M'), findsOneWidget);
     });
 
     testWidgets('compact mode resumes bouncing after a long-press menu selection', (tester) async {
@@ -446,12 +472,9 @@ void main() {
       expect(grouping(tester), TimelineOverviewMode.all);
     });
 
-    testWidgets('compact mode shows the full "Months" label at normal size and never clips when enlarged', (
-      tester,
-    ) async {
-      // "Months" is the widest grouping label. At the default text scale it must render at full
-      // size inside the compact chip; when the OS enlarges text it may scale down to fit but must
-      // never clip (the old "Mo..." truncation).
+    testWidgets('compact chip paints its initial in full at normal size and never clips when enlarged', (tester) async {
+      // The chip carries a single localized initial. At the default text scale it must render at
+      // full size; when the OS enlarges text it may scale down to fit but must never clip.
       Future<void> pumpAt(double scale) async {
         await tester.pumpConsumerWidget(
           MediaQuery(
@@ -469,18 +492,18 @@ void main() {
 
       // Default scale: the glyphs are painted at their full intrinsic width (not shrunk, not clipped).
       await pumpAt(1.0);
-      expect(find.text('Months'), findsOneWidget);
-      expect(find.text('Month'), findsNothing);
-      final paragraph = tester.renderObject<RenderParagraph>(find.text('Months'));
+      expect(find.text('M'), findsOneWidget);
+      expect(find.text('Months'), findsNothing);
+      final paragraph = tester.renderObject<RenderParagraph>(find.text('M'));
       final intrinsic = paragraph.getMaxIntrinsicWidth(double.infinity);
-      expect(tester.getRect(find.text('Months')).width, greaterThanOrEqualTo(intrinsic - 0.5));
+      expect(tester.getRect(find.text('M')).width, greaterThanOrEqualTo(intrinsic - 0.5));
       expect(tester.takeException(), isNull);
 
-      // Enlarged text: the label still renders in full (scaled down to fit), bounded by the chip.
+      // Enlarged text: the initial still renders in full (scaled down to fit), bounded by the chip.
       await pumpAt(2.0);
-      expect(find.text('Months'), findsOneWidget);
+      expect(find.text('M'), findsOneWidget);
       final chipWidth = tester.getSize(find.byKey(const Key('timeline-grouping-compact-selector'))).width;
-      expect(tester.getRect(find.text('Months')).width, lessThanOrEqualTo(chipWidth));
+      expect(tester.getRect(find.text('M')).width, lessThanOrEqualTo(chipWidth));
       expect(tester.takeException(), isNull);
     });
   });

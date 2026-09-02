@@ -10,6 +10,7 @@ import 'package:immich_mobile/providers/asset_viewer/asset_viewer.provider.dart'
 import 'package:immich_mobile/providers/infrastructure/action.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/asset.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/asset_viewer/asset.provider.dart';
+import 'package:immich_mobile/providers/timeline/multiselect.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:immich_mobile/services/action.service.dart';
 import 'package:immich_mobile/services/foreground_upload.service.dart';
@@ -71,13 +72,91 @@ void main() {
     addTearDown(container.dispose);
   });
 
+  // #1018: the editor's consent warning is only as good as the count it is handed. This is the
+  // half a widget test cannot see — that the number comes from the real selection's owners rather
+  // than a constant.
+  group('shareLink contributedCount', () {
+    final theirs = RemoteAsset(
+      id: 'asset-2',
+      name: 'theirs.jpg',
+      ownerId: 'someone-else',
+      checksum: 'checksum-2',
+      type: AssetType.image,
+      createdAt: DateTime(2026, 6, 10, 10, 27),
+      updatedAt: DateTime(2026, 6, 10, 10, 27),
+      isEdited: false,
+    );
+    final alsoTheirs = RemoteAsset(
+      id: 'asset-3',
+      name: 'also-theirs.jpg',
+      ownerId: 'another-member',
+      checksum: 'checksum-3',
+      type: AssetType.image,
+      createdAt: DateTime(2026, 6, 10, 10, 27),
+      updatedAt: DateTime(2026, 6, 10, 10, 27),
+      isEdited: false,
+    );
+
+    setUp(() {
+      when(
+        () => actionService.shareLink(
+          any(),
+          any(),
+          spaceId: any(named: 'spaceId'),
+          contributedCount: any(named: 'contributedCount'),
+        ),
+      ).thenAnswer((_) async {});
+    });
+
+    int capturedCount() =>
+        verify(
+              () => actionService.shareLink(
+                any(),
+                any(),
+                spaceId: any(named: 'spaceId'),
+                contributedCount: captureAny(named: 'contributedCount'),
+              ),
+            ).captured.single
+            as int;
+
+    test('counts only the assets other members own', () async {
+      for (final a in [_asset, theirs, alsoTheirs]) {
+        container.read(multiSelectProvider.notifier).selectAsset(a);
+      }
+
+      await container.read(actionProvider.notifier).shareLink(ActionSource.timeline, FakeBuildContext(), spaceId: 's1');
+
+      expect(capturedCount(), 2);
+    });
+
+    test('counts none when the caller owns the whole selection', () async {
+      container.read(multiSelectProvider.notifier).selectAsset(_asset);
+
+      await container.read(actionProvider.notifier).shareLink(ActionSource.timeline, FakeBuildContext(), spaceId: 's1');
+
+      expect(capturedCount(), 0);
+    });
+
+    test('counts none off a space surface, where the link is narrowed to the caller anyway', () async {
+      for (final a in [_asset, theirs]) {
+        container.read(multiSelectProvider.notifier).selectAsset(a);
+      }
+
+      await container.read(actionProvider.notifier).shareLink(ActionSource.timeline, FakeBuildContext());
+
+      expect(capturedCount(), 0);
+    });
+  });
+
   group('editDateTime', () {
     test('refreshes the exif provider when editing from the viewer', () async {
       container.read(assetViewerProvider.notifier).setAsset(_asset);
       container.listen(assetExifProvider(_asset), (_, __) {});
       await container.read(assetExifProvider(_asset).future);
 
-      final result = await container.read(actionProvider.notifier).editDateTime(ActionSource.viewer, FakeBuildContext());
+      final result = await container
+          .read(actionProvider.notifier)
+          .editDateTime(ActionSource.viewer, FakeBuildContext());
 
       expect(result?.success, isTrue);
       await container.read(assetExifProvider(_asset).future);
@@ -89,7 +168,9 @@ void main() {
       container.listen(assetExifProvider(_asset), (_, __) {});
       await container.read(assetExifProvider(_asset).future);
 
-      final result = await container.read(actionProvider.notifier).editDateTime(ActionSource.timeline, FakeBuildContext());
+      final result = await container
+          .read(actionProvider.notifier)
+          .editDateTime(ActionSource.timeline, FakeBuildContext());
 
       expect(result?.success, isTrue);
       await container.read(assetExifProvider(_asset).future);
@@ -102,7 +183,9 @@ void main() {
       container.listen(assetExifProvider(_asset), (_, __) {});
       await container.read(assetExifProvider(_asset).future);
 
-      final result = await container.read(actionProvider.notifier).editDateTime(ActionSource.viewer, FakeBuildContext());
+      final result = await container
+          .read(actionProvider.notifier)
+          .editDateTime(ActionSource.viewer, FakeBuildContext());
 
       expect(result, isNull);
       await container.read(assetExifProvider(_asset).future);

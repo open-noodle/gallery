@@ -22,6 +22,7 @@ class SharedLinkCreateDto {
     this.password = const Optional.absent(),
     this.showMetadata = const Optional.present(true),
     this.slug = const Optional.absent(),
+    this.spaceId = const Optional.absent(),
     required this.type,
   });
 
@@ -64,6 +65,15 @@ class SharedLinkCreateDto {
   /// Custom URL slug
   Optional<String?> slug;
 
+  /// Shared space this link is created from. Lets the link cover assets contributed by other members, which requires the caller to be an Owner or Editor of the space.
+  ///
+  /// Please note: This property should have been non-nullable! Since the specification file
+  /// does not include a default value (using the "default:" property), however, the generated
+  /// source code must fall back to having a nullable type.
+  /// Consider adding a "default:" property in the specification file to hide this note.
+  ///
+  Optional<String?> spaceId;
+
   SharedLinkType type;
 
   @override
@@ -77,6 +87,7 @@ class SharedLinkCreateDto {
     other.password == password &&
     other.showMetadata == showMetadata &&
     other.slug == slug &&
+    other.spaceId == spaceId &&
     other.type == type;
 
   @override
@@ -91,10 +102,11 @@ class SharedLinkCreateDto {
     (password == null ? 0 : password!.hashCode) +
     (showMetadata.hashCode) +
     (slug == null ? 0 : slug!.hashCode) +
+    (spaceId == null ? 0 : spaceId!.hashCode) +
     (type.hashCode);
 
   @override
-  String toString() => 'SharedLinkCreateDto[albumId=$albumId, allowDownload=$allowDownload, allowUpload=$allowUpload, assetIds=$assetIds, description=$description, expiresAt=$expiresAt, password=$password, showMetadata=$showMetadata, slug=$slug, type=$type]';
+  String toString() => 'SharedLinkCreateDto[albumId=$albumId, allowDownload=$allowDownload, allowUpload=$allowUpload, assetIds=$assetIds, description=$description, expiresAt=$expiresAt, password=$password, showMetadata=$showMetadata, slug=$slug, spaceId=$spaceId, type=$type]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -136,6 +148,10 @@ class SharedLinkCreateDto {
       final value = this.slug.value;
       json[r'slug'] = value;
     }
+    if (this.spaceId.isPresent) {
+      final value = this.spaceId.value;
+      json[r'spaceId'] = value;
+    }
       json[r'type'] = this.type;
     return json;
   }
@@ -160,6 +176,7 @@ class SharedLinkCreateDto {
         password: json.containsKey(r'password') ? Optional.present(mapValueOfType<String>(json, r'password')) : const Optional.absent(),
         showMetadata: json.containsKey(r'showMetadata') ? Optional.present(mapValueOfType<bool>(json, r'showMetadata')) : const Optional.absent(),
         slug: json.containsKey(r'slug') ? Optional.present(mapValueOfType<String>(json, r'slug')) : const Optional.absent(),
+        spaceId: json.containsKey(r'spaceId') ? Optional.present(mapValueOfType<String>(json, r'spaceId')) : const Optional.absent(),
         type: SharedLinkType.fromJson(json[r'type'])!,
       );
     }

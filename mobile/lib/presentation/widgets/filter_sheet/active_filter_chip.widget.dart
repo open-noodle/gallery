@@ -34,9 +34,11 @@ class ActiveFilterChip extends ConsumerWidget {
       }
     }
 
+    final displayLabel = spec.labelIsKey ? spec.label.tr() : spec.label;
+
     return Semantics(
       button: true,
-      label: spec.semanticsLabel ?? '${spec.label}, ${'remove_filter'.tr()}',
+      label: spec.semanticsLabel ?? '$displayLabel, ${'remove_filter'.tr()}',
       onTap: removeChip,
       child: ExcludeSemantics(
         child: Material(
@@ -54,7 +56,7 @@ class ActiveFilterChip extends ConsumerWidget {
                 if (_needsLeadingGap) const SizedBox(width: 8),
                 Flexible(
                   child: Text(
-                    spec.label,
+                    displayLabel,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: spec.visual == ChipVisual.when

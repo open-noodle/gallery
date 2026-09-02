@@ -7,8 +7,16 @@
     filters?: FilterState;
     withSharedSpaces?: boolean;
     spaceId?: string;
+    albumIds?: string[];
     language?: string;
     total?: number;
+    // $bindable on the real component, so a host that binds it expects to be able to read loaded
+    // results back. Spreading it onto the div instead made any behaviour keyed on results — the
+    // selection toolbar acting on the search grid — unobservable.
+    results?: unknown[];
+    isShared?: boolean;
+    space?: { id: string; canWrite: boolean };
+    onScroll?: (scrollTop: number) => void;
     [key: string]: unknown;
   }
 
@@ -18,8 +26,13 @@
     filters,
     withSharedSpaces,
     spaceId,
+    albumIds,
     language = '',
     total,
+    results = $bindable([]),
+    isShared,
+    space,
+    onScroll,
     ...rest
   }: Props = $props();
 </script>
@@ -46,7 +59,16 @@
   data-filter-model={filters?.model ?? ''}
   data-with-shared-spaces={String(withSharedSpaces)}
   data-space-id={spaceId ?? ''}
+  data-album-ids={albumIds?.join(',') ?? ''}
+  data-result-count={results.length}
+  data-is-shared={String(isShared)}
+  data-space={JSON.stringify(space ?? null)}
   data-country={filters?.country ?? ''}
   data-language={language}
   data-total={total ?? ''}
-></div>
+>
+  <!-- The real grid scrolls its own container; hosts learn about it only through `onScroll`.
+       These stand in for scrolling past / back above the collapse threshold. -->
+  <button type="button" data-testid="search-results-scroll-down" onclick={() => onScroll?.(240)}> scroll down </button>
+  <button type="button" data-testid="search-results-scroll-top" onclick={() => onScroll?.(0)}> scroll to top </button>
+</div>

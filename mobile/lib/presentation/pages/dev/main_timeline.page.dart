@@ -3,7 +3,6 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/filter_sheet.widget.dart';
-import 'package:immich_mobile/presentation/widgets/filter_sheet/sort_icon_button.widget.dart';
 import 'package:immich_mobile/presentation/widgets/memory/memory_lane.widget.dart';
 import 'package:immich_mobile/presentation/widgets/photos_filter/filter_subheader.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
@@ -134,9 +133,11 @@ class _SearchLoadMoreFooter extends ConsumerWidget {
 class PhotosTimelineAppBar extends StatelessWidget {
   const PhotosTimelineAppBar({super.key});
 
-  // Filter/search is reached from the bottom-nav search button (GallerySearchBlob), so the app bar
-  // keeps only the grouping chip and the sort control (the latter shows itself once a search is active).
-  static const actions = <Widget>[TimelineGroupingSelector.compact(), SortIconButton()];
+  // Filter/search is reached from the bottom-nav search button (GallerySearchBlob), and sort now
+  // rides the filter subheader alongside the chips it orders — so the app bar keeps only the
+  // grouping chip. Every widget here is permanent and 40-50 px wide, which is what keeps the title
+  // slot (and therefore the logo) the same width in every state (#1030).
+  static const actions = <Widget>[TimelineGroupingSelector.compact()];
 
   @override
   Widget build(BuildContext context) {

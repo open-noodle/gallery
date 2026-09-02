@@ -773,7 +773,7 @@ void main() {
 
   // PRE-FLIGHT: verifies Drift's reactive layer tracks tables reached via
   // aliased LEFT OUTER JOINs. The full timeline space visibility design
-  // (docs/plans/2026-04-12-mobile-timeline-space-visibility-design.md) is
+  // (specs/2026-04-12-mobile-timeline-space-visibility-design.md) is
   // load-bearing on this behavior — if this test fails, switch the design
   // to .drift SQL files with explicit table imports.
   test('PRE-FLIGHT: aliased shared_space_member join re-emits on showInTimeline toggle', () async {

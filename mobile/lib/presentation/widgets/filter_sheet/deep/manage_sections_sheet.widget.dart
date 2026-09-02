@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/filter_section_id.dart';
 import 'package:immich_mobile/providers/photos_filter/hidden_sections.provider.dart';
+import 'package:immich_mobile/providers/photos_filter/section_availability.provider.dart';
 
 Future<void> showManageSectionsSheet(BuildContext context) => showModalBottomSheet<void>(
   context: context,
@@ -19,6 +20,7 @@ class ManageSectionsSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final hidden = ref.watch(hiddenSectionsProvider);
+    final available = ref.watch(sectionAvailabilityProvider);
     return SafeArea(
       child: SingleChildScrollView(
         child: Column(
@@ -30,15 +32,17 @@ class ManageSectionsSheet extends ConsumerWidget {
               child: Text('filter_sheet_deep_manage_sections'.tr(), style: theme.textTheme.titleMedium),
             ),
             for (final section in FilterSectionId.values)
-              SwitchListTile.adaptive(
-                key: Key('manage-section-${section.storageId}'),
-                title: Text(section.titleKey.tr()),
-                value: !hidden.contains(section),
-                onChanged: (visible) {
-                  HapticFeedback.selectionClick();
-                  ref.read(hiddenSectionsProvider.notifier).setVisible(section, visible);
-                },
-              ),
+              // A section the user cannot see is a switch that does nothing. #910
+              if (available.contains(section))
+                SwitchListTile.adaptive(
+                  key: Key('manage-section-${section.storageId}'),
+                  title: Text(section.titleKey.tr()),
+                  value: !hidden.contains(section),
+                  onChanged: (visible) {
+                    HapticFeedback.selectionClick();
+                    ref.read(hiddenSectionsProvider.notifier).setVisible(section, visible);
+                  },
+                ),
             const SizedBox(height: 8),
           ],
         ),

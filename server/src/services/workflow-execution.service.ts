@@ -27,6 +27,7 @@ import { ArgOf } from 'src/repositories/event.repository';
 import { AlbumService } from 'src/services/album.service';
 import { AssetService } from 'src/services/asset.service';
 import { BaseService } from 'src/services/base.service';
+import { GalleryWorkflowHostService } from 'src/services/gallery-workflow-host.service';
 import { JobOf } from 'src/types';
 
 const dummy = () => {
@@ -57,6 +58,7 @@ export class WorkflowExecutionService extends BaseService {
 
       const { environment, resourcePaths, plugins } = this.configRepository.getEnv();
       await this.importFolder(resourcePaths.corePlugin, { force: environment === ImmichEnvironment.Development });
+      await this.importFolder(resourcePaths.galleryPlugin, { force: environment === ImmichEnvironment.Development });
 
       if (plugins.external.allow && plugins.external.installFolder) {
         await this.importFolders(plugins.external.installFolder);
@@ -69,6 +71,7 @@ export class WorkflowExecutionService extends BaseService {
     this.jwtSecret = this.cryptoRepository.randomBytesAsText(32);
 
     const albumService = BaseService.create(AlbumService, this);
+    const galleryHost = BaseService.create(GalleryWorkflowHostService, this);
 
     const searchAlbums = this.wrap<[dto: GetAlbumsDto]>((authDto, ctx, args) => albumService.getAll(authDto, ...args));
     const createAlbum = this.wrap<[dto: CreateAlbumDto]>((authDto, ctx, args) => albumService.create(authDto, ...args));
@@ -107,12 +110,18 @@ export class WorkflowExecutionService extends BaseService {
       throw new Error('Hostname did not match any listed in methods[].allowedHosts in the plugin manifest');
     });
 
+    // Gallery fork: one generic dispatcher, so fork actions and filters never add lines here again.
+    const gallery = this.wrap<[method: string, args: unknown]>((authDto, ctx, args) =>
+      galleryHost.dispatch(authDto, ...args),
+    );
+
     const functions = {
       searchAlbums,
       createAlbum,
       addAssetsToAlbum,
       addAssetsToAlbums,
       httpRequest,
+      gallery,
     };
 
     const stubs: typeof functions = {
@@ -121,6 +130,7 @@ export class WorkflowExecutionService extends BaseService {
       addAssetsToAlbum: dummy,
       addAssetsToAlbums: dummy,
       httpRequest: dummy,
+      gallery: dummy,
     };
 
     const plugins = await this.pluginRepository.getForLoad();

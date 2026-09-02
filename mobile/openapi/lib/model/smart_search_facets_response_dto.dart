@@ -17,6 +17,9 @@ class SmartSearchFacetsResponseDto {
     this.cameraModels = const [],
     this.cities = const [],
     this.countries = const [],
+    required this.hasAssetsInAlbum,
+    required this.hasAssetsNotInAlbum,
+    required this.hasFavorites,
     required this.hasUnnamedPeople,
     this.mediaTypes = const [],
     this.people = const [],
@@ -37,6 +40,15 @@ class SmartSearchFacetsResponseDto {
 
   /// Available countries
   List<String> countries;
+
+  /// Whether any filtered asset belongs to an album
+  bool hasAssetsInAlbum;
+
+  /// Whether any filtered asset belongs to no album
+  bool hasAssetsNotInAlbum;
+
+  /// Whether any favourite exists in the filtered set, ignoring isFavorite
+  bool hasFavorites;
 
   /// Whether unnamed people exist in the filtered smart-search set
   bool hasUnnamedPeople;
@@ -68,6 +80,9 @@ class SmartSearchFacetsResponseDto {
     _deepEquality.equals(other.cameraModels, cameraModels) &&
     _deepEquality.equals(other.cities, cities) &&
     _deepEquality.equals(other.countries, countries) &&
+    other.hasAssetsInAlbum == hasAssetsInAlbum &&
+    other.hasAssetsNotInAlbum == hasAssetsNotInAlbum &&
+    other.hasFavorites == hasFavorites &&
     other.hasUnnamedPeople == hasUnnamedPeople &&
     _deepEquality.equals(other.mediaTypes, mediaTypes) &&
     _deepEquality.equals(other.people, people) &&
@@ -83,6 +98,9 @@ class SmartSearchFacetsResponseDto {
     (cameraModels.hashCode) +
     (cities.hashCode) +
     (countries.hashCode) +
+    (hasAssetsInAlbum.hashCode) +
+    (hasAssetsNotInAlbum.hashCode) +
+    (hasFavorites.hashCode) +
     (hasUnnamedPeople.hashCode) +
     (mediaTypes.hashCode) +
     (people.hashCode) +
@@ -92,7 +110,7 @@ class SmartSearchFacetsResponseDto {
     (total.hashCode);
 
   @override
-  String toString() => 'SmartSearchFacetsResponseDto[cameraMakes=$cameraMakes, cameraModels=$cameraModels, cities=$cities, countries=$countries, hasUnnamedPeople=$hasUnnamedPeople, mediaTypes=$mediaTypes, people=$people, ratings=$ratings, tags=$tags, timeBuckets=$timeBuckets, total=$total]';
+  String toString() => 'SmartSearchFacetsResponseDto[cameraMakes=$cameraMakes, cameraModels=$cameraModels, cities=$cities, countries=$countries, hasAssetsInAlbum=$hasAssetsInAlbum, hasAssetsNotInAlbum=$hasAssetsNotInAlbum, hasFavorites=$hasFavorites, hasUnnamedPeople=$hasUnnamedPeople, mediaTypes=$mediaTypes, people=$people, ratings=$ratings, tags=$tags, timeBuckets=$timeBuckets, total=$total]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -100,6 +118,9 @@ class SmartSearchFacetsResponseDto {
       json[r'cameraModels'] = this.cameraModels;
       json[r'cities'] = this.cities;
       json[r'countries'] = this.countries;
+      json[r'hasAssetsInAlbum'] = this.hasAssetsInAlbum;
+      json[r'hasAssetsNotInAlbum'] = this.hasAssetsNotInAlbum;
+      json[r'hasFavorites'] = this.hasFavorites;
       json[r'hasUnnamedPeople'] = this.hasUnnamedPeople;
       json[r'mediaTypes'] = this.mediaTypes;
       json[r'people'] = this.people;
@@ -131,6 +152,9 @@ class SmartSearchFacetsResponseDto {
         countries: json[r'countries'] is Iterable
             ? (json[r'countries'] as Iterable).cast<String>().toList(growable: false)
             : const [],
+        hasAssetsInAlbum: mapValueOfType<bool>(json, r'hasAssetsInAlbum')!,
+        hasAssetsNotInAlbum: mapValueOfType<bool>(json, r'hasAssetsNotInAlbum')!,
+        hasFavorites: mapValueOfType<bool>(json, r'hasFavorites')!,
         hasUnnamedPeople: mapValueOfType<bool>(json, r'hasUnnamedPeople')!,
         mediaTypes: AssetTypeEnum.listFromJson(json[r'mediaTypes']),
         people: FilterSuggestionsPersonDto.listFromJson(json[r'people']),
@@ -191,6 +215,9 @@ class SmartSearchFacetsResponseDto {
     'cameraModels',
     'cities',
     'countries',
+    'hasAssetsInAlbum',
+    'hasAssetsNotInAlbum',
+    'hasFavorites',
     'hasUnnamedPeople',
     'mediaTypes',
     'people',

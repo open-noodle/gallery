@@ -1,6 +1,6 @@
 import { MemoryType, type MemoryResponseDto } from '@immich/sdk';
 import type { MessageFormatter } from 'svelte-i18n';
-import { getMemoryTitle } from '$lib/utils';
+import { getMemorySubtitle, getMemoryTitle } from '$lib/utils';
 
 export type MemoryIndexFilter = 'all' | 'saved';
 
@@ -59,7 +59,7 @@ export const buildMemoryIndexItems = (
     .map((memory): MemoryIndexItem => {
       const shownAt = new Date(memory.showAt ?? memory.createdAt);
       const title = getMemoryTitle(memory, translate, now);
-      const subtitle = memory.subtitle ?? '';
+      const subtitle = getMemorySubtitle(memory, translate);
       const dateLabel = dateFormatter.format(shownAt);
       const typeLabel = getTypeLabel(memory, translate);
       const memoryYear = getMemoryYear(memory);

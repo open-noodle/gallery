@@ -15,6 +15,7 @@ class UpdateAlbumDto {
   UpdateAlbumDto({
     this.albumName = const Optional.absent(),
     this.albumThumbnailAssetId = const Optional.absent(),
+    this.createdAt = const Optional.absent(),
     this.description = const Optional.absent(),
     this.isActivityEnabled = const Optional.absent(),
     this.order = const Optional.absent(),
@@ -37,6 +38,15 @@ class UpdateAlbumDto {
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
   Optional<String?> albumThumbnailAssetId;
+
+  /// Album creation date. Must include a timezone designator (Z or ±HH:MM).
+  ///
+  /// Please note: This property should have been non-nullable! Since the specification file
+  /// does not include a default value (using the "default:" property), however, the generated
+  /// source code must fall back to having a nullable type.
+  /// Consider adding a "default:" property in the specification file to hide this note.
+  ///
+  Optional<DateTime?> createdAt;
 
   /// Album description
   ///
@@ -68,6 +78,7 @@ class UpdateAlbumDto {
   bool operator ==(Object other) => identical(this, other) || other is UpdateAlbumDto &&
     other.albumName == albumName &&
     other.albumThumbnailAssetId == albumThumbnailAssetId &&
+    other.createdAt == createdAt &&
     other.description == description &&
     other.isActivityEnabled == isActivityEnabled &&
     other.order == order;
@@ -77,12 +88,13 @@ class UpdateAlbumDto {
     // ignore: unnecessary_parenthesis
     (albumName == null ? 0 : albumName!.hashCode) +
     (albumThumbnailAssetId == null ? 0 : albumThumbnailAssetId!.hashCode) +
+    (createdAt == null ? 0 : createdAt!.hashCode) +
     (description == null ? 0 : description!.hashCode) +
     (isActivityEnabled == null ? 0 : isActivityEnabled!.hashCode) +
     (order == null ? 0 : order!.hashCode);
 
   @override
-  String toString() => 'UpdateAlbumDto[albumName=$albumName, albumThumbnailAssetId=$albumThumbnailAssetId, description=$description, isActivityEnabled=$isActivityEnabled, order=$order]';
+  String toString() => 'UpdateAlbumDto[albumName=$albumName, albumThumbnailAssetId=$albumThumbnailAssetId, createdAt=$createdAt, description=$description, isActivityEnabled=$isActivityEnabled, order=$order]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -93,6 +105,12 @@ class UpdateAlbumDto {
     if (this.albumThumbnailAssetId.isPresent) {
       final value = this.albumThumbnailAssetId.value;
       json[r'albumThumbnailAssetId'] = value;
+    }
+    if (this.createdAt.isPresent) {
+      final value = this.createdAt.value;
+      json[r'createdAt'] = value == null ? null : (_isEpochMarker(r'/^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$/')
+        ? value.millisecondsSinceEpoch
+        : value.toUtc().toIso8601String());
     }
     if (this.description.isPresent) {
       final value = this.description.value;
@@ -120,6 +138,7 @@ class UpdateAlbumDto {
       return UpdateAlbumDto(
         albumName: json.containsKey(r'albumName') ? Optional.present(mapValueOfType<String>(json, r'albumName')) : const Optional.absent(),
         albumThumbnailAssetId: json.containsKey(r'albumThumbnailAssetId') ? Optional.present(mapValueOfType<String>(json, r'albumThumbnailAssetId')) : const Optional.absent(),
+        createdAt: json.containsKey(r'createdAt') ? Optional.present(mapDateTime(json, r'createdAt', r'/^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$/')) : const Optional.absent(),
         description: json.containsKey(r'description') ? Optional.present(mapValueOfType<String>(json, r'description')) : const Optional.absent(),
         isActivityEnabled: json.containsKey(r'isActivityEnabled') ? Optional.present(mapValueOfType<bool>(json, r'isActivityEnabled')) : const Optional.absent(),
         order: json.containsKey(r'order') ? Optional.present(AssetOrder.fromJson(json[r'order'])) : const Optional.absent(),

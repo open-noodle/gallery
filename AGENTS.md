@@ -17,7 +17,8 @@ It's a monorepo managed with **pnpm workspaces** containing:
 - **cli/** — Node.js CLI (`@immich/cli`)
 - **open-api/** — OpenAPI spec and generated SDKs (`@immich/sdk`)
 - **e2e/** — End-to-end tests (Playwright + Vitest)
-- **docs/** — Docusaurus site deployed to `docs.opennoodle.de`
+- **docs/** — Docusaurus site deployed to `docs.opennoodle.de` (published, user-facing content only)
+- **specs/** — Internal design docs, mockups, research, and upstream-sync reports (not published)
 - **branding/** — Fork branding assets and the `apply-branding` script that rewrites upstream Immich references before Docker builds
 - **deployment/** — Demo, personal, and marketing deploy configs and scripts
 
@@ -161,8 +162,8 @@ The copy step (1) is needed because:
 - **Local DB**: Isar with Drift for migrations
 - **API client**: Generated from OpenAPI (in `mobile/openapi/`)
 - **Navigation**: auto_route
-- **Faces/people are local-first, and sync is owner-scoped.** The asset-viewer people strip (`people_details.widget.dart` → `driftPeopleAssetProvider` → `DriftPeopleRepository.getAssetPeople`) reads faces from the local Drift DB. The `person`/`asset_face` sync streams (`sync.repository.ts` `PersonSync`/`AssetFaceSync`) filter `ownerId = userId`, so a viewer never syncs faces for assets shared with them through a Space — unlike the web app, which fetches asset detail on demand (`AssetService.get`) and resolves those faces to the Space's people. For non-owned assets the mobile people strip therefore fetches from the asset-info endpoint (`PersonApiRepository.getAssetPeople`) to match web (issue #727); those server-resolved people are read-only on the strip, so the inline add-a-name / rename affordance is gated to owned assets. Tapping through to a shared person's own page still hits local Drift and remains limited.
-- **The global People page is the #727 sibling: server-sourced, not local.** For the same owner-scoped-sync reason, the global People page (`DriftPeopleCollectionPage`) can't read the local Drift `person` table (empty of shared-space people). It uses a dedicated `driftGetAllPeopleWithSharedSpacesProvider` → `DriftPeopleService.getAllPeopleWithSharedSpaces` → `PersonApiRepository.getAllPeopleWithSharedSpaces`, which pages `GET /api/people?withSharedSpaces=true` (own + timeline-enabled shared-space people, RBAC-projected server-side — same call the web People page makes) and re-sorts client-side to honour the People-page sort. It falls back to the owner-scoped local list only on server/offline failure. Keep this **separate** from the plain `driftGetAllPeopleProvider` / `getAllPeople` (local-only): those still feed the owner-scoped, local-first surfaces (the library people card), which intentionally must not surface shared-space people. Both providers are invalidated together at the people-list invalidation sites (rename/birthday modals, tab/gallery nav). **Note (mobile filter-parity #473):** the photos-filter people **picker** was moved OFF the local-only source onto `driftGetAllPeopleWithSharedSpacesProvider` (see `mobile/lib/providers/photos_filter/people_picker.provider.dart`) so its search surfaces shared-space people like the People page, falling back to the local list only offline — do not revert it to `driftGetAllPeopleProvider`. Tapping through to a shared person still reads the timeline from local Drift, same accepted limitation as the strip. **Edits are gated and routed exactly like web** (`person.service.ts` / `people/+page.svelte`): `_personToDriftPerson` carries `DriftPerson.spaceId` from `PersonResponseDto.primaryProfile` (non-null only for a `space-person` profile); a person is editable (rename / birthday / add-a-name / tap-through header + option sheet) iff it is personal/owned (null `spaceId`, always) **or** the viewer is an owner/editor of its space (`driftSpaceEditableProvider` → `SharedSpaceApiRepository.isSpaceEditor`, resolved optimistically — defaults to editable until known, fails open, since the server enforces the role). `DriftPeopleService.updateName/updateBrithday` route on `spaceId`: personal → owner-only `PersonApiRepository.update` + local Drift write; space → editor-gated `SharedSpaceApiRepository.updateSpacePerson` with **no** local write (no local row exists). Never send a space-person edit to the owner-only person endpoint. Viewer-only space people render read-only (plain name, no add-a-name, no options). The face thumbnail is likewise resolved per profile via `getPersonThumbnailUrl` (used by the grid avatar and the tap-through `PersonSliverAppBar` header): a Space person (non-null `spaceId`) routes to the membership-gated `GET /shared-spaces/{spaceId}/people/{profileId}/thumbnail`, a personal person to owner-only `GET /people/{id}/thumbnail`, mirroring web `getGlobalPersonThumbnailUrl` — the shared-space person id has no row in the owner-only `person` table, so the owner endpoint would 404.
+- **Shared-space content must be read from the server; the local sync DB is owner-scoped.** The `person`, `asset_face`, `memory` and `memory_asset` sync streams all filter `ownerId = userId`, so anything shared with the viewer through a Space is simply absent locally and has to come from the API to match web. Surfaces that do this: the asset-viewer people strip (`PersonApiRepository.getAssetPeople`, #727), the People page and the photos-filter people picker (`DriftPeopleService.getAllPeopleWithSharedSpaces`), and the memory lane (`MemoryApiRepository.getMemoryLane`, #997). Each falls back to the owner-scoped local query only on server/offline failure. Keep the plain local `getAllPeople` for the owner-scoped library people card. Person edits gate and route on `DriftPerson.spaceId` (set from `PersonResponseDto.primaryProfile`): a space person goes to the editor-gated `SharedSpaceApiRepository.updateSpacePerson` with no local write, never to the owner-only person endpoint, and editability resolves optimistically via `driftSpaceEditableProvider` (fails open; the server enforces the role). Space-person thumbnails route to `GET /shared-spaces/{spaceId}/people/{profileId}/thumbnail` — the owner-only person endpoint 404s for them. Still owner-only server-side, so still local: tapping through to a shared person's timeline, and `GET /memories/{id}` (the by-id memory deep link).
+- **Date-only query params must be hand-formatted.** The generated Dart client serialises every `DateTime` query param as a full ISO timestamp, which any endpoint validating `format: date` rejects with a 400 — e.g. `GET /memories?for=`. Build `YYYY-MM-DD` by hand (not with `intl`, whose digits follow the ambient locale) and send it via `ApiClient.invokeAPI`. Dropping such a filter is rarely free: without `for`, `/memories` stops applying `hideAt` and returns the whole retention window (365 days by default) with every asset attached.
 - **Running mobile unit tests locally** (mirrors `.github/workflows/test.yml`): use Flutter **3.44.8** — the pin lives in `mobile/mise.toml` (`"aqua:flutter/flutter" = "3.44.8"`), corroborated by `mobile/pubspec.yaml` (`flutter: 3.44.8`). Read the pin rather than trusting this line; it has gone stale before. A local `mise install` may symlink an older patch under a path that self-reports the wrong version, so if in doubt invoke the binary directly from `~/.local/share/mise/installs/aqua-flutter-flutter/<version>/flutter/bin/{flutter,dart}`. From `mobile/`: `flutter pub get`, then generate localization/keys once — `dart run easy_localization:generate -S ../i18n && dart run bin/generate_keys.dart` (the `lib/generated/*.g.dart` files are gitignored) — then `flutter test <path>`. Drift/OpenAPI generated code is committed, so `build_runner` is not needed for tests. **`dart analyze` is not a substitute for `flutter test`**: generated-code compile errors — e.g. a generator bump turning a class into a real Dart `enum`, so `.value` no longer exists — only surface when the test actually compiles.
 
 ### Machine Learning (Python)
@@ -180,6 +181,38 @@ The copy step (1) is needed because:
 - **Server imports**: No relative imports allowed — use `src/` path alias
 - **TypeScript**: Strict mode in all packages
 - **Async**: `no-floating-promises` and `no-misused-promises` enforced everywhere
+
+## Commit Messages & PR Descriptions
+
+**Never refer to an upstream Immich PR with a form GitHub autolinks.** This repo is a **fork of
+`immich-app/immich`**, so GitHub resolves a bare `#30881` against the **parent** repo and files an
+"added a commit that referenced this pull request" event on Immich's PR. The rolling rebase branch
+replays every fork commit under a new SHA each cycle, so one such reference re-notifies that
+upstream PR on **every force-push** — it is not a one-off.
+
+| Write this                        | Never this                                                     |
+| --------------------------------- | -------------------------------------------------------------- |
+| `immich-30881`                    | `#30881` · `PR#30881` · `GH-30881` · `immich-app/immich#30881` |
+| `sveltejs/svelte 18546`           | `sveltejs/svelte#18546`                                        |
+| `xneo1/portainer_templates PR 13` | a `github.com/<other-repo>/pull/13` URL                        |
+
+**Our own `#NNN` stays** — a fork PR or issue number resolves inside this repo and is the normal,
+useful case. Only numbers above our own PR numbering, and any explicit `owner/repo#N` or foreign
+issue/PR URL, cause the problem.
+
+This applies to **commit messages, PR titles and PR descriptions** — all three create
+cross-references. Ordinary file contents do not, so `specs/upstream-reports/*.md` may cite `#30900`
+freely.
+
+To check a branch, grep its own commits — anything this prints is a reference that will notify
+another repo (5+ digits, because Immich is well past 30000 while our own PR numbers are 4-digit):
+
+```bash
+git log origin/main..HEAD --format=%B | grep -nE '(^|[^0-9A-Za-z_/-])#[0-9]{5,}|[a-z0-9._-]+/[a-z0-9._-]+#[0-9]+'
+```
+
+The rolling rebase branch also carries `make commit-autolink-check`, which covers every autolink
+form GitHub honours; it reaches `main` at the next upstream cutover.
 
 ## i18n
 
@@ -213,14 +246,43 @@ Upstream Immich references are rewritten to Gallery at build time by `branding/a
 
 - **Release workflows** (manual `workflow_dispatch`, triggered from `main`): mobile and server release **independently** — no draft handoff, no auto-versioning (versions are always supplied manually).
   - **Release Mobile** (`.github/workflows/gallery-release-mobile.yml`): takes a required `version`, builds + signs the Android AAB/APK and iOS IPA, uploads the AAB to Play internal and the IPA to TestFlight, keeps the APK as a workflow artifact, and records the built commit SHA in the run summary. Creates no GitHub Release or git tag.
-  - **Release Gallery Server** (`.github/workflows/gallery-release-server-only.yml`): takes a required `version` and an optional `commit` (defaults to branch HEAD; pass the SHA the mobile run recorded to ship a matching build). Builds + pushes `gallery-server` / `gallery-ml` / `gallery-ml:*-cuda`, moves the `vX.Y.Z` / `vX` / `release` tags, creates the GitHub Release, and flips the version endpoint self-hosted instances poll. See `docs/plans/2026-05-18-decoupled-release-design.md`.
+  - **Release Gallery Server** (`.github/workflows/gallery-release-server-only.yml`): takes a required `version` and an optional `commit` (defaults to branch HEAD; pass the SHA the mobile run recorded to ship a matching build). Builds + pushes `gallery-server` / `gallery-ml` / `gallery-ml:*-cuda`, moves the `vX.Y.Z` / `vX` / `release` tags, creates the GitHub Release, and flips the version endpoint self-hosted instances poll. See `specs/2026-05-18-decoupled-release-design.md`.
 - **Deploy targets**: `demo.opennoodle.de` (demo), `docs.opennoodle.de` (Docusaurus). Each has a corresponding skill in `.claude/skills/` (see `/deploy-gallery-*` slash commands).
 - **RC builds**: `rc-personal` skill ships a tagged server image to the personal instance via a compose override — remember to remove the override after merge or release deploys will ship stale RC images.
 - **Automatic PR RC builds**: labelling a PR `rc` builds `ghcr.io/open-noodle/gallery-server:pr-<number>-rc.<n>` from the PR head on every push and keeps one sticky PR comment with tester instructions plus a history of earlier RCs; add `rc-ml` to also build `gallery-ml` under the same tag. **Tags are immutable** — `n` increments per build (resolved from the tags already in GHCR, never from the comment), so a tester can stay on or roll back to an earlier RC. There is no floating `pr-<number>` tag. All of a PR's RC images are deleted from GHCR when it closes. See `.github/workflows/gallery-pr-rc-comment.yml` and `gallery-pr-rc-cleanup.yml`.
 
+## Internal Design Docs (`specs/`)
+
+`specs/` holds the fork's internal engineering record. It is deliberately **outside `docs/`** so it is
+neither published to `docs.opennoodle.de`, prettier-gated, nor a trigger for the Docs Build workflow.
+
+```
+specs/                      design docs — one per feature/decision, durable
+specs/mockups/              HTML mockups and visual explorations (some are cited from web/src)
+specs/research/             feature research and prior-art notes
+specs/upstream-reports/     per-cycle upstream rebase reports
+specs/testing/              manual test plans
+```
+
+**Naming:** `YYYY-MM-DD-<topic>-design.md` for designs; keep the date of the *original* decision when
+revising, so the filename stays a stable citation target.
+
+**What belongs here — the test is lifespan, not format.** Write a doc here when it explains *why* the
+code is shaped the way it is, and will still be true after the PR merges: designs, decision records,
+diagnoses, permission matrices, research. Code may cite these by path (`grep -rn 'specs/' server/src web/src`),
+which only works because they live in-tree at the same commit as the code they explain.
+
+**What does NOT belong here:** slice-by-slice implementation plans, execution checklists, session
+handoffs, task lists, and "future improvements" wishlists. They expire the moment the work lands and
+then actively mislead — write them to a scratch directory instead. If something in a plan is worth
+keeping, fold it into the design doc or the PR description before you finish.
+
+**Pruning is expected.** `git log --diff-filter=D -- specs/` retrieves anything deleted, so deleting a
+doc that has gone stale loses nothing. A stale doc that stays costs every future search.
+
 ## Contributing & Docs
 
 - `CONTRIBUTING.md` and the README's Contributing section cover the dev-environment setup (`cp docker/example.env docker/.env`, `pnpm install`, `make dev`).
-- User-facing docs live in `docs/docs/` and are deployed to `docs.opennoodle.de`. Run prettier on any markdown under `docs/` or `docs/plans/` before committing — CI Docs Build is strict.
+- User-facing docs live in `docs/docs/` and are deployed to `docs.opennoodle.de`. Run prettier on any markdown under `docs/` before committing — CI Docs Build is strict. `specs/` is outside `docs/` precisely so it is *not* prettier-gated and does not trigger the Docs Build workflow.
 - Guides for switching to / from Gallery live under `docs/docs/guides/` — the switch-back-to-immich script is at `scripts/revert-to-immich/`.
 - The README's "What's Different from Upstream Immich" section must stay in feature parity with the marketing site (source of truth: `apps/marketing/src/data/features.ts` + `apps/marketing/src/pages/features/*.astro` in the `platform` repo) and mirror the grouping of the `noodle-gallery-vs-immich` comparison post. When a feature launches there (see the `launch-new-feature` skill), update this README too. Each feature links to `https://opennoodle.de/features/<marketing-slug>` and, where one exists, `https://docs.opennoodle.de/features/<docs-slug>` — note docs slugs can differ from marketing slugs (e.g. `dynamic-filters`→`dynamic-filter-suggestions`, `image-editing`/`video-trimming`→`editing`, `connected-libraries`→`libraries`, memories→`memories`, mobile apps→`mobile-app`).

@@ -1,7 +1,7 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Writable } from 'node:stream';
-import { AlbumUserRole, AssetVisibility, SyncEntityType, SyncRequestType } from 'src/enum';
-import { SyncService } from 'src/services/sync.service';
+import { AlbumUserRole, AssetVisibility, MemoryType, SyncEntityType, SyncRequestType } from 'src/enum';
+import { SYNC_TYPES_ORDER, SyncService } from 'src/services/sync.service';
 import { toAck } from 'src/utils/sync';
 import { authStub } from 'test/fixtures/auth.stub';
 import { newUuid } from 'test/small.factory';
@@ -482,13 +482,66 @@ describe(SyncService.name, () => {
       mocks.syncCheckpoint.getAll.mockResolvedValue([]);
       mocks.syncCheckpoint.getNow.mockResolvedValue({ nowId: 'now-id' });
       syncSubs.memory.getDeletes.mockReturnValue(makeStream([{ id: deleteId, memoryId: 'm1' }]));
-      syncSubs.memory.getUpserts.mockReturnValue(makeStream([{ updateId, id: 'm1', ownerId: 'u1' }]));
+      syncSubs.memory.getUpserts.mockReturnValue(
+        makeStream([{ updateId, id: 'm1', ownerId: 'u1', type: MemoryType.OnThisDay }]),
+      );
 
       await sut.stream(authStub.user1, writable, { types: [SyncRequestType.MemoriesV1] });
 
       const messages = parseChunks(chunks);
       expect(messages.some((m: any) => m.type === SyncEntityType.MemoryDeleteV1)).toBe(true);
       expect(messages.some((m: any) => m.type === SyncEntityType.MemoryV1)).toBe(true);
+    });
+
+    it('should omit fork-only memory types from the stream for clients that do not request a gallery-fork-only sync type (upstream Immich client compatibility, #999)', async () => {
+      const { writable, chunks } = makeWritable();
+      const onThisDayId = newUuid();
+      const ruleId = newUuid();
+
+      mocks.session.isPendingSyncReset.mockResolvedValue(false);
+      mocks.syncCheckpoint.getAll.mockResolvedValue([]);
+      mocks.syncCheckpoint.getNow.mockResolvedValue({ nowId: 'now-id' });
+      syncSubs.memory.getUpserts.mockReturnValue(
+        makeStream([
+          { updateId: onThisDayId, id: 'm1', ownerId: 'u1', type: MemoryType.OnThisDay },
+          { updateId: ruleId, id: 'm2', ownerId: 'u1', type: MemoryType.Rule },
+        ]),
+      );
+
+      // No gallery-fork-only sync type (e.g. SharedSpacesV1) requested alongside MemoriesV1 —
+      // this is the request shape an unmodified upstream Immich client sends, since its
+      // generated client has no fork-only SyncRequestType values to request in the first place.
+      await sut.stream(authStub.user1, writable, { types: [SyncRequestType.MemoriesV1] });
+
+      const memoryMessages = parseChunks(chunks).filter((m: any) => m.type === SyncEntityType.MemoryV1);
+      expect(memoryMessages).toHaveLength(1);
+      expect(memoryMessages[0].data.type).toBe(MemoryType.OnThisDay);
+    });
+
+    it('should include fork-only memory types for clients that also request a gallery-fork-only sync type', async () => {
+      const { writable, chunks } = makeWritable();
+      const onThisDayId = newUuid();
+      const ruleId = newUuid();
+
+      mocks.session.isPendingSyncReset.mockResolvedValue(false);
+      mocks.syncCheckpoint.getAll.mockResolvedValue([]);
+      mocks.syncCheckpoint.getNow.mockResolvedValue({ nowId: 'now-id' });
+      syncSubs.memory.getUpserts.mockReturnValue(
+        makeStream([
+          { updateId: onThisDayId, id: 'm1', ownerId: 'u1', type: MemoryType.OnThisDay },
+          { updateId: ruleId, id: 'm2', ownerId: 'u1', type: MemoryType.Rule },
+        ]),
+      );
+
+      await sut.stream(authStub.user1, writable, {
+        types: [SyncRequestType.MemoriesV1, SyncRequestType.SharedSpacesV1],
+      });
+
+      const memoryMessages = parseChunks(chunks).filter((m: any) => m.type === SyncEntityType.MemoryV1);
+      expect(memoryMessages.map((m: any) => m.data.type)).toEqual(
+        expect.arrayContaining([MemoryType.OnThisDay, MemoryType.Rule]),
+      );
+      expect(memoryMessages).toHaveLength(2);
     });
 
     it('should handle MemoryToAssetsV1 sync type', async () => {
@@ -1070,6 +1123,53 @@ describe(SyncService.name, () => {
         expect.objectContaining({ afterUpdateId: partialExtraId }),
         partnerId,
       );
+    });
+  });
+
+  // gallery-fork: mobile's `memory_asset_entity` carries real foreign keys — `assetId` →
+  // `remote_asset_entity.id` and `memoryId` → `memory_entity.id`. Drift inserts the whole
+  // MemoryToAssetV1 batch in one statement, so a single link row whose asset has not been
+  // streamed yet fails with SQLITE_CONSTRAINT_FOREIGNKEY (787), aborts the batch, and — because
+  // the batch is then never acked — leaves the sync stuck on the same checkpoint forever.
+  //
+  // Upstream keeps this safe by construction: every stream that carries an asset row
+  // (AssetsV*, PartnerAssetsV*, AlbumAssetsV*) is ordered before MemoryToAssetsV1, and a memory
+  // upstream can only ever reference the owner's own assets. The fork breaks that assumption in
+  // two ways: shared spaces, libraries and space albums deliver assets belonging to *other*
+  // owners, and a memory may legitimately reference them (MemoryRepository.search gates memory
+  // assets on visibility, not ownership). Those fork streams must therefore land before the
+  // memory link rows, exactly like AlbumAssetsV2 lands before AlbumToAssetsV1.
+  describe('SYNC_TYPES_ORDER', () => {
+    // Every request type whose mobile handler writes into `remote_asset_entity`.
+    const assetBearingTypes = [
+      SyncRequestType.AssetsV1,
+      SyncRequestType.AssetsV2,
+      SyncRequestType.PartnerAssetsV1,
+      SyncRequestType.PartnerAssetsV2,
+      SyncRequestType.AlbumAssetsV1,
+      SyncRequestType.AlbumAssetsV2,
+      SyncRequestType.SharedSpaceAssetsV1,
+      SyncRequestType.LibraryAssetsV1,
+      SyncRequestType.SharedSpaceAlbumAssetsV1,
+    ];
+
+    it('should stream every asset-bearing type before MemoryToAssetsV1', () => {
+      const linkIndex = SYNC_TYPES_ORDER.indexOf(SyncRequestType.MemoryToAssetsV1);
+      expect(linkIndex).toBeGreaterThan(-1);
+
+      const streamedAfter = assetBearingTypes.filter((type) => SYNC_TYPES_ORDER.indexOf(type) > linkIndex);
+      expect(streamedAfter).toEqual([]);
+    });
+
+    it('should stream MemoriesV1 before MemoryToAssetsV1', () => {
+      expect(SYNC_TYPES_ORDER.indexOf(SyncRequestType.MemoriesV1)).toBeLessThan(
+        SYNC_TYPES_ORDER.indexOf(SyncRequestType.MemoryToAssetsV1),
+      );
+    });
+
+    it('should order every asset-bearing type it names', () => {
+      const missing = assetBearingTypes.filter((type) => !SYNC_TYPES_ORDER.includes(type));
+      expect(missing).toEqual([]);
     });
   });
 

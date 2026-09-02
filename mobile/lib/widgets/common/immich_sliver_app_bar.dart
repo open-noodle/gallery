@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:auto_route/auto_route.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart';
@@ -65,8 +63,12 @@ class ImmichSliverAppBar extends ConsumerWidget {
           automaticallyImplyLeading: false,
           centerTitle: false,
           title: title ?? const _ImmichLogoWithText(),
+          // Sync progress rides the bottom edge of the bar rather than the actions row (#1030):
+          // an action that comes and goes changes how much width the title slot is offered, and
+          // the logo — a BoxFit.contain SVG — silently resized to match. flexibleSpace sits
+          // behind the toolbar, so the line costs the bar no height and no horizontal room.
+          flexibleSpace: const _SyncProgressLine(),
           actions: [
-            const _SyncStatusIndicator(),
             if (isCasting && !isReadonlyModeEnabled)
               IconButton(
                 onPressed: () => showDialog(context: context, builder: (context) => const CastDialog()),
@@ -83,6 +85,14 @@ class ImmichSliverAppBar extends ConsumerWidget {
   }
 }
 
+/// Height of the app-bar wordmark.
+///
+/// The artwork is 122x35, so this height asks for ~150 px of the title slot — and the slot is
+/// only ever `barWidth - actionsWidth - 2 * titleSpacing` wide. `SvgPicture` fits with
+/// `BoxFit.contain`, so anything the actions row takes beyond that budget comes straight out of
+/// the logo (#1030). Keep the actions row at or below ~155 px on the busiest bar, or lower this.
+const double _kLogoHeight = 43;
+
 class _ImmichLogoWithText extends StatelessWidget {
   const _ImmichLogoWithText();
 
@@ -92,7 +102,7 @@ class _ImmichLogoWithText extends StatelessWidget {
     duration: kThemeChangeDuration,
     child: SvgPicture.asset(
       context.isDarkTheme ? 'assets/immich-logo-inline-dark.svg' : 'assets/immich-logo-inline-light.svg',
-      height: 43,
+      height: _kLogoHeight,
     ),
   );
 }
@@ -264,84 +274,37 @@ class _BadgeLabel extends StatelessWidget {
   }
 }
 
-class _SyncStatusIndicator extends ConsumerStatefulWidget {
-  const _SyncStatusIndicator();
+/// Sync progress as a hairline along the bottom edge of the app bar.
+///
+/// Replaces the rotating `Icons.sync` action that used to sit in the actions row. As an action
+/// it occupied 40 px only while a sync was running, which moved the title slot's width under the
+/// logo twice per sync and made it visibly grow and shrink (#1030). A line costs no horizontal
+/// room at all, so nothing in the bar moves when a sync starts or finishes.
+class _SyncProgressLine extends ConsumerWidget {
+  const _SyncProgressLine();
+
+  static const double _height = 3;
 
   @override
-  ConsumerState<_SyncStatusIndicator> createState() => _SyncStatusIndicatorState();
-}
-
-class _SyncStatusIndicatorState extends ConsumerState<_SyncStatusIndicator> with TickerProviderStateMixin {
-  late AnimationController _rotationController;
-  late AnimationController _dismissalController;
-  late Animation<double> _rotationAnimation;
-  late Animation<double> _dismissalAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _rotationController = AnimationController(duration: const Duration(seconds: 2), vsync: this);
-    _dismissalController = AnimationController(duration: const Duration(milliseconds: 300), vsync: this);
-    _rotationAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(_rotationController);
-    _dismissalAnimation = Tween<double>(
-      begin: 1.0,
-      end: 0.0,
-    ).animate(CurvedAnimation(parent: _dismissalController, curve: Curves.easeOutQuart));
-  }
-
-  @override
-  void dispose() {
-    _rotationController.dispose();
-    _dismissalController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final syncStatus = ref.watch(syncStatusProvider);
     final isSyncing = syncStatus.isRemoteSyncing || syncStatus.isLocalSyncing;
 
-    // Control animations based on sync status
-    if (isSyncing) {
-      if (!_rotationController.isAnimating) {
-        _rotationController.repeat();
-      }
-      _dismissalController.reset();
-    } else {
-      _rotationController.stop();
-      if (_dismissalController.status == AnimationStatus.dismissed) {
-        _dismissalController.forward();
-      }
-    }
-
-    // Don't show anything if not syncing and dismissal animation is complete
-    if (!isSyncing && _dismissalController.status == AnimationStatus.completed) {
-      return const SizedBox.shrink();
-    }
-
-    return Padding(
-      padding: const EdgeInsets.all(8),
-      child: TweenAnimationBuilder<double>(
-        tween: Tween(end: IconTheme.of(context).opacity ?? 1),
-        duration: kThemeChangeDuration,
-        builder: (context, opacity, child) {
-          return AnimatedBuilder(
-            animation: Listenable.merge([_rotationAnimation, _dismissalAnimation]),
-            builder: (context, child) {
-              final dismissalValue = isSyncing ? 1.0 : _dismissalAnimation.value;
-              return IconTheme(
-                data: IconTheme.of(context).copyWith(opacity: opacity * dismissalValue),
-                child: Transform(
-                  alignment: Alignment.center,
-                  transform: Matrix4.identity()
-                    ..scaleByDouble(dismissalValue, dismissalValue, dismissalValue, 1.0)
-                    ..rotateZ(-_rotationAnimation.value * 2 * math.pi),
-                  child: const Icon(Icons.sync),
-                ),
-              );
-            },
-          );
-        },
+    // The multi-select fade is handled by the bar's own SliverAnimatedOpacity, so the line
+    // needs no opacity handling of its own — it simply is or is not there.
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: SizedBox(
+        height: _height,
+        child: isSyncing
+            ? LinearProgressIndicator(
+                key: const Key('app-bar-sync-progress'),
+                minHeight: _height,
+                // Only the travelling segment paints; an idle bar shows nothing at all.
+                backgroundColor: Colors.transparent,
+                semanticsLabel: 'sync'.tr(),
+              )
+            : null,
       ),
     );
   }

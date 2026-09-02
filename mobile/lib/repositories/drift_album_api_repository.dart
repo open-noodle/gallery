@@ -76,6 +76,7 @@ class DriftAlbumApiRepository extends ApiRepository {
     String? thumbnailAssetId,
     bool? isActivityEnabled,
     AlbumAssetOrder? order,
+    DateTime? createdAt,
   }) async {
     AssetOrder? apiOrder;
     if (order != null) {
@@ -88,6 +89,7 @@ class DriftAlbumApiRepository extends ApiRepository {
         UpdateAlbumDto(
           albumName: name == null ? const Optional.absent() : Optional.present(name),
           description: description == null ? const Optional.absent() : Optional.present(description),
+          createdAt: createdAt == null ? const Optional.absent() : Optional.present(createdAt),
           albumThumbnailAssetId: thumbnailAssetId == null
               ? const Optional.absent()
               : Optional.present(thumbnailAssetId),

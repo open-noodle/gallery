@@ -1,6 +1,6 @@
 import { AssetTypeEnum, MemoryType, type MemoryResponseDto } from '@immich/sdk';
 import '@testing-library/jest-dom';
-import { render, screen, waitFor } from '@testing-library/svelte';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import type { Component } from 'svelte';
 import TestWrapper from '$lib/components/TestWrapper.svelte';
 import { findMemoryAsset } from '$lib/utils/memory-viewer-source';
@@ -13,6 +13,7 @@ const {
   mockAssetViewerManager,
   mockAuthManager,
   mockGetAssetInfo,
+  mockGoto,
   mockMemoryManager,
   mockPage,
 } = vi.hoisted(() => ({
@@ -35,6 +36,7 @@ const {
     preferences: { memories: { duration: 5 }, tags: { enabled: true } },
   },
   mockGetAssetInfo: vi.fn(),
+  mockGoto: vi.fn(),
   mockMemoryManager: {
     memories: [] as MemoryResponseDto[],
     ready: vi.fn(),
@@ -52,7 +54,7 @@ const {
 
 vi.mock('$app/navigation', () => ({
   afterNavigate: mockAfterNavigate,
-  goto: vi.fn(),
+  goto: mockGoto,
 }));
 
 vi.mock('$app/state', () => ({ page: mockPage }));
@@ -194,6 +196,21 @@ function memory(id: string, assetIds: string[]): MemoryResponseDto {
   };
 }
 
+/** A memory whose assets span several years, as an `on_this_day_place` card does. */
+function multiYearMemory(id: string, assets: { id: string; localDateTime: string }[]): MemoryResponseDto {
+  return {
+    ...memory(
+      id,
+      assets.map(({ id }) => id),
+    ),
+    assets: assets.map(({ id, localDateTime }) =>
+      assetFactory.build({ id, type: AssetTypeEnum.Image, localDateTime, fileCreatedAt: localDateTime }),
+    ),
+    type: MemoryType.Rule,
+    data: { ruleId: 'on_this_day_place', title: 'On this day in Berlin', context: { years: [2021, 2025] } },
+  };
+}
+
 function renderViewer() {
   return render(TestWrapper as Component<{ component: typeof MemoryViewer; componentProps: Record<string, never> }>, {
     component: MemoryViewer,
@@ -272,5 +289,129 @@ describe('MemoryViewer memory-scoped navigation (#790)', () => {
         expect(href).toContain('memoryId=memory-2');
       }
     });
+  });
+});
+
+describe('MemoryViewer date overlay for a memory spanning years', () => {
+  const memoryAssets = [
+    { id: 'berlin-2021', localDateTime: '2021-08-26T13:48:33.000Z' },
+    { id: 'berlin-2025', localDateTime: '2025-08-26T18:15:01.000Z' },
+  ];
+  // `current` is recomputed inside afterNavigate, so replaying this callback with a new url is
+  // how the viewed asset changes in production — a fresh render cannot prove the overlay reacts.
+  let navigated: (nav: { from: null; to: { params: object; url: URL } }) => void;
+
+  const navigateTo = (url: string) => {
+    mockPage.url = new URL(url);
+    navigated({ from: null, to: { params: mockPage.params, url: mockPage.url } });
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockMemoryManager.memories = [multiYearMemory('memory-1', memoryAssets)];
+    mockMemoryManager.ready.mockResolvedValue(undefined);
+    mockMemoryManager.getMemoryAsset.mockImplementation((assetId: string | undefined, memoryId?: string) =>
+      findMemoryAsset(mockMemoryManager.memories, assetId, memoryId),
+    );
+    mockGetAssetInfo.mockResolvedValue(mockMemoryManager.memories[0].assets[0]);
+    mockPage.params = {};
+    mockAfterNavigate.mockImplementation((callback) => {
+      navigated = callback;
+      callback({ from: null, to: { params: mockPage.params, url: mockPage.url } });
+    });
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        observe = vi.fn();
+        disconnect = vi.fn();
+      },
+    );
+  });
+
+  it("shows the FIRST asset's date when it is the one being viewed", async () => {
+    mockPage.url = new URL('https://gallery.test/memory?id=berlin-2021&memoryId=memory-1');
+
+    renderViewer();
+
+    expect(await screen.findByText(/August 26, 2021/)).toBeInTheDocument();
+    expect(screen.queryByText(/August 26, 2025/)).not.toBeInTheDocument();
+  });
+
+  it("shows the SECOND asset's own date, not the memory's first asset", async () => {
+    mockPage.url = new URL('https://gallery.test/memory?id=berlin-2025&memoryId=memory-1');
+
+    renderViewer();
+
+    expect(await screen.findByText(/August 26, 2025/)).toBeInTheDocument();
+    expect(screen.queryByText(/August 26, 2021/)).not.toBeInTheDocument();
+  });
+
+  it('updates the date when paging from the 2021 photos into the 2025 ones', async () => {
+    mockPage.url = new URL('https://gallery.test/memory?id=berlin-2021&memoryId=memory-1');
+    renderViewer();
+    expect(await screen.findByText(/August 26, 2021/)).toBeInTheDocument();
+
+    navigateTo('https://gallery.test/memory?id=berlin-2025&memoryId=memory-1');
+
+    expect(await screen.findByText(/August 26, 2025/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText(/August 26, 2021/)).not.toBeInTheDocument());
+  });
+
+  it('offers a next control that targets the asset in the other year', async () => {
+    mockPage.url = new URL('https://gallery.test/memory?id=berlin-2021&memoryId=memory-1');
+
+    renderViewer();
+
+    // the overlay only tracks whatever `current` points at, so the forward control has to reach
+    // the 2025 asset for the paging test above to reflect a real user path
+    const next = await screen.findByLabelText('next_memory');
+    expect(next).toBeInTheDocument();
+    await fireEvent.click(next);
+    await waitFor(() => expect(mockGoto).toHaveBeenCalled());
+    expect(mockGoto.mock.calls.at(-1)?.[0]).toContain('berlin-2025');
+  });
+});
+
+describe('MemoryViewer date overlay across a memory boundary', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockMemoryManager.memories = [
+      multiYearMemory('memory-1', [
+        { id: 'paris-a', localDateTime: '2019-03-14T10:00:00.000Z' },
+        { id: 'paris-b', localDateTime: '2019-03-14T11:00:00.000Z' },
+      ]),
+      multiYearMemory('memory-2', [
+        { id: 'berlin-2021', localDateTime: '2021-08-26T13:48:33.000Z' },
+        { id: 'berlin-2025', localDateTime: '2025-08-26T18:15:01.000Z' },
+      ]),
+    ];
+    mockMemoryManager.ready.mockResolvedValue(undefined);
+    mockMemoryManager.getMemoryAsset.mockImplementation((assetId: string | undefined, memoryId?: string) =>
+      findMemoryAsset(mockMemoryManager.memories, assetId, memoryId),
+    );
+    mockGetAssetInfo.mockResolvedValue(mockMemoryManager.memories[0].assets[0]);
+    mockPage.params = {};
+    mockAfterNavigate.mockImplementation((callback) => {
+      callback({ from: null, to: { params: mockPage.params, url: mockPage.url } });
+    });
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        observe = vi.fn();
+        disconnect = vi.fn();
+      },
+    );
+  });
+
+  it("indexes within the current memory, not across the whole viewer's assets", async () => {
+    // berlin-2025 is asset 1 of memory-2, but asset 3 counting from the start of the viewer.
+    // Reading [0] gives 2021; reading a viewer-wide index would run off the end of memory-2.
+    mockPage.url = new URL('https://gallery.test/memory?id=berlin-2025&memoryId=memory-2');
+
+    renderViewer();
+
+    expect(await screen.findByText(/August 26, 2025/)).toBeInTheDocument();
+    expect(screen.queryByText(/August 26, 2021/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/March 14, 2019/)).not.toBeInTheDocument();
   });
 });

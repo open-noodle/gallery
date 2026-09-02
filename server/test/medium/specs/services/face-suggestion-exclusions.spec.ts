@@ -22,7 +22,7 @@ import { factory } from 'test/small.factory';
 import { getKyselyDB } from 'test/utils';
 import { Mocked } from 'vitest';
 
-// D3 (docs/superpowers/plans/2026-07-23-face-verdict-remediation-slice-3.md): the suggestion engine must
+// D3 of the face-verdict remediation work: the suggestion engine must
 // consult the SAME shared verdict layer the Face Cleanup engine writes to. This suite drives the REAL
 // suggestion-scan handlers (PersonService) and the REAL space-confirm handler (SharedSpaceService) against
 // one database, with real face-embedding search (no ANN mocking), and proves a face already settled by

@@ -168,18 +168,6 @@
   const smartFacetBuckets = $derived(showSearchResults ? (smartFacets?.timeBuckets ?? []) : timelineBuckets);
   const smartFacetTotal = $derived(showSearchResults ? smartFacets?.total : undefined);
 
-  const emptyFilterSuggestions = () => ({
-    countries: [],
-    cities: [],
-    cameraMakes: [],
-    cameraModels: [],
-    tags: [],
-    people: [],
-    ratings: [],
-    mediaTypes: [],
-    hasUnnamedPeople: false,
-  });
-
   const loadPhotoFilterSuggestions = async (nextFilters: FilterState) => {
     const context = buildFilterContext(nextFilters);
     const response = await getFilterSuggestions({
@@ -225,6 +213,9 @@
       ratings: response.ratings,
       mediaTypes: response.mediaTypes,
       hasUnnamedPeople: response.hasUnnamedPeople,
+      hasFavorites: response.hasFavorites,
+      hasAssetsInAlbum: response.hasAssetsInAlbum,
+      hasAssetsNotInAlbum: response.hasAssetsNotInAlbum,
     };
   };
 
@@ -306,7 +297,10 @@
 
       const facets = await loadPhotoSmartFacets(nextFilters);
       if (!facets) {
-        return emptyFilterSuggestions();
+        // #910: never resolve with a fabricated empty response — the panel cannot tell it apart from a
+        // genuinely empty library and would hide every section. Rejecting lets the panel keep the last
+        // good facets.
+        throw new Error('smart-search facets unavailable');
       }
 
       for (const p of facets.people) {
@@ -317,6 +311,10 @@
       }
       return mapSmartSearchFacetsToFilterSuggestions(facets);
     },
+    // #910: no baseline in query mode. A second concurrent facet request would abort the in-flight
+    // one (single `smartFacetInFlight` slot) and then clobber `smartFacets`, which feeds the
+    // timeline and the result count. `undefined` means "don't hide anything here" — see spec §4.5.
+    baselineProvider: async () => (showSearchResults ? undefined : loadPhotoFilterSuggestions(createFilterState())),
     providers: {
       ...normalProviders,
       cities: async (country, context) => {

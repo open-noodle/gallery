@@ -9,6 +9,11 @@
     searchQuery: string;
     filters: FilterState;
     spaceId?: string;
+    /**
+     * Album scope imposed by the host route — how an album detail page narrows a page-aware search
+     * to the album it is showing. Unioned with any `filters.albumId`; see `buildSmartSearchParams`.
+     */
+    albumIds?: string[];
     /** Shared-space surface + the caller's write capability on it — see `Timeline` (#889). */
     space?: { id: string; canWrite: boolean };
     withSharedSpaces?: boolean;
@@ -26,12 +31,15 @@
      * undone delete, since undo hands back TimelineAssets rather than full AssetResponseDtos.
      */
     reloadToken?: number;
+    /** Reports the results grid's scroll offset — see `SpaceSearchResults` (#1028). */
+    onScroll?: (scrollTop: number) => void;
   }
 
   let {
     searchQuery,
     filters,
     spaceId,
+    albumIds,
     space,
     withSharedSpaces,
     language,
@@ -40,7 +48,19 @@
     total,
     results: searchResults = $bindable([]),
     reloadToken = 0,
+    onScroll,
   }: Props = $props();
+
+  /**
+   * Content key for the album scope. Hosts pass `$derived([album.id])`, and Svelte's derived
+   * compares with `===`, so every unrelated `album` reassignment — a rename, the `refreshAlbum()`
+   * that follows a delete — mints a fresh array. Tracking the ARRAY in the re-search effect below
+   * would discard every loaded page and re-run the whole vector search on each of those. Reading it
+   * through a `$derived` string collapses that to value equality: the effect only re-fires when the
+   * scope genuinely changes. (Calling `.join()` inside the effect would not help — reading the prop
+   * at all is what registers the dependency.)
+   */
+  const albumScopeKey = $derived(albumIds?.join(',') ?? '');
 
   let hasMoreResults = $state(false);
   let searchPage = $state(1);
@@ -60,7 +80,7 @@
     try {
       const { assets } = await searchSmart({
         smartSearchDto: {
-          ...buildSmartSearchParams({ query, filters, spaceId, withSharedSpaces, language }),
+          ...buildSmartSearchParams({ query, filters, spaceId, albumIds, withSharedSpaces, language }),
           page,
           size: 100,
         },
@@ -75,7 +95,7 @@
       // (smart_search.embedding <=>) so that vchord's ordered index scan can
       // be used; identical embeddings (byte-identical image content) can then
       // yield the same asset.id on adjacent pages. See
-      // docs/plans/2026-04-21-search-tiebreaker-design.md.
+      // specs/2026-04-21-search-tiebreaker-design.md.
       searchResults = append ? dedupeAppend(searchResults, assets.items) : assets.items;
       searchPage = page;
       hasMoreResults = assets.nextPage !== null;
@@ -108,6 +128,10 @@
     const _ = [
       searchQuery,
       reloadToken,
+      // Navigating straight from one album to a sibling keeps this component mounted and only swaps
+      // the scope, so it has to re-search like any other narrowing change. Tracked by CONTENT via
+      // `albumScopeKey` — see its doc comment for why the array itself must not be read here.
+      albumScopeKey,
       filters.personIds,
       filters.city,
       filters.country,
@@ -153,4 +177,5 @@
   {isShared}
   sortMode={filters.sortOrder}
   {total}
+  {onScroll}
 />

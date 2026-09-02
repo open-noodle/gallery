@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { DateTime } from 'luxon';
+import { SystemConfig } from 'src/config';
 import { Memory } from 'src/database';
 import { OnJob } from 'src/decorators';
 import { BulkIdResponseDto, BulkIdsDto } from 'src/dtos/asset-ids.response.dto';
@@ -15,11 +16,21 @@ import {
   isMemoryTypeEnabledForUser,
 } from 'src/services/memory-rules/memory-type.metadata';
 import { createMemoryRules } from 'src/services/memory-rules/memory-type.registry';
+import { MemoryThemeSearchAdapter } from 'src/services/memory-rules/theme-search.adapter';
+import { ThemeSearchPort } from 'src/services/memory-rules/theme-search.port';
 import { addAssets, removeAssets } from 'src/utils/asset.util';
 import { getPreferences } from 'src/utils/preferences';
 
 const DAYS = 3;
-const RULE_DAILY_LIMIT = 2;
+/**
+ * Cap on rule memories *visible* on a given day, so a multi-day recap holds its slot for its
+ * whole window. Sized from the worst-case overlap of the current rules: the calendar-fixed
+ * windows only ever overlap two deep (e.g. `person_throwback` 13–19 and `favorites_throwback`
+ * 15–21), plus `recent_trip` and `trip_anniversary`, which can start on any day — four lingering
+ * cards. The remaining two slots keep the date-anchored 1-day rules (`birthday` above all, since
+ * a missed one waits a year) from ever being crowded out.
+ */
+export const RULE_DAILY_LIMIT = 6;
 
 @Injectable()
 export class MemoryService extends BaseService {
@@ -112,11 +123,34 @@ export class MemoryService extends BaseService {
     );
   }
 
-  private getMemoryRules(enabledKeys: Iterable<string>): MemoryRule[] {
+  private themeSearchPort?: ThemeSearchPort;
+
+  /** Overridable seam: the medium test subclasses MemoryService to inject a stub. */
+  protected createThemeSearchPort(): ThemeSearchPort {
+    return new MemoryThemeSearchAdapter(
+      this.machineLearningRepository,
+      this.searchRepository,
+      () => this.getConfig({ withCache: true }),
+      this.logger,
+    );
+  }
+
+  /**
+   * Memoized per-service-instance: the adapter holds the embedding cache, so a theme is encoded
+   * once per process rather than once per user per night.
+   */
+  private getThemeSearchPort(): ThemeSearchPort {
+    this.themeSearchPort ??= this.createThemeSearchPort();
+    return this.themeSearchPort;
+  }
+
+  private getMemoryRules(enabledKeys: Iterable<string>, memories: SystemConfig['memories']): MemoryRule[] {
     return createMemoryRules(enabledKeys, {
       personRepository: this.personRepository,
       assetRepository: this.assetRepository,
       memoryRepository: this.memoryRepository,
+      themeSearchPort: this.getThemeSearchPort(),
+      memories,
     });
   }
 
@@ -131,9 +165,14 @@ export class MemoryService extends BaseService {
       return;
     }
 
-    const showAt = target.startOf('day').toJSDate();
-    const hideAt = target.endOf('day').toJSDate();
+    const startOfDay = target.startOf('day');
+    const showAt = startOfDay.toJSDate();
     const seenDedupeKeys = new Set<string>();
+    // A multi-day (recap) rule may occupy at most one slot per trigger day. Without this, a
+    // single recap type that qualifies for several past years could take BOTH daily slots and
+    // hold them for its whole 7–10-day window, monthly starving the 1-day rules. 1-day rules
+    // are unaffected and may still fill every remaining slot on their own day.
+    const insertedMultiDayRuleIds = new Set<string>();
     const evaluatedCandidates = await this.evaluateRuleCandidates(ownerId, target, enabledRuleKeys);
     const candidates = evaluatedCandidates.toSorted((left, right) => right.score - left.score);
     let inserted = 0;
@@ -149,9 +188,19 @@ export class MemoryService extends BaseService {
 
       seenDedupeKeys.add(candidate.dedupeKey);
 
+      const isMultiDay = (candidate.visibleForDays ?? 1) > 1;
+      if (isMultiDay && insertedMultiDayRuleIds.has(candidate.ruleId)) {
+        continue;
+      }
+
       if (await this.memoryRepository.hasRuleMemory(ownerId, candidate.ruleId, candidate.dedupeKey)) {
         continue;
       }
+
+      const hideAt = startOfDay
+        .plus({ days: Math.max(1, candidate.visibleForDays ?? 1) - 1 })
+        .endOf('day')
+        .toJSDate();
 
       await this.memoryRepository.create(
         {
@@ -171,6 +220,18 @@ export class MemoryService extends BaseService {
         },
         new Set(candidate.assetIds),
       );
+      // A card that stands in for the day's plain "N years ago" memory replaces it rather than
+      // sitting beside it — the two hold substantially the same photos. Safe to run after the
+      // insert: the on-this-day loop writes up to DAYS ahead and runs first inside this lock,
+      // so that memory already exists, and its cursor only ever moves forward, so it is never
+      // recreated afterwards. (Resetting MemoriesState can bring the pair back for a few days;
+      // retention clears it.)
+      for (const year of candidate.supersedesOnThisDayYears ?? []) {
+        await this.memoryRepository.deleteOnThisDay({ ownerId, year, showAt });
+      }
+      if (isMultiDay) {
+        insertedMultiDayRuleIds.add(candidate.ruleId);
+      }
       inserted++;
     }
   }
@@ -181,8 +242,9 @@ export class MemoryService extends BaseService {
     enabledRuleKeys: Iterable<string>,
   ): Promise<MemoryRuleCandidate[]> {
     const candidates: MemoryRuleCandidate[] = [];
+    const { memories } = await this.getConfig({ withCache: true });
 
-    for (const rule of this.getMemoryRules(enabledRuleKeys)) {
+    for (const rule of this.getMemoryRules(enabledRuleKeys, memories)) {
       try {
         candidates.push(...(await rule.evaluate({ ownerId, target })));
       } catch (error) {
