@@ -55,6 +55,20 @@ const giveOwnFace = async (ctx: ReturnType<typeof setup>['ctx'], assetId: string
   return faceId;
 };
 
+// getAllForUser helpers. One axis of a 512-dim unit vector, so the cosine distance between two of
+// them is exactly 0 (same axis) or 1 (different) — no near-miss arithmetic to reason about.
+const axis = (index: number) =>
+  '[' + Array.from({ length: 512 }, (_, position) => (position === index ? 1 : 0)).join(',') + ']';
+
+const seedFace = async (
+  ctx: ReturnType<typeof setup>['ctx'],
+  input: { assetId: string; personId?: string; embedding: string },
+) => {
+  const { result: faceId } = await ctx.newAssetFace({ assetId: input.assetId, personId: input.personId ?? null });
+  await ctx.database.insertInto('face_search').values({ faceId, embedding: input.embedding }).execute();
+  return faceId;
+};
+
 describe(PersonRepository.name, () => {
   describe('getByName', () => {
     it('matches names case-insensitively', async () => {
@@ -1017,6 +1031,52 @@ describe(PersonRepository.name, () => {
 
       expect(people).toEqual([expect.objectContaining({ id: human.id })]);
       expect(faces).toEqual([expect.objectContaining({ id: humanFaceId, personId: human.id })]);
+    });
+  });
+
+  describe('getAllForUser', () => {
+    // The picker asks for one page of 500. When `closestFaceAssetId` ordered by resemblance ALONE,
+    // that LIMIT cut named people out of the page purely on resemblance — and since resemblance is
+    // the only input that changes between two faces on the same photo, the same picker offered a
+    // different set of names for each face it was opened on (#992: ten names for one face, two for
+    // the next). Named people now sort first, ahead of the limit, so no page is all clusters while
+    // names go missing. `take: 1` stands in for the real 500 against a real library.
+    it('keeps a named person in the page when a cluster resembles the edited face more closely', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+
+      const editedFaceId = await seedFace(ctx, { assetId: asset.id, embedding: axis(0) });
+
+      // Named, and deliberately the WORSE match: distance 1 to the edited face.
+      const { person: named } = await ctx.newPerson({ ownerId: user.id, name: 'Zelda' });
+      const namedFaceId = await seedFace(ctx, { assetId: asset.id, personId: named.id, embedding: axis(1) });
+      await ctx.database.updateTable('person').set({ faceAssetId: namedFaceId }).where('id', '=', named.id).execute();
+
+      // Unnamed, so it needs three faces to clear the minimum-faces floor, and the PERFECT match:
+      // distance 0. Ordering on resemblance alone puts it first and `take: 1` then drops Zelda.
+      const { person: cluster } = await ctx.newPerson({ ownerId: user.id, name: '' });
+      const clusterFaceId = await seedFace(ctx, { assetId: asset.id, personId: cluster.id, embedding: axis(0) });
+      await seedFace(ctx, { assetId: asset.id, personId: cluster.id, embedding: axis(0) });
+      await seedFace(ctx, { assetId: asset.id, personId: cluster.id, embedding: axis(0) });
+      await ctx.database
+        .updateTable('person')
+        .set({ faceAssetId: clusterFaceId })
+        .where('id', '=', cluster.id)
+        .execute();
+
+      const firstPage = await sut.getAllForUser({ take: 1, skip: 0 }, user.id, {
+        withHidden: true,
+        closestFaceAssetId: editedFaceId,
+      });
+      expect(firstPage.items.map((person) => person.name)).toEqual(['Zelda']);
+
+      // Both are still offered, and resemblance still orders within each group.
+      const wholeList = await sut.getAllForUser({ take: 10, skip: 0 }, user.id, {
+        withHidden: true,
+        closestFaceAssetId: editedFaceId,
+      });
+      expect(wholeList.items.map((person) => person.name)).toEqual(['Zelda', '']);
     });
   });
 

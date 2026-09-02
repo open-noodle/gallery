@@ -551,21 +551,34 @@ export class PersonRepository {
       )
       .groupBy('person.id')
       .$if(!!options?.closestFaceAssetId, (qb) =>
-        qb.orderBy((eb) =>
-          eb(
-            (eb) =>
-              eb
-                .selectFrom('face_search')
-                .select('face_search.embedding')
-                .whereRef('face_search.faceId', '=', 'person.faceAssetId'),
-            '<=>',
-            (eb) =>
-              eb
-                .selectFrom('face_search')
-                .select('face_search.embedding')
-                .where('face_search.faceId', '=', options!.closestFaceAssetId!),
-          ),
-        ),
+        qb
+          // Named people first, exactly as the branch below does. This is NOT cosmetic here: the
+          // ordering runs BEFORE the LIMIT, and this page is 500 rows by default. A library with
+          // more people than that (unnamed clusters dominate the count) would otherwise have its
+          // named people truncated away by resemblance alone -- and which ones survived changed
+          // per face, because resemblance is the only thing that changed. Reported on #992: the
+          // same picker, on the same photo, listed ten named people for one face and two for the
+          // next. No amount of client-side re-ordering can recover a row the page never contained.
+          .orderBy(sql`NULLIF(BTRIM(person.name), '') is null`, 'asc')
+          .orderBy((eb) =>
+            eb(
+              (eb) =>
+                eb
+                  .selectFrom('face_search')
+                  .select('face_search.embedding')
+                  .whereRef('face_search.faceId', '=', 'person.faceAssetId'),
+              '<=>',
+              (eb) =>
+                eb
+                  .selectFrom('face_search')
+                  .select('face_search.embedding')
+                  .where('face_search.faceId', '=', options!.closestFaceAssetId!),
+            ),
+          )
+          // Resemblance is NULL for every person whose representative face has no embedding, and
+          // NULL for all of them when the edited face has none — leaving the order unspecified
+          // and OFFSET paging free to repeat or skip a row. The id makes it total.
+          .orderBy('person.id'),
       )
       .$if(!options?.closestFaceAssetId, (qb) =>
         qb
