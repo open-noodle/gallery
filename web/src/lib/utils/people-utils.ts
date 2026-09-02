@@ -120,10 +120,14 @@ export const getSpacePersonThumbnailUrl = (spaceId: string, personId: string, up
  * interleaved buries every name — reported on #992 as "an unstructured list of unlabeled faces
  * instead of the named people list".
  *
- * The partition is STABLE, so whatever order the caller arrived with survives inside each group.
- * That matters most for the owner's picker, whose `closestAssetId` order is "looks most like this
- * face": the likeliest named person stays first, and the clusters simply move below. The space
- * picker already arrives named-first alphabetical (`getPersonsBySpaceId`), so this is a no-op there.
+ * A BACKSTOP rather than the mechanism: all three sources now arrive named-first on their own — the
+ * owner's list (`getAllForUser`, alphabetical), the space list (`getPersonsBySpaceId`) and a name
+ * search (every result has a name by construction). This keeps the invariant the picker rests on
+ * true at the point of rendering rather than depending on three separate queries continuing to
+ * agree about it.
+ *
+ * The partition is STABLE, so whatever order the caller arrived with survives inside each group —
+ * alphabetical stays alphabetical.
  */
 export function orderPickerCandidates<T extends { name: string }>(candidates: T[]): T[] {
   const named: T[] = [];

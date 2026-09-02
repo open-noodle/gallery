@@ -84,10 +84,22 @@ describe('AssignFaceSidePanel', () => {
     searchPersonMock.mockResolvedValue([]);
   });
 
+  // Field report against pr-992-rc.8: the list "doesn't seem to follow any clear sort order,
+  // neither alphabetical nor by frequency", which on a library with several hundred people makes it
+  // impossible to scroll to anyone. It was ordered by resemblance to the tapped face -- upstream's
+  // `closestAssetId`, a name suggestion that is useful for a handful of rows and noise after them.
+  // Asking without it takes `getAllForUser`'s alphabetical branch, the same order every other
+  // people list in the fork serves.
+  it('asks for the alphabetical list, not the one ordered by resemblance', async () => {
+    renderPanel();
+
+    await waitFor(() => expect(getAllPeopleMock).toHaveBeenCalledWith({ withHidden: true }));
+  });
+
   // Field report against pr-992-rc.5: the admin -- who owns the photos, so lands here rather than
   // on the space-flavoured picker -- got "an unstructured list of unlabeled faces instead of the
-  // named people list". `getAllPeople` orders by resemblance to the edited face and includes every
-  // unnamed cluster in the library, so on a real library the named people are buried.
+  // named people list". The server sorts named people first now; this is the rendering-side
+  // backstop for that, and it must not disturb the alphabetical order it arrives in.
   it('lists named people ahead of the unnamed clusters', async () => {
     getAllPeopleMock.mockResolvedValue({
       people: [

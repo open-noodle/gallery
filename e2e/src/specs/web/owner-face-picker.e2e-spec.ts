@@ -14,14 +14,12 @@ import { utils } from 'src/utils';
 // this one, and reported "an unstructured list of unlabeled faces instead of the named people
 // list". Both now render through `PersonPickerPanel.svelte`.
 //
-// Why the ordering assertion needs a favourite. `getAllPeople` orders named people first ONLY on
-// its no-`closestFaceAssetId` branch (`getAllForUser`, person.repository.ts): the picker passes
-// `closestAssetId`, which swaps that whole block for an embedding distance ordering. These
-// fixtures have no `face_search` rows, so every distance is NULL and the preceding
-// `isFavorite DESC` is what actually decides the order. Favouriting the UNNAMED cluster is
-// therefore the one lever that makes the server hand the picker its candidates unnamed-first --
-// without it this test would pass whether or not the client re-orders anything, which is no test
-// at all.
+// Why the ordering assertion needs a favourite. The picker asks `getAllPeople` WITHOUT
+// `closestAssetId`, so `getAllForUser` serves its alphabetical branch and already sorts named
+// people ahead of clusters. `isFavorite DESC` outranks that key, though, so favouriting the UNNAMED
+// cluster is the one lever left that makes the server hand the picker its candidates
+// cluster-first -- without it the render assertion would pass whether or not the client re-orders
+// anything, which is no test at all.
 
 async function openInfoPanel(page: Page) {
   const navbar = page.getByTestId('asset-viewer-navbar-actions');
@@ -50,6 +48,7 @@ test.describe("Owner's face picker — named people first, search in plain sight
   let owner: LoginResponseDto;
   let assetId: string;
   const namedPerson = 'Zelda Namewell';
+  const firstAlphabetically = 'Anna Aardvark';
 
   test.beforeAll(async () => {
     utils.initSdk();
@@ -65,9 +64,12 @@ test.describe("Owner's face picker — named people first, search in plain sight
     await utils.createFace({ assetId: anchorAsset.id, personId: anchor.id });
     assetId = anchorAsset.id;
 
-    const named = await utils.createPerson(owner.accessToken, { name: namedPerson });
-    const namedAsset = await utils.createAsset(owner.accessToken);
-    await utils.createFace({ assetId: namedAsset.id, personId: named.id });
+    // Created in REVERSE alphabetical order, so creation order cannot masquerade as sorted.
+    for (const name of [namedPerson, firstAlphabetically]) {
+      const named = await utils.createPerson(owner.accessToken, { name });
+      const namedAsset = await utils.createAsset(owner.accessToken);
+      await utils.createFace({ assetId: namedAsset.id, personId: named.id });
+    }
 
     // Unnamed, so it needs three faces to clear the minimum-faces floor, and favourited so the
     // server returns it FIRST — see the header note.
@@ -78,26 +80,26 @@ test.describe("Owner's face picker — named people first, search in plain sight
     }
   });
 
-  // The complaint itself. The server hands this picker the favourited unnamed cluster first; the
-  // person with a name has to come out on top regardless.
-  test('lists the named person ahead of the unnamed cluster the server returned first', async ({ context, page }) => {
+  // The complaint itself, in both of its rounds: named people ahead of the clusters, and among
+  // themselves in alphabetical order rather than by resemblance to the tapped face.
+  test('lists named people alphabetically, ahead of the unnamed cluster', async ({ context, page }) => {
     await utils.setAuthCookies(context, owner.accessToken);
 
     // Armed before the picker opens, because the request fires as the panel mounts. Asserting on
-    // what the SERVER sent is what stops this test being vacuous: if `getAllPeople` ever came back
-    // named-first on its own, the rendered order below would prove nothing about the client, and
-    // this line fails loudly instead of the test quietly ceasing to test anything.
-    const servedPeople = page.waitForResponse(
-      (response) => response.url().includes('/api/people') && response.url().includes('closestAssetId'),
-    );
+    // what the SERVER sent is what stops the render assertion below being vacuous: the favourited
+    // cluster leads the response (`isFavorite DESC` outranks the name), so the rendered order can
+    // only come out named-first if the client really does re-partition. If that response order ever
+    // changes, this line fails loudly rather than the test quietly ceasing to test anything.
+    const servedPeople = page.waitForResponse((response) => response.url().includes('/api/people?withHidden=true'));
 
     const { captions } = await openFacePicker(page, assetId);
 
     const { people } = await (await servedPeople).json();
-    expect(people.map((person: { name: string }) => person.name)).toEqual(['', namedPerson]);
+    expect(people.map((person: { name: string }) => person.name)).toEqual(['', firstAlphabetically, namedPerson]);
 
-    // ...and the picker turns that around. The cluster is the empty caption.
-    await expect(captions).toHaveText([namedPerson, '']);
+    // Alphabetical among the named, cluster last — and note the named pair arrives already sorted,
+    // so this also pins that the client's partition leaves that order alone.
+    await expect(captions).toHaveText([firstAlphabetically, namedPerson, '']);
   });
 
   // The search sat behind a magnifier icon, so on a library of any size the first thing this panel
@@ -117,7 +119,7 @@ test.describe("Owner's face picker — named people first, search in plain sight
     await utils.setAuthCookies(context, owner.accessToken);
 
     const { panel, captions } = await openFacePicker(page, assetId);
-    await expect(captions).toHaveCount(2);
+    await expect(captions).toHaveCount(3);
 
     const search = page.waitForResponse((response) => response.url().includes('/search/person'));
     await panel.getByPlaceholder('Search people').fill('Zelda');
