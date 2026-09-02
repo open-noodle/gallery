@@ -21,9 +21,11 @@ class FilterSheet extends ConsumerStatefulWidget {
 
 class _FilterSheetState extends ConsumerState<FilterSheet> {
   /// The sheet's only resting extent. Deliberately short of 1.0 so a strip of
-  /// dimmed timeline stays visible above it: that strip is the scrim's tap
-  /// target, and it keeps the panel reading as a layer over the photos rather
-  /// than a screen of its own.
+  /// dimmed timeline stays visible above it, which keeps the panel reading as a
+  /// layer over the photos rather than a screen of its own. On iOS that strip
+  /// doubles as a tap-to-close target; on Android it sits under the status-bar
+  /// window, which swallows the touch, so treat closing there as ✕ / Done /
+  /// system-back / drag-to-dismiss.
   static const _snapFull = 0.95;
 
   /// Lowest extent the sheet can be dragged to before it dismisses.
@@ -76,11 +78,19 @@ class _FilterSheetState extends ConsumerState<FilterSheet> {
     final view = View.of(context);
     final textDirection = Directionality.of(context);
 
-    // Registered before the mount gate below, so it also sees hidden → visible.
-    // (Inside the gate it would only be registered on builds where the sheet is
-    // already up, and so would never fire for the transition that opens it.)
+    // Registered before the mount gate below, so it sees every transition —
+    // including hidden → visible, which a listener registered inside the gate
+    // could never see (on that build the gate had already returned).
     ref.listen<FilterSheetVisibility>(photosFilterSheetProvider, (prev, next) {
-      if (next == FilterSheetVisibility.hidden || !accessibleNavigation) return;
+      if (next == FilterSheetVisibility.hidden) {
+        // Something other than the drag closed the sheet (✕, Done, back, scrim,
+        // a submitted search). Drop any settle still in flight: it was measured
+        // against a sheet that is already gone, and firing it later would close
+        // whatever the user has reopened since.
+        _settleTimer?.cancel();
+        return;
+      }
+      if (!accessibleNavigation) return;
       SemanticsService.sendAnnouncement(view, 'filter panel opened', textDirection);
     });
 
