@@ -433,6 +433,100 @@ export function accessibleTimelineAssetPredicate(options: {
             })}`;
 }
 
+/**
+ * The service-resolved scope of what a caller has hidden from their OWN timeline. See
+ * `SharedSpaceRepository.getTimelineHiddenScope` — this type is its return shape.
+ */
+export interface TimelineHiddenScope {
+  hiddenSpaceIds: string[];
+  hiddenAlbumIds: string[];
+  hiddenAlbumSpacePairs: Array<{ albumId: string; spaceId: string }>;
+  hiddenLibraryIds: string[];
+}
+
+/**
+ * #1041: the subtraction applied to the caller's OWN assets — "I have hidden every way this photo
+ * reaches a space, so keep it off my timeline".
+ *
+ * Returns `undefined` when the scope is empty so the caller emits nothing at all; that is the common
+ * case and keeps the change free for everyone who has hidden nothing (mirrors the hasTimelineSpaces
+ * collapse in {@link accessibleTimelineAssetPredicate}).
+ *
+ * Attach ONLY to the caller's own-id arm — never to `userIds`, which includes partners. See §6.4 of
+ * the design doc: AND-ing this into the shared owner arm would remove a PARTNER's photos based on the
+ * CALLER's flags.
+ *
+ * Deliberately NOT wired into any query yet (slice 6) — slice 8 does that.
+ */
+export function hiddenFromOwnTimeline(
+  eb: ExpressionBuilder<DB, keyof DB>,
+  scope: TimelineHiddenScope,
+): Expression<SqlBool> | undefined {
+  const terms: Expression<SqlBool>[] = [];
+
+  if (scope.hiddenSpaceIds.length > 0) {
+    terms.push(
+      eb.not(
+        eb.exists(
+          eb
+            .selectFrom('shared_space_asset')
+            .select(eb.lit(1).as('exists'))
+            .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+            .where('shared_space_asset.spaceId', '=', anyUuid(scope.hiddenSpaceIds)),
+        ),
+      ),
+    );
+  }
+
+  if (scope.hiddenAlbumIds.length > 0) {
+    terms.push(
+      eb.not(
+        eb.exists(
+          eb
+            .selectFrom('album_asset')
+            .select(eb.lit(1).as('exists'))
+            .whereRef('album_asset.assetId', '=', 'asset.id')
+            .where('album_asset.albumId', '=', anyUuid(scope.hiddenAlbumIds)),
+        ),
+      ),
+    );
+  }
+
+  if (scope.hiddenAlbumSpacePairs.length > 0) {
+    terms.push(
+      eb.not(
+        eb.exists(
+          eb
+            .selectFrom('album_space_asset')
+            .select(eb.lit(1).as('exists'))
+            .whereRef('album_space_asset.assetId', '=', 'asset.id')
+            .where((inner) =>
+              inner.or(
+                scope.hiddenAlbumSpacePairs.map((pair) =>
+                  inner.and([
+                    inner('album_space_asset.albumId', '=', asUuid(pair.albumId)),
+                    inner('album_space_asset.spaceId', '=', asUuid(pair.spaceId)),
+                  ]),
+                ),
+              ),
+            ),
+        ),
+      ),
+    );
+  }
+
+  if (scope.hiddenLibraryIds.length > 0) {
+    // asset.libraryId is NULLABLE and `NULL <> ALL (...)` is NULL, not true — the bare form would
+    // subtract every asset that has no library, i.e. most of the timeline. The IS NULL arm is
+    // mandatory. Pinned by E13.
+    terms.push(
+      eb.or([eb('asset.libraryId', 'is', null), eb.not(eb('asset.libraryId', '=', anyUuid(scope.hiddenLibraryIds)))]),
+    );
+  }
+
+  return terms.length > 0 ? eb.and(terms) : undefined;
+}
+
 export function spaceAlbumAssetExistsSql(options: SpaceAlbumAssetSqlOptions): RawBuilder<SqlBool> {
   const albumJoin =
     (options.requireAlbumNotDeleted ?? true)
