@@ -26275,6 +26275,7 @@
           "themeMaxDistance": {
             "default": 0.75,
             "description": "Max CLIP cosine distance for themed memories",
+            "format": "double",
             "maximum": 2,
             "minimum": 0,
             "type": "number"
@@ -26802,7 +26803,9 @@
             "type": "string"
           },
           "assetCount": {
-            "type": "number"
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
           },
           "endDate": {
             "type": "string"
@@ -29734,7 +29737,9 @@
             "type": "boolean"
           },
           "total": {
-            "type": "number"
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
           }
         },
         "required": [
@@ -29747,7 +29752,9 @@
       "FaceRepairDeclineCreatedDto": {
         "properties": {
           "created": {
-            "type": "number"
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
           }
         },
         "required": [
@@ -29861,7 +29868,9 @@
       "FaceRepairDeclineRemovedDto": {
         "properties": {
           "removed": {
-            "type": "number"
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
           }
         },
         "required": [
@@ -29957,7 +29966,9 @@
             "type": "array"
           },
           "total": {
-            "type": "number"
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
           }
         },
         "required": [
@@ -30023,7 +30034,9 @@
       "FaceRepairPersonMetadataResponseDto": {
         "properties": {
           "faceCount": {
-            "type": "number"
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
           },
           "id": {
             "type": "string"
@@ -30056,17 +30069,20 @@
           },
           "maxAttributionDistance": {
             "exclusiveMinimum": true,
+            "format": "double",
             "maximum": 2,
             "minimum": 0,
             "type": "number"
           },
           "maxDistance": {
             "exclusiveMinimum": true,
+            "format": "double",
             "maximum": 2,
             "minimum": 0,
             "type": "number"
           },
           "maxFlaggedFraction": {
+            "format": "double",
             "maximum": 1,
             "minimum": 0,
             "type": "number"
@@ -30218,7 +30234,9 @@
       "FaceRepairResolutionsRemovedDto": {
         "properties": {
           "removed": {
-            "type": "number"
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
           }
         },
         "required": [
@@ -30328,22 +30346,34 @@
       "FaceRepairResolveResponseDto": {
         "properties": {
           "declined": {
-            "type": "number"
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
           },
           "detached": {
-            "type": "number"
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
           },
           "locked": {
-            "type": "number"
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
           },
           "moved": {
-            "type": "number"
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
           },
           "skipped": {
-            "type": "number"
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
           },
           "unknown": {
-            "type": "number"
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
           }
         },
         "required": [
@@ -30499,9 +30529,11 @@
       "FaceRepairScanDefaultsDto": {
         "properties": {
           "maxDistance": {
+            "format": "double",
             "type": "number"
           },
           "maxFlaggedFraction": {
+            "format": "double",
             "type": "number"
           },
           "minFaces": {
@@ -30885,7 +30917,9 @@
           "ratings": {
             "description": "Available ratings",
             "items": {
-              "type": "number"
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer"
             },
             "type": "array"
           },
@@ -37948,7 +37982,9 @@
           },
           "contributionCount": {
             "description": "Number of photos contributed by this member",
-            "type": "number"
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
           },
           "email": {
             "description": "User email",
@@ -38105,7 +38141,9 @@
           },
           "assetCount": {
             "description": "Number of unique assets with this person",
-            "type": "number"
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
           },
           "birthDate": {
             "description": "Person date of birth",
@@ -38119,7 +38157,9 @@
           },
           "faceCount": {
             "description": "Number of faces assigned to this person",
-            "type": "number"
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
           },
           "id": {
             "description": "Person ID",
@@ -38208,11 +38248,15 @@
         "properties": {
           "albumCount": {
             "description": "Number of linked albums",
-            "type": "number"
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
           },
           "assetCount": {
             "description": "Number of assets",
-            "type": "number"
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
           },
           "color": {
             "allOf": [
@@ -38283,7 +38327,9 @@
           },
           "memberCount": {
             "description": "Number of members",
-            "type": "number"
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
           },
           "members": {
             "description": "Space members (summary)",
@@ -38298,7 +38344,9 @@
           },
           "newAssetCount": {
             "description": "Number of new assets since last viewed",
-            "type": "number"
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer"
           },
           "petsEnabled": {
             "description": "Whether pets are shown in space people list",
@@ -38325,8 +38373,10 @@
           },
           "thumbnailCropY": {
             "description": "Vertical crop position for cover photo (0-100)",
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
             "nullable": true,
-            "type": "number"
+            "type": "integer"
           },
           "updatedAt": {
             "description": "Last update date",
@@ -39536,7 +39586,9 @@
           "ratings": {
             "description": "Available ratings",
             "items": {
-              "type": "number"
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer"
             },
             "type": "array"
           },
@@ -43415,6 +43467,7 @@
           },
           "representativeRatio": {
             "description": "Representative asset width/height ratio",
+            "format": "double",
             "nullable": true,
             "type": "number"
           },
@@ -43516,11 +43569,13 @@
         "properties": {
           "endTime": {
             "description": "End time in seconds",
+            "format": "double",
             "minimum": 0,
             "type": "number"
           },
           "startTime": {
             "description": "Start time in seconds",
+            "format": "double",
             "minimum": 0,
             "type": "number"
           }
