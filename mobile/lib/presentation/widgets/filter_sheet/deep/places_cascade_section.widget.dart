@@ -15,7 +15,7 @@ import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dar
 /// swaps in [_CityCascade], whose InputChip shows the selection instead.
 const int _kPreviewCap = 10;
 
-/// PlacesCascadeSection — Deep-snap section for the Places filter dimension.
+/// PlacesCascadeSection — Deep section for the Places filter dimension.
 ///
 /// When no country is selected, renders a Wrap of country FilterChips sourced
 /// from photosFilterSuggestionsProvider (capped to [_kPreviewCap]). Tapping a

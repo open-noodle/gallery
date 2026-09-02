@@ -24,6 +24,6 @@ Future<void> openGallerySearch(TabsRouter tabsRouter, ProviderReader read) async
     await Future<void>.delayed(kGalleryTabTransitionDelay);
   }
 
-  read(photosFilterSheetProvider.notifier).state = FilterSheetSnap.deep;
+  read(photosFilterSheetProvider.notifier).state = FilterSheetVisibility.visible;
   read(photosFilterSearchFocusRequestProvider.notifier).state++;
 }

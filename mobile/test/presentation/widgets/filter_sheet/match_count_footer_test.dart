@@ -66,7 +66,7 @@ Future<void> _pumpFooterUnderRemovedPadding(WidgetTester tester) => tester.pumpC
 double _gapUnderButton(WidgetTester tester) =>
     _screenHeight - tester.getBottomLeft(find.byKey(const Key('match-count-footer-done'))).dy;
 
-/// BrowseContent / DeepContent pad the bottom of their lists by this much to
+/// DeepContent pads the bottom of its list by this much to
 /// clear the footer stacked on top of them. If it were smaller than the footer,
 /// the last filter row would sit behind the Done bar, unreachable.
 void _expectReserveCoversFooter(WidgetTester tester) {

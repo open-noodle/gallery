@@ -31,7 +31,7 @@ Widget _buildHarness({required ScrollController controller}) {
   final overrides = <Override>[
     filterSectionPrefsProvider.overrideWithValue(_FakePrefs({})),
     filterSectionVisibilityPrefsProvider.overrideWithValue(_FakeVis({})),
-    photosFilterSheetProvider.overrideWith((ref) => FilterSheetSnap.deep),
+    photosFilterSheetProvider.overrideWith((ref) => FilterSheetVisibility.visible),
     timeBucketsProvider.overrideWith(
       (ref, filter) =>
           Future.value(const <BucketLite>[(timeBucket: '2024-06-01', count: 12), (timeBucket: '2023-12-01', count: 7)]),

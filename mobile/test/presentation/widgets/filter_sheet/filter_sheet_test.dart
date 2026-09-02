@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:immich_mobile/presentation/widgets/filter_sheet/browse_content.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep_content.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/filter_sheet.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/filter_section_id.dart';
@@ -29,16 +28,32 @@ class _FakeVis implements FilterSectionVisibilityPrefs {
   Future<void> saveHidden(Set<FilterSectionId> ids) async => stored = ids;
 }
 
-Future<void> _pump(WidgetTester tester, {FilterSheetSnap? snap}) async {
+Future<void> _pump(WidgetTester tester, {FilterSheetVisibility? visibility}) async {
   await tester.pumpConsumerWidget(
     const FilterSheet(),
     overrides: [
       filterSectionPrefsProvider.overrideWithValue(_FakePrefs({})),
       filterSectionVisibilityPrefsProvider.overrideWithValue(_FakeVis({})),
-      if (snap != null) photosFilterSheetProvider.overrideWith((ref) => snap),
+      if (visibility != null) photosFilterSheetProvider.overrideWith((ref) => visibility),
     ],
   );
   await tester.pumpAndSettle();
+}
+
+/// Replays a run of live drag extents as the `DraggableScrollableSheet` would,
+/// one per frame, without letting the settle debounce elapse in between.
+Future<void> _dragThrough(WidgetTester tester, List<double> extents) async {
+  final sheetContext = tester.element(find.byType(DraggableScrollableSheet));
+  for (final extent in extents) {
+    DraggableScrollableNotification(
+      extent: extent,
+      minExtent: 0.3,
+      maxExtent: 0.95,
+      initialExtent: 0.95,
+      context: sheetContext,
+    ).dispatch(sheetContext);
+    await tester.pump(const Duration(milliseconds: 16));
+  }
 }
 
 void main() {
@@ -48,107 +63,87 @@ void main() {
       expect(find.byType(DraggableScrollableSheet), findsNothing);
     });
 
-    testWidgets('browse → DraggableScrollableSheet mounted + scrim visible', (tester) async {
-      await _pump(tester, snap: FilterSheetSnap.browse);
+    testWidgets('visible → DraggableScrollableSheet mounted + scrim + DeepContent', (tester) async {
+      await _pump(tester, visibility: FilterSheetVisibility.visible);
       expect(find.byType(DraggableScrollableSheet), findsOneWidget);
       expect(find.byKey(const Key('filter-sheet-scrim')), findsOneWidget);
-    });
-
-    testWidgets('deep → DraggableScrollableSheet mounted + scrim visible', (tester) async {
-      await _pump(tester, snap: FilterSheetSnap.deep);
-      expect(find.byType(DraggableScrollableSheet), findsOneWidget);
-      expect(find.byKey(const Key('filter-sheet-scrim')), findsOneWidget);
-    });
-
-    testWidgets('scrim tap at browse → hidden', (tester) async {
-      await _pump(tester, snap: FilterSheetSnap.browse);
-      final container = ProviderScope.containerOf(tester.element(find.byType(FilterSheet)));
-      container.read(photosFilterSheetProvider.notifier).state = FilterSheetSnap.browse;
-      await tester.pumpAndSettle();
-
-      await tester.tapAt(const Offset(10, 10));
-      await tester.pumpAndSettle();
-
-      expect(container.read(photosFilterSheetProvider), FilterSheetSnap.hidden);
-    });
-
-    testWidgets('scrim tap at deep → browse', (tester) async {
-      await _pump(tester, snap: FilterSheetSnap.deep);
-      final container = ProviderScope.containerOf(tester.element(find.byType(FilterSheet)));
-      container.read(photosFilterSheetProvider.notifier).state = FilterSheetSnap.deep;
-      await tester.pumpAndSettle();
-
-      await tester.tapAt(const Offset(10, 10));
-      await tester.pumpAndSettle();
-
-      expect(container.read(photosFilterSheetProvider), FilterSheetSnap.browse);
-    });
-
-    testWidgets('deep → DeepContent mounted', (tester) async {
-      await _pump(tester, snap: FilterSheetSnap.deep);
       expect(find.byType(DeepContent), findsOneWidget);
+    });
+
+    testWidgets('scrim tap → hidden in one tap', (tester) async {
+      await _pump(tester, visibility: FilterSheetVisibility.visible);
+      final container = ProviderScope.containerOf(tester.element(find.byType(FilterSheet)));
+
+      await tester.tapAt(const Offset(10, 10));
+      await tester.pumpAndSettle();
+
+      expect(container.read(photosFilterSheetProvider), FilterSheetVisibility.hidden);
+    });
+  });
+
+  group('FilterSheet has a single resting extent', () {
+    testWidgets('full height is the only snap size, so a drag can never rest half-way', (tester) async {
+      await _pump(tester, visibility: FilterSheetVisibility.visible);
+      final sheet = tester.widget<DraggableScrollableSheet>(find.byType(DraggableScrollableSheet));
+
+      expect(sheet.snapSizes, [sheet.maxChildSize], reason: 'the removed half-height browse snap must not come back');
+      expect(sheet.initialChildSize, sheet.maxChildSize);
+      expect(sheet.snap, isTrue);
+    });
+
+    testWidgets('a drag that settles above the dismiss threshold stays open on DeepContent', (tester) async {
+      await _pump(tester, visibility: FilterSheetVisibility.visible);
+      final container = ProviderScope.containerOf(tester.element(find.byType(FilterSheet)));
+
+      // The extent the old browse snap used to sit at. Settling there must now
+      // leave the sheet open — the sheet springs back to full rather than
+      // resting half-way, and no intermediate state exists to commit.
+      await _dragThrough(tester, [0.90, 0.75, 0.62]);
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pumpAndSettle();
+
+      expect(container.read(photosFilterSheetProvider), FilterSheetVisibility.visible);
+      expect(find.byType(DeepContent), findsOneWidget);
+    });
+
+    testWidgets('a drag that settles below the dismiss threshold closes the sheet', (tester) async {
+      await _pump(tester, visibility: FilterSheetVisibility.visible);
+      final container = ProviderScope.containerOf(tester.element(find.byType(FilterSheet)));
+
+      await _dragThrough(tester, [0.90, 0.70, 0.48]);
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pumpAndSettle();
+
+      expect(container.read(photosFilterSheetProvider), FilterSheetVisibility.hidden);
+      expect(find.byType(DraggableScrollableSheet), findsNothing);
     });
   });
 
   group('FilterSheet drag settling (#1002)', () {
-    testWidgets('a drag that transiently dips through browse/dismiss extents does not '
-        'change snap until the drag actually settles', (tester) async {
-      await _pump(tester, snap: FilterSheetSnap.deep);
+    testWidgets('a drag that transiently dips below the dismiss threshold does not '
+        'close the sheet until the drag actually settles', (tester) async {
+      await _pump(tester, visibility: FilterSheetVisibility.visible);
       final container = ProviderScope.containerOf(tester.element(find.byType(FilterSheet)));
-      final sheetContext = tester.element(find.byType(DraggableScrollableSheet));
 
-      // A single continuous "swipe down (half)" gesture: the live extent
-      // sweeps down past the browse snap point and even dips below the
-      // dismiss threshold, then springs back up to rest at deep — the
-      // user's thumb never actually released down there.
-      for (final extent in [0.90, 0.70, 0.55, 0.48, 0.60, 0.80, 0.94]) {
-        DraggableScrollableNotification(
-          extent: extent,
-          minExtent: 0.3,
-          maxExtent: 0.95,
-          initialExtent: 0.95,
-          context: sheetContext,
-        ).dispatch(sheetContext);
-        await tester.pump(const Duration(milliseconds: 16));
-      }
+      // A single continuous "swipe down (half)" gesture: the live extent sweeps
+      // down past the dismiss threshold, then springs back up to rest at full —
+      // the user's thumb never actually released down there.
+      await _dragThrough(tester, [0.90, 0.70, 0.55, 0.48, 0.60, 0.80, 0.94]);
 
       // Still mid-drag: nothing should have committed from the transient
       // pass-through extents yet.
-      expect(container.read(photosFilterSheetProvider), FilterSheetSnap.deep);
+      expect(container.read(photosFilterSheetProvider), FilterSheetVisibility.visible);
       expect(find.byType(DeepContent), findsOneWidget);
 
-      // Let the debounce window elapse with no further motion, then let
-      // any resulting animation/rebuild finish.
+      // Let the debounce window elapse with no further motion, then let any
+      // resulting animation/rebuild finish.
       await tester.pump(const Duration(milliseconds: 200));
       await tester.pumpAndSettle();
 
-      // Once the drag has settled, the snap reflects where it actually
-      // came to rest (deep) — the sheet never bounced through hidden/browse.
-      expect(container.read(photosFilterSheetProvider), FilterSheetSnap.deep);
+      // Once the drag has settled, the sheet reflects where it actually came to
+      // rest (open) — it never bounced through hidden.
+      expect(container.read(photosFilterSheetProvider), FilterSheetVisibility.visible);
       expect(find.byType(DeepContent), findsOneWidget);
-    });
-
-    testWidgets('a drag that settles at the browse extent commits browse', (tester) async {
-      await _pump(tester, snap: FilterSheetSnap.deep);
-      final container = ProviderScope.containerOf(tester.element(find.byType(FilterSheet)));
-      final sheetContext = tester.element(find.byType(DraggableScrollableSheet));
-
-      for (final extent in [0.90, 0.75, 0.62]) {
-        DraggableScrollableNotification(
-          extent: extent,
-          minExtent: 0.3,
-          maxExtent: 0.95,
-          initialExtent: 0.95,
-          context: sheetContext,
-        ).dispatch(sheetContext);
-        await tester.pump(const Duration(milliseconds: 16));
-      }
-
-      await tester.pump(const Duration(milliseconds: 200));
-      await tester.pumpAndSettle();
-
-      expect(container.read(photosFilterSheetProvider), FilterSheetSnap.browse);
-      expect(find.byType(BrowseContent), findsOneWidget);
     });
   });
 }
