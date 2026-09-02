@@ -204,7 +204,11 @@ export const TimeBucketCoverResponseSchema = z
     timeBucket: z.string().meta({ example: '2024-01-01' }),
     representativeAssetId: z.string().nullable().describe('Representative asset ID for this bucket'),
     representativeThumbhash: z.string().nullable().describe('Representative asset thumbhash, base64 encoded'),
-    representativeRatio: z.number().nullable().describe('Representative asset width/height ratio'),
+    representativeRatio: z
+      .number()
+      .meta({ format: 'double' })
+      .nullable()
+      .describe('Representative asset width/height ratio'),
   })
   .meta({ id: 'TimeBucketCoverResponseDto' });
 
