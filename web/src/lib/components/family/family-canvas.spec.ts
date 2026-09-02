@@ -699,6 +699,64 @@ describe('FamilyCanvas person actions', () => {
   });
 });
 
+// Deleting a union was reachable from the API since the write path shipped, but from nowhere in
+// the UI — mockup §2 puts the danger action in the union editor.
+describe('FamilyCanvas union deletion', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  const twoUnions = () => ({
+    unions: [
+      union({ id: 'u-keep', partners: [known('root'), known('mia')], children: [known('kid')] }),
+      union({ id: 'u-drop', partners: [known('mia'), known('other')], children: [] }),
+    ],
+    identities: {
+      root: identity('Root'),
+      mia: identity('Mia'),
+      other: identity('Other'),
+      kid: identity('Kid'),
+    },
+  });
+
+  it('deletes the union whose editor is open', async () => {
+    const { unions, identities } = twoUnions();
+    sdkMock.deleteUnion.mockResolvedValue(undefined as never);
+
+    renderCanvas({ unions, identities, rootId: 'root', canContribute: true });
+    const bars = screen.getAllByTestId('family-union-bar');
+    await fireEvent.click(bars[0]!);
+    await fireEvent.click(screen.getByTestId('family-union-delete'));
+
+    expect(sdkMock.deleteUnion).toHaveBeenCalledTimes(1);
+    expect(sdkMock.deleteUnion).toHaveBeenCalledWith({ id: expect.any(String) });
+  });
+
+  // A6: a view-only viewer never gets the editor at all, so there is nothing to delete from.
+  it('offers no deletion to a view-only viewer', async () => {
+    const { unions, identities } = twoUnions();
+
+    renderCanvas({ unions, identities, rootId: 'root', canContribute: false });
+    await fireEvent.click(screen.getAllByTestId('family-union-bar')[0]!);
+
+    expect(screen.queryByTestId('family-union-delete')).not.toBeInTheDocument();
+  });
+
+  // The relationship goes; the people stay. A deletion that also swept the cards away would be
+  // indistinguishable on screen from having removed the people themselves.
+  it('keeps every person on the canvas after their union is deleted', async () => {
+    const { unions, identities } = twoUnions();
+    sdkMock.deleteUnion.mockResolvedValue(undefined as never);
+
+    renderCanvas({ unions, identities, rootId: 'root', canContribute: true });
+    await fireEvent.click(screen.getAllByTestId('family-union-bar')[0]!);
+    await fireEvent.click(screen.getByTestId('family-union-delete'));
+
+    expect(screen.getByText('Root')).toBeInTheDocument();
+    expect(screen.getByText('Mia')).toBeInTheDocument();
+  });
+});
+
 // A6's dashed "+ Add a parent" card looked like a button from the day it shipped and did nothing
 // when clicked. It fills the free partner seat of the union it belongs to.
 describe('FamilyCanvas empty seats', () => {
