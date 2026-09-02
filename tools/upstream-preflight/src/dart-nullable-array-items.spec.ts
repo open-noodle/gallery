@@ -29,6 +29,7 @@ const DART_MODEL_DIR = path.join(
 
 interface SpecProperty {
   type?: string;
+  format?: string;
   items?: SpecProperty & { nullable?: boolean; $ref?: string };
 }
 
@@ -58,7 +59,14 @@ function dartItemType(items: SpecProperty & { $ref?: string }): string {
       return 'int';
     }
     case 'number': {
-      return 'num';
+      // openapi-generator's Dart typeMapping keys on the FORMAT, not just the
+      // type: `double`/`float` produce `double`, and only a formatless number
+      // produces `num`. immich-31222 made a format mandatory on every number
+      // property, so lat/long went `num` -> `double` and this guard reported the
+      // correctly-generated `List<double?>` as an offender.
+      return items.format === 'double' || items.format === 'float'
+        ? 'double'
+        : 'num';
     }
     case 'boolean': {
       return 'bool';
