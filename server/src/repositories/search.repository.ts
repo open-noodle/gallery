@@ -291,6 +291,12 @@ export interface PetEmbeddingSearch extends SearchEmbeddingOptions {
   hasPerson?: boolean;
   numResults: number;
   maxDistance: number;
+  /**
+   * Required here, unlike the optional base: pet recognition has no album- or space-scoped caller,
+   * so every `searchPets` scan is owner-scoped and the `asset.ownerId` predicate below is
+   * unconditional. (`searchFaces` can drop it because a space scope replaces it.)
+   */
+  userIds: string[];
 }
 
 export interface PetSearchResult {
