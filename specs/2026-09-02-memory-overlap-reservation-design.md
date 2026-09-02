@@ -273,6 +273,9 @@ Every other row satisfies `minAssets <= smallest emitted sample`, so apart from 
 rule can generate a memory that is immediately swept. §8.2 asserts this against the real constants
 rather than against a copy of this table.
 
+Read through `getMemoryTypeFloor(key: string | undefined): number`, which returns `0` for an
+unknown or absent key so such a memory is never removed for size.
+
 Floors are constants, not admin config. If a knob is wanted later, `SystemConfig['memories']` is the
 place.
 
@@ -384,21 +387,29 @@ The backfill reuses `reconcileMemoryOverlap` unchanged — it is the same per-da
 run over a much wider range:
 
 ```
-if (!state.overlapBackfilledAt || state.overlapBackfilledAt < today) {
-  for each user:
-    start = oldest showAt among the user's memories   one MIN() query, null => skip user
-    for each day from max(start, cursor) to today:    chunked, cursor advanced per chunk
-      reconcileMemoryOverlap(user, day, day)
-  state.overlapBackfilledAt = today.toISO()
-}
+if (state.overlapBackfilledAt >= today) return          // done; not even one query
+
+oldest = MIN(coalesce(showAt, createdAt)) over all memories    one global query
+start  = state.overlapBackfilledAt ? cursor + 1 day : oldest
+
+for each day from start to today:        days OUTER
+  for each user:                         users INNER
+    reconcileMemoryOverlap(user, day, day)
+  state.overlapBackfilledAt = day        cursor advanced per day
 ```
 
-The start day comes from a `MIN(showAt)` query per user rather than from `today - retentionDays`.
-`retentionDays: 0` means retention is **disabled**, not zero days — `cleanup` returns early and
-memories are kept forever (`memory.repository.ts:26-28`) — so a `today - retentionDays` window would
-either skip the backfill entirely or run unbounded. Deriving the start from the data is correct for
-every retention setting, skips users with no memories in one query, and costs nothing extra: a day
-holding no memories is already a no-op.
+Two details carry their weight:
+
+**The loop is days-outer, users-inner.** That makes a _single_ cursor enough to resume after a
+crash, mirroring how `lastOnThisDayDate` already works. A users-outer loop would need per-user
+state to be resumable, which is a lot of bookkeeping for a routine that runs once.
+
+**The start day comes from the data, not from `retentionDays`.** `retentionDays: 0` means retention
+is **disabled**, not zero days — `cleanup` returns early and memories are kept forever
+(`memory.repository.ts:26-28`) — so a `today - retentionDays` window would either skip the backfill
+entirely or run unbounded. One global `MIN(coalesce("showAt", "createdAt"))` is correct for every
+retention setting. `coalesce` matters because a memory with a null `showAt` is always visible and
+would otherwise be missed. Days holding no memories cost one cheap query and are no-ops.
 
 - Guarded by a new optional `overlapBackfilledAt?: string` on `MemoriesState`
   (`server/src/types.ts:728`), so it runs **once** and never again. Same shape as the existing
@@ -411,7 +422,8 @@ holding no memories is already a no-op.
 - Cost is bounded: a day with no memories is a no-op, and `getForOverlapReconcile` is one indexed
   query per day per user. Deliberately **not** run every night — sweeping a year per user nightly
   would be pure waste once the history is clean.
-- Needs a second small repository method, `getOldestMemoryDate(ownerId): Promise<Date | null>`.
+- Needs a second small repository method, `getOldestMemoryDate(): Promise<Date | null>` — global,
+  not per-owner, because the loop is days-outer.
 
 Chosen over sweeping the full retention window on every run, which needs no state but repeats a
 year of work nightly forever.
