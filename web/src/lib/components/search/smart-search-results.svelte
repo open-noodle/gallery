@@ -31,6 +31,8 @@
      * undone delete, since undo hands back TimelineAssets rather than full AssetResponseDtos.
      */
     reloadToken?: number;
+    /** Reports the results grid's scroll offset — see `SpaceSearchResults` (#1028). */
+    onScroll?: (scrollTop: number) => void;
   }
 
   let {
@@ -46,6 +48,7 @@
     total,
     results: searchResults = $bindable([]),
     reloadToken = 0,
+    onScroll,
   }: Props = $props();
 
   /**
@@ -174,4 +177,5 @@
   {isShared}
   sortMode={filters.sortOrder}
   {total}
+  {onScroll}
 />
