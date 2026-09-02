@@ -1,6 +1,6 @@
 import { Kysely } from 'kysely';
 import { DateTime } from 'luxon';
-import { AssetFileType, AssetType, AssetVisibility, MemoryType, UserMetadataKey } from 'src/enum';
+import { AssetFileType, AssetType, AssetVisibility, MemoryType, SystemMetadataKey, UserMetadataKey } from 'src/enum';
 import { AccessRepository } from 'src/repositories/access.repository';
 import { AssetRepository } from 'src/repositories/asset.repository';
 import { ConfigRepository } from 'src/repositories/config.repository';
@@ -1732,6 +1732,96 @@ describe(MemoryService.name, () => {
       expect(after).toEqual(snapshot);
     });
 
+    // F2: the four other e2e scenarios in this describe block all create their memories during
+    // the run itself, so they only ever exercise the nightly `[today, today+3]` window -- the
+    // historical backfill (`backfillMemoryOverlap`, spec §11's "largest single behaviour change")
+    // never runs against a real database anywhere in the suite. Reproduces that path end to end:
+    // seed two overlapping memories dated well outside the nightly window, run once, and prove
+    // both that they reconcile and that the cursor advances.
+    it('reconciles overlapping memories in the historical backfill, then makes no further writes on a second run', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+
+      const today = DateTime.fromObject({ year: 2026, month: 9, day: 1 }, { zone: 'utc' });
+      // 65 days back: well outside `[today, today+3]`, so only the backfill -- not the nightly
+      // pass -- ever reaches these two memories.
+      const past = today.minus({ days: 65 });
+      const pastIso = past.toJSDate().toISOString();
+
+      const { asset: shared } = await ctx.newAsset({ ownerId: user.id, localDateTime: pastIso });
+      const tripOwn = await Promise.all(
+        Array.from({ length: 2 }, () => ctx.newAsset({ ownerId: user.id, localDateTime: pastIso })),
+      );
+      const anniversaryOwn = await Promise.all(
+        Array.from({ length: 2 }, () => ctx.newAsset({ ownerId: user.id, localDateTime: pastIso })),
+      );
+
+      // Both clear their own floor (2) on their own-only assets alone, so overlap resolution
+      // strips the loser rather than deleting it -- isolating the reconciliation itself.
+      const { memory: trip } = await ctx.newMemory({
+        ownerId: user.id,
+        type: MemoryType.Rule,
+        data: { ruleId: 'recent_trip', dedupeKey: 'trip', title: 'Trip', score: 130 },
+        memoryAt: past.toJSDate(),
+        showAt: past.startOf('day').toJSDate(),
+        hideAt: past.endOf('day').toJSDate(),
+      });
+      const { memory: anniversary } = await ctx.newMemory({
+        ownerId: user.id,
+        type: MemoryType.Rule,
+        data: { ruleId: 'trip_anniversary', dedupeKey: 'anniversary', title: 'Anniversary', score: 110 },
+        memoryAt: past.toJSDate(),
+        showAt: past.startOf('day').toJSDate(),
+        hideAt: past.endOf('day').toJSDate(),
+      });
+
+      for (const { asset } of [...tripOwn, { asset: shared }]) {
+        await ctx.newMemoryAsset({ memoryId: trip.id, assetId: asset.id });
+      }
+      for (const { asset } of [...anniversaryOwn, { asset: shared }]) {
+        await ctx.newMemoryAsset({ memoryId: anniversary.id, assetId: asset.id });
+      }
+
+      const assetsOf = async (memoryId: string) => {
+        const rows = await ctx.database
+          .selectFrom('memory_asset')
+          .select('assetId')
+          .where('memoriesId', '=', memoryId)
+          .execute();
+        return rows.map((row) => row.assetId);
+      };
+
+      // Confirm the two memories genuinely existed and overlapped BEFORE the run -- otherwise
+      // the "disjoint after" assertion below would be vacuously true.
+      const tripBefore = await assetsOf(trip.id);
+      const anniversaryBefore = await assetsOf(anniversary.id);
+      expect(tripBefore).toContain(shared.id);
+      expect(anniversaryBefore).toContain(shared.id);
+
+      vi.setSystemTime(today.toJSDate());
+      await sut.onMemoriesCreate();
+
+      const state = await ctx.get(SystemMetadataRepository).get(SystemMetadataKey.MemoriesState);
+      expect(state?.overlapBackfilledAt).toBeDefined();
+
+      const tripAfterFirst = await assetsOf(trip.id);
+      const anniversaryAfterFirst = await assetsOf(anniversary.id);
+
+      // Disjoint: the shared asset now belongs to exactly one of the two. `trip` (score 130)
+      // outranks `anniversary` (score 110) and keeps everything; `anniversary` loses the shared
+      // asset but still clears its own floor of 2 on its two own-only assets.
+      expect(tripAfterFirst.toSorted()).toEqual([shared.id, ...tripOwn.map(({ asset }) => asset.id)].toSorted());
+      expect(anniversaryAfterFirst.toSorted()).toEqual(anniversaryOwn.map(({ asset }) => asset.id).toSorted());
+
+      await sut.onMemoriesCreate();
+
+      const tripAfterSecond = await assetsOf(trip.id);
+      const anniversaryAfterSecond = await assetsOf(anniversary.id);
+
+      expect(tripAfterSecond.toSorted()).toEqual(tripAfterFirst.toSorted());
+      expect(anniversaryAfterSecond.toSorted()).toEqual(anniversaryAfterFirst.toSorted());
+    });
+
     it('never deletes a memory created through the API', async () => {
       const { sut, ctx } = setup();
       const { user } = await ctx.newUser();
@@ -1766,6 +1856,47 @@ describe(MemoryService.name, () => {
         .where('memoriesId', '=', manual.id)
         .execute();
       expect(attachedAssetIds.map((row) => row.assetId).toSorted()).toEqual([first.id, second.id].toSorted());
+    });
+
+    // F5: pins the `managed` boundary the sibling test above does NOT cover. That test leaves
+    // showAt/hideAt unset, which is what actually keeps an API-created memory safe (see
+    // `toReservable`, spec §6.2.1). Here both are set — a shape no first-party client sends, but
+    // one `POST /memories` accepts — so the memory IS `managed` and strippable/deletable, same as
+    // a generated card. This is a DELIBERATE accepted limitation, pinned here so a future reader
+    // knows it was a decision, not an oversight. Do not change production behaviour to make this
+    // test pass differently.
+    it('deletes an API-created memory when showAt/hideAt are both set — accepted limitation, spec §6.2.1', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+
+      const { asset: first } = await ctx.newAsset({ ownerId: user.id, localDateTime: '2025-09-02T12:00:00Z' });
+      const { asset: second } = await ctx.newAsset({ ownerId: user.id, localDateTime: '2025-09-02T12:01:00Z' });
+
+      // showAt/hideAt deliberately land on 2026-09-01, NOT on the photos' own 2025-09-02 date, so
+      // this memory never overlaps the auto-generated on_this_day card the run below creates for
+      // the same two photos on their actual 2026-09-02 anniversary — isolating the assertion to
+      // the `managed` boundary itself rather than ordinary same-day claim competition.
+      const manual = await sut.create(factory.auth({ user }), {
+        type: MemoryType.OnThisDay,
+        data: { year: 2025 },
+        memoryAt: new Date('2025-09-02T12:00:00Z'),
+        assetIds: [first.id, second.id],
+        showAt: new Date('2026-09-01T00:00:00Z'),
+        hideAt: new Date('2026-09-01T23:59:59Z'),
+      });
+
+      vi.setSystemTime(new Date('2026-09-01T02:00:00Z'));
+      await sut.onMemoriesCreate();
+
+      const stillThere = await ctx.database
+        .selectFrom('memory')
+        .select('id')
+        .where('id', '=', manual.id)
+        .executeTakeFirst();
+
+      // Only 2 assets — below the on_this_day floor of 3 — so once `managed`, the sweep deletes
+      // it exactly as it would a generated card.
+      expect(stillThere).toBeUndefined();
     });
   });
 
