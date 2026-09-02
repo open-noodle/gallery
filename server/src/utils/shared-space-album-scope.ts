@@ -192,7 +192,19 @@ function linkedAlbumAssetExists(
           (scope as { spaceIdRef: ReferenceExpression<DB, keyof DB> }).spaceIdRef,
         ),
       )
-      .$if(options.albumTimelineGate === 'space-tab', (qb) => qb.where('shared_space_album.showInTimeline', '=', true))
+      .$call((qb) => {
+        // Exhaustive switch, not `=== 'space-tab'`: the readers were plain comparisons before
+        // #1041 slice 8, and adding `'personal'` to the union then produced ZERO `tsc` errors
+        // (see the union's doc comment). A switch missing a case fails to compile instead.
+        switch (options.albumTimelineGate) {
+          case 'space-tab': {
+            return qb.where('shared_space_album.showInTimeline', '=', true);
+          }
+          case 'none': {
+            return qb;
+          }
+        }
+      })
       .$if(!!options.excludeAlbumId, (qb) => qb.where('shared_space_album.albumId', '!=', options.excludeAlbumId!)),
   );
 }
@@ -247,7 +259,17 @@ export function spaceContributedAssetExists(
           (scope as { spaceIdRef: ReferenceExpression<DB, keyof DB> }).spaceIdRef,
         ),
       )
-      .$if(options.albumTimelineGate === 'space-tab', (qb) => qb.where('shared_space_album.showInTimeline', '=', true))
+      .$call((qb) => {
+        // Exhaustive switch — see the sibling comment in linkedAlbumAssetExists.
+        switch (options.albumTimelineGate) {
+          case 'space-tab': {
+            return qb.where('shared_space_album.showInTimeline', '=', true);
+          }
+          case 'none': {
+            return qb;
+          }
+        }
+      })
       .$if(!!options.excludeAlbumId, (qb) => qb.where('shared_space_album.albumId', '!=', options.excludeAlbumId!)),
   );
 }
@@ -532,8 +554,18 @@ export function spaceAlbumAssetExistsSql(options: SpaceAlbumAssetSqlOptions): Ra
     (options.requireAlbumNotDeleted ?? true)
       ? sql`INNER JOIN album ON album.id = shared_space_album."albumId" AND album."deletedAt" IS NULL`
       : sql``;
-  const timelineGate =
-    options.albumTimelineGate === 'space-tab' ? sql`AND "shared_space_album"."showInTimeline" = true` : sql``;
+  // Exhaustive switch — see the sibling comment in linkedAlbumAssetExists.
+  let timelineGate: RawBuilder<unknown>;
+  switch (options.albumTimelineGate) {
+    case 'space-tab': {
+      timelineGate = sql`AND "shared_space_album"."showInTimeline" = true`;
+      break;
+    }
+    case 'none': {
+      timelineGate = sql``;
+      break;
+    }
+  }
   return sql<SqlBool>`(EXISTS (
               SELECT 1
               FROM shared_space_album
