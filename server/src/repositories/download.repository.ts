@@ -25,17 +25,36 @@ export class DownloadRepository {
     return builder(this.db).select(['asset.originalPath']).where('asset.id', '=', anyUuid(ids)).stream();
   }
 
-  downloadAlbumId(albumId: string) {
-    return (
-      builder(this.db)
-        .innerJoin('album_asset', 'asset.id', 'album_asset.assetId')
-        .where('album_asset.albumId', '=', albumId)
-        // rbac-8 (no functional change): flat visibility gate — NO owner exception — so an album-archive
-        // export omits Hidden/Locked rows for everyone, matching the album grid (withDefaultVisibility) and
-        // map-markers. An `own OR` here would let the owner download Hidden while the grid hides it.
-        .where((eb) => spaceVisibilityGate(eb))
-        .stream()
-    );
+  /**
+   * #1048: `albumSpaceIds` are the live member-spaces the SERVICE resolved for this caller
+   * (`getAlbumSpaceIds`) — the viewer's spaces linking the album, or the single tethered space of a
+   * share link. When set, the archive unions the cross-owner `album_space_asset` contributions
+   * (#764) the album grid already shows; a personal album, an `album_user` share and a spaceless
+   * link all resolve none and read `album_asset` alone, exactly as before. Same contract as
+   * `AssetRepository`'s album arm, so browse and download can't disagree.
+   */
+  downloadAlbumId(albumId: string, albumSpaceIds?: string[]) {
+    const ownerRows = builder(this.db)
+      .innerJoin('album_asset', 'asset.id', 'album_asset.assetId')
+      .where('album_asset.albumId', '=', albumId)
+      // rbac-8 (no functional change): flat visibility gate — NO owner exception — so an album-archive
+      // export omits Hidden/Locked rows for everyone, matching the album grid (withDefaultVisibility) and
+      // map-markers. An `own OR` here would let the owner download Hidden while the grid hides it.
+      .where((eb) => spaceVisibilityGate(eb));
+
+    if (!albumSpaceIds?.length) {
+      return ownerRows.stream();
+    }
+
+    const contributed = builder(this.db)
+      .innerJoin('album_space_asset', 'asset.id', 'album_space_asset.assetId')
+      .where('album_space_asset.albumId', '=', albumId)
+      .where('album_space_asset.spaceId', '=', anyUuid(albumSpaceIds))
+      .where((eb) => spaceVisibilityGate(eb));
+
+    // UNION (not ALL) dedupes the P1-6 coexistence window, where the same asset carries both an
+    // `album_asset` and an `album_space_asset` row — the archive must list it once.
+    return ownerRows.union(contributed).stream();
   }
 
   downloadUserId(userId: string) {
@@ -66,6 +85,23 @@ export class DownloadRepository {
       .where('shared_space_album.spaceId', '=', spaceId)
       .where((eb) => spaceVisibilityGate(eb));
 
-    return direct.union(library).union(album).stream();
+    // #1048: the linked album's cross-owner contributions (#764) — the fourth path a space shows.
+    // Correlated on BOTH albumId and spaceId so a contribution is only ever reachable through the
+    // one space it was made to, and requires a live `shared_space_album` link, so a retained
+    // contribution row of an unlinked album stays inert.
+    const contributed = builder(this.db)
+      .innerJoin('album_space_asset', 'asset.id', 'album_space_asset.assetId')
+      .innerJoin('shared_space_album', (join) =>
+        join
+          .onRef('shared_space_album.albumId', '=', 'album_space_asset.albumId')
+          .onRef('shared_space_album.spaceId', '=', 'album_space_asset.spaceId'),
+      )
+      .innerJoin('album', (join) =>
+        join.onRef('album.id', '=', 'shared_space_album.albumId').on('album.deletedAt', 'is', null),
+      )
+      .where('shared_space_album.spaceId', '=', spaceId)
+      .where((eb) => spaceVisibilityGate(eb));
+
+    return direct.union(library).union(album).union(contributed).stream();
   }
 }

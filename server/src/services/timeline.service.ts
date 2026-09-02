@@ -11,8 +11,8 @@ import { AssetVisibility, Permission, TimeBucketSize } from 'src/enum';
 import { TimeBucketOptions } from 'src/repositories/asset.repository';
 import { BaseService } from 'src/services/base.service';
 import { requireElevatedPermission } from 'src/utils/access';
+import { getAlbumSpaceIds } from 'src/utils/album-space-ids';
 import { getMyPartnerIds } from 'src/utils/asset.util';
-import { sharedLinkPublisherRoles } from 'src/utils/shared-link-space-tether';
 import { normalizeTimeBucketForBucketSize } from 'src/utils/timeline-bucket';
 
 @Injectable()
@@ -87,37 +87,12 @@ export class TimelineService extends BaseService {
       }
     }
 
-    let albumSpaceIds: string[] | undefined;
     // #752 P0-2: album browse — resolve the viewer's live member-spaces linking this album so the
-    // repository unions member-gated contributions.
-    if (dto.albumId) {
-      if (auth.sharedLink) {
-        // #1018: a shared link resolves at most the ONE space it was created from, never the link
-        // creator's full membership — that would leak a contribution from any OTHER space they
-        // happen to share the album into. Both halves of the tether are re-checked here: the album
-        // must still be linked to that space, and the creator must still be a member of it (which
-        // is exactly what getMemberSpaceIdsLinkingAlbum returns). A link with no space — every
-        // pre-#1018 link, and every album_user share — resolves none, as before.
-        const linkSpaceId = auth.sharedLink.spaceId;
-        if (linkSpaceId) {
-          // Role-gated for the same reason the access tether is: a creator demoted to Viewer no
-          // longer holds the authority that published the contributions.
-          const ids = await this.sharedSpaceRepository.getMemberSpaceIdsLinkingAlbum(
-            dto.albumId,
-            auth.sharedLink.userId,
-            { roles: sharedLinkPublisherRoles },
-          );
-          if (ids.includes(linkSpaceId)) {
-            albumSpaceIds = [linkSpaceId];
-          }
-        }
-      } else {
-        const ids = await this.sharedSpaceRepository.getMemberSpaceIdsLinkingAlbum(dto.albumId, auth.user.id);
-        if (ids.length > 0) {
-          albumSpaceIds = ids;
-        }
-      }
-    }
+    // repository unions member-gated contributions. Shared with the album archive (#1048) so the
+    // grid and "download all" can never disagree about what the album contains.
+    const albumSpaceIds = dto.albumId
+      ? await getAlbumSpaceIds({ auth, albumId: dto.albumId, repository: this.sharedSpaceRepository })
+      : undefined;
 
     const scopedOptions = await this.resolveScopedPersonFilters(auth, { ...options, timelineSpaceIds });
 
