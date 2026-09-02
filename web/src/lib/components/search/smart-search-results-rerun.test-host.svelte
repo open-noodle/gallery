@@ -30,6 +30,10 @@
 </button>
 <button type="button" data-testid="host-reload" onclick={() => reloadToken++}>reload</button>
 
+<!-- The gallery virtualizes to zero height under happy-dom, so the loaded assets are only
+     observable through the host's own copy of them. -->
+<span data-testid="host-result-ids">{results.map((asset) => asset.id).join(',')}</span>
+
 {#if searchQuery}
   <SmartSearchResults bind:results {searchQuery} {filters} {reloadToken} isShared={false} language="en" />
 {/if}
