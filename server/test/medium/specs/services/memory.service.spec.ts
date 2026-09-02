@@ -9,6 +9,7 @@ import { LoggingRepository } from 'src/repositories/logging.repository';
 import { MemoryRepository } from 'src/repositories/memory.repository';
 import { PartnerRepository } from 'src/repositories/partner.repository';
 import { PersonRepository } from 'src/repositories/person.repository';
+import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
 import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository';
 import { UserRepository } from 'src/repositories/user.repository';
 import { DB } from 'src/schema';
@@ -30,6 +31,7 @@ const setup = (db?: Kysely<DB>) => {
       DatabaseRepository,
       MemoryRepository,
       PersonRepository,
+      SharedSpaceRepository,
       UserRepository,
       SystemMetadataRepository,
       UserRepository,
