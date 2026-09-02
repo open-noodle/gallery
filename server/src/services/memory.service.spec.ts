@@ -74,6 +74,27 @@ describe(MemoryService.name, () => {
     return user;
   };
 
+  // Keyed for the same reason as `stubMetadata` above: one `get` mock answers every key, and
+  // handing a memories-state object to SystemConfig would feed junk into config parsing. Used
+  // by the 'overlap backfill' tests, which each need a different starting MemoriesState.
+  const runWithState = async (state: Record<string, unknown>) => {
+    const user = factory.userAdmin();
+    mocks.user.getList.mockResolvedValue([user]);
+    mocks.systemMetadata.get.mockImplementation((key: SystemMetadataKey) =>
+      Promise.resolve(
+        key === SystemMetadataKey.MemoriesState
+          ? {
+              lastOnThisDayDate: '2026-09-30T00:00:00.000Z',
+              lastRuleDate: '2026-09-30T00:00:00.000Z',
+              ...state,
+            }
+          : null,
+      ),
+    );
+    await sut.onMemoriesCreate();
+    return user;
+  };
+
   beforeEach(() => {
     ({ sut, mocks } = newTestService(MemoryService));
     mocks.memory.search.mockResolvedValue([]);
@@ -1130,6 +1151,82 @@ describe(MemoryService.name, () => {
 
       expect(mocks.memory.delete).not.toHaveBeenCalled();
       expect(mocks.memory.removeAssetIds).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('overlap backfill', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-09-03T12:00:00Z'));
+      mocks.memory.getForOverlapReconcile.mockResolvedValue([]);
+      mocks.memory.removeAssetIds.mockResolvedValue(void 0);
+      mocks.memory.delete.mockResolvedValue(void 0);
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('B1: walks from the oldest memory to today and records the cursor', async () => {
+      mocks.memory.getOldestMemoryDate.mockResolvedValue(new Date('2026-09-01T00:00:00Z'));
+
+      await runWithState({});
+
+      // 1st, 2nd, 3rd of September for the backfill, plus the nightly window pass.
+      expect(mocks.memory.getForOverlapReconcile).toHaveBeenCalledTimes(4);
+      expect(mocks.systemMetadata.set).toHaveBeenCalledWith(
+        SystemMetadataKey.MemoriesState,
+        expect.objectContaining({ overlapBackfilledAt: expect.stringContaining('2026-09-03') }),
+      );
+    });
+
+    it('B2: does nothing at all once the cursor has reached today', async () => {
+      mocks.memory.getOldestMemoryDate.mockResolvedValue(new Date('2026-01-01T00:00:00Z'));
+
+      await runWithState({ overlapBackfilledAt: '2026-09-03T00:00:00.000Z' });
+
+      // Only the nightly window pass — the backfill short-circuits before even querying.
+      expect(mocks.memory.getOldestMemoryDate).not.toHaveBeenCalled();
+      expect(mocks.memory.getForOverlapReconcile).toHaveBeenCalledTimes(1);
+    });
+
+    it('B3: resumes from the recorded cursor rather than restarting', async () => {
+      mocks.memory.getOldestMemoryDate.mockResolvedValue(new Date('2026-01-01T00:00:00Z'));
+
+      await runWithState({ overlapBackfilledAt: '2026-09-02T00:00:00.000Z' });
+
+      // Only the 3rd remains, plus the nightly window pass.
+      expect(mocks.memory.getForOverlapReconcile).toHaveBeenCalledTimes(2);
+    });
+
+    it('B4/B6: records completion without walking when there are no memories at all', async () => {
+      mocks.memory.getOldestMemoryDate.mockResolvedValue(null);
+
+      await runWithState({});
+
+      expect(mocks.systemMetadata.set).toHaveBeenCalledWith(
+        SystemMetadataKey.MemoriesState,
+        expect.objectContaining({ overlapBackfilledAt: expect.any(String) }),
+      );
+      // Only the nightly window pass.
+      expect(mocks.memory.getForOverlapReconcile).toHaveBeenCalledTimes(1);
+    });
+
+    it('B5: runs the backfill before the nightly window pass', async () => {
+      mocks.memory.getOldestMemoryDate.mockResolvedValue(new Date('2026-09-03T00:00:00Z'));
+      const windows: { from: Date; to: Date }[] = [];
+      mocks.memory.getForOverlapReconcile.mockImplementation((_ownerId: string, window: any) => {
+        windows.push(window);
+        return Promise.resolve([]);
+      });
+
+      await runWithState({});
+
+      // Backfill covers a single day; the nightly pass spans today..today+3.
+      expect(windows).toHaveLength(2);
+      expect(windows[1]!.to.getTime() - windows[1]!.from.getTime()).toBeGreaterThan(
+        windows[0]!.to.getTime() - windows[0]!.from.getTime(),
+      );
     });
   });
 

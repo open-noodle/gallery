@@ -20,7 +20,7 @@ import { createMemoryRules } from 'src/services/memory-rules/memory-type.registr
 import { planReservation, ReservableMemory } from 'src/services/memory-rules/reservation.util';
 import { MemoryThemeSearchAdapter } from 'src/services/memory-rules/theme-search.adapter';
 import { ThemeSearchPort } from 'src/services/memory-rules/theme-search.port';
-import { RuleMemoryData } from 'src/types';
+import { MemoriesState, RuleMemoryData } from 'src/types';
 import { addAssets, removeAssets } from 'src/utils/asset.util';
 import { getPreferences } from 'src/utils/preferences';
 
@@ -129,7 +129,18 @@ export class MemoryService extends BaseService {
       }
 
       // `today` is already declared above for the rule loop — reuse it rather than introducing a
-      // second name for the same value.
+      // second name for the same value. Wrapped in try/catch to fail soft, matching every other
+      // phase in this method: a lookup error here must not block the nightly reconcile pass below.
+      try {
+        await this.backfillMemoryOverlap(
+          users.map(({ id }) => id),
+          today,
+          nextState,
+        );
+      } catch (error) {
+        this.logger.error(`Failed to backfill memory overlap: ${error}`);
+      }
+
       const reconcileTo = today.plus({ days: DAYS });
       for (const owner of users) {
         try {
@@ -186,6 +197,48 @@ export class MemoryService extends BaseService {
       floor: getMemoryTypeFloor(key),
       priority: managed ? (row.type === MemoryType.Rule ? RANK_RULE + score : RANK_ON_THIS_DAY) : RANK_UNMANAGED,
     };
+  }
+
+  /**
+   * Reconcile overlap across history, once. The nightly window only reaches `today + DAYS`, but
+   * the memories index lists a year of history, so without this the duplicates already on screen
+   * would survive until retention expired them. Days outer / users inner, so one cursor makes it
+   * resumable — the same shape as `lastOnThisDayDate`.
+   */
+  private async backfillMemoryOverlap(ownerIds: string[], today: DateTime, state: MemoriesState) {
+    if (
+      state.overlapBackfilledAt &&
+      DateTime.fromISO(state.overlapBackfilledAt, { zone: 'utc' }).startOf('day') >= today
+    ) {
+      return;
+    }
+
+    const oldest = await this.memoryRepository.getOldestMemoryDate();
+    if (!oldest) {
+      state.overlapBackfilledAt = today.toISO()!;
+      await this.systemMetadataRepository.set(SystemMetadataKey.MemoriesState, { ...state });
+      return;
+    }
+
+    // `{ zone: 'utc' }` is load-bearing: without it fromISO builds a LOCAL DateTime, and
+    // startOf('day') then lands on a different instant than the UTC `today` it is compared to.
+    // Tests would pass in UTC CI and fail on a machine west of Greenwich.
+    const start = state.overlapBackfilledAt
+      ? DateTime.fromISO(state.overlapBackfilledAt, { zone: 'utc' }).startOf('day').plus({ days: 1 })
+      : DateTime.fromJSDate(oldest, { zone: 'utc' }).startOf('day');
+
+    for (let target = start; target <= today; target = target.plus({ days: 1 })) {
+      for (const ownerId of ownerIds) {
+        try {
+          await this.reconcileMemoryOverlap(ownerId, target, target);
+        } catch (error) {
+          this.logger.error(`Failed to backfill memory overlap for ${ownerId} on ${target.toISO()}: ${error}`);
+        }
+      }
+
+      state.overlapBackfilledAt = target.toISO()!;
+      await this.systemMetadataRepository.set(SystemMetadataKey.MemoriesState, { ...state });
+    }
   }
 
   /**
