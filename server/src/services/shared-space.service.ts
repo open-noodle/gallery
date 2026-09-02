@@ -1,4 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { Kysely, Transaction } from 'kysely';
 import { AssetFace, SharedSpacePerson } from 'src/database';
 import { OnEvent, OnJob } from 'src/decorators';
 import { MapAlbumDto, mapAlbum } from 'src/dtos/album.dto';
@@ -41,6 +42,7 @@ import {
   SharedSpaceMemberTimelineDto,
   SharedSpaceMemberUpdateDto,
   SharedSpaceResponseDto,
+  SharedSpaceTimelineHidePreviewDto,
   SharedSpaceUpdateDto,
 } from 'src/dtos/shared-space.dto';
 import {
@@ -63,6 +65,7 @@ import { AlbumAssetCount } from 'src/repositories/album.repository';
 import type { ArgOf } from 'src/repositories/event.repository';
 import type { SpaceFaceAssignment } from 'src/repositories/shared-space.repository';
 import { visibleSpaceAssetVisibilities } from 'src/repositories/shared-space.repository';
+import { DB } from 'src/schema';
 import {
   buildAutomaticReconciliationClaim,
   chooseAutomaticTargetIdentity,
@@ -573,6 +576,77 @@ export class SharedSpaceService extends BaseService {
     await (dto.showInTimeline
       ? this.sharedSpaceRepository.unhideAlbumForUser(spaceId, albumId, auth.user.id)
       : this.sharedSpaceRepository.hideAlbumForUser(spaceId, albumId, auth.user.id));
+  }
+
+  // #1041 slice 12 (§8.1) — how many of the CALLER's own photos would leave THEIR OWN timeline if
+  // they hid this whole space.
+  //
+  // This is NOT computed by diffing two in-memory hypothetical `TimelineHiddenScope`s: the real
+  // timeline predicate's "another visible path rescues this asset" arm
+  // (asset.repository.ts `withTimeBucketAssetFilters`'s `timelineSpaceIds` branch) re-checks LIVE
+  // per-user state for some path types, so an in-memory simulation of that arm would silently
+  // disagree with reality whenever a photo has more than one path into a space (S6/S4-shaped
+  // cases in the design doc's truth table). Instead this performs the REAL write — flipping
+  // showInTimeline — inside a transaction, measures the REAL post-write count with the exact same
+  // query the live timeline uses, and rolls back: Postgres transactions see their own uncommitted
+  // writes, so the read observes the hide as if it had already happened, and nothing is ever
+  // persisted. Read-only from the caller's perspective — the dialog can be opened and cancelled
+  // freely — and membership-gated.
+  async getTimelineHidePreview(auth: AuthDto, spaceId: string): Promise<SharedSpaceTimelineHidePreviewDto> {
+    await this.requireMembership(auth, spaceId);
+    const callerId = auth.user.id;
+
+    const before = await this.countOwnTimeline(callerId);
+    const after = await this.sharedSpaceRepository.previewInRolledBackTransaction(
+      (trx) => this.sharedSpaceRepository.updateMember(spaceId, callerId, { showInTimeline: false }, trx).then(),
+      (trx) => this.countOwnTimeline(callerId, trx),
+    );
+
+    // Clamped: the hypothetical write only ever adds a hide, so `after` can never legitimately
+    // exceed `before` — the floor is defensive, not a normal code path.
+    return { hiddenAssetCount: Math.max(0, before - after) };
+  }
+
+  // Album equivalent of getTimelineHidePreview above — how many of the caller's own photos would
+  // leave their own timeline if they hid just this one album (their own row only; never a
+  // cross-member number). Same real-write-then-rollback approach, writing a
+  // shared_space_album_hidden row instead of flipping the member's showInTimeline flag.
+  async getAlbumTimelineHidePreview(
+    auth: AuthDto,
+    spaceId: string,
+    albumId: string,
+  ): Promise<SharedSpaceTimelineHidePreviewDto> {
+    await this.requireMembership(auth, spaceId);
+    await this.requireAlbumLinked(spaceId, albumId);
+    const callerId = auth.user.id;
+
+    const before = await this.countOwnTimeline(callerId);
+    const after = await this.sharedSpaceRepository.previewInRolledBackTransaction(
+      (trx) => this.sharedSpaceRepository.hideAlbumForUser(spaceId, albumId, callerId, trx),
+      (trx) => this.countOwnTimeline(callerId, trx),
+    );
+
+    return { hiddenAssetCount: Math.max(0, before - after) };
+  }
+
+  // The caller's own merged-personal-timeline asset count, exactly as `/timeline/buckets` would
+  // compute it (userId + withSharedSpaces=true). Optionally bound to a transaction handle so the
+  // preview methods above can re-run it against their own uncommitted write.
+  private async countOwnTimeline(callerId: string, db?: Kysely<DB> | Transaction<DB>): Promise<number> {
+    const [hiddenScope, spaceRows] = await Promise.all([
+      this.sharedSpaceRepository.getTimelineHiddenScope(callerId, db),
+      this.sharedSpaceRepository.getSpaceIdsForTimeline(callerId, db),
+    ]);
+    const timelineSpaceIds = spaceRows.map((row) => row.spaceId);
+    return this.assetRepository.getTimelineAssetCount(
+      {
+        userIds: [callerId],
+        callerId,
+        hiddenScope,
+        timelineSpaceIds: timelineSpaceIds.length > 0 ? timelineSpaceIds : undefined,
+      },
+      db,
+    );
   }
 
   async updateMemberMetadataContribution(

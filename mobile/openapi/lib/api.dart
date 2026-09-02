@@ -401,6 +401,7 @@ part 'model/shared_space_person_update_dto.dart';
 part 'model/shared_space_response_dto.dart';
 part 'model/shared_space_response_dto_last_contributor.dart';
 part 'model/shared_space_role.dart';
+part 'model/shared_space_timeline_hide_preview_dto.dart';
 part 'model/shared_space_update_dto.dart';
 part 'model/sign_up_dto.dart';
 part 'model/smart_search_dto.dart';

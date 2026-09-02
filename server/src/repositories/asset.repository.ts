@@ -11,6 +11,7 @@ import {
   ShallowDehydrateObject,
   sql,
   SqlBool,
+  Transaction,
   Updateable,
   UpdateResult,
 } from 'kysely';
@@ -1623,6 +1624,24 @@ export class AssetRepository {
       .select('bucket_counts.count')
       .orderBy('bucket_counts.timeBucket', order)
       .execute() as any as Promise<TimeBucketItem[]>;
+  }
+
+  // #1041 slice 12: a plain COUNT variant of getTimeBuckets, reusing the exact same
+  // `withTimeBucketAssetFilters` predicate (no separate counting logic to drift out of sync with the
+  // real timeline). Used by the hide-preview endpoints, which run this twice — once with the caller's
+  // current `hiddenScope`, once with a hypothetical scope that adds the switch being considered — and
+  // diff the two totals. Cheaper than bucketing since there is no GROUP BY.
+  // Optional trx handle so the #1041 slice 12 preview endpoints can re-run this INSIDE a
+  // rolled-back transaction that has just performed the hypothetical hide — see
+  // SharedSpaceRepository.previewInRolledBackTransaction. Every other caller omits it.
+  @GenerateSql({ params: [{}] })
+  async getTimelineAssetCount(options: TimeBucketOptions, db: Kysely<DB> | Transaction<DB> = this.db): Promise<number> {
+    const result = await db
+      .selectFrom('asset')
+      .$call((qb) => withTimeBucketAssetFilters(qb, options))
+      .select((eb) => eb.fn.countAll<number>().as('count'))
+      .executeTakeFirstOrThrow();
+    return Number(result.count);
   }
 
   async getTimeBucketCovers(options: TimeBucketOptions): Promise<TimeBucketCoverItem[]> {

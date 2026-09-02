@@ -321,6 +321,7 @@ Class | Method | HTTP request | Description
 *SharedSpacesApi* | [**deleteSpacePerson**](doc//SharedSpacesApi.md#deletespaceperson) | **DELETE** /shared-spaces/{id}/people/{personId} | Delete a person from a shared space
 *SharedSpacesApi* | [**deleteSpacePersonAlias**](doc//SharedSpacesApi.md#deletespacepersonalias) | **DELETE** /shared-spaces/{id}/people/{personId}/alias | Delete a person alias in a shared space
 *SharedSpacesApi* | [**dismissSpacePersonFaceSuggestion**](doc//SharedSpacesApi.md#dismissspacepersonfacesuggestion) | **POST** /shared-spaces/{id}/people/{personId}/face-suggestions/{assetFaceId}/dismiss | Dismiss a face suggestion for a person in a shared space
+*SharedSpacesApi* | [**getAlbumTimelineHidePreview**](doc//SharedSpacesApi.md#getalbumtimelinehidepreview) | **GET** /shared-spaces/{id}/albums/{albumId}/timeline-hide-preview | Preview how many of the caller's own photos hiding this album would remove
 *SharedSpacesApi* | [**getAllSpaces**](doc//SharedSpacesApi.md#getallspaces) | **GET** /shared-spaces | Get all shared spaces
 *SharedSpacesApi* | [**getMembers**](doc//SharedSpacesApi.md#getmembers) | **GET** /shared-spaces/{id}/members | Get members of a shared space
 *SharedSpacesApi* | [**getSharedSpaceAlbums**](doc//SharedSpacesApi.md#getsharedspacealbums) | **GET** /shared-spaces/{id}/albums | List albums linked to a shared space
@@ -338,6 +339,7 @@ Class | Method | HTTP request | Description
 *SharedSpacesApi* | [**getSpacePersonFaces**](doc//SharedSpacesApi.md#getspacepersonfaces) | **GET** /shared-spaces/{id}/people/{personId}/faces | Get space person faces
 *SharedSpacesApi* | [**getSpacePersonStatistics**](doc//SharedSpacesApi.md#getspacepersonstatistics) | **GET** /shared-spaces/{id}/people/{personId}/statistics | Get space person statistics
 *SharedSpacesApi* | [**getSpacePersonThumbnail**](doc//SharedSpacesApi.md#getspacepersonthumbnail) | **GET** /shared-spaces/{id}/people/{personId}/thumbnail | Get a space person thumbnail
+*SharedSpacesApi* | [**getTimelineHidePreview**](doc//SharedSpacesApi.md#gettimelinehidepreview) | **GET** /shared-spaces/{id}/timeline-hide-preview | Preview how many of the caller's own photos hiding this space would remove
 *SharedSpacesApi* | [**ignoreSpacePersonFaceSuggestion**](doc//SharedSpacesApi.md#ignorespacepersonfacesuggestion) | **POST** /shared-spaces/{id}/people/{personId}/face-suggestions/{assetFaceId}/ignore | Ignore a face suggestion for a person in a shared space
 *SharedSpacesApi* | [**linkAlbum**](doc//SharedSpacesApi.md#linkalbum) | **PUT** /shared-spaces/{id}/albums/{albumId} | Link an album to a shared space
 *SharedSpacesApi* | [**linkLibrary**](doc//SharedSpacesApi.md#linklibrary) | **PUT** /shared-spaces/{id}/libraries | Link a library to a shared space
@@ -771,6 +773,7 @@ Class | Method | HTTP request | Description
  - [SharedSpaceResponseDto](doc//SharedSpaceResponseDto.md)
  - [SharedSpaceResponseDtoLastContributor](doc//SharedSpaceResponseDtoLastContributor.md)
  - [SharedSpaceRole](doc//SharedSpaceRole.md)
+ - [SharedSpaceTimelineHidePreviewDto](doc//SharedSpaceTimelineHidePreviewDto.md)
  - [SharedSpaceUpdateDto](doc//SharedSpaceUpdateDto.md)
  - [SignUpDto](doc//SignUpDto.md)
  - [SmartSearchDto](doc//SmartSearchDto.md)

@@ -10342,6 +10342,180 @@ describe(SharedSpaceService.name, () => {
     });
   });
 
+  // #1041 slice 12 (§8.1) — the two read-only preview endpoints behind the confirm dialogs.
+  //
+  // Both are implemented as a REAL write inside a transaction that `previewInRolledBackTransaction`
+  // always rolls back (see the repository method's own comment for why an in-memory hypothetical
+  // scope can't safely stand in for the real predicate). These unit tests mock that repository
+  // method to just invoke `mutate` then `read` against a stub trx — proving the SERVICE wires the
+  // right mutation and the right before/after reads — and leave proving the actual COUNT arithmetic
+  // to the e2e specs (shared-space-timeline-hide-preview.e2e-spec.ts), which run against a real
+  // Postgres and a real rolled-back transaction.
+  const stubTrx = { __stub: 'trx' } as any;
+
+  const setUpRolledBackTransaction = () => {
+    mocks.sharedSpace.previewInRolledBackTransaction.mockImplementation(async (mutate: any, read: any) => {
+      await mutate(stubTrx);
+      return read(stubTrx);
+    });
+  };
+
+  describe('getTimelineHidePreview', () => {
+    it('rejects a non-member with ForbiddenException', async () => {
+      const auth = factory.auth({ user: { isAdmin: false } });
+      mocks.sharedSpace.getMember.mockResolvedValue(void 0 as any);
+
+      await expect(sut.getTimelineHidePreview(auth, newUuid())).rejects.toThrow(ForbiddenException);
+      expect(mocks.sharedSpace.previewInRolledBackTransaction).not.toHaveBeenCalled();
+    });
+
+    it('writes the hypothetical member-timeline flip inside the rolled-back transaction and diffs the before/after counts', async () => {
+      const auth = factory.auth({ user: { isAdmin: false } });
+      const space = factory.sharedSpace();
+      mocks.sharedSpace.getMember.mockResolvedValue(
+        makeMemberResult({ spaceId: space.id, userId: auth.user.id, role: SharedSpaceRole.Viewer }),
+      );
+      mocks.sharedSpace.getTimelineHiddenScope.mockResolvedValue({
+        hiddenSpaceIds: [],
+        hiddenAlbumIds: [],
+        hiddenAlbumSpacePairs: [],
+        hiddenLibraryIds: [],
+      });
+      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
+      mocks.sharedSpace.updateMember.mockResolvedValue(void 0 as any);
+      setUpRolledBackTransaction();
+      mocks.asset.getTimelineAssetCount.mockResolvedValueOnce(100).mockResolvedValueOnce(63);
+
+      const result = await sut.getTimelineHidePreview(auth, space.id);
+
+      expect(result).toEqual({ hiddenAssetCount: 37 });
+      expect(mocks.sharedSpace.updateMember).toHaveBeenCalledWith(
+        space.id,
+        auth.user.id,
+        { showInTimeline: false },
+        stubTrx,
+      );
+      // The "after" read is the one bound to the transaction — proves it runs INSIDE the same trx
+      // as the write, not against a separate connection that wouldn't see the uncommitted flip.
+      expect(mocks.sharedSpace.getTimelineHiddenScope).toHaveBeenCalledWith(auth.user.id, stubTrx);
+      expect(mocks.sharedSpace.getSpaceIdsForTimeline).toHaveBeenCalledWith(auth.user.id, stubTrx);
+    });
+
+    // Worth showing, not suppressing — tells a user with a "dump everything" space why nothing
+    // will change (#1041, the confusion behind the original report).
+    it('the zero case returns 0 rather than erroring', async () => {
+      const auth = factory.auth({ user: { isAdmin: false } });
+      const space = factory.sharedSpace();
+      mocks.sharedSpace.getMember.mockResolvedValue(
+        makeMemberResult({ spaceId: space.id, userId: auth.user.id, role: SharedSpaceRole.Viewer }),
+      );
+      mocks.sharedSpace.getTimelineHiddenScope.mockResolvedValue({
+        hiddenSpaceIds: [],
+        hiddenAlbumIds: [],
+        hiddenAlbumSpacePairs: [],
+        hiddenLibraryIds: [],
+      });
+      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
+      mocks.sharedSpace.updateMember.mockResolvedValue(void 0 as any);
+      setUpRolledBackTransaction();
+      mocks.asset.getTimelineAssetCount.mockResolvedValueOnce(50).mockResolvedValueOnce(50);
+
+      await expect(sut.getTimelineHidePreview(auth, space.id)).resolves.toEqual({ hiddenAssetCount: 0 });
+    });
+
+    it('clamps at 0 rather than going negative', async () => {
+      const auth = factory.auth({ user: { isAdmin: false } });
+      const space = factory.sharedSpace();
+      mocks.sharedSpace.getMember.mockResolvedValue(
+        makeMemberResult({ spaceId: space.id, userId: auth.user.id, role: SharedSpaceRole.Viewer }),
+      );
+      mocks.sharedSpace.getTimelineHiddenScope.mockResolvedValue({
+        hiddenSpaceIds: [],
+        hiddenAlbumIds: [],
+        hiddenAlbumSpacePairs: [],
+        hiddenLibraryIds: [],
+      });
+      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
+      mocks.sharedSpace.updateMember.mockResolvedValue(void 0 as any);
+      setUpRolledBackTransaction();
+      // Defensive only — "after" should never legitimately exceed "before".
+      mocks.asset.getTimelineAssetCount.mockResolvedValueOnce(10).mockResolvedValueOnce(12);
+
+      await expect(sut.getTimelineHidePreview(auth, space.id)).resolves.toEqual({ hiddenAssetCount: 0 });
+    });
+  });
+
+  describe('getAlbumTimelineHidePreview', () => {
+    it('rejects a non-member with ForbiddenException', async () => {
+      const auth = factory.auth({ user: { isAdmin: false } });
+      mocks.sharedSpace.getMember.mockResolvedValue(void 0 as any);
+
+      await expect(sut.getAlbumTimelineHidePreview(auth, newUuid(), newUuid())).rejects.toThrow(ForbiddenException);
+      expect(mocks.sharedSpace.previewInRolledBackTransaction).not.toHaveBeenCalled();
+    });
+
+    it('rejects an album not linked to the space with BadRequestException', async () => {
+      const auth = factory.auth({ user: { isAdmin: false } });
+      const space = factory.sharedSpace();
+      mocks.sharedSpace.getMember.mockResolvedValue(
+        makeMemberResult({ spaceId: space.id, userId: auth.user.id, role: SharedSpaceRole.Viewer }),
+      );
+      mocks.sharedSpace.hasAlbumLink.mockResolvedValue(false);
+
+      await expect(sut.getAlbumTimelineHidePreview(auth, space.id, newUuid())).rejects.toThrow(BadRequestException);
+      expect(mocks.sharedSpace.previewInRolledBackTransaction).not.toHaveBeenCalled();
+    });
+
+    it('writes the hypothetical shared_space_album_hidden row (own row only) inside the rolled-back transaction', async () => {
+      const auth = factory.auth({ user: { isAdmin: false } });
+      const space = factory.sharedSpace();
+      const albumId = newUuid();
+      mocks.sharedSpace.getMember.mockResolvedValue(
+        makeMemberResult({ spaceId: space.id, userId: auth.user.id, role: SharedSpaceRole.Viewer }),
+      );
+      mocks.sharedSpace.hasAlbumLink.mockResolvedValue(true);
+      mocks.sharedSpace.getTimelineHiddenScope.mockResolvedValue({
+        hiddenSpaceIds: [],
+        hiddenAlbumIds: [],
+        hiddenAlbumSpacePairs: [],
+        hiddenLibraryIds: [],
+      });
+      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
+      mocks.sharedSpace.hideAlbumForUser.mockResolvedValue(void 0 as any);
+      setUpRolledBackTransaction();
+      mocks.asset.getTimelineAssetCount.mockResolvedValueOnce(20).mockResolvedValueOnce(5);
+
+      const result = await sut.getAlbumTimelineHidePreview(auth, space.id, albumId);
+
+      expect(result).toEqual({ hiddenAssetCount: 15 });
+      expect(mocks.sharedSpace.hideAlbumForUser).toHaveBeenCalledWith(space.id, albumId, auth.user.id, stubTrx);
+    });
+
+    it('the zero case returns 0 rather than erroring', async () => {
+      const auth = factory.auth({ user: { isAdmin: false } });
+      const space = factory.sharedSpace();
+      const albumId = newUuid();
+      mocks.sharedSpace.getMember.mockResolvedValue(
+        makeMemberResult({ spaceId: space.id, userId: auth.user.id, role: SharedSpaceRole.Viewer }),
+      );
+      mocks.sharedSpace.hasAlbumLink.mockResolvedValue(true);
+      mocks.sharedSpace.getTimelineHiddenScope.mockResolvedValue({
+        hiddenSpaceIds: [],
+        hiddenAlbumIds: [],
+        hiddenAlbumSpacePairs: [],
+        hiddenLibraryIds: [],
+      });
+      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
+      mocks.sharedSpace.hideAlbumForUser.mockResolvedValue(void 0 as any);
+      setUpRolledBackTransaction();
+      mocks.asset.getTimelineAssetCount.mockResolvedValueOnce(8).mockResolvedValueOnce(8);
+
+      await expect(sut.getAlbumTimelineHidePreview(auth, space.id, albumId)).resolves.toEqual({
+        hiddenAssetCount: 0,
+      });
+    });
+  });
+
   describe('getLinkedAlbums', () => {
     it('returns AlbumResponseDto-shaped data + space fields, with album createdAt distinct from linkedAt', async () => {
       const row = makeRichRow();

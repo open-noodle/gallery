@@ -244,9 +244,17 @@ export class SharedSpaceRepository {
     return this.db.insertInto('shared_space_member').values(values).returningAll().executeTakeFirstOrThrow();
   }
 
+  // #1041 slice 12: optional trx param, mirroring removeMember below — lets
+  // previewInRolledBackTransaction write the hypothetical member-timeline flip inside its own
+  // rolled-back transaction.
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID, { role: 'editor' }] })
-  updateMember(spaceId: string, userId: string, values: Updateable<SharedSpaceMemberTable>) {
-    return this.db
+  updateMember(
+    spaceId: string,
+    userId: string,
+    values: Updateable<SharedSpaceMemberTable>,
+    db: Kysely<DB> | Transaction<DB> = this.db,
+  ) {
+    return db
       .updateTable('shared_space_member')
       .set(values)
       .where('spaceId', '=', spaceId)
@@ -365,9 +373,10 @@ export class SharedSpaceRepository {
     return rows.map((row) => row.spaceId);
   }
 
+  // See the getTimelineHiddenScope comment above re: the optional trx handle.
   @GenerateSql({ params: [DummyValue.UUID] })
-  getSpaceIdsForTimeline(userId: string) {
-    return this.db
+  getSpaceIdsForTimeline(userId: string, db: Kysely<DB> | Transaction<DB> = this.db) {
+    return db
       .selectFrom('shared_space_member')
       .where('userId', '=', userId)
       .where('showInTimeline', '=', true)
@@ -377,8 +386,13 @@ export class SharedSpaceRepository {
 
   // #1041: own-row-only by construction — always a specific (spaceId, albumId, userId), never a
   // bulk/admin write. onConflict doNothing makes hiding an already-hidden album a no-op, not an error.
-  async hideAlbumForUser(spaceId: string, albumId: string, userId: string): Promise<void> {
-    await this.db
+  async hideAlbumForUser(
+    spaceId: string,
+    albumId: string,
+    userId: string,
+    db: Kysely<DB> | Transaction<DB> = this.db,
+  ): Promise<void> {
+    await db
       .insertInto('shared_space_album_hidden')
       .values({ spaceId: asUuid(spaceId), albumId: asUuid(albumId), userId: asUuid(userId) })
       .onConflict((oc) => oc.doNothing())
@@ -420,11 +434,19 @@ export class SharedSpaceRepository {
   // editor-settable flag governs only the space's own Photos tab (updateAlbumLink /
   // setAlbumShowInTimeline) — it must never subtract anything from a personal timeline again, which
   // is the whole point of this redesign (§2).
+  // #1041 slice 12: accepts an optional transaction handle so the preview endpoints can re-resolve
+  // the scope INSIDE a rolled-back transaction that has just performed the hypothetical hide — the
+  // trx sees its own uncommitted write, so this returns exactly what the scope would be after the
+  // real toggle, with nothing actually persisted. Every other caller omits it and gets the original
+  // this.db-bound behavior, unchanged.
   @GenerateSql({ params: [DummyValue.UUID] })
-  async getTimelineHiddenScope(userId: string): Promise<TimelineHiddenScope> {
+  async getTimelineHiddenScope(
+    userId: string,
+    db: Kysely<DB> | Transaction<DB> = this.db,
+  ): Promise<TimelineHiddenScope> {
     // Rule 1: every set below derives from MY OWN shared_space_member rows. A space I've never
     // joined can never contribute, no matter what shared_space_album_hidden rows exist for it.
-    const memberRows = await this.db
+    const memberRows = await db
       .selectFrom('shared_space_member')
       .select(['spaceId', 'showInTimeline'])
       .where('userId', '=', asUuid(userId))
@@ -441,7 +463,7 @@ export class SharedSpaceRepository {
     const hiddenLibraryIds =
       hiddenSpaceIds.length === 0
         ? []
-        : await this.db
+        : await db
             .selectFrom('shared_space_library')
             .select('libraryId')
             .where('spaceId', 'in', hiddenSpaceIds)
@@ -453,7 +475,7 @@ export class SharedSpaceRepository {
     // require album.deletedAt IS NULL (rule 3a / A1 invariant) — a trashed album must not keep
     // hiding. Restricted to memberSpaceIds so an album linked to a space I'm not even a member of
     // (rule 1) can never appear here, however it got a shared_space_album_hidden row.
-    const candidateRows = await this.db
+    const candidateRows = await db
       .selectFrom('shared_space_album')
       .innerJoin('album', (join) =>
         join.onRef('album.id', '=', 'shared_space_album.albumId').on('album.deletedAt', 'is', null),
@@ -481,7 +503,7 @@ export class SharedSpaceRepository {
     const cancelRows =
       visibleSpaceIds.length === 0
         ? []
-        : await this.db
+        : await db
             .selectFrom('shared_space_album')
             .innerJoin('album', (join) =>
               join.onRef('album.id', '=', 'shared_space_album.albumId').on('album.deletedAt', 'is', null),
@@ -506,6 +528,32 @@ export class SharedSpaceRepository {
     const hiddenAlbumSpacePairs = hiddenPairs.map((row) => ({ albumId: row.albumId, spaceId: row.spaceId }));
 
     return { hiddenSpaceIds, hiddenAlbumIds, hiddenAlbumSpacePairs, hiddenLibraryIds };
+  }
+
+  // #1041 slice 12 (§8.1) — runs `mutate` (the hypothetical hide, written for real) then `read`
+  // (measuring its effect) inside a transaction that is ALWAYS rolled back, so the preview
+  // endpoints get an exact answer — the real write + read code paths, nothing simulated — with
+  // nothing ever persisted. Postgres transactions see their own uncommitted writes, so `read`
+  // (which re-resolves getTimelineHiddenScope/getSpaceIdsForTimeline against the SAME trx handle)
+  // observes the hide as if it had already happened.
+  async previewInRolledBackTransaction<T>(
+    mutate: (trx: Transaction<DB>) => Promise<void>,
+    read: (trx: Transaction<DB>) => Promise<T>,
+  ): Promise<T> {
+    const rollbackSentinel = Symbol('previewInRolledBackTransaction rollback');
+    let result: T | undefined;
+    try {
+      await this.db.transaction().execute(async (trx) => {
+        await mutate(trx);
+        result = await read(trx);
+        throw rollbackSentinel;
+      });
+    } catch (error) {
+      if (error !== rollbackSentinel) {
+        throw error;
+      }
+    }
+    return result as T;
   }
 
   @GenerateSql({ params: [] })

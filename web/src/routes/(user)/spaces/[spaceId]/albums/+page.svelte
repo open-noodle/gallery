@@ -5,11 +5,14 @@
   import SpaceAlbumsList from '$lib/components/spaces/space-albums-list.svelte';
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { eventManager } from '$lib/managers/event-manager.svelte';
+  import AlbumHideFromMyTimelineConfirmModal from '$lib/modals/AlbumHideFromMyTimelineConfirmModal.svelte';
+  import AlbumHideFromSpacePhotosConfirmModal from '$lib/modals/AlbumHideFromSpacePhotosConfirmModal.svelte';
   import SpaceLinkAlbumModal from '$lib/modals/SpaceLinkAlbumModal.svelte';
   import { Route } from '$lib/route';
   import { handleError } from '$lib/utils/handle-error';
   import { createAlbum } from '$lib/utils/album-utils';
   import {
+    getAlbumTimelineHidePreview,
     getSharedSpaceAlbums,
     linkAlbum,
     SharedSpaceRole,
@@ -79,14 +82,46 @@
     }
   }
 
+  // Editor-gated shared showInTimeline flag governing the space's own Photos tab. Hiding removes
+  // the album from what EVERYONE in the space sees there, so it gets a confirm dialog stating a
+  // count and offering the §2 bridge — a checked-by-default "also hide from my own timeline",
+  // which writes only the actor's own row via the member-only endpoint below. Showing again needs
+  // no confirmation.
   async function handleToggleTimeline(album: SharedSpaceLinkedAlbumDto) {
     try {
-      await updateSharedSpaceAlbum({
-        id: space.id,
-        albumId: album.id,
-        sharedSpaceAlbumLinkUpdateDto: { showInTimeline: !album.showInTimeline },
-      });
-      albums = albums.map((a) => (a.id === album.id ? { ...a, showInTimeline: !album.showInTimeline } : a));
+      if (album.showInTimeline) {
+        const result = await modalManager.show(AlbumHideFromSpacePhotosConfirmModal, {
+          albumName: album.albumName,
+          spaceName: space.name,
+        });
+        if (!result?.confirmed) {
+          return;
+        }
+        await updateSharedSpaceAlbum({
+          id: space.id,
+          albumId: album.id,
+          sharedSpaceAlbumLinkUpdateDto: { showInTimeline: false },
+        });
+        if (result.alsoHideFromMyTimeline && !album.hiddenFromMyTimeline) {
+          await updateAlbumTimelineForMember({
+            id: space.id,
+            albumId: album.id,
+            sharedSpaceAlbumMemberTimelineDto: { showInTimeline: false },
+          });
+          albums = albums.map((a) =>
+            a.id === album.id ? { ...a, showInTimeline: false, hiddenFromMyTimeline: true } : a,
+          );
+        } else {
+          albums = albums.map((a) => (a.id === album.id ? { ...a, showInTimeline: false } : a));
+        }
+      } else {
+        await updateSharedSpaceAlbum({
+          id: space.id,
+          albumId: album.id,
+          sharedSpaceAlbumLinkUpdateDto: { showInTimeline: true },
+        });
+        albums = albums.map((a) => (a.id === album.id ? { ...a, showInTimeline: true } : a));
+      }
       // Keep the layout's cached linkedAlbums in sync so the timeline tab + a re-mount reflect it.
       await invalidateAll();
     } catch (error) {
@@ -96,9 +131,20 @@
 
   // The member-facing "hide from my timeline" switch (#1041 §2) — own row only, never reaches
   // anyone else's library. Distinct from handleToggleTimeline above, which is the editor-gated
-  // shared showInTimeline flag governing the space's own Photos tab.
+  // shared showInTimeline flag governing the space's own Photos tab. Hiding gets a confirm dialog
+  // stating a count; showing again needs no confirmation.
   async function handleToggleMyTimeline(album: SharedSpaceLinkedAlbumDto) {
     try {
+      if (!album.hiddenFromMyTimeline) {
+        const { hiddenAssetCount } = await getAlbumTimelineHidePreview({ id: space.id, albumId: album.id });
+        const confirmed = await modalManager.show(AlbumHideFromMyTimelineConfirmModal, {
+          albumName: album.albumName,
+          count: hiddenAssetCount,
+        });
+        if (!confirmed) {
+          return;
+        }
+      }
       await updateAlbumTimelineForMember({
         id: space.id,
         albumId: album.id,

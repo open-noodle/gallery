@@ -837,6 +837,8 @@ class ApiClient {
           return SharedSpaceResponseDtoLastContributor.fromJson(value);
         case 'SharedSpaceRole':
           return SharedSpaceRoleTypeTransformer().decode(value);
+        case 'SharedSpaceTimelineHidePreviewDto':
+          return SharedSpaceTimelineHidePreviewDto.fromJson(value);
         case 'SharedSpaceUpdateDto':
           return SharedSpaceUpdateDto.fromJson(value);
         case 'SignUpDto':

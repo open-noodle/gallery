@@ -144,6 +144,15 @@ const SharedSpaceAlbumMemberTimelineSchema = z
   })
   .meta({ id: 'SharedSpaceAlbumMemberTimelineDto' });
 
+// #1041 slice 12: the caller's own preview count, for the confirm dialogs above. Always the
+// caller's own number — never a cross-member count, which would be both expensive and meaningless
+// since each member's other memberships differ. See specs/2026-08-31-space-hide-from-timeline-design.md §8.1.
+const SharedSpaceTimelineHidePreviewSchema = z
+  .object({
+    hiddenAssetCount: z.number().int().min(0).describe("Photos that would leave the caller's own timeline"),
+  })
+  .meta({ id: 'SharedSpaceTimelineHidePreviewDto' });
+
 const SharedSpaceAlbumParamSchema = z.object({
   id: z.uuidv4(),
   albumId: z.uuidv4(),
@@ -244,6 +253,7 @@ export class SharedSpaceMemberMetadataContributionDto extends createZodDto(
 export class SharedSpaceLibraryLinkDto extends createZodDto(SharedSpaceLibraryLinkSchema) {}
 export class SharedSpaceAlbumLinkUpdateDto extends createZodDto(SharedSpaceAlbumLinkUpdateSchema) {}
 export class SharedSpaceAlbumMemberTimelineDto extends createZodDto(SharedSpaceAlbumMemberTimelineSchema) {}
+export class SharedSpaceTimelineHidePreviewDto extends createZodDto(SharedSpaceTimelineHidePreviewSchema) {}
 export class SharedSpaceAlbumParamDto extends createZodDto(SharedSpaceAlbumParamSchema) {}
 export class SharedSpaceMemberParamDto extends createZodDto(SharedSpaceMemberParamSchema) {}
 export class SharedSpacePersonParamDto extends createZodDto(SharedSpacePersonParamSchema) {}

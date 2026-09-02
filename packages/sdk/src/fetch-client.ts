@@ -3050,6 +3050,10 @@ export type SharedSpaceAlbumMemberTimelineDto = {
     /** Show this album's assets in your own personal timeline */
     showInTimeline: boolean;
 };
+export type SharedSpaceTimelineHidePreviewDto = {
+    /** Photos that would leave the caller's own timeline */
+    hiddenAssetCount: number;
+};
 export type SharedSpaceAssetRemoveDto = {
     /** Asset IDs */
     assetIds: string[];
@@ -8288,6 +8292,20 @@ export function updateAlbumTimelineForMember({ albumId, id, sharedSpaceAlbumMemb
     })));
 }
 /**
+ * Preview how many of the caller's own photos hiding this album would remove
+ */
+export function getAlbumTimelineHidePreview({ albumId, id }: {
+    albumId: string;
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: SharedSpaceTimelineHidePreviewDto;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/albums/${encodeURIComponent(albumId)}/timeline-hide-preview`, {
+        ...opts
+    }));
+}
+/**
  * Remove assets from a shared space
  */
 export function removeAssets({ id, sharedSpaceAssetRemoveDto }: {
@@ -8839,6 +8857,19 @@ export function getSpacePersonThumbnail({ id, personId }: {
         status: 200;
         data: Blob;
     }>(`/shared-spaces/${encodeURIComponent(id)}/people/${encodeURIComponent(personId)}/thumbnail`, {
+        ...opts
+    }));
+}
+/**
+ * Preview how many of the caller's own photos hiding this space would remove
+ */
+export function getTimelineHidePreview({ id }: {
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: SharedSpaceTimelineHidePreviewDto;
+    }>(`/shared-spaces/${encodeURIComponent(id)}/timeline-hide-preview`, {
         ...opts
     }));
 }

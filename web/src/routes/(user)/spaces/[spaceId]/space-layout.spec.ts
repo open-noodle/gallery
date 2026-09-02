@@ -152,15 +152,33 @@ describe('space [spaceId] +layout.svelte', () => {
     });
 
     it('handleToggleTimeline: hides the space from the timeline and revalidates', async () => {
+      sdkMock.getTimelineHidePreview.mockResolvedValue({ hiddenAssetCount: 12 });
+      vi.mocked(modalManager.show).mockResolvedValue(true as never);
       renderLayout(SharedSpaceRole.Owner, { member: member({ role: SharedSpaceRole.Owner, showInTimeline: true }) });
 
       await clickOverflowOption('spaces_hide_from_timeline');
 
+      await waitFor(() => expect(sdkMock.getTimelineHidePreview).toHaveBeenCalledWith({ id: 's1' }));
+      expect(modalManager.show).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ spaceName: 'Trip', count: 12 }),
+      );
       expect(sdkMock.updateMemberTimeline).toHaveBeenCalledWith({
         id: 's1',
         sharedSpaceMemberTimelineDto: { showInTimeline: false },
       });
       await waitFor(() => expect(invalidateAllMock).toHaveBeenCalled());
+    });
+
+    it('handleToggleTimeline: does nothing when the hide confirm dialog is dismissed', async () => {
+      sdkMock.getTimelineHidePreview.mockResolvedValue({ hiddenAssetCount: 12 });
+      vi.mocked(modalManager.show).mockResolvedValue(false as never);
+      renderLayout(SharedSpaceRole.Owner, { member: member({ role: SharedSpaceRole.Owner, showInTimeline: true }) });
+
+      await clickOverflowOption('spaces_hide_from_timeline');
+
+      await waitFor(() => expect(modalManager.show).toHaveBeenCalled());
+      expect(sdkMock.updateMemberTimeline).not.toHaveBeenCalled();
     });
 
     it('handleToggleTimeline: shows the space on the timeline when currently hidden', async () => {
