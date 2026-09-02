@@ -171,9 +171,14 @@ test.describe('Family relationships (web)', () => {
     const dropZone = page.locator(
       `[data-testid="family-drop-zone"][data-position="above"][data-target-id="${root.identityId}"]`,
     );
+    const rootNode = page.locator(`[data-testid="family-node"][data-identity-id="${root.identityId}"]`);
 
     const dataTransfer = await page.evaluateHandle(() => new DataTransfer());
     await secondParentNode.dispatchEvent('dragstart', { dataTransfer });
+    // Only the card under the pointer offers its gestures — every card showing all three at once
+    // tiled the canvas with overlapping boxes. So the drag has to reach `root` before its zones
+    // exist, exactly as a real one does.
+    await rootNode.dispatchEvent('dragover', { dataTransfer });
     await expect(dropZone).toBeVisible();
 
     const joined = page.waitForResponse(
