@@ -16,6 +16,7 @@
     results?: unknown[];
     isShared?: boolean;
     space?: { id: string; canWrite: boolean };
+    onScroll?: (scrollTop: number) => void;
     [key: string]: unknown;
   }
 
@@ -31,6 +32,7 @@
     results = $bindable([]),
     isShared,
     space,
+    onScroll,
     ...rest
   }: Props = $props();
 </script>
@@ -64,4 +66,9 @@
   data-country={filters?.country ?? ''}
   data-language={language}
   data-total={total ?? ''}
-></div>
+>
+  <!-- The real grid scrolls its own container; hosts learn about it only through `onScroll`.
+       These stand in for scrolling past / back above the collapse threshold. -->
+  <button type="button" data-testid="search-results-scroll-down" onclick={() => onScroll?.(240)}> scroll down </button>
+  <button type="button" data-testid="search-results-scroll-top" onclick={() => onScroll?.(0)}> scroll to top </button>
+</div>
