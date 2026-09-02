@@ -335,8 +335,23 @@ albumTimelineGate: "space-tab" | "personal" | "none";
 
 Making it a required union rather than an optional boolean is deliberate: a defaulted boolean would let
 a missed site silently keep the old gate, which is precisely the class of bug that a green `tsc` cannot
-catch on a re-key. Triage of all 40 sites is a reviewable artifact of slice 5 — a table of site → chosen
+catch on a re-key. Triage of all 38 sites is a reviewable artifact of slice 5 — a table of site → chosen
 value → reason, in the PR description.
+
+> **Measured in slice 5, and slice 8 depends on it: the compiler will NOT enumerate the sites for you.**
+> Slice 5 shipped `AlbumTimelineGate = 'space-tab' | 'none'` (`shared-space-album-scope.ts:83`), read at
+> three places (`:195`, `:250`, `:442`) as `options.albumTimelineGate === 'space-tab'` — comparisons,
+> not exhaustive `switch`es. Adding `| 'personal'` was tried during slice 5 and produced **zero** new
+> `tsc` errors.
+>
+> Two consequences. First, a site left as `'space-tab'` when it should become `'personal'` compiles
+> silently, so slice 8 must walk the triage table by hand rather than following compiler errors.
+> Second, the SQL regen is the real safety net: a pure re-mapping changes emitted SQL, so slice 8's
+> `server/src/queries/` diff must show **exactly** the personal-timeline surfaces changing and nothing
+> else. Slice 5's own regen was byte-identical, which is what proved its 38-site mapping correct.
+>
+> If slice 8 wants compiler help, convert the three readers to exhaustive `switch` statements over the
+> union first, as its own inert step.
 
 ### 6.2 Service-side resolution
 
@@ -813,7 +828,60 @@ slices is itself a finding. §9.6's honesty requirements apply throughout — in
 in slice 8 must give the viewer a second, visible space, or the §6.2 collapse silently runs the wrong
 code path and the test proves nothing.
 
-## 11. Out of scope
+## 11. Appendix — slice 5 gate triage (38 sites)
+
+Every call site's chosen `albumTimelineGate`, recorded because slice 8 must walk this table by hand:
+the compiler cannot enumerate the sites (§6.1). `'space-tab'` is today's `requireShowInTimeline: true`;
+`'none'` is today's absent. **Slice 8 flips a subset of the `'space-tab'` rows to `'personal'`** — the
+personal-timeline surfaces. The `'none'` rows are reachability/RBAC checks and must not move.
+
+| Site                                    | Gate        | Why                                                                     |
+| --------------------------------------- | ----------- | ----------------------------------------------------------------------- |
+| `utils/database.ts:835`                 | `space-tab` | asset browse, spaceId timeline filter                                   |
+| `utils/database.ts:873`                 | `space-tab` | asset browse, timelineSpaceIds filter                                   |
+| `utils/shared-link-space-tether.ts:63`  | `none`      | shared-link publish tether — pure reachability                          |
+| `asset.repository.ts:445`               | `space-tab` | asset browse (spaceId)                                                  |
+| `asset.repository.ts:493`               | `space-tab` | asset browse (timelineSpaceIds)                                         |
+| `asset.repository.ts:1784`              | `space-tab` | Explore-strip city aggregation                                          |
+| `access.repository.ts:862`              | `none`      | `checkSharedSpaceAccess` — PersonRead reachability                      |
+| `access.repository.ts:909`              | `none`      | `checkSharedSpaceEditAccess` — reachability                             |
+| `face-person-verdict.repository.ts:765` | `none`      | `getPendingForSpacePerson` reachability                                 |
+| `face-person-verdict.repository.ts:851` | `none`      | `hasPendingForSpacePerson` reachability                                 |
+| `face-person-verdict.repository.ts:893` | `none`      | `isFaceReachableInSpace` reachability                                   |
+| `map.repository.ts:127`                 | `space-tab` | map browse, albumIds + timelineSpaceIds                                 |
+| `map.repository.ts:170`                 | `space-tab` | map browse, timelineSpaceIds album arm                                  |
+| `memory.repository.ts:97`               | `space-tab` | memory candidate assets                                                 |
+| `person.repository.ts:633`              | `none`      | face RBAC scope narrowing                                               |
+| `person.repository.ts:825`              | `none`      | `getStatistics` memberUserId narrowing                                  |
+| `search.repository.ts:1128`             | `none`      | face-search candidates (reachability)                                   |
+| `search.repository.ts:1205`             | `space-tab` | `getAssetsByCity` — Explore "view all"                                  |
+| `search.repository.ts:1431`             | `space-tab` | `getAccessibleTags` spaceId branch                                      |
+| `search.repository.ts:1450`             | `space-tab` | `getAccessibleTags` timelineSpaceIds branch                             |
+| `search.repository.ts:1574`             | `none`      | album-participants branch inside a specific-album query                 |
+| `search.repository.ts:1595`             | `space-tab` | spaceId branch (filter suggestions)                                     |
+| `search.repository.ts:1617`             | `space-tab` | timelineSpaceIds branch (filter suggestions)                            |
+| `view-repository.ts:65`                 | `space-tab` | folder explorer `ownedOrSpaceAccessible`                                |
+| `shared-space.repository.ts:553`        | `space-tab` | `getAssetCount` — space Photos tab count                                |
+| `shared-space.repository.ts:1370`       | `space-tab` | `getRecentAssets` — Photos tab preview                                  |
+| `shared-space.repository.ts:1434`       | `space-tab` | `getLastAssetAddedAt` — Photos tab metadata                             |
+| `shared-space.repository.ts:2320`       | `none`      | `getSpaceRepresentativeFaceForUpdate` reachability                      |
+| `shared-space.repository.ts:2362`       | `none`      | `getSpaceRepresentativeFaces` reachability                              |
+| `shared-space.repository.ts:2725`       | `none`      | `getIdentityEvidenceForSpacePerson` reachability                        |
+| `shared-space.repository.ts:2836`       | `space-tab` | `getPersonAssetIds`                                                     |
+| `shared-space.repository.ts:2996`       | `none`      | `isSpacePersonRepresentativeFaceValid`                                  |
+| `shared-space.repository.ts:3040`       | `none`      | `getFirstValidRepresentativeFaceForPerson`                              |
+| `shared-space.repository.ts:3346`       | `none`      | `getAssetIdsWithoutOtherSpacePath` — face-cleanup anti-join             |
+| `shared-space.repository.ts:3753`       | `none`      | `getScannableSpacePeopleWithUnassignedFaces`                            |
+| `shared-space.repository.ts:3833`       | `none`      | `isAssetInSpace` (contributed arm)                                      |
+| `shared-space.repository.ts:3943`       | `none`      | `getAssetIdsInSpacePage` — comment states "NOT gated by showInTimeline" |
+| `shared-space-album-scope.ts:432`       | `space-tab` | `accessibleTimelineAssetPredicate` — People-page reachability           |
+
+No site required guessing: each `'none'` either carries a doc comment stating it is reachability-only,
+or is plainly not a browse surface (RBAC checks, face-cleanup anti-joins, representative-face validity).
+The **empty `server/src/queries/` diff** after the refactor is the independent proof that none were
+mis-mapped — a wrong value changes emitted SQL even on surfaces no test covers.
+
+## 12. Out of scope
 
 - Search, map, People page, tag explorer — Archive parity (§4).
 - Retiring `shared_space_album.showInTimeline`. It keeps a real job (§2).

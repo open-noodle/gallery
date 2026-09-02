@@ -64,12 +64,30 @@ export type SpaceScope =
   | { memberUserId: string; memberRole?: SharedSpaceRole[] }
   | { spaceIdRef: ReferenceExpression<DB, keyof DB> };
 
+/**
+ * Which album-visibility gate a space-scoped query wants.
+ *
+ * Deliberately a REQUIRED union rather than an optional boolean: after #1041 there are two distinct
+ * gates, and an optional flag would let a new call site silently inherit the wrong one — the class of
+ * mistake a green `tsc` cannot catch on a re-key.
+ *
+ *  - 'space-tab' : shared_space_album.showInTimeline = true. Governs the SPACE's own Photos tab, which
+ *                  is the same for every member. This is exactly the old `requireShowInTimeline: true`.
+ *  - 'none'      : no album gate at all (the album page itself, grant surfaces, sync streams). Exactly
+ *                  the old absent/false.
+ *
+ * Slice 8 adds 'personal' (the per-member shared_space_album_hidden rows). When it does, every switch
+ * over this type becomes non-exhaustive and the compiler will demand each site be reconsidered. That
+ * is intentional.
+ */
+export type AlbumTimelineGate = 'space-tab' | 'none';
+
 export interface SpaceAlbumAssetOptions {
   /** Outer column the album's asset must match, e.g. 'asset.id' / 'asset_face.assetId'. */
   correlateAssetId: ReferenceExpression<DB, keyof DB>;
   scope: SpaceScope;
-  /** Timeline surfaces only: require `shared_space_album.showInTimeline = true`. Default false. */
-  requireShowInTimeline?: boolean;
+  /** Which album-visibility gate this query wants. See {@link AlbumTimelineGate}. */
+  albumTimelineGate: AlbumTimelineGate;
   /**
    * The A1 invariant: require `album.deletedAt IS NULL`. Default true. Passing
    * false reproduces the pre-fix soft-delete hole at the four legacy sites and is
@@ -174,7 +192,7 @@ function linkedAlbumAssetExists(
           (scope as { spaceIdRef: ReferenceExpression<DB, keyof DB> }).spaceIdRef,
         ),
       )
-      .$if(!!options.requireShowInTimeline, (qb) => qb.where('shared_space_album.showInTimeline', '=', true))
+      .$if(options.albumTimelineGate === 'space-tab', (qb) => qb.where('shared_space_album.showInTimeline', '=', true))
       .$if(!!options.excludeAlbumId, (qb) => qb.where('shared_space_album.albumId', '!=', options.excludeAlbumId!)),
   );
 }
@@ -229,7 +247,7 @@ export function spaceContributedAssetExists(
           (scope as { spaceIdRef: ReferenceExpression<DB, keyof DB> }).spaceIdRef,
         ),
       )
-      .$if(!!options.requireShowInTimeline, (qb) => qb.where('shared_space_album.showInTimeline', '=', true))
+      .$if(options.albumTimelineGate === 'space-tab', (qb) => qb.where('shared_space_album.showInTimeline', '=', true))
       .$if(!!options.excludeAlbumId, (qb) => qb.where('shared_space_album.albumId', '!=', options.excludeAlbumId!)),
   );
 }
@@ -240,7 +258,8 @@ export interface SpacePathBranchOptions {
   /** Outer library-id column for the library arm, e.g. 'asset.libraryId'. */
   correlateLibraryId: ReferenceExpression<DB, keyof DB>;
   scope: SpaceScope;
-  requireShowInTimeline?: boolean;
+  /** Which album-visibility gate this query wants. See {@link AlbumTimelineGate}. */
+  albumTimelineGate: AlbumTimelineGate;
 }
 
 /** The directly-added-asset arm (`shared_space_asset`), matching the clean asset-outer sites. */
@@ -330,7 +349,7 @@ export function spaceAssetPathBranches(
     spaceAlbumAssetExists(eb, {
       correlateAssetId: options.correlateAssetId,
       scope: options.scope,
-      requireShowInTimeline: options.requireShowInTimeline,
+      albumTimelineGate: options.albumTimelineGate,
     }),
   ];
 }
@@ -353,8 +372,8 @@ export interface SpaceAlbumAssetSqlOptions {
   spaceScopeJoin: RawBuilder<unknown>;
   /** A1 invariant: require `album.deletedAt IS NULL`. Default true. */
   requireAlbumNotDeleted?: boolean;
-  /** Timeline surfaces only: require `shared_space_album.showInTimeline = true`. Default false. */
-  requireShowInTimeline?: boolean;
+  /** Which album-visibility gate this query wants. See {@link AlbumTimelineGate}. */
+  albumTimelineGate: AlbumTimelineGate;
 }
 
 /**
@@ -410,7 +429,7 @@ export function accessibleTimelineAssetPredicate(options: {
             OR ${spaceAlbumAssetExistsSql({
               assetIdColumn: sql`asset.id`,
               spaceScopeJoin: sql`INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_album."spaceId"`,
-              requireShowInTimeline: true,
+              albumTimelineGate: 'space-tab',
             })}`;
 }
 
@@ -419,7 +438,8 @@ export function spaceAlbumAssetExistsSql(options: SpaceAlbumAssetSqlOptions): Ra
     (options.requireAlbumNotDeleted ?? true)
       ? sql`INNER JOIN album ON album.id = shared_space_album."albumId" AND album."deletedAt" IS NULL`
       : sql``;
-  const timelineGate = options.requireShowInTimeline ? sql`AND "shared_space_album"."showInTimeline" = true` : sql``;
+  const timelineGate =
+    options.albumTimelineGate === 'space-tab' ? sql`AND "shared_space_album"."showInTimeline" = true` : sql``;
   return sql<SqlBool>`(EXISTS (
               SELECT 1
               FROM shared_space_album

@@ -550,7 +550,7 @@ export class SharedSpaceRepository {
                 spaceContributedAssetExists(eb, {
                   correlateAssetId: 'asset.id',
                   scope: { spaceId },
-                  requireShowInTimeline: true,
+                  albumTimelineGate: 'space-tab',
                 }),
               )
               .where('asset.deletedAt', 'is', null)
@@ -1367,7 +1367,7 @@ export class SharedSpaceRepository {
                 spaceContributedAssetExists(eb, {
                   correlateAssetId: 'asset.id',
                   scope: { spaceId },
-                  requireShowInTimeline: true,
+                  albumTimelineGate: 'space-tab',
                 }),
               )
               .where('asset.deletedAt', 'is', null)
@@ -1431,7 +1431,7 @@ export class SharedSpaceRepository {
                 spaceContributedAssetExists(eb, {
                   correlateAssetId: 'asset.id',
                   scope: { spaceId },
-                  requireShowInTimeline: true,
+                  albumTimelineGate: 'space-tab',
                 }),
               )
               .where('asset.deletedAt', 'is', null)
@@ -2317,6 +2317,7 @@ export class SharedSpaceRepository {
           spaceAlbumAssetExists(eb, {
             correlateAssetId: 'asset_face.assetId',
             scope: { spaceIdRef: 'shared_space_person.spaceId' },
+            albumTimelineGate: 'none',
           }),
         ]),
       )
@@ -2358,6 +2359,7 @@ export class SharedSpaceRepository {
           spaceAlbumAssetExists(eb, {
             correlateAssetId: 'asset_face.assetId',
             scope: { spaceIdRef: 'shared_space_person.spaceId' },
+            albumTimelineGate: 'none',
           }),
         ]),
       )
@@ -2720,6 +2722,7 @@ export class SharedSpaceRepository {
           spaceAlbumAssetExists(eb, {
             correlateAssetId: 'asset_face.assetId',
             scope: { spaceId },
+            albumTimelineGate: 'none',
           }),
         ]),
       )
@@ -2830,7 +2833,7 @@ export class SharedSpaceRepository {
           spaceAlbumAssetExists(eb, {
             correlateAssetId: 'asset_face.assetId',
             scope: { spaceIdRef: 'shared_space_person.spaceId' },
-            requireShowInTimeline: true,
+            albumTimelineGate: 'space-tab',
           }),
         ]),
       )
@@ -2990,6 +2993,7 @@ export class SharedSpaceRepository {
           spaceAlbumAssetExists(eb, {
             correlateAssetId: 'asset_face.assetId',
             scope: { spaceIdRef: 'shared_space_person.spaceId' },
+            albumTimelineGate: 'none',
           }),
         ]),
       )
@@ -3033,6 +3037,7 @@ export class SharedSpaceRepository {
           spaceAlbumAssetExists(eb, {
             correlateAssetId: 'asset_face.assetId',
             scope: { spaceIdRef: 'shared_space_person.spaceId' },
+            albumTimelineGate: 'none',
           }),
         ]),
       )
@@ -3336,7 +3341,11 @@ export class SharedSpaceRepository {
       // contributions (#764), via the canonical scope helper. Every read/visibility surface unions
       // both arms; routing retention through the same helper keeps them in agreement. Omitting the
       // contributed arm sweeps faces for assets still visible in the space via a contribution.
-      .where((eb) => eb.not(spaceAlbumAssetExists(eb, { correlateAssetId: 'asset.id', scope: { spaceId } })))
+      .where((eb) =>
+        eb.not(
+          spaceAlbumAssetExists(eb, { correlateAssetId: 'asset.id', scope: { spaceId }, albumTimelineGate: 'none' }),
+        ),
+      )
       .where((eb) =>
         eb.not(
           eb.exists(
@@ -3754,6 +3763,7 @@ export class SharedSpaceRepository {
                   correlateAssetId: 'asset.id',
                   correlateLibraryId: 'asset.libraryId',
                   scope: { spaceIdRef: 'shared_space_person.spaceId' },
+                  albumTimelineGate: 'none',
                 }),
               ),
             ),
@@ -3833,6 +3843,7 @@ export class SharedSpaceRepository {
                 spaceContributedAssetExists(eb, {
                   correlateAssetId: 'asset.id',
                   scope: { spaceId },
+                  albumTimelineGate: 'none',
                 }),
               )
               .where('asset.deletedAt', 'is', null)
@@ -3941,7 +3952,9 @@ export class SharedSpaceRepository {
           // Album path: owner album_asset + cross-owner album_space_asset contributions (#764).
           // Face membership is NOT gated by showInTimeline, so the reconcile re-projects every album
           // asset's faces — matching the retention helper's union so projection and retention agree.
-          .where((eb) => spaceAlbumAssetExists(eb, { correlateAssetId: 'asset.id', scope: { spaceId } }))
+          .where((eb) =>
+            spaceAlbumAssetExists(eb, { correlateAssetId: 'asset.id', scope: { spaceId }, albumTimelineGate: 'none' }),
+          )
           .where('asset.deletedAt', 'is', null)
           .where('asset.isOffline', '=', false)
           .where('asset.visibility', 'in', visibleSpaceAssetVisibilities),

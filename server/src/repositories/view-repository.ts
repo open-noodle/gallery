@@ -62,7 +62,7 @@ export class ViewRepository {
         correlateAssetId: 'asset.id',
         correlateLibraryId: 'asset.libraryId',
         scope: { memberUserId: userId },
-        requireShowInTimeline: true,
+        albumTimelineGate: 'space-tab',
       }),
     ]);
   }

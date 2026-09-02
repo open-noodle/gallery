@@ -11,6 +11,7 @@ import {
   spaceAssetPathBranches,
   spaceDirectAssetExists,
   spaceLibraryAssetExists,
+  type AlbumTimelineGate,
   type SpaceScope,
 } from 'src/utils/shared-space-album-scope';
 import { newMediumService } from 'test/medium.factory';
@@ -32,12 +33,14 @@ type Ctx = ReturnType<typeof setup>['ctx'];
 /** Assets whose album leg resolves for the given scope. */
 const albumAssetIds = async (
   scope: SpaceScope,
-  flags?: { requireShowInTimeline?: boolean; requireAlbumNotDeleted?: boolean; excludeAlbumId?: string },
+  flags?: { albumTimelineGate?: AlbumTimelineGate; requireAlbumNotDeleted?: boolean; excludeAlbumId?: string },
 ): Promise<Set<string>> => {
   const rows = await db
     .selectFrom('asset')
     .select('asset.id')
-    .where((eb) => spaceAlbumAssetExists(eb, { correlateAssetId: 'asset.id', scope, ...flags }))
+    .where((eb) =>
+      spaceAlbumAssetExists(eb, { correlateAssetId: 'asset.id', scope, albumTimelineGate: 'none', ...flags }),
+    )
     .execute();
   return new Set(rows.map((x) => x.id));
 };
@@ -63,7 +66,7 @@ const libraryAssetIds = async (scope: SpaceScope): Promise<Set<string>> => {
 };
 
 /** Assets visible via ANY of the three space paths for the given scope. */
-const anyPathAssetIds = (scope: SpaceScope, requireShowInTimeline?: boolean) =>
+const anyPathAssetIds = (scope: SpaceScope, albumTimelineGate: AlbumTimelineGate = 'none') =>
   db
     .selectFrom('asset')
     .select('asset.id')
@@ -73,7 +76,7 @@ const anyPathAssetIds = (scope: SpaceScope, requireShowInTimeline?: boolean) =>
           correlateAssetId: 'asset.id',
           correlateLibraryId: 'asset.libraryId',
           scope,
-          requireShowInTimeline,
+          albumTimelineGate,
         }),
       ),
     )
@@ -126,7 +129,7 @@ describe('spaceAlbumAssetExists — album leg', () => {
     await ctx.newSharedSpaceAlbum({ spaceId: space.id, albumId: album.id, showInTimeline: false });
 
     const withoutGate = await albumAssetIds({ spaceId: space.id });
-    const withGate = await albumAssetIds({ spaceId: space.id }, { requireShowInTimeline: true });
+    const withGate = await albumAssetIds({ spaceId: space.id }, { albumTimelineGate: 'space-tab' });
     expect(withoutGate.has(a1.id)).toBe(true);
     expect(withGate.has(a1.id)).toBe(false);
   });
@@ -182,7 +185,7 @@ describe('spaceAlbumAssetExists — album leg', () => {
     const rows = await db
       .selectFrom('asset')
       .select('asset.id')
-      .where((eb) => spaceAlbumAssetExists(eb, { correlateAssetId: 'asset.id', scope: { spaceIds: [s1.id, s2.id] } }))
+      .where((eb) => spaceAlbumAssetExists(eb, { correlateAssetId: 'asset.id', scope: { spaceIds: [s1.id, s2.id] }, albumTimelineGate: 'none' }))
       .execute();
     expect(rows.filter((r) => r.id === a1.id)).toHaveLength(1);
   });
@@ -202,7 +205,11 @@ describe('spaceAlbumAssetExists — album leg', () => {
       .select('asset_face.id')
       .where('asset_face.id', '=', faceId)
       .where((eb) =>
-        spaceAlbumAssetExists(eb, { correlateAssetId: 'asset_face.assetId', scope: { spaceId: space.id } }),
+        spaceAlbumAssetExists(eb, {
+          correlateAssetId: 'asset_face.assetId',
+          scope: { spaceId: space.id },
+          albumTimelineGate: 'none',
+        }),
       )
       .execute();
     expect(rows).toHaveLength(1);
@@ -318,6 +325,7 @@ describe('spaceAssetPathBranches — the three-path OR', () => {
             correlateAssetId: 'asset.id',
             correlateLibraryId: 'asset.libraryId',
             scope: { spaceId: s.space.id },
+            albumTimelineGate: 'none',
           }),
         ),
       )

@@ -442,7 +442,7 @@ export function withTimeBucketAssetFilters<O>(
               correlateAssetId: 'asset.id',
               correlateLibraryId: 'asset.libraryId',
               scope: { spaceId: options.spaceId! },
-              requireShowInTimeline: true,
+              albumTimelineGate: 'space-tab',
             }),
           ),
           eb.or([
@@ -490,7 +490,7 @@ export function withTimeBucketAssetFilters<O>(
                 correlateAssetId: 'asset.id',
                 correlateLibraryId: 'asset.libraryId',
                 scope: { spaceIds: options.timelineSpaceIds! },
-                requireShowInTimeline: true,
+                albumTimelineGate: 'space-tab',
               }),
             ),
           ]),
@@ -1781,7 +1781,7 @@ export class AssetRepository {
                 correlateAssetId: 'asset.id',
                 correlateLibraryId: 'asset.libraryId',
                 scope: { spaceIds: timelineSpaceIds },
-                requireShowInTimeline: true,
+                albumTimelineGate: 'space-tab',
               })
             : []),
         ]),
