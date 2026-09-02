@@ -471,6 +471,20 @@ chrome, the search field, the candidate ordering and the grid for both; `AssignF
 it is a no-op on the space list, which `getPersonsBySpaceId` already serves named-first, and it keeps
 the owner list's `closestAssetId` resemblance order inside each group.
 
+**Follow-up (2026-09-02): the ordering was only half of it.** Field testing of pr-992-rc.7 narrowed
+the remaining complaint precisely: the picker looked right when opened on an already-named face and
+wrong when opened on an unassigned one, on the SAME photo. That rules out anything role- or
+space-shaped — the only input that differs between those two opens is `closestAssetId`, which feeds
+the resemblance ordering. Ordering plus `LIMIT` is membership: `GET /people` serves one 500-row page,
+`getAllForUser` sorted that page by resemblance ALONE on its `closestFaceAssetId` branch, and on a
+library past 500 people (unnamed clusters dominate the count) the named people were simply cut from
+the page — a different set of them for each face. No client-side re-ordering can recover a row the
+response never contained, which is why the first fix improved the screen without curing it.
+`getAllForUser` now applies the same named-first key its no-`closestFaceAssetId` branch always had,
+ahead of the limit, with resemblance ordering within each group and `person.id` as a total-order
+tiebreak for paging. Pinned by a medium test that gives the cluster the perfect embedding match and
+`take: 1`, so the named person can only survive if the name outranks resemblance.
+
 **What was deliberately NOT done: merging the two candidate lists.** They are different tables reached
 through different endpoints (`person`/`reassignFacesById` vs `shared_space_person`/§6.3), so a merged
 grid would hold two id namespaces and dispatch each click to a different endpoint, directly on top of
