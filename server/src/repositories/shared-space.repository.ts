@@ -397,6 +397,21 @@ export class SharedSpaceRepository {
       .execute();
   }
 
+  // #1041 slice 11 — the album list needs to tell the caller which of THEIR own albums they have
+  // hidden from their own timeline, so the web/mobile album kebab can render the correct verb
+  // ("Hide" vs "Show") and badge. Deliberately just this one user's rows for this one space — never
+  // another member's, and never mixed with the space-level hide (that's a different switch, §2).
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
+  async getHiddenAlbumIdsForUser(spaceId: string, userId: string): Promise<string[]> {
+    const rows = await this.db
+      .selectFrom('shared_space_album_hidden')
+      .select('albumId')
+      .where('spaceId', '=', asUuid(spaceId))
+      .where('userId', '=', asUuid(userId))
+      .execute();
+    return rows.map((row) => row.albumId);
+  }
+
   // #1041 §6.2 — resolves, for `userId`, everything that should disappear from THEIR OWN personal
   // timeline. Deliberately NOT wired to any query yet (that is a later slice) — see the
   // TimelineHiddenScope doc comment above.

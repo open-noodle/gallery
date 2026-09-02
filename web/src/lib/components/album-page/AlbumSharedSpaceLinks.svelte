@@ -60,7 +60,10 @@
           <span class="flex items-center gap-2 text-sm dark:text-immich-dark-fg">
             <span>{link.spaceName}</span>
             {#if !link.showInTimeline}
-              <span class="text-xs text-gray-500">· {$t('space_albums_hidden_from_timeline')}</span>
+              <!-- link.showInTimeline is the shared, editor-controlled flag (the space's own Photos
+                   tab) — never the per-caller "my timeline" preference, so this must use the
+                   space-photos badge, not space_albums_hidden_from_timeline (#1041 §2). -->
+              <span class="text-xs text-gray-500">· {$t('space_albums_hidden_from_space_photos')}</span>
             {/if}
           </span>
           <IconButton

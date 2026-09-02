@@ -22,6 +22,7 @@ class SharedSpaceLinkedAlbumDto {
     required this.description,
     this.endDate = const Optional.absent(),
     required this.hasSharedLink,
+    required this.hiddenFromMyTimeline,
     required this.id,
     required this.isActivityEnabled,
     this.lastModifiedAssetTimestamp = const Optional.absent(),
@@ -69,6 +70,9 @@ class SharedSpaceLinkedAlbumDto {
 
   /// Has shared link
   bool hasSharedLink;
+
+  /// Whether the caller has hidden this album from their own timeline (§2 personal switch)
+  bool hiddenFromMyTimeline;
 
   /// Album ID
   String id;
@@ -130,6 +134,7 @@ class SharedSpaceLinkedAlbumDto {
     other.description == description &&
     other.endDate == endDate &&
     other.hasSharedLink == hasSharedLink &&
+    other.hiddenFromMyTimeline == hiddenFromMyTimeline &&
     other.id == id &&
     other.isActivityEnabled == isActivityEnabled &&
     other.lastModifiedAssetTimestamp == lastModifiedAssetTimestamp &&
@@ -154,6 +159,7 @@ class SharedSpaceLinkedAlbumDto {
     (description.hashCode) +
     (endDate == null ? 0 : endDate!.hashCode) +
     (hasSharedLink.hashCode) +
+    (hiddenFromMyTimeline.hashCode) +
     (id.hashCode) +
     (isActivityEnabled.hashCode) +
     (lastModifiedAssetTimestamp == null ? 0 : lastModifiedAssetTimestamp!.hashCode) +
@@ -167,7 +173,7 @@ class SharedSpaceLinkedAlbumDto {
     (updatedAt.hashCode);
 
   @override
-  String toString() => 'SharedSpaceLinkedAlbumDto[addedById=$addedById, albumName=$albumName, albumThumbnailAssetId=$albumThumbnailAssetId, assetCount=$assetCount, contributorCounts=$contributorCounts, createdAt=$createdAt, description=$description, endDate=$endDate, hasSharedLink=$hasSharedLink, id=$id, isActivityEnabled=$isActivityEnabled, lastModifiedAssetTimestamp=$lastModifiedAssetTimestamp, linkedAt=$linkedAt, order=$order, ownerId=$ownerId, shared=$shared, sharedSpaceLinks=$sharedSpaceLinks, showInTimeline=$showInTimeline, startDate=$startDate, updatedAt=$updatedAt]';
+  String toString() => 'SharedSpaceLinkedAlbumDto[addedById=$addedById, albumName=$albumName, albumThumbnailAssetId=$albumThumbnailAssetId, assetCount=$assetCount, contributorCounts=$contributorCounts, createdAt=$createdAt, description=$description, endDate=$endDate, hasSharedLink=$hasSharedLink, hiddenFromMyTimeline=$hiddenFromMyTimeline, id=$id, isActivityEnabled=$isActivityEnabled, lastModifiedAssetTimestamp=$lastModifiedAssetTimestamp, linkedAt=$linkedAt, order=$order, ownerId=$ownerId, shared=$shared, sharedSpaceLinks=$sharedSpaceLinks, showInTimeline=$showInTimeline, startDate=$startDate, updatedAt=$updatedAt]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -194,6 +200,7 @@ class SharedSpaceLinkedAlbumDto {
       json[r'endDate'] = value == null ? null : value.toUtc().toIso8601String();
     }
       json[r'hasSharedLink'] = this.hasSharedLink;
+      json[r'hiddenFromMyTimeline'] = this.hiddenFromMyTimeline;
       json[r'id'] = this.id;
       json[r'isActivityEnabled'] = this.isActivityEnabled;
     if (this.lastModifiedAssetTimestamp.isPresent) {
@@ -238,6 +245,7 @@ class SharedSpaceLinkedAlbumDto {
         description: mapValueOfType<String>(json, r'description')!,
         endDate: json.containsKey(r'endDate') ? Optional.present(mapDateTime(json, r'endDate', r'')) : const Optional.absent(),
         hasSharedLink: mapValueOfType<bool>(json, r'hasSharedLink')!,
+        hiddenFromMyTimeline: mapValueOfType<bool>(json, r'hiddenFromMyTimeline')!,
         id: mapValueOfType<String>(json, r'id')!,
         isActivityEnabled: mapValueOfType<bool>(json, r'isActivityEnabled')!,
         lastModifiedAssetTimestamp: json.containsKey(r'lastModifiedAssetTimestamp') ? Optional.present(mapDateTime(json, r'lastModifiedAssetTimestamp', r'')) : const Optional.absent(),
@@ -303,6 +311,7 @@ class SharedSpaceLinkedAlbumDto {
     'createdAt',
     'description',
     'hasSharedLink',
+    'hiddenFromMyTimeline',
     'id',
     'isActivityEnabled',
     'linkedAt',

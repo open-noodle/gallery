@@ -105,6 +105,58 @@ describe('hideAlbumForUser / unhideAlbumForUser', () => {
   });
 });
 
+// #1041 slice 11 — this is a narrower query than getTimelineHiddenScope: it must report ONLY the
+// caller's own per-album hide for THIS space, never the effective "hidden via the space switch"
+// result, so the album kebab's own toggle state never drifts from what the caller actually did to
+// that specific album.
+describe('getHiddenAlbumIdsForUser', () => {
+  it('returns only the albums the caller has personally hidden in this space', async () => {
+    const { ctx, sut } = setup();
+    const { user: owner } = await ctx.newUser();
+    const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id });
+    const { result: hiddenAlbum } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'Hidden' });
+    const { result: visibleAlbum } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'Visible' });
+    await sut.addAlbum({ spaceId: space.id, albumId: hiddenAlbum.id, addedById: owner.id });
+    await sut.addAlbum({ spaceId: space.id, albumId: visibleAlbum.id, addedById: owner.id });
+
+    await sut.hideAlbumForUser(space.id, hiddenAlbum.id, owner.id);
+
+    const ids = await sut.getHiddenAlbumIdsForUser(space.id, owner.id);
+    expect(ids).toEqual([hiddenAlbum.id]);
+  });
+
+  it('never returns another member row for the same album', async () => {
+    const { ctx, sut } = setup();
+    const { user: owner } = await ctx.newUser();
+    const { user: memberA } = await ctx.newUser();
+    const { user: memberB } = await ctx.newUser();
+    const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: memberA.id });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: memberB.id });
+    const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'Shared' });
+    await sut.addAlbum({ spaceId: space.id, albumId: album.id, addedById: owner.id });
+
+    await sut.hideAlbumForUser(space.id, album.id, memberA.id);
+
+    expect(await sut.getHiddenAlbumIdsForUser(space.id, memberB.id)).toEqual([]);
+    expect(await sut.getHiddenAlbumIdsForUser(space.id, memberA.id)).toEqual([album.id]);
+  });
+
+  it('returns [] when the space itself is hidden but the album was never individually hidden', async () => {
+    // Deliberately does NOT reuse getTimelineHiddenScope's "effective" merge: the space switch and
+    // the album switch are different rows, and this method must reflect the album row alone.
+    const { ctx, sut } = setup();
+    const { user: owner } = await ctx.newUser();
+    const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, showInTimeline: false });
+    const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'NeverToggled' });
+    await sut.addAlbum({ spaceId: space.id, albumId: album.id, addedById: owner.id });
+
+    expect(await sut.getHiddenAlbumIdsForUser(space.id, owner.id)).toEqual([]);
+  });
+});
+
 describe('getTimelineHiddenScope', () => {
   it('rule 1: is scoped to my memberships', async () => {
     const { ctx, sut } = setup();

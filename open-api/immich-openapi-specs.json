@@ -33203,6 +33203,10 @@
             "description": "Has shared link",
             "type": "boolean"
           },
+          "hiddenFromMyTimeline": {
+            "description": "Whether the caller has hidden this album from their own timeline (§2 personal switch)",
+            "type": "boolean"
+          },
           "id": {
             "description": "Album ID",
             "format": "uuid",
@@ -33263,6 +33267,7 @@
           "createdAt",
           "description",
           "hasSharedLink",
+          "hiddenFromMyTimeline",
           "id",
           "isActivityEnabled",
           "linkedAt",

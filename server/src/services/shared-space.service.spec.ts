@@ -93,6 +93,7 @@ const arrange = (mocks: ServiceMocks, rows: Record<string, unknown>[], metadata:
   );
   mocks.sharedSpace.getLinkedAlbums.mockResolvedValue(rows as any);
   mocks.album.getMetadataForIds.mockResolvedValue(metadata as any);
+  mocks.sharedSpace.getHiddenAlbumIdsForUser.mockResolvedValue([]);
   return { auth, space };
 };
 
@@ -10469,6 +10470,32 @@ describe(SharedSpaceService.name, () => {
       const auth = factory.auth({ user: { isAdmin: false } });
       mocks.sharedSpace.getMember.mockResolvedValue(void 0 as any);
       await expect(sut.getLinkedAlbums(auth, newUuid())).rejects.toThrow(ForbiddenException);
+    });
+
+    // #1041 slice 11 — hiddenFromMyTimeline is the caller's OWN per-album hide, distinct from the
+    // shared showInTimeline flag: an album can be showInTimeline=true (visible on the space's own
+    // Photos tab for everyone) while still being hidden from THIS caller's personal timeline.
+    it('marks an album hiddenFromMyTimeline when the caller has a shared_space_album_hidden row for it', async () => {
+      const hiddenRow = makeRichRow();
+      const visibleRow = makeRichRow();
+      const { auth, space } = arrange(
+        mocks,
+        [hiddenRow, visibleRow],
+        [hiddenRow, visibleRow].map((r) => ({
+          albumId: r.id,
+          assetCount: 1,
+          startDate: null,
+          endDate: null,
+          lastModifiedAssetTimestamp: null,
+        })),
+      );
+      mocks.sharedSpace.getHiddenAlbumIdsForUser.mockResolvedValue([hiddenRow.id as string]);
+
+      const result = await sut.getLinkedAlbums(auth, space.id);
+
+      expect(result.find((a) => a.id === hiddenRow.id)?.hiddenFromMyTimeline).toBe(true);
+      expect(result.find((a) => a.id === visibleRow.id)?.hiddenFromMyTimeline).toBe(false);
+      expect(mocks.sharedSpace.getHiddenAlbumIdsForUser).toHaveBeenCalledWith(space.id, auth.user.id);
     });
   });
 

@@ -13,22 +13,23 @@ Like the rest of Shared Spaces, album actions are governed by the space's three 
 - **Two ways photos land in a space album:**
   - **Owner-added photos** — the album owner (or an editor of the album) adds their own photos to the album, exactly like a normal album.
   - **Cross-owner contributions** — a space Editor or Owner can add photos they _don't_ own into a linked space album. These become **contributions**: they show up in the album for all members, but they never leave their real owner's library. See [Contributions](#contributions).
-- **Independent timeline control.** Each linked album has its own "show in the space timeline" switch, separate from each member's personal timeline preference. See [Showing album photos in the timeline](#showing-album-photos-in-the-timeline).
+- **Independent timeline control.** Each linked album has its own "show in the space's photos" switch (Owners/Editors), and every member can separately hide any album from just their own timeline. See [Showing album photos in the timeline](#showing-album-photos-in-the-timeline).
 
 ## Roles and Permissions
 
-| Permission                                    | Owner | Editor | Viewer |
-| --------------------------------------------- | ----- | ------ | ------ |
-| Browse the Albums tab                         | Yes   | Yes    | Yes    |
-| Search / sort / group / switch album views    | Yes   | Yes    | Yes    |
-| Open a space album and view its photos        | Yes   | Yes    | Yes    |
-| Download photos from a space album            | Yes   | Yes    | Yes    |
-| Link an existing album into the space \*      | Yes   | Yes    | No     |
-| Create a new album inside the space           | Yes   | Yes    | No     |
-| Unlink an album from the space                | Yes   | Yes    | No     |
-| Add / remove photos in a space album          | Yes   | Yes    | No     |
-| Contribute photos you don't own (cross-owner) | Yes   | Yes    | No     |
-| Toggle "show in space timeline" for an album  | Yes   | Yes    | No     |
+| Permission                                         | Owner | Editor | Viewer |
+| -------------------------------------------------- | ----- | ------ | ------ |
+| Browse the Albums tab                              | Yes   | Yes    | Yes    |
+| Search / sort / group / switch album views         | Yes   | Yes    | Yes    |
+| Open a space album and view its photos             | Yes   | Yes    | Yes    |
+| Download photos from a space album                 | Yes   | Yes    | Yes    |
+| Link an existing album into the space \*           | Yes   | Yes    | No     |
+| Create a new album inside the space                | Yes   | Yes    | No     |
+| Unlink an album from the space                     | Yes   | Yes    | No     |
+| Add / remove photos in a space album               | Yes   | Yes    | No     |
+| Contribute photos you don't own (cross-owner)      | Yes   | Yes    | No     |
+| Toggle "hide from the space's photos" for an album | Yes   | Yes    | No     |
+| Hide/show an album on just your own timeline       | Yes   | Yes    | Yes    |
 
 \* Linking also requires that you are the **owner or an editor of the album itself** — you can only link albums you are allowed to manage.
 
@@ -76,12 +77,14 @@ You can't remove an asset from a space directly if it's only present through a l
 
 ## Showing album photos in the timeline
 
-Whether a linked album's photos show up in the space's aggregated **timeline** is controlled by two independent switches:
+Whether a linked album's photos show up in a timeline is controlled by two independent switches, each on the album's ⋯ menu:
 
-1. **Per-album (set by Editors/Owners).** Each linked album has a "show in the space timeline" toggle. Turn it off to keep an album browsable on the Albums tab without adding its photos to the space timeline.
-2. **Per-member (set by each member).** Every member independently chooses whether that space appears in **their own** timeline (the space's timeline-integration preference).
+1. **"Hide this album from the space's photos"** (Owners/Editors only) — governs whether the album appears on the space's own Albums/Photos tabs at all, for **every member**. Turn it off to keep an album browsable but out of the space's aggregated view.
+2. **"Hide this album from my timeline"** (any member, yourself only) — a personal preference that removes just this one album from **your own** main Photos timeline, without changing what anyone else sees or what the space itself shows.
 
-An album's photos appear in a given member's timeline only when **both** switches are on. This lets an editor curate which albums belong in the shared timeline, while each member still controls whether the space shows up in their personal timeline at all.
+These don't combine with AND: hiding an album from the space's photos does **not** also remove it from any member's personal timeline — each member decides that for themselves with switch 2. See [Timeline Integration](shared-spaces.md#timeline-integration) for the full picture, including the space-level "hide all space photos from my timeline" switch and the truth table for when a photo disappears from your timeline.
+
+Hiding is a tidiness feature, not a privacy feature — it never restricts anyone's access to the album or its photos.
 
 ## Editing a space album
 

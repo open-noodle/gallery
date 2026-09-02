@@ -179,6 +179,9 @@ const SharedSpaceLinkedAlbumSchema = AlbumResponseSchema.omit({ albumUsers: true
     showInTimeline: z.boolean().describe('Include this album in the space timeline'),
     addedById: z.string().nullable().describe('User who linked the album into the space'),
     linkedAt: z.string().meta({ format: 'date-time' }).describe('Link creation timestamp'),
+    hiddenFromMyTimeline: z
+      .boolean()
+      .describe('Whether the caller has hidden this album from their own timeline (§2 personal switch)'),
   })
   .meta({ id: 'SharedSpaceLinkedAlbumDto' });
 

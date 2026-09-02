@@ -3019,6 +3019,8 @@ export type SharedSpaceLinkedAlbumDto = {
     endDate?: string;
     /** Has shared link */
     hasSharedLink: boolean;
+    /** Whether the caller has hidden this album from their own timeline (§2 personal switch) */
+    hiddenFromMyTimeline: boolean;
     /** Album ID */
     id: string;
     /** Activity feed enabled */

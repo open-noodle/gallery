@@ -74,6 +74,7 @@ function makeAlbum(overrides: Partial<SharedSpaceLinkedAlbumDto> = {}): SharedSp
     assetCount: 5,
     albumThumbnailAssetId: null,
     showInTimeline: true,
+    hiddenFromMyTimeline: false,
     addedById: null,
     linkedAt: '2026-01-01T00:00:00.000Z',
     description: '',
@@ -272,8 +273,9 @@ describe('Space albums page', () => {
       expect(menuButton).not.toBeNull();
       await fireEvent.click(menuButton!);
 
-      // Click "Hide from timeline" (showInTimeline=true → shows hide option)
-      const toggleOption = await screen.findByText('Hide from timeline');
+      // Click "Hide this album from the space's photos" (showInTimeline=true → shows hide option;
+      // this is the editor-gated shared flag, distinct from the "my timeline" item above it).
+      const toggleOption = await screen.findByText("Hide this album from the space's photos");
       await fireEvent.click(toggleOption);
 
       await waitFor(() =>
@@ -284,8 +286,8 @@ describe('Space albums page', () => {
         }),
       );
 
-      // Optimistic flip: "hidden from timeline" label should now appear
-      await waitFor(() => expect(screen.getByText(/hidden from timeline/i)).toBeInTheDocument());
+      // Optimistic flip: "hidden from the space's photos" label should now appear
+      await waitFor(() => expect(screen.getByText(/Hidden from the space's photos/)).toBeInTheDocument());
     });
 
     // ── Owner equivalents for unlink and toggle ──────────────────────────────
@@ -318,7 +320,7 @@ describe('Space albums page', () => {
       expect(menuButton).not.toBeNull();
       await fireEvent.click(menuButton!);
 
-      const toggleOption = await screen.findByText('Hide from timeline');
+      const toggleOption = await screen.findByText("Hide this album from the space's photos");
       await fireEvent.click(toggleOption);
 
       await waitFor(() =>
@@ -403,9 +405,39 @@ describe('Space albums page', () => {
 
   // ── Viewer gating: card menu and empty CTA ──────────────────────────────────
 
-  it('viewer with a linked album sees no space-album-card-menu', () => {
+  // The card menu itself is no longer editor-gated — a viewer needs it too, to hide the album
+  // from their OWN timeline (#1041 §2, a personal preference, not an editor action). Only the
+  // editor-only items inside it (space-photos toggle, unlink) are gated.
+  it('viewer with a linked album sees the card menu, with only the my-timeline item', async () => {
     renderPage([makeAlbum()], SharedSpaceRole.Viewer);
-    expect(screen.queryByTestId('space-album-card-menu')).not.toBeInTheDocument();
+    expect(screen.getByTestId('space-album-card-menu')).toBeInTheDocument();
+
+    const menuButton = screen.getByTestId('space-album-card-menu').querySelector('button');
+    await fireEvent.click(menuButton!);
+
+    expect(await screen.findByText('Hide this album from my timeline')).toBeInTheDocument();
+    expect(screen.queryByText("Hide this album from the space's photos")).not.toBeInTheDocument();
+    expect(screen.queryByText('Unlink album')).not.toBeInTheDocument();
+  });
+
+  it('viewer clicking "Hide this album from my timeline" calls the member-only endpoint', async () => {
+    sdkMock.updateAlbumTimelineForMember.mockResolvedValue(undefined as never);
+    const album = makeAlbum({ id: 'album-1', albumName: 'Vacation', hiddenFromMyTimeline: false });
+    renderPage([album], SharedSpaceRole.Viewer);
+
+    const menuButton = screen.getByTestId('space-album-card-menu').querySelector('button');
+    await fireEvent.click(menuButton!);
+    await fireEvent.click(await screen.findByText('Hide this album from my timeline'));
+
+    await waitFor(() =>
+      expect(sdkMock.updateAlbumTimelineForMember).toHaveBeenCalledWith({
+        id: 'space-1',
+        albumId: 'album-1',
+        sharedSpaceAlbumMemberTimelineDto: { showInTimeline: false },
+      }),
+    );
+    // Never the editor-only endpoint — a viewer has no permission to call it.
+    expect(sdkMock.updateSharedSpaceAlbum).not.toHaveBeenCalled();
   });
 
   it('viewer with empty albums list sees no empty-link-album-button', () => {

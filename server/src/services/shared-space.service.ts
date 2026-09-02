@@ -873,6 +873,7 @@ export class SharedSpaceService extends BaseService {
     for (const m of metadata) {
       byId[m.albumId] = m;
     }
+    const hiddenAlbumIds = new Set(await this.sharedSpaceRepository.getHiddenAlbumIdsForUser(spaceId, auth.user.id));
     return rows.map((row) => {
       const { albumUsers: _albumUsers, ...albumFields } = mapAlbum(row as unknown as MapAlbumDto);
       return {
@@ -885,6 +886,7 @@ export class SharedSpaceService extends BaseService {
         showInTimeline: row.showInTimeline,
         addedById: row.addedById,
         linkedAt: (row.linkedAt as unknown as Date).toISOString(),
+        hiddenFromMyTimeline: hiddenAlbumIds.has(row.id),
       };
     });
   }

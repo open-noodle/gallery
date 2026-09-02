@@ -14,6 +14,7 @@
     linkAlbum,
     SharedSpaceRole,
     unlinkAlbum,
+    updateAlbumTimelineForMember,
     updateSharedSpaceAlbum,
     type SharedSpaceLinkedAlbumDto,
     type SharedSpaceMemberResponseDto,
@@ -86,6 +87,24 @@
         sharedSpaceAlbumLinkUpdateDto: { showInTimeline: !album.showInTimeline },
       });
       albums = albums.map((a) => (a.id === album.id ? { ...a, showInTimeline: !album.showInTimeline } : a));
+      // Keep the layout's cached linkedAlbums in sync so the timeline tab + a re-mount reflect it.
+      await invalidateAll();
+    } catch (error) {
+      handleError(error, $t('spaces_linked_albums_error_update'));
+    }
+  }
+
+  // The member-facing "hide from my timeline" switch (#1041 §2) — own row only, never reaches
+  // anyone else's library. Distinct from handleToggleTimeline above, which is the editor-gated
+  // shared showInTimeline flag governing the space's own Photos tab.
+  async function handleToggleMyTimeline(album: SharedSpaceLinkedAlbumDto) {
+    try {
+      await updateAlbumTimelineForMember({
+        id: space.id,
+        albumId: album.id,
+        sharedSpaceAlbumMemberTimelineDto: { showInTimeline: album.hiddenFromMyTimeline },
+      });
+      albums = albums.map((a) => (a.id === album.id ? { ...a, hiddenFromMyTimeline: !a.hiddenFromMyTimeline } : a));
       // Keep the layout's cached linkedAlbums in sync so the timeline tab + a re-mount reflect it.
       await invalidateAll();
     } catch (error) {
@@ -175,6 +194,7 @@
         {searchQuery}
         onUnlink={handleUnlink}
         onToggleTimeline={handleToggleTimeline}
+        onToggleMyTimeline={handleToggleMyTimeline}
       />
     </div>
   {/if}

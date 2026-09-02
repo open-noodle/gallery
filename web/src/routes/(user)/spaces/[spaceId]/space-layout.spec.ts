@@ -137,6 +137,20 @@ describe('space [spaceId] +layout.svelte', () => {
   });
 
   describe('overflow handlers', () => {
+    // #1041 regression guard: the space-level switch and the album-level "my timeline" switch
+    // used to share the literal key `spaces_hide_from_timeline` / rendered string "Hide from
+    // timeline". `svelte-i18n` returns raw keys in this test setup, so asserting the exact key
+    // here pins that they no longer collide with the album kebab's `space_albums_hide_from_my_*`
+    // keys (see space-album-card.spec.ts / space-albums-table.spec.ts for the album side).
+    it('renders a DIFFERENT key than the album kebab\'s "my timeline" toggle (#1041 regression guard)', async () => {
+      renderLayout(SharedSpaceRole.Owner, { member: member({ role: SharedSpaceRole.Owner, showInTimeline: true }) });
+
+      await openOverflow();
+
+      expect(screen.getByText('spaces_hide_from_timeline')).toBeInTheDocument();
+      expect(screen.queryByText('space_albums_hide_from_my_timeline')).not.toBeInTheDocument();
+    });
+
     it('handleToggleTimeline: hides the space from the timeline and revalidates', async () => {
       renderLayout(SharedSpaceRole.Owner, { member: member({ role: SharedSpaceRole.Owner, showInTimeline: true }) });
 
