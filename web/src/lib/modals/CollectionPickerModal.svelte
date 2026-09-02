@@ -118,10 +118,18 @@
     loading = false;
   });
 
+  /**
+   * Every album the user can add to: one request, no filters.
+   *
+   * This used to fetch `isOwned: true` and `isShared: true` and concatenate them, which double-
+   * listed any album the user owns *and* has shared — both queries match it (#1043). The
+   * original pair was `shared: false` + `shared: true`, a real partition; the rename to
+   * `isOwned`/`isShared` turned it into two overlapping sets. Omitting both filters returns
+   * exactly the union the picker wants — every album the user owns or is a member of — and
+   * halves the requests. Row order does not depend on it: the converter sorts by name.
+   */
   const loadAlbums = async () => {
-    const owned = await getAllAlbums({ isOwned: true });
-    owned.push(...(await getAllAlbums({ isShared: true })));
-    albums = owned;
+    albums = await getAllAlbums({});
   };
 
   // `SharedSpaceLinkedAlbumDto` is `AlbumResponseDto` minus `albumUsers` (plus link metadata),
