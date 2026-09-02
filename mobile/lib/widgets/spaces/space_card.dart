@@ -110,7 +110,7 @@ class SpaceCard extends StatelessWidget {
   }
 
   String _activityText() {
-    final count = space.newAssetCount.value?.toInt() ?? 0;
+    final count = space.newAssetCount.value ?? 0;
     final countStr = count > 99 ? '99+' : '$count';
     final contributorName = space.lastContributor.value?.name;
 
@@ -121,8 +121,8 @@ class SpaceCard extends StatelessWidget {
   }
 
   String _detailsText() {
-    final assetCount = space.assetCount.value?.toInt() ?? 0;
-    final memberCount = space.memberCount.value?.toInt() ?? 0;
+    final assetCount = space.assetCount.value ?? 0;
+    final memberCount = space.memberCount.value ?? 0;
     final photos = '$assetCount photo${assetCount == 1 ? '' : 's'}';
     final members = '$memberCount member${memberCount == 1 ? '' : 's'}';
     return '$photos \u00B7 $members';
