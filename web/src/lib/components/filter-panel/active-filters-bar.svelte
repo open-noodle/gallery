@@ -213,86 +213,106 @@
 </script>
 
 <div
-  class="flex flex-wrap items-center gap-2 {embedded
+  class="flex flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2 {embedded
     ? ''
     : 'border-b border-gray-200/60 px-4 py-2.5 dark:border-white/10'}"
   data-testid="active-filters-bar"
 >
-  {#if resultCount !== undefined}
-    <span class="text-xs font-medium text-gray-500 dark:text-gray-400" data-testid="result-count">
-      {$t('filter_result_count', { values: { count: resultCount } })}
-    </span>
-  {/if}
+  <!--
+    Below `sm` the chips are one horizontally-scrollable row with the actions underneath, so the bar
+    is a fixed two rows however many filters are on. It used to wrap to roughly a row per chip, and
+    on a phone that ate the screen the search results were supposed to be using (#1028): four rows
+    for a single search chip, six once a few filters were added.
 
-  {#if showCountSeparator}
-    <span class="size-1 rounded-full bg-gray-400/60 dark:bg-gray-500/60" aria-hidden="true"></span>
-  {/if}
+    `sm:contents` dissolves this wrapper from `sm` up, leaving every desktop viewport with exactly
+    the single wrapping row it has always had.
+  -->
+  <div class="flex scrollbar-hidden items-center gap-2 overflow-x-auto pe-1 sm:contents">
+    {#if resultCount !== undefined}
+      <span class="shrink-0 text-xs font-medium text-gray-500 dark:text-gray-400" data-testid="result-count">
+        {$t('filter_result_count', { values: { count: resultCount } })}
+      </span>
+    {/if}
 
-  {#if searchQuery.trim()}
-    <span
-      class="inline-flex items-center gap-1.5 rounded-full border border-immich-primary/30 bg-immich-primary/10 py-1 pr-1 pl-2.5 text-xs font-medium text-immich-primary dark:border-immich-dark-primary/30 dark:bg-immich-dark-primary/10 dark:text-immich-dark-primary"
-      data-testid="search-chip"
-    >
-      <Icon icon={mdiMagnify} size="14" />
-      <span>{searchQuery}</span>
-      <button
-        type="button"
-        class="flex size-[18px] items-center justify-center rounded-full text-immich-primary/60 transition-colors hover:bg-immich-primary/15 hover:text-immich-primary dark:text-immich-dark-primary/60 dark:hover:bg-immich-dark-primary/20 dark:hover:text-immich-dark-primary"
-        onclick={() => onClearSearch?.()}
-        aria-label={$t('filter_sheet_picker_clear_search')}
-        data-testid="search-chip-close"
+    {#if showCountSeparator}
+      <span class="size-1 shrink-0 rounded-full bg-gray-400/60 dark:bg-gray-500/60" aria-hidden="true"></span>
+    {/if}
+
+    {#if searchQuery.trim()}
+      <span
+        class="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-immich-primary/30 bg-immich-primary/10 py-1 pr-1 pl-2.5 text-xs font-medium text-immich-primary dark:border-immich-dark-primary/30 dark:bg-immich-dark-primary/10 dark:text-immich-dark-primary"
+        data-testid="search-chip"
       >
-        <Icon icon={mdiClose} size="12" />
-      </button>
-    </span>
-  {/if}
+        <Icon icon={mdiMagnify} size="14" />
+        <span>{searchQuery}</span>
+        <button
+          type="button"
+          class="flex size-[18px] items-center justify-center rounded-full text-immich-primary/60 transition-colors hover:bg-immich-primary/15 hover:text-immich-primary dark:text-immich-dark-primary/60 dark:hover:bg-immich-dark-primary/20 dark:hover:text-immich-dark-primary"
+          onclick={() => onClearSearch?.()}
+          aria-label={$t('filter_sheet_picker_clear_search')}
+          data-testid="search-chip-close"
+        >
+          <Icon icon={mdiClose} size="12" />
+        </button>
+      </span>
+    {/if}
 
-  {#each chips as chip (`${chip.type}-${chip.id ?? chip.labelKey ?? chip.label}`)}
-    {@const chipLabel = chip.labelKey ? $t(chip.labelKey, { values: chip.labelValues }) : (chip.label ?? '')}
-    <span
-      class="inline-flex items-center gap-1.5 rounded-full border border-gray-200/70 bg-gray-100 py-1 pr-1 pl-2.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:border-white/10 dark:bg-white/6 dark:text-gray-200 dark:hover:bg-white/10"
-      data-testid="active-chip"
-    >
-      <Icon icon={chip.icon} size="14" class="text-gray-500 dark:text-gray-400" />
-      <span>{chipLabel}</span>
-      <button
-        type="button"
-        class="flex size-[18px] items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-300/70 hover:text-gray-700 dark:text-gray-500 dark:hover:bg-white/10 dark:hover:text-gray-200"
-        onclick={() => onRemoveFilter(chip.type, chip.id)}
-        aria-label={$t('filter_remove_chip', { values: { label: chipLabel } })}
-        data-testid="chip-close"
+    {#each chips as chip (`${chip.type}-${chip.id ?? chip.labelKey ?? chip.label}`)}
+      {@const chipLabel = chip.labelKey ? $t(chip.labelKey, { values: chip.labelValues }) : (chip.label ?? '')}
+      <span
+        class="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-gray-200/70 bg-gray-100 py-1 pr-1 pl-2.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:border-white/10 dark:bg-white/6 dark:text-gray-200 dark:hover:bg-white/10"
+        data-testid="active-chip"
       >
-        <Icon icon={mdiClose} size="12" />
-      </button>
-    </span>
-  {/each}
+        <Icon icon={chip.icon} size="14" class="text-gray-500 dark:text-gray-400" />
+        <span>{chipLabel}</span>
+        <button
+          type="button"
+          class="flex size-[18px] items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-300/70 hover:text-gray-700 dark:text-gray-500 dark:hover:bg-white/10 dark:hover:text-gray-200"
+          onclick={() => onRemoveFilter(chip.type, chip.id)}
+          aria-label={$t('filter_remove_chip', { values: { label: chipLabel } })}
+          data-testid="chip-close"
+        >
+          <Icon icon={mdiClose} size="12" />
+        </button>
+      </span>
+    {/each}
+  </div>
 
-  {#if showAddAll}
-    <button
-      type="button"
-      class="ml-auto inline-flex items-center gap-1.5 rounded-full bg-immich-primary/10 py-1 ps-2.5 pe-3.5 text-xs font-semibold text-immich-primary transition-colors hover:bg-immich-primary/16 dark:bg-immich-dark-primary/10 dark:text-immich-dark-primary dark:hover:bg-immich-dark-primary/20"
-      onclick={() => onAddAllToCollection?.()}
-      data-testid="add-all-to-collection"
-    >
-      <Icon icon={mdiPlus} size="15" />
-      <span>{$t('add_all_search_results', { values: { count: resultCount ?? 0 } })}</span>
-    </button>
-  {/if}
+  {#if showAddAll || hasActiveFilters}
+    <!-- `sm:ms-auto` reproduces the `ml-auto` these two buttons used to carry individually: from
+         `sm` up the chips are siblings again, so pushing the group right right-aligns the actions
+         exactly as before. -->
+    <div class="flex items-center gap-2 sm:ms-auto">
+      {#if showAddAll}
+        <button
+          type="button"
+          class="inline-flex min-w-0 items-center gap-1.5 rounded-full bg-immich-primary/10 py-1 ps-2.5 pe-3.5 text-xs font-semibold text-immich-primary transition-colors hover:bg-immich-primary/16 dark:bg-immich-dark-primary/10 dark:text-immich-dark-primary dark:hover:bg-immich-dark-primary/20"
+          onclick={() => onAddAllToCollection?.()}
+          data-testid="add-all-to-collection"
+        >
+          <Icon icon={mdiPlus} size="15" class="shrink-0" />
+          <!-- Truncated rather than swapped for a shorter string: the accessible name then stays
+               the full label at every width, so what a screen reader announces still matches what
+               is on screen (WCAG 2.5.3). -->
+          <span class="truncate">{$t('add_all_search_results', { values: { count: resultCount ?? 0 } })}</span>
+        </button>
+      {/if}
 
-  {#if hasActiveFilters}
-    <button
-      type="button"
-      class="rounded-full px-2.5 py-1 text-xs font-semibold text-immich-primary transition-colors hover:bg-immich-primary/10 dark:text-immich-dark-primary dark:hover:bg-immich-dark-primary/10"
-      class:ml-auto={!showAddAll}
-      onclick={() => {
-        onClearAll();
-        if (searchQuery) {
-          onClearSearch?.();
-        }
-      }}
-      data-testid="clear-all-btn"
-    >
-      {$t('clear_all')}
-    </button>
+      {#if hasActiveFilters}
+        <button
+          type="button"
+          class="shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold text-immich-primary transition-colors hover:bg-immich-primary/10 dark:text-immich-dark-primary dark:hover:bg-immich-dark-primary/10"
+          onclick={() => {
+            onClearAll();
+            if (searchQuery) {
+              onClearSearch?.();
+            }
+          }}
+          data-testid="clear-all-btn"
+        >
+          {$t('clear_all')}
+        </button>
+      {/if}
+    </div>
   {/if}
 </div>

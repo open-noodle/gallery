@@ -11,6 +11,7 @@
   import SpaceEditModal from '$lib/modals/SpaceEditModal.svelte';
   import { Route } from '$lib/route';
   import { handleError } from '$lib/utils/handle-error';
+  import { getSearchablePageState } from '$lib/utils/searchable-page-search';
   import {
     bulkAddAssets,
     removeMember,
@@ -71,6 +72,12 @@
   // The cover (SpaceHero) is tall + scroll-collapsible on the Photos route, compact on other tabs.
   let repositioning = $state(false);
   const onPhotosTab = $derived(page.url.pathname === base || page.url.pathname.startsWith(`${base}/photos`));
+
+  // It is compact on the Photos route too while a search is showing results — a results view leads
+  // with the results. A phone leaves the space ~520 CSS px of page height, and a tall cover stacked
+  // with the app bar, tabs and search header left the grid a sliver of it (#1028). The query is read
+  // from the URL (`?q=`), the same source the Photos page commits it from.
+  const searchActive = $derived(onPhotosTab && getSearchablePageState(page.url).query.length > 0);
 
   // No-cover spaces fall back to a per-space colored gradient derived from space.color.
   const gradientClasses: Record<string, string> = {
@@ -305,7 +312,7 @@
           {repositioning}
           onSavePosition={handleSavePosition}
           onCancelReposition={() => (repositioning = false)}
-          compact={!onPhotosTab}
+          compact={!onPhotosTab || searchActive}
           collapsed={onPhotosTab && spaceUiManager.coverCollapsed}
         />
         <SpaceTabs
