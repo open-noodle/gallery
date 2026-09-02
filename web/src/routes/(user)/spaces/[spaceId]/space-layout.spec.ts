@@ -342,6 +342,23 @@ describe('space [spaceId] +layout.svelte', () => {
     expect(screen.getByTestId('hero-title')).toHaveTextContent('Trip');
   });
 
+  // #1028: a phone gives the space roughly 520 CSS px of page height. The tall cover alone eats
+  // 220 of them, which — stacked with the app bar, tabs and the search header — left the results
+  // grid a sliver. A search is a results view, so the cover steps down to its compact size the
+  // moment results are on screen, before the reader scrolls at all.
+  it('shrinks the cover to compact while the photos tab is showing search results', () => {
+    mockPage.url = new URL('https://gallery.test/spaces/s1/photos?q=beach');
+    renderLayout(SharedSpaceRole.Owner);
+    expect(screen.getByTestId('space-hero').style.height).toBe('96px');
+  });
+
+  // The counterpart: browsing the space is a cover-first view, and must stay that way.
+  it('keeps the cover tall on the photos tab when no search is running', () => {
+    mockPage.url = new URL('https://gallery.test/spaces/s1/photos');
+    renderLayout(SharedSpaceRole.Owner);
+    expect(screen.getByTestId('space-hero').style.height).toBe('220px');
+  });
+
   it('passes a per-space colored gradient to the cover derived from space.color', () => {
     renderLayout(SharedSpaceRole.Owner, { space: space({ color: UserAvatarColor.Pink }) });
     expect(screen.getByTestId('hero-gradient')).toHaveClass('from-pink-300', 'to-pink-500');
