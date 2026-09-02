@@ -271,10 +271,38 @@ describe('MemoryViewer view in timeline (#1047)', () => {
     );
   });
 
-  it('sends a photo from the viewer\u2019s own library to the personal timeline', async () => {
+  it('sends a photo from the viewer’s own library to the personal timeline', async () => {
     renderViewer();
 
     expect(await screen.findByLabelText('view_in_timeline')).toHaveAttribute('href', '/photos?at=memory-asset-1');
+  });
+
+  // The timeline collapses a stack to its primary asset, so a stack child has no tile of its
+  // own to land on. That held for /photos before #1047 and has to keep holding for a Space.
+  it('lands on the stack primary for a stacked photo in a Space', async () => {
+    mockGetAssetInfo.mockResolvedValue({
+      ...mockMemoryManager.memories[0].assets[0],
+      resolvedSpaceId: 'space-1',
+      stack: { id: 'stack-1', primaryAssetId: 'stack-primary', assetCount: 2 },
+    });
+
+    renderViewer();
+
+    expect(await screen.findByLabelText('view_in_timeline')).toHaveAttribute(
+      'href',
+      '/spaces/space-1?at=stack-primary',
+    );
+  });
+
+  it('lands on the stack primary for a stacked photo in the personal library', async () => {
+    mockGetAssetInfo.mockResolvedValue({
+      ...mockMemoryManager.memories[0].assets[0],
+      stack: { id: 'stack-1', primaryAssetId: 'stack-primary', assetCount: 2 },
+    });
+
+    renderViewer();
+
+    expect(await screen.findByLabelText('view_in_timeline')).toHaveAttribute('href', '/photos?at=stack-primary');
   });
 
   // #1047: a memory can hold a photo the viewer only reaches through a Space. The personal timeline

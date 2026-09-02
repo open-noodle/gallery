@@ -4,6 +4,7 @@ import 'package:immich_mobile/providers/asset_viewer/view_in_timeline_action.dar
 import 'package:immich_mobile/providers/gallery_nav/gallery_search_action.dart';
 import 'package:immich_mobile/providers/infrastructure/shared_space.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
+import 'package:logging/logging.dart';
 
 /// The space whose timeline a "view in timeline" jump for [asset] should land on, or
 /// null when the personal timeline is the right destination.
@@ -29,8 +30,9 @@ Future<String?> viewInTimelineSpaceId({
 /// otherwise (#1047).
 ///
 /// [goToMainTimeline] and [goToSpace] are injected so the routing can be tested without
-/// a router. The space is resolved before anything is popped: it is a local read, and a
-/// failure to resolve must not leave the viewer half-closed.
+/// a router. The space is resolved before anything is popped, and a failed lookup falls
+/// back to the personal timeline: the jump the user asked for has to happen either way,
+/// rather than the button quietly doing nothing.
 Future<void> viewMemoryAssetInTimeline({
   required BaseAsset asset,
   required ProviderReader read,
@@ -38,14 +40,7 @@ Future<void> viewMemoryAssetInTimeline({
   required Future<void> Function() goToMainTimeline,
   required Future<void> Function(String spaceId) goToSpace,
 }) async {
-  final currentUserId = read(currentUserProvider)?.id;
-  final spaceId = currentUserId == null
-      ? null
-      : await viewInTimelineSpaceId(
-          asset: asset,
-          currentUserId: currentUserId,
-          repository: read(sharedSpaceRepositoryProvider),
-        );
+  final spaceId = await _resolveSpaceId(asset, read);
 
   await viewAssetInTimeline(
     asset: asset,
@@ -54,4 +49,21 @@ Future<void> viewMemoryAssetInTimeline({
     goToTimeline: spaceId == null ? goToMainTimeline : () => goToSpace(spaceId),
     spaceId: spaceId,
   );
+}
+
+Future<String?> _resolveSpaceId(BaseAsset asset, ProviderReader read) async {
+  final currentUserId = read(currentUserProvider)?.id;
+  if (currentUserId == null) {
+    return null;
+  }
+  try {
+    return await viewInTimelineSpaceId(
+      asset: asset,
+      currentUserId: currentUserId,
+      repository: read(sharedSpaceRepositoryProvider),
+    );
+  } catch (error, stackTrace) {
+    Logger('ViewInTimeline').warning('Could not resolve the space for asset ${asset.heroTag}', error, stackTrace);
+    return null;
+  }
 }

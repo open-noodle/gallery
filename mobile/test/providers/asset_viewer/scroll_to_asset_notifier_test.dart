@@ -101,6 +101,16 @@ void main() {
       expect(notifier.value?.spaceId, 'space-1');
     });
 
+    test('replaces a request for one Space with a request for another', () {
+      final notifier = ScrollToAssetNotifier(null);
+      final createdAt = DateTime(2026, 4, 3, 12);
+
+      notifier.scrollToAsset(_asset('a1', createdAt: createdAt), spaceId: 'space-1');
+      notifier.scrollToAsset(_asset('a1', createdAt: createdAt), spaceId: 'space-2');
+
+      expect(notifier.value?.spaceId, 'space-2');
+    });
+
     test('treats two copies of the same asset as the same target', () {
       // The merged-timeline copy carries localId; the album-fetched copy does not.
       // They must not count as a new request.

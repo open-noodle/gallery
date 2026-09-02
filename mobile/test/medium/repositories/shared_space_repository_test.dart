@@ -63,6 +63,34 @@ void main() {
       expect(await repo.findSpaceIdForAsset(assetId: asset.id, userId: viewer.id), space.id);
     });
 
+    // The asset can sit in a space the viewer is a stranger to and one they belong to at
+    // the same time. Only the latter is a place they could actually be sent.
+    test('picks the space the viewer belongs to when another also holds the asset', () async {
+      final owner = await ctx.newUser();
+      final viewer = await ctx.newUser();
+      final strangers = await ctx.newSharedSpace(createdById: owner.id);
+      final mine = await ctx.newSharedSpace(createdById: owner.id);
+      await ctx.newSharedSpaceMember(spaceId: strangers.id, userId: owner.id);
+      await ctx.newSharedSpaceMember(spaceId: mine.id, userId: viewer.id);
+      final asset = await ctx.newRemoteAsset(ownerId: owner.id);
+      await ctx.insertSharedSpaceAsset(spaceId: strangers.id, assetId: asset.id);
+      await ctx.insertSharedSpaceAsset(spaceId: mine.id, assetId: asset.id);
+
+      expect(await repo.findSpaceIdForAsset(assetId: asset.id, userId: viewer.id), mine.id);
+    });
+
+    test('ignores a deleted asset reached through a shared library', () async {
+      final owner = await ctx.newUser();
+      final viewer = await ctx.newUser();
+      final space = await ctx.newSharedSpace(createdById: owner.id);
+      await ctx.newSharedSpaceMember(spaceId: space.id, userId: viewer.id);
+      final library = await ctx.newLibrary(ownerId: owner.id);
+      await ctx.insertSharedSpaceLibrary(spaceId: space.id, libraryId: library.id);
+      final asset = await ctx.newRemoteAsset(ownerId: owner.id, libraryId: library.id, deletedAt: DateTime(2026, 4, 3));
+
+      expect(await repo.findSpaceIdForAsset(assetId: asset.id, userId: viewer.id), isNull);
+    });
+
     test('ignores an asset that was deleted', () async {
       final owner = await ctx.newUser();
       final viewer = await ctx.newUser();

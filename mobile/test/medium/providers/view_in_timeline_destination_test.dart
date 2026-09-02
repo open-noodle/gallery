@@ -7,6 +7,7 @@ import 'package:immich_mobile/infrastructure/repositories/shared_space.repositor
 import 'package:immich_mobile/providers/asset_viewer/scroll_to_asset_notifier.provider.dart';
 import 'package:immich_mobile/providers/asset_viewer/view_in_timeline_destination.dart';
 import 'package:immich_mobile/providers/infrastructure/db.provider.dart';
+import 'package:immich_mobile/providers/infrastructure/shared_space.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -91,14 +92,11 @@ void main() {
   group('viewMemoryAssetInTimeline', () {
     late List<String> navigations;
 
-    ProviderContainer containerFor(UserDto user) {
-      final userService = _MockUserService();
-      when(() => userService.tryGetMyUser()).thenReturn(user);
-      when(() => userService.watchMyUser()).thenAnswer((_) => const Stream<UserDto?>.empty());
+    ProviderContainer containerFor(UserDto? user) {
       final container = ProviderContainer(
         overrides: [
           driftProvider.overrideWithValue(ctx.db),
-          currentUserProvider.overrideWith((ref) => _StubCurrentUserNotifier(userService, user)),
+          currentUserProvider.overrideWith((ref) => _StubCurrentUserNotifier(_userService(user), user)),
         ],
       );
       addTearDown(container.dispose);
@@ -134,6 +132,43 @@ void main() {
       expect(scrollToAssetNotifierProvider.value?.spaceId, space.id);
     });
 
+    test('falls back to the personal timeline when no user is signed in', () async {
+      // Nothing to resolve membership against; the jump must still work rather than
+      // throw out of a button press.
+      final owner = await ctx.newUser();
+      final space = await ctx.newSharedSpace(createdById: owner.id);
+      final asset = await ctx.newRemoteAsset(ownerId: owner.id);
+      await ctx.insertSharedSpaceAsset(spaceId: space.id, assetId: asset.id);
+
+      await jump(containerFor(null), _remoteAsset(asset.id, ownerId: owner.id));
+
+      expect(navigations, ['pop', 'main']);
+      expect(scrollToAssetNotifierProvider.value?.spaceId, isNull);
+    });
+
+    test('still jumps to the personal timeline when the space lookup fails', () async {
+      // A dead local read must not swallow the button press: without a fallback the
+      // viewer stays open on the memory and nothing at all happens.
+      final owner = await ctx.newUser();
+      final viewer = await ctx.newUser();
+      final asset = await ctx.newRemoteAsset(ownerId: owner.id);
+      final container = ProviderContainer(
+        overrides: [
+          driftProvider.overrideWithValue(ctx.db),
+          sharedSpaceRepositoryProvider.overrideWithValue(_ThrowingSharedSpaceRepository(ctx.db)),
+          currentUserProvider.overrideWith(
+            (ref) => _StubCurrentUserNotifier(_userService(_user(viewer.id)), _user(viewer.id)),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await jump(container, _remoteAsset(asset.id, ownerId: owner.id));
+
+      expect(navigations, ['pop', 'main']);
+      expect(scrollToAssetNotifierProvider.value?.spaceId, isNull);
+    });
+
     test('opens the personal timeline for a photo the viewer owns', () async {
       final owner = await ctx.newUser();
       final space = await ctx.newSharedSpace(createdById: owner.id);
@@ -150,6 +185,21 @@ void main() {
 }
 
 class _MockUserService extends Mock implements UserService {}
+
+UserService _userService(UserDto? user) {
+  final service = _MockUserService();
+  when(() => service.tryGetMyUser()).thenReturn(user);
+  when(() => service.watchMyUser()).thenAnswer((_) => const Stream<UserDto?>.empty());
+  return service;
+}
+
+class _ThrowingSharedSpaceRepository extends SharedSpaceRepository {
+  const _ThrowingSharedSpaceRepository(super.db);
+
+  @override
+  Future<String?> findSpaceIdForAsset({required String assetId, required String userId}) async =>
+      throw StateError('database is gone');
+}
 
 class _StubCurrentUserNotifier extends CurrentUserProvider {
   _StubCurrentUserNotifier(super.service, UserDto? initial) {

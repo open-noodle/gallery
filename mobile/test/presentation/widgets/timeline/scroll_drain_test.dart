@@ -54,6 +54,13 @@ void main() {
       expect(decide(pendingSpaceId: 'space-1', timelineSpaceId: 'space-1'), ScrollDrainAction.scroll);
     });
 
+    // The scope check has to sit AHEAD of the attempt budget. Behind it, a Space request
+    // the main timeline keeps declining would burn the budget and be given up — consumed
+    // and gone before the Space timeline it was meant for ever mounted.
+    test('never gives up a request addressed to another timeline, however long it sits', () {
+      expect(decide(pendingSpaceId: 'space-1', attempts: maxAttempts + 5), ScrollDrainAction.idle);
+    });
+
     test('does nothing when there is no pending request', () {
       expect(decide(hasPending: false), ScrollDrainAction.idle);
     });

@@ -168,6 +168,10 @@ describe('Route', () => {
     it('scrolls the space timeline to an asset', () => {
       expect(Route.viewSpace({ id: 'space-1' }, { at: 'asset-2' })).toBe('/spaces/space-1?at=asset-2');
     });
+
+    it('emits no query string when there is nothing to scroll to', () => {
+      expect(Route.viewSpace({ id: 'space-1' }, { at: undefined })).toBe('/spaces/space-1');
+    });
   });
 
   describe('viewSpaceAlbum', () => {
