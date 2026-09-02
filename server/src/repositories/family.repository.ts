@@ -463,6 +463,22 @@ export class FamilyRepository {
         .where('identityId', '=', identityId)
         .execute();
 
+      // A union needs two participants to mean anything: `computeVisibleUnions` drops anything
+      // below that (`E27`-`E29`), so what is left here is a row nobody can ever see. Left behind,
+      // those husks are not merely untidy — a one-partner remnant still has a FREE PARTNER SEAT,
+      // and the `beside` drop gesture fills the first union with one. Dropping a new partner next
+      // to someone would silently resurrect an abandoned union, carrying whatever status and dates
+      // it had ("married", 1998) into a relationship that has nothing to do with them.
+      const [remainingPartners, remainingChildren] = await Promise.all([
+        trx.selectFrom('family_union_partner').select('identityId').where('unionId', '=', unionId).execute(),
+        trx.selectFrom('family_union_child').select('identityId').where('unionId', '=', unionId).execute(),
+      ]);
+
+      if (remainingPartners.length + remainingChildren.length < 2) {
+        await trx.deleteFrom('family_union').where('id', '=', unionId).execute();
+        return;
+      }
+
       if (wasPartner) {
         await trx.updateTable('family_union').set({ partnerKey: null }).where('id', '=', unionId).execute();
       }

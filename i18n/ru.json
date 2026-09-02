@@ -1799,6 +1799,7 @@
   "family_edit_drop_beside": "Перетащите сюда, чтобы создать союз",
   "family_edit_union_cancel": "Отмена",
   "family_edit_union_date_order_error": "Дата окончания не может быть раньше даты начала",
+  "family_edit_union_delete": "Удалить",
   "family_edit_union_edit_button_label": "Редактировать этот союз",
   "family_edit_union_end_date_label": "По",
   "family_edit_union_save": "Сохранить",

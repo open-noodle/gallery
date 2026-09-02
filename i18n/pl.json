@@ -1799,6 +1799,7 @@
   "family_edit_drop_beside": "Upuść tutaj, aby utworzyć związek",
   "family_edit_union_cancel": "Anuluj",
   "family_edit_union_date_order_error": "Data zakończenia nie może być wcześniejsza niż data rozpoczęcia",
+  "family_edit_union_delete": "Usuń",
   "family_edit_union_edit_button_label": "Edytuj ten związek",
   "family_edit_union_end_date_label": "Do",
   "family_edit_union_save": "Zapisz",

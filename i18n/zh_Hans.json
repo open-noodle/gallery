@@ -1799,6 +1799,7 @@
   "family_edit_drop_beside": "拖放到此处以建立新的伴侣关系",
   "family_edit_union_cancel": "取消",
   "family_edit_union_date_order_error": "结束日期不能早于开始日期",
+  "family_edit_union_delete": "移除",
   "family_edit_union_edit_button_label": "编辑这段关系",
   "family_edit_union_end_date_label": "结束于",
   "family_edit_union_save": "保存",

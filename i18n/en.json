@@ -1801,6 +1801,7 @@
   "family_edit_drop_beside": "Drop here to start a union",
   "family_edit_union_cancel": "Cancel",
   "family_edit_union_date_order_error": "The end date can't be before the start date",
+  "family_edit_union_delete": "Remove",
   "family_edit_union_edit_button_label": "Edit this union",
   "family_edit_union_end_date_label": "Until",
   "family_edit_union_save": "Save",

@@ -1799,6 +1799,7 @@
   "family_edit_drop_beside": "Déposer ici pour créer une union",
   "family_edit_union_cancel": "Annuler",
   "family_edit_union_date_order_error": "La date de fin ne peut pas être antérieure à la date de début",
+  "family_edit_union_delete": "Supprimer",
   "family_edit_union_edit_button_label": "Modifier cette union",
   "family_edit_union_end_date_label": "Jusqu'à",
   "family_edit_union_save": "Enregistrer",

@@ -1799,6 +1799,7 @@
   "family_edit_drop_beside": "Hierher ziehen, um eine Partnerschaft zu beginnen",
   "family_edit_union_cancel": "Abbrechen",
   "family_edit_union_date_order_error": "Das Enddatum darf nicht vor dem Startdatum liegen",
+  "family_edit_union_delete": "Entfernen",
   "family_edit_union_edit_button_label": "Diese Verbindung bearbeiten",
   "family_edit_union_end_date_label": "Bis",
   "family_edit_union_save": "Speichern",
