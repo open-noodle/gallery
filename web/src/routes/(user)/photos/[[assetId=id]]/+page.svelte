@@ -633,6 +633,8 @@
         showFilterButton={filterCollapsed && !isTimelineEmpty && !assetMultiSelectManager.selectionActive}
         filterActive={getActiveFilterCount(filters) > 0}
         onExpandFilters={() => (filterCollapsed = false)}
+        showSearchButton={!assetMultiSelectManager.selectionActive}
+        onSearch={() => globalSearchManager.open()}
       />
       {#if showSearchResults}
         <SmartSearchResults

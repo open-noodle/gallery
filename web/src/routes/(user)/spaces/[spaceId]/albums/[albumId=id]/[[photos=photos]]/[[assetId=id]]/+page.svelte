@@ -20,6 +20,7 @@
   import ControlAppBar from '$lib/components/shared-components/ControlAppBar.svelte';
   import SelectionToolbar from '$lib/components/timeline/SelectionToolbar.svelte';
   import Timeline from '$lib/components/timeline/Timeline.svelte';
+  import ScopedSearchButton from '$lib/components/search/scoped-search-button.svelte';
   import TimelineGroupingControl from '$lib/components/timeline/TimelineGroupingControl.svelte';
   import { assetMultiSelectManager, AssetMultiSelectManager } from '$lib/managers/asset-multi-select-manager.svelte';
   import { authManager } from '$lib/managers/auth-manager.svelte';
@@ -658,6 +659,11 @@
             {/if}
             <div class="hidden md:flex md:items-center" data-testid="timeline-desktop-grouping-control">
               <TimelineGroupingControl grouping={timelineGrouping} onGroupingChange={handleTimelineGroupingChange} />
+            </div>
+            <!-- #1051: the "search here" affordance, desktop-only to match the grouping pill beside it.
+                 Below md the nav bar's own magnifier opens the same page-scoped palette. -->
+            <div class="hidden md:flex md:items-center" data-testid="space-album-toolbar-search">
+              <ScopedSearchButton onclick={() => globalSearchManager.open()} />
             </div>
           </div>
         {/if}
