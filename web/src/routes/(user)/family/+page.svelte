@@ -76,7 +76,7 @@
           <button
             type="button"
             data-testid="family-first-run-action"
-            class="rounded-full bg-primary px-4 py-2 text-sm text-white"
+            class="rounded-full bg-primary px-4 py-2 text-sm text-white dark:text-black"
             onclick={() => (linking = true)}
           >
             {$t('family_first_run_action')}
