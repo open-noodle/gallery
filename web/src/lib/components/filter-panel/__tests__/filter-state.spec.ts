@@ -229,6 +229,11 @@ describe('FilterState utilities', () => {
     expect(getActiveFilterCount(noCity)).toBe(1);
   });
 
+  it('counts locationPresence as the one location filter', () => {
+    expect(getActiveFilterCount({ ...createFilterState(), locationPresence: 'noGps' })).toBe(1);
+    expect(getActiveFilterCount({ ...createFilterState(), locationPresence: 'noGps', country: 'France' })).toBe(1);
+  });
+
   it('clearFilters clears the four new dimensions', () => {
     const filters = {
       ...createFilterState(),
@@ -244,6 +249,12 @@ describe('FilterState utilities', () => {
       albumId: undefined,
       ownerId: undefined,
     });
+  });
+
+  it('clearFilters clears locationPresence', () => {
+    const filters = { ...createFilterState(), locationPresence: 'noGps' as const };
+
+    expect(clearFilters(filters).locationPresence).toBeUndefined();
   });
 });
 

@@ -34,22 +34,46 @@ class PlacesCascadeSection extends ConsumerWidget {
     final filter = ref.watch(photosFilterDebouncedProvider);
     final async = ref.watch(photosFilterSuggestionsProvider(filter));
     final countriesAsync = async.whenData((s) => s.countries);
+    final suggestions = async.valueOrNull;
     final selectedCountry = ref.watch(photosFilterProvider.select((f) => f.location.country));
+    final selectedPresence = ref.watch(photosFilterProvider.select((f) => f.location.locationPresence));
     final count = countriesAsync.valueOrNull?.length ?? 0;
+
+    // Same gate as each individual presence chip below (server flag OR already selected) —
+    // computed once here because it also has to keep the *section itself* (and its route to
+    // the full picker) from collapsing when there are zero countries. See hasExtraEntries /
+    // _SearchMoreRow's gate below.
+    final hasExtraEntries =
+        (suggestions?.hasNoGpsAssets ?? false) ||
+        (suggestions?.hasNoPlaceNameAssets ?? false) ||
+        selectedPresence == 'noGps' ||
+        selectedPresence == 'noPlaceName';
 
     return DeepSectionScaffold<String>(
       sectionId: FilterSectionId.places,
       titleKey: 'filter_sheet_deep_places_section',
       emptyCaptionKey: 'filter_sheet_deep_empty_places',
       items: countriesAsync,
+      // Zero countries must not collapse the section: a fully-unlocated library is the
+      // headline case for this filter, and it needs the presence chips below to still render.
+      hasExtraEntries: hasExtraEntries,
       onRetry: () => ref.invalidate(photosFilterSuggestionsProvider(filter)),
       childBuilder: (countries) {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (selectedCountry == null) _CountryWrap(countries: countries) else _CityCascade(country: selectedCountry),
-            if (count > 0) _SearchMoreRow(count: count, onOpenPicker: onOpenPicker),
+            if (selectedCountry == null)
+              _CountryWrap(
+                countries: countries,
+                hasNoGpsAssets: suggestions?.hasNoGpsAssets ?? false,
+                hasNoPlaceNameAssets: suggestions?.hasNoPlaceNameAssets ?? false,
+              )
+            else
+              _CityCascade(country: selectedCountry),
+            // Also gated on hasExtraEntries: with zero countries this is otherwise the
+            // section's only route to the full PlacesPickerPage, and count alone is 0.
+            if (count > 0 || hasExtraEntries) _SearchMoreRow(count: count, onOpenPicker: onOpenPicker),
           ],
         );
       },
@@ -105,15 +129,43 @@ String _searchMorePlacesLabel(int count) {
 
 class _CountryWrap extends ConsumerWidget {
   final List<String> countries;
-  const _CountryWrap({required this.countries});
+  final bool hasNoGpsAssets;
+  final bool hasNoPlaceNameAssets;
+  const _CountryWrap({required this.countries, required this.hasNoGpsAssets, required this.hasNoPlaceNameAssets});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final display = countries.take(_kPreviewCap).toList();
+    final selectedPresence = ref.watch(photosFilterProvider.select((f) => f.location.locationPresence));
+    // Location presence ("no GPS" / "coordinates but no name") is a member of the same
+    // location group as country/city — mutually exclusive with them, ONE chip. Offered ahead
+    // of the country chips, gated on the server flag OR the value already being selected (so
+    // a selection made under a different filter combo stays reachable here).
+    final presenceEntries = <_PresenceEntry>[
+      if (hasNoGpsAssets || selectedPresence == 'noGps') const _PresenceEntry('noGps', 'filter_location_no_gps'),
+      if (hasNoPlaceNameAssets || selectedPresence == 'noPlaceName')
+        const _PresenceEntry('noPlaceName', 'filter_location_no_place_name'),
+    ];
     return Wrap(
       spacing: 8,
       runSpacing: 8,
       children: [
+        for (final entry in presenceEntries)
+          FilterChip(
+            key: Key('places-presence-${entry.value}'),
+            label: Text(entry.labelKey.tr()),
+            selected: selectedPresence == entry.value,
+            onSelected: (_) {
+              HapticFeedback.selectionClick();
+              // Replaces the whole location group — a fresh SearchLocationFilter, never
+              // copyWith (copyWith's `x ?? this.x` can't clear a field it doesn't set).
+              ref
+                  .read(photosFilterProvider.notifier)
+                  .setLocation(
+                    selectedPresence == entry.value ? null : SearchLocationFilter(locationPresence: entry.value),
+                  );
+            },
+          ),
         for (final country in display)
           FilterChip(
             key: Key('places-country-$country'),
@@ -127,6 +179,14 @@ class _CountryWrap extends ConsumerWidget {
       ],
     );
   }
+}
+
+/// One entry of the location-presence group: `value` is the wire value sent as
+/// `locationPresence` ('noGps' / 'noPlaceName'), `labelKey` the i18n key for its chip label.
+class _PresenceEntry {
+  final String value;
+  final String labelKey;
+  const _PresenceEntry(this.value, this.labelKey);
 }
 
 class _CityCascade extends ConsumerWidget {

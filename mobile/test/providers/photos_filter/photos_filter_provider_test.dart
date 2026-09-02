@@ -105,6 +105,27 @@ void main() {
       notifier.setLocation(null);
       expect(container.read(photosFilterProvider).location.country, null);
     });
+
+    test('setLocation(null) clears locationPresence', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+
+      notifier.setLocation(SearchLocationFilter(locationPresence: 'noGps'));
+      notifier.setLocation(null);
+
+      expect(container.read(photosFilterProvider).location.locationPresence, isNull);
+      expect(container.read(photosFilterProvider).isEmpty, true);
+    });
+
+    test('choosing a country replaces the group and drops locationPresence', () {
+      final notifier = container.read(photosFilterProvider.notifier);
+
+      notifier.setLocation(SearchLocationFilter(locationPresence: 'noGps'));
+      notifier.setLocation(SearchLocationFilter(country: 'France'));
+
+      final location = container.read(photosFilterProvider).location;
+      expect(location.locationPresence, isNull);
+      expect(location.country, 'France');
+    });
   });
 
   group('setCamera', () {

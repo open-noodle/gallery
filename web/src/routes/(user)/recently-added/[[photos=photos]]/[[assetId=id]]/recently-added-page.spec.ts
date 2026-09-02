@@ -211,6 +211,8 @@ describe('Recently Added page filters', () => {
       hasFavorites: false,
       hasAssetsInAlbum: false,
       hasAssetsNotInAlbum: false,
+      hasNoGpsAssets: false,
+      hasNoPlaceNameAssets: false,
     });
     sdkMock.getSearchSuggestions.mockResolvedValue([]);
     sdkMock.getTimeBuckets.mockResolvedValue([]);
@@ -339,6 +341,8 @@ describe('Recently Added page query mode', () => {
       hasFavorites: false,
       hasAssetsInAlbum: false,
       hasAssetsNotInAlbum: false,
+      hasNoGpsAssets: false,
+      hasNoPlaceNameAssets: false,
     });
     sdkMock.getSearchSuggestions.mockResolvedValue([]);
     sdkMock.getTimeBuckets.mockResolvedValue([]);
@@ -357,6 +361,8 @@ describe('Recently Added page query mode', () => {
       hasFavorites: true,
       hasAssetsInAlbum: true,
       hasAssetsNotInAlbum: true,
+      hasNoGpsAssets: false,
+      hasNoPlaceNameAssets: false,
     });
   });
 

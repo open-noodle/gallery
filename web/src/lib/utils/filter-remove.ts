@@ -12,9 +12,10 @@ import { clearTimelineTemporalFilter } from '$lib/utils/timeline-temporal-filter
  * GROUP of sibling fields that all narrow the same dimension. The rule: a chip's ✕ clears a
  * sibling field ONLY if that sibling has no chip of its own — otherwise clearing it here would
  * silently drop a filter the user never touched, with no chip having shown it was going away.
- *  - `location` clears `city` + `state` + `country`. `state` has no chip of its own (it is folded
- *    into the location chip's label, and `getActiveFilterCount` counts city/state/country as a
- *    single filter), so it must go with the rest of the group.
+ *  - `location` clears `city` + `state` + `country` + `locationPresence`. `state` and
+ *    `locationPresence` have no chip of their own (they are folded into the location chip's label,
+ *    and `getActiveFilterCount` counts city/state/country/locationPresence as a single filter), so
+ *    they must go with the rest of the group.
  *  - `camera` clears `make` + `model` only. `lensModel` has its own chip and its own `lens` case
  *    below (`getActiveFilterCount` counts `make` and `lensModel` separately), so clearing it here
  *    would clear a filter with no chip shown for it.
@@ -27,7 +28,7 @@ export function handleRemoveFilter(filters: FilterState, type: string, id?: stri
       return { ...filters, personIds: filters.personIds.filter((p) => p !== id) };
     }
     case 'location': {
-      return { ...filters, city: undefined, state: undefined, country: undefined };
+      return { ...filters, city: undefined, state: undefined, country: undefined, locationPresence: undefined };
     }
     case 'camera': {
       return { ...filters, make: undefined, model: undefined };

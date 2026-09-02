@@ -26,6 +26,7 @@ class RandomSearchDto {
     this.isOffline = const Optional.absent(),
     this.lensModel = const Optional.absent(),
     this.libraryId = const Optional.absent(),
+    this.locationPresence = const Optional.absent(),
     this.make = const Optional.absent(),
     this.model = const Optional.absent(),
     this.ocr = const Optional.absent(),
@@ -138,6 +139,9 @@ class RandomSearchDto {
 
   /// Library ID to filter by
   Optional<String?> libraryId;
+
+  /// Filter for assets with no location: noGps (no coordinates) or noPlaceName (coordinates the geocoder could not name). Cannot be combined with city, state or country.
+  Optional<RandomSearchDtoLocationPresenceEnum?> locationPresence;
 
   /// Filter by camera make
   Optional<String?> make;
@@ -332,6 +336,7 @@ class RandomSearchDto {
     other.isOffline == isOffline &&
     other.lensModel == lensModel &&
     other.libraryId == libraryId &&
+    other.locationPresence == locationPresence &&
     other.make == make &&
     other.model == model &&
     other.ocr == ocr &&
@@ -373,6 +378,7 @@ class RandomSearchDto {
     (isOffline == null ? 0 : isOffline!.hashCode) +
     (lensModel == null ? 0 : lensModel!.hashCode) +
     (libraryId == null ? 0 : libraryId!.hashCode) +
+    (locationPresence == null ? 0 : locationPresence!.hashCode) +
     (make == null ? 0 : make!.hashCode) +
     (model == null ? 0 : model!.hashCode) +
     (ocr == null ? 0 : ocr!.hashCode) +
@@ -399,7 +405,7 @@ class RandomSearchDto {
     (withStacked == null ? 0 : withStacked!.hashCode);
 
   @override
-  String toString() => 'RandomSearchDto[albumIds=$albumIds, city=$city, country=$country, createdAfter=$createdAfter, createdBefore=$createdBefore, isEncoded=$isEncoded, isFavorite=$isFavorite, isInAlbum=$isInAlbum, isMotion=$isMotion, isNotInAlbum=$isNotInAlbum, isOffline=$isOffline, lensModel=$lensModel, libraryId=$libraryId, make=$make, model=$model, ocr=$ocr, ownerId=$ownerId, personIds=$personIds, rating=$rating, size=$size, spaceId=$spaceId, spacePersonIds=$spacePersonIds, state=$state, tagIds=$tagIds, takenAfter=$takenAfter, takenBefore=$takenBefore, trashedAfter=$trashedAfter, trashedBefore=$trashedBefore, type=$type, updatedAfter=$updatedAfter, updatedBefore=$updatedBefore, visibility=$visibility, withDeleted=$withDeleted, withExif=$withExif, withPeople=$withPeople, withSharedSpaces=$withSharedSpaces, withStacked=$withStacked]';
+  String toString() => 'RandomSearchDto[albumIds=$albumIds, city=$city, country=$country, createdAfter=$createdAfter, createdBefore=$createdBefore, isEncoded=$isEncoded, isFavorite=$isFavorite, isInAlbum=$isInAlbum, isMotion=$isMotion, isNotInAlbum=$isNotInAlbum, isOffline=$isOffline, lensModel=$lensModel, libraryId=$libraryId, locationPresence=$locationPresence, make=$make, model=$model, ocr=$ocr, ownerId=$ownerId, personIds=$personIds, rating=$rating, size=$size, spaceId=$spaceId, spacePersonIds=$spacePersonIds, state=$state, tagIds=$tagIds, takenAfter=$takenAfter, takenBefore=$takenBefore, trashedAfter=$trashedAfter, trashedBefore=$trashedBefore, type=$type, updatedAfter=$updatedAfter, updatedBefore=$updatedBefore, visibility=$visibility, withDeleted=$withDeleted, withExif=$withExif, withPeople=$withPeople, withSharedSpaces=$withSharedSpaces, withStacked=$withStacked]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -458,6 +464,10 @@ class RandomSearchDto {
     if (this.libraryId.isPresent) {
       final value = this.libraryId.value;
       json[r'libraryId'] = value;
+    }
+    if (this.locationPresence.isPresent) {
+      final value = this.locationPresence.value;
+      json[r'locationPresence'] = value;
     }
     if (this.make.isPresent) {
       final value = this.make.value;
@@ -594,6 +604,7 @@ class RandomSearchDto {
         isOffline: json.containsKey(r'isOffline') ? Optional.present(mapValueOfType<bool>(json, r'isOffline')) : const Optional.absent(),
         lensModel: json.containsKey(r'lensModel') ? Optional.present(mapValueOfType<String>(json, r'lensModel')) : const Optional.absent(),
         libraryId: json.containsKey(r'libraryId') ? Optional.present(mapValueOfType<String>(json, r'libraryId')) : const Optional.absent(),
+        locationPresence: json.containsKey(r'locationPresence') ? Optional.present(RandomSearchDtoLocationPresenceEnum.fromJson(json[r'locationPresence'])) : const Optional.absent(),
         make: json.containsKey(r'make') ? Optional.present(mapValueOfType<String>(json, r'make')) : const Optional.absent(),
         model: json.containsKey(r'model') ? Optional.present(mapValueOfType<String>(json, r'model')) : const Optional.absent(),
         ocr: json.containsKey(r'ocr') ? Optional.present(mapValueOfType<String>(json, r'ocr')) : const Optional.absent(),
@@ -673,4 +684,82 @@ class RandomSearchDto {
   static const requiredKeys = <String>{
   };
 }
+
+/// Filter for assets with no location: noGps (no coordinates) or noPlaceName (coordinates the geocoder could not name). Cannot be combined with city, state or country.
+enum RandomSearchDtoLocationPresenceEnum {
+  noGps._(r'noGps'),
+  noPlaceName._(r'noPlaceName'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const RandomSearchDtoLocationPresenceEnum._(this._value);
+
+  /// The underlying value of this enum member.
+  final String _value;
+
+  @override
+  String toString() => _value;
+
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
+
+  /// Returns the instance of [RandomSearchDtoLocationPresenceEnum] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
+  static RandomSearchDtoLocationPresenceEnum? fromJson(dynamic value) => RandomSearchDtoLocationPresenceEnumTypeTransformer().decode(value);
+
+  /// Returns a [List] containing instances of [RandomSearchDtoLocationPresenceEnum]
+  /// that were successfully decoded from the passed [JSON][json].
+  static List<RandomSearchDtoLocationPresenceEnum> listFromJson(dynamic json, {bool growable = false,}) {
+    final result = <RandomSearchDtoLocationPresenceEnum>[];
+    if (json is List && json.isNotEmpty) {
+      for (final row in json) {
+        final value = RandomSearchDtoLocationPresenceEnum.fromJson(row);
+        if (value != null) {
+          result.add(value);
+        }
+      }
+    }
+    return result.toList(growable: growable);
+  }
+}
+
+/// Transformation class that can [encode] an instance of [RandomSearchDtoLocationPresenceEnum] to Optional<String?>,
+/// and [decode] dynamic data back to [RandomSearchDtoLocationPresenceEnum].
+class RandomSearchDtoLocationPresenceEnumTypeTransformer {
+  factory RandomSearchDtoLocationPresenceEnumTypeTransformer() => _instance ??= const RandomSearchDtoLocationPresenceEnumTypeTransformer._();
+
+  const RandomSearchDtoLocationPresenceEnumTypeTransformer._();
+
+  String encode(RandomSearchDtoLocationPresenceEnum data) => data._value;
+
+  /// Returns the instance of [RandomSearchDtoLocationPresenceEnum] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
+  ///
+  /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
+  /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
+  /// cannot be decoded successfully, then an [UnimplementedError] is thrown.
+  ///
+  /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
+  /// and users are still using an old app with the old code.
+  RandomSearchDtoLocationPresenceEnum? decode(dynamic data, {bool allowNull = true}) {
+    if (data is RandomSearchDtoLocationPresenceEnum) {
+      return data;
+    }
+    if (data != null) {
+      switch (data) {
+        case r'noGps': return RandomSearchDtoLocationPresenceEnum.noGps;
+        case r'noPlaceName': return RandomSearchDtoLocationPresenceEnum.noPlaceName;
+        default:
+          if (!allowNull) {
+            throw ArgumentError('Unknown enum value to decode: $data');
+          }
+      }
+    }
+    return null;
+  }
+
+  /// The singleton instance of this transformer.
+  static RandomSearchDtoLocationPresenceEnumTypeTransformer? _instance;
+}
+
 

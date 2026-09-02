@@ -27,6 +27,7 @@ class SmartSearchDto {
     this.language = const Optional.absent(),
     this.lensModel = const Optional.absent(),
     this.libraryId = const Optional.absent(),
+    this.locationPresence = const Optional.absent(),
     this.make = const Optional.absent(),
     this.model = const Optional.absent(),
     this.ocr = const Optional.absent(),
@@ -150,6 +151,9 @@ class SmartSearchDto {
 
   /// Library ID to filter by
   Optional<String?> libraryId;
+
+  /// Filter for assets with no location: noGps (no coordinates) or noPlaceName (coordinates the geocoder could not name). Cannot be combined with city, state or country.
+  Optional<SmartSearchDtoLocationPresenceEnum?> locationPresence;
 
   /// Filter by camera make
   Optional<String?> make;
@@ -365,6 +369,7 @@ class SmartSearchDto {
     other.language == language &&
     other.lensModel == lensModel &&
     other.libraryId == libraryId &&
+    other.locationPresence == locationPresence &&
     other.make == make &&
     other.model == model &&
     other.ocr == ocr &&
@@ -409,6 +414,7 @@ class SmartSearchDto {
     (language == null ? 0 : language!.hashCode) +
     (lensModel == null ? 0 : lensModel!.hashCode) +
     (libraryId == null ? 0 : libraryId!.hashCode) +
+    (locationPresence == null ? 0 : locationPresence!.hashCode) +
     (make == null ? 0 : make!.hashCode) +
     (model == null ? 0 : model!.hashCode) +
     (ocr == null ? 0 : ocr!.hashCode) +
@@ -437,7 +443,7 @@ class SmartSearchDto {
     (withSharedSpaces == null ? 0 : withSharedSpaces!.hashCode);
 
   @override
-  String toString() => 'SmartSearchDto[albumIds=$albumIds, city=$city, country=$country, createdAfter=$createdAfter, createdBefore=$createdBefore, isEncoded=$isEncoded, isFavorite=$isFavorite, isInAlbum=$isInAlbum, isMotion=$isMotion, isNotInAlbum=$isNotInAlbum, isOffline=$isOffline, language=$language, lensModel=$lensModel, libraryId=$libraryId, make=$make, model=$model, ocr=$ocr, order=$order, ownerId=$ownerId, page=$page, personIds=$personIds, query=$query, queryAssetId=$queryAssetId, rating=$rating, size=$size, spaceId=$spaceId, spacePersonIds=$spacePersonIds, state=$state, tagIds=$tagIds, takenAfter=$takenAfter, takenBefore=$takenBefore, trashedAfter=$trashedAfter, trashedBefore=$trashedBefore, type=$type, updatedAfter=$updatedAfter, updatedBefore=$updatedBefore, visibility=$visibility, withDeleted=$withDeleted, withExif=$withExif, withSharedSpaces=$withSharedSpaces]';
+  String toString() => 'SmartSearchDto[albumIds=$albumIds, city=$city, country=$country, createdAfter=$createdAfter, createdBefore=$createdBefore, isEncoded=$isEncoded, isFavorite=$isFavorite, isInAlbum=$isInAlbum, isMotion=$isMotion, isNotInAlbum=$isNotInAlbum, isOffline=$isOffline, language=$language, lensModel=$lensModel, libraryId=$libraryId, locationPresence=$locationPresence, make=$make, model=$model, ocr=$ocr, order=$order, ownerId=$ownerId, page=$page, personIds=$personIds, query=$query, queryAssetId=$queryAssetId, rating=$rating, size=$size, spaceId=$spaceId, spacePersonIds=$spacePersonIds, state=$state, tagIds=$tagIds, takenAfter=$takenAfter, takenBefore=$takenBefore, trashedAfter=$trashedAfter, trashedBefore=$trashedBefore, type=$type, updatedAfter=$updatedAfter, updatedBefore=$updatedBefore, visibility=$visibility, withDeleted=$withDeleted, withExif=$withExif, withSharedSpaces=$withSharedSpaces]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -500,6 +506,10 @@ class SmartSearchDto {
     if (this.libraryId.isPresent) {
       final value = this.libraryId.value;
       json[r'libraryId'] = value;
+    }
+    if (this.locationPresence.isPresent) {
+      final value = this.locationPresence.value;
+      json[r'locationPresence'] = value;
     }
     if (this.make.isPresent) {
       final value = this.make.value;
@@ -645,6 +655,7 @@ class SmartSearchDto {
         language: json.containsKey(r'language') ? Optional.present(mapValueOfType<String>(json, r'language')) : const Optional.absent(),
         lensModel: json.containsKey(r'lensModel') ? Optional.present(mapValueOfType<String>(json, r'lensModel')) : const Optional.absent(),
         libraryId: json.containsKey(r'libraryId') ? Optional.present(mapValueOfType<String>(json, r'libraryId')) : const Optional.absent(),
+        locationPresence: json.containsKey(r'locationPresence') ? Optional.present(SmartSearchDtoLocationPresenceEnum.fromJson(json[r'locationPresence'])) : const Optional.absent(),
         make: json.containsKey(r'make') ? Optional.present(mapValueOfType<String>(json, r'make')) : const Optional.absent(),
         model: json.containsKey(r'model') ? Optional.present(mapValueOfType<String>(json, r'model')) : const Optional.absent(),
         ocr: json.containsKey(r'ocr') ? Optional.present(mapValueOfType<String>(json, r'ocr')) : const Optional.absent(),
@@ -726,4 +737,82 @@ class SmartSearchDto {
   static const requiredKeys = <String>{
   };
 }
+
+/// Filter for assets with no location: noGps (no coordinates) or noPlaceName (coordinates the geocoder could not name). Cannot be combined with city, state or country.
+enum SmartSearchDtoLocationPresenceEnum {
+  noGps._(r'noGps'),
+  noPlaceName._(r'noPlaceName'),
+  ;
+
+  /// Instantiate a new enum with the provided value.
+  const SmartSearchDtoLocationPresenceEnum._(this._value);
+
+  /// The underlying value of this enum member.
+  final String _value;
+
+  @override
+  String toString() => _value;
+
+  /// Encodes this enum as a value suitable for JSON.
+  String toJson() => _value;
+
+  /// Returns the instance of [SmartSearchDtoLocationPresenceEnum] that was successfully decoded
+  /// from the passed [value] on success, null otherwise.
+  static SmartSearchDtoLocationPresenceEnum? fromJson(dynamic value) => SmartSearchDtoLocationPresenceEnumTypeTransformer().decode(value);
+
+  /// Returns a [List] containing instances of [SmartSearchDtoLocationPresenceEnum]
+  /// that were successfully decoded from the passed [JSON][json].
+  static List<SmartSearchDtoLocationPresenceEnum> listFromJson(dynamic json, {bool growable = false,}) {
+    final result = <SmartSearchDtoLocationPresenceEnum>[];
+    if (json is List && json.isNotEmpty) {
+      for (final row in json) {
+        final value = SmartSearchDtoLocationPresenceEnum.fromJson(row);
+        if (value != null) {
+          result.add(value);
+        }
+      }
+    }
+    return result.toList(growable: growable);
+  }
+}
+
+/// Transformation class that can [encode] an instance of [SmartSearchDtoLocationPresenceEnum] to Optional<String?>,
+/// and [decode] dynamic data back to [SmartSearchDtoLocationPresenceEnum].
+class SmartSearchDtoLocationPresenceEnumTypeTransformer {
+  factory SmartSearchDtoLocationPresenceEnumTypeTransformer() => _instance ??= const SmartSearchDtoLocationPresenceEnumTypeTransformer._();
+
+  const SmartSearchDtoLocationPresenceEnumTypeTransformer._();
+
+  String encode(SmartSearchDtoLocationPresenceEnum data) => data._value;
+
+  /// Returns the instance of [SmartSearchDtoLocationPresenceEnum] that was successfully decoded
+  /// from the passed [data] value on success, null otherwise.
+  ///
+  /// If [allowNull] is true and the [dynamic value][data] cannot be decoded successfully,
+  /// then null is returned. However, if [allowNull] is false and the [dynamic value][data]
+  /// cannot be decoded successfully, then an [UnimplementedError] is thrown.
+  ///
+  /// The [allowNull] is very handy when an API changes and a new enum value is added or removed,
+  /// and users are still using an old app with the old code.
+  SmartSearchDtoLocationPresenceEnum? decode(dynamic data, {bool allowNull = true}) {
+    if (data is SmartSearchDtoLocationPresenceEnum) {
+      return data;
+    }
+    if (data != null) {
+      switch (data) {
+        case r'noGps': return SmartSearchDtoLocationPresenceEnum.noGps;
+        case r'noPlaceName': return SmartSearchDtoLocationPresenceEnum.noPlaceName;
+        default:
+          if (!allowNull) {
+            throw ArgumentError('Unknown enum value to decode: $data');
+          }
+      }
+    }
+    return null;
+  }
+
+  /// The singleton instance of this transformer.
+  static SmartSearchDtoLocationPresenceEnumTypeTransformer? _instance;
+}
+
 

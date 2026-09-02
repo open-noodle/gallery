@@ -1777,6 +1777,8 @@
   "filter_has_no_album": "未加入相簿",
   "filter_invalid_from_date": "请输入有效的“从”日期",
   "filter_invalid_to_date": "请输入有效的“到”日期",
+  "filter_location_no_gps": "无位置",
+  "filter_location_no_place_name": "未命名地点",
   "filter_manage_sections": "显示或隐藏筛选分区",
   "filter_name_people_hint": "为人物命名后才能使用此筛选条件",
   "filter_no_cameras_found": "未找到相机",

@@ -32,7 +32,10 @@ bool hasActiveFilterFor(FilterSectionId id, SearchFilter filter) {
     case FilterSectionId.people:
       return filter.people.isNotEmpty;
     case FilterSectionId.places:
-      return filter.location.country != null || filter.location.state != null || filter.location.city != null;
+      return filter.location.country != null ||
+          filter.location.state != null ||
+          filter.location.city != null ||
+          filter.location.locationPresence != null;
     case FilterSectionId.tags:
       return (filter.tagIds ?? const []).isNotEmpty;
     case FilterSectionId.camera:
@@ -56,7 +59,11 @@ bool _facetEmpty(FilterSectionId id, FilterSuggestionsResponseDto facets) {
     case FilterSectionId.people:
       return facets.people.isEmpty && !facets.hasUnnamedPeople;
     case FilterSectionId.places:
-      return facets.countries.isEmpty;
+      // Not just the country list since #868: the section also offers the "No location" and
+      // "No place name" entries, and a scope where nothing has coordinates offers exactly those.
+      // Only the absence of all three leaves the user nothing to select. Mirrors web's
+      // filter-availability.ts.
+      return facets.countries.isEmpty && !facets.hasNoGpsAssets && !facets.hasNoPlaceNameAssets;
     case FilterSectionId.tags:
       return facets.tags.isEmpty;
     case FilterSectionId.camera:
@@ -125,6 +132,7 @@ bool toggleAvailable({required bool activeFilter, required bool? currentFacet, r
 bool _isEmptyForFacets(SearchFilter filter) {
   return filter.location.city == null &&
       filter.location.country == null &&
+      filter.location.locationPresence == null &&
       filter.camera.make == null &&
       filter.camera.model == null &&
       filter.mediaType == AssetType.other &&

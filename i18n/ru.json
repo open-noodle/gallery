@@ -1777,6 +1777,8 @@
   "filter_has_no_album": "Нет альбома",
   "filter_invalid_from_date": "Введите корректную дату «С»",
   "filter_invalid_to_date": "Введите корректную дату «По»",
+  "filter_location_no_gps": "Без места",
+  "filter_location_no_place_name": "Место без названия",
   "filter_manage_sections": "Показать или скрыть разделы",
   "filter_name_people_hint": "Присвойте людям имена, чтобы использовать этот фильтр",
   "filter_no_cameras_found": "Камеры не найдены",

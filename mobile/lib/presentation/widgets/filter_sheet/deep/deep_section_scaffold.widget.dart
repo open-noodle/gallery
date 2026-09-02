@@ -24,6 +24,15 @@ class DeepSectionScaffold<T> extends StatefulWidget {
   /// "Search N →" affordance here — consumed by Tasks A4 / A7).
   final Widget? trailingHeader;
 
+  /// Opt-in: treat the section as non-empty even when [items]'s resolved list is empty,
+  /// because the caller has extra entries to show that aren't sourced from [items] — e.g.
+  /// the places section's "no location" chips, gated on a separate server flag rather than
+  /// the country list. Keeps the header un-disabled (no "(0)", normal expand/collapse), runs
+  /// [childBuilder] with an empty list, and still builds [trailingHeader]. Defaults to false,
+  /// so every other deep section's existing collapse-when-empty behaviour is byte-for-byte
+  /// unchanged.
+  final bool hasExtraEntries;
+
   const DeepSectionScaffold({
     super.key,
     required this.sectionId,
@@ -33,6 +42,7 @@ class DeepSectionScaffold<T> extends StatefulWidget {
     required this.childBuilder,
     this.onRetry,
     this.trailingHeader,
+    this.hasExtraEntries = false,
   });
 
   @override
@@ -49,14 +59,15 @@ class _DeepSectionScaffoldState<T> extends State<DeepSectionScaffold<T>> {
     if (data != null) _lastData = data;
 
     final cache = _lastData;
-    final isEmpty = cache != null && cache.isEmpty;
+    final isEmpty = cache != null && cache.isEmpty && !widget.hasExtraEntries;
 
     Widget body;
     if (cache != null) {
       // Body is hidden by CollapsibleSection when empty; isEmpty drives the "(0)" + disabled header.
       // widget.emptyCaptionKey is kept on the constructor for callers, but its caption is
       // unreachable while isEmpty is true, so we skip building it here.
-      body = cache.isEmpty
+      // `hasExtraEntries` (folded into `isEmpty` above) opts out of the collapse — see its field doc.
+      body = (cache.isEmpty && !widget.hasExtraEntries)
           ? const SizedBox.shrink()
           : Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: widget.childBuilder(cache));
     } else if (items is AsyncError) {

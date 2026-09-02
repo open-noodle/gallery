@@ -10,7 +10,7 @@ import { DB } from 'src/schema';
 import { BaseService } from 'src/services/base.service';
 import { upsertTags } from 'src/utils/tag';
 import { newMediumService } from 'test/medium.factory';
-import { newEmbedding } from 'test/small.factory';
+import { factory, newEmbedding } from 'test/small.factory';
 import { getKyselyDB } from 'test/utils';
 
 let defaultDatabase: Kysely<DB>;
@@ -44,6 +44,39 @@ const newCanonPair = async (ctx: Awaited<ReturnType<typeof setup>>['ctx'], userI
 
   return { r5, sevenD };
 };
+
+/**
+ * A1 no exif row · A2 exif/no lat/no city · A3 exif/lat/no city
+ * A4 fully located · A5 city without lat (unreachable via the app; pins the predicate)
+ */
+const newLocationFixture = async (ctx: Awaited<ReturnType<typeof setup>>['ctx'], userId: string) => {
+  const { asset: a1 } = await ctx.newAsset({ ownerId: userId });
+
+  const { asset: a2 } = await ctx.newAsset({ ownerId: userId });
+  await ctx.newExif({ assetId: a2.id, latitude: null, longitude: null, city: null, country: null });
+
+  const { asset: a3 } = await ctx.newAsset({ ownerId: userId });
+  await ctx.newExif({ assetId: a3.id, latitude: 48.85, longitude: 2.35, city: null, country: null });
+
+  const { asset: a4 } = await ctx.newAsset({ ownerId: userId });
+  await ctx.newExif({ assetId: a4.id, latitude: 48.85, longitude: 2.35, city: 'Paris', country: 'France' });
+
+  const { asset: a5 } = await ctx.newAsset({ ownerId: userId });
+  await ctx.newExif({ assetId: a5.id, latitude: null, longitude: null, city: 'Berlin', country: 'Germany' });
+
+  return { a1, a2, a3, a4, a5 };
+};
+
+const searchLocationPresence = async (
+  sut: Awaited<ReturnType<typeof setup>>['sut'],
+  userId: string,
+  options: Record<string, unknown>,
+) => {
+  const { items } = await sut.searchMetadata({ page: 1, size: 100 }, { userIds: [userId], ...options });
+  return items.map((item) => item.id).sort();
+};
+
+const totalBucketCount = (buckets: { count: number }[]) => buckets.reduce((sum, b) => sum + b.count, 0);
 
 beforeAll(async () => {
   defaultDatabase = await getKyselyDB();
@@ -337,6 +370,8 @@ describe(SearchRepository.name, () => {
         hasFavorites: false,
         hasAssetsInAlbum: false,
         hasAssetsNotInAlbum: false,
+        hasNoGpsAssets: false,
+        hasNoPlaceNameAssets: false,
       });
     });
 
@@ -721,6 +756,8 @@ describe(SearchRepository.name, () => {
         hasFavorites: false,
         hasAssetsInAlbum: false,
         hasAssetsNotInAlbum: false,
+        hasNoGpsAssets: false,
+        hasNoPlaceNameAssets: false,
       });
     });
 
@@ -1862,6 +1899,267 @@ describe(SearchRepository.name, () => {
       const ids = result.map((face) => face.id);
       expect(ids).toContain(timelineFace.id); // positive control
       expect(ids).not.toContain(lockedFace.id);
+    });
+  });
+
+  describe('locationPresence', () => {
+    it('matches assets with no coordinates, including assets with no exif row at all', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { a1, a2, a5 } = await newLocationFixture(ctx, user.id);
+
+      await expect(searchLocationPresence(sut, user.id, { locationPresence: 'noGps' })).resolves.toEqual(
+        [a1.id, a2.id, a5.id].sort(),
+      );
+    });
+
+    it('matches only assets that have coordinates but no place name', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { a3 } = await newLocationFixture(ctx, user.id);
+
+      await expect(searchLocationPresence(sut, user.id, { locationPresence: 'noPlaceName' })).resolves.toEqual([a3.id]);
+    });
+
+    it('returns disjoint sets whose union is everything that is not fully located', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { a1, a2, a3, a4, a5 } = await newLocationFixture(ctx, user.id);
+
+      const noGps = await searchLocationPresence(sut, user.id, { locationPresence: 'noGps' });
+      const noPlaceName = await searchLocationPresence(sut, user.id, { locationPresence: 'noPlaceName' });
+
+      expect(noGps.filter((id) => noPlaceName.includes(id))).toEqual([]);
+      expect([...noGps, ...noPlaceName].sort()).toEqual([a1.id, a2.id, a3.id, a5.id].sort());
+      expect(noGps).not.toContain(a4.id);
+      expect(noPlaceName).not.toContain(a4.id);
+    });
+
+    it('is NOT equivalent to the existing city-is-null filter', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { a2, a3 } = await newLocationFixture(ctx, user.id);
+
+      // city:null joins asset_exif, so it drops the row-less A1, and A5 carries a place name.
+      // This test exists so nobody "simplifies" the two predicates into the one that already existed.
+      await expect(searchLocationPresence(sut, user.id, { city: null })).resolves.toEqual([a2.id, a3.id].sort());
+    });
+
+    it('narrows rather than replaces other dimensions', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { a1, a2 } = await newLocationFixture(ctx, user.id);
+      // Tag creation goes through upsertTags, not a factory method — see search.repository.spec.ts:110.
+      const [travel] = await upsertTags(ctx.get(TagRepository), { userId: user.id, tags: ['Travel'] });
+      await ctx.newTagAsset({ tagIds: [travel.id], assetIds: [a1.id] });
+
+      const ids = await searchLocationPresence(sut, user.id, { locationPresence: 'noGps', tagIds: [travel.id] });
+
+      expect(ids).toEqual([a1.id]);
+      expect(ids).not.toContain(a2.id); // matches noGps, but is untagged
+    });
+
+    it('does not return another user’s assets', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { user: stranger } = await ctx.newUser();
+      await newLocationFixture(ctx, stranger.id);
+
+      await expect(searchLocationPresence(sut, user.id, { locationPresence: 'noGps' })).resolves.toEqual([]);
+    });
+
+    it('narrows the timeline buckets, not just metadata search', async () => {
+      const { ctx } = setup();
+      const assets = ctx.get(AssetRepository);
+      const { user } = await ctx.newUser();
+      await newLocationFixture(ctx, user.id);
+
+      const all = await assets.getTimeBuckets({ userIds: [user.id] });
+      const noGps = await assets.getTimeBuckets({ userIds: [user.id], locationPresence: 'noGps' });
+      const noPlaceName = await assets.getTimeBuckets({ userIds: [user.id], locationPresence: 'noPlaceName' });
+
+      expect(totalBucketCount(all)).toBe(5);
+      expect(totalBucketCount(noGps)).toBe(3);
+      expect(totalBucketCount(noPlaceName)).toBe(1);
+    });
+
+    it('keeps getTimeBuckets and getTimeBucket in agreement under a locationPresence filter', async () => {
+      const { ctx } = setup();
+      const assets = ctx.get(AssetRepository);
+      const { user } = await ctx.newUser();
+      const auth = factory.auth({ user: { id: user.id } });
+      await newLocationFixture(ctx, user.id);
+
+      const buckets = await assets.getTimeBuckets({ userIds: [user.id], locationPresence: 'noPlaceName' });
+      expect(buckets).toHaveLength(1);
+      const [bucket] = buckets;
+
+      const page = await assets.getTimeBucket(
+        bucket.timeBucket,
+        { userIds: [user.id], locationPresence: 'noPlaceName' },
+        auth,
+      );
+      const pageAssets = JSON.parse(page.assets) as { id: string[] };
+
+      expect(pageAssets.id).toHaveLength(bucket.count);
+    });
+
+    it('respects visibility and trash gating', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: trashed } = await ctx.newAsset({ ownerId: user.id, deletedAt: new Date() });
+      const { asset: archived } = await ctx.newAsset({
+        ownerId: user.id,
+        visibility: AssetVisibility.Archive,
+      });
+      const { asset: visible } = await ctx.newAsset({ ownerId: user.id });
+
+      const ids = await searchLocationPresence(sut, user.id, {
+        locationPresence: 'noGps',
+        visibility: AssetVisibility.Timeline,
+      });
+
+      expect(ids).toEqual([visible.id]);
+      expect(ids).not.toContain(trashed.id);
+      expect(ids).not.toContain(archived.id);
+    });
+
+    it('returns an un-geotagged asset shared through a timeline-enabled space', async () => {
+      const { ctx, sut } = setup();
+      const { user: owner } = await ctx.newUser();
+      const { user: member } = await ctx.newUser();
+      const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+      await ctx.newSharedSpaceMember({ spaceId: space.id, userId: member.id, role: 'viewer' });
+
+      const { asset } = await ctx.newAsset({ ownerId: owner.id });
+      await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: asset.id, addedById: owner.id });
+
+      const ids = await searchLocationPresence(sut, member.id, {
+        locationPresence: 'noGps',
+        timelineSpaceIds: [space.id],
+      });
+
+      expect(ids).toContain(asset.id);
+    });
+
+    it('reports which absence-of-location entries are worth offering', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      await newLocationFixture(ctx, user.id);
+
+      const suggestions = await sut.getFilterSuggestions([user.id], {});
+
+      expect(suggestions.hasNoGpsAssets).toBe(true);
+      expect(suggestions.hasNoPlaceNameAssets).toBe(true);
+    });
+
+    it('reports both false for a fully located library', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newExif({ assetId: asset.id, latitude: 48.85, longitude: 2.35, city: 'Paris', country: 'France' });
+
+      const suggestions = await sut.getFilterSuggestions([user.id], {});
+
+      expect(suggestions.hasNoGpsAssets).toBe(false);
+      expect(suggestions.hasNoPlaceNameAssets).toBe(false);
+    });
+
+    it('keeps the sibling entry offered once one is selected', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      await newLocationFixture(ctx, user.id);
+
+      const suggestions = await sut.getFilterSuggestions([user.id], { locationPresence: 'noGps' });
+
+      // Both flags are computed with the location group excluded, so selecting one entry must not
+      // make the other vanish from the panel.
+      expect(suggestions.hasNoPlaceNameAssets).toBe(true);
+      expect(suggestions.countries).toContain('France');
+    });
+
+    it('narrows the camera-makes list, not just the flags and countries, when locationPresence is selected', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+
+      const { asset: noGpsCanon } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newExif({ assetId: noGpsCanon.id, latitude: null, longitude: null, make: 'Canon' });
+
+      const { asset: locatedNikon } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newExif({
+        assetId: locatedNikon.id,
+        latitude: 48.85,
+        longitude: 2.35,
+        city: 'Paris',
+        country: 'France',
+        make: 'Nikon',
+      });
+
+      const suggestions = await sut.getFilterSuggestions([user.id], { locationPresence: 'noGps' });
+
+      // Unlike countries (excluded because it's the location group's own entry), every other
+      // suggestion list must narrow by locationPresence the same way it narrows by city/country —
+      // otherwise selecting "No GPS" leaves the panel's other lists showing unfiltered options.
+      expect(suggestions.cameraMakes).toEqual(['Canon']);
+    });
+
+    it('reports the same flags through the smart-facets path', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { a1 } = await newLocationFixture(ctx, user.id);
+      await addEmbedding(ctx.database, a1.id);
+
+      const facets = await sut.getSmartSearchFacets({ userIds: [user.id], embedding: matchingEmbedding });
+
+      expect(facets.hasNoGpsAssets).toBe(true);
+    });
+
+    it('reports hasNoPlaceNameAssets through the smart-facets path', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { a3 } = await newLocationFixture(ctx, user.id);
+      await addEmbedding(ctx.database, a3.id);
+
+      const facets = await sut.getSmartSearchFacets({ userIds: [user.id], embedding: matchingEmbedding });
+
+      expect(facets.hasNoPlaceNameAssets).toBe(true);
+    });
+
+    it('reports both false for a fully located smart-search result set', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.newExif({ assetId: asset.id, latitude: 48.85, longitude: 2.35, city: 'Paris', country: 'France' });
+      await addEmbedding(ctx.database, asset.id);
+
+      const facets = await sut.getSmartSearchFacets({ userIds: [user.id], embedding: matchingEmbedding });
+
+      expect(facets.hasNoGpsAssets).toBe(false);
+      expect(facets.hasNoPlaceNameAssets).toBe(false);
+    });
+
+    it('keeps the sibling entry and countries offered when locationPresence is selected on smart facets', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { a1, a3, a4 } = await newLocationFixture(ctx, user.id);
+      await addEmbedding(ctx.database, a1.id);
+      await addEmbedding(ctx.database, a3.id);
+      await addEmbedding(ctx.database, a4.id);
+
+      const facets = await sut.getSmartSearchFacets({
+        userIds: [user.id],
+        embedding: matchingEmbedding,
+        locationPresence: 'noGps',
+      });
+
+      // Both flags and the countries list are computed with the location group excluded, so
+      // selecting one entry must not make the sibling vanish from the panel. This also pins that
+      // `locationPresence` must stay OUT of the shared smart-facet candidate table (excluded there,
+      // like city/country) — if it leaked in, a3/a4 would never reach the candidate set at all and
+      // both assertions below would fail.
+      expect(facets.hasNoGpsAssets).toBe(true);
+      expect(facets.hasNoPlaceNameAssets).toBe(true);
+      expect(facets.countries).toContain('France');
     });
   });
 });

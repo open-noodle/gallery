@@ -915,6 +915,27 @@ export function searchAssetBuilderLegacy(kysely: Kysely<DB>, options: AssetSearc
           .innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId')
           .where('asset_exif.country', options.country === null ? 'is' : '=', options.country!),
       )
+      .$if(options.locationPresence === 'noPlaceName', (qb) =>
+        qb
+          .innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId')
+          .where('asset_exif.latitude', 'is not', null)
+          .where('asset_exif.city', 'is', null),
+      )
+      // Deliberately NOT a join: an asset whose metadata has not been extracted has no asset_exif
+      // row at all, and is exactly the kind of asset "no GPS" must find. Mirrors the tagIds === null
+      // predicate above.
+      .$if(options.locationPresence === 'noGps', (qb) =>
+        qb.where((eb) =>
+          eb.not(
+            eb.exists(
+              eb
+                .selectFrom('asset_exif')
+                .whereRef('asset_exif.assetId', '=', 'asset.id')
+                .where('asset_exif.latitude', 'is not', null),
+            ),
+          ),
+        ),
+      )
       .$if(options.make !== undefined, (qb) =>
         qb
           .innerJoin('asset_exif', 'asset.id', 'asset_exif.assetId')

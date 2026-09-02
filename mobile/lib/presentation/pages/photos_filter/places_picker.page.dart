@@ -1,12 +1,15 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/models/search/search_filter.model.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/places_picker_country_accordion.widget.dart';
 import 'package:immich_mobile/presentation/pages/photos_filter/widgets/places_picker_search_header.widget.dart';
 import 'package:immich_mobile/providers/photos_filter/city_suggestions.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/filter_debounce.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/filter_suggestions.provider.dart';
+import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/places_picker.provider.dart';
 
 @RoutePage()
@@ -71,6 +74,10 @@ class _PlacesPickerPageState extends ConsumerState<PlacesPickerPage> {
             onChanged: (v) => ref.read(placesPickerQueryProvider.notifier).state = v,
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 8)),
+          // Independent of `countriesAsync`/`hasVisibleContent` below — a library with
+          // nothing geotagged has an empty country list but must still offer these rows
+          // (mirrors web's location-filter.svelte parity behaviour).
+          const SliverToBoxAdapter(child: _PresenceRows()),
           ..._bodySlivers(countriesAsync, query),
         ],
       ),
@@ -165,6 +172,103 @@ class _PlacesNoResultsPanel extends StatelessWidget {
             child: Text('filter_sheet_picker_clear_search'.tr()),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// One entry of the location-presence group: `value` is the wire value sent as
+/// `locationPresence` ('noGps' / 'noPlaceName'), `labelKey` the i18n key for its row label.
+class _PresenceEntry {
+  final String value;
+  final String labelKey;
+  const _PresenceEntry(this.value, this.labelKey);
+}
+
+/// Rows for the absence of location data ("no GPS at all" / "coordinates but no name").
+/// Mutually exclusive with country/city/state — ONE location group, ONE chip — so selecting
+/// one here replaces the whole group with a fresh [SearchLocationFilter], never `copyWith`
+/// (`copyWith`'s `x ?? this.x` semantics can't clear a field it doesn't set).
+///
+/// Rendered independent of the country accordion below: gated on the server flag OR the
+/// value already being selected, so a selection made under a different filter combo (or a
+/// library with zero geotagged countries at all) stays reachable here.
+class _PresenceRows extends ConsumerWidget {
+  const _PresenceRows();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final filter = ref.watch(photosFilterDebouncedProvider);
+    final suggestions = ref.watch(photosFilterSuggestionsProvider(filter)).valueOrNull;
+    final selectedPresence = ref.watch(photosFilterProvider.select((f) => f.location.locationPresence));
+
+    final entries = <_PresenceEntry>[
+      if ((suggestions?.hasNoGpsAssets ?? false) || selectedPresence == 'noGps')
+        const _PresenceEntry('noGps', 'filter_location_no_gps'),
+      if ((suggestions?.hasNoPlaceNameAssets ?? false) || selectedPresence == 'noPlaceName')
+        const _PresenceEntry('noPlaceName', 'filter_location_no_place_name'),
+    ];
+    if (entries.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final entry in entries)
+          _PresenceRow(
+            value: entry.value,
+            label: entry.labelKey.tr(),
+            selected: selectedPresence == entry.value,
+            onToggle: () {
+              HapticFeedback.selectionClick();
+              ref
+                  .read(photosFilterProvider.notifier)
+                  .setLocation(
+                    selectedPresence == entry.value ? null : SearchLocationFilter(locationPresence: entry.value),
+                  );
+            },
+          ),
+      ],
+    );
+  }
+}
+
+class _PresenceRow extends StatelessWidget {
+  final String value;
+  final String label;
+  final bool selected;
+  final VoidCallback onToggle;
+
+  const _PresenceRow({required this.value, required this.label, required this.selected, required this.onToggle});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return InkWell(
+      key: Key('places-picker-presence-$value'),
+      onTap: onToggle,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                  color: selected ? theme.colorScheme.primary : theme.colorScheme.onSurface,
+                ),
+              ),
+            ),
+            if (selected)
+              Icon(
+                Icons.check_circle_rounded,
+                key: Key('places-picker-presence-$value-check'),
+                size: 18,
+                color: theme.colorScheme.primary,
+              ),
+          ],
+        ),
       ),
     );
   }

@@ -72,11 +72,15 @@ FilterSuggestionsResponseDto _suggestions({
   List<FilterSuggestionsTagDto> tags = const [],
   List<String> countries = const [],
   List<String> cameraMakes = const [],
+  bool hasNoGpsAssets = false,
+  bool hasNoPlaceNameAssets = false,
 }) => FilterSuggestionsResponseDto(
   hasUnnamedPeople: false,
   hasFavorites: true,
   hasAssetsInAlbum: true,
   hasAssetsNotInAlbum: true,
+    hasNoGpsAssets: hasNoGpsAssets,
+  hasNoPlaceNameAssets: hasNoPlaceNameAssets,
   people: people,
   tags: tags,
   countries: countries,
@@ -313,6 +317,79 @@ void main() {
 
       expect(find.byType(PlacesPickerPage), findsOneWidget);
       expect(find.byType(PlacesStrip), findsNothing);
+    });
+
+    testWidgets('offers the no-location entries when the server allows them', (tester) async {
+      final s = _suggestions(countries: ['France'], hasNoGpsAssets: true, hasNoPlaceNameAssets: true);
+      await tester.pumpConsumerWidget(const PlacesStrip(), overrides: _overrideSuggestions(s));
+      await tester.pumpAndSettle();
+
+      expect(find.widgetWithText(FilterChip, 'filter_location_no_gps'.tr()), findsOneWidget);
+      expect(find.widgetWithText(FilterChip, 'filter_location_no_place_name'.tr()), findsOneWidget);
+    });
+
+    // The headline case: a library with nothing geotagged has an empty `countries` list, but
+    // the strip must still offer the presence chip instead of collapsing entirely (the shared
+    // StripScaffold otherwise hides title + body whenever the resolved data list is empty).
+    testWidgets('offers the no-gps entry even with zero countries', (tester) async {
+      final s = _suggestions(countries: const [], hasNoGpsAssets: true);
+      await tester.pumpConsumerWidget(const PlacesStrip(), overrides: _overrideSuggestions(s));
+      await tester.pumpAndSettle();
+
+      expect(find.widgetWithText(FilterChip, 'filter_location_no_gps'.tr()), findsOneWidget);
+    });
+
+    testWidgets('hides the no-location entries when the server says they would match nothing', (tester) async {
+      final s = _suggestions(countries: ['France']);
+      await tester.pumpConsumerWidget(const PlacesStrip(), overrides: _overrideSuggestions(s));
+      await tester.pumpAndSettle();
+
+      expect(find.widgetWithText(FilterChip, 'filter_location_no_gps'.tr()), findsNothing);
+      expect(find.widgetWithText(FilterChip, 'filter_location_no_place_name'.tr()), findsNothing);
+    });
+
+    testWidgets('tapping the no-gps entry replaces any selected country with a fresh presence filter', (tester) async {
+      final s = _suggestions(countries: ['France'], hasNoGpsAssets: true);
+      await tester.pumpConsumerWidget(const PlacesStrip(), overrides: _overrideSuggestions(s));
+      await tester.pumpAndSettle();
+
+      final container = ProviderScope.containerOf(tester.element(find.byType(PlacesStrip)));
+      container.read(photosFilterProvider.notifier).setLocation(SearchLocationFilter(country: 'France'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(FilterChip, 'filter_location_no_gps'.tr()));
+      await tester.pumpAndSettle();
+
+      final loc = container.read(photosFilterProvider).location;
+      expect(loc.locationPresence, 'noGps');
+      expect(loc.country, isNull);
+    });
+
+    testWidgets('tapping the already-selected no-gps entry clears the location filter', (tester) async {
+      final s = _suggestions(countries: ['France'], hasNoGpsAssets: true);
+      await tester.pumpConsumerWidget(const PlacesStrip(), overrides: _overrideSuggestions(s));
+      await tester.pumpAndSettle();
+
+      final container = ProviderScope.containerOf(tester.element(find.byType(PlacesStrip)));
+      container.read(photosFilterProvider.notifier).setLocation(SearchLocationFilter(locationPresence: 'noGps'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(FilterChip, 'filter_location_no_gps'.tr()));
+      await tester.pumpAndSettle();
+
+      expect(container.read(photosFilterProvider).location.locationPresence, isNull);
+    });
+
+    testWidgets('keeps the no-gps entry visible when already selected even if the flag turns false', (tester) async {
+      final s = _suggestions(countries: ['France']);
+      await tester.pumpConsumerWidget(const PlacesStrip(), overrides: _overrideSuggestions(s));
+      await tester.pumpAndSettle();
+
+      final container = ProviderScope.containerOf(tester.element(find.byType(PlacesStrip)));
+      container.read(photosFilterProvider.notifier).setLocation(SearchLocationFilter(locationPresence: 'noGps'));
+      await tester.pumpAndSettle();
+
+      expect(find.widgetWithText(FilterChip, 'filter_location_no_gps'.tr()), findsOneWidget);
     });
   });
 

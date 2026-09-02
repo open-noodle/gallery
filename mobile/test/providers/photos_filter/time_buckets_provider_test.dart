@@ -63,6 +63,38 @@ void main() {
     ).called(1);
   });
 
+  test('forwards locationPresence to getTimeBuckets', () async {
+    final filter = SearchFilter.empty()..location = SearchLocationFilter(locationPresence: 'noGps');
+
+    when(
+      () => mockTimelineApi.getTimeBuckets(
+        country: any(named: 'country'),
+        city: any(named: 'city'),
+        locationPresence: any(named: 'locationPresence'),
+        isFavorite: any(named: 'isFavorite'),
+        personIds: any(named: 'personIds'),
+        rating: any(named: 'rating'),
+        tagIds: any(named: 'tagIds'),
+        type: any(named: 'type'),
+      ),
+    ).thenAnswer((_) async => []);
+
+    await container.read(timeBucketsProvider(filter).future);
+
+    verify(
+      () => mockTimelineApi.getTimeBuckets(
+        country: null,
+        city: null,
+        locationPresence: 'noGps',
+        isFavorite: null,
+        personIds: null,
+        rating: null,
+        tagIds: null,
+        type: null,
+      ),
+    ).called(1);
+  });
+
   test('null API response → empty list', () async {
     when(
       () => mockTimelineApi.getTimeBuckets(

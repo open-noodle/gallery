@@ -15,6 +15,13 @@ class StripScaffold extends ConsumerStatefulWidget {
   final Widget Function(List<dynamic>) childBuilder;
   final VoidCallback? onRetry;
 
+  /// Opt-in: keep rendering (title + `childBuilder`, called with an empty list) even when
+  /// the resolved data list is empty, because the caller has extra entries to show that
+  /// aren't sourced from [items] — e.g. the places strip's "no location" chips, gated on a
+  /// separate server flag rather than the country list. Defaults to false, so every other
+  /// strip's existing collapse-when-empty behaviour is byte-for-byte unchanged.
+  final bool hasExtraEntries;
+
   const StripScaffold({
     super.key,
     required this.titleKey,
@@ -22,6 +29,7 @@ class StripScaffold extends ConsumerStatefulWidget {
     required this.height,
     required this.childBuilder,
     this.onRetry,
+    this.hasExtraEntries = false,
   });
 
   @override
@@ -39,7 +47,8 @@ class _StripScaffoldState extends ConsumerState<StripScaffold> {
 
     // Cached-empty → stay collapsed, including through subsequent refetches.
     // Avoids the skeleton briefly pushing content down only to snap back up.
-    if (_lastData != null && _lastData!.isEmpty) {
+    // `hasExtraEntries` opts out of this collapse — see its field doc.
+    if (_lastData != null && _lastData!.isEmpty && !widget.hasExtraEntries) {
       return const SizedBox.shrink();
     }
 

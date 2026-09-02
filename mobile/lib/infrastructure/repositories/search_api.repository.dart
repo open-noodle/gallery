@@ -39,6 +39,9 @@ class SearchApiRepository extends ApiRepository {
         country: filter.location.country == null ? const Optional.absent() : Optional.present(filter.location.country!),
         state: filter.location.state == null ? const Optional.absent() : Optional.present(filter.location.state!),
         city: filter.location.city == null ? const Optional.absent() : Optional.present(filter.location.city!),
+        locationPresence: filter.location.locationPresence == null
+            ? const Optional.absent()
+            : Optional.present(SmartSearchDtoLocationPresenceEnum.fromJson(filter.location.locationPresence!)!),
         make: filter.camera.make == null ? const Optional.absent() : Optional.present(filter.camera.make!),
         model: filter.camera.model == null ? const Optional.absent() : Optional.present(filter.camera.model!),
         takenAfter: filter.date.takenAfter == null
@@ -76,6 +79,9 @@ class SearchApiRepository extends ApiRepository {
       ocr: filter.ocr != null && filter.ocr!.isNotEmpty ? Optional.present(filter.ocr!) : const Optional.absent(),
       state: filter.location.state == null ? const Optional.absent() : Optional.present(filter.location.state!),
       city: filter.location.city == null ? const Optional.absent() : Optional.present(filter.location.city!),
+      locationPresence: filter.location.locationPresence == null
+          ? const Optional.absent()
+          : Optional.present(MetadataSearchDtoLocationPresenceEnum.fromJson(filter.location.locationPresence!)!),
       make: filter.camera.make == null ? const Optional.absent() : Optional.present(filter.camera.make!),
       model: filter.camera.model == null ? const Optional.absent() : Optional.present(filter.camera.model!),
       takenAfter: filter.date.takenAfter == null ? const Optional.absent() : Optional.present(filter.date.takenAfter!),

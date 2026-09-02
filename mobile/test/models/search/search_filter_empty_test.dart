@@ -18,5 +18,10 @@ void main() {
       final f = SearchFilter.empty().copyWith(display: SearchFilter.empty().display.copyWith(isUntagged: true));
       expect(f.isEmpty, false);
     });
+
+    test('locationPresence alone is not empty', () {
+      final f = SearchFilter.empty().copyWith(location: SearchLocationFilter(locationPresence: 'noGps'));
+      expect(f.isEmpty, false);
+    });
   });
 }

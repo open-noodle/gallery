@@ -1356,6 +1356,8 @@ describe(SearchService.name, () => {
       hasFavorites: false,
       hasAssetsInAlbum: false,
       hasAssetsNotInAlbum: false,
+      hasNoGpsAssets: false,
+      hasNoPlaceNameAssets: false,
     };
 
     beforeEach(() => {
@@ -2036,6 +2038,8 @@ describe(SearchService.name, () => {
       hasFavorites: false,
       hasAssetsInAlbum: false,
       hasAssetsNotInAlbum: false,
+      hasNoGpsAssets: false,
+      hasNoPlaceNameAssets: false,
     };
 
     it('should return filter suggestions', async () => {
@@ -2053,6 +2057,8 @@ describe(SearchService.name, () => {
         hasFavorites: false,
         hasAssetsInAlbum: false,
         hasAssetsNotInAlbum: false,
+        hasNoGpsAssets: false,
+        hasNoPlaceNameAssets: false,
       });
       (mocks.faceIdentity as any).getAccessiblePersonFilterSuggestions.mockResolvedValue({
         people: [{ id: 'p1', name: 'Alice' }],
@@ -2142,6 +2148,8 @@ describe(SearchService.name, () => {
         hasFavorites: false,
         hasAssetsInAlbum: false,
         hasAssetsNotInAlbum: false,
+        hasNoGpsAssets: false,
+        hasNoPlaceNameAssets: false,
       });
 
       const result = await sut.getFilterSuggestions(auth, { albumId });

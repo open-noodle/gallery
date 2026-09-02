@@ -175,6 +175,7 @@
       country: nextFilters.country,
       state: nextFilters.state,
       city: nextFilters.city,
+      locationPresence: nextFilters.locationPresence,
       make: nextFilters.make,
       model: nextFilters.model,
       lensModel: nextFilters.lensModel,
@@ -216,6 +217,8 @@
       hasFavorites: response.hasFavorites,
       hasAssetsInAlbum: response.hasAssetsInAlbum,
       hasAssetsNotInAlbum: response.hasAssetsNotInAlbum,
+      hasNoGpsAssets: response.hasNoGpsAssets,
+      hasNoPlaceNameAssets: response.hasNoPlaceNameAssets,
     };
   };
 

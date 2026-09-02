@@ -41,6 +41,12 @@ const BaseSearchSchema = z.object({
   city: z.string().nullable().optional().describe('Filter by city name'),
   state: z.string().nullable().optional().describe('Filter by state/province name'),
   country: z.string().nullable().optional().describe('Filter by country name'),
+  locationPresence: z
+    .enum(['noGps', 'noPlaceName'])
+    .optional()
+    .describe(
+      'Filter for assets with no location: noGps (no coordinates) or noPlaceName (coordinates the geocoder could not name). Cannot be combined with city, state or country.',
+    ),
   make: z.string().nullable().optional().describe('Filter by camera make'),
   model: z.string().nullable().optional().describe('Filter by camera model'),
   lensModel: z.string().nullable().optional().describe('Filter by lens model'),
@@ -79,17 +85,28 @@ const BaseSearchWithResultsSchema = BaseSearchSchema.extend({
   size: z.int().min(1).max(1000).optional().describe('Number of results to return'),
 });
 
-const RandomSearchSchema = BaseSearchWithResultsSchema.extend({
+// Kept as a plain object schema (no pipe) because MetadataSearchSchema below extends it — piping a
+// schema (see RandomSearchSchema) yields a ZodPipe, which has no .extend(). The exclusivity
+// constraint is instead applied separately to RandomSearchSchema, the DTO-facing schema derived
+// from this shape.
+const RandomSearchObjectSchema = BaseSearchWithResultsSchema.extend({
   withStacked: z.boolean().optional().describe('Include stacked assets'),
   withPeople: z.boolean().optional().describe('Include people data in response'),
-}).meta({ id: 'RandomSearchDto' });
+});
 
-const LargeAssetSearchSchema = BaseSearchWithResultsSchema.extend({
+const RandomSearchSchema = RandomSearchObjectSchema.pipe(
+  IsNotSiblingOf(RandomSearchObjectSchema, 'locationPresence', ['city', 'state', 'country']),
+).meta({ id: 'RandomSearchDto' });
+
+const LargeAssetSearchBaseSchema = BaseSearchWithResultsSchema.extend({
   minFileSize: z.coerce.number().int().min(0).optional().describe('Minimum file size in bytes'),
   size: z.coerce.number().int().min(1).max(1000).optional().describe('Number of results to return'),
-}).meta({ id: 'LargeAssetSearchDto' });
+});
+const LargeAssetSearchSchema = LargeAssetSearchBaseSchema.pipe(
+  IsNotSiblingOf(LargeAssetSearchBaseSchema, 'locationPresence', ['city', 'state', 'country']),
+).meta({ id: 'LargeAssetSearchDto' });
 
-const MetadataSearchSchema = RandomSearchSchema.extend({
+const MetadataSearchBaseSchema = RandomSearchObjectSchema.extend({
   id: z.uuidv4().optional().describe('Filter by asset ID'),
   description: boundedTextFilter(z.string().trim()).optional().describe('Filter by description text'),
   checksum: z.string().optional().describe('Filter by file checksum'),
@@ -100,22 +117,33 @@ const MetadataSearchSchema = RandomSearchSchema.extend({
   encodedVideoPath: z.string().optional().describe('Filter by encoded video file path'),
   order: AssetOrderSchema.default(AssetOrder.Desc).optional().describe('Sort order'),
   page: z.int().min(1).optional().describe('Page number'),
-}).meta({ id: 'MetadataSearchDto' });
+});
+const MetadataSearchSchema = MetadataSearchBaseSchema.pipe(
+  IsNotSiblingOf(MetadataSearchBaseSchema, 'locationPresence', ['city', 'state', 'country']),
+).meta({ id: 'MetadataSearchDto' });
 
-const StatisticsSearchSchema = BaseSearchSchema.extend({
+const StatisticsSearchBaseSchema = BaseSearchSchema.extend({
   description: boundedTextFilter(z.string().trim()).optional().describe('Filter by description text'),
-}).meta({ id: 'StatisticsSearchDto' });
+});
+const StatisticsSearchSchema = StatisticsSearchBaseSchema.pipe(
+  IsNotSiblingOf(StatisticsSearchBaseSchema, 'locationPresence', ['city', 'state', 'country']),
+).meta({ id: 'StatisticsSearchDto' });
 
-const SmartSearchSchema = BaseSearchWithResultsSchema.extend({
+const SmartSearchBaseSchema = BaseSearchWithResultsSchema.extend({
   query: z.string().trim().optional().describe('Natural language search query'),
   queryAssetId: z.uuidv4().optional().describe('Asset ID to use as search reference'),
   language: z.string().optional().describe('Search language code'),
   order: AssetOrderSchema.optional().describe('Sort order (omit for relevance)'),
   page: z.int().min(1).optional().describe('Page number'),
   withSharedSpaces: z.boolean().optional().describe('Include shared spaces the user is a member of'),
-}).meta({ id: 'SmartSearchDto' });
+});
+const SmartSearchSchema = SmartSearchBaseSchema.pipe(
+  IsNotSiblingOf(SmartSearchBaseSchema, 'locationPresence', ['city', 'state', 'country']),
+).meta({ id: 'SmartSearchDto' });
 
-const SmartSearchFacetsSchema = BaseSearchSchema.pick({
+// Kept as a plain object schema (no pipe) so the id can be applied to the piped export below,
+// matching the established pattern (see RandomSearchObjectSchema / MetadataSearchBaseSchema).
+const SmartSearchFacetsBaseSchema = BaseSearchSchema.pick({
   type: true,
   isFavorite: true,
   isNotInAlbum: true,
@@ -124,6 +152,10 @@ const SmartSearchFacetsSchema = BaseSearchSchema.pick({
   takenAfter: true,
   city: true,
   country: true,
+  // `state` is deliberately NOT picked here (see the un-picked keys above) — `locationPresence`'s
+  // sibling list below is only `city`/`country`, not `state`, because `IsNotSiblingOf`'s key
+  // parameter is constrained to keys this schema actually has.
+  locationPresence: true,
   make: true,
   model: true,
   personIds: true,
@@ -136,14 +168,16 @@ const SmartSearchFacetsSchema = BaseSearchSchema.pick({
   albumIds: true,
   spaceId: true,
   spacePersonIds: true,
-})
-  .extend({
-    query: z.string().trim().optional().describe('Natural language search query'),
-    queryAssetId: z.uuidv4().optional().describe('Asset ID to use as search reference'),
-    language: z.string().optional().describe('Search language code'),
-    withSharedSpaces: z.boolean().optional().describe('Include shared spaces the user is a member of'),
-  })
-  .meta({ id: 'SmartSearchFacetsDto' });
+}).extend({
+  query: z.string().trim().optional().describe('Natural language search query'),
+  queryAssetId: z.uuidv4().optional().describe('Asset ID to use as search reference'),
+  language: z.string().optional().describe('Search language code'),
+  withSharedSpaces: z.boolean().optional().describe('Include shared spaces the user is a member of'),
+});
+
+const SmartSearchFacetsSchema = SmartSearchFacetsBaseSchema.pipe(
+  IsNotSiblingOf(SmartSearchFacetsBaseSchema, 'locationPresence', ['city', 'country']),
+).meta({ id: 'SmartSearchFacetsDto' });
 
 const SearchPlacesSchema = z
   .object({
@@ -270,6 +304,10 @@ const FilterSuggestionsResponseSchema = z
     hasFavorites: z.boolean().describe('Whether any favourite exists in the filtered set, ignoring isFavorite'),
     hasAssetsInAlbum: z.boolean().describe('Whether any filtered asset belongs to an album'),
     hasAssetsNotInAlbum: z.boolean().describe('Whether any filtered asset belongs to no album'),
+    hasNoGpsAssets: z.boolean().describe('Whether assets without coordinates exist in the filtered set'),
+    hasNoPlaceNameAssets: z
+      .boolean()
+      .describe('Whether assets with coordinates but no place name exist in the filtered set'),
   })
   .meta({ id: 'FilterSuggestionsResponseDto' });
 
@@ -291,6 +329,10 @@ const SmartSearchFacetsResponseSchema = z
     hasFavorites: z.boolean().describe('Whether any favourite exists in the filtered set, ignoring isFavorite'),
     hasAssetsInAlbum: z.boolean().describe('Whether any filtered asset belongs to an album'),
     hasAssetsNotInAlbum: z.boolean().describe('Whether any filtered asset belongs to no album'),
+    hasNoGpsAssets: z.boolean().describe('Whether assets without coordinates exist in the filtered set'),
+    hasNoPlaceNameAssets: z
+      .boolean()
+      .describe('Whether assets with coordinates but no place name exist in the filtered set'),
   })
   .meta({ id: 'SmartSearchFacetsResponseDto' });
 
@@ -302,6 +344,12 @@ const FilterSuggestionsRequestBaseSchema = z.object({
   country: z.string().optional().describe('Filter by country'),
   state: z.string().optional().describe('Filter by state/province'),
   city: z.string().optional().describe('Filter by city'),
+  locationPresence: z
+    .enum(['noGps', 'noPlaceName'])
+    .optional()
+    .describe(
+      'Filter for assets with no location: noGps (no coordinates) or noPlaceName (coordinates the geocoder could not name). Cannot be combined with city, state or country.',
+    ),
   make: z.string().optional().describe('Filter by camera make'),
   model: z.string().optional().describe('Filter by camera model'),
   lensModel: z.string().optional().describe('Filter by lens model'),
@@ -327,6 +375,7 @@ const FilterSuggestionsRequestSchema = FilterSuggestionsRequestBaseSchema.pipe(
   IsNotSiblingOf(FilterSuggestionsRequestBaseSchema, 'albumId', ['spaceId']),
 )
   .pipe(IsNotSiblingOf(FilterSuggestionsRequestBaseSchema, 'albumId', ['withSharedSpaces']))
+  .pipe(IsNotSiblingOf(FilterSuggestionsRequestBaseSchema, 'locationPresence', ['city', 'state', 'country']))
   .meta({ id: 'FilterSuggestionsRequestDto' });
 
 export class RandomSearchDto extends createZodDto(RandomSearchSchema) {}

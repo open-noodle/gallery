@@ -8,7 +8,7 @@ import {
   TimeBucketSize,
   TimeBucketSizeSchema,
 } from 'src/enum';
-import { boundedTextFilter, stringToBool } from 'src/validation';
+import { boundedTextFilter, IsNotSiblingOf, stringToBool } from 'src/validation';
 import z from 'zod';
 
 const UUID_PATTERN = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}';
@@ -17,118 +17,128 @@ const ScopedPersonTokenSchema = z
   .regex(new RegExp(`^(?:${UUID_PATTERN}|person:${UUID_PATTERN}|space-person:${UUID_PATTERN})$`))
   .describe('Legacy person ID or scoped identity filter token');
 
-const TimeBucketQueryBaseSchema = z
-  .object({
-    bucketSize: TimeBucketSizeSchema.optional()
-      .default(TimeBucketSize.Month)
-      .describe('Timeline bucket granularity. Defaults to month for backwards compatibility'),
-    userId: z.uuidv4().optional().describe('Filter assets by specific user ID'),
-    albumId: z.uuidv4().optional().describe('Filter assets belonging to a specific album'),
-    personId: z.uuidv4().optional().describe('Filter assets containing a specific person (face recognition)'),
-    tagId: z.uuidv4().optional().describe('Filter assets with a specific tag'),
-    isFavorite: stringToBool
-      .optional()
-      .describe('Filter by favorite status (true for favorites only, false for non-favorites only)'),
-    isNotInAlbum: stringToBool.optional().describe('Filter assets not in any album'),
-    isInAlbum: stringToBool.optional().describe('Filter assets in at least one album'),
-    isTrashed: stringToBool
-      .optional()
-      .describe('Filter by trash status (true for trashed assets only, false for non-trashed only)'),
-    withStacked: stringToBool
-      .optional()
-      .describe('Include stacked assets in the response. When true, only primary assets from stacks are returned.'),
-    withPartners: stringToBool.optional().describe('Include assets shared by partners'),
-    withSharedSpaces: stringToBool
-      .optional()
-      .describe('Include assets from shared spaces where the user has timeline enabled'),
-    spaceId: z.uuidv4().optional().describe('Filter assets belonging to a specific shared space'),
-    spacePersonId: z
-      .uuidv4()
-      .optional()
-      .describe('Filter assets containing a specific shared space person (space face recognition)'),
-    personIds: z
-      .preprocess((v) => (v === undefined ? undefined : Array.isArray(v) ? v : [v]), z.array(ScopedPersonTokenSchema))
-      .optional()
-      .describe('Filter assets containing any of these persons (multi-select)'),
-    spacePersonIds: z
-      .preprocess((v) => (v === undefined ? undefined : Array.isArray(v) ? v : [v]), z.array(z.uuidv4()))
-      .optional()
-      .describe('Filter assets containing any of these shared space persons (multi-select)'),
-    tagIds: z
-      .preprocess((v) => (v === undefined ? undefined : Array.isArray(v) ? v : [v]), z.array(z.uuidv4()))
-      .optional()
-      .describe('Filter assets with any of these tags (multi-select)'),
-    city: z.string().optional().describe('Filter by city name'),
-    country: z.string().optional().describe('Filter by country name'),
-    make: z.string().optional().describe('Filter by camera make'),
-    model: z.string().optional().describe('Filter by camera model'),
-    lensModel: z.string().optional().describe('Filter by camera lens model'),
-    state: z.string().optional().describe('Filter by state/province name'),
-    ownerId: z
-      .uuidv4()
-      .optional()
-      .describe(
-        'Filter by asset owner (contributor). Narrows within the current scope and never widens it. This is NOT the same as userId, which selects whose timeline is being composed.',
-      ),
-    originalFileName: boundedTextFilter()
-      .optional()
-      .describe('Filter by original filename (substring, case/accent-insensitive)'),
-    description: boundedTextFilter()
-      .optional()
-      .describe('Filter by asset description (substring, case/accent-insensitive)'),
-    ocr: boundedTextFilter().optional().describe('Filter by OCR text content (substring, case/accent-insensitive)'),
-    rating: z.coerce.number().int().min(1).max(5).optional().describe('Minimum star rating (>=)'),
-    type: AssetTypeSchema.optional().describe('Filter by asset type (IMAGE or VIDEO)'),
-    takenAfter: z.string().optional().describe('Only include assets taken on or after this date (ISO 8601)'),
-    takenBefore: z.string().optional().describe('Only include assets taken on or before this date (ISO 8601)'),
-    order: AssetOrderSchema.optional().describe(
-      'Sort order for assets within time buckets (ASC for oldest first, DESC for newest first)',
+const TimeBucketQueryBaseSchema = z.object({
+  bucketSize: TimeBucketSizeSchema.optional()
+    .default(TimeBucketSize.Month)
+    .describe('Timeline bucket granularity. Defaults to month for backwards compatibility'),
+  userId: z.uuidv4().optional().describe('Filter assets by specific user ID'),
+  albumId: z.uuidv4().optional().describe('Filter assets belonging to a specific album'),
+  personId: z.uuidv4().optional().describe('Filter assets containing a specific person (face recognition)'),
+  tagId: z.uuidv4().optional().describe('Filter assets with a specific tag'),
+  isFavorite: stringToBool
+    .optional()
+    .describe('Filter by favorite status (true for favorites only, false for non-favorites only)'),
+  isNotInAlbum: stringToBool.optional().describe('Filter assets not in any album'),
+  isInAlbum: stringToBool.optional().describe('Filter assets in at least one album'),
+  isTrashed: stringToBool
+    .optional()
+    .describe('Filter by trash status (true for trashed assets only, false for non-trashed only)'),
+  withStacked: stringToBool
+    .optional()
+    .describe('Include stacked assets in the response. When true, only primary assets from stacks are returned.'),
+  withPartners: stringToBool.optional().describe('Include assets shared by partners'),
+  withSharedSpaces: stringToBool
+    .optional()
+    .describe('Include assets from shared spaces where the user has timeline enabled'),
+  spaceId: z.uuidv4().optional().describe('Filter assets belonging to a specific shared space'),
+  spacePersonId: z
+    .uuidv4()
+    .optional()
+    .describe('Filter assets containing a specific shared space person (space face recognition)'),
+  personIds: z
+    .preprocess((v) => (v === undefined ? undefined : Array.isArray(v) ? v : [v]), z.array(ScopedPersonTokenSchema))
+    .optional()
+    .describe('Filter assets containing any of these persons (multi-select)'),
+  spacePersonIds: z
+    .preprocess((v) => (v === undefined ? undefined : Array.isArray(v) ? v : [v]), z.array(z.uuidv4()))
+    .optional()
+    .describe('Filter assets containing any of these shared space persons (multi-select)'),
+  tagIds: z
+    .preprocess((v) => (v === undefined ? undefined : Array.isArray(v) ? v : [v]), z.array(z.uuidv4()))
+    .optional()
+    .describe('Filter assets with any of these tags (multi-select)'),
+  city: z.string().optional().describe('Filter by city name'),
+  country: z.string().optional().describe('Filter by country name'),
+  make: z.string().optional().describe('Filter by camera make'),
+  model: z.string().optional().describe('Filter by camera model'),
+  lensModel: z.string().optional().describe('Filter by camera lens model'),
+  state: z.string().optional().describe('Filter by state/province name'),
+  locationPresence: z
+    .enum(['noGps', 'noPlaceName'])
+    .optional()
+    .describe(
+      'Filter for assets with no location: noGps (no coordinates) or noPlaceName (coordinates the geocoder could not name). Cannot be combined with city, state or country.',
     ),
-    orderBy: AssetOrderBySchema.optional().describe(
-      'Date to group and order assets by (takenAt for date taken, createdAt for date added to Immich)',
+  ownerId: z
+    .uuidv4()
+    .optional()
+    .describe(
+      'Filter by asset owner (contributor). Narrows within the current scope and never widens it. This is NOT the same as userId, which selects whose timeline is being composed.',
     ),
-    visibility: AssetVisibilitySchema.optional().describe(
-      'Filter by asset visibility status (ARCHIVE, TIMELINE, HIDDEN, LOCKED)',
-    ),
-    withCoordinates: stringToBool.optional().describe('Include location data in the response'),
-    key: z.string().optional(),
-    slug: z.string().optional(),
-    bbox: z
-      .string()
-      .transform((value, ctx) => {
-        const parts = value.split(',');
-        if (parts.length !== 4) {
-          ctx.issues.push({
-            code: 'custom',
-            message: 'bbox must have 4 comma-separated numbers: west,south,east,north',
-            input: value,
-          });
-          return z.NEVER;
-        }
+  originalFileName: boundedTextFilter()
+    .optional()
+    .describe('Filter by original filename (substring, case/accent-insensitive)'),
+  description: boundedTextFilter()
+    .optional()
+    .describe('Filter by asset description (substring, case/accent-insensitive)'),
+  ocr: boundedTextFilter().optional().describe('Filter by OCR text content (substring, case/accent-insensitive)'),
+  rating: z.coerce.number().int().min(1).max(5).optional().describe('Minimum star rating (>=)'),
+  type: AssetTypeSchema.optional().describe('Filter by asset type (IMAGE or VIDEO)'),
+  takenAfter: z.string().optional().describe('Only include assets taken on or after this date (ISO 8601)'),
+  takenBefore: z.string().optional().describe('Only include assets taken on or before this date (ISO 8601)'),
+  order: AssetOrderSchema.optional().describe(
+    'Sort order for assets within time buckets (ASC for oldest first, DESC for newest first)',
+  ),
+  orderBy: AssetOrderBySchema.optional().describe(
+    'Date to group and order assets by (takenAt for date taken, createdAt for date added to Immich)',
+  ),
+  visibility: AssetVisibilitySchema.optional().describe(
+    'Filter by asset visibility status (ARCHIVE, TIMELINE, HIDDEN, LOCKED)',
+  ),
+  withCoordinates: stringToBool.optional().describe('Include location data in the response'),
+  key: z.string().optional(),
+  slug: z.string().optional(),
+  bbox: z
+    .string()
+    .transform((value, ctx) => {
+      const parts = value.split(',');
+      if (parts.length !== 4) {
+        ctx.issues.push({
+          code: 'custom',
+          message: 'bbox must have 4 comma-separated numbers: west,south,east,north',
+          input: value,
+        });
+        return z.NEVER;
+      }
 
-        const [west, south, east, north] = parts.map(Number);
-        if ([west, south, east, north].some((part) => Number.isNaN(part))) {
-          ctx.issues.push({
-            code: 'custom',
-            message: 'bbox parts must be valid numbers',
-            input: value,
-          });
-          return z.NEVER;
-        }
+      const [west, south, east, north] = parts.map(Number);
+      if ([west, south, east, north].some((part) => Number.isNaN(part))) {
+        ctx.issues.push({
+          code: 'custom',
+          message: 'bbox parts must be valid numbers',
+          input: value,
+        });
+        return z.NEVER;
+      }
 
-        return { west, south, east, north };
-      })
-      .pipe(BBoxSchema)
-      .optional()
-      .describe('Bounding box coordinates as west,south,east,north (WGS84)')
-      .meta({ example: '11.075683,49.416711,11.117589,49.454875' }),
-  })
-  .meta({ id: 'TimeBucketDto' });
+      return { west, south, east, north };
+    })
+    .pipe(BBoxSchema)
+    .optional()
+    .describe('Bounding box coordinates as west,south,east,north (WGS84)')
+    .meta({ example: '11.075683,49.416711,11.117589,49.454875' }),
+});
 
-const TimeBucketSchema = TimeBucketQueryBaseSchema;
-const TimeBucketAssetSchema = TimeBucketQueryBaseSchema.extend({
+const TimeBucketSchema = TimeBucketQueryBaseSchema.pipe(
+  IsNotSiblingOf(TimeBucketQueryBaseSchema, 'locationPresence', ['city', 'state', 'country']),
+).meta({ id: 'TimeBucketDto' });
+
+const TimeBucketAssetBaseSchema = TimeBucketQueryBaseSchema.extend({
   timeBucket: z.string().describe('Time bucket identifier in YYYY-MM-DD format').meta({ example: '2024-01-01' }),
-}).meta({ id: 'TimeBucketAssetDto' });
+});
+const TimeBucketAssetSchema = TimeBucketAssetBaseSchema.pipe(
+  IsNotSiblingOf(TimeBucketAssetBaseSchema, 'locationPresence', ['city', 'state', 'country']),
+).meta({ id: 'TimeBucketAssetDto' });
 
 const stackTupleSchema = z.array(z.string()).length(2).nullable();
 
@@ -191,11 +201,14 @@ export const TimeBucketsResponseSchema = z
   })
   .meta({ id: 'TimeBucketsResponseDto' });
 
-const TimeBucketCoverSchema = TimeBucketQueryBaseSchema.extend({
+const TimeBucketCoverBaseSchema = TimeBucketQueryBaseSchema.extend({
   timeBuckets: z
     .preprocess((v) => (v === undefined ? undefined : Array.isArray(v) ? v : [v]), z.array(z.string()))
     .describe('Time bucket identifiers (YYYY-MM-DD) to resolve covers for'),
-}).meta({ id: 'TimeBucketCoverDto' });
+});
+const TimeBucketCoverSchema = TimeBucketCoverBaseSchema.pipe(
+  IsNotSiblingOf(TimeBucketCoverBaseSchema, 'locationPresence', ['city', 'state', 'country']),
+).meta({ id: 'TimeBucketCoverDto' });
 
 export const TimeBucketCoverResponseSchema = z
   .object({

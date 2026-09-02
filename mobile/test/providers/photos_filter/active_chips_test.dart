@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
@@ -114,6 +115,8 @@ void main() {
         hasFavorites: false,
         hasAssetsInAlbum: false,
         hasAssetsNotInAlbum: false,
+        hasNoGpsAssets: false,
+        hasNoPlaceNameAssets: false,
         tags: [FilterSuggestionsTagDto(id: 't1', value: 'wedding')],
       );
       final chips = activeChipsFromFilter(f, suggestions: suggestions);
@@ -149,6 +152,27 @@ void main() {
     test('location with all fields null → no chip (defensive)', () {
       final f = _base();
       expect(activeChipsFromFilter(f).where((c) => c.visual == ChipVisual.location), isEmpty);
+    });
+
+    test('renders exactly one location chip for locationPresence', () {
+      final filter = SearchFilter.empty().copyWith(location: SearchLocationFilter(locationPresence: 'noGps'));
+
+      final chips = activeChipsFromFilter(filter);
+
+      final location = chips.where((c) => c.id == const LocationChipId()).toList();
+      expect(location.length, 1);
+      expect(location.single.visual, ChipVisual.location);
+      expect(location.single.label, 'filter_location_no_gps'.tr());
+    });
+
+    test('renders the no-place-name label for locationPresence noPlaceName', () {
+      final filter = SearchFilter.empty().copyWith(location: SearchLocationFilter(locationPresence: 'noPlaceName'));
+
+      final chips = activeChipsFromFilter(filter);
+
+      final location = chips.where((c) => c.id == const LocationChipId()).toList();
+      expect(location.length, 1);
+      expect(location.single.label, 'filter_location_no_place_name'.tr());
     });
 
     test('camera with make + model → 1 chip "Canon · R5"', () {
@@ -282,6 +306,8 @@ void main() {
         hasFavorites: false,
         hasAssetsInAlbum: false,
         hasAssetsNotInAlbum: false,
+        hasNoGpsAssets: false,
+        hasNoPlaceNameAssets: false,
       ); // no people field
       final chips = activeChipsFromFilter(f, suggestions: suggestions);
       expect(chips.single.label, 'Alice');
