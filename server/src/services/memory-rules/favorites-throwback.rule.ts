@@ -56,8 +56,6 @@ export class FavoritesThrowbackMemoryRule implements MemoryRule {
       });
     }
 
-    return candidates
-      .toSorted((left, right) => right.score - left.score)
-      .slice(0, MAX_YEARS);
+    return candidates.toSorted((left, right) => right.score - left.score).slice(0, MAX_YEARS);
   }
 }
