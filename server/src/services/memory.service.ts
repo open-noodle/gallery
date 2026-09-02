@@ -5,19 +5,22 @@ import { Memory } from 'src/database';
 import { OnJob } from 'src/decorators';
 import { BulkIdResponseDto, BulkIdsDto } from 'src/dtos/asset-ids.response.dto';
 import { AuthDto } from 'src/dtos/auth.dto';
-import { MemoryCreateDto, MemoryResponseDto, MemorySearchDto, MemoryUpdateDto, mapMemory } from 'src/dtos/memory.dto';
+import { mapMemory, MemoryCreateDto, MemoryResponseDto, MemorySearchDto, MemoryUpdateDto } from 'src/dtos/memory.dto';
 import { DatabaseLock, JobName, MemoryType, Permission, QueueName, SystemMetadataKey } from 'src/enum';
 import { BaseService } from 'src/services/base.service';
 import { MemoryRule, MemoryRuleCandidate } from 'src/services/memory-rules/memory-rule.interface';
 import {
   getAdminAvailableMemoryTypeKeys,
+  getMemoryTypeFloor,
   getMemoryTypeKeyForMemory,
   getMemoryTypeMetadata,
   isMemoryTypeEnabledForUser,
 } from 'src/services/memory-rules/memory-type.metadata';
 import { createMemoryRules } from 'src/services/memory-rules/memory-type.registry';
+import { planReservation, ReservableMemory } from 'src/services/memory-rules/reservation.util';
 import { MemoryThemeSearchAdapter } from 'src/services/memory-rules/theme-search.adapter';
 import { ThemeSearchPort } from 'src/services/memory-rules/theme-search.port';
+import { RuleMemoryData } from 'src/types';
 import { addAssets, removeAssets } from 'src/utils/asset.util';
 import { getPreferences } from 'src/utils/preferences';
 
@@ -31,6 +34,31 @@ const DAYS = 3;
  * a missed one waits a year) from ever being crowded out.
  */
 export const RULE_DAILY_LIMIT = 6;
+
+/**
+ * Claim-order bands. Offsets are far larger than any real rule score (the highest is `birthday`
+ * at ~330), so type always outranks score: an `on_this_day` can never overtake a rule memory,
+ * and no rule memory can overtake an unmanaged one. See spec §6.3.
+ */
+const RANK_UNMANAGED = 2_000_000;
+const RANK_RULE = 1_000_000;
+const RANK_ON_THIS_DAY = 0;
+
+interface MemoryOverlapRow {
+  id: string;
+  type: string;
+  data: unknown;
+  isSaved: boolean;
+  showAt: Date | null;
+  hideAt: Date | null;
+  assets: { id: string }[];
+}
+
+const isVisibleOn = (row: Pick<MemoryOverlapRow, 'showAt' | 'hideAt'>, target: DateTime): boolean => {
+  const start = target.startOf('day').toJSDate();
+  const end = target.endOf('day').toJSDate();
+  return (row.showAt === null || row.showAt <= end) && (row.hideAt === null || row.hideAt >= start);
+};
 
 @Injectable()
 export class MemoryService extends BaseService {
@@ -99,6 +127,17 @@ export class MemoryService extends BaseService {
           this.logger.error(`Failed to create rule memories for ${target.toISO()}: ${error}`);
         }
       }
+
+      // `today` is already declared above for the rule loop — reuse it rather than introducing a
+      // second name for the same value.
+      const reconcileTo = today.plus({ days: DAYS });
+      for (const owner of users) {
+        try {
+          await this.reconcileMemoryOverlap(owner.id, today, reconcileTo);
+        } catch (error) {
+          this.logger.error(`Failed to reconcile memory overlap for ${owner.id}: ${error}`);
+        }
+      }
     });
   }
 
@@ -121,6 +160,81 @@ export class MemoryService extends BaseService {
         ),
       ),
     );
+  }
+
+  /**
+   * A memory may be stripped or deleted only when it is unambiguously one this job generated.
+   * `MemoryType` has just two values and `POST /memories` accepts both, so a hand-made memory is
+   * indistinguishable by type alone — hence the `showAt`/`hideAt` and registry checks. Anything
+   * else still claims its assets (otherwise the duplicate survives) but is never modified.
+   * See spec §6.2.1.
+   */
+  private toReservable(row: MemoryOverlapRow, stripped: Map<string, Set<string>>): ReservableMemory {
+    const key = getMemoryTypeKeyForMemory(row.type as MemoryType, row.data);
+    const isKnownType = key !== undefined && getMemoryTypeMetadata(key) !== undefined;
+    const managed = !row.isSaved && row.showAt !== null && row.hideAt !== null && isKnownType;
+
+    const alreadyStripped = stripped.get(row.id);
+    const assetIds = row.assets.map(({ id }) => id).filter((id) => !alreadyStripped?.has(id));
+
+    const score = (row.data as RuleMemoryData | null | undefined)?.score ?? 0;
+
+    return {
+      id: row.id,
+      assetIds,
+      managed,
+      floor: getMemoryTypeFloor(key),
+      priority: managed ? (row.type === MemoryType.Rule ? RANK_RULE + score : RANK_ON_THIS_DAY) : RANK_UNMANAGED,
+    };
+  }
+
+  /**
+   * Make every day in `[from, to]` non-overlapping for one owner: no photo appears in two of that
+   * day's memories, and a generated memory left under its floor is deleted. Resolving per day is
+   * what keeps it exact — two memories whose windows never overlap are never forced apart.
+   */
+  private async reconcileMemoryOverlap(ownerId: string, from: DateTime, to: DateTime) {
+    const rows = (await this.memoryRepository.getForOverlapReconcile(ownerId, {
+      from: from.startOf('day').toJSDate(),
+      to: to.endOf('day').toJSDate(),
+    })) as MemoryOverlapRow[];
+
+    if (rows.length === 0) {
+      return;
+    }
+
+    const stripped = new Map<string, Set<string>>();
+    const removed = new Set<string>();
+
+    for (let target = from.startOf('day'); target <= to.startOf('day'); target = target.plus({ days: 1 })) {
+      const visible = rows.filter((row) => !removed.has(row.id) && isVisibleOn(row, target));
+      if (visible.length === 0) {
+        continue;
+      }
+
+      const plan = planReservation(visible.map((row) => this.toReservable(row, stripped)));
+
+      for (const { memoryId, assetIds } of plan.strip) {
+        const set = stripped.get(memoryId) ?? new Set<string>();
+        for (const assetId of assetIds) {
+          set.add(assetId);
+        }
+        stripped.set(memoryId, set);
+      }
+
+      for (const id of plan.remove) {
+        removed.add(id);
+      }
+    }
+
+    for (const id of removed) {
+      stripped.delete(id);
+      await this.memoryRepository.delete(id);
+    }
+
+    for (const [memoryId, assetIds] of stripped) {
+      await this.memoryRepository.removeAssetIds(memoryId, [...assetIds]);
+    }
   }
 
   private themeSearchPort?: ThemeSearchPort;

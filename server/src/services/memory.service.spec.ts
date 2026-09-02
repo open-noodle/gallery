@@ -23,9 +23,56 @@ const visibleRuleMemories = (ownerId: string, memoryAt: string, count: number) =
     ),
   );
 
+const day = (iso: string) => new Date(iso);
+
+/** N distinct asset ids. Floors are real, so fixtures need volume to survive them. */
+const ids = (prefix: string, count: number) => Array.from({ length: count }, (_, index) => `${prefix}${index}`);
+
+/** Shape a row the way `getForOverlapReconcile` returns it. */
+const overlapRow = (overrides: {
+  id: string;
+  assets: string[];
+  type?: MemoryType;
+  data?: unknown;
+  isSaved?: boolean;
+  showAt?: Date | null;
+  hideAt?: Date | null;
+}) => ({
+  id: overrides.id,
+  type: overrides.type ?? MemoryType.Rule,
+  data: overrides.data ?? { ruleId: 'season_recap', dedupeKey: 'k', score: 130 },
+  isSaved: overrides.isSaved ?? false,
+  showAt: overrides.showAt === undefined ? day('2026-09-01T00:00:00Z') : overrides.showAt,
+  hideAt: overrides.hideAt === undefined ? day('2026-09-01T23:59:59Z') : overrides.hideAt,
+  assets: overrides.assets.map((id) => ({ id })),
+});
+
 describe(MemoryService.name, () => {
   let sut: MemoryService;
   let mocks: ServiceMocks;
+
+  /**
+   * One `systemMetadata.get` mock answers EVERY key, so it must be keyed. Returning the
+   * memories-state object for `SystemConfig` too would feed junk into config parsing — which is
+   * why the existing tests in this file pass `null`.
+   */
+  const stubMetadata = () =>
+    mocks.systemMetadata.get.mockImplementation((key: SystemMetadataKey) =>
+      Promise.resolve(
+        key === SystemMetadataKey.MemoriesState
+          ? { lastOnThisDayDate: '2026-09-30T00:00:00.000Z', lastRuleDate: '2026-09-30T00:00:00.000Z' }
+          : null,
+      ),
+    );
+
+  // Both cursors sit in the future so the two generation loops no-op and only reconciliation runs.
+  const runJob = async () => {
+    const user = factory.userAdmin();
+    mocks.user.getList.mockResolvedValue([user]);
+    stubMetadata();
+    await sut.onMemoriesCreate();
+    return user;
+  };
 
   beforeEach(() => {
     ({ sut, mocks } = newTestService(MemoryService));
@@ -787,6 +834,275 @@ describe(MemoryService.name, () => {
       ]);
 
       vi.useRealTimers();
+    });
+  });
+
+  describe('reconcileMemoryOverlap', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(day('2026-09-01T12:00:00Z'));
+      mocks.memory.getForOverlapReconcile.mockResolvedValue([]);
+      mocks.memory.removeAssetIds.mockResolvedValue(void 0);
+      mocks.memory.delete.mockResolvedValue(void 0);
+      // Unused until Task 6 adds the backfill; stubbed now so these tests still pass then.
+      // `MemoriesState.overlapBackfilledAt` does not exist yet — it must NOT appear above.
+      mocks.memory.getOldestMemoryDate.mockResolvedValue(null);
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('S5: makes no writes when the owner has no memories', async () => {
+      await runJob();
+
+      expect(mocks.memory.removeAssetIds).not.toHaveBeenCalled();
+      expect(mocks.memory.delete).not.toHaveBeenCalled();
+    });
+
+    it('strips the lower-scoring memory rather than the higher one', async () => {
+      const shared = 'shared-0';
+      mocks.memory.getForOverlapReconcile.mockResolvedValue([
+        overlapRow({ id: 'season', assets: [shared, ...ids('s', 11)], data: { ruleId: 'season_recap', score: 130 } }),
+        overlapRow({ id: 'month', assets: [shared, ...ids('m', 9)], data: { ruleId: 'month_recap', score: 110 } }),
+      ] as any);
+
+      await runJob();
+
+      // season keeps 12 (>= 10); month keeps 9 (>= 8) after losing the shared one.
+      expect(mocks.memory.removeAssetIds).toHaveBeenCalledExactlyOnceWith('month', [shared]);
+      expect(mocks.memory.delete).not.toHaveBeenCalled();
+    });
+
+    it('deletes an on_this_day card left under its floor', async () => {
+      const shared = ids('x', 2);
+      mocks.memory.getForOverlapReconcile.mockResolvedValue([
+        overlapRow({
+          id: 'season',
+          assets: [...shared, ...ids('s', 10)],
+          data: { ruleId: 'season_recap', score: 130 },
+        }),
+        overlapRow({ id: 'otd', assets: shared, type: MemoryType.OnThisDay, data: { year: 2025 } }),
+      ] as any);
+
+      await runJob();
+
+      expect(mocks.memory.delete).toHaveBeenCalledExactlyOnceWith('otd');
+      expect(mocks.memory.removeAssetIds).not.toHaveBeenCalledWith('otd', expect.anything());
+    });
+
+    it('S1: does not force apart memories whose windows never overlap', async () => {
+      const shared = ids('x', 10);
+      mocks.memory.getForOverlapReconcile.mockResolvedValue([
+        overlapRow({
+          id: 'first',
+          assets: shared,
+          showAt: day('2026-09-01T00:00:00Z'),
+          hideAt: day('2026-09-01T23:59:59Z'),
+          data: { ruleId: 'season_recap', score: 130 },
+        }),
+        overlapRow({
+          id: 'later',
+          assets: shared,
+          showAt: day('2026-09-03T00:00:00Z'),
+          hideAt: day('2026-09-03T23:59:59Z'),
+          data: { ruleId: 'month_recap', score: 110 },
+        }),
+      ] as any);
+
+      await runJob();
+
+      expect(mocks.memory.removeAssetIds).not.toHaveBeenCalled();
+      expect(mocks.memory.delete).not.toHaveBeenCalled();
+    });
+
+    it('S2: strips a multi-day memory once, unioned across every day it is visible', async () => {
+      const shared = ids('x', 2);
+      const spanning = { hideAt: day('2026-09-04T23:59:59Z') };
+      mocks.memory.getForOverlapReconcile.mockResolvedValue([
+        overlapRow({
+          id: 'season',
+          assets: [...shared, ...ids('s', 10)],
+          ...spanning,
+          data: { ruleId: 'season_recap', score: 130 },
+        }),
+        overlapRow({
+          id: 'month',
+          assets: [...shared, ...ids('m', 8)],
+          ...spanning,
+          data: { ruleId: 'month_recap', score: 110 },
+        }),
+      ] as any);
+
+      await runJob();
+
+      // Both are visible on all four days. Day 1 strips the shared pair; days 2-4 see the already
+      // stripped set and add nothing, so exactly one write goes out.
+      expect(mocks.memory.removeAssetIds).toHaveBeenCalledExactlyOnceWith('month', shared);
+    });
+
+    it('S3: deletes a memory once even when it is visible on several days', async () => {
+      const shared = ids('x', 2);
+      const spanning = { hideAt: day('2026-09-04T23:59:59Z') };
+      mocks.memory.getForOverlapReconcile.mockResolvedValue([
+        overlapRow({
+          id: 'season',
+          assets: [...shared, ...ids('s', 10)],
+          ...spanning,
+          data: { ruleId: 'season_recap', score: 130 },
+        }),
+        overlapRow({ id: 'otd', assets: shared, ...spanning, type: MemoryType.OnThisDay, data: { year: 2025 } }),
+      ] as any);
+
+      await runJob();
+
+      expect(mocks.memory.delete).toHaveBeenCalledExactlyOnceWith('otd');
+    });
+
+    it('S4: reaches a look-ahead on_this_day written three days ahead', async () => {
+      const shared = ids('x', 2);
+      mocks.memory.getForOverlapReconcile.mockResolvedValue([
+        overlapRow({
+          id: 'season',
+          assets: [...shared, ...ids('s', 10)],
+          hideAt: day('2026-09-04T23:59:59Z'),
+          data: { ruleId: 'season_recap', score: 130 },
+        }),
+        overlapRow({
+          id: 'otd-ahead',
+          assets: shared,
+          showAt: day('2026-09-04T00:00:00Z'),
+          hideAt: day('2026-09-04T23:59:59Z'),
+          type: MemoryType.OnThisDay,
+          data: { year: 2025 },
+        }),
+      ] as any);
+
+      await runJob();
+
+      // Proves the window really extends to today + DAYS: otd-ahead is only visible on the 4th.
+      expect(mocks.memory.delete).toHaveBeenCalledExactlyOnceWith('otd-ahead');
+    });
+
+    it("S6: reconciles rule memories regardless of the owner's memory-type preferences", async () => {
+      const user = factory.userAdmin();
+      user.metadata = [
+        { key: UserMetadataKey.Preferences, value: { memories: { types: { on_this_day: false } } } },
+      ] as any;
+      mocks.user.getList.mockResolvedValue([user]);
+      stubMetadata();
+
+      const shared = 'shared-0';
+      mocks.memory.getForOverlapReconcile.mockResolvedValue([
+        overlapRow({ id: 'season', assets: [shared, ...ids('s', 11)], data: { ruleId: 'season_recap', score: 130 } }),
+        overlapRow({ id: 'month', assets: [shared, ...ids('m', 9)], data: { ruleId: 'month_recap', score: 110 } }),
+      ] as any);
+
+      await sut.onMemoriesCreate();
+
+      // Reconciliation is deliberately preference-independent: preferences gate generation and what
+      // `search` returns, never what is stored.
+      expect(mocks.memory.removeAssetIds).toHaveBeenCalledExactlyOnceWith('month', [shared]);
+    });
+
+    it('S7: never deletes or strips a saved memory, and lets it claim first', async () => {
+      mocks.memory.getForOverlapReconcile.mockResolvedValue([
+        overlapRow({ id: 'saved', assets: ['a'], isSaved: true, type: MemoryType.OnThisDay, data: { year: 2025 } }),
+        overlapRow({ id: 'rule', assets: ['a', ...ids('s', 11)], data: { ruleId: 'season_recap', score: 130 } }),
+      ] as any);
+
+      await runJob();
+
+      expect(mocks.memory.delete).not.toHaveBeenCalled();
+      expect(mocks.memory.removeAssetIds).toHaveBeenCalledExactlyOnceWith('rule', ['a']);
+    });
+
+    it('S7b: never touches an API-created memory with no showAt/hideAt', async () => {
+      mocks.memory.getForOverlapReconcile.mockResolvedValue([
+        overlapRow({
+          id: 'manual',
+          assets: ['a'],
+          showAt: null,
+          hideAt: null,
+          type: MemoryType.OnThisDay,
+          data: { year: 2025 },
+        }),
+        overlapRow({ id: 'rule', assets: ['a', ...ids('s', 11)], data: { ruleId: 'season_recap', score: 130 } }),
+      ] as any);
+
+      await runJob();
+
+      expect(mocks.memory.delete).not.toHaveBeenCalled();
+      expect(mocks.memory.removeAssetIds).toHaveBeenCalledExactlyOnceWith('rule', ['a']);
+    });
+
+    it('S7c: never deletes a rule memory whose ruleId is no longer in the registry', async () => {
+      mocks.memory.getForOverlapReconcile.mockResolvedValue([
+        overlapRow({ id: 'orphan', assets: [], data: { ruleId: 'a_rule_we_deleted', score: 500 } }),
+      ] as any);
+
+      await runJob();
+
+      expect(mocks.memory.delete).not.toHaveBeenCalled();
+    });
+
+    it('S9: deletes a memory whose assets are all archived, trashed or hidden', async () => {
+      // The repository query already filtered them out, so the service simply sees an empty list.
+      mocks.memory.getForOverlapReconcile.mockResolvedValue([
+        overlapRow({ id: 'empty', assets: [], data: { ruleId: 'month_recap', score: 110 } }),
+      ] as any);
+
+      await runJob();
+
+      expect(mocks.memory.delete).toHaveBeenCalledExactlyOnceWith('empty');
+    });
+
+    it('S10: makes no writes on a second run over already-reconciled memories', async () => {
+      mocks.memory.getForOverlapReconcile.mockResolvedValue([
+        overlapRow({ id: 'season', assets: ids('s', 12), data: { ruleId: 'season_recap', score: 130 } }),
+        overlapRow({ id: 'month', assets: ids('m', 10), data: { ruleId: 'month_recap', score: 110 } }),
+      ] as any);
+
+      await runJob();
+
+      expect(mocks.memory.removeAssetIds).not.toHaveBeenCalled();
+      expect(mocks.memory.delete).not.toHaveBeenCalled();
+    });
+
+    it('S11: logs and continues when reconciliation fails for one user', async () => {
+      mocks.memory.getForOverlapReconcile.mockRejectedValue(new Error('boom'));
+
+      await expect(runJob()).resolves.not.toThrow();
+
+      expect(mocks.logger.error).toHaveBeenCalled();
+    });
+
+    it('S12: reserves strictly per owner', async () => {
+      const first = factory.userAdmin();
+      const second = factory.userAdmin();
+      mocks.user.getList.mockResolvedValue([first, second]);
+      stubMetadata();
+      mocks.memory.getForOverlapReconcile.mockResolvedValue([
+        overlapRow({ id: 'season', assets: ids('s', 12), data: { ruleId: 'season_recap', score: 130 } }),
+      ] as any);
+
+      await sut.onMemoriesCreate();
+
+      expect(mocks.memory.getForOverlapReconcile).toHaveBeenCalledWith(first.id, expect.anything());
+      expect(mocks.memory.getForOverlapReconcile).toHaveBeenCalledWith(second.id, expect.anything());
+      // The same rows came back for both owners and neither stripped the other.
+      expect(mocks.memory.removeAssetIds).not.toHaveBeenCalled();
+    });
+
+    it('S13: is a no-op when a superseded on_this_day card is already gone', async () => {
+      mocks.memory.getForOverlapReconcile.mockResolvedValue([
+        overlapRow({ id: 'place', assets: ids('p', 5), data: { ruleId: 'on_this_day_place', score: 120 } }),
+      ] as any);
+
+      await runJob();
+
+      expect(mocks.memory.delete).not.toHaveBeenCalled();
+      expect(mocks.memory.removeAssetIds).not.toHaveBeenCalled();
     });
   });
 
