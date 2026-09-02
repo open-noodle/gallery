@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { DateTime } from 'luxon';
+import { DateTime, Settings } from 'luxon';
 import { defaults } from 'src/config';
 import { MemoryType, SystemMetadataKey, UserMetadataKey } from 'src/enum';
 import { MemoryService, RULE_DAILY_LIMIT } from 'src/services/memory.service';
@@ -1188,6 +1188,26 @@ describe(MemoryService.name, () => {
       // Only the nightly window pass — the backfill short-circuits before even querying.
       expect(mocks.memory.getOldestMemoryDate).not.toHaveBeenCalled();
       expect(mocks.memory.getForOverlapReconcile).toHaveBeenCalledTimes(1);
+    });
+
+    it('guards the cursor in UTC regardless of the host timezone', async () => {
+      // vitest pins TZ=UTC for the whole process (server/test/vitest.config.mjs), so an unzoned
+      // `fromISO` would still resolve to UTC here and this hazard would go untested. Overriding
+      // Luxon's own default zone is the only way to exercise it; always restored below so it
+      // cannot leak into other tests.
+      const originalZone = Settings.defaultZone;
+      Settings.defaultZone = 'America/New_York';
+      try {
+        mocks.memory.getOldestMemoryDate.mockResolvedValue(new Date('2026-01-01T00:00:00Z'));
+
+        await runWithState({ overlapBackfilledAt: '2026-09-03T00:00:00.000Z' });
+
+        // Same as B2: the guard must still short-circuit before querying, even though the host
+        // (and now Luxon's default) zone is west of UTC.
+        expect(mocks.memory.getOldestMemoryDate).not.toHaveBeenCalled();
+      } finally {
+        Settings.defaultZone = originalZone;
+      }
     });
 
     it('B3: resumes from the recorded cursor rather than restarting', async () => {
