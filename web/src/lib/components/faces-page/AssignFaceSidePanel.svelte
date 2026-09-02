@@ -35,10 +35,24 @@
 
   let isShowLoadingPeople = $state(false);
 
+  /**
+   * Deliberately WITHOUT upstream's `closestAssetId`.
+   *
+   * That parameter orders the whole list by how much each person's face resembles the one you
+   * tapped. It is a name suggestion, and a good one for the first handful of rows -- but past those
+   * it is indistinguishable from random, and a library with several hundred named people is then
+   * several hundred rows nobody can scan or scroll to (#992). Dropping it takes `getAllForUser`'s
+   * other branch, which sorts named people alphabetically and puts the unnamed clusters after them
+   * by face count -- the same order `getPersonsBySpaceId` serves the space picker, and the same one
+   * every other people list in the fork already uses. This picker was the sole exception.
+   *
+   * The resemblance ordering itself stays on the server for the person page's "sort faces" toggle
+   * (`closestPersonId`), which opts into it explicitly.
+   */
   async function loadPeople() {
     const timeout = setTimeout(() => (isShowLoadingPeople = true), timeBeforeShowLoadingSpinner);
     try {
-      const { people } = await getAllPeople({ withHidden: true, closestAssetId: editedFace.id });
+      const { people } = await getAllPeople({ withHidden: true });
       allPeople = people;
     } catch (error) {
       handleError(error, $t('errors.cant_get_faces'));

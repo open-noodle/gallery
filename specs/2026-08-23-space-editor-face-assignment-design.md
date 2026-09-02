@@ -485,6 +485,27 @@ ahead of the limit, with resemblance ordering within each group and `person.id` 
 tiebreak for paging. Pinned by a medium test that gives the cluster the perfect embedding match and
 `take: 1`, so the named person can only survive if the name outranks resemblance.
 
+**Settled (2026-09-02): the picker does not ask for resemblance ordering at all.** With the names no
+longer truncated away, rc.8 testing surfaced what the surviving order actually was — resemblance to
+the tapped face, which past the first handful of rows is indistinguishable from random, so a library
+with several hundred named people became several hundred unscannable rows. `AssignFaceSidePanel` now
+omits upstream's `closestAssetId`, taking `getAllForUser`'s other branch: named people alphabetical,
+unnamed clusters after them by face count. That is the order `getPersonsBySpaceId` already serves the
+space picker and that every other people list in the fork already uses — this picker was the sole
+exception. The suggestion value is not missed much: it was only ever trustworthy for the top few
+rows, and a name search now sits in plain sight above the grid.
+
+Consequence worth knowing: `getAllForUser`'s `closestFaceAssetId` branch now has no caller in this
+repo. It stays — it is public API, and the named-first fix above keeps it from truncating names for
+any consumer — but nothing in web or mobile reaches it any more.
+
+**Unrelated bug found while confirming that (NOT fixed here).** The person page's merge picker is the
+only other caller of the closest ordering (`closestPersonId`, behind its "sort faces" toggle), and it
+also passes `withSharedSpaces: true`. `PersonService.getAll` returns `getAccessiblePeople` for that
+flag **before** it looks at `closestPersonId` (`person.service.ts:196`), so the toggle has never
+reached the ordering it asks for — it is a no-op on the server today, independent of anything in this
+document.
+
 **What was deliberately NOT done: merging the two candidate lists.** They are different tables reached
 through different endpoints (`person`/`reassignFacesById` vs `shared_space_person`/§6.3), so a merged
 grid would hold two id namespaces and dispatch each click to a different endpoint, directly on top of
