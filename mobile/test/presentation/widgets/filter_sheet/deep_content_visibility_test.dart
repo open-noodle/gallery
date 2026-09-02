@@ -33,7 +33,7 @@ FilterSuggestionsResponseDto emptySuggestions() => FilterSuggestionsResponseDto(
 extension _CopyWithRatings on FilterSuggestionsResponseDto {
   /// Test-only helper: returns a copy with [ratings] substituted. #910's rating-star guard needs a
   /// populated ratings facet without hand-rolling every other field.
-  FilterSuggestionsResponseDto copyWithRatings(List<num> ratings) => FilterSuggestionsResponseDto(
+  FilterSuggestionsResponseDto copyWithRatings(List<int> ratings) => FilterSuggestionsResponseDto(
     cameraMakes: cameraMakes,
     countries: countries,
     hasAssetsInAlbum: hasAssetsInAlbum,
