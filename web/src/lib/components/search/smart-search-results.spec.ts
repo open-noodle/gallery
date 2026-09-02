@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getIntersectionObserverMock } from '$lib/__mocks__/intersection-observer.mock';
 import type { FilterState } from '$lib/components/filter-panel/filter-panel';
+import SmartSearchResultsRerunHost from '$lib/components/search/smart-search-results-rerun.test-host.svelte';
 import SmartSearchResults from '$lib/components/search/smart-search-results.svelte';
 import SmartSearchResultsHost from '$lib/components/search/smart-search-results.test-host.svelte';
 import { SEARCH_FILTER_DEBOUNCE_MS } from '$lib/utils/space-search';
@@ -301,6 +302,76 @@ describe('SmartSearchResults', () => {
     await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
 
     expect(getByTestId('result-count')).toHaveTextContent('spaces_search_result_count');
+  });
+
+  // #1052: a new search must blank the grid the moment it is triggered. Until it did, the previous
+  // query's photos stayed on screen — keeping their scroll offset — for the debounce plus the whole
+  // round trip, and a host remount replayed them from scratch.
+  describe('clearing previous results (#1052)', () => {
+    const renderHost = async () => {
+      searchSmartMock.mockResolvedValue({
+        assets: { items: [{ id: 'asset-1', originalFileName: 'beach.jpg' }], nextPage: null },
+      });
+      render(SmartSearchResultsRerunHost, { props: { filters: baseFilters } });
+      await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
+      expect(screen.getByTestId('result-count')).toBeInTheDocument();
+    };
+
+    it('blanks the previous results as soon as a new query is submitted', async () => {
+      await renderHost();
+
+      await fireEvent.click(screen.getByTestId('host-new-search'));
+
+      // Deliberately no timer advance: the old results must be gone *before* the replacement lands.
+      expect(screen.getByTestId('search-loading')).toBeInTheDocument();
+      expect(screen.queryByTestId('result-count')).not.toBeInTheDocument();
+    });
+
+    it('blanks the previous results as soon as a filter change re-runs the search', async () => {
+      await renderHost();
+
+      await fireEvent.click(screen.getByTestId('host-add-filter'));
+
+      expect(screen.getByTestId('search-loading')).toBeInTheDocument();
+      expect(screen.queryByTestId('result-count')).not.toBeInTheDocument();
+    });
+
+    it('does not replay the previous search when the host re-mounts it for a new query', async () => {
+      await renderHost();
+
+      // Clearing the query unmounts the component, but the host keeps the loaded assets.
+      await fireEvent.click(screen.getByTestId('host-clear-search'));
+      await fireEvent.click(screen.getByTestId('host-new-search'));
+
+      expect(screen.getByTestId('search-loading')).toBeInTheDocument();
+      expect(screen.queryByTestId('result-count')).not.toBeInTheDocument();
+    });
+
+    it('keeps the current results on screen while a reload re-runs the same search', async () => {
+      await renderHost();
+
+      await fireEvent.click(screen.getByTestId('host-reload'));
+
+      // A reload restores results after an undone delete — same search, so nothing to blank.
+      expect(screen.getByTestId('result-count')).toBeInTheDocument();
+      expect(screen.queryByTestId('search-loading')).not.toBeInTheDocument();
+    });
+
+    it('shows the new results once they arrive', async () => {
+      await renderHost();
+
+      searchSmartMock.mockResolvedValue({
+        assets: { items: [{ id: 'asset-2', originalFileName: 'mountain.jpg' }], nextPage: null },
+      });
+      await fireEvent.click(screen.getByTestId('host-new-search'));
+      await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
+
+      expect(screen.getByTestId('result-count')).toBeInTheDocument();
+      expect(screen.queryByTestId('search-loading')).not.toBeInTheDocument();
+      expect(searchSmartMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({ smartSearchDto: expect.objectContaining({ query: 'mountain' }) }),
+      );
+    });
   });
 
   // Test 57 — render assertion for isShared on the dumb grid

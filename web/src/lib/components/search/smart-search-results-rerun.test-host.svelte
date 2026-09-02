@@ -1,0 +1,35 @@
+<script lang="ts">
+  import type { FilterState } from '$lib/components/filter-panel/filter-panel';
+  import SmartSearchResults from '$lib/components/search/smart-search-results.svelte';
+  import type { AssetResponseDto } from '@immich/sdk';
+
+  /**
+   * Test host that reproduces how the searchable pages (`/photos`, `/recently-added`, a space
+   * timeline) drive `SmartSearchResults`: the HOST owns `results` and mounts the component only
+   * while there is a query, so the loaded assets outlive an unmount.
+   *
+   * `rerender` from @testing-library/svelte re-fires the component's mount effect, so it cannot
+   * tell "the host re-ran the search" from "the component was mounted fresh" — the difference
+   * #1052 turns on. Driving a real host is the only way to observe it.
+   */
+  interface Props {
+    filters: FilterState;
+  }
+
+  let { filters = $bindable() }: Props = $props();
+
+  let searchQuery = $state('beach');
+  let reloadToken = $state(0);
+  let results = $state<AssetResponseDto[]>([]);
+</script>
+
+<button type="button" data-testid="host-clear-search" onclick={() => (searchQuery = '')}>clear</button>
+<button type="button" data-testid="host-new-search" onclick={() => (searchQuery = 'mountain')}>search</button>
+<button type="button" data-testid="host-add-filter" onclick={() => (filters = { ...filters, city: 'Berlin' })}>
+  filter
+</button>
+<button type="button" data-testid="host-reload" onclick={() => reloadToken++}>reload</button>
+
+{#if searchQuery}
+  <SmartSearchResults bind:results {searchQuery} {filters} {reloadToken} isShared={false} language="en" />
+{/if}
