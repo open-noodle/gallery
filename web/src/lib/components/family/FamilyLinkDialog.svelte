@@ -220,7 +220,7 @@
         <button
           type="button"
           data-testid="family-link-create"
-          class="rounded-lg bg-primary px-3 py-2 text-sm text-white"
+          class="rounded-lg bg-primary px-3 py-2 text-sm text-white dark:text-black"
           disabled={saving}
           onclick={() => void create()}
         >
