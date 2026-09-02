@@ -21,7 +21,7 @@ FilterSuggestionsResponseDto emptySuggestions() => FilterSuggestionsResponseDto(
   hasAssetsNotInAlbum: false,
 );
 
-FilterSuggestionsResponseDto withRatings(List<num> ratings) => FilterSuggestionsResponseDto(
+FilterSuggestionsResponseDto withRatings(List<int> ratings) => FilterSuggestionsResponseDto(
   hasUnnamedPeople: false,
   hasFavorites: false,
   hasAssetsInAlbum: false,
