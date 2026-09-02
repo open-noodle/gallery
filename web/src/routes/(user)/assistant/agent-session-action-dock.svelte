@@ -197,7 +197,7 @@
 
   const stopPolling = () => {
     if (!interval) {
-    	return;
+      return;
     }
 
     clearInterval(interval);

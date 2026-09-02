@@ -92,14 +92,7 @@ export type AgentAssetSourceInput =
     };
 
 export type AgentIdDomain =
-  | 'asset'
-  | 'person'
-  | 'album'
-  | 'space'
-  | 'tag'
-  | 'selectionHandle'
-  | 'sourceRef'
-  | 'unknown';
+  'asset' | 'person' | 'album' | 'space' | 'tag' | 'selectionHandle' | 'sourceRef' | 'unknown';
 
 export type AgentIdDomainLookup = Partial<
   Record<Exclude<AgentIdDomain, 'unknown'>, ReadonlySet<string> | readonly string[]>

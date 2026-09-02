@@ -9,7 +9,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-export const AGENT_CAPABILITY_MATRIX_RELATIVE_PATH = 'docs/superpowers/specs/2026-05-19-pi-agent-capability-matrix.md';
+export const AGENT_CAPABILITY_MATRIX_RELATIVE_PATH = 'specs/2026-05-19-pi-agent-capability-matrix.md';
 
 export const AGENT_WORKFLOW_MANIFEST_RELATIVE_PATH = '../agent-runner/src/strict-workflows/manifest.generated.json';
 

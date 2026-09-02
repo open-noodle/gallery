@@ -35,7 +35,7 @@
 
   const markDirty = () => {
     if (!(status === 'connected' || status === 'error')) {
-    	return;
+      return;
     }
 
     status = 'idle';

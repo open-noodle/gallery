@@ -1,6 +1,6 @@
 import {
   SharedSpaceRole,
-  Type,
+  Type5 as Type,
   type PersonFaceSuggestionPageResponseDto,
   type PersonResponseDto,
   type PersonStatisticsResponseDto,

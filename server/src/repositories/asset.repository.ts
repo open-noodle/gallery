@@ -219,6 +219,8 @@ export interface MemoryPeriodOptions {
   type?: AssetType;
   /** exclude assets taken after this instant (defensive guard against future-dated assets) */
   takenBefore: Date;
+}
+
 export interface MemoryLocationDayBucket {
   localDate: Date;
   country: string | null;

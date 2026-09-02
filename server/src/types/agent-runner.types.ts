@@ -79,29 +79,34 @@ export type AgentRunnerActivityStreamEvent = {
 };
 
 export type AgentRunnerStreamEvent =
-  AgentRunnerActivityStreamEvent | {
+  | AgentRunnerActivityStreamEvent
+  | {
       type: 'assistant-message-delta';
       sessionId: string;
       runnerSessionId: string;
       delta: string;
       sequence: number;
-    } | {
+    }
+  | {
       type: 'assistant-message-completed';
       sessionId: string;
       runnerSessionId: string;
       providerMessageId: string | null;
       content: AgentMessageContent;
-    } | {
+    }
+  | {
       type: 'tool-approval-needed';
       sessionId: string;
       runnerSessionId: string;
       toolCallId: string;
-    } | {
+    }
+  | {
       type: 'runner-error';
       sessionId: string;
       runnerSessionId: string;
       message: string;
-    } | {
+    }
+  | {
       type: 'workflow-state-update';
       sessionId: string;
       runnerSessionId: string;

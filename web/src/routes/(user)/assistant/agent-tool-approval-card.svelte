@@ -124,8 +124,7 @@
       id={`approval-reason-${toolCall.id}`}
       class="mt-1 min-h-16 w-full resize-y rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
       bind:value={reason}
-      disabled={busy}
-    ></textarea>
+      disabled={busy}></textarea>
   {/if}
 
   {#if errorMessage}

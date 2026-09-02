@@ -40,7 +40,7 @@
   let detailsOpenSessionId = session.id;
   $effect(() => {
     if (session.id === detailsOpenSessionId) {
-    	return;
+      return;
     }
 
     detailsOpenSessionId = session.id;

@@ -915,12 +915,10 @@ describe(AgentMcpToolRegistryService.name, () => {
     const proposal = sut.listTools().find((tool) => tool.name === AgentToolName.ProposeAlbumOperations);
     const operationSchema = findOperationSchema(proposal?.inputSchema, AgentOperationType.AssetUpdateMetadata);
     const payloadSchema = (operationSchema?.properties as Record<string, unknown> | undefined)?.payload as
-      | Record<string, unknown>
-      | undefined;
+      Record<string, unknown> | undefined;
     const payloadProperties = payloadSchema?.properties as Record<string, unknown> | undefined;
     const rawTargetKindSchema = (operationSchema?.properties as Record<string, unknown> | undefined)?.targetKind as
-      | Record<string, unknown>
-      | undefined;
+      Record<string, unknown> | undefined;
     const targetKindSchema =
       typeof rawTargetKindSchema?.$ref === 'string'
         ? (resolveJsonSchemaRef(proposal?.inputSchema, rawTargetKindSchema.$ref) as Record<string, unknown> | undefined)

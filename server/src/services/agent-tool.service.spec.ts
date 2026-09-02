@@ -468,6 +468,9 @@ describe(AgentToolService.name, () => {
       ratings: [],
       mediaTypes: [],
       hasUnnamedPeople: false,
+      hasFavorites: false,
+      hasAssetsInAlbum: false,
+      hasAssetsNotInAlbum: false,
     });
     searchRepository.getCameraModels.mockResolvedValue([]);
     searchRepository.getCameraLensModels.mockResolvedValue([]);
@@ -6531,6 +6534,9 @@ describe(AgentToolService.name, () => {
       ratings: [],
       mediaTypes: [],
       hasUnnamedPeople: false,
+      hasFavorites: false,
+      hasAssetsInAlbum: false,
+      hasAssetsNotInAlbum: false,
     });
     searchRepository.getCameraModels.mockResolvedValue(['X100VI', 'X-T5']);
     searchRepository.getCameraLensModels.mockResolvedValue(['23mm f/2']);
@@ -6649,6 +6655,9 @@ describe(AgentToolService.name, () => {
       ratings: [],
       mediaTypes: [],
       hasUnnamedPeople: false,
+      hasFavorites: false,
+      hasAssetsInAlbum: false,
+      hasAssetsNotInAlbum: false,
     });
 
     const result = await sut.resolveAssetSearchFilters(auth, session.id, {
@@ -6703,6 +6712,9 @@ describe(AgentToolService.name, () => {
       ratings: [],
       mediaTypes: [],
       hasUnnamedPeople: false,
+      hasFavorites: false,
+      hasAssetsInAlbum: false,
+      hasAssetsNotInAlbum: false,
     });
 
     const result = await sut.resolveAssetSearchFilters(auth, session.id, {
@@ -6752,6 +6764,9 @@ describe(AgentToolService.name, () => {
       ratings: [],
       mediaTypes: [],
       hasUnnamedPeople: false,
+      hasFavorites: false,
+      hasAssetsInAlbum: false,
+      hasAssetsNotInAlbum: false,
     });
 
     const result = await sut.resolveAssetSearchFilters(auth, session.id, {
@@ -6788,6 +6803,9 @@ describe(AgentToolService.name, () => {
       ratings: [],
       mediaTypes: [],
       hasUnnamedPeople: false,
+      hasFavorites: false,
+      hasAssetsInAlbum: false,
+      hasAssetsNotInAlbum: false,
     });
 
     const result = await sut.resolveAssetSearchFilters(auth, session.id, { people: ['Hidden Person'] });
@@ -6874,6 +6892,9 @@ describe(AgentToolService.name, () => {
       ratings: [],
       mediaTypes: [],
       hasUnnamedPeople: false,
+      hasFavorites: false,
+      hasAssetsInAlbum: false,
+      hasAssetsNotInAlbum: false,
     });
     albumRepository.getAgentAlbums.mockResolvedValue([
       makeAlbumSummary({ id: visibleAlbumId, albumName: 'Public', ownerId: auth.user.id }),
@@ -6924,6 +6945,9 @@ describe(AgentToolService.name, () => {
       ratings: [],
       mediaTypes: [],
       hasUnnamedPeople: false,
+      hasFavorites: false,
+      hasAssetsInAlbum: false,
+      hasAssetsNotInAlbum: false,
     });
 
     const result = await sut.resolveAssetSearchFilters(auth, session.id, { tags: ['Berlin'] });
@@ -6958,6 +6982,9 @@ describe(AgentToolService.name, () => {
       ratings: [],
       mediaTypes: [],
       hasUnnamedPeople: false,
+      hasFavorites: false,
+      hasAssetsInAlbum: false,
+      hasAssetsNotInAlbum: false,
     });
 
     const result = await sut.resolveAssetSearchFilters(auth, session.id, { tags: ['OwnedTag'] });
@@ -7061,6 +7088,9 @@ describe(AgentToolService.name, () => {
       ratings: [],
       mediaTypes: [],
       hasUnnamedPeople: false,
+      hasFavorites: false,
+      hasAssetsInAlbum: false,
+      hasAssetsNotInAlbum: false,
     });
 
     const result = await sut.resolveAssetSearchFilters(auth, session.id, { toolCallId: approved.id });
@@ -7091,6 +7121,9 @@ describe(AgentToolService.name, () => {
       ratings: [],
       mediaTypes: [],
       hasUnnamedPeople: false,
+      hasFavorites: false,
+      hasAssetsInAlbum: false,
+      hasAssetsNotInAlbum: false,
     });
 
     const result = await sut.resolveAssetSearchFilters(auth, session.id, {

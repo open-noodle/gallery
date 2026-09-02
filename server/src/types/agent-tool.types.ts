@@ -27,10 +27,7 @@ export type AgentToolReadSelectionMetadataRequestMetadata = {
 };
 
 export type AgentCurateSelectionStrategy =
-  | 'metadata-highlights'
-  | 'date-spread'
-  | 'favorites-first'
-  | 'cover-candidate';
+  'metadata-highlights' | 'date-spread' | 'favorites-first' | 'cover-candidate';
 
 export type AgentCurateSelectionDiversifyBy = 'date' | 'location' | 'people' | 'tags';
 
@@ -68,15 +65,7 @@ export type AgentSearchAssetsRequestDetail = 'ids' | 'handle' | 'summary' | 'met
 export type AgentSearchAssetsDetail = 'handle' | 'summary' | 'metadata';
 
 export type AgentSearchAssetsField =
-  | 'type'
-  | 'dates'
-  | 'location'
-  | 'camera'
-  | 'tags'
-  | 'rating'
-  | 'filename'
-  | 'favorite'
-  | 'visibility';
+  'type' | 'dates' | 'location' | 'camera' | 'tags' | 'rating' | 'filename' | 'favorite' | 'visibility';
 
 export type AgentAssetMetadataDetail = 'basic' | 'descriptive' | 'technical' | 'allSafe';
 
@@ -329,13 +318,7 @@ export type AgentSearchAssetsFilters = {
 };
 
 export type AgentResolvedAssetSearchFilterKind =
-  | 'person'
-  | 'tag'
-  | 'album'
-  | 'space'
-  | 'cameraMake'
-  | 'cameraModel'
-  | 'lensModel';
+  'person' | 'tag' | 'album' | 'space' | 'cameraMake' | 'cameraModel' | 'lensModel';
 
 export type AgentResolvedAssetSearchFilterStatus = 'matched' | 'ambiguous' | 'not_found';
 

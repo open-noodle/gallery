@@ -178,8 +178,7 @@ export class MediaRepository {
     ]);
 
     const adjust = edits.find((edit) => edit.action === AssetEditAction.Adjust)?.parameters as
-      | AdjustParameters
-      | undefined;
+      AdjustParameters | undefined;
     if (adjust) {
       if (adjust.autoEnhance) {
         pipeline = pipeline.normalise();

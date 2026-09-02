@@ -461,6 +461,18 @@ DELETE FROM "kysely_migrations"
    '1789000000000-AddFacePersonVerdictStatusCreatedAtIdIndex',
    '1790000000000-FixFaceRepairScanInFlightIndex',
    '1792123120451-AddSharedLinkSpaceId',
+   '1777000000000-AgentProviderCredential',
+   '1777100000000-AgentSession',
+   '1778800000000-AgentMessage',
+   '1778900000000-AgentToolCall',
+   '1778920000000-AgentOperationPlan',
+   '1778930000000-AgentSessionTitle',
+   '1778940000000-AgentSessionActivityEvent',
+   '1778950000000-AgentSelectionHandle',
+   '1778778147082-AddAgentSessionProviderCredentialIndex',
+   '1779000000000-AddAgentSessionWorkflowState',
+   '1778910000000-BackfillAgentReadSessionLimits',
+   '1779100000000-AddAssetQualityScoring',
 
    -- Pre-rename names for two migrations that were renumbered off timestamp collisions
    -- ("renumber AddFaceRepairScanFlaggedFace off the #722 collision",
@@ -471,18 +483,6 @@ DELETE FROM "kysely_migrations"
    -- trips "corrupted migrations: previously executed migration ... is missing" on boot.
    '1782000000000-AddFaceRepairScanFlaggedFace',
    '1783000000000-AddFaceRepairScanInFlightIndex',
-   '1777000000000-AgentProviderCredential',
-   '1777100000000-AgentSession',
-   '1778800000000-AgentMessage',
-   '1778778147082-AddAgentSessionProviderCredentialIndex',
-   '1778900000000-AgentToolCall',
-   '1778910000000-BackfillAgentReadSessionLimits',
-   '1778920000000-AgentOperationPlan',
-   '1778930000000-AgentSessionTitle',
-   '1778940000000-AgentSessionActivityEvent',
-   '1778950000000-AgentSelectionHandle',
-   '1779000000000-AddAgentSessionWorkflowState',
-   '1779100000000-AddAssetQualityScoring',
 
    -- Build-time compatibility alias (server/bin/sync-gallery-migrations.mjs).
    -- Gallery's postbuild records ChangeDurationToInteger under BOTH its current

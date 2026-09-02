@@ -11,7 +11,7 @@ import { AgentMcpToolContractService } from 'src/services/agent-mcp-tool-contrac
 import { AgentMcpToolRegistryService } from 'src/services/agent-mcp-tool-registry.service';
 
 const readMatrix = () =>
-  readFileSync(resolve(process.cwd(), '../docs/superpowers/specs/2026-05-19-pi-agent-capability-matrix.md'), 'utf8');
+  readFileSync(resolve(process.cwd(), '../specs/2026-05-19-pi-agent-capability-matrix.md'), 'utf8');
 
 const readManifest = (): WorkflowManifestEntry[] =>
   JSON.parse(readFileSync(resolve(process.cwd(), AGENT_WORKFLOW_MANIFEST_RELATIVE_PATH), 'utf8'));
