@@ -112,7 +112,10 @@ describe('AssignFaceSidePanel', () => {
 
     renderPanel();
 
-    await waitFor(async () => expect((await gridCaptions()).slice(0, 2)).toEqual(['Bob', 'Carol']));
+    await waitFor(async () => {
+      const captions = await gridCaptions();
+      expect(captions.slice(0, 2)).toEqual(['Bob', 'Carol']);
+    });
   });
 
   // The search was behind a magnifier icon, so the first thing this panel showed on a large

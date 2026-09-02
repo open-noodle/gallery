@@ -501,7 +501,7 @@ describe('orderPickerCandidates', () => {
 
   it('treats a whitespace-only name as unnamed', () => {
     const ordered = orderPickerCandidates([
-      { id: 'p-1', name: '   ' },
+      { id: 'p-1', name: ' '.repeat(3) },
       { id: 'p-2', name: 'Bob' },
     ]);
 

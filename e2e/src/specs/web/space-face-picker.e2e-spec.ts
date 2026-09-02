@@ -99,7 +99,8 @@ test.describe("Space editor's face picker — the shared panel in its other call
       (response) => response.url().includes('/shared-spaces/') && response.request().method() === 'PUT',
     );
     await panel.getByRole('button', { name: candidateName }).click();
-    expect((await attach).ok()).toBe(true);
+    const attachResponse = await attach;
+    expect(attachResponse.ok()).toBe(true);
 
     await expect(page.getByTestId('person-picker-panel')).toHaveCount(0);
     // The face row's caption specifically. A bare `getByText` also matches hidden copies of the
