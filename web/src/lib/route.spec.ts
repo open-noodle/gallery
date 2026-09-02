@@ -158,6 +158,18 @@ describe('Route', () => {
     });
   });
 
+  describe('viewSpace', () => {
+    it('links to a space timeline', () => {
+      expect(Route.viewSpace({ id: 'space-1' })).toBe('/spaces/space-1');
+    });
+
+    // #1047: "view in timeline" on a Space photo has to land on the photo, not just the space. The
+    // space timeline reads `at` through the same (user) layout hook as /photos.
+    it('scrolls the space timeline to an asset', () => {
+      expect(Route.viewSpace({ id: 'space-1' }, { at: 'asset-2' })).toBe('/spaces/space-1?at=asset-2');
+    });
+  });
+
   describe('viewSpaceAlbum', () => {
     it('links to an album inside a space', () => {
       expect(Route.viewSpaceAlbum({ spaceId: 'space-1', albumId: 'album-2' })).toBe('/spaces/space-1/albums/album-2');

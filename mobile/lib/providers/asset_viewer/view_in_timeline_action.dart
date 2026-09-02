@@ -9,8 +9,13 @@ import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dar
 /// timeline.
 ///
 /// [popViewer] closes the surface the action was invoked from, [goToTimeline]
-/// activates the main timeline route. They are injected so the sequencing can be
+/// activates the destination timeline route. They are injected so the sequencing can be
 /// tested without a router.
+///
+/// [spaceId] names the Space whose timeline [goToTimeline] lands on, and travels with
+/// the latched request so only that timeline drains it. A Space timeline is pushed OVER
+/// the main one, which stays mounted and listening, so an unscoped request would be
+/// taken by whichever is laid out first (#1047).
 ///
 /// Clearing the Photos filter is what makes this work from search results (#898).
 /// Unlike web, mobile has no separate search route: `MainTimelinePage` renders the
@@ -29,10 +34,11 @@ Future<void> viewAssetInTimeline({
   required ProviderReader read,
   required Future<void> Function() popViewer,
   required Future<void> Function() goToTimeline,
+  String? spaceId,
 }) async {
   await popViewer();
   read(photosFilterProvider.notifier).reset();
   read(photosFilterSheetProvider.notifier).state = FilterSheetSnap.hidden;
   await goToTimeline();
-  scrollToAssetNotifierProvider.scrollToAsset(asset);
+  scrollToAssetNotifierProvider.scrollToAsset(asset, spaceId: spaceId);
 }

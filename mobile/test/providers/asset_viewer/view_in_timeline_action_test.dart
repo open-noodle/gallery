@@ -89,6 +89,27 @@ void main() {
     expect(scrollToAssetNotifierProvider.value?.asset.heroTag, _asset('a1').heroTag);
   });
 
+  // #1047: the destination timeline has to travel with the request. A Space timeline is
+  // pushed OVER the main one, which stays mounted and listening on the same latch, so an
+  // unscoped request is drained by whichever is ready first.
+  test('latches the Space that must honour the jump', () async {
+    await viewAssetInTimeline(
+      asset: _asset('a1'),
+      read: container.read,
+      popViewer: steps.pop,
+      goToTimeline: steps.goToTimeline,
+      spaceId: 'space-1',
+    );
+
+    expect(scrollToAssetNotifierProvider.value?.spaceId, 'space-1');
+  });
+
+  test('leaves the request unscoped for a jump to the personal timeline', () async {
+    await run();
+
+    expect(scrollToAssetNotifierProvider.value?.spaceId, isNull);
+  });
+
   test('activates the main timeline route after closing the viewer', () async {
     await run();
 

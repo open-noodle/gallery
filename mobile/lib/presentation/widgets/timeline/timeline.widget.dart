@@ -64,6 +64,7 @@ class Timeline extends ConsumerWidget {
     this.loadingWidget,
     this.emptyWidget,
     this.withGroupingPill = false,
+    this.spaceId,
   });
 
   final Widget? topSliverWidget;
@@ -90,6 +91,11 @@ class Timeline extends ConsumerWidget {
   /// Photos page keeps its app-bar chip and stays off.
   final bool withGroupingPill;
 
+  /// The space this timeline shows, for timelines scoped to one. Only a "view in
+  /// timeline" request naming the same space is drained here — the main timeline stays
+  /// mounted under a pushed Space timeline and would otherwise consume it (#1047).
+  final String? spaceId;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final columnCount = ref.watch(appConfigProvider.select((config) => config.timeline.tilesPerRow));
@@ -108,6 +114,7 @@ class Timeline extends ConsumerWidget {
           loadingWidget: loadingWidget,
           emptyWidget: emptyWidget,
           withGroupingPill: withGroupingPill,
+          spaceId: spaceId,
         );
         return ProviderScope(
           overrides: [
@@ -162,6 +169,7 @@ class _SliverTimeline extends ConsumerStatefulWidget {
     this.loadingWidget,
     this.emptyWidget,
     this.withGroupingPill = false,
+    this.spaceId,
   });
 
   final Widget? topSliverWidget;
@@ -176,6 +184,7 @@ class _SliverTimeline extends ConsumerStatefulWidget {
   final Widget? loadingWidget;
   final Widget? emptyWidget;
   final bool withGroupingPill;
+  final String? spaceId;
 
   @override
   ConsumerState createState() => _SliverTimelineState();
@@ -453,6 +462,8 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
       isOverviewTimeline: isOverview,
       attempts: _scrollDrainAttempts,
       maxAttempts: _maxScrollDrainAttempts,
+      pendingSpaceId: target?.spaceId,
+      timelineSpaceId: widget.spaceId,
     );
 
     switch (action) {

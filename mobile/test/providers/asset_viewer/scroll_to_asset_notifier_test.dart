@@ -70,6 +70,37 @@ void main() {
       expect((notifier.value?.asset as RemoteAsset).id, 'a2');
     });
 
+    // #1047: a memory photo that lives in a Space has to be drained by that Space's
+    // timeline, not by the main timeline sitting mounted underneath it.
+    test('latches the space whose timeline should honour the request', () {
+      final notifier = ScrollToAssetNotifier(null);
+
+      notifier.scrollToAsset(_asset('a1'), spaceId: 'space-1');
+
+      expect(notifier.value?.spaceId, 'space-1');
+    });
+
+    test('leaves the space unset for a jump to the personal timeline', () {
+      final notifier = ScrollToAssetNotifier(null);
+
+      notifier.scrollToAsset(_asset('a1'));
+
+      expect(notifier.value?.spaceId, isNull);
+    });
+
+    test('replaces a personal-timeline request with a space-scoped one for the same asset', () {
+      // The same asset for a different destination is a DIFFERENT request. Absorbing it
+      // as unchanged would leave the personal-timeline target latched, and the Space
+      // timeline would never drain it.
+      final notifier = ScrollToAssetNotifier(null);
+      final createdAt = DateTime(2026, 4, 3, 12);
+
+      notifier.scrollToAsset(_asset('a1', createdAt: createdAt));
+      notifier.scrollToAsset(_asset('a1', createdAt: createdAt), spaceId: 'space-1');
+
+      expect(notifier.value?.spaceId, 'space-1');
+    });
+
     test('treats two copies of the same asset as the same target', () {
       // The merged-timeline copy carries localId; the album-fetched copy does not.
       // They must not count as a new request.

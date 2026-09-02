@@ -45,6 +45,14 @@ enum ScrollDrainAction {
 /// target date. Until then it keeps retrying — this is what makes the scroll
 /// survive the timeline being reloaded fresh by the navigation, where the scroll
 /// view is not laid out for several frames after the segments arrive.
+///
+/// [pendingSpaceId] is the space the request names (null for the personal timeline)
+/// and [timelineSpaceId] the space this timeline shows. They must match: a Space
+/// timeline is pushed OVER the main one, which stays mounted and listening on the same
+/// latch, so an unscoped drain lets whichever is laid out first consume the request —
+/// and for a Space photo that is the main timeline, which scrolls to the right day and
+/// shows nothing (#1047). A request for another timeline reads as `idle` rather than
+/// `giveUp` so it survives for the timeline it was addressed to.
 ScrollDrainAction decideScrollDrain({
   required bool hasPending,
   required bool segmentsLoaded,
@@ -53,8 +61,10 @@ ScrollDrainAction decideScrollDrain({
   required bool isOverviewTimeline,
   required int attempts,
   required int maxAttempts,
+  String? pendingSpaceId,
+  String? timelineSpaceId,
 }) {
-  if (!hasPending) return ScrollDrainAction.idle;
+  if (!hasPending || pendingSpaceId != timelineSpaceId) return ScrollDrainAction.idle;
   // `scroll` stays ahead of the budget check so a request that becomes ready on the
   // very last frame still scrolls. `!isOverviewTimeline` gates it so an overview
   // timeline can never scroll to a year/month card — the #822 symptom.

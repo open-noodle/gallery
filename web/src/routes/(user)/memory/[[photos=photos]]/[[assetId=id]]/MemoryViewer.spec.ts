@@ -248,6 +248,51 @@ describe('MemoryViewer GalleryViewer grouping', () => {
   });
 });
 
+describe('MemoryViewer view in timeline (#1047)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPage.url = new URL('https://gallery.test/memory/photos/memory-asset-1');
+    mockPage.params = { assetId: 'memory-asset-1' };
+    mockMemoryManager.memories = [memory('memory-1', ['memory-asset-1', 'memory-asset-2'])];
+    mockMemoryManager.ready.mockResolvedValue(undefined);
+    mockMemoryManager.getMemoryAsset.mockImplementation((assetId: string | undefined) =>
+      findMemoryAsset(mockMemoryManager.memories, assetId),
+    );
+    mockGetAssetInfo.mockResolvedValue(mockMemoryManager.memories[0].assets[0]);
+    mockAfterNavigate.mockImplementation((callback) => {
+      callback({ from: null, to: { params: mockPage.params, url: mockPage.url } });
+    });
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        observe = vi.fn();
+        disconnect = vi.fn();
+      },
+    );
+  });
+
+  it('sends a photo from the viewer\u2019s own library to the personal timeline', async () => {
+    renderViewer();
+
+    expect(await screen.findByLabelText('view_in_timeline')).toHaveAttribute('href', '/photos?at=memory-asset-1');
+  });
+
+  // #1047: a memory can hold a photo the viewer only reaches through a Space. The personal timeline
+  // skips it unless that membership is shown in the timeline, so the jump used to scroll to the
+  // right date and show nothing. The server resolves the space for exactly this case
+  // (`resolvedSpaceId`, set only when the viewer is not the owner), so follow it.
+  it('sends a photo the viewer only has through a Space to that Space timeline', async () => {
+    mockGetAssetInfo.mockResolvedValue({ ...mockMemoryManager.memories[0].assets[0], resolvedSpaceId: 'space-1' });
+
+    renderViewer();
+
+    expect(await screen.findByLabelText('view_in_timeline')).toHaveAttribute(
+      'href',
+      '/spaces/space-1?at=memory-asset-1',
+    );
+  });
+});
+
 describe('MemoryViewer memory-scoped navigation (#790)', () => {
   beforeEach(() => {
     vi.clearAllMocks();

@@ -18,6 +18,8 @@ void main() {
       bool segmentMatched = true,
       bool isOverviewTimeline = false,
       int attempts = 0,
+      String? pendingSpaceId,
+      String? timelineSpaceId,
     }) {
       return decideScrollDrain(
         hasPending: hasPending,
@@ -27,8 +29,30 @@ void main() {
         isOverviewTimeline: isOverviewTimeline,
         attempts: attempts,
         maxAttempts: maxAttempts,
+        pendingSpaceId: pendingSpaceId,
+        timelineSpaceId: timelineSpaceId,
       );
     }
+
+    // #1047: a Space timeline is pushed OVER the main one, which stays mounted and
+    // listening on the same latch. Every timeline must ignore a request addressed to
+    // another one — and ignore it as `idle`, not `giveUp`, so the request survives for
+    // the timeline it was meant for.
+    test('leaves a Space-scoped request alone on the personal timeline', () {
+      expect(decide(pendingSpaceId: 'space-1'), ScrollDrainAction.idle);
+    });
+
+    test('leaves a personal-timeline request alone on a Space timeline', () {
+      expect(decide(timelineSpaceId: 'space-1'), ScrollDrainAction.idle);
+    });
+
+    test('leaves a Space-scoped request alone on a different Space timeline', () {
+      expect(decide(pendingSpaceId: 'space-1', timelineSpaceId: 'space-2'), ScrollDrainAction.idle);
+    });
+
+    test('scrolls on the Space timeline the request names', () {
+      expect(decide(pendingSpaceId: 'space-1', timelineSpaceId: 'space-1'), ScrollDrainAction.scroll);
+    });
 
     test('does nothing when there is no pending request', () {
       expect(decide(hasPending: false), ScrollDrainAction.idle);
