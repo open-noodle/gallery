@@ -639,6 +639,27 @@ describe(SearchRepository.name, () => {
       expect(result.total).toBe(2);
       expect(result.hasFavorites).toBe(true);
     });
+
+    // #763: the same fixture as above, minus the caller. `hasFavorites` is a per-user question, so
+    // with no caller identity in the options there is no answer to give and the facet must stay
+    // false — the section is not offered rather than being answered for the wrong user.
+    //
+    // Seeding a real favourite is what makes this a pin rather than a tautology: the assertion can
+    // only pass because the caller is absent, not because the scope is empty. It also guards the
+    // reverse regression — resolving the caller from `userIds[0]` would report `true` here, which
+    // is another user's favourite state leaking into this viewer's facets.
+    it('reports hasFavorites false on the smart path when no caller identity is supplied (#763)', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+      const { asset: favourite } = await ctx.newAsset({ ownerId: user.id });
+      await ctx.database.insertInto('asset_favorite').values({ userId: user.id, assetId: favourite.id }).execute();
+      await addEmbedding(defaultDatabase, favourite.id);
+
+      const result = await sut.getSmartSearchFacets({ userIds: [user.id], embedding: matchingEmbedding });
+
+      expect(result.total).toBe(1);
+      expect(result.hasFavorites).toBe(false);
+    });
   });
 
   // #763 slice 1 Task 3 — isFavorite must resolve against the per-user asset_favorite overlay, not

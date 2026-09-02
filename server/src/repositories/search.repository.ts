@@ -793,6 +793,12 @@ export class SearchRepository {
     const appliesModel = exclude !== 'camera' && exclude !== 'cameraModel' && options.model !== undefined;
     const appliesRating = exclude !== 'rating' && options.rating !== undefined;
     const needsExifJoin = !!(appliesCountry || appliesCity || appliesMake || appliesModel || appliesRating);
+    // #763: same caller resolution as getSmartFacetHasFavorites — `authUserId` and `callerId` are two
+    // names for the viewer on this path, and `userIds[0]` is deliberately not consulted (it is not the
+    // caller under an album scope). Only read when `isFavorite` is set, and the assertion holds for
+    // every production caller: SearchService.resolveSmartSearch is the only one, and it always sets
+    // both alongside any client-supplied `isFavorite`.
+    const facetCallerId = options.authUserId ?? options.callerId;
 
     return kysely
       .selectFrom('asset')
@@ -811,9 +817,7 @@ export class SearchRepository {
       .$if(exclude !== 'media' && !!options.type, (qb) => qb.where('asset.type', '=', options.type!))
       .$if(exclude !== 'favorites' && options.isFavorite !== undefined, (qb) =>
         qb.where((eb) =>
-          options.isFavorite
-            ? favoriteExistsFor(eb, options.authUserId!)
-            : eb.not(favoriteExistsFor(eb, options.authUserId!)),
+          options.isFavorite ? favoriteExistsFor(eb, facetCallerId!) : eb.not(favoriteExistsFor(eb, facetCallerId!)),
         ),
       )
       .$if(exclude !== 'albums' && !!options.isNotInAlbum && !options.albumIds?.length, (qb) =>
@@ -1079,11 +1083,32 @@ export class SearchRepository {
   }
 
   private async getSmartFacetHasFavorites(trx: Kysely<DB>, options: SmartSearchFacetsOptions): Promise<boolean> {
+    // #763: "is the Favourites section worth offering" is a per-CALLER question — probe the
+    // caller's `asset_favorite` overlay, not the dropped `asset.isFavorite` column.
+    //
+    // The caller is `authUserId`/`callerId` — two names for the same value (`auth.user.id`, set by
+    // SearchService.resolveSmartSearch), one from this path's search-builder options and one from
+    // SearchEmbeddingOptions. Deliberately NOT `userIds[0]`: unlike the browse path, where
+    // getUserIdsToSearch guarantees `[auth.user.id, ...partnerIds]`, `userIds` here is left unset
+    // entirely under an album scope (see SearchEmbeddingOptions.userIds and the `callerId` note in
+    // getSmartFacetPeople). Probing `userIds[0]` there would answer for whichever owner happened to
+    // head an owner-scoping array — another user's favourite state, surfaced in my UI.
+    //
+    // With no caller in scope there is no per-user answer, so the section is simply not offered.
+    // That is the fail-safe direction — it can only hide a filter, never reveal someone else's
+    // favourites — and it is consistent with what the section would do if shown: the `isFavorite`
+    // filter behind it needs a caller too. Mirrors the `.$if(!!authUserId, ...)` fail-safe the
+    // overlay projections use in asset.repository.ts.
+    const callerId = options.authUserId ?? options.callerId;
+    if (!callerId) {
+      return false;
+    }
+
     const row = await trx
       .selectFrom('asset')
       .select('asset.id')
       .where('asset.id', 'in', this.buildSmartFacetFilteredAssetIds(trx, options, 'favorites'))
-      .where('asset.isFavorite', '=', true)
+      .where((eb) => favoriteExistsFor(eb, callerId))
       .limit(1)
       .executeTakeFirst();
     return !!row;
