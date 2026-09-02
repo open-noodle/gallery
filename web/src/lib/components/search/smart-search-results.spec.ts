@@ -289,6 +289,20 @@ describe('SmartSearchResults', () => {
     expect(dto).not.toHaveProperty('albumIds');
   });
 
+  // #1028: the space shell collapses its cover as the reader scrolls the results, and the only
+  // scrolling element lives inside the grid this component wraps.
+  it('forwards scroll reports from the result grid to the host', async () => {
+    const onScroll = vi.fn();
+    const { getByTestId } = render(SmartSearchResults, { props: { ...baseProps, onScroll } });
+    await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
+
+    const scroller = getByTestId('search-results-scroller');
+    Object.defineProperty(scroller, 'scrollTop', { value: 180, configurable: true });
+    await fireEvent.scroll(scroller);
+
+    expect(onScroll).toHaveBeenCalledWith(180);
+  });
+
   it('forwards route-provided exact total to the result grid', async () => {
     searchSmartMock.mockResolvedValueOnce({
       assets: {

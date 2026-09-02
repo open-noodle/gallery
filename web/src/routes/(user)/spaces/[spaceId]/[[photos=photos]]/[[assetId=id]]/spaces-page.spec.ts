@@ -297,6 +297,45 @@ describe('Spaces page search URL state', () => {
     expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-sort-order', 'relevance');
   });
 
+  // #1028: on a phone the cover + tabs left search results a sliver of the screen, because only
+  // the browse timeline reported its scroll offset — the results grid never did, so the shell's
+  // collapse-on-scroll never fired while a search was on screen.
+  it('collapses the space cover once the search results are scrolled', async () => {
+    mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?q=beach');
+
+    renderPage();
+    expect(spaceUiManager.coverCollapsed).toBe(false);
+
+    await fireEvent.click(screen.getByTestId('search-results-scroll-down'));
+
+    expect(spaceUiManager.coverCollapsed).toBe(true);
+  });
+
+  it('restores the space cover when the search results are scrolled back to the top', async () => {
+    mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?q=beach');
+
+    renderPage();
+    await fireEvent.click(screen.getByTestId('search-results-scroll-down'));
+
+    await fireEvent.click(screen.getByTestId('search-results-scroll-top'));
+
+    expect(spaceUiManager.coverCollapsed).toBe(false);
+  });
+
+  // Committing or clearing a search swaps the timeline for the results grid and back. The
+  // incoming surface always mounts scrolled to the top, so a collapse left over from the outgoing
+  // one hides the cover with nothing scrolled under it.
+  it('shows the cover again when clearing the search swaps back to the timeline', async () => {
+    mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?q=beach');
+    renderPage();
+    await fireEvent.click(screen.getByTestId('search-results-scroll-down'));
+    expect(spaceUiManager.coverCollapsed).toBe(true);
+
+    mockPage.url = new URL('https://gallery.test/spaces/space-1/photos');
+
+    await waitFor(() => expect(spaceUiManager.coverCollapsed).toBe(false));
+  });
+
   it('hydrates an explicit search sort from the URL', () => {
     mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?q=beach&sort=asc');
 
