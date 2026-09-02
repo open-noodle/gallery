@@ -97,6 +97,30 @@ describe('SpaceSearchResults', () => {
     expect(screen.getByTestId('gallery-viewer')).toHaveAttribute('data-has-scroll-element', 'true');
   });
 
+  // #1028: the results grid owns the only scrolling element on the surface, so a host that wants
+  // to shrink its chrome as the reader scrolls (the space shell collapsing its cover) can only
+  // learn about it from here.
+  it('should report its scroll position so the host can collapse the chrome around it', async () => {
+    const onScroll = vi.fn();
+    render(SpaceSearchResults, {
+      props: {
+        results: mockAssets,
+        isLoading: false,
+        hasMore: false,
+        totalLoaded: 3,
+        onLoadMore: vi.fn(),
+        sortMode: 'relevance',
+        onScroll,
+      },
+    });
+
+    const scroller = screen.getByTestId('search-results-scroller');
+    Object.defineProperty(scroller, 'scrollTop', { value: 240, configurable: true });
+    await fireEvent.scroll(scroller);
+
+    expect(onScroll).toHaveBeenCalledWith(240);
+  });
+
   it('should keep ownership of the asset viewer so space context is preserved', () => {
     render(SpaceSearchResults, {
       props: {
