@@ -37,6 +37,10 @@ const suggestions = (overrides: Partial<FilterSuggestionsResponse> = {}): Filter
   hasFavorites: false,
   hasAssetsInAlbum: false,
   hasAssetsNotInAlbum: false,
+  // Both off, so the absence-of-location rows stay out of the list and the nesting assertions
+  // below still see nothing between the search box and the country rows.
+  hasNoGpsAssets: false,
+  hasNoPlaceNameAssets: false,
   ...overrides,
 });
 
