@@ -470,9 +470,9 @@ DELETE FROM "kysely_migrations"
    '1778940000000-AgentSessionActivityEvent',
    '1778950000000-AgentSelectionHandle',
    '1778778147082-AddAgentSessionProviderCredentialIndex',
-   '1779000000000-AddAgentSessionWorkflowState',
+   '1779400000000-AddAgentSessionWorkflowState',
    '1778910000000-BackfillAgentReadSessionLimits',
-   '1779100000000-AddAssetQualityScoring',
+   '1779500000000-AddAssetQualityScoring',
 
    -- Pre-rename names for two migrations that were renumbered off timestamp collisions
    -- ("renumber AddFaceRepairScanFlaggedFace off the #722 collision",

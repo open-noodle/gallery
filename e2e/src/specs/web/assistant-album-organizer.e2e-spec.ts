@@ -42,7 +42,7 @@ const createE2eCredential = (accessToken: string) =>
         providerType: ProviderType.OpenaiCompatible,
         label: credentialLabel,
         secret: 'e2e-secret',
-        baseUrl: 'http://e2e-provider.invalid/v1',
+        baseUrl: 'https://e2e-provider.invalid/v1',
         models: [model],
         defaultModel: model,
       },
