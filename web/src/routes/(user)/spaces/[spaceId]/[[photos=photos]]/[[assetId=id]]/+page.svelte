@@ -662,6 +662,14 @@
   const smartFacetBuckets = $derived(showSearchResults ? (smartFacets?.timeBuckets ?? []) : timelineBuckets);
   const smartFacetTotal = $derived(showSearchResults ? smartFacets?.total : undefined);
 
+  // Collapse the shell's cover once the reader scrolls past it. Both surfaces this tab can show —
+  // the browse timeline and the search results grid — scroll independently, so both report here;
+  // wiring only the timeline left the cover pinned open over search results, which on a phone is
+  // most of the screen (#1028).
+  const COVER_COLLAPSE_SCROLL_THRESHOLD = 64;
+  const handleSurfaceScroll = (scrollTop: number) =>
+    spaceUiManager.setCoverCollapsed(scrollTop > COVER_COLLAPSE_SCROLL_THRESHOLD);
+
   const clearSearch = () => {
     isLoading = false;
     const nextUrl = buildSearchablePageUrl(page.url, '', filters.sortOrder, filters);
@@ -761,6 +769,10 @@
         smartFacets = undefined;
         smartFacetKey = '';
         smartFacetInFlight = undefined;
+        // Committing or clearing the query swaps the timeline for the results grid and back, and
+        // the incoming surface mounts at the top — so a collapse inherited from the outgoing one
+        // would hide the cover with nothing scrolled under it.
+        spaceUiManager.setCoverCollapsed(false);
       }
       lastHandledSearchState = nextToken;
     });
@@ -880,6 +892,7 @@
         space={{ id: space.id, canWrite: isEditor }}
         isShared={true}
         total={smartFacetTotal}
+        onScroll={handleSurfaceScroll}
       />
     {/if}
 
@@ -907,7 +920,7 @@
           onTemporalAnchorResolved={() => (temporalAnchor = undefined)}
           grouping={timelineGrouping}
           onGroupingChange={handleTimelineGroupingChange}
-          onScroll={(scrollTop) => spaceUiManager.setCoverCollapsed(scrollTop > 64)}
+          onScroll={handleSurfaceScroll}
         >
           {#if viewMode === 'view'}
             {#if isOwner}
