@@ -186,6 +186,30 @@ timeline and folder view, still present in search. Match it.
 | Tag explorer                | ❌          | see the name-collision warning below                                              |
 | The album/space page itself | ❌          | must always show its own contents                                                 |
 
+### Why search stays out — measured, not assumed
+
+Archive parity is the *reason*; the cost is the *proof*. Measured 2026-09-03 on a real 66,387-embedding
+library (personal instance, warm cache, `jit=off`, `vchordrq.probes=1`), a top-100 CLIP search with 86%
+of the library hidden:
+
+| | run 1 | run 2 | run 3 |
+| --- | ---: | ---: | ---: |
+| current (no subtraction) | 1118 ms cold | 17.7 ms | **8.0 ms** |
+| with the hidden-space subtraction | 32,498 ms | 29,417 ms | **27,311 ms** |
+
+```
+Limit
+  └─ Nested Loop Anti Join
+       └─ Index Scan using clip_index on smart_search  (actual time=492 .. 28,000 ms)
+Execution Time: 29,956 ms
+```
+
+An ANN index emits candidates in distance order and stops when `LIMIT` is satisfied. A predicate that
+rejects most of the library means it never satisfies it early — it walks essentially the whole
+`clip_index` computing exact distances. There is no push-down to fix this, so the anti-join cannot be
+made cheap; it has to stay off the vector path. Same family as the §6.5 regression, an order of
+magnitude worse. **Do not "just add it to search" without re-running this measurement.**
+
 Three server timeline call sites, not two: `getTimeBuckets`, `getTimeBucket` and `getTimeBucketCovers`
 all route through `withTimeBucketAssetFilters`, so editing that one helper covers all three — which is
 exactly why they share it (`asset.repository.ts:1626`).
