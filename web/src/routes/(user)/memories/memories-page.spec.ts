@@ -82,7 +82,7 @@ describe('Memories page', () => {
     // svelte-i18n is initialised without messages in tests, so `$t` echoes the key back. The
     // point of the assertion is that the recent-trip branch of `getMemorySubtitle` is reached
     // and rendered at all — it renders nothing when the fork delta is dropped.
-    expect(screen.getByText('recent_trip_subtitle')).toBeInTheDocument();
+    expect(screen.getByText('memory_recent_trip_subtitle')).toBeInTheDocument();
   });
 
   it('renders no subtitle line for a memory that has none', () => {

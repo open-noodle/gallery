@@ -278,7 +278,7 @@ describe('FaceRepairScanRepository flagged faces', () => {
     const { asset } = await ctx.newAsset({ ownerId: user.id });
     const { assetFace } = await ctx.newAssetFace({
       assetId: asset.id,
-      personId: person.id,
+      personGroupId: person.personGroupId,
       sourceType: SourceType.MachineLearning,
       boundingBoxX1: 10,
       boundingBoxY1: 20,
@@ -290,15 +290,15 @@ describe('FaceRepairScanRepository flagged faces', () => {
     await ctx.database.insertInto('face_search').values({ faceId: assetFace.id, embedding: EMBEDDING }).execute();
 
     await sut.replaceScanFlaggedFaces(scan.id, [
-      { assetFaceId: assetFace.id, personId: person.id, suspectedOwnerId: owner.id },
+      { assetFaceId: assetFace.id, personGroupId: person.personGroupId, suspectedOwnerId: owner.personGroupId },
     ]);
 
-    const result = await sut.getScanFlaggedFaces(scan.id, person.id);
+    const result = await sut.getScanFlaggedFaces(scan.id, person.personGroupId);
 
     expect(result).toEqual([
       expect.objectContaining({
         assetFaceId: assetFace.id,
-        suspectedOwnerId: owner.id,
+        suspectedOwnerId: owner.personGroupId,
         boundingBoxX1: 10,
         boundingBoxY1: 20,
         boundingBoxX2: 30,
