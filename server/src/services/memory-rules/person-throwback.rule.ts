@@ -2,7 +2,7 @@ import { DateTime } from 'luxon';
 import { AssetRepository, MemoryAsset } from 'src/repositories/asset.repository';
 import { PersonRepository } from 'src/repositories/person.repository';
 import { Chapter, CHAPTER_MAX_SPAN_DAYS, DayCount, densestChapter } from 'src/services/memory-rules/chapter.util';
-import { medianTime, monthName, recencyBonus, sampleAssetsByTime } from 'src/services/memory-rules/curation.util';
+import { medianTime, recencyBonus, sampleAssetsByTime } from 'src/services/memory-rules/curation.util';
 import { MemoryRule, MemoryRuleCandidate, MemoryRuleContext } from 'src/services/memory-rules/memory-rule.interface';
 
 export const TRIGGER_DAY = 13;
@@ -119,18 +119,19 @@ export class PersonThrowbackMemoryRule implements MemoryRule {
       candidates.push({
         ruleId: this.id,
         dedupeKey: `person_throwback:${candidate.personId}`,
-        title: `Times with ${candidate.name}`,
-        // `chapter.count` — the full chapter total — never `assetIds.length` (capped at ASSET_CAP).
-        subtitle: `${candidate.chapter.count} photos · ${monthName(memoryAt.month)} ${memoryAt.year}`,
         score: candidate.score,
         assetIds: sampleAssetsByTime(assets, ASSET_CAP),
         memoryAt,
         visibleForDays: VISIBLE_FOR_DAYS,
         context: {
           personId: candidate.personId,
+          personName: candidate.name,
           chapterFrom: candidate.chapter.from,
           chapterTo: candidate.chapter.to,
+          // `chapter.count` — the full chapter total — never `assetIds.length` (capped at ASSET_CAP).
           count: candidate.chapter.count,
+          month: memoryAt.month,
+          year: memoryAt.year,
         },
       });
     }

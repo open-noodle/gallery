@@ -62,20 +62,20 @@ describe(ThemedMemoryRule.name, () => {
   });
 
   describe('given 18 qualifying assets in 2023 (theme sunset, target 2026-07-22)', () => {
-    it('fires with the pinned title/subtitle/dedupeKey/score/visibleForDays/ruleId', async () => {
+    it('fires with the pinned dedupeKey/score/visibleForDays/ruleId and no baked-in English', async () => {
       const { rule } = ruleWith({ 2023: yearAssets(2023, 18) });
       const [candidate] = await rule.evaluate({ ownerId: 'user-1', target });
 
       expect(candidate).toMatchObject({
         ruleId: 'themed',
         dedupeKey: 'themed:sunset:2023',
-        title: 'Sunsets from 2023',
-        subtitle: '18 photos',
         visibleForDays: 5,
         context: { year: 2023, theme: 'sunset', count: 18 },
       });
       // SCORE_BASE(70) + min(18,25) + recencyBonus(2023,2026)=max(0,10-3)=7 => 95
       expect(candidate.score).toBe(95);
+      expect(candidate.title).toBeUndefined();
+      expect(candidate.subtitle).toBeUndefined();
       expect(candidate.assetIds).toHaveLength(16);
     });
   });
@@ -108,7 +108,7 @@ describe(ThemedMemoryRule.name, () => {
       const [candidate] = await rule.evaluate({ ownerId: 'user-1', target });
 
       expect(candidate.context).toMatchObject({ year: 2023, count: 10 });
-      expect(candidate.subtitle).toBe('10 photos');
+      expect(candidate.context).toMatchObject({ count: 10 });
     });
 
     it('does not fire when 8 raw assets for the year include only 7 in-year (MIN_ASSETS applied after filtering)', async () => {

@@ -630,8 +630,7 @@ describe(MemoryService.name, () => {
           type: MemoryType.Rule,
           data: expect.objectContaining({
             ruleId: 'birthday',
-            title: 'Happy birthday, Alice',
-            subtitle: 'Photos from different years',
+            context: expect.objectContaining({ personName: 'Alice', variant: 'across_years' }),
           }),
         }),
       ]);
@@ -678,8 +677,7 @@ describe(MemoryService.name, () => {
           type: MemoryType.Rule,
           data: expect.objectContaining({
             ruleId: 'birthday',
-            title: 'Happy birthday, Pierre',
-            subtitle: 'Recent photos of Pierre',
+            context: expect.objectContaining({ personName: 'Pierre', variant: 'recent' }),
           }),
         }),
       ]);
@@ -1254,8 +1252,6 @@ describe(MemoryService.name, () => {
           hideAt: now.startOf('day').plus({ days: 6 }).endOf('day').toJSDate(),
           data: expect.objectContaining({
             ruleId: 'month_recap',
-            title: 'July 2023',
-            subtitle: '12 photos',
             context: expect.objectContaining({ year: 2023, month: 7, count: 12 }),
           }),
         }),
@@ -1320,8 +1316,6 @@ describe(MemoryService.name, () => {
           memoryAt: DateTime.fromISO('2023-07-10T00:00:00Z')!.toJSDate(),
           data: expect.objectContaining({
             ruleId: 'on_this_day_place',
-            title: 'On this day in Lisbon',
-            subtitle: '11 photos from 2021 and 2023',
             context: expect.objectContaining({
               city: 'Lisbon',
               country: 'Portugal',
@@ -1399,7 +1393,10 @@ describe(MemoryService.name, () => {
       const rules = await memoryRepo.search(user.id, { type: MemoryType.Rule, for: now.toJSDate() });
       expect(rules).toEqual([
         expect.objectContaining({
-          data: expect.objectContaining({ ruleId: 'on_this_day_place', title: 'On this day in Lisbon' }),
+          data: expect.objectContaining({
+            ruleId: 'on_this_day_place',
+            context: expect.objectContaining({ city: 'Lisbon' }),
+          }),
         }),
       ]);
 
@@ -1446,13 +1443,14 @@ describe(MemoryService.name, () => {
           hideAt: now.startOf('day').plus({ days: 6 }).endOf('day').toJSDate(),
           data: expect.objectContaining({
             ruleId: 'people_together',
-            title: `${first.name} & ${second.name}`,
-            subtitle: '6 photos together · June 2023',
             context: expect.objectContaining({
               year: 2023,
+              month: 6,
               count: 6,
               personAId: first.personGroupId,
+              personAName: first.name,
               personBId: second.personGroupId,
+              personBName: second.name,
             }),
           }),
         }),
@@ -1511,8 +1509,6 @@ describe(MemoryService.name, () => {
           type: MemoryType.Rule,
           data: expect.objectContaining({
             ruleId: 'video_moments',
-            title: 'Video moments from July 2023',
-            subtitle: '3 videos',
             context: expect.objectContaining({ year: 2023, month: 7, count: 3, favoriteCount: 0 }),
           }),
         }),
@@ -1613,10 +1609,9 @@ describe(MemoryService.name, () => {
           type: MemoryType.Rule,
           data: expect.objectContaining({
             ruleId: 'trip_anniversary',
-            title: 'Your trip to Paris, France',
-            subtitle: '2 years ago · 7 photos over 2 days',
             context: expect.objectContaining({
               year: 2024,
+              yearsAgo: 2,
               country: 'France',
               city: 'Paris',
               assetCount: 7,
@@ -1707,8 +1702,6 @@ describe(MemoryService.name, () => {
           type: MemoryType.Rule,
           data: expect.objectContaining({
             ruleId: 'themed',
-            title: 'Sunsets from 2025',
-            subtitle: '8 photos',
             context: expect.objectContaining({ year: 2025, theme: 'sunset', count: 8 }),
           }),
         }),
@@ -1803,9 +1796,13 @@ describe(MemoryService.name, () => {
           hideAt: target.startOf('day').plus({ days: 6 }).endOf('day').toJSDate(),
           data: expect.objectContaining({
             ruleId: 'person_throwback',
-            title: `Times with ${person.name}`,
-            subtitle: '6 photos · August 2023',
-            context: expect.objectContaining({ personId: person.personGroupId, count: 6 }),
+            context: expect.objectContaining({
+              personId: person.personGroupId,
+              personName: person.name,
+              count: 6,
+              month: 8,
+              year: 2023,
+            }),
           }),
         }),
       ]);
@@ -1879,8 +1876,7 @@ describe(MemoryService.name, () => {
         expect.objectContaining({
           data: expect.objectContaining({
             ruleId: 'person_throwback',
-            subtitle: '6 photos · August 2023',
-            context: expect.objectContaining({ count: 6 }),
+            context: expect.objectContaining({ count: 6, month: 8, year: 2023 }),
           }),
         }),
       ]);
@@ -1934,8 +1930,7 @@ describe(MemoryService.name, () => {
         expect.objectContaining({
           data: expect.objectContaining({
             ruleId: 'person_throwback',
-            title: `Times with ${anna.name}`,
-            subtitle: '6 photos · August 2023',
+            context: expect.objectContaining({ personName: anna.name, count: 6, month: 8, year: 2023 }),
           }),
         }),
       ]);
@@ -1997,8 +1992,7 @@ describe(MemoryService.name, () => {
         expect.objectContaining({
           data: expect.objectContaining({
             ruleId: 'person_throwback',
-            title: `Times with ${anna.name}`,
-            subtitle: '6 photos · August 2023',
+            context: expect.objectContaining({ personName: anna.name, count: 6, month: 8, year: 2023 }),
           }),
         }),
       ]);
@@ -2075,7 +2069,10 @@ describe(MemoryService.name, () => {
       const memories = await memoryRepo.search(user.id, { type: MemoryType.Rule, for: target.toJSDate() });
       expect(memories).toEqual([
         expect.objectContaining({
-          data: expect.objectContaining({ ruleId: 'person_throwback', title: `Times with ${ben.name}` }),
+          data: expect.objectContaining({
+            ruleId: 'person_throwback',
+            context: expect.objectContaining({ personName: ben.name }),
+          }),
         }),
       ]);
 

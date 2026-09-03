@@ -70,11 +70,11 @@ describe(VideoMomentsMemoryRule.name, () => {
       expect(candidate).toMatchObject({
         ruleId: 'video_moments',
         dedupeKey: 'video_moments:2023-07',
-        title: 'Video moments from July 2023',
-        subtitle: '9 videos',
         visibleForDays: 5,
         context: { year: 2023, month: 7, count: 9, favoriteCount: 3 },
       });
+      expect(candidate.title).toBeUndefined();
+      expect(candidate.subtitle).toBeUndefined();
       expect(candidate.assetIds).toHaveLength(8);
     });
 
@@ -100,7 +100,7 @@ describe(VideoMomentsMemoryRule.name, () => {
       const { rule } = ruleWith(assets);
       const [candidate] = await rule.evaluate({ ownerId: 'user-1', target });
 
-      expect(candidate.subtitle).toBe('5 videos');
+      expect(candidate.context).toMatchObject({ count: 5 });
       expect(candidate.context).toMatchObject({ count: 5 });
       expect(candidate.assetIds).toEqual(['clear-1', 'boundary-3000', 'boundary-180000', 'clear-2', 'clear-3']);
     });
@@ -173,7 +173,7 @@ describe(VideoMomentsMemoryRule.name, () => {
       const assets = Array.from({ length: 12 }, (_, index) => video(`v${index}`, 2022, index));
       const [candidate] = await ruleWith(assets).rule.evaluate({ ownerId: 'user-1', target });
 
-      expect(candidate.subtitle).toBe('12 videos');
+      expect(candidate.context).toMatchObject({ count: 12 });
       expect(candidate.assetIds).toHaveLength(8);
     });
   });
@@ -188,7 +188,7 @@ describe(VideoMomentsMemoryRule.name, () => {
         ownerId: 'user-1',
         target,
       });
-      expect(three[0].subtitle).toBe('3 videos');
+      expect(three[0].context).toMatchObject({ count: 3 });
 
       const six = await ruleWith(
         Array.from({ length: 6 }, (_, index) => video(`v${index}`, 2023, index)),
@@ -196,7 +196,7 @@ describe(VideoMomentsMemoryRule.name, () => {
         ownerId: 'user-1',
         target,
       });
-      expect(six[0].subtitle).toBe('6 videos');
+      expect(six[0].context).toMatchObject({ count: 6 });
     });
   });
 
