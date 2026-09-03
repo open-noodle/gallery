@@ -157,6 +157,49 @@ rows and the anchor stays at `d44f0d2dece`.
 ## Remote CI Verification
 
 - **Test branch**: `rebase/upstream-batch-217`
-- **Commit validated**: recorded on completion.
+- **Commit validated**: `8975230ac6ce6ad69257cdf1dbadb56e83409143`
+- **Result**: **10 / 10 green**
 
-(Results appended once the dispatched suite reports.)
+| Workflow                                  | Status | Notes                         |
+| ----------------------------------------- | ------ | ----------------------------- |
+| `test.yml`                                | GREEN  | green on re-run (flake below) |
+| `docker.yml`                              | GREEN  | first try                     |
+| `static_analysis.yml`                     | GREEN  | first try                     |
+| `gallery-build-mobile.yml`                | GREEN  | first try                     |
+| `gallery-rebase-smoke.yml`                | GREEN  | first try                     |
+| `storage-migration-tests.yml`             | GREEN  | first try                     |
+| `storage-migration-e2e.yml`               | GREEN  | first try                     |
+| `gallery-revert-to-immich-validation.yml` | GREEN  | green on re-run (flake below) |
+| `gallery-ml-smoke.yml`                    | GREEN  | first try                     |
+| `gallery-mobile-smoke.yml`                | GREEN  | first try                     |
+
+### Confirmed flakes — all self-inflicted by an unstaggered dispatch
+
+The first round reported four failing jobs across two workflows. **Every one died
+in infrastructure before running a single assertion**, and all were the container
+registry rate limit that the skill warns about when workflows are dispatched
+simultaneously:
+
+| Job                                  | Failing step                                      | Error                                           |
+| ------------------------------------ | ------------------------------------------------- | ----------------------------------------------- |
+| SQL Schema Checks                    | Initialize containers                             | `toomanyrequests: allowed: 44000/minute`        |
+| End-to-End Tests (Server & CLI, arm) | Start Docker Compose                              | `toomanyrequests: allowed: 44000/minute`        |
+| Validate revert-to-immich.sql        | Run validation → `pre: pull immich-server:v3.1.0` | `toomanyrequests: allowed: 44000/minute`        |
+| ShellCheck                           | Download shellcheck                               | curl exit 35 (SSL connect); later steps skipped |
+
+`End-to-End Tests Success` was the aggregate gate reporting the arm above, not a
+fifth failure.
+
+Two facts identified these as infrastructure before the re-run, rather than after:
+
+1. `server/`, `scripts/` and `.github/` are **byte-identical** to the tip that went
+   10/10 green the previous day, so those jobs contain no changed code at all.
+2. The revert gate's **coverage grep job — the half that reads branch code —
+   passed**; only its Docker-boot half, which pulls a published image, failed.
+
+Both workflows were re-run **staggered** (150 s apart) and came back
+`completed|success` with zero failing jobs, confirming the diagnosis.
+
+**Process note for the next cycle**: dispatching all ten workflows in one loop is
+what tripped the 44000/minute limit. Stagger the dispatch, as the skill's step 10
+already advises for re-dispatches — it applies to the first dispatch too.
