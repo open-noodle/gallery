@@ -47,7 +47,7 @@ const sizeImage = (img: HTMLImageElement) => {
   ] as const) {
     Object.defineProperty(img, property, { configurable: true, value });
   }
-  fireEvent.load(img);
+  void fireEvent.load(img);
 };
 
 describe('FacePhotoModal', () => {

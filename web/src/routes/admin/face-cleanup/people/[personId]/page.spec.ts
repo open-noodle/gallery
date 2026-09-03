@@ -12,6 +12,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/sve
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { goto } from '$app/navigation';
 import FaceActionsHelpModal from '$lib/components/face-cleanup/FaceActionsHelpModal.svelte';
+import FacePhotoModal from '$lib/components/face-cleanup/FacePhotoModal.svelte';
 import { Route } from '$lib/route';
 import Page from './+page.svelte';
 import { createManualReviewModel, type ManualReviewModel } from './manual-review.svelte';
@@ -114,9 +115,19 @@ vi.mock('$lib/components/layouts/AdminPageLayout.svelte', async () => {
 // Face crops must go through the admin-gated, join-free face-thumbnail route (the same helper the guided
 // review page uses) — never the user-scoped /people/:id/thumbnail route, which 404s for people the admin
 // does not own.
-vi.mock('$lib/utils/people-utils', () => ({
-  getAdminFaceThumbnailUrl: (assetFaceId: string) => `/api/admin/face-repair/faces/${assetFaceId}/thumbnail`,
-}));
+//
+// Keeps the REAL isUsableFaceBox/clampFaceBoxToImage/getBoundingBox/getAdminFacePreviewUrl (via `...actual`)
+// rather than dropping them — FacePhotoModal (imported below purely for reference-identity assertions
+// against modalManager.show) statically imports those at module-eval time, so a mock object missing them
+// would break on import even though this file never renders the modal itself (same trap the guided page's
+// page.spec.ts documents).
+vi.mock('$lib/utils/people-utils', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('$lib/utils/people-utils')>();
+  return {
+    ...actual,
+    getAdminFaceThumbnailUrl: (assetFaceId: string) => `/api/admin/face-repair/faces/${assetFaceId}/thumbnail`,
+  };
+});
 
 // Spy on the model factory, delegating to the REAL implementation, so tests can reach the exact instance the
 // page created and drive it directly (mark faces, pre-seed a selection) without any bulk-action UI — that UI
@@ -147,9 +158,21 @@ const makeMetadata = (
   ...over,
 });
 
-const face = (assetFaceId: string) => ({ assetFaceId });
+// #1061: the source-photo context every face now carries — irrelevant to selection/state tests, so every
+// fixture face shares one stub rather than each test inventing its own (matches the guided page's PHOTO_CONTEXT).
+const PHOTO_CONTEXT = {
+  localDateTime: '2019-07-04T10:30:00.000Z',
+  imageWidth: 400,
+  imageHeight: 300,
+  boundingBoxX1: 100,
+  boundingBoxY1: 75,
+  boundingBoxX2: 200,
+  boundingBoxY2: 150,
+};
 
-const makeFacesResponse = (faces: { assetFaceId: string }[], total: number): FaceRepairClusterFacesResponseDto => ({
+const face = (assetFaceId: string) => ({ assetFaceId, ...PHOTO_CONTEXT });
+
+const makeFacesResponse = (faces: ReturnType<typeof face>[], total: number): FaceRepairClusterFacesResponseDto => ({
   faces,
   total,
   hasMore: faces.length < total,
@@ -344,6 +367,37 @@ describe('+page.svelte (manual face-review page)', () => {
     const image = tileFor('f3').querySelector('img');
     expect(image?.getAttribute('style')).toContain('grayscale(1)');
     expect(image?.getAttribute('style')).toContain('opacity(0.55)');
+  });
+
+  // #1061: the manual-grid twin of the guided page's source-photo access tests. T8.2 is the load-bearing one
+  // — a manual tile defaults to `keep`, so the meaningful "nothing happened" assertion is `keep` +
+  // `data-selected="false"`, not an unchanged arbitrary state like guided's `owner`.
+  describe('source-photo access', () => {
+    const renderManualPage = async () => {
+      render(Page, { props: { data: makePageData() } });
+      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
+    };
+
+    it('T8.1/T8.3: manual tiles carry a labelled magnifier and a date pill', async () => {
+      await renderManualPage();
+      const tiles = screen.getAllByTestId('face-tile');
+
+      expect(screen.getAllByTestId('face-tile-view-photo')).toHaveLength(tiles.length);
+      expect(screen.getAllByTestId('face-tile-date')).toHaveLength(tiles.length);
+    });
+
+    it('T8.2: clicking the magnifier leaves the tile at `keep` — nothing is staged', async () => {
+      await renderManualPage();
+      const tile = screen.getAllByTestId('face-tile')[0];
+      expect(tile.dataset.state).toBe('keep'); // positive control: manual defaults to keep
+      expect(tile.dataset.selected).toBe('false');
+
+      await fireEvent.click(within(tile.parentElement!).getByTestId('face-tile-view-photo'));
+
+      expect(tile.dataset.state).toBe('keep');
+      expect(tile.dataset.selected).toBe('false');
+      expect(modalManager.show).toHaveBeenCalledWith(FacePhotoModal, expect.objectContaining({ index: 0 }));
+    });
   });
 
   // ---- 7. selection: click selects, shift-click selects a range, clear works ----
