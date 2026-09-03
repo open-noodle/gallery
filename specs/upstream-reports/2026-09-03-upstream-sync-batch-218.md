@@ -178,20 +178,54 @@ cycle — and the anchor remains an ancestor of `origin/main`, so scans stay cle
 ## Remote CI Verification
 
 - **Test branch**: `rebase/upstream-batch-218`
-- **Commit validated**: (filled in below after dispatch)
+- **Commit validated**: `71f2d4b8f1ba6dd08b98022a94fd727871d748fe`
 
-| Workflow                                  | Status | Notes |
-| ----------------------------------------- | ------ | ----- |
-| `test.yml`                                | TBD    |       |
-| `docker.yml`                              | TBD    |       |
-| `static_analysis.yml`                     | TBD    |       |
-| `gallery-build-mobile.yml`                | TBD    |       |
-| `gallery-rebase-smoke.yml`                | TBD    |       |
-| `storage-migration-tests.yml`             | TBD    |       |
-| `storage-migration-e2e.yml`               | TBD    |       |
-| `gallery-revert-to-immich-validation.yml` | TBD    |       |
-| `gallery-ml-smoke.yml`                    | TBD    |       |
-| `gallery-mobile-smoke.yml`                | TBD    |       |
+Results were read **by headSha**, not by branch: the branch name already existed and the push was a
+forced update over `0171097eb8a`, so a branch-scoped query could have served a stale green.
+
+Dispatch was **staggered in two waves** (light workflows first, then the Docker-heavy set at
+35–45 s intervals, ~60 s between waves). Last cycle a ten-workflow burst with 2 s gaps produced four
+registry-ratelimit failures before a single assertion ran.
+
+**Final: 10/10 green.**
+
+| Workflow                                  | Status | Notes                                               |
+| ----------------------------------------- | ------ | --------------------------------------------------- |
+| `test.yml`                                | GREEN  | green on re-run (one flaky E2E web test, see below) |
+| `docker.yml`                              | GREEN  | first pass                                          |
+| `static_analysis.yml`                     | GREEN  | first pass                                          |
+| `gallery-build-mobile.yml`                | GREEN  | green on re-run (60-minute job timeout, see below)  |
+| `gallery-rebase-smoke.yml`                | GREEN  | first pass                                          |
+| `storage-migration-tests.yml`             | GREEN  | first pass                                          |
+| `storage-migration-e2e.yml`               | GREEN  | first pass                                          |
+| `gallery-revert-to-immich-validation.yml` | GREEN  | first pass — migration coverage grep passes         |
+| `gallery-ml-smoke.yml`                    | GREEN  | first pass                                          |
+| `gallery-mobile-smoke.yml`                | GREEN  | first pass                                          |
+
+### Confirmed flakes (both green on re-run, no code change)
+
+**1. `Test` → End-to-End Tests (Web) → "Run maintenance tests".**
+`e2e/src/specs/maintenance/web/maintenance.e2e-spec.ts`, test "enter and exit maintenance mode":
+`expect(page.getByText('Temporarily Unavailable')).toBeVisible({ timeout: 10_000 })` timed out after
+clicking "Switch to maintenance mode" (1 failed, 2 passed; 397 + 108 assertions green in the earlier
+shards).
+
+This one warranted real scrutiny because `web/` genuinely changed this cycle. Two independent
+signals ruled the fork delta out **before** the re-run confirmed it:
+
+- The **sibling test in the same file asserts the identical `Temporarily Unavailable` locator and
+  passed**. The maintenance page renders correctly; only the first test's post-click transition
+  raced its 10 s timeout.
+- The batch delta is album date formatting (`date-time.ts`, `dateFormats`, `AlbumSummary.svelte`).
+  Nothing on the maintenance path reads any of it, and `e2e/` is byte-identical to the last
+  10/10-green tip.
+
+**2. `Gallery Build Mobile` → "Build and sign Android".**
+Hit the **60-minute job timeout** mid-`Build signed Android App Bundle` (13:06:54 → 14:07:05). No
+step reported a failure — the build simply never finished one. `mobile/` is byte-identical to the
+last 10/10-green tip, so no changed mobile code could regress it; the three sibling mobile gates
+(`static_analysis`, `gallery-mobile-smoke`, and `Unit Test Mobile` inside `test.yml`) were green on
+the first pass, which rules out the Dart-compile class that normally reddens all of them together.
 
 ## Post-Rebase Verification
 
