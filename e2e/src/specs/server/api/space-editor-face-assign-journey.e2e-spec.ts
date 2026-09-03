@@ -1,6 +1,6 @@
 /**
  * End-to-end journey for Slice 9 of the space-editor face-assignment feature (spec
- * `docs/superpowers/specs/2026-08-23-space-editor-face-assignment-design.md` §6.1-§6.7): a
+ * `specs/2026-08-23-space-editor-face-assignment-design.md` §6.1-§6.7): a
  * Shared Space Editor names faces on a fellow member's photo, corrects a mistaken match, draws
  * and deletes her own box, and both mutations she made land in the space's activity feed
  * attributed to her -- plus the negative half that proves the widened permission has a ceiling.
