@@ -3,11 +3,23 @@ import { DateTime } from 'luxon';
 export interface MemoryRuleCandidate {
   ruleId: string;
   dedupeKey: string;
+  /**
+   * Finished prose, for a rule that has some fixed, language-free label to show. Leave unset:
+   * a memory is generated once and then read for days by clients in whatever language each
+   * viewer picked, so English written here is stuck (#1006, #1045). Every current rule leaves
+   * both unset and lets the clients build the card text from `context` instead.
+   */
   title?: string;
   subtitle?: string;
   score: number;
   assetIds: string[];
   memoryAt: DateTime;
+  /**
+   * Structured facts the clients build the card's title and subtitle from, in the viewer's
+   * language. Put every part of the card text here, then add the message to `i18n/en.json` and
+   * the builders in `web/src/lib/utils/memory-card.ts` and
+   * `mobile/lib/utils/memory_card_text.dart`.
+   */
   context?: Record<string, unknown>;
   /**
    * How many days the memory stays visible, starting from its trigger day. Defaults to 1

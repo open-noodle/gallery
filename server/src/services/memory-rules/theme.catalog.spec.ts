@@ -1,5 +1,10 @@
 import { THEMES, themeForMonth } from 'src/services/memory-rules/theme.catalog';
 
+import { readFileSync } from 'node:fs';
+
+/** The shared `i18n/en.json`, read from disk (vitest roots at `server/`): no module alias reaches it. */
+const messageKeys = new Set(Object.keys(JSON.parse(readFileSync('../i18n/en.json', 'utf8'))));
+
 describe('THEMES', () => {
   it('has 6 entries', () => {
     expect(THEMES).toHaveLength(6);
@@ -10,10 +15,17 @@ describe('THEMES', () => {
     expect(new Set(keys).size).toBe(keys.length);
   });
 
-  it('has a non-empty query and label for every entry', () => {
+  it('has a non-empty query for every entry', () => {
     for (const theme of THEMES) {
       expect(theme.query.length).toBeGreaterThan(0);
-      expect(theme.label.length).toBeGreaterThan(0);
+    }
+  });
+
+  // The rule stores only the key; the clients turn it into a label in the viewer's language.
+  // A theme with no message renders as "Unknown", which is how #1045 looked to users.
+  it('has a translated label for every key', () => {
+    for (const theme of THEMES) {
+      expect([...messageKeys]).toContain(`memory_theme_${theme.key}`);
     }
   });
 });
