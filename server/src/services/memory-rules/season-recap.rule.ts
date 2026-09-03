@@ -2,7 +2,7 @@ import { DateTime } from 'luxon';
 import { AssetRepository, MemoryPeriodAsset } from 'src/repositories/asset.repository';
 import { medianTime, recencyBonus, sampleAssetsByTime } from 'src/services/memory-rules/curation.util';
 import { MemoryRule, MemoryRuleCandidate, MemoryRuleContext } from 'src/services/memory-rules/memory-rule.interface';
-import { SEASON_LABEL, SEASON_MONTHS, seasonStartingOn, seasonYearOf } from 'src/services/memory-rules/season.util';
+import { SEASON_MONTHS, seasonStartingOn, seasonYearOf } from 'src/services/memory-rules/season.util';
 
 /** "Summer 2024" — a recap of a past meteorological season, shown when that season starts. */
 export class SeasonRecapMemoryRule implements MemoryRule {
@@ -48,8 +48,6 @@ export class SeasonRecapMemoryRule implements MemoryRule {
       candidates.push({
         ruleId: this.id,
         dedupeKey: `season_recap:${seasonYear}-${season}`,
-        title: `${SEASON_LABEL[season]} ${seasonYear}`,
-        subtitle: `${count} photos`,
         score: 90 + Math.min(count, 40) + recencyBonus(seasonYear, target.year),
         assetIds: sampleAssetsByTime(yearAssets, SeasonRecapMemoryRule.ASSET_CAP),
         memoryAt: DateTime.fromJSDate(medianTime(yearAssets), { zone: 'utc' }),
