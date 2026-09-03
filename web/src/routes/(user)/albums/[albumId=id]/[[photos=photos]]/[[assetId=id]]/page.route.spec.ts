@@ -16,14 +16,19 @@ import { userAdminFactory } from '@test-data/factories/user-factory';
 import { reactivePageMock as mockPage } from '@test-data/mocks/reactive-page.mock.svelte';
 import AlbumPage from './+page.svelte';
 
-const { registerAlbumContextMock, registerSelectionContextMock, gotoMock, mockFeatureFlagsManager } = vi.hoisted(
-  () => ({
-    registerAlbumContextMock: vi.fn(),
-    registerSelectionContextMock: vi.fn(),
-    gotoMock: vi.fn(),
-    mockFeatureFlagsManager: { init: vi.fn(), loadFeatureFlags: vi.fn(), value: { map: false } },
-  }),
-);
+const {
+  registerAlbumContextMock,
+  registerSelectionContextMock,
+  gotoMock,
+  mockFeatureFlagsManager,
+  mockOpenSearchPalette,
+} = vi.hoisted(() => ({
+  registerAlbumContextMock: vi.fn(),
+  registerSelectionContextMock: vi.fn(),
+  gotoMock: vi.fn(),
+  mockFeatureFlagsManager: { init: vi.fn(), loadFeatureFlags: vi.fn(), value: { map: false } },
+  mockOpenSearchPalette: vi.fn(),
+}));
 
 vi.mock('$app/navigation', () => ({
   goto: gotoMock,
@@ -46,6 +51,14 @@ vi.mock('$lib/components/search/smart-search-results.svelte', async () => {
   const { default: MockComponent } = await import('@test-data/mocks/smart-search-results.stub.svelte');
   return { default: MockComponent };
 });
+
+vi.mock('$lib/managers/global-search-manager.svelte', () => ({
+  globalSearchManager: {
+    // Returns a teardown, matching the real registration the page's $effect consumes.
+    registerSearchablePageFilters: vi.fn(() => vi.fn()),
+    open: mockOpenSearchPalette,
+  },
+}));
 
 vi.mock('$lib/managers/command-context-manager.svelte', () => ({
   registerAlbumContext: registerAlbumContextMock,
@@ -323,6 +336,52 @@ describe('album detail filter panel route', () => {
     expect(screen.getByTestId('timeline-mobile-grouping-props')).toHaveTextContent(
       JSON.stringify({ grouping: 'day', hasHandler: true }),
     );
+  });
+
+  // #1051: searching an album already narrowed to the album — via the nav bar, which gave no hint
+  // it would. This puts the trigger on the album itself.
+  describe('scoped search button', () => {
+    it('sits beside the album grouping control', async () => {
+      renderPage();
+
+      expect(await screen.findByTestId('scoped-search-button')).toBeInTheDocument();
+    });
+
+    it('opens the album-scoped search palette when clicked', async () => {
+      renderPage();
+      await fireEvent.click(await screen.findByTestId('scoped-search-button'));
+
+      expect(mockOpenSearchPalette).toHaveBeenCalledOnce();
+    });
+
+    it('is hidden in select-assets mode, alongside the grouping control', async () => {
+      renderPage();
+
+      await fireEvent.click(screen.getByLabelText('add_photos'));
+
+      await waitFor(() => expect(screen.queryByTestId('scoped-search-button')).not.toBeInTheDocument());
+    });
+
+    it('is hidden in select-thumbnail mode, where the grouping control also goes', async () => {
+      renderPage();
+      const user = userEvent.setup();
+
+      await user.click(screen.getByLabelText('album_options'));
+      await user.click(screen.getByText('select_album_cover'));
+
+      expect(screen.queryByTestId('scoped-search-button')).not.toBeInTheDocument();
+    });
+
+    // The grouping pill is swapped out in search mode; the search button must NOT be, or the
+    // only way to change a query would be to clear it first.
+    it('stays available while album search results are showing', async () => {
+      mockPage.url = new URL('https://gallery.test/albums/album-1?q=beach');
+
+      renderPage(albumFactory.build({ id: 'album-1', assetCount: 2 }));
+
+      expect(await screen.findByTestId('scoped-search-button')).toBeInTheDocument();
+      expect(screen.queryByTestId('timeline-desktop-grouping-control')).not.toBeInTheDocument();
+    });
   });
 
   it('changes album grouping without changing album filters or URL state', async () => {
