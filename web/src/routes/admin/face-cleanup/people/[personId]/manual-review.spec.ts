@@ -9,9 +9,21 @@ import {
   type ManualResolveRequest,
 } from './manual-review.svelte';
 
-// Manual mode has no scan, so a cluster face is just an id — no suspectedOwnerId (design §6.5: the guided
-// FlaggedFace shape does not even typecheck here).
-const face = (assetFaceId: string): ManualFace => ({ assetFaceId });
+// Manual mode has no scan, so a cluster face has no suspectedOwnerId (design §6.5: the guided FlaggedFace
+// shape does not even typecheck here). It still carries the #1061 source-photo context every ManualFace now
+// does — irrelevant to these state/tally tests, so every fixture face shares one stub rather than each test
+// inventing its own.
+const PHOTO_CONTEXT = {
+  localDateTime: '2019-07-04T10:30:00.000Z',
+  imageWidth: 400,
+  imageHeight: 300,
+  boundingBoxX1: 100,
+  boundingBoxY1: 75,
+  boundingBoxX2: 200,
+  boundingBoxY2: 150,
+};
+
+const face = (assetFaceId: string): ManualFace => ({ assetFaceId, ...PHOTO_CONTEXT });
 
 const makeFaces = (): ManualFace[] => [face('f1'), face('f2'), face('f3')];
 

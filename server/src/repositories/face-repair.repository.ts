@@ -2,7 +2,7 @@ import { Kysely, sql, Transaction } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { SourceType } from 'src/enum';
 import { DB } from 'src/schema';
-import { reviewableAssetVisibility } from 'src/utils/face-review';
+import { FaceWithPhotoContext, reviewableAssetVisibility } from 'src/utils/face-review';
 
 export interface EligibleFaceRow {
   assetFaceId: string;
@@ -219,7 +219,7 @@ export class FaceRepairRepository {
   async getClusterFacePage(
     personGroupId: string,
     options: { excludeFaceIds: string[]; limit: number; offset: number },
-  ): Promise<{ faces: { assetFaceId: string }[]; total: number; hasMore: boolean }> {
+  ): Promise<{ faces: FaceWithPhotoContext[]; total: number; hasMore: boolean }> {
     const base = this.db
       .selectFrom('asset_face')
       .innerJoin('asset', 'asset.id', 'asset_face.assetId')
@@ -236,14 +236,25 @@ export class FaceRepairRepository {
     const total = Number(count);
 
     const rows = await base
-      .select(['asset_face.id as assetFaceId'])
+      .select([
+        'asset_face.id as assetFaceId',
+        // #1061: the console needs the capture date and the box to render a source-photo preview. `asset` is
+        // already joined above, so these are free columns rather than a second query.
+        'asset.localDateTime',
+        'asset_face.boundingBoxX1',
+        'asset_face.boundingBoxY1',
+        'asset_face.boundingBoxX2',
+        'asset_face.boundingBoxY2',
+        'asset_face.imageWidth',
+        'asset_face.imageHeight',
+      ])
       .orderBy('asset_face.id')
       .limit(options.limit)
       .offset(options.offset)
       .execute();
 
     return {
-      faces: rows.map((row) => ({ assetFaceId: row.assetFaceId })),
+      faces: rows,
       total,
       hasMore: options.offset + rows.length < total,
     };

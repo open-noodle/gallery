@@ -730,6 +730,66 @@ describe('FaceRepairRepository.getClusterFacePage', () => {
     // bind-parameter limits and exact exclusion, not a latency budget, so give it room rather than
     // shrinking the fixture, which would stop exercising the worst case it exists for.
   }, 60_000);
+
+  // #1061: the console needs enough of the source photo to judge a face in context. getClusterFacePage
+  // already inner-joins asset, so this is a free column set on a query that already runs.
+  it('T5.1: returns the photo context alongside each face id', async () => {
+    const { ctx, sut } = setup();
+    const { user } = await ctx.newUser();
+    const { person } = await ctx.newPerson({ ownerId: user.id });
+    const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+    const { assetFace } = await ctx.newAssetFace({
+      assetId: asset.id,
+      personId: person.id,
+      sourceType: SourceType.MachineLearning,
+      boundingBoxX1: 10,
+      boundingBoxY1: 20,
+      boundingBoxX2: 30,
+      boundingBoxY2: 40,
+      imageWidth: 400,
+      imageHeight: 300,
+    });
+    // getClusterFacePage INNER JOINs face_search, so a face without an embedding row never appears. There is
+    // no ctx.newFaceSearch helper — this direct insert with the file's existing EMBEDDING const (defined at
+    // face-repair.repository.spec.ts:30) is the idiom every other test in this file uses.
+    await ctx.database.insertInto('face_search').values({ faceId: assetFace.id, embedding: EMBEDDING }).execute();
+
+    const page = await sut.getClusterFacePage(person.id, { excludeFaceIds: [], limit: 10, offset: 0 });
+
+    expect(page.faces).toEqual([
+      expect.objectContaining({
+        assetFaceId: assetFace.id,
+        boundingBoxX1: 10,
+        boundingBoxY1: 20,
+        boundingBoxX2: 30,
+        boundingBoxY2: 40,
+        imageWidth: 400,
+        imageHeight: 300,
+      }),
+    ]);
+    expect(page.faces[0].localDateTime).toBeInstanceOf(Date);
+  });
+
+  it('T5.3 (pin): a face on a trashed asset is still absent from the page', async () => {
+    const { ctx, sut } = setup();
+    const { user } = await ctx.newUser();
+    const { person } = await ctx.newPerson({ ownerId: user.id });
+    const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+    const { assetFace } = await ctx.newAssetFace({
+      assetId: asset.id,
+      personId: person.id,
+      sourceType: SourceType.MachineLearning,
+    });
+    // getClusterFacePage INNER JOINs face_search, so a face without an embedding row never appears. There is
+    // no ctx.newFaceSearch helper — this direct insert with the file's existing EMBEDDING const (defined at
+    // face-repair.repository.spec.ts:30) is the idiom every other test in this file uses.
+    await ctx.database.insertInto('face_search').values({ faceId: assetFace.id, embedding: EMBEDDING }).execute();
+    await ctx.database.updateTable('asset').set({ deletedAt: new Date() }).where('id', '=', asset.id).execute();
+
+    const page = await sut.getClusterFacePage(person.id, { excludeFaceIds: [], limit: 10, offset: 0 });
+
+    expect(page.faces).toEqual([]);
+  });
 });
 
 describe('FaceRepairRepository.getEligibleFacePage / countEligibleFaces / countAllFaces (Slice 1, S1.7)', () => {
