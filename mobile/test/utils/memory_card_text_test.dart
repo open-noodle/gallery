@@ -26,7 +26,7 @@ Memory _ruleMemory(String ruleId, Map<String, dynamic> context, {String? title})
   updatedAt: DateTime.utc(2026, 4, 23),
   ownerId: 'owner-id',
   type: MemoryTypeEnum.rule,
-  data: MemoryData({'ruleId': ruleId, 'context': context, if (title != null) 'title': title}),
+  data: MemoryData({'ruleId': ruleId, 'context': context, 'title': ?title}),
   isSaved: false,
   memoryAt: DateTime.utc(2026, 4, 23),
   assets: const [],
