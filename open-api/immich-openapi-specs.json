@@ -899,6 +899,56 @@
         ]
       }
     },
+    "/admin/face-repair/faces/{assetFaceId}/preview": {
+      "get": {
+        "operationId": "getFaceRepairFacePreview",
+        "parameters": [
+          {
+            "name": "assetFaceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "cookie": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Get an admin face-repair source photo",
+        "tags": [
+          "Faces"
+        ],
+        "x-immich-admin-only": true,
+        "x-immich-history": [
+          {
+            "version": "v1",
+            "state": "Added"
+          }
+        ]
+      }
+    },
     "/admin/face-repair/faces/{assetFaceId}/thumbnail": {
       "get": {
         "operationId": "getFaceRepairFaceThumbnail",
@@ -29694,10 +29744,39 @@
               "properties": {
                 "assetFaceId": {
                   "type": "string"
+                },
+                "boundingBoxX1": {
+                  "type": "number"
+                },
+                "boundingBoxX2": {
+                  "type": "number"
+                },
+                "boundingBoxY1": {
+                  "type": "number"
+                },
+                "boundingBoxY2": {
+                  "type": "number"
+                },
+                "imageHeight": {
+                  "type": "number"
+                },
+                "imageWidth": {
+                  "type": "number"
+                },
+                "localDateTime": {
+                  "format": "date-time",
+                  "type": "string"
                 }
               },
               "required": [
-                "assetFaceId"
+                "assetFaceId",
+                "localDateTime",
+                "boundingBoxX1",
+                "boundingBoxY1",
+                "boundingBoxX2",
+                "boundingBoxY2",
+                "imageWidth",
+                "imageHeight"
               ],
               "type": "object"
             },
@@ -29979,13 +30058,42 @@
                 "assetFaceId": {
                   "type": "string"
                 },
+                "boundingBoxX1": {
+                  "type": "number"
+                },
+                "boundingBoxX2": {
+                  "type": "number"
+                },
+                "boundingBoxY1": {
+                  "type": "number"
+                },
+                "boundingBoxY2": {
+                  "type": "number"
+                },
+                "imageHeight": {
+                  "type": "number"
+                },
+                "imageWidth": {
+                  "type": "number"
+                },
+                "localDateTime": {
+                  "format": "date-time",
+                  "type": "string"
+                },
                 "suspectedOwnerId": {
                   "type": "string"
                 }
               },
               "required": [
                 "assetFaceId",
-                "suspectedOwnerId"
+                "suspectedOwnerId",
+                "localDateTime",
+                "boundingBoxX1",
+                "boundingBoxY1",
+                "boundingBoxX2",
+                "boundingBoxY2",
+                "imageWidth",
+                "imageHeight"
               ],
               "type": "object"
             },
