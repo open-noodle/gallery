@@ -39,17 +39,17 @@ void main() {
 
     testWidgets('Close button closes the sheet (hidden)', (tester) async {
       // The X is a "close" affordance (icon: close_rounded, tooltip: close) — it must
-      // dismiss the sheet, consistent with Done / system-back / drag-to-dismiss. The
-      // progressive step-back (deep → browse) is the scrim-tap / drag gesture, not the X.
+      // dismiss the sheet, consistent with Done / system-back / scrim-tap / drag-to-dismiss.
+      // The sheet has no intermediate state, so every close affordance goes straight to hidden.
       await tester.pumpConsumerWidget(const Material(child: DeepHeader()));
       final container = ProviderScope.containerOf(tester.element(find.byType(DeepHeader)));
-      container.read(photosFilterSheetProvider.notifier).state = FilterSheetSnap.deep;
+      container.read(photosFilterSheetProvider.notifier).state = FilterSheetVisibility.visible;
       await tester.pumpAndSettle();
 
       await tester.tap(find.byKey(const Key('deep-header-close')));
       await tester.pumpAndSettle();
 
-      expect(container.read(photosFilterSheetProvider), FilterSheetSnap.hidden);
+      expect(container.read(photosFilterSheetProvider), FilterSheetVisibility.hidden);
     });
 
     testWidgets('Reset calls reset() on notifier and filter becomes empty', (tester) async {
@@ -68,14 +68,14 @@ void main() {
     testWidgets('Reset does not dismiss the sheet', (tester) async {
       await tester.pumpConsumerWidget(const Material(child: DeepHeader()));
       final container = ProviderScope.containerOf(tester.element(find.byType(DeepHeader)));
-      container.read(photosFilterSheetProvider.notifier).state = FilterSheetSnap.deep;
+      container.read(photosFilterSheetProvider.notifier).state = FilterSheetVisibility.visible;
       container.read(photosFilterProvider.notifier).setText('paris');
       await tester.pumpAndSettle();
 
       await tester.tap(find.byKey(const Key('deep-header-reset')));
       await tester.pumpAndSettle();
 
-      expect(container.read(photosFilterSheetProvider), FilterSheetSnap.deep);
+      expect(container.read(photosFilterSheetProvider), FilterSheetVisibility.visible);
     });
 
     testWidgets('close + reset buttons meet kMinInteractiveDimension tap targets (a11y)', (tester) async {
