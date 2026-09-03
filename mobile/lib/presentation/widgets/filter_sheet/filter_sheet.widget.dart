@@ -60,7 +60,9 @@ class _FilterSheetState extends ConsumerState<FilterSheet> {
   }
 
   void _commitSettledExtent(double extent) {
-    if (!mounted || extent >= _dismissThreshold) return;
+    if (!mounted || extent >= _dismissThreshold) {
+      return;
+    }
     if (ref.read(photosFilterSheetProvider) != FilterSheetVisibility.hidden) {
       ref.read(photosFilterSheetProvider.notifier).state = FilterSheetVisibility.hidden;
     }
@@ -89,11 +91,15 @@ class _FilterSheetState extends ConsumerState<FilterSheet> {
         _settleTimer?.cancel();
         return;
       }
-      if (!accessibleNavigation) return;
-      SemanticsService.sendAnnouncement(view, 'filter panel opened', textDirection);
+      if (!accessibleNavigation) {
+        return;
+      }
+      unawaited(SemanticsService.sendAnnouncement(view, 'filter panel opened', textDirection));
     });
 
-    if (ref.watch(photosFilterSheetProvider) == FilterSheetVisibility.hidden) return const SizedBox.shrink();
+    if (ref.watch(photosFilterSheetProvider) == FilterSheetVisibility.hidden) {
+      return const SizedBox.shrink();
+    }
 
     final theme = Theme.of(context);
 
@@ -102,7 +108,9 @@ class _FilterSheetState extends ConsumerState<FilterSheet> {
       // once the sheet is hidden does back propagate up to the tab shell / app.
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
-        if (didPop) return;
+        if (didPop) {
+          return;
+        }
         _close();
       },
       child: Stack(
