@@ -134,10 +134,11 @@
       // Unhiding needs no confirmation — only hiding removes photos from the caller's timeline,
       // so only that direction gets a dialog stating a count (§8).
       if (showInTimeline) {
-        const { hiddenAssetCount } = await getTimelineHidePreview({ id: space.id });
+        const { hiddenAssetCount, retainedAssetCount } = await getTimelineHidePreview({ id: space.id });
         const confirmed = await modalManager.show(SpaceHideFromTimelineConfirmModal, {
           spaceName: space.name,
           count: hiddenAssetCount,
+          retainedCount: retainedAssetCount,
         });
         if (!confirmed) {
           return;

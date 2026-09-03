@@ -81,7 +81,7 @@ describe('shared-space timeline-hide-preview (#1041 slice 12)', () => {
 
       const res = await spacePreview(user.accessToken, spaceId);
       expect(res.status).toBe(200);
-      expect(res.body).toEqual({ hiddenAssetCount: 0 });
+      expect(res.body).toEqual({ hiddenAssetCount: 0, retainedAssetCount: 0 });
     });
 
     it('the count matches exactly what /timeline/buckets actually drops once the space is hidden', async () => {
@@ -101,7 +101,9 @@ describe('shared-space timeline-hide-preview (#1041 slice 12)', () => {
 
       const preview = await spacePreview(user.accessToken, spaceId);
       expect(preview.status).toBe(200);
-      expect(preview.body).toEqual({ hiddenAssetCount: 3 });
+      // Nothing is rescued here — this space is the only path — so the dialog has no second
+      // sentence to show.
+      expect(preview.body).toEqual({ hiddenAssetCount: 3, retainedAssetCount: 0 });
 
       // Flip the switch for real and confirm the timeline actually drops by exactly the previewed
       // count — the preview must never merely look plausible, it must match reality.
@@ -129,7 +131,11 @@ describe('shared-space timeline-hide-preview (#1041 slice 12)', () => {
       expect(before).toBe(1);
 
       const preview = await spacePreview(user.accessToken, spaceId);
-      expect(preview.body).toEqual({ hiddenAssetCount: 0 });
+      // This is the shape behind the "why only 3 photos?" report, in miniature: hiding removes
+      // nothing, and `retainedAssetCount` is the number that explains why — the asset belongs to
+      // this space but survives via the other one. Without it the dialog says "removes 0 photos"
+      // and leaves the user to guess.
+      expect(preview.body).toEqual({ hiddenAssetCount: 0, retainedAssetCount: 1 });
 
       const toggle = await request(app)
         .patch(`/shared-spaces/${spaceId}/members/me/timeline`)

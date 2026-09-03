@@ -14,6 +14,7 @@ class SharedSpaceTimelineHidePreviewDto {
   /// Returns a new [SharedSpaceTimelineHidePreviewDto] instance.
   SharedSpaceTimelineHidePreviewDto({
     required this.hiddenAssetCount,
+    this.retainedAssetCount = const Optional.absent(),
   });
 
   /// Photos that would leave the caller's own timeline
@@ -22,21 +23,39 @@ class SharedSpaceTimelineHidePreviewDto {
   /// Maximum value: 9007199254740991
   int hiddenAssetCount;
 
+  /// Photos in this space that stay on the caller's timeline via another visible path
+  ///
+  /// Minimum value: 0
+  /// Maximum value: 9007199254740991
+  ///
+  /// Please note: This property should have been non-nullable! Since the specification file
+  /// does not include a default value (using the "default:" property), however, the generated
+  /// source code must fall back to having a nullable type.
+  /// Consider adding a "default:" property in the specification file to hide this note.
+  ///
+  Optional<int?> retainedAssetCount;
+
   @override
   bool operator ==(Object other) => identical(this, other) || other is SharedSpaceTimelineHidePreviewDto &&
-    other.hiddenAssetCount == hiddenAssetCount;
+    other.hiddenAssetCount == hiddenAssetCount &&
+    other.retainedAssetCount == retainedAssetCount;
 
   @override
   int get hashCode =>
     // ignore: unnecessary_parenthesis
-    (hiddenAssetCount.hashCode);
+    (hiddenAssetCount.hashCode) +
+    (retainedAssetCount == null ? 0 : retainedAssetCount!.hashCode);
 
   @override
-  String toString() => 'SharedSpaceTimelineHidePreviewDto[hiddenAssetCount=$hiddenAssetCount]';
+  String toString() => 'SharedSpaceTimelineHidePreviewDto[hiddenAssetCount=$hiddenAssetCount, retainedAssetCount=$retainedAssetCount]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
       json[r'hiddenAssetCount'] = this.hiddenAssetCount;
+    if (this.retainedAssetCount.isPresent) {
+      final value = this.retainedAssetCount.value;
+      json[r'retainedAssetCount'] = value;
+    }
     return json;
   }
 
@@ -50,6 +69,7 @@ class SharedSpaceTimelineHidePreviewDto {
 
       return SharedSpaceTimelineHidePreviewDto(
         hiddenAssetCount: mapValueOfType<int>(json, r'hiddenAssetCount')!,
+        retainedAssetCount: json.containsKey(r'retainedAssetCount') ? Optional.present(json[r'retainedAssetCount'] == null ? null : int.parse('${json[r'retainedAssetCount']}')) : const Optional.absent(),
       );
     }
     return null;

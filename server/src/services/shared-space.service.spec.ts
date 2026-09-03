@@ -10384,11 +10384,11 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
       mocks.sharedSpace.updateMember.mockResolvedValue(void 0 as any);
       setUpRolledBackTransaction();
-      mocks.asset.getTimelineAssetCount.mockResolvedValueOnce(100).mockResolvedValueOnce(63);
+      mocks.asset.getTimelineAssetCount.mockResolvedValueOnce(100).mockResolvedValueOnce(63).mockResolvedValueOnce(12);
 
       const result = await sut.getTimelineHidePreview(auth, space.id);
 
-      expect(result).toEqual({ hiddenAssetCount: 37 });
+      expect(result).toEqual({ hiddenAssetCount: 37, retainedAssetCount: 12 });
       expect(mocks.sharedSpace.updateMember).toHaveBeenCalledWith(
         space.id,
         auth.user.id,
@@ -10399,6 +10399,28 @@ describe(SharedSpaceService.name, () => {
       // as the write, not against a separate connection that wouldn't see the uncommitted flip.
       expect(mocks.sharedSpace.getTimelineHiddenScope).toHaveBeenCalledWith(auth.user.id, stubTrx);
       expect(mocks.sharedSpace.getSpaceIdsForTimeline).toHaveBeenCalledWith(auth.user.id, stubTrx);
+
+      // #1041 follow-up: the third count is the one narrowed to THIS space — it is what makes
+      // "3 photos leave, 56,417 stay" explainable. Scoping it to the space is the whole point, so
+      // assert the option rather than just the returned number.
+      expect(mocks.asset.getTimelineAssetCount).toHaveBeenCalledTimes(3);
+      expect(mocks.asset.getTimelineAssetCount).toHaveBeenNthCalledWith(
+        3,
+        expect.objectContaining({ callerId: auth.user.id, spaceId: space.id }),
+        stubTrx,
+      );
+      // ...and the first two must NOT be space-scoped, or the diff would stop being the whole
+      // timeline and hiddenAssetCount would silently become a per-space number.
+      expect(mocks.asset.getTimelineAssetCount).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ spaceId: undefined }),
+        undefined,
+      );
+      expect(mocks.asset.getTimelineAssetCount).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ spaceId: undefined }),
+        stubTrx,
+      );
     });
 
     // Worth showing, not suppressing — tells a user with a "dump everything" space why nothing
@@ -10418,9 +10440,41 @@ describe(SharedSpaceService.name, () => {
       mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
       mocks.sharedSpace.updateMember.mockResolvedValue(void 0 as any);
       setUpRolledBackTransaction();
-      mocks.asset.getTimelineAssetCount.mockResolvedValueOnce(50).mockResolvedValueOnce(50);
+      mocks.asset.getTimelineAssetCount.mockResolvedValueOnce(50).mockResolvedValueOnce(50).mockResolvedValueOnce(50);
 
-      await expect(sut.getTimelineHidePreview(auth, space.id)).resolves.toEqual({ hiddenAssetCount: 0 });
+      await expect(sut.getTimelineHidePreview(auth, space.id)).resolves.toEqual({
+        hiddenAssetCount: 0,
+        retainedAssetCount: 50,
+      });
+    });
+
+    // The exact shape behind the "why only 3 photos?" report: a 58,977-photo space where all but 3
+    // also sit in a second space the caller still shows. The pair of numbers is the explanation —
+    // hiddenAssetCount alone reads as broken.
+    it('reports the rescued photos separately when another visible path holds most of them', async () => {
+      const auth = factory.auth({ user: { isAdmin: false } });
+      const space = factory.sharedSpace();
+      mocks.sharedSpace.getMember.mockResolvedValue(
+        makeMemberResult({ spaceId: space.id, userId: auth.user.id, role: SharedSpaceRole.Viewer }),
+      );
+      mocks.sharedSpace.getTimelineHiddenScope.mockResolvedValue({
+        hiddenSpaceIds: [],
+        hiddenAlbumIds: [],
+        hiddenAlbumSpacePairs: [],
+        hiddenLibraryIds: [],
+      });
+      mocks.sharedSpace.getSpaceIdsForTimeline.mockResolvedValue([]);
+      mocks.sharedSpace.updateMember.mockResolvedValue(void 0 as any);
+      setUpRolledBackTransaction();
+      mocks.asset.getTimelineAssetCount
+        .mockResolvedValueOnce(66_413) // whole timeline before
+        .mockResolvedValueOnce(66_410) // whole timeline after — only 3 actually leave
+        .mockResolvedValueOnce(56_417); // of this space, still on the timeline via another space
+
+      await expect(sut.getTimelineHidePreview(auth, space.id)).resolves.toEqual({
+        hiddenAssetCount: 3,
+        retainedAssetCount: 56_417,
+      });
     });
 
     it('clamps at 0 rather than going negative', async () => {

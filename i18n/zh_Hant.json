@@ -3173,6 +3173,7 @@
   "spaces_hidden_too_many_assets": "Spaces 已隱藏 — 選取的相片過多（上限 {count} 張）",
   "spaces_hide_from_timeline": "從我的時間軸中隱藏所有 Space 照片",
   "spaces_hide_from_timeline_confirm_prompt": "這會從您的時間軸中移除 {count} 張相片。它們仍會保留在 Space、搜尋結果和任何共用連結中。",
+  "spaces_hide_from_timeline_confirm_retained": "其中 {count} 張相片仍會保留，因為它們也在您仍在顯示的其他 Space 中。",
   "spaces_hide_from_timeline_confirm_title": "要從您的時間軸中隱藏「{name}」中的所有相片嗎？",
   "spaces_hide_people": "隱藏人物",
   "spaces_hide_pets": "隱藏寵物",

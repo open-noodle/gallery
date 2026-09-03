@@ -597,14 +597,19 @@ export class SharedSpaceService extends BaseService {
     const callerId = auth.user.id;
 
     const before = await this.countOwnTimeline(callerId);
-    const after = await this.sharedSpaceRepository.previewInRolledBackTransaction(
+    // Both reads run inside the SAME rolled-back transaction, so they observe one consistent
+    // hypothetical state: `after` is the whole timeline, `retained` narrows it to this space.
+    const { after, retained } = await this.sharedSpaceRepository.previewInRolledBackTransaction(
       (trx) => this.sharedSpaceRepository.updateMember(spaceId, callerId, { showInTimeline: false }, trx).then(),
-      (trx) => this.countOwnTimeline(callerId, trx),
+      async (trx) => ({
+        after: await this.countOwnTimeline(callerId, trx),
+        retained: await this.countOwnTimeline(callerId, trx, spaceId),
+      }),
     );
 
     // Clamped: the hypothetical write only ever adds a hide, so `after` can never legitimately
     // exceed `before` — the floor is defensive, not a normal code path.
-    return { hiddenAssetCount: Math.max(0, before - after) };
+    return { hiddenAssetCount: Math.max(0, before - after), retainedAssetCount: retained };
   }
 
   // Album equivalent of getTimelineHidePreview above — how many of the caller's own photos would
@@ -632,7 +637,15 @@ export class SharedSpaceService extends BaseService {
   // The caller's own merged-personal-timeline asset count, exactly as `/timeline/buckets` would
   // compute it (userId + withSharedSpaces=true). Optionally bound to a transaction handle so the
   // preview methods above can re-run it against their own uncommitted write.
-  private async countOwnTimeline(callerId: string, db?: Kysely<DB> | Transaction<DB>): Promise<number> {
+  //
+  // `spaceId` narrows the same count to assets reachable through that one space, which is how
+  // `retainedAssetCount` is measured: after the hypothetical hide, anything still counted here is a
+  // photo of that space some OTHER visible path is keeping on the timeline (§3).
+  private async countOwnTimeline(
+    callerId: string,
+    db?: Kysely<DB> | Transaction<DB>,
+    spaceId?: string,
+  ): Promise<number> {
     const [hiddenScope, spaceRows] = await Promise.all([
       this.sharedSpaceRepository.getTimelineHiddenScope(callerId, db),
       this.sharedSpaceRepository.getSpaceIdsForTimeline(callerId, db),
@@ -644,6 +657,7 @@ export class SharedSpaceService extends BaseService {
         callerId,
         hiddenScope,
         timelineSpaceIds: timelineSpaceIds.length > 0 ? timelineSpaceIds : undefined,
+        spaceId,
       },
       db,
     );

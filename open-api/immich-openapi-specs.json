@@ -33892,6 +33892,12 @@
             "maximum": 9007199254740991,
             "minimum": 0,
             "type": "integer"
+          },
+          "retainedAssetCount": {
+            "description": "Photos in this space that stay on the caller's timeline via another visible path",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
           }
         },
         "required": [

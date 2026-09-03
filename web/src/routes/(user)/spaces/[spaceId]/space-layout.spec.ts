@@ -152,7 +152,7 @@ describe('space [spaceId] +layout.svelte', () => {
     });
 
     it('handleToggleTimeline: hides the space from the timeline and revalidates', async () => {
-      sdkMock.getTimelineHidePreview.mockResolvedValue({ hiddenAssetCount: 12 });
+      sdkMock.getTimelineHidePreview.mockResolvedValue({ hiddenAssetCount: 12, retainedAssetCount: 0 });
       vi.mocked(modalManager.show).mockResolvedValue(true as never);
       renderLayout(SharedSpaceRole.Owner, { member: member({ role: SharedSpaceRole.Owner, showInTimeline: true }) });
 
@@ -161,13 +161,29 @@ describe('space [spaceId] +layout.svelte', () => {
       await waitFor(() => expect(sdkMock.getTimelineHidePreview).toHaveBeenCalledWith({ id: 's1' }));
       expect(modalManager.show).toHaveBeenCalledWith(
         expect.anything(),
-        expect.objectContaining({ spaceName: 'Trip', count: 12 }),
+        expect.objectContaining({ spaceName: 'Trip', count: 12, retainedCount: 0 }),
       );
       expect(sdkMock.updateMemberTimeline).toHaveBeenCalledWith({
         id: 's1',
         sharedSpaceMemberTimelineDto: { showInTimeline: false },
       });
       await waitFor(() => expect(invalidateAllMock).toHaveBeenCalled());
+    });
+
+    // #1041 follow-up: the count that explains a surprisingly small hiddenAssetCount has to reach
+    // the dialog, or the user sees "removes 3 photos" about a 58,977-photo space with no context.
+    it('handleToggleTimeline: passes the rescued-photo count through to the dialog', async () => {
+      sdkMock.getTimelineHidePreview.mockResolvedValue({ hiddenAssetCount: 3, retainedAssetCount: 56_417 });
+      vi.mocked(modalManager.show).mockResolvedValue(true as never);
+      renderLayout(SharedSpaceRole.Owner, { member: member({ role: SharedSpaceRole.Owner, showInTimeline: true }) });
+
+      await clickOverflowOption('spaces_hide_from_timeline');
+
+      await waitFor(() => expect(modalManager.show).toHaveBeenCalled());
+      expect(modalManager.show).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ count: 3, retainedCount: 56_417 }),
+      );
     });
 
     it('handleToggleTimeline: does nothing when the hide confirm dialog is dismissed', async () => {

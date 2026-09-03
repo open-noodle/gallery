@@ -3175,6 +3175,7 @@
   "spaces_hidden_too_many_assets": "Spaces скрыты — выбрано слишком много фото (максимум {count})",
   "spaces_hide_from_timeline": "Скрыть все фото Space с моей временной шкалы",
   "spaces_hide_from_timeline_confirm_prompt": "Это удалит {count, plural, one {# фото} few {# фото} many {# фото} other {# фото}} с вашей временной шкалы. Они останутся в Space, в поиске и в общих ссылках.",
+  "spaces_hide_from_timeline_confirm_retained": "{count, plural, one {# фото останется, так как оно также находится в другом Space, который вы продолжаете показывать.} few {# фото останутся, так как они также находятся в другом Space, который вы продолжаете показывать.} many {# фото останутся, так как они также находятся в другом Space, который вы продолжаете показывать.} other {# фото останется, так как оно также находится в другом Space, который вы продолжаете показывать.}}",
   "spaces_hide_from_timeline_confirm_title": "Скрыть все фото из «{name}» с вашей временной шкалы?",
   "spaces_hide_people": "Скрыть людей",
   "spaces_hide_pets": "Скрыть питомцев",
