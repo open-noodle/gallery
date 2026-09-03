@@ -1651,12 +1651,12 @@ describe(MemoryService.name, () => {
       await sut.onMemoriesCreate();
 
       const memories = await sut.search(factory.auth({ user }), {});
-      const titles = memories.map((memory) => memory.title);
+      const ruleIds = memories.map((memory) => (memory.data as { ruleId?: string }).ruleId);
 
       // The season recap claims first; the month recap starves out (it can only ever pick a
       // subset of the same September pool, and the season recap already claims the lot).
-      expect(titles).toContain('Autumn 2025');
-      expect(titles).not.toContain('September 2025');
+      expect(ruleIds).toContain('season_recap');
+      expect(ruleIds).not.toContain('month_recap');
     });
 
     it('keeps all three cards on a large library, with disjoint photos and different covers', async () => {
@@ -1679,10 +1679,10 @@ describe(MemoryService.name, () => {
 
       // All three of the reporter's cards survive: the season recap, the month recap (with
       // enough of the September pool left over after the season recap claims first), and the
-      // plain on_this_day card (untitled — title is only set for MemoryType.Rule).
-      const titles = memories.map((memory) => memory.title);
-      expect(titles).toContain('Autumn 2025');
-      expect(titles).toContain('September 2025');
+      // plain on_this_day card (which carries no ruleId).
+      const ruleIds = memories.map((memory) => (memory.data as { ruleId?: string }).ruleId);
+      expect(ruleIds).toContain('season_recap');
+      expect(ruleIds).toContain('month_recap');
       expect(memories).toHaveLength(3);
 
       const assetIdSets = memories.map((memory) => memory.assets.map((asset) => asset.id));
