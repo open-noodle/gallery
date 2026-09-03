@@ -322,7 +322,7 @@ select
         from
           "person"
         where
-          "person"."id" = "asset_face"."personId"
+          "person"."personGroupId" = "asset_face"."personGroupId"
       ) as obj
   ) as "person"
 from
