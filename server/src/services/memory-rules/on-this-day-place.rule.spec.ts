@@ -13,6 +13,9 @@ import {
 
 const target = DateTime.fromISO('2026-06-10', { zone: 'utc' });
 
+/** The city a candidate stands for, now that the rule leaves the title to the client. */
+const cityOf = ({ context }: { context?: Record<string, unknown> }) => context!.city as string;
+
 let seq = 0;
 const cityAssets = (
   year: number,
@@ -61,14 +64,14 @@ describe(OnThisDayPlaceMemoryRule.name, () => {
     });
     expect(candidate).toMatchObject({
       ruleId: 'on_this_day_place',
-      title: 'On this day in Lisbon',
-      subtitle: '11 photos from 2021 and 2023',
       // keyed on the most recent year it covers — the key `trip_anniversary` also emits, so a
       // trip card to the same place on the same day suppresses this one
       dedupeKey: 'place_day:2023-06-10:france:lisbon',
       score: SCORE_BASE + 11 * 3 + recencyBonus(2023, 2026) + YEAR_BONUS,
       context: { city: 'Lisbon', country: 'France', count: 11, years: [2021, 2023] },
     });
+    expect(candidate.title).toBeUndefined();
+    expect(candidate.subtitle).toBeUndefined();
     // anchored to the most recent year it covers
     expect(candidate.memoryAt.toISODate()).toBe('2023-06-10');
     expect(candidate.assetIds).toHaveLength(11);
@@ -111,18 +114,17 @@ describe(OnThisDayPlaceMemoryRule.name, () => {
         ...cityAssets(2020, 'Rome', 5, 'Italy'),
       ]);
       const result = await rule.evaluate({ ownerId: 'user-1', target });
-      expect(result.map(({ title }) => title).toSorted((left, right) => left!.localeCompare(right!))).toEqual([
-        'On this day in Lisbon',
-        'On this day in Rome',
-      ]);
+      expect(result.map((candidate) => cityOf(candidate)).toSorted((left, right) => left.localeCompare(right))).toEqual(
+        ['Lisbon', 'Rome'],
+      );
     });
   });
 
-  describe('the subtitle', () => {
+  describe('the subtitle context', () => {
     it('lists two years', async () => {
       const { rule } = ruleWith([...cityAssets(2023, 'Lisbon', 6), ...otherYear('Lisbon', 5)]);
       const [candidate] = await rule.evaluate({ ownerId: 'user-1', target });
-      expect(candidate.subtitle).toBe('11 photos from 2021 and 2023');
+      expect(candidate.context).toMatchObject({ count: 11, years: [2021, 2023] });
     });
 
     it('lists three years oldest first', async () => {
@@ -132,7 +134,7 @@ describe(OnThisDayPlaceMemoryRule.name, () => {
         ...cityAssets(2019, 'Lisbon', 4),
       ]);
       const [candidate] = await rule.evaluate({ ownerId: 'user-1', target });
-      expect(candidate.subtitle).toBe('12 photos from 2019, 2021 and 2023');
+      expect(candidate.context).toMatchObject({ count: 12, years: [2019, 2021, 2023] });
     });
 
     it('counts the years instead of listing them beyond three', async () => {
@@ -143,15 +145,14 @@ describe(OnThisDayPlaceMemoryRule.name, () => {
         ...cityAssets(2020, 'Lisbon', 4),
       ]);
       const [candidate] = await rule.evaluate({ ownerId: 'user-1', target });
-      expect(candidate.subtitle).toBe('16 photos across 4 years');
+      expect(candidate.context).toMatchObject({ count: 16, years: [2020, 2021, 2022, 2023] });
     });
 
     it('keeps the full count even when the attached assets are capped', async () => {
       const { rule } = ruleWith([...cityAssets(2023, 'Lisbon', 40), ...otherYear('Lisbon', 5)]);
       const [candidate] = await rule.evaluate({ ownerId: 'user-1', target });
       expect(candidate.assetIds).toHaveLength(ASSET_CAP);
-      expect(candidate.subtitle).toBe('45 photos from 2021 and 2023');
-      expect(candidate.context).toMatchObject({ count: 45 });
+      expect(candidate.context).toMatchObject({ count: 45, years: [2021, 2023] });
     });
   });
 
@@ -200,7 +201,7 @@ describe(OnThisDayPlaceMemoryRule.name, () => {
       ]);
       const result = await rule.evaluate({ ownerId: 'user-1', target });
       expect(result).toHaveLength(1);
-      expect(result[0]).toMatchObject({ title: 'On this day in Lisbon', subtitle: '9 photos from 2021 and 2023' });
+      expect(result[0]).toMatchObject({ context: { city: 'Lisbon', count: 9, years: [2021, 2023] } });
     });
 
     it('treats a blank ("") city the same as no city', async () => {
@@ -212,7 +213,7 @@ describe(OnThisDayPlaceMemoryRule.name, () => {
       ]);
       const result = await rule.evaluate({ ownerId: 'user-1', target });
       expect(result).toHaveLength(1);
-      expect(result[0].title).toBe('On this day in Lisbon');
+      expect(result[0].context).toMatchObject({ city: 'Lisbon' });
     });
 
     it('accepts exactly 60% dominance (inclusive boundary)', async () => {
@@ -223,7 +224,7 @@ describe(OnThisDayPlaceMemoryRule.name, () => {
       ]);
       const result = await rule.evaluate({ ownerId: 'user-1', target });
       expect(result).toHaveLength(1);
-      expect(result[0].subtitle).toBe('11 photos from 2021 and 2023');
+      expect(result[0].context).toMatchObject({ count: 11, years: [2021, 2023] });
     });
 
     it('drops a year whose dominant place is below the 60% majority even with >= 4 photos', async () => {
@@ -273,7 +274,7 @@ describe(OnThisDayPlaceMemoryRule.name, () => {
       const result = await rule.evaluate({ ownerId: 'user-1', target });
       expect(result).toHaveLength(3);
       // equal sizes and spans, so the recency bonus orders them and the oldest (A) is dropped
-      expect(result.map(({ title }) => title)).toEqual(['On this day in D', 'On this day in C', 'On this day in B']);
+      expect(result.map((candidate) => cityOf(candidate))).toEqual(['D', 'C', 'B']);
     });
 
     it('ranks a place that recurs in more years above an equally sized, more recent one', async () => {
@@ -287,7 +288,7 @@ describe(OnThisDayPlaceMemoryRule.name, () => {
       const result = await rule.evaluate({ ownerId: 'user-1', target });
       // Both hold 12 photos, and Rome is the more recent (+2 recency) — but Lisbon's third
       // year is worth YEAR_BONUS, which is decisive.
-      expect(result.map(({ title }) => title)).toEqual(['On this day in Lisbon', 'On this day in Rome']);
+      expect(result.map((candidate) => cityOf(candidate))).toEqual(['Lisbon', 'Rome']);
       expect(result[0].score - result[1].score).toBe(YEAR_BONUS - 2);
     });
 
