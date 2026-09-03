@@ -1,5 +1,6 @@
 <script lang="ts">
   import FilterToggleButton from '$lib/components/filter-panel/filter-toggle-button.svelte';
+  import ScopedSearchButton from '$lib/components/search/scoped-search-button.svelte';
   import TimelineGroupingControl from '$lib/components/timeline/TimelineGroupingControl.svelte';
   import type { TimelineGrouping } from '$lib/managers/timeline-manager/types';
   import type { Snippet } from 'svelte';
@@ -17,6 +18,11 @@
     showFilterButton?: boolean;
     filterActive?: boolean;
     onExpandFilters?: () => void;
+    // "Search here" affordance for surfaces whose search is page-scoped (#1051). Opt-in: most
+    // callers of this toolbar (favorites, archive, tags, trash…) are not searchable pages, and an
+    // icon that silently searched the whole library from inside them would be a lie.
+    showSearchButton?: boolean;
+    onSearch?: () => void;
   }
 
   let {
@@ -30,10 +36,14 @@
     showFilterButton = false,
     filterActive = false,
     onExpandFilters,
+    showSearchButton = false,
+    onSearch,
   }: Props = $props();
+
+  const searchButtonVisible = $derived(showSearchButton && onSearch !== undefined);
 </script>
 
-{#if showGrouping || showFilters || (showFilterButton && onExpandFilters)}
+{#if showGrouping || showFilters || (showFilterButton && onExpandFilters) || searchButtonVisible}
   <!--
     Root display is responsive-by-intent:
     - showFilters → `flex` (visible on ALL sizes, so the chip bar still shows on mobile)
@@ -73,8 +83,23 @@
       </div>
     {/if}
 
+    {#if searchButtonVisible}
+      <!-- Desktop-only (`hidden md:flex`), matching the grouping pill it sits beside; below md the
+           nav bar's magnifier is the only trigger.
+           Note the nav magnifier is `xl:hidden` (NavigationBar.svelte), so between md and xl BOTH are
+           on screen. That overlap is accepted, not an oversight: they read as different affordances in
+           different places — global chrome vs. "search this surface" — and it is exactly what the
+           YouTube channel pattern this copies does when its masthead search collapses to an icon. -->
+      <div class="hidden md:flex md:items-center" data-testid="filter-toolbar-search">
+        <ScopedSearchButton onclick={() => onSearch?.()} />
+      </div>
+    {/if}
+
     {#if showFilters}
-      {#if showGrouping}
+      <!-- The separator divides the leading controls from the chip bar, so it must follow whichever
+           of them is present — the grouping pill OR the search button (search mode drops the pill
+           but keeps the button). -->
+      {#if showGrouping || searchButtonVisible}
         <span
           class="hidden h-5 w-px shrink-0 bg-gray-200/70 md:block dark:bg-white/10"
           data-testid="filter-toolbar-separator"
