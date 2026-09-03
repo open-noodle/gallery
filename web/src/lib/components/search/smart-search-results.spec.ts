@@ -1,8 +1,8 @@
 import { AssetOrder } from '@immich/sdk';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getIntersectionObserverMock } from '$lib/__mocks__/intersection-observer.mock';
 import type { FilterState } from '$lib/components/filter-panel/filter-panel';
+import SmartSearchResultsRerunHost from '$lib/components/search/smart-search-results-rerun.test-host.svelte';
 import SmartSearchResults from '$lib/components/search/smart-search-results.svelte';
 import SmartSearchResultsHost from '$lib/components/search/smart-search-results.test-host.svelte';
 import { SEARCH_FILTER_DEBOUNCE_MS } from '$lib/utils/space-search';
@@ -30,10 +30,31 @@ const baseProps = {
 
 const mockEmptyResult = { assets: { items: [], nextPage: null } };
 
+/**
+ * The shared mock never invokes its callback, so the infinite-scroll sentinel can't be driven from a
+ * test. Capture the callbacks instead — the newest belongs to the live sentinel — so paging can be
+ * exercised alongside the search-clearing behaviour it shares state with.
+ */
+let intersectionCallbacks: IntersectionObserverCallback[] = [];
+
+const getCapturingIntersectionObserverMock = () =>
+  vi.fn(function (callback: IntersectionObserverCallback) {
+    intersectionCallbacks.push(callback);
+    return { disconnect: vi.fn(), observe: vi.fn(), takeRecords: vi.fn(), unobserve: vi.fn() };
+  });
+
+const scrollToLoadMore = async () => {
+  const callback = intersectionCallbacks.at(-1);
+  expect(callback).toBeDefined();
+  callback!([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver);
+  await vi.advanceTimersByTimeAsync(0);
+};
+
 describe('SmartSearchResults', () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    vi.stubGlobal('IntersectionObserver', getIntersectionObserverMock());
+    intersectionCallbacks = [];
+    vi.stubGlobal('IntersectionObserver', getCapturingIntersectionObserverMock());
     searchSmartMock.mockReset();
     searchSmartMock.mockResolvedValue(mockEmptyResult);
   });
@@ -181,23 +202,8 @@ describe('SmartSearchResults', () => {
     expect(lastCall![0].smartSearchDto.order).toBeUndefined();
   });
 
-  // Test 47 — loadMore (requires triggering the dumb grid's IntersectionObserver or direct invocation)
-  // The exact mechanism depends on whether onLoadMore is exposed; you may need to grab the prop
-  // off the rendered SpaceSearchResults via a test export, or simulate the IntersectionObserver
-  // entry firing. See the existing space-search-results.spec.ts for patterns.
-  it.todo('loadMore fetches the next page and appends results');
-
-  // Test 48
-  it.todo('loadMore does nothing when hasMore is false');
-
   // Test 49
   it.todo('loadMore while another loadMore is in flight: abort first, second wins');
-
-  // Test 50
-  it.todo('concurrent submit: query A in flight, query B submitted, B wins');
-
-  // Test 51
-  it.todo('submit while loadMore in flight: loadMore aborted, restart from page 1');
 
   // Test 52 — cooperative abort on unmount, NOT SDK signal propagation.
   // The wrapper uses cooperative abort (checks `controller.signal.aborted` *after*
@@ -315,6 +321,233 @@ describe('SmartSearchResults', () => {
     await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
 
     expect(getByTestId('result-count')).toHaveTextContent('spaces_search_result_count');
+  });
+
+  // #1052: a new search must blank the grid the moment it is triggered. Until it did, the previous
+  // query's photos stayed on screen — keeping their scroll offset — for the debounce plus the whole
+  // round trip, and a host remount replayed them from scratch.
+  describe('clearing previous results (#1052)', () => {
+    const asset = (id: string) => ({ id, originalFileName: `${id}.jpg` });
+    const page = (ids: string[], nextPage: string | null = null) => ({
+      assets: { items: ids.map((id) => asset(id)), nextPage },
+    });
+
+    /** The assets the host currently holds — the grid itself virtualizes to nothing under happy-dom. */
+    const resultIds = () => screen.getByTestId('host-result-ids').textContent;
+
+    const renderHost = async () => {
+      searchSmartMock.mockResolvedValue(page(['asset-1']));
+      render(SmartSearchResultsRerunHost, { props: { filters: baseFilters } });
+      await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
+      expect(resultIds()).toBe('asset-1');
+    };
+
+    it('blanks the previous results as soon as a new query is submitted', async () => {
+      await renderHost();
+
+      await fireEvent.click(screen.getByTestId('host-new-search'));
+
+      // Deliberately no timer advance: the old results must be gone *before* the replacement lands.
+      expect(resultIds()).toBe('');
+      expect(screen.getByTestId('search-loading')).toBeInTheDocument();
+      expect(screen.queryByTestId('result-count')).not.toBeInTheDocument();
+    });
+
+    it('blanks the previous results as soon as a filter change re-runs the search', async () => {
+      await renderHost();
+
+      await fireEvent.click(screen.getByTestId('host-add-filter'));
+
+      expect(resultIds()).toBe('');
+      expect(screen.getByTestId('search-loading')).toBeInTheDocument();
+      expect(screen.queryByTestId('result-count')).not.toBeInTheDocument();
+    });
+
+    it('does not replay the previous search when the host re-mounts it for a new query', async () => {
+      await renderHost();
+
+      // Clearing the query unmounts the component, but the host keeps the loaded assets.
+      await fireEvent.click(screen.getByTestId('host-clear-search'));
+      await fireEvent.click(screen.getByTestId('host-new-search'));
+
+      expect(resultIds()).toBe('');
+      expect(screen.getByTestId('search-loading')).toBeInTheDocument();
+      expect(screen.queryByTestId('result-count')).not.toBeInTheDocument();
+    });
+
+    it('stays blank for the whole debounce window, not just the first tick', async () => {
+      await renderHost();
+
+      await fireEvent.click(screen.getByTestId('host-new-search'));
+      await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS - 1);
+
+      expect(resultIds()).toBe('');
+      expect(searchSmartMock).toHaveBeenCalledTimes(1);
+    });
+
+    // The blanked grid must show the spinner, not the empty state. Every searchable page resets its
+    // own `isLoading` to false in the same block that commits the new query, so the component has to
+    // re-assert loading afterwards — otherwise a new search flashes "no results" before it resolves,
+    // which reads as a worse bug than the stale results #1052 is about.
+    it('shows the loading state, not the empty state, when the host commits a search from the URL', async () => {
+      await renderHost();
+
+      await fireEvent.click(screen.getByTestId('host-commit-url-search'));
+
+      expect(resultIds()).toBe('');
+      expect(screen.getByTestId('search-loading')).toBeInTheDocument();
+      expect(screen.queryByTestId('search-empty')).not.toBeInTheDocument();
+    });
+
+    it('keeps the current results on screen while a reload re-runs the same search', async () => {
+      await renderHost();
+
+      await fireEvent.click(screen.getByTestId('host-reload'));
+
+      // A reload restores results after an undone delete — same search, so nothing to blank.
+      expect(resultIds()).toBe('asset-1');
+      expect(screen.getByTestId('result-count')).toBeInTheDocument();
+      expect(screen.queryByTestId('search-loading')).not.toBeInTheDocument();
+    });
+
+    it('shows the new results once they arrive', async () => {
+      await renderHost();
+
+      searchSmartMock.mockResolvedValue(page(['asset-2']));
+      await fireEvent.click(screen.getByTestId('host-new-search'));
+      await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
+
+      expect(resultIds()).toBe('asset-2');
+      expect(screen.getByTestId('result-count')).toBeInTheDocument();
+      expect(screen.queryByTestId('search-loading')).not.toBeInTheDocument();
+      expect(searchSmartMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({ smartSearchDto: expect.objectContaining({ query: 'mountain' }) }),
+      );
+    });
+
+    it('does not restore the previous results while the new search is in flight', async () => {
+      await renderHost();
+
+      let resolveSecond: (value: unknown) => void = () => {};
+      searchSmartMock.mockImplementationOnce(() => new Promise((resolve) => (resolveSecond = resolve)));
+
+      await fireEvent.click(screen.getByTestId('host-new-search'));
+      await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
+      expect(resultIds()).toBe('');
+
+      resolveSecond(page(['asset-2']));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(resultIds()).toBe('asset-2');
+    });
+
+    it('ignores a late response from the query that was replaced', async () => {
+      let resolveFirst: (value: unknown) => void = () => {};
+      searchSmartMock.mockImplementationOnce(() => new Promise((resolve) => (resolveFirst = resolve)));
+      searchSmartMock.mockResolvedValue(page(['asset-2']));
+
+      render(SmartSearchResultsRerunHost, { props: { filters: baseFilters } });
+      await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
+
+      await fireEvent.click(screen.getByTestId('host-new-search'));
+      await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
+      expect(resultIds()).toBe('asset-2');
+
+      // The abandoned query answers last; it must not overwrite the search now on screen.
+      resolveFirst(page(['asset-1']));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(resultIds()).toBe('asset-2');
+    });
+
+    it('leaves the results blank when the new search fails', async () => {
+      await renderHost();
+
+      searchSmartMock.mockRejectedValueOnce(new Error('smart search is not enabled'));
+      await fireEvent.click(screen.getByTestId('host-new-search'));
+      await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
+
+      expect(resultIds()).toBe('');
+      expect(screen.getByTestId('search-empty')).toBeInTheDocument();
+    });
+
+    it('restarts pagination at page 1 after a new query, discarding the loaded pages', async () => {
+      searchSmartMock.mockResolvedValueOnce(page(['asset-1'], '2'));
+      render(SmartSearchResultsRerunHost, { props: { filters: baseFilters } });
+      await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
+
+      searchSmartMock.mockResolvedValueOnce(page(['asset-2'], null));
+      await scrollToLoadMore();
+      expect(resultIds()).toBe('asset-1,asset-2');
+
+      searchSmartMock.mockResolvedValue(page(['asset-9']));
+      await fireEvent.click(screen.getByTestId('host-new-search'));
+      expect(resultIds()).toBe('');
+      await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
+
+      expect(resultIds()).toBe('asset-9');
+      expect(searchSmartMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({ smartSearchDto: expect.objectContaining({ page: 1, query: 'mountain' }) }),
+      );
+    });
+
+    it('appends the next page without blanking what is already loaded', async () => {
+      searchSmartMock.mockResolvedValueOnce(page(['asset-1'], '2'));
+      render(SmartSearchResultsRerunHost, { props: { filters: baseFilters } });
+      await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
+
+      searchSmartMock.mockResolvedValueOnce(page(['asset-2'], null));
+      await scrollToLoadMore();
+
+      // Paging is an append, not a new search — the first page must survive it.
+      expect(resultIds()).toBe('asset-1,asset-2');
+      expect(searchSmartMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({ smartSearchDto: expect.objectContaining({ page: 2 }) }),
+      );
+    });
+
+    // Test 51 — the dangerous ordering: an append is in flight when the query changes, so its
+    // response could land on top of the freshly blanked grid and mix two searches together.
+    it('discards a page that was still loading when a new query replaced the search', async () => {
+      searchSmartMock.mockResolvedValueOnce(page(['asset-1'], '2'));
+      render(SmartSearchResultsRerunHost, { props: { filters: baseFilters } });
+      await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
+
+      let resolvePage2: (value: unknown) => void = () => {};
+      searchSmartMock.mockImplementationOnce(() => new Promise((resolve) => (resolvePage2 = resolve)));
+      await scrollToLoadMore();
+      expect(resultIds()).toBe('asset-1');
+
+      searchSmartMock.mockResolvedValue(page(['asset-9']));
+      await fireEvent.click(screen.getByTestId('host-new-search'));
+      await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
+
+      resolvePage2(page(['asset-2'], null));
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(resultIds()).toBe('asset-9');
+    });
+
+    it('blanks the previous album scope results when the host switches album', async () => {
+      searchSmartMock.mockResolvedValue(page(['asset-1']));
+      render(SmartSearchResultsHost, { props: { album: { id: 'album-1', name: 'a' }, filters: baseFilters } });
+      await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
+      expect(screen.getByTestId('result-count')).toBeInTheDocument();
+
+      await fireEvent.click(screen.getByTestId('host-switch-album'));
+
+      expect(screen.getByTestId('search-loading')).toBeInTheDocument();
+      expect(screen.queryByTestId('result-count')).not.toBeInTheDocument();
+    });
+
+    it('does not blank when the host re-derives the album scope without changing it', async () => {
+      searchSmartMock.mockResolvedValue(page(['asset-1']));
+      render(SmartSearchResultsHost, { props: { album: { id: 'album-1', name: 'a' }, filters: baseFilters } });
+      await vi.advanceTimersByTimeAsync(SEARCH_FILTER_DEBOUNCE_MS);
+
+      await fireEvent.click(screen.getByTestId('host-rename-album'));
+
+      expect(screen.getByTestId('result-count')).toBeInTheDocument();
+      expect(screen.queryByTestId('search-loading')).not.toBeInTheDocument();
+    });
   });
 
   // Test 57 — render assertion for isShared on the dumb grid
