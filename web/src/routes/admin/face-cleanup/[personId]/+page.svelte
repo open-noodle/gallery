@@ -19,8 +19,11 @@
   import { t, type Translations } from 'svelte-i18n';
   import { getServerErrorMessage, handleError } from '$lib/utils/handle-error';
   import FaceActionsHelpModal from '$lib/components/face-cleanup/FaceActionsHelpModal.svelte';
+  import FacePhotoModal from '$lib/components/face-cleanup/FacePhotoModal.svelte';
   import FaceReviewDock from '$lib/components/face-cleanup/FaceReviewDock.svelte';
+  import FaceTileOverlay from '$lib/components/face-cleanup/FaceTileOverlay.svelte';
   import type { FaceActionId } from '$lib/components/face-cleanup/face-actions';
+  import type { FacePhotoFace } from '$lib/components/face-cleanup/face-photo';
   import { faceCleanupBreadcrumbs, guidedCrumb } from '../breadcrumbs';
   import type { PageData } from './$types';
   import { selectableDestinations, sortDestinations, type SuspectedOwner } from './destination';
@@ -82,7 +85,7 @@
   // server now refuses to drain on such a resolve; the client no longer makes one. "Move entire cluster" stays a
   // separate, explicit commit — it moves ALL eligible faces, flagged ones included.
   const REST_PAGE_SIZE = 48;
-  let restFaces = $state<{ assetFaceId: string }[]>([]);
+  let restFaces = $state<FacePhotoFace[]>([]);
   let restTotal = $state(0);
   let restPage = $state(0);
   let restHasMore = $state(false);
@@ -243,6 +246,42 @@
     } else {
       vm.toggleSelect(assetFaceId);
     }
+  };
+
+  // #1061: opens the source photo behind a face crop. `faces` is whichever grid's array the magnifier was
+  // clicked from — the modal only knows the faces LOADED in that grid (both paginate), so it never claims a
+  // cycle over the whole cluster.
+  // `selection` is passed per GRID, not per page: the flagged grid stages through the review model, while the
+  // rest grid stages into `restSelected` behind a destination gate. Handing the modal the wrong pair would let
+  // it stage into the other grid's bucket.
+  const openPhoto = (
+    faces: FacePhotoFace[],
+    index: number,
+    selection: {
+      isSelected: (assetFaceId: string) => boolean;
+      canSelect?: (assetFaceId: string) => boolean;
+      onToggleSelect: (assetFaceId: string) => void;
+    },
+  ) => {
+    void modalManager.show(FacePhotoModal, { faces, index, ...selection });
+  };
+
+  // Deselecting always works — a staged face is never trapped by a destination that later became unusable (a
+  // mis-click into a self-move must not destroy deliberate selection, and the admin's only way out otherwise
+  // would be to pick a new destination first). Only NEW staging is gated: adding a face onto a destination the
+  // whole-cluster actions have already refused would let the ribbon/dock chip start naming a destination Apply
+  // refuses to use (see canBulkMove/restBlocked below).
+  //
+  // Shared by the rest tile and the photo modal deliberately — two copies of this gate would drift.
+  const toggleRestSelection = (assetFaceId: string) => {
+    if (restSelected.has(assetFaceId)) {
+      restSelected.delete(assetFaceId);
+      return;
+    }
+    if (!canBulkMove) {
+      return;
+    }
+    restSelected.add(assetFaceId);
   };
 
   // The six guided routes, in bar order. `owner` gains a testid it never had — every other id is preserved
@@ -667,47 +706,58 @@
           class="grid grid-cols-4 gap-2.5 bg-gray-50 p-4 sm:grid-cols-6 lg:grid-cols-8 dark:bg-gray-800/50"
           data-testid="flagged-grid"
         >
-          {#each visibleFaces as face (face.assetFaceId)}
+          {#each visibleFaces as face, tileIndex (face.assetFaceId)}
             {@const selected = vm.isSelected(face.assetFaceId)}
-            <button
-              type="button"
-              class={[
-                'relative aspect-square overflow-hidden rounded-xl border-2 transition-all',
-                selected ? 'border-primary' : 'border-transparent',
-              ].join(' ')}
-              style={selected ? 'box-shadow: 0 0 0 3px rgba(79,70,229,0.32);' : ''}
-              onclick={(event) => handleTileClick(face.assetFaceId, event)}
-              data-testid="face-tile"
-              data-faceid={face.assetFaceId}
-              data-state={face.state}
-            >
-              <img
-                src={faceThumbnailUrl(face.assetFaceId)}
-                alt=""
-                class="size-full object-cover"
-                style={face.state === 'detach' ? 'filter: grayscale(1) opacity(0.55);' : ''}
-                loading="lazy"
+            <div class="relative aspect-square">
+              <button
+                type="button"
+                class={[
+                  'absolute inset-0 overflow-hidden rounded-xl border-2 transition-all',
+                  selected ? 'border-primary' : 'border-transparent',
+                ].join(' ')}
+                style={selected ? 'box-shadow: 0 0 0 3px rgba(79,70,229,0.32);' : ''}
+                onclick={(event) => handleTileClick(face.assetFaceId, event)}
+                data-testid="face-tile"
+                data-faceid={face.assetFaceId}
+                data-state={face.state}
+              >
+                <img
+                  src={faceThumbnailUrl(face.assetFaceId)}
+                  alt=""
+                  class="size-full object-cover"
+                  style={face.state === 'detach' ? 'filter: grayscale(1) opacity(0.55);' : ''}
+                  loading="lazy"
+                />
+                {#if selected}
+                  <div class="absolute inset-0 bg-primary/15"></div>
+                {/if}
+                <!-- State indicator: its own icon per state, never colour alone (owner/stay/other used to share
+                     one check mark, so indigo-vs-violet was all that separated "moved away" from "locked here"). -->
+                <div
+                  class="absolute top-1.5 left-1.5 flex size-5 items-center justify-center rounded-md border-2 border-white shadow-sm"
+                  style="background: {STATE_COLOR[face.state]}"
+                  data-state-icon={face.state}
+                >
+                  <Icon icon={STATE_ICON[face.state]} size="11" color="white" />
+                </div>
+                <!-- Ribbon: right-aligned and capped short of full width so it never overpaints the date pill
+                     (FaceTileOverlay, a sibling of this button) sitting in the bottom-left corner. -->
+                <div
+                  class="absolute right-0 bottom-0 max-w-[70%] truncate rounded-tl-sm p-1 text-center text-[9.5px] font-bold text-white"
+                  style="background: {STATE_COLOR[face.state]}"
+                >
+                  {ribbonLabel(face)}
+                </div>
+              </button>
+              <FaceTileOverlay
+                localDateTime={face.localDateTime}
+                onOpen={() =>
+                  openPhoto(visibleFaces, tileIndex, {
+                    isSelected: (assetFaceId) => vm.isSelected(assetFaceId),
+                    onToggleSelect: (assetFaceId) => vm.toggleSelect(assetFaceId),
+                  })}
               />
-              {#if selected}
-                <div class="absolute inset-0 bg-primary/15"></div>
-              {/if}
-              <!-- State indicator: its own icon per state, never colour alone (owner/stay/other used to share
-                   one check mark, so indigo-vs-violet was all that separated "moved away" from "locked here"). -->
-              <div
-                class="absolute top-1.5 left-1.5 flex size-5 items-center justify-center rounded-md border-2 border-white shadow-sm"
-                style="background: {STATE_COLOR[face.state]}"
-                data-state-icon={face.state}
-              >
-                <Icon icon={STATE_ICON[face.state]} size="11" color="white" />
-              </div>
-              <!-- Ribbon -->
-              <div
-                class="absolute inset-x-0 bottom-0 p-1 text-center text-[9.5px] font-bold text-white"
-                style="background: {STATE_COLOR[face.state]}"
-              >
-                {ribbonLabel(face)}
-              </div>
-            </button>
+            </div>
           {/each}
         </div>
 
@@ -809,7 +859,7 @@
           </div>
         {:else}
           <div class="grid grid-cols-4 gap-3 bg-gray-50 p-4 sm:grid-cols-6 lg:grid-cols-8 dark:bg-gray-800/50">
-            {#each restFaces as face (face.assetFaceId)}
+            {#each restFaces as face, tileIndex (face.assetFaceId)}
               {@const selected = restSelected.has(face.assetFaceId)}
               {@const blocked = !canBulkMove && !selected}
               <div class="relative aspect-square">
@@ -821,22 +871,7 @@
                     blocked ? 'cursor-not-allowed opacity-30 hover:opacity-30' : '',
                   ].join(' ')}
                   disabled={blocked}
-                  onclick={() => {
-                    // Deselecting always works — a staged face is never trapped by a destination that later
-                    // became unusable (a mis-click into a self-move must not destroy deliberate selection, and
-                    // the admin's only way out otherwise would be to pick a new destination first). Only NEW
-                    // staging is gated: adding a face onto a destination the whole-cluster actions have
-                    // already refused would let the ribbon/dock chip start naming a destination Apply refuses
-                    // to use (see canBulkMove/restBlocked below).
-                    if (restSelected.has(face.assetFaceId)) {
-                      restSelected.delete(face.assetFaceId);
-                      return;
-                    }
-                    if (!canBulkMove) {
-                      return;
-                    }
-                    restSelected.add(face.assetFaceId);
-                  }}
+                  onclick={() => toggleRestSelection(face.assetFaceId)}
                   data-testid="rest-tile"
                   data-faceid={face.assetFaceId}
                   data-selected={selected}
@@ -849,7 +884,7 @@
                       <Icon icon={mdiCheckBold} size="10" color="white" />
                     </div>
                     <div
-                      class="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/70 to-transparent px-1.5 pt-3 pb-1 text-[10px] font-semibold text-white"
+                      class="absolute right-0 bottom-0 max-w-[70%] truncate rounded-tl-sm bg-linear-to-t from-black/70 to-transparent px-1.5 pt-3 pb-1 text-[10px] font-semibold text-white"
                     >
                       {canBulkMove
                         ? $t('admin.face_cleanup_review_tile_dest', { values: { name: destinationName } })
@@ -857,6 +892,16 @@
                     </div>
                   {/if}
                 </button>
+                <FaceTileOverlay
+                  localDateTime={face.localDateTime}
+                  onOpen={() =>
+                    openPhoto(restFaces, tileIndex, {
+                      isSelected: (assetFaceId) => restSelected.has(assetFaceId),
+                      // Adding is gated on a usable destination; removing never is — same asymmetry the tile has.
+                      canSelect: () => canBulkMove,
+                      onToggleSelect: toggleRestSelection,
+                    })}
+                />
               </div>
             {/each}
           </div>
