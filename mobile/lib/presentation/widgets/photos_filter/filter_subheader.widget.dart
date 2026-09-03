@@ -19,7 +19,7 @@ import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dar
 /// with the filter: as an app-bar action it changed how much width the title
 /// slot was offered, which resized the logo (#1030). Here it costs the app bar
 /// nothing and sits next to the chips it orders. The live match count stays in
-/// the filter-sheet footer. The filter sheet snap state is untouched — the user
+/// the filter-sheet footer. The filter sheet visibility is untouched — the user
 /// can interact with this bar with the sheet open or closed.
 class PhotosFilterSubheader extends ConsumerWidget {
   const PhotosFilterSubheader({super.key});

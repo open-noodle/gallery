@@ -48,7 +48,7 @@ void main() {
       await tester.pumpConsumerWidget(
         DeepContent(scrollController: controller),
         overrides: [
-          photosFilterSheetProvider.overrideWith((ref) => FilterSheetSnap.deep),
+          photosFilterSheetProvider.overrideWith((ref) => FilterSheetVisibility.visible),
           // Return empty buckets so WhenAccordionSection collapses to the
           // short empty-caption body instead of the full skeleton / retry.
           timeBucketsProvider.overrideWith((ref, filter) => Future.value(const <BucketLite>[])),
