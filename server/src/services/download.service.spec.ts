@@ -1,7 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { Readable } from 'node:stream';
 import { DownloadResponseDto } from 'src/dtos/download.dto';
-import { AssetType } from 'src/enum';
+import { AssetType, SharedSpaceRole } from 'src/enum';
 import { DownloadService } from 'src/services/download.service';
 import { StorageService } from 'src/services/storage.service';
 import { AssetFactory } from 'test/factories/asset.factory';
@@ -19,6 +19,17 @@ const downloadResponse: DownloadResponseDto = {
     },
   ],
 };
+
+const albumStream = () =>
+  makeStream([
+    { id: 'asset-1', livePhotoVideoId: null, size: 100_000 },
+    { id: 'asset-2', livePhotoVideoId: null, size: 5000 },
+  ]);
+
+const albumLinkAuth = (spaceId: string | null) => ({
+  user: authStub.admin.user,
+  sharedLink: { ...authStub.adminSharedLink.sharedLink, albumId: 'album-1', spaceId },
+});
 
 describe(DownloadService.name, () => {
   let sut: DownloadService;
@@ -562,6 +573,7 @@ describe(DownloadService.name, () => {
     it('should return a list of archives (albumId)', async () => {
       mocks.user.getMetadata.mockResolvedValue([]);
       mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set(['album-1']));
+      mocks.sharedSpace.getMemberSpaceIdsLinkingAlbum.mockResolvedValue([]);
       mocks.downloadRepository.downloadAlbumId.mockReturnValue(
         makeStream([
           { id: 'asset-1', livePhotoVideoId: null, size: 100_000 },
@@ -572,7 +584,68 @@ describe(DownloadService.name, () => {
       await expect(sut.getDownloadInfo(authStub.admin, { albumId: 'album-1' })).resolves.toEqual(downloadResponse);
 
       expect(mocks.access.album.checkOwnerAccess).toHaveBeenCalledWith(authStub.admin.user.id, new Set(['album-1']));
-      expect(mocks.downloadRepository.downloadAlbumId).toHaveBeenCalledWith('album-1');
+      expect(mocks.downloadRepository.downloadAlbumId).toHaveBeenCalledWith('album-1', undefined);
+    });
+
+    // #1048: a space-linked album shows cross-owner contributions (#764) in the grid and through a
+    // share link created from the space (#1018). The archive is scoped by the SAME space ids the
+    // album browse resolves, so "download all" ships what the page showed.
+    describe('albumId — cross-owner contributions', () => {
+      beforeEach(() => {
+        mocks.user.getMetadata.mockResolvedValue([]);
+        mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set(['album-1']));
+        mocks.access.album.checkSharedLinkAccess.mockResolvedValue(new Set(['album-1']));
+        mocks.downloadRepository.downloadAlbumId.mockReturnValue(albumStream());
+      });
+
+      it("scopes an authenticated download to the viewer's live member-spaces linking the album", async () => {
+        mocks.sharedSpace.getMemberSpaceIdsLinkingAlbum.mockResolvedValue(['space-1', 'space-2']);
+
+        await expect(sut.getDownloadInfo(authStub.admin, { albumId: 'album-1' })).resolves.toEqual(downloadResponse);
+
+        expect(mocks.sharedSpace.getMemberSpaceIdsLinkingAlbum).toHaveBeenCalledWith('album-1', authStub.admin.user.id);
+        expect(mocks.downloadRepository.downloadAlbumId).toHaveBeenCalledWith('album-1', ['space-1', 'space-2']);
+      });
+
+      it('resolves no space scope when the album is not linked to any space the viewer belongs to', async () => {
+        mocks.sharedSpace.getMemberSpaceIdsLinkingAlbum.mockResolvedValue([]);
+
+        await expect(sut.getDownloadInfo(authStub.admin, { albumId: 'album-1' })).resolves.toEqual(downloadResponse);
+
+        expect(mocks.downloadRepository.downloadAlbumId).toHaveBeenCalledWith('album-1', undefined);
+      });
+
+      it("scopes a shared link to the ONE space it was created from, never the creator's other spaces", async () => {
+        mocks.sharedSpace.getMemberSpaceIdsLinkingAlbum.mockResolvedValue(['space-1', 'space-2']);
+
+        await expect(sut.getDownloadInfo(albumLinkAuth('space-1'), { albumId: 'album-1' })).resolves.toEqual(
+          downloadResponse,
+        );
+
+        expect(mocks.sharedSpace.getMemberSpaceIdsLinkingAlbum).toHaveBeenCalledWith('album-1', '42', {
+          roles: [SharedSpaceRole.Owner, SharedSpaceRole.Editor],
+        });
+        expect(mocks.downloadRepository.downloadAlbumId).toHaveBeenCalledWith('album-1', ['space-1']);
+      });
+
+      it('resolves no space scope for a shared link whose creator no longer holds a publisher role', async () => {
+        mocks.sharedSpace.getMemberSpaceIdsLinkingAlbum.mockResolvedValue([]);
+
+        await expect(sut.getDownloadInfo(albumLinkAuth('space-1'), { albumId: 'album-1' })).resolves.toEqual(
+          downloadResponse,
+        );
+
+        expect(mocks.downloadRepository.downloadAlbumId).toHaveBeenCalledWith('album-1', undefined);
+      });
+
+      it('resolves no space scope for a link with no space (every pre-#1018 link)', async () => {
+        await expect(sut.getDownloadInfo(albumLinkAuth(null), { albumId: 'album-1' })).resolves.toEqual(
+          downloadResponse,
+        );
+
+        expect(mocks.sharedSpace.getMemberSpaceIdsLinkingAlbum).not.toHaveBeenCalled();
+        expect(mocks.downloadRepository.downloadAlbumId).toHaveBeenCalledWith('album-1', undefined);
+      });
     });
 
     it('should return a list of archives (userId)', async () => {
