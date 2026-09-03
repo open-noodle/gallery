@@ -632,7 +632,10 @@ it('T5.1: returns the photo context alongside each face id', async () => {
     imageWidth: 400,
     imageHeight: 300,
   });
-  await ctx.newFaceSearch({ faceId: assetFace.id });
+  // getClusterFacePage INNER JOINs face_search, so a face without an embedding row never appears. There is
+  // no ctx.newFaceSearch helper — this direct insert with the file's existing EMBEDDING const (defined at
+  // face-repair.repository.spec.ts:30) is the idiom every other test in this file uses.
+  await ctx.database.insertInto('face_search').values({ faceId: assetFace.id, embedding: EMBEDDING }).execute();
 
   const page = await sut.getClusterFacePage(person.id, { excludeFaceIds: [], limit: 10, offset: 0 });
 
@@ -660,7 +663,10 @@ it('T5.3 (pin): a face on a trashed asset is still absent from the page', async 
     personId: person.id,
     sourceType: SourceType.MachineLearning,
   });
-  await ctx.newFaceSearch({ faceId: assetFace.id });
+  // getClusterFacePage INNER JOINs face_search, so a face without an embedding row never appears. There is
+  // no ctx.newFaceSearch helper — this direct insert with the file's existing EMBEDDING const (defined at
+  // face-repair.repository.spec.ts:30) is the idiom every other test in this file uses.
+  await ctx.database.insertInto('face_search').values({ faceId: assetFace.id, embedding: EMBEDDING }).execute();
   await ctx.database.updateTable('asset').set({ deletedAt: new Date() }).where('id', '=', asset.id).execute();
 
   const page = await sut.getClusterFacePage(person.id, { excludeFaceIds: [], limit: 10, offset: 0 });
@@ -815,7 +821,22 @@ Expected: T2.10 FAILS (no `imageWidth` on the result). T2.11 passes already — 
 
 - [ ] **Step 10: Wire the passthrough**
 
-In `getPersonFlaggedFaces` (`face-repair.service.ts:696`), the shared `FlaggedFace` type must **not** grow — it is also used by `withLiveFlaggedCounts`, which feeds the dashboard. Carry the context in a side map instead. Replace the body's tail:
+In `getPersonFlaggedFaces` (`face-repair.service.ts:696`), the shared `FlaggedFace` type must **not** grow — it
+is also used by `withLiveFlaggedCounts`, which feeds the dashboard. Carry the context in a side map instead.
+
+Replace **exactly these five existing lines** (`:717-724`) — note the block below re-includes the
+`applyVerdictFilters` call, so do not leave the original in place as well:
+
+```ts
+applyVerdictFilters(byPerson, verdictMaps);
+const flaggedFaces = (byPerson.get(personId) ?? []).map((f) => ({
+  assetFaceId: f.assetFaceId,
+  suspectedOwnerId: f.suspectedOwnerId,
+}));
+return { personId, flaggedFaces };
+```
+
+with:
 
 ```ts
 // FlaggedFace is shared with withLiveFlaggedCounts (the dashboard recompute), so the photo context does
@@ -1299,17 +1320,29 @@ Implements spec §4.3, tests T6.1–T6.11, edge cases E8–E10, E13, E15, E16, E
 
 **Files:**
 
+- Create: `web/src/lib/components/face-cleanup/face-photo.ts`
 - Create: `web/src/lib/components/face-cleanup/FacePhotoModal.svelte`
 - Test: `web/src/lib/components/face-cleanup/FacePhotoModal.spec.ts`
 
 **Interfaces:**
 
 - Consumes: `getAdminFacePreviewUrl`, `isUsableFaceBox`, `clampFaceBoxToImage`, `getBoundingBox` (Task 6); the i18n keys (Task 6).
-- Produces: a component with props `{ faces: FacePhotoFace[]; index: number; onClose: () => void }` where
+- Produces:
+  - `web/src/lib/components/face-cleanup/face-photo.ts` exporting
 
-  ```ts
-  export type FacePhotoFace = FaceBox & { assetFaceId: string; localDateTime: string };
-  ```
+    ```ts
+    import type { FaceBox } from '$lib/utils/people-utils';
+
+    /** One face as the photo modal and the tile overlay need it: the box, plus which face and when. */
+    export type FacePhotoFace = FaceBox & { assetFaceId: string; localDateTime: string };
+    ```
+
+    A plain `.ts` module, NOT an `export type` inside the component: every type-from-a-module import in
+    this codebase points at a `.ts` / `.svelte.ts` file, never at a `.svelte` component's instance script,
+    which needs a `<script module>` block to export anything. `face-actions.ts` in this same folder is the
+    precedent.
+
+  - a component with props `{ faces: FacePhotoFace[]; index: number; onClose: () => void }`
 
   Tasks 8 and 9 open it via `modalManager.show(FacePhotoModal, { faces, index })`.
 
@@ -1464,8 +1497,8 @@ Expected: FAIL — the component does not exist.
     getAdminFacePreviewUrl,
     getBoundingBox,
     isUsableFaceBox,
-    type FaceBox,
   } from '$lib/utils/people-utils';
+  import type { FacePhotoFace } from '$lib/components/face-cleanup/face-photo';
 
   // #1061: a 250px face crop cannot separate two similar-looking children. This shows the SOURCE PHOTO with
   // the detection boxed, through the admin-gated preview route — never /photos/{assetId}, which enforces
@@ -1473,8 +1506,6 @@ Expected: FAIL — the component does not exist.
   //
   // Escape-to-dismiss and the focus trap come from @immich/ui's Modal; they are not re-implemented or
   // re-asserted here.
-  export type FacePhotoFace = FaceBox & { assetFaceId: string; localDateTime: string };
-
   interface Props {
     faces: FacePhotoFace[];
     index: number;
@@ -1775,7 +1806,10 @@ describe('source-photo access', () => {
     await fireEvent.click(within(tile.parentElement!).getByTestId('face-tile-view-photo'));
 
     expect(tile.dataset.state).toBe(stateBefore);
-    expect(screen.queryByTestId('review-dock')).not.toBeInTheDocument(); // nothing became selected
+    // `face-dock` really is the testid, and the dock really is conditional — page.spec.ts asserts its
+    // presence at :327 and its absence at :1271. Querying a testid that never exists would return null
+    // whether or not the feature works, which is the failure mode this whole plan keeps warning about.
+    expect(screen.queryByTestId('face-dock')).not.toBeInTheDocument(); // nothing became selected
   });
 
   it('T7.5/T7.6: the rest grid’s magnifier opens the modal and stages nothing, with no destination chosen', async () => {
@@ -1799,7 +1833,8 @@ describe('source-photo access', () => {
 });
 ```
 
-Replace `renderPageWithFlaggedFaces` / `renderPageWithRestFaces` / `review-dock` with whatever this file already uses — read it first. If the dock's testid differs, assert on the selection count element instead.
+Replace `renderPageWithFlaggedFaces` / `renderPageWithRestFaces` with whatever this file already uses — read it
+first. `face-dock` is verified; the render helpers are not.
 
 - [ ] **Step 4: Run to verify they fail**
 
@@ -1845,7 +1880,7 @@ Add the imports and one handler:
 ```ts
 import FacePhotoModal from '$lib/components/face-cleanup/FacePhotoModal.svelte';
 import FaceTileOverlay from '$lib/components/face-cleanup/FaceTileOverlay.svelte';
-import type { FacePhotoFace } from '$lib/components/face-cleanup/FacePhotoModal.svelte';
+import type { FacePhotoFace } from '$lib/components/face-cleanup/face-photo';
 
 const openPhoto = (faces: FacePhotoFace[], index: number) => {
   void modalManager.show(FacePhotoModal, { faces, index });
@@ -2087,6 +2122,6 @@ EOF
 
 **Spec coverage.** Every spec section maps to a task: §4.1 → Tasks 1–2, §4.2 → Task 3, regeneration → Task 4, §7 T10 → Task 5, §4.3 → Tasks 6–7, §4.4/§4.5 → Tasks 8–9, §4.6 → Task 6, §8 → Task 9, §10 docs note → Task 9 Step 9. All 23 edge cases are claimed by a numbered test except E11 (video assets), which §7 documents as deliberately untested.
 
-**Type consistency.** `FacePhotoFace` (Task 7) = `FaceBox` + `assetFaceId` + `localDateTime`; web's `FlaggedFace` (Task 8) and `ManualFace` (Task 9) are structurally assignable to it, which is what lets `openPhoto` take all three grids' arrays. `getFaceByIdOnLiveAsset` (Task 1) is the exact name Task 2 calls and Task 3's tests mock. `isUsableFaceBox` / `clampFaceBoxToImage` (Task 6) are the exact names Task 7 imports.
+**Type consistency.** `FacePhotoFace` lives in `face-photo.ts` (Task 7) and is `FaceBox` + `assetFaceId` + `localDateTime`; web's `FlaggedFace` (Task 8) and `ManualFace` (Task 9) are structurally assignable to it, which is what lets `openPhoto` take all three grids' arrays. `getFaceByIdOnLiveAsset` (Task 1) is the exact name Task 2 calls and Task 3's tests mock. `isUsableFaceBox` / `clampFaceBoxToImage` (Task 6) are the exact names Task 7 imports.
 
 **Deliberate carry-overs to the executor.** Three places name a helper this plan could not verify without reading a file it does not modify: `renderPageWithFlaggedFaces` and friends in the two page specs, the seeding helper in `face-repair-scan-flagged-face.repository.spec.ts`, and the e2e `utils.*` signatures. Each step says to read the file and reuse what is there rather than invent — inventing a fixture that shadows an existing one is how these suites grow false greens.
