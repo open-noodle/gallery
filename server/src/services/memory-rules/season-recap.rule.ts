@@ -4,13 +4,14 @@ import { medianTime, recencyBonus, sampleAssetsByTime } from 'src/services/memor
 import { MemoryRule, MemoryRuleCandidate, MemoryRuleContext } from 'src/services/memory-rules/memory-rule.interface';
 import { SEASON_MONTHS, seasonStartingOn, seasonYearOf } from 'src/services/memory-rules/season.util';
 
+export const MIN_ASSETS = 15;
+export const MAX_YEARS = 2;
+export const ASSET_CAP = 30;
+export const VISIBLE_FOR_DAYS = 10;
+
 /** "Summer 2024" — a recap of a past meteorological season, shown when that season starts. */
 export class SeasonRecapMemoryRule implements MemoryRule {
   readonly id = 'season_recap';
-  private static readonly MIN_ASSETS = 15;
-  private static readonly MAX_YEARS = 2;
-  private static readonly ASSET_CAP = 30;
-  private static readonly VISIBLE_FOR_DAYS = 10;
 
   constructor(private assetRepository: Pick<AssetRepository, 'getMemoryAssetsForPeriod'>) {}
 
@@ -40,7 +41,7 @@ export class SeasonRecapMemoryRule implements MemoryRule {
 
     const candidates: MemoryRuleCandidate[] = [];
     for (const [seasonYear, yearAssets] of byYear) {
-      if (yearAssets.length < SeasonRecapMemoryRule.MIN_ASSETS) {
+      if (yearAssets.length < MIN_ASSETS) {
         continue;
       }
 
@@ -49,13 +50,13 @@ export class SeasonRecapMemoryRule implements MemoryRule {
         ruleId: this.id,
         dedupeKey: `season_recap:${seasonYear}-${season}`,
         score: 90 + Math.min(count, 40) + recencyBonus(seasonYear, target.year),
-        assetIds: sampleAssetsByTime(yearAssets, SeasonRecapMemoryRule.ASSET_CAP),
+        assetIds: sampleAssetsByTime(yearAssets, ASSET_CAP),
         memoryAt: DateTime.fromJSDate(medianTime(yearAssets), { zone: 'utc' }),
         context: { seasonYear, season, count },
-        visibleForDays: SeasonRecapMemoryRule.VISIBLE_FOR_DAYS,
+        visibleForDays: VISIBLE_FOR_DAYS,
       });
     }
 
-    return candidates.toSorted((left, right) => right.score - left.score).slice(0, SeasonRecapMemoryRule.MAX_YEARS);
+    return candidates.toSorted((left, right) => right.score - left.score).slice(0, MAX_YEARS);
   }
 }
