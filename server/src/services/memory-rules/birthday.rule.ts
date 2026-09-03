@@ -43,12 +43,15 @@ export class BirthdayMemoryRule implements MemoryRule {
         candidates.push({
           ruleId: this.id,
           dedupeKey: `birthday:${person.personGroupId}:${target.toFormat('yyyy-MM-dd')}`,
-          title: `Happy birthday, ${person.name}`,
-          subtitle: 'Photos from different years',
           score: 300 + byYear.size * 10 + assetIds.length,
           assetIds,
           memoryAt: target,
-          context: { personId: person.personGroupId, distinctYears: byYear.size },
+          context: {
+            personId: person.personGroupId,
+            personName: person.name,
+            variant: 'across_years',
+            distinctYears: byYear.size,
+          },
         });
 
         continue;
@@ -66,12 +69,10 @@ export class BirthdayMemoryRule implements MemoryRule {
       candidates.push({
         ruleId: this.id,
         dedupeKey: `birthday:${person.personGroupId}:${target.toFormat('yyyy-MM-dd')}`,
-        title: `Happy birthday, ${person.name}`,
-        subtitle: `Recent photos of ${person.name}`,
         score: 250 + fallbackAssetIds.length,
         assetIds: fallbackAssetIds,
         memoryAt: target,
-        context: { personId: person.personGroupId, distinctYears: byYear.size },
+        context: { personId: person.personGroupId, personName: person.name, variant: 'recent', distinctYears: byYear.size },
       });
     }
 

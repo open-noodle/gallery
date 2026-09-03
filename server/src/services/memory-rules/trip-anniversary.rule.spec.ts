@@ -121,15 +121,16 @@ describe(TripAnniversaryMemoryRule.name, () => {
       expect(candidate).toMatchObject({
         ruleId: 'trip_anniversary',
         dedupeKey: 'place_day:2023-06-10:italy:rome',
-        title: 'Your trip to Rome, Italy',
-        subtitle: '3 years ago · 8 photos over 3 days',
         score: 287, // 260 + 3*4 + min(8,20) + recencyBonus(2023,2026)=7 -> 260+12+8+7
         visibleForDays: 3,
       });
+      expect(candidate.title).toBeUndefined();
+      expect(candidate.subtitle).toBeUndefined();
       expect(candidate.memoryAt.toISO()).toBe('2023-06-10T09:00:00.000Z');
       expect(candidate.assetIds).toEqual(['rome-1', 'rome-2', 'rome-3']);
       expect(candidate.context).toEqual({
         year: 2023,
+        yearsAgo: 3,
         placeKey: 'italy:rome',
         placeLabel: 'Rome, Italy',
         country: 'Italy',
@@ -450,26 +451,26 @@ describe(TripAnniversaryMemoryRule.name, () => {
     });
   });
 
-  describe('subtitle pluralization', () => {
-    it('reads "1 year ago" for a trip one year back and "3 years ago" for a trip three years back', async () => {
+  describe('yearsAgo', () => {
+    it('reads 1 for a trip one year back and 3 for a trip three years back', async () => {
       const oneYearAgo = ruleWith(probeCityAssets(TARGET, 2025, 'Rome', 6));
       oneYearAgo.assetRepository.getMemoryLocationClusters
         .mockResolvedValueOnce([germanyHome()])
         .mockResolvedValueOnce([romeTrip(2025)]);
       const [candidate1] = await oneYearAgo.rule.evaluate({ ownerId: 'user-1', target: TARGET });
-      expect(candidate1.subtitle).toBe('1 year ago · 8 photos over 3 days');
+      expect(candidate1.context).toMatchObject({ yearsAgo: 1, assetCount: 8, dayCount: 3 });
 
       const threeYearsAgo = ruleWith(probeCityAssets(TARGET, 2023, 'Rome', 6));
       threeYearsAgo.assetRepository.getMemoryLocationClusters
         .mockResolvedValueOnce([germanyHome()])
         .mockResolvedValueOnce([romeTrip(2023)]);
       const [candidate3] = await threeYearsAgo.rule.evaluate({ ownerId: 'user-1', target: TARGET });
-      expect(candidate3.subtitle).toBe('3 years ago · 8 photos over 3 days');
+      expect(candidate3.context).toMatchObject({ yearsAgo: 3, assetCount: 8, dayCount: 3 });
     });
   });
 
   describe('city null', () => {
-    it("falls back to 'Your trip to Italy' (country only) when the trip cluster has no city", async () => {
+    it('falls back to a country-only placeLabel when the trip cluster has no city', async () => {
       const { rule, assetRepository } = ruleWith(probeCityAssets(TARGET, 2023, 'Rome', 6));
       assetRepository.getMemoryLocationClusters
         .mockResolvedValueOnce([germanyHome()])
@@ -477,7 +478,8 @@ describe(TripAnniversaryMemoryRule.name, () => {
 
       const [candidate] = await rule.evaluate({ ownerId: 'user-1', target: TARGET });
 
-      expect(candidate.title).toBe('Your trip to Italy');
+      expect(candidate.title).toBeUndefined();
+      expect(candidate.context).toMatchObject({ placeLabel: 'Italy', city: null });
       expect(candidate.dedupeKey).toBe('place_day:2023-06-10:italy:');
     });
   });

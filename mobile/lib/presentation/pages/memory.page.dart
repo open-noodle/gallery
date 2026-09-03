@@ -8,30 +8,15 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/memory.model.dart';
-import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/presentation/widgets/images/image_provider.dart';
 import 'package:immich_mobile/presentation/widgets/memory/memory_bottom_info.widget.dart';
 import 'package:immich_mobile/presentation/widgets/memory/memory_card.widget.dart';
 import 'package:immich_mobile/providers/asset_viewer/asset_viewer.provider.dart';
 import 'package:immich_mobile/providers/haptic_feedback.provider.dart';
+import 'package:immich_mobile/utils/memory_card_text.dart';
 import 'package:immich_mobile/utils/system_ui.utils.dart';
 import 'package:immich_mobile/widgets/memories/memory_epilogue.dart';
 import 'package:immich_mobile/widgets/memories/memory_progress_indicator.dart';
-
-String getMemoryTitle(BuildContext context, Memory memory) {
-  final serverTitle = memory.data.title;
-  if (serverTitle != null && serverTitle.isNotEmpty) {
-    return serverTitle;
-  }
-
-  final year = memory.data.year;
-  if (year != null) {
-    final yearsAgo = DateTime.now().year - year;
-    return context.t.years_ago(years: yearsAgo);
-  }
-
-  return context.t.memory;
-}
 
 /// Expects the current asset to be set via [assetViewerProvider] before navigating to this page
 @RoutePage()
