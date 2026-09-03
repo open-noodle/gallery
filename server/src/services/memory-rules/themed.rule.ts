@@ -69,8 +69,6 @@ export class ThemedMemoryRule implements MemoryRule {
       candidates.push({
         ruleId: this.id,
         dedupeKey: `themed:${theme.key}:${year}`,
-        title: `${theme.label} from ${year}`,
-        subtitle: `${count} photos`,
         score: SCORE_BASE + Math.min(count, 25) + recencyBonus(year, target.year),
         assetIds: sampleAssetsByTime(filtered, ASSET_CAP),
         memoryAt: DateTime.fromJSDate(medianTime(filtered), { zone: 'utc' }),

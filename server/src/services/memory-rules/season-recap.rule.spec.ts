@@ -54,12 +54,12 @@ describe(SeasonRecapMemoryRule.name, () => {
       expect(candidate).toMatchObject({
         ruleId: 'season_recap',
         dedupeKey: 'season_recap:2024-summer',
-        title: 'Summer 2024',
-        subtitle: '15 photos',
         score: 113, // 90 + min(15,40)=15 + recencyBonus(2024,2026)=8
         visibleForDays: 10,
         context: { seasonYear: 2024, season: 'summer', count: 15 },
       });
+      expect(candidate.title).toBeUndefined();
+      expect(candidate.subtitle).toBeUndefined();
       expect(candidate.memoryAt.toISODate()).toBe('2024-07-01');
       expect(candidate.assetIds).toHaveLength(15);
       expect(candidate.assetIds[0]).toBe('a-2024-7-0');
@@ -71,7 +71,7 @@ describe(SeasonRecapMemoryRule.name, () => {
       const { rule } = ruleWith([...assetsIn(2024, 12, 8), ...assetsIn(2025, 1, 5), ...assetsIn(2025, 2, 3)]);
       const result = await rule.evaluate({ ownerId: 'user-1', target: winterStart });
       expect(result).toHaveLength(1);
-      expect(result[0]).toMatchObject({ title: 'Winter 2024', subtitle: '16 photos' });
+      expect(result[0]).toMatchObject({ context: { seasonYear: 2024, season: 'winter', count: 16 } });
     });
 
     it('drops the in-progress winter (season starting today)', async () => {
@@ -96,7 +96,10 @@ describe(SeasonRecapMemoryRule.name, () => {
     it('emits only the top 2, newest first', async () => {
       const { rule } = ruleWith([...assetsIn(2022, 7, 15), ...assetsIn(2023, 7, 15), ...assetsIn(2024, 7, 15)]);
       const result = await rule.evaluate({ ownerId: 'user-1', target: summerStart });
-      expect(result.map((c) => c.title)).toEqual(['Summer 2024', 'Summer 2023']);
+      expect(result.map((c) => c.context)).toEqual([
+        { seasonYear: 2024, season: 'summer', count: 15 },
+        { seasonYear: 2023, season: 'summer', count: 15 },
+      ]);
     });
   });
 
@@ -112,7 +115,7 @@ describe(SeasonRecapMemoryRule.name, () => {
       const { rule } = ruleWith(assetsIn(2024, 7, 35));
       const [candidate] = await rule.evaluate({ ownerId: 'user-1', target: summerStart });
       expect(candidate.assetIds).toHaveLength(30);
-      expect(candidate.subtitle).toBe('35 photos');
+      expect(candidate.context).toMatchObject({ count: 35 });
     });
   });
 });
