@@ -1,7 +1,7 @@
 import { Kysely } from 'kysely';
 import { DateTime } from 'luxon';
 import { BulkIdErrorReason } from 'src/dtos/asset-ids.response.dto';
-import { AssetFileType, AssetType, AssetVisibility, MemoryType, UserMetadataKey } from 'src/enum';
+import { AssetFileType, AssetType, AssetVisibility, MemoryType, SystemMetadataKey, UserMetadataKey } from 'src/enum';
 import { AccessRepository } from 'src/repositories/access.repository';
 import { AssetRepository } from 'src/repositories/asset.repository';
 import { ConfigRepository } from 'src/repositories/config.repository';
@@ -425,15 +425,26 @@ describe(MemoryService.name, () => {
       const memoryRepo = ctx.get(MemoryRepository);
       const now = DateTime.fromObject({ year: 2025, month: 2, day: 25 }, { zone: 'utc' }) as DateTime<true>;
       const { user } = await ctx.newUser();
-      const { asset } = await ctx.newAsset({ ownerId: user.id, localDateTime: now.minus({ years: 1 }).toISO() });
-      await Promise.all([
-        ctx.newExif({ assetId: asset.id, make: 'Canon' }),
-        ctx.newJobStatus({ assetId: asset.id }),
-        assetRepo.upsertFiles([
-          { assetId: asset.id, type: AssetFileType.Preview, path: '/path/to/preview.jpg' },
-          { assetId: asset.id, type: AssetFileType.Thumbnail, path: '/path/to/thumbnail.jpg' },
-        ]),
-      ]);
+      // Three assets on the same target day: on_this_day's floor is 3 (unconditional -- spec
+      // P3/§6.2), so a single asset would be generated then swept before this test could observe
+      // it. See 'sweeps an on_this_day memory that holds fewer photos than its floor' below for
+      // that case.
+      const assetIds: string[] = [];
+      for (let hour = 0; hour < 3; hour++) {
+        const { asset } = await ctx.newAsset({
+          ownerId: user.id,
+          localDateTime: now.minus({ years: 1 }).plus({ hours: hour }).toISO(),
+        });
+        assetIds.push(asset.id);
+        await Promise.all([
+          ctx.newExif({ assetId: asset.id, make: 'Canon' }),
+          ctx.newJobStatus({ assetId: asset.id }),
+          assetRepo.upsertFiles([
+            { assetId: asset.id, type: AssetFileType.Preview, path: `/path/to/preview-${asset.id}.jpg` },
+            { assetId: asset.id, type: AssetFileType.Thumbnail, path: `/path/to/thumbnail-${asset.id}.jpg` },
+          ]),
+        ]);
+      }
 
       vi.setSystemTime(now.toJSDate());
       await sut.onMemoriesCreate();
@@ -448,7 +459,7 @@ describe(MemoryService.name, () => {
           updatedAt: expect.any(Date),
           deletedAt: null,
           ownerId: user.id,
-          assets: expect.arrayContaining([expect.objectContaining({ id: asset.id })]),
+          assets: expect.arrayContaining(assetIds.map((id) => expect.objectContaining({ id }))),
           isSaved: false,
           showAt: now.startOf('day').toJSDate(),
           hideAt: now.endOf('day').toJSDate(),
@@ -457,6 +468,7 @@ describe(MemoryService.name, () => {
           data: { year: 2024 },
         }),
       );
+      expect(memories[0]?.assets).toHaveLength(3);
     });
 
     it('should create a memory from an asset - in advance', async () => {
@@ -465,15 +477,23 @@ describe(MemoryService.name, () => {
       const memoryRepo = ctx.get(MemoryRepository);
       const now = DateTime.fromObject({ year: 2035, month: 2, day: 26 }, { zone: 'utc' }) as DateTime<true>;
       const { user } = await ctx.newUser();
-      const { asset } = await ctx.newAsset({ ownerId: user.id, localDateTime: now.minus({ years: 1 }).toISO() });
-      await Promise.all([
-        ctx.newExif({ assetId: asset.id, make: 'Canon' }),
-        ctx.newJobStatus({ assetId: asset.id }),
-        assetRepo.upsertFiles([
-          { assetId: asset.id, type: AssetFileType.Preview, path: '/path/to/preview.jpg' },
-          { assetId: asset.id, type: AssetFileType.Thumbnail, path: '/path/to/thumbnail.jpg' },
-        ]),
-      ]);
+      // Three assets on the same target day -- see the floor comment in the previous test.
+      const assetIds: string[] = [];
+      for (let hour = 0; hour < 3; hour++) {
+        const { asset } = await ctx.newAsset({
+          ownerId: user.id,
+          localDateTime: now.minus({ years: 1 }).plus({ hours: hour }).toISO(),
+        });
+        assetIds.push(asset.id);
+        await Promise.all([
+          ctx.newExif({ assetId: asset.id, make: 'Canon' }),
+          ctx.newJobStatus({ assetId: asset.id }),
+          assetRepo.upsertFiles([
+            { assetId: asset.id, type: AssetFileType.Preview, path: `/path/to/preview-${asset.id}.jpg` },
+            { assetId: asset.id, type: AssetFileType.Thumbnail, path: `/path/to/thumbnail-${asset.id}.jpg` },
+          ]),
+        ]);
+      }
 
       vi.setSystemTime(now.toJSDate());
       await sut.onMemoriesCreate();
@@ -488,7 +508,7 @@ describe(MemoryService.name, () => {
           updatedAt: expect.any(Date),
           deletedAt: null,
           ownerId: user.id,
-          assets: expect.arrayContaining([expect.objectContaining({ id: asset.id })]),
+          assets: expect.arrayContaining(assetIds.map((id) => expect.objectContaining({ id }))),
           isSaved: false,
           showAt: now.startOf('day').toJSDate(),
           hideAt: now.endOf('day').toJSDate(),
@@ -497,6 +517,7 @@ describe(MemoryService.name, () => {
           data: { year: 2034 },
         }),
       );
+      expect(memories[0]?.assets).toHaveLength(3);
     });
 
     it('should not generate a memory twice for the same day', async () => {
@@ -505,18 +526,21 @@ describe(MemoryService.name, () => {
       const memoryRepo = ctx.get(MemoryRepository);
       const now = DateTime.fromObject({ year: 2025, month: 2, day: 20 }, { zone: 'utc' }) as DateTime<true>;
       const { user } = await ctx.newUser();
+      // All three assets land on the SAME target day (now + 3 days) so the resulting on_this_day
+      // memory clears its floor of 3 -- see the floor comment on 'should create a memory from an
+      // asset' above.
       for (const dto of [
         {
           ownerId: user.id,
-          localDateTime: now.minus({ year: 1 }).plus({ days: 3 }).toISO(),
+          localDateTime: now.minus({ year: 1 }).plus({ days: 3, hours: 0 }).toISO(),
         },
         {
           ownerId: user.id,
-          localDateTime: now.minus({ year: 1 }).plus({ days: 4 }).toISO(),
+          localDateTime: now.minus({ year: 1 }).plus({ days: 3, hours: 1 }).toISO(),
         },
         {
           ownerId: user.id,
-          localDateTime: now.minus({ year: 1 }).plus({ days: 5 }).toISO(),
+          localDateTime: now.minus({ year: 1 }).plus({ days: 3, hours: 2 }).toISO(),
         },
       ]) {
         const { asset } = await ctx.newAsset(dto);
@@ -524,8 +548,8 @@ describe(MemoryService.name, () => {
           ctx.newExif({ assetId: asset.id, make: 'Canon' }),
           ctx.newJobStatus({ assetId: asset.id }),
           assetRepo.upsertFiles([
-            { assetId: asset.id, type: AssetFileType.Preview, path: '/path/to/preview.jpg' },
-            { assetId: asset.id, type: AssetFileType.Thumbnail, path: '/path/to/thumbnail.jpg' },
+            { assetId: asset.id, type: AssetFileType.Preview, path: `/path/to/preview-${asset.id}.jpg` },
+            { assetId: asset.id, type: AssetFileType.Thumbnail, path: `/path/to/thumbnail-${asset.id}.jpg` },
           ]),
         ]);
       }
@@ -538,11 +562,41 @@ describe(MemoryService.name, () => {
 
       const memories = await memoryRepo.search(user.id, { for: now.plus({ days: 3 }).toJSDate() });
       expect(memories.length).toBe(1);
+      expect(memories[0]?.assets).toHaveLength(3);
 
       await sut.onMemoriesCreate();
 
       const memoriesAfter = await memoryRepo.search(user.id, { for: now.plus({ days: 3 }).toJSDate() });
       expect(memoriesAfter.length).toBe(1);
+      expect(memoriesAfter[0]?.assets).toHaveLength(3);
+    });
+
+    it('sweeps an on_this_day memory that holds fewer photos than its floor', async () => {
+      // on_this_day's floor is 3 (`minAssets` on the 'on_this_day' entry in
+      // `src/services/memory-rules/memory-type.metadata.ts`), applied unconditionally per spec
+      // §6.2/P3 -- even with nothing else visible that day. This is deliberately what removes
+      // the reporter's original 2-photo card, so pin it here rather than leaving it as an
+      // incidental side effect of the overlap-reconciliation tests below.
+      const { sut, ctx } = setup();
+      const assetRepo = ctx.get(AssetRepository);
+      const memoryRepo = ctx.get(MemoryRepository);
+      const now = DateTime.fromObject({ year: 2025, month: 2, day: 25 }, { zone: 'utc' }) as DateTime<true>;
+      const { user } = await ctx.newUser();
+      const { asset } = await ctx.newAsset({ ownerId: user.id, localDateTime: now.minus({ years: 1 }).toISO() });
+      await Promise.all([
+        ctx.newExif({ assetId: asset.id, make: 'Canon' }),
+        ctx.newJobStatus({ assetId: asset.id }),
+        assetRepo.upsertFiles([
+          { assetId: asset.id, type: AssetFileType.Preview, path: '/path/to/preview.jpg' },
+          { assetId: asset.id, type: AssetFileType.Thumbnail, path: '/path/to/thumbnail.jpg' },
+        ]),
+      ]);
+
+      vi.setSystemTime(now.toJSDate());
+      await sut.onMemoriesCreate();
+
+      const memories = await memoryRepo.search(user.id, {});
+      expect(memories).toEqual([]);
     });
 
     it('creates a birthday rule memory on the birthday itself', async () => {
@@ -1709,9 +1763,11 @@ describe(MemoryService.name, () => {
         const asset = await seedRuleAsset(ctx, { ownerId: user.id, localDateTime: `2020-01-10T${hour}:00:00Z` });
         await ctx.newAssetFace({ assetId: asset.id, personGroupId: anna.personGroupId, isVisible: true });
       }
+      const annaChapterAssetIds: string[] = [];
       for (const day of [5, 6, 7, 8, 9, 10, 11, 12, 13]) {
         const asset = await seedRuleAsset(ctx, { ownerId: user.id, localDateTime: `2023-08-${day}T12:00:00Z` });
         await ctx.newAssetFace({ assetId: asset.id, personGroupId: anna.personGroupId, isVisible: true });
+        annaChapterAssetIds.push(asset.id);
       }
 
       const { person: ben } = await seedDormantPersonChapter(ctx, { ownerId: user.id, name: 'Ben' });
@@ -1721,7 +1777,7 @@ describe(MemoryService.name, () => {
       // today's rule slots -- the test isolates the dedupeKey skip (D8), not the slot cap.
       const dedupeKeyAnna = `person_throwback:${anna.personGroupId}`;
       const priorShowAt = DateTime.fromObject({ year: 2025, month: 8, day: 13 }, { zone: 'utc' });
-      await ctx.newMemory({
+      const { memory: annaMemory } = await ctx.newMemory({
         ownerId: user.id,
         type: MemoryType.Rule,
         data: {
@@ -1736,6 +1792,15 @@ describe(MemoryService.name, () => {
         showAt: priorShowAt.toJSDate(),
         hideAt: priorShowAt.plus({ days: 6 }).endOf('day').toJSDate(),
       });
+      // The overlap sweep now enforces the person_throwback floor (4) unconditionally (spec P14:
+      // a memory holding zero real assets is removed). A hand-built prior memory row with no
+      // `memory_asset` rows would otherwise vanish during `onMemoriesCreate`'s history backfill
+      // before the dedupe check ever runs, which is a test-fixture gap, not a production bug --
+      // link Anna's real chapter assets (the same 9 the subtitle already claims) so the fixture
+      // matches what a real person_throwback memory always has.
+      for (const assetId of annaChapterAssetIds) {
+        await ctx.newMemoryAsset({ memoryId: annaMemory.id, assetId });
+      }
 
       vi.setSystemTime(target.toJSDate());
       await sut.onMemoriesCreate();
@@ -1759,6 +1824,272 @@ describe(MemoryService.name, () => {
         for: priorShowAt.plus({ days: 2 }).toJSDate(),
       });
       expect(priorMemories.map((memory) => (memory.data as { dedupeKey?: string }).dedupeKey)).toEqual([dedupeKeyAnna]);
+    });
+  });
+
+  describe('onMemoriesCreate — overlap reconciliation (end-to-end)', () => {
+    it('drops the thin overlapping cards on a modest library', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+
+      // ~30 photos across September 2025, two of them on the 2nd.
+      for (let index = 0; index < 30; index++) {
+        await seedRuleAsset(ctx, {
+          ownerId: user.id,
+          localDateTime: `2025-09-${String((index % 28) + 1).padStart(2, '0')}T12:00:00Z`,
+        });
+      }
+
+      vi.setSystemTime(new Date('2026-09-01T02:00:00Z'));
+      await sut.onMemoriesCreate();
+
+      const memories = await sut.search(factory.auth({ user }), {});
+      const ruleIds = memories.map((memory) => (memory.data as { ruleId?: string }).ruleId);
+
+      // The season recap claims first; the month recap starves out (it can only ever pick a
+      // subset of the same September pool, and the season recap already claims the lot).
+      expect(ruleIds).toContain('season_recap');
+      expect(ruleIds).not.toContain('month_recap');
+    });
+
+    it('keeps all three cards on a large library, with disjoint photos and different covers', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+
+      for (let index = 0; index < 600; index++) {
+        const month = 9 + Math.floor(index / 200);
+        const day = (index % 28) + 1;
+        await seedRuleAsset(ctx, {
+          ownerId: user.id,
+          localDateTime: `2025-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T12:00:00Z`,
+        });
+      }
+
+      vi.setSystemTime(new Date('2026-09-01T02:00:00Z'));
+      await sut.onMemoriesCreate();
+
+      const memories = await sut.search(factory.auth({ user }), {});
+
+      // All three of the reporter's cards survive: the season recap, the month recap (with
+      // enough of the September pool left over after the season recap claims first), and the
+      // plain on_this_day card (which carries no ruleId).
+      const ruleIds = memories.map((memory) => (memory.data as { ruleId?: string }).ruleId);
+      expect(ruleIds).toContain('season_recap');
+      expect(ruleIds).toContain('month_recap');
+      expect(memories).toHaveLength(3);
+
+      const assetIdSets = memories.map((memory) => memory.assets.map((asset) => asset.id));
+
+      // No photo appears in two memories.
+      const all = assetIdSets.flat();
+      expect(new Set(all).size).toBe(all.length);
+
+      // Every cover is distinct — this is the reported symptom.
+      const covers = assetIdSets.map((ids) => ids[0]);
+      expect(new Set(covers).size).toBe(covers.length);
+    });
+
+    it('makes no further changes on a second run', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+
+      for (let index = 0; index < 120; index++) {
+        await seedRuleAsset(ctx, {
+          ownerId: user.id,
+          localDateTime: `2025-09-${String((index % 28) + 1).padStart(2, '0')}T12:00:00Z`,
+        });
+      }
+
+      vi.setSystemTime(new Date('2026-09-01T02:00:00Z'));
+      await sut.onMemoriesCreate();
+
+      const snapshot = await ctx.database
+        .selectFrom('memory_asset')
+        .select(['memoriesId', 'assetId'])
+        .orderBy('memoriesId')
+        .orderBy('assetId')
+        .execute();
+
+      // Non-empty, so the equality below isn't vacuously true of two empty result sets.
+      expect(snapshot.length).toBeGreaterThan(0);
+
+      await sut.onMemoriesCreate();
+
+      const after = await ctx.database
+        .selectFrom('memory_asset')
+        .select(['memoriesId', 'assetId'])
+        .orderBy('memoriesId')
+        .orderBy('assetId')
+        .execute();
+
+      expect(after).toEqual(snapshot);
+    });
+
+    // F2: the four other e2e scenarios in this describe block all create their memories during
+    // the run itself, so they only ever exercise the nightly `[today, today+3]` window -- the
+    // historical backfill (`backfillMemoryOverlap`, spec §11's "largest single behaviour change")
+    // never runs against a real database anywhere in the suite. Reproduces that path end to end:
+    // seed two overlapping memories dated well outside the nightly window, run once, and prove
+    // both that they reconcile and that the cursor advances.
+    it('reconciles overlapping memories in the historical backfill, then makes no further writes on a second run', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+
+      const today = DateTime.fromObject({ year: 2026, month: 9, day: 1 }, { zone: 'utc' });
+      // 65 days back: well outside `[today, today+3]`, so only the backfill -- not the nightly
+      // pass -- ever reaches these two memories.
+      const past = today.minus({ days: 65 });
+      const pastIso = past.toJSDate().toISOString();
+
+      const { asset: shared } = await ctx.newAsset({ ownerId: user.id, localDateTime: pastIso });
+      const tripOwn = await Promise.all(
+        Array.from({ length: 2 }, () => ctx.newAsset({ ownerId: user.id, localDateTime: pastIso })),
+      );
+      const anniversaryOwn = await Promise.all(
+        Array.from({ length: 2 }, () => ctx.newAsset({ ownerId: user.id, localDateTime: pastIso })),
+      );
+
+      // Both clear their own floor (2) on their own-only assets alone, so overlap resolution
+      // strips the loser rather than deleting it -- isolating the reconciliation itself.
+      const { memory: trip } = await ctx.newMemory({
+        ownerId: user.id,
+        type: MemoryType.Rule,
+        data: { ruleId: 'recent_trip', dedupeKey: 'trip', title: 'Trip', score: 130 },
+        memoryAt: past.toJSDate(),
+        showAt: past.startOf('day').toJSDate(),
+        hideAt: past.endOf('day').toJSDate(),
+      });
+      const { memory: anniversary } = await ctx.newMemory({
+        ownerId: user.id,
+        type: MemoryType.Rule,
+        data: { ruleId: 'trip_anniversary', dedupeKey: 'anniversary', title: 'Anniversary', score: 110 },
+        memoryAt: past.toJSDate(),
+        showAt: past.startOf('day').toJSDate(),
+        hideAt: past.endOf('day').toJSDate(),
+      });
+
+      for (const { asset } of [...tripOwn, { asset: shared }]) {
+        await ctx.newMemoryAsset({ memoryId: trip.id, assetId: asset.id });
+      }
+      for (const { asset } of [...anniversaryOwn, { asset: shared }]) {
+        await ctx.newMemoryAsset({ memoryId: anniversary.id, assetId: asset.id });
+      }
+
+      const assetsOf = async (memoryId: string) => {
+        const rows = await ctx.database
+          .selectFrom('memory_asset')
+          .select('assetId')
+          .where('memoriesId', '=', memoryId)
+          .execute();
+        return rows.map((row) => row.assetId);
+      };
+
+      // Confirm the two memories genuinely existed and overlapped BEFORE the run -- otherwise
+      // the "disjoint after" assertion below would be vacuously true.
+      const tripBefore = await assetsOf(trip.id);
+      const anniversaryBefore = await assetsOf(anniversary.id);
+      expect(tripBefore).toContain(shared.id);
+      expect(anniversaryBefore).toContain(shared.id);
+
+      vi.setSystemTime(today.toJSDate());
+      await sut.onMemoriesCreate();
+
+      const state = await ctx.get(SystemMetadataRepository).get(SystemMetadataKey.MemoriesState);
+      expect(state?.overlapBackfilledAt).toBeDefined();
+
+      const tripAfterFirst = await assetsOf(trip.id);
+      const anniversaryAfterFirst = await assetsOf(anniversary.id);
+
+      // Disjoint: the shared asset now belongs to exactly one of the two. `trip` (score 130)
+      // outranks `anniversary` (score 110) and keeps everything; `anniversary` loses the shared
+      // asset but still clears its own floor of 2 on its two own-only assets.
+      expect(tripAfterFirst.toSorted()).toEqual([shared.id, ...tripOwn.map(({ asset }) => asset.id)].toSorted());
+      expect(anniversaryAfterFirst.toSorted()).toEqual(anniversaryOwn.map(({ asset }) => asset.id).toSorted());
+
+      await sut.onMemoriesCreate();
+
+      const tripAfterSecond = await assetsOf(trip.id);
+      const anniversaryAfterSecond = await assetsOf(anniversary.id);
+
+      expect(tripAfterSecond.toSorted()).toEqual(tripAfterFirst.toSorted());
+      expect(anniversaryAfterSecond.toSorted()).toEqual(anniversaryAfterFirst.toSorted());
+    });
+
+    it('never deletes a memory created through the API', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+
+      const { asset: first } = await ctx.newAsset({ ownerId: user.id, localDateTime: '2025-09-02T12:00:00Z' });
+      const { asset: second } = await ctx.newAsset({ ownerId: user.id, localDateTime: '2025-09-02T12:01:00Z' });
+
+      const manual = await sut.create(factory.auth({ user }), {
+        type: MemoryType.OnThisDay,
+        data: { year: 2025 },
+        memoryAt: new Date('2025-09-02T12:00:00Z'),
+        assetIds: [first.id, second.id],
+        isSaved: false,
+      });
+
+      vi.setSystemTime(new Date('2026-09-01T02:00:00Z'));
+      await sut.onMemoriesCreate();
+
+      const stillThere = await ctx.database
+        .selectFrom('memory')
+        .select('id')
+        .where('id', '=', manual.id)
+        .executeTakeFirst();
+
+      expect(stillThere).toBeDefined();
+
+      // Untouched, not merely un-deleted: both assets are still attached, neither stripped away
+      // by the reconciliation sweep despite carrying the same MemoryType as a generated on_this_day.
+      const attachedAssetIds = await ctx.database
+        .selectFrom('memory_asset')
+        .select('assetId')
+        .where('memoriesId', '=', manual.id)
+        .execute();
+      expect(attachedAssetIds.map((row) => row.assetId).toSorted()).toEqual([first.id, second.id].toSorted());
+    });
+
+    // F5: pins the `managed` boundary the sibling test above does NOT cover. That test leaves
+    // showAt/hideAt unset, which is what actually keeps an API-created memory safe (see
+    // `toReservable`, spec §6.2.1). Here both are set — a shape no first-party client sends, but
+    // one `POST /memories` accepts — so the memory IS `managed` and strippable/deletable, same as
+    // a generated card. This is a DELIBERATE accepted limitation, pinned here so a future reader
+    // knows it was a decision, not an oversight. Do not change production behaviour to make this
+    // test pass differently.
+    it('deletes an API-created memory when showAt/hideAt are both set — accepted limitation, spec §6.2.1', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+
+      const { asset: first } = await ctx.newAsset({ ownerId: user.id, localDateTime: '2025-09-02T12:00:00Z' });
+      const { asset: second } = await ctx.newAsset({ ownerId: user.id, localDateTime: '2025-09-02T12:01:00Z' });
+
+      // showAt/hideAt deliberately land on 2026-09-01, NOT on the photos' own 2025-09-02 date, so
+      // this memory never overlaps the auto-generated on_this_day card the run below creates for
+      // the same two photos on their actual 2026-09-02 anniversary — isolating the assertion to
+      // the `managed` boundary itself rather than ordinary same-day claim competition.
+      const manual = await sut.create(factory.auth({ user }), {
+        type: MemoryType.OnThisDay,
+        data: { year: 2025 },
+        memoryAt: new Date('2025-09-02T12:00:00Z'),
+        assetIds: [first.id, second.id],
+        showAt: new Date('2026-09-01T00:00:00Z'),
+        hideAt: new Date('2026-09-01T23:59:59Z'),
+      });
+
+      vi.setSystemTime(new Date('2026-09-01T02:00:00Z'));
+      await sut.onMemoriesCreate();
+
+      const stillThere = await ctx.database
+        .selectFrom('memory')
+        .select('id')
+        .where('id', '=', manual.id)
+        .executeTakeFirst();
+
+      // Only 2 assets — below the on_this_day floor of 3 — so once `managed`, the sweep deletes
+      // it exactly as it would a generated card.
+      expect(stillThere).toBeUndefined();
     });
   });
 
