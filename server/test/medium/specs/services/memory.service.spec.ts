@@ -1868,7 +1868,12 @@ describe(MemoryService.name, () => {
       vi.setSystemTime(new Date('2026-09-01T02:00:00Z'));
       await sut.onMemoriesCreate();
 
-      const memories = await sut.search(factory.auth({ user }), {});
+      // isUpcoming: false, not {}. `onMemoriesCreate` seeds on_this_day cards for a DAYS-wide
+      // window, so three of them are still scheduled at this system time. On `main` the bare `{}`
+      // hid them implicitly; the fork adopted upstream's immich-28675 contract, where `GET /memories`
+      // scopes `showAt` only when the caller asks. Ask for the shown ones — the cards the reporter
+      // actually sees — which is what this assertion always meant.
+      const memories = await sut.search(factory.auth({ user }), { isUpcoming: false });
 
       // All three of the reporter's cards survive: the season recap, the month recap (with
       // enough of the September pool left over after the season recap claims first), and the
