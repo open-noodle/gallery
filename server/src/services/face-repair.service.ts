@@ -2,7 +2,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { AssetFace } from 'src/database';
 import { OnJob } from 'src/decorators';
 import { FaceRepairResolveRequest, FaceRepairResolveResponse, FaceRepairScanParams } from 'src/dtos/face-repair.dto';
-import { JobName, JobStatus, QueueName } from 'src/enum';
+import { CacheControl, JobName, JobStatus, QueueName } from 'src/enum';
 import { RepairScanPerson, RepairScanRow, ScanInProgressError } from 'src/repositories/face-repair-scan.repository';
 import { OwnerPersonRow, PersonMetadataRow } from 'src/repositories/face-repair.repository';
 import { BaseService } from 'src/services/base.service';
@@ -19,7 +19,9 @@ import {
   findUnresolvableIds,
   tallyReattribution,
 } from 'src/utils/face-repair';
+import { FaceWithPhotoContext } from 'src/utils/face-review';
 import { ImmichMediaResponse } from 'src/utils/file';
+import { mimeTypes } from 'src/utils/mime-types';
 import { spaceVisibleAssetVisibilities } from 'src/utils/shared-space-album-scope';
 
 export interface ReattributionCandidate extends ReattributionTally {
@@ -703,7 +705,7 @@ export class FaceRepairService extends BaseService {
   getClusterFaces(
     personGroupId: string,
     options: { excludeFaceIds: string[]; page: number; size: number },
-  ): Promise<{ faces: { assetFaceId: string }[]; total: number; hasMore: boolean }> {
+  ): Promise<{ faces: FaceWithPhotoContext[]; total: number; hasMore: boolean }> {
     return this.faceRepairRepository.getClusterFacePage(personGroupId, {
       excludeFaceIds: options.excludeFaceIds,
       limit: options.size,
@@ -713,7 +715,7 @@ export class FaceRepairService extends BaseService {
 
   async getPersonFlaggedFaces(
     personGroupId: string,
-  ): Promise<{ personId: string; flaggedFaces: { assetFaceId: string; suspectedOwnerId: string }[] }> {
+  ): Promise<{ personId: string; flaggedFaces: (FaceWithPhotoContext & { suspectedOwnerId: string })[] }> {
     const latest = await this.faceRepairScanRepository.getLatestScan();
     if (!latest) {
       return { personId: personGroupId, flaggedFaces: [] };
@@ -734,11 +736,33 @@ export class FaceRepairService extends BaseService {
         })),
       ],
     ]);
+
+    // FlaggedFace is shared with withLiveFlaggedCounts (the dashboard recompute), so the photo context does
+    // not go on it. Keep it in a side map keyed by face id and re-join after filtering — a face the verdict
+    // layer drops then contributes nothing, rather than leaking a context row for a face the admin will
+    // never see.
+    const contextByFace = new Map(
+      stored.map((s) => [
+        s.assetFaceId,
+        {
+          localDateTime: s.localDateTime,
+          boundingBoxX1: s.boundingBoxX1,
+          boundingBoxY1: s.boundingBoxY1,
+          boundingBoxX2: s.boundingBoxX2,
+          boundingBoxY2: s.boundingBoxY2,
+          imageWidth: s.imageWidth,
+          imageHeight: s.imageHeight,
+        },
+      ]),
+    );
+
     applyVerdictFilters(byPerson, verdictMaps);
-    const flaggedFaces = (byPerson.get(personGroupId) ?? []).map((f) => ({
-      assetFaceId: f.assetFaceId,
-      suspectedOwnerId: f.suspectedOwnerId,
-    }));
+
+    // flatMap, not map: a survivor with no context row is dropped rather than emitted half-populated.
+    const flaggedFaces = (byPerson.get(personGroupId) ?? []).flatMap((f) => {
+      const context = contextByFace.get(f.assetFaceId);
+      return context ? [{ assetFaceId: f.assetFaceId, suspectedOwnerId: f.suspectedOwnerId, ...context }] : [];
+    });
     return { personId: personGroupId, flaggedFaces };
   }
 
@@ -1324,6 +1348,31 @@ export class FaceRepairService extends BaseService {
     }
 
     return this.generateFaceThumbnailResponse(face, sourcePath);
+  }
+
+  // Sibling of getAdminFaceThumbnail: same admin-only, face-keyed, ownership-free resolution, but serves
+  // the SOURCE photo instead of the crop, so an admin can judge a face in context (issue #1061 — similar
+  // -looking children are indistinguishable at 250px). getFaceThumbnailSource has already located the
+  // generated preview file, so this is a straight serve: no decode, no crop, no temp dir. It is genuinely
+  // cheaper than the thumbnail route beside it.
+  async getAdminFacePreview(assetFaceId: string): Promise<ImmichMediaResponse> {
+    let face: AssetFace;
+    try {
+      // NOT getFaceByIdIncludingTombstoned: that one serves faces on trashed assets, which is tolerable for
+      // a face crop and not for a whole photo.
+      face = await this.personRepository.getFaceByIdOnLiveAsset(assetFaceId);
+    } catch {
+      throw new NotFoundException();
+    }
+
+    const sourcePath = await this.getFaceThumbnailSource(face.assetId);
+    if (!sourcePath) {
+      throw new NotFoundException();
+    }
+
+    // serveFromBackend, not a bare ImmichFileResponse: the preview may live in S3, and the content type is
+    // read from the file because image.preview.format is configurable (jpeg or webp).
+    return this.serveFromBackend(sourcePath, mimeTypes.lookup(sourcePath), CacheControl.PrivateWithCache);
   }
 
   private async collectClusterFaceIds(personGroupId: string): Promise<string[]> {
