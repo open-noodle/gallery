@@ -32,7 +32,7 @@ Future<void> viewAssetInTimeline({
 }) async {
   await popViewer();
   read(photosFilterProvider.notifier).reset();
-  read(photosFilterSheetProvider.notifier).state = FilterSheetSnap.hidden;
+  read(photosFilterSheetProvider.notifier).state = FilterSheetVisibility.hidden;
   await goToTimeline();
   scrollToAssetNotifierProvider.scrollToAsset(asset);
 }
