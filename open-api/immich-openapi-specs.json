@@ -37813,7 +37813,7 @@
             ]
           },
           "endDate": {
-            "description": "End date (latest asset)",
+            "description": "UTC representation of (local) end date (latest asset)",
             "format": "date-time",
             "type": "string"
           },
@@ -37863,7 +37863,7 @@
             "type": "boolean"
           },
           "startDate": {
-            "description": "Start date (earliest asset)",
+            "description": "UTC representation of (local) start date (earliest asset)",
             "format": "date-time",
             "type": "string"
           },
