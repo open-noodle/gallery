@@ -230,6 +230,7 @@
     "face_cleanup_people_no_users": "Geen gebruikers gevonden.",
     "face_cleanup_people_page_error": "Kan niet meer personen laden. De personen hierboven blijven zichtbaar.",
     "face_cleanup_people_search_placeholder": "Zoek personen van deze eigenaar…",
+    "face_cleanup_photo_modal_select": "Dit gezicht selecteren",
     "face_cleanup_photo_modal_taken": "Genomen op {date}",
     "face_cleanup_photo_modal_title": "Originele foto",
     "face_cleanup_reason_bad_target": "ook gemarkeerd",

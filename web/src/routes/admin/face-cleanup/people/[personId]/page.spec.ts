@@ -398,6 +398,31 @@ describe('+page.svelte (manual face-review page)', () => {
       expect(tile.dataset.selected).toBe('false');
       expect(modalManager.show).toHaveBeenCalledWith(FacePhotoModal, expect.objectContaining({ index: 0 }));
     });
+
+    // The modal is mocked here, so rendering it proves nothing about the wiring. This calls the callbacks the
+    // PAGE handed it and asserts the grid reacted — without it, a refactor could drop the selection props and
+    // every test above would stay green. Manual has one grid and no destination gate, so no `canSelect`.
+    it('hands the modal a working selection toggle', async () => {
+      await renderManualPage();
+      const tile = screen.getAllByTestId('face-tile')[0];
+      const faceId = tile.dataset.faceid!;
+
+      await fireEvent.click(within(tile.parentElement!).getByTestId('face-tile-view-photo'));
+      const props = vi.mocked(modalManager.show).mock.calls.at(-1)![1] as unknown as {
+        isSelected: (id: string) => boolean;
+        onToggleSelect: (id: string) => void;
+      };
+
+      expect(props.isSelected(faceId)).toBe(false); // positive control: opening staged nothing
+      props.onToggleSelect(faceId);
+      await waitFor(() => expect(tile.dataset.selected).toBe('true'));
+
+      props.onToggleSelect(faceId);
+      await waitFor(() => expect(tile.dataset.selected).toBe('false'));
+      // Staging a selection must not have marked the face — `keep` is manual's default and only a bulk
+      // action moves a tile out of it.
+      expect(tile.dataset.state).toBe('keep');
+    });
   });
 
   // ---- 7. selection: click selects, shift-click selects a range, clear works ----

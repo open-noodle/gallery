@@ -230,6 +230,7 @@
     "face_cleanup_people_no_users": "Nessun utente trovato.",
     "face_cleanup_people_page_error": "Impossibile caricare altre persone. Le persone sopra restano visibili.",
     "face_cleanup_people_search_placeholder": "Cerca tra le persone di questo proprietario…",
+    "face_cleanup_photo_modal_select": "Seleziona questo volto",
     "face_cleanup_photo_modal_taken": "Scattata il {date}",
     "face_cleanup_photo_modal_title": "Foto originale",
     "face_cleanup_reason_bad_target": "segnalata anche",

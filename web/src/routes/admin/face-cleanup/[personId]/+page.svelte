@@ -251,8 +251,37 @@
   // #1061: opens the source photo behind a face crop. `faces` is whichever grid's array the magnifier was
   // clicked from — the modal only knows the faces LOADED in that grid (both paginate), so it never claims a
   // cycle over the whole cluster.
-  const openPhoto = (faces: FacePhotoFace[], index: number) => {
-    void modalManager.show(FacePhotoModal, { faces, index });
+  // `selection` is passed per GRID, not per page: the flagged grid stages through the review model, while the
+  // rest grid stages into `restSelected` behind a destination gate. Handing the modal the wrong pair would let
+  // it stage into the other grid's bucket.
+  const openPhoto = (
+    faces: FacePhotoFace[],
+    index: number,
+    selection: {
+      isSelected: (assetFaceId: string) => boolean;
+      canSelect?: (assetFaceId: string) => boolean;
+      onToggleSelect: (assetFaceId: string) => void;
+    },
+  ) => {
+    void modalManager.show(FacePhotoModal, { faces, index, ...selection });
+  };
+
+  // Deselecting always works — a staged face is never trapped by a destination that later became unusable (a
+  // mis-click into a self-move must not destroy deliberate selection, and the admin's only way out otherwise
+  // would be to pick a new destination first). Only NEW staging is gated: adding a face onto a destination the
+  // whole-cluster actions have already refused would let the ribbon/dock chip start naming a destination Apply
+  // refuses to use (see canBulkMove/restBlocked below).
+  //
+  // Shared by the rest tile and the photo modal deliberately — two copies of this gate would drift.
+  const toggleRestSelection = (assetFaceId: string) => {
+    if (restSelected.has(assetFaceId)) {
+      restSelected.delete(assetFaceId);
+      return;
+    }
+    if (!canBulkMove) {
+      return;
+    }
+    restSelected.add(assetFaceId);
   };
 
   // The six guided routes, in bar order. `owner` gains a testid it never had — every other id is preserved
@@ -720,7 +749,14 @@
                   {ribbonLabel(face)}
                 </div>
               </button>
-              <FaceTileOverlay localDateTime={face.localDateTime} onOpen={() => openPhoto(visibleFaces, tileIndex)} />
+              <FaceTileOverlay
+                localDateTime={face.localDateTime}
+                onOpen={() =>
+                  openPhoto(visibleFaces, tileIndex, {
+                    isSelected: (assetFaceId) => vm.isSelected(assetFaceId),
+                    onToggleSelect: (assetFaceId) => vm.toggleSelect(assetFaceId),
+                  })}
+              />
             </div>
           {/each}
         </div>
@@ -835,22 +871,7 @@
                     blocked ? 'cursor-not-allowed opacity-30 hover:opacity-30' : '',
                   ].join(' ')}
                   disabled={blocked}
-                  onclick={() => {
-                    // Deselecting always works — a staged face is never trapped by a destination that later
-                    // became unusable (a mis-click into a self-move must not destroy deliberate selection, and
-                    // the admin's only way out otherwise would be to pick a new destination first). Only NEW
-                    // staging is gated: adding a face onto a destination the whole-cluster actions have
-                    // already refused would let the ribbon/dock chip start naming a destination Apply refuses
-                    // to use (see canBulkMove/restBlocked below).
-                    if (restSelected.has(face.assetFaceId)) {
-                      restSelected.delete(face.assetFaceId);
-                      return;
-                    }
-                    if (!canBulkMove) {
-                      return;
-                    }
-                    restSelected.add(face.assetFaceId);
-                  }}
+                  onclick={() => toggleRestSelection(face.assetFaceId)}
                   data-testid="rest-tile"
                   data-faceid={face.assetFaceId}
                   data-selected={selected}
@@ -871,7 +892,16 @@
                     </div>
                   {/if}
                 </button>
-                <FaceTileOverlay localDateTime={face.localDateTime} onOpen={() => openPhoto(restFaces, tileIndex)} />
+                <FaceTileOverlay
+                  localDateTime={face.localDateTime}
+                  onOpen={() =>
+                    openPhoto(restFaces, tileIndex, {
+                      isSelected: (assetFaceId) => restSelected.has(assetFaceId),
+                      // Adding is gated on a usable destination; removing never is — same asymmetry the tile has.
+                      canSelect: () => canBulkMove,
+                      onToggleSelect: toggleRestSelection,
+                    })}
+                />
               </div>
             {/each}
           </div>

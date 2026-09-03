@@ -327,6 +327,61 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
       expect(tile.dataset.selected).toBe('false');
     });
 
+    // The modal is mocked here, so rendering it proves nothing about the wiring. These call the callbacks the
+    // PAGE actually handed it and assert the grid reacted — without them, a refactor could drop the selection
+    // props entirely and every test above would stay green.
+    it('hands the flagged grid a working selection toggle', async () => {
+      render(Page, { props: { data: makePageData() } });
+      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
+      const tile = screen.getAllByTestId('face-tile')[0];
+      const faceId = tile.dataset.faceid!;
+
+      await fireEvent.click(within(tile.parentElement!).getByTestId('face-tile-view-photo'));
+      const props = vi.mocked(modalManager.show).mock.calls.at(-1)![1] as unknown as {
+        isSelected: (id: string) => boolean;
+        onToggleSelect: (id: string) => void;
+      };
+
+      expect(props.isSelected(faceId)).toBe(false); // positive control: nothing staged by opening
+      props.onToggleSelect(faceId);
+      await waitFor(() => expect(screen.getByTestId('face-bulk-bar')).toBeInTheDocument());
+      expect(props.isSelected(faceId)).toBe(true);
+    });
+
+    it('hands the rest grid a working toggle plus the destination gate it lives under', async () => {
+      vi.mocked(getFaceRepairClusterFaces).mockResolvedValue({
+        faces: [{ assetFaceId: 'rest-1', ...PHOTO_CONTEXT }],
+        total: 1,
+        hasMore: false,
+      } as unknown as FaceRepairClusterFacesResponseDto);
+
+      render(Page, { props: { data: makePageData() } });
+      await waitFor(() => expect(screen.getAllByTestId('rest-tile')).toHaveLength(1));
+      const tile = screen.getAllByTestId('rest-tile')[0];
+
+      await fireEvent.click(within(tile.parentElement!).getByTestId('face-tile-view-photo'));
+      const props = vi.mocked(modalManager.show).mock.calls.at(-1)![1] as unknown as {
+        isSelected: (id: string) => boolean;
+        canSelect: (id: string) => boolean;
+        onToggleSelect: (id: string) => void;
+      };
+
+      // This fixture's scan supplies a suspected owner, so `canBulkMove` is true and adding is permitted —
+      // the page must report that faithfully rather than hardcoding a gate. The REFUSAL half of the gate, and
+      // the deliberate asymmetry that removal is never blocked, are pinned in FacePhotoModal.spec.ts, where
+      // both directions were proven red.
+      expect(props.canSelect('rest-1')).toBe(true);
+      expect(props.isSelected('rest-1')).toBe(false); // positive control
+
+      props.onToggleSelect('rest-1');
+      await waitFor(() => expect(tile.dataset.selected).toBe('true'));
+      expect(props.isSelected('rest-1')).toBe(true);
+
+      // And back out again — the shared toggleRestSelection handles both directions.
+      props.onToggleSelect('rest-1');
+      await waitFor(() => expect(tile.dataset.selected).toBe('false'));
+    });
+
     it('T7.7: the magnifier is a SIBLING of the tile button, never nested inside it', async () => {
       render(Page, { props: { data: makePageData() } });
       await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));

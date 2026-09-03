@@ -230,6 +230,7 @@
     "face_cleanup_people_no_users": "找不到使用者。",
     "face_cleanup_people_page_error": "無法載入更多人物。上方的人物仍會顯示。",
     "face_cleanup_people_search_placeholder": "搜尋此擁有者的人物…",
+    "face_cleanup_photo_modal_select": "選擇此人臉",
     "face_cleanup_photo_modal_taken": "拍攝於 {date}",
     "face_cleanup_photo_modal_title": "原始照片",
     "face_cleanup_reason_bad_target": "同樣被標記",

@@ -230,6 +230,7 @@
     "face_cleanup_people_no_users": "Пользователи не найдены.",
     "face_cleanup_people_page_error": "Не удалось загрузить больше людей. Люди выше по-прежнему отображаются.",
     "face_cleanup_people_search_placeholder": "Поиск среди людей этого владельца…",
+    "face_cleanup_photo_modal_select": "Выбрать это лицо",
     "face_cleanup_photo_modal_taken": "Снято {date}",
     "face_cleanup_photo_modal_title": "Исходное фото",
     "face_cleanup_reason_bad_target": "тоже отмечен",

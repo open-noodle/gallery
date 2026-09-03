@@ -210,8 +210,15 @@
 
   // #1061: opens the source photo behind a face crop. Same helper as the guided page — see its comment for
   // why `faces` is the array the magnifier was clicked from rather than some cluster-wide list.
+  // Selection is handed in so the admin can stage a face without closing the lightbox — manual has one grid
+  // and no destination gate, so there is no `canSelect` here.
   const openPhoto = (faces: FacePhotoFace[], index: number) => {
-    void modalManager.show(FacePhotoModal, { faces, index });
+    void modalManager.show(FacePhotoModal, {
+      faces,
+      index,
+      isSelected: (assetFaceId: string) => vm.isSelected(assetFaceId),
+      onToggleSelect: (assetFaceId: string) => vm.toggle(assetFaceId),
+    });
   };
 
   // ---- Bulk actions (slice 9) ----

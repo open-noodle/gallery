@@ -230,6 +230,7 @@
     "face_cleanup_people_no_users": "No users found.",
     "face_cleanup_people_page_error": "Failed to load more people. The people above are still shown.",
     "face_cleanup_people_search_placeholder": "Search this owner's people…",
+    "face_cleanup_photo_modal_select": "Select this face",
     "face_cleanup_photo_modal_taken": "Taken {date}",
     "face_cleanup_photo_modal_title": "Original photo",
     "face_cleanup_reason_bad_target": "also flagged",

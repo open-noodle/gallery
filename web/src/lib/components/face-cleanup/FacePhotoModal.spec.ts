@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom';
-import { fireEvent, render, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { Settings } from 'luxon';
+import { SvelteSet } from 'svelte/reactivity';
 import { describe, expect, it, vi } from 'vitest';
 import FacePhotoModal from '$lib/components/face-cleanup/FacePhotoModal.svelte';
 
@@ -203,5 +204,145 @@ describe('FacePhotoModal', () => {
 
     expect(screen.queryByTestId('face-photo-taken')).not.toBeInTheDocument();
     expect(screen.queryByText(/Invalid DateTime/)).not.toBeInTheDocument();
+  });
+
+  // Selecting from inside the lightbox. The point is triage without closing: page through 48 faces, marking
+  // the wrong ones as you go, then apply once from the dock. This does NOT weaken "opening a photo never
+  // stages a decision" — that invariant is about the MAGNIFIER click (pinned by the page specs' T7.3/T7.6/
+  // T8.2); the control below is a deliberate, explicit act taken inside the modal.
+  describe('selection', () => {
+    it('renders no selection control when the caller does not supply one', () => {
+      render(FacePhotoModal, { faces: [face()], index: 0, onClose: vi.fn() });
+
+      expect(screen.getByTestId('face-photo')).toBeInTheDocument(); // positive control: the modal did render
+      expect(screen.queryByTestId('face-photo-select')).not.toBeInTheDocument();
+    });
+
+    it('toggles the CURRENT face, and keeps targeting the right face after paging', async () => {
+      const onToggleSelect = vi.fn();
+      render(FacePhotoModal, {
+        faces: [face(), face({ assetFaceId: 'face-2' })],
+        index: 0,
+        onClose: vi.fn(),
+        isSelected: () => false,
+        onToggleSelect,
+      });
+
+      await fireEvent.click(screen.getByTestId('face-photo-select'));
+      expect(onToggleSelect).toHaveBeenCalledWith('face-1');
+
+      await fireEvent.click(screen.getByTestId('face-photo-next'));
+      await fireEvent.click(screen.getByTestId('face-photo-select'));
+      expect(onToggleSelect).toHaveBeenLastCalledWith('face-2');
+    });
+
+    it("reflects the current face's selection state", () => {
+      const { unmount } = render(FacePhotoModal, {
+        faces: [face()],
+        index: 0,
+        onClose: vi.fn(),
+        isSelected: () => false,
+        onToggleSelect: vi.fn(),
+      });
+      expect(screen.getByTestId('face-photo-select')).toHaveAttribute('aria-pressed', 'false');
+      unmount();
+
+      render(FacePhotoModal, {
+        faces: [face()],
+        index: 0,
+        onClose: vi.fn(),
+        isSelected: () => true,
+        onToggleSelect: vi.fn(),
+      });
+      expect(screen.getByTestId('face-photo-select')).toHaveAttribute('aria-pressed', 'true');
+    });
+
+    it('Space toggles the current face', async () => {
+      const onToggleSelect = vi.fn();
+      render(FacePhotoModal, {
+        faces: [face()],
+        index: 0,
+        onClose: vi.fn(),
+        isSelected: () => false,
+        onToggleSelect,
+      });
+
+      await fireEvent.keyDown(document.body, { key: ' ' });
+
+      expect(onToggleSelect).toHaveBeenCalledWith('face-1');
+    });
+
+    // The rest-of-cluster grid's gate is ASYMMETRIC: a staged face can always be removed, but a new one can
+    // only be added once a valid destination is chosen — otherwise the tile ribbon would name a destination
+    // Apply refuses to use. The modal must mirror that exactly, or the control lies about what it will do.
+    it('disables ADDING when the caller says the face cannot be selected', () => {
+      render(FacePhotoModal, {
+        faces: [face()],
+        index: 0,
+        onClose: vi.fn(),
+        isSelected: () => false,
+        canSelect: () => false,
+        onToggleSelect: vi.fn(),
+      });
+
+      expect(screen.getByTestId('face-photo-select')).toBeDisabled();
+    });
+
+    it('still allows REMOVING an already-selected face when adding is gated', async () => {
+      const onToggleSelect = vi.fn();
+      render(FacePhotoModal, {
+        faces: [face()],
+        index: 0,
+        onClose: vi.fn(),
+        isSelected: () => true,
+        canSelect: () => false,
+        onToggleSelect,
+      });
+
+      const control = screen.getByTestId('face-photo-select');
+      expect(control).toBeEnabled(); // the asymmetry: deselecting is never blocked
+      await fireEvent.click(control);
+      expect(onToggleSelect).toHaveBeenCalledWith('face-1');
+    });
+
+    // The callers hand in closures over their own reactive stores, so the control's pressed state only tracks
+    // reality if reading through that closure inside a $derived registers the dependency. A plain object or a
+    // captured boolean would render correctly once and then go stale — the button would stop reflecting the
+    // selection the moment the admin used it, which is exactly the workflow this control exists for.
+    it('updates its pressed state when the caller’s selection changes underneath it', async () => {
+      const staged = new SvelteSet<string>();
+      render(FacePhotoModal, {
+        faces: [face()],
+        index: 0,
+        onClose: vi.fn(),
+        isSelected: (id: string) => staged.has(id),
+        onToggleSelect: (id: string) => (staged.has(id) ? staged.delete(id) : staged.add(id)),
+      });
+
+      const control = screen.getByTestId('face-photo-select');
+      expect(control).toHaveAttribute('aria-pressed', 'false');
+
+      await fireEvent.click(control);
+      await waitFor(() => expect(screen.getByTestId('face-photo-select')).toHaveAttribute('aria-pressed', 'true'));
+
+      await fireEvent.click(screen.getByTestId('face-photo-select'));
+      await waitFor(() => expect(screen.getByTestId('face-photo-select')).toHaveAttribute('aria-pressed', 'false'));
+    });
+
+    it('does not fire on Space when adding is gated', async () => {
+      const onToggleSelect = vi.fn();
+      render(FacePhotoModal, {
+        faces: [face()],
+        index: 0,
+        onClose: vi.fn(),
+        isSelected: () => false,
+        canSelect: () => false,
+        onToggleSelect,
+      });
+
+      await fireEvent.keyDown(document.body, { key: ' ' });
+
+      expect(onToggleSelect).not.toHaveBeenCalled();
+    });
   });
 });

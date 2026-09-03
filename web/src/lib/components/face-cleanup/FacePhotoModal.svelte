@@ -23,9 +23,18 @@
     faces: FacePhotoFace[];
     index: number;
     onClose: () => void;
+    /** Current selection state of a face. Omit (with onToggleSelect) to render no selection control at all. */
+    isSelected?: (assetFaceId: string) => boolean;
+    /**
+     * Whether a face may be ADDED to the selection. Defaults to always. The rest-of-cluster grid's gate is
+     * asymmetric — a staged face can always be removed, but a new one can only be added once a valid
+     * destination is chosen — so this governs adding only; removing is never blocked.
+     */
+    canSelect?: (assetFaceId: string) => boolean;
+    onToggleSelect?: (assetFaceId: string) => void;
   }
 
-  const { faces, index, onClose }: Props = $props();
+  const { faces, index, onClose, isSelected, canSelect, onToggleSelect }: Props = $props();
 
   // Clamped, never wrapped: the modal only knows the faces LOADED in the grid it was opened from, and both
   // grids paginate — wrapping would imply a cycle over the whole cluster that this array does not represent.
@@ -61,6 +70,19 @@
     const parsed = DateTime.fromISO(face.localDateTime, { zone: 'UTC', locale: $locale ?? undefined });
     return parsed.isValid ? parsed.toLocaleString(dateFormats.album) : null;
   });
+
+  // Selecting without closing (#1061 follow-up): paging 48 faces and reopening the lightbox for each one to
+  // stage it is the workflow this control removes.
+  const selectable = $derived(!!onToggleSelect);
+  const selected = $derived(selectable && !!isSelected?.(face.assetFaceId));
+  // Removing is never gated, only adding — see `canSelect`.
+  const canToggle = $derived(selected || (canSelect?.(face.assetFaceId) ?? true));
+
+  const toggleSelection = () => {
+    if (canToggle) {
+      onToggleSelect?.(face.assetFaceId);
+    }
+  };
 </script>
 
 <Modal title={$t('admin.face_cleanup_photo_modal_title')} {onClose} size="large">
@@ -109,7 +131,27 @@
       >
         <Icon icon={mdiChevronLeft} size="18" />
       </Button>
-      <span class="text-sm text-gray-500 dark:text-gray-400">{current + 1} / {faces.length}</span>
+      <div class="flex flex-col items-center gap-1.5">
+        {#if selectable}
+          <button
+            type="button"
+            class={[
+              'rounded-full border px-3 py-1 text-sm font-semibold transition-colors',
+              selected
+                ? 'border-primary bg-primary text-white'
+                : 'border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800',
+              canToggle ? '' : 'cursor-not-allowed opacity-40',
+            ].join(' ')}
+            aria-pressed={selected}
+            disabled={!canToggle}
+            onclick={toggleSelection}
+            data-testid="face-photo-select"
+          >
+            {$t('admin.face_cleanup_photo_modal_select')}
+          </button>
+        {/if}
+        <span class="text-sm text-gray-500 dark:text-gray-400">{current + 1} / {faces.length}</span>
+      </div>
       <Button
         shape="round"
         color="secondary"
@@ -130,6 +172,12 @@
     }
     if (event.key === 'ArrowRight' && hasNext) {
       current += 1;
+    }
+    // Space is the natural key for a pressed-state control and does not collide with the paging arrows.
+    // preventDefault stops the page scrolling underneath the modal.
+    if (event.key === ' ' && selectable) {
+      event.preventDefault();
+      toggleSelection();
     }
   }}
 />
