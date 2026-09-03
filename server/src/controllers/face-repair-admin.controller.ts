@@ -102,7 +102,11 @@ export class FaceRepairAdminController {
     @Param('personId', new ParseUUIDPipe({ version: '4' })) personId: string,
     @Body() dto: FaceRepairClusterFacesRequestDto,
   ): Promise<FaceRepairClusterFacesResponseDto> {
-    return this.service.getClusterFaces(personId, dto) as Promise<FaceRepairClusterFacesResponseDto>;
+    // #1061: same Date-vs-string split as getFaceRepairPersonFaces above — the service keeps localDateTime
+    // as a Date (repository/DB shape), the DTO schema declares it a string (serialized over the wire), and
+    // that mismatch sitting inside the `faces` array element defeats the direct cast's "sufficient overlap"
+    // check the way scalar fields do not. Route through unknown like getFaceRepairDeclines below.
+    return this.service.getClusterFaces(personId, dto) as unknown as Promise<FaceRepairClusterFacesResponseDto>;
   }
 
   // Slice 3 (manual face review): the manual review page has no scan to read personName/ownerId off. Does not

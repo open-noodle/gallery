@@ -281,7 +281,24 @@ describe(FaceRepairAdminController.name, () => {
     });
 
     it('delegates to service.getClusterFaces and returns the page', async () => {
-      service.getClusterFaces.mockResolvedValue({ faces: [{ assetFaceId: faceId }], total: 1, hasMore: false });
+      // #1061: getClusterFaces now carries photo context alongside each face id — this test is about the
+      // HTTP delegation, not the context, so the values here are arbitrary.
+      service.getClusterFaces.mockResolvedValue({
+        faces: [
+          {
+            assetFaceId: faceId,
+            localDateTime: new Date('2019-07-04T10:30:00.000Z'),
+            boundingBoxX1: 10,
+            boundingBoxY1: 20,
+            boundingBoxX2: 30,
+            boundingBoxY2: 40,
+            imageWidth: 400,
+            imageHeight: 300,
+          },
+        ],
+        total: 1,
+        hasMore: false,
+      });
       const { status, body } = await request(ctx.getHttpServer())
         .post(`/admin/face-repair/scan/person/${personId}/cluster-faces`)
         .set('Authorization', 'Bearer token')
