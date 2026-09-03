@@ -7,6 +7,19 @@ import { AssetFaceFactory } from 'test/factories/asset-face.factory';
 import { getForAssetFace } from 'test/mappers';
 import { newTestService, ServiceMocks } from 'test/utils';
 
+// #1061: a stored flagged face carrying the photo context getScanFlaggedFaces now returns.
+const stored = (assetFaceId: string) => ({
+  assetFaceId,
+  suspectedOwnerId: 'owner-1',
+  localDateTime: new Date('2019-07-04T10:30:00.000Z'),
+  boundingBoxX1: 10,
+  boundingBoxY1: 20,
+  boundingBoxX2: 30,
+  boundingBoxY2: 40,
+  imageWidth: 400,
+  imageHeight: 300,
+});
+
 // Slice 7: admin cleanup + resolutions surfaces need to render face crops for faces the admin does not own.
 // getAdminFaceThumbnail is a join-free, tombstone-inclusive read — no person join, no ownership check.
 describe(FaceRepairService.name, () => {
@@ -158,6 +171,42 @@ describe(FaceRepairService.name, () => {
       mocks.asset.getForThumbnail.mockResolvedValue({ path: null } as any);
 
       await expect(sut.getAdminFacePreview('face-1')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  // #1061: the console needs enough of the source photo to judge a face in context. getPersonFlaggedFaces
+  // is the read the person-detail grid hits, so the stored context has to survive verdict filtering intact —
+  // and disappear cleanly for a face the filter removes, rather than leaking a stale context row.
+  describe('getPersonFlaggedFaces photo context', () => {
+    it('T2.10: carries the context of a surviving face through the verdict filter', async () => {
+      mocks.faceRepairScan.getLatestScan.mockResolvedValue({ id: 'scan-1' } as any);
+      mocks.faceRepairScan.getScanFlaggedFaces.mockResolvedValue([stored('face-1')]);
+      vi.spyOn(sut as any, 'buildVerdictMaps').mockResolvedValue({
+        manualLinkedFaceIds: new Set(),
+        negativeFaceTargets: new Map(),
+        ownerTokens: new Map(),
+        mutedPersons: new Map(),
+      });
+
+      const result = await sut.getPersonFlaggedFaces('person-1');
+
+      expect(result.flaggedFaces).toEqual([expect.objectContaining({ assetFaceId: 'face-1', imageWidth: 400 })]);
+    });
+
+    it('T2.11: a face the verdict layer removes contributes no context', async () => {
+      mocks.faceRepairScan.getLatestScan.mockResolvedValue({ id: 'scan-1' } as any);
+      mocks.faceRepairScan.getScanFlaggedFaces.mockResolvedValue([stored('face-1')]);
+      // Settled by a manual link — the same mechanism the dashboard uses to drop a face.
+      vi.spyOn(sut as any, 'buildVerdictMaps').mockResolvedValue({
+        manualLinkedFaceIds: new Set(['face-1']),
+        negativeFaceTargets: new Map(),
+        ownerTokens: new Map(),
+        mutedPersons: new Map(),
+      });
+
+      const result = await sut.getPersonFlaggedFaces('person-1');
+
+      expect(result.flaggedFaces).toEqual([]);
     });
   });
 });

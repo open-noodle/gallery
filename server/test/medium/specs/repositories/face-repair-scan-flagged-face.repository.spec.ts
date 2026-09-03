@@ -253,4 +253,48 @@ describe('FaceRepairScanRepository flagged faces', () => {
     const forApply = await sut.getScanFlaggedFacesForPersons(scan.id, [person.id]);
     expect(forApply.map((r) => r.assetFaceId)).toEqual([control]);
   });
+
+  // #1061: mirrors face-repair.repository.spec.ts T5.1 — the console needs the same photo context out of
+  // getScanFlaggedFaces (the single-person snapshot read) as it does out of getClusterFacePage.
+  it('T5.2: returns the photo context alongside each flagged face', async () => {
+    const { sut, ctx } = setup();
+    const { user } = await ctx.newUser();
+    const { person } = await ctx.newPerson({ ownerId: user.id });
+    const { person: owner } = await ctx.newPerson({ ownerId: user.id });
+    const scan = await sut.createScan({ requestedBy: null, params: PARAMS });
+
+    const { asset } = await ctx.newAsset({ ownerId: user.id });
+    const { assetFace } = await ctx.newAssetFace({
+      assetId: asset.id,
+      personId: person.id,
+      sourceType: SourceType.MachineLearning,
+      boundingBoxX1: 10,
+      boundingBoxY1: 20,
+      boundingBoxX2: 30,
+      boundingBoxY2: 40,
+      imageWidth: 400,
+      imageHeight: 300,
+    });
+    await ctx.database.insertInto('face_search').values({ faceId: assetFace.id, embedding: EMBEDDING }).execute();
+
+    await sut.replaceScanFlaggedFaces(scan.id, [
+      { assetFaceId: assetFace.id, personId: person.id, suspectedOwnerId: owner.id },
+    ]);
+
+    const result = await sut.getScanFlaggedFaces(scan.id, person.id);
+
+    expect(result).toEqual([
+      expect.objectContaining({
+        assetFaceId: assetFace.id,
+        suspectedOwnerId: owner.id,
+        boundingBoxX1: 10,
+        boundingBoxY1: 20,
+        boundingBoxX2: 30,
+        boundingBoxY2: 40,
+        imageWidth: 400,
+        imageHeight: 300,
+      }),
+    ]);
+    expect(result[0].localDateTime).toBeInstanceOf(Date);
+  });
 });

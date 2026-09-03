@@ -19,6 +19,7 @@ import {
   findUnresolvableIds,
   tallyReattribution,
 } from 'src/utils/face-repair';
+import { FaceWithPhotoContext } from 'src/utils/face-review';
 import { ImmichMediaResponse } from 'src/utils/file';
 import { mimeTypes } from 'src/utils/mime-types';
 import { spaceVisibleAssetVisibilities } from 'src/utils/shared-space-album-scope';
@@ -696,7 +697,7 @@ export class FaceRepairService extends BaseService {
 
   async getPersonFlaggedFaces(
     personId: string,
-  ): Promise<{ personId: string; flaggedFaces: { assetFaceId: string; suspectedOwnerId: string }[] }> {
+  ): Promise<{ personId: string; flaggedFaces: (FaceWithPhotoContext & { suspectedOwnerId: string })[] }> {
     const latest = await this.faceRepairScanRepository.getLatestScan();
     if (!latest) {
       return { personId, flaggedFaces: [] };
@@ -717,11 +718,33 @@ export class FaceRepairService extends BaseService {
         })),
       ],
     ]);
+
+    // FlaggedFace is shared with withLiveFlaggedCounts (the dashboard recompute), so the photo context does
+    // not go on it. Keep it in a side map keyed by face id and re-join after filtering — a face the verdict
+    // layer drops then contributes nothing, rather than leaking a context row for a face the admin will
+    // never see.
+    const contextByFace = new Map(
+      stored.map((s) => [
+        s.assetFaceId,
+        {
+          localDateTime: s.localDateTime,
+          boundingBoxX1: s.boundingBoxX1,
+          boundingBoxY1: s.boundingBoxY1,
+          boundingBoxX2: s.boundingBoxX2,
+          boundingBoxY2: s.boundingBoxY2,
+          imageWidth: s.imageWidth,
+          imageHeight: s.imageHeight,
+        },
+      ]),
+    );
+
     applyVerdictFilters(byPerson, verdictMaps);
-    const flaggedFaces = (byPerson.get(personId) ?? []).map((f) => ({
-      assetFaceId: f.assetFaceId,
-      suspectedOwnerId: f.suspectedOwnerId,
-    }));
+
+    // flatMap, not map: a survivor with no context row is dropped rather than emitted half-populated.
+    const flaggedFaces = (byPerson.get(personId) ?? []).flatMap((f) => {
+      const context = contextByFace.get(f.assetFaceId);
+      return context ? [{ assetFaceId: f.assetFaceId, suspectedOwnerId: f.suspectedOwnerId, ...context }] : [];
+    });
     return { personId, flaggedFaces };
   }
 

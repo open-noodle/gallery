@@ -85,7 +85,11 @@ export class FaceRepairAdminController {
   getFaceRepairPersonFaces(
     @Param('personId', new ParseUUIDPipe({ version: '4' })) personId: string,
   ): Promise<FaceRepairPersonFacesDto> {
-    return this.service.getPersonFlaggedFaces(personId) as Promise<FaceRepairPersonFacesDto>;
+    // #1061: the service keeps localDateTime as a Date (repository/DB shape); the DTO schema declares it a
+    // string (serialized over the wire). The array-of-objects shape defeats the direct cast's "sufficient
+    // overlap" check the way the scalar fields on FaceRepairScanStatusDto do not, so route through unknown
+    // like getFaceRepairDeclines below.
+    return this.service.getPersonFlaggedFaces(personId) as unknown as Promise<FaceRepairPersonFacesDto>;
   }
 
   @Post('scan/person/:personId/cluster-faces')

@@ -131,7 +131,27 @@ export const FaceRepairScanStatusSchema = z
   .meta({ id: 'FaceRepairScanStatusDto' });
 export class FaceRepairScanStatusDto extends createZodDto(FaceRepairScanStatusSchema) {}
 
-const FlaggedFaceSchema = z.object({ assetFaceId: z.string(), suspectedOwnerId: z.string() });
+// Enough of the source photo to judge a face in context (#1061): when it was taken, and where in the frame
+// the detection sits. Both list queries already inner-join `asset`, so these are added columns on queries
+// that already run — no new join, no second round-trip.
+//
+// FLAT, not nested: this is byte-for-byte web's existing `FaceBox` type (web/src/lib/utils/people-utils.ts),
+// so the client hands it straight to getBoundingBox/getFaceCropTransform.
+const FacePhotoContextShape = {
+  localDateTime: z.string().meta({ format: 'date-time' }),
+  boundingBoxX1: z.number(),
+  boundingBoxY1: z.number(),
+  boundingBoxX2: z.number(),
+  boundingBoxY2: z.number(),
+  imageWidth: z.number(),
+  imageHeight: z.number(),
+};
+
+const FlaggedFaceSchema = z.object({
+  assetFaceId: z.string(),
+  suspectedOwnerId: z.string(),
+  ...FacePhotoContextShape,
+});
 export const FaceRepairPersonFacesSchema = z
   .object({ personId: z.string(), flaggedFaces: z.array(FlaggedFaceSchema) })
   .meta({ id: 'FaceRepairPersonFacesDto' });
@@ -303,7 +323,7 @@ export class FaceRepairClusterFacesRequestDto extends createZodDto(FaceRepairClu
 
 export const FaceRepairClusterFacesResponseSchema = z
   .object({
-    faces: z.array(z.object({ assetFaceId: z.string() })),
+    faces: z.array(z.object({ assetFaceId: z.string(), ...FacePhotoContextShape })),
     total: z.number(),
     hasMore: z.boolean(),
   })
