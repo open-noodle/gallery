@@ -3,7 +3,6 @@ import {
   dominantBy,
   FaceRow,
   medianTime,
-  monthName,
   pairCounts,
   pickEvenlySpaced,
   recencyBonus,
@@ -181,14 +180,6 @@ describe('dominantBy', () => {
     // '' is lexicographically smallest, so it must win an equal-sized tie whether seen first or last.
     expect(dominantBy(['', '', 'a', 'a'], (v) => v)).toMatchObject({ key: '', items: ['', ''] });
     expect(dominantBy(['a', 'a', '', ''], (v) => v)).toMatchObject({ key: '', items: ['', ''] });
-  });
-});
-
-describe('monthName', () => {
-  it('returns the English name for a 1-based month', () => {
-    expect(monthName(1)).toBe('January');
-    expect(monthName(7)).toBe('July');
-    expect(monthName(12)).toBe('December');
   });
 });
 

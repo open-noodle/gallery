@@ -64,12 +64,20 @@ describe(PeopleTogetherMemoryRule.name, () => {
     expect(candidate).toMatchObject({
       ruleId: 'people_together',
       dedupeKey: 'people_together:p1:p2:2023-06',
-      title: 'Anna & Ben',
-      subtitle: '6 photos together · June 2023',
       score: 125, // 100 + 6*3 + recencyBonus(2023,2026)=7
       visibleForDays: 7,
-      context: { year: 2023, personAId: 'p1', personBId: 'p2', count: 6 },
+      context: {
+        year: 2023,
+        month: 6,
+        personAId: 'p1',
+        personAName: 'Anna',
+        personBId: 'p2',
+        personBName: 'Ben',
+        count: 6,
+      },
     });
+    expect(candidate.title).toBeUndefined();
+    expect(candidate.subtitle).toBeUndefined();
     expect(candidate.assetIds).toHaveLength(6);
     // memoryAt is the median moment of the pair's shared assets (three on 06-10, three on 06-11 → lower-middle is 06-10).
     expect(candidate.memoryAt.toISODate()).toBe('2023-06-10');
@@ -104,7 +112,7 @@ describe(PeopleTogetherMemoryRule.name, () => {
     const { rule } = ruleWith(rows);
     const result = await rule.evaluate({ ownerId: 'user-1', target });
     expect(result).toHaveLength(1);
-    expect(result[0].title).toBe('Carl & Dana');
+    expect(result[0].context).toMatchObject({ personAName: 'Carl', personBName: 'Dana' });
   });
 
   it('given qualifying pairs across 3 prior years, then only the top MAX_YEARS (2) survive, score-sorted', async () => {
@@ -138,10 +146,14 @@ describe(PeopleTogetherMemoryRule.name, () => {
     const { rule } = ruleWith(rows);
     const result = await rule.evaluate({ ownerId: 'user-1', target });
     expect(result).toHaveLength(2);
-    expect(result.map((c) => c.title).toSorted((a, b) => (a ?? '').localeCompare(b ?? ''))).toEqual([
-      'Anna & Rex',
-      'Rex & Whiskers',
-    ]);
+    expect(
+      result
+        .map(
+          (c) =>
+            `${(c.context as { personAName: string }).personAName} & ${(c.context as { personBName: string }).personBName}`,
+        )
+        .toSorted((a, b) => a.localeCompare(b)),
+    ).toEqual(['Anna & Rex', 'Rex & Whiskers']);
   });
 
   it('given more than 8 co-occurring photos, then assetIds is capped at 8', async () => {
@@ -151,11 +163,14 @@ describe(PeopleTogetherMemoryRule.name, () => {
     expect(candidate.assetIds).toHaveLength(8);
   });
 
-  it('given the pair rows in reversed input order, then the dedupeKey/title are identical', async () => {
+  it('given the pair rows in reversed input order, then the dedupeKey/person order are identical', async () => {
     const rows = pairRows(2023, anna, ben, ['10', '10', '10', '11', '11', '11']);
     const { rule } = ruleWith(rows.toReversed());
     const [candidate] = await rule.evaluate({ ownerId: 'user-1', target });
-    expect(candidate).toMatchObject({ dedupeKey: 'people_together:p1:p2:2023-06', title: 'Anna & Ben' });
+    expect(candidate).toMatchObject({
+      dedupeKey: 'people_together:p1:p2:2023-06',
+      context: { personAName: 'Anna', personBName: 'Ben' },
+    });
   });
 
   it('given equal counts in a newer and an older year, then the newer year scores higher', async () => {
