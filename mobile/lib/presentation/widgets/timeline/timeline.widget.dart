@@ -683,7 +683,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
 
     final targetOffset = targetSegment.startOffset - 50;
     _resolvingZoomAnchor = anchor;
-    ref.read(timelineStateProvider.notifier).setScrubbing(true);
+    ref.read(timelineStateProvider.notifier).setRecommendDeferredLoading(true);
     unawaited(
       _scrollController
           .animateTo(
@@ -702,7 +702,7 @@ class _SliverTimelineState extends ConsumerState<_SliverTimeline> with WidgetsBi
             if (_resolvingZoomAnchor == anchor) {
               _resolvingZoomAnchor = null;
             }
-            ref.read(timelineStateProvider.notifier).setScrubbing(false);
+            ref.read(timelineStateProvider.notifier).setRecommendDeferredLoading(false);
           }),
     );
   }
