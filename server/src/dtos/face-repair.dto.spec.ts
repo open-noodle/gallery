@@ -1,6 +1,8 @@
 import {
   FaceRepairClusterFacesRequestSchema,
+  FaceRepairClusterFacesResponseSchema,
   FaceRepairDeclineRemoveRequestSchema,
+  FaceRepairPersonFacesSchema,
   FaceRepairResolutionsRemoveRequestSchema,
   FaceRepairResolveRequestSchema,
   FaceRepairScanStatusSchema,
@@ -352,5 +354,56 @@ describe('ScanSuspectedOwnerSchema (via FaceRepairScanStatusSchema)', () => {
   it('requires the overlay to state whether the destination still exists', () => {
     const { ownerMissing: _ownerMissing, ...withoutFlag } = validOwner;
     expect(FaceRepairScanStatusSchema.safeParse(scan(withoutFlag)).success).toBe(false);
+  });
+});
+
+// The console's grids need enough of the source photo to judge a face in context (#1061). These fields ride
+// the two list DTOs rather than a second endpoint, because both underlying queries already join `asset`.
+describe('face photo context on the list DTOs', () => {
+  const context = {
+    localDateTime: '2019-07-04T10:30:00.000Z',
+    boundingBoxX1: 100,
+    boundingBoxY1: 120,
+    boundingBoxX2: 300,
+    boundingBoxY2: 340,
+    imageWidth: 1440,
+    imageHeight: 1080,
+  };
+
+  it('T4.1: FaceRepairPersonFacesSchema accepts a flagged face carrying context', () => {
+    const result = FaceRepairPersonFacesSchema.safeParse({
+      personId: UUID_V4,
+      flaggedFaces: [{ assetFaceId: UUID_V4, suspectedOwnerId: UUID_V4, ...context }],
+    });
+    // Assert on the parsed data, not just success: zod strips unknown keys by default, so a schema that
+    // silently discards these fields would still report success — the assertion-that-cannot-fail trap.
+    expect(result.success && result.data.flaggedFaces[0].localDateTime).toBe('2019-07-04T10:30:00.000Z');
+  });
+
+  it('T4.2: FaceRepairClusterFacesResponseSchema accepts a cluster face carrying context', () => {
+    const result = FaceRepairClusterFacesResponseSchema.safeParse({
+      faces: [{ assetFaceId: UUID_V4, ...context }],
+      total: 1,
+      hasMore: false,
+    });
+    expect(result.success && result.data.faces[0].localDateTime).toBe('2019-07-04T10:30:00.000Z');
+  });
+
+  it('T4.3: both reject a face missing localDateTime — the pill has no silent empty state', () => {
+    const { localDateTime: _dropped, ...withoutDate } = context;
+
+    expect(
+      FaceRepairPersonFacesSchema.safeParse({
+        personId: UUID_V4,
+        flaggedFaces: [{ assetFaceId: UUID_V4, suspectedOwnerId: UUID_V4, ...withoutDate }],
+      }).success,
+    ).toBe(false);
+    expect(
+      FaceRepairClusterFacesResponseSchema.safeParse({
+        faces: [{ assetFaceId: UUID_V4, ...withoutDate }],
+        total: 1,
+        hasMore: false,
+      }).success,
+    ).toBe(false);
   });
 });

@@ -11,7 +11,24 @@ describe(FaceRepairService.name, () => {
 
   describe('getClusterFaces', () => {
     it('converts page/size to offset/limit and delegates to the repository', async () => {
-      const repoResult = { faces: [{ assetFaceId: 'f1' }], total: 7, hasMore: true };
+      const repoResult = {
+        // #1061: getClusterFacePage now carries photo context alongside each face id — this test is about
+        // the page/size -> offset/limit translation, not the context, so the values here are arbitrary.
+        faces: [
+          {
+            assetFaceId: 'f1',
+            localDateTime: new Date('2019-07-04T10:30:00.000Z'),
+            boundingBoxX1: 10,
+            boundingBoxY1: 20,
+            boundingBoxX2: 30,
+            boundingBoxY2: 40,
+            imageWidth: 400,
+            imageHeight: 300,
+          },
+        ],
+        total: 7,
+        hasMore: true,
+      };
       mocks.faceRepair.getClusterFacePage.mockResolvedValue(repoResult);
 
       const result = await sut.getClusterFaces('person-1', { excludeFaceIds: ['x'], page: 2, size: 3 });

@@ -32,6 +32,16 @@ export interface FlaggedFace {
   // Per-face suspected owner from the persisted scan snapshot — a mixed cluster can flag faces toward
   // different owners, so "move to owner" groups by each face's OWN suspectedOwnerId, not one destination.
   suspectedOwnerId: string;
+  // #1061: enough of the source photo to judge the face in context. Rides through into FaceEntry, so the
+  // grid and the modal read the same object. NOTE the asymmetry with the SERVER's FlaggedFace, which must
+  // NOT grow these — it is shared with the dashboard's live flagged-count recompute.
+  localDateTime: string;
+  imageWidth: number;
+  imageHeight: number;
+  boundingBoxX1: number;
+  boundingBoxY1: number;
+  boundingBoxX2: number;
+  boundingBoxY2: number;
 }
 
 export interface FaceEntry extends FlaggedFace {

@@ -16,6 +16,15 @@ export type ManualFaceState = 'keep' | 'move' | 'lock' | 'unknown' | 'detach';
 export interface ManualFace {
   // NOTE: no suspectedOwnerId — manual mode has no scan snapshot to suggest a destination.
   assetFaceId: string;
+  // #1061: the source-photo context, arriving through appendFaces on the same cluster-faces DTO the guided
+  // rest grid reads.
+  localDateTime: string;
+  imageWidth: number;
+  imageHeight: number;
+  boundingBoxX1: number;
+  boundingBoxY1: number;
+  boundingBoxX2: number;
+  boundingBoxY2: number;
 }
 
 export interface ManualResolveRequest {
