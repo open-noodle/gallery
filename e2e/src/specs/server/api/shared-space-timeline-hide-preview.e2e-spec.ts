@@ -12,7 +12,6 @@
  * real, and the zero case returns 0 rather than erroring.
  */
 
-import { SharedSpaceRole } from '@immich/sdk';
 import { createUserDto } from 'src/fixtures';
 import { app, asBearerAuth, utils } from 'src/utils';
 import request from 'supertest';
@@ -20,6 +19,23 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 let seq = 0;
 const uniqueName = (prefix: string) => `${prefix}-${++seq}`;
+
+/** A fresh user, a fresh space they own, and a fresh album (owned by them) linked into it. */
+const freshOwnerWithLinkedAlbum = async (
+  admin: Awaited<ReturnType<typeof utils.adminSetup>>,
+  prefix: string,
+  assetCount: number,
+) => {
+  const user = await utils.userSetup(admin.accessToken, createUserDto.create(uniqueName(prefix)));
+  const space = await utils.createSpace(user.accessToken, { name: uniqueName(`${prefix}-space`) });
+  const assets = await Promise.all(Array.from({ length: assetCount }, () => utils.createAsset(user.accessToken)));
+  const album = await utils.createAlbum(user.accessToken, {
+    albumName: uniqueName(`${prefix}-album`),
+    assetIds: assets.map((a) => a.id),
+  });
+  await utils.linkSpaceAlbum(user.accessToken, space.id, album.id);
+  return { user, spaceId: space.id, albumId: album.id, assets };
+};
 
 /** The caller's own merged personal timeline total (own assets + shared-space assets). */
 const personalTimelineTotal = async (token: string): Promise<number> => {
@@ -31,14 +47,10 @@ const personalTimelineTotal = async (token: string): Promise<number> => {
 };
 
 const spacePreview = (token: string, spaceId: string) =>
-  request(app)
-    .get(`/shared-spaces/${spaceId}/timeline-hide-preview`)
-    .set(asBearerAuth(token));
+  request(app).get(`/shared-spaces/${spaceId}/timeline-hide-preview`).set(asBearerAuth(token));
 
 const albumPreview = (token: string, spaceId: string, albumId: string) =>
-  request(app)
-    .get(`/shared-spaces/${spaceId}/albums/${albumId}/timeline-hide-preview`)
-    .set(asBearerAuth(token));
+  request(app).get(`/shared-spaces/${spaceId}/albums/${albumId}/timeline-hide-preview`).set(asBearerAuth(token));
 
 describe('shared-space timeline-hide-preview (#1041 slice 12)', () => {
   let admin: Awaited<ReturnType<typeof utils.adminSetup>>;
@@ -108,7 +120,7 @@ describe('shared-space timeline-hide-preview (#1041 slice 12)', () => {
       const { user, spaceId } = await freshOwnerWithSpace('sp-second-path');
       const otherSpace = await utils.createSpace(user.accessToken, { name: uniqueName('sp-second-path-other') });
 
-      const [asset] = await Promise.all([utils.createAsset(user.accessToken)]);
+      const asset = await utils.createAsset(user.accessToken);
       // Added to BOTH spaces — hiding just the first must not remove it from the timeline.
       await utils.addSpaceAssets(user.accessToken, spaceId, [asset.id]);
       await utils.addSpaceAssets(user.accessToken, otherSpace.id, [asset.id]);
@@ -131,23 +143,8 @@ describe('shared-space timeline-hide-preview (#1041 slice 12)', () => {
   });
 
   describe('GET /shared-spaces/:spaceId/albums/:albumId/timeline-hide-preview', () => {
-    /** A fresh user, a fresh space they own, and a fresh album (owned by them) linked into it. */
-    const freshOwnerWithLinkedAlbum = async (prefix: string, assetCount: number) => {
-      const user = await utils.userSetup(admin.accessToken, createUserDto.create(uniqueName(prefix)));
-      const space = await utils.createSpace(user.accessToken, { name: uniqueName(`${prefix}-space`) });
-      const assets = await Promise.all(
-        Array.from({ length: assetCount }, () => utils.createAsset(user.accessToken)),
-      );
-      const album = await utils.createAlbum(user.accessToken, {
-        albumName: uniqueName(`${prefix}-album`),
-        assetIds: assets.map((a) => a.id),
-      });
-      await utils.linkSpaceAlbum(user.accessToken, space.id, album.id);
-      return { user, spaceId: space.id, albumId: album.id, assets };
-    };
-
     it('a non-member gets 403', async () => {
-      const { spaceId, albumId } = await freshOwnerWithLinkedAlbum('al-403', 1);
+      const { spaceId, albumId } = await freshOwnerWithLinkedAlbum(admin, 'al-403', 1);
       const nonMember = await utils.userSetup(admin.accessToken, createUserDto.create(uniqueName('al-403-outsider')));
 
       const res = await albumPreview(nonMember.accessToken, spaceId, albumId);
@@ -163,7 +160,7 @@ describe('shared-space timeline-hide-preview (#1041 slice 12)', () => {
     });
 
     it('the zero case: an empty linked album returns 0, not an error', async () => {
-      const { user, spaceId, albumId } = await freshOwnerWithLinkedAlbum('al-zero', 0);
+      const { user, spaceId, albumId } = await freshOwnerWithLinkedAlbum(admin, 'al-zero', 0);
 
       const res = await albumPreview(user.accessToken, spaceId, albumId);
       expect(res.status).toBe(200);
@@ -171,7 +168,7 @@ describe('shared-space timeline-hide-preview (#1041 slice 12)', () => {
     });
 
     it('the count matches exactly what /timeline/buckets actually drops once the album is hidden', async () => {
-      const { user, spaceId, albumId } = await freshOwnerWithLinkedAlbum('al-match', 2);
+      const { user, spaceId, albumId } = await freshOwnerWithLinkedAlbum(admin, 'al-match', 2);
 
       const before = await personalTimelineTotal(user.accessToken);
       expect(before).toBe(2);
@@ -192,7 +189,7 @@ describe('shared-space timeline-hide-preview (#1041 slice 12)', () => {
     });
 
     it('an asset also added to the space directly is not counted — the preview matches the real drop of 0', async () => {
-      const { user, spaceId, albumId, assets } = await freshOwnerWithLinkedAlbum('al-second-path', 1);
+      const { user, spaceId, albumId, assets } = await freshOwnerWithLinkedAlbum(admin, 'al-second-path', 1);
       // Same asset also reaches the space directly, independent of the album link.
       await utils.addSpaceAssets(
         user.accessToken,
@@ -217,7 +214,7 @@ describe('shared-space timeline-hide-preview (#1041 slice 12)', () => {
     });
 
     it('the zero case when the album is already fully hidden via a hidden space', async () => {
-      const { user, spaceId, albumId } = await freshOwnerWithLinkedAlbum('al-space-already-hidden', 2);
+      const { user, spaceId, albumId } = await freshOwnerWithLinkedAlbum(admin, 'al-space-already-hidden', 2);
 
       // Hide the whole space first — the album's assets are already off the timeline via that
       // broader switch, so hiding the album individually would remove nothing further.
