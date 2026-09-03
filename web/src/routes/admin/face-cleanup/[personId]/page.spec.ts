@@ -12,6 +12,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/sve
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { goto } from '$app/navigation';
 import FaceActionsHelpModal from '$lib/components/face-cleanup/FaceActionsHelpModal.svelte';
+import FacePhotoModal from '$lib/components/face-cleanup/FacePhotoModal.svelte';
 import { Route } from '$lib/route';
 import Page from './+page.svelte';
 import type { SuspectedOwner } from './destination';
@@ -119,11 +120,18 @@ vi.mock('$lib/components/layouts/AdminPageLayout.svelte', async () => {
   return { default: stub };
 });
 
-// Mock people-utils thumbnail helper
-vi.mock('$lib/utils/people-utils', () => ({
-  getAdminFaceThumbnailUrl: (assetFaceId: string) => `/api/admin/face-repair/faces/${assetFaceId}/thumbnail`,
-  getSpacePersonFaceThumbnailUrl: vi.fn(),
-}));
+// Mock people-utils thumbnail helper. Keeps the REAL isUsableFaceBox/clampFaceBoxToImage/getBoundingBox/
+// getAdminFacePreviewUrl (via `...actual`) rather than dropping them — FacePhotoModal (imported below purely
+// for reference-identity assertions against modalManager.show) statically imports those at module-eval time,
+// so a mock object missing them would break on import even though this file never renders the modal itself.
+vi.mock('$lib/utils/people-utils', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('$lib/utils/people-utils')>();
+  return {
+    ...actual,
+    getAdminFaceThumbnailUrl: (assetFaceId: string) => `/api/admin/face-repair/faces/${assetFaceId}/thumbnail`,
+    getSpacePersonFaceThumbnailUrl: vi.fn(),
+  };
+});
 
 // ---- helpers ----
 
@@ -131,12 +139,24 @@ const PERSON_ID = 'person-1';
 const OWNER_A_ID = 'owner-a';
 const OWNER_B_ID = 'owner-b';
 
+// #1061: the source-photo context every face now carries — irrelevant to selection/state tests, so every
+// fixture face shares one stub rather than each test inventing its own.
+const PHOTO_CONTEXT = {
+  localDateTime: '2019-07-04T10:30:00.000Z',
+  imageWidth: 400,
+  imageHeight: 300,
+  boundingBoxX1: 100,
+  boundingBoxY1: 75,
+  boundingBoxX2: 200,
+  boundingBoxY2: 150,
+};
+
 // A mixed cluster: two faces suspect owner A, one suspects owner B (E14) — exercises the per-face grouping
 // (W1) all the way through the rendered page and into the resolveFaces call (P4).
 const makeFlaggedFaces = () => [
-  { assetFaceId: 'face-1', suspectedOwnerId: OWNER_A_ID },
-  { assetFaceId: 'face-2', suspectedOwnerId: OWNER_A_ID },
-  { assetFaceId: 'face-3', suspectedOwnerId: OWNER_B_ID },
+  { assetFaceId: 'face-1', suspectedOwnerId: OWNER_A_ID, ...PHOTO_CONTEXT },
+  { assetFaceId: 'face-2', suspectedOwnerId: OWNER_A_ID, ...PHOTO_CONTEXT },
+  { assetFaceId: 'face-3', suspectedOwnerId: OWNER_B_ID, ...PHOTO_CONTEXT },
 ];
 
 const makeScanPerson = (
@@ -242,6 +262,133 @@ describe('+page.svelte (face-cleanup review — Model B)', () => {
       for (const tile of tiles) {
         expect(tile).toHaveAttribute('data-state', 'owner');
       }
+    });
+  });
+
+  // #1061. T7.3 and T7.6 are the load-bearing tests of the whole change: opening a photo must never be
+  // mistaken for staging a decision, on either grid.
+  describe('source-photo access', () => {
+    it('T7.1/T7.4: every flagged tile carries a labelled magnifier and a date pill', async () => {
+      render(Page, { props: { data: makePageData() } });
+      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
+      const tiles = screen.getAllByTestId('face-tile');
+
+      expect(screen.getAllByTestId('face-tile-view-photo')).toHaveLength(tiles.length);
+      expect(screen.getAllByTestId('face-tile-date')).toHaveLength(tiles.length);
+    });
+
+    it('T7.2: clicking the magnifier opens the photo modal at that face', async () => {
+      render(Page, { props: { data: makePageData() } });
+      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
+
+      await fireEvent.click(screen.getAllByTestId('face-tile-view-photo')[1]);
+
+      expect(modalManager.show).toHaveBeenCalledWith(FacePhotoModal, expect.objectContaining({ index: 1 }));
+    });
+
+    it('T7.3: clicking the magnifier changes NO selection or state on the flagged grid', async () => {
+      render(Page, { props: { data: makePageData() } });
+      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
+      const tile = screen.getAllByTestId('face-tile')[0];
+      const stateBefore = tile.dataset.state;
+
+      await fireEvent.click(within(tile.parentElement!).getByTestId('face-tile-view-photo'));
+
+      // Two probes, deliberately: `data-state` catches a state mutation on THIS tile, and the bulk bar catches
+      // a selection anywhere. `face-bulk-bar` (not `face-dock`) is the selection-gated element — the dock's
+      // outer div is mounted whenever there are flagged faces at all, regardless of selection (R13).
+      expect(tile.dataset.state).toBe(stateBefore);
+      expect(screen.queryByTestId('face-bulk-bar')).not.toBeInTheDocument();
+
+      // Positive control: the bulk-bar probe must actually respond to a real selection, or its absence above
+      // is meaningless — click the tile itself (not the magnifier) and confirm the bar appears.
+      await fireEvent.click(tile);
+      await waitFor(() => expect(screen.getByTestId('face-bulk-bar')).toBeInTheDocument());
+    });
+
+    it('T7.5/T7.6: the rest grid’s magnifier opens the modal and stages nothing, with no destination chosen', async () => {
+      vi.mocked(getFaceRepairClusterFaces).mockResolvedValue({
+        faces: [
+          { assetFaceId: 'rest-1', ...PHOTO_CONTEXT },
+          { assetFaceId: 'rest-2', ...PHOTO_CONTEXT },
+        ],
+        total: 2,
+        hasMore: false,
+      } as unknown as FaceRepairClusterFacesResponseDto);
+
+      render(Page, { props: { data: makePageData() } });
+      await waitFor(() => expect(screen.getAllByTestId('rest-tile')).toHaveLength(2));
+      const tile = screen.getAllByTestId('rest-tile')[0];
+      expect(tile.dataset.selected).toBe('false'); // positive control
+
+      await fireEvent.click(within(tile.parentElement!).getByTestId('face-tile-view-photo'));
+
+      expect(modalManager.show).toHaveBeenCalledWith(FacePhotoModal, expect.anything());
+      expect(tile.dataset.selected).toBe('false');
+    });
+
+    // The modal is mocked here, so rendering it proves nothing about the wiring. These call the callbacks the
+    // PAGE actually handed it and assert the grid reacted — without them, a refactor could drop the selection
+    // props entirely and every test above would stay green.
+    it('hands the flagged grid a working selection toggle', async () => {
+      render(Page, { props: { data: makePageData() } });
+      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
+      const tile = screen.getAllByTestId('face-tile')[0];
+      const faceId = tile.dataset.faceid!;
+
+      await fireEvent.click(within(tile.parentElement!).getByTestId('face-tile-view-photo'));
+      const props = vi.mocked(modalManager.show).mock.calls.at(-1)![1] as unknown as {
+        isSelected: (id: string) => boolean;
+        onToggleSelect: (id: string) => void;
+      };
+
+      expect(props.isSelected(faceId)).toBe(false); // positive control: nothing staged by opening
+      props.onToggleSelect(faceId);
+      await waitFor(() => expect(screen.getByTestId('face-bulk-bar')).toBeInTheDocument());
+      expect(props.isSelected(faceId)).toBe(true);
+    });
+
+    it('hands the rest grid a working toggle plus the destination gate it lives under', async () => {
+      vi.mocked(getFaceRepairClusterFaces).mockResolvedValue({
+        faces: [{ assetFaceId: 'rest-1', ...PHOTO_CONTEXT }],
+        total: 1,
+        hasMore: false,
+      } as unknown as FaceRepairClusterFacesResponseDto);
+
+      render(Page, { props: { data: makePageData() } });
+      await waitFor(() => expect(screen.getAllByTestId('rest-tile')).toHaveLength(1));
+      const tile = screen.getAllByTestId('rest-tile')[0];
+
+      await fireEvent.click(within(tile.parentElement!).getByTestId('face-tile-view-photo'));
+      const props = vi.mocked(modalManager.show).mock.calls.at(-1)![1] as unknown as {
+        isSelected: (id: string) => boolean;
+        canSelect: (id: string) => boolean;
+        onToggleSelect: (id: string) => void;
+      };
+
+      // This fixture's scan supplies a suspected owner, so `canBulkMove` is true and adding is permitted —
+      // the page must report that faithfully rather than hardcoding a gate. The REFUSAL half of the gate, and
+      // the deliberate asymmetry that removal is never blocked, are pinned in FacePhotoModal.spec.ts, where
+      // both directions were proven red.
+      expect(props.canSelect('rest-1')).toBe(true);
+      expect(props.isSelected('rest-1')).toBe(false); // positive control
+
+      props.onToggleSelect('rest-1');
+      await waitFor(() => expect(tile.dataset.selected).toBe('true'));
+      expect(props.isSelected('rest-1')).toBe(true);
+
+      // And back out again — the shared toggleRestSelection handles both directions.
+      props.onToggleSelect('rest-1');
+      await waitFor(() => expect(tile.dataset.selected).toBe('false'));
+    });
+
+    it('T7.7: the magnifier is a SIBLING of the tile button, never nested inside it', async () => {
+      render(Page, { props: { data: makePageData() } });
+      await waitFor(() => expect(screen.getAllByTestId('face-tile')).toHaveLength(3));
+      const magnifier = screen.getAllByTestId('face-tile-view-photo')[0];
+
+      // A button inside a button is invalid HTML and browsers recover from it unpredictably.
+      expect(magnifier.closest('[data-testid="face-tile"]')).toBeNull();
     });
   });
 
