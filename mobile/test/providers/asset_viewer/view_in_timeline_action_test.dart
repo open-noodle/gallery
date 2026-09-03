@@ -53,11 +53,11 @@ void main() {
   });
 
   test('hides the filter sheet so it cannot cover the photo it lands on', () async {
-    container.read(photosFilterSheetProvider.notifier).state = FilterSheetSnap.browse;
+    container.read(photosFilterSheetProvider.notifier).state = FilterSheetVisibility.visible;
 
     await run();
 
-    expect(container.read(photosFilterSheetProvider), FilterSheetSnap.hidden);
+    expect(container.read(photosFilterSheetProvider), FilterSheetVisibility.hidden);
   });
 
   test('closes the viewer before the filter clears out of under it', () async {

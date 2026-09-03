@@ -26,7 +26,7 @@ bool _rangeCoversYear({required int year, DateTime? after, DateTime? before}) {
   return true;
 }
 
-/// WhenAccordionSection — Deep-snap section for the "When" filter dimension.
+/// WhenAccordionSection — Deep section for the "When" filter dimension.
 ///
 /// Lists years (descending) with a trailing count, capped to [_kPreviewCap]
 /// so a library spanning many years does not produce an endless section (#820).

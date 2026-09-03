@@ -16,7 +16,7 @@ import 'package:openapi/api.dart';
 /// plus any selected suggestion beyond the cap (pinned so it stays visible).
 const int _kPreviewCap = 6;
 
-/// PeopleSectionDeep — Deep-snap section for the People filter dimension.
+/// PeopleSectionDeep — Deep section for the People filter dimension.
 ///
 /// Layout: circular-avatar wrap grid (52pt avatars, 62pt tile), 14pt gap,
 /// capped to [_kPreviewCap] avatars (selected suggestions beyond the cap are

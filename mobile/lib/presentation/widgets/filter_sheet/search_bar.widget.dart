@@ -53,7 +53,7 @@ class _FilterSheetSearchBarState extends ConsumerState<FilterSheetSearchBar> {
     ref.read(photosFilterProvider.notifier).setText(value);
     FocusScope.of(context).unfocus();
     if (value.trim().isNotEmpty) {
-      ref.read(photosFilterSheetProvider.notifier).state = FilterSheetSnap.hidden;
+      ref.read(photosFilterSheetProvider.notifier).state = FilterSheetVisibility.hidden;
     }
   }
 
@@ -71,7 +71,7 @@ class _FilterSheetSearchBarState extends ConsumerState<FilterSheetSearchBar> {
     // Watch the request counter and compare against the consumed-counter
     // provider. If request > consumed, schedule a post-frame requestFocus and
     // bump consumed. Storing the consumed counter in a provider (not a State
-    // field) means snap transitions — which unmount+remount this widget —
+    // field) means sheet remounts — which unmount+remount this widget —
     // don't retrigger focus on the already-processed request.
     final focusRequest = ref.watch(photosFilterSearchFocusRequestProvider);
     final focusConsumed = ref.read(photosFilterSearchFocusConsumedProvider);

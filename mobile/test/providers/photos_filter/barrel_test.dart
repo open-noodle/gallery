@@ -5,7 +5,7 @@ void main() {
   test('barrel exports are resolvable', () {
     // Compile-time smoke test — if any symbol isn't exported, this file won't build.
     expect(PhotosFilterNotifier, isNotNull);
-    expect(FilterSheetSnap.values, isNotEmpty);
+    expect(FilterSheetVisibility.values, isNotEmpty);
     expect(const PersonChipId('x'), isA<ChipId>());
     expect(photosFilterProvider, isNotNull);
     expect(photosFilterSheetProvider, isNotNull);
