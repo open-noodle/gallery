@@ -740,7 +740,7 @@ describe('FaceRepairRepository.getClusterFacePage', () => {
     const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
     const { assetFace } = await ctx.newAssetFace({
       assetId: asset.id,
-      personId: person.id,
+      personGroupId: person.personGroupId,
       sourceType: SourceType.MachineLearning,
       boundingBoxX1: 10,
       boundingBoxY1: 20,
@@ -754,7 +754,7 @@ describe('FaceRepairRepository.getClusterFacePage', () => {
     // face-repair.repository.spec.ts:30) is the idiom every other test in this file uses.
     await ctx.database.insertInto('face_search').values({ faceId: assetFace.id, embedding: EMBEDDING }).execute();
 
-    const page = await sut.getClusterFacePage(person.id, { excludeFaceIds: [], limit: 10, offset: 0 });
+    const page = await sut.getClusterFacePage(person.personGroupId, { excludeFaceIds: [], limit: 10, offset: 0 });
 
     expect(page.faces).toEqual([
       expect.objectContaining({
@@ -777,7 +777,7 @@ describe('FaceRepairRepository.getClusterFacePage', () => {
     const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
     const { assetFace } = await ctx.newAssetFace({
       assetId: asset.id,
-      personId: person.id,
+      personGroupId: person.personGroupId,
       sourceType: SourceType.MachineLearning,
     });
     // getClusterFacePage INNER JOINs face_search, so a face without an embedding row never appears. There is
@@ -786,7 +786,7 @@ describe('FaceRepairRepository.getClusterFacePage', () => {
     await ctx.database.insertInto('face_search').values({ faceId: assetFace.id, embedding: EMBEDDING }).execute();
     await ctx.database.updateTable('asset').set({ deletedAt: new Date() }).where('id', '=', asset.id).execute();
 
-    const page = await sut.getClusterFacePage(person.id, { excludeFaceIds: [], limit: 10, offset: 0 });
+    const page = await sut.getClusterFacePage(person.personGroupId, { excludeFaceIds: [], limit: 10, offset: 0 });
 
     expect(page.faces).toEqual([]);
   });
