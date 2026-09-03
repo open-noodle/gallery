@@ -139,8 +139,7 @@ describe(MemoryService.name, () => {
           data: {
             ruleId: 'birthday',
             dedupeKey: 'birthday:person-1:2026-04-23',
-            title: 'Happy birthday, Alice',
-            subtitle: 'Photos from different years',
+            context: { personId: 'person-1', personName: 'Alice', variant: 'across_years', distinctYears: 6 },
           },
         }) as any,
       );
@@ -154,7 +153,7 @@ describe(MemoryService.name, () => {
           type: MemoryType.Rule,
           data: expect.objectContaining({
             ruleId: 'birthday',
-            title: 'Happy birthday, Alice',
+            context: expect.objectContaining({ personName: 'Alice', variant: 'across_years' }),
           }),
         }),
         new Set(['a-2025-1', 'a-2024-1', 'a-2023-1', 'a-2022-1', 'a-2021-1', 'a-2020-1']),

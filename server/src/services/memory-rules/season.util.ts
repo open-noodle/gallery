@@ -11,14 +11,6 @@ export const SEASON_MONTHS: Record<Season, number[]> = {
   winter: [12, 1, 2],
 };
 
-/** Human-facing season label used in memory titles. */
-export const SEASON_LABEL: Record<Season, string> = {
-  spring: 'Spring',
-  summer: 'Summer',
-  autumn: 'Autumn',
-  winter: 'Winter',
-};
-
 /** The month (1–12) each season begins on. */
 const SEASON_START_MONTH: Record<number, Season> = { 3: 'spring', 6: 'summer', 9: 'autumn', 12: 'winter' };
 

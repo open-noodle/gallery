@@ -47,12 +47,12 @@ describe(MonthRecapMemoryRule.name, () => {
       expect(candidate).toMatchObject({
         ruleId: 'month_recap',
         dedupeKey: 'month_recap:2023-07',
-        title: 'July 2023',
-        subtitle: '12 photos',
         score: 99, // 80 + min(12,30) + recencyBonus(2023, 2026)=7
         visibleForDays: 7,
         context: { year: 2023, month: 7, count: 12 },
       });
+      expect(candidate.title).toBeUndefined();
+      expect(candidate.subtitle).toBeUndefined();
       expect(candidate.memoryAt.toISODate()).toBe('2023-07-01');
       expect(candidate.assetIds).toHaveLength(12);
       expect(candidate.assetIds[0]).toBe('a-2023-0');
@@ -69,7 +69,11 @@ describe(MonthRecapMemoryRule.name, () => {
         ...assetsForYear(2025, 10),
       ]);
       const result = await rule.evaluate({ ownerId: 'user-1', target });
-      expect(result.map((c) => c.title)).toEqual(['July 2025', 'July 2024', 'July 2023']);
+      expect(result.map((c) => c.context)).toEqual([
+        { year: 2025, month: 7, count: 10 },
+        { year: 2024, month: 7, count: 10 },
+        { year: 2023, month: 7, count: 10 },
+      ]);
     });
   });
 
@@ -97,7 +101,7 @@ describe(MonthRecapMemoryRule.name, () => {
       expect(candidate.assetIds).toHaveLength(24);
       expect(candidate.assetIds[0]).toBe('a-2023-0');
       expect(candidate.assetIds.at(-1)).toBe('a-2023-29');
-      expect(candidate.subtitle).toBe('30 photos'); // true count, not the capped sample
+      expect(candidate.context).toMatchObject({ count: 30 }); // true count, not the capped sample
     });
   });
 
@@ -105,7 +109,7 @@ describe(MonthRecapMemoryRule.name, () => {
     it('scores a newer year above an older year at equal count', async () => {
       const { rule } = ruleWith([...assetsForYear(2020, 10), ...assetsForYear(2024, 10)]);
       const result = await rule.evaluate({ ownerId: 'user-1', target });
-      expect(result[0].title).toBe('July 2024');
+      expect(result[0].context).toMatchObject({ year: 2024 });
       expect(result[0].score).toBeGreaterThan(result[1].score);
     });
   });
