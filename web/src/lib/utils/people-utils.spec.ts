@@ -5,8 +5,12 @@ import { PeopleSortBy, peopleViewSettings } from '$lib/stores/preferences.store'
 import type { Size } from '$lib/utils/container-utils';
 import {
   appendUniqueById,
+  clampFaceBoxToImage,
+  type FaceBox,
+  getAdminFacePreviewUrl,
   getBoundingBox,
   getFaceCropTransform,
+  isUsableFaceBox,
   sortPeople,
   sortPeopleForManagement,
   zoomImageToBase64,
@@ -468,5 +472,93 @@ describe(zoomImageToBase64.name, () => {
     const photoViewer = { naturalWidth: 0, naturalHeight: 0, src: 'http://localhost/preview.jpg' } as HTMLImageElement;
 
     await expect(zoomImageToBase64(makeFace(), 'asset-1', AssetTypeEnum.Image, photoViewer)).resolves.toBeNull();
+  });
+});
+
+describe('getAdminFacePreviewUrl', () => {
+  it('T9.1: points at the admin-gated, face-keyed preview route', () => {
+    expect(getAdminFacePreviewUrl('face-1')).toBe('/api/admin/face-repair/faces/face-1/preview');
+  });
+});
+
+describe('isUsableFaceBox', () => {
+  const box = (overrides: Partial<FaceBox> = {}): FaceBox => ({
+    imageWidth: 400,
+    imageHeight: 300,
+    boundingBoxX1: 100,
+    boundingBoxY1: 75,
+    boundingBoxX2: 200,
+    boundingBoxY2: 150,
+    ...overrides,
+  });
+
+  it('accepts an ordinary box (positive control)', () => {
+    expect(isUsableFaceBox(box())).toBe(true);
+  });
+
+  it('rejects zero image dimensions — 0/0 is NaN, not a small number', () => {
+    expect(isUsableFaceBox(box({ imageWidth: 0 }))).toBe(false);
+    expect(isUsableFaceBox(box({ imageHeight: 0 }))).toBe(false);
+  });
+
+  it('rejects a degenerate box', () => {
+    expect(isUsableFaceBox(box({ boundingBoxX2: 100 }))).toBe(false);
+    expect(isUsableFaceBox(box({ boundingBoxY2: 50 }))).toBe(false);
+  });
+
+  it('accepts a full-frame box, which getFaceCropTransform separately rejects', () => {
+    // The two predicates deliberately differ at the upper bound: a box covering the whole image renders fine
+    // as an overlay, but has no meaningful CSS crop transform.
+    expect(isUsableFaceBox(box({ boundingBoxX1: 0, boundingBoxY1: 0, boundingBoxX2: 400, boundingBoxY2: 300 }))).toBe(
+      true,
+    );
+  });
+});
+
+describe('clampFaceBoxToImage', () => {
+  it('pulls an out-of-range box back inside the image', () => {
+    const clamped = clampFaceBoxToImage({
+      imageWidth: 400,
+      imageHeight: 300,
+      boundingBoxX1: -50,
+      boundingBoxY1: -10,
+      boundingBoxX2: 900,
+      boundingBoxY2: 700,
+    });
+
+    expect(clamped).toMatchObject({
+      boundingBoxX1: 0,
+      boundingBoxY1: 0,
+      boundingBoxX2: 400,
+      boundingBoxY2: 300,
+    });
+  });
+
+  it('leaves an in-range box untouched (positive control)', () => {
+    const original = {
+      imageWidth: 400,
+      imageHeight: 300,
+      boundingBoxX1: 100,
+      boundingBoxY1: 75,
+      boundingBoxX2: 200,
+      boundingBoxY2: 150,
+    };
+
+    expect(clampFaceBoxToImage(original)).toEqual(original);
+  });
+});
+
+describe('getFaceCropTransform (regression)', () => {
+  it('still returns the cover fallback for a full-frame box after the guard was extracted', () => {
+    const transform = getFaceCropTransform({
+      imageWidth: 400,
+      imageHeight: 300,
+      boundingBoxX1: 0,
+      boundingBoxY1: 0,
+      boundingBoxX2: 400,
+      boundingBoxY2: 300,
+    });
+
+    expect(transform).toEqual({ backgroundSize: 'cover', backgroundPosition: 'center' });
   });
 });

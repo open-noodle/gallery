@@ -18,8 +18,11 @@
   import { onMount } from 'svelte';
   import { t } from 'svelte-i18n';
   import FaceActionsHelpModal from '$lib/components/face-cleanup/FaceActionsHelpModal.svelte';
+  import FacePhotoModal from '$lib/components/face-cleanup/FacePhotoModal.svelte';
   import FaceReviewDock from '$lib/components/face-cleanup/FaceReviewDock.svelte';
+  import FaceTileOverlay from '$lib/components/face-cleanup/FaceTileOverlay.svelte';
   import type { FaceActionId } from '$lib/components/face-cleanup/face-actions';
+  import type { FacePhotoFace } from '$lib/components/face-cleanup/face-photo';
   import { faceCleanupBreadcrumbs, manualCrumb } from '../../breadcrumbs';
   import PersonPicker from '../../[personId]/PersonPicker.svelte';
   import type { PageData } from './$types';
@@ -203,6 +206,19 @@
 
   const handleTileClick = (assetFaceId: string, event: MouseEvent) => {
     vm.toggle(assetFaceId, event.shiftKey);
+  };
+
+  // #1061: opens the source photo behind a face crop. Same helper as the guided page — see its comment for
+  // why `faces` is the array the magnifier was clicked from rather than some cluster-wide list.
+  // Selection is handed in so the admin can stage a face without closing the lightbox — manual has one grid
+  // and no destination gate, so there is no `canSelect` here.
+  const openPhoto = (faces: FacePhotoFace[], index: number) => {
+    void modalManager.show(FacePhotoModal, {
+      faces,
+      index,
+      isSelected: (assetFaceId: string) => vm.isSelected(assetFaceId),
+      onToggleSelect: (assetFaceId: string) => vm.toggle(assetFaceId),
+    });
   };
 
   // ---- Bulk actions (slice 9) ----
@@ -566,53 +582,58 @@
           class="grid grid-cols-4 gap-2.5 bg-gray-50 p-4 sm:grid-cols-6 lg:grid-cols-8 dark:bg-gray-800/50"
           data-testid="manual-review-face-grid"
         >
-          {#each vm.faces as face (face.assetFaceId)}
+          {#each vm.faces as face, tileIndex (face.assetFaceId)}
             {@const selected = vm.isSelected(face.assetFaceId)}
             {@const state = vm.stateOf(face.assetFaceId)}
-            <button
-              type="button"
-              class={[
-                'relative aspect-square overflow-hidden rounded-xl border-2 transition-all',
-                selected ? 'border-primary' : 'border-transparent',
-              ].join(' ')}
-              style={selected ? 'box-shadow: 0 0 0 3px rgba(79,70,229,0.32);' : ''}
-              onclick={(event) => handleTileClick(face.assetFaceId, event)}
-              data-testid="face-tile"
-              data-faceid={face.assetFaceId}
-              data-state={state}
-              data-selected={selected}
-            >
-              <img
-                src={faceThumbnailUrl(face.assetFaceId)}
-                alt=""
-                class="size-full object-cover"
-                style={state === 'detach' ? 'filter: grayscale(1) opacity(0.55);' : ''}
-                loading="lazy"
-              />
-              {#if selected}
-                <div class="absolute inset-0 bg-primary/15"></div>
-              {/if}
-              <!-- The visual inversion (§6.4): `keep` (the default) renders NEITHER the badge nor the ribbon
-                   below — it is signalled by absence, not a 7th colour swatch. Every other state reuses
-                   guided's exact STATE_COLOR/STATE_ICON tokens via MANUAL_STATE_COLOR/MANUAL_STATE_ICON, so
-                   one glyph means one thing across both pages. -->
-              {#if state !== 'keep'}
-                {@const nonKeepState = state as Exclude<ManualFaceState, 'keep'>}
-                <div
-                  class="absolute top-1.5 left-1.5 flex size-5 items-center justify-center rounded-md border-2 border-white shadow-sm"
-                  style="background: {MANUAL_STATE_COLOR[nonKeepState]}"
-                  data-state-icon={state}
-                >
-                  <Icon icon={MANUAL_STATE_ICON[nonKeepState]} size="11" color="white" />
-                </div>
-                <div
-                  class="absolute inset-x-0 bottom-0 p-1 text-center text-[9.5px] font-bold text-white"
-                  style="background: {MANUAL_STATE_COLOR[nonKeepState]}"
-                >
-                  {ribbonLabel(face.assetFaceId, state)}
-                </div>
-              {/if}
-            </button>
+            <div class="relative aspect-square">
+              <button
+                type="button"
+                class={[
+                  'absolute inset-0 overflow-hidden rounded-xl border-2 transition-all',
+                  selected ? 'border-primary' : 'border-transparent',
+                ].join(' ')}
+                style={selected ? 'box-shadow: 0 0 0 3px rgba(79,70,229,0.32);' : ''}
+                onclick={(event) => handleTileClick(face.assetFaceId, event)}
+                data-testid="face-tile"
+                data-faceid={face.assetFaceId}
+                data-state={state}
+                data-selected={selected}
+              >
+                <img
+                  src={faceThumbnailUrl(face.assetFaceId)}
+                  alt=""
+                  class="size-full object-cover"
+                  style={state === 'detach' ? 'filter: grayscale(1) opacity(0.55);' : ''}
+                  loading="lazy"
+                />
+                {#if selected}
+                  <div class="absolute inset-0 bg-primary/15"></div>
+                {/if}
+                <!-- The visual inversion (§6.4): `keep` (the default) renders NEITHER the badge nor the ribbon
+                     below — it is signalled by absence, not a 7th colour swatch. Every other state reuses
+                     guided's exact STATE_COLOR/STATE_ICON tokens via MANUAL_STATE_COLOR/MANUAL_STATE_ICON, so
+                     one glyph means one thing across both pages. -->
+                {#if state !== 'keep'}
+                  {@const nonKeepState = state as Exclude<ManualFaceState, 'keep'>}
+                  <div
+                    class="absolute top-1.5 left-1.5 flex size-5 items-center justify-center rounded-md border-2 border-white shadow-sm"
+                    style="background: {MANUAL_STATE_COLOR[nonKeepState]}"
+                    data-state-icon={state}
+                  >
+                    <Icon icon={MANUAL_STATE_ICON[nonKeepState]} size="11" color="white" />
+                  </div>
+                  <!-- Right-aligned and capped short of full width so it never overpaints the date pill
+                       (FaceTileOverlay, a sibling of this button) sitting in the bottom-left corner. -->
+                  <div
+                    class="absolute right-0 bottom-0 max-w-[70%] truncate rounded-tl-sm p-1 text-center text-[9.5px] font-bold text-white"
+                    style="background: {MANUAL_STATE_COLOR[nonKeepState]}"
+                  >
+                    {ribbonLabel(face.assetFaceId, state)}
+                  </div>
+                {/if}
+              </button>
+              <FaceTileOverlay localDateTime={face.localDateTime} onOpen={() => openPhoto(vm.faces, tileIndex)} />
+            </div>
           {/each}
         </div>
 
