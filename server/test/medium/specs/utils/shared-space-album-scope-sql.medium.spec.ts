@@ -29,7 +29,12 @@ const kyselyIds = async (spaceId: string, requireAlbumNotDeleted = true): Promis
     .selectFrom('asset')
     .select('asset.id')
     .where((eb) =>
-      spaceAlbumAssetExists(eb, { correlateAssetId: 'asset.id', scope: { spaceId }, requireAlbumNotDeleted, albumTimelineGate: 'none' }),
+      spaceAlbumAssetExists(eb, {
+        correlateAssetId: 'asset.id',
+        scope: { spaceId },
+        requireAlbumNotDeleted,
+        albumTimelineGate: 'none',
+      }),
     )
     .execute();
   return new Set(rows.map((r) => r.id));

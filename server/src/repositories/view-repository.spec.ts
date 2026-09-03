@@ -18,7 +18,7 @@ describe(ViewRepository.name, () => {
     // VIEWER's own per-user hide (a shared_space_album_hidden NOT EXISTS), not the shared
     // showInTimeline flag, which governs only the space's own Photos tab (§3). This test used to
     // assert the OPPOSITE (`"showInTimeline" = `) — that assertion described exactly the #1041 bug.
-    it('album arm gates on the viewer\'s personal hide (shared_space_album_hidden), not the shared showInTimeline flag', () => {
+    it("album arm gates on the viewer's personal hide (shared_space_album_hidden), not the shared showInTimeline flag", () => {
       const db = offlineKysely();
       const sut = new ViewRepository(db as never);
       const query = db

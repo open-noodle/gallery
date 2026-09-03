@@ -62,7 +62,7 @@ class SpaceAlbumKebab extends StatelessWidget {
           enabled: toggleEnabled,
           child: Text(
             showInTimeline
-                ? 'spaces_hide_from_timeline'.t(context: context)
+                ? 'space_albums_hide_from_space_photos'.t(context: context)
                 : 'spaces_linked_albums_show_in_timeline'.t(context: context),
           ),
         ),

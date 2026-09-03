@@ -62,7 +62,7 @@ class SpaceDetailKebab extends StatelessWidget {
           value: _KebabAction.toggleTimeline,
           enabled: !timelineBusy,
           child: Text(
-            showInTimeline ? 'spaces_hide_from_timeline'.t(context: context) : 'show_in_timeline'.t(context: context),
+            showInTimeline ? 'spaces_hide_from_timeline'.t(context: context) : 'spaces_show_on_timeline'.t(context: context),
           ),
         ),
         if (showPeople)

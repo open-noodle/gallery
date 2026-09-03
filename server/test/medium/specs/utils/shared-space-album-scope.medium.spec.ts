@@ -185,7 +185,13 @@ describe('spaceAlbumAssetExists — album leg', () => {
     const rows = await db
       .selectFrom('asset')
       .select('asset.id')
-      .where((eb) => spaceAlbumAssetExists(eb, { correlateAssetId: 'asset.id', scope: { spaceIds: [s1.id, s2.id] }, albumTimelineGate: 'none' }))
+      .where((eb) =>
+        spaceAlbumAssetExists(eb, {
+          correlateAssetId: 'asset.id',
+          scope: { spaceIds: [s1.id, s2.id] },
+          albumTimelineGate: 'none',
+        }),
+      )
       .execute();
     expect(rows.filter((r) => r.id === a1.id)).toHaveLength(1);
   });
