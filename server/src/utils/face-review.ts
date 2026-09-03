@@ -17,3 +17,16 @@ export const reviewableAssetVisibility = (
   eb: ExpressionBuilder<DB, keyof DB>,
   column: ReferenceExpression<DB, keyof DB> = 'asset.visibility',
 ): Expression<SqlBool> => eb(column, 'in', spaceVisibleAssetVisibilities);
+
+// #1061: the face-review console renders a source-photo preview with the detection boxed, so both list
+// reads carry the capture date and the box. Flat field names deliberately mirror web's `FaceBox` type.
+export interface FaceWithPhotoContext {
+  assetFaceId: string;
+  localDateTime: Date;
+  boundingBoxX1: number;
+  boundingBoxY1: number;
+  boundingBoxX2: number;
+  boundingBoxY2: number;
+  imageWidth: number;
+  imageHeight: number;
+}
