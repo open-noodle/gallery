@@ -304,3 +304,246 @@ describe('DownloadRepository.downloadAlbumId', () => {
     // Locked cannot be placed in albums (see service-layer invariant above).
   });
 });
+
+// ---------------------------------------------------------------------------
+// #1048: cross-owner contributions (#764) inside a space-linked album. The album
+// grid — and an album share link created from the space (#1018) — both show the
+// other members' photos, so the album archive must contain them too. Before this
+// the album arm read `album_asset` alone and silently shipped only the album
+// owner's own photos.
+//
+// The contributed arm is gated on the space ids the SERVICE resolved (live
+// member-spaces linking the album, or the single tethered space of a link), the
+// same contract `AssetRepository`'s album arm uses — so a plain album_user share
+// or a spaceless link resolves none and nothing widens.
+// ---------------------------------------------------------------------------
+const seedContributedAlbum = async () => {
+  const { ctx, sut, spaceRepo } = setup();
+  const { user: owner } = await ctx.newUser();
+  const { user: contributor } = await ctx.newUser();
+  const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+  await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: 'owner' });
+  await ctx.newSharedSpaceMember({ spaceId: space.id, userId: contributor.id, role: 'editor' });
+
+  const { asset: ownAsset } = await ctx.newAsset({ ownerId: owner.id });
+  await ctx.newExif({ assetId: ownAsset.id, fileSizeInByte: 1024 });
+  const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'Space album' }, [ownAsset.id]);
+  await spaceRepo.addAlbum({ spaceId: space.id, albumId: album.id, addedById: owner.id });
+
+  const { asset: contributed } = await ctx.newAsset({ ownerId: contributor.id });
+  await ctx.newExif({ assetId: contributed.id, fileSizeInByte: 2048 });
+  await ctx.newAlbumSpaceAsset({
+    albumId: album.id,
+    assetId: contributed.id,
+    spaceId: space.id,
+    addedById: contributor.id,
+  });
+
+  return { ctx, sut, spaceRepo, owner, contributor, space, album, ownAsset, contributed };
+};
+
+describe('DownloadRepository.downloadAlbumId — cross-owner contributions', () => {
+  it("includes another member's contribution when the album's space is in scope", async () => {
+    const { sut, album, space, ownAsset, contributed } = await seedContributedAlbum();
+
+    const ids = await collectIds(sut.downloadAlbumId(album.id, [space.id]));
+
+    expect(ids.has(ownAsset.id)).toBe(true);
+    expect(ids.has(contributed.id)).toBe(true);
+  });
+
+  it('omits contributions when no space scope is resolved (plain album share)', async () => {
+    const { sut, album, ownAsset, contributed } = await seedContributedAlbum();
+
+    const ids = await collectIds(sut.downloadAlbumId(album.id));
+
+    expect(ids.has(ownAsset.id)).toBe(true);
+    expect(ids.has(contributed.id)).toBe(false);
+  });
+
+  it('omits a contribution tethered to a different space', async () => {
+    const { ctx, sut, owner, album, ownAsset, contributed } = await seedContributedAlbum();
+    const { space: otherSpace } = await ctx.newSharedSpace({ createdById: owner.id });
+
+    const ids = await collectIds(sut.downloadAlbumId(album.id, [otherSpace.id]));
+
+    expect(ids.has(ownAsset.id)).toBe(true);
+    expect(ids.has(contributed.id)).toBe(false);
+  });
+
+  it('excludes a Hidden contribution, includes an Archive one', async () => {
+    const { ctx, sut, contributor, space, album, contributed } = await seedContributedAlbum();
+
+    const { asset: archived } = await ctx.newAsset({ ownerId: contributor.id, visibility: AssetVisibility.Archive });
+    await ctx.newExif({ assetId: archived.id, fileSizeInByte: 2048 });
+    await ctx.newAlbumSpaceAsset({ albumId: album.id, assetId: archived.id, spaceId: space.id });
+
+    await ctx.database
+      .updateTable('asset')
+      .set({ visibility: AssetVisibility.Hidden })
+      .where('id', '=', contributed.id)
+      .execute();
+
+    const ids = await collectIds(sut.downloadAlbumId(album.id, [space.id]));
+
+    expect(ids.has(archived.id)).toBe(true);
+    expect(ids.has(contributed.id)).toBe(false);
+  });
+
+  it('excludes a soft-deleted contribution', async () => {
+    const { ctx, sut, space, album, contributed } = await seedContributedAlbum();
+    await ctx.softDeleteAsset(contributed.id);
+
+    const ids = await collectIds(sut.downloadAlbumId(album.id, [space.id]));
+
+    expect(ids.has(contributed.id)).toBe(false);
+  });
+
+  it('yields an asset once when it is both an album member and a contribution', async () => {
+    const { ctx, sut, space, album, ownAsset } = await seedContributedAlbum();
+    // P1-6 coexistence window: the same asset carries an album_asset AND an
+    // album_space_asset row. The archive must not list it twice.
+    await ctx.newAlbumSpaceAsset({ albumId: album.id, assetId: ownAsset.id, spaceId: space.id });
+
+    const rows: string[] = [];
+    for await (const row of sut.downloadAlbumId(album.id, [space.id])) {
+      rows.push(row.id);
+    }
+
+    expect(rows.filter((id) => id === ownAsset.id)).toHaveLength(1);
+  });
+});
+
+describe('DownloadRepository.downloadSpaceId — cross-owner contributions', () => {
+  it("includes another member's contribution to a linked album", async () => {
+    const { ctx, sut, spaceRepo } = setup();
+    const { user: owner } = await ctx.newUser();
+    const { user: contributor } = await ctx.newUser();
+    const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: owner.id, role: 'owner' });
+    await ctx.newSharedSpaceMember({ spaceId: space.id, userId: contributor.id, role: 'editor' });
+
+    const { asset: ownAsset } = await ctx.newAsset({ ownerId: owner.id });
+    await ctx.newExif({ assetId: ownAsset.id, fileSizeInByte: 1024 });
+    const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'Space album' }, [ownAsset.id]);
+    await spaceRepo.addAlbum({ spaceId: space.id, albumId: album.id, addedById: owner.id });
+
+    const { asset: contributed } = await ctx.newAsset({ ownerId: contributor.id });
+    await ctx.newExif({ assetId: contributed.id, fileSizeInByte: 2048 });
+    await ctx.newAlbumSpaceAsset({ albumId: album.id, assetId: contributed.id, spaceId: space.id });
+
+    const ids = await collectIds(sut.downloadSpaceId(space.id));
+
+    expect(ids.has(ownAsset.id)).toBe(true);
+    expect(ids.has(contributed.id)).toBe(true);
+  });
+
+  it('excludes a contribution whose album has been unlinked from the space', async () => {
+    const { ctx, sut, spaceRepo } = setup();
+    const { user: owner } = await ctx.newUser();
+    const { user: contributor } = await ctx.newUser();
+    const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+
+    const { asset: ownAsset } = await ctx.newAsset({ ownerId: owner.id });
+    await ctx.newExif({ assetId: ownAsset.id, fileSizeInByte: 1024 });
+    const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'Unlinked' }, [ownAsset.id]);
+    await spaceRepo.addAlbum({ spaceId: space.id, albumId: album.id, addedById: owner.id });
+
+    const { asset: contributed } = await ctx.newAsset({ ownerId: contributor.id });
+    await ctx.newExif({ assetId: contributed.id, fileSizeInByte: 2048 });
+    await ctx.newAlbumSpaceAsset({ albumId: album.id, assetId: contributed.id, spaceId: space.id });
+
+    // Unlinking drops shared_space_album; the album_space_asset row is retained but inert.
+    await spaceRepo.removeAlbum(space.id, album.id);
+
+    const ids = await collectIds(sut.downloadSpaceId(space.id));
+
+    expect(ids.has(ownAsset.id)).toBe(false);
+    expect(ids.has(contributed.id)).toBe(false);
+  });
+
+  it('excludes an OFFLINE contribution and an OFFLINE album asset, but keeps a directly-added one', async () => {
+    // Deliberate asymmetry, mirrored from `checkSpaceAccess`: its album and contributed arms gate
+    // `isOffline = false`, its directly-added arm does not. The download manifest must match the
+    // gate arm for arm — a row the gate rejects 400s the whole download, not just that row.
+    const { ctx, sut, spaceRepo } = setup();
+    const { user: owner } = await ctx.newUser();
+    const { user: contributor } = await ctx.newUser();
+    const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+    const { library } = await ctx.newLibrary({ ownerId: owner.id });
+
+    const seedOffline = async (ownerId: string) => {
+      const { asset } = await ctx.newAsset({ ownerId, libraryId: library.id, isOffline: true });
+      await ctx.newExif({ assetId: asset.id, fileSizeInByte: 1024 });
+      return asset;
+    };
+
+    const offlineDirect = await seedOffline(owner.id);
+    await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: offlineDirect.id });
+
+    const offlineAlbumAsset = await seedOffline(owner.id);
+    const offlineContribution = await seedOffline(contributor.id);
+    const { asset: online } = await ctx.newAsset({ ownerId: owner.id });
+    await ctx.newExif({ assetId: online.id, fileSizeInByte: 1024 });
+    const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'Offline mix' }, [
+      online.id,
+      offlineAlbumAsset.id,
+    ]);
+    await spaceRepo.addAlbum({ spaceId: space.id, albumId: album.id, addedById: owner.id });
+    await ctx.newAlbumSpaceAsset({ albumId: album.id, assetId: offlineContribution.id, spaceId: space.id });
+
+    const ids = await collectIds(sut.downloadSpaceId(space.id));
+
+    expect(ids.has(online.id)).toBe(true);
+    expect(ids.has(offlineDirect.id)).toBe(true);
+    expect(ids.has(offlineAlbumAsset.id)).toBe(false);
+    expect(ids.has(offlineContribution.id)).toBe(false);
+  });
+
+  it('excludes a contribution to a linked album that has since been trashed', async () => {
+    const { ctx, sut, spaceRepo } = setup();
+    const { user: owner } = await ctx.newUser();
+    const { user: contributor } = await ctx.newUser();
+    const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+
+    const { asset: ownAsset } = await ctx.newAsset({ ownerId: owner.id });
+    await ctx.newExif({ assetId: ownAsset.id, fileSizeInByte: 1024 });
+    const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'Trashed' }, [ownAsset.id]);
+    await spaceRepo.addAlbum({ spaceId: space.id, albumId: album.id, addedById: owner.id });
+
+    const { asset: contributed } = await ctx.newAsset({ ownerId: contributor.id });
+    await ctx.newExif({ assetId: contributed.id, fileSizeInByte: 2048 });
+    await ctx.newAlbumSpaceAsset({ albumId: album.id, assetId: contributed.id, spaceId: space.id });
+
+    await ctx.softDeleteAlbum(album.id);
+
+    const ids = await collectIds(sut.downloadSpaceId(space.id));
+
+    expect(ids.has(ownAsset.id)).toBe(false);
+    expect(ids.has(contributed.id)).toBe(false);
+  });
+
+  it('yields an asset once when it is reachable both directly and as a contribution', async () => {
+    const { ctx, sut, spaceRepo } = setup();
+    const { user: owner } = await ctx.newUser();
+    const { user: contributor } = await ctx.newUser();
+    const { space } = await ctx.newSharedSpace({ createdById: owner.id });
+
+    const { asset: ownAsset } = await ctx.newAsset({ ownerId: owner.id });
+    await ctx.newExif({ assetId: ownAsset.id, fileSizeInByte: 1024 });
+    const { result: album } = await ctx.newAlbum({ ownerId: owner.id, albumName: 'Both paths' }, [ownAsset.id]);
+    await spaceRepo.addAlbum({ spaceId: space.id, albumId: album.id, addedById: owner.id });
+
+    const { asset: contributed } = await ctx.newAsset({ ownerId: contributor.id });
+    await ctx.newExif({ assetId: contributed.id, fileSizeInByte: 2048 });
+    await ctx.newAlbumSpaceAsset({ albumId: album.id, assetId: contributed.id, spaceId: space.id });
+    await ctx.newSharedSpaceAsset({ spaceId: space.id, assetId: contributed.id });
+
+    const rows: string[] = [];
+    for await (const row of sut.downloadSpaceId(space.id)) {
+      rows.push(row.id);
+    }
+
+    expect(rows.filter((id) => id === contributed.id)).toHaveLength(1);
+  });
+});
