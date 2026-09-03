@@ -10,21 +10,29 @@ export interface MemoryTypeMetadata {
   defaultEnabled: boolean;
   /** whether an admin can globally disable this type */
   adminConfigurable: boolean;
+  /**
+   * Fewest assets a generated memory of this type may still hold after overlap reservation
+   * (spec §6.4). Below this it is deleted rather than shown. Set from the smallest sample the
+   * rule can actually emit — which is not its pool gate for the burst-collapsing trip rules.
+   * `on_this_day` is the deliberate exception: its floor is above what it can emit, which is
+   * how the one-photo "N years ago" card gets removed.
+   */
+  minAssets: number;
 }
 
 export const MEMORY_TYPE_METADATA: MemoryTypeMetadata[] = [
-  { key: 'on_this_day', kind: 'on_this_day', defaultEnabled: true, adminConfigurable: true },
-  { key: 'birthday', kind: 'rule', defaultEnabled: true, adminConfigurable: true },
-  { key: 'recent_trip', kind: 'rule', defaultEnabled: true, adminConfigurable: true },
-  { key: 'month_recap', kind: 'rule', defaultEnabled: true, adminConfigurable: true },
-  { key: 'favorites_throwback', kind: 'rule', defaultEnabled: true, adminConfigurable: true },
-  { key: 'on_this_day_place', kind: 'rule', defaultEnabled: true, adminConfigurable: true },
-  { key: 'season_recap', kind: 'rule', defaultEnabled: true, adminConfigurable: true },
-  { key: 'people_together', kind: 'rule', defaultEnabled: true, adminConfigurable: true },
-  { key: 'video_moments', kind: 'rule', defaultEnabled: true, adminConfigurable: true },
-  { key: 'trip_anniversary', kind: 'rule', defaultEnabled: true, adminConfigurable: true },
-  { key: 'themed', kind: 'rule', defaultEnabled: true, adminConfigurable: true },
-  { key: 'person_throwback', kind: 'rule', defaultEnabled: true, adminConfigurable: true },
+  { key: 'on_this_day', kind: 'on_this_day', defaultEnabled: true, adminConfigurable: true, minAssets: 3 },
+  { key: 'birthday', kind: 'rule', defaultEnabled: true, adminConfigurable: true, minAssets: 3 },
+  { key: 'recent_trip', kind: 'rule', defaultEnabled: true, adminConfigurable: true, minAssets: 2 },
+  { key: 'month_recap', kind: 'rule', defaultEnabled: true, adminConfigurable: true, minAssets: 8 },
+  { key: 'favorites_throwback', kind: 'rule', defaultEnabled: true, adminConfigurable: true, minAssets: 3 },
+  { key: 'on_this_day_place', kind: 'rule', defaultEnabled: true, adminConfigurable: true, minAssets: 3 },
+  { key: 'season_recap', kind: 'rule', defaultEnabled: true, adminConfigurable: true, minAssets: 10 },
+  { key: 'people_together', kind: 'rule', defaultEnabled: true, adminConfigurable: true, minAssets: 4 },
+  { key: 'video_moments', kind: 'rule', defaultEnabled: true, adminConfigurable: true, minAssets: 3 },
+  { key: 'trip_anniversary', kind: 'rule', defaultEnabled: true, adminConfigurable: true, minAssets: 2 },
+  { key: 'themed', kind: 'rule', defaultEnabled: true, adminConfigurable: true, minAssets: 5 },
+  { key: 'person_throwback', kind: 'rule', defaultEnabled: true, adminConfigurable: true, minAssets: 4 },
 ];
 
 export const MEMORY_TYPE_KEYS = MEMORY_TYPE_METADATA.map((m) => m.key);
@@ -101,3 +109,7 @@ export const isMemoryTypeEnabledForUser = (userTypes: Record<string, boolean> | 
   }
   return getMemoryTypeMetadata(key)?.defaultEnabled ?? false;
 };
+
+/** Floor for a registry key; 0 (never removed for size) for an unknown or absent key. */
+export const getMemoryTypeFloor = (key: string | undefined): number =>
+  (key === undefined ? undefined : getMemoryTypeMetadata(key)?.minAssets) ?? 0;
