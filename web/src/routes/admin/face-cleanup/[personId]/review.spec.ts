@@ -24,10 +24,22 @@ describe('STATE_ICON', () => {
 // destination. Every face resolves to exactly one of six terminal states
 // (`owner`/`other`/`stay`/`lock`/`detach`/`unknown`).
 describe('createReviewModel (Model B / full resolution)', () => {
+  // #1061 context fields (localDateTime + the box) are irrelevant to the review model itself — it never reads
+  // them, only carries them through into FaceEntry for the grid/modal — so every fixture face shares one stub.
+  const photoContext = {
+    localDateTime: '2019-07-04T10:30:00.000Z',
+    imageWidth: 400,
+    imageHeight: 300,
+    boundingBoxX1: 100,
+    boundingBoxY1: 75,
+    boundingBoxX2: 200,
+    boundingBoxY2: 150,
+  };
+
   const makeFaces = (): FlaggedFace[] => [
-    { assetFaceId: 'f1', suspectedOwnerId: 'owner-a' },
-    { assetFaceId: 'f2', suspectedOwnerId: 'owner-a' },
-    { assetFaceId: 'f3', suspectedOwnerId: 'owner-b' },
+    { assetFaceId: 'f1', suspectedOwnerId: 'owner-a', ...photoContext },
+    { assetFaceId: 'f2', suspectedOwnerId: 'owner-a', ...photoContext },
+    { assetFaceId: 'f3', suspectedOwnerId: 'owner-b', ...photoContext },
   ];
 
   const sortedGroups = (req: { moveToPerson?: { destinationPersonId: string; faceIds: string[]; lock?: boolean }[] }) =>
