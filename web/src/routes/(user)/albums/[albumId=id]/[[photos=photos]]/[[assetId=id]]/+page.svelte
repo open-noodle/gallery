@@ -872,6 +872,8 @@
                 (!isTimelineEmpty || showSearchResults)}
               filterActive={getActiveFilterCount(albumFilters) > 0}
               onExpandFilters={() => (filterCollapsed = false)}
+              showSearchButton={isBrowseTimeline && !assetMultiSelectManager.selectionActive}
+              onSearch={() => globalSearchManager.open()}
             />
           {/if}
 
