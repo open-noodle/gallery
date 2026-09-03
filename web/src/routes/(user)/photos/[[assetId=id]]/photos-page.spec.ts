@@ -19,6 +19,7 @@ const {
   mockMemoryManager,
   mockRegisterSelectionContext,
   mockRegisterSearchablePageFilters,
+  mockOpenSearchPalette,
   readableFn,
 } = vi.hoisted(() => ({
   mockAssetMultiSelectManager: {
@@ -38,6 +39,7 @@ const {
   },
   mockRegisterSelectionContext: vi.fn(),
   mockRegisterSearchablePageFilters: vi.fn(() => vi.fn()),
+  mockOpenSearchPalette: vi.fn(),
   // `memoryLaneTitle` and `getAltText` are `derived(t, ...)` stores *holding a function*, read by
   // the page as `$memoryLaneTitle(memory)` / `$getAltText(asset)`. As bare vi.fn()s they threw
   // `store_invalid_shape` the first time anything rendered the memories strip - which nothing did
@@ -197,6 +199,7 @@ vi.mock('$lib/managers/command-context-manager.svelte', () => ({
 vi.mock('$lib/managers/global-search-manager.svelte', () => ({
   globalSearchManager: {
     registerSearchablePageFilters: mockRegisterSearchablePageFilters,
+    open: mockOpenSearchPalette,
   },
 }));
 
@@ -1124,6 +1127,45 @@ describe('Photos page search URL state', () => {
     renderPage();
 
     expect(screen.queryByTestId('timeline-desktop-grouping-control')).not.toBeInTheDocument();
+  });
+
+  // #1051: same affordance as the album and space timelines — one rule, "the icon is wherever
+  // scoped search works", rather than a per-page allowlist that drifts.
+  describe('scoped search button', () => {
+    it('sits beside the grouping control on the photos timeline', async () => {
+      mockPage.url = new URL('https://gallery.test/photos');
+
+      renderPage();
+
+      expect(await screen.findByTestId('scoped-search-button')).toBeInTheDocument();
+    });
+
+    it('opens the page-scoped search palette when clicked', async () => {
+      mockPage.url = new URL('https://gallery.test/photos');
+
+      renderPage();
+      await fireEvent.click(await screen.findByTestId('scoped-search-button'));
+
+      expect(mockOpenSearchPalette).toHaveBeenCalledOnce();
+    });
+
+    it('is hidden while photos selection mode is active', () => {
+      mockPage.url = new URL('https://gallery.test/photos');
+      mockAssetMultiSelectManager.selectionActive = true;
+
+      renderPage();
+
+      expect(screen.queryByTestId('scoped-search-button')).not.toBeInTheDocument();
+    });
+
+    it('stays available while search results are showing, unlike the grouping pill', async () => {
+      mockPage.url = new URL('https://gallery.test/photos?q=nature');
+
+      renderPage();
+
+      expect(await screen.findByTestId('scoped-search-button')).toBeInTheDocument();
+      expect(screen.queryByTestId('timeline-desktop-grouping-control')).not.toBeInTheDocument();
+    });
   });
 
   it('ignores photos bucket activation while selection mode is active', async () => {
