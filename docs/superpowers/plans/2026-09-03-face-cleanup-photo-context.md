@@ -21,7 +21,10 @@
 - **Every user-facing string lands in ten locale files in the same commit:** `en` plus `de` · `fr` · `it` · `nl` · `pl` · `es` · `ru` · `zh_Hans` · `zh_Hant`. Keys alphabetically sorted, 2-space indent, unescaped Unicode. Do not touch the other ~80 locale files.
 - **`i18n/` is shared by web and mobile.** Grep both before renaming a key.
 - **Markdown under `docs/` uses the docs package's prettier**, not web's: `pnpm -C docs exec prettier --write <file>`.
-- **Regeneration after any `server/src/repositories/` or route change:** `mise open-api` and `mise sql`, run bare from `server/`. `make open-api` / `make sql` no longer exist.
+- **Regeneration after any `server/src/repositories/` or route change:** `mise open-api` and `mise sql`, run
+  **from the repo ROOT** — both are root-level `mise.toml` tasks. `server/mise.toml` defines `sql` and
+  `sync-open-api`, but NOT `open-api`, so `mise open-api` fails from `server/`. `make open-api` / `make sql`
+  no longer exist at all.
 - **Commit messages** end with `Claude-Session: https://claude.ai/code/session_01HqnsLPcwJhmVAjccwzMUbK` and never add a Claude co-author trailer.
 - **Every test must be proven capable of failing.** After writing a test, run it and see red before implementing. Assertions that pass whether or not the feature exists (`queryBy...` without a paired positive control) do not count as coverage.
 
@@ -918,13 +921,14 @@ Implements spec §4.2 (regeneration). No new tests — this task's deliverable i
 - [ ] **Step 1: Build the server**
 
 ```bash
-cd server && rm -rf dist && pnpm build
+cd server && rm -rf dist && pnpm build   # dist must be fresh before `mise sql`
 ```
 
 - [ ] **Step 2: Regenerate**
 
 ```bash
-cd server && mise open-api && mise sql
+# From the repo ROOT — both are root-level mise tasks (`mise open-api` does not exist in server/).
+mise open-api && mise sql
 ```
 
 `mise sql` needs a migrated throwaway Postgres. If it emits empty or error-laden query files, start one and point `DB_URL` at it before re-running.
