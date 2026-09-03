@@ -1698,10 +1698,10 @@ describe(PersonRepository.name, () => {
       const { user } = await ctx.newUser();
 
       const { asset: liveAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
-      const { assetFace: liveFace } = await ctx.newAssetFace({ assetId: liveAsset.id, personId: null });
+      const { assetFace: liveFace } = await ctx.newAssetFace({ assetId: liveAsset.id, personGroupId: null });
 
       const { asset: trashedAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
-      const { assetFace: trashedFace } = await ctx.newAssetFace({ assetId: trashedAsset.id, personId: null });
+      const { assetFace: trashedFace } = await ctx.newAssetFace({ assetId: trashedAsset.id, personGroupId: null });
       await ctx.database
         .updateTable('asset')
         .set({ deletedAt: new Date() })
@@ -1717,7 +1717,7 @@ describe(PersonRepository.name, () => {
       const { user } = await ctx.newUser();
 
       const { asset: lockedAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Locked });
-      const { assetFace: lockedFace } = await ctx.newAssetFace({ assetId: lockedAsset.id, personId: null });
+      const { assetFace: lockedFace } = await ctx.newAssetFace({ assetId: lockedAsset.id, personGroupId: null });
 
       await expect(sut.getFaceByIdOnLiveAsset(lockedFace.id)).rejects.toThrow();
     });
@@ -1727,7 +1727,7 @@ describe(PersonRepository.name, () => {
       const { user } = await ctx.newUser();
 
       const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
       await ctx.database
         .updateTable('asset_face')
         .set({ deletedAt: new Date() })
@@ -1742,7 +1742,7 @@ describe(PersonRepository.name, () => {
       const { user } = await ctx.newUser();
 
       const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
-      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: null });
       await ctx.database.updateTable('asset').set({ deletedAt: new Date() }).where('id', '=', asset.id).execute();
 
       // The three shipped crop surfaces must not change. If this ever goes red, the deletedAt filter was
