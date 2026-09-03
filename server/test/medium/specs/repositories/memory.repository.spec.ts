@@ -348,7 +348,7 @@ describe(MemoryRepository.name, () => {
       });
       const { asset: hiddenPerson } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
       const { person } = await ctx.newPerson({ ownerId: user.id, isHidden: true });
-      await ctx.newAssetFace({ assetId: hiddenPerson.id, personId: person.id });
+      await ctx.newAssetFace({ assetId: hiddenPerson.id, personGroupId: person.personGroupId });
 
       for (const asset of [visible, archived, trashed, hiddenPerson]) {
         await ctx.newMemoryAsset({ memoryId: memory.id, assetId: asset.id });
