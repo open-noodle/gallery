@@ -12,7 +12,7 @@ class MatchCountFooter extends ConsumerWidget {
   static const double _basePadding = 20;
 
   /// Height the footer occupies over the scrolling content it is stacked on
-  /// top of, so BrowseContent / DeepContent can reserve exactly that much at
+  /// top of, so DeepContent can reserve exactly that much at
   /// the bottom of their lists. Anything less and the last filter row sits
   /// permanently behind the Done bar, unreachable.
   static double reservedHeightFor(BuildContext context) => 88 + systemNavBarInset(context);
@@ -77,7 +77,7 @@ class MatchCountFooter extends ConsumerWidget {
             const Expanded(child: MatchCountLabel()),
             FilledButton.tonal(
               key: const Key('match-count-footer-done'),
-              onPressed: () => ref.read(photosFilterSheetProvider.notifier).state = FilterSheetSnap.hidden,
+              onPressed: () => ref.read(photosFilterSheetProvider.notifier).state = FilterSheetVisibility.hidden,
               child: Text(context.t.filter_sheet_done),
             ),
           ],
