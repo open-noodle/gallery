@@ -579,6 +579,23 @@ export class PersonRepository {
       .executeTakeFirstOrThrow();
   }
 
+  // Sibling of getFaceByIdIncludingTombstoned for the admin PREVIEW route, which serves the whole source
+  // photo rather than a 250px crop. It adds one filter: the asset must not be in the trash. The face
+  // tombstone is deliberately still allowed through — the resolutions history renders tombstoned faces, so
+  // a future magnifier there needs no server change.
+  @GenerateSql({ params: [DummyValue.UUID] })
+  getFaceByIdOnLiveAsset(id: string) {
+    return this.db
+      .selectFrom('asset_face')
+      .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+      .selectAll('asset_face')
+      .select(withPerson)
+      .where('asset_face.id', '=', id)
+      .where('asset.deletedAt', 'is', null)
+      .where((eb) => reviewableAssetVisibility(eb))
+      .executeTakeFirstOrThrow();
+  }
+
   @GenerateSql({ params: [{ personId: DummyValue.UUID, take: 50, skip: 0 }] })
   getRepresentativeFaces(options: RepresentativeFaceListOptions) {
     return this.db

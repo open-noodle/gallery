@@ -176,6 +176,7 @@ Class | Method | HTTP request | Description
 *FacesApi* | [**deleteFace**](doc//FacesApi.md#deleteface) | **DELETE** /faces/{id} | Delete a face
 *FacesApi* | [**getFaceRepairClusterFaces**](doc//FacesApi.md#getfacerepairclusterfaces) | **POST** /admin/face-repair/scan/person/{personId}/cluster-faces | List a person's cluster faces (paginated, excluding the supplied flagged ids)
 *FacesApi* | [**getFaceRepairDeclines**](doc//FacesApi.md#getfacerepairdeclines) | **GET** /admin/face-repair/decline | List face-repair declines
+*FacesApi* | [**getFaceRepairFacePreview**](doc//FacesApi.md#getfacerepairfacepreview) | **GET** /admin/face-repair/faces/{assetFaceId}/preview | Get an admin face-repair source photo
 *FacesApi* | [**getFaceRepairFaceThumbnail**](doc//FacesApi.md#getfacerepairfacethumbnail) | **GET** /admin/face-repair/faces/{assetFaceId}/thumbnail | Get an admin face-repair face thumbnail
 *FacesApi* | [**getFaceRepairOwnerPeople**](doc//FacesApi.md#getfacerepairownerpeople) | **GET** /admin/face-repair/owner/{ownerId}/people | Search an owner's people for the move-to-chosen-person picker
 *FacesApi* | [**getFaceRepairPersonFaces**](doc//FacesApi.md#getfacerepairpersonfaces) | **GET** /admin/face-repair/scan/person/{personId} | Get a person's flagged faces for review

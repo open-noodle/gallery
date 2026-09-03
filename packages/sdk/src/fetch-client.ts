@@ -250,6 +250,13 @@ export type FaceRepairScanDefaultsDto = {
 export type FaceRepairPersonFacesDto = {
     flaggedFaces: {
         assetFaceId: string;
+        boundingBoxX1: number;
+        boundingBoxX2: number;
+        boundingBoxY1: number;
+        boundingBoxY2: number;
+        imageHeight: number;
+        imageWidth: number;
+        localDateTime: string;
         suspectedOwnerId: string;
     }[];
     personId: string;
@@ -262,6 +269,13 @@ export type FaceRepairClusterFacesRequestDto = {
 export type FaceRepairClusterFacesResponseDto = {
     faces: {
         assetFaceId: string;
+        boundingBoxX1: number;
+        boundingBoxX2: number;
+        boundingBoxY1: number;
+        boundingBoxY2: number;
+        imageHeight: number;
+        imageWidth: number;
+        localDateTime: string;
     }[];
     hasMore: boolean;
     total: number;
@@ -4667,6 +4681,19 @@ export function declineFaceRepair({ faceRepairDeclineRequestDto }: {
         method: "POST",
         body: faceRepairDeclineRequestDto
     })));
+}
+/**
+ * Get an admin face-repair source photo
+ */
+export function getFaceRepairFacePreview({ assetFaceId }: {
+    assetFaceId: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchBlob<{
+        status: 200;
+        data: Blob;
+    }>(`/admin/face-repair/faces/${encodeURIComponent(assetFaceId)}/preview`, {
+        ...opts
+    }));
 }
 /**
  * Get an admin face-repair face thumbnail
