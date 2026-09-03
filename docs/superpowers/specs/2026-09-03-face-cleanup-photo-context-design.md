@@ -110,6 +110,11 @@ preview file is jpeg **or** webp.
 `CacheControl.PrivateWithCache` for the same reason the crop route uses it — a preview file is immutable
 for a given face id, and the grid would otherwise refetch on every visit.
 
+`getFaceThumbnailSource` passes `edited: false` to `getForThumbnail`, so for an asset with saved edits this
+serves the **original**, not the edited version. That is deliberate and must stay: the crop the admin is
+comparing against was generated from the same unedited preview, and the stored bounding box is in that
+image's coordinate space. Serving the edited preview would misplace the overlay on any crop or rotate.
+
 **New controller route** in `server/src/controllers/face-repair-admin.controller.ts`, mirroring `:210`:
 
 ```ts
@@ -135,12 +140,21 @@ const FacePhotoContextSchema = z.object({
 });
 ```
 
-Fields are **flat, not nested**, because that is exactly the shape `getBoundingBox` already consumes
-(`web/src/lib/utils/people-utils.ts:113` → `Faces`), so web reuses the existing geometry helper rather
-than reimplementing it.
+Fields are **flat, not nested**, because that is byte-for-byte the existing `FaceBox` type
+(`web/src/lib/utils/people-utils.ts:128`) — the same six fields, in the same names — so the web side is an
+assignment, not an adapter.
+
+Note that `getBoundingBox` takes `Faces`, **not** `FaceBox`: `Faces` additionally requires `id`, and the
+helper stamps it onto each result (`people-utils.ts:123`). The modal therefore passes
+`{ id: assetFaceId, ...context }`. This is the whole difference between the two types and the only reason
+an adapter line exists at all.
 
 `localDateTime` is non-nullable — the column is `localDateTime!: Timestamp`
 (`server/src/schema/tables/asset.table.ts:133`).
+
+It crosses the wire as a `Date` in TypeScript and an ISO string in JSON, exactly like `createdAt` on the
+neighbouring `DeclineItemSchema` (`:207`). Nest serialises it; do **not** add a `.toISOString()` in the
+service.
 
 It extends:
 
@@ -152,7 +166,7 @@ reads the scan snapshot, then runs `applyVerdictFilters` over a `Map<string, Fla
 `FlaggedFace` is shared with `withLiveFlaggedCounts`, which feeds the dashboard and must not grow these
 fields. So the context does **not** go on `FlaggedFace`: build a `Map<assetFaceId, FacePhotoContext>` from
 the `stored` rows before filtering, and re-join it onto the survivors afterwards. A face the verdict layer
-removes therefore leaks no context — asserted in T2.10.
+removes therefore leaks no context — asserted in T2.11.
 
 `getScanFlaggedFacesForPersons` (the dashboard/apply path, `:328`) is **not** changed.
 
@@ -170,8 +184,31 @@ Props: `{ faces: FacePhotoContext[]; index: number; onClose: () => void }`.
 - Image `src` = new `getAdminFacePreviewUrl(assetFaceId)` in `people-utils.ts`, beside
   `getAdminFaceThumbnailUrl`.
 - Box overlay: `getContentMetrics(img)` (`container-utils.ts:65`, which handles `object-contain`
-  letterboxing) → `getBoundingBox([face], metrics)` → one absolutely-positioned `div`. No new geometry
-  code.
+  letterboxing) → `getBoundingBox([{ id: assetFaceId, ...face }], metrics)` → one absolutely-positioned
+  `div`.
+
+  **`getBoundingBox` does not validate or clamp.** It divides raw (`people-utils.ts:117-121`), so a zero
+  `imageWidth` yields `NaN` and an out-of-range box yields a rect outside the image. The modal guards
+  _before_ calling it and skips the overlay when the guard fails (E8–E10), reusing the idiom
+  `getFaceCropTransform` already established two functions below (`people-utils.ts:143`) — including its
+  `Number.isFinite` form and the reason for it, which is worth quoting because the obvious rewrite is
+  wrong:
+
+  > `Number.isFinite` rather than `bw <= 0`: imageWidth/imageHeight can be 0, and 0/0 is NaN. `!(NaN > 0)`
+  > is true but `NaN <= 0` is false, so the obvious rewrite the linter suggests would silently drop the
+  > NaN guard.
+
+  That docstring also already anticipates this modal — "the review modal shows the undistorted full photo
+  separately". Extract the shared guard as `isUsableFaceBox(face: FaceBox): boolean` in `people-utils.ts`
+  and have `getFaceCropTransform` use it too, so the two cannot drift.
+
+  **Why fractions of `imageWidth`/`imageHeight` are correct against the preview file**, rather than merely
+  plausible: face detection runs on the preview itself — `detectFaces(previewFile.path, …)`
+  (`person.service.ts:925`) — and stores that file's dimensions on the row (`:963`). The stored box is
+  therefore a box in the very file this route serves, orientation already baked in. Manually-created faces
+  take the other path and store the _original_ dimensions (`:1554`); fractions are resolution-independent,
+  so both are safe, and a later preview regeneration at a new size stays safe for the same reason.
+
 - Caption: date via `fromISODateTimeUTC(face.localDateTime)` (`timeline-util.ts:40`) formatted with
   `dateFormats.album`. **UTC, not the viewer's zone** — `localDateTime` stores local wall-clock time as a
   UTC timestamp, so `new Date(...).toLocaleDateString()` would shift a 00:30 photo to the previous day.
@@ -183,7 +220,27 @@ Props: `{ faces: FacePhotoContext[]; index: number; onClose: () => void }`.
 The modal pages within **one grid**. Opening from the flagged grid walks flagged faces; from the rest grid,
 rest faces; from manual, manual faces. No cross-grid paging.
 
-### 4.4 Web — the tiles
+**Only the clicked face is boxed**, even when the photo contains several people. The discussion asked
+about this case; the answer is that the console holds no data for the other faces (they belong to other
+clusters, or to none), and a single box answers the question the admin is actually asking — "is _this_
+detection the same child?" Boxing every face would need a second endpoint and would bury the subject.
+
+### 4.4 Web — the three view-model types
+
+Server-side, `FlaggedFace` deliberately does **not** grow (§4.2, it is shared with the dashboard). Web-side,
+the same-named type **must**. Getting this backwards is the easiest mistake in this change, so all three
+sites are named here:
+
+| File                                                                             | Type          | Why                                                                      |
+| -------------------------------------------------------------------------------- | ------------- | ------------------------------------------------------------------------ |
+| `web/src/routes/admin/face-cleanup/[personId]/review.svelte.ts:30`               | `FlaggedFace` | `FaceEntry extends FlaggedFace`, so the guided grid gets the fields free |
+| `web/src/routes/admin/face-cleanup/people/[personId]/manual-review.svelte.ts:16` | `ManualFace`  | flows in through `appendFaces(faces, total)` (`:65`)                     |
+| `web/src/routes/admin/face-cleanup/[personId]/+page.svelte:213`                  | the SDK cast  | `facesResult as unknown as { flaggedFaces: FlaggedFace[] }` — widen it   |
+
+Web's `FlaggedFace` is not shared with any count or summary path, which is exactly why the asymmetry with
+the server type is safe.
+
+### 4.5 Web — the tiles
 
 Each of the three grids gets a magnifier control and a date pill.
 
@@ -204,7 +261,7 @@ magnifier top-right, date pill bottom-left with the flagged tile's ribbon narrow
 right-aligned. **The three grids get screenshotted before this is finalised.** Existing `data-testid`s and
 ribbon text are unchanged, so the current page specs stay valid.
 
-### 4.5 i18n
+### 4.6 i18n
 
 Three new keys under the existing `admin.face_cleanup_*` namespace:
 
@@ -245,6 +302,8 @@ Every row has a test in §7.
 | E19 | Preview stored in S3                                         | `serveFromBackend` resolves the backend correctly                        |
 | E20 | Regression pin                                               | `getFaceByIdIncludingTombstoned` still returns a face on a trashed asset |
 | E21 | `localDateTime` missing from a stale SDK response            | pill omitted, never renders Luxon's "Invalid DateTime"                   |
+| E22 | Asset has saved edits                                        | serves the **unedited** preview, so the box stays aligned (§4.1)         |
+| E23 | Photo contains several people                                | exactly one box — the clicked face (§4.3)                                |
 
 ## 6. Slices (TDD — each slice is red first, then green, then gates)
 
@@ -252,19 +311,20 @@ Every slice writes its failing test **before** the implementation, and each test
 failing (delete or invert the implementation and watch it go red) — `queryBy`-style assertions that pass
 either way do not count.
 
-| Slice | Scope                                                   | Depends on |
-| ----- | ------------------------------------------------------- | ---------- |
-| S1    | Repository: `getFaceByIdOnLiveAsset` + the E20 pin      | —          |
-| S2    | Service + controller: `getAdminFacePreview`, the route  | S1         |
-| S3    | DTOs + queries: context fields on both list paths       | —          |
-| S4    | `mise open-api` + `mise sql` regeneration               | S2, S3     |
-| S5    | Web: `getAdminFacePreviewUrl` + `FacePhotoModal` + i18n | S4         |
-| S6    | Web: guided page — flagged grid and rest grid           | S5         |
-| S7    | Web: manual review page                                 | S5         |
-| S8    | Full gates, screenshots, commit                         | all        |
+| Slice | Scope                                                                        | Depends on |
+| ----- | ---------------------------------------------------------------------------- | ---------- |
+| S1    | Repository: `getFaceByIdOnLiveAsset` + the E20 pin                           | —          |
+| S2    | Service + controller: `getAdminFacePreview`, the route                       | S1         |
+| S3    | DTOs + queries: context fields on both list paths                            | —          |
+| S4    | `mise open-api` + `mise sql` regeneration                                    | S2, S3     |
+| S5    | API e2e: cross-owner read, non-admin refusal (T10)                           | S2         |
+| S6    | Web: `getAdminFacePreviewUrl` + `FacePhotoModal` + i18n                      | S4         |
+| S7    | Web: guided page — flagged grid and rest grid, plus web `FlaggedFace` (§4.4) | S6         |
+| S8    | Web: manual review page, plus `ManualFace` (§4.4)                            | S6         |
+| S9    | Full gates, screenshots, commit                                              | all        |
 
 S3 is independent of S1/S2 and may run in parallel with them; S4 is the join point because web needs the
-regenerated SDK types.
+regenerated SDK types. S5 depends only on the route, so it can run while the web slices are in flight.
 
 ## 7. Test matrix
 
@@ -299,6 +359,7 @@ existing `getAdminFaceThumbnail` block: `AssetFaceFactory.create` + `getForAsset
 | T2.6 | a `.webp` preview path yields `image/webp`                                                  | E6     |
 | T2.7 | serves with `CacheControl.PrivateWithCache`                                                 | E18    |
 | T2.8 | goes through `serveFromBackend`, not a bare `ImmichFileResponse`                            | E19    |
+| T2.9 | requests the thumbnail source with `edited: false` — the unedited preview                   | E22    |
 
 T2.2 and T2.8 are the two that would silently regress into an expensive or disk-only implementation.
 
@@ -306,8 +367,8 @@ T2.2 and T2.8 are the two that would silently regress into an expensive or disk-
 
 | Id    | Test                                                                        | Covers |
 | ----- | --------------------------------------------------------------------------- | ------ |
-| T2.9  | surviving faces carry `localDateTime` and the box fields through the filter | §4.2   |
-| T2.10 | a face removed by `applyVerdictFilters` contributes no context              | E12    |
+| T2.10 | surviving faces carry `localDateTime` and the box fields through the filter | §4.2   |
+| T2.11 | a face removed by `applyVerdictFilters` contributes no context              | E12    |
 
 ### T3 — Controller
 
@@ -335,11 +396,11 @@ the filesystem.
 `server/test/medium/specs/repositories/face-repair.repository.spec.ts` and
 `face-repair-scan-flagged-face.repository.spec.ts`.
 
-| Id   | Test                                                                           | Covers |
-| ---- | ------------------------------------------------------------------------------ | ------ |
-| T5.1 | `getClusterFacePage` returns `localDateTime` + the six box fields per face     | §3     |
-| T5.2 | `getScanFlaggedFaces` returns the same                                         | §3     |
-| T5.3 | pin: neither grew a join — a face on a trashed asset is still absent from both | §3     |
+| Id   | Test                                                                       | Covers |
+| ---- | -------------------------------------------------------------------------- | ------ |
+| T5.1 | `getClusterFacePage` returns `localDateTime` + the six box fields per face | §3     |
+| T5.2 | `getScanFlaggedFaces` returns the same                                     | §3     |
+| T5.3 | pin: a face on a trashed asset is still absent from both pages             | §3     |
 
 ### T6 — Web: modal
 
@@ -352,6 +413,7 @@ separately covered by calling `getBoundingBox` with a synthetic `ContentMetrics`
 | T6.1  | renders an `<img>` pointing at the admin preview URL for the face       | §4.3   |
 | T6.2  | renders the box overlay positioned from `getContentMetrics`             | §4.3   |
 | T6.3  | omits the overlay when `imageWidth` is 0                                | E8     |
+| T6.11 | renders exactly one box for a face whose photo holds several people     | E23    |
 | T6.4  | omits the overlay for a degenerate box                                  | E9     |
 | T6.5  | clamps a box that extends past the image edge                           | E10    |
 | T6.6  | `→` advances, `←` goes back, and the image `src` follows                | §4.3   |
@@ -367,13 +429,13 @@ separately covered by calling `getBoundingBox` with a synthetic `ContentMetrics`
 
 | Id   | Test                                                                                      | Covers   |
 | ---- | ----------------------------------------------------------------------------------------- | -------- |
-| T7.1 | every flagged tile renders a labelled magnifier                                           | §4.4     |
-| T7.2 | clicking it calls `modalManager.show(FacePhotoModal, …)` with that face's index           | §4.4     |
+| T7.1 | every flagged tile renders a labelled magnifier                                           | §4.5     |
+| T7.2 | clicking it calls `modalManager.show(FacePhotoModal, …)` with that face's index           | §4.5     |
 | T7.3 | **clicking it leaves the tile's `data-state` and the selection count unchanged**          | E14      |
-| T7.4 | every flagged tile renders its date pill                                                  | §4.4     |
-| T7.5 | rest-grid tiles render a magnifier that opens the modal over `restFaces`                  | §4.4     |
+| T7.4 | every flagged tile renders its date pill                                                  | §4.5     |
+| T7.5 | rest-grid tiles render a magnifier that opens the modal over `restFaces`                  | §4.5     |
 | T7.6 | **rest-grid magnifier leaves `data-selected` alone and works with no destination chosen** | E14, E17 |
-| T7.7 | the magnifier is a sibling of the tile button, not nested inside it                       | §4.4     |
+| T7.7 | the magnifier is a sibling of the tile button, not nested inside it                       | §4.5     |
 
 T7.3 and T7.6 are the load-bearing tests of this whole change; both assert observable state before and
 after the click, not merely that a handler ran.
@@ -384,9 +446,9 @@ after the click, not merely that a handler ran.
 
 | Id   | Test                                                                      | Covers |
 | ---- | ------------------------------------------------------------------------- | ------ |
-| T8.1 | manual tiles render a labelled magnifier that opens the modal             | §4.4   |
+| T8.1 | manual tiles render a labelled magnifier that opens the modal             | §4.5   |
 | T8.2 | **clicking it leaves the tile's manual state at `keep`** — nothing staged | E14    |
-| T8.3 | manual tiles render the date pill                                         | §4.4   |
+| T8.3 | manual tiles render the date pill                                         | §4.5   |
 
 ### T9 — Web: url helper
 
@@ -396,13 +458,38 @@ after the click, not merely that a handler ran.
 | ---- | ---------------------------------------------------------------------- | ------ |
 | T9.1 | `getAdminFacePreviewUrl` builds `/admin/face-repair/faces/:id/preview` | §4.3   |
 
+### T10 — API end-to-end
+
+New `e2e/src/specs/server/api/face-repair-preview.e2e-spec.ts`, following the scope-focused specs already
+in that directory (`person-faces-picker-scope`, `person-representative-face-write-scope`). This is the fast
+vitest API suite, **not** the Playwright web suite — it has none of the `.serial` fragility that makes web
+e2e expensive, and this route's central promise is a cross-owner authorization claim that no unit test
+exercises end to end.
+
+| Id    | Test                                                                                   | Covers |
+| ----- | -------------------------------------------------------------------------------------- | ------ |
+| T10.1 | an admin GETs the preview for a face on **another user's** asset and receives an image | §2     |
+| T10.2 | a non-admin user is refused for that same face id                                      | E7     |
+| T10.3 | an unauthenticated request is refused                                                  | E7     |
+| T10.4 | the same face id on a trashed asset 404s for the admin                                 | E1     |
+| T10.5 | control: the crop route still serves that trashed face id                              | E20    |
+
+T10.1 is the only test in the whole matrix that proves the feature actually does the thing the discussion
+asked for. T10.5 pairs with T1.5 to pin the crop route from the other side of the stack.
+
 ### Not covered by automated tests
 
-- The visual placement of the magnifier and date pill (§4.4) — verified by screenshot. The reskin visual
+- The visual placement of the magnifier and date pill (§4.5) — verified by screenshot. The reskin visual
   regression cases are `test.fixme`, so UI is enforced through component reuse and testids, not
   screenshots.
-- End-to-end admin-sees-another-user's-photo. The medium repository tests (T1) prove the scoping at the
-  query, which is where it lives; an e2e would add a slow, `.serial`-fragile duplicate of that proof.
+- A Playwright web journey (open the console → click a magnifier → see the photo). T7/T8 cover the click
+  contract at the component level and T10 covers the route; a browser journey would mostly re-assert both
+  through the slowest available harness, in a `.serial` file where one failure skips every later test.
+- **E11 (face on a video asset) — the only edge case in §5 with no test, deliberately.** There is no
+  asset-type branch to exercise: `getFaceThumbnailSource` reads `asset_file` rows by `AssetFileType`, and
+  Immich generates preview images for videos through the same pipeline it uses for photos — which is also
+  why the existing crop route already works on video faces today. A test here would assert that an
+  `if` nobody wrote is still absent.
 
 ## 8. Verification gates
 
@@ -414,10 +501,14 @@ pnpm exec vitest --run src/services/face-repair.service.spec.ts \
 pnpm exec vitest --config test/vitest.config.medium.mjs --run \
   test/medium/specs/repositories/person.repository.spec.ts \
   test/medium/specs/repositories/face-repair.repository.spec.ts
+pnpm exec vitest --run src/utils/shared-space-album-scope.guard.spec.ts
 pnpm lint                       # --max-warnings 0
 pnpm exec prettier --check src test
 mise open-api
 mise sql
+
+# API e2e (from e2e/, against a rebuilt stack)
+pnpm test src/specs/server/api/face-repair-preview.e2e-spec.ts
 
 # web (from web/)
 pnpm exec vitest --run src/lib/components/face-cleanup/FacePhotoModal.spec.ts \
@@ -436,6 +527,12 @@ Traps this repo has hit before, all applicable here:
   `pnpm exec vitest --run <path>`.
 - Server `prettier --check` is a **separate CI gate** from eslint, and runs over `src/` **and** `test/`.
 - `mise sql` needs a clean `dist` and a migrated throwaway Postgres, or it emits empty query files.
+- **`shared-space-album-scope.guard.spec.ts` matches its visibility allowlist by _proximity_**, so inserting
+  a new repository read can flip the verdict on a neighbouring method that did not change. The new method
+  carries `reviewableAssetVisibility` inline and should pass on its own merits, but run that spec
+  explicitly — it is the one gate that a purely additive change can still break.
+- `mise e2e` runs `docker compose up` **without** `--build` and will happily serve 404s for a new route
+  from a stale image. Rebuild explicitly before T10.
 - Markdown under `docs/` must be formatted with the **docs** package's prettier, not web's — CI's
   "Docs Build → Check formatting" is strict and the two configs disagree.
 - `check:svelte` is effectively push-only; a `$t` key typed as `string` passes tsc and local svelte-check
