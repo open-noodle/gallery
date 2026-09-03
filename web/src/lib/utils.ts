@@ -19,7 +19,6 @@ import {
   type UserResponseDto,
 } from '@immich/sdk';
 import { toastManager, type ActionItem, type IfLike } from '@immich/ui';
-import { DateTime } from 'luxon';
 import { init, register, t } from 'svelte-i18n';
 import { derived, get } from 'svelte/store';
 import { defaultLang, locales } from '$lib/constants';
