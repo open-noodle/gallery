@@ -1125,7 +1125,9 @@ Append to `web/src/lib/utils/people-utils.spec.ts`, and add `clampFaceBoxToImage
 ```ts
 describe('getAdminFacePreviewUrl', () => {
   it('T9.1: points at the admin-gated, face-keyed preview route', () => {
-    expect(getAdminFacePreviewUrl('face-1')).toBe('/admin/face-repair/faces/face-1/preview');
+    // `/api` prefix included: createUrl returns `getBaseUrl() + path`, and getBaseUrl defaults to `/api`.
+    // The sibling getAdminFaceThumbnailUrl is mocked with the same prefix in three existing page specs.
+    expect(getAdminFacePreviewUrl('face-1')).toBe('/api/admin/face-repair/faces/face-1/preview');
   });
 });
 

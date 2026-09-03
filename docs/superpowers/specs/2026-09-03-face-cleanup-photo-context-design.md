@@ -454,9 +454,9 @@ after the click, not merely that a handler ran.
 
 `web/src/lib/utils/people-utils.spec.ts`.
 
-| Id   | Test                                                                   | Covers |
-| ---- | ---------------------------------------------------------------------- | ------ |
-| T9.1 | `getAdminFacePreviewUrl` builds `/admin/face-repair/faces/:id/preview` | §4.3   |
+| Id   | Test                                                                       | Covers |
+| ---- | -------------------------------------------------------------------------- | ------ |
+| T9.1 | `getAdminFacePreviewUrl` builds `/api/admin/face-repair/faces/:id/preview` | §4.3   |
 
 ### T10 — API end-to-end
 
