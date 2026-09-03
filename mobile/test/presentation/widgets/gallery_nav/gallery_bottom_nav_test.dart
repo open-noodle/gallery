@@ -367,7 +367,7 @@ void main() {
     await tester.tap(find.byType(GallerySearchBlob));
     await tester.pumpAndSettle();
 
-    expect(container.read(photosFilterSheetProvider), FilterSheetSnap.deep);
+    expect(container.read(photosFilterSheetProvider), FilterSheetVisibility.visible);
   });
 
   testWidgets('re-tap Photos (already active): emits ScrollToTopEvent', (tester) async {
