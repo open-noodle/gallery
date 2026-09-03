@@ -298,6 +298,18 @@ describe('Recently Added page filters', () => {
     await waitFor(() => expect(mockRegisterSearchablePageFilters).toHaveBeenCalledOnce());
   });
 
+  // #1051: deliberately NO scoped search button here. Recently Added is an ORDERING
+  // (orderBy: CreatedAt), not a set — the search it launches carries no recency predicate
+  // (see <SmartSearchResults> in +page.svelte: filters + withSharedSpaces only), so a
+  // "Search here" affordance would promise a scope the page does not have and hand back
+  // ten-year-old photos.
+  it('has no scoped search button, because the page is an ordering rather than a scope', async () => {
+    renderPage();
+
+    await waitFor(() => expect(screen.getByTestId('filter-panel-stub')).toBeInTheDocument());
+    expect(screen.queryByTestId('scoped-search-button')).toBeNull();
+  });
+
   it('passes all ten sections to the filter panel', async () => {
     renderPage();
 
