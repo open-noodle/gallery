@@ -17,7 +17,7 @@ import 'package:immich_mobile/providers/photos_filter/hidden_sections.provider.d
 import 'package:immich_mobile/providers/photos_filter/section_availability.provider.dart';
 import 'package:immich_mobile/routing/router.dart';
 
-/// The Deep snap body. Owns the scroll view, the sticky Done bar, and the
+/// The filter panel body. Owns the scroll view, the sticky Done bar, and the
 /// PageStorageKey that retains scroll offset across picker pushes (design §6.5).
 class DeepContent extends ConsumerWidget {
   final ScrollController scrollController;

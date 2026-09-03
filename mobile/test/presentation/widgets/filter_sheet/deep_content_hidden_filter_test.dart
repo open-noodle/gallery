@@ -40,7 +40,7 @@ void main() {
     await tester.pumpConsumerWidget(
       DeepContent(scrollController: controller),
       overrides: [
-        photosFilterSheetProvider.overrideWith((ref) => FilterSheetSnap.deep),
+        photosFilterSheetProvider.overrideWith((ref) => FilterSheetVisibility.visible),
         timeBucketsProvider.overrideWith((ref, filter) => Future.value(const [])),
       ],
     );

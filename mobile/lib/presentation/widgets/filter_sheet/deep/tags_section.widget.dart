@@ -14,7 +14,7 @@ import 'package:openapi/api.dart';
 /// plus any selected suggestion beyond the cap (pinned so it stays visible).
 const int _kPreviewCap = 10;
 
-/// TagsSectionDeep — Deep-snap section for the Tags filter dimension.
+/// TagsSectionDeep — Deep section for the Tags filter dimension.
 ///
 /// Layout: pill-wrap of tag chips (8pt spacing), capped to [_kPreviewCap]
 /// (selected suggestions beyond the cap are pinned). Data comes from

@@ -11,7 +11,7 @@ final photosFilterSearchFocusRequestProvider = StateProvider<int>((_) => 0);
 
 /// Tracks the last request value actually processed by a mounted
 /// `FilterSheetSearchBar`. Lifted to a provider (rather than per-State field)
-/// so that snap transitions — which unmount+remount the search bar — don't
+/// so that sheet remounts — which unmount+remount the search bar — do not
 /// retrigger focus on the already-processed request. A fresh mount reads the
 /// consumed counter and only focuses if `request > consumed`.
 final photosFilterSearchFocusConsumedProvider = StateProvider<int>((_) => 0);
