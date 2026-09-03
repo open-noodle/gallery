@@ -717,11 +717,13 @@ export class PersonRepository {
   // a future magnifier there needs no server change.
   @GenerateSql({ params: [DummyValue.UUID] })
   getFaceByIdOnLiveAsset(id: string) {
+    // withPersonAnyOwner, like the sibling above: this serves the admin console, which reads faces of
+    // people the admin does not own and has no viewer to key `withPerson` on.
     return this.db
       .selectFrom('asset_face')
       .innerJoin('asset', 'asset.id', 'asset_face.assetId')
       .selectAll('asset_face')
-      .select(withPerson)
+      .select(withPersonAnyOwner)
       .where('asset_face.id', '=', id)
       .where('asset.deletedAt', 'is', null)
       .where((eb) => reviewableAssetVisibility(eb))
