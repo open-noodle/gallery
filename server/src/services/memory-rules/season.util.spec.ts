@@ -1,5 +1,16 @@
 import { DateTime } from 'luxon';
-import { isSeasonStart, seasonOf, seasonStartingOn, seasonYearOf } from 'src/services/memory-rules/season.util';
+import {
+  isSeasonStart,
+  SEASON_MONTHS,
+  seasonOf,
+  seasonStartingOn,
+  seasonYearOf,
+} from 'src/services/memory-rules/season.util';
+
+import { readFileSync } from 'node:fs';
+
+/** The shared `i18n/en.json`, read from disk (vitest roots at `server/`): no module alias reaches it. */
+const messageKeys = new Set(Object.keys(JSON.parse(readFileSync('../i18n/en.json', 'utf8'))));
 
 const utc = (iso: string) => DateTime.fromISO(iso, { zone: 'utc' });
 
@@ -45,5 +56,15 @@ describe('isSeasonStart', () => {
     expect(isSeasonStart(utc('2026-06-01'))).toBe(true);
     expect(isSeasonStart(utc('2026-06-02'))).toBe(false);
     expect(isSeasonStart(utc('2026-01-01'))).toBe(false);
+  });
+});
+
+describe('season labels', () => {
+  // The rule stores only the season key; the clients turn it into a label in the viewer's
+  // language. A season with no message renders as "Unknown", which is how #1045 looked to users.
+  it('has a translated label for every season', () => {
+    for (const season of Object.keys(SEASON_MONTHS)) {
+      expect([...messageKeys]).toContain(`memory_season_${season}`);
+    }
   });
 });
