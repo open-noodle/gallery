@@ -9,6 +9,7 @@ import { Permission } from 'src/enum.js';
 import { StorageBackend } from 'src/interfaces/storage-backend.interface.js';
 import type { ImmichReadStream } from 'src/repositories/storage.repository.js';
 import { BaseService } from 'src/services/base.service.js';
+import { getAlbumSpaceIds } from 'src/utils/album-space-ids.js';
 import { HumanReadableSize } from 'src/utils/bytes.js';
 import { getPreferences } from 'src/utils/preferences.js';
 import { StorageService } from 'src/services/storage.service.js';
@@ -79,7 +80,11 @@ export class DownloadService extends BaseService {
     } else if (dto.albumId) {
       const albumId = dto.albumId;
       await this.requireAccess({ auth, permission: Permission.AlbumDownload, ids: [albumId] });
-      assets = this.downloadRepository.downloadAlbumId(albumId);
+      // #1048: a space-linked album shows cross-owner contributions (#764) — in the grid, and
+      // through a link created from the space (#1018). Scope the archive by the SAME space ids the
+      // album browse resolves, or "download all" silently ships only the album owner's own photos.
+      const albumSpaceIds = await getAlbumSpaceIds({ auth, albumId, repository: this.sharedSpaceRepository });
+      assets = this.downloadRepository.downloadAlbumId(albumId, albumSpaceIds);
     } else if (dto.userId) {
       const userId = dto.userId;
       await this.requireAccess({ auth, permission: Permission.TimelineDownload, ids: [userId] });
