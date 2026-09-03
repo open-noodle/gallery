@@ -24,8 +24,8 @@ class DeepHeader extends ConsumerWidget {
             icon: const Icon(Icons.close_rounded),
             tooltip: context.t.close,
             // Close = dismiss the sheet entirely (hidden), matching Done / system-back /
-            // drag-to-dismiss. Progressive collapse (deep → browse) is the scrim-tap / drag.
-            onPressed: () => ref.read(photosFilterSheetProvider.notifier).state = FilterSheetSnap.hidden,
+            // scrim-tap / drag-to-dismiss. The sheet has no intermediate state to step back to.
+            onPressed: () => ref.read(photosFilterSheetProvider.notifier).state = FilterSheetVisibility.hidden,
           ),
           Expanded(
             child: Text(context.t.filter_sheet_title, style: theme.textTheme.titleMedium, textAlign: TextAlign.center),
