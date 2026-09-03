@@ -576,10 +576,18 @@ const makeService = (profiles: MergeProfile[], options: { unrepairableSpaceIds?:
         new Map(spaceIds.map((spaceId) => [spaceId, unrepairableSpaceIds.has(spaceId) ? 'viewer' : 'owner'])),
     ),
   };
+  // Family repointing (Task 3) is exercised end to end against a real DB in
+  // family-identity-merge.spec.ts, never against this hand-rolled fake — a no-op mock here is
+  // enough to let the planning/policy tests in THIS file exercise executePlanInTransaction
+  // without caring about family data at all.
+  const familyRepository = {
+    repointIdentities: vi.fn().mockResolvedValue(void 0),
+  };
 
   const sut = new IdentityMergePropagationService({
     databaseRepository: databaseRepository as never,
     faceIdentityRepository: faceIdentityRepository as never,
+    familyRepository: familyRepository as never,
     jobRepository: jobRepository as never,
     logger: logger as never,
     personRepository: personRepository as never,
@@ -591,6 +599,7 @@ const makeService = (profiles: MergeProfile[], options: { unrepairableSpaceIds?:
     mocks: {
       database: databaseRepository,
       faceIdentity: faceIdentityRepository,
+      family: familyRepository,
       job: jobRepository,
       logger,
       person: personRepository,

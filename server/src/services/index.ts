@@ -16,6 +16,7 @@ import { DownloadService } from 'src/services/download.service';
 import { DuplicateService } from 'src/services/duplicate.service';
 import { FaceRepairService } from 'src/services/face-repair.service';
 import { FaceSuggestionService } from 'src/services/face-suggestion.service';
+import { FamilyService } from 'src/services/family.service';
 import { HlsService } from 'src/services/hls.service';
 import { IntegrityService } from 'src/services/integrity.service';
 import { JobService } from 'src/services/job.service';
@@ -78,6 +79,7 @@ export const services = [
   DuplicateService,
   FaceRepairService,
   FaceSuggestionService,
+  FamilyService,
   IntegrityService,
   HlsService,
   JobService,

@@ -477,6 +477,46 @@ class ApiClient {
           return FaceSuggestionConfig.fromJson(value);
         case 'FacialRecognitionConfig':
           return FacialRecognitionConfig.fromJson(value);
+        case 'FamilyAccessGrantResponseDto':
+          return FamilyAccessGrantResponseDto.fromJson(value);
+        case 'FamilyAccessLevel':
+          return FamilyAccessLevelTypeTransformer().decode(value);
+        case 'FamilyAccessUpdateDto':
+          return FamilyAccessUpdateDto.fromJson(value);
+        case 'FamilyClusterResponseDto':
+          return FamilyClusterResponseDto.fromJson(value);
+        case 'FamilyGenderUpdateDto':
+          return FamilyGenderUpdateDto.fromJson(value);
+        case 'FamilyGraphResponseDto':
+          return FamilyGraphResponseDto.fromJson(value);
+        case 'FamilyIdentityDto':
+          return FamilyIdentityDto.fromJson(value);
+        case 'FamilyMyRootResponseDto':
+          return FamilyMyRootResponseDto.fromJson(value);
+        case 'FamilyMyRootUpdateDto':
+          return FamilyMyRootUpdateDto.fromJson(value);
+        case 'FamilyParticipantAddDto':
+          return FamilyParticipantAddDto.fromJson(value);
+        case 'FamilyParticipantDto':
+          return FamilyParticipantDto.fromJson(value);
+        case 'FamilyParticipantKind':
+          return FamilyParticipantKindTypeTransformer().decode(value);
+        case 'FamilyParticipantRole':
+          return FamilyParticipantRoleTypeTransformer().decode(value);
+        case 'FamilyPersonRelationDto':
+          return FamilyPersonRelationDto.fromJson(value);
+        case 'FamilyPersonRelationsResponseDto':
+          return FamilyPersonRelationsResponseDto.fromJson(value);
+        case 'FamilyUnionCreateDto':
+          return FamilyUnionCreateDto.fromJson(value);
+        case 'FamilyUnionCreateResponseDto':
+          return FamilyUnionCreateResponseDto.fromJson(value);
+        case 'FamilyUnionDto':
+          return FamilyUnionDto.fromJson(value);
+        case 'FamilyUnionStatus':
+          return FamilyUnionStatusTypeTransformer().decode(value);
+        case 'FamilyUnionUpdateDto':
+          return FamilyUnionUpdateDto.fromJson(value);
         case 'FilterSuggestionsPersonDto':
           return FilterSuggestionsPersonDto.fromJson(value);
         case 'FilterSuggestionsResponseDto':
@@ -985,6 +1025,8 @@ class ApiClient {
           return SystemConfigFFmpegRealtimeDto.fromJson(value);
         case 'SystemConfigFacesDto':
           return SystemConfigFacesDto.fromJson(value);
+        case 'SystemConfigFamilyTreeDto':
+          return SystemConfigFamilyTreeDto.fromJson(value);
         case 'SystemConfigGeneratedFullsizeImageDto':
           return SystemConfigGeneratedFullsizeImageDto.fromJson(value);
         case 'SystemConfigGeneratedImageDto':

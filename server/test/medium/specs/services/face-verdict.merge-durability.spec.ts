@@ -3,6 +3,7 @@ import { SharedSpaceRole, SourceType } from 'src/enum';
 import { DatabaseRepository } from 'src/repositories/database.repository';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository';
 import { FacePersonVerdictRepository } from 'src/repositories/face-person-verdict.repository';
+import { FamilyRepository } from 'src/repositories/family.repository';
 import { JobRepository } from 'src/repositories/job.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { PersonRepository } from 'src/repositories/person.repository';
@@ -34,6 +35,7 @@ const setup = (db: Kysely<DB> = defaultDatabase) => {
     real: [
       DatabaseRepository,
       FaceIdentityRepository,
+      FamilyRepository,
       PersonRepository,
       SharedSpaceRepository,
       FacePersonVerdictRepository,
@@ -45,6 +47,7 @@ const setup = (db: Kysely<DB> = defaultDatabase) => {
   const sut = new IdentityMergePropagationService({
     databaseRepository: ctx.get(DatabaseRepository),
     faceIdentityRepository: ctx.get(FaceIdentityRepository),
+    familyRepository: ctx.get(FamilyRepository),
     jobRepository,
     logger: ctx.getMock<LoggingRepository, Mocked<LoggingRepository>>(LoggingRepository),
     personRepository: ctx.get(PersonRepository),

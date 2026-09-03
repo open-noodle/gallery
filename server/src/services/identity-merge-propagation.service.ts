@@ -6,6 +6,7 @@ import { MergeScopedPeopleDto, ScopedPersonProfileRefDto } from 'src/dtos/person
 import { JobName, SharedSpaceActivityType, SharedSpaceRole } from 'src/enum';
 import { DatabaseRepository } from 'src/repositories/database.repository';
 import { FaceIdentityRepository } from 'src/repositories/face-identity.repository';
+import { FamilyRepository } from 'src/repositories/family.repository';
 import { JobRepository } from 'src/repositories/job.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { PersonRepository } from 'src/repositories/person.repository';
@@ -115,6 +116,9 @@ export type IdentityMergePropagationPlan = {
 type IdentityMergePropagationDependencies = {
   databaseRepository: DatabaseRepository;
   faceIdentityRepository: FaceIdentityRepository;
+  // Gallery-fork: family relationships (D1.6). Every table keyed on identityId must participate
+  // in a merge, and family_union_partner/family_union_child are not exempt — see repointIdentities.
+  familyRepository: FamilyRepository;
   jobRepository: JobRepository;
   logger: LoggingRepository;
   personRepository: PersonRepository;
@@ -368,6 +372,14 @@ export class IdentityMergePropagationService {
             db,
           ));
     }
+
+    // Gallery-fork (D1.6): re-point family_union_partner/family_union_child from the merged-away
+    // identities to the survivor BEFORE mergeIdentitiesAfterProfileResolution below can delete the
+    // source face_identity rows — those FKs are ON DELETE CASCADE, so a source row deleted first
+    // would silently take its family memberships with it (E56). repointIdentities is self-contained
+    // and never throws: a merge is a user correcting recognition, not asserting a family fact, and
+    // must never fail — or lose data — because of it.
+    await this.deps.familyRepository.repointIdentities(plan.sourceIdentityIds, plan.targetIdentityId, db);
 
     await this.deps.faceIdentityRepository.mergeIdentitiesAfterProfileResolution(
       {

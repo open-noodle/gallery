@@ -21,5 +21,6 @@ extension UserMetadataDataExtension on UserMetadataEntityData {
     UserMetadataKey.onboarding => UserMetadata(userId: userId, key: key, onboarding: Onboarding.fromMap(value)),
     UserMetadataKey.preferences => UserMetadata(userId: userId, key: key, preferences: Preferences.fromMap(value)),
     UserMetadataKey.license => UserMetadata(userId: userId, key: key, license: License.fromMap(value)),
+    UserMetadataKey.familyRoot => UserMetadata(userId: userId, key: key, familyRoot: FamilyRoot.fromMap(value)),
   };
 }

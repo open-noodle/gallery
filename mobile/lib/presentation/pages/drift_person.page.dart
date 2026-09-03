@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/person.model.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
+import 'package:immich_mobile/presentation/widgets/people/family_focus_card.widget.dart';
 import 'package:immich_mobile/presentation/widgets/people/person_option_sheet.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.widget.dart';
 import 'package:immich_mobile/presentation/widgets/timeline/timeline_route_scope.dart';
@@ -86,15 +87,28 @@ class _DriftPersonPageState extends ConsumerState<DriftPersonPage> {
       // the server-resolved Space assets (the local owner-scoped join is empty for a person the
       // viewer does not own). See buildPersonTimelineRouteService.
       timelineServiceBuilder: (ref, scope, groupBy) => buildPersonTimelineRouteService(ref, _person, scope, groupBy),
-      child: Timeline(
-        withGroupingPill: true,
-        appBar: PersonSliverAppBar(
-          person: _person,
-          editable: editable,
-          onNameTap: () => handleEditName(context),
-          onBirthdayTap: () => handleEditBirthday(context),
-          onShowOptions: () => showOptionSheet(context),
-        ),
+      // Slice 13: the family focus card sits above the timeline rather than inside
+      // `PersonSliverAppBar`'s sliver (a fixed-height, heavily animated background header) —
+      // `Timeline` only accepts one `appBar` sliver, and reworking that shared widget to carry
+      // a second, variable-height section was judged out of proportion to a read-only card.
+      // It renders nothing of its own when there is nothing to show (offline explanation aside),
+      // so it never adds empty space to a person with no recorded relations or no family access.
+      child: Column(
+        children: [
+          FamilyFocusCard(personId: _person.id),
+          Expanded(
+            child: Timeline(
+              withGroupingPill: true,
+              appBar: PersonSliverAppBar(
+                person: _person,
+                editable: editable,
+                onNameTap: () => handleEditName(context),
+                onBirthdayTap: () => handleEditBirthday(context),
+                onShowOptions: () => showOptionSheet(context),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

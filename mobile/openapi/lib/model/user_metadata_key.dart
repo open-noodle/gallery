@@ -15,6 +15,7 @@ enum UserMetadataKey {
   preferences._(r'preferences'),
   license._(r'license'),
   onboarding._(r'onboarding'),
+  familyRoot._(r'family-root'),
   ;
 
   /// Instantiate a new enum with the provided value.
@@ -77,6 +78,7 @@ class UserMetadataKeyTypeTransformer {
         case r'preferences': return UserMetadataKey.preferences;
         case r'license': return UserMetadataKey.license;
         case r'onboarding': return UserMetadataKey.onboarding;
+        case r'family-root': return UserMetadataKey.familyRoot;
         default:
           if (!allowNull) {
             throw ArgumentError('Unknown enum value to decode: $data');

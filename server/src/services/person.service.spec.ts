@@ -105,6 +105,12 @@ const onConfigUpdateTestConfig = (
     },
   }) as SystemConfig;
 
+// Gallery-fork: family relationships. Enables the feature for `familyRelationLabel` tests —
+// `sut['getConfig']` is overridden directly, matching `FamilyService`'s own spec convention.
+const enableFamilyFeature = (sut: PersonService) => {
+  sut['getConfig'] = () => Promise.resolve({ familyTree: { enabled: true, defaultAccess: 'none' } } as any);
+};
+
 describe(PersonService.name, () => {
   let sut: PersonService;
   let mocks: ServiceMocks;
@@ -958,6 +964,114 @@ describe(PersonService.name, () => {
       await expect(sut.getById(auth, person.id)).resolves.toEqual(
         expect.objectContaining({ id: person.id, name: 'Owner Local Name', birthDate: null }),
       );
+    });
+  });
+
+  // Gallery-fork: family relationships. `familyRelationLabel` on `PersonResponseDto` — populated
+  // only when the viewer's effective family access is 'view' or 'contribute', derived from the
+  // SAME projected graph and label engine `GET /family/unions` uses (`src/utils/family-graph.ts`,
+  // never a second derivation path).
+  describe('familyRelationLabel', () => {
+    const VIEWER_ROOT_ID = newUuid();
+    const PERSON_IDENTITY_ID = newUuid();
+
+    // A one-union graph making PERSON_IDENTITY_ID the viewer's root's child — enough for
+    // `deriveRelationLabel` to produce a real, non-null label rather than a stub value.
+    const setUpGraph = () => {
+      mocks.family.getAllUnionsWithParticipants.mockResolvedValue([
+        {
+          id: 'u1',
+          status: 'married',
+          startDate: null,
+          endDate: null,
+          partnerIds: [VIEWER_ROOT_ID],
+          childIds: [PERSON_IDENTITY_ID],
+        },
+      ] as any);
+      mocks.faceIdentity.resolveAccessibleIdentityNames.mockResolvedValue(
+        new Map([
+          [VIEWER_ROOT_ID, 'Root'],
+          [PERSON_IDENTITY_ID, 'Kid'],
+        ]) as any,
+      );
+      mocks.family.getGenders.mockResolvedValue(new Map());
+      mocks.family.computeVisibleUnions.mockReturnValue([
+        {
+          id: 'u1',
+          status: 'married',
+          startDate: null,
+          endDate: null,
+          partners: [{ identityId: VIEWER_ROOT_ID }],
+          children: [{ identityId: PERSON_IDENTITY_ID }],
+        },
+      ] as any);
+      mocks.user.getMetadata.mockResolvedValue([{ key: 'family-root', value: { identityId: VIEWER_ROOT_ID } }] as any);
+    };
+
+    it('carries a label for a reachable person when the viewer has view access', async () => {
+      const auth = AuthFactory.create();
+      const person = PersonFactory.create({ ownerId: auth.user.id, identityId: PERSON_IDENTITY_ID });
+      enableFamilyFeature(sut);
+      setUpGraph();
+      mocks.family.getAccess.mockResolvedValue({ level: 'view' } as any);
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.id]));
+      mocks.person.getById.mockResolvedValue(person);
+
+      const response = await sut.getById(auth, person.id);
+
+      expect(response.familyRelationLabel).toBe('your child');
+    });
+
+    // Paired negative/positive control: SAME fixture, only the access level differs.
+    it('omits the field entirely for a viewer with no family access', async () => {
+      const auth = AuthFactory.create();
+      const person = PersonFactory.create({ ownerId: auth.user.id, identityId: PERSON_IDENTITY_ID });
+      enableFamilyFeature(sut);
+      mocks.family.getAccess.mockResolvedValue({ level: 'none' } as any);
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.id]));
+      mocks.person.getById.mockResolvedValue(person);
+
+      const response = await sut.getById(auth, person.id);
+
+      expect('familyRelationLabel' in response).toBe(false);
+      expect(mocks.family.getAllUnionsWithParticipants).not.toHaveBeenCalled();
+    });
+
+    it('reports no label when the viewer has access but has never set a root', async () => {
+      const auth = AuthFactory.create();
+      const person = PersonFactory.create({ ownerId: auth.user.id, identityId: PERSON_IDENTITY_ID });
+      enableFamilyFeature(sut);
+      setUpGraph();
+      mocks.user.getMetadata.mockResolvedValue([]);
+      mocks.family.getAccess.mockResolvedValue({ level: 'view' } as any);
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.id]));
+      mocks.person.getById.mockResolvedValue(person);
+
+      const response = await sut.getById(auth, person.id);
+
+      expect(response.familyRelationLabel).toBeNull();
+    });
+
+    // The perf-critical property for `getAll`: however many people the list holds, the
+    // (potentially large) union graph is fetched exactly ONCE for the whole response, never once
+    // per person.
+    it('issues one graph load for a response with many people, not one per person', async () => {
+      const auth = AuthFactory.create();
+      const people = Array.from({ length: 25 }, () =>
+        PersonFactory.create({ ownerId: auth.user.id, identityId: PERSON_IDENTITY_ID }),
+      );
+      enableFamilyFeature(sut);
+      setUpGraph();
+      mocks.family.getAccess.mockResolvedValue({ level: 'contribute' } as any);
+      mocks.person.getAllForUser.mockResolvedValue({ items: people, hasNextPage: false });
+      mocks.person.getNumberOfPeople.mockResolvedValue({ total: people.length, hidden: 0 });
+
+      const response = await sut.getAll(auth, { withHidden: false, page: 1, size: 50 } as any);
+
+      expect(response.people).toHaveLength(25);
+      expect(response.people.every((person) => person.familyRelationLabel === 'your child')).toBe(true);
+      expect(mocks.family.getAllUnionsWithParticipants).toHaveBeenCalledTimes(1);
+      expect(mocks.faceIdentity.resolveAccessibleIdentityNames).toHaveBeenCalledTimes(1);
     });
   });
 

@@ -1,3 +1,5 @@
+import { defaults } from 'src/config';
+import { SystemConfigSchema } from 'src/dtos/system-config.dto';
 import { ConfigRepository } from 'src/repositories/config.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository';
@@ -351,5 +353,63 @@ describe('deriveSuggestionBand', () => {
       merged(0.5, { enabled: true, maxDistance: 0.7 }),
     );
     expect(result.machineLearning.facialRecognition.suggestions.maxDistance).toBe(0.7);
+  });
+});
+
+describe('familyTree config', () => {
+  let configRepo: ReturnType<typeof newConfigRepositoryMock>;
+  let metadataRepo: ReturnType<typeof newSystemMetadataRepositoryMock>;
+  let logger: { warn: ReturnType<typeof vi.fn>; error: ReturnType<typeof vi.fn> };
+
+  beforeEach(() => {
+    configRepo = newConfigRepositoryMock(); // also clears the module-level config cache (see the mock factory).
+    metadataRepo = newSystemMetadataRepositoryMock();
+    logger = { warn: vi.fn(), error: vi.fn() };
+  });
+
+  const repos = () => ({
+    configRepo: configRepo as unknown as ConfigRepository,
+    metadataRepo: metadataRepo as unknown as SystemMetadataRepository,
+    logger: logger as unknown as LoggingRepository,
+  });
+
+  // GIVEN an instance that has never configured the feature
+  // WHEN the config is built
+  // THEN the feature is off and nobody has access — an upgrade must behave exactly
+  // as it did before this release.
+  it('defaults the family tree to disabled', async () => {
+    metadataRepo.get.mockResolvedValue({});
+    const config = await getConfig(repos(), { withCache: false });
+    expect(config.familyTree.enabled).toBe(false);
+  });
+
+  it('defaults new installs to no family tree access', async () => {
+    metadataRepo.get.mockResolvedValue({});
+    const config = await getConfig(repos(), { withCache: false });
+    expect(config.familyTree.defaultAccess).toBe('none');
+  });
+
+  it('accepts each of the three access levels', () => {
+    for (const level of ['none', 'view', 'contribute']) {
+      const result = SystemConfigSchema.safeParse({
+        ...defaults,
+        familyTree: { enabled: true, defaultAccess: level },
+      });
+      expect(result.success, `expected ${level} to be accepted`).toBe(true);
+    }
+  });
+
+  it('rejects a defaultAccess value outside none, view and contribute', () => {
+    const result = SystemConfigSchema.safeParse({
+      ...defaults,
+      familyTree: { enabled: true, defaultAccess: 'admin' },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('preserves an admin-set defaultAccess through a config round-trip', async () => {
+    metadataRepo.get.mockResolvedValue({ familyTree: { enabled: true, defaultAccess: 'contribute' } });
+    const config = await getConfig(repos(), { withCache: false });
+    expect(config.familyTree).toEqual({ enabled: true, defaultAccess: 'contribute' });
   });
 });

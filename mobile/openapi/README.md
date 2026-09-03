@@ -191,6 +191,22 @@ Class | Method | HTTP request | Description
 *FacesApi* | [**runFaceRepair**](doc//FacesApi.md#runfacerepair) | **POST** /admin/face-repair | Run face re-attribution repair
 *FacesApi* | [**triggerScan**](doc//FacesApi.md#triggerscan) | **POST** /admin/face-repair/scan | Trigger a face-repair scan
 *FacesApi* | [**unconfirmFaceRepairFaces**](doc//FacesApi.md#unconfirmfacerepairfaces) | **POST** /admin/face-repair/unconfirm | Un-confirm human-placed faces so a re-scan may flag them again
+*FamilyApi* | [**addParticipant**](doc//FamilyApi.md#addparticipant) | **PUT** /family/unions/{id}/participants | Add a participant to a family union
+*FamilyApi* | [**createUnion**](doc//FamilyApi.md#createunion) | **POST** /family/unions | Create a family union
+*FamilyApi* | [**deleteAccess**](doc//FamilyApi.md#deleteaccess) | **DELETE** /family/access/{userId} | Remove a user's family access grant
+*FamilyApi* | [**deleteUnion**](doc//FamilyApi.md#deleteunion) | **DELETE** /family/unions/{id} | Delete a family union
+*FamilyApi* | [**getAllAccess**](doc//FamilyApi.md#getallaccess) | **GET** /family/access | Get all family access grants
+*FamilyApi* | [**getClusters**](doc//FamilyApi.md#getclusters) | **GET** /family/clusters | Get family clusters
+*FamilyApi* | [**getIdentityPerson**](doc//FamilyApi.md#getidentityperson) | **GET** /family/identities/{id}/person | Get the person behind a family identity
+*FamilyApi* | [**getIdentityThumbnail**](doc//FamilyApi.md#getidentitythumbnail) | **GET** /family/identities/{id}/thumbnail | Get a family identity's thumbnail
+*FamilyApi* | [**getMyRoot**](doc//FamilyApi.md#getmyroot) | **GET** /family/me | Get the viewer's family root and access level
+*FamilyApi* | [**getPersonRelations**](doc//FamilyApi.md#getpersonrelations) | **GET** /family/people/{personId}/relations | Get a person's own family relations
+*FamilyApi* | [**getUnions**](doc//FamilyApi.md#getunions) | **GET** /family/unions | Get family unions
+*FamilyApi* | [**removeParticipant**](doc//FamilyApi.md#removeparticipant) | **DELETE** /family/unions/{id}/participants/{identityId} | Remove a participant from a family union
+*FamilyApi* | [**setAccess**](doc//FamilyApi.md#setaccess) | **PUT** /family/access/{userId} | Set a user's family access grant
+*FamilyApi* | [**setMyRoot**](doc//FamilyApi.md#setmyroot) | **PUT** /family/me | Set the viewer's family root
+*FamilyApi* | [**updateGender**](doc//FamilyApi.md#updategender) | **PUT** /family/identities/{id}/gender | Set an identity's gender
+*FamilyApi* | [**updateUnion**](doc//FamilyApi.md#updateunion) | **PUT** /family/unions/{id} | Update a family union
 *GalleryMapApi* | [**getFilteredMapMarkers**](doc//GalleryMapApi.md#getfilteredmapmarkers) | **GET** /gallery/map/markers | Get filtered map markers
 *JobsApi* | [**createJob**](doc//JobsApi.md#createjob) | **POST** /jobs | Create a manual job
 *JobsApi* | [**getQueuesLegacy**](doc//JobsApi.md#getqueueslegacy) | **GET** /jobs | Retrieve queue counts and status
@@ -589,6 +605,26 @@ Class | Method | HTTP request | Description
  - [FaceSuggestionActionResponseDto](doc//FaceSuggestionActionResponseDto.md)
  - [FaceSuggestionConfig](doc//FaceSuggestionConfig.md)
  - [FacialRecognitionConfig](doc//FacialRecognitionConfig.md)
+ - [FamilyAccessGrantResponseDto](doc//FamilyAccessGrantResponseDto.md)
+ - [FamilyAccessLevel](doc//FamilyAccessLevel.md)
+ - [FamilyAccessUpdateDto](doc//FamilyAccessUpdateDto.md)
+ - [FamilyClusterResponseDto](doc//FamilyClusterResponseDto.md)
+ - [FamilyGenderUpdateDto](doc//FamilyGenderUpdateDto.md)
+ - [FamilyGraphResponseDto](doc//FamilyGraphResponseDto.md)
+ - [FamilyIdentityDto](doc//FamilyIdentityDto.md)
+ - [FamilyMyRootResponseDto](doc//FamilyMyRootResponseDto.md)
+ - [FamilyMyRootUpdateDto](doc//FamilyMyRootUpdateDto.md)
+ - [FamilyParticipantAddDto](doc//FamilyParticipantAddDto.md)
+ - [FamilyParticipantDto](doc//FamilyParticipantDto.md)
+ - [FamilyParticipantKind](doc//FamilyParticipantKind.md)
+ - [FamilyParticipantRole](doc//FamilyParticipantRole.md)
+ - [FamilyPersonRelationDto](doc//FamilyPersonRelationDto.md)
+ - [FamilyPersonRelationsResponseDto](doc//FamilyPersonRelationsResponseDto.md)
+ - [FamilyUnionCreateDto](doc//FamilyUnionCreateDto.md)
+ - [FamilyUnionCreateResponseDto](doc//FamilyUnionCreateResponseDto.md)
+ - [FamilyUnionDto](doc//FamilyUnionDto.md)
+ - [FamilyUnionStatus](doc//FamilyUnionStatus.md)
+ - [FamilyUnionUpdateDto](doc//FamilyUnionUpdateDto.md)
  - [FilterSuggestionsPersonDto](doc//FilterSuggestionsPersonDto.md)
  - [FilterSuggestionsResponseDto](doc//FilterSuggestionsResponseDto.md)
  - [FilterSuggestionsTagDto](doc//FilterSuggestionsTagDto.md)
@@ -843,6 +879,7 @@ Class | Method | HTTP request | Description
  - [SystemConfigFFmpegDto](doc//SystemConfigFFmpegDto.md)
  - [SystemConfigFFmpegRealtimeDto](doc//SystemConfigFFmpegRealtimeDto.md)
  - [SystemConfigFacesDto](doc//SystemConfigFacesDto.md)
+ - [SystemConfigFamilyTreeDto](doc//SystemConfigFamilyTreeDto.md)
  - [SystemConfigGeneratedFullsizeImageDto](doc//SystemConfigGeneratedFullsizeImageDto.md)
  - [SystemConfigGeneratedImageDto](doc//SystemConfigGeneratedImageDto.md)
  - [SystemConfigImageDto](doc//SystemConfigImageDto.md)

@@ -32,6 +32,7 @@ import {
 import {
   AssetVisibility,
   CacheControl,
+  FamilyAccessLevel,
   ImmichWorker,
   JobName,
   JobStatus,
@@ -90,6 +91,11 @@ export const FACE_IDENTITY_BACKFILL_MAX_CONTINUATIONS = 5;
 
 @Injectable()
 export class PersonService extends BaseService {
+  // Gallery-fork: family relationships. `getAll`/`getById` below call the shared
+  // `BaseService.getFamilyLabelSet(auth)` to attach `familyRelationLabel` — `AssetService` needs
+  // the exact same composition for the people embedded in an asset response, so it lives on
+  // `BaseService` rather than being duplicated per service.
+
   private async crossOwnerMergeAuthorizer(dto: { confirmCrossOwner?: boolean }): Promise<MergeAuthorizer> {
     // Resolve the toggle here, BEFORE the merge transaction opens. The authorizer runs inside that transaction
     // while it holds the instance-wide advisory lock; reading config there would query a second pool connection
@@ -224,8 +230,19 @@ export class PersonService extends BaseService {
       minimumFaceCount,
     });
 
+    // Gallery-fork: family relationships. ONE graph load for the whole list (however many
+    // hundreds of people it holds), never one per person — see `getFamilyLabelSet`.
+    const labelSet = await this.getFamilyLabelSet(auth);
+    const people = items.map((person) => {
+      const response = mapPerson(person);
+      if (labelSet.level !== FamilyAccessLevel.None) {
+        response.familyRelationLabel = labelSet.label(person.identityId);
+      }
+      return response;
+    });
+
     return {
-      people: items.map((person) => mapPerson(person)),
+      people,
       hasNextPage,
       total,
       hidden,
@@ -385,6 +402,22 @@ export class PersonService extends BaseService {
       resolve: (identityId) => this.faceIdentityRepository.getResolvedPersonByIdentityId(auth.user.id, identityId),
     });
 
+    // Gallery-fork: family relationships. This is the asset-viewer people strip's OWN data
+    // source for the common (non-space) case — `DetailPanelPeople.svelte` reads `faceManager
+    // .people`, which comes from THIS endpoint, not from `getAssetInfo`'s `asset.people` (that
+    // one only backs the space-member branch, and already gets `familyRelationLabel` via
+    // `AssetService.applyFamilyRelationLabels`). Missing this left every owner viewing their own
+    // photos with no relation label at all — exactly the surface slice 9 exists for. Same
+    // discipline as everywhere else: one graph load for the whole face list, never one per face.
+    const labelSet = await this.getFamilyLabelSet(auth);
+    if (labelSet.level !== FamilyAccessLevel.None) {
+      for (const face of response) {
+        if (face.person) {
+          face.person.familyRelationLabel = labelSet.label(identityByPersonId.get(face.person.id));
+        }
+      }
+    }
+
     return response;
   }
 
@@ -424,6 +457,14 @@ export class PersonService extends BaseService {
           response.birthDate = resolved.birthDate;
         }
       }
+
+      // Gallery-fork: family relationships. A single-person fetch, so one graph load here is
+      // proportionate — see `getAll` for the "many people" case this same helper is built for.
+      const labelSet = await this.getFamilyLabelSet(auth);
+      if (labelSet.level !== FamilyAccessLevel.None) {
+        response.familyRelationLabel = labelSet.label(person.identityId);
+      }
+
       return response;
     }
 

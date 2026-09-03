@@ -2,12 +2,21 @@ import { Kysely } from 'kysely';
 import { StorageCore } from 'src/cores/storage.core';
 import { AssetResponseDto } from 'src/dtos/asset-response.dto';
 import { AssetEditAction } from 'src/dtos/editing.dto';
-import { AssetFileType, AssetMetadataKey, AssetStatus, AssetVisibility, JobName, SharedLinkType } from 'src/enum';
+import {
+  AssetFileType,
+  AssetMetadataKey,
+  AssetStatus,
+  AssetVisibility,
+  JobName,
+  SharedLinkType,
+  SystemMetadataKey,
+} from 'src/enum';
 import { AccessRepository } from 'src/repositories/access.repository';
 import { AlbumRepository } from 'src/repositories/album.repository';
 import { AssetEditRepository } from 'src/repositories/asset-edit.repository';
 import { AssetJobRepository } from 'src/repositories/asset-job.repository';
 import { AssetRepository } from 'src/repositories/asset.repository';
+import { ConfigRepository } from 'src/repositories/config.repository';
 import { EventRepository } from 'src/repositories/event.repository';
 import { JobRepository } from 'src/repositories/job.repository';
 import { LoggingRepository } from 'src/repositories/logging.repository';
@@ -19,17 +28,19 @@ import { SharedLinkRepository } from 'src/repositories/shared-link.repository';
 import { SharedSpaceRepository } from 'src/repositories/shared-space.repository';
 import { StackRepository } from 'src/repositories/stack.repository';
 import { StorageRepository } from 'src/repositories/storage.repository';
+import { SystemMetadataRepository } from 'src/repositories/system-metadata.repository';
 import { UserRepository } from 'src/repositories/user.repository';
 import { DB } from 'src/schema';
 import { AssetService } from 'src/services/asset.service';
 import { newMediumService } from 'test/medium.factory';
 import { factory } from 'test/small.factory';
 import { getKyselyDB } from 'test/utils';
+import { Mocked } from 'vitest';
 
 let defaultDatabase: Kysely<DB>;
 
 const setup = (db?: Kysely<DB>) => {
-  return newMediumService(AssetService, {
+  const { sut, ctx } = newMediumService(AssetService, {
     database: db || defaultDatabase,
     real: [
       AssetRepository,
@@ -37,14 +48,35 @@ const setup = (db?: Kysely<DB>) => {
       AssetJobRepository,
       AlbumRepository,
       AccessRepository,
+      ConfigRepository,
       PersonRepository,
       SharedLinkAssetRepository,
       SharedSpaceRepository,
       StackRepository,
       UserRepository,
     ],
-    mock: [EventRepository, LoggingRepository, JobRepository, StorageRepository, OcrRepository, MapRepository],
+    mock: [
+      EventRepository,
+      LoggingRepository,
+      JobRepository,
+      StorageRepository,
+      OcrRepository,
+      MapRepository,
+      SystemMetadataRepository,
+    ],
   });
+
+  // Gallery-fork: `AssetService.get` attaches `familyRelationLabel` to the people it embeds, and
+  // that path calls `getConfig()` before anything else — so the config plumbing has to be present
+  // even though every test here leaves the feature off. A bare `{}` yields all defaults, which
+  // means `familyTree.enabled === false` and `resolveFamilyAccessLevel` short-circuits to `none`
+  // without ever touching `familyRepository`/`faceIdentityRepository`. Enabling the feature in a
+  // test here would need those two added to `real` as well. Same shape as `person.service.spec.ts`.
+  ctx
+    .getMock<SystemMetadataRepository, Mocked<SystemMetadataRepository>>(SystemMetadataRepository)
+    .get.mockImplementation((key) => (key === SystemMetadataKey.SystemConfig ? ({} as any) : (undefined as any)));
+
+  return { sut, ctx };
 };
 
 beforeAll(async () => {

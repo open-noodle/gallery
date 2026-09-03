@@ -169,6 +169,26 @@ class _Avatar extends StatelessWidget {
                     style: context.textTheme.labelLarge,
                     maxLines: 1,
                   ),
+                  // A12: `hasFamilyAccess` is false whenever the server omitted
+                  // `familyRelationLabel` entirely (no access at all) — render exactly as
+                  // today, with no line. When true, a `null` label means access is granted
+                  // but no relationship is recorded, shown as a neutral dash rather than left
+                  // blank (a blank line reads as a loading state, not "nothing recorded").
+                  if (person.hasFamilyAccess)
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        person.familyRelationLabel ?? "family_mobile_relation_none".t(context: context),
+                        key: Key('family-relation-label-${person.id}'),
+                        textAlign: TextAlign.center,
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                        style: context.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w300,
+                          color: context.textTheme.bodyMedium?.color?.withAlpha(175),
+                        ),
+                      ),
+                    ),
                   if (person.birthDate != null)
                     FittedBox(
                       fit: BoxFit.scaleDown,

@@ -1264,11 +1264,18 @@ class SyncStreamRepository extends DriftDatabaseRepository {
     try {
       await _db.batch((batch) {
         for (final userMetadata in data) {
+          // See the `toUserMetadataKey()` extension below: a key with no local representation
+          // (currently only `familyRoot`) maps to null and is skipped, never written.
+          final key = userMetadata.key.toUserMetadataKey();
+          if (key == null) {
+            continue;
+          }
+
           final companion = UserMetadataEntityCompanion(value: Value(userMetadata.value as Map<String, Object?>));
 
           batch.insert(
             _db.userMetadataEntity,
-            companion.copyWith(userId: Value(userMetadata.userId), key: Value(userMetadata.key.toUserMetadataKey())),
+            companion.copyWith(userId: Value(userMetadata.userId), key: Value(key)),
             onConflict: DoUpdate((_) => companion),
           );
         }
@@ -1283,12 +1290,14 @@ class SyncStreamRepository extends DriftDatabaseRepository {
     try {
       await _db.batch((batch) {
         for (final userMetadata in data) {
+          final key = userMetadata.key.toUserMetadataKey();
+          if (key == null) {
+            continue;
+          }
+
           batch.delete(
             _db.userMetadataEntity,
-            UserMetadataEntityCompanion(
-              userId: Value(userMetadata.userId),
-              key: Value(userMetadata.key.toUserMetadataKey()),
-            ),
+            UserMetadataEntityCompanion(userId: Value(userMetadata.userId), key: Value(key)),
           );
         }
       });
@@ -1563,10 +1572,16 @@ extension on api.AssetVisibility {
 }
 
 extension on api.UserMetadataKey {
-  UserMetadataKey toUserMetadataKey() => switch (this) {
+  // Gallery-fork: `familyRoot` (D4, family relationships) has deliberately no local
+  // representation — the family-root pointer is server-sourced only, same as the rest of the
+  // family feature's viewer-scoped data, never synced into the local Drift store. Returning
+  // `null` here (rather than adding a matching `UserMetadataKey.familyRoot` locally) is what
+  // callers filter on to skip it, instead of writing/deleting a row nothing else ever reads.
+  UserMetadataKey? toUserMetadataKey() => switch (this) {
     api.UserMetadataKey.onboarding => UserMetadataKey.onboarding,
     api.UserMetadataKey.preferences => UserMetadataKey.preferences,
     api.UserMetadataKey.license => UserMetadataKey.license,
+    api.UserMetadataKey.familyRoot => null,
   };
 }
 

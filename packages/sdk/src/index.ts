@@ -60,3 +60,9 @@ export const getUserProfileImagePath = (userId: string) =>
 
 export const getPeopleThumbnailPath = (personId: string) =>
   `/people/${personId}/thumbnail`;
+
+// Gallery-fork: family relationships. Canvas cards are addressed by IDENTITY id — a client never
+// holds a person id for them (`PersonResponseDto` withholds `identityId` by design), and for an
+// identity resolved through a shared space the owner-only people route 404s.
+export const getFamilyIdentityThumbnailPath = (identityId: string) =>
+  `/family/identities/${identityId}/thumbnail`;

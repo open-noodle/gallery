@@ -471,6 +471,16 @@ const SystemConfigStorageUsageSchema = z
   })
   .meta({ id: 'SystemConfigStorageUsageDto' });
 
+// Gallery-fork: family relationships — see D2 in the family-relationships design.
+const SystemConfigFamilyTreeSchema = z
+  .object({
+    enabled: configBool.describe('Enable family relationships'),
+    defaultAccess: z
+      .enum(['none', 'view', 'contribute'])
+      .describe('Family tree access for users without an explicit grant'),
+  })
+  .meta({ id: 'SystemConfigFamilyTreeDto' });
+
 const SystemConfigUserSchema = z
   .object({
     deleteDelay: z.int().min(1).describe('Delete delay'),
@@ -494,6 +504,8 @@ export const SystemConfigSchema = z
     storageTemplate: SystemConfigStorageTemplateSchema,
     // Gallery-fork: see SystemConfigStorageUsageSchema above.
     storageUsage: SystemConfigStorageUsageSchema,
+    // Gallery-fork: see SystemConfigFamilyTreeSchema above.
+    familyTree: SystemConfigFamilyTreeSchema,
     job: SystemConfigJobSchema,
     image: SystemConfigImageSchema,
     trash: SystemConfigTrashSchema,

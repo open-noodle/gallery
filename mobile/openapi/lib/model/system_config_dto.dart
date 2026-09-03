@@ -15,6 +15,7 @@ class SystemConfigDto {
   SystemConfigDto({
     required this.backup,
     required this.classification,
+    required this.familyTree,
     required this.ffmpeg,
     required this.image,
     required this.integrityChecks,
@@ -43,6 +44,8 @@ class SystemConfigDto {
   SystemConfigBackupsDto backup;
 
   SystemConfigClassificationDto classification;
+
+  SystemConfigFamilyTreeDto familyTree;
 
   SystemConfigFFmpegDto ffmpeg;
 
@@ -94,6 +97,7 @@ class SystemConfigDto {
   bool operator ==(Object other) => identical(this, other) || other is SystemConfigDto &&
     other.backup == backup &&
     other.classification == classification &&
+    other.familyTree == familyTree &&
     other.ffmpeg == ffmpeg &&
     other.image == image &&
     other.integrityChecks == integrityChecks &&
@@ -123,6 +127,7 @@ class SystemConfigDto {
     // ignore: unnecessary_parenthesis
     (backup.hashCode) +
     (classification.hashCode) +
+    (familyTree.hashCode) +
     (ffmpeg.hashCode) +
     (image.hashCode) +
     (integrityChecks.hashCode) +
@@ -148,12 +153,13 @@ class SystemConfigDto {
     (user.hashCode);
 
   @override
-  String toString() => 'SystemConfigDto[backup=$backup, classification=$classification, ffmpeg=$ffmpeg, image=$image, integrityChecks=$integrityChecks, job=$job, library_=$library_, logging=$logging, machineLearning=$machineLearning, map=$map, memories=$memories, metadata=$metadata, newVersionCheck=$newVersionCheck, nightlyTasks=$nightlyTasks, notifications=$notifications, oauth=$oauth, passwordLogin=$passwordLogin, reverseGeocoding=$reverseGeocoding, server=$server, storageTemplate=$storageTemplate, storageUsage=$storageUsage, templates=$templates, theme=$theme, trash=$trash, user=$user]';
+  String toString() => 'SystemConfigDto[backup=$backup, classification=$classification, familyTree=$familyTree, ffmpeg=$ffmpeg, image=$image, integrityChecks=$integrityChecks, job=$job, library_=$library_, logging=$logging, machineLearning=$machineLearning, map=$map, memories=$memories, metadata=$metadata, newVersionCheck=$newVersionCheck, nightlyTasks=$nightlyTasks, notifications=$notifications, oauth=$oauth, passwordLogin=$passwordLogin, reverseGeocoding=$reverseGeocoding, server=$server, storageTemplate=$storageTemplate, storageUsage=$storageUsage, templates=$templates, theme=$theme, trash=$trash, user=$user]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
       json[r'backup'] = this.backup;
       json[r'classification'] = this.classification;
+      json[r'familyTree'] = this.familyTree;
       json[r'ffmpeg'] = this.ffmpeg;
       json[r'image'] = this.image;
       json[r'integrityChecks'] = this.integrityChecks;
@@ -191,6 +197,7 @@ class SystemConfigDto {
       return SystemConfigDto(
         backup: SystemConfigBackupsDto.fromJson(json[r'backup'])!,
         classification: SystemConfigClassificationDto.fromJson(json[r'classification'])!,
+        familyTree: SystemConfigFamilyTreeDto.fromJson(json[r'familyTree'])!,
         ffmpeg: SystemConfigFFmpegDto.fromJson(json[r'ffmpeg'])!,
         image: SystemConfigImageDto.fromJson(json[r'image'])!,
         integrityChecks: SystemConfigIntegrityChecks.fromJson(json[r'integrityChecks'])!,
@@ -263,6 +270,7 @@ class SystemConfigDto {
   static const requiredKeys = <String>{
     'backup',
     'classification',
+    'familyTree',
     'ffmpeg',
     'image',
     'integrityChecks',

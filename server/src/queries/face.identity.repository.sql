@@ -1658,6 +1658,227 @@ WITH
       )
   )
 SELECT
+  requested_identities."identityId",
+  primary_profiles."profileType",
+  primary_profiles."profileId",
+  primary_profiles."spaceId",
+  COALESCE(
+    NULLIF(display_profiles.name, ''),
+    primary_profiles.name,
+    ''
+  ) AS name,
+  COALESCE(
+    birthdate_profiles."birthDate",
+    primary_profiles."birthDate"
+  ) AS "birthDate",
+  primary_profiles."thumbnailPath",
+  primary_profiles."isHidden",
+  primary_profiles."isFavorite",
+  primary_profiles.color,
+  primary_profiles."updatedAt",
+  primary_profiles.type,
+  primary_profiles.species,
+  asset_counts."numberOfAssets" AS "numberOfAssets"
+FROM
+  requested_identities
+  INNER JOIN ranked_profiles AS primary_profiles ON primary_profiles."identityId" = requested_identities."identityId"
+  AND primary_profiles.primary_rn = 1
+  INNER JOIN ranked_profiles AS display_profiles ON display_profiles."identityId" = requested_identities."identityId"
+  AND display_profiles.display_rn = 1
+  INNER JOIN ranked_profiles AS birthdate_profiles ON birthdate_profiles."identityId" = requested_identities."identityId"
+  AND birthdate_profiles.birthdate_rn = 1
+  LEFT JOIN asset_counts ON asset_counts."identityId" = requested_identities."identityId"
+ORDER BY
+  requested_identities.ord
+
+-- FaceIdentityRepository.resolveAccessibleIdentityNames
+select
+  "shared_space_member"."spaceId"
+from
+  "shared_space_member"
+where
+  "shared_space_member"."userId" = $1
+  and "shared_space_member"."showInTimeline" = $2
+limit
+  $3
+WITH
+  requested_identities AS (
+    SELECT
+      *
+    FROM
+      unnest(array[$1]::uuid[]) WITH ORDINALITY AS requested ("identityId", ord)
+  ),
+  timeline_spaces AS (
+    SELECT
+      "spaceId"
+    FROM
+      shared_space_member
+    WHERE
+      "userId" = $2
+      AND "showInTimeline" = true
+  ),
+  accessible_faces AS (
+    SELECT
+      face_identity_face."identityId",
+      asset_face."assetId"
+    FROM
+      face_identity_face
+      INNER JOIN requested_identities ON requested_identities."identityId" = face_identity_face."identityId"
+      INNER JOIN asset_face ON asset_face.id = face_identity_face."assetFaceId"
+      INNER JOIN asset ON asset.id = asset_face."assetId"
+    WHERE
+      asset_face."deletedAt" IS NULL
+      AND asset_face."isVisible" = true
+      AND asset."deletedAt" IS NULL
+      AND asset."isOffline" = false
+      AND asset.visibility = $3
+      AND (asset."ownerId" = $4)
+  ),
+  asset_counts AS (
+    SELECT
+      "identityId",
+      COUNT(DISTINCT "assetId") AS "numberOfAssets"
+    FROM
+      accessible_faces
+    GROUP BY
+      "identityId"
+  ),
+  profiles AS (
+    SELECT
+      'user-person'::text AS "profileType",
+      person.id AS "profileId",
+      NULL::uuid AS "spaceId",
+      person."identityId",
+      person.name,
+      person."birthDate",
+      CASE
+        WHEN person."birthDate" IS NOT NULL THEN 'manual'
+        ELSE 'none'
+      END AS "birthDateSource",
+      person."updatedAt" AS "birthDateSourceUpdatedAt",
+      person."thumbnailPath",
+      person."isHidden",
+      person."isFavorite",
+      person.color,
+      person."updatedAt",
+      person.type,
+      person.species,
+      0 AS "profileRank"
+    FROM
+      person
+      INNER JOIN requested_identities ON requested_identities."identityId" = person."identityId"
+    WHERE
+      person."ownerId" = $5
+      AND (
+        $6::boolean
+        OR person."isHidden" = false
+      )
+    UNION ALL
+    SELECT
+      'space-person'::text AS "profileType",
+      shared_space_person.id AS "profileId",
+      shared_space_person."spaceId",
+      shared_space_person."identityId",
+      COALESCE(
+        NULLIF(shared_space_person_alias.alias, ''),
+        shared_space_person.name,
+        ''
+      ) AS name,
+      shared_space_person."birthDate",
+      shared_space_person."birthDateSource",
+      shared_space_person."birthDateSourceUpdatedAt",
+      ''::text AS "thumbnailPath",
+      shared_space_person."isHidden",
+      NULL::boolean AS "isFavorite",
+      NULL::text AS color,
+      shared_space_person."updatedAt",
+      shared_space_person.type,
+      NULL::text AS species,
+      CASE
+        WHEN NULLIF(shared_space_person_alias.alias, '') IS NULL THEN 2
+        ELSE 1
+      END AS "profileRank"
+    FROM
+      shared_space_person
+      INNER JOIN requested_identities ON requested_identities."identityId" = shared_space_person."identityId"
+      INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_person."spaceId"
+      LEFT JOIN shared_space_person_alias ON shared_space_person_alias."personId" = shared_space_person.id
+      AND shared_space_person_alias."userId" = $7
+    WHERE
+      (
+        $8::boolean
+        OR shared_space_person."isHidden" = false
+      )
+      AND EXISTS (
+        SELECT
+          1
+        FROM
+          shared_space_person_face
+          INNER JOIN asset_face AS profile_face ON profile_face.id = shared_space_person_face."assetFaceId"
+        WHERE
+          shared_space_person_face."personId" = shared_space_person.id
+          AND profile_face."deletedAt" IS NULL
+          AND profile_face."isVisible" = true
+      )
+  ),
+  ranked_profiles AS (
+    SELECT
+      profiles.*,
+      row_number() OVER (
+        PARTITION BY
+          profiles."identityId"
+        ORDER BY
+          NULLIF(profiles.name, '') IS NULL,
+          profiles."profileRank",
+          lower(profiles.name),
+          profiles."updatedAt" DESC,
+          profiles."profileId"
+      ) AS display_rn,
+      row_number() OVER (
+        PARTITION BY
+          profiles."identityId"
+        ORDER BY
+          CASE
+            WHEN profiles."profileType" = 'user-person' THEN 0
+            ELSE profiles."profileRank"
+          END,
+          NULLIF(profiles.name, '') IS NULL,
+          lower(profiles.name),
+          profiles."updatedAt" DESC,
+          profiles."profileId"
+      ) AS primary_rn,
+      row_number() OVER (
+        PARTITION BY
+          profiles."identityId"
+        ORDER BY
+          profiles."birthDate" IS NULL,
+          CASE
+            WHEN profiles."profileType" = 'user-person' THEN 0
+            ELSE 1
+          END,
+          CASE profiles."birthDateSource"
+            WHEN 'manual' THEN 0
+            WHEN 'inherited' THEN 1
+            ELSE 2
+          END,
+          profiles."birthDateSourceUpdatedAt" DESC NULLS LAST,
+          profiles."updatedAt" DESC,
+          profiles."profileId"
+      ) AS birthdate_rn
+    FROM
+      profiles
+    WHERE
+      EXISTS (
+        SELECT
+          1
+        FROM
+          accessible_faces
+        WHERE
+          accessible_faces."identityId" = profiles."identityId"
+      )
+  )
+SELECT
+  requested_identities."identityId",
   primary_profiles."profileType",
   primary_profiles."profileId",
   primary_profiles."spaceId",

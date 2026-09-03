@@ -120,6 +120,10 @@ DROP TABLE IF EXISTS "shared_space_person" CASCADE;
 DROP TABLE IF EXISTS "shared_space_face_match_backfill_target" CASCADE;
 DROP TABLE IF EXISTS "shared_space_library_asset_audit" CASCADE;
 DROP TABLE IF EXISTS "shared_space_album_asset_audit" CASCADE;
+DROP TABLE IF EXISTS "family_access" CASCADE;
+DROP TABLE IF EXISTS "family_union_child" CASCADE;
+DROP TABLE IF EXISTS "family_union_partner" CASCADE;
+DROP TABLE IF EXISTS "family_union" CASCADE;
 DROP TABLE IF EXISTS "face_person_verdict" CASCADE;
 DROP TABLE IF EXISTS "shared_space_asset_audit" CASCADE;
 DROP TABLE IF EXISTS "shared_space_member_audit" CASCADE;
@@ -445,6 +449,7 @@ DELETE FROM "kysely_migrations"
    '1789000000000-AddFacePersonVerdictStatusCreatedAtIdIndex',
    '1790000000000-FixFaceRepairScanInFlightIndex',
    '1792123120451-AddSharedLinkSpaceId',
+   '1795000000000-AddFamilyRelationships',
 
    -- Pre-rename names for two migrations that were renumbered off timestamp collisions
    -- ("renumber AddFaceRepairScanFlaggedFace off the #722 collision",

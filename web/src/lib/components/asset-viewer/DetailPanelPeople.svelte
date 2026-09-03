@@ -34,10 +34,19 @@
 
   const { asset, isOwner, previousRoute, canFilter = false, spaceId }: Props = $props();
 
-  type AssetPerson = NonNullable<AssetResponseDto['people']>[number];
+  // `familyRelationLabel` is not (yet) part of the generated `PersonResponseDto` — no data source
+  // populates it today, so this line stays inert until something wires it in. When present, it is
+  // ALREADY the fully-derived, viewer-specific string ("your niece") computed server-side; this
+  // component only ever renders it, never derives it (see the family-relationships design's D4).
+  type AssetPerson = NonNullable<AssetResponseDto['people']>[number] & { familyRelationLabel?: string | null };
 
   const isSpaceMember = $derived(!!spaceId);
-  const people = $derived(isSpaceMember && !isOwner ? asset.people || [] : Array.from(faceManager.people));
+  // Cast to `AssetPerson`: both sources (`asset.people`, `faceManager.people`) are typed as the
+  // generated `PersonResponseDto`, which doesn't know about `familyRelationLabel` yet — see the
+  // comment on `AssetPerson` above.
+  const people = $derived(
+    (isSpaceMember && !isOwner ? asset.people || [] : Array.from(faceManager.people)) as AssetPerson[],
+  );
 
   // A non-owner has no access to the owner-scoped person page, so their name is rendered as plain
   // text rather than a link into a 404.
@@ -233,6 +242,23 @@
               {@render avatar(avatarSource.url, person, isHighlighted)}
             {/if}
             <p class="mt-1 truncate font-medium" title={person.name}>{person.name}</p>
+            {#if person.familyRelationLabel}
+              <!--
+                A3 — an ADDED line, not a replacement: the age line below stays regardless. Rows
+                will differ in height depending on who has a birthdate and who has a known
+                relation — CSS grid equalises within a row, so that reads as normal variation, not
+                breakage. `truncate` (not a reserved second line) is what keeps a long relation
+                from wrapping and blowing out row height at the crowded grid-cols-4 breakpoint.
+              -->
+              <p
+                class="truncate font-light {visiblePeople.length > 6 ? 'text-xs' : ''}"
+                title={person.familyRelationLabel}
+                aria-label={$t('family_strip_relation_label', { values: { relation: person.familyRelationLabel } })}
+                data-testid="detail-panel-person-relation"
+              >
+                {person.familyRelationLabel}
+              </p>
+            {/if}
             {#if person.birthDate && person.formattedAge}
               <p class="font-light {visiblePeople.length > 6 ? 'text-xs' : ''}" title={person.formattedBirthDate!}>
                 {person.formattedAge}

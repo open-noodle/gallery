@@ -5,6 +5,11 @@ enum UserMetadataKey {
   onboarding,
   preferences,
   license,
+  // Gallery-fork: mirrors the server's `family-root` UserMetadataKey (the identity the viewer
+  // nominated as themselves for family-relationship labels). Added here only so the generic
+  // user-metadata sync stream compiles against the server enum — relations themselves are
+  // server-sourced and never synced to Drift (see `family_relations.provider.dart`).
+  familyRoot,
 }
 
 class Onboarding {
@@ -223,6 +228,45 @@ licenseKey: $licenseKey,
   int get hashCode => activatedAt.hashCode ^ activationKey.hashCode ^ licenseKey.hashCode;
 }
 
+// Gallery-fork: the local shape of the server's `family-root` metadata value — just the
+// nominated identity id, or null if never set / cleared. See `UserMetadataKey.familyRoot`.
+class FamilyRoot {
+  final String? identityId;
+
+  const FamilyRoot({this.identityId});
+
+  FamilyRoot copyWith({String? identityId}) {
+    return FamilyRoot(identityId: identityId ?? this.identityId);
+  }
+
+  Map<String, Object?> toMap() {
+    return {"identityId": identityId};
+  }
+
+  factory FamilyRoot.fromMap(Map<String, Object?> map) {
+    return FamilyRoot(identityId: map["identityId"] as String?);
+  }
+
+  @override
+  String toString() {
+    return '''FamilyRoot {
+identityId: ${identityId ?? "<NA>"},
+}''';
+  }
+
+  @override
+  bool operator ==(covariant FamilyRoot other) {
+    if (identical(this, other)) {
+      return true;
+    }
+
+    return identityId == other.identityId;
+  }
+
+  @override
+  int get hashCode => identityId.hashCode;
+}
+
 // Model for a user metadata stored in the server
 class UserMetadata {
   final String userId;
@@ -230,12 +274,19 @@ class UserMetadata {
   final Onboarding? onboarding;
   final Preferences? preferences;
   final License? license;
+  final FamilyRoot? familyRoot;
 
-  const UserMetadata({required this.userId, required this.key, this.onboarding, this.preferences, this.license})
-    : assert(
-        onboarding != null || preferences != null || license != null,
-        'One of onboarding, preferences and license must be provided',
-      );
+  const UserMetadata({
+    required this.userId,
+    required this.key,
+    this.onboarding,
+    this.preferences,
+    this.license,
+    this.familyRoot,
+  }) : assert(
+         onboarding != null || preferences != null || license != null || familyRoot != null,
+         'One of onboarding, preferences, license and familyRoot must be provided',
+       );
 
   UserMetadata copyWith({
     String? userId,
@@ -243,6 +294,7 @@ class UserMetadata {
     Onboarding? onboarding,
     Preferences? preferences,
     License? license,
+    FamilyRoot? familyRoot,
   }) {
     return UserMetadata(
       userId: userId ?? this.userId,
@@ -250,6 +302,7 @@ class UserMetadata {
       onboarding: onboarding ?? this.onboarding,
       preferences: preferences ?? this.preferences,
       license: license ?? this.license,
+      familyRoot: familyRoot ?? this.familyRoot,
     );
   }
 
@@ -261,6 +314,7 @@ key: $key,
 onboarding: ${onboarding ?? "<NA>"},
 preferences: ${preferences ?? "<NA>"},
 license: ${license ?? "<NA>"},
+familyRoot: ${familyRoot ?? "<NA>"},
 }''';
   }
 
@@ -274,11 +328,17 @@ license: ${license ?? "<NA>"},
         other.key == key &&
         other.onboarding == onboarding &&
         other.preferences == preferences &&
-        other.license == license;
+        other.license == license &&
+        other.familyRoot == familyRoot;
   }
 
   @override
   int get hashCode {
-    return userId.hashCode ^ key.hashCode ^ onboarding.hashCode ^ preferences.hashCode ^ license.hashCode;
+    return userId.hashCode ^
+        key.hashCode ^
+        onboarding.hashCode ^
+        preferences.hashCode ^
+        license.hashCode ^
+        familyRoot.hashCode;
   }
 }
