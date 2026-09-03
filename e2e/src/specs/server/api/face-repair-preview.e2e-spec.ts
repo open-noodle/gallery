@@ -16,7 +16,6 @@ import { beforeAll, describe, expect, it } from 'vitest';
 // signal alone, poll the route itself until the source photo is actually servable.
 const waitForFacePreview = async (accessToken: string, assetFaceId: string, timeoutMs = 20_000): Promise<void> => {
   const deadline = Date.now() + timeoutMs;
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     const { status } = await request(app)
       .get(`/admin/face-repair/faces/${assetFaceId}/preview`)
@@ -27,7 +26,9 @@ const waitForFacePreview = async (accessToken: string, assetFaceId: string, time
     }
 
     if (Date.now() > deadline) {
-      throw new Error(`Timed out waiting for face ${assetFaceId}'s preview to become available (last status ${status})`);
+      throw new Error(
+        `Timed out waiting for face ${assetFaceId}'s preview to become available (last status ${status})`,
+      );
     }
 
     await new Promise((resolve) => setTimeout(resolve, 200));
