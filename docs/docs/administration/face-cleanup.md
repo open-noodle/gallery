@@ -82,6 +82,9 @@ mean their suspected owner is itself flagged — resolving the owners first turn
 On a person's review page, every flagged face has to end in one of six states before that person leaves the
 cleanup queue. Nothing is written until you press **Apply**.
 
+Each tile also carries a magnifier and its capture date — click either to view the original photo the face was
+cropped from. Opening it never stages a decision or changes a tile's selection.
+
 | Action              | What it does                                                                       |
 | ------------------- | ---------------------------------------------------------------------------------- |
 | **Move to owner**   | the default — sends the face to the person the scan thinks it actually is          |
@@ -137,8 +140,9 @@ Manual review lets you audit **any** person without running a scan first.
 3. The review page lists **every** face on that person — not just suspicious ones.
 4. Select the faces that are wrong and apply an action.
 
-The interaction is the same as guided review: select tiles, then apply. The actions differ slightly, because
-there is no scan making a suggestion to accept or reject:
+The interaction is the same as guided review: select tiles, then apply — including each tile's magnifier for
+viewing the original photo without staging a decision. The actions differ slightly, because there is no scan
+making a suggestion to accept or reject:
 
 | Action              | What it does                                                          |
 | ------------------- | --------------------------------------------------------------------- |
