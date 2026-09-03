@@ -3823,7 +3823,7 @@ export type SharedSpaceLinkedAlbumDto = {
     createdAt: string;
     /** Album description */
     description: string;
-    /** End date (latest asset) */
+    /** UTC representation of (local) end date (latest asset) */
     endDate?: string;
     /** Has shared link */
     hasSharedLink: boolean;
@@ -3843,7 +3843,7 @@ export type SharedSpaceLinkedAlbumDto = {
     sharedSpaceLinks?: AlbumSharedSpaceLinkResponseDto[];
     /** Include this album in the space timeline */
     showInTimeline: boolean;
-    /** Start date (earliest asset) */
+    /** UTC representation of (local) start date (earliest asset) */
     startDate?: string;
     /** Last update date */
     updatedAt: string;
