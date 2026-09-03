@@ -106,6 +106,8 @@ vi.mock('$lib/stores/preferences.store', async () => {
   const { readable } = await import('svelte/store');
   return {
     lang: readable('en-US'),
+    // `utils.ts` derives `memoryLaneTitle` from this at module load, so the mock must carry it.
+    locale: readable('en-US'),
   };
 });
 
