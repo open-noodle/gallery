@@ -2,7 +2,6 @@
   import { Button, Icon, Modal, ModalBody, ModalFooter } from '@immich/ui';
   import { mdiChevronLeft, mdiChevronRight } from '@mdi/js';
   import { DateTime } from 'luxon';
-  import { get } from 'svelte/store';
   import { locale, t } from 'svelte-i18n';
   import { dateFormats } from '$lib/constants';
   import { getContentMetrics, type ContentMetrics } from '$lib/utils/container-utils';
@@ -59,30 +58,37 @@
   // localDateTime stores local wall-clock time as a UTC timestamp; the viewer's zone would shift a 00:30
   // photo to the previous day.
   const takenLabel = $derived.by(() => {
-    const parsed = DateTime.fromISO(face.localDateTime, { zone: 'UTC', locale: get(locale) ?? undefined });
+    const parsed = DateTime.fromISO(face.localDateTime, { zone: 'UTC', locale: $locale ?? undefined });
     return parsed.isValid ? parsed.toLocaleString(dateFormats.album) : null;
   });
 </script>
 
 <Modal title={$t('admin.face_cleanup_photo_modal_title')} {onClose} size="large">
   <ModalBody>
-    <div class="relative flex max-h-[70vh] justify-center">
-      <img
-        src={getAdminFacePreviewUrl(face.assetFaceId)}
-        alt=""
-        class="max-h-[70vh] w-auto object-contain"
-        data-testid="face-photo"
-        onload={onImageLoad}
-      />
-      {#if box}
-        <!-- Only the CLICKED face is boxed. The console holds no data for the other people in the frame, and
-             one box answers the question the admin is actually asking. -->
-        <div
-          class="pointer-events-none absolute rounded border-2 border-primary shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]"
-          style="top: {box.top}px; left: {box.left}px; width: {box.width}px; height: {box.height}px;"
-          data-testid="face-photo-box"
-        ></div>
-      {/if}
+    <div class="flex max-h-[70vh] justify-center">
+      <!-- Shrink-wrapping origin: `justify-center` on the OUTER flex row shifts the img right by
+           (container − img)/2, so a box positioned from the outer div's edge lands offset on any photo whose
+           aspect ratio doesn't fill the row (portrait previews inside this modal's ~728px body). This inner
+           div is a flex item sized to its own content (the img), so it and the img share one coordinate
+           origin — see PersonSuggestionReviewModal.svelte for the same shrink-wrap principle. -->
+      <div class="relative">
+        <img
+          src={getAdminFacePreviewUrl(face.assetFaceId)}
+          alt=""
+          class="max-h-[70vh] w-auto object-contain"
+          data-testid="face-photo"
+          onload={onImageLoad}
+        />
+        {#if box}
+          <!-- Only the CLICKED face is boxed. The console holds no data for the other people in the frame, and
+               one box answers the question the admin is actually asking. -->
+          <div
+            class="pointer-events-none absolute rounded-sm border-2 border-primary shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]"
+            style="top: {box.top}px; left: {box.left}px; width: {box.width}px; height: {box.height}px;"
+            data-testid="face-photo-box"
+          ></div>
+        {/if}
+      </div>
     </div>
 
     {#if takenLabel}

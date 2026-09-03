@@ -82,8 +82,9 @@ mean their suspected owner is itself flagged — resolving the owners first turn
 On a person's review page, every flagged face has to end in one of six states before that person leaves the
 cleanup queue. Nothing is written until you press **Apply**.
 
-Each tile also carries a magnifier and its capture date — click either to view the original photo the face was
-cropped from. Opening it never stages a decision or changes a tile's selection.
+Each tile also carries a magnifier and a capture-date label. Click the magnifier to view the original photo the
+face was cropped from; opening it never stages a decision or changes a tile's selection. The date is a label,
+not a control — clicking it lands on the tile underneath and toggles selection.
 
 | Action              | What it does                                                                       |
 | ------------------- | ---------------------------------------------------------------------------------- |

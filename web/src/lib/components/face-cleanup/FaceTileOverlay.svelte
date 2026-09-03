@@ -2,7 +2,6 @@
   import { Icon } from '@immich/ui';
   import { mdiMagnify } from '@mdi/js';
   import { DateTime } from 'luxon';
-  import { get } from 'svelte/store';
   import { locale, t } from 'svelte-i18n';
 
   // The per-tile chrome for both cleanup grids, so the markup and the testid contract exist ONCE.
@@ -28,14 +27,14 @@
   // Luxon directly, and UTC: see FacePhotoModal for why fromISODateTimeUTC's `DateTime<true>` cast is the
   // wrong tool when invalid input is a real case. Month + year fits a ~90px tile in the 8-column grid.
   const takenLabel = $derived.by(() => {
-    const parsed = DateTime.fromISO(localDateTime, { zone: 'UTC', locale: get(locale) ?? undefined });
+    const parsed = DateTime.fromISO(localDateTime, { zone: 'UTC', locale: $locale ?? undefined });
     return parsed.isValid ? parsed.toLocaleString({ month: 'short', year: 'numeric' }) : null;
   });
 </script>
 
 {#if takenLabel}
   <span
-    class="pointer-events-none absolute bottom-1 left-1 rounded bg-black/60 px-1 py-px text-[9px] font-semibold text-white"
+    class="pointer-events-none absolute bottom-1 left-1 rounded-sm bg-black/60 px-1 py-px text-[9px] font-semibold text-white"
     data-testid="face-tile-date"
   >
     {takenLabel}

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import FaceTileOverlay from './FaceTileOverlay.svelte';
+  import FaceTileOverlay from '$lib/components/face-cleanup/FaceTileOverlay.svelte';
 
   // Test-only host for FaceTileOverlay.spec.ts's stopPropagation probe.
   //

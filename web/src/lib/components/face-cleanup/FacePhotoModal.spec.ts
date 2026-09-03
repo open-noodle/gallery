@@ -68,6 +68,40 @@ describe('FacePhotoModal', () => {
     expect(boxes[0].style.width).toBe('200px');
   });
 
+  // I1 regression: happy-dom has no layout, so it cannot reproduce the actual portrait misalignment (the box
+  // would land at the same computed offset either way in this runner). What CAN be pinned structurally is the
+  // coordinate origin the box and the img must share: `left`/`top` are measured from getContentMetrics(img),
+  // which is relative to the IMG's own box. If the img's positioning ancestor (the nearest `position:relative`
+  // element) is a wider element than the img itself — e.g. a `justify-center` flex row that centers the img
+  // inside it — the box's offset and the img's rendered position diverge by exactly the centring gap, which is
+  // 0 for a landscape photo that fills the row and nonzero for a portrait one. Asserting the box's offset
+  // parent is an element that shrink-wraps the img (i.e. is not the outer flex/justify-center container) is
+  // the structural invariant that catches a reintroduction of that bug even though this runner can't measure
+  // the pixel gap directly.
+  it('I1: the box and the img share the same offset parent, not the outer centring container', async () => {
+    render(FacePhotoModal, { faces: [face()], index: 0, onClose: vi.fn() });
+    const img = screen.getByTestId('face-photo');
+    sizeImage(img as HTMLImageElement);
+
+    const box = await screen.findByTestId('face-photo-box');
+
+    // The box's positioning parent must be the SAME element that directly wraps the img — not some ancestor
+    // further out. `position:absolute` resolves against the nearest positioned ancestor, so this is exactly
+    // "do they share a coordinate origin".
+    const boxParent = box.parentElement;
+    expect(boxParent).not.toBeNull();
+    expect(boxParent).toContainElement(img);
+
+    // The regression this guards against: wrapping the img directly in the `justify-center` flex row (no
+    // shrink-wrapping element in between) would make the box's parent equal the img's parent AND that parent
+    // a flex container that centers a narrower img inside a wider box — i.e. the img's own parent is the
+    // `justify-center` container. A correct, shrink-wrapped structure puts a dedicated element between the
+    // flex row and the img, so the img's parent must NOT itself carry `justify-center`.
+    const imgParent = img.parentElement;
+    expect(imgParent).not.toBeNull();
+    expect(imgParent?.className).not.toMatch(/justify-center/);
+  });
+
   it('T6.3: renders the photo but no box when imageWidth is 0', () => {
     render(FacePhotoModal, { faces: [face({ imageWidth: 0 })], index: 0, onClose: vi.fn() });
     sizeImage(screen.getByTestId('face-photo') as HTMLImageElement);

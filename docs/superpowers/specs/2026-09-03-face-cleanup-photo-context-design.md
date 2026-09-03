@@ -1,7 +1,7 @@
 # Face cleanup: judging a face in the context of its photo
 
 Discussion: [open-noodle/gallery#1061](https://github.com/open-noodle/gallery/discussions/1061)
-Status: approved design, not yet implemented
+Status: implemented
 Date: 2026-09-03
 
 ## 1. Problem

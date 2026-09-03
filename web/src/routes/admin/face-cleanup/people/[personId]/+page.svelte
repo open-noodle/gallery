@@ -615,8 +615,10 @@
                   >
                     <Icon icon={MANUAL_STATE_ICON[nonKeepState]} size="11" color="white" />
                   </div>
+                  <!-- Right-aligned and capped short of full width so it never overpaints the date pill
+                       (FaceTileOverlay, a sibling of this button) sitting in the bottom-left corner. -->
                   <div
-                    class="absolute inset-x-0 bottom-0 p-1 text-center text-[9.5px] font-bold text-white"
+                    class="absolute right-0 bottom-0 max-w-[70%] truncate rounded-tl-sm p-1 text-center text-[9.5px] font-bold text-white"
                     style="background: {MANUAL_STATE_COLOR[nonKeepState]}"
                   >
                     {ribbonLabel(face.assetFaceId, state)}

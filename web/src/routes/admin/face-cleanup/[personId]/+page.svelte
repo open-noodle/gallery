@@ -711,18 +711,16 @@
                 >
                   <Icon icon={STATE_ICON[face.state]} size="11" color="white" />
                 </div>
-                <!-- Ribbon -->
+                <!-- Ribbon: right-aligned and capped short of full width so it never overpaints the date pill
+                     (FaceTileOverlay, a sibling of this button) sitting in the bottom-left corner. -->
                 <div
-                  class="absolute inset-x-0 bottom-0 p-1 text-center text-[9.5px] font-bold text-white"
+                  class="absolute right-0 bottom-0 max-w-[70%] truncate rounded-tl-sm p-1 text-center text-[9.5px] font-bold text-white"
                   style="background: {STATE_COLOR[face.state]}"
                 >
                   {ribbonLabel(face)}
                 </div>
               </button>
-              <FaceTileOverlay
-                localDateTime={face.localDateTime}
-                onOpen={() => openPhoto(visibleFaces, tileIndex)}
-              />
+              <FaceTileOverlay localDateTime={face.localDateTime} onOpen={() => openPhoto(visibleFaces, tileIndex)} />
             </div>
           {/each}
         </div>
@@ -865,7 +863,7 @@
                       <Icon icon={mdiCheckBold} size="10" color="white" />
                     </div>
                     <div
-                      class="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/70 to-transparent px-1.5 pt-3 pb-1 text-[10px] font-semibold text-white"
+                      class="absolute right-0 bottom-0 max-w-[70%] truncate rounded-tl-sm bg-linear-to-t from-black/70 to-transparent px-1.5 pt-3 pb-1 text-[10px] font-semibold text-white"
                     >
                       {canBulkMove
                         ? $t('admin.face_cleanup_review_tile_dest', { values: { name: destinationName } })
