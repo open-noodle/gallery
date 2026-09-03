@@ -603,6 +603,28 @@ describe('TimelineManager', () => {
       expect(timelineManager.assetCount).toEqual(0);
     });
 
+    // Gallery: Space-scoped timelines are scoped like upstream's album/person ones. Upstream's
+    // guard enumerates only its own scope options, so these two cases pin the fork's scopes.
+    it('does not insert unknown live event assets into Space timelines', async () => {
+      await timelineManager.updateOptions({ spaceId: 'space-id' });
+
+      const asset = deriveLocalDateTimeFromFileCreatedAt(timelineAssetFactory.build());
+
+      timelineManager.upsertAssetsFromLiveEvent([asset]);
+
+      expect(timelineManager.assetCount).toEqual(0);
+    });
+
+    it('does not insert unknown live event assets into Space album timelines', async () => {
+      await timelineManager.updateOptions({ timelineSpaceId: 'space-id' });
+
+      const asset = deriveLocalDateTimeFromFileCreatedAt(timelineAssetFactory.build());
+
+      timelineManager.upsertAssetsFromLiveEvent([asset]);
+
+      expect(timelineManager.assetCount).toEqual(0);
+    });
+
     it('updates existing live event assets in scoped timelines', async () => {
       await timelineManager.updateOptions({ albumId: 'album-id' });
 
