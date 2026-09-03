@@ -26,6 +26,7 @@ const {
   mockRegisterSelectionContext,
   mockRegisterSpaceContext,
   mockRegisterSearchablePageFilters,
+  mockOpenSearchPalette,
 } = vi.hoisted(() => ({
   gotoMock: vi.fn().mockResolvedValue(undefined),
   invalidateAllMock: vi.fn().mockResolvedValue(undefined),
@@ -46,6 +47,7 @@ const {
   mockRegisterSelectionContext: vi.fn(),
   mockRegisterSpaceContext: vi.fn(),
   mockRegisterSearchablePageFilters: vi.fn(() => vi.fn()),
+  mockOpenSearchPalette: vi.fn(),
 }));
 
 vi.mock('$app/navigation', () => ({ goto: gotoMock, invalidateAll: invalidateAllMock }));
@@ -139,6 +141,7 @@ vi.mock('$lib/managers/event-manager.svelte', () => ({ eventManager: mockEventMa
 vi.mock('$lib/managers/global-search-manager.svelte', () => ({
   globalSearchManager: {
     registerSearchablePageFilters: mockRegisterSearchablePageFilters,
+    open: mockOpenSearchPalette,
   },
 }));
 
@@ -1069,6 +1072,44 @@ describe('Spaces page search URL state', () => {
     renderPage();
 
     expect(screen.queryByTestId('timeline-desktop-grouping-control')).not.toBeInTheDocument();
+  });
+
+  // #1051: the space timeline searches the space, but nothing on the surface said so — the only
+  // trigger lived in the nav bar. The palette itself already scopes from the URL.
+  describe('scoped search button', () => {
+    it('sits beside the grouping control on the space browse timeline', async () => {
+      mockPage.url = new URL('https://gallery.test/spaces/space-1/photos');
+
+      renderPage();
+
+      expect(await screen.findByTestId('scoped-search-button')).toBeInTheDocument();
+    });
+
+    it('opens the page-scoped search palette when clicked', async () => {
+      mockPage.url = new URL('https://gallery.test/spaces/space-1/photos');
+
+      renderPage();
+      await fireEvent.click(await screen.findByTestId('scoped-search-button'));
+
+      expect(mockOpenSearchPalette).toHaveBeenCalledOnce();
+    });
+
+    it('stays available while space search results are showing, so the query can be changed', async () => {
+      mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?q=nature');
+
+      renderPage();
+
+      expect(await screen.findByTestId('scoped-search-button')).toBeInTheDocument();
+    });
+
+    it('is hidden in select-assets mode, where the toolbar belongs to the selection', async () => {
+      mockPage.url = new URL('https://gallery.test/spaces/space-1/photos');
+
+      renderPage();
+      await enterSelectAssets();
+
+      await waitFor(() => expect(screen.queryByTestId('scoped-search-button')).not.toBeInTheDocument());
+    });
   });
 
   it('shows the filtered empty state for a filtered space timeline with no assets', () => {
