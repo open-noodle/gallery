@@ -1,6 +1,6 @@
 import { DateTime } from 'luxon';
 import { AssetRepository, MemoryPeriodAsset } from 'src/repositories/asset.repository';
-import { medianTime, monthName, recencyBonus, sampleAssetsByTime } from 'src/services/memory-rules/curation.util';
+import { medianTime, recencyBonus, sampleAssetsByTime } from 'src/services/memory-rules/curation.util';
 import { MemoryRule, MemoryRuleCandidate, MemoryRuleContext } from 'src/services/memory-rules/memory-rule.interface';
 
 /** "Favorite moments from July 2023" — favorited photos from this month in a past year. */
@@ -47,8 +47,6 @@ export class FavoritesThrowbackMemoryRule implements MemoryRule {
       candidates.push({
         ruleId: this.id,
         dedupeKey: `favorites_throwback:${year}-${String(month).padStart(2, '0')}`,
-        title: `Favorite moments from ${monthName(month)} ${year}`,
-        subtitle: `${count} favorites`,
         score:
           200 + Math.min(count, FavoritesThrowbackMemoryRule.SCORE_COUNT_CAP) * 3 + recencyBonus(year, target.year),
         assetIds: sampleAssetsByTime(yearAssets, FavoritesThrowbackMemoryRule.ASSET_CAP),

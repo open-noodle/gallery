@@ -1,7 +1,7 @@
 import { DateTime } from 'luxon';
 import { AssetType } from 'src/enum';
 import { AssetRepository, MemoryPeriodAsset } from 'src/repositories/asset.repository';
-import { medianTime, monthName, pickEvenlySpaced, recencyBonus } from 'src/services/memory-rules/curation.util';
+import { medianTime, pickEvenlySpaced, recencyBonus } from 'src/services/memory-rules/curation.util';
 import { MemoryRule, MemoryRuleCandidate, MemoryRuleContext } from 'src/services/memory-rules/memory-rule.interface';
 
 export const TRIGGER_DAY = 8;
@@ -70,8 +70,6 @@ export class VideoMomentsMemoryRule implements MemoryRule {
       candidates.push({
         ruleId: this.id,
         dedupeKey: `video_moments:${year}-${mm}`,
-        title: `Video moments from ${monthName(month)} ${year}`,
-        subtitle: `${count} video${count === 1 ? '' : 's'}`,
         score:
           SCORE_BASE +
           Math.min(count, 15) * 2 +

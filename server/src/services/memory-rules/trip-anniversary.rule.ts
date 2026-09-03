@@ -87,14 +87,13 @@ export class TripAnniversaryMemoryRule implements MemoryRule {
       candidates.push({
         ruleId: this.id,
         dedupeKey: `place_day:${year}-${mm}-${dd}:${placeKey}`,
-        title: cluster.city ? `Your trip to ${cluster.city}, ${cluster.country}` : `Your trip to ${cluster.country}`,
-        subtitle: `${yearsAgo} year${yearsAgo === 1 ? '' : 's'} ago · ${cluster.assetCount} photos over ${cluster.dayCount} days`,
         score: SCORE_BASE + cluster.dayCount * 4 + Math.min(cluster.assetCount, 20) + recencyBonus(year, target.year),
         assetIds,
         memoryAt: DateTime.fromJSDate(cluster.firstDate, { zone: 'utc' }),
         visibleForDays: Math.min(Math.max(cluster.dayCount, 3), 7),
         context: {
           year,
+          yearsAgo,
           placeKey,
           placeLabel,
           country: cluster.country,

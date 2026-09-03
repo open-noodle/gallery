@@ -2,27 +2,12 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/memory.model.dart';
-import 'package:immich_mobile/extensions/translate_extensions.dart';
 import 'package:immich_mobile/presentation/pages/drift_memory.page.dart';
 import 'package:immich_mobile/presentation/widgets/images/thumbnail.widget.dart';
 import 'package:immich_mobile/providers/haptic_feedback.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/memory.provider.dart';
 import 'package:immich_mobile/routing/router.dart';
-
-String getMemoryTitle(BuildContext context, DriftMemory memory) {
-  final serverTitle = memory.data.title;
-  if (serverTitle != null && serverTitle.isNotEmpty) {
-    return serverTitle;
-  }
-
-  final year = memory.data.year;
-  if (year != null) {
-    final yearsAgo = DateTime.now().year - year;
-    return 'years_ago'.t(context: context, args: {'years': yearsAgo.toString()});
-  }
-
-  return 'memory'.t(context: context);
-}
+import 'package:immich_mobile/utils/memory_card_text.dart';
 
 class DriftMemoryLane extends ConsumerWidget {
   const DriftMemoryLane({super.key});

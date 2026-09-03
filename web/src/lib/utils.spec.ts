@@ -1,5 +1,5 @@
-import { AssetMediaSize, AssetTypeEnum, MemoryType, type MemoryResponseDto } from '@immich/sdk';
-import { getAssetMediaUrl, getAssetUrl, getMemorySubtitle, getMemoryTitle, semverToName } from '$lib/utils';
+import { AssetMediaSize, AssetTypeEnum } from '@immich/sdk';
+import { getAssetMediaUrl, getAssetUrl, semverToName } from '$lib/utils';
 import { assetFactory } from '@test-data/factories/asset-factory';
 import { sharedLinkFactory } from '@test-data/factories/shared-link-factory';
 
@@ -196,101 +196,6 @@ describe('utils', () => {
 
     it('should append release candidate if set', () => {
       expect(semverToName({ major: 3, minor: 0, patch: 0, prerelease: 0 })).toEqual('v3.0.0-rc.0');
-    });
-  });
-
-  const memoryTranslate = ((key: string, payload?: { values?: Record<string, number | string> }) => {
-    if (key === 'years_ago') {
-      return `${payload?.values?.years} years ago`;
-    }
-
-    if (key === 'recent_trip_title') {
-      return `Recent trip to ${payload?.values?.location}`;
-    }
-
-    if (key === 'recent_trip_subtitle') {
-      return `${payload?.values?.assetCount} photos over ${payload?.values?.dayCount} days`;
-    }
-
-    return key;
-  }) as unknown as Parameters<typeof getMemoryTitle>[1];
-
-  const memory = (overrides: Partial<MemoryResponseDto>): MemoryResponseDto => ({
-    assets: [],
-    createdAt: '2026-04-23T00:00:00Z',
-    data: {},
-    id: 'memory-id',
-    isSaved: false,
-    memoryAt: '2026-04-23T00:00:00Z',
-    ownerId: 'owner-id',
-    type: MemoryType.Rule,
-    updatedAt: '2026-04-23T00:00:00Z',
-    ...overrides,
-  });
-
-  describe(getMemoryTitle.name, () => {
-    it('prefers a server-supplied title when present', () => {
-      expect(
-        getMemoryTitle(
-          memory({
-            type: MemoryType.Rule,
-            title: 'Happy birthday, Alice',
-            data: { title: 'Happy birthday, Alice' },
-          }),
-          memoryTranslate,
-          new Date('2026-04-23T00:00:00Z'),
-        ),
-      ).toBe('Happy birthday, Alice');
-    });
-
-    it('falls back to the localized on-this-day title when no server title exists', () => {
-      expect(
-        getMemoryTitle(
-          memory({
-            type: MemoryType.OnThisDay,
-            data: { year: 2024 },
-          }),
-          memoryTranslate,
-          new Date('2026-04-23T00:00:00Z'),
-        ),
-      ).toBe('2 years ago');
-    });
-
-    it('builds a localized title for a recent-trip memory from its structured context', () => {
-      expect(
-        getMemoryTitle(
-          memory({
-            type: MemoryType.Rule,
-            data: { ruleId: 'recent_trip', context: { placeLabel: 'Paris, France' } },
-          }),
-          memoryTranslate,
-          new Date('2026-04-23T00:00:00Z'),
-        ),
-      ).toBe('Recent trip to Paris, France');
-    });
-  });
-
-  describe(getMemorySubtitle.name, () => {
-    it('prefers a server-supplied subtitle when present', () => {
-      expect(getMemorySubtitle(memory({ type: MemoryType.Rule, subtitle: 'Coastal weekend' }), memoryTranslate)).toBe(
-        'Coastal weekend',
-      );
-    });
-
-    it('builds a localized subtitle for a recent-trip memory from its structured context', () => {
-      expect(
-        getMemorySubtitle(
-          memory({
-            type: MemoryType.Rule,
-            data: { ruleId: 'recent_trip', context: { assetCount: 9, dayCount: 3 } },
-          }),
-          memoryTranslate,
-        ),
-      ).toBe('9 photos over 3 days');
-    });
-
-    it('falls back to an empty string when no subtitle can be built', () => {
-      expect(getMemorySubtitle(memory({ type: MemoryType.OnThisDay, data: { year: 2024 } }), memoryTranslate)).toBe('');
     });
   });
 });
