@@ -102,23 +102,34 @@ vi.mock('$lib/managers/feature-flags-manager.svelte', () => ({
   featureFlagsManager: { value: { trash: true } },
 }));
 
-const { mockAssetMultiSelectManager, pickerMultiSelectClear, pickerSelectedAssets } = vi.hoisted(() => ({
-  pickerMultiSelectClear: vi.fn(),
-  // Shared so a test can give the PICKER (not the browse bar) a selection to add.
-  pickerSelectedAssets: [] as { id: string }[],
-  mockAssetMultiSelectManager: {
-    selectionActive: false,
-    assets: [] as { id: string }[],
-    clear: vi.fn(),
-    isAllFavorite: false,
-    isAllArchived: false,
-    isAllUserOwned: true,
-    // Mirrors the real manager's derived field. These fixtures only model the all-owned and
-    // none-owned ends of the range, so deriving it from isAllUserOwned keeps the two in step.
-    get ownedAssets() {
-      // eslint-disable-next-line unicorn/no-this-outside-of-class
-      return this.isAllUserOwned ? this.assets : [];
+const { mockAssetMultiSelectManager, pickerMultiSelectClear, pickerSelectedAssets, mockOpenSearchPalette } = vi.hoisted(
+  () => ({
+    mockOpenSearchPalette: vi.fn(),
+    pickerMultiSelectClear: vi.fn(),
+    // Shared so a test can give the PICKER (not the browse bar) a selection to add.
+    pickerSelectedAssets: [] as { id: string }[],
+    mockAssetMultiSelectManager: {
+      selectionActive: false,
+      assets: [] as { id: string }[],
+      clear: vi.fn(),
+      isAllFavorite: false,
+      isAllArchived: false,
+      isAllUserOwned: true,
+      // Mirrors the real manager's derived field. These fixtures only model the all-owned and
+      // none-owned ends of the range, so deriving it from isAllUserOwned keeps the two in step.
+      get ownedAssets() {
+        // eslint-disable-next-line unicorn/no-this-outside-of-class
+        return this.isAllUserOwned ? this.assets : [];
+      },
     },
+  }),
+);
+
+vi.mock('$lib/managers/global-search-manager.svelte', () => ({
+  globalSearchManager: {
+    // Returns a teardown, matching the real registration the page's $effect consumes.
+    registerSearchablePageFilters: vi.fn(() => vi.fn()),
+    open: mockOpenSearchPalette,
   },
 }));
 
@@ -404,6 +415,46 @@ describe('Space album detail page', () => {
   it('in browse mode, the timeline-desktop-grouping-control renders', () => {
     renderPage();
     expect(screen.getByTestId('timeline-desktop-grouping-control')).toBeInTheDocument();
+  });
+
+  // #1051. This page hand-rolls the toolbar row rather than using FilterToolbar, so the button is
+  // wired separately here and needs its own coverage — a FilterToolbar test proves nothing for it.
+  describe('scoped search button', () => {
+    it('sits beside the grouping control in browse mode', () => {
+      renderPage();
+      expect(screen.getByTestId('scoped-search-button')).toBeInTheDocument();
+    });
+
+    it('opens the album-scoped search palette when clicked', async () => {
+      renderPage();
+      await fireEvent.click(screen.getByTestId('scoped-search-button'));
+
+      expect(mockOpenSearchPalette).toHaveBeenCalledOnce();
+    });
+
+    it('is hidden when selection is active, alongside the grouping control', () => {
+      mockAssetMultiSelectManager.selectionActive = true;
+      renderPage();
+      expect(screen.queryByTestId('scoped-search-button')).not.toBeInTheDocument();
+    });
+
+    it('stays available while album search results are showing', () => {
+      mockPage.reset('https://gallery.test/spaces/space-1/albums/album-1?q=beach');
+
+      renderPage();
+
+      expect(screen.getByTestId('scoped-search-button')).toBeInTheDocument();
+    });
+
+    // This toolbar row is hand-rolled rather than FilterToolbar, so its responsive contract
+    // has to be asserted here too — a FilterToolbar test proves nothing for it.
+    it('is desktop-only, matching the grouping control beside it', () => {
+      renderPage();
+
+      const wrapper = screen.getByTestId('space-album-toolbar-search');
+      expect(wrapper.className).toContain('hidden');
+      expect(wrapper.className).toContain('md:flex');
+    });
   });
 
   it('the grouping-control bar is transparent (no navy/border bar) to match the space page', () => {
