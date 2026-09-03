@@ -110,6 +110,11 @@ export const getSpacePersonFaceThumbnailUrl = (spaceId: string, personId: string
 export const getAdminFaceThumbnailUrl = (assetFaceId: string, updatedAt?: string) =>
   createUrl(`/admin/face-repair/faces/${assetFaceId}/thumbnail`, { updatedAt });
 
+// The SOURCE PHOTO behind that crop (#1061), for the same admin-gated, face-keyed reason: the console shows
+// clusters the admin does not own, and the owner-scoped asset routes would 403 on them.
+export const getAdminFacePreviewUrl = (assetFaceId: string, updatedAt?: string) =>
+  createUrl(`/admin/face-repair/faces/${assetFaceId}/preview`, { updatedAt });
+
 export const getBoundingBox = (faces: Faces[], imageSize: Size | ContentMetrics): BoundingBox[] => {
   const boxes: BoundingBox[] = [];
 
@@ -135,6 +140,33 @@ export type FaceBox = {
   boundingBoxY2: number;
 };
 
+/**
+ * Whether a face box can be mapped onto its image at all. `getBoundingBox` divides by imageWidth/imageHeight
+ * without validating, so a legacy row with 0 dimensions yields NaN and an inverted box yields a negative
+ * rect — both render as garbage rather than failing loudly.
+ *
+ * `Number.isFinite` rather than `bw <= 0`: imageWidth/imageHeight can be 0, and 0/0 is NaN. `!(NaN > 0)` is
+ * true but `NaN <= 0` is false, so the obvious rewrite the linter suggests would silently drop the NaN
+ * guard. This form also catches ±Infinity explicitly.
+ *
+ * Deliberately has NO upper bound: a box covering the whole frame is a perfectly renderable overlay.
+ * `getFaceCropTransform` adds its own `>= 1` rejection on top, because a full-frame CSS crop is degenerate.
+ */
+export const isUsableFaceBox = (face: FaceBox): boolean => {
+  const bw = (face.boundingBoxX2 - face.boundingBoxX1) / face.imageWidth;
+  const bh = (face.boundingBoxY2 - face.boundingBoxY1) / face.imageHeight;
+  return Number.isFinite(bw) && Number.isFinite(bh) && bw > 0 && bh > 0;
+};
+
+/** Pulls a box back inside its image, so a bad detection cannot paint an overlay outside the photo. */
+export const clampFaceBoxToImage = (face: FaceBox): FaceBox => ({
+  ...face,
+  boundingBoxX1: Math.max(0, Math.min(face.imageWidth, face.boundingBoxX1)),
+  boundingBoxX2: Math.max(0, Math.min(face.imageWidth, face.boundingBoxX2)),
+  boundingBoxY1: Math.max(0, Math.min(face.imageHeight, face.boundingBoxY1)),
+  boundingBoxY2: Math.max(0, Math.min(face.imageHeight, face.boundingBoxY2)),
+});
+
 export type FaceCropTransform = { backgroundSize: string; backgroundPosition: string };
 
 /**
@@ -146,11 +178,7 @@ export const getFaceCropTransform = (face: FaceBox): FaceCropTransform => {
   const bw = (face.boundingBoxX2 - face.boundingBoxX1) / face.imageWidth;
   const bh = (face.boundingBoxY2 - face.boundingBoxY1) / face.imageHeight;
 
-  // Number.isFinite rather than `bw <= 0`: imageWidth/imageHeight can be 0, and 0/0 is NaN. `!(NaN > 0)` is
-  // true but `NaN <= 0` is false, so the obvious rewrite the linter suggests would silently drop the NaN
-  // guard and let a garbage transform through. This form also catches ±Infinity explicitly, which the old
-  // code only caught incidentally via the `>= 1` bound.
-  if (!Number.isFinite(bw) || !Number.isFinite(bh) || bw <= 0 || bh <= 0 || bw >= 1 || bh >= 1) {
+  if (!isUsableFaceBox(face) || bw >= 1 || bh >= 1) {
     return { backgroundSize: 'cover', backgroundPosition: 'center' };
   }
 
