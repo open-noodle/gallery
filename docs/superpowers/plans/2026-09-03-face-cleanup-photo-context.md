@@ -14,7 +14,10 @@
 
 - **Server has no relative imports.** Always use the `src/` path alias.
 - **Server lint is `--max-warnings 0`,** and `prettier --check` is a **separate** CI gate that runs over `src/` **and** `test/`. `pnpm lint` passing does not mean prettier passes.
-- **`pnpm test -- --run <path>` silently drops the path filter** and runs the entire suite. Always use `pnpm exec vitest --run <path>`.
+- **`pnpm test -- --run <path>` silently drops the path filter** and runs the entire suite. Always use
+  `pnpm exec vitest --run <path>`. In `server/` that form ALSO needs the config flag —
+  `pnpm exec vitest --config test/vitest.config.mjs --run <path>` — or it fails with
+  `describe is not defined`. Medium tests use `--config test/vitest.config.medium.mjs` as already shown.
 - **Every user-facing string lands in ten locale files in the same commit:** `en` plus `de` · `fr` · `it` · `nl` · `pl` · `es` · `ru` · `zh_Hans` · `zh_Hant`. Keys alphabetically sorted, 2-space indent, unescaped Unicode. Do not touch the other ~80 locale files.
 - **`i18n/` is shared by web and mobile.** Grep both before renaming a key.
 - **Markdown under `docs/` uses the docs package's prettier**, not web's: `pnpm -C docs exec prettier --write <file>`.
@@ -182,7 +185,7 @@ Temporarily delete the `.where('asset.deletedAt', 'is', null)` line, re-run, and
 
 ```bash
 cd server && mise sql
-pnpm exec vitest --run src/utils/shared-space-album-scope.guard.spec.ts
+pnpm exec vitest --config test/vitest.config.mjs --run src/utils/shared-space-album-scope.guard.spec.ts
 ```
 
 Expected: both clean. If `mise sql` emits empty files, it needs a clean `dist` (`rm -rf dist && pnpm build`) and a migrated throwaway Postgres.
@@ -313,7 +316,7 @@ import { AssetFileType, CacheControl } from 'src/enum';
 - [ ] **Step 2: Run the tests to verify they fail**
 
 ```bash
-cd server && pnpm exec vitest --run src/services/face-repair.service.spec.ts
+cd server && pnpm exec vitest --config test/vitest.config.mjs --run src/services/face-repair.service.spec.ts
 ```
 
 Expected: FAIL — `sut.getAdminFacePreview is not a function`.
@@ -361,7 +364,7 @@ import { mimeTypes } from 'src/utils/mime-types';
 - [ ] **Step 4: Run the service tests to verify they pass**
 
 ```bash
-cd server && pnpm exec vitest --run src/services/face-repair.service.spec.ts
+cd server && pnpm exec vitest --config test/vitest.config.mjs --run src/services/face-repair.service.spec.ts
 ```
 
 Expected: PASS.
@@ -412,7 +415,7 @@ describe('GET /admin/face-repair/faces/:assetFaceId/preview', () => {
 - [ ] **Step 6: Run the controller tests to verify they fail**
 
 ```bash
-cd server && pnpm exec vitest --run src/controllers/face-repair-admin.controller.spec.ts
+cd server && pnpm exec vitest --config test/vitest.config.mjs --run src/controllers/face-repair-admin.controller.spec.ts
 ```
 
 Expected: FAIL — 404, because the route does not exist yet.
@@ -443,7 +446,7 @@ No new imports: every decorator and helper used here is already imported by this
 - [ ] **Step 8: Run both suites to verify they pass**
 
 ```bash
-cd server && pnpm exec vitest --run src/controllers/face-repair-admin.controller.spec.ts src/services/face-repair.service.spec.ts
+cd server && pnpm exec vitest --config test/vitest.config.mjs --run src/controllers/face-repair-admin.controller.spec.ts src/services/face-repair.service.spec.ts
 ```
 
 Expected: PASS.
@@ -556,7 +559,7 @@ Add `FaceRepairPersonFacesSchema` and `FaceRepairClusterFacesResponseSchema` to 
 - [ ] **Step 2: Run to verify they fail**
 
 ```bash
-cd server && pnpm exec vitest --run src/dtos/face-repair.dto.spec.ts
+cd server && pnpm exec vitest --config test/vitest.config.mjs --run src/dtos/face-repair.dto.spec.ts
 ```
 
 Expected: T4.1 and T4.2 FAIL (unknown keys are stripped, so the parse succeeds but the fields vanish — assert on the parsed **data** if the schema is not strict; see Step 3's note). T4.3 FAILS because a missing field is currently permitted.
@@ -606,7 +609,7 @@ And at line 306, replace the cluster-faces element:
 - [ ] **Step 4: Run the DTO tests to verify they pass**
 
 ```bash
-cd server && pnpm exec vitest --run src/dtos/face-repair.dto.spec.ts
+cd server && pnpm exec vitest --config test/vitest.config.mjs --run src/dtos/face-repair.dto.spec.ts
 ```
 
 Expected: PASS.
@@ -814,7 +817,7 @@ If `buildVerdictMaps`'s real `VerdictMaps` shape differs from the four keys abov
 - [ ] **Step 9: Run to verify T2.10 fails**
 
 ```bash
-cd server && pnpm exec vitest --run src/services/face-repair.service.spec.ts -t 'photo context'
+cd server && pnpm exec vitest --config test/vitest.config.mjs --run src/services/face-repair.service.spec.ts -t 'photo context'
 ```
 
 Expected: T2.10 FAILS (no `imageWidth` on the result). T2.11 passes already — it is a pin on existing filtering.
@@ -873,7 +876,7 @@ Widen the method's declared return type at `:697-698` to include the context fie
 - [ ] **Step 11: Run every server suite touched so far**
 
 ```bash
-cd server && pnpm exec vitest --run src/services/face-repair.service.spec.ts src/dtos/face-repair.dto.spec.ts src/controllers/face-repair-admin.controller.spec.ts
+cd server && pnpm exec vitest --config test/vitest.config.mjs --run src/services/face-repair.service.spec.ts src/dtos/face-repair.dto.spec.ts src/controllers/face-repair-admin.controller.spec.ts
 pnpm exec vitest --config test/vitest.config.medium.mjs --run test/medium/specs/repositories/
 ```
 
@@ -2077,7 +2080,7 @@ Spec §4.5 leaves exact tile chrome placement to a render. Start the dev stack, 
 
 ```bash
 cd server && pnpm lint && pnpm exec prettier --check src test
-pnpm exec vitest --run src/services/face-repair.service.spec.ts src/controllers/face-repair-admin.controller.spec.ts src/dtos/face-repair.dto.spec.ts src/utils/shared-space-album-scope.guard.spec.ts
+pnpm exec vitest --config test/vitest.config.mjs --run src/services/face-repair.service.spec.ts src/controllers/face-repair-admin.controller.spec.ts src/dtos/face-repair.dto.spec.ts src/utils/shared-space-album-scope.guard.spec.ts
 pnpm exec vitest --config test/vitest.config.medium.mjs --run test/medium/specs/repositories/
 cd ../web && pnpm check && pnpm lint
 cd .. && npx prettier --check 'i18n/*.json'
