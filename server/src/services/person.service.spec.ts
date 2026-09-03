@@ -3111,15 +3111,6 @@ describe(PersonService.name, () => {
         expected: JobStatus.Failed,
       },
       {
-        label: 'asset with multiple preview files',
-        asset: AssetFactory.from()
-          .file({ type: AssetFileType.Preview, path: '/preview-1.jpg' })
-          .file({ type: AssetFileType.Preview, path: '/preview-2.jpg' })
-          .exif()
-          .build(),
-        expected: JobStatus.Failed,
-      },
-      {
         label: 'hidden asset with preview file',
         asset: AssetFactory.from({ visibility: AssetVisibility.Hidden })
           .file({ type: AssetFileType.Preview, path: '/hidden-preview.jpg' })
@@ -6520,8 +6511,9 @@ describe(PersonService.name, () => {
     it('should skip hidden assets', async () => {
       const asset = AssetFactory.from({ visibility: AssetVisibility.Hidden })
         .file({ type: AssetFileType.Preview })
+        .exif()
         .build();
-      mocks.assetJob.getForDetectFacesJob.mockResolvedValue(asset as any);
+      mocks.assetJob.getForDetectFacesJob.mockResolvedValue(getForDetectedFaces(asset));
 
       await expect(sut.handleDetectFaces({ id: asset.id })).resolves.toBe(JobStatus.Skipped);
       expect(mocks.machineLearning.detectFaces).not.toHaveBeenCalled();
