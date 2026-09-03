@@ -5,6 +5,8 @@ import { MemoryRepository } from 'src/repositories/memory.repository';
 import { MemoryRule, MemoryRuleCandidate, MemoryRuleContext } from 'src/services/memory-rules/memory-rule.interface';
 import { curateTripAssets, inferHome, isAwayFromHome, placeKeyOf } from 'src/services/memory-rules/trip.util';
 
+export const ASSET_CAP = 10;
+
 export class RecentTripMemoryRule implements MemoryRule {
   readonly id = 'recent_trip';
 
@@ -70,7 +72,7 @@ export class RecentTripMemoryRule implements MemoryRule {
       takenAfter: recentFrom.toJSDate(),
       takenBefore: target.endOf('day').toJSDate(),
     });
-    const assetIds = curateTripAssets(locationAssets, 10);
+    const assetIds = curateTripAssets(locationAssets, ASSET_CAP);
 
     const placeLabel = candidate.city ? `${candidate.city}, ${candidate.country}` : candidate.country;
     const dedupeDay = target.toFormat('yyyy-MM-dd');
