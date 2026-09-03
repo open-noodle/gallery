@@ -36,8 +36,6 @@ export const YEAR_BONUS = 10;
  * at 100 + 90 + 9 + 30 = 229.
  */
 export const MAX_YEAR_BONUS = 30;
-/** Beyond this many years the subtitle counts them instead of listing them. */
-export const MAX_LISTED_YEARS = 3;
 /**
  * Share of *all* of a year's photos for the day — not just the geotagged ones — that the card
  * must hold before it stands in for that year's plain "N years ago" memory.
@@ -53,14 +51,6 @@ export const SUPERSEDE_COVERAGE = 0.75;
 
 /** A usable place needs a non-blank city (EXIF city is usually null when absent, but can be ''). */
 const hasCity = (asset: MemoryPeriodAsset): boolean => asset.city !== null && asset.city.trim() !== '';
-
-/** "from 2021 and 2023", "from 2019, 2021 and 2023", then "across 5 years". Years ascending. */
-const describeYears = (years: number[]): string => {
-  if (years.length > MAX_LISTED_YEARS) {
-    return `across ${years.length} years`;
-  }
-  return `from ${years.slice(0, -1).join(', ')} and ${years.at(-1)}`;
-};
 
 /** One past year whose photos for the day are dominated by a single place. */
 interface ContributingYear {
@@ -140,8 +130,6 @@ export class OnThisDayPlaceMemoryRule implements MemoryRule {
         // both appearing — see the shared-key contract test in trip-anniversary.rule.spec.
         // Do not re-key this without re-keying that rule too.
         dedupeKey: `place_day:${latest.year}-${mm}-${dd}:${placeKey}`,
-        title: `On this day in ${latest.city}`,
-        subtitle: `${count} photos ${describeYears(yearNumbers)}`,
         score:
           SCORE_BASE +
           Math.min(count, MAX_COUNT_BONUS) * 3 +
