@@ -15,7 +15,7 @@ List<AssetEdit> normalizedToEdits(NormalizedTransform transform) {
   }
 
   if (transform.rotation != 0) {
-    edits.add(RotateEdit(RotateParameters(angle: transform.rotation.round())));
+    edits.add(RotateEdit(RotateParameters(angle: transform.rotation)));
   }
 
   return edits;
