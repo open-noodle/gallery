@@ -66,6 +66,14 @@
   let searchPage = $state(1);
   let searchAbortController: AbortController | undefined;
 
+  /**
+   * Identity of the search whose assets are currently in `searchResults`, so a genuinely new search
+   * can blank them (#1052). Undefined until the first search runs, which is what makes a re-mount
+   * clear too: the HOST owns `results`, so mounting this component for a new query starts out
+   * rendering the *previous* query's assets.
+   */
+  let renderedSearchKey: string | undefined;
+
   const executeSearch = async (page: number, append: boolean) => {
     const query = searchQuery.trim();
     if (!query) {
@@ -124,10 +132,9 @@
   };
 
   $effect(() => {
-    // Track everything that should trigger a re-search
-    const _ = [
+    // Track everything that should trigger a re-search, and key the results on screen by it.
+    const searchKey = JSON.stringify([
       searchQuery,
-      reloadToken,
       // Navigating straight from one album to a sibling keeps this component mounted and only swaps
       // the scope, so it has to re-search like any other narrowing change. Tracked by CONTENT via
       // `albumScopeKey` — see its doc comment for why the array itself must not be read here.
@@ -147,10 +154,26 @@
       filters.sortOrder,
       filters.isFavorite,
       language,
-    ];
+    ]);
+
+    // Tracked so a bump re-runs the search, but deliberately kept OUT of `searchKey`: a reload
+    // re-runs the SAME search (restoring results after an undone delete) and must not blank the grid.
+    const _ = [reloadToken];
 
     if (!searchQuery.trim()) {
       return;
+    }
+
+    if (searchKey !== renderedSearchKey) {
+      renderedSearchKey = searchKey;
+      // #1052: drop the previous search's assets the moment a new one is triggered, before the
+      // debounce and the round trip. Left in place they read as results for the query just typed,
+      // and the grid keeps its old scroll offset, so the new results open part-way down the page.
+      // Clearing hands the scroll container back to the loading state, which starts at the top.
+      searchResults = [];
+      hasMoreResults = false;
+      searchPage = 1;
+      isLoading = true;
     }
 
     const timeout = setTimeout(() => {
