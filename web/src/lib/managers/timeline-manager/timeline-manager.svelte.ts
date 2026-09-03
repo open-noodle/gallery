@@ -846,7 +846,15 @@ export class TimelineManager extends VirtualScrollManager {
     if (this.isExcluded(asset)) {
       return false;
     }
-    if (this.#options.albumId || this.#options.personId || this.#options.timelineAlbumId) {
+    // Gallery: Space-scoped timelines are scoped the same way upstream's album/person ones are,
+    // so a live socket asset must not be inserted into them either.
+    if (
+      this.#options.albumId ||
+      this.#options.personId ||
+      this.#options.timelineAlbumId ||
+      this.#options.spaceId ||
+      this.#options.timelineSpaceId
+    ) {
       return false;
     }
     if (this.#options.userId && !this.#options.withPartners && asset.ownerId !== this.#options.userId) {
