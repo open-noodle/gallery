@@ -5,8 +5,9 @@
 - **Upstream commits pulled**: 8 (`da8131d5c2e..2e7365f16b2`), batches 219–222
 - **Fork commits synced from `origin/main`**: 7 (`d44f0d2dece..1f5e270bd14`)
 - **Conflicts resolved**: 13 upstream-replay conflicts (26 hunks) + 20 fork-sync conflicts
+- **CI rounds**: 2 (round 1 exposed five fork-sync/toolchain failures; all fixed)
 - **Risk level**: MEDIUM — two zero-conflict semantic breaks and one rolling-only re-key collision, all found and fixed locally
-- **Recommendation**: PROCEED
+- **Recommendation**: PROCEED — 10/10 CI green on `2be00fc43b7`
 - **Landing on `main`**: NO. Upstream's latest final tag is still `v3.1.0`; `v3.2.0-rc.0/1/2` are pre-releases. The standing rule needs a real tag plus real-data validation, so the branch stays off `main`.
 
 ## Incoming Upstream Changes
@@ -197,7 +198,23 @@ arises.
    spec; every one fixed to the established idiom of its own file (`286a9ddb1b8`).
 4. **`memories-page.spec.ts` asserted a renamed i18n key** — a rolling-only spec that #1053's rename
    invalidated; updated to `memory_recent_trip_subtitle` (`286a9ddb1b8`).
-5. **`specs/2026-09-03-face-cleanup-photo-context-design.md` is not prettier-clean** — pre-existing: the same
+5. **`filter_sheet.widget.dart` tripped rolling's stricter Dart lints** — four unbraced control bodies
+   (`always_put_control_body_on_new_line`) and one discarded `sendAnnouncement` future
+   (`discarded_futures`). `main` does not enable these, so #1054 came across clean. Fixed
+   (`8da30d2c2da`), along with two infos the same sync surfaced: a now-noop `.round()` on
+   immich-31246's `int` rotation, and a null-aware element in the new util's test.
+6. **Two fork `handleDetectFaces` unit tests encoded the guard immich-31240 removed** — one asserted
+   that two preview files FAIL detection (now the supported edited-asset case), the other fed the raw
+   factory asset past the reshaped mapper. Fixed (`8a87a400dab`).
+7. **`web/src/lib/utils.ts` kept an unused luxon `DateTime` import** after #1053 moved its only user to
+   `$lib/utils/memory-card`. Lint Web runs `--max-warnings 0`, so this was a hard failure. Fixed
+   (`2be00fc43b7`).
+8. **A medium memory test disagreed with rolling's `isUpcoming` contract** — "keeps all three cards on a
+   large library" expected 3 and got 6. Not a regression: `onMemoriesCreate` seeds `on_this_day` cards
+   across a DAYS-wide window and three were still scheduled at the test's system time. `main`'s bare
+   `{}` hid them implicitly; the fork adopted upstream's immich-28675 contract, where `GET /memories`
+   scopes `showAt` only when asked. The test now asks for the shown cards (`2be00fc43b7`).
+9. **`specs/2026-09-03-face-cleanup-photo-context-design.md` is not prettier-clean** — pre-existing: the same
    file fails identically on `origin/main`, and no CI job formats `specs/`. Left as-is rather than creating a
    pointless divergence from `main`.
 
@@ -209,27 +226,85 @@ present and undispatched.
 
 ## Local CI Verification
 
-| Check                                                                      | Status | Notes                                                         |
-| -------------------------------------------------------------------------- | ------ | ------------------------------------------------------------- |
-| `server pnpm build` (+ postbuild sync)                                     | PASS   | 62 migrations synced, 1 compatibility alias                   |
-| `server pnpm check` (tsc)                                                  | PASS   | 20 re-key errors found and fixed first                        |
-| `server pnpm lint`                                                         | PASS   |                                                               |
-| `server prettier --check .`                                                | PASS   | 2 files reformatted after the fix                             |
-| `server` unit tests                                                        | PASS   |                                                               |
-| `web check:typescript`                                                     | PASS   |                                                               |
-| `web check:svelte`                                                         | PASS   | 632 files, 0 errors (after the SDK rebuild)                   |
-| `web` unit tests                                                           | PASS   | 6114 tests; the one failure was the stale key, now fixed      |
-| `e2e pnpm check`                                                           | PASS   | 2 re-key errors found and fixed first                         |
-| `e2e pnpm lint` / prettier                                                 | PASS   |                                                               |
-| `mobile analyze` (`--fatal-infos`)                                         | PASS   |                                                               |
-| `mobile format`                                                            | PASS   | 862 files, 0 changed                                          |
-| `mobile test`                                                              | PASS   |                                                               |
-| `.github` prettier                                                         | PASS   |                                                               |
-| `i18n` prettier + JSON validity + sorting                                  | PASS   | all 10 locales                                                |
-| OpenAPI regeneration                                                       | PASS   | Spec already current; SDK rebuilt (stale build was the trap)  |
-| SQL regeneration                                                           | PASS   | Only `memory`/`person` drifted, matching the two source edits |
-| `tools/upstream-preflight` vitest                                          | PASS   | 24 files, 257 tests                                           |
-| Post-rebase audit / ci-invariants / fork-patches / mobile-drift / autolink | PASS   | all green                                                     |
+**A process failure worth recording, because it cost a CI round.** Several gates were first run as
+`<cmd> | tail -N`, so the exit code observed was `tail`'s, not the command's. `mise //mobile:analyze`
+printed `ERROR task failed` and the server unit suite printed 2 failures, and both were read as green.
+CI caught them. Every row below was subsequently re-run capturing the command's own exit status; that
+is the only form worth trusting, and `| tail` must never be the last stage of a gate.
+
+| Check                                                                      | Status | Notes                                                            |
+| -------------------------------------------------------------------------- | ------ | ---------------------------------------------------------------- |
+| `server pnpm build` (+ postbuild sync)                                     | PASS   | 62 migrations synced, 1 compatibility alias                      |
+| `server pnpm check` (tsc)                                                  | PASS   | 20 re-key errors found and fixed first                           |
+| `server pnpm lint`                                                         | PASS   |                                                                  |
+| web eslint (`tscompat` off)                                                | PASS   | 0 errors; 13 warnings, all the known false unused-directive ones |
+| `server` medium tests (memory.service)                                     | PASS   | exit 0, 59/59 after the `isUpcoming` adaptation                  |
+| `server prettier --check .`                                                | PASS   | 2 files reformatted after the fix                                |
+| `server` unit tests                                                        | PASS   | exit 0, 6201 passed (2 obsolete detect-faces tests fixed first)  |
+| `web check:typescript`                                                     | PASS   |                                                                  |
+| `web check:svelte`                                                         | PASS   | 632 files, 0 errors (after the SDK rebuild)                      |
+| `web` unit tests                                                           | PASS   | exit 0, 6108 passed; the stale i18n key was fixed first          |
+| `e2e pnpm check`                                                           | PASS   | 2 re-key errors found and fixed first                            |
+| `e2e pnpm lint` / prettier                                                 | PASS   |                                                                  |
+| `mobile analyze` (`--fatal-infos`)                                         | PASS   | exit 0, "No issues found!" — 7 lint issues fixed first           |
+| `mobile format`                                                            | PASS   | 862 files, 0 changed                                             |
+| `mobile test`                                                              | PASS   | exit 0, 3476 passed                                              |
+| `.github` prettier                                                         | PASS   |                                                                  |
+| `i18n` prettier + JSON validity + sorting                                  | PASS   | all 10 locales                                                   |
+| OpenAPI regeneration                                                       | PASS   | Spec already current; SDK rebuilt (stale build was the trap)     |
+| SQL regeneration                                                           | PASS   | Only `memory`/`person` drifted, matching the two source edits    |
+| `tools/upstream-preflight` vitest                                          | PASS   | 24 files, 257 tests                                              |
+| Post-rebase audit / ci-invariants / fork-patches / mobile-drift / autolink | PASS   | all green                                                        |
+
+## Remote CI Verification
+
+- **Test branch**: `rebase/upstream-batch-222`
+- **Round 1**: `5a9f56c9471` — 6/10 green. Five jobs failed, all of them the fork sync meeting rolling's
+  newer toolchain: two Dart-analyze gates, Lint Web, the server unit suite and Medium Tests.
+- **Round 2 (final)**: `2be00fc43b7`
+
+| Workflow                         | Status | Notes                                                      |
+| -------------------------------- | ------ | ---------------------------------------------------------- |
+| `test.yml`                       | GREEN  | Medium Tests needed 2 re-runs — see the note below         |
+| `docker.yml`                     | GREEN  | image builds                                               |
+| `static_analysis.yml`            | GREEN  | was red in round 1 on the Dart lints                       |
+| `gallery-build-mobile.yml`       | GREEN  | iOS + Android compile                                      |
+| `gallery-mobile-smoke.yml`       | GREEN  | was red in round 1 on the same Dart lints                  |
+| `gallery-ml-smoke.yml`           | GREEN  |                                                            |
+| `gallery-rebase-smoke.yml`       | GREEN  |                                                            |
+| `storage-migration-tests.yml`    | GREEN  |                                                            |
+| `storage-migration-e2e.yml`      | GREEN  |                                                            |
+| `gallery-revert-to-immich-*.yml` | GREEN  | including the Docker-boot half, not just the coverage grep |
+
+**Failures fixed between rounds**: `8da30d2c2da` (Dart lints), `8a87a400dab` (obsolete detect-faces
+tests), `2be00fc43b7` (unused import + the `isUpcoming` contract).
+
+**Final state: 10/10 green** on `2be00fc43b7`.
+
+### Medium Tests became intermittently red this cycle — worth a follow-up, not a shrug
+
+After the one real Medium Tests defect was fixed, that job still failed **twice more, on a different set
+each time**, and went green on the third:
+
+| Attempt | Failed                                                                                                                        |
+| ------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| 1       | `memory.service` › "keeps all three cards…" — **real**, the `isUpcoming` contract                                             |
+| 2       | `face-repair.service` › "a declined face is not flagged on the next scan"                                                     |
+| 3       | `shared-space-face-matching.spec.ts` (whole file, 47 skipped) + `memory.service` › "makes no further changes on a second run" |
+| 4       | — green —                                                                                                                     |
+
+Attempts 2–4 ran on **byte-identical code**. Every one of those specs passes locally in isolation
+(`memory.service` 59/59 twice, `face-repair.service` 20/20, `shared-space-face-matching` 35/35), attempt
+3's failure was a whole-file collection error rather than an assertion, and the logs carry
+`duplicate key … face_repair_scan_in_flight_uq` contention noise. That is DB contention, not a
+regression.
+
+**But it is new, and this cycle plausibly caused it.** #1059 added an
+`onMemoriesCreate — overlap reconciliation (end-to-end)` describe that did not exist at the pre-cycle tip
+and seeds **750 assets across three tests** (30 / 600 / 120), running the whole memory pipeline — twice in
+one of them. `main` at the same #1059 commit passed its own Test run, so this is rolling-specific: the
+fork's medium suite is the larger one (169 files / 2894 tests), and the extra load tips it over on a
+shared runner. Worth trimming those fixtures or isolating that describe before it costs another cycle.
 
 ## Post-Rebase Verification
 
