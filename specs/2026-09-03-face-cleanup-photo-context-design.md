@@ -1,7 +1,7 @@
 # Face cleanup: judging a face in the context of its photo
 
 Discussion: [open-noodle/gallery#1061](https://github.com/open-noodle/gallery/discussions/1061)
-Status: implemented
+Status: implemented (PR #1063)
 Date: 2026-09-03
 
 ## 1. Problem
@@ -561,3 +561,40 @@ Traps this repo has hit before, all applicable here:
 - **Docs.** `docs/docs/administration/face-cleanup.md` has drifted from the shipped console before. It
   should gain a line about the magnifier once this lands; verify vocabulary against `i18n/en.json` and the
   route files, not against older spec documents.
+
+## 11. Implementation notes
+
+Findings from building this that explain why the code and its tests are shaped the way they are. Kept
+because each one is a trap a future change would otherwise re-enter.
+
+**The box's coordinate origin is load-bearing.** `getContentMetrics(img)` returns offsets relative to the
+`<img>`'s own box, so the overlay must share a positioning ancestor that shrink-wraps the image. An earlier
+revision put the overlay inside the `justify-center` flex row: correct for landscape (the image fills the
+row, offset 0) and wrong by half the centring gap for portrait — on a group photo the box landed on a
+different person. `FacePhotoModal.spec.ts` pins the structure rather than the pixels, because happy-dom has
+no layout and cannot reproduce the misalignment. `PersonSuggestionReviewModal.svelte` is the precedent that
+gets this right.
+
+**`stopPropagation()` on the tile magnifier is defence in depth, not the guarantee.** The magnifier is a
+*sibling* of the tile button, and a DOM click bubbles only up its own ancestor chain — so it can never reach
+the tile, with or without the call. The regression the tests actually guard is someone re-nesting the
+overlay inside the tile button (the pre-fix structure, and invalid HTML), which both re-opens the leak and
+makes `stopPropagation()` load-bearing again. The two protections are redundant: a leak needs both to fail.
+
+**Date tests must pin their own zone.** `web/vite.config.ts` sets `env: { TZ: 'UTC' }` for the whole vitest
+process, so Luxon's system zone *is* UTC there and a naive parse is indistinguishable from an explicit
+`{ zone: 'UTC' }`. Any test meant to prove the UTC parse must override the zone itself — via Luxon's
+`Settings.defaultZone`, since `process.env.TZ` is inert once ICU has resolved the zone. The two date tests
+pin `America/Los_Angeles` and `Asia/Tokyo` so one is discriminating on either side of UTC.
+
+**Selection inside the lightbox does not weaken the "opening a photo stages nothing" invariant.** That
+invariant is about the *magnifier click*; the in-modal control is a deliberate act. The rest-of-cluster
+grid's gate is asymmetric — a staged face can always be removed, but a new one can only be added once a
+valid destination is chosen — and that logic lives in one shared `toggleRestSelection` used by both the tile
+and the modal, because two copies would drift.
+
+**Gates that were not obvious.** The web gate is `format` + `lint` + `check:svelte` + `check:typescript`;
+there is no `pnpm check` script, and dropping the first two hides real failures that CI's `web-lint` job
+(which runs only `pnpm lint`) will not catch either. `e2e/` has its own `format`/`lint`/`check` scripts that
+a server- or web-only gate misses entirely. Server vitest needs `--config test/vitest.config.mjs`; the
+regeneration tasks (`mise open-api`, `mise sql`) are root-level, not `server/`.
