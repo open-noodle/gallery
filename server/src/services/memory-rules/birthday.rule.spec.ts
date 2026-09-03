@@ -28,12 +28,12 @@ describe(BirthdayMemoryRule.name, () => {
     expect(candidate).toMatchObject({
       ruleId: 'birthday',
       dedupeKey: 'birthday:person-1:2026-04-24',
-      title: 'Happy birthday, Pierre',
-      subtitle: 'Recent photos of Pierre',
       score: 254,
       assetIds: ['a-4', 'a-3', 'a-2', 'a-1'],
-      context: { personId: 'person-1', distinctYears: 1 },
+      context: { personId: 'person-1', personName: 'Pierre', variant: 'recent', distinctYears: 1 },
     });
+    expect(candidate.title).toBeUndefined();
+    expect(candidate.subtitle).toBeUndefined();
   });
 
   it('skips the snapshot fallback when only three single-year assets qualify', async () => {
@@ -86,9 +86,9 @@ describe(BirthdayMemoryRule.name, () => {
     });
 
     expect(candidate).toMatchObject({
-      subtitle: 'Recent photos of Pierre',
       score: 254,
       assetIds: ['a-5', 'a-4', 'a-3', 'a-2'],
+      context: { personName: 'Pierre', variant: 'recent' },
     });
   });
 
@@ -119,12 +119,10 @@ describe(BirthdayMemoryRule.name, () => {
       {
         ruleId: 'birthday',
         dedupeKey: 'birthday:person-2:2026-04-24',
-        title: 'Happy birthday, Alice',
-        subtitle: 'Photos from different years',
         score: 356,
         assetIds: ['a-1', 'a-2', 'a-3', 'a-4', 'a-5', 'a-6'],
         memoryAt: DateTime.fromISO('2026-04-24', { zone: 'utc' }),
-        context: { personId: 'person-2', distinctYears: 5 },
+        context: { personId: 'person-2', personName: 'Alice', variant: 'across_years', distinctYears: 5 },
       },
     ]);
   });

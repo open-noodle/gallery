@@ -121,24 +121,6 @@ export const dominantBy = <T>(items: T[], key: (item: T) => string): DominantGro
 /** Small recency nudge (0–10) so newer memories edge out older ones without dominating count. */
 export const recencyBonus = (year: number, targetYear: number): number => Math.max(0, 10 - (targetYear - year));
 
-const MONTH_NAMES = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-];
-
-/** The English name of a 1-based month, used in memory titles. */
-export const monthName = (month: number): string => MONTH_NAMES[month - 1]!;
-
 // Structural input, decoupled from the repository type so curation.util stays dependency-free.
 export interface FaceRow {
   assetId: string;
