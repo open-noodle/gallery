@@ -966,4 +966,41 @@ describe(FaceRepairAdminController.name, () => {
       expect(service.getAdminFaceThumbnail).not.toHaveBeenCalled();
     });
   });
+
+  // Same shape as the thumbnail route's coverage above, and for the same reason: this route is new and
+  // returns any user's source photo by face id, so it must not be the one route on this controller with no
+  // coverage.
+  describe('GET /admin/face-repair/faces/:assetFaceId/preview', () => {
+    const assetFaceId = '00000000-0000-4000-a000-000000000061';
+
+    it('T3.1: should be an authenticated admin route', async () => {
+      await request(ctx.getHttpServer()).get(`/admin/face-repair/faces/${assetFaceId}/preview`);
+      expect(ctx.authenticate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({ adminRoute: true }),
+        }),
+      );
+    });
+
+    it('T3.2: delegates to service.getAdminFacePreview with the assetFaceId', async () => {
+      // ImmichRedirectResponse exercises sendFile's real dispatch without touching the filesystem.
+      service.getAdminFacePreview.mockResolvedValue(
+        new ImmichRedirectResponse({ url: 'https://example.com/photo.jpg', cacheControl: CacheControl.None }),
+      );
+      const { status, headers } = await request(ctx.getHttpServer())
+        .get(`/admin/face-repair/faces/${assetFaceId}/preview`)
+        .set('Authorization', 'Bearer token');
+      expect(status).toBe(302);
+      expect(headers.location).toBe('https://example.com/photo.jpg');
+      expect(service.getAdminFacePreview).toHaveBeenCalledWith(assetFaceId);
+    });
+
+    it('rejects a non-uuid assetFaceId with 400', async () => {
+      const { status } = await request(ctx.getHttpServer())
+        .get('/admin/face-repair/faces/not-a-uuid/preview')
+        .set('Authorization', 'Bearer token');
+      expect(status).toBe(400);
+      expect(service.getAdminFacePreview).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -218,4 +218,19 @@ export class FaceRepairAdminController {
   ): Promise<void> {
     await sendFile(res, next, () => this.service.getAdminFaceThumbnail(assetFaceId), this.logger);
   }
+
+  // The source photo behind a face crop (#1061). Admin-gated and face-keyed for exactly the reason the
+  // thumbnail above is: the console repairs clusters in other people's libraries, and the owner-scoped
+  // asset routes enforce Permission.AssetView with no admin bypass, so they would 403 on the main case.
+  @Get('faces/:assetFaceId/preview')
+  @FileResponse()
+  @Authenticated({ admin: true })
+  @Endpoint({ summary: 'Get an admin face-repair source photo', history: new HistoryBuilder().added('v1') })
+  async getFaceRepairFacePreview(
+    @Res() res: Response,
+    @Next() next: NextFunction,
+    @Param('assetFaceId', new ParseUUIDPipe({ version: '4' })) assetFaceId: string,
+  ): Promise<void> {
+    await sendFile(res, next, () => this.service.getAdminFacePreview(assetFaceId), this.logger);
+  }
 }
