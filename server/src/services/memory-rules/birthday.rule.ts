@@ -72,7 +72,12 @@ export class BirthdayMemoryRule implements MemoryRule {
         score: 250 + fallbackAssetIds.length,
         assetIds: fallbackAssetIds,
         memoryAt: target,
-        context: { personId: person.personGroupId, personName: person.name, variant: 'recent', distinctYears: byYear.size },
+        context: {
+          personId: person.personGroupId,
+          personName: person.name,
+          variant: 'recent',
+          distinctYears: byYear.size,
+        },
       });
     }
 
