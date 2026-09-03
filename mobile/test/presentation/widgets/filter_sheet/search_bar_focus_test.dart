@@ -12,7 +12,7 @@ void main() {
   testWidgets('keyboard search submits text immediately and hides the filter sheet', (tester) async {
     final container = ProviderContainer();
     addTearDown(container.dispose);
-    container.read(photosFilterSheetProvider.notifier).state = FilterSheetSnap.browse;
+    container.read(photosFilterSheetProvider.notifier).state = FilterSheetVisibility.visible;
 
     await tester.pumpWidget(
       localizedForTest(
@@ -29,7 +29,7 @@ void main() {
     await tester.pump();
 
     expect(container.read(photosFilterProvider).context, 'beach');
-    expect(container.read(photosFilterSheetProvider), FilterSheetSnap.hidden);
+    expect(container.read(photosFilterSheetProvider), FilterSheetVisibility.hidden);
   });
 
   testWidgets('mounted-before-increment: focus requested on counter rise', (tester) async {
@@ -102,10 +102,10 @@ void main() {
     await tester.pump();
   });
 
-  testWidgets('remount with unchanged counter does not re-focus (snap-transition regression)', (tester) async {
+  testWidgets('remount with unchanged counter does not re-focus (sheet-remount regression)', (tester) async {
     // User opens sheet via search blob → counter bumped, search bar mounts and
-    // focuses. User dismisses keyboard. User taps More filters → browse snap
-    // unmounts, deep snap mounts a FRESH search bar. Because the counter
+    // focuses. User dismisses keyboard. The sheet is closed and reopened, so a
+    // FRESH search bar mounts. Because the counter
     // hasn't changed (same request), the new mount must NOT auto-focus.
     final container = ProviderContainer();
     addTearDown(container.dispose);
