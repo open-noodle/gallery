@@ -178,6 +178,12 @@ const updatedConfig = Object.freeze<SystemConfig>({
       modelName: 'yolo11s',
       minScore: 0.6,
     },
+    petRecognition: {
+      enabled: false,
+      modelName: 'pet-recognition-base',
+      maxDistance: 0.55,
+      minFaces: 1,
+    },
   },
   map: {
     enabled: true,
@@ -188,6 +194,7 @@ const updatedConfig = Object.freeze<SystemConfig>({
     startTime: '00:00',
     databaseCleanup: true,
     clusterNewFaces: true,
+    clusterNewPets: true,
     missingThumbnails: true,
     generateMemories: true,
     syncQuotaUsage: true,
