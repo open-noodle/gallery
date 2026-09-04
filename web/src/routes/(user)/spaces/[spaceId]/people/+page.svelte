@@ -14,7 +14,7 @@
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { featureFlagsManager } from '$lib/managers/feature-flags-manager.svelte';
   import PersonEditBirthDateModal from '$lib/modals/PersonEditBirthDateModal.svelte';
-  import { locale, PeopleSortBy, peopleViewSettings } from '$lib/stores/preferences.store';
+  import { locale, PeopleFilterBy, PeopleSortBy, peopleViewSettings } from '$lib/stores/preferences.store';
   import { createUrl, handlePromiseError } from '$lib/utils';
   import { createCrossOwnerMergeHandlers, runMergeWithCrossOwnerConfirmation } from '$lib/utils/cross-owner-merge';
   import { handleError } from '$lib/utils/handle-error';
@@ -37,10 +37,12 @@
   import {
     mdiAccountGroupOutline,
     mdiAccountMultipleCheckOutline,
+    mdiAccountMultipleOutline,
     mdiCalendarEditOutline,
     mdiDotsVertical,
     mdiEyeOffOutline,
     mdiEyeOutline,
+    mdiPaw,
     mdiSortAlphabeticalAscending,
     mdiSortNumericDescending,
   } from '@mdi/js';
@@ -86,6 +88,40 @@
       ? $peopleViewSettings.sortBy
       : PeopleSortBy.PhotoCount,
   );
+
+  // Space People type filter. Server-side rather than a filter over `people`: the tab pages at
+  // PAGE_SIZE and pets are a small fraction of a real library, so filtering only what has loaded
+  // would show a near-empty grid until scrolled to the end. Mirrors `/people/+page.svelte`.
+  const peopleFilterOptions = [PeopleFilterBy.All, PeopleFilterBy.People, PeopleFilterBy.Pets];
+  const peopleFilterIcons: Record<PeopleFilterBy, string> = {
+    [PeopleFilterBy.All]: mdiAccountGroupOutline,
+    [PeopleFilterBy.People]: mdiAccountMultipleOutline,
+    [PeopleFilterBy.Pets]: mdiPaw,
+  };
+  let peopleFilterNames: Record<PeopleFilterBy, string> = $derived({
+    [PeopleFilterBy.All]: $t('all'),
+    [PeopleFilterBy.People]: $t('people'),
+    [PeopleFilterBy.Pets]: $t('pets'),
+  });
+  let peopleFilterBy = $derived(
+    Object.values(PeopleFilterBy).includes($peopleViewSettings.filterBy as PeopleFilterBy)
+      ? ($peopleViewSettings.filterBy as PeopleFilterBy)
+      : PeopleFilterBy.All,
+  );
+  const filterToTypeParam = (filterBy: PeopleFilterBy) => {
+    switch (filterBy) {
+      case PeopleFilterBy.People: {
+        return 'person' as const;
+      }
+      case PeopleFilterBy.Pets: {
+        return 'pet' as const;
+      }
+      default: {
+        return undefined;
+      }
+    }
+  };
+
   const visiblePeople = $derived(
     sortPeople(
       people.filter((p) => !p.isHidden),
@@ -148,6 +184,12 @@
       searchName = searchedPeople;
       handlePromiseError(searchPeople(searchedPeople));
     }
+
+    // The SSR load (+page.ts) is always unfiltered, so a persisted non-All choice has to trigger
+    // a refetch here, same as the global people page.
+    if (peopleFilterBy !== PeopleFilterBy.All) {
+      handlePromiseError(handleFilterChange(peopleFilterBy));
+    }
   });
 
   const getThumbUrl = (person: SharedSpacePersonResponseDto): string => {
@@ -172,9 +214,13 @@
     spaceId = space.id,
   ) => {
     const name = searchFilter.trim();
-    return { id: spaceId, ...(name && { name }), ...query };
+    const type = filterToTypeParam(peopleFilterBy);
+    return { id: spaceId, ...(name && { name }), ...(type && { $type: type }), ...query };
   };
 
+  // Shared by TWO endpoints — getSpacePeopleStatistics and getSpacePeopleFaceStatistics. Do NOT
+  // add the type filter here: face statistics deliberately stay whole-space and ignore it. Add
+  // `$type` at the getSpacePeopleStatistics call sites only.
   const getStatisticsQuery = (searchFilter = searchName, spaceId = space.id) => {
     const name = searchFilter.trim();
     return { id: spaceId, ...(name && { name }) };
@@ -214,10 +260,14 @@
   async function refreshPeople() {
     const requestSpaceId = space.id;
     const requestSearchName = searchName.trim();
+    const type = filterToTypeParam(peopleFilterBy);
     try {
       const [newPeople, newStatistics] = await Promise.all([
         getSpacePeople(getPeopleQuery({ limit: PAGE_SIZE }, requestSearchName, requestSpaceId)),
-        getSpacePeopleStatistics(getStatisticsQuery(requestSearchName, requestSpaceId)).catch((error) => {
+        getSpacePeopleStatistics({
+          ...getStatisticsQuery(requestSearchName, requestSpaceId),
+          ...(type && { $type: type }),
+        }).catch((error) => {
           if (statisticsScopeMatches(requestSpaceId, requestSearchName)) {
             handleError(error, $t('spaces_error_loading_people'));
           }
@@ -256,15 +306,17 @@
     const controller = new AbortController();
     abortController = controller;
     searchTimeout = setTimeout(() => (showLoadingSpinner = true), timeBeforeShowLoadingSpinner);
+    const type = filterToTypeParam(peopleFilterBy);
 
     try {
       const [newPeople, newStatistics] = await Promise.all([
         getSpacePeople(getPeopleQuery({ limit: PAGE_SIZE }, requestSearchName, requestSpaceId), {
           signal: controller.signal,
         }),
-        getSpacePeopleStatistics(getStatisticsQuery(requestSearchName, requestSpaceId), {
-          signal: controller.signal,
-        }).catch((error) => {
+        getSpacePeopleStatistics(
+          { ...getStatisticsQuery(requestSearchName, requestSpaceId), ...(type && { $type: type }) },
+          { signal: controller.signal },
+        ).catch((error) => {
           if (!controller.signal.aborted && statisticsScopeMatches(requestSpaceId, requestSearchName)) {
             handleError(error, $t('spaces_error_loading_people'));
           }
@@ -301,6 +353,13 @@
     searchName = '';
     cancelSearchRequest();
     await clearQueryParam(QueryParameter.SEARCHED_PEOPLE, $page.url);
+    await refreshPeople();
+  }
+
+  async function handleFilterChange(filterBy: PeopleFilterBy) {
+    $peopleViewSettings.filterBy = filterBy;
+    // refreshPeople re-fetches from offset 0, so switching filters replaces the loaded list
+    // rather than appending onto it, and carries the active search along.
     await refreshPeople();
   }
 
@@ -483,6 +542,13 @@
                 />
               </div>
             </div>
+            <Dropdown
+              title={$t('filter_people_by')}
+              options={peopleFilterOptions}
+              selectedOption={peopleFilterBy}
+              onSelect={(filterBy) => handlePromiseError(handleFilterChange(filterBy))}
+              render={(filterBy) => ({ title: peopleFilterNames[filterBy], icon: peopleFilterIcons[filterBy] })}
+            />
             <Dropdown
               title={$t('sort_people_by')}
               options={peopleSortOptions}
