@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
@@ -87,6 +89,51 @@ void main() {
 
     expect(filterWasEmptyAtLatch, isTrue);
     expect(scrollToAssetNotifierProvider.value?.asset.heroTag, _asset('a1').heroTag);
+  });
+
+  // #1047: the destination timeline has to travel with the request. A Space timeline is
+  // pushed OVER the main one, which stays mounted and listening on the same latch, so an
+  // unscoped request is drained by whichever is ready first.
+  test('latches the Space that must honour the jump', () async {
+    await viewAssetInTimeline(
+      asset: _asset('a1'),
+      read: container.read,
+      popViewer: steps.pop,
+      goToTimeline: steps.goToTimeline,
+      spaceId: 'space-1',
+    );
+
+    expect(scrollToAssetNotifierProvider.value?.spaceId, 'space-1');
+  });
+
+  // The Space timeline is PUSHED, and auto_route's push future completes when the route
+  // is POPPED. A jump that waited for it would latch the request only after the user had
+  // already left the Space, so the scroll never happened (#1047).
+  test('latches the Space target before the pushed route settles', () async {
+    final pushed = Completer<void>();
+    final jump = viewAssetInTimeline(
+      asset: _asset('a1'),
+      read: container.read,
+      popViewer: steps.pop,
+      goToTimeline: () {
+        steps.calls.add('timeline');
+        return pushed.future;
+      },
+      spaceId: 'space-1',
+    );
+    await pumpEventQueue();
+
+    expect(steps.calls, ['pop', 'timeline'], reason: 'precondition: the Space route is still on screen');
+    expect(scrollToAssetNotifierProvider.value?.spaceId, 'space-1');
+
+    pushed.complete();
+    await jump;
+  });
+
+  test('leaves the request unscoped for a jump to the personal timeline', () async {
+    await run();
+
+    expect(scrollToAssetNotifierProvider.value?.spaceId, isNull);
   });
 
   test('activates the main timeline route after closing the viewer', () async {
