@@ -1428,24 +1428,18 @@ class TestPetDetection:
         assert detector.min_score == 0.8
 
     def test_detector_clamps_boxes_to_image_bounds(self, mocker: MockerFixture) -> None:
-        mocker.patch.object(PetDetector, "load")
-        detector = PetDetector("yolo11n", min_score=0.5, cache_dir="test_cache")
-
-        session = mock.Mock()
-        # cv_image-sized inputs are (orig_h=800, orig_w=600); scale_x = 600/640, scale_y = 800/640.
-        # Bottom-right detection overflows past (600, 800); top-left detection overflows below (0, 0).
-        session.run.return_value = self._make_yolo_output(
+        """RF-DETR emits normalised centre/size; a query straddling the edge must not escape it."""
+        detector = self._detector(mocker, min_score=0.5)
+        # Boxes wider than the frame and centred on the edges: unclamped these produce negative
+        # corners and corners past (600, 800).
+        detector.session.run.return_value = self._make_rfdetr_output(
             [
-                (630, 630, 100, 100, 16, 0.9),  # dog, overflows bottom-right
-                (5, 5, 50, 50, 15, 0.85),  # cat, overflows top-left
+                (0.95, 0.95, 0.5, 0.5, 18, 0.9),  # dog, overflows bottom-right
+                (0.05, 0.05, 0.5, 0.5, 17, 0.85),  # cat, overflows top-left
             ]
         )
-        detector.session = session
-        detector._input_name = "images"
 
-        # width=600, height=800 (matches the cv_image fixture's PIL Image.new("RGB", (600, 800)))
-        image = np.zeros((800, 600, 3), dtype=np.uint8)
-        results = detector.predict(image)
+        results = detector.predict(Image.new("RGB", (600, 800)))
 
         assert len(results) == 2
         for detection in results:
@@ -1728,7 +1722,7 @@ class TestPetRecognition:
         assert get_model_class("pet-recognition-base", ModelType.RECOGNITION, ModelTask.PET_DETECTION) is PetRecognizer
 
     def test_pet_detector_still_resolves(self) -> None:
-        assert get_model_class("yolo11s", ModelType.DETECTION, ModelTask.PET_DETECTION) is PetDetector
+        assert get_model_class("rfdetr-nano", ModelType.DETECTION, ModelTask.PET_DETECTION) is PetDetector
 
     def test_download_uses_open_noodle_org(self, mocker: MockerFixture) -> None:
         snapshot_download = mocker.patch("immich_ml.models.pet_recognition.recognition.snapshot_download")
