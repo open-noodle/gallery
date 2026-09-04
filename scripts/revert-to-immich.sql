@@ -669,6 +669,11 @@ DELETE FROM "kysely_migrations"
   '1793100000000-AddSharedSpaceAlbumFolderTable',
   '1793200000000-SharedSpaceAlbumFolderAuditTable',
   '1793300000000-ClearPreOptionMFaceRepairScans',
+  -- Build-time compatibility alias (server/bin/sync-gallery-migrations.mjs): this migration was
+  -- renumbered off 1793000000000 when fork PR #1060 took that timestamp, but rolling RC instances
+  -- had already recorded the pre-rename name. Drop that row too, or upstream's migrator aborts
+  -- with "corrupted migrations" on a reverted rolling-derived DB.
+  '1793000000000-ClearPreOptionMFaceRepairScans',
 
    -- Pre-rename names for two migrations that were renumbered off timestamp collisions
    -- ("renumber AddFaceRepairScanFlaggedFace off the #722 collision",
