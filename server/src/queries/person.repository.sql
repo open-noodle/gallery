@@ -104,6 +104,7 @@ group by
 having
   (
     "person"."name" != $3
+    or "person"."type" = 'pet'
     or count("asset_face"."assetId") >= COALESCE(
       (
         SELECT
@@ -589,11 +590,17 @@ WITH
       AND "asset"."deletedAt" IS NULL
       AND "asset_face"."deletedAt" IS NULL
       AND "asset_face"."isVisible" = true
+      AND (
+        $3 = ''
+        OR "person"."type" = $4
+      )
     GROUP BY
-      "person"."id"
+      "person"."id",
+      "person"."type"
     HAVING
       NULLIF(BTRIM("person"."name"), '') IS NOT NULL
-      OR COUNT("asset_face"."assetId") >= $3
+      OR "person"."type" = 'pet'
+      OR COUNT("asset_face"."assetId") >= $5
   )
 SELECT
   COUNT(*)::int AS "total",

@@ -224,6 +224,7 @@ export class PersonService extends BaseService {
     });
     const { total, hidden } = await this.personRepository.getNumberOfPeople(auth.user.id, {
       minimumFaceCount,
+      type,
     });
 
     return {

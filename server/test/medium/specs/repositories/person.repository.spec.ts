@@ -511,6 +511,28 @@ describe(PersonRepository.name, () => {
       expect(items.map(({ id }) => id)).not.toContain(human.id);
     });
 
+    // getNumberOfPeople feeds the People header's total/hidden on the owner-scoped arm. It has to
+    // honour the same type filter and the same pets exemption, or the header reports the whole
+    // library above a filtered grid — which is exactly what the e2e caught.
+    it('scopes the header total to the type filter', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      await seedTypedPerson(ctx, { ownerId: user.id, name: 'Alice', faces: 3 });
+      await seedTypedPerson(ctx, { ownerId: user.id, type: 'pet', species: 'dog', name: 'Rex', faces: 3 });
+
+      await expect(sut.getNumberOfPeople(user.id, {})).resolves.toMatchObject({ total: 2 });
+      await expect(sut.getNumberOfPeople(user.id, { type: 'pet' })).resolves.toMatchObject({ total: 1 });
+      await expect(sut.getNumberOfPeople(user.id, { type: 'person' })).resolves.toMatchObject({ total: 1 });
+    });
+
+    it('counts an exempt single-face pet in the header total', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      await seedTypedPerson(ctx, { ownerId: user.id, type: 'pet', species: 'dog', faces: 1 });
+
+      await expect(sut.getNumberOfPeople(user.id, { minimumFaceCount: 3 })).resolves.toMatchObject({ total: 1 });
+    });
+
     it('returns both when no type is given', async () => {
       const { sut, ctx } = setup();
       const { user } = await ctx.newUser();

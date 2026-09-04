@@ -79,6 +79,8 @@ export interface PeopleFaceStatistics {
 
 export interface PeopleFaceStatisticsOptions {
   minimumFaceCount?: number;
+  /** People-page type filter: 'person' or 'pet'. Undefined counts both. */
+  type?: string;
 }
 
 const peopleAssetVisibilities = spaceVisibleAssetVisibilities;
@@ -1012,6 +1014,7 @@ export class PersonRepository {
   @GenerateSql({ params: [DummyValue.UUID, { minimumFaceCount: 3 }] })
   async getNumberOfPeople(userId: string, options: PeopleFaceStatisticsOptions = {}) {
     const minimumFaceCount = options.minimumFaceCount ?? 1;
+    const typeFilter = options.type ?? '';
     const result = await sql<{ total: number; hidden: number }>`
       WITH "eligible_people" AS (
         SELECT
@@ -1025,8 +1028,10 @@ export class PersonRepository {
           AND "asset"."deletedAt" IS NULL
           AND "asset_face"."deletedAt" IS NULL
           AND "asset_face"."isVisible" = true
-        GROUP BY "person"."id"
+          AND (${typeFilter} = '' OR "person"."type" = ${typeFilter})
+        GROUP BY "person"."id", "person"."type"
         HAVING NULLIF(BTRIM("person"."name"), '') IS NOT NULL
+          OR "person"."type" = 'pet'
           OR COUNT("asset_face"."assetId") >= ${minimumFaceCount}
       )
       SELECT
