@@ -2340,12 +2340,29 @@ export class SharedSpaceRepository {
     return result.count > 0;
   }
 
-  @GenerateSql({
-    params: [
-      DummyValue.UUID,
-      { withHidden: false, petsEnabled: true, limit: 50, offset: 0, named: false, minimumFaceCount: 3 },
-    ],
-  })
+  @GenerateSql(
+    {
+      params: [
+        DummyValue.UUID,
+        { withHidden: false, petsEnabled: true, limit: 50, offset: 0, named: false, minimumFaceCount: 3 },
+      ],
+    },
+    {
+      name: 'type: pet',
+      params: [
+        DummyValue.UUID,
+        {
+          withHidden: false,
+          petsEnabled: true,
+          limit: 50,
+          offset: 0,
+          named: false,
+          minimumFaceCount: 3,
+          type: 'pet',
+        },
+      ],
+    },
+  )
   getPersonsBySpaceId(
     spaceId: string,
     options: {
@@ -2463,9 +2480,15 @@ export class SharedSpaceRepository {
     );
   }
 
-  @GenerateSql({
-    params: [DummyValue.UUID, { petsEnabled: true, named: false, name: 'Alice', minimumFaceCount: 3 }],
-  })
+  @GenerateSql(
+    {
+      params: [DummyValue.UUID, { petsEnabled: true, named: false, name: 'Alice', minimumFaceCount: 3 }],
+    },
+    {
+      name: 'type: pet',
+      params: [DummyValue.UUID, { petsEnabled: true, named: false, name: 'Alice', minimumFaceCount: 3, type: 'pet' }],
+    },
+  )
   async countPersonsBySpaceId(
     spaceId: string,
     options: {
