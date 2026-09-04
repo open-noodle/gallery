@@ -45,25 +45,34 @@ invent a permission hierarchy that does not exist. This is enforced by where the
 ### 3.1 New table `shared_space_album_folder`
 
 `server/src/schema/tables/shared-space-album-folder.table.ts`, with the migration in
-`server/src/schema/migrations-gallery/1785000000000-AddSharedSpaceAlbumFolderTable.ts` (round
-timestamp per the fork convention; `1784800000000` was the highest existing fork migration when
-this branch started).
+`server/src/schema/migrations-gallery/1793100000000-AddSharedSpaceAlbumFolderTable.ts`, and the
+audit table in `1793200000000-SharedSpaceAlbumFolderAuditTable.ts`. The table migration must sort
+before the audit one, because the audit migration creates a trigger on the table.
 
-**These timestamps now sit BELOW main's, and must stay that way.** `main` has since gained
-`1787000000000`–`1792123120451`, so on a database that already tracks main these two apply out of
-order. That is fine at runtime — `DatabaseRepository.createMigrator()` sets
-`allowUnorderedMigrations: true` precisely for this, which is what makes fork migrations
-interleavable with upstream ones at all. The only cost is `pnpm migrations:run`, whose `sql-tools`
-CLI hardcodes `allowUnorderedMigrations: false` and will refuse them on a dev database that already
-ran main's later migrations; the server applies them itself on startup.
+**These timestamps sit ABOVE main's highest fork migration (`1792123120451`), which is where a new
+fork migration belongs.** They therefore apply in order on any database, so `pnpm migrations:run`
+accepts them even though its `sql-tools` CLI hardcodes `allowUnorderedMigrations: false`. (The
+server's own `DatabaseRepository.createMigrator()` sets `allowUnorderedMigrations: true` regardless,
+which is what lets fork migrations interleave with upstream ones at all — but relying on it here is
+unnecessary.)
 
-Re-stamping them above main's would be **worse than the untidiness it fixes**. Release-candidate
-images have been built from this branch and run against real databases, which have therefore
-already recorded `1785000000000` / `1786000000000`. Renaming the files would make those databases
-treat the migrations as un-run and re-apply them (`CREATE TABLE` on a table that exists → boot
-failure), *and* leave the recorded names with no matching file on disk, which Kysely hard-fails on
-at boot. This is the same trap the `ChangeDurationToInteger` compatibility alias in
-`server/bin/sync-gallery-migrations.mjs` exists to paper over — do not re-open it.
+**They were renumbered mid-review, and the reason is worth recording.** They were originally
+`1785000000000` / `1786000000000`, round timestamps chosen when `1784800000000` was the highest fork
+migration on this branch's base. `main` then gained pet recognition Phase 2, whose
+`1785000000000-CreatePetSearchTable` had independently taken the same round number off the same
+base — two branches, one timestamp, and neither could see the other. The clash only became visible
+when this branch rebased onto that main, and `tools/upstream-preflight/src/migration-timestamps.spec.ts`
+is the guard that caught it.
+
+The fix was to re-stamp **this branch's** pair, since `CreatePetSearchTable` was already merged.
+That was safe **only because nothing carrying these migrations had shipped**: no release, and no
+deployed database, had recorded either name. Renaming an applied migration is a different and much
+worse operation — the old name is left with no matching file on disk, which Kysely hard-fails on at
+boot (`#ensureNoMissingMigrations`), and papering over it needs a permanent `compatibilityAliases`
+entry in `server/bin/sync-gallery-migrations.mjs`, the debt `ChangeDurationToInteger` already
+carries. So the rule the guard encodes is: **renumber before you ship, grandfather only after.**
+Had this collision been noticed a release later, the three pre-existing collisions in that guard's
+baseline would have gained a fourth.
 
 | Column        | Type                | Notes                                                                              |
 | ------------- | ------------------- | ---------------------------------------------------------------------------------- |
@@ -696,7 +705,7 @@ slices 7 and 9.
 
 - `src/schema/tables/shared-space-album-folder.table.ts` _(new)_
 - `src/schema/tables/shared-space-album.table.ts` — `folderId`
-- `src/schema/migrations-gallery/1785000000000-AddSharedSpaceAlbumFolderTable.ts` _(new)_
+- `src/schema/migrations-gallery/1793100000000-AddSharedSpaceAlbumFolderTable.ts` _(new)_
 - `src/enum.ts` — three `Permission` values
 - `src/dtos/shared-space.dto.ts` — folder DTOs; `folderId` on `SharedSpaceLinkedAlbumSchema`; link
   query schema

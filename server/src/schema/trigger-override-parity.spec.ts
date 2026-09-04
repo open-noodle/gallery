@@ -58,9 +58,9 @@ describe('album_space_asset_delete_audit trigger parity (#764, migration 1783100
   });
 });
 
-describe('shared_space_album_folder_delete_audit trigger parity (space album folders mobile Task 1, migration 1786000000000)', () => {
+describe('shared_space_album_folder_delete_audit trigger parity (space album folders mobile Task 1, migration 1793200000000)', () => {
   it('generates trigger DDL byte-identical to the statement the migration executed', () => {
-    // Verbatim from 1786000000000-SharedSpaceAlbumFolderAuditTable.ts. Asserted against the
+    // Verbatim from 1793200000000-SharedSpaceAlbumFolderAuditTable.ts. Asserted against the
     // migration source below too, so this literal cannot silently rot away from it.
     const expected = `CREATE OR REPLACE TRIGGER "shared_space_album_folder_delete_audit"
   AFTER DELETE ON "shared_space_album_folder"
@@ -72,7 +72,7 @@ describe('shared_space_album_folder_delete_audit trigger parity (space album fol
 
     // The migration executes this as a plain (unescaped) template literal, so the source contains
     // the text verbatim — no template-literal unescaping to hand-simulate.
-    expect(migrationSource('1786000000000-SharedSpaceAlbumFolderAuditTable.ts')).toContain(expected);
+    expect(migrationSource('1793200000000-SharedSpaceAlbumFolderAuditTable.ts')).toContain(expected);
   });
 
   // The pre-existing updatedAt trigger on the same table, as a control: proves the assertion above

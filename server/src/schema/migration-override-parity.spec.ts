@@ -45,8 +45,8 @@ import { up as upAlbumSoftDelete } from 'src/schema/migrations-gallery/178205000
 import { up as upAlbumSpaceAssetSyncAndAudit } from 'src/schema/migrations-gallery/1783100000000-AddAlbumSpaceAssetSyncAndAudit';
 import { up as upMemberJoinGrantCreateId } from 'src/schema/migrations-gallery/1783700000000-FixSharedSpaceMemberJoinGrantCreateId';
 import { up as upRepairDrift } from 'src/schema/migrations-gallery/1784800000000-RepairSharedSpaceAlbumGrantDrift';
-import { up as upSharedSpaceAlbumFolderAuditTable } from 'src/schema/migrations-gallery/1786000000000-SharedSpaceAlbumFolderAuditTable';
 import { up as upSharedSpaceAlbumHidden } from 'src/schema/migrations-gallery/1793000000000-AddSharedSpaceAlbumHidden';
+import { up as upSharedSpaceAlbumFolderAuditTable } from 'src/schema/migrations-gallery/1793200000000-SharedSpaceAlbumFolderAuditTable';
 
 describe('1782050000000-AddAlbumSoftDeleteSharedSpaceAlbumTrigger override parity', () => {
   beforeEach(() => {
@@ -168,7 +168,7 @@ describe('1783100000000-AddAlbumSpaceAssetSyncAndAudit override parity', () => {
 // parity) Task 1. Guards against the same drift class documented on
 // 1783100000000-AddAlbumSpaceAssetSyncAndAudit: nothing else in the suite would notice if the
 // migration's executed DDL or its migration_overrides row ever rotted away from functions.ts.
-describe('1786000000000-SharedSpaceAlbumFolderAuditTable override parity', () => {
+describe('1793200000000-SharedSpaceAlbumFolderAuditTable override parity', () => {
   beforeEach(() => {
     capturedSql.length = 0;
   });
