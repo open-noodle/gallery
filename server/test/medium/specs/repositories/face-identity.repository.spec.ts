@@ -5679,6 +5679,22 @@ describe('FaceIdentityRepository getAccessiblePeople type filter', () => {
     expect(stats.unassignedFaceCount).toBe(0);
   });
 
+  // The header count must move with the filter: filtering to Pets and reading "2 people" above a
+  // grid of one pet is worse than no count at all.
+  it('reports a total scoped to the type filter', async () => {
+    const { sut, ctx } = setup();
+    const { user } = await ctx.newUser();
+    await seedTypedIdentity(ctx, sut, { userId: user.id, name: 'Alice', assets: 3 });
+    await seedTypedIdentity(ctx, sut, { userId: user.id, type: 'pet', species: 'dog', name: 'Rex', assets: 3 });
+
+    const all = await sut.getAccessiblePeople(user.id, { withHidden: false, page: 1, size: 50 });
+    const pets = await sut.getAccessiblePeople(user.id, { withHidden: false, page: 1, size: 50, type: 'pet' });
+
+    expect(all.total).toBe(2);
+    expect(pets.total).toBe(1);
+    expect(pets.people).toHaveLength(1);
+  });
+
   it('still hides an unnamed human with a single face', async () => {
     const { sut, ctx } = setup();
     const { user } = await ctx.newUser();

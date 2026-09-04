@@ -18,7 +18,7 @@
   import { Route } from '$lib/route';
   import { getPersonActions, isSpaceEditor, updatePersonName } from '$lib/services/person.service';
   import Dropdown from '$lib/elements/Dropdown.svelte';
-  import { locale, PeopleSortBy, peopleViewSettings } from '$lib/stores/preferences.store';
+  import { locale, PeopleFilterBy, PeopleSortBy, peopleViewSettings } from '$lib/stores/preferences.store';
   import { websocketEvents } from '$lib/stores/websocket';
   import { normalizeSearchString } from '$lib/utils/string-utils';
   import { handlePromiseError } from '$lib/utils';
@@ -44,6 +44,9 @@
     mdiEyeOutline,
     mdiHeartMinusOutline,
     mdiHeartOutline,
+    mdiAccountGroupOutline,
+    mdiAccountMultipleOutline,
+    mdiPaw,
     mdiSortAlphabeticalAscending,
     mdiSortNumericDescending,
   } from '@mdi/js';
@@ -72,6 +75,10 @@
   // re-check), and both are gated on the `loading` prop below. Without it the same page is fetched
   // concurrently and appended twice.
   let loadingPage = $state(false);
+  // Totals for the currently applied type filter. The SSR load and the overview-statistics endpoint
+  // are both unfiltered, so once a filter is active the header has to read the filtered list's own
+  // total instead, or it reports the whole library above a filtered grid.
+  let listTotals = $state<{ total: number; hidden: number } | null>(null);
 
   onMount(() => {
     const getSearchedPeople = $page.url.searchParams.get(QueryParameter.SEARCHED_PEOPLE);
@@ -80,6 +87,10 @@
       if (searchPeopleElement) {
         handlePromiseError(searchPeopleElement.searchPeople(true, searchName));
       }
+    }
+
+    if (peopleFilterBy !== PeopleFilterBy.All) {
+      handlePromiseError(handleFilterChange(peopleFilterBy));
     }
 
     return websocketEvents.on('on_person_thumbnail', (personId: string) => {
@@ -143,6 +154,7 @@
         withSharedSpaces: true,
         page: nextPage,
         size: PEOPLE_PAGE_SIZE,
+        $type: filterToTypeParam(peopleFilterBy),
       });
       people = appendUniqueById(people, newPeople);
       if (nextPage !== null) {
@@ -262,7 +274,7 @@
 
   let visiblePeople = $derived(people.filter((people) => !people.isHidden));
   let overviewStatistics = $derived(data.peopleStatistics);
-  let peopleCountStatistics = $derived(overviewStatistics ?? data.people);
+  let peopleCountStatistics = $derived(listTotals ?? overviewStatistics ?? data.people);
   let hasUnsupportedStatsFilter = $derived(
     !!$page.url.searchParams.get(QueryParameter.SEARCHED_PEOPLE) || !!searchName.trim(),
   );
@@ -302,6 +314,61 @@
       : PeopleSortBy.PhotoCount,
   );
   let showPeople = $derived(sortPeople(searchName ? searchedPeopleLocal : visiblePeople, peopleSortBy));
+
+  // People-page type filter. Server-side rather than a filter over `people`: the grid is paged
+  // (PEOPLE_PAGE_SIZE at a time) and pets are a small fraction of a real library, so filtering only
+  // what has been loaded would show a near-empty grid until you scrolled to the very end.
+  const peopleFilterOptions = [PeopleFilterBy.All, PeopleFilterBy.People, PeopleFilterBy.Pets];
+  const peopleFilterIcons: Record<PeopleFilterBy, string> = {
+    [PeopleFilterBy.All]: mdiAccountGroupOutline,
+    [PeopleFilterBy.People]: mdiAccountMultipleOutline,
+    [PeopleFilterBy.Pets]: mdiPaw,
+  };
+  let peopleFilterNames: Record<PeopleFilterBy, string> = $derived({
+    [PeopleFilterBy.All]: $t('all'),
+    [PeopleFilterBy.People]: $t('people'),
+    [PeopleFilterBy.Pets]: $t('pets'),
+  });
+  let peopleFilterBy = $derived(
+    Object.values(PeopleFilterBy).includes($peopleViewSettings.filterBy as PeopleFilterBy)
+      ? ($peopleViewSettings.filterBy as PeopleFilterBy)
+      : PeopleFilterBy.All,
+  );
+  const filterToTypeParam = (filterBy: PeopleFilterBy) => {
+    switch (filterBy) {
+      case PeopleFilterBy.People: {
+        return 'person' as const;
+      }
+      case PeopleFilterBy.Pets: {
+        return 'pet' as const;
+      }
+      default: {
+        return undefined;
+      }
+    }
+  };
+
+  const handleFilterChange = async (filterBy: PeopleFilterBy) => {
+    $peopleViewSettings.filterBy = filterBy;
+    loadingPage = true;
+    try {
+      const result = await getAllPeople({
+        withHidden: true,
+        withSharedSpaces: true,
+        page: 1,
+        size: PEOPLE_PAGE_SIZE,
+        $type: filterToTypeParam(filterBy),
+      });
+      people = result.people;
+      listTotals = { total: result.total, hidden: result.hidden };
+      currentPage = 1;
+      nextPage = result.hasNextPage ? 2 : null;
+    } catch (error) {
+      handleError(error, $t('errors.failed_to_load_people'));
+    } finally {
+      loadingPage = false;
+    }
+  };
 
   const getPersonHref = (person: PersonResponseDto) => getGlobalPersonHref(person, Route.people());
 
@@ -458,6 +525,13 @@
             />
           </div>
         </div>
+        <Dropdown
+          title={$t('filter_people_by')}
+          options={peopleFilterOptions}
+          selectedOption={peopleFilterBy}
+          onSelect={(filterBy) => handlePromiseError(handleFilterChange(filterBy))}
+          render={(filterBy) => ({ title: peopleFilterNames[filterBy], icon: peopleFilterIcons[filterBy] })}
+        />
         <Dropdown
           title={$t('sort_people_by')}
           options={peopleSortOptions}

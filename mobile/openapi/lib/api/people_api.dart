@@ -375,12 +375,15 @@ class PeopleApi {
   /// * [int] size:
   ///   Number of items per page
   ///
+  /// * [String] type:
+  ///   Filter the list to human people or to pets. Omit for both.
+  ///
   /// * [bool] withHidden:
   ///   Include hidden people
   ///
   /// * [bool] withSharedSpaces:
   ///   Include identity-grouped people from timeline-enabled shared spaces
-  Future<Response> getAllPeopleWithHttpInfo({ String? closestAssetId, String? closestPersonId, int? page, int? size, bool? withHidden, bool? withSharedSpaces, Future<void>? abortTrigger, }) async {
+  Future<Response> getAllPeopleWithHttpInfo({ String? closestAssetId, String? closestPersonId, int? page, int? size, String? type, bool? withHidden, bool? withSharedSpaces, Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/people';
 
@@ -402,6 +405,9 @@ class PeopleApi {
     }
     if (size != null) {
       queryParams.addAll(_queryParams('', 'size', size));
+    }
+    if (type != null) {
+      queryParams.addAll(_queryParams('', 'type', type));
     }
     if (withHidden != null) {
       queryParams.addAll(_queryParams('', 'withHidden', withHidden));
@@ -443,13 +449,16 @@ class PeopleApi {
   /// * [int] size:
   ///   Number of items per page
   ///
+  /// * [String] type:
+  ///   Filter the list to human people or to pets. Omit for both.
+  ///
   /// * [bool] withHidden:
   ///   Include hidden people
   ///
   /// * [bool] withSharedSpaces:
   ///   Include identity-grouped people from timeline-enabled shared spaces
-  Future<PeopleResponseDto?> getAllPeople({ String? closestAssetId, String? closestPersonId, int? page, int? size, bool? withHidden, bool? withSharedSpaces, Future<void>? abortTrigger, }) async {
-    final response = await getAllPeopleWithHttpInfo(closestAssetId: closestAssetId, closestPersonId: closestPersonId, page: page, size: size, withHidden: withHidden, withSharedSpaces: withSharedSpaces, abortTrigger: abortTrigger,);
+  Future<PeopleResponseDto?> getAllPeople({ String? closestAssetId, String? closestPersonId, int? page, int? size, String? type, bool? withHidden, bool? withSharedSpaces, Future<void>? abortTrigger, }) async {
+    final response = await getAllPeopleWithHttpInfo(closestAssetId: closestAssetId, closestPersonId: closestPersonId, page: page, size: size, type: type, withHidden: withHidden, withSharedSpaces: withSharedSpaces, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -483,12 +492,15 @@ class PeopleApi {
   /// * [int] size:
   ///   Number of items per page
   ///
+  /// * [String] type:
+  ///   Filter the list to human people or to pets. Omit for both.
+  ///
   /// * [bool] withHidden:
   ///   Include hidden people
   ///
   /// * [bool] withSharedSpaces:
   ///   Include identity-grouped people from timeline-enabled shared spaces
-  Future<Response> getPeopleFaceStatisticsWithHttpInfo({ String? closestAssetId, String? closestPersonId, int? page, int? size, bool? withHidden, bool? withSharedSpaces, Future<void>? abortTrigger, }) async {
+  Future<Response> getPeopleFaceStatisticsWithHttpInfo({ String? closestAssetId, String? closestPersonId, int? page, int? size, String? type, bool? withHidden, bool? withSharedSpaces, Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/people/face-statistics';
 
@@ -510,6 +522,9 @@ class PeopleApi {
     }
     if (size != null) {
       queryParams.addAll(_queryParams('', 'size', size));
+    }
+    if (type != null) {
+      queryParams.addAll(_queryParams('', 'type', type));
     }
     if (withHidden != null) {
       queryParams.addAll(_queryParams('', 'withHidden', withHidden));
@@ -551,13 +566,16 @@ class PeopleApi {
   /// * [int] size:
   ///   Number of items per page
   ///
+  /// * [String] type:
+  ///   Filter the list to human people or to pets. Omit for both.
+  ///
   /// * [bool] withHidden:
   ///   Include hidden people
   ///
   /// * [bool] withSharedSpaces:
   ///   Include identity-grouped people from timeline-enabled shared spaces
-  Future<PeopleFaceStatisticsResponseDto?> getPeopleFaceStatistics({ String? closestAssetId, String? closestPersonId, int? page, int? size, bool? withHidden, bool? withSharedSpaces, Future<void>? abortTrigger, }) async {
-    final response = await getPeopleFaceStatisticsWithHttpInfo(closestAssetId: closestAssetId, closestPersonId: closestPersonId, page: page, size: size, withHidden: withHidden, withSharedSpaces: withSharedSpaces, abortTrigger: abortTrigger,);
+  Future<PeopleFaceStatisticsResponseDto?> getPeopleFaceStatistics({ String? closestAssetId, String? closestPersonId, int? page, int? size, String? type, bool? withHidden, bool? withSharedSpaces, Future<void>? abortTrigger, }) async {
+    final response = await getPeopleFaceStatisticsWithHttpInfo(closestAssetId: closestAssetId, closestPersonId: closestPersonId, page: page, size: size, type: type, withHidden: withHidden, withSharedSpaces: withSharedSpaces, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }
@@ -591,12 +609,15 @@ class PeopleApi {
   /// * [int] size:
   ///   Number of items per page
   ///
+  /// * [String] type:
+  ///   Filter the list to human people or to pets. Omit for both.
+  ///
   /// * [bool] withHidden:
   ///   Include hidden people
   ///
   /// * [bool] withSharedSpaces:
   ///   Include identity-grouped people from timeline-enabled shared spaces
-  Future<Response> getPeopleStatisticsWithHttpInfo({ String? closestAssetId, String? closestPersonId, int? page, int? size, bool? withHidden, bool? withSharedSpaces, Future<void>? abortTrigger, }) async {
+  Future<Response> getPeopleStatisticsWithHttpInfo({ String? closestAssetId, String? closestPersonId, int? page, int? size, String? type, bool? withHidden, bool? withSharedSpaces, Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/people/statistics';
 
@@ -618,6 +639,9 @@ class PeopleApi {
     }
     if (size != null) {
       queryParams.addAll(_queryParams('', 'size', size));
+    }
+    if (type != null) {
+      queryParams.addAll(_queryParams('', 'type', type));
     }
     if (withHidden != null) {
       queryParams.addAll(_queryParams('', 'withHidden', withHidden));
@@ -659,13 +683,16 @@ class PeopleApi {
   /// * [int] size:
   ///   Number of items per page
   ///
+  /// * [String] type:
+  ///   Filter the list to human people or to pets. Omit for both.
+  ///
   /// * [bool] withHidden:
   ///   Include hidden people
   ///
   /// * [bool] withSharedSpaces:
   ///   Include identity-grouped people from timeline-enabled shared spaces
-  Future<PeopleStatisticsResponseDto?> getPeopleStatistics({ String? closestAssetId, String? closestPersonId, int? page, int? size, bool? withHidden, bool? withSharedSpaces, Future<void>? abortTrigger, }) async {
-    final response = await getPeopleStatisticsWithHttpInfo(closestAssetId: closestAssetId, closestPersonId: closestPersonId, page: page, size: size, withHidden: withHidden, withSharedSpaces: withSharedSpaces, abortTrigger: abortTrigger,);
+  Future<PeopleStatisticsResponseDto?> getPeopleStatistics({ String? closestAssetId, String? closestPersonId, int? page, int? size, String? type, bool? withHidden, bool? withSharedSpaces, Future<void>? abortTrigger, }) async {
+    final response = await getPeopleStatisticsWithHttpInfo(closestAssetId: closestAssetId, closestPersonId: closestPersonId, page: page, size: size, type: type, withHidden: withHidden, withSharedSpaces: withSharedSpaces, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }

@@ -100,6 +100,7 @@ const PersonSearchSchema = z
     withSharedSpaces: stringToBool
       .optional()
       .describe('Include identity-grouped people from timeline-enabled shared spaces'),
+    type: z.enum(['person', 'pet']).optional().describe('Filter the list to human people or to pets. Omit for both.'),
     closestPersonId: z.uuidv4().optional().describe('Closest person ID for similarity search'),
     closestAssetId: z.uuidv4().optional().describe('Closest asset ID for similarity search'),
     page: z.coerce.number().int().min(1).default(1).describe('Page number for pagination'),

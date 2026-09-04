@@ -1806,6 +1806,7 @@ export class FaceIdentityRepository {
           AND EXISTS (
             SELECT 1 FROM accessible_faces WHERE accessible_faces."identityId" = person."identityId"
           )
+          AND (${typeFilter} = '' OR person.type = ${typeFilter})
         UNION ALL
         SELECT
           shared_space_person."identityId",
@@ -1834,13 +1835,13 @@ export class FaceIdentityRepository {
           AND EXISTS (
             SELECT 1 FROM accessible_faces WHERE accessible_faces."identityId" = shared_space_person."identityId"
           )
+          AND (${typeFilter} = '' OR shared_space_person.type = ${typeFilter})
       ),
       eligible_profiles AS (
         SELECT *
         FROM accessible_profiles
         WHERE (${input.withHidden}::boolean OR "isHidden" = false)
           AND (${searchName} = '' OR name ILIKE ${`%${searchName}%`})
-          AND (${typeFilter} = '' OR type = ${typeFilter})
       ),
       -- Pets are exempt from the minimumFaceCount gate below: pet clustering already applied its
       -- own petRecognition.minFaces, and re-applying a human-tuned threshold hides exactly the

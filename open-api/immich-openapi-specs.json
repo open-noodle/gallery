@@ -10159,6 +10159,19 @@
             }
           },
           {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Filter the list to human people or to pets. Omit for both.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "person",
+                "pet"
+              ]
+            }
+          },
+          {
             "name": "withHidden",
             "required": false,
             "in": "query",
@@ -10442,6 +10455,19 @@
             }
           },
           {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Filter the list to human people or to pets. Omit for both.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "person",
+                "pet"
+              ]
+            }
+          },
+          {
             "name": "withHidden",
             "required": false,
             "in": "query",
@@ -10599,6 +10625,19 @@
               "maximum": 1000,
               "default": 500,
               "type": "integer"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Filter the list to human people or to pets. Omit for both.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "person",
+                "pet"
+              ]
             }
           },
           {

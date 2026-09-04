@@ -124,12 +124,21 @@ export enum PeopleSortBy {
   Name = 'name',
 }
 
+export enum PeopleFilterBy {
+  All = 'All',
+  People = 'People',
+  Pets = 'Pets',
+}
+
 export interface PeopleViewSettings {
   sortBy: PeopleSortBy;
+  /** People-page type filter. Persisted alongside sortBy; older stored objects have no value. */
+  filterBy?: PeopleFilterBy;
 }
 
 export const peopleViewSettings = persistedObject<PeopleViewSettings>('people-view-settings', {
   sortBy: PeopleSortBy.PhotoCount,
+  filterBy: PeopleFilterBy.All,
 });
 
 export enum PlacesGroupBy {
