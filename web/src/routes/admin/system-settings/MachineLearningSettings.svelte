@@ -426,9 +426,8 @@
             name="pet-detection-model"
             bind:value={configToEdit.machineLearning.petDetection.modelName}
             options={[
-              { value: 'yolo11n', text: 'yolo11n (fast, least accurate)' },
-              { value: 'yolo11s', text: 'yolo11s (balanced, recommended)' },
-              { value: 'yolo11m', text: 'yolo11m (slow, most accurate)' },
+              { value: 'rfdetr-nano', text: 'rfdetr-nano (fast, recommended)' },
+              { value: 'rfdetr-small', text: 'rfdetr-small (slower, better with small pets)' },
             ]}
             disabled={disabled ||
               !configToEdit.machineLearning.enabled ||
