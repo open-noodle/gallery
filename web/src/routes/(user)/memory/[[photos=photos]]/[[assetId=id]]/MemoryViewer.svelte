@@ -40,6 +40,7 @@
     removeMemoryAssets,
     searchMemories,
     updateMemory,
+    type AssetResponseDto,
     type MemoryResponseDto,
   } from '@immich/sdk';
   import { ActionButton, IconButton, Text, toastManager } from '@immich/ui';
@@ -104,6 +105,15 @@
   const exitRoute = $derived(getMemoryViewerExitRoute(memoryViewerSource));
   const asHref = (asset: { id: string }, memory?: { id: string }) =>
     Route.memoryViewer({ id: asset.id, memoryId: memory?.id, source: memoryViewerSource });
+
+  // #1047: a memory can hold a photo the viewer only reaches through a Space. The personal timeline
+  // carries such a photo only while that membership is shown in the timeline, so sending every jump
+  // to /photos scrolled to the right date and showed nothing. `resolvedSpaceId` is set by the server
+  // exactly for an asset the viewer does not own but reaches through a space they belong to.
+  const viewInTimelineHref = (asset: AssetResponseDto) => {
+    const at = asset.stack?.primaryAssetId ?? asset.id;
+    return asset.resolvedSpaceId ? Route.viewSpace({ id: asset.resolvedSpaceId }, { at }) : Route.photos({ at });
+  };
 
   const handleNavigate = async (asset?: { id: string }, memory?: { id: string }) => {
     if (assetViewerManager.isViewing) {
@@ -635,7 +645,7 @@
                 {#await currentMemoryAssetFull then asset}
                   {#if asset}
                     <IconButton
-                      href={Route.photos({ at: asset.stack?.primaryAssetId ?? asset.id })}
+                      href={viewInTimelineHref(asset)}
                       icon={mdiImageSearch}
                       aria-label={$t('view_in_timeline')}
                       color="secondary"

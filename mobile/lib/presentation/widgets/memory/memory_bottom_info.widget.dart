@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/domain/models/memory.model.dart';
-import 'package:immich_mobile/providers/asset_viewer/view_in_timeline_action.dart';
+import 'package:immich_mobile/providers/asset_viewer/view_in_timeline_destination.dart';
 import 'package:immich_mobile/routing/router.dart';
 
 /// The asset shown on [page] of [memory], clamped to the memory's bounds.
@@ -47,13 +47,19 @@ class DriftMemoryBottomInfo extends ConsumerWidget {
             message: 'view_in_timeline'.tr(),
             child: MaterialButton(
               minWidth: 0,
-              onPressed: () => viewAssetInTimeline(
+              onPressed: () => viewMemoryAssetInTimeline(
                 asset: asset,
                 read: ref.read,
                 popViewer: () => context.maybePop(),
                 // Activate the existing timeline tab without rebuilding it (a fresh
                 // TabShellRoute would reload the timeline to the top and discard the scroll).
-                goToTimeline: () => context.navigateTo(const MainTimelineRoute()),
+                goToMainTimeline: () => context.navigateTo(const MainTimelineRoute()),
+                // #1047: a photo the viewer only reaches through a Space is not in their
+                // personal timeline, so open the Space's own timeline instead. Pushed, not
+                // navigated, so the Space stacks over the timeline — the jump latches its
+                // scroll target BEFORE this future settles, because a push future completes
+                // when the route is popped.
+                goToSpace: (spaceId) => context.pushRoute(SpaceDetailRoute(spaceId: spaceId)),
               ),
               shape: const CircleBorder(),
               color: Colors.white.withValues(alpha: 0.2),

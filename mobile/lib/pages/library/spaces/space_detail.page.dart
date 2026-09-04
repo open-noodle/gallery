@@ -437,6 +437,9 @@ class _SpaceDetailPageState extends ConsumerState<SpaceDetailPage> {
           .sharedSpace(spaceId: widget.spaceId, groupBy: groupBy, temporalScope: scope),
       child: Timeline(
         withGroupingPill: true,
+        // Claims "view in timeline" requests addressed to this space, and leaves the
+        // main timeline underneath alone (#1047).
+        spaceId: widget.spaceId,
         topSliverWidget: SpaceTopSliver(
           spaceId: widget.spaceId,
           canEdit: _canEdit,

@@ -161,7 +161,9 @@ export const Route = {
 
   // spaces
   spaces: () => '/spaces',
-  viewSpace: ({ id }: { id: string }) => `/spaces/${id}`,
+  // `at` scrolls the space timeline to an asset, the same param /photos takes: both are read by
+  // the shared (user) layout, which seeds `assetViewerManager.gridScrollTarget` from the URL.
+  viewSpace: ({ id }: { id: string }, params?: { at?: string }) => `/spaces/${id}` + asQueryString(params),
   viewSpaceAlbums: ({ id }: { id: string }) => `/spaces/${id}/albums`,
   viewSpaceAlbum: ({ spaceId, albumId }: { spaceId: string; albumId: string }) =>
     `/spaces/${spaceId}/albums/${albumId}`,
