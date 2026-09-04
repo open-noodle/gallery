@@ -27,6 +27,16 @@ _ANIMAL_CLASSES: dict[int, str] = {
 }
 _ANIMAL_IDS = np.array(sorted(_ANIMAL_CLASSES), dtype=np.int64)
 
+# Only cats and dogs are surfaced. The remaining _ANIMAL_CLASSES entries stay in the
+# scoring subspace above purely as distractors: a horse has to be able to win its own
+# argmax so that it is discarded below. Dropping it from the subspace instead would
+# force it onto its best cat/dog score and file horses and cows under the dog entry.
+_PET_CLASSES: dict[int, str] = {
+    17: "cat",
+    18: "dog",
+}
+_PET_IDS = np.array(sorted(_PET_CLASSES), dtype=np.int64)
+
 # RF-DETR inherits DINOv2's ImageNet normalisation.
 _MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
 _STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
@@ -124,7 +134,7 @@ class PetDetector(InferenceModel):
         confidences = animal_scores[np.arange(len(best)), best]
         class_ids = _ANIMAL_IDS[best]
 
-        keep = confidences >= self.min_score
+        keep = (confidences >= self.min_score) & np.isin(class_ids, _PET_IDS)
         boxes_cxcywh = boxes_cxcywh[keep]
         confidences = confidences[keep]
         class_ids = class_ids[keep]
@@ -159,7 +169,7 @@ class PetDetector(InferenceModel):
                 {
                     "boundingBox": box,
                     "score": float(confidences[i]),
-                    "label": _ANIMAL_CLASSES[int(class_ids[i])],
+                    "label": _PET_CLASSES[int(class_ids[i])],
                 }
             )
 
