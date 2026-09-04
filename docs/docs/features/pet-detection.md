@@ -2,6 +2,8 @@
 
 Gallery can automatically detect pets and other animals in your photos using YOLO11 object detection. Detected animals appear in the **People** section alongside human faces, making it easy to browse all photos of a specific pet.
 
+By default every animal of a species shares one entry — one "dog", one "cat". Turn on [Pet Recognition](/features/pet-recognition) to tell your individual dogs and cats apart and name them.
+
 ## How It Works
 
 When a photo is uploaded or reprocessed, the machine learning service runs a YOLO11 model to detect animals. Each detected animal is cropped and added to the People section as a recognizable entity, similar to how face detection works for people.
@@ -33,7 +35,15 @@ The default model is **yolo11s**, which offers a good balance between accuracy a
 To detect pets in existing photos that were uploaded before pet detection was enabled:
 
 1. Go to **Administration** > **Jobs**.
-2. Run the **Pet Detection** job for all assets.
+2. Run the **Pet Detection** job for **Missing** assets.
+
+:::danger "All" is a destructive reset, not a top-up
+Running the job for **All** assets (the **Reset** button) is a full reset: it **deletes every pet person and every pet detection first**, including any names you gave them and the copies projected into shared spaces, and only then re-detects. Names are not recoverable.
+
+The deletion happens even when pet detection is disabled — that is deliberate, so you can turn detection off and then clear out the pets it already created. But it means resetting while detection is off leaves you with no pets at all until you re-enable it and reset again.
+
+**Missing** is the safe option, and the one you want here: it only processes assets that have never been through pet detection.
+:::
 
 ## Tips
 
@@ -72,6 +82,12 @@ Pet detection extends two existing tables rather than creating new ones:
 - **`asset_job_status`** — Added `petsDetectedAt` timestamp to track which assets have been processed.
 
 Detected pets are stored as `person` rows with `type = 'pet'`. Each species creates one person entry per user (e.g., one "dog" person, one "cat" person), and individual detections are stored as `asset_face` rows with bounding box coordinates linked to that person. This reuses the existing face/person infrastructure for thumbnails, naming, merging, and browsing.
+
+:::note Pet Recognition covers dogs and cats only
+When [Pet Recognition](/features/pet-recognition) is enabled, **dogs and cats** are grouped into individual pets you can name, instead of one shared bucket per species. The other eight detected categories (bird, horse, sheep, cow, elephant, bear, zebra, giraffe) always keep the one-person-per-species behaviour described above.
+
+This is a limit of the recognition model, not an oversight: it is trained on dog and cat identities, so it has no basis for telling one bird or one horse apart from another. Restricting it also contains the cost of a misdetection — the detector occasionally labels a person as an animal, and a shared species bucket absorbs that far more gracefully than an individual identity would.
+:::
 
 ### Job Flow
 
