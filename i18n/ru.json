@@ -3214,6 +3214,8 @@
   "spaces_hide_from_timeline_confirm_title": "Скрыть все фото из «{name}» с вашей временной шкалы?",
   "spaces_hide_people": "Скрыть людей",
   "spaces_hide_pets": "Скрыть питомцев",
+  "spaces_in_nav_body": "Spaces занял место Альбомов на панели навигации. Альбомы остались в Библиотеке — вернуть можно в «Настройки» → «Параметры».",
+  "spaces_in_nav_title": "Spaces на панели навигации",
   "spaces_joined_as": "Присоединился(ась) как {role}",
   "spaces_leave": "Покинуть Space",
   "spaces_leave_confirmation": "Вы уверены, что хотите покинуть «{name}»? Вы потеряете доступ к его фото, альбомам и людям.",

@@ -3212,6 +3212,8 @@
   "spaces_hide_from_timeline_confirm_title": "Nascondere tutte le foto in \"{name}\" dalla tua timeline?",
   "spaces_hide_people": "Nascondi persone",
   "spaces_hide_pets": "Nascondi animali",
+  "spaces_in_nav_body": "Gli Space occupano il posto degli Album nella barra di navigazione. Gli Album restano sotto Libreria — Impostazioni → Preferenze per tornare.",
+  "spaces_in_nav_title": "Gli Space nella barra di navigazione",
   "spaces_joined_as": "Si è unito come {role}",
   "spaces_leave": "Lascia lo spazio",
   "spaces_leave_confirmation": "Vuoi davvero lasciare \"{name}\"? Perderai l'accesso a foto, album e persone.",

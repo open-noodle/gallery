@@ -3212,6 +3212,8 @@
   "spaces_hide_from_timeline_confirm_title": "Masquer toutes les photos de « {name} » de votre Chronologie ?",
   "spaces_hide_people": "Masquer les personnes",
   "spaces_hide_pets": "Masquer les animaux",
+  "spaces_in_nav_body": "Les Espaces occupent la place des Albums dans la barre de navigation. Les Albums restent sous Bibliothèque — Paramètres → Préférences pour revenir.",
+  "spaces_in_nav_title": "Les Espaces dans votre barre de navigation",
   "spaces_joined_as": "Rejoint en tant que {role}",
   "spaces_leave": "Quitter l'espace",
   "spaces_leave_confirmation": "Voulez-vous vraiment quitter \"{name}\" ? Vous perdrez l'accès à ses photos, albums et personnes.",

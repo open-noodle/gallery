@@ -3215,6 +3215,8 @@
   "spaces_hide_from_timeline_confirm_title": "Hide all photos in \"{name}\" from your timeline?",
   "spaces_hide_people": "Hide people",
   "spaces_hide_pets": "Hide pets",
+  "spaces_in_nav_body": "Spaces now holds the navigation bar slot Albums used to. Albums is still under Library — switch back in Settings → Preferences.",
+  "spaces_in_nav_title": "Spaces in your navigation bar",
   "spaces_joined_as": "Joined as {role}",
   "spaces_leave": "Leave space",
   "spaces_leave_confirmation": "Are you sure you want to leave \"{name}\"? You'll lose access to its photos, albums, and people.",

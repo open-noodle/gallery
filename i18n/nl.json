@@ -3212,6 +3212,8 @@
   "spaces_hide_from_timeline_confirm_title": "Alle foto’s in \"{name}\" verbergen uit je tijdlijn?",
   "spaces_hide_people": "Mensen verbergen",
   "spaces_hide_pets": "Huisdieren verbergen",
+  "spaces_in_nav_body": "Spaces staat nu op de plek van Albums in de navigatiebalk. Albums blijft onder Bibliotheek — terugzetten via Instellingen → Voorkeuren.",
+  "spaces_in_nav_title": "Spaces in je navigatiebalk",
   "spaces_joined_as": "Toegetreden als {role}",
   "spaces_leave": "Space verlaten",
   "spaces_leave_confirmation": "Weet je zeker dat je \"{name}\" wilt verlaten? Je verliest de toegang tot de foto's, albums en personen.",

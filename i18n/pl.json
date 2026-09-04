@@ -3230,6 +3230,8 @@
   "spaces_hide_from_timeline_confirm_title": "Ukryć wszystkie zdjęcia z „{name}” na Twojej osi czasu?",
   "spaces_hide_people": "Ukryj osoby",
   "spaces_hide_pets": "Ukryj zwierzęta",
+  "spaces_in_nav_body": "Spaces zajmuje teraz miejsce Albumów na pasku nawigacji. Albumy pozostają w Bibliotece — przywrócisz je w Ustawieniach.",
+  "spaces_in_nav_title": "Spaces na pasku nawigacji",
   "spaces_joined_as": "Dołączono jako {role}",
   "spaces_leave": "Opuść przestrzeń",
   "spaces_leave_confirmation": "Czy na pewno chcesz opuścić \"{name}\"? Stracisz dostęp do zdjęć, albumów i osób.",

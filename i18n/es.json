@@ -3212,6 +3212,8 @@
   "spaces_hide_from_timeline_confirm_title": "¿Ocultar todas las fotos de \"{name}\" de tu línea de tiempo?",
   "spaces_hide_people": "Ocultar personas",
   "spaces_hide_pets": "Ocultar mascotas",
+  "spaces_in_nav_body": "Spaces ocupa ahora el lugar de Álbumes en la barra de navegación. Álbumes sigue en Biblioteca: vuelve en Ajustes → Preferencias.",
+  "spaces_in_nav_title": "Spaces en tu barra de navegación",
   "spaces_joined_as": "Se unió como {role}",
   "spaces_leave": "Salir del espacio",
   "spaces_leave_confirmation": "¿Seguro que quieres salir de \"{name}\"? Perderás el acceso a sus fotos, álbumes y personas.",

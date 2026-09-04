@@ -3212,6 +3212,8 @@
   "spaces_hide_from_timeline_confirm_title": "Alle Fotos in „{name}“ aus deiner Zeitleiste ausblenden?",
   "spaces_hide_people": "Personen ausblenden",
   "spaces_hide_pets": "Haustiere ausblenden",
+  "spaces_in_nav_body": "Spaces hat den Platz von Alben in der Navigationsleiste. Alben bleibt unter Bibliothek – zurückwechseln in Einstellungen → Voreinstellungen.",
+  "spaces_in_nav_title": "Spaces in deiner Navigationsleiste",
   "spaces_joined_as": "Beigetreten als {role}",
   "spaces_leave": "Space verlassen",
   "spaces_leave_confirmation": "Möchtest du \"{name}\" wirklich verlassen? Du verlierst den Zugriff auf Fotos, Alben und Personen.",

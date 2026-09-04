@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
-import 'package:immich_mobile/utils/semver.dart';
+// The batch itself is fork-owned; this file keeps only the type and the two symbol names
+// upstream's consumers read. See feature_message_gallery.model.dart.
+import 'package:immich_mobile/domain/models/feature_message_gallery.model.dart';
 
 class FeatureHighlight {
   /// Asset path of the feature screenshot, or null to show a placeholder.
@@ -18,37 +20,15 @@ class FeatureHighlight {
   bool get isVisibleOnCurrentPlatform => platform.contains(defaultTargetPlatform);
 }
 
-/// The release this batch of highlights was authored for. Content-defined:
-/// bump it only when publishing a new batch, never from the running app version.
-const featureMessageRelease = SemVer(major: 3, minor: 0, patch: 0);
+/// The release this batch of highlights was authored for.
+///
+/// Delegated to the fork-owned batch — see `feature_message_gallery.model.dart` for why the
+/// content and the version live there and not here.
+const featureMessageRelease = galleryFeatureMessageRelease;
 
 /// Highlights relevant to the current platform.
 List<FeatureHighlight> get visibleFeatureMessageHighlights =>
     featureMessageHighlights.where((h) => h.isVisibleOnCurrentPlatform).toList();
 
-const List<FeatureHighlight> featureMessageHighlights = [
-  FeatureHighlight(
-    image: 'assets/feature_message/share_quality.webp',
-    titleKey: 'share_quality_title',
-    bodyKey: 'share_quality_body',
-  ),
-  FeatureHighlight(
-    image: 'assets/feature_message/slideshow.webp',
-    titleKey: 'slideshow_title',
-    bodyKey: 'slideshow_body',
-  ),
-  FeatureHighlight(
-    image: 'assets/feature_message/recently_added.webp',
-    titleKey: 'recently_added_title',
-    bodyKey: 'recently_added_body',
-  ),
-
-  FeatureHighlight(image: 'assets/feature_message/ocr.webp', titleKey: 'ocr_title', bodyKey: 'ocr_body'),
-  FeatureHighlight(
-    image: 'assets/feature_message/open_in_immich.webp',
-    titleKey: 'open_in_immich_title',
-    bodyKey: 'open_in_immich_body',
-    platform: [.android],
-  ),
-  FeatureHighlight(titleKey: 'upload_to_album_title', bodyKey: 'upload_to_album_body'),
-];
+/// Delegated to the fork-owned batch — see `feature_message_gallery.model.dart`.
+const List<FeatureHighlight> featureMessageHighlights = galleryFeatureMessageHighlights;

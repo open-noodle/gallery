@@ -3212,6 +3212,8 @@
   "spaces_hide_from_timeline_confirm_title": "要从您的时间线中隐藏“{name}”中的所有照片吗？",
   "spaces_hide_people": "隐藏人物",
   "spaces_hide_pets": "隐藏宠物",
+  "spaces_in_nav_body": "Space 现在占据了原来“相册”在导航栏中的位置。“相册”仍在“资源库”中——可在“设置 → 偏好设置”中换回。",
+  "spaces_in_nav_title": "导航栏中的 Space",
   "spaces_joined_as": "以 {role} 身份加入",
   "spaces_leave": "退出 Space",
   "spaces_leave_confirmation": "确定要退出“{name}”吗？您将失去对其照片、相簿和人物的访问权限。",
