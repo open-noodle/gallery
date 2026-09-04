@@ -23,7 +23,7 @@ import { SharedSpacePersonAliasTable } from 'src/schema/tables/shared-space-pers
 import { SharedSpacePersonFaceTable } from 'src/schema/tables/shared-space-person-face.table';
 import { SharedSpacePersonTable } from 'src/schema/tables/shared-space-person.table';
 import { SharedSpaceTable } from 'src/schema/tables/shared-space.table';
-import { anyUuid, retryOnDeadlock, searchAssetBuilderLegacy } from 'src/utils/database';
+import { anyUuid, asUuid, retryOnDeadlock, searchAssetBuilderLegacy } from 'src/utils/database';
 import { retargetVerdictSpacePersonId } from 'src/utils/face-verdict-merge';
 import {
   spaceAlbumAssetExists,
@@ -34,6 +34,15 @@ import {
 } from 'src/utils/shared-space-album-scope';
 
 export const visibleSpaceAssetVisibilities = spaceVisibleAssetVisibilities;
+
+// #1041 slice 2 — the per-request "what have I hidden from MY timeline" resolution. Nothing reads
+// this yet (wired in a later slice); see specs/2026-08-31-space-hide-from-timeline-design.md §6.2.
+export interface TimelineHiddenScope {
+  hiddenSpaceIds: string[];
+  hiddenAlbumIds: string[];
+  hiddenAlbumSpacePairs: Array<{ albumId: string; spaceId: string }>;
+  hiddenLibraryIds: string[];
+}
 
 type SpacePersonStatistics = {
   assets: number;
@@ -235,9 +244,17 @@ export class SharedSpaceRepository {
     return this.db.insertInto('shared_space_member').values(values).returningAll().executeTakeFirstOrThrow();
   }
 
+  // #1041 slice 12: optional trx param, mirroring removeMember below — lets
+  // previewInRolledBackTransaction write the hypothetical member-timeline flip inside its own
+  // rolled-back transaction.
   @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID, { role: 'editor' }] })
-  updateMember(spaceId: string, userId: string, values: Updateable<SharedSpaceMemberTable>) {
-    return this.db
+  updateMember(
+    spaceId: string,
+    userId: string,
+    values: Updateable<SharedSpaceMemberTable>,
+    db: Kysely<DB> | Transaction<DB> = this.db,
+  ) {
+    return db
       .updateTable('shared_space_member')
       .set(values)
       .where('spaceId', '=', spaceId)
@@ -356,14 +373,187 @@ export class SharedSpaceRepository {
     return rows.map((row) => row.spaceId);
   }
 
+  // See the getTimelineHiddenScope comment above re: the optional trx handle.
   @GenerateSql({ params: [DummyValue.UUID] })
-  getSpaceIdsForTimeline(userId: string) {
-    return this.db
+  getSpaceIdsForTimeline(userId: string, db: Kysely<DB> | Transaction<DB> = this.db) {
+    return db
       .selectFrom('shared_space_member')
       .where('userId', '=', userId)
       .where('showInTimeline', '=', true)
       .select('spaceId')
       .execute();
+  }
+
+  // #1041: own-row-only by construction — always a specific (spaceId, albumId, userId), never a
+  // bulk/admin write. onConflict doNothing makes hiding an already-hidden album a no-op, not an error.
+  async hideAlbumForUser(
+    spaceId: string,
+    albumId: string,
+    userId: string,
+    db: Kysely<DB> | Transaction<DB> = this.db,
+  ): Promise<void> {
+    await db
+      .insertInto('shared_space_album_hidden')
+      .values({ spaceId: asUuid(spaceId), albumId: asUuid(albumId), userId: asUuid(userId) })
+      .onConflict((oc) => oc.doNothing())
+      .execute();
+  }
+
+  // Unhiding is a row DELETE — shared_space_album_hidden_delete_audit (schema/functions.ts) records
+  // it so mobile's Drift sync learns about the unhide (§5.1). A no-op delete (nothing was hidden) is
+  // not an error.
+  async unhideAlbumForUser(spaceId: string, albumId: string, userId: string): Promise<void> {
+    await this.db
+      .deleteFrom('shared_space_album_hidden')
+      .where('spaceId', '=', asUuid(spaceId))
+      .where('albumId', '=', asUuid(albumId))
+      .where('userId', '=', asUuid(userId))
+      .execute();
+  }
+
+  // #1041 slice 11 — the album list needs to tell the caller which of THEIR own albums they have
+  // hidden from their own timeline, so the web/mobile album kebab can render the correct verb
+  // ("Hide" vs "Show") and badge. Deliberately just this one user's rows for this one space — never
+  // another member's, and never mixed with the space-level hide (that's a different switch, §2).
+  @GenerateSql({ params: [DummyValue.UUID, DummyValue.UUID] })
+  async getHiddenAlbumIdsForUser(spaceId: string, userId: string): Promise<string[]> {
+    const rows = await this.db
+      .selectFrom('shared_space_album_hidden')
+      .select('albumId')
+      .where('spaceId', '=', asUuid(spaceId))
+      .where('userId', '=', asUuid(userId))
+      .execute();
+    return rows.map((row) => row.albumId);
+  }
+
+  // #1041 §6.2 — resolves, for `userId`, everything that should disappear from THEIR OWN personal
+  // timeline. Deliberately NOT wired to any query yet (that is a later slice) — see the
+  // TimelineHiddenScope doc comment above.
+  //
+  // Rule 5 (load-bearing): this method never reads shared_space_album.showInTimeline. That shared,
+  // editor-settable flag governs only the space's own Photos tab (updateAlbumLink /
+  // setAlbumShowInTimeline) — it must never subtract anything from a personal timeline again, which
+  // is the whole point of this redesign (§2).
+  // #1041 slice 12: accepts an optional transaction handle so the preview endpoints can re-resolve
+  // the scope INSIDE a rolled-back transaction that has just performed the hypothetical hide — the
+  // trx sees its own uncommitted write, so this returns exactly what the scope would be after the
+  // real toggle, with nothing actually persisted. Every other caller omits it and gets the original
+  // this.db-bound behavior, unchanged.
+  @GenerateSql({ params: [DummyValue.UUID] })
+  async getTimelineHiddenScope(
+    userId: string,
+    db: Kysely<DB> | Transaction<DB> = this.db,
+  ): Promise<TimelineHiddenScope> {
+    // Rule 1: every set below derives from MY OWN shared_space_member rows. A space I've never
+    // joined can never contribute, no matter what shared_space_album_hidden rows exist for it.
+    const memberRows = await db
+      .selectFrom('shared_space_member')
+      .select(['spaceId', 'showInTimeline'])
+      .where('userId', '=', asUuid(userId))
+      .execute();
+
+    if (memberRows.length === 0) {
+      return { hiddenSpaceIds: [], hiddenAlbumIds: [], hiddenAlbumSpacePairs: [], hiddenLibraryIds: [] };
+    }
+
+    const memberSpaceIds = memberRows.map((row) => row.spaceId);
+    const hiddenSpaceIds = memberRows.filter((row) => !row.showInTimeline).map((row) => row.spaceId);
+    const visibleSpaceIds = memberRows.filter((row) => row.showInTimeline).map((row) => row.spaceId);
+
+    const hiddenLibraryIds =
+      hiddenSpaceIds.length === 0
+        ? []
+        : await db
+            .selectFrom('shared_space_library')
+            .select('libraryId')
+            .where('spaceId', 'in', hiddenSpaceIds)
+            .execute()
+            .then((rows) => rows.map((row) => row.libraryId));
+
+    // Candidate hidden (albumId, spaceId) pairs: albums linked to a space I hid (rule 2b) UNIONed
+    // with albums I personally hid, regardless of that space's own visibility (rule 2a). Both legs
+    // require album.deletedAt IS NULL (rule 3a / A1 invariant) — a trashed album must not keep
+    // hiding. Restricted to memberSpaceIds so an album linked to a space I'm not even a member of
+    // (rule 1) can never appear here, however it got a shared_space_album_hidden row.
+    const candidateRows = await db
+      .selectFrom('shared_space_album')
+      .innerJoin('album', (join) =>
+        join.onRef('album.id', '=', 'shared_space_album.albumId').on('album.deletedAt', 'is', null),
+      )
+      .leftJoin('shared_space_album_hidden', (join) =>
+        join
+          .onRef('shared_space_album_hidden.spaceId', '=', 'shared_space_album.spaceId')
+          .onRef('shared_space_album_hidden.albumId', '=', 'shared_space_album.albumId')
+          .on('shared_space_album_hidden.userId', '=', asUuid(userId)),
+      )
+      .where('shared_space_album.spaceId', 'in', memberSpaceIds)
+      .where((eb) =>
+        eb.or([
+          eb('shared_space_album_hidden.userId', 'is not', null),
+          ...(hiddenSpaceIds.length > 0 ? [eb('shared_space_album.spaceId', 'in', hiddenSpaceIds)] : []),
+        ]),
+      )
+      .select(['shared_space_album.albumId as albumId', 'shared_space_album.spaceId as spaceId'])
+      .execute();
+
+    // Cancelling pairs (the MINUS, rule 2c): albums linked to a space I show, with NO
+    // shared_space_album_hidden row of mine for that exact (space, album) pair — "a visible path
+    // wins". Also requires album.deletedAt IS NULL (rule 3b / A1 invariant): a trashed album must
+    // never re-admit a hide.
+    const cancelRows =
+      visibleSpaceIds.length === 0
+        ? []
+        : await db
+            .selectFrom('shared_space_album')
+            .innerJoin('album', (join) =>
+              join.onRef('album.id', '=', 'shared_space_album.albumId').on('album.deletedAt', 'is', null),
+            )
+            .leftJoin('shared_space_album_hidden', (join) =>
+              join
+                .onRef('shared_space_album_hidden.spaceId', '=', 'shared_space_album.spaceId')
+                .onRef('shared_space_album_hidden.albumId', '=', 'shared_space_album.albumId')
+                .on('shared_space_album_hidden.userId', '=', asUuid(userId)),
+            )
+            .where('shared_space_album.spaceId', 'in', visibleSpaceIds)
+            .where('shared_space_album_hidden.userId', 'is', null)
+            .select('shared_space_album.albumId as albumId')
+            .execute();
+
+    // The album-level set difference happens here, in TypeScript, not SQL — the candidate/cancel
+    // sets are tiny per request, and this is the difference between a working query and the 1600%
+    // regression measured for the CTE + correlated NOT EXISTS form (§6.5).
+    const cancelledAlbumIds = new Set(cancelRows.map((row) => row.albumId));
+    const hiddenPairs = candidateRows.filter((row) => !cancelledAlbumIds.has(row.albumId));
+    const hiddenAlbumIds = [...new Set(hiddenPairs.map((row) => row.albumId))];
+    const hiddenAlbumSpacePairs = hiddenPairs.map((row) => ({ albumId: row.albumId, spaceId: row.spaceId }));
+
+    return { hiddenSpaceIds, hiddenAlbumIds, hiddenAlbumSpacePairs, hiddenLibraryIds };
+  }
+
+  // #1041 slice 12 (§8.1) — runs `mutate` (the hypothetical hide, written for real) then `read`
+  // (measuring its effect) inside a transaction that is ALWAYS rolled back, so the preview
+  // endpoints get an exact answer — the real write + read code paths, nothing simulated — with
+  // nothing ever persisted. Postgres transactions see their own uncommitted writes, so `read`
+  // (which re-resolves getTimelineHiddenScope/getSpaceIdsForTimeline against the SAME trx handle)
+  // observes the hide as if it had already happened.
+  async previewInRolledBackTransaction<T>(
+    mutate: (trx: Transaction<DB>) => Promise<void>,
+    read: (trx: Transaction<DB>) => Promise<T>,
+  ): Promise<T> {
+    const rollbackSentinel = Symbol('previewInRolledBackTransaction rollback');
+    let result: T | undefined;
+    try {
+      await this.db.transaction().execute(async (trx) => {
+        await mutate(trx);
+        result = await read(trx);
+        throw rollbackSentinel;
+      });
+    } catch (error) {
+      if (error !== rollbackSentinel) {
+        throw error;
+      }
+    }
+    return result as T;
   }
 
   @GenerateSql({ params: [] })
@@ -423,7 +613,7 @@ export class SharedSpaceRepository {
                 spaceContributedAssetExists(eb, {
                   correlateAssetId: 'asset.id',
                   scope: { spaceId },
-                  requireShowInTimeline: true,
+                  albumTimelineGate: 'space-tab',
                 }),
               )
               .where('asset.deletedAt', 'is', null)
@@ -1240,7 +1430,7 @@ export class SharedSpaceRepository {
                 spaceContributedAssetExists(eb, {
                   correlateAssetId: 'asset.id',
                   scope: { spaceId },
-                  requireShowInTimeline: true,
+                  albumTimelineGate: 'space-tab',
                 }),
               )
               .where('asset.deletedAt', 'is', null)
@@ -1304,7 +1494,7 @@ export class SharedSpaceRepository {
                 spaceContributedAssetExists(eb, {
                   correlateAssetId: 'asset.id',
                   scope: { spaceId },
-                  requireShowInTimeline: true,
+                  albumTimelineGate: 'space-tab',
                 }),
               )
               .where('asset.deletedAt', 'is', null)
@@ -2190,6 +2380,7 @@ export class SharedSpaceRepository {
           spaceAlbumAssetExists(eb, {
             correlateAssetId: 'asset_face.assetId',
             scope: { spaceIdRef: 'shared_space_person.spaceId' },
+            albumTimelineGate: 'none',
           }),
         ]),
       )
@@ -2231,6 +2422,7 @@ export class SharedSpaceRepository {
           spaceAlbumAssetExists(eb, {
             correlateAssetId: 'asset_face.assetId',
             scope: { spaceIdRef: 'shared_space_person.spaceId' },
+            albumTimelineGate: 'none',
           }),
         ]),
       )
@@ -2593,6 +2785,7 @@ export class SharedSpaceRepository {
           spaceAlbumAssetExists(eb, {
             correlateAssetId: 'asset_face.assetId',
             scope: { spaceId },
+            albumTimelineGate: 'none',
           }),
         ]),
       )
@@ -2703,7 +2896,7 @@ export class SharedSpaceRepository {
           spaceAlbumAssetExists(eb, {
             correlateAssetId: 'asset_face.assetId',
             scope: { spaceIdRef: 'shared_space_person.spaceId' },
-            requireShowInTimeline: true,
+            albumTimelineGate: 'space-tab',
           }),
         ]),
       )
@@ -2863,6 +3056,7 @@ export class SharedSpaceRepository {
           spaceAlbumAssetExists(eb, {
             correlateAssetId: 'asset_face.assetId',
             scope: { spaceIdRef: 'shared_space_person.spaceId' },
+            albumTimelineGate: 'none',
           }),
         ]),
       )
@@ -2906,6 +3100,7 @@ export class SharedSpaceRepository {
           spaceAlbumAssetExists(eb, {
             correlateAssetId: 'asset_face.assetId',
             scope: { spaceIdRef: 'shared_space_person.spaceId' },
+            albumTimelineGate: 'none',
           }),
         ]),
       )
@@ -3209,7 +3404,11 @@ export class SharedSpaceRepository {
       // contributions (#764), via the canonical scope helper. Every read/visibility surface unions
       // both arms; routing retention through the same helper keeps them in agreement. Omitting the
       // contributed arm sweeps faces for assets still visible in the space via a contribution.
-      .where((eb) => eb.not(spaceAlbumAssetExists(eb, { correlateAssetId: 'asset.id', scope: { spaceId } })))
+      .where((eb) =>
+        eb.not(
+          spaceAlbumAssetExists(eb, { correlateAssetId: 'asset.id', scope: { spaceId }, albumTimelineGate: 'none' }),
+        ),
+      )
       .where((eb) =>
         eb.not(
           eb.exists(
@@ -3627,6 +3826,7 @@ export class SharedSpaceRepository {
                   correlateAssetId: 'asset.id',
                   correlateLibraryId: 'asset.libraryId',
                   scope: { spaceIdRef: 'shared_space_person.spaceId' },
+                  albumTimelineGate: 'none',
                 }),
               ),
             ),
@@ -3706,6 +3906,7 @@ export class SharedSpaceRepository {
                 spaceContributedAssetExists(eb, {
                   correlateAssetId: 'asset.id',
                   scope: { spaceId },
+                  albumTimelineGate: 'none',
                 }),
               )
               .where('asset.deletedAt', 'is', null)
@@ -3814,7 +4015,9 @@ export class SharedSpaceRepository {
           // Album path: owner album_asset + cross-owner album_space_asset contributions (#764).
           // Face membership is NOT gated by showInTimeline, so the reconcile re-projects every album
           // asset's faces — matching the retention helper's union so projection and retention agree.
-          .where((eb) => spaceAlbumAssetExists(eb, { correlateAssetId: 'asset.id', scope: { spaceId } }))
+          .where((eb) =>
+            spaceAlbumAssetExists(eb, { correlateAssetId: 'asset.id', scope: { spaceId }, albumTimelineGate: 'none' }),
+          )
           .where('asset.deletedAt', 'is', null)
           .where('asset.isOffline', '=', false)
           .where('asset.visibility', 'in', visibleSpaceAssetVisibilities),
