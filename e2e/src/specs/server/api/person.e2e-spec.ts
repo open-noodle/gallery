@@ -139,6 +139,41 @@ describe('/people', () => {
       });
     });
 
+    // The /people page's All / People / Pets filter reaches the server as ?type=. These fixtures are
+    // all human, so `type=person` must be a no-op over them while `type=pet` empties the list —
+    // which also proves the param is actually applied rather than silently ignored. `pet` means the
+    // individuals pet recognition identified, not the detector's species buckets.
+    it('returns the same people for type=person as unfiltered', async () => {
+      const { status, body } = await request(app)
+        .get('/people')
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .query({ withHidden: true, type: 'person' });
+
+      expect(status).toBe(200);
+      expect(body.total).toBe(10);
+      expect(body.people).toHaveLength(10);
+    });
+
+    it('returns no people for type=pet when the library has none', async () => {
+      const { status, body } = await request(app)
+        .get('/people')
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .query({ withHidden: true, type: 'pet' });
+
+      expect(status).toBe(200);
+      expect(body.total).toBe(0);
+      expect(body.people).toEqual([]);
+    });
+
+    it('rejects an unknown type', async () => {
+      const { status } = await request(app)
+        .get('/people')
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .query({ type: 'aardvark' });
+
+      expect(status).toBe(400);
+    });
+
     it('should sort visible people by favorite, named people alphabetically, then unnamed by asset count', async () => {
       const { status, body } = await request(app).get('/people').set('Authorization', `Bearer ${admin.accessToken}`);
 
