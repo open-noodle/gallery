@@ -43,6 +43,7 @@ class PreloadModelData(BaseModel):
 class MaxBatchSize(BaseModel):
     facial_recognition: int = 4
     ocr: int = 6
+    pet_recognition: int = 4
 
 
 def default_worker_timeout() -> int:

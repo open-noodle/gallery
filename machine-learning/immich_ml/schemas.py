@@ -6,7 +6,7 @@ from typing import Annotated, Any, Protocol, TypeAlias
 import numpy as np
 import numpy.typing as npt
 from pydantic import ConfigDict, Field
-from typing_extensions import TypedDict
+from typing_extensions import NotRequired, TypedDict
 
 
 class StrEnum(str, Enum):
@@ -45,6 +45,7 @@ class ModelSource(StrEnum):
     MCLIP = "mclip"
     OPENCLIP = "openclip"
     PADDLE = "paddle"
+    PET_RECOGNITION = "pet-recognition"
     YOLO = "yolo"
 
 
@@ -131,6 +132,18 @@ class DetectedPet(TypedDict):
 
 
 PetDetectionOutput = list[DetectedPet]
+
+
+class RecognizedPet(TypedDict):
+    boundingBox: BoundingBox
+    score: float
+    label: str
+    # Absent when the crop was too small (post-clamp) to embed — such pets are routed to the
+    # species bucket server-side instead of being written as unassigned embedding-less faces.
+    embedding: NotRequired[str]
+
+
+PetRecognitionOutput = list[RecognizedPet]
 
 
 class Options:
