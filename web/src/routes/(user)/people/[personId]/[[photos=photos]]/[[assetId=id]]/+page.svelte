@@ -814,11 +814,15 @@
       />
       <ButtonContextMenu icon={mdiDotsVertical} title={$t('menu')}>
         <DownloadAction menuItem filename="{person.name || 'immich'}.zip" />
-        <MenuOption
-          icon={mdiAccountMultipleCheckOutline}
-          text={$t('fix_incorrect_match')}
-          onClick={handleReassignAssets}
-        />
+        <!-- Reassigning a space person's faces is Editor-gated server-side, exactly like the rename /
+             birthday / merge actions above; offering it to a viewer only buys them a 403. -->
+        {#if canEditSpacePerson}
+          <MenuOption
+            icon={mdiAccountMultipleCheckOutline}
+            text={$t('fix_incorrect_match')}
+            onClick={handleReassignAssets}
+          />
+        {/if}
         <ChangeDate menuItem />
         <ChangeDescription menuItem />
         <ChangeLocation menuItem />

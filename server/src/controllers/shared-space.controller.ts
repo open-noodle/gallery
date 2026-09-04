@@ -31,6 +31,8 @@ import {
   SharedSpacePeopleStatisticsResponseDto,
   SharedSpacePersonAliasDto,
   SharedSpacePersonMergeDto,
+  SharedSpacePersonReassignDto,
+  SharedSpacePersonReassignResponseDto,
   SharedSpacePersonResponseDto,
   SharedSpacePersonUpdateDto,
   SpacePeopleQueryDto,
@@ -604,6 +606,24 @@ export class SharedSpaceController {
     @Body() dto: SharedSpacePersonMergeDto,
   ): Promise<void> {
     return this.service.mergeSpacePeople(auth, id, personId, dto);
+  }
+
+  @Post(':id/people/:personId/reassign')
+  @Authenticated({ permission: Permission.SharedSpaceUpdate })
+  // NestJS defaults POST handlers to 201, not 200 — explicit override needed here since this
+  // returns a body (unlike mergeSpacePeople's 204, which needed no such override either way).
+  @HttpCode(HttpStatus.OK)
+  @Endpoint({
+    summary: 'Reassign faces from a person in a shared space',
+    description: "Reassign the selected assets' faces from this person to another person, or to a new person.",
+    history: new HistoryBuilder().added('v1').beta('v1'),
+  })
+  reassignSpacePersonFaces(
+    @Auth() auth: AuthDto,
+    @Param() { id, personId }: SharedSpacePersonParamDto,
+    @Body() dto: SharedSpacePersonReassignDto,
+  ): Promise<SharedSpacePersonReassignResponseDto> {
+    return this.service.reassignSpacePersonFaces(auth, id, personId, dto);
   }
 
   @Put(':id/people/:personId/alias')

@@ -2382,6 +2382,47 @@ describe('/shared-spaces', () => {
       });
     });
 
+    describe('POST /shared-spaces/:id/people/:personId/reassign (#765)', () => {
+      // Slice 3 Task 2: the reassign endpoint itself. Editor-gated like merge above,
+      // but returns a body (`{ reassigned }`) so the default 200 applies — unlike
+      // merge's 204. Target resolution, the self-reassign guard, and the cross-owner
+      // gate are already pinned by shared-space.service.spec.ts's `reassignSpacePersonFaces`
+      // describe; this block only needs to prove the HTTP surface is wired correctly.
+
+      it('access matrix', async () => {
+        // One fresh source person per actor (mirrors T12's merge access matrix):
+        // only the editor's call actually succeeds and consumes its source's face,
+        // so give every actor its own isolated fixture.
+        const sourceByActor: Record<string, string> = {};
+        for (const id of ['spaceEditor', 'spaceViewer', 'spaceNonMember', 'anon']) {
+          const res = await utils.createSpacePerson(spaceId, `ReassignSource-${id}`, owner.userId, spaceAssetId);
+          sourceByActor[id] = res.spacePersonId;
+        }
+
+        await forEachActor(
+          [editorActor, viewerActor, nonMemberActor, anonActor],
+          (actor) =>
+            request(app)
+              .post(`/shared-spaces/${spaceId}/people/${sourceByActor[actor.id]}/reassign`)
+              .set(authHeaders(actor))
+              .send({ assetIds: [spaceAssetId], target: { type: 'new' } }),
+          { spaceEditor: 200, spaceViewer: 403, spaceNonMember: 403, anon: 401 },
+        );
+      });
+
+      it('editor reassign-to-new returns { reassigned: 1 }', async () => {
+        const source = await utils.createSpacePerson(spaceId, 'ReassignHappy', owner.userId, spaceAssetId);
+
+        const res = await request(app)
+          .post(`/shared-spaces/${spaceId}/people/${source.spacePersonId}/reassign`)
+          .set('Authorization', `Bearer ${editor.accessToken}`)
+          .send({ assetIds: [spaceAssetId], target: { type: 'new' } });
+
+        expect(res.status).toBe(200);
+        expect(res.body).toEqual({ reassigned: 1 });
+      });
+    });
+
     describe('PUT/DELETE /shared-spaces/:id/people/:personId/alias (T13)', () => {
       // T13 covers per-user alias on a space person.
       //

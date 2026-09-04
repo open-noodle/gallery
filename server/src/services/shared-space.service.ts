@@ -18,6 +18,7 @@ import {
   SharedSpacePeopleStatisticsResponseDto,
   SharedSpacePersonAliasDto,
   SharedSpacePersonMergeDto,
+  SharedSpacePersonReassignDto,
   SharedSpacePersonResponseDto,
   SharedSpacePersonUpdateDto,
   SpacePeopleQueryDto,
@@ -2099,6 +2100,56 @@ export class SharedSpaceService extends BaseService {
       type: SharedSpaceActivityType.PersonMerge,
       data: { personName: target.name ?? '', count: dto.ids.length },
     });
+  }
+
+  /**
+   * Reassign a space person's misassigned faces to another person (#765).
+   *
+   * Editor-gated like every other space person mutation. The client only ever sends space-scoped ids
+   * (or a global person id it already holds); the owner-aligned target person is resolved server-side.
+   */
+  async reassignSpacePersonFaces(
+    auth: AuthDto,
+    spaceId: string,
+    personId: string,
+    dto: SharedSpacePersonReassignDto,
+  ): Promise<{ reassigned: number }> {
+    await this.requireRole(auth, spaceId, SharedSpaceRole.Editor);
+
+    const source = await this.sharedSpaceRepository.getPersonById(personId);
+    if (!source || source.spaceId !== spaceId) {
+      throw new BadRequestException('Person not found');
+    }
+
+    if (dto.target.type === 'existing') {
+      const { profile } = dto.target;
+      if (profile.type === 'space-person') {
+        if (profile.id === personId) {
+          throw new BadRequestException('Cannot reassign a person into themselves');
+        }
+        const target = await this.sharedSpaceRepository.getPersonById(profile.id);
+        if (!target || target.spaceId !== spaceId) {
+          throw new BadRequestException('Target person not found in this space');
+        }
+      } else {
+        // A global person id supplied by the client. Without this the caller could inject a face into
+        // an arbitrary stranger's person by passing any UUID. Mirrors PersonService's reassign target
+        // gate: owner fast path, then shared-space Editor access.
+        const ids = new Set([profile.id]);
+        const isOwner = await this.accessRepository.person.checkOwnerAccess(auth.user.id, ids);
+        if (!isOwner.has(profile.id)) {
+          const canEdit = await this.accessRepository.person.checkSharedSpaceEditAccess(auth.user.id, ids);
+          if (!canEdit.has(profile.id)) {
+            throw new BadRequestException('Not found or no person.update access');
+          }
+        }
+      }
+    }
+
+    const faces = await this.sharedSpaceRepository.getSourceFacesForSpacePersonAssets(personId, dto.assetIds);
+    const { reassigned } = await this.identityMergePropagationService.reassignSpaceFacesToTarget(faces, dto.target);
+
+    return { reassigned };
   }
 
   async setSpacePersonAlias(

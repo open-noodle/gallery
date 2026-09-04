@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { NoResultError } from 'kysely';
 import { writeFile } from 'node:fs/promises';
 import { DiskStorageBackend } from 'src/backends/disk-storage.backend';
 import { SystemConfig } from 'src/config';
@@ -68,6 +69,21 @@ type MergeAuthorizerFn = (plan: {
   repointedOwnerIds: string[];
   unrepairableSpaceCollapseIds: string[];
 }) => Promise<void>;
+
+/**
+ * Arms the non-access lookups both reassign entry points perform, so a test only has to state the
+ * access-repository answers under test (#765 authorization matrix).
+ */
+const armReassignLookups = (
+  mocks: ServiceMocks,
+  face: ReturnType<typeof AssetFaceFactory.create>,
+  person: ReturnType<typeof PersonFactory.create>,
+) => {
+  mocks.person.getFaceById.mockResolvedValue(getForAssetFace(face));
+  mocks.person.getFacesByIds.mockResolvedValue([getForAssetFace(face)]);
+  mocks.person.getById.mockResolvedValue(person);
+  mocks.person.reassignFace.mockResolvedValue(1);
+};
 
 const planWith = (overrides: {
   collapsedOwnerIds?: string[];
@@ -144,6 +160,12 @@ describe(PersonService.name, () => {
     (mocks.faceIdentity as any).getAccessiblePersonByProfileId.mockResolvedValue(void 0);
     (mocks.faceIdentity as any).getAccessibleProfileIdentityId.mockResolvedValue(void 0);
     mocks.sharedSpace.getSpaceIdsWithFaceRecognitionEnabled.mockResolvedValue([]);
+    // Default: the asset is in no shared space, so reassigning skips the projection refresh.
+    mocks.sharedSpace.getSpaceIdsForAsset.mockResolvedValue([]);
+    mocks.sharedSpace.removePersonFaceAssignmentsForSpaceFace.mockResolvedValue([]);
+    mocks.sharedSpace.isAssetInSpace.mockResolvedValue(true);
+    mocks.sharedSpace.recountPersons.mockResolvedValue(void 0);
+    mocks.sharedSpace.deleteOrphanedPersonsByIds.mockResolvedValue(void 0);
     // Default: no stored preferences → getPreferences() falls back to minimumFaces = 3.
     mocks.user.getMetadata.mockResolvedValue([]);
     mocks.sharedSpace.getAssignedFaceIdsForSpace.mockResolvedValue([]);
@@ -6045,6 +6067,538 @@ describe(PersonService.name, () => {
       await sut.reassignFacesById(AuthFactory.create(), person.id, { id: face.id });
 
       expect(mocks.facePersonVerdict.resolveAssignedFace).toHaveBeenCalledWith(face.id);
+    });
+  });
+
+  const setupReassignById = (face: any, person: any) => {
+    mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.id]));
+    mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set([face.id]));
+    mocks.person.getFaceById.mockResolvedValue(getForAssetFace(face));
+    mocks.person.getById.mockResolvedValue(person);
+    mocks.person.reassignFace.mockResolvedValue(1);
+  };
+
+  // Regression coverage for #765: "Fix incorrect match" appeared to succeed but the photo
+  // reappeared under the original person. Reassigning writes asset_face.personId and the
+  // face identity link, but space-scoped views read from the shared_space_person_face
+  // projection, which was never refreshed. Editors also could not reassign at all, because
+  // both gates were owner-only.
+  describe('reassign — shared space projection refresh (#765)', () => {
+    it('evicts the stale space assignment and queues a re-match for each space', async () => {
+      const face = AssetFaceFactory.create();
+      const person = PersonFactory.create();
+      setupReassignById(face, person);
+      mocks.sharedSpace.getSpaceIdsForAsset.mockResolvedValue([{ spaceId: 'space-1' }]);
+
+      await sut.reassignFacesById(AuthFactory.create(), person.id, { id: face.id });
+
+      expect(mocks.sharedSpace.getSpaceIdsForAsset).toHaveBeenCalledWith(face.assetId);
+      expect(mocks.sharedSpace.removePersonFaceAssignmentsForSpaceFace).toHaveBeenCalledWith('space-1', face.id);
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.SharedSpaceFaceMatch,
+        data: { spaceId: 'space-1', assetId: face.assetId },
+      });
+    });
+
+    it('evicts before queueing the re-match so the photo leaves the wrong person immediately', async () => {
+      const face = AssetFaceFactory.create();
+      const person = PersonFactory.create();
+      setupReassignById(face, person);
+      mocks.sharedSpace.getSpaceIdsForAsset.mockResolvedValue([{ spaceId: 'space-1' }]);
+
+      const order: string[] = [];
+      mocks.sharedSpace.removePersonFaceAssignmentsForSpaceFace.mockImplementation(() => {
+        order.push('evict');
+        return Promise.resolve([]);
+      });
+      mocks.job.queue.mockImplementation((job: any) => {
+        if (job.name === JobName.SharedSpaceFaceMatch) {
+          order.push('queue');
+        }
+        return Promise.resolve();
+      });
+
+      await sut.reassignFacesById(AuthFactory.create(), person.id, { id: face.id });
+
+      expect(order).toEqual(['evict', 'queue']);
+    });
+
+    it('evicts and queues exactly once per space when an asset resolves the same space twice', async () => {
+      const face = AssetFaceFactory.create();
+      const person = PersonFactory.create();
+      setupReassignById(face, person);
+      mocks.sharedSpace.getSpaceIdsForAsset.mockResolvedValue([
+        { spaceId: 'space-1' },
+        { spaceId: 'space-1' },
+        { spaceId: 'space-2' },
+      ]);
+
+      await sut.reassignFacesById(AuthFactory.create(), person.id, { id: face.id });
+
+      expect(mocks.sharedSpace.removePersonFaceAssignmentsForSpaceFace.mock.calls).toEqual([
+        ['space-1', face.id],
+        ['space-2', face.id],
+      ]);
+      const spaceJobs = mocks.job.queue.mock.calls
+        .map(([job]: [any]) => job)
+        .filter((job: any) => job.name === JobName.SharedSpaceFaceMatch);
+      expect(spaceJobs).toEqual([
+        { name: JobName.SharedSpaceFaceMatch, data: { spaceId: 'space-1', assetId: face.assetId } },
+        { name: JobName.SharedSpaceFaceMatch, data: { spaceId: 'space-2', assetId: face.assetId } },
+      ]);
+    });
+
+    it('does not evict or queue when the asset belongs to no space', async () => {
+      const face = AssetFaceFactory.create();
+      const person = PersonFactory.create();
+      setupReassignById(face, person);
+      mocks.sharedSpace.getSpaceIdsForAsset.mockResolvedValue([]);
+
+      await sut.reassignFacesById(AuthFactory.create(), person.id, { id: face.id });
+
+      expect(mocks.sharedSpace.removePersonFaceAssignmentsForSpaceFace).not.toHaveBeenCalled();
+      expect(mocks.job.queue).not.toHaveBeenCalledWith(expect.objectContaining({ name: JobName.SharedSpaceFaceMatch }));
+    });
+
+    it('refreshes the projection for every face on the bulk reassign path', async () => {
+      const auth = AuthFactory.create();
+      const person = PersonFactory.create();
+      const faceA = AssetFaceFactory.create();
+      const faceB = AssetFaceFactory.create();
+
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.id]));
+      mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set([faceA.id, faceB.id]));
+      mocks.person.getById.mockResolvedValue(person);
+      mocks.person.reassignFace.mockResolvedValue(1);
+      mocks.person.getFacesByIds
+        .mockResolvedValueOnce([getForAssetFace(faceA)])
+        .mockResolvedValueOnce([getForAssetFace(faceB)]);
+      mocks.sharedSpace.getSpaceIdsForAsset.mockResolvedValue([{ spaceId: 'space-1' }]);
+
+      await sut.reassignFaces(auth, person.id, {
+        data: [
+          { personId: person.id, assetId: faceA.assetId },
+          { personId: person.id, assetId: faceB.assetId },
+        ],
+      });
+
+      expect(mocks.sharedSpace.removePersonFaceAssignmentsForSpaceFace).toHaveBeenCalledWith('space-1', faceA.id);
+      expect(mocks.sharedSpace.removePersonFaceAssignmentsForSpaceFace).toHaveBeenCalledWith('space-1', faceB.id);
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.SharedSpaceFaceMatch,
+        data: { spaceId: 'space-1', assetId: faceA.assetId },
+      });
+      expect(mocks.job.queue).toHaveBeenCalledWith({
+        name: JobName.SharedSpaceFaceMatch,
+        data: { spaceId: 'space-1', assetId: faceB.assetId },
+      });
+    });
+
+    it('does not evict when the asset is not visible in the space, since the job would not re-add it', async () => {
+      // getSpaceIdsForAsset is broader than the job's own isAssetInSpace guard (it ignores
+      // deletedAt / isOffline / visibility). Evicting a face the job will refuse to re-add would
+      // drop it from the space entirely — worse than the stale row.
+      const face = AssetFaceFactory.create();
+      const person = PersonFactory.create();
+      setupReassignById(face, person);
+      mocks.sharedSpace.getSpaceIdsForAsset.mockResolvedValue([{ spaceId: 'space-1' }]);
+      mocks.sharedSpace.isAssetInSpace.mockResolvedValue(false);
+
+      await sut.reassignFacesById(AuthFactory.create(), person.id, { id: face.id });
+
+      expect(mocks.sharedSpace.removePersonFaceAssignmentsForSpaceFace).not.toHaveBeenCalled();
+    });
+
+    it('recounts and reaps the space person the face was evicted from', async () => {
+      const face = AssetFaceFactory.create();
+      const person = PersonFactory.create();
+      setupReassignById(face, person);
+      mocks.sharedSpace.getSpaceIdsForAsset.mockResolvedValue([{ spaceId: 'space-1' }]);
+      mocks.sharedSpace.removePersonFaceAssignmentsForSpaceFace.mockResolvedValue(['old-space-person']);
+
+      await sut.reassignFacesById(AuthFactory.create(), person.id, { id: face.id });
+
+      expect(mocks.sharedSpace.recountPersons).toHaveBeenCalledWith(['old-space-person']);
+      expect(mocks.sharedSpace.deleteOrphanedPersonsByIds).toHaveBeenCalledWith('space-1', ['old-space-person']);
+    });
+
+    it('does not recount or reap when the face had no space assignment to evict', async () => {
+      const face = AssetFaceFactory.create();
+      const person = PersonFactory.create();
+      setupReassignById(face, person);
+      mocks.sharedSpace.getSpaceIdsForAsset.mockResolvedValue([{ spaceId: 'space-1' }]);
+      mocks.sharedSpace.removePersonFaceAssignmentsForSpaceFace.mockResolvedValue([]);
+
+      await sut.reassignFacesById(AuthFactory.create(), person.id, { id: face.id });
+
+      expect(mocks.sharedSpace.recountPersons).not.toHaveBeenCalled();
+      expect(mocks.sharedSpace.deleteOrphanedPersonsByIds).not.toHaveBeenCalled();
+    });
+
+    it('links the face to its new identity before evicting, so the job cannot re-add the old person', async () => {
+      // Ordering is load-bearing: processSpaceFaceMatch resolves the space person from
+      // face_identity_face. Evicting before the identity swap would re-add the OLD person.
+      const face = AssetFaceFactory.create();
+      const person = PersonFactory.create();
+      setupReassignById(face, person);
+      mocks.sharedSpace.getSpaceIdsForAsset.mockResolvedValue([{ spaceId: 'space-1' }]);
+
+      const order: string[] = [];
+      mocks.faceIdentity.replaceFaceIdentity.mockImplementation(() => {
+        order.push('identity');
+        return Promise.resolve({} as any);
+      });
+      mocks.sharedSpace.removePersonFaceAssignmentsForSpaceFace.mockImplementation(() => {
+        order.push('evict');
+        return Promise.resolve([]);
+      });
+
+      await sut.reassignFacesById(AuthFactory.create(), person.id, { id: face.id });
+
+      expect(order).toEqual(['identity', 'evict']);
+    });
+
+    it('does not refresh the projection when access is denied', async () => {
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.person.checkSharedSpaceEditAccess.mockResolvedValue(new Set());
+
+      await expect(sut.reassignFacesById(AuthFactory.create(), 'person-id', { id: 'face-id' })).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+
+      expect(mocks.sharedSpace.removePersonFaceAssignmentsForSpaceFace).not.toHaveBeenCalled();
+      expect(mocks.job.queue).not.toHaveBeenCalledWith(expect.objectContaining({ name: JobName.SharedSpaceFaceMatch }));
+    });
+  });
+
+  describe('reassign — shared space editor permissions (#765)', () => {
+    it('allows a space editor to reassign onto a person they do not own', async () => {
+      const auth = AuthFactory.create();
+      const face = AssetFaceFactory.create();
+      const person = PersonFactory.create();
+
+      // Not the person owner, but an Editor of a space the person is shared through.
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.person.checkSharedSpaceEditAccess.mockResolvedValue(new Set([person.id]));
+      mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set([face.id]));
+      mocks.person.getFaceById.mockResolvedValue(getForAssetFace(face));
+      mocks.person.getById.mockResolvedValue(person);
+      mocks.person.reassignFace.mockResolvedValue(1);
+
+      await expect(sut.reassignFacesById(auth, person.id, { id: face.id })).resolves.toBeDefined();
+
+      expect(mocks.access.person.checkSharedSpaceEditAccess).toHaveBeenCalledWith(auth.user.id, new Set([person.id]));
+      expect(mocks.person.reassignFace).toHaveBeenCalledWith(face.id, person.id);
+    });
+
+    it('denies a space viewer, who has read but not edit access to the person', async () => {
+      const auth = AuthFactory.create();
+      const face = AssetFaceFactory.create();
+      const person = PersonFactory.create();
+
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.person.checkSharedSpaceAccess.mockResolvedValue(new Set([person.id]));
+      mocks.access.person.checkSharedSpaceEditAccess.mockResolvedValue(new Set());
+      mocks.person.getFaceById.mockResolvedValue(getForAssetFace(face));
+      mocks.person.getById.mockResolvedValue(person);
+
+      await expect(sut.reassignFacesById(auth, person.id, { id: face.id })).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(mocks.person.reassignFace).not.toHaveBeenCalled();
+    });
+
+    it("allows a space editor to reassign a face on another member's asset", async () => {
+      const auth = AuthFactory.create();
+      const face = AssetFaceFactory.create();
+      const person = PersonFactory.create();
+
+      // Owns the target person (e.g. just created it) but not the underlying asset.
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.id]));
+      mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set([face.assetId]));
+      mocks.person.getFaceById.mockResolvedValue(getForAssetFace(face));
+      mocks.person.getById.mockResolvedValue(person);
+      mocks.person.reassignFace.mockResolvedValue(1);
+
+      await expect(sut.reassignFacesById(auth, person.id, { id: face.id })).resolves.toBeDefined();
+
+      expect(mocks.person.reassignFace).toHaveBeenCalledWith(face.id, person.id);
+    });
+
+    it("denies reassigning a face on another member's asset without space edit rights", async () => {
+      const auth = AuthFactory.create();
+      const face = AssetFaceFactory.create();
+      const person = PersonFactory.create();
+
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.id]));
+      mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set());
+      mocks.person.getFaceById.mockResolvedValue(getForAssetFace(face));
+      mocks.person.getById.mockResolvedValue(person);
+
+      await expect(sut.reassignFacesById(auth, person.id, { id: face.id })).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(mocks.person.reassignFace).not.toHaveBeenCalled();
+    });
+
+    it('allows a space editor to reassign on the bulk path', async () => {
+      const auth = AuthFactory.create();
+      const face = AssetFaceFactory.create();
+      const person = PersonFactory.create();
+
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.person.checkSharedSpaceEditAccess.mockResolvedValue(new Set([person.id]));
+      mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set([face.assetId]));
+      mocks.person.getById.mockResolvedValue(person);
+      mocks.person.getFacesByIds.mockResolvedValue([getForAssetFace(face)]);
+      mocks.person.reassignFace.mockResolvedValue(1);
+
+      await expect(
+        sut.reassignFaces(auth, person.id, { data: [{ personId: person.id, assetId: face.assetId }] }),
+      ).resolves.toBeDefined();
+
+      expect(mocks.person.reassignFace).toHaveBeenCalledWith(face.id, person.id);
+    });
+
+    it('rejects an unknown face id as a bad request rather than leaking a lookup failure', async () => {
+      // The face is now fetched before the face-level check (to resolve its asset for the
+      // space-Editor fallback), so a missing row must not surface as a 500 — and must be
+      // indistinguishable from an unauthorized face.
+      const person = PersonFactory.create();
+
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.id]));
+      mocks.person.getFaceById.mockRejectedValue(new NoResultError({} as any));
+
+      await expect(sut.reassignFacesById(AuthFactory.create(), person.id, { id: newUuid() })).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+
+      expect(mocks.person.reassignFace).not.toHaveBeenCalled();
+    });
+
+    it('propagates a genuine database failure instead of masking it as a bad request', async () => {
+      const person = PersonFactory.create();
+
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.id]));
+      mocks.person.getFaceById.mockRejectedValue(new Error('connection terminated'));
+
+      await expect(sut.reassignFacesById(AuthFactory.create(), person.id, { id: newUuid() })).rejects.toThrow(
+        'connection terminated',
+      );
+    });
+
+    it('does not consult space edit access when the caller already owns the person', async () => {
+      const auth = AuthFactory.create();
+      const face = AssetFaceFactory.create();
+      const person = PersonFactory.create();
+
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.id]));
+      mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set([face.id]));
+      mocks.person.getFaceById.mockResolvedValue(getForAssetFace(face));
+      mocks.person.getById.mockResolvedValue(person);
+      mocks.person.reassignFace.mockResolvedValue(1);
+
+      await sut.reassignFacesById(auth, person.id, { id: face.id });
+
+      expect(mocks.access.person.checkSharedSpaceEditAccess).not.toHaveBeenCalled();
+      expect(mocks.access.asset.checkSpaceEditAccess).not.toHaveBeenCalled();
+    });
+  });
+
+  // #765 narrowed two owner-only upstream gates into fork helpers. Upstream v3.1.0 checked:
+  //   Permission.PersonUpdate -> access.person.checkOwnerAccess       (person.ownerId = caller)
+  //   Permission.PersonCreate -> access.person.checkFaceOwnerAccess   (face's asset owned by caller)
+  // The fork's requireReassignTargetAccess / requireReassignFaceAccess keep both of those as the fast
+  // path and OR in exactly ONE extra predicate each, both of which require a shared_space_member row
+  // with role owner|editor:
+  //   target -> access.person.checkSharedSpaceEditAccess  (memberRole: [owner, editor])
+  //   face   -> Permission.AssetUpdate = asset.checkOwnerAccess U asset.checkSpaceEditAccess
+  // So the new gates are supersets of the old ones by construction, and the whole security argument is
+  // that the added principals are ONLY space Owners/Editors. These tests pin that: they fail if a
+  // future edit swaps in an any-role grant (checkSharedSpaceAccess / asset.checkSpaceAccess) or a
+  // broader asset permission (AssetRead/AssetView, which also admit partners and album members) — every
+  // one of which would admit a principal that failed the owner-only gates being replaced.
+  describe('reassign — authorization is no wider than the owner-only gates it replaced (#765)', () => {
+    // Both entry points share the two helpers, so every row of the matrix is asserted against both.
+    const entryPoints = {
+      reassignFacesById: (
+        auth: ReturnType<typeof AuthFactory.create>,
+        personId: string,
+        face: ReturnType<typeof AssetFaceFactory.create>,
+      ) => sut.reassignFacesById(auth, personId, { id: face.id }),
+      reassignFaces: (
+        auth: ReturnType<typeof AuthFactory.create>,
+        personId: string,
+        face: ReturnType<typeof AssetFaceFactory.create>,
+      ) =>
+        sut.reassignFaces(auth, personId, {
+          data: [{ personId: face.person?.id ?? newUuid(), assetId: face.assetId }],
+        }),
+    };
+    const bothEntryPoints = Object.entries(entryPoints) as [
+      keyof typeof entryPoints,
+      (typeof entryPoints)[keyof typeof entryPoints],
+    ][];
+
+    it.each(bothEntryPoints)(
+      '%s does not admit the any-role PersonRead space grant on the target person',
+      async (_name, call) => {
+        const face = AssetFaceFactory.create();
+        const person = PersonFactory.create();
+        armReassignLookups(mocks, face, person);
+        // A Viewer: reachable for PersonRead (checkSharedSpaceAccess) but not for edit.
+        mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set());
+        mocks.access.person.checkSharedSpaceAccess.mockResolvedValue(new Set([person.id]));
+        mocks.access.person.checkSharedSpaceEditAccess.mockResolvedValue(new Set());
+
+        // The message pins WHICH gate refused: if the target gate were dropped the call would only
+        // fail later, at the face gate, with 'asset.update' instead.
+        await expect(call(AuthFactory.create(), person.id, face)).rejects.toThrow(
+          'Not found or no person.update access',
+        );
+
+        expect(mocks.access.person.checkSharedSpaceAccess).not.toHaveBeenCalled();
+        expect(mocks.person.reassignFace).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each(bothEntryPoints)(
+      '%s does not admit the any-role space / partner / album grants on the face’s asset',
+      async (_name, call) => {
+        const face = AssetFaceFactory.create();
+        const person = PersonFactory.create();
+        armReassignLookups(mocks, face, person);
+        // Owns the target person, so only the face gate is under test.
+        mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.id]));
+        mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set());
+        // Every grant a *read* permission on the asset would have honoured is satisfied here; only the
+        // Owner/Editor one is not. The call must still be refused, and those grants never consulted.
+        mocks.access.asset.checkSpaceAccess.mockResolvedValue(new Set([face.assetId]));
+        mocks.access.asset.checkPartnerAccess.mockResolvedValue(new Set([face.assetId]));
+        mocks.access.asset.checkAlbumAccess.mockResolvedValue(new Set([face.assetId]));
+        mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set());
+
+        await expect(call(AuthFactory.create(), person.id, face)).rejects.toThrow(
+          'Not found or no asset.update access',
+        );
+
+        expect(mocks.access.asset.checkSpaceAccess).not.toHaveBeenCalled();
+        expect(mocks.access.asset.checkPartnerAccess).not.toHaveBeenCalled();
+        expect(mocks.access.asset.checkAlbumAccess).not.toHaveBeenCalled();
+        expect(mocks.person.reassignFace).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each(bothEntryPoints)('%s refuses an admin at the target gate', async (_name, call) => {
+      const face = AssetFaceFactory.create();
+      const person = PersonFactory.create();
+      armReassignLookups(mocks, face, person);
+      // Every access grant stays empty (the mock default) — being an admin must not substitute for one.
+      const admin = AuthFactory.create({ isAdmin: true });
+
+      await expect(call(admin, person.id, face)).rejects.toThrow('Not found or no person.update access');
+
+      expect(mocks.person.reassignFace).not.toHaveBeenCalled();
+    });
+
+    it.each(bothEntryPoints)('%s refuses an admin at the face gate', async (_name, call) => {
+      const face = AssetFaceFactory.create();
+      const person = PersonFactory.create();
+      armReassignLookups(mocks, face, person);
+      // Admin owning the target person still may not touch a face on someone else's asset without
+      // being an Owner/Editor of a space that asset is in.
+      const admin = AuthFactory.create({ isAdmin: true });
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.id]));
+
+      await expect(call(admin, person.id, face)).rejects.toThrow('Not found or no asset.update access');
+
+      expect(mocks.person.reassignFace).not.toHaveBeenCalled();
+    });
+
+    it.each(bothEntryPoints)('%s rejects a denied target before looking the face up at all', async (_name, call) => {
+      const face = AssetFaceFactory.create();
+      const person = PersonFactory.create();
+      armReassignLookups(mocks, face, person);
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set());
+      mocks.access.person.checkSharedSpaceEditAccess.mockResolvedValue(new Set());
+
+      await expect(call(AuthFactory.create(), person.id, face)).rejects.toBeInstanceOf(BadRequestException);
+
+      // No face row is read, so the response cannot be used as an existence oracle for a face id.
+      expect(mocks.person.getFaceById).not.toHaveBeenCalled();
+      expect(mocks.person.getFacesByIds).not.toHaveBeenCalled();
+      expect(mocks.access.person.checkFaceOwnerAccess).not.toHaveBeenCalled();
+    });
+
+    it.each(bothEntryPoints)(
+      '%s reports a denial with the same message whether the target is missing or forbidden',
+      async (_name, call) => {
+        const face = AssetFaceFactory.create();
+        const person = PersonFactory.create();
+        armReassignLookups(mocks, face, person);
+        mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set());
+        mocks.access.person.checkSharedSpaceEditAccess.mockResolvedValue(new Set());
+
+        await expect(call(AuthFactory.create(), person.id, face)).rejects.toThrow(
+          'Not found or no person.update access',
+        );
+      },
+    );
+
+    it('checks the face gate once per face on the bulk path, not just for the first', async () => {
+      const person = PersonFactory.create();
+      const faceA = AssetFaceFactory.create();
+      const faceB = AssetFaceFactory.create();
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.id]));
+      mocks.access.person.checkFaceOwnerAccess.mockResolvedValue(new Set([faceA.id, faceB.id]));
+      mocks.person.getById.mockResolvedValue(person);
+      mocks.person.reassignFace.mockResolvedValue(1);
+      mocks.person.getFacesByIds
+        .mockResolvedValueOnce([getForAssetFace(faceA)])
+        .mockResolvedValueOnce([getForAssetFace(faceB)]);
+
+      await sut.reassignFaces(AuthFactory.create(), person.id, {
+        data: [
+          { personId: person.id, assetId: faceA.assetId },
+          { personId: person.id, assetId: faceB.assetId },
+        ],
+      });
+
+      expect(mocks.access.person.checkFaceOwnerAccess.mock.calls).toEqual([
+        [expect.any(String), new Set([faceA.id])],
+        [expect.any(String), new Set([faceB.id])],
+      ]);
+    });
+
+    // Characterisation, not an endorsement: the per-face gate lives inside the loop (as it did
+    // upstream), so a batch is not atomic — a face the caller may touch is already reassigned when a
+    // later one is refused. Pinned so the behaviour is visible if the batch is ever made atomic.
+    it('aborts the bulk path at the first unauthorized face, keeping earlier writes', async () => {
+      const person = PersonFactory.create();
+      const faceA = AssetFaceFactory.create();
+      const faceB = AssetFaceFactory.create();
+      mocks.access.person.checkOwnerAccess.mockResolvedValue(new Set([person.id]));
+      mocks.access.person.checkFaceOwnerAccess.mockImplementation((_userId: string, ids: Set<string>) =>
+        Promise.resolve(new Set([...ids].filter((id) => id === faceA.id))),
+      );
+      mocks.access.asset.checkSpaceEditAccess.mockResolvedValue(new Set());
+      mocks.person.getById.mockResolvedValue(person);
+      mocks.person.reassignFace.mockResolvedValue(1);
+      mocks.person.getFacesByIds
+        .mockResolvedValueOnce([getForAssetFace(faceA)])
+        .mockResolvedValueOnce([getForAssetFace(faceB)]);
+
+      await expect(
+        sut.reassignFaces(AuthFactory.create(), person.id, {
+          data: [
+            { personId: person.id, assetId: faceA.assetId },
+            { personId: person.id, assetId: faceB.assetId },
+          ],
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(mocks.person.reassignFace.mock.calls).toEqual([[faceA.id, person.id]]);
     });
   });
 

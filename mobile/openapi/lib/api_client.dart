@@ -823,6 +823,16 @@ class ApiClient {
           return SharedSpacePersonAliasDto.fromJson(value);
         case 'SharedSpacePersonMergeDto':
           return SharedSpacePersonMergeDto.fromJson(value);
+        case 'SharedSpacePersonReassignDto':
+          return SharedSpacePersonReassignDto.fromJson(value);
+        case 'SharedSpacePersonReassignDtoTarget':
+          return SharedSpacePersonReassignDtoTarget.fromJson(value);
+        case 'SharedSpacePersonReassignDtoTargetOneOf':
+          return SharedSpacePersonReassignDtoTargetOneOf.fromJson(value);
+        case 'SharedSpacePersonReassignDtoTargetOneOf1':
+          return SharedSpacePersonReassignDtoTargetOneOf1.fromJson(value);
+        case 'SharedSpacePersonReassignResponseDto':
+          return SharedSpacePersonReassignResponseDto.fromJson(value);
         case 'SharedSpacePersonResponseDto':
           return SharedSpacePersonResponseDto.fromJson(value);
         case 'SharedSpacePersonUpdateDto':

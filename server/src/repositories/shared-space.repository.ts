@@ -2241,6 +2241,57 @@ export class SharedSpaceRepository {
       .execute();
   }
 
+  @GenerateSql({ params: [DummyValue.UUID, [DummyValue.UUID]] })
+  getSourceFacesForSpacePersonAssets(
+    spacePersonId: string,
+    assetIds: string[],
+  ): Promise<Array<{ assetFaceId: string; assetId: string; personId: string | null; assetOwnerId: string }>> {
+    if (assetIds.length === 0) {
+      return Promise.resolve([]);
+    }
+    return this.db
+      .selectFrom('shared_space_person_face')
+      .innerJoin('shared_space_person', 'shared_space_person.id', 'shared_space_person_face.personId')
+      .innerJoin('asset_face', 'asset_face.id', 'shared_space_person_face.assetFaceId')
+      .innerJoin('asset', 'asset.id', 'asset_face.assetId')
+      .select([
+        'asset_face.id as assetFaceId',
+        'asset_face.assetId as assetId',
+        'asset_face.personId as personId',
+        'asset.ownerId as assetOwnerId',
+      ])
+      .where('shared_space_person_face.personId', '=', spacePersonId)
+      .where('asset_face.assetId', 'in', assetIds)
+      .where('asset_face.deletedAt', 'is', null)
+      .where('asset_face.isVisible', 'is', true)
+      .where('asset.deletedAt', 'is', null)
+      .where('asset.isOffline', '=', false)
+      .where('asset.visibility', 'in', visibleSpaceAssetVisibilities)
+      .where((eb) =>
+        eb.or([
+          eb.exists(
+            eb
+              .selectFrom('shared_space_asset')
+              .select('shared_space_asset.assetId')
+              .whereRef('shared_space_asset.assetId', '=', 'asset_face.assetId')
+              .whereRef('shared_space_asset.spaceId', '=', 'shared_space_person.spaceId'),
+          ),
+          eb.exists(
+            eb
+              .selectFrom('shared_space_library')
+              .select('shared_space_library.libraryId')
+              .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
+              .whereRef('shared_space_library.spaceId', '=', 'shared_space_person.spaceId'),
+          ),
+          spaceAlbumAssetExists(eb, {
+            correlateAssetId: 'asset_face.assetId',
+            scope: { spaceIdRef: 'shared_space_person.spaceId' },
+          }),
+        ]),
+      )
+      .execute();
+  }
+
   createPerson(values: Insertable<SharedSpacePersonTable>) {
     return this.db.insertInto('shared_space_person').values(values).returningAll().executeTakeFirstOrThrow();
   }
@@ -3945,6 +3996,29 @@ export class SharedSpaceRepository {
       .where('assetFaceId', '=', assetFaceId)
       .where('personId', 'in', personIds)
       .execute();
+
+    // A space person whose avatar WAS this face must not keep showing it once the face has left
+    // (#765). Neither repair helper covers this: repairInvalidRepresentativeFaces only inspects
+    // manual picks, repairOrphanedRepresentativeFaces only fills NULLs. Re-pick after the delete so
+    // the evicted face cannot be chosen again; a manual pick that is no longer valid degrades to
+    // 'auto', exactly as repairInvalidRepresentativeFaces does.
+    const staleRepresentatives = await this.db
+      .selectFrom('shared_space_person')
+      .select('id')
+      .where('id', 'in', personIds)
+      .where('representativeFaceId', '=', assetFaceId)
+      .execute();
+
+    for (const { id } of staleRepresentatives) {
+      await this.db
+        .updateTable('shared_space_person')
+        .set({
+          representativeFaceId: await this.getFirstValidRepresentativeFaceForPerson(id),
+          representativeFaceSource: 'auto',
+        })
+        .where('id', '=', id)
+        .execute();
+    }
 
     return personIds;
   }
