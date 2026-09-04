@@ -13,20 +13,42 @@ import '../table/remote/shared_space_library.dart';
 import '../table/remote/shared_space_member.dart';
 import '../table/remote/shared_space_album_asset.dart';
 import '../table/remote/shared_space_album_link.dart';
+import '../table/remote/shared_space_album_hidden.dart';
 
 -- A viewer's main timeline is a UNION over three sources:
---   1. Remote assets owned by the timeline users (self + partners)
+--   1. Remote assets owned by the timeline users (self + partners). The
+--      CALLER's own assets (owner_id = current_user_id, a strict subset of
+--      :user_ids which also includes partner ids) are additionally subject
+--      to the #1041 "hide from my timeline" subtraction below — a partner's
+--      assets must never be filtered by the CALLER's own hidden rows
+--      (server-side "partner trap", design doc §6.4), so the owner arm is
+--      SPLIT: partner rows pass through untouched, and only
+--      owner_id = current_user_id carries the subtraction. Correlating the
+--      NOT EXISTS legs to current_user_id is NOT sufficient on its own —
+--      they would still be ANDed against every row in :user_ids (E10).
 --   2. Remote assets shared with the viewer via a space where the viewer
 --      has showInTimeline=true — either directly via shared_space_asset,
 --      transitively via a library linked to the space (shared_space_library),
 --      or transitively via an album linked into the space
---      (shared_space_album_asset ⋈ shared_space_album_link) whose own
---      showInTimeline toggle is also true.
+--      (shared_space_album_asset ⋈ shared_space_album_link).
 --      This mirrors the server's TimeBucket query which OR-joins ownerId with
 --      timelineSpaceIds (see `asset.repository.ts` timelineSpaceIds branch).
 --      Only the viewer's own member row is honored — partner memberships do
 --      NOT leak into the viewer's timeline.
+--      The album leg's own gate is the viewer's PERSONAL "hide from my
+--      timeline" preference (shared_space_album_hidden, #1041) — NOT the
+--      shared shared_space_album_link.show_in_timeline flag, which now
+--      governs only the space's own Photos tab (design doc §2, §6.1).
 --   3. Local assets not yet backed up.
+--
+-- #1041 "hide from my timeline" (design doc §3, §6.3): for an asset the
+-- viewer OWNS, it disappears from their own timeline only when EVERY path it
+-- has into a space the viewer belongs to is a path the viewer has hidden —
+-- a space hidden via their own member.show_in_timeline=0, or an album hidden
+-- via their own shared_space_album_hidden row (or the album's space itself
+-- hidden via the member flag). A single VISIBLE path re-admits the asset,
+-- which the sibling OR arms below already provide for free — so the owner
+-- arm only needs to subtract assets that have NO other, visible path.
 mergedAsset(:current_user_id AS TEXT):
 SELECT
 	rae.id as remote_id,
@@ -60,7 +82,46 @@ WHERE
 	rae.deleted_at IS NULL
 	AND rae.visibility = 0 -- timeline visibility
 	AND (
-		rae.owner_id IN :user_ids
+		(
+			-- A partner's asset is never filtered by MY hidden rows: the subtraction below
+			-- belongs to the CALLER alone (design doc §6.4, server E10). Splitting the arm is
+			-- what enforces that; correlating the legs to :current_user_id is not enough,
+			-- because they would still be ANDed against every row in :user_ids.
+			(rae.owner_id IN :user_ids AND rae.owner_id != :current_user_id)
+			OR (
+				rae.owner_id = :current_user_id
+				AND NOT EXISTS (
+					SELECT 1 FROM shared_space_asset_entity ssa
+					INNER JOIN shared_space_member_entity ssm ON ssm.space_id = ssa.space_id
+					WHERE ssa.asset_id = rae.id
+						AND ssm.user_id = :current_user_id
+						AND ssm.show_in_timeline = 0
+				)
+				AND NOT EXISTS (
+					SELECT 1 FROM shared_space_library_entity ssl
+					INNER JOIN shared_space_member_entity ssm ON ssm.space_id = ssl.space_id
+					WHERE ssl.library_id = rae.library_id
+						AND ssm.user_id = :current_user_id
+						AND ssm.show_in_timeline = 0
+				)
+				AND NOT EXISTS (
+					SELECT 1 FROM shared_space_album_asset_entity ssaa
+					INNER JOIN shared_space_album_link_entity ssal ON ssal.album_id = ssaa.album_id
+					INNER JOIN shared_space_member_entity ssm ON ssm.space_id = ssal.space_id
+					WHERE ssaa.asset_id = rae.id
+						AND ssm.user_id = :current_user_id
+						AND (
+							ssm.show_in_timeline = 0
+							OR EXISTS (
+								SELECT 1 FROM shared_space_album_hidden_entity ssah
+								WHERE ssah.space_id = ssal.space_id
+									AND ssah.album_id = ssal.album_id
+									AND ssah.user_id = :current_user_id
+							)
+						)
+				)
+			)
+		)
 		OR EXISTS (
 			SELECT 1 FROM shared_space_asset_entity ssa
 			INNER JOIN shared_space_member_entity ssm ON ssm.space_id = ssa.space_id
@@ -80,7 +141,12 @@ WHERE
 			INNER JOIN shared_space_album_link_entity ssal ON ssal.album_id = ssaa.album_id
 			INNER JOIN shared_space_member_entity ssm ON ssm.space_id = ssal.space_id
 			WHERE ssaa.asset_id = rae.id
-				AND ssal.show_in_timeline = 1
+				AND NOT EXISTS (
+					SELECT 1 FROM shared_space_album_hidden_entity ssah
+					WHERE ssah.space_id = ssal.space_id
+						AND ssah.album_id = ssal.album_id
+						AND ssah.user_id = :current_user_id
+				)
 				AND ssm.user_id = :current_user_id
 				AND ssm.show_in_timeline = 1
 		)
@@ -163,7 +229,46 @@ FROM
 		rae.deleted_at IS NULL
 		AND rae.visibility = 0 -- timeline visibility
 		AND (
-			rae.owner_id IN :user_ids
+			(
+				-- A partner's asset is never filtered by MY hidden rows: the subtraction below
+				-- belongs to the CALLER alone (design doc §6.4, server E10). Splitting the arm is
+				-- what enforces that; correlating the legs to :current_user_id is not enough,
+				-- because they would still be ANDed against every row in :user_ids.
+				(rae.owner_id IN :user_ids AND rae.owner_id != :current_user_id)
+				OR (
+					rae.owner_id = :current_user_id
+					AND NOT EXISTS (
+						SELECT 1 FROM shared_space_asset_entity ssa
+						INNER JOIN shared_space_member_entity ssm ON ssm.space_id = ssa.space_id
+						WHERE ssa.asset_id = rae.id
+							AND ssm.user_id = :current_user_id
+							AND ssm.show_in_timeline = 0
+					)
+					AND NOT EXISTS (
+						SELECT 1 FROM shared_space_library_entity ssl
+						INNER JOIN shared_space_member_entity ssm ON ssm.space_id = ssl.space_id
+						WHERE ssl.library_id = rae.library_id
+							AND ssm.user_id = :current_user_id
+							AND ssm.show_in_timeline = 0
+					)
+					AND NOT EXISTS (
+						SELECT 1 FROM shared_space_album_asset_entity ssaa
+						INNER JOIN shared_space_album_link_entity ssal ON ssal.album_id = ssaa.album_id
+						INNER JOIN shared_space_member_entity ssm ON ssm.space_id = ssal.space_id
+						WHERE ssaa.asset_id = rae.id
+							AND ssm.user_id = :current_user_id
+							AND (
+								ssm.show_in_timeline = 0
+								OR EXISTS (
+									SELECT 1 FROM shared_space_album_hidden_entity ssah
+									WHERE ssah.space_id = ssal.space_id
+										AND ssah.album_id = ssal.album_id
+										AND ssah.user_id = :current_user_id
+								)
+							)
+					)
+				)
+			)
 			OR EXISTS (
 				SELECT 1 FROM shared_space_asset_entity ssa
 				INNER JOIN shared_space_member_entity ssm ON ssm.space_id = ssa.space_id
@@ -183,7 +288,12 @@ FROM
 				INNER JOIN shared_space_album_link_entity ssal ON ssal.album_id = ssaa.album_id
 				INNER JOIN shared_space_member_entity ssm ON ssm.space_id = ssal.space_id
 				WHERE ssaa.asset_id = rae.id
-					AND ssal.show_in_timeline = 1
+					AND NOT EXISTS (
+						SELECT 1 FROM shared_space_album_hidden_entity ssah
+						WHERE ssah.space_id = ssal.space_id
+							AND ssah.album_id = ssal.album_id
+							AND ssah.user_id = :current_user_id
+					)
 					AND ssm.user_id = :current_user_id
 					AND ssm.show_in_timeline = 1
 			)

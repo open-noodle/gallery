@@ -74,6 +74,7 @@ function makeAlbum(overrides: Partial<SharedSpaceLinkedAlbumDto> = {}): SharedSp
     assetCount: 5,
     albumThumbnailAssetId: null,
     showInTimeline: true,
+    hiddenFromMyTimeline: false,
     addedById: null,
     linkedAt: '2026-01-01T00:00:00.000Z',
     description: '',
@@ -263,6 +264,7 @@ describe('Space albums page', () => {
 
     it('toggle show-in-timeline calls updateSharedSpaceAlbum and flips optimistic state', async () => {
       sdkMock.updateSharedSpaceAlbum.mockResolvedValue(undefined as never);
+      modalManagerMock.show.mockResolvedValue({ confirmed: true, alsoHideFromMyTimeline: false });
       const album = makeAlbum({ id: 'album-1', albumName: 'Vacation', showInTimeline: true });
       renderPage([album], SharedSpaceRole.Editor);
 
@@ -272,8 +274,9 @@ describe('Space albums page', () => {
       expect(menuButton).not.toBeNull();
       await fireEvent.click(menuButton!);
 
-      // Click "Hide from timeline" (showInTimeline=true → shows hide option)
-      const toggleOption = await screen.findByText('Hide from timeline');
+      // Click "Hide this album from the space's photos" (showInTimeline=true → shows hide option;
+      // this is the editor-gated shared flag, distinct from the "my timeline" item above it).
+      const toggleOption = await screen.findByText("Hide this album from the space's photos");
       await fireEvent.click(toggleOption);
 
       await waitFor(() =>
@@ -284,8 +287,9 @@ describe('Space albums page', () => {
         }),
       );
 
-      // Optimistic flip: "hidden from timeline" label should now appear
-      await waitFor(() => expect(screen.getByText(/hidden from timeline/i)).toBeInTheDocument());
+      // Optimistic flip: "hidden from the space's photos" label should now appear
+      await waitFor(() => expect(screen.getByText(/Hidden from the space's photos/)).toBeInTheDocument());
+      await waitFor(() => expect(invalidateAll).toHaveBeenCalled());
     });
 
     // ── Owner equivalents for unlink and toggle ──────────────────────────────
@@ -310,6 +314,7 @@ describe('Space albums page', () => {
 
     it('owner can toggle show-in-timeline: calls updateSharedSpaceAlbum', async () => {
       sdkMock.updateSharedSpaceAlbum.mockResolvedValue(undefined as never);
+      modalManagerMock.show.mockResolvedValue({ confirmed: true, alsoHideFromMyTimeline: false });
       const album = makeAlbum({ id: 'album-1', albumName: 'Vacation', showInTimeline: true });
       renderPage([album], SharedSpaceRole.Owner);
 
@@ -318,7 +323,7 @@ describe('Space albums page', () => {
       expect(menuButton).not.toBeNull();
       await fireEvent.click(menuButton!);
 
-      const toggleOption = await screen.findByText('Hide from timeline');
+      const toggleOption = await screen.findByText("Hide this album from the space's photos");
       await fireEvent.click(toggleOption);
 
       await waitFor(() =>
@@ -328,6 +333,82 @@ describe('Space albums page', () => {
           sharedSpaceAlbumLinkUpdateDto: { showInTimeline: false },
         }),
       );
+    });
+
+    // The editor dialog's checked-by-default "also hide from my own timeline" checkbox writes
+    // ONLY the actor's own row, via the member-only endpoint — never a bulk/cross-member write.
+    it('the editor dialog\'s "also hide from my timeline" checkbox additionally writes the actor\'s own row', async () => {
+      sdkMock.updateSharedSpaceAlbum.mockResolvedValue(undefined as never);
+      sdkMock.updateAlbumTimelineForMember.mockResolvedValue(undefined as never);
+      modalManagerMock.show.mockResolvedValue({ confirmed: true, alsoHideFromMyTimeline: true });
+      const album = makeAlbum({ id: 'album-1', albumName: 'Vacation', showInTimeline: true });
+      renderPage([album], SharedSpaceRole.Owner);
+
+      const menuButton = screen.getByTestId('space-album-card-menu').querySelector('button');
+      await fireEvent.click(menuButton!);
+      await fireEvent.click(await screen.findByText("Hide this album from the space's photos"));
+
+      await waitFor(() =>
+        expect(sdkMock.updateSharedSpaceAlbum).toHaveBeenCalledWith({
+          id: 'space-1',
+          albumId: 'album-1',
+          sharedSpaceAlbumLinkUpdateDto: { showInTimeline: false },
+        }),
+      );
+      await waitFor(() =>
+        expect(sdkMock.updateAlbumTimelineForMember).toHaveBeenCalledWith({
+          id: 'space-1',
+          albumId: 'album-1',
+          sharedSpaceAlbumMemberTimelineDto: { showInTimeline: false },
+        }),
+      );
+    });
+
+    // Partial failure: the shared flag write SUCCEEDED, so the server state has already changed.
+    // If the follow-up own-row write throws, the page must still reconcile with the server —
+    // otherwise the row keeps rendering "Hide from the space's photos" for a flag that is already
+    // off, and only a manual reload fixes it.
+    it('still reconciles with the server when the second (own-row) write fails', async () => {
+      sdkMock.updateSharedSpaceAlbum.mockResolvedValue(undefined as never);
+      sdkMock.updateAlbumTimelineForMember.mockRejectedValue(new Error('boom') as never);
+      modalManagerMock.show.mockResolvedValue({ confirmed: true, alsoHideFromMyTimeline: true });
+      const album = makeAlbum({ id: 'album-1', albumName: 'Vacation', showInTimeline: true });
+      renderPage([album], SharedSpaceRole.Owner);
+
+      const menuButton = screen.getByTestId('space-album-card-menu').querySelector('button');
+      await fireEvent.click(menuButton!);
+      await fireEvent.click(await screen.findByText("Hide this album from the space's photos"));
+
+      await waitFor(() => expect(sdkMock.updateAlbumTimelineForMember).toHaveBeenCalled());
+      await waitFor(() => expect(invalidateAll).toHaveBeenCalled());
+    });
+
+    it('leaving the "also hide from my timeline" checkbox unticked writes only the shared flag', async () => {
+      sdkMock.updateSharedSpaceAlbum.mockResolvedValue(undefined as never);
+      modalManagerMock.show.mockResolvedValue({ confirmed: true, alsoHideFromMyTimeline: false });
+      const album = makeAlbum({ id: 'album-1', albumName: 'Vacation', showInTimeline: true });
+      renderPage([album], SharedSpaceRole.Owner);
+
+      const menuButton = screen.getByTestId('space-album-card-menu').querySelector('button');
+      await fireEvent.click(menuButton!);
+      await fireEvent.click(await screen.findByText("Hide this album from the space's photos"));
+
+      await waitFor(() => expect(sdkMock.updateSharedSpaceAlbum).toHaveBeenCalled());
+      expect(sdkMock.updateAlbumTimelineForMember).not.toHaveBeenCalled();
+    });
+
+    it('the editor dialog: does nothing when dismissed', async () => {
+      modalManagerMock.show.mockResolvedValue(undefined);
+      const album = makeAlbum({ id: 'album-1', albumName: 'Vacation', showInTimeline: true });
+      renderPage([album], SharedSpaceRole.Owner);
+
+      const menuButton = screen.getByTestId('space-album-card-menu').querySelector('button');
+      await fireEvent.click(menuButton!);
+      await fireEvent.click(await screen.findByText("Hide this album from the space's photos"));
+
+      await waitFor(() => expect(modalManagerMock.show).toHaveBeenCalled());
+      expect(sdkMock.updateSharedSpaceAlbum).not.toHaveBeenCalled();
+      expect(sdkMock.updateAlbumTimelineForMember).not.toHaveBeenCalled();
     });
 
     it('create: creates an album, links it, and navigates to the space album route', async () => {
@@ -403,9 +484,65 @@ describe('Space albums page', () => {
 
   // ── Viewer gating: card menu and empty CTA ──────────────────────────────────
 
-  it('viewer with a linked album sees no space-album-card-menu', () => {
+  // The card menu itself is no longer editor-gated — a viewer needs it too, to hide the album
+  // from their OWN timeline (#1041 §2, a personal preference, not an editor action). Only the
+  // editor-only items inside it (space-photos toggle, unlink) are gated.
+  it('viewer with a linked album sees the card menu, with only the my-timeline item', async () => {
     renderPage([makeAlbum()], SharedSpaceRole.Viewer);
-    expect(screen.queryByTestId('space-album-card-menu')).not.toBeInTheDocument();
+    expect(screen.getByTestId('space-album-card-menu')).toBeInTheDocument();
+
+    const menuButton = screen.getByTestId('space-album-card-menu').querySelector('button');
+    await fireEvent.click(menuButton!);
+
+    expect(await screen.findByText('Hide this album from my timeline')).toBeInTheDocument();
+    expect(screen.queryByText("Hide this album from the space's photos")).not.toBeInTheDocument();
+    expect(screen.queryByText('Unlink album')).not.toBeInTheDocument();
+  });
+
+  it('viewer clicking "Hide this album from my timeline" surfaces the preview count and calls the member-only endpoint', async () => {
+    sdkMock.getAlbumTimelineHidePreview.mockResolvedValue({ hiddenAssetCount: 4 });
+    sdkMock.updateAlbumTimelineForMember.mockResolvedValue(undefined as never);
+    modalManagerMock.show.mockResolvedValue(true);
+    const album = makeAlbum({ id: 'album-1', albumName: 'Vacation', hiddenFromMyTimeline: false });
+    renderPage([album], SharedSpaceRole.Viewer);
+
+    const menuButton = screen.getByTestId('space-album-card-menu').querySelector('button');
+    await fireEvent.click(menuButton!);
+    await fireEvent.click(await screen.findByText('Hide this album from my timeline'));
+
+    await waitFor(() =>
+      expect(sdkMock.getAlbumTimelineHidePreview).toHaveBeenCalledWith({ id: 'space-1', albumId: 'album-1' }),
+    );
+    expect(modalManagerMock.show).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ albumName: 'Vacation', count: 4 }),
+    );
+    await waitFor(() =>
+      expect(sdkMock.updateAlbumTimelineForMember).toHaveBeenCalledWith({
+        id: 'space-1',
+        albumId: 'album-1',
+        sharedSpaceAlbumMemberTimelineDto: { showInTimeline: false },
+      }),
+    );
+    // Never the editor-only endpoint — a viewer has no permission to call it.
+    expect(sdkMock.updateSharedSpaceAlbum).not.toHaveBeenCalled();
+    // The member-toggle handler was never audited for this before #1041 slice 12 — it must
+    // invalidate the [spaceId] layout's cached linkedAlbums, same as the editor toggle does.
+    await waitFor(() => expect(invalidateAll).toHaveBeenCalled());
+  });
+
+  it('cancelling the "my timeline" confirm dialog changes nothing', async () => {
+    sdkMock.getAlbumTimelineHidePreview.mockResolvedValue({ hiddenAssetCount: 4 });
+    modalManagerMock.show.mockResolvedValue(false);
+    const album = makeAlbum({ id: 'album-1', albumName: 'Vacation', hiddenFromMyTimeline: false });
+    renderPage([album], SharedSpaceRole.Viewer);
+
+    const menuButton = screen.getByTestId('space-album-card-menu').querySelector('button');
+    await fireEvent.click(menuButton!);
+    await fireEvent.click(await screen.findByText('Hide this album from my timeline'));
+
+    await waitFor(() => expect(modalManagerMock.show).toHaveBeenCalled());
+    expect(sdkMock.updateAlbumTimelineForMember).not.toHaveBeenCalled();
   });
 
   it('viewer with empty albums list sees no empty-link-album-button', () => {

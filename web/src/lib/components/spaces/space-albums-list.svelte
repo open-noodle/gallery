@@ -26,6 +26,7 @@
     searchQuery?: string;
     onUnlink?: (album: SharedSpaceLinkedAlbumDto) => void;
     onToggleTimeline?: (album: SharedSpaceLinkedAlbumDto) => void;
+    onToggleMyTimeline?: (album: SharedSpaceLinkedAlbumDto) => void;
   }
 
   let {
@@ -38,6 +39,7 @@
     searchQuery = '',
     onUnlink,
     onToggleTimeline,
+    onToggleMyTimeline,
   }: Props = $props();
 
   const filtered = $derived.by(() => {
@@ -79,9 +81,18 @@
   <p data-testid="space-albums-no-results" class="p-4 text-center text-gray-500">{$t('space_albums_no_matching')}</p>
 {:else if $spaceAlbumViewSettings.view === AlbumViewMode.List}
   {#if isGrouped}
-    <SpaceAlbumsTable {spaceId} albums={sorted} {canManage} {groups} grouped {onUnlink} {onToggleTimeline} />
+    <SpaceAlbumsTable
+      {spaceId}
+      albums={sorted}
+      {canManage}
+      {groups}
+      grouped
+      {onUnlink}
+      {onToggleTimeline}
+      {onToggleMyTimeline}
+    />
   {:else}
-    <SpaceAlbumsTable {spaceId} albums={sorted} {canManage} {onUnlink} {onToggleTimeline} />
+    <SpaceAlbumsTable {spaceId} albums={sorted} {canManage} {onUnlink} {onToggleTimeline} {onToggleMyTimeline} />
   {/if}
 {:else if isGrouped}
   {#each groups as group (group.id)}
@@ -108,7 +119,7 @@
     {#if !collapsed}
       <div class="mt-4 grid grid-auto-fill-56 gap-y-4" transition:slide={{ duration: 300 }}>
         {#each group.albums as album (album.id)}
-          <SpaceAlbumCard {spaceId} {album} {canManage} {onUnlink} {onToggleTimeline} />
+          <SpaceAlbumCard {spaceId} {album} {canManage} {onUnlink} {onToggleTimeline} {onToggleMyTimeline} />
         {/each}
       </div>
     {/if}
@@ -116,7 +127,7 @@
 {:else}
   <div class="grid grid-auto-fill-56 gap-y-4">
     {#each sorted as album (album.id)}
-      <SpaceAlbumCard {spaceId} {album} {canManage} {onUnlink} {onToggleTimeline} />
+      <SpaceAlbumCard {spaceId} {album} {canManage} {onUnlink} {onToggleTimeline} {onToggleMyTimeline} />
     {/each}
   </div>
 {/if}

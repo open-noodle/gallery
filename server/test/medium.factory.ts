@@ -409,7 +409,7 @@ export class MediumTestContext<S extends ClassConstructor<typeof BaseService> = 
     return { space: result, result };
   }
 
-  async newSharedSpaceMember(dto: { spaceId: string; userId: string; role?: string }) {
+  async newSharedSpaceMember(dto: { spaceId: string; userId: string; role?: string; showInTimeline?: boolean }) {
     const member = mediumFactory.sharedSpaceMemberInsert(dto);
     const result = await this.database
       .insertInto('shared_space_member')
@@ -477,6 +477,19 @@ export class MediumTestContext<S extends ClassConstructor<typeof BaseService> = 
       .returningAll()
       .executeTakeFirstOrThrow();
     return { spaceAlbum: result, result };
+  }
+
+  // #1041: the PER-USER "hide this album from my own timeline" row — sibling to
+  // newSharedSpaceAlbum's `showInTimeline` (the SHARED, editor-settable flag governing the space's
+  // own Photos tab). Do not confuse the two in a test: this one is what `albumTimelineGate: 'personal'`
+  // reads.
+  async newSharedSpaceAlbumHidden(dto: { spaceId: string; albumId: string; userId: string }) {
+    const result = await this.database
+      .insertInto('shared_space_album_hidden')
+      .values({ spaceId: dto.spaceId, albumId: dto.albumId, userId: dto.userId })
+      .returningAll()
+      .executeTakeFirstOrThrow();
+    return { spaceAlbumHidden: result, result };
   }
 
   async newSharedLink(dto: {
@@ -1095,12 +1108,12 @@ const sharedSpaceInsert = (
   };
 };
 
-const sharedSpaceMemberInsert = (dto: { spaceId: string; userId: string; role?: string }) => {
+const sharedSpaceMemberInsert = (dto: { spaceId: string; userId: string; role?: string; showInTimeline?: boolean }) => {
   return {
     spaceId: dto.spaceId,
     userId: dto.userId,
     role: dto.role ?? 'viewer',
-    showInTimeline: true,
+    showInTimeline: dto.showInTimeline ?? true,
   };
 };
 

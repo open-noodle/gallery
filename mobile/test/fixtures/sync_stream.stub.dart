@@ -533,4 +533,23 @@ abstract final class SyncStreamStub {
     data: _makeExifV1(assetId: 'sa-asset-stub-3'),
     ack: 'sa-exif-backfill-ack',
   );
+
+  // gallery-fork (#1041): per-member "hidden from my timeline" album rows.
+  static final sharedSpaceAlbumHiddenV1 = SyncEvent(
+    type: SyncEntityType.sharedSpaceAlbumHiddenV1,
+    data: SyncSharedSpaceAlbumHiddenV1(spaceId: 'space-1', albumId: 'album-stub-1', userId: 'user-1'),
+    ack: 'sa-album-hidden-v1-ack',
+  );
+
+  static final sharedSpaceAlbumHiddenBackfillV1 = SyncEvent(
+    type: SyncEntityType.sharedSpaceAlbumHiddenBackfillV1,
+    data: SyncSharedSpaceAlbumHiddenV1(spaceId: 'space-2', albumId: 'album-stub-2', userId: 'user-1'),
+    ack: 'sa-album-hidden-backfill-ack',
+  );
+
+  static final sharedSpaceAlbumHiddenDeleteV1 = SyncEvent(
+    type: SyncEntityType.sharedSpaceAlbumHiddenDeleteV1,
+    data: SyncSharedSpaceAlbumHiddenDeleteV1(spaceId: 'space-3', albumId: 'album-stub-3', userId: 'user-1'),
+    ack: 'sa-album-hidden-delete-ack',
+  );
 }
