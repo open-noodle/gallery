@@ -46,15 +46,36 @@ describe('addAssetsToSpace', () => {
       id: 'space-1',
       sharedSpaceAssetAddDto: { assetIds: ['asset-1', 'asset-2'] },
     });
-    expect(emitSpy).toHaveBeenCalledWith('SpaceAddAssets', { assetIds: ['asset-1', 'asset-2'], spaceId: 'space-1' });
+    expect(emitSpy).toHaveBeenCalledWith('SpaceAddAssets', {
+      assetIds: ['asset-1', 'asset-2'],
+      spaceId: 'space-1',
+      hiddenFromMyTimeline: false,
+    });
     expect(toastManager.primary).toHaveBeenCalledOnce();
+  });
+
+  // #1041: the flag rides the event so the personal timeline can drop assets that just landed in a
+  // space the caller has hidden. Defaulting to false (not undefined) keeps listeners off the "the
+  // emitter didn't say" branch when the caller genuinely knows the space is shown.
+  it('forwards hiddenFromMyTimeline on the event when the target space is hidden from my timeline', async () => {
+    await addAssetsToSpace('space-1', ['asset-1'], { notify: false, hiddenFromMyTimeline: true });
+
+    expect(emitSpy).toHaveBeenCalledWith('SpaceAddAssets', {
+      assetIds: ['asset-1'],
+      spaceId: 'space-1',
+      hiddenFromMyTimeline: true,
+    });
   });
 
   it('does not show a toast when notify is false', async () => {
     await expect(addAssetsToSpace('space-1', ['asset-1'], { notify: false })).resolves.toBe(true);
 
     expect(toastManager.primary).not.toHaveBeenCalled();
-    expect(emitSpy).toHaveBeenCalledWith('SpaceAddAssets', { assetIds: ['asset-1'], spaceId: 'space-1' });
+    expect(emitSpy).toHaveBeenCalledWith('SpaceAddAssets', {
+      assetIds: ['asset-1'],
+      spaceId: 'space-1',
+      hiddenFromMyTimeline: false,
+    });
   });
 
   it('routes the success toast action to the target space', async () => {

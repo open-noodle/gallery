@@ -179,9 +179,52 @@ Only frames with space-eligible visibility are pulled in — Hidden and Locked f
 
 ## Timeline Integration
 
-Each member can choose whether a space's photos appear in their personal timeline. Tap or click the **eye icon** in the space header to toggle between **Show on timeline** and **Hide from timeline**.
+Photos from a space you belong to are merged into your main Photos timeline alongside your own assets — that's what makes a space feel like part of your library instead of a separate silo. There are three independent switches that control this, each with exactly one job:
 
-When enabled, photos from that space are merged into your main Photos timeline alongside your own assets. This is per-member — each user controls their own setting independently.
+| Switch                                      | Who can change it          | Controls                                                        |
+| ------------------------------------------- | -------------------------- | --------------------------------------------------------------- |
+| **Hide all space photos from my timeline**  | Any member (yourself only) | Everything in this space, in **your own** timeline              |
+| **Hide this album from my timeline**        | Any member (yourself only) | This one album, in **your own** timeline                        |
+| **Hide this album from the space's photos** | Owners and Editors         | Whether the album appears in the space itself, for **everyone** |
+
+The first two are personal viewing preferences — open the space's or the album's **three-dot menu** (⋮) to toggle them. Nobody else can change what appears in your own timeline, and toggling them changes nothing about what other members see. The third is a shared setting on the album's kebab menu in the Albums tab; because it changes what the whole space shows, only Owners and Editors can flip it, and it never touches anyone's personal timeline.
+
+A photo disappears from your timeline only when **every** way it reaches you through a space is hidden by you — for example, a photo in two albums where you've only hidden one, or added to the space both directly and through a hidden album, still shows.
+
+| Asset's space presence                                            | Shows in your timeline? |
+| ----------------------------------------------------------------- | ----------------------- |
+| Not in any space                                                  | Yes                     |
+| Only in an album you've hidden, in a space you show               | No                      |
+| Only in a space you've hidden (any path)                          | No                      |
+| In an album you hid **and** an album you didn't                   | Yes                     |
+| In an album you hid **and** also added to the space directly      | Yes                     |
+| In a space you hid **and** a second space you show                | Yes                     |
+| In an album hidden from the space's photos, but not hidden by you | Yes                     |
+
+**Hiding is a tidiness feature, not a privacy feature.** It only changes what appears in _your own_ timeline (or, for the editor switch, the space's own Photos tab) — it never restricts anyone's access. Hidden photos stay fully visible in the space itself, in search, and in any shared links. If you need to actually restrict access, expire or delete the shared link, or unlink the album from the space instead.
+
+### Where hiding applies
+
+Hiding is a **timeline** preference, so it reaches the surfaces that make up your timeline — and deliberately nothing else:
+
+| Follows your hide                                | Ignores it — the photos stay             |
+| ------------------------------------------------ | ---------------------------------------- |
+| Main **Photos** timeline (and its date scrubber) | The **space** itself, and album pages    |
+| **Folders** view                                 | **Search**, **Map**, the **People** page |
+| **Memories**                                     | **Trash**, **Archive**, **Favorites**    |
+| The **mobile** timeline                          | Any **shared link**                      |
+
+Trash, Archive and Favorites keep hidden photos on purpose: those are the places you go to _find_ or _recover_ something, so hiding a photo must never make it unreachable there. A photo you hid and later deleted is still in your trash, and still restorable.
+
+Memories and Folders follow the same "every path must be hidden" rule as the timeline, so a photo your timeline still shows is never quietly missing from a memory.
+
+Only your own photos and the space content you can see are affected. Photos shared with you by a **partner** are never removed by your hiding — that is their sharing setting, not yours.
+
+### What the confirmation tells you
+
+Hiding asks for confirmation and states how many photos it will actually remove from your timeline. When that number is smaller than you expect — sometimes zero — the dialog also says how many stay, because they reach you by a path you have not hidden.
+
+That is the usual surprise: a photo can be in a linked album _and_ in a linked external library, or added to the space directly as well. Hiding the album alone changes nothing for those photos until the other path is hidden too, so hide the whole space (or unlink the library) if you want them all gone.
 
 > Timeline integration cannot be combined with archive, favorites, or trash filters.
 
@@ -540,7 +583,7 @@ The feature follows the standard NestJS layered architecture:
 
 **Reference-based sharing** — The `shared_space_asset` table is a pure junction table linking spaces to existing assets. No file duplication occurs; the same asset row is referenced by the space and the owner's library. For linked libraries, assets are resolved at query time via `shared_space_library` JOIN `asset.libraryId` — no rows are copied into `shared_space_asset`.
 
-**Timeline integration** — Each membership row has a `showInTimeline` boolean. When fetching a user's timeline, the server queries `getSpaceIdsForTimeline(userId)` and includes assets from those spaces in the timeline result set alongside the user's own assets.
+**Timeline integration** — Three independent switches, each with exactly one job: `shared_space_member.showInTimeline` (space → my timeline, mine alone), `shared_space_album_hidden` (album → my timeline, mine alone), and `shared_space_album.showInTimeline` (album → the space's own Photos tab, shared, editor-settable). Personal timeline resolution starts from `getSpaceIdsForTimeline(userId)` for spaces I show, then the `hiddenFromOwnTimeline` predicate builder (`shared-space-album-scope.ts`) subtracts assets whose only path into a space I'm a member of is one I've hidden — a photo disappears from a member's timeline only when _every_ path it has into a space is hidden by that member; any other visible path (a different album, a direct space add, a second space) keeps it showing. The two "my timeline" flags are private to their own owner: nobody else can change what appears in your library, which is what makes it safe for a per-user flag to subtract from a personal timeline. The space's own Photos tab is governed only by `shared_space_album.showInTimeline`, identically for every member — it never varies per user. None of the three switches restrict access; they only change what appears in a timeline or a tab. See `specs/2026-08-31-space-hide-from-timeline-design.md` for the full resolution semantics.
 
 **Activity log** — Every mutation (add/remove assets, member changes, metadata updates) inserts a row into `shared_space_activity` with a `type` enum and a `data` JSONB column for event-specific metadata (e.g., asset IDs, old/new values, who invited whom). The feed is paginated with a default page size of 50.
 

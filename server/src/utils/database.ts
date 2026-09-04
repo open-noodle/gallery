@@ -869,7 +869,7 @@ export function searchAssetBuilderLegacy(kysely: Kysely<DB>, options: AssetSearc
                 correlateAssetId: 'asset.id',
                 correlateLibraryId: 'asset.libraryId',
                 scope: { spaceId: options.spaceId! },
-                requireShowInTimeline: true,
+                albumTimelineGate: 'space-tab',
               }),
             ),
             // Fork RBAC (M3/Slice 10): elevation only unlocks the CALLER'S OWN locked/archived
@@ -907,7 +907,7 @@ export function searchAssetBuilderLegacy(kysely: Kysely<DB>, options: AssetSearc
                   correlateAssetId: 'asset.id',
                   correlateLibraryId: 'asset.libraryId',
                   scope: { spaceIds: options.timelineSpaceIds! },
-                  requireShowInTimeline: true,
+                  albumTimelineGate: 'space-tab',
                 }),
               ),
             ]),

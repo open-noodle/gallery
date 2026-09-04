@@ -90,6 +90,8 @@ import { SharedLinkTable } from 'src/schema/tables/shared-link.table.js';
 import { SharedSpaceActivityTable } from 'src/schema/tables/shared-space-activity.table.js';
 import { SharedSpaceAlbumAssetAuditTable } from 'src/schema/tables/shared-space-album-asset-audit.table.js';
 import { SharedSpaceAlbumAuditTable } from 'src/schema/tables/shared-space-album-audit.table.js';
+import { SharedSpaceAlbumHiddenAuditTable } from 'src/schema/tables/shared-space-album-hidden-audit.table.js';
+import { SharedSpaceAlbumHiddenTable } from 'src/schema/tables/shared-space-album-hidden.table.js';
 import { SharedSpaceAlbumUserAuditTable } from 'src/schema/tables/shared-space-album-user-audit.table.js';
 import { SharedSpaceAlbumUserTable } from 'src/schema/tables/shared-space-album-user.table.js';
 import { SharedSpaceAlbumTable } from 'src/schema/tables/shared-space-album.table.js';
@@ -204,6 +206,8 @@ export class ImmichDatabase {
     SharedSpaceAlbumAssetAuditTable,
     SharedSpaceAlbumUserTable,
     SharedSpaceAlbumUserAuditTable,
+    SharedSpaceAlbumHiddenTable,
+    SharedSpaceAlbumHiddenAuditTable,
     SharedSpaceLibraryTable,
     SharedSpaceLibraryAuditTable,
     SharedSpaceLibraryAssetAuditTable,
@@ -363,6 +367,8 @@ export interface DB {
   shared_space_album_asset_audit: SharedSpaceAlbumAssetAuditTable;
   shared_space_album_user: SharedSpaceAlbumUserTable;
   shared_space_album_user_audit: SharedSpaceAlbumUserAuditTable;
+  shared_space_album_hidden: SharedSpaceAlbumHiddenTable;
+  shared_space_album_hidden_audit: SharedSpaceAlbumHiddenAuditTable;
   shared_space_library: SharedSpaceLibraryTable;
   shared_space_library_audit: SharedSpaceLibraryAuditTable;
   shared_space_library_asset_audit: SharedSpaceLibraryAssetAuditTable;

@@ -137,16 +137,64 @@ describe('space [spaceId] +layout.svelte', () => {
   });
 
   describe('overflow handlers', () => {
+    // #1041 regression guard: the space-level switch and the album-level "my timeline" switch
+    // used to share the literal key `spaces_hide_from_timeline` / rendered string "Hide from
+    // timeline". `svelte-i18n` returns raw keys in this test setup, so asserting the exact key
+    // here pins that they no longer collide with the album kebab's `space_albums_hide_from_my_*`
+    // keys (see space-album-card.spec.ts / space-albums-table.spec.ts for the album side).
+    it('renders a DIFFERENT key than the album kebab\'s "my timeline" toggle (#1041 regression guard)', async () => {
+      renderLayout(SharedSpaceRole.Owner, { member: member({ role: SharedSpaceRole.Owner, showInTimeline: true }) });
+
+      await openOverflow();
+
+      expect(screen.getByText('spaces_hide_from_timeline')).toBeInTheDocument();
+      expect(screen.queryByText('space_albums_hide_from_my_timeline')).not.toBeInTheDocument();
+    });
+
     it('handleToggleTimeline: hides the space from the timeline and revalidates', async () => {
+      sdkMock.getTimelineHidePreview.mockResolvedValue({ hiddenAssetCount: 12, retainedAssetCount: 0 });
+      vi.mocked(modalManager.show).mockResolvedValue(true as never);
       renderLayout(SharedSpaceRole.Owner, { member: member({ role: SharedSpaceRole.Owner, showInTimeline: true }) });
 
       await clickOverflowOption('spaces_hide_from_timeline');
 
+      await waitFor(() => expect(sdkMock.getTimelineHidePreview).toHaveBeenCalledWith({ id: 's1' }));
+      expect(modalManager.show).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ spaceName: 'Trip', count: 12, retainedCount: 0 }),
+      );
       expect(sdkMock.updateMemberTimeline).toHaveBeenCalledWith({
         id: 's1',
         sharedSpaceMemberTimelineDto: { showInTimeline: false },
       });
       await waitFor(() => expect(invalidateAllMock).toHaveBeenCalled());
+    });
+
+    // #1041 follow-up: the count that explains a surprisingly small hiddenAssetCount has to reach
+    // the dialog, or the user sees "removes 3 photos" about a 58,977-photo space with no context.
+    it('handleToggleTimeline: passes the rescued-photo count through to the dialog', async () => {
+      sdkMock.getTimelineHidePreview.mockResolvedValue({ hiddenAssetCount: 3, retainedAssetCount: 56_417 });
+      vi.mocked(modalManager.show).mockResolvedValue(true as never);
+      renderLayout(SharedSpaceRole.Owner, { member: member({ role: SharedSpaceRole.Owner, showInTimeline: true }) });
+
+      await clickOverflowOption('spaces_hide_from_timeline');
+
+      await waitFor(() => expect(modalManager.show).toHaveBeenCalled());
+      expect(modalManager.show).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ count: 3, retainedCount: 56_417 }),
+      );
+    });
+
+    it('handleToggleTimeline: does nothing when the hide confirm dialog is dismissed', async () => {
+      sdkMock.getTimelineHidePreview.mockResolvedValue({ hiddenAssetCount: 12 });
+      vi.mocked(modalManager.show).mockResolvedValue(false as never);
+      renderLayout(SharedSpaceRole.Owner, { member: member({ role: SharedSpaceRole.Owner, showInTimeline: true }) });
+
+      await clickOverflowOption('spaces_hide_from_timeline');
+
+      await waitFor(() => expect(modalManager.show).toHaveBeenCalled());
+      expect(sdkMock.updateMemberTimeline).not.toHaveBeenCalled();
     });
 
     it('handleToggleTimeline: shows the space on the timeline when currently hidden', async () => {

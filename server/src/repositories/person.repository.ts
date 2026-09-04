@@ -955,6 +955,7 @@ export class PersonRepository {
                 correlateAssetId: 'asset.id',
                 correlateLibraryId: 'asset.libraryId',
                 scope: { memberUserId: options.scope!.memberUserId },
+                albumTimelineGate: 'none',
               }),
             ),
           ]),
@@ -1202,6 +1203,7 @@ export class PersonRepository {
                 correlateAssetId: 'asset.id',
                 correlateLibraryId: 'asset.libraryId',
                 scope: { memberUserId: options.memberUserId },
+                albumTimelineGate: 'none',
               })
             : []),
         ]),

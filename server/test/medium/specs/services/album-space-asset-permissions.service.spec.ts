@@ -88,7 +88,13 @@ describe('AlbumService — cross-owner contribution permission matrix (#764)', (
       .selectFrom('asset')
       .select('asset.id')
       .where('asset.id', '=', assetId)
-      .where((eb) => spaceContributedAssetExists(eb, { correlateAssetId: 'asset.id', scope: { memberUserId: userId } }))
+      .where((eb) =>
+        spaceContributedAssetExists(eb, {
+          correlateAssetId: 'asset.id',
+          scope: { memberUserId: userId },
+          albumTimelineGate: 'none',
+        }),
+      )
       .execute();
     return rows.length > 0;
   };

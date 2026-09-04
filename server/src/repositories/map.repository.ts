@@ -128,7 +128,7 @@ export class MapRepository {
                 correlateAssetId: 'asset.id',
                 correlateLibraryId: 'asset.libraryId',
                 scope: { spaceIds: timelineSpaceIds },
-                requireShowInTimeline: true,
+                albumTimelineGate: 'space-tab',
               }),
             );
           }
@@ -171,7 +171,7 @@ export class MapRepository {
               spaceAlbumAssetExists(eb, {
                 correlateAssetId: 'asset.id',
                 scope: { spaceIds: timelineSpaceIds },
-                requireShowInTimeline: true,
+                albumTimelineGate: 'space-tab',
               }),
             ]),
           );

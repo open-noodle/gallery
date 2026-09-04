@@ -194,9 +194,18 @@ test.describe('Spaces — Albums UI journey & permission matrix', () => {
     // hop 5: viewer SEES the album (read access via the space grant; viewer has
     // no album_user share).
     await expect(page.getByTestId('space-album-card-link').filter({ hasText: ALBUM_NAME })).toBeVisible();
-    // hop 8: viewer gating @ grid — link button + card menu NOT rendered (canManage=false).
+    // hop 8: viewer gating @ grid — link button NOT rendered (canManage=false).
     await expect(page.getByTestId('link-album-button')).toHaveCount(0);
-    await expect(page.getByTestId('space-album-card-menu')).toHaveCount(0);
+    // #1041: the card menu IS now rendered for a viewer, because "hide this album from my
+    // timeline" is a personal preference any member may set. What stays canManage-gated is the
+    // space-wide pair. Assert the shape rather than the mere absence of the menu.
+    const cardMenu = page.getByTestId('space-album-card-menu');
+    await expect(cardMenu).toBeAttached();
+    await cardMenu.getByRole('button', { name: 'More' }).click();
+    await expect(page.getByText('Hide this album from my timeline')).toBeVisible();
+    await expect(page.getByText("Hide this album from the space's photos")).toHaveCount(0);
+    await expect(page.getByText('Unlink album')).toHaveCount(0);
+    await page.keyboard.press('Escape');
 
     await openAlbumCard(page, space.id, ALBUM_NAME); // hop 6
     // hop 9: viewer gating @ detail — add-photos button NOT rendered.

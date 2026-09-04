@@ -41,7 +41,16 @@ where
         where
           "shared_space_member"."userId" = $5::uuid
           and "album_asset"."assetId" = "asset"."id"
-          and "shared_space_album"."showInTimeline" = $6
+          and not exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album_hidden"
+            where
+              "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
+              and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
+              and "shared_space_album_hidden"."userId" = $6::uuid
+          )
       )
       or exists (
         select
@@ -56,7 +65,16 @@ where
         where
           "shared_space_member"."userId" = $7::uuid
           and "album_space_asset"."assetId" = "asset"."id"
-          and "shared_space_album"."showInTimeline" = $8
+          and not exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album_hidden"
+            where
+              "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
+              and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
+              and "shared_space_album_hidden"."userId" = $8::uuid
+          )
       )
     )
   )
@@ -111,7 +129,16 @@ where
         where
           "shared_space_member"."userId" = $4::uuid
           and "album_asset"."assetId" = "asset"."id"
-          and "shared_space_album"."showInTimeline" = $5
+          and not exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album_hidden"
+            where
+              "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
+              and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
+              and "shared_space_album_hidden"."userId" = $5::uuid
+          )
       )
       or exists (
         select
@@ -126,7 +153,16 @@ where
         where
           "shared_space_member"."userId" = $6::uuid
           and "album_space_asset"."assetId" = "asset"."id"
-          and "shared_space_album"."showInTimeline" = $7
+          and not exists (
+            select
+              1 as "exists"
+            from
+              "shared_space_album_hidden"
+            where
+              "shared_space_album_hidden"."spaceId" = "shared_space_album"."spaceId"
+              and "shared_space_album_hidden"."albumId" = "shared_space_album"."albumId"
+              and "shared_space_album_hidden"."userId" = $7::uuid
+          )
       )
     )
   )

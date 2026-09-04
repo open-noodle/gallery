@@ -1,5 +1,5 @@
 import type { SharedSpaceLinkedAlbumDto } from '@immich/sdk';
-import { render, screen, waitFor } from '@testing-library/svelte';
+import { fireEvent, screen, waitFor, within } from '@testing-library/svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
 import SpaceAlbumsTable from '$lib/components/spaces/space-albums-table.svelte';
 import { SpaceAlbumGroupBy, spaceAlbumViewSettings } from '$lib/stores/space-album-view-settings.store';
@@ -14,6 +14,7 @@ function makeAlbum(overrides: Partial<SharedSpaceLinkedAlbumDto> = {}): SharedSp
     assetCount: 5,
     albumThumbnailAssetId: null,
     showInTimeline: true,
+    hiddenFromMyTimeline: false,
     addedById: null,
     linkedAt: '2026-01-01T00:00:00.000Z',
     description: '',
@@ -37,24 +38,33 @@ describe('SpaceAlbumsTable', () => {
   const a2 = makeAlbum({ id: 'a-2', albumName: 'Road Trip', assetCount: 10 });
 
   it('renders a linking row per album to the space album route', () => {
-    render(SpaceAlbumsTable, { spaceId: 's-1', albums: [a1, a2], canManage: false });
+    renderWithTooltips(SpaceAlbumsTable, { spaceId: 's-1', albums: [a1, a2], canManage: false });
     expect(screen.getByTestId(`space-album-row-${a1.id}`)).toHaveAttribute('href', '/spaces/s-1/albums/a-1');
     expect(screen.getByText('Vacation')).toBeInTheDocument();
     expect(screen.getByText(/5 items/i)).toBeInTheDocument();
   });
 
-  it('shows the manage menu only when canManage', () => {
+  it('shows the row menu for both an editor and a viewer (the "my timeline" item is not editor-gated)', () => {
     renderWithTooltips(SpaceAlbumsTable, { spaceId: 's-1', albums: [a1], canManage: true });
     expect(screen.getByTestId(`space-album-row-menu-${a1.id}`)).toBeInTheDocument();
   });
 
-  it('does not show manage menu when canManage is false', () => {
-    render(SpaceAlbumsTable, { spaceId: 's-1', albums: [a1], canManage: false });
-    expect(screen.queryByTestId(`space-album-row-menu-${a1.id}`)).not.toBeInTheDocument();
+  it('still shows the row menu when canManage is false — just without the editor-only items', () => {
+    renderWithTooltips(SpaceAlbumsTable, { spaceId: 's-1', albums: [a1], canManage: false });
+    expect(screen.getByTestId(`space-album-row-menu-${a1.id}`)).toBeInTheDocument();
+  });
+
+  it('when canManage=false, only the my-timeline item is present — the editor-only items are hidden', async () => {
+    renderWithTooltips(SpaceAlbumsTable, { spaceId: 's-1', albums: [a1], canManage: false });
+    const menu = screen.getByTestId(`space-album-row-menu-${a1.id}`);
+    await fireEvent.click(within(menu).getByLabelText(/more/i));
+    expect(await screen.findByText('Hide this album from my timeline')).toBeInTheDocument();
+    expect(screen.queryByText("Hide this album from the space's photos")).not.toBeInTheDocument();
+    expect(screen.queryByText('Unlink album')).not.toBeInTheDocument();
   });
 
   it('renders all albums as rows', () => {
-    render(SpaceAlbumsTable, { spaceId: 's-1', albums: [a1, a2], canManage: false });
+    renderWithTooltips(SpaceAlbumsTable, { spaceId: 's-1', albums: [a1, a2], canManage: false });
     expect(screen.getByTestId('space-album-row-a-1')).toBeInTheDocument();
     expect(screen.getByTestId('space-album-row-a-2')).toBeInTheDocument();
   });
@@ -71,7 +81,13 @@ describe('SpaceAlbumsTable', () => {
         { id: '2024', name: '2024', albums: [a1] },
         { id: '2020', name: '2020', albums: [a2] },
       ];
-      render(SpaceAlbumsTable, { spaceId: 's-1', albums: [a1, a2], canManage: false, groups, grouped: true });
+      renderWithTooltips(SpaceAlbumsTable, {
+        spaceId: 's-1',
+        albums: [a1, a2],
+        canManage: false,
+        groups,
+        grouped: true,
+      });
       const header2024 = screen.getByTestId('space-album-group-header-2024');
       expect(header2024).toHaveTextContent('2024');
       expect(header2024).toHaveTextContent('1');
@@ -86,7 +102,13 @@ describe('SpaceAlbumsTable', () => {
         { id: '2024', name: '2024', albums: [a1] },
         { id: '2020', name: '2020', albums: [a2] },
       ];
-      render(SpaceAlbumsTable, { spaceId: 's-1', albums: [a1, a2], canManage: false, groups, grouped: true });
+      renderWithTooltips(SpaceAlbumsTable, {
+        spaceId: 's-1',
+        albums: [a1, a2],
+        canManage: false,
+        groups,
+        grouped: true,
+      });
       expect(screen.getByTestId('space-album-group-header-2024')).toHaveAttribute('aria-expanded', 'true');
       toggleSpaceAlbumGroupCollapsing('2024');
       await waitFor(() =>
