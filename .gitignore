@@ -30,6 +30,10 @@ uploads
 coverage
 
 mobile/generated
+# The committed Dart client is retired: it is generated into mobile/generated/openapi at build
+# time. Ignored so a fork PR authored before the retirement cannot silently re-add files here —
+# git treats them as clean ADDs against a deleted tree, so no conflict and no audit sees them.
+mobile/openapi/
 mobile/gradle.properties
 mobile/*.jks
 mobile/libisar.dylib

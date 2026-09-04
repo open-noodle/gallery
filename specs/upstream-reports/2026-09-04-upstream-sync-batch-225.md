@@ -210,7 +210,15 @@ Beyond the conflicts above, these landed with **zero conflict** and were caught 
 5. **`space-albums-list.svelte` missing from the branded-spinner swapped set**, and the three new fork
    migrations missing from the ownership manifest. **Caught by `tools/upstream-preflight`** — the
    fork-only suite the skill flags as load-bearing, and it earned that description again.
-6. **The PR's new bottom-nav tests pump without `localizedForTest`**, which rolling's `context.t`
+6. **Ten generated Dart models resurrected into the retired `mobile/openapi/`** (Shape Q). #931 and
+   #1060 predate the move to build-time codegen, so they carry committed client files. The fork
+   deleted that tree, which is precisely why they slipped in: git sees a clean **ADD** against a
+   deleted directory, so there is no conflict, the post-rebase audit passes (the path is not
+   fork-owned) and the fork-owned-file check passes too. They are stale duplicates — the real client
+   generates into the gitignored `mobile/generated/openapi/`, which already declares both models.
+   **Caught only by the retired-directory detector**, run as the final sweep. `mobile/openapi/` is now
+   gitignored so the next main-authored PR cannot re-add it.
+7. **The PR's new bottom-nav tests pump without `localizedForTest`**, which rolling's `context.t`
    requires. **Caught by `flutter test` (8 failures), not by analyze.**
 
 ### Two local-tooling traps worth recording
