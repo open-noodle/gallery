@@ -24,9 +24,19 @@
     grouped?: boolean;
     onUnlink?: (album: SharedSpaceLinkedAlbumDto) => void;
     onToggleTimeline?: (album: SharedSpaceLinkedAlbumDto) => void;
+    onToggleMyTimeline?: (album: SharedSpaceLinkedAlbumDto) => void;
   }
 
-  let { spaceId, albums, canManage, groups = [], grouped = false, onUnlink, onToggleTimeline }: Props = $props();
+  let {
+    spaceId,
+    albums,
+    canManage,
+    groups = [],
+    grouped = false,
+    onUnlink,
+    onToggleTimeline,
+    onToggleMyTimeline,
+  }: Props = $props();
 
   const dateLocaleString = (dateString: string) => {
     return new Date(dateString).toLocaleDateString($locale, dateFormats.album);
@@ -55,25 +65,35 @@
     <td class="text-md hidden w-3/12 text-center text-ellipsis sm:block xl:w-[15%] 2xl:w-[12%]">
       {dateLocaleString(album.createdAt)}
     </td>
-    {#if canManage}
-      <td class="text-md w-1/12 text-end" data-testid="space-album-row-menu-{album.id}">
-        <ButtonContextMenu
-          icon={mdiDotsVertical}
-          title={$t('more')}
-          color="secondary"
-          variant="ghost"
-          size="medium"
-          align="top-right"
-          direction="left"
-        >
+    <!-- Every member sees the menu (the "my timeline" item is a personal preference, not an
+         editor action); only canManage adds the space-wide items. -->
+    <td class="text-md w-1/12 text-end" data-testid="space-album-row-menu-{album.id}">
+      <ButtonContextMenu
+        icon={mdiDotsVertical}
+        title={$t('more')}
+        color="secondary"
+        variant="ghost"
+        size="medium"
+        align="top-right"
+        direction="left"
+      >
+        <MenuOption
+          text={album.hiddenFromMyTimeline
+            ? $t('space_albums_show_in_my_timeline')
+            : $t('space_albums_hide_from_my_timeline')}
+          onClick={() => onToggleMyTimeline?.(album)}
+        />
+        {#if canManage}
           <MenuOption
-            text={album.showInTimeline ? $t('spaces_hide_from_timeline') : $t('spaces_linked_albums_show_in_timeline')}
+            text={album.showInTimeline
+              ? $t('space_albums_hide_from_space_photos')
+              : $t('spaces_linked_albums_show_in_timeline')}
             onClick={() => onToggleTimeline?.(album)}
           />
           <MenuOption text={$t('spaces_linked_albums_unlink')} onClick={() => onUnlink?.(album)} />
-        </ButtonContextMenu>
-      </td>
-    {/if}
+        {/if}
+      </ButtonContextMenu>
+    </td>
   </tr>
 {/snippet}
 
@@ -86,9 +106,7 @@
       >
       <th class="text-md hidden text-center sm:block xl:w-[15%] 2xl:w-[12%]">{$t('sort_modified')}</th>
       <th class="text-md hidden text-center sm:block xl:w-[15%] 2xl:w-[12%]">{$t('date_created')}</th>
-      {#if canManage}
-        <th class="text-md w-1/12 text-end"></th>
-      {/if}
+      <th class="text-md w-1/12 text-end"></th>
     </tr>
   </thead>
   {#if grouped}
