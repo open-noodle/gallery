@@ -88,6 +88,7 @@ import 'package:immich_mobile/providers/api.provider.dart';
 import 'package:immich_mobile/routing/auth_guard.dart';
 import 'package:immich_mobile/routing/duplicate_guard.dart';
 import 'package:immich_mobile/routing/locked_guard.dart';
+import 'package:immich_mobile/routing/space_albums_duplicate_guard.dart';
 import 'package:immich_mobile/services/api.service.dart';
 import 'package:immich_mobile/services/auth.service.dart';
 import 'package:immich_mobile/services/local_auth.service.dart';
@@ -111,6 +112,7 @@ class AppRouter extends RootStackRouter {
   late final AuthGuard _authGuard;
   late final DuplicateGuard _duplicateGuard;
   late final LockedGuard _lockedGuard;
+  late final SpaceAlbumsDuplicateGuard _spaceAlbumsDuplicateGuard;
 
   AppRouter(
     ApiService apiService,
@@ -121,6 +123,7 @@ class AppRouter extends RootStackRouter {
     _authGuard = AuthGuard(apiService, authService);
     _duplicateGuard = const DuplicateGuard();
     _lockedGuard = LockedGuard(apiService, secureStorageService, localAuthService);
+    _spaceAlbumsDuplicateGuard = const SpaceAlbumsDuplicateGuard();
   }
 
   @override
@@ -149,6 +152,11 @@ class AppRouter extends RootStackRouter {
       children: [
         AutoRoute(page: MainTimelineRoute.page, guards: [_authGuard, _duplicateGuard]),
         AutoRoute(page: AlbumsRoute.page, guards: [_authGuard, _duplicateGuard]),
+        // Declared but not always a tab: the `routes:` list in
+        // GalleryTabShellPage picks three of these four per the user's
+        // navShowSpaces preference. AlbumsRoute stays declared even when
+        // Spaces occupies slot 1 — the Library tab pushes it directly.
+        AutoRoute(page: SpacesRoute.page, guards: [_authGuard, _duplicateGuard]),
         AutoRoute(page: LibraryRoute.page, guards: [_authGuard, _duplicateGuard]),
       ],
     ),
@@ -166,7 +174,16 @@ class AppRouter extends RootStackRouter {
     AutoRoute(page: SpaceDetailRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: SpaceMembersRoute.page, guards: [_authGuard, _duplicateGuard]),
     AutoRoute(page: SpacePeopleRoute.page, guards: [_authGuard, _duplicateGuard]),
-    AutoRoute(page: SpaceAlbumsRoute.page, guards: [_authGuard, _duplicateGuard]),
+    // No _duplicateGuard: this route is legitimately self-recursive — drilling into a folder
+    // pushes SpaceAlbumsRoute onto SpaceAlbumsRoute with a different folderId. DuplicateGuard
+    // compares route NAMES only, so it would treat every folder tap as a duplicate and block it.
+    // _spaceAlbumsDuplicateGuard (space_albums_duplicate_guard.dart) is the args-aware
+    // replacement: it compares `spaceId` + `folderId` off the pending/current route's args
+    // directly (auto_route 11.1.0 exposes both via `resolver.route.args` / `router.current.args`),
+    // so a folder tap with a different folderId still pushes while a double-tap producing an
+    // IDENTICAL spaceId+folderId is blocked — closing the double-push regression this route would
+    // otherwise have reintroduced by dropping _duplicateGuard entirely.
+    AutoRoute(page: SpaceAlbumsRoute.page, guards: [_authGuard, _spaceAlbumsDuplicateGuard]),
     AutoRoute(page: SpaceAlbumDetailRoute.page, guards: [_authGuard, _duplicateGuard]),
     CustomRoute(
       page: SpaceLinkAlbumRoute.page,

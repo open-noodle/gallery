@@ -3,6 +3,7 @@
   import ButtonContextMenu from '$lib/components/shared-components/context-menu/ButtonContextMenu.svelte';
   import MenuOption from '$lib/components/shared-components/context-menu/MenuOption.svelte';
   import { Route } from '$lib/route';
+  import { setActiveDragPayload, writeDragPayload } from '$lib/utils/space-album-folder-dnd';
   import { type AlbumResponseDto, type SharedSpaceLinkedAlbumDto } from '@immich/sdk';
   import { mdiDotsVertical } from '@mdi/js';
   import { t } from 'svelte-i18n';
@@ -14,13 +15,30 @@
     onUnlink?: (album: SharedSpaceLinkedAlbumDto) => void;
     onToggleTimeline?: (album: SharedSpaceLinkedAlbumDto) => void;
     onToggleMyTimeline?: (album: SharedSpaceLinkedAlbumDto) => void;
+    onMove?: (album: SharedSpaceLinkedAlbumDto) => void;
   }
 
-  let { spaceId, album, canManage, onUnlink, onToggleTimeline, onToggleMyTimeline }: Props = $props();
+  let { spaceId, album, canManage, onUnlink, onToggleTimeline, onToggleMyTimeline, onMove }: Props = $props();
 </script>
 
 <div
   data-testid="space-album-card"
+  role="listitem"
+  draggable={canManage}
+  ondragstart={(event) => {
+    // draggable="false" on this div does not stop the inner <a>/cover image from being natively
+    // draggable, and dragstart bubbles — so without this guard a viewer could still drag the
+    // cover and write a payload. No target ever accepts it (every drop target also gates on
+    // canManage) and the server enforces regardless, but this keeps that guarantee local rather
+    // than relying on every other surface getting it right.
+    if (!canManage || !event.dataTransfer) {
+      return;
+    }
+    const payload = { kind: 'album' as const, id: album.id };
+    writeDragPayload(event.dataTransfer, payload);
+    setActiveDragPayload(payload);
+  }}
+  ondragend={() => setActiveDragPayload(null)}
   class="group relative rounded-2xl border border-transparent p-5 hover:border-gray-200 hover:bg-gray-100 dark:hover:border-gray-800 dark:hover:bg-gray-900"
 >
   <!-- ⋯ menu — sibling of the anchor, not inside it. Every member sees it (the "my timeline" item
@@ -52,6 +70,7 @@
             : $t('spaces_linked_albums_show_in_timeline')}
           onClick={() => onToggleTimeline?.(album)}
         />
+        <MenuOption text={$t('space_album_folder_move')} onClick={() => onMove?.(album)} />
         <MenuOption text={$t('spaces_linked_albums_unlink')} onClick={() => onUnlink?.(album)} />
       {/if}
     </ButtonContextMenu>
