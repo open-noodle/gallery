@@ -114,6 +114,8 @@ Mirroring `/people`'s hard-won details:
 
 `manage-space-people-visibility.svelte:19-27` maps space people onto `VisibilityPerson` but drops `type`, although `SharedSpacePersonResponseDto` already carries it. This is the identical gap #1065 fixed on the global manage page (which now passes `type: person.type, species: person.species`): pet tiles render indistinguishably from humans — a `role="img"` with no accessible name.
 
+**The fix is one line, because #1065 already built for this case.** The badge itself lives in the shared `web/src/lib/components/people/people-visibility-modal.svelte`, which this wrapper feeds; and `getPetBadgeLabel` (`web/src/lib/utils/pet-species.ts`) already names shared spaces in its own doc comment — "`SharedSpacePersonResponseDto` has `type`, no `species` — so fall back to a generic 'Pet'". Passing `type` through the wrapper's mapping is the entire change. Nothing in the badge or the label util needs to move.
+
 Pets belong on this screen: hiding a misdetected bucket is the only way to get rid of it, and buckets are exactly what the unfiltered view keeps showing. Pass `type` through and reuse the existing badge. `species` has no space equivalent and is simply omitted — the badge must degrade to a generic pet badge without it.
 
 Small, cheap, and squarely part of the parity this change is for.
@@ -210,6 +212,12 @@ The raw-SQL twin. **No `tsc` safety net**, so every list-arm predicate gets a co
 
 **Counter-agreement property.** S18/S19 assert list length and count against the _same_ fixture rather than hardcoded numbers, so the two arms cannot drift apart without a failure.
 
+**The two arms do not count the same unit.** `countPersonsBySpaceId` collapses rows by identity — `person_rows` selects `COALESCE(identityId, id) AS personKey`, `person_keys` groups by it — so `total` counts **distinct identities**, while `getPersonsBySpaceId` returns **raw rows**. Where two space-person rows share an `identityId`, `total < list.length` **independent of any filter**. The agreement fixture must therefore give every person a distinct or NULL `identityId`, stated as an explicit precondition; otherwise the test fails while telling the truth. S33 separately guards that the collapse still happens under a filter.
+
+| #   | Kind | Test                                                                                |
+| --- | ---- | ----------------------------------------------------------------------------------- |
+| S33 | A    | Two same-identity pet rows still collapse to one counted person under `type: 'pet'` |
+
 ### Server — service and contract
 
 | #   | Kind | Test                                                                                                          |
@@ -220,6 +228,9 @@ The raw-SQL twin. **No `tsc` safety net**, so every list-arm predicate gets a co
 | S29 | B    | Membership is still required with `type` present — the filter is not an auth bypass                           |
 | S30 | A    | DTO validation: `type: 'dog'` is rejected 400; `type` absent is valid                                         |
 | S31 | A    | e2e: `GET /shared-spaces/{id}/people?type=pet` filters the list **and** the statistics agree                  |
+| S32 | A    | `getSpacePeopleFaceStatistics` is **unchanged** by `type` — it shares the DTO but must ignore the filter      |
+
+**A third endpoint inherits `type` for free, and must ignore it.** `SpacePeopleQueryDto` is also the query DTO for `GET /shared-spaces/{id}/people/face-statistics` (`shared-space.controller.ts:387-400`), so adding `type` to the schema silently extends it there. `getPeopleFaceStatisticsBySpaceId` has no `type` option and ignores it — which is correct, and matches #1065's decision not to filter face statistics. S32 makes that a tested decision rather than an accident. The web client must likewise not send it: `getStatisticsQuery` on the space page is shared between the statistics and face-statistics calls, so the filter goes on the `getSpacePeopleStatistics` call sites only.
 
 ### Web — space People tab
 
@@ -232,6 +243,8 @@ The raw-SQL twin. **No `tsc` safety net**, so every list-arm predicate gets a co
 | W5  | A    | A persisted non-`All` choice is reapplied on mount, since SSR loads unfiltered                    |
 | W6  | A    | Switching filters resets paging rather than appending onto the previous type's list               |
 | W7  | A    | Selecting All sends **no** type parameter (asserted absent, not merely `undefined`)               |
+| W12 | A    | The filter composes with an active search rather than replacing it                                |
+| W13 | A    | The filter is **never** sent to `getSpacePeopleFaceStatistics` (the shared-helper leak)           |
 
 ### Web — space show/hide screen (Arm 2b)
 
@@ -283,7 +296,9 @@ The raw-SQL twin. **No `tsc` safety net**, so every list-arm predicate gets a co
 | Unnamed one-photo human                        | Hidden everywhere.                                                                 | S7         |
 | Mobile offline + Pets                          | Unfiltered local owner-scoped list.                                                | M8         |
 | Mobile space page offline                      | Error state, no fallback.                                                          | M13        |
-| Filter + search together                       | AND.                                                                               | S13        |
+| Filter + search together                       | AND, on both server and client.                                                    | S13, W12   |
+| Two space-person rows sharing an `identityId`  | Counted once; list returns both rows. Pre-existing, preserved under the filter.    | S33        |
+| Face statistics under a filter                 | Unchanged — whole-space, never filtered, and the client never sends the param.     | S32, W13   |
 | Filter + hidden people                         | `withHidden` composes; `hidden` count is per-type.                                 | S14, S20   |
 | Filter + paging                                | Page 2 of a filtered list contains no excluded type; ordering unchanged.           | S16, S17   |
 | `type` outside the enum                        | 400 from DTO validation.                                                           | S30        |
@@ -320,3 +335,13 @@ The first draft was reviewed against the code and revised. Findings, all verifie
 8. **A precedent mis-cited.** `detectedFaceCount` staying unfiltered was justified by #1065's statistics revert, which was about the _waiver_, not the _type filter_. The reasoning now stands on its own.
 9. **Ordering left implicit.** The list query's 4-key ORDER BY with `limit`/`offset` makes "filter inside the query" a correctness requirement, not a style choice. Stated, and guarded by S17.
 10. **A missing failure mode.** A persisted `pets` choice in a library with no pets now has defined behaviour.
+
+## Second review pass — implementation-plan review findings
+
+A review of the derived implementation plan against the codebase surfaced three more issues, folded back above:
+
+11. **The two counter arms do not count the same unit.** `total` counts distinct identities (`COALESCE(identityId, id)`); the list returns raw rows. The counter-agreement tests need an explicit fixture precondition or they fail while telling the truth. S33 added.
+12. **A third endpoint inherits `type` from the shared DTO.** `GET /shared-spaces/{id}/people/face-statistics` uses `SpacePeopleQueryDto` and must ignore the filter; the web client must not send it, because `getStatisticsQuery` is shared between the two statistics calls. S32 and W13 added.
+13. **Arm 2b is smaller than first described.** The badge is in the shared visibility modal and `getPetBadgeLabel` already handles the no-`species` shared-space case by name. Passing `type` through the wrapper mapping is the whole change; W11 is a regression guard, not new behaviour.
+
+One trap belongs to the plan rather than this design, and is recorded there: `petPersonFilter` is interpolated in **two** places in the count query — `person_rows` and `assignedPersonFaceFilter` — and the new predicates belong only in the first, or `detectedFaceCount` gets filtered in contradiction of S24.
