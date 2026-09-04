@@ -160,6 +160,16 @@
 
   const ondrop = async (e: DragEvent) => {
     if (isInternalDrag) {
+      // The matching `dragend` (which normally clears this) fires on the drag SOURCE element,
+      // not the drop target — if the drop handler synchronously detaches the source from the DOM
+      // (e.g. an optimistic move that re-renders it out of the current view, as the space album
+      // folders drag-and-drop does), that element has no parent left to bubble `dragend` through
+      // and it never reaches this listener, leaving `isInternalDrag` stuck `true` and silently
+      // disabling file-drop uploads for the rest of the session. `drop` always bubbles here first
+      // (it fires on the target, which — unlike the source — is not what gets removed), so
+      // clearing the flag here as well is a reliable backstop regardless of what the internal
+      // drop handler does to the DOM afterward.
+      isInternalDrag = false;
       return;
     }
 

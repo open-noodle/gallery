@@ -214,8 +214,13 @@ class SharedSpaceApiRepository extends ApiRepository {
 
   /// Link an album to a shared space (PUT /shared-spaces/{id}/albums/{albumId}).
   /// SDK arg order is (albumId, id) where id = spaceId.
-  Future<void> linkAlbum(String spaceId, String albumId) async {
-    await _api.linkAlbum(albumId, spaceId);
+  ///
+  /// [folderId] places the album inside a space album folder; null links it at the space root.
+  /// The query param is optional-and-not-nullable server-side, so null must be OMITTED rather
+  /// than sent — the generated client already drops null named args, which is what makes
+  /// passing null here mean "root" instead of a 400.
+  Future<void> linkAlbum(String spaceId, String albumId, {String? folderId}) async {
+    await _api.linkAlbum(albumId, spaceId, folderId: folderId);
   }
 
   /// Unlink an album from a shared space (DELETE /shared-spaces/{id}/albums/{albumId}).
@@ -229,4 +234,51 @@ class SharedSpaceApiRepository extends ApiRepository {
   Future<void> updateAlbumLink(String spaceId, String albumId, {required bool showInTimeline}) async {
     await _api.updateSharedSpaceAlbum(albumId, spaceId, SharedSpaceAlbumLinkUpdateDto(showInTimeline: showInTimeline));
   }
+
+  /// Create an album folder in a space (POST /shared-spaces/{id}/album-folders).
+  /// [parentId] null (the default) creates the folder at the space root.
+  Future<void> createAlbumFolder(String spaceId, String name, {String? parentId}) => checkNull(
+    _api.createSharedSpaceAlbumFolder(
+      spaceId,
+      SharedSpaceAlbumFolderCreateDto(
+        name: name,
+        parentId: parentId == null ? const Optional.absent() : Optional.present(parentId),
+      ),
+    ),
+  );
+
+  /// Rename an album folder (PATCH /shared-spaces/{id}/album-folders/{folderId}).
+  Future<void> renameAlbumFolder(String spaceId, String folderId, String name) => _api.updateSharedSpaceAlbumFolder(
+    folderId,
+    spaceId,
+    SharedSpaceAlbumFolderUpdateDto(name: Optional.present(name)),
+  );
+
+  /// Move an album folder to a new parent, or to the space root when [parentId] is null
+  /// (PATCH /shared-spaces/{id}/album-folders/{folderId}).
+  ///
+  /// [parentId] is `Optional.present(...)` UNCONDITIONALLY, including when it is null.
+  ///
+  /// This is the one place where copying the prevailing repo idiom would introduce a bug.
+  /// Elsewhere in this repo (see `update` above) the pattern is
+  /// `x == null ? const Optional.absent() : Optional.present(x)` — but for `parentId`, null MEANS
+  /// "move to the space root" and must be SENT. `toJson` only writes a key when `isPresent`, so
+  /// `absent()` would omit `parentId` entirely and the server would leave the folder where it
+  /// was — a silent no-op. The field is `Optional<String?>`, so `present(null)` is valid and
+  /// serialises `parentId: null`.
+  Future<void> moveAlbumFolder(String spaceId, String folderId, String? parentId) => _api.updateSharedSpaceAlbumFolder(
+    folderId,
+    spaceId,
+    SharedSpaceAlbumFolderUpdateDto(parentId: Optional.present(parentId)),
+  );
+
+  /// Delete an album folder (DELETE /shared-spaces/{id}/album-folders/{folderId}). Direct
+  /// children are promoted one level up server-side; albums are never unlinked.
+  Future<void> deleteAlbumFolder(String spaceId, String folderId) =>
+      _api.deleteSharedSpaceAlbumFolder(folderId, spaceId);
+
+  /// Move a linked album into a folder, or to the space root when [folderId] is null
+  /// (PUT /shared-spaces/{id}/albums/{albumId}/folder).
+  Future<void> setAlbumFolder(String spaceId, String albumId, String? folderId) =>
+      _api.setSharedSpaceAlbumFolder(albumId, spaceId, SharedSpaceAlbumFolderMoveAlbumDto(folderId: folderId));
 }
