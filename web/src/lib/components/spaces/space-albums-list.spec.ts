@@ -1,5 +1,5 @@
 import type { SharedSpaceAlbumFolderDto, SharedSpaceLinkedAlbumDto, SharedSpaceMemberResponseDto } from '@immich/sdk';
-import { render, screen, waitFor } from '@testing-library/svelte';
+import { screen, waitFor } from '@testing-library/svelte';
 import { init, register, waitLocale } from 'svelte-i18n';
 import { get } from 'svelte/store';
 import SpaceAlbumsList from '$lib/components/spaces/space-albums-list.svelte';
@@ -333,7 +333,7 @@ describe('SpaceAlbumsList', () => {
     it('W-01: renders folders before albums', () => {
       const folders = [makeFolder('trips', 'Trips'), makeFolder('family', 'Family')];
       const albums = [makeAlbum({ id: 'a1', albumName: 'Rome' }), makeAlbum({ id: 'a2', albumName: 'Venice' })];
-      const { container } = render(SpaceAlbumsList, { spaceId: 's-1', albums, folders, canManage: false });
+      const { container } = renderWithTooltips(SpaceAlbumsList, { spaceId: 's-1', albums, folders, canManage: false });
 
       const rendered = [
         ...container.querySelectorAll('[data-testid="space-album-folder-card"],[data-testid="space-album-card"]'),
@@ -348,7 +348,7 @@ describe('SpaceAlbumsList', () => {
         makeAlbum({ id: 'a1', albumName: 'Rome' }),
         makeAlbum({ id: 'a2', albumName: 'Venice', folderId: 'trips' }),
       ];
-      render(SpaceAlbumsList, { spaceId: 's-1', albums, folders, canManage: false });
+      renderWithTooltips(SpaceAlbumsList, { spaceId: 's-1', albums, folders, canManage: false });
 
       expect(screen.getByText('Rome')).toBeInTheDocument();
       expect(screen.queryByText('Venice')).not.toBeInTheDocument();
@@ -358,7 +358,13 @@ describe('SpaceAlbumsList', () => {
     // albums at all, when it only means THIS folder is empty.
     it('W-08: renders the folder-specific empty state for an empty folder', () => {
       const folders = [makeFolder('trips', 'Trips'), makeFolder('family', 'Family')];
-      render(SpaceAlbumsList, { spaceId: 's-1', albums: [], folders, canManage: false, currentFolderId: 'family' });
+      renderWithTooltips(SpaceAlbumsList, {
+        spaceId: 's-1',
+        albums: [],
+        folders,
+        canManage: false,
+        currentFolderId: 'family',
+      });
 
       // Unlike space-albums-page.spec.ts, this file's beforeAll registers the real en-US locale
       // (see above), so $t() resolves actual copy here rather than raw i18n keys.
@@ -379,7 +385,7 @@ describe('SpaceAlbumsList', () => {
         makeAlbum({ id: 'a2', endDate: '2024-06-01T00:00:00.000Z' }),
       ];
 
-      render(SpaceAlbumsList, { spaceId: 's-1', albums, folders, canManage: false });
+      renderWithTooltips(SpaceAlbumsList, { spaceId: 's-1', albums, folders, canManage: false });
 
       expect(screen.getAllByTestId('space-album-folder-card')).toHaveLength(2);
       const foldersGrid = screen.getByTestId('space-album-folders-grid');
@@ -394,7 +400,7 @@ describe('SpaceAlbumsList', () => {
       const folders = [makeFolder('trips', 'Trips')];
       const albums = [makeAlbum({ id: 'a2', albumName: 'Venice', folderId: 'trips' })];
 
-      const { container } = render(SpaceAlbumsList, {
+      const { container } = renderWithTooltips(SpaceAlbumsList, {
         spaceId: 's-1',
         albums,
         folders,
@@ -413,7 +419,7 @@ describe('SpaceAlbumsList', () => {
       const folders = [makeFolder('trips', 'Trips')];
       const albums = [makeAlbum({ id: 'a2', albumName: 'Venice', folderId: 'trips' })];
 
-      const { container } = render(SpaceAlbumsList, {
+      const { container } = renderWithTooltips(SpaceAlbumsList, {
         spaceId: 's-1',
         albums,
         folders,
@@ -432,7 +438,13 @@ describe('SpaceAlbumsList', () => {
       // Deliberately inserted out of alpha order, so a passing test proves re-sorting happened.
       const albums = [makeAlbum({ id: 'b', albumName: 'Bravo Trip' }), makeAlbum({ id: 'a', albumName: 'Alpha Trip' })];
 
-      render(SpaceAlbumsList, { spaceId: 's-1', albums, folders: [], canManage: false, searchQuery: 'trip' });
+      renderWithTooltips(SpaceAlbumsList, {
+        spaceId: 's-1',
+        albums,
+        folders: [],
+        canManage: false,
+        searchQuery: 'trip',
+      });
 
       expect(idsInCoverOrder()).toEqual(['a', 'b']);
     });
@@ -444,7 +456,7 @@ describe('SpaceAlbumsList', () => {
       const folders = [makeFolder('trips', 'Trips')];
       const albums = [makeAlbum({ id: 'a2', albumName: 'Venice', folderId: 'trips' })];
 
-      render(SpaceAlbumsList, { spaceId: 's-1', albums, folders, canManage: false, searchQuery: 'ven' });
+      renderWithTooltips(SpaceAlbumsList, { spaceId: 's-1', albums, folders, canManage: false, searchQuery: 'ven' });
 
       expect(screen.getByTestId('space-album-row-a2')).toBeInTheDocument();
       expect(screen.queryByTestId('space-album-card')).not.toBeInTheDocument();
@@ -454,7 +466,7 @@ describe('SpaceAlbumsList', () => {
     // the caller's on-mount folder fetch resolves) rendered nothing at all instead of some kind
     // of feedback.
     it('renders a fallback instead of leaving the pane blank when nothing exists at the root level', () => {
-      render(SpaceAlbumsList, { spaceId: 's-1', albums: [], folders: [], canManage: false });
+      renderWithTooltips(SpaceAlbumsList, { spaceId: 's-1', albums: [], folders: [], canManage: false });
 
       expect(screen.getByTestId('space-albums-loading')).toBeInTheDocument();
     });
@@ -465,7 +477,7 @@ describe('SpaceAlbumsList', () => {
     // album vanish behind the loading fallback for as long as its folder stayed unknown.
     it('shows an album at the root instead of the loading fallback when its folder is not loaded', () => {
       const albums = [makeAlbum({ id: 'a1', albumName: 'Rome', folderId: 'unknown-folder' })];
-      render(SpaceAlbumsList, { spaceId: 's-1', albums, folders: [], canManage: false });
+      renderWithTooltips(SpaceAlbumsList, { spaceId: 's-1', albums, folders: [], canManage: false });
 
       expect(screen.getByText('Rome')).toBeInTheDocument();
       expect(screen.queryByTestId('space-albums-loading')).not.toBeInTheDocument();
@@ -479,7 +491,13 @@ describe('SpaceAlbumsList', () => {
         makeAlbum({ id: 'a1', albumName: 'Rome' }),
         makeAlbum({ id: 'a2', albumName: 'Venice', folderId: 'trips' }),
       ];
-      render(SpaceAlbumsList, { spaceId: 's-1', albums, folders: [], canManage: false, foldersUnavailable: true });
+      renderWithTooltips(SpaceAlbumsList, {
+        spaceId: 's-1',
+        albums,
+        folders: [],
+        canManage: false,
+        foldersUnavailable: true,
+      });
 
       expect(screen.getByText('Rome')).toBeInTheDocument();
       expect(screen.getByText('Venice')).toBeInTheDocument();

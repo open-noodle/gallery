@@ -1,5 +1,5 @@
 import type { SharedSpaceLinkedAlbumDto } from '@immich/sdk';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
+import { fireEvent, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { init, register, waitLocale } from 'svelte-i18n';
 import SpaceAlbumsTable from '$lib/components/spaces/space-albums-table.svelte';
@@ -86,7 +86,7 @@ describe('SpaceAlbumsTable', () => {
     // `<tr onclick>`: openable with a mouse, invisible to the keyboard and to a screen reader,
     // in a table whose album rows are all anchors.
     it('renders the folder name as a real link to the folder URL', () => {
-      render(SpaceAlbumsTable, {
+      renderWithTooltips(SpaceAlbumsTable, {
         spaceId: 's-1',
         albums: [],
         allAlbums: [],
@@ -103,7 +103,7 @@ describe('SpaceAlbumsTable', () => {
 
     it('opens the folder through the callback instead of a full navigation', async () => {
       const onOpenFolder = vi.fn();
-      render(SpaceAlbumsTable, {
+      renderWithTooltips(SpaceAlbumsTable, {
         spaceId: 's-1',
         albums: [],
         allAlbums: [],
@@ -121,7 +121,7 @@ describe('SpaceAlbumsTable', () => {
     // The count is recursive: albums filed in a descendant folder still count toward the parent.
     // Reading it from the shared summary map must not change that.
     it('shows the recursive album count, including albums in a nested folder', () => {
-      render(SpaceAlbumsTable, {
+      renderWithTooltips(SpaceAlbumsTable, {
         spaceId: 's-1',
         albums: [],
         allAlbums: [
@@ -187,7 +187,7 @@ describe('SpaceAlbumsTable', () => {
   });
 
   it('labels the item-count column with a proper header, not a stripped plural', () => {
-    render(SpaceAlbumsTable, { spaceId: 's-1', albums: [a1], canManage: false });
+    renderWithTooltips(SpaceAlbumsTable, { spaceId: 's-1', albums: [a1], canManage: false });
 
     const headerTexts = screen.getAllByRole('columnheader').map((header) => header.textContent?.trim());
 
@@ -198,7 +198,7 @@ describe('SpaceAlbumsTable', () => {
   });
 
   it('gives the item-count column header a base width so the longer label does not wrap', () => {
-    render(SpaceAlbumsTable, { spaceId: 's-1', albums: [a1], canManage: false });
+    renderWithTooltips(SpaceAlbumsTable, { spaceId: 's-1', albums: [a1], canManage: false });
 
     const header = screen
       .getAllByRole('columnheader')

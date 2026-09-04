@@ -164,7 +164,15 @@
     <div class="grid grid-auto-fill-56 gap-y-4">
       {#each searchHits as hit (hit.album.id)}
         <div>
-          <SpaceAlbumCard {spaceId} album={hit.album} {canManage} {onUnlink} {onToggleTimeline} {onToggleMyTimeline} onMove={onMoveAlbum} />
+          <SpaceAlbumCard
+            {spaceId}
+            album={hit.album}
+            {canManage}
+            {onUnlink}
+            {onToggleTimeline}
+            {onToggleMyTimeline}
+            onMove={onMoveAlbum}
+          />
           {#if hit.path.length > 0}
             <p class="px-5 text-xs opacity-70" data-testid="space-album-search-path-{hit.album.id}">
               {hit.path.join(' › ')}
@@ -258,7 +266,15 @@
           {#if !collapsed}
             <div class="mt-4 grid grid-auto-fill-56 gap-y-4" transition:slide={{ duration: 300 }}>
               {#each group.albums as album (album.id)}
-                <SpaceAlbumCard {spaceId} {album} {canManage} {onUnlink} {onToggleTimeline} {onToggleMyTimeline} onMove={onMoveAlbum} />
+                <SpaceAlbumCard
+                  {spaceId}
+                  {album}
+                  {canManage}
+                  {onUnlink}
+                  {onToggleTimeline}
+                  {onToggleMyTimeline}
+                  onMove={onMoveAlbum}
+                />
               {/each}
             </div>
           {/if}
@@ -266,7 +282,15 @@
       {:else}
         <div class="grid grid-auto-fill-56 gap-y-4">
           {#each sorted as album (album.id)}
-            <SpaceAlbumCard {spaceId} {album} {canManage} {onUnlink} {onToggleTimeline} {onToggleMyTimeline} onMove={onMoveAlbum} />
+            <SpaceAlbumCard
+              {spaceId}
+              {album}
+              {canManage}
+              {onUnlink}
+              {onToggleTimeline}
+              {onToggleMyTimeline}
+              onMove={onMoveAlbum}
+            />
           {/each}
         </div>
       {/if}
