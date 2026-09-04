@@ -40,6 +40,7 @@ import {
   galleryMachineLearningDefaults,
   GalleryMemoriesSchema,
   GalleryPetDetectionSchema,
+  GalleryPetRecognitionSchema,
   galleryServerDefaults,
   GalleryServerExtension,
   GalleryStorageUsageSchema,
@@ -246,6 +247,7 @@ const AdminConfigSchemaWithVisibility = z
           .meta({ id: 'AdminConfigMachineLearningAvailabilityChecksDto' }),
         clip: AdminConfigMachineLearningModelSchema.extend(GalleryClipExtension).meta({ id: 'AdminConfigClipDto' }),
         petDetection: GalleryPetDetectionSchema,
+        petRecognition: GalleryPetRecognitionSchema,
         duplicateDetection: AdminConfigMachineLearningTaskSchema.extend({
           maxDistance: z
             .number()
@@ -417,6 +419,7 @@ const AdminConfigSchemaWithVisibility = z
         databaseCleanup: configBool.describe('Database cleanup'),
         missingThumbnails: configBool.describe('Missing thumbnails'),
         clusterNewFaces: configBool.describe('Cluster new faces'),
+        clusterNewPets: configBool.describe('Cluster new pets'),
         generateMemories: configBool.describe('Generate memories'),
         syncQuotaUsage: configBool.describe('Sync quota usage'),
       })
@@ -694,6 +697,7 @@ export const defaults = Object.freeze<SystemConfig>({
       maxDistance: galleryMachineLearningDefaults.clipMaxDistance,
     },
     petDetection: galleryMachineLearningDefaults.petDetection,
+    petRecognition: galleryMachineLearningDefaults.petRecognition,
     duplicateDetection: {
       enabled: true,
       maxDistance: 0.01,
@@ -797,6 +801,7 @@ export const defaults = Object.freeze<SystemConfig>({
     syncQuotaUsage: true,
     missingThumbnails: true,
     clusterNewFaces: true,
+    clusterNewPets: true,
   },
   trash: {
     enabled: true,

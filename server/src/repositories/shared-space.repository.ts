@@ -3323,13 +3323,26 @@ export class SharedSpaceRepository {
   }
 
   @GenerateSql({ params: [] })
-  async deleteAllPersonFaces() {
-    await this.db.deleteFrom('shared_space_person_face').execute();
+  async deleteAllPersonFaces(options: { excludePets?: boolean } = {}) {
+    await this.db
+      .deleteFrom('shared_space_person_face')
+      // shared_space_person_face has no type of its own (personId + assetFaceId only), so the
+      // pet exclusion has to go through the parent person. Human recognition resets wipe space
+      // people to rebuild them; the pet copies are not theirs to destroy (F1).
+      .$if(!!options.excludePets, (qb) =>
+        qb.where('personId', 'not in', (eb) =>
+          eb.selectFrom('shared_space_person').select('shared_space_person.id').where('type', '=', 'pet'),
+        ),
+      )
+      .execute();
   }
 
   @GenerateSql({ params: [] })
-  async deleteAllPersons() {
-    await this.db.deleteFrom('shared_space_person').execute();
+  async deleteAllPersons(options: { excludePets?: boolean } = {}) {
+    await this.db
+      .deleteFrom('shared_space_person')
+      .$if(!!options.excludePets, (qb) => qb.where('type', '!=', 'pet'))
+      .execute();
   }
 
   @GenerateSql({ params: [] })
