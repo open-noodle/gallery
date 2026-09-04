@@ -10,7 +10,8 @@ import { AssetFaceTable } from 'src/schema/tables/asset-face.table';
 import { FaceSearchTable } from 'src/schema/tables/face-search.table';
 import { PersonGroupTable } from 'src/schema/tables/person-group.table';
 import { PersonTable } from 'src/schema/tables/person.table';
-import { asUuid, dummy, inSharedAlbum, removeUndefinedKeys, withFilePath } from 'src/utils/database';
+import { PetSearchTable } from 'src/schema/tables/pet-search.table';
+import { asUuid, dummy, inSharedAlbum, petFacePredicate, removeUndefinedKeys, withFilePath } from 'src/utils/database';
 import { retargetDeclinePersonId } from 'src/utils/face-decline-merge';
 import { reviewableAssetVisibility } from 'src/utils/face-review';
 import { retargetVerdictPersonId } from 'src/utils/face-verdict-merge';
@@ -101,6 +102,12 @@ const visibleFaceOnAsset = (eb: ExpressionBuilder<DB, 'person'>, { locked }: { l
 
 export interface DeleteFacesOptions {
   sourceType: SourceType;
+  /**
+   * Human-pipeline callers set this so pet faces survive their resets. Pet faces share
+   * `sourceType: 'machine-learning'` with human faces, so a plain sourceType filter reaches them
+   * (F1/F3) — {@link petFacePredicate} is the only thing that tells the two apart.
+   */
+  excludePetFaces?: boolean;
 }
 
 export interface GetAllPeopleOptions {
@@ -124,6 +131,8 @@ export interface GetAllFacesOptions {
    * `face_identity_face` row via `unassignFaces` before this runs) and every other caller are unchanged.
    */
   excludeManuallyPlaced?: boolean;
+  /** See {@link DeleteFacesOptions.excludePetFaces} — keeps pet faces out of human fan-outs (F2). */
+  excludePetFaces?: boolean;
 }
 
 export interface RepresentativeFaceListOptions {
@@ -204,6 +213,26 @@ const withFaceSearch = (eb: ExpressionBuilder<DB, 'asset_face'>) => {
     eb.selectFrom('face_search').selectAll('face_search').whereRef('face_search.faceId', '=', 'asset_face.id'),
   ).as('faceSearch');
 };
+
+const withPetSearch = (eb: ExpressionBuilder<DB, 'asset_face'>) => {
+  return jsonObjectFrom(
+    eb.selectFrom('pet_search').selectAll('pet_search').whereRef('pet_search.faceId', '=', 'asset_face.id'),
+  ).as('petSearch');
+};
+
+/**
+ * Every embedded pet face: unassigned (recognition-written, not yet clustered) faces are invisible
+ * to a person-scoped delete — the `pet_search` join is the only thing that identifies them. Shared
+ * by {@link PersonRepository.deleteAllPets} (full purge) and
+ * {@link PersonRepository.purgePetRecognitionArtifacts} (scoped purge) as their first statement:
+ * both need this same delete, and it must run before anything that would remove the `pet_search`
+ * rows it joins against (F5).
+ */
+const deleteEmbeddedPetFaces = (trx: Transaction<DB>) =>
+  trx
+    .deleteFrom('asset_face')
+    .where('asset_face.id', 'in', (eb) => eb.selectFrom('pet_search').select('pet_search.faceId'))
+    .execute();
 
 @Injectable()
 export class PersonRepository {
@@ -359,15 +388,21 @@ export class PersonRepository {
   }
 
   @GenerateSql({ params: [{ sourceType: SourceType.MachineLearning, clusterGroupId: DummyValue.UUID }] })
-  async unassignFaces({ sourceType, clusterGroupId }: UnassignFacesOptions): Promise<void> {
+  async unassignFaces({ sourceType, clusterGroupId, excludePetFaces }: UnassignFacesOptions): Promise<void> {
     // "Reset all people" bulk-nulls personId across the whole library. It must also clear the human-placement
     // record (face_identity_face.source='manual'); otherwise every previously-confirmed face keeps a stale
     // manual link with no person behind it, and both face engines would treat those unassigned faces as
     // settled forever — permanently excluding them from recognition and suggestions after a reset.
+    // `excludePetFaces` scopes it the same way the personId reset below is scoped: a human reset must
+    // leave pet faces, and their manual links, alone (F2).
     await this.db
       .deleteFrom('face_identity_face')
       .where('assetFaceId', 'in', (eb) =>
-        eb.selectFrom('asset_face').select('id').where('asset_face.sourceType', '=', sourceType),
+        eb
+          .selectFrom('asset_face')
+          .select('id')
+          .where('asset_face.sourceType', '=', sourceType)
+          .$if(!!excludePetFaces, (qb) => qb.where((inner) => inner.not(petFacePredicate(inner)))),
       )
       .execute();
     await this.db
@@ -379,6 +414,7 @@ export class PersonRepository {
       .$if(!!clusterGroupId, (qb) =>
         qb.innerJoin('user', 'user.id', 'asset.ownerId').where('user.clusterGroupId', '=', clusterGroupId!),
       )
+      .$if(!!excludePetFaces, (qb) => qb.where((eb) => eb.not(petFacePredicate(eb))))
       .execute();
   }
 
@@ -437,12 +473,23 @@ export class PersonRepository {
     return Number(result.numDeletedRows);
   }
 
-  async deleteFaces({ sourceType }: DeleteFacesOptions): Promise<void> {
-    await this.db.deleteFrom('asset_face').where('asset_face.sourceType', '=', sourceType).execute();
+  async deleteFaces({ sourceType, excludePetFaces }: DeleteFacesOptions): Promise<void> {
+    await this.db
+      .deleteFrom('asset_face')
+      .where('asset_face.sourceType', '=', sourceType)
+      .$if(!!excludePetFaces, (qb) => qb.where((eb) => eb.not(petFacePredicate(eb))))
+      .execute();
   }
 
   async deleteAllPets(): Promise<void> {
     await this.db.transaction().execute(async (trx) => {
+      // Unassigned pet faces (recognition-written, not yet clustered) are invisible to the
+      // person-scoped delete below — the pet_search join is the only thing that identifies
+      // them. Delete them first, while their pet_search rows still exist: the force purge
+      // calls deleteAllPetSearch() afterwards, and truncating first would orphan these rows
+      // forever.
+      await deleteEmbeddedPetFaces(trx);
+
       // Delete pet faces before the pet people they belong to: asset_face.personId is
       // ON DELETE SET NULL, so removing the people first would orphan (not delete) the faces.
       await trx
@@ -453,6 +500,68 @@ export class PersonRepository {
         .execute();
 
       await trx.deleteFrom('person').where('person.type', '=', 'pet').execute();
+    });
+  }
+
+  /**
+   * Truncates `pet_search` outright, independent of `deleteAllPets()`'s delete order. Used by
+   * {@link PetRecognitionService.handleQueuePetRecognition}'s force purge (enabling recognition or
+   * switching model) as the explicit, order-independent guarantee that no stale embedding survives
+   * — `deleteAllPets()` already removes most rows via the `asset_face` CASCADE, but a truncate
+   * doesn't depend on that cascade to have run first or completely. A no-op (not an error) when the
+   * table is already empty.
+   */
+  async deleteAllPetSearch(): Promise<void> {
+    await sql`truncate ${sql.table('pet_search')}`.execute(this.db);
+  }
+
+  /**
+   * The SCOPED purge used by {@link PetRecognitionService}'s model-switch handler. Unlike
+   * {@link deleteAllPets} (the FULL purge behind the admin Reset button, which also wipes species
+   * buckets — the requeue rebuilds them, and the confirmation dialog promises exactly that), a
+   * model switch invalidates only embeddings and the individuals recognition created from them.
+   * Species buckets are pure detector output, are not model-coupled, and must survive every switch.
+   */
+  async purgePetRecognitionArtifacts(): Promise<void> {
+    await this.db.transaction().execute(async (trx) => {
+      // 1. Every embedded pet face. Bucket faces have no pet_search row, so they are untouched.
+      await deleteEmbeddedPetFaces(trx);
+
+      // 2. Pet people left with zero faces are exactly the recognition-created individuals — a
+      //    species bucket still holds its (embedding-less) faces after step 1.
+      const orphaned = await trx
+        .selectFrom('person')
+        .select(['person.personGroupId', 'person.identityId'])
+        .where('person.type', '=', 'pet')
+        .where((eb) =>
+          eb.not(
+            eb.exists(
+              eb
+                .selectFrom('asset_face')
+                .select(sql`1`.as('one'))
+                .whereRef('asset_face.personGroupId', '=', 'person.personGroupId'),
+            ),
+          ),
+        )
+        .execute();
+
+      if (orphaned.length > 0) {
+        const identityIds = orphaned.map((row) => row.identityId).filter((id): id is string => !!id);
+        if (identityIds.length > 0) {
+          await trx.deleteFrom('shared_space_person').where('identityId', 'in', identityIds).execute();
+        }
+        await trx
+          .deleteFrom('person')
+          .where(
+            'person.personGroupId',
+            'in',
+            orphaned.map((row) => row.personGroupId),
+          )
+          .execute();
+      }
+
+      // 3. Belt and braces: step 1 already cascaded these away.
+      await sql`truncate ${sql.table('pet_search')}`.execute(trx);
     });
   }
 
@@ -487,6 +596,25 @@ export class PersonRepository {
           ),
         ),
       )
+      .$if(!!options.excludePetFaces, (qb) => qb.where((eb) => eb.not(petFacePredicate(eb))))
+      .where('asset_face.deletedAt', 'is', null)
+      .where('asset_face.isVisible', 'is', true)
+      .stream();
+  }
+
+  /**
+   * Pet-recognition equivalent of {@link getAllFaces}'s `{ personGroupId: null }` case, used by
+   * {@link PetRecognitionService.handleQueuePetRecognition}'s non-force fan-out: every pet face that
+   * has been embedded (has a `pet_search` row) but not yet assigned to a person. The inner join on
+   * `pet_search` is the "has an embedding" filter — a face detected before recognition was enabled
+   * has no `pet_search` row and is deliberately excluded (it gets one the next time detection runs).
+   */
+  getUnassignedPetFaces() {
+    return this.db
+      .selectFrom('asset_face')
+      .innerJoin('pet_search', 'pet_search.faceId', 'asset_face.id')
+      .select(['asset_face.id'])
+      .where('asset_face.personGroupId', 'is', null)
       .where('asset_face.deletedAt', 'is', null)
       .where('asset_face.isVisible', 'is', true)
       .stream();
@@ -848,6 +976,28 @@ export class PersonRepository {
         ).as('asset'),
       )
       .select(withFaceSearch)
+      .where('asset_face.id', '=', id)
+      .where('asset_face.deletedAt', 'is', null)
+      .executeTakeFirst();
+  }
+
+  /**
+   * Pet-recognition equivalent of {@link getFaceForFacialRecognitionJob}: face + owning asset +
+   * `pet_search` embedding for {@link PetRecognitionService.handlePetRecognition}. Pets have no
+   * birthdate/visibility gating (see `PetEmbeddingSearch`), so the asset selection is narrower —
+   * just `ownerId`.
+   */
+  @GenerateSql({ params: [DummyValue.UUID] })
+  getPetFaceForRecognition(id: string) {
+    return this.db
+      .selectFrom('asset_face')
+      .select(['asset_face.id', 'asset_face.assetId', 'asset_face.personGroupId'])
+      .select((eb) =>
+        jsonObjectFrom(
+          eb.selectFrom('asset').select(['asset.ownerId']).whereRef('asset.id', '=', 'asset_face.assetId'),
+        ).as('asset'),
+      )
+      .select(withPetSearch)
       .where('asset_face.id', '=', id)
       .where('asset_face.deletedAt', 'is', null)
       .executeTakeFirst();
@@ -1334,6 +1484,60 @@ export class PersonRepository {
     await query.selectFrom(dummy).execute();
   }
 
+  /**
+   * Pet-recognition equivalent of {@link refreshFaces}, simplified: pets have no "remove stale
+   * faces" step here (that lives in the detection pipeline, not recognition).
+   *
+   * Like `refreshFaces`, the caller pre-generates each face's id (`CryptoRepository.randomUUID`)
+   * and pairs embeddings to faces by explicit `faceId`. The previous version let the DB generate
+   * ids and paired `embeddingsToAdd[i]` with the i-th `INSERT … RETURNING` row, which is only
+   * correct while postgres happens to return insert order (F7) — nothing in the SQL standard or
+   * Kysely guarantees it, and a mispairing silently attaches one pet's embedding to another pet's
+   * face.
+   *
+   * Every face must have exactly one embedding: callers route embedding-less pets to the species
+   * bucket instead, so a mismatch here is a broken contract and throws rather than writing a
+   * partially-embedded batch.
+   */
+  @GenerateSql({
+    params: [
+      [{ id: DummyValue.UUID, assetId: DummyValue.UUID }],
+      [{ faceId: DummyValue.UUID, embedding: DummyValue.VECTOR, species: 'dog' }],
+    ],
+  })
+  async refreshPetFaces(
+    facesToAdd: (Insertable<AssetFaceTable> & { id: string; assetId: string })[],
+    embeddingsToAdd: { faceId: string; embedding: string; species: string | null }[],
+  ): Promise<void> {
+    if (facesToAdd.length !== embeddingsToAdd.length) {
+      throw new Error(
+        `refreshPetFaces requires one embedding per face, got ${facesToAdd.length} faces and ${embeddingsToAdd.length} embeddings`,
+      );
+    }
+
+    const faceIds = new Set(facesToAdd.map(({ id }) => id));
+    for (const { faceId } of embeddingsToAdd) {
+      if (!faceIds.has(faceId)) {
+        throw new Error(`refreshPetFaces got an embedding for unknown face ${faceId}`);
+      }
+    }
+
+    if (facesToAdd.length === 0) {
+      return;
+    }
+
+    await this.db.transaction().execute(async (trx) => {
+      await trx.insertInto('asset_face').values(facesToAdd).execute();
+
+      const embeddingRows: Insertable<PetSearchTable>[] = embeddingsToAdd.map(({ faceId, embedding, species }) => ({
+        faceId,
+        embedding,
+        species,
+      }));
+      await trx.insertInto('pet_search').values(embeddingRows).execute();
+    });
+  }
+
   async update(person: Updateable<PersonTable> & PersonId, db: Kysely<DB> | Transaction<DB> = this.db) {
     return db
       .updateTable('person')
@@ -1485,6 +1689,24 @@ export class PersonRepository {
       .executeTakeFirst()) as { latestDate: string } | undefined;
 
     return result?.latestDate;
+  }
+
+  /**
+   * Pet-recognition equivalent of {@link getLatestFaceDate}, used by the nightly
+   * `handleQueuePetRecognition` skip check: pets have no `personsAssignedAt`-style column, so
+   * `petsDetectedAt` (stamped by `handlePetDetection`) is the closest analogue of "a pet was added
+   * since the last nightly run". Unlike the sibling, this returns the `Date` directly rather than
+   * pg-text (F11) — `state.lastRun` is an ISO string with a `T` separator, and comparing it against
+   * pg's `::text` timestamp format (space-separated) mis-ordered same-day timestamps. The service
+   * compares two `Date`s instead.
+   */
+  async getLatestPetDate(): Promise<Date | undefined> {
+    const result = await this.db
+      .selectFrom('asset_job_status')
+      .select((eb) => eb.fn.max('asset_job_status.petsDetectedAt').as('latestDate'))
+      .executeTakeFirst();
+
+    return result?.latestDate ?? undefined;
   }
 
   getByOwnerAndSpecies(ownerId: string, species: string) {

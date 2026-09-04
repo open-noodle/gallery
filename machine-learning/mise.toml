@@ -26,6 +26,13 @@ run = [
   { task = ":test" },
 ]
 
+# pet-recognition-training is a separate uv project (its own venv, python and lock) and is excluded
+# from the service's pytest run, so it needs its own entry point. Kept out of ci-unit/checklist: it
+# installs torch + transformers, which the ML service itself never needs.
+[tasks.test-training]
+dir = "pet-recognition-training"
+run = ["uv sync --locked --extra dev", "uv run pytest"]
+
 [tasks.checklist]
 run = [
   { task = ":install" },

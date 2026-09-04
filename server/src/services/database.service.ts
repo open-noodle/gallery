@@ -96,7 +96,7 @@ export class DatabaseService extends BaseService {
       }
 
       try {
-        await this.databaseRepository.reindexVectorsIfNeeded([VectorIndex.Clip, VectorIndex.Face]);
+        await this.databaseRepository.reindexVectorsIfNeeded([VectorIndex.Clip, VectorIndex.Face, VectorIndex.Pet]);
       } catch (error) {
         this.logger.warn(
           'Could not run vector reindexing checks. If the extension was updated, please restart the Postgres instance. If you are upgrading directly from a version below 1.107.2, please upgrade to 1.107.2 first.',
@@ -129,6 +129,7 @@ export class DatabaseService extends BaseService {
       await Promise.all([
         this.databaseRepository.prewarm(VectorIndex.Clip),
         this.databaseRepository.prewarm(VectorIndex.Face),
+        this.databaseRepository.prewarm(VectorIndex.Pet),
       ]);
     });
   }
