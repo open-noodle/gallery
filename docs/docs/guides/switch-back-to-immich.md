@@ -115,7 +115,7 @@ Watch the server log. A successful boot ends with the usual Immich startup banne
 
 For transparency, here is what the cleanup script changes:
 
-- **Drops Gallery-only tables**: `shared_space*`, `album_space_asset*`, `library_user`, `library_audit`, `library_asset_audit`, `shared_space_library*`, `face_identity*`, `user_group`, `user_group_member`, `classification_category`, `classification_prompt_embedding`, `storage_migration_log`, `asset_duplicate_checksum`.
+- **Drops Gallery-only tables**: `shared_space*`, `album_space_asset*`, `library_user`, `library_audit`, `library_asset_audit`, `shared_space_library*`, `face_identity*`, `face_repair*`, `pet_search`, `user_group`, `user_group_member`, `classification_category`, `classification_prompt_embedding`, `storage_migration_log`, `asset_duplicate_checksum`.
 - **Drops Gallery-added columns**: `person.type`, `person.species`, `asset_job_status.petsDetectedAt`, `asset_job_status.classifiedAt`, `library.createId`.
 - **Drops Gallery-only functions and triggers** that reference the dropped tables.
 - **Strips the `classification` key** out of the `system-config` row in `system_metadata`.

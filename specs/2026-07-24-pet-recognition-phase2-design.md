@@ -44,7 +44,7 @@ propagation (existing pattern).
 | Embedding dim         | **Uniform 512-d** for all 3 backbones (projection maps 384/768/1024→512)                    |
 | Identity model        | Species buckets **replaced by named individuals**; `species` = metadata                     |
 | Clustering threshold  | **Low `minFaces`** so sparse pets still surface (no "unassigned" bucket)                    |
-| Migration             | Enabling recognition / switching model **reprocesses** (clear buckets → re-embed → cluster) |
+| Migration             | Enabling recognition / switching model **reprocesses** — _superseded, see §4.7_        |
 | Shared spaces         | Follow the **existing pet→space propagation**; deep parity is fast-follow                   |
 | Default model         | **base**                                                                                    |
 
@@ -149,6 +149,21 @@ PET_DETECTION)`, `depends=[(DETECTION, PET_DETECTION)]` — mirrors `FaceRecogni
 - Auto-clustered pets are "unnamed," named via the existing unnamed-person affordance.
 
 ### 4.7 Migration / reprocess / model-switch
+
+:::note Superseded — see `2026-07-26-pet-recognition-review-fixes-implementation-slices.md`
+This section, and the "Migration" row of the §3 decision table, describe the design as brainstormed.
+Two things changed during review and the **shipped behaviour is the one below**:
+
+1. **Enabling recognition reprocesses nothing.** There is no automatic reprocess on the enable
+   toggle — the admin runs the explicit, confirm-gated **Reset** on the Pet Recognition queue.
+   Until they do, the library sits in a mixed state: assets detected before the toggle stay
+   bucketed, new uploads get individual treatment.
+2. **A model switch's purge is scoped, not total.** Species buckets are pure detector output and
+   are not model-coupled, so they **survive** every model switch
+   (`PersonRepository.purgePetRecognitionArtifacts` deletes only embedded faces and the
+   individuals left face-less by that). Only the Reset button does the full,
+   bucket-inclusive purge (`deleteAllPets`), because its confirmation dialog promises exactly that.
+:::
 
 - Migration adds `pet_search` + `petRecognition` config defaults.
 - Enabling recognition (or **switching the model**) reprocesses: clear species buckets
