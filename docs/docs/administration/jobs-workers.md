@@ -71,6 +71,10 @@ graph TD
     D --> F[Face Detection]
     D --> G[OCR]
     D --> H[Video Transcoding]
+    D --> K[Pet Detection]
     E --> I[Duplicate Detection]
     F --> J[Facial Recognition]
+    K --> L[Pet Recognition]
 ```
+
+[Pet Detection](/features/pet-detection) and [Pet Recognition](/features/pet-recognition) are both disabled by default; with pet detection off, neither job does anything. Pet Recognition only runs for detections that carry an embedding, which is dogs and cats.
