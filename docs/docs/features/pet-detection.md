@@ -1,45 +1,48 @@
 # Pet Detection
 
-Gallery can automatically detect pets and other animals in your photos using RF-DETR object
+Gallery can automatically detect cats and dogs in your photos using RF-DETR object
 detection. Paired with [Pet Recognition](/features/pet-recognition), your individual dogs and
 cats appear in the **People** section alongside human faces, so you can name them and browse
 every photo of a specific pet.
 
-Detection on its own does not add anything to the People section. It records each animal it
-finds against a single per-species entry — one "dog", one "cat", one "bird" — and those
-per-species entries are not displayed. See
+Detection on its own does not add anything to the People section. It records each pet it
+finds against a single per-species entry — one "dog", one "cat" — and those per-species
+entries are not displayed. See
 [What you can and cannot see](#what-you-can-and-cannot-see) before enabling it on its own.
 
 ## How It Works
 
 When a photo is uploaded or reprocessed, the machine learning service runs an RF-DETR model to
-detect animals. Each detected animal is cropped and recorded with its bounding box, the same
+detect pets. Each detected pet is cropped and recorded with its bounding box, the same
 way face detection records a human face.
 
-The model detects the following animal categories: bird, cat, dog, horse, sheep, and cow.
+Only **cats and dogs** are detected. Every other animal is discarded.
 
-Wild animals such as bears, zebras, giraffes and elephants are deliberately **not** detected.
-They are rare in a household photo library, and including them caused bear-like dog breeds —
-Newfoundlands, Keeshonds, Great Pyrenees — to be confidently mislabelled as bears.
+The model still scores birds, horses, sheep and cows internally, and that is deliberate: it
+gives a horse a class of its own to win, so it is thrown away rather than being forced onto
+whichever of cat or dog happened to score highest. Removing those classes outright would file
+horses and cows under your dog entry instead of discarding them.
+
+Wild animals such as bears, zebras, giraffes and elephants are excluded from that scoring step
+as well. They are rare in a household photo library, and including them caused bear-like dog
+breeds — Newfoundlands, Keeshonds, Great Pyrenees — to be confidently mislabelled as bears.
 
 ## What you can and cannot see
 
-Detection records every animal it finds, but only some of them are browsable today.
+Detection records every pet it finds, but it is only browsable with Pet Recognition on.
 
 | What was detected                                                  | Where it ends up                                                 |
 | ------------------------------------------------------------------ | ---------------------------------------------------------------- |
 | A dog or cat, with [Pet Recognition](/features/pet-recognition) on | An individual pet in **People** — nameable, mergeable, browsable |
 | A dog or cat, with Pet Recognition off                             | A shared per-species entry, **not shown**                        |
-| A bird, horse, sheep or cow                                        | A shared per-species entry, **not shown**                        |
+| Any other animal                                                   | Discarded — never recorded                                       |
 
 Per-species entries are stored, but the People page lists identities rather than raw person
 records, and a per-species entry is never given one. So with Pet Recognition switched off,
 **Pet Detection alone puts nothing in your People section** — it quietly records detections
-you have no way to view, rename or delete from the UI. The same is true of birds, horses,
-sheep and cows whether or not Pet Recognition is on.
+you have no way to view, rename or delete from the UI.
 
-If what you want is named pets, enable Pet Recognition too. If you only want the other species
-catalogued, be aware that today the results are effectively write-only.
+If what you want is named pets, enable Pet Recognition too.
 
 ## Model Options
 
@@ -136,11 +139,12 @@ of machine-learning work on your server without asking.
 
 - **Existing detections are left exactly as they were.** They were produced by the old model,
   so they keep its mistakes. Nothing re-runs over them.
-- **Wild-animal entries become permanent until you rebuild.** Any bear, zebra, giraffe or
-  elephant YOLO11 created stays in your library as a per-species entry. RF-DETR will never
-  produce those species again, so nothing will ever correct or replace them on its own — and
-  because per-species entries are not shown in the People section, a Reset is the only thing
-  that clears them.
+- **Non-pet entries become permanent until you rebuild.** Any bear, zebra, giraffe or
+  elephant YOLO11 created — and any bird, horse, sheep or cow created before detection was
+  narrowed to cats and dogs — stays in your library as a per-species entry. Neither species is
+  produced any more, so nothing will ever correct or replace them on its own, and because
+  per-species entries are not shown in the People section, a Reset is the only thing that
+  clears them.
 - **Individual pets are not re-clustered.** If you use [Pet Recognition](/features/pet-recognition),
   your existing pets keep the embeddings the old detector's crops produced.
 - **Your confidence threshold is not migrated.** This is the one to check. If you never changed
@@ -198,8 +202,9 @@ re-clusters your dogs and cats, so individual pets are rebuilt from scratch too.
    NCHW.
 2. **Inference** — ONNX Runtime runs the RF-DETR model, producing 300 object queries: box
    coordinates plus class logits over the 91-class COCO label space.
-3. **Postprocessing** — Logits are passed through a sigmoid, restricted to the six domestic
-   animal classes, and thresholded by the configured `minScore`. Boxes are converted from
+3. **Postprocessing** — Logits are passed through a sigmoid and restricted to the six domestic
+   animal classes. The best class is taken per query, everything that is not a cat or a dog is
+   dropped, and the rest is thresholded by the configured `minScore`. Boxes are converted from
    normalised centre/width/height to pixel corners and clipped to the image. No
    non-maximum-suppression step is needed — RF-DETR's queries are already deduplicated.
 
@@ -211,8 +216,7 @@ supports CUDA, OpenVINO, CoreML, and CPU backends via ONNX Runtime.
 Pet detection extends two existing tables rather than creating new ones:
 
 - **`person`** — Added `type` column (VARCHAR, default `'person'`) to distinguish humans from
-  pets, and `species` column (VARCHAR, nullable) for the animal label (e.g., `'dog'`,
-  `'cat'`).
+  pets, and `species` column (VARCHAR, nullable) for the pet label (`'dog'` or `'cat'`).
 - **`asset_job_status`** — Added `petsDetectedAt` timestamp to track which assets have been
   processed.
 
@@ -226,9 +230,9 @@ queries identities rather than `person` rows directly — which is why these ent
 appear there. Only pets promoted to individuals by Pet Recognition receive one.
 
 :::note Pet Recognition covers dogs and cats only
-When [Pet Recognition](/features/pet-recognition) is enabled, **dogs and cats** are grouped into individual pets you can name, instead of one shared bucket per species. The other four detected categories (bird, horse, sheep, cow) always keep the one-person-per-species behaviour described above, which means they are recorded but never listed in the People section.
+When [Pet Recognition](/features/pet-recognition) is enabled, **dogs and cats** are grouped into individual pets you can name, instead of one shared bucket per species. Since detection is limited to those two species, everything it records is eligible for recognition.
 
-This is a limit of the recognition model, not an oversight: it is trained on dog and cat identities, so it has no basis for telling one bird or one horse apart from another. Restricting it also contains the cost of a misdetection — the detector occasionally labels a person as an animal, and a shared species bucket absorbs that far more gracefully than an individual identity would.
+Detection and recognition agree on scope by design: the recognition model is trained on dog and cat identities, so it has no basis for telling one bird or one horse apart from another. Detecting species it could never individuate only produced entries that were recorded but never listed.
 :::
 
 ### Job Flow
