@@ -5,7 +5,7 @@ Pet Recognition tells your individual pets apart. With it enabled, two dogs in y
 It builds on [Pet Detection](/features/pet-detection): detection finds the animal in the photo, recognition decides _which_ animal it is.
 
 :::info Dogs and cats only
-Only **dogs** and **cats** are recognized as individuals. The other eight detected categories (bird, horse, sheep, cow, elephant, bear, zebra, giraffe) keep the one-person-per-species behaviour Pet Detection has always had.
+Only **dogs** and **cats** are recognized as individuals. The other four detected categories (bird, horse, sheep, cow) keep the one-person-per-species behaviour Pet Detection has always had.
 
 This is a limit of the model, not an oversight: it is trained on dog and cat identities, so it has no basis for telling one bird apart from another. It also contains the cost of a misdetection — the detector occasionally labels a person as an animal, and a shared species bucket absorbs that far more gracefully than a named identity would.
 :::
