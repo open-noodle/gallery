@@ -75,7 +75,7 @@ Immich's AI surface is focused on faces and basic CLIP search — pets aren't de
 - **[Auto-Classification](https://opennoodle.de/features/auto-classification)** — define what clutter looks like (screenshots, memes, receipts) and Gallery tags and optionally archives it automatically, each category with its own threshold. ([Docs](https://docs.opennoodle.de/features/auto-classification))
 - **[Memories Archive](https://opennoodle.de/features/memories-archive)** — a dedicated Memories page with search, an All/Saved filter, and retention controls. ([Docs](https://docs.opennoodle.de/features/memories))
 - **[Smarter Memories](https://opennoodle.de/features/smarter-memories)** — recent-trip recaps detected from location clusters, plus birthday memories that adapt to each person's photo history. ([Docs](https://docs.opennoodle.de/features/memories))
-- **[Pet Detection](https://opennoodle.de/features/pet-detection)** — YOLO11 detects dogs, cats, birds, and other animals and surfaces them alongside people. ([Docs](https://docs.opennoodle.de/features/pet-detection))
+- **[Pet Detection](https://opennoodle.de/features/pet-detection)** — RF-DETR detects dogs, cats, birds, horses, sheep, and cows and surfaces them alongside people. ([Docs](https://docs.opennoodle.de/features/pet-detection))
 - **[Video Duplicate Detection](https://opennoodle.de/features/video-duplicate-detection)** — averages CLIP embeddings across sampled frames, catching duplicate videos even after re-encoding or resizing. ([Docs](https://docs.opennoodle.de/features/video-duplicate-detection))
 
 ### Media management and migration
