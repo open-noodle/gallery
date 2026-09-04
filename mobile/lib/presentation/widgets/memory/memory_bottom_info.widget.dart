@@ -55,7 +55,10 @@ class DriftMemoryBottomInfo extends ConsumerWidget {
                 // TabShellRoute would reload the timeline to the top and discard the scroll).
                 goToMainTimeline: () => context.navigateTo(const MainTimelineRoute()),
                 // #1047: a photo the viewer only reaches through a Space is not in their
-                // personal timeline, so open the Space's own timeline instead.
+                // personal timeline, so open the Space's own timeline instead. Pushed, not
+                // navigated, so the Space stacks over the timeline — the jump latches its
+                // scroll target BEFORE this future settles, because a push future completes
+                // when the route is popped.
                 goToSpace: (spaceId) => context.pushRoute(SpaceDetailRoute(spaceId: spaceId)),
               ),
               shape: const CircleBorder(),

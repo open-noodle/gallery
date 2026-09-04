@@ -28,7 +28,8 @@ import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dar
 /// * pop first, because clearing the filter disposes the search `TimelineService`
 ///   the viewer was handed by value;
 /// * latch the scroll target last, so the drain resolves against the global
-///   timeline instead of the results it is replacing.
+///   timeline instead of the results it is replacing — except for a Space jump,
+///   which inverts that step for the reason given on the branch below.
 Future<void> viewAssetInTimeline({
   required BaseAsset asset,
   required ProviderReader read,
@@ -39,6 +40,17 @@ Future<void> viewAssetInTimeline({
   await popViewer();
   read(photosFilterProvider.notifier).reset();
   read(photosFilterSheetProvider.notifier).state = FilterSheetSnap.hidden;
+  if (spaceId != null) {
+    // A Space timeline is PUSHED over the main one, and auto_route's push future
+    // completes when the route is POPPED, not when it is pushed (`_addNewPage` returns
+    // the pop completer). Waiting for it would latch the request only once the user had
+    // already left the Space, so the jump landed on the Space at the top and never
+    // scrolled. Latching first is safe precisely because the request names the Space:
+    // the main timeline reads a scoped request as `idle` and leaves it alone (#1047).
+    scrollToAssetNotifierProvider.scrollToAsset(asset, spaceId: spaceId);
+    await goToTimeline();
+    return;
+  }
   await goToTimeline();
-  scrollToAssetNotifierProvider.scrollToAsset(asset, spaceId: spaceId);
+  scrollToAssetNotifierProvider.scrollToAsset(asset);
 }
