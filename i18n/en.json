@@ -505,7 +505,7 @@
     "machine_learning_ocr_model": "OCR model",
     "machine_learning_ocr_model_description": "Server models are more accurate than mobile models, but take longer to process and use more memory.",
     "machine_learning_pet_detection": "Pet Detection",
-    "machine_learning_pet_detection_description": "Detect cats, dogs, and other animals in photos (YOLOv8)",
+    "machine_learning_pet_detection_description": "Detect cats, dogs, and other animals in photos (RF-DETR)",
     "machine_learning_pet_detection_model": "Pet Detection Model",
     "machine_learning_pet_detection_model_description": "Model used for detecting pets. Nano is faster, Small is more accurate.",
     "machine_learning_pet_detection_setting": "Pet Detection",

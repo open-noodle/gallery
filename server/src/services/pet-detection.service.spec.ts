@@ -190,7 +190,7 @@ describe(PetDetectionService.name, () => {
     const enabledConfig = {
       machineLearning: {
         enabled: true,
-        petDetection: { enabled: true, modelName: 'yolo11n', minScore: 0.6 },
+        petDetection: { enabled: true, modelName: 'rfdetr-nano', minScore: 0.3 },
       },
     };
 
