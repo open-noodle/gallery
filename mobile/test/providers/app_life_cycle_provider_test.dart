@@ -7,6 +7,7 @@ import 'package:immich_mobile/domain/models/config/app_config.dart';
 import 'package:immich_mobile/domain/models/log.model.dart';
 import 'package:immich_mobile/domain/services/device_permission.service.dart';
 import 'package:immich_mobile/domain/services/log.service.dart';
+import 'package:immich_mobile/domain/utils/background_sync.dart';
 import 'package:immich_mobile/models/auth/auth_state.model.dart';
 import 'package:immich_mobile/models/server_info/server_version.model.dart';
 import 'package:immich_mobile/providers/app_life_cycle.provider.dart';
@@ -139,6 +140,15 @@ void main() {
     when(() => backgroundSync.syncLocal(full: any(named: 'full'))).thenAnswer((_) async {});
     when(() => backgroundSync.syncRemote()).thenAnswer((_) async => true);
     when(() => backgroundSync.hashAssets()).thenAnswer((_) async {});
+    // Fork-only: #513 routes resume through syncRemoteThenLocal instead of upstream's
+    // syncLocal/syncRemote pair. Without this stub the mock throws, _handleBackgroundSync's
+    // try/catch swallows it, and the memory-lane invalidate below never runs.
+    when(
+      () => backgroundSync.syncRemoteThenLocal(
+        fullLocalSync: any(named: 'fullLocalSync'),
+        shouldRunLocal: any(named: 'shouldRunLocal'),
+      ),
+    ).thenAnswer((_) => RemoteThenLocalSync(remoteSync: Future.value(true), deferredLocalSync: Future.value()));
 
     container = ProviderContainer(
       overrides: [
