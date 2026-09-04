@@ -56,6 +56,10 @@ jobs:
             machine-learning:
               - 'machine-learning/**'
               - 'mise.toml'
+            ml-training:
+              - 'machine-learning/pet-recognition-training/**'
+              - 'machine-learning/mise.toml'
+              - 'mise.toml'
             upstream-preflight:
               - '.github/workflows/test.yml'
               - 'tools/upstream-preflight/**'
@@ -678,6 +682,30 @@ jobs:
 
       - name: Run ci-unit
         run: mise run ci-unit
+
+  ml-training-tests:
+    name: Unit Test ML Training
+    needs: pre-job
+    if: ${{ fromJSON(needs.pre-job.outputs.should_run).ml-training == true }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: ./machine-learning
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+          token: ${{ github.token }}
+
+      - name: Setup Mise
+        uses: immich-app/devtools/actions/use-mise@3bca63ca3c15020293b36b51737a3ee2c773340b # use-mise-action-v3.1.0
+        with:
+          github_token: ${{ github.token }}
+
+      - name: Run test-training
+        run: mise run test-training
 
   github-files-formatting:
     name: .github Files Formatting
