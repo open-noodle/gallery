@@ -7595,7 +7595,7 @@ export function deletePeople({ peopleDeleteDto }: {
 /**
  * Get all people
  */
-export function getAllPeople({ closestAssetId, closestPersonId, page, size, withHidden, withSharedSpaces }: {
+export function getAllPeople({ closestAssetId, closestPersonId, page, size, $type, withHidden, withSharedSpaces }: {
     closestAssetId?: string;
     closestPersonId?: string;
     isFavorite?: boolean;
@@ -7604,6 +7604,7 @@ export function getAllPeople({ closestAssetId, closestPersonId, page, size, with
     sharedById?: string;
     sharedWithId?: string;
     size?: number;
+    $type?: "person" | "pet";
     withHidden?: boolean;
     withSharedSpaces?: boolean;
 }, opts?: Oazapfts.RequestOpts) {
@@ -7619,6 +7620,7 @@ export function getAllPeople({ closestAssetId, closestPersonId, page, size, with
         sharedById,
         sharedWithId,
         size,
+        "type": $type,
         withHidden,
         withSharedSpaces
     }))}`, {
@@ -7685,11 +7687,12 @@ export function detachScopedPerson({ detachScopedPersonDto }: {
 /**
  * Get people face statistics
  */
-export function getPeopleFaceStatistics({ closestAssetId, closestPersonId, page, size, withHidden, withSharedSpaces }: {
+export function getPeopleFaceStatistics({ closestAssetId, closestPersonId, page, size, $type, withHidden, withSharedSpaces }: {
     closestAssetId?: string;
     closestPersonId?: string;
     page?: number;
     size?: number;
+    $type?: "person" | "pet";
     withHidden?: boolean;
     withSharedSpaces?: boolean;
 }, opts?: Oazapfts.RequestOpts) {
@@ -7701,6 +7704,7 @@ export function getPeopleFaceStatistics({ closestAssetId, closestPersonId, page,
         closestPersonId,
         page,
         size,
+        "type": $type,
         withHidden,
         withSharedSpaces
     }))}`, {
@@ -7722,11 +7726,12 @@ export function mergeScopedPeople({ mergeScopedPeopleDto }: {
 /**
  * Get people statistics
  */
-export function getPeopleStatistics({ closestAssetId, closestPersonId, page, size, withHidden, withSharedSpaces }: {
+export function getPeopleStatistics({ closestAssetId, closestPersonId, page, size, $type, withHidden, withSharedSpaces }: {
     closestAssetId?: string;
     closestPersonId?: string;
     page?: number;
     size?: number;
+    $type?: "person" | "pet";
     withHidden?: boolean;
     withSharedSpaces?: boolean;
 }, opts?: Oazapfts.RequestOpts) {
@@ -7738,6 +7743,7 @@ export function getPeopleStatistics({ closestAssetId, closestPersonId, page, siz
         closestPersonId,
         page,
         size,
+        "type": $type,
         withHidden,
         withSharedSpaces
     }))}`, {
