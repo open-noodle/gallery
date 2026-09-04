@@ -506,7 +506,11 @@
     try {
       await addAssets({ id: space.id, sharedSpaceAssetAddDto: { assetIds } });
       skipNextLocalSpaceAddEventForSpaceId = space.id;
-      eventManager.emit('SpaceAddAssets', { assetIds, spaceId: space.id });
+      eventManager.emit('SpaceAddAssets', {
+        assetIds,
+        spaceId: space.id,
+        hiddenFromMyTimeline: currentMember?.showInTimeline === false,
+      });
       toastManager.success($t('added_to_space_count', { values: { count: assetIds.length } }));
       await applySpaceAddSuccess();
       return true;
