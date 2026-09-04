@@ -55,6 +55,33 @@ const giveOwnFace = async (ctx: ReturnType<typeof setup>['ctx'], assetId: string
   return faceId;
 };
 
+// Seeds a person of a given type with `faces` timeline photos, for the getAllForUser type-filter
+// block. Module scope: eslint's consistent-function-scoping rejects helpers defined in a describe.
+const seedTypedPerson = async (
+  ctx: ReturnType<typeof setup>['ctx'],
+  input: { ownerId: string; type?: string; species?: string | null; name?: string; faces: number; embedded?: boolean },
+) => {
+  const { person } = await ctx.newPerson({
+    ownerId: input.ownerId,
+    name: input.name ?? '',
+    ...(input.type && { type: input.type }),
+    ...(input.species !== undefined && { species: input.species }),
+  });
+  for (let i = 0; i < input.faces; i++) {
+    const { asset } = await ctx.newAsset({ ownerId: input.ownerId, visibility: AssetVisibility.Timeline });
+    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+    // A pet_search row is what makes a pet an *individual* the re-ID model identified, as opposed to
+    // a species bucket, which is pure detector output and never carries an embedding.
+    if (input.embedded) {
+      await ctx.database
+        .insertInto('pet_search')
+        .values({ faceId: assetFace.id, embedding: newEmbedding(), species: input.species ?? null })
+        .execute();
+    }
+  }
+  return person;
+};
+
 describe(PersonRepository.name, () => {
   describe('createAll', () => {
     it('should create people in the groups they were given', async () => {
@@ -611,6 +638,177 @@ describe(PersonRepository.name, () => {
           birthDate: new Date('1990-04-23T00:00:00Z'),
         }),
       ]);
+    });
+  });
+
+  // The /people page's type filter (All / People / Pets). Both list arms must honour it —
+  // getAllForUser here, and FaceIdentityRepository.getAccessiblePeople for the withSharedSpaces
+  // path the web page actually calls — or the filter leaks through whichever arm was missed.
+  describe('getAllForUser type filter', () => {
+    it('returns only pets when type is pet', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const human = await seedTypedPerson(ctx, { ownerId: user.id, name: 'Alice', faces: 3 });
+      const pet = await seedTypedPerson(ctx, {
+        ownerId: user.id,
+        type: 'pet',
+        species: 'dog',
+        name: 'Rex',
+        faces: 3,
+        embedded: true,
+      });
+
+      const { items } = await sut.getAllForUser({ take: 50, skip: 0 }, user.id, { withHidden: false, type: 'pet' });
+
+      const ids = items.map(({ personGroupId }) => personGroupId);
+      expect(ids).toContain(pet.personGroupId);
+      expect(ids).not.toContain(human.personGroupId);
+    });
+
+    it('returns only humans when type is person', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const human = await seedTypedPerson(ctx, { ownerId: user.id, name: 'Bob', faces: 3 });
+      const pet = await seedTypedPerson(ctx, {
+        ownerId: user.id,
+        type: 'pet',
+        species: 'cat',
+        name: 'Mochi',
+        faces: 3,
+      });
+
+      const { items } = await sut.getAllForUser({ take: 50, skip: 0 }, user.id, { withHidden: false, type: 'person' });
+
+      const ids = items.map(({ personGroupId }) => personGroupId);
+      expect(ids).toContain(human.personGroupId);
+      expect(ids).not.toContain(pet.personGroupId);
+    });
+
+    // "Pets" means the cats and dogs the re-ID model actually identified — a pet person with an
+    // embedded face. Species buckets (bird, cow, horse ...) are pure YOLO output with no embedding;
+    // they are a category, not an individual, and are where the misdetections collect.
+    it('excludes species buckets from type=pet', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const bucket = await seedTypedPerson(ctx, {
+        ownerId: user.id,
+        type: 'pet',
+        species: 'bird',
+        name: 'bird',
+        faces: 5,
+      });
+      const individual = await seedTypedPerson(ctx, {
+        ownerId: user.id,
+        type: 'pet',
+        species: 'dog',
+        faces: 3,
+        embedded: true,
+      });
+
+      const { items } = await sut.getAllForUser({ take: 50, skip: 0 }, user.id, { withHidden: false, type: 'pet' });
+
+      const ids = items.map(({ personGroupId }) => personGroupId);
+      expect(ids).toContain(individual.personGroupId);
+      expect(ids).not.toContain(bucket.personGroupId);
+    });
+
+    // The minimumFaces gate is waived only for the Pets view. Recognition ships minFaces: 1 so a pet
+    // photographed once still becomes an individual, and the Pets view is where you go to name them.
+    it('surfaces a single-face individual under type=pet', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const individual = await seedTypedPerson(ctx, {
+        ownerId: user.id,
+        type: 'pet',
+        species: 'cat',
+        faces: 1,
+        embedded: true,
+      });
+
+      const { items } = await sut.getAllForUser({ take: 50, skip: 0 }, user.id, { withHidden: false, type: 'pet' });
+
+      expect(items.map(({ personGroupId }) => personGroupId)).toContain(individual.personGroupId);
+    });
+
+    // ...and NOT waived on the unfiltered view, so All keeps behaving exactly as it does today
+    // rather than gaining 187 one-photo pets overnight.
+    it('still hides a single-face individual on the unfiltered view', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const individual = await seedTypedPerson(ctx, {
+        ownerId: user.id,
+        type: 'pet',
+        species: 'cat',
+        faces: 1,
+        embedded: true,
+      });
+
+      const { items } = await sut.getAllForUser({ take: 50, skip: 0 }, user.id, { withHidden: false });
+
+      expect(items.map(({ personGroupId }) => personGroupId)).not.toContain(individual.personGroupId);
+    });
+
+    it('keeps a named species bucket on the unfiltered view', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const bucket = await seedTypedPerson(ctx, {
+        ownerId: user.id,
+        type: 'pet',
+        species: 'horse',
+        name: 'horse',
+        faces: 2,
+      });
+
+      const { items } = await sut.getAllForUser({ take: 50, skip: 0 }, user.id, { withHidden: false });
+
+      expect(items.map(({ personGroupId }) => personGroupId)).toContain(bucket.personGroupId);
+    });
+
+    it('scopes the header total to the type filter', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      await seedTypedPerson(ctx, { ownerId: user.id, name: 'Alice', faces: 3 });
+      await seedTypedPerson(ctx, {
+        ownerId: user.id,
+        type: 'pet',
+        species: 'dog',
+        name: 'Rex',
+        faces: 3,
+        embedded: true,
+      });
+
+      await expect(sut.getNumberOfPeople(user.id, {})).resolves.toMatchObject({ total: 2 });
+      await expect(sut.getNumberOfPeople(user.id, { type: 'pet' })).resolves.toMatchObject({ total: 1 });
+      await expect(sut.getNumberOfPeople(user.id, { type: 'person' })).resolves.toMatchObject({ total: 1 });
+    });
+
+    it('counts a single-face individual in the header total only under type=pet', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      await seedTypedPerson(ctx, { ownerId: user.id, type: 'pet', species: 'dog', faces: 1, embedded: true });
+
+      await expect(sut.getNumberOfPeople(user.id, { minimumFaceCount: 3 })).resolves.toMatchObject({ total: 0 });
+      await expect(sut.getNumberOfPeople(user.id, { minimumFaceCount: 3, type: 'pet' })).resolves.toMatchObject({
+        total: 1,
+      });
+    });
+
+    it('returns both when no type is given', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const human = await seedTypedPerson(ctx, { ownerId: user.id, name: 'Cara', faces: 3 });
+      const pet = await seedTypedPerson(ctx, {
+        ownerId: user.id,
+        type: 'pet',
+        species: 'dog',
+        name: 'Bandit',
+        faces: 3,
+      });
+
+      const { items } = await sut.getAllForUser({ take: 50, skip: 0 }, user.id, { withHidden: false });
+
+      const ids = items.map(({ personGroupId }) => personGroupId);
+      expect(ids).toEqual(expect.arrayContaining([human.personGroupId, pet.personGroupId]));
     });
   });
 
