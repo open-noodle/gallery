@@ -203,7 +203,7 @@ export class PersonService extends BaseService {
   }
 
   async getAll(auth: AuthDto, dto: PersonSearchDto): Promise<PeopleResponseDto> {
-    const { withHidden = false, withSharedSpaces = false, closestAssetId, closestPersonId, page, size } = dto;
+    const { withHidden = false, withSharedSpaces = false, closestAssetId, closestPersonId, page, size, type } = dto;
     const minimumFaceCount = await this.resolveMinimumFaceCount(auth);
 
     if (withSharedSpaces) {
@@ -212,6 +212,7 @@ export class PersonService extends BaseService {
         page,
         size,
         minimumFaceCount,
+        type,
       });
     }
 
@@ -234,10 +235,11 @@ export class PersonService extends BaseService {
     const { items, hasNextPage } = await this.personRepository.getAllForUser(pagination, auth.user.id, {
       withHidden,
       closestFaceAssetId,
-      ...filters,
+      type,
     });
     const { total, hidden } = await this.personRepository.getNumberOfPeople(auth.user.id, {
       minimumFaceCount,
+      type,
     });
 
     return {
