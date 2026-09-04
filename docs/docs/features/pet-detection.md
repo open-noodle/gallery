@@ -93,6 +93,15 @@ The deletion happens even when pet detection is disabled — that is deliberate,
 Earlier versions of Gallery used YOLO11 (`yolo11n`, `yolo11s`, `yolo11m`). If you had pet
 detection enabled before this release, here is exactly what changes.
 
+:::warning Your existing photos are not reprocessed automatically
+Nothing is re-detected, re-embedded or re-clustered on upgrade. The new model applies to
+**newly uploaded photos only** until you explicitly rebuild — so none of the accuracy above
+reaches the photos already in your library until you run a Reset.
+
+This is deliberate: an automatic rebuild would delete every pet name you have set and put hours
+of machine-learning work on your server without asking.
+:::
+
 ### What happens on its own
 
 - **Your model setting is migrated.** Any `yolo*` value becomes `rfdetr-nano` when the server
@@ -103,8 +112,13 @@ detection enabled before this release, here is exactly what changes.
 ### What does _not_ happen on its own
 
 - **Existing detections are left exactly as they were.** They were produced by the old model,
-  so they keep its mistakes — including any bears, zebras, giraffes or elephants it found.
-  Those entries stay in your People section until you rebuild.
+  so they keep its mistakes. Nothing re-runs over them.
+- **Wild-animal entries become permanent until you rebuild.** Any bear, zebra, giraffe or
+  elephant YOLO11 created stays in your People section. RF-DETR will never produce those
+  species again, so nothing will ever correct or replace them on its own — a Reset is the only
+  thing that clears them.
+- **Individual pets are not re-clustered.** If you use [Pet Recognition](/features/pet-recognition),
+  your existing pets keep the embeddings the old detector's crops produced.
 - **Your confidence threshold is not migrated.** This is the one to check. If you never changed
   it, you get the new default of `0.3` and nothing more is needed. But if you _explicitly_ set a
   value for YOLO11, it carries over — and the two models are calibrated differently, so the old
@@ -113,7 +127,8 @@ detection enabled before this release, here is exactly what changes.
   you have a reason not to.
 
 Until you rebuild, your library is in a mixed state: older photos carry YOLO11's detections and
-newer ones carry RF-DETR's.
+newer ones carry RF-DETR's. If you want the improved accuracy across your whole library, the
+Reset below is not optional — it is the only thing that applies it.
 
 ### Rebuilding
 
