@@ -27,8 +27,8 @@ class SpaceTopSliver extends StatelessWidget {
   final VoidCallback onLinkTap;
   final void Function(String albumId) onAlbumTap;
 
-  /// Invoked when the user taps "See all ▸" in the shelf header.
-  /// B3 wires this to push [SpaceAlbumsRoute]. If null, the tap is a no-op.
+  /// Invoked when the user taps "See all ▸" in the shelf header. The caller
+  /// pushes [SpaceAlbumsRoute]. If null, the tap is a no-op.
   final VoidCallback? onSeeAll;
 
   @override

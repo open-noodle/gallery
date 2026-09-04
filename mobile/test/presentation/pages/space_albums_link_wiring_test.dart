@@ -14,6 +14,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/data/db/main/database.dart';
 import 'package:immich_mobile/domain/models/settings_key.dart';
 import 'package:immich_mobile/domain/models/space_album.model.dart';
+import 'package:immich_mobile/domain/models/space_album_folder.model.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
@@ -24,8 +25,15 @@ import 'package:immich_mobile/providers/infrastructure/space_album.provider.dart
 import '../../test_utils.dart';
 import '../../widget_tester_extensions.dart';
 
-List<Override> _overrides({required String spaceId, required List<SpaceAlbum> albums}) => [
+// Task 10 added a folders stream the page now watches unconditionally; every override list here
+// must supply one (an empty list) or the page throws resolving `driftProvider`.
+List<Override> _overrides({
+  required String spaceId,
+  required List<SpaceAlbum> albums,
+  List<SpaceAlbumFolder> folders = const <SpaceAlbumFolder>[],
+}) => [
   spaceAlbumsProvider(spaceId).overrideWith((_) => Stream.value(albums)),
+  spaceAlbumFoldersProvider(spaceId).overrideWith((_) => Stream.value(folders)),
 ];
 
 void main() {
@@ -53,9 +61,17 @@ void main() {
 
   testWidgets('tapping ＋ Link in SpaceAlbumsPage invokes the onLink callback', (tester) async {
     var callCount = 0;
+    final folderIds = <String?>[];
 
     await tester.pumpConsumerWidget(
-      SpaceAlbumsPage(spaceId: spaceId, canEdit: true, onLink: () => callCount++),
+      SpaceAlbumsPage(
+        spaceId: spaceId,
+        canEdit: true,
+        onLink: (folderId) {
+          callCount++;
+          folderIds.add(folderId);
+        },
+      ),
       overrides: _overrides(
         spaceId: spaceId,
         albums: [
@@ -76,13 +92,15 @@ void main() {
     await tester.pump();
 
     expect(callCount, 1);
+    // At the space root the callback must carry null, so the album links at the root.
+    expect(folderIds, [null]);
   });
 
   testWidgets('tapping ＋ Link in empty-state SpaceAlbumsPage invokes the onLink callback', (tester) async {
     var callCount = 0;
 
     await tester.pumpConsumerWidget(
-      SpaceAlbumsPage(spaceId: spaceId, canEdit: true, onLink: () => callCount++),
+      SpaceAlbumsPage(spaceId: spaceId, canEdit: true, onLink: (_) => callCount++),
       overrides: _overrides(spaceId: spaceId, albums: const []), // empty — shows empty state
     );
 
@@ -91,5 +109,27 @@ void main() {
     await tester.pump();
 
     expect(callCount, 1);
+  });
+
+  // The bug this pins: `onLink` used to be a bare VoidCallback owned by the parent space-detail
+  // page, which has no idea which folder the albums page is showing — so linking an album while
+  // inside a folder silently dropped it at the space ROOT. The callback must carry the folder
+  // the user is actually looking at.
+  testWidgets('tapping + Link inside a folder passes that folder to onLink', (tester) async {
+    final folderIds = <String?>[];
+
+    await tester.pumpConsumerWidget(
+      SpaceAlbumsPage(spaceId: spaceId, canEdit: true, folderId: 'trips', onLink: folderIds.add),
+      overrides: _overrides(
+        spaceId: spaceId,
+        albums: const [],
+        folders: [const SpaceAlbumFolder(id: 'trips', spaceId: spaceId, parentId: null, name: 'Trips')],
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('space-albums-link-action')));
+    await tester.pump();
+
+    expect(folderIds, ['trips']);
   });
 }

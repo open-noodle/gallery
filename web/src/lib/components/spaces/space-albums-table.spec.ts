@@ -1,5 +1,6 @@
 import type { SharedSpaceLinkedAlbumDto } from '@immich/sdk';
 import { fireEvent, screen, waitFor, within } from '@testing-library/svelte';
+import userEvent from '@testing-library/user-event';
 import { init, register, waitLocale } from 'svelte-i18n';
 import SpaceAlbumsTable from '$lib/components/spaces/space-albums-table.svelte';
 import { SpaceAlbumGroupBy, spaceAlbumViewSettings } from '$lib/stores/space-album-view-settings.store';
@@ -13,6 +14,7 @@ function makeAlbum(overrides: Partial<SharedSpaceLinkedAlbumDto> = {}): SharedSp
     albumName: 'Vacation',
     assetCount: 5,
     albumThumbnailAssetId: null,
+    folderId: null,
     showInTimeline: true,
     hiddenFromMyTimeline: false,
     addedById: null,
@@ -69,6 +71,73 @@ describe('SpaceAlbumsTable', () => {
     expect(screen.getByTestId('space-album-row-a-2')).toBeInTheDocument();
   });
 
+  describe('folder rows', () => {
+    const folder = (id: string, name: string, parentId: string | null = null) => ({
+      id,
+      spaceId: 's-1',
+      parentId,
+      name,
+      createdById: null,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    // The folder row must be reachable the same way an album row is. It used to be a bare
+    // `<tr onclick>`: openable with a mouse, invisible to the keyboard and to a screen reader,
+    // in a table whose album rows are all anchors.
+    it('renders the folder name as a real link to the folder URL', () => {
+      renderWithTooltips(SpaceAlbumsTable, {
+        spaceId: 's-1',
+        albums: [],
+        allAlbums: [],
+        folders: [folder('f-1', 'Trips')],
+        currentFolderId: null,
+        canManage: false,
+      });
+
+      expect(screen.getByTestId('space-album-folder-link-f-1')).toHaveAttribute(
+        'href',
+        '/spaces/s-1/albums?folder=f-1',
+      );
+    });
+
+    it('opens the folder through the callback instead of a full navigation', async () => {
+      const onOpenFolder = vi.fn();
+      renderWithTooltips(SpaceAlbumsTable, {
+        spaceId: 's-1',
+        albums: [],
+        allAlbums: [],
+        folders: [folder('f-1', 'Trips')],
+        currentFolderId: null,
+        canManage: false,
+        onOpenFolder,
+      });
+
+      await userEvent.click(screen.getByTestId('space-album-folder-link-f-1'));
+
+      expect(onOpenFolder).toHaveBeenCalledWith(expect.objectContaining({ id: 'f-1' }));
+    });
+
+    // The count is recursive: albums filed in a descendant folder still count toward the parent.
+    // Reading it from the shared summary map must not change that.
+    it('shows the recursive album count, including albums in a nested folder', () => {
+      renderWithTooltips(SpaceAlbumsTable, {
+        spaceId: 's-1',
+        albums: [],
+        allAlbums: [
+          makeAlbum({ id: 'a-1', albumName: 'Rome', folderId: 'f-1' }),
+          makeAlbum({ id: 'a-2', albumName: 'Milan', folderId: 'f-2' }),
+          makeAlbum({ id: 'a-3', albumName: 'Unfiled', folderId: null }),
+        ],
+        folders: [folder('f-1', 'Trips'), folder('f-2', '2026', 'f-1')],
+        currentFolderId: null,
+        canManage: false,
+      });
+
+      expect(screen.getByText('2 albums')).toBeInTheDocument();
+    });
+  });
+
   describe('grouped rendering', () => {
     beforeEach(() => {
       localStorage.clear();
@@ -115,5 +184,27 @@ describe('SpaceAlbumsTable', () => {
         expect(screen.getByTestId('space-album-group-header-2024')).toHaveAttribute('aria-expanded', 'false'),
       );
     });
+  });
+
+  it('labels the item-count column with a proper header, not a stripped plural', () => {
+    renderWithTooltips(SpaceAlbumsTable, { spaceId: 's-1', albums: [a1], canManage: false });
+
+    const headerTexts = screen.getAllByRole('columnheader').map((header) => header.textContent?.trim());
+
+    expect(headerTexts).toContain('Number of items');
+    // The bug rendered the bare fragment; assert on the exact string so a
+    // substring match cannot pass against it.
+    expect(headerTexts).not.toContain('items');
+  });
+
+  it('gives the item-count column header a base width so the longer label does not wrap', () => {
+    renderWithTooltips(SpaceAlbumsTable, { spaceId: 's-1', albums: [a1], canManage: false });
+
+    const header = screen
+      .getAllByRole('columnheader')
+      .find((candidate) => candidate.textContent?.trim() === 'Number of items');
+
+    expect(header).toBeDefined();
+    expect(header?.className).toContain('w-4/12');
   });
 });

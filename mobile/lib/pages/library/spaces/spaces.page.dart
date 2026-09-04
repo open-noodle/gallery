@@ -44,25 +44,37 @@ class SpacesPage extends HookConsumerWidget {
         context: context,
         builder: (context) {
           return AlertDialog(
-            title: const Text('Create Space'),
+            title: Text(context.t.spaces_create),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextField(
                   controller: nameController,
-                  decoration: const InputDecoration(labelText: 'Name', hintText: 'Enter space name'),
+                  decoration: InputDecoration(
+                    labelText: context.t.name,
+                    hintText: context.t.spaces_create_name_hint,
+                  ),
                   autofocus: true,
                 ),
                 const SizedBox(height: 8),
                 TextField(
                   controller: descController,
-                  decoration: const InputDecoration(labelText: 'Description (optional)', hintText: 'Enter description'),
+                  decoration: InputDecoration(
+                    labelText: context.t.spaces_create_description_label,
+                    hintText: context.t.spaces_create_description_hint,
+                  ),
                 ),
               ],
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
-              TextButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Create')),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: Text(context.t.cancel),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: Text(context.t.create),
+              ),
             ],
           );
         },
@@ -75,7 +87,11 @@ class SpacesPage extends HookConsumerWidget {
           ref.invalidate(sharedSpacesProvider);
         } catch (e) {
           if (context.mounted) {
-            ImmichToast.show(context: context, msg: 'Failed to create space: $e', toastType: ToastType.error);
+            ImmichToast.show(
+              context: context,
+              msg: context.t.spaces_create_failed(error: '$e'),
+              toastType: ToastType.error,
+            );
           }
         }
       }
@@ -109,7 +125,11 @@ class SpacesPage extends HookConsumerWidget {
         ref.invalidate(sharedSpacesProvider);
       } catch (e) {
         if (context.mounted) {
-          ImmichToast.show(context: context, msg: 'Failed to delete space', toastType: ToastType.error);
+          ImmichToast.show(
+            context: context,
+            msg: context.t.spaces_delete_failed,
+            toastType: ToastType.error,
+          );
         }
       }
     }
@@ -157,7 +177,24 @@ class SpacesPage extends HookConsumerWidget {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Spaces')),
+      appBar: AppBar(
+        title: Text(context.t.spaces),
+        // Create lives in the app bar rather than in a FAB because this page is
+        // now a bottom-nav tab (SettingsKey.navShowSpaces, default on), and the
+        // shell paints its floating nav pill + search blob over the body — a
+        // bottom-right FAB lands underneath the blob and loses its taps on any
+        // phone up to ~410pt wide. Mirrors DriftAlbumsPage, the sibling
+        // collection tab, which puts its ＋ in the app bar for the same reason
+        // that no tab page can own the bottom-right corner.
+        actions: [
+          IconButton(
+            key: const Key('spaces-create-button'),
+            onPressed: createSpaceDialog,
+            icon: const Icon(Icons.add_rounded),
+            tooltip: context.t.spaces_create,
+          ),
+        ],
+      ),
       body: spacesAsync.when(
         data: (spaces) {
           if (spaces.isEmpty) {
@@ -169,19 +206,20 @@ class SpacesPage extends HookConsumerWidget {
                   Icon(Icons.workspaces_outlined, size: 64, color: context.colorScheme.onSurface.withAlpha(100)),
                   const SizedBox(height: 16),
                   Text(
-                    'No spaces yet',
+                    context.t.spaces_empty_title,
                     style: context.textTheme.titleMedium?.copyWith(color: context.colorScheme.onSurface.withAlpha(150)),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Create a space to share photos with others',
+                    context.t.spaces_empty_subtitle,
                     style: context.textTheme.bodyMedium?.copyWith(color: context.colorScheme.onSurface.withAlpha(100)),
                   ),
                   const SizedBox(height: 24),
                   ElevatedButton.icon(
+                    key: const Key('spaces-empty-create-button'),
                     onPressed: createSpaceDialog,
                     icon: const Icon(Icons.add),
-                    label: const Text('Create Space'),
+                    label: Text(context.t.spaces_create),
                   ),
                 ],
               ),
@@ -249,14 +287,16 @@ class SpacesPage extends HookConsumerWidget {
             children: [
               const Icon(Icons.error_outline, size: 48),
               const SizedBox(height: 16),
-              Text('Failed to load spaces: $error'),
+              Text(context.t.spaces_load_failed(error: '$error')),
               const SizedBox(height: 16),
-              ElevatedButton(onPressed: () => ref.invalidate(sharedSpacesProvider), child: const Text('Retry')),
+              ElevatedButton(
+                onPressed: () => ref.invalidate(sharedSpacesProvider),
+                child: Text(context.t.retry),
+              ),
             ],
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton(onPressed: createSpaceDialog, child: const Icon(Icons.add)),
     );
   }
 }

@@ -147,7 +147,7 @@ class _CollectionCards extends StatelessWidget {
             _PeopleCollectionCard(),
             _PlacesCollectionCard(),
             _LocalAlbumsCollectionCard(),
-            _AlbumsCollectionCard(),
+            AlbumsCollectionCard(),
             _MemoriesCollectionCard(),
           ],
         ),
@@ -512,8 +512,18 @@ final sharedWithPartnerProvider = StreamProvider.autoDispose<Iterable<Partner>>(
   return ref.watch(partnerServiceProvider).search(currentUser.id, .sharedWith);
 });
 
-class _AlbumsCollectionCard extends ConsumerWidget {
-  const _AlbumsCollectionCard();
+/// Albums entry point on the Library tab.
+///
+/// Public (unlike its sibling cards) so a widget test can pin the route it
+/// pushes: with Spaces occupying the middle nav slot by default
+/// (`SettingsKey.navShowSpaces`), the Library tab is where the albums list is
+/// reached from — this card and the `albums` tile in [_QuickAccessButtonList]
+/// are its only two entry points. Pumping the whole [DriftLibraryPage] to cover
+/// that would mean standing up the app bar's auth/server stack plus a maplibre
+/// platform view.
+@visibleForTesting
+class AlbumsCollectionCard extends ConsumerWidget {
+  const AlbumsCollectionCard({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -527,6 +537,7 @@ class _AlbumsCollectionCard extends ConsumerWidget {
         final size = context.width * widthFactor - 20.0;
 
         return GestureDetector(
+          key: const Key('library-albums-card'),
           onTap: () => context.pushRoute(const AlbumsRoute()),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

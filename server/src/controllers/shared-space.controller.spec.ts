@@ -395,4 +395,41 @@ describe(SharedSpaceController.name, () => {
       expect(service.ignoreSpacePersonFaceSuggestion).not.toHaveBeenCalled();
     });
   });
+
+  describe('album folders', () => {
+    it.each([
+      ['GET', '/shared-spaces/:id/album-folders'],
+      ['POST', '/shared-spaces/:id/album-folders'],
+      ['PATCH', '/shared-spaces/:id/album-folders/:folderId'],
+      ['DELETE', '/shared-spaces/:id/album-folders/:folderId'],
+      ['PUT', '/shared-spaces/:id/albums/:albumId/folder'],
+    ])('%s %s should be an authenticated route', async (method, route) => {
+      const path = route
+        .replace(':id', () => factory.uuid())
+        .replace(':folderId', () => factory.uuid())
+        .replace(':albumId', () => factory.uuid());
+
+      const verb = method.toLowerCase() as 'get' | 'post' | 'patch' | 'delete' | 'put';
+      await request(ctx.getHttpServer())[verb](path);
+
+      expect(ctx.authenticate).toHaveBeenCalled();
+    });
+
+    // A malformed uuid must surface as a 400 from zod, never as a Postgres 22P02 -> 500.
+    it('rejects a malformed space id in GET /shared-spaces/:id/album-folders with 400', async () => {
+      const { status, body } = await request(ctx.getHttpServer()).get('/shared-spaces/invalid/album-folders');
+
+      expect(status).toBe(400);
+      expect(body).toEqual(errorDto.validationError([{ path: ['id'], message: 'Invalid UUID' }]));
+    });
+
+    it('rejects a malformed folder id in DELETE /shared-spaces/:id/album-folders/:folderId with 400', async () => {
+      const { status, body } = await request(ctx.getHttpServer()).delete(
+        `/shared-spaces/${factory.uuid()}/album-folders/invalid`,
+      );
+
+      expect(status).toBe(400);
+      expect(body).toEqual(errorDto.validationError([{ path: ['folderId'], message: 'Invalid UUID' }]));
+    });
+  });
 });

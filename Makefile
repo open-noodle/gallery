@@ -130,6 +130,10 @@ rebase-confidence-check:
 gallery-branding-check:
 	branding/scripts/gallery-branding-check.sh
 
+.PHONY: spec-citation-check
+spec-citation-check:
+	scripts/spec-citation-check.sh
+
 .PHONY: gallery-ml-smoke
 gallery-ml-smoke:
 	machine-learning/scripts/gallery-ml-smoke.sh
