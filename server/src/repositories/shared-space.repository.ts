@@ -2358,6 +2358,7 @@ export class SharedSpaceRepository {
       takenAfter?: Date;
       takenBefore?: Date;
       minimumFaceCount?: number;
+      type?: string;
     },
   ) {
     const escapedName = options.name
@@ -2367,77 +2368,99 @@ export class SharedSpaceRepository {
     const namePattern = escapedName ? `%${escapedName}%` : undefined;
     const minimumFaceCount = options.minimumFaceCount;
 
-    return this.db
-      .selectFrom('shared_space_person')
-      .selectAll('shared_space_person')
-      .where('shared_space_person.spaceId', '=', spaceId)
-      .$if(!options.withHidden, (qb) => qb.where('shared_space_person.isHidden', '=', false))
-      .$if(!options.petsEnabled, (qb) => qb.where('shared_space_person.type', '!=', 'pet'))
-      .$if(!!options.named, (qb) => qb.where('shared_space_person.name', '!=', ''))
-      .$if(!!namePattern, (qb) => qb.where(() => sql`"shared_space_person"."name" ILIKE ${namePattern} ESCAPE '\\'`))
-      .$if(minimumFaceCount !== undefined, (qb) =>
-        qb.where((eb) =>
-          eb.or([
-            eb('shared_space_person.name', '!=', ''),
-            eb('shared_space_person.assetCount', '>=', minimumFaceCount!),
-          ]),
-        ),
-      )
-      .where((eb) =>
-        eb.exists(
-          eb
-            .selectFrom('shared_space_person_face as spf2')
-            .innerJoin('asset_face as af2', 'af2.id', 'spf2.assetFaceId')
-            .innerJoin('asset', 'asset.id', 'af2.assetId')
-            .whereRef('spf2.personId', '=', 'shared_space_person.id')
-            .where('af2.deletedAt', 'is', null)
-            .where('af2.isVisible', '=', true)
-            .where('asset.deletedAt', 'is', null)
-            .where('asset.isOffline', '=', false)
-            .where('asset.visibility', 'in', visibleSpaceAssetVisibilities)
-            .where((spaceEb) =>
-              spaceEb.or([
-                spaceEb.exists(
-                  spaceEb
-                    .selectFrom('shared_space_asset')
-                    .select('shared_space_asset.assetId')
-                    .whereRef('shared_space_asset.assetId', '=', 'asset.id')
-                    .where('shared_space_asset.spaceId', '=', spaceId),
-                ),
-                spaceEb.exists(
-                  spaceEb
-                    .selectFrom('shared_space_library')
-                    .select('shared_space_library.libraryId')
-                    .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
-                    .where('shared_space_library.spaceId', '=', spaceId),
-                ),
-                spaceEb.exists(
-                  spaceEb
-                    .selectFrom('shared_space_album')
-                    .innerJoin('album', (j) =>
-                      j.onRef('album.id', '=', 'shared_space_album.albumId').on('album.deletedAt', 'is', null),
-                    )
-                    .innerJoin('album_asset', 'album_asset.albumId', 'shared_space_album.albumId')
-                    .select('shared_space_album.albumId')
-                    .whereRef('album_asset.assetId', '=', 'asset.id')
-                    .where('shared_space_album.spaceId', '=', spaceId),
-                ),
-              ]),
-            )
-            .$if(!!options.takenAfter, (qb2) => qb2.where('asset.fileCreatedAt', '>=', options.takenAfter!))
-            .$if(!!options.takenBefore, (qb2) => qb2.where('asset.fileCreatedAt', '<', options.takenBefore!)),
-        ),
-      )
-      .orderBy('shared_space_person.isHidden', 'asc')
-      .orderBy(sql`NULLIF(BTRIM(shared_space_person.name), '')`, (om) => om.asc().nullsLast())
-      .orderBy(
-        sql`CASE WHEN NULLIF(BTRIM(shared_space_person.name), '') IS NULL THEN "shared_space_person"."assetCount" END`,
-        (om) => om.desc().nullsLast(),
-      )
-      .orderBy('shared_space_person.id')
-      .$if(!!options.limit, (qb) => qb.limit(options.limit!))
-      .$if(!!options.offset, (qb) => qb.offset(options.offset!))
-      .execute();
+    return (
+      this.db
+        .selectFrom('shared_space_person')
+        .selectAll('shared_space_person')
+        .where('shared_space_person.spaceId', '=', spaceId)
+        .$if(!options.withHidden, (qb) => qb.where('shared_space_person.isHidden', '=', false))
+        .$if(!options.petsEnabled, (qb) => qb.where('shared_space_person.type', '!=', 'pet'))
+        .$if(!!options.type, (qb) => qb.where('shared_space_person.type', '=', options.type!))
+        // "Pets" means the individuals pet recognition identified, not the per-species buckets the
+        // detector alone produces. A bucket has no pet_search row on any of its faces. pet_search.faceId
+        // IS an asset_face.id and shared_space_person_face.assetFaceId already holds that id, so this
+        // joins directly — no asset_face hop, unlike the global query which needs one to reach personId.
+        .$if(options.type === 'pet', (qb) =>
+          qb.where((eb) =>
+            eb.exists(
+              eb
+                .selectFrom('shared_space_person_face as spf')
+                .innerJoin('pet_search', 'pet_search.faceId', 'spf.assetFaceId')
+                .select(sql`1`.as('one'))
+                .whereRef('spf.personId', '=', 'shared_space_person.id'),
+            ),
+          ),
+        )
+        .$if(!!options.named, (qb) => qb.where('shared_space_person.name', '!=', ''))
+        .$if(!!namePattern, (qb) => qb.where(() => sql`"shared_space_person"."name" ILIKE ${namePattern} ESCAPE '\\'`))
+        .$if(minimumFaceCount !== undefined, (qb) =>
+          qb.where((eb) =>
+            eb.or([
+              eb('shared_space_person.name', '!=', ''),
+              eb('shared_space_person.assetCount', '>=', minimumFaceCount!),
+              // Pets view only: pet clustering already applied its own petRecognition.minFaces
+              // (shipped default 1). Layering the human threshold on top hides exactly the
+              // single-photo pets this view exists to let you name.
+              ...(options.type === 'pet' ? [eb('shared_space_person.type', '=', sql.lit('pet'))] : []),
+            ]),
+          ),
+        )
+        .where((eb) =>
+          eb.exists(
+            eb
+              .selectFrom('shared_space_person_face as spf2')
+              .innerJoin('asset_face as af2', 'af2.id', 'spf2.assetFaceId')
+              .innerJoin('asset', 'asset.id', 'af2.assetId')
+              .whereRef('spf2.personId', '=', 'shared_space_person.id')
+              .where('af2.deletedAt', 'is', null)
+              .where('af2.isVisible', '=', true)
+              .where('asset.deletedAt', 'is', null)
+              .where('asset.isOffline', '=', false)
+              .where('asset.visibility', 'in', visibleSpaceAssetVisibilities)
+              .where((spaceEb) =>
+                spaceEb.or([
+                  spaceEb.exists(
+                    spaceEb
+                      .selectFrom('shared_space_asset')
+                      .select('shared_space_asset.assetId')
+                      .whereRef('shared_space_asset.assetId', '=', 'asset.id')
+                      .where('shared_space_asset.spaceId', '=', spaceId),
+                  ),
+                  spaceEb.exists(
+                    spaceEb
+                      .selectFrom('shared_space_library')
+                      .select('shared_space_library.libraryId')
+                      .whereRef('shared_space_library.libraryId', '=', 'asset.libraryId')
+                      .where('shared_space_library.spaceId', '=', spaceId),
+                  ),
+                  spaceEb.exists(
+                    spaceEb
+                      .selectFrom('shared_space_album')
+                      .innerJoin('album', (j) =>
+                        j.onRef('album.id', '=', 'shared_space_album.albumId').on('album.deletedAt', 'is', null),
+                      )
+                      .innerJoin('album_asset', 'album_asset.albumId', 'shared_space_album.albumId')
+                      .select('shared_space_album.albumId')
+                      .whereRef('album_asset.assetId', '=', 'asset.id')
+                      .where('shared_space_album.spaceId', '=', spaceId),
+                  ),
+                ]),
+              )
+              .$if(!!options.takenAfter, (qb2) => qb2.where('asset.fileCreatedAt', '>=', options.takenAfter!))
+              .$if(!!options.takenBefore, (qb2) => qb2.where('asset.fileCreatedAt', '<', options.takenBefore!)),
+          ),
+        )
+        .orderBy('shared_space_person.isHidden', 'asc')
+        .orderBy(sql`NULLIF(BTRIM(shared_space_person.name), '')`, (om) => om.asc().nullsLast())
+        .orderBy(
+          sql`CASE WHEN NULLIF(BTRIM(shared_space_person.name), '') IS NULL THEN "shared_space_person"."assetCount" END`,
+          (om) => om.desc().nullsLast(),
+        )
+        .orderBy('shared_space_person.id')
+        .$if(!!options.limit, (qb) => qb.limit(options.limit!))
+        .$if(!!options.offset, (qb) => qb.offset(options.offset!))
+        .execute()
+    );
   }
 
   @GenerateSql({
