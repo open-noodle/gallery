@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { nextTimelineMountId } from './mock-timeline-mount';
   import type { Snippet } from 'svelte';
   import type { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
   import type { TimelineGrouping } from '$lib/managers/timeline-manager/types';
@@ -27,6 +28,8 @@
     grouping = 'day',
     onGroupingChange,
   }: Props = $props();
+
+  const mountId = nextTimelineMountId();
 
   $effect(() => {
     if (album?.id === 'without-bound-timeline-manager') {
@@ -62,6 +65,7 @@
 </script>
 
 <div data-testid="timeline-options">{JSON.stringify(options)}</div>
+<div data-testid="timeline-mount-id">{mountId}</div>
 <button
   type="button"
   data-testid="activate-year-bucket"

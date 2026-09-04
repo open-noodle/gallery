@@ -289,6 +289,19 @@ const VIS_ALLOWLIST: Record<string, string> = {
   'shared-space.repository.ts::getLinkedAlbumsContainingAssets':
     "resolves linked-album id/name for the caller's OWN selected assetIds (remove-from-space message); returns album metadata only, no asset content",
   'shared-space.repository.ts::getSpacesLinkedToAlbum': 'returns space-album link metadata (ids/flags), not asset rows',
+  // #1041: resolves WHICH spaces/albums/libraries the caller has hidden from their own timeline.
+  // Returns id lists used to build a subtraction predicate; it never selects from `asset`, so
+  // there is no asset content for a visibility gate to protect. The gate belongs on the timeline
+  // queries that consume this scope (slices 8-10), and those are separately covered by this guard.
+  'shared-space.repository.ts::getTimelineHiddenScope':
+    'returns hidden space/album/library ids for the caller (timeline subtraction scope); never selects asset rows',
+  // #1018, PRE-EXISTING: this function has never had a visibility gate and was never allowlisted —
+  // it passed only because this guard matches a gate ANYWHERE NEARBY, and an unrelated gate used to
+  // fall inside that window. #1041 inserted new methods between them, pushing it out of range and
+  // surfacing the omission. Reviewed and correct as-is: it returns spaceIds for membership
+  // resolution, never asset rows.
+  'shared-space.repository.ts::getMemberSpaceIdsLinkingAlbum':
+    'membership resolution; returns spaceIds the user still belongs to, not asset data',
   // albums-6: departing-member album-link cleanup + correctness-4 reconcile targeting —
   // both operate on shared_space_album LINK rows (delete-by-ownership / id list), never
   // asset content.
