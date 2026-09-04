@@ -202,6 +202,74 @@ function renderViewer() {
   });
 }
 
+describe('MemoryViewer view in timeline (#1047)', () => {
+  beforeEach(() => {
+    memoryManager.memories = [memory('memory-1', ['memory-asset-1', 'memory-asset-2'])];
+    mockPage.reset('https://gallery.test/memories/memory-1?assetId=memory-asset-1', {
+      routeId: '/(user)/memories/[id]/[[photos=photos]]/[[assetId=id]]',
+      params: { id: 'memory-1' },
+    });
+    mockGetAssetInfo.mockResolvedValue(memoryManager.memories[0].assets[0]);
+
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        observe = vi.fn();
+        disconnect = vi.fn();
+      },
+    );
+  });
+
+  it('sends a photo from the viewer\u2019s own library to the personal timeline', async () => {
+    renderViewer();
+
+    expect(await screen.findByLabelText('view_in_timeline')).toHaveAttribute('href', '/photos?at=memory-asset-1');
+  });
+
+  // The timeline collapses a stack to its primary asset, so a stack child has no tile of its
+  // own to land on. That held for /photos before #1047 and has to keep holding for a Space.
+  it('lands on the stack primary for a stacked photo in a Space', async () => {
+    mockGetAssetInfo.mockResolvedValue({
+      ...memoryManager.memories[0].assets[0],
+      resolvedSpaceId: 'space-1',
+      stack: { id: 'stack-1', primaryAssetId: 'stack-primary', assetCount: 2 },
+    });
+
+    renderViewer();
+
+    expect(await screen.findByLabelText('view_in_timeline')).toHaveAttribute(
+      'href',
+      '/spaces/space-1?at=stack-primary',
+    );
+  });
+
+  it('lands on the stack primary for a stacked photo in the personal library', async () => {
+    mockGetAssetInfo.mockResolvedValue({
+      ...memoryManager.memories[0].assets[0],
+      stack: { id: 'stack-1', primaryAssetId: 'stack-primary', assetCount: 2 },
+    });
+
+    renderViewer();
+
+    expect(await screen.findByLabelText('view_in_timeline')).toHaveAttribute('href', '/photos?at=stack-primary');
+  });
+
+  // #1047: a memory can hold a photo the viewer only reaches through a Space. The personal timeline
+  // skips it unless that membership is shown in the timeline, so the jump used to scroll to the
+  // right date and show nothing. The server resolves the space for exactly this case
+  // (`resolvedSpaceId`, set only when the viewer is not the owner), so follow it.
+  it('sends a photo the viewer only has through a Space to that Space timeline', async () => {
+    mockGetAssetInfo.mockResolvedValue({ ...memoryManager.memories[0].assets[0], resolvedSpaceId: 'space-1' });
+
+    renderViewer();
+
+    expect(await screen.findByLabelText('view_in_timeline')).toHaveAttribute(
+      'href',
+      '/spaces/space-1?at=memory-asset-1',
+    );
+  });
+});
+
 describe('MemoryViewer memory-scoped navigation (#790)', () => {
   beforeEach(() => {
     // The same asset id appears in two memories (e.g. a birthday memory and an on-this-day
