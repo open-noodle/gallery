@@ -659,6 +659,8 @@ export class SyncSharedSpaceAlbumHiddenV1 extends createZodDto(SyncSharedSpaceAl
 
 @ExtraModel()
 export class SyncSharedSpaceAlbumHiddenDeleteV1 extends createZodDto(SyncSharedSpaceAlbumHiddenDeleteV1Schema) {}
+
+@ExtraModel()
 export class SyncSharedSpaceAlbumFolderV1 extends createZodDto(SyncSharedSpaceAlbumFolderV1Schema) {}
 
 @ExtraModel()
