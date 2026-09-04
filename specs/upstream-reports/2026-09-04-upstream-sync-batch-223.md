@@ -6,6 +6,7 @@
 - **Fork commits synced from `origin/main`**: 0 (`integratedForkHead` already at `1f5e270bd14` = `origin/main`)
 - **Conflicts resolved**: 3 (across 2 files, at fork commits #513, #663, #892)
 - **Risk level**: LOW — single mobile bugfix; one zero-conflict semantic break found and fixed locally
+- **CI**: 10/10 green on `10d44177b60` (2 confirmed flakes, both pre-existing and proven non-regressions)
 - **Recommendation**: PROCEED
 - **Landing on `main`**: NO. Upstream's latest final tag is still `v3.1.0` (`v3.2.0-rc.0/1/2` are pre-releases). The standing rule requires a real tag plus real-data validation, so the branch stays off `main`.
 
@@ -134,9 +135,82 @@ the fork's v32–v36), which failed `dart analyze` and `migration_test.dart` loa
 `mobile/pubspec.lock`'s Dart SDK constraint (`>=3.12.0` → `>=3.13.0`, local Dart 3.13.1) — reverted, and
 both `mise.lock` files confirmed untouched.
 
+## Pre-existing CI Finding — Medium Tests connection exhaustion (NOT from this batch)
+
+`Medium Tests (Server)` failed twice on this headSha, both times rooted in
+`PostgresError: sorry, too many clients already` (`code: 53300`, `routine: InitProcess`).
+**It is not a regression from batch 223**, and the proof does not depend on judgement:
+
+- `HEAD:server` is the tree object `ab335cd0c5` — **byte-identical** to `2be00fc43b7:server`, the tree
+  that **passed** this same job on 2026-09-03. The same server code both passes and fails, which is
+  nondeterminism by definition.
+- The failure **set shifts between runs** (run 1: 3 face-repair + `never deletes a memory created
+through the API`; run 2: 2 face-repair + `onMemoriesCleanup > should run without error`) — the
+  documented signature of DB contention rather than a behavioural break.
+- The same job was already red once in the previous cycle (`5a9f56c9471`) and green on the next
+  (`2be00fc43b7`).
+- No assertion about product behaviour failed; every failure is a connection acquisition error.
+
+**Mechanism** (already documented in-repo at `server/test/medium/specs/services/memory.service.spec.ts:260`):
+`getKyselyDB()` opens its own pool of up to 10 connections per call, and a spec that never calls
+`.destroy()` holds them for the lifetime of the file. The medium Postgres container is started in
+`server/test/medium/globalSetup.ts` with **no `max_connections` override** (image default), and vitest
+runs the suite at default parallelism.
+
+A scan of the branch shows the leak is **systemic and shared with upstream**, not fork-specific:
+
+| Medium specs calling `getKyselyDB()` | With an `afterEach` destroy | Leaking |
+| ------------------------------------ | --------------------------- | ------- |
+| ~165                                 | 5                           | ~160    |
+
+Worst offenders by pool count in a single file: `repositories/face-identity.repository.spec.ts` (29),
+`repositories/person.repository.spec.ts` (5), `repositories/asset.repository.spec.ts` (5),
+`sync/sync-user.spec.ts` (5), `services/face-repair.service.spec.ts` (4).
+
+Why it bites **rolling** rather than `main`: medium spec counts are **upstream 64 → `main` 161 →
+rolling 169**. The fork more than doubles the suite, so the accumulated pools cross the container's
+ceiling; `main` sits just under it and passes.
+
+**Deliberately NOT fixed in this cycle.** It is pre-existing, systemic (~160 files), and touching
+`server/` would forfeit this branch's byte-identical-to-a-green-tree property and require full
+server re-validation. It wants its own PR. Recommended fix, cheapest first:
+
+1. Pass `-c max_connections=200` in `globalSetup.ts`'s container command (one line, no spec churn).
+2. Add the `afterEach(() => db.destroy())` pattern to the highest-pool-count specs.
+3. Cap vitest medium `poolOptions.threads.maxThreads` so concurrent files are bounded.
+
 ## Inconsistencies Found
 
 One, fixed in this cycle: the unstubbed `syncRemoteThenLocal` described above.
+
+## Remote CI Verification
+
+- **Test branch**: `rebase/upstream-batch-223`
+- **Commit validated**: `10d44177b60` (read by `headSha`, not by branch)
+- **Result: 10/10 GREEN**
+
+| Workflow                                  | Status | Notes                                         |
+| ----------------------------------------- | ------ | --------------------------------------------- |
+| `test.yml`                                | GREEN  | green on re-run; see the flake analysis above |
+| `docker.yml`                              | GREEN  | first pass                                    |
+| `static_analysis.yml`                     | GREEN  | first pass                                    |
+| `gallery-build-mobile.yml`                | GREEN  | first pass — iOS + Android compile            |
+| `gallery-rebase-smoke.yml`                | GREEN  | first pass                                    |
+| `storage-migration-tests.yml`             | GREEN  | first pass                                    |
+| `storage-migration-e2e.yml`               | GREEN  | first pass                                    |
+| `gallery-revert-to-immich-validation.yml` | GREEN  | first pass                                    |
+| `gallery-ml-smoke.yml`                    | GREEN  | first pass                                    |
+| `gallery-mobile-smoke.yml`                | GREEN  | first pass                                    |
+
+Dispatched in two waves (light first, Docker-heavy ~25 s apart) per the registry-ratelimit mitigation.
+**Zero registry-ratelimit failures** — 9/10 green on the first pass.
+
+- **Failures fixed**: none required (no code defect surfaced remotely).
+- **Confirmed flakes**: `Test Web` — 6108 passed, 0 assertion failures; an unhandled
+  `ReferenceError: document is not defined` from third-party `bits-ui`'s `body-scroll-lock`
+  `setTimeout` firing after happy-dom teardown. Passed on re-run.
+  `Medium Tests (Server)` — Postgres connection exhaustion, analysed in full above; green on the
+  third attempt with no code change.
 
 ## Post-Rebase Verification
 
