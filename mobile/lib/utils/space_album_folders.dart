@@ -40,7 +40,9 @@ List<SpaceAlbumFolder> _ancestors(Map<String, SpaceAlbumFolder> index, String fo
 /// keeps that distinction intact.
 bool _isRoot(Map<String, SpaceAlbumFolder> index, SpaceAlbumFolder f) {
   final parentId = f.parentId;
-  if (parentId == null || !index.containsKey(parentId)) return true;
+  if (parentId == null || !index.containsKey(parentId)) {
+    return true;
+  }
   return _isCycleMember(index, f);
 }
 
@@ -51,7 +53,9 @@ bool _isCycleMember(Map<String, SpaceAlbumFolder> index, SpaceAlbumFolder f) {
   final seen = <String>{};
   var current = index[f.parentId];
   while (current != null && seen.add(current.id)) {
-    if (current.id == f.id) return true;
+    if (current.id == f.id) {
+      return true;
+    }
     final parentId = current.parentId;
     current = parentId == null ? null : index[parentId];
   }
@@ -84,7 +88,9 @@ List<FolderNode> buildFolderTree(List<SpaceAlbumFolder> folders) {
 }
 
 List<SpaceAlbumFolder> folderPath(List<SpaceAlbumFolder> folders, String? folderId) {
-  if (folderId == null) return const [];
+  if (folderId == null) {
+    return const [];
+  }
   return _ancestors(_byId(folders), folderId).reversed.toList();
 }
 
@@ -121,7 +127,9 @@ Set<String> _subtreeIds(List<SpaceAlbumFolder> folders, String folderId) {
   final stack = [folderId];
   while (stack.isNotEmpty) {
     final current = stack.removeLast();
-    if (!ids.add(current)) continue;
+    if (!ids.add(current)) {
+      continue;
+    }
     stack.addAll(childrenByParent[current] ?? const []);
   }
   return ids;
@@ -206,7 +214,9 @@ Map<String, FolderSummary> buildFolderSummaries(List<SpaceAlbumFolder> folders, 
   final albumsByFolder = <String, List<SpaceAlbum>>{};
   for (final a in albums) {
     final folderId = a.folderId;
-    if (folderId == null) continue;
+    if (folderId == null) {
+      continue;
+    }
     albumsByFolder.putIfAbsent(folderId, () => []).add(a);
   }
 
@@ -225,13 +235,17 @@ Map<String, FolderSummary> buildFolderSummaries(List<SpaceAlbumFolder> folders, 
 
     while (stack.isNotEmpty) {
       final current = stack.removeLast();
-      if (!seen.add(current)) continue;
+      if (!seen.add(current)) {
+        continue;
+      }
 
       for (final a in albumsByFolder[current] ?? const <SpaceAlbum>[]) {
         albumCount++;
         // Filter before the take, exactly as folderPreviewAlbums does: a null cover renders a
         // broken tile, and taking first would discard good covers further down the list.
-        if (a.thumbnailAssetId != null) withCovers.add(a);
+        if (a.thumbnailAssetId != null) {
+          withCovers.add(a);
+        }
       }
 
       stack.addAll(childrenByParent[current] ?? const <String>[]);
@@ -259,7 +273,9 @@ List<FolderSearchHit> flattenForSearch(List<SpaceAlbumFolder> folders, List<Spac
   final needle = query.trim().toLowerCase();
   // A blank query means "search is inactive", not "match everything" — the caller uses a non-empty
   // query as the signal to switch into flattened mode at all.
-  if (needle.isEmpty) return const [];
+  if (needle.isEmpty) {
+    return const [];
+  }
 
   final index = _byId(folders);
   // Name OR description, matching web's flattenForSearch and the flat filterAndSortSpaceAlbums
