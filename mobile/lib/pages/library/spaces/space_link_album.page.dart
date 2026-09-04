@@ -13,15 +13,19 @@ import 'package:immich_mobile/providers/infrastructure/asset.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:immich_mobile/utils/space_link_album_candidates.dart';
 
-/// Space Link-Album Picker — Surface 4 of the Phase-2B design.
+/// Space Link-Album Picker.
+///
+/// Layout: "Surfaces > 4 — Link picker" in
+/// `specs/2026-06-15-space-albums-phase2-mobile-design.md`.
 ///
 /// Pushed via [SpaceLinkAlbumRoute(spaceId, linkedAlbumIds)].
 ///
 /// Shows the albums the current user **owns or can edit** that are **not yet**
 /// linked to the space. The user selects one or more, then taps "Link (N)" to
 /// confirm. The page returns the selected ids via [onAlbumsPicked] and
-/// [context.maybePop(List<String>)] — it does NOT call the link API (that is
-/// B6's responsibility).
+/// [context.maybePop(List<String>)] — it does NOT call the link API. That is the
+/// caller's job ([SpaceDetailPage], which owns the PUT loop and the sync-nudge),
+/// so this page stays a pure picker and can be widget-tested without a server.
 ///
 /// Searchable multi-select: checkbox + cover thumbnail + name + asset count.
 /// Empty state shown when no candidates are available.
@@ -30,8 +34,9 @@ class SpaceLinkAlbumPage extends HookConsumerWidget {
   final String spaceId;
   final List<String> linkedAlbumIds;
 
-  /// Called with the selected album ids when the user confirms.
-  /// No-op by default; B6 replaces with the PUT loop + sync-nudge.
+  /// Called with the selected album ids when the user confirms. Defaults to a
+  /// no-op so the page can be pumped standalone; the caller supplies the PUT
+  /// loop and the sync-nudge.
   final void Function(List<String> ids) onAlbumsPicked;
 
   const SpaceLinkAlbumPage({

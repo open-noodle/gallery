@@ -143,30 +143,56 @@ void main() {
       expect(albumTypes.every(types.contains), isTrue);
     });
 
-    test('M14: every SharedSpaceAlbum* SyncRequestType enum value is inside the version gate', () async {
+    test('M14: every legacy SharedSpaceAlbum* SyncRequestType is inside the version gate, and '
+        'SharedSpaceAlbumFoldersV1 never rides it', () async {
       // Guards the invariant the tests above only spot-check with the hardcoded `albumTypes`
       // list: derives the "must be gated" set from the generated SyncRequestType.values enum
       // itself, so a future fork-only SharedSpaceAlbum* type landing in the enum without being
       // added to the `serverVersion > SemVer(5, 0, 0)` gate in sync_api.repository.dart fails
       // here even if `albumTypes` above is never updated to match — the exact regression class
       // the mobile-1 gate exists to prevent (a whole-stream 400 outage on an older server).
+      //
+      // SharedSpaceAlbumFoldersV1 is deliberately excluded from `forkAlbumTypes`: it was
+      // introduced after M14 capability signalling shipped, so it must join only the
+      // declared-capability list, never the version-gate fallback (see H-05 below).
       final forkAlbumTypes = SyncRequestType.values
           .map((t) => t.toString())
-          .where((v) => v.startsWith('SharedSpaceAlbum'))
+          .where((v) => v.startsWith('SharedSpaceAlbum') && v != 'SharedSpaceAlbumFoldersV1')
           .toSet();
 
       final ungated = (await capturedRequestTypes(const SemVer(major: 5, minor: 0, patch: 0))).toSet();
       expect(
         ungated.intersection(forkAlbumTypes),
         isEmpty,
-        reason: 'every SharedSpaceAlbum* SyncRequestType must be inside the version gate',
+        reason: 'every legacy SharedSpaceAlbum* SyncRequestType must be inside the version gate',
       );
 
       final gated = (await capturedRequestTypes(const SemVer(major: 6, minor: 0, patch: 0))).toSet();
       expect(
         forkAlbumTypes.difference(gated),
         isEmpty,
-        reason: 'every SharedSpaceAlbum* SyncRequestType must be sent once the version gate is satisfied',
+        reason: 'every legacy SharedSpaceAlbum* SyncRequestType must be sent once the version gate is satisfied',
+      );
+      expect(
+        gated,
+        isNot(contains('SharedSpaceAlbumFoldersV1')),
+        reason: 'SharedSpaceAlbumFoldersV1 must never ride the version-gate fallback, even far above it',
+      );
+    });
+
+    test('v5.2.0 (shipped without capability signalling, has albums but not folders): fallback '
+        'excludes SharedSpaceAlbumFoldersV1', () async {
+      // Regression test for the fork-server outage: v5.2.0/v5.2.1/v5.2.2 accept the original
+      // five album types but do not declare syncRequestTypes, so supportedSyncTypes resolves
+      // null and this fallback fires. Sending SharedSpaceAlbumFoldersV1 here made these
+      // servers 400 the WHOLE /sync/stream request (unknown zod enum value), a total sync
+      // outage. The fallback must send only the five legacy types.
+      final types = await capturedRequestTypes(const SemVer(major: 5, minor: 2, patch: 0));
+      expect(albumTypes.every(types.contains), isTrue, reason: 'legacy album types still sync');
+      expect(
+        types,
+        isNot(contains('SharedSpaceAlbumFoldersV1')),
+        reason: 'no pre-declaration server can accept the folder type; it must never ride the fallback',
       );
     });
   });
@@ -206,6 +232,118 @@ void main() {
         supportedSyncTypes: declared,
       );
       expect(types.where(albumTypes.contains).toSet(), declared);
+    });
+
+    test('a declaring server WITH folder support includes SharedSpaceAlbumFoldersV1', () async {
+      final types = await capturedRequestTypes(
+        const SemVer(major: 5, minor: 0, patch: 0),
+        supportedSyncTypes: {...albumTypes, 'SharedSpaceAlbumFoldersV1', 'AssetsV1'},
+      );
+      expect(types, contains('SharedSpaceAlbumFoldersV1'), reason: 'declared folder support opens the gate');
+      expect(albumTypes.every(types.contains), isTrue, reason: 'the album streams still sync');
+    });
+
+    // H-05: a server that supports space albums but predates nestable folders. This state is
+    // also reachable via the version-gate fallback for a pre-declaration server (see the
+    // v5.2.0 regression test above); this test instead exercises the declaration path directly
+    // — a capability declaration that omits SharedSpaceAlbumFoldersV1.
+    test('H-05: a server declaring album support without folder support omits SharedSpaceAlbumFoldersV1', () async {
+      final types = await capturedRequestTypes(
+        const SemVer(major: 5, minor: 0, patch: 0),
+        supportedSyncTypes: {...albumTypes, 'AssetsV1'},
+      );
+      expect(types, isNot(contains('SharedSpaceAlbumFoldersV1')), reason: 'no folder stream requested');
+      expect(albumTypes.every(types.contains), isTrue, reason: 'the album streams still sync');
+    });
+  });
+
+  // M-2 — a missing `_kResponseMap` entry doesn't throw: `_parseLines` logs "Unknown type" and
+  // `continue`s, so a new SyncEntityType silently never syncs at all, with everything else in the
+  // stream still processing green. No test exercised the three new SharedSpaceAlbumFolder* types
+  // through the actual parsing path (only through per-handler dispatch, one layer up), so a
+  // missing/wrong `_kResponseMap` entry for any of them would have gone unnoticed.
+  group('gallery-fork: SharedSpaceAlbumFolder response-map parsing', () {
+    test('SharedSpaceAlbumFolderV1 parses into SyncSharedSpaceAlbumFolderV1, not skipped as unknown', () async {
+      final received = <SyncEvent>[];
+      final streamChangesFuture = streamChanges(
+        (events, _, _) async => received.addAll(events),
+        const SemVer(major: 2, minor: 5, patch: 0),
+      );
+      await Future.delayed(const Duration(milliseconds: 50));
+
+      responseStreamController.add(
+        utf8.encode(
+          _createJsonLine(SyncEntityType.sharedSpaceAlbumFolderV1.toString(), {
+            'id': 'folder-1',
+            'spaceId': 'space-1',
+            'parentId': null,
+            'name': 'Trips',
+            'createdAt': DateTime(2026, 6, 1).toIso8601String(),
+            'updatedAt': DateTime(2026, 6, 1).toIso8601String(),
+          }, 'folder-ack'),
+        ),
+      );
+
+      await responseStreamController.close();
+      await streamChangesFuture;
+
+      expect(received, hasLength(1));
+      expect(received.single.type, SyncEntityType.sharedSpaceAlbumFolderV1);
+      expect(received.single.data, isA<SyncSharedSpaceAlbumFolderV1>());
+      expect((received.single.data as SyncSharedSpaceAlbumFolderV1).name, 'Trips');
+    });
+
+    test('SharedSpaceAlbumFolderBackfillV1 parses into SyncSharedSpaceAlbumFolderV1 (same DTO as create)', () async {
+      final received = <SyncEvent>[];
+      final streamChangesFuture = streamChanges(
+        (events, _, _) async => received.addAll(events),
+        const SemVer(major: 2, minor: 5, patch: 0),
+      );
+      await Future.delayed(const Duration(milliseconds: 50));
+
+      responseStreamController.add(
+        utf8.encode(
+          _createJsonLine(SyncEntityType.sharedSpaceAlbumFolderBackfillV1.toString(), {
+            'id': 'folder-2',
+            'spaceId': 'space-1',
+            'parentId': null,
+            'name': 'Backfilled',
+            'createdAt': DateTime(2026, 6, 1).toIso8601String(),
+            'updatedAt': DateTime(2026, 6, 1).toIso8601String(),
+          }, 'folder-backfill-ack'),
+        ),
+      );
+
+      await responseStreamController.close();
+      await streamChangesFuture;
+
+      expect(received, hasLength(1));
+      expect(received.single.data, isA<SyncSharedSpaceAlbumFolderV1>());
+    });
+
+    test('SharedSpaceAlbumFolderDeleteV1 parses into SyncSharedSpaceAlbumFolderDeleteV1, not skipped', () async {
+      final received = <SyncEvent>[];
+      final streamChangesFuture = streamChanges(
+        (events, _, _) async => received.addAll(events),
+        const SemVer(major: 2, minor: 5, patch: 0),
+      );
+      await Future.delayed(const Duration(milliseconds: 50));
+
+      responseStreamController.add(
+        utf8.encode(
+          _createJsonLine(SyncEntityType.sharedSpaceAlbumFolderDeleteV1.toString(), {
+            'folderId': 'folder-3',
+          }, 'folder-delete-ack'),
+        ),
+      );
+
+      await responseStreamController.close();
+      await streamChangesFuture;
+
+      expect(received, hasLength(1));
+      expect(received.single.type, SyncEntityType.sharedSpaceAlbumFolderDeleteV1);
+      expect(received.single.data, isA<SyncSharedSpaceAlbumFolderDeleteV1>());
+      expect((received.single.data as SyncSharedSpaceAlbumFolderDeleteV1).folderId, 'folder-3');
     });
   });
 

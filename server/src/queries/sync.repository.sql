@@ -2261,6 +2261,7 @@ select
   "shared_space_album"."spaceId",
   "shared_space_album"."albumId",
   "shared_space_album"."showInTimeline",
+  "shared_space_album"."folderId",
   "shared_space_album"."addedById",
   "shared_space_album"."createdAt",
   "shared_space_album"."updatedAt",
@@ -2310,6 +2311,7 @@ select
   "shared_space_album"."spaceId",
   "shared_space_album"."albumId",
   "shared_space_album"."showInTimeline",
+  "shared_space_album"."folderId",
   "shared_space_album"."addedById",
   "shared_space_album"."createdAt",
   "shared_space_album"."updatedAt",
@@ -2389,6 +2391,85 @@ where
   and "album"."deletedAt" is null
 order by
   "shared_space_album_hidden"."updateId" asc
+
+-- SyncRepository.sharedSpaceAlbumFolder.getBackfill
+select
+  "shared_space_album_folder"."id",
+  "shared_space_album_folder"."spaceId",
+  "shared_space_album_folder"."parentId",
+  "shared_space_album_folder"."name",
+  "shared_space_album_folder"."createdAt",
+  "shared_space_album_folder"."updatedAt",
+  "shared_space_album_folder"."updateId"
+from
+  "shared_space_album_folder" as "shared_space_album_folder"
+where
+  "shared_space_album_folder"."updateId" < $1
+  and "shared_space_album_folder"."updateId" <= $2
+  and "shared_space_album_folder"."updateId" > $3
+  and "shared_space_album_folder"."spaceId" = $4
+order by
+  "shared_space_album_folder"."updateId" asc
+
+-- SyncRepository.sharedSpaceAlbumFolder.getDeletes
+select
+  "id",
+  "spaceId",
+  "folderId"
+from
+  "shared_space_album_folder_audit" as "shared_space_album_folder_audit"
+where
+  "shared_space_album_folder_audit"."id" < $1
+  and "shared_space_album_folder_audit"."id" > $2
+  and "spaceId" in (
+    select
+      "shared_space"."id"
+    from
+      "shared_space"
+    where
+      "shared_space"."createdById" = $3
+    union
+    select
+      "shared_space_member"."spaceId" as "id"
+    from
+      "shared_space_member"
+    where
+      "shared_space_member"."userId" = $4
+  )
+order by
+  "shared_space_album_folder_audit"."id" asc
+
+-- SyncRepository.sharedSpaceAlbumFolder.getUpserts
+select
+  "shared_space_album_folder"."id",
+  "shared_space_album_folder"."spaceId",
+  "shared_space_album_folder"."parentId",
+  "shared_space_album_folder"."name",
+  "shared_space_album_folder"."createdAt",
+  "shared_space_album_folder"."updatedAt",
+  "shared_space_album_folder"."updateId"
+from
+  "shared_space_album_folder" as "shared_space_album_folder"
+where
+  "shared_space_album_folder"."updateId" < $1
+  and "shared_space_album_folder"."updateId" > $2
+  and "shared_space_album_folder"."spaceId" in (
+    select
+      "shared_space"."id"
+    from
+      "shared_space"
+    where
+      "shared_space"."createdById" = $3
+    union
+    select
+      "shared_space_member"."spaceId" as "id"
+    from
+      "shared_space_member"
+    where
+      "shared_space_member"."userId" = $4
+  )
+order by
+  "shared_space_album_folder"."updateId" asc
 
 -- SyncRepository.sharedSpaceAlbumToAsset.getBackfill
 select

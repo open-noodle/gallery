@@ -22,6 +22,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/data/db/main/database.dart';
 import 'package:immich_mobile/domain/models/settings_key.dart';
 import 'package:immich_mobile/domain/models/space_album.model.dart';
+import 'package:immich_mobile/domain/models/space_album_folder.model.dart';
 import 'package:immich_mobile/domain/services/store.service.dart';
 import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/infrastructure/repositories/settings.repository.dart';
@@ -48,8 +49,11 @@ SpaceAlbum _album({required String id, String name = 'Album', int assetCount = 0
       createdAt: DateTime.utc(2026, 1, 1),
     );
 
+// Task 10 added a folders stream the page now watches unconditionally; every override list here
+// must supply one (an empty list) or the page throws resolving `driftProvider`.
 List<Override> _overrides({required String spaceId, required List<SpaceAlbum> albums}) => [
   spaceAlbumsProvider(spaceId).overrideWith((_) => Stream.value(albums)),
+  spaceAlbumFoldersProvider(spaceId).overrideWith((_) => Stream.value(const <SpaceAlbumFolder>[])),
 ];
 
 /// Wraps a SliverAppBar in a scrollable context so it renders.

@@ -28,6 +28,7 @@ const A = (o: Partial<SharedSpaceLinkedAlbumDto>): SharedSpaceLinkedAlbumDto => 
   albumName: 'A',
   assetCount: 0,
   albumThumbnailAssetId: null,
+  folderId: null,
   showInTimeline: true,
   hiddenFromMyTimeline: false,
   addedById: null,

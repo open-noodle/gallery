@@ -652,6 +652,22 @@ export const shared_space_album_hidden_delete_audit = registerFunction({
     END`,
 });
 
+// Fan-out trigger: on folder delete (direct, or via cascade from shared_space) emits a tombstone
+// row so synced clients drop the folder. Simpler than shared_space_album_delete_audit — folders
+// carry no per-member grants, so this only inserts the tombstone row.
+export const shared_space_album_folder_delete_audit = registerFunction({
+  name: 'shared_space_album_folder_delete_audit',
+  returnType: 'TRIGGER',
+  language: 'PLPGSQL',
+  body: `
+    BEGIN
+      INSERT INTO shared_space_album_folder_audit ("spaceId", "folderId")
+      SELECT "spaceId", "id" FROM "old";
+      RETURN NULL;
+    END
+  `,
+});
+
 // Fan-out trigger: on member removal, revoke album grants for all albums linked
 // to that space, gated. Skips during shared_space cascade (EXISTS guard fails).
 // Mirrors shared_space_member_delete_library_audit.

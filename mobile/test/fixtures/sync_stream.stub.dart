@@ -404,6 +404,9 @@ abstract final class SyncStreamStub {
       albumId: 'album-stub-1',
       showInTimeline: true,
       addedById: null,
+      // null = at the space root. Do not change to a non-null value — see the
+      // note on `makeAlbumLink` in sync_stream_repository_test.dart.
+      folderId: null,
       createdAt: DateTime(2026, 6, 1),
       updatedAt: DateTime(2026, 6, 1),
     ),
@@ -417,6 +420,7 @@ abstract final class SyncStreamStub {
       albumId: 'album-stub-2',
       showInTimeline: false,
       addedById: null,
+      folderId: null,
       createdAt: DateTime(2026, 6, 1),
       updatedAt: DateTime(2026, 6, 1),
     ),
@@ -427,6 +431,34 @@ abstract final class SyncStreamStub {
     type: SyncEntityType.sharedSpaceAlbumLinkDeleteV1,
     data: SyncSharedSpaceAlbumLinkDeleteV1(spaceId: 'space-3', albumId: 'album-stub-3'),
     ack: 'sa-album-link-delete-ack',
+  );
+
+  static SyncSharedSpaceAlbumFolderV1 _makeAlbumFolderV1({String id = 'folder-stub-1', String spaceId = 'space-1'}) =>
+      SyncSharedSpaceAlbumFolderV1(
+        id: id,
+        spaceId: spaceId,
+        parentId: null,
+        name: 'Stub Folder',
+        createdAt: DateTime(2026, 6, 1),
+        updatedAt: DateTime(2026, 6, 1),
+      );
+
+  static final sharedSpaceAlbumFolderV1 = SyncEvent(
+    type: SyncEntityType.sharedSpaceAlbumFolderV1,
+    data: _makeAlbumFolderV1(),
+    ack: 'sa-album-folder-v1-ack',
+  );
+
+  static final sharedSpaceAlbumFolderBackfillV1 = SyncEvent(
+    type: SyncEntityType.sharedSpaceAlbumFolderBackfillV1,
+    data: _makeAlbumFolderV1(id: 'folder-stub-2', spaceId: 'space-2'),
+    ack: 'sa-album-folder-backfill-ack',
+  );
+
+  static final sharedSpaceAlbumFolderDeleteV1 = SyncEvent(
+    type: SyncEntityType.sharedSpaceAlbumFolderDeleteV1,
+    data: SyncSharedSpaceAlbumFolderDeleteV1(folderId: 'folder-stub-3'),
+    ack: 'sa-album-folder-delete-ack',
   );
 
   static final sharedSpaceAlbumToAssetV1 = SyncEvent(

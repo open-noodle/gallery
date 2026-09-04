@@ -168,6 +168,16 @@ describe('Route', () => {
     it('links to a space albums tab', () => {
       expect(Route.viewSpaceAlbums({ id: 'space-1' })).toBe('/spaces/space-1/albums');
     });
+
+    it('links to a folder inside a space albums tab', () => {
+      expect(Route.viewSpaceAlbums({ id: 'space-1', folderId: 'folder-1' })).toBe(
+        '/spaces/space-1/albums?folder=folder-1',
+      );
+    });
+
+    it('omits the folder query param for a null folderId (the space root)', () => {
+      expect(Route.viewSpaceAlbums({ id: 'space-1', folderId: null })).toBe('/spaces/space-1/albums');
+    });
   });
 
   describe(Route.map.name, () => {

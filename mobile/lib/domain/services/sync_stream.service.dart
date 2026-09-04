@@ -411,6 +411,11 @@ class SyncStreamService {
         return _syncStreamRepository.updateSharedSpaceAlbumLinksV1(data.cast());
       case SyncEntityType.sharedSpaceAlbumLinkDeleteV1:
         return _syncStreamRepository.deleteSharedSpaceAlbumLinksV1(data.cast());
+      case SyncEntityType.sharedSpaceAlbumFolderV1:
+      case SyncEntityType.sharedSpaceAlbumFolderBackfillV1:
+        return _syncStreamRepository.updateSharedSpaceAlbumFoldersV1(data.cast());
+      case SyncEntityType.sharedSpaceAlbumFolderDeleteV1:
+        return _syncStreamRepository.deleteSharedSpaceAlbumFoldersV1(data.cast());
       case SyncEntityType.sharedSpaceAlbumToAssetV1:
       case SyncEntityType.sharedSpaceAlbumToAssetBackfillV1:
         return _syncStreamRepository.updateSharedSpaceAlbumToAssetsV1(data.cast());
