@@ -39,7 +39,7 @@ Future<void> viewAssetInTimeline({
 }) async {
   await popViewer();
   read(photosFilterProvider.notifier).reset();
-  read(photosFilterSheetProvider.notifier).state = FilterSheetSnap.hidden;
+  read(photosFilterSheetProvider.notifier).state = FilterSheetVisibility.hidden;
   if (spaceId != null) {
     // A Space timeline is PUSHED over the main one, and auto_route's push future
     // completes when the route is POPPED, not when it is pushed (`_addNewPage` returns

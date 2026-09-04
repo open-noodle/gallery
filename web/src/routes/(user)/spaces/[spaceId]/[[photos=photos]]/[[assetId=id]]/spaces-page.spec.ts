@@ -26,6 +26,7 @@ const {
   mockRegisterSelectionContext,
   mockRegisterSpaceContext,
   mockRegisterSearchablePageFilters,
+  mockOpenSearchPalette,
 } = vi.hoisted(() => ({
   gotoMock: vi.fn().mockResolvedValue(undefined),
   invalidateAllMock: vi.fn().mockResolvedValue(undefined),
@@ -46,6 +47,7 @@ const {
   mockRegisterSelectionContext: vi.fn(),
   mockRegisterSpaceContext: vi.fn(),
   mockRegisterSearchablePageFilters: vi.fn(() => vi.fn()),
+  mockOpenSearchPalette: vi.fn(),
 }));
 
 vi.mock('$app/navigation', () => ({ goto: gotoMock, invalidateAll: invalidateAllMock }));
@@ -139,6 +141,7 @@ vi.mock('$lib/managers/event-manager.svelte', () => ({ eventManager: mockEventMa
 vi.mock('$lib/managers/global-search-manager.svelte', () => ({
   globalSearchManager: {
     registerSearchablePageFilters: mockRegisterSearchablePageFilters,
+    open: mockOpenSearchPalette,
   },
 }));
 
@@ -295,6 +298,45 @@ describe('Spaces page search URL state', () => {
     expect(screen.queryByTestId('sort-toggle')).not.toBeInTheDocument();
     expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-search-query', 'beach');
     expect(screen.getByTestId('smart-search-results')).toHaveAttribute('data-sort-order', 'relevance');
+  });
+
+  // #1028: on a phone the cover + tabs left search results a sliver of the screen, because only
+  // the browse timeline reported its scroll offset — the results grid never did, so the shell's
+  // collapse-on-scroll never fired while a search was on screen.
+  it('collapses the space cover once the search results are scrolled', async () => {
+    mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?q=beach');
+
+    renderPage();
+    expect(spaceUiManager.coverCollapsed).toBe(false);
+
+    await fireEvent.click(screen.getByTestId('search-results-scroll-down'));
+
+    expect(spaceUiManager.coverCollapsed).toBe(true);
+  });
+
+  it('restores the space cover when the search results are scrolled back to the top', async () => {
+    mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?q=beach');
+
+    renderPage();
+    await fireEvent.click(screen.getByTestId('search-results-scroll-down'));
+
+    await fireEvent.click(screen.getByTestId('search-results-scroll-top'));
+
+    expect(spaceUiManager.coverCollapsed).toBe(false);
+  });
+
+  // Committing or clearing a search swaps the timeline for the results grid and back. The
+  // incoming surface always mounts scrolled to the top, so a collapse left over from the outgoing
+  // one hides the cover with nothing scrolled under it.
+  it('shows the cover again when clearing the search swaps back to the timeline', async () => {
+    mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?q=beach');
+    renderPage();
+    await fireEvent.click(screen.getByTestId('search-results-scroll-down'));
+    expect(spaceUiManager.coverCollapsed).toBe(true);
+
+    mockPage.url = new URL('https://gallery.test/spaces/space-1/photos');
+
+    await waitFor(() => expect(spaceUiManager.coverCollapsed).toBe(false));
   });
 
   it('hydrates an explicit search sort from the URL', () => {
@@ -1030,6 +1072,44 @@ describe('Spaces page search URL state', () => {
     renderPage();
 
     expect(screen.queryByTestId('timeline-desktop-grouping-control')).not.toBeInTheDocument();
+  });
+
+  // #1051: the space timeline searches the space, but nothing on the surface said so — the only
+  // trigger lived in the nav bar. The palette itself already scopes from the URL.
+  describe('scoped search button', () => {
+    it('sits beside the grouping control on the space browse timeline', async () => {
+      mockPage.url = new URL('https://gallery.test/spaces/space-1/photos');
+
+      renderPage();
+
+      expect(await screen.findByTestId('scoped-search-button')).toBeInTheDocument();
+    });
+
+    it('opens the page-scoped search palette when clicked', async () => {
+      mockPage.url = new URL('https://gallery.test/spaces/space-1/photos');
+
+      renderPage();
+      await fireEvent.click(await screen.findByTestId('scoped-search-button'));
+
+      expect(mockOpenSearchPalette).toHaveBeenCalledOnce();
+    });
+
+    it('stays available while space search results are showing, so the query can be changed', async () => {
+      mockPage.url = new URL('https://gallery.test/spaces/space-1/photos?q=nature');
+
+      renderPage();
+
+      expect(await screen.findByTestId('scoped-search-button')).toBeInTheDocument();
+    });
+
+    it('is hidden in select-assets mode, where the toolbar belongs to the selection', async () => {
+      mockPage.url = new URL('https://gallery.test/spaces/space-1/photos');
+
+      renderPage();
+      await enterSelectAssets();
+
+      await waitFor(() => expect(screen.queryByTestId('scoped-search-button')).not.toBeInTheDocument());
+    });
   });
 
   it('shows the filtered empty state for a filtered space timeline with no assets', () => {

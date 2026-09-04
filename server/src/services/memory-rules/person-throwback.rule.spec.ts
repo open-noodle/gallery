@@ -83,10 +83,11 @@ describe(PersonThrowbackMemoryRule.name, () => {
     expect(result[0]).toMatchObject({
       ruleId: 'person_throwback',
       dedupeKey: 'person_throwback:p1',
-      title: 'Times with Anna',
-      subtitle: '23 photos · August 2023',
       score: 186, // 110 + min(23,30)*3 + recencyBonus(2023,2026)=7 -> 110+69+7
+      context: { personId: 'p1', personName: 'Anna', count: 23, month: 8, year: 2023 },
     });
+    expect(result[0].title).toBeUndefined();
+    expect(result[0].subtitle).toBeUndefined();
   });
 
   it('given any run reaching the dormant-person query, then lastSeenBefore is exactly the default 6 months before the trigger day', async () => {
@@ -163,13 +164,13 @@ describe(PersonThrowbackMemoryRule.name, () => {
     expect(result.map((c) => c.context?.personId)).toEqual(['pA', 'pB']);
   });
 
-  it('given a chapter spanning a month boundary, then the subtitle month/year come from medianTime, not chapter.from', async () => {
+  it('given a chapter spanning a month boundary, then the context month/year come from medianTime, not chapter.from', async () => {
     const counts = [1, 1, 1, 2, 2, 2, 2]; // 2019-07-29..07-31, 08-01..08-04, heavier in August, sums to 11
     const days = dailyCounts('p1', '2019-07-29', counts);
     const assets = buildAssets('2019-07-29', counts);
     const { rule } = ruleWith([person('p1', 'Dana')], days, assets);
     const [candidate] = await rule.evaluate({ ownerId: 'user-1', target });
-    expect(candidate.subtitle).toBe('11 photos · August 2019');
+    expect(candidate.context).toMatchObject({ count: 11, month: 8, year: 2019 });
   });
 
   it('given a single-day chapter of 8 assets, then it is included (no distinct-day minimum)', async () => {
@@ -248,7 +249,7 @@ describe(PersonThrowbackMemoryRule.name, () => {
     const fewerAssets = buildAssets('2023-08-01', [10]); // only 10, all still within August 2023
     const { rule } = ruleWith([person('p1', 'Anna')], days, fewerAssets);
     const [candidate] = await rule.evaluate({ ownerId: 'user-1', target });
-    expect(candidate.subtitle).toBe('23 photos · August 2023');
+    expect(candidate.context).toMatchObject({ count: 23, month: 8, year: 2023 });
   });
 
   it('given the window query returns 4 assets, then the candidate is dropped', async () => {

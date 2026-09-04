@@ -4,7 +4,7 @@ import { PostgresError } from 'postgres';
 import { SourceType } from 'src/enum';
 import { DB } from 'src/schema';
 import { FaceRepairScanTable } from 'src/schema/tables/face-repair-scan.table';
-import { reviewableAssetVisibility } from 'src/utils/face-review';
+import { FaceWithPhotoContext, reviewableAssetVisibility } from 'src/utils/face-review';
 
 // The partial unique index enforcing at most one in-flight scan (see face-repair-scan.table.ts).
 const IN_FLIGHT_INDEX = 'face_repair_scan_in_flight_uq';
@@ -294,14 +294,24 @@ export class FaceRepairScanRepository {
   async getScanFlaggedFaces(
     scanId: string,
     personId: string,
-  ): Promise<{ assetFaceId: string; suspectedOwnerId: string }[]> {
+  ): Promise<(FaceWithPhotoContext & { suspectedOwnerId: string })[]> {
     return (
       this.db
         .selectFrom('face_repair_scan_flagged_face as ff')
         .innerJoin('asset_face', 'asset_face.id', 'ff.assetFaceId')
         .innerJoin('asset', 'asset.id', 'asset_face.assetId')
         .innerJoin('face_search', 'face_search.faceId', 'asset_face.id')
-        .select(['ff.assetFaceId as assetFaceId', 'ff.suspectedOwnerId as suspectedOwnerId'])
+        .select([
+          'ff.assetFaceId as assetFaceId',
+          'ff.suspectedOwnerId as suspectedOwnerId',
+          'asset.localDateTime',
+          'asset_face.boundingBoxX1',
+          'asset_face.boundingBoxY1',
+          'asset_face.boundingBoxX2',
+          'asset_face.boundingBoxY2',
+          'asset_face.imageWidth',
+          'asset_face.imageHeight',
+        ])
         .where('ff.scanId', '=', scanId)
         .where('ff.personId', '=', personId)
         .where('asset_face.personId', '=', personId)

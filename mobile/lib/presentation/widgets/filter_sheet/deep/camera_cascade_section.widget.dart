@@ -15,7 +15,7 @@ import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dar
 /// [_ModelCascade], whose InputChip shows the selection instead.
 const int _kPreviewCap = 10;
 
-/// CameraCascadeSection — Deep-snap section for the Camera filter dimension.
+/// CameraCascadeSection — Deep section for the Camera filter dimension.
 ///
 /// When no make is selected, renders a Wrap of make FilterChips sourced from
 /// photosFilterSuggestionsProvider (capped to [_kPreviewCap]). Tapping a make

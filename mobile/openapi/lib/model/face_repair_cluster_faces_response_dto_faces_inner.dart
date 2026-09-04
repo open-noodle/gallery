@@ -14,25 +14,67 @@ class FaceRepairClusterFacesResponseDtoFacesInner {
   /// Returns a new [FaceRepairClusterFacesResponseDtoFacesInner] instance.
   FaceRepairClusterFacesResponseDtoFacesInner({
     required this.assetFaceId,
+    required this.boundingBoxX1,
+    required this.boundingBoxX2,
+    required this.boundingBoxY1,
+    required this.boundingBoxY2,
+    required this.imageHeight,
+    required this.imageWidth,
+    required this.localDateTime,
   });
 
   String assetFaceId;
 
+  num boundingBoxX1;
+
+  num boundingBoxX2;
+
+  num boundingBoxY1;
+
+  num boundingBoxY2;
+
+  num imageHeight;
+
+  num imageWidth;
+
+  DateTime localDateTime;
+
   @override
   bool operator ==(Object other) => identical(this, other) || other is FaceRepairClusterFacesResponseDtoFacesInner &&
-    other.assetFaceId == assetFaceId;
+    other.assetFaceId == assetFaceId &&
+    other.boundingBoxX1 == boundingBoxX1 &&
+    other.boundingBoxX2 == boundingBoxX2 &&
+    other.boundingBoxY1 == boundingBoxY1 &&
+    other.boundingBoxY2 == boundingBoxY2 &&
+    other.imageHeight == imageHeight &&
+    other.imageWidth == imageWidth &&
+    other.localDateTime == localDateTime;
 
   @override
   int get hashCode =>
     // ignore: unnecessary_parenthesis
-    (assetFaceId.hashCode);
+    (assetFaceId.hashCode) +
+    (boundingBoxX1.hashCode) +
+    (boundingBoxX2.hashCode) +
+    (boundingBoxY1.hashCode) +
+    (boundingBoxY2.hashCode) +
+    (imageHeight.hashCode) +
+    (imageWidth.hashCode) +
+    (localDateTime.hashCode);
 
   @override
-  String toString() => 'FaceRepairClusterFacesResponseDtoFacesInner[assetFaceId=$assetFaceId]';
+  String toString() => 'FaceRepairClusterFacesResponseDtoFacesInner[assetFaceId=$assetFaceId, boundingBoxX1=$boundingBoxX1, boundingBoxX2=$boundingBoxX2, boundingBoxY1=$boundingBoxY1, boundingBoxY2=$boundingBoxY2, imageHeight=$imageHeight, imageWidth=$imageWidth, localDateTime=$localDateTime]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
       json[r'assetFaceId'] = this.assetFaceId;
+      json[r'boundingBoxX1'] = this.boundingBoxX1;
+      json[r'boundingBoxX2'] = this.boundingBoxX2;
+      json[r'boundingBoxY1'] = this.boundingBoxY1;
+      json[r'boundingBoxY2'] = this.boundingBoxY2;
+      json[r'imageHeight'] = this.imageHeight;
+      json[r'imageWidth'] = this.imageWidth;
+      json[r'localDateTime'] = this.localDateTime.toUtc().toIso8601String();
     return json;
   }
 
@@ -46,6 +88,13 @@ class FaceRepairClusterFacesResponseDtoFacesInner {
 
       return FaceRepairClusterFacesResponseDtoFacesInner(
         assetFaceId: mapValueOfType<String>(json, r'assetFaceId')!,
+        boundingBoxX1: num.parse('${json[r'boundingBoxX1']}'),
+        boundingBoxX2: num.parse('${json[r'boundingBoxX2']}'),
+        boundingBoxY1: num.parse('${json[r'boundingBoxY1']}'),
+        boundingBoxY2: num.parse('${json[r'boundingBoxY2']}'),
+        imageHeight: num.parse('${json[r'imageHeight']}'),
+        imageWidth: num.parse('${json[r'imageWidth']}'),
+        localDateTime: mapDateTime(json, r'localDateTime', r'')!,
       );
     }
     return null;
@@ -94,6 +143,13 @@ class FaceRepairClusterFacesResponseDtoFacesInner {
   /// The list of required keys that must be present in a JSON.
   static const requiredKeys = <String>{
     'assetFaceId',
+    'boundingBoxX1',
+    'boundingBoxX2',
+    'boundingBoxY1',
+    'boundingBoxY2',
+    'imageHeight',
+    'imageWidth',
+    'localDateTime',
   };
 }
 

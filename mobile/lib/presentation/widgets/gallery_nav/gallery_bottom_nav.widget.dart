@@ -72,8 +72,8 @@ class _GalleryBottomNavState extends ConsumerState<GalleryBottomNav> {
     }
 
     // Hide the pill while the FilterSheet is visible — it would otherwise
-    // overlap the sheet's bottom content (e.g. the Done button at Deep snap).
-    final sheetVisible = ref.watch(photosFilterSheetProvider) != FilterSheetSnap.hidden;
+    // overlap the sheet's bottom content (e.g. the Done button).
+    final sheetVisible = ref.watch(photosFilterSheetProvider) != FilterSheetVisibility.hidden;
     final hiding = _hiddenForMultiSelect || keyboardUp || sheetVisible;
     final bottomInset = mq.padding.bottom > _bottomFloat ? mq.padding.bottom : _bottomFloat;
     final pillVisibleHeight = bottomInset + _pillHeight;

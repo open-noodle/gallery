@@ -11,11 +11,11 @@ const translate = ((key: string, payload?: { values?: Record<string, number | st
     return 'On this day';
   }
 
-  if (key === 'recent_trip_title') {
+  if (key === 'memory_recent_trip_title') {
     return `Recent trip to ${payload?.values?.location}`;
   }
 
-  if (key === 'recent_trip_subtitle') {
+  if (key === 'memory_recent_trip_subtitle') {
     return `${payload?.values?.assetCount} photos over ${payload?.values?.dayCount} days`;
   }
 

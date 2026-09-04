@@ -214,6 +214,30 @@ where
   "asset_face"."id" = $1
   and "asset"."visibility" in ($2, $3)
 
+-- PersonRepository.getFaceByIdOnLiveAsset
+select
+  "asset_face".*,
+  (
+    select
+      to_json(obj)
+    from
+      (
+        select
+          "person".*
+        from
+          "person"
+        where
+          "person"."id" = "asset_face"."personId"
+      ) as obj
+  ) as "person"
+from
+  "asset_face"
+  inner join "asset" on "asset"."id" = "asset_face"."assetId"
+where
+  "asset_face"."id" = $1
+  and "asset"."deletedAt" is null
+  and "asset"."visibility" in ($2, $3)
+
 -- PersonRepository.getRepresentativeFaces
 select
   "asset_face".*,

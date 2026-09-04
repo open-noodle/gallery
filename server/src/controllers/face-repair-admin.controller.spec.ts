@@ -281,7 +281,24 @@ describe(FaceRepairAdminController.name, () => {
     });
 
     it('delegates to service.getClusterFaces and returns the page', async () => {
-      service.getClusterFaces.mockResolvedValue({ faces: [{ assetFaceId: faceId }], total: 1, hasMore: false });
+      // #1061: getClusterFaces now carries photo context alongside each face id — this test is about the
+      // HTTP delegation, not the context, so the values here are arbitrary.
+      service.getClusterFaces.mockResolvedValue({
+        faces: [
+          {
+            assetFaceId: faceId,
+            localDateTime: new Date('2019-07-04T10:30:00.000Z'),
+            boundingBoxX1: 10,
+            boundingBoxY1: 20,
+            boundingBoxX2: 30,
+            boundingBoxY2: 40,
+            imageWidth: 400,
+            imageHeight: 300,
+          },
+        ],
+        total: 1,
+        hasMore: false,
+      });
       const { status, body } = await request(ctx.getHttpServer())
         .post(`/admin/face-repair/scan/person/${personId}/cluster-faces`)
         .set('Authorization', 'Bearer token')
@@ -964,6 +981,43 @@ describe(FaceRepairAdminController.name, () => {
         .set('Authorization', 'Bearer token');
       expect(status).toBe(400);
       expect(service.getAdminFaceThumbnail).not.toHaveBeenCalled();
+    });
+  });
+
+  // Same shape as the thumbnail route's coverage above, and for the same reason: this route is new and
+  // returns any user's source photo by face id, so it must not be the one route on this controller with no
+  // coverage.
+  describe('GET /admin/face-repair/faces/:assetFaceId/preview', () => {
+    const assetFaceId = '00000000-0000-4000-a000-000000000061';
+
+    it('T3.1: should be an authenticated admin route', async () => {
+      await request(ctx.getHttpServer()).get(`/admin/face-repair/faces/${assetFaceId}/preview`);
+      expect(ctx.authenticate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({ adminRoute: true }),
+        }),
+      );
+    });
+
+    it('T3.2: delegates to service.getAdminFacePreview with the assetFaceId', async () => {
+      // ImmichRedirectResponse exercises sendFile's real dispatch without touching the filesystem.
+      service.getAdminFacePreview.mockResolvedValue(
+        new ImmichRedirectResponse({ url: 'https://example.com/photo.jpg', cacheControl: CacheControl.None }),
+      );
+      const { status, headers } = await request(ctx.getHttpServer())
+        .get(`/admin/face-repair/faces/${assetFaceId}/preview`)
+        .set('Authorization', 'Bearer token');
+      expect(status).toBe(302);
+      expect(headers.location).toBe('https://example.com/photo.jpg');
+      expect(service.getAdminFacePreview).toHaveBeenCalledWith(assetFaceId);
+    });
+
+    it('rejects a non-uuid assetFaceId with 400', async () => {
+      const { status } = await request(ctx.getHttpServer())
+        .get('/admin/face-repair/faces/not-a-uuid/preview')
+        .set('Authorization', 'Bearer token');
+      expect(status).toBe(400);
+      expect(service.getAdminFacePreview).not.toHaveBeenCalled();
     });
   });
 });

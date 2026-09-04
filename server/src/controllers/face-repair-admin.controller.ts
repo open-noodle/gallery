@@ -85,7 +85,11 @@ export class FaceRepairAdminController {
   getFaceRepairPersonFaces(
     @Param('personId', new ParseUUIDPipe({ version: '4' })) personId: string,
   ): Promise<FaceRepairPersonFacesDto> {
-    return this.service.getPersonFlaggedFaces(personId) as Promise<FaceRepairPersonFacesDto>;
+    // #1061: the service keeps localDateTime as a Date (repository/DB shape); the DTO schema declares it a
+    // string (serialized over the wire). The array-of-objects shape defeats the direct cast's "sufficient
+    // overlap" check the way the scalar fields on FaceRepairScanStatusDto do not, so route through unknown
+    // like getFaceRepairDeclines below.
+    return this.service.getPersonFlaggedFaces(personId) as unknown as Promise<FaceRepairPersonFacesDto>;
   }
 
   @Post('scan/person/:personId/cluster-faces')
@@ -98,7 +102,11 @@ export class FaceRepairAdminController {
     @Param('personId', new ParseUUIDPipe({ version: '4' })) personId: string,
     @Body() dto: FaceRepairClusterFacesRequestDto,
   ): Promise<FaceRepairClusterFacesResponseDto> {
-    return this.service.getClusterFaces(personId, dto) as Promise<FaceRepairClusterFacesResponseDto>;
+    // #1061: same Date-vs-string split as getFaceRepairPersonFaces above — the service keeps localDateTime
+    // as a Date (repository/DB shape), the DTO schema declares it a string (serialized over the wire), and
+    // that mismatch sitting inside the `faces` array element defeats the direct cast's "sufficient overlap"
+    // check the way scalar fields do not. Route through unknown like getFaceRepairDeclines below.
+    return this.service.getClusterFaces(personId, dto) as unknown as Promise<FaceRepairClusterFacesResponseDto>;
   }
 
   // Slice 3 (manual face review): the manual review page has no scan to read personName/ownerId off. Does not
@@ -217,5 +225,20 @@ export class FaceRepairAdminController {
     @Param('assetFaceId', new ParseUUIDPipe({ version: '4' })) assetFaceId: string,
   ): Promise<void> {
     await sendFile(res, next, () => this.service.getAdminFaceThumbnail(assetFaceId), this.logger);
+  }
+
+  // The source photo behind a face crop (#1061). Admin-gated and face-keyed for exactly the reason the
+  // thumbnail above is: the console repairs clusters in other people's libraries, and the owner-scoped
+  // asset routes enforce Permission.AssetView with no admin bypass, so they would 403 on the main case.
+  @Get('faces/:assetFaceId/preview')
+  @FileResponse()
+  @Authenticated({ admin: true })
+  @Endpoint({ summary: 'Get an admin face-repair source photo', history: new HistoryBuilder().added('v1') })
+  async getFaceRepairFacePreview(
+    @Res() res: Response,
+    @Next() next: NextFunction,
+    @Param('assetFaceId', new ParseUUIDPipe({ version: '4' })) assetFaceId: string,
+  ): Promise<void> {
+    await sendFile(res, next, () => this.service.getAdminFacePreview(assetFaceId), this.logger);
   }
 }

@@ -1273,6 +1273,69 @@ describe(PersonRepository.name, () => {
     });
   });
 
+  // The preview route serves the WHOLE source photo rather than a 250px crop, so it refuses a face whose
+  // asset is in the trash. The face tombstone stays allowed (the resolutions history renders tombstoned
+  // faces) — that asymmetry is the only difference from getFaceByIdIncludingTombstoned, and T1.4/T1.5 pin
+  // both halves of it.
+  describe('getFaceByIdOnLiveAsset', () => {
+    it('T1.1/T1.2: returns a face on a live timeline asset, throws once its asset is trashed', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+
+      const { asset: liveAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+      const { assetFace: liveFace } = await ctx.newAssetFace({ assetId: liveAsset.id, personId: null });
+
+      const { asset: trashedAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+      const { assetFace: trashedFace } = await ctx.newAssetFace({ assetId: trashedAsset.id, personId: null });
+      await ctx.database
+        .updateTable('asset')
+        .set({ deletedAt: new Date() })
+        .where('id', '=', trashedAsset.id)
+        .execute();
+
+      await expect(sut.getFaceByIdOnLiveAsset(liveFace.id)).resolves.toMatchObject({ id: liveFace.id }); // positive control
+      await expect(sut.getFaceByIdOnLiveAsset(trashedFace.id)).rejects.toThrow();
+    });
+
+    it('T1.3: throws for a face on a locked asset', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+
+      const { asset: lockedAsset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Locked });
+      const { assetFace: lockedFace } = await ctx.newAssetFace({ assetId: lockedAsset.id, personId: null });
+
+      await expect(sut.getFaceByIdOnLiveAsset(lockedFace.id)).rejects.toThrow();
+    });
+
+    it('T1.4: still returns a tombstoned face whose asset is live', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+
+      const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      await ctx.database
+        .updateTable('asset_face')
+        .set({ deletedAt: new Date() })
+        .where('id', '=', assetFace.id)
+        .execute();
+
+      await expect(sut.getFaceByIdOnLiveAsset(assetFace.id)).resolves.toMatchObject({ id: assetFace.id });
+    });
+
+    it('T1.5 (pin): getFaceByIdIncludingTombstoned STILL returns a face on a trashed asset', async () => {
+      const { ctx, sut } = setup();
+      const { user } = await ctx.newUser();
+
+      const { asset } = await ctx.newAsset({ ownerId: user.id, visibility: AssetVisibility.Timeline });
+      const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personId: null });
+      await ctx.database.updateTable('asset').set({ deletedAt: new Date() }).where('id', '=', asset.id).execute();
+
+      // The three shipped crop surfaces must not change. If this ever goes red, the deletedAt filter was
+      // added to the wrong method.
+      await expect(sut.getFaceByIdIncludingTombstoned(assetFace.id)).resolves.toMatchObject({ id: assetFace.id });
+    });
+  });
+
   // Slice 5 (F9): recognition must never re-claim a face a human has already placed. `excludeManuallyPlaced`
   // is the mechanism — a NOT EXISTS anti-join against face_identity_face.source='manual'.
   describe('getAllFaces', () => {

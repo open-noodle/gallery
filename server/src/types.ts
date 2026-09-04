@@ -730,6 +730,11 @@ export type MemoriesState = {
   lastOnThisDayDate?: string;
   /** rule memories have already been created through this date */
   lastRuleDate?: string;
+  /**
+   * Overlap reconciliation has already swept history through this date. Set once by the one-off
+   * backfill; when it reaches today the backfill never runs again.
+   */
+  overlapBackfilledAt?: string;
 };
 export type MediaLocation = { location: string };
 

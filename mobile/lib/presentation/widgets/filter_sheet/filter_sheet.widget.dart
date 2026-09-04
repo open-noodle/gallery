@@ -3,14 +3,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:immich_mobile/presentation/widgets/filter_sheet/browse_content.widget.dart';
 import 'package:immich_mobile/presentation/widgets/filter_sheet/deep_content.widget.dart';
 import 'package:immich_mobile/providers/photos_filter/filter_sheet.provider.dart';
 
-/// The single draggable sheet owning browse / deep snaps.
+/// The draggable sheet holding the filter panel.
 ///
-/// Mount gate: iff `photosFilterSheetProvider != hidden`. Programmatic snap
-/// changes animate the `DraggableScrollableController` to the target extent.
+/// Mount gate: iff `photosFilterSheetProvider != hidden`. The sheet has a
+/// single resting extent — full height. A downward drag either settles below
+/// [_dismissThreshold] and closes the sheet, or springs back to full; there is
+/// no intermediate half-height state to land on.
 class FilterSheet extends ConsumerStatefulWidget {
   const FilterSheet({super.key});
 
@@ -19,42 +20,36 @@ class FilterSheet extends ConsumerStatefulWidget {
 }
 
 class _FilterSheetState extends ConsumerState<FilterSheet> {
-  final _controller = DraggableScrollableController();
-
-  static const _snapBrowse = 0.62;
-  static const _snapDeep = 0.95;
-  static const _snapTolerance = 0.02;
+  /// The sheet's only resting extent. Deliberately short of 1.0 so a strip of
+  /// dimmed timeline stays visible above it, which keeps the panel reading as a
+  /// layer over the photos rather than a screen of its own. On iOS that strip
+  /// doubles as a tap-to-close target; on Android it sits under the status-bar
+  /// window, which swallows the touch, so treat closing there as ✕ / Done /
+  /// system-back / drag-to-dismiss.
+  static const _snapFull = 0.95;
 
   /// Lowest extent the sheet can be dragged to before it dismisses.
   /// Below this, we set state → hidden and the sheet unmounts.
   static const _dismissThreshold = 0.5;
 
-  /// Allow drag to go below `_snapBrowse` so the dismiss gesture is reachable.
+  /// Allow drag to go below [_snapFull] so the dismiss gesture is reachable.
   static const _minExtent = 0.3;
 
   /// A live drag fires a `DraggableScrollableNotification` on every frame of
-  /// motion, so a "half" swipe can pass *through* the browse extent (or dip
-  /// below the dismiss threshold) well before the user's thumb comes to
-  /// rest — e.g. on its way back up after an overshoot. Committing the snap
-  /// on each of those transient extents flips the sheet between deep/browse/
-  /// hidden mid-gesture, unmounting `DeepContent`/`BrowseContent` (and, once
-  /// hidden, the sheet itself) while the drag is still live — losing the
-  /// notification stream and, further up, the pointer routing for the rest
-  /// of that same gesture (#1002). Debounce so only the extent the drag
-  /// actually *settles* on (no further motion for `_settleDelay`) commits.
+  /// motion, so a "half" swipe can dip below the dismiss threshold well before
+  /// the user's thumb comes to rest — e.g. on its way back up after an
+  /// overshoot. Committing the dismiss on one of those transient extents
+  /// unmounts `DeepContent` and, with it, the sheet itself while the drag is
+  /// still live — losing the notification stream and, further up, the pointer
+  /// routing for the rest of that same gesture (#1002). Debounce so only the
+  /// extent the drag actually *settles* on (no further motion for
+  /// [_settleDelay]) commits.
   static const _settleDelay = Duration(milliseconds: 160);
   Timer? _settleTimer;
-
-  double _targetExtent(FilterSheetSnap snap) => switch (snap) {
-    FilterSheetSnap.browse => _snapBrowse,
-    FilterSheetSnap.deep => _snapDeep,
-    FilterSheetSnap.hidden => _snapBrowse,
-  };
 
   @override
   void dispose() {
     _settleTimer?.cancel();
-    _controller.dispose();
     super.dispose();
   }
 
@@ -66,105 +61,76 @@ class _FilterSheetState extends ConsumerState<FilterSheet> {
   }
 
   void _commitSettledExtent(double extent) {
-    if (!mounted) return;
-    if (extent < _dismissThreshold) {
-      final current = ref.read(photosFilterSheetProvider);
-      if (current != FilterSheetSnap.hidden) {
-        ref.read(photosFilterSheetProvider.notifier).state = FilterSheetSnap.hidden;
-      }
-      return;
-    }
-    final mapping = <double, FilterSheetSnap>{_snapBrowse: FilterSheetSnap.browse, _snapDeep: FilterSheetSnap.deep};
-    for (final entry in mapping.entries) {
-      if ((extent - entry.key).abs() < _snapTolerance) {
-        final current = ref.read(photosFilterSheetProvider);
-        if (current != entry.value) {
-          ref.read(photosFilterSheetProvider.notifier).state = entry.value;
-        }
-        return;
-      }
+    if (!mounted || extent >= _dismissThreshold) return;
+    if (ref.read(photosFilterSheetProvider) != FilterSheetVisibility.hidden) {
+      ref.read(photosFilterSheetProvider.notifier).state = FilterSheetVisibility.hidden;
     }
   }
 
-  void _onScrimTap() {
-    final snap = ref.read(photosFilterSheetProvider);
-    final next = switch (snap) {
-      FilterSheetSnap.deep => FilterSheetSnap.browse,
-      FilterSheetSnap.browse => FilterSheetSnap.hidden,
-      FilterSheetSnap.hidden => FilterSheetSnap.hidden,
-    };
-    ref.read(photosFilterSheetProvider.notifier).state = next;
-  }
+  void _close() => ref.read(photosFilterSheetProvider.notifier).state = FilterSheetVisibility.hidden;
 
   @override
   Widget build(BuildContext context) {
-    final snap = ref.watch(photosFilterSheetProvider);
-    if (snap == FilterSheetSnap.hidden) return const SizedBox.shrink();
+    // Resolved here rather than inside the listener below: an inherited-widget
+    // lookup belongs in build, not in a callback that runs at an arbitrary
+    // point in the element's life cycle.
+    final accessibleNavigation = MediaQuery.accessibleNavigationOf(context);
+    final view = View.of(context);
+    final textDirection = Directionality.of(context);
 
-    ref.listen<FilterSheetSnap>(photosFilterSheetProvider, (prev, next) {
-      if (next == FilterSheetSnap.hidden || !_controller.isAttached) return;
-      final target = _targetExtent(next);
-      if ((_controller.size - target).abs() < 0.01) return;
-      _controller.animateTo(target, duration: const Duration(milliseconds: 280), curve: Curves.easeOutCubic);
-      if (MediaQuery.of(context).accessibleNavigation) {
-        SemanticsService.sendAnnouncement(View.of(context), 'filter panel ${next.name}', Directionality.of(context));
+    // Registered before the mount gate below, so it sees every transition —
+    // including hidden → visible, which a listener registered inside the gate
+    // could never see (on that build the gate had already returned).
+    ref.listen<FilterSheetVisibility>(photosFilterSheetProvider, (prev, next) {
+      if (next == FilterSheetVisibility.hidden) {
+        // Something other than the drag closed the sheet (✕, Done, back, scrim,
+        // a submitted search). Drop any settle still in flight: it was measured
+        // against a sheet that is already gone, and firing it later would close
+        // whatever the user has reopened since.
+        _settleTimer?.cancel();
+        return;
       }
+      if (!accessibleNavigation) return;
+      SemanticsService.sendAnnouncement(view, 'filter panel opened', textDirection);
     });
 
+    if (ref.watch(photosFilterSheetProvider) == FilterSheetVisibility.hidden) return const SizedBox.shrink();
+
     final theme = Theme.of(context);
-    final scrimVisible = snap == FilterSheetSnap.browse || snap == FilterSheetSnap.deep;
 
     return PopScope(
-      // While the sheet is visible, intercept system back: collapse
-      // deep → browse, or close browse → hidden. Only once the sheet is
-      // hidden does back propagate up to the tab shell / app.
+      // While the sheet is visible, intercept system back to close it. Only
+      // once the sheet is hidden does back propagate up to the tab shell / app.
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
-        ref.read(photosFilterSheetProvider.notifier).state = FilterSheetSnap.hidden;
+        _close();
       },
       child: Stack(
         children: [
           Positioned.fill(
-            child: IgnorePointer(
-              ignoring: !scrimVisible,
-              child: AnimatedOpacity(
-                duration: const Duration(milliseconds: 150),
-                opacity: scrimVisible ? 1 : 0,
-                child: GestureDetector(
-                  key: const Key('filter-sheet-scrim'),
-                  behavior: HitTestBehavior.opaque,
-                  onTap: _onScrimTap,
-                  child: ColoredBox(color: theme.colorScheme.scrim.withValues(alpha: 0.32)),
-                ),
-              ),
+            child: GestureDetector(
+              key: const Key('filter-sheet-scrim'),
+              behavior: HitTestBehavior.opaque,
+              onTap: _close,
+              child: ColoredBox(color: theme.colorScheme.scrim.withValues(alpha: 0.32)),
             ),
           ),
           NotificationListener<DraggableScrollableNotification>(
             onNotification: _onNotification,
             child: DraggableScrollableSheet(
-              controller: _controller,
-              initialChildSize: _targetExtent(snap),
+              initialChildSize: _snapFull,
               minChildSize: _minExtent,
-              maxChildSize: _snapDeep,
+              maxChildSize: _snapFull,
               snap: true,
-              snapSizes: const [_snapBrowse, _snapDeep],
-              builder: (context, scrollController) => _snapChild(snap, scrollController),
+              // One snap target: a drag that does not go far enough to dismiss
+              // springs back to full height instead of resting half-way.
+              snapSizes: const [_snapFull],
+              builder: (context, scrollController) => DeepContent(scrollController: scrollController),
             ),
           ),
         ],
       ),
     );
-  }
-
-  Widget _snapChild(FilterSheetSnap snap, ScrollController scrollController) {
-    switch (snap) {
-      case FilterSheetSnap.browse:
-        return BrowseContent(scrollController: scrollController);
-      case FilterSheetSnap.deep:
-        return DeepContent(scrollController: scrollController);
-      case FilterSheetSnap.hidden:
-        return const SizedBox.shrink();
-    }
   }
 }
