@@ -25,7 +25,7 @@
   import { locale } from '$lib/stores/preferences.store';
   import { getAssetMediaUrl, handlePromiseError, memoryLaneTitle } from '$lib/utils';
   import { fromISODateTimeUTC, toTimelineAsset } from '$lib/utils/timeline-util';
-  import { AssetMediaSize, AssetTypeEnum, getAssetInfo, MemoryType } from '@immich/sdk';
+  import { AssetMediaSize, type AssetResponseDto, AssetTypeEnum, getAssetInfo, MemoryType } from '@immich/sdk';
   import { ActionButton, CommandPaletteDefaultProvider, Icon, IconButton, Text } from '@immich/ui';
   import {
     mdiCakeVariant,
@@ -86,6 +86,15 @@
   const galleryViewport: Viewport = $derived({ height: viewport.height, width: viewport.width - 32 });
   let progressBarController: Tween<number> | undefined = $state(undefined);
   let videoPlayer: HTMLVideoElement | undefined = $state();
+  // #1047: a memory can hold a photo the viewer only reaches through a Space. The personal timeline
+  // carries such a photo only while that membership is shown in the timeline, so sending every jump
+  // to /photos scrolled to the right date and showed nothing. `resolvedSpaceId` is set by the server
+  // exactly for an asset the viewer does not own but reaches through a space they belong to.
+  const viewInTimelineHref = (asset: AssetResponseDto) => {
+    const at = asset.stack?.primaryAssetId ?? asset.id;
+    return asset.resolvedSpaceId ? Route.viewSpace({ id: asset.resolvedSpaceId }, { at }) : Route.photos({ at });
+  };
+
   const handleNavigate = async (href: string | undefined, options?: { replaceState?: boolean }) => {
     if (assetViewerManager.isViewing || !href) {
       return;
@@ -518,7 +527,7 @@
                 {#await currentMemoryAssetFull then asset}
                   {#if asset}
                     <IconButton
-                      href={Route.photos({ at: asset.stack?.primaryAssetId ?? asset.id })}
+                      href={viewInTimelineHref(asset)}
                       icon={mdiImageSearch}
                       aria-label={$t('view_in_timeline')}
                       color="secondary"
