@@ -285,4 +285,67 @@ void main() {
     // Default is recentlyLinked desc -> the June link before the January one.
     expect(_tileOrder(tester, ['a1', 'a2']), ['a2', 'a1']);
   });
+
+  testWidgets('tapping the header title — not just "See all" — opens the albums page', (tester) async {
+    var called = 0;
+
+    await tester.pumpConsumerWidget(
+      SpaceAlbumsShelf(spaceId: spaceId, canEdit: true, onLinkTap: () {}, onAlbumTap: (_) {}, onSeeAll: () => called++),
+      overrides: _overrides(
+        spaceId: spaceId,
+        albums: [_album(id: 'a1', name: 'Hawaii')],
+      ),
+    );
+
+    await tester.tap(find.text('Albums (1)'));
+    await tester.pumpAndSettle();
+
+    expect(called, 1);
+  });
+
+  testWidgets('the header tap target spans the full shelf width', (tester) async {
+    await tester.pumpConsumerWidget(
+      SpaceAlbumsShelf(spaceId: spaceId, canEdit: true, onLinkTap: () {}, onAlbumTap: (_) {}, onSeeAll: () {}),
+      overrides: _overrides(
+        spaceId: spaceId,
+        albums: [_album(id: 'a1', name: 'Hawaii')],
+      ),
+    );
+
+    final inkWell = tester.getSize(find.byKey(const Key('space-albums-shelf-see-all')));
+    final shelf = tester.getSize(find.byKey(const Key('space-albums-shelf')));
+
+    expect(inkWell.width, shelf.width);
+  });
+
+  testWidgets('an editor with zero albums can still reach the albums page', (tester) async {
+    var called = 0;
+
+    await tester.pumpConsumerWidget(
+      SpaceAlbumsShelf(spaceId: spaceId, canEdit: true, onLinkTap: () {}, onAlbumTap: (_) {}, onSeeAll: () => called++),
+      overrides: _overrides(spaceId: spaceId, albums: const []),
+    );
+
+    expect(find.byKey(const Key('space-albums-shelf-see-all')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('space-albums-shelf-see-all')));
+    await tester.pumpAndSettle();
+
+    expect(called, 1, reason: 'a fresh space has no other route to New album / New folder');
+  });
+
+  testWidgets('a null onSeeAll leaves the header inert', (tester) async {
+    await tester.pumpConsumerWidget(
+      SpaceAlbumsShelf(spaceId: spaceId, canEdit: true, onLinkTap: () {}, onAlbumTap: (_) {}),
+      overrides: _overrides(
+        spaceId: spaceId,
+        albums: [_album(id: 'a1', name: 'Hawaii')],
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('space-albums-shelf-see-all')));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+  });
 }
