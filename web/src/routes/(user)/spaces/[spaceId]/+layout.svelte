@@ -9,11 +9,13 @@
   import { authManager } from '$lib/managers/auth-manager.svelte';
   import { spaceUiManager } from '$lib/managers/space-ui-manager.svelte';
   import SpaceEditModal from '$lib/modals/SpaceEditModal.svelte';
+  import SpaceHideFromTimelineConfirmModal from '$lib/modals/SpaceHideFromTimelineConfirmModal.svelte';
   import { Route } from '$lib/route';
   import { handleError } from '$lib/utils/handle-error';
   import { getSearchablePageState } from '$lib/utils/searchable-page-search';
   import {
     bulkAddAssets,
+    getTimelineHidePreview,
     removeMember,
     removeSpace,
     SharedSpaceRole,
@@ -129,6 +131,19 @@
 
   const handleToggleTimeline = async () => {
     try {
+      // Unhiding needs no confirmation — only hiding removes photos from the caller's timeline,
+      // so only that direction gets a dialog stating a count (§8).
+      if (showInTimeline) {
+        const { hiddenAssetCount, retainedAssetCount } = await getTimelineHidePreview({ id: space.id });
+        const confirmed = await modalManager.show(SpaceHideFromTimelineConfirmModal, {
+          spaceName: space.name,
+          count: hiddenAssetCount,
+          retainedCount: retainedAssetCount,
+        });
+        if (!confirmed) {
+          return;
+        }
+      }
       await updateMemberTimeline({
         id: space.id,
         sharedSpaceMemberTimelineDto: { showInTimeline: !showInTimeline },

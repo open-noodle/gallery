@@ -13,43 +13,58 @@
     canManage: boolean;
     onUnlink?: (album: SharedSpaceLinkedAlbumDto) => void;
     onToggleTimeline?: (album: SharedSpaceLinkedAlbumDto) => void;
+    onToggleMyTimeline?: (album: SharedSpaceLinkedAlbumDto) => void;
   }
 
-  let { spaceId, album, canManage, onUnlink, onToggleTimeline }: Props = $props();
+  let { spaceId, album, canManage, onUnlink, onToggleTimeline, onToggleMyTimeline }: Props = $props();
 </script>
 
 <div
   data-testid="space-album-card"
   class="group relative rounded-2xl border border-transparent p-5 hover:border-gray-200 hover:bg-gray-100 dark:hover:border-gray-800 dark:hover:bg-gray-900"
 >
-  <!-- ⋯ menu — sibling of the anchor, not inside it -->
-  {#if canManage}
-    <div
-      class="absolute inset-e-6 top-6 z-10 opacity-0 group-hover:opacity-100 focus-within:opacity-100"
-      data-testid="space-album-card-menu"
+  <!-- ⋯ menu — sibling of the anchor, not inside it. Every member sees it (the "my timeline" item
+       is a personal preference, not an editor action); only canManage adds the space-wide items. -->
+  <div
+    class="absolute inset-e-6 top-6 z-10 opacity-0 group-hover:opacity-100 focus-within:opacity-100"
+    data-testid="space-album-card-menu"
+  >
+    <ButtonContextMenu
+      icon={mdiDotsVertical}
+      title={$t('more')}
+      color="secondary"
+      variant="filled"
+      size="medium"
+      align="top-right"
+      direction="left"
+      buttonClass="icon-white-drop-shadow"
     >
-      <ButtonContextMenu
-        icon={mdiDotsVertical}
-        title={$t('more')}
-        color="secondary"
-        variant="filled"
-        size="medium"
-        align="top-right"
-        direction="left"
-        buttonClass="icon-white-drop-shadow"
-      >
+      <MenuOption
+        text={album.hiddenFromMyTimeline
+          ? $t('space_albums_show_in_my_timeline')
+          : $t('space_albums_hide_from_my_timeline')}
+        onClick={() => onToggleMyTimeline?.(album)}
+      />
+      {#if canManage}
         <MenuOption
-          text={album.showInTimeline ? $t('spaces_hide_from_timeline') : $t('spaces_linked_albums_show_in_timeline')}
+          text={album.showInTimeline
+            ? $t('space_albums_hide_from_space_photos')
+            : $t('spaces_linked_albums_show_in_timeline')}
           onClick={() => onToggleTimeline?.(album)}
         />
         <MenuOption text={$t('spaces_linked_albums_unlink')} onClick={() => onUnlink?.(album)} />
-      </ButtonContextMenu>
-    </div>
-  {/if}
+      {/if}
+    </ButtonContextMenu>
+  </div>
 
   <a href={Route.viewSpaceAlbum({ spaceId, albumId: album.id })} data-testid="space-album-card-link">
     <!-- Cover image -->
-    <div class="relative aspect-square w-full overflow-hidden rounded-xl {album.showInTimeline ? '' : 'opacity-60'}">
+    <div
+      class="relative aspect-square w-full overflow-hidden rounded-xl {album.showInTimeline &&
+      !album.hiddenFromMyTimeline
+        ? ''
+        : 'opacity-60'}"
+    >
       <AlbumCover album={album as unknown as AlbumResponseDto} class="size-full object-cover" />
     </div>
 
@@ -64,6 +79,9 @@
       <p class="text-sm dark:text-immich-dark-fg">
         {$t('items_count', { values: { count: album.assetCount } })}
         {#if !album.showInTimeline}
+          · {$t('space_albums_hidden_from_space_photos')}
+        {/if}
+        {#if album.hiddenFromMyTimeline}
           · {$t('space_albums_hidden_from_timeline')}
         {/if}
       </p>

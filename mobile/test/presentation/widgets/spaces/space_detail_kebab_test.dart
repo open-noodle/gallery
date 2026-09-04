@@ -50,7 +50,7 @@ void main() {
       await pumpKebab(tester, canEdit: false, canDelete: false);
       await openMenu(tester);
 
-      expect(find.text('Show in timeline'), findsOneWidget);
+      expect(find.text('Show all space photos in my timeline'), findsOneWidget);
       expect(find.text('People'), findsOneWidget);
       expect(find.text('Members'), findsOneWidget);
       expect(find.text('Edit Space'), findsNothing);
@@ -79,16 +79,16 @@ void main() {
       await pumpKebab(tester, showInTimeline: false);
       await openMenu(tester);
 
-      expect(find.text('Show in timeline'), findsOneWidget);
-      expect(find.text('Hide from timeline'), findsNothing);
+      expect(find.text('Show all space photos in my timeline'), findsOneWidget);
+      expect(find.text('Hide all space photos from my timeline'), findsNothing);
     });
 
     testWidgets('offers to hide when the space is shown in the timeline', (tester) async {
       await pumpKebab(tester, showInTimeline: true);
       await openMenu(tester);
 
-      expect(find.text('Hide from timeline'), findsOneWidget);
-      expect(find.text('Show in timeline'), findsNothing);
+      expect(find.text('Hide all space photos from my timeline'), findsOneWidget);
+      expect(find.text('Show all space photos in my timeline'), findsNothing);
     });
 
     testWidgets('is inert while a toggle is already in flight', (tester) async {
@@ -97,7 +97,7 @@ void main() {
       final result = await pumpKebab(tester, timelineBusy: true);
       await openMenu(tester);
 
-      await tester.tap(find.text('Show in timeline'));
+      await tester.tap(find.text('Show all space photos in my timeline'));
       await tester.pumpAndSettle();
 
       expect(result.events, isEmpty);
@@ -107,7 +107,7 @@ void main() {
       final result = await pumpKebab(tester, timelineBusy: false);
       await openMenu(tester);
 
-      await tester.tap(find.text('Show in timeline'));
+      await tester.tap(find.text('Show all space photos in my timeline'));
       await tester.pumpAndSettle();
 
       expect(result.events, ['timeline']);
@@ -134,7 +134,7 @@ void main() {
       await pumpKebab(tester, showPeople: false, canEdit: true, canDelete: true);
       await openMenu(tester);
 
-      expect(find.text('Show in timeline'), findsOneWidget);
+      expect(find.text('Show all space photos in my timeline'), findsOneWidget);
       expect(find.text('Members'), findsOneWidget);
       expect(find.text('Edit Space'), findsOneWidget);
       expect(find.text('Delete Space'), findsOneWidget);
@@ -190,7 +190,7 @@ void main() {
     await openMenu(tester);
 
     final positions = [
-      tester.getTopLeft(find.text('Hide from timeline')).dy,
+      tester.getTopLeft(find.text('Hide all space photos from my timeline')).dy,
       tester.getTopLeft(find.text('People')).dy,
       tester.getTopLeft(find.text('Members')).dy,
       tester.getTopLeft(find.text('Edit Space')).dy,

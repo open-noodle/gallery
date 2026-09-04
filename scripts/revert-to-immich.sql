@@ -125,6 +125,8 @@ DROP TABLE IF EXISTS "shared_space_asset_audit" CASCADE;
 DROP TABLE IF EXISTS "shared_space_member_audit" CASCADE;
 DROP TABLE IF EXISTS "shared_space_audit" CASCADE;
 DROP TABLE IF EXISTS "shared_space_asset" CASCADE;
+DROP TABLE IF EXISTS "shared_space_album_hidden" CASCADE;
+DROP TABLE IF EXISTS "shared_space_album_hidden_audit" CASCADE;
 DROP TABLE IF EXISTS "shared_space_album_user" CASCADE;
 DROP TABLE IF EXISTS "shared_space_album_user_audit" CASCADE;
 DROP TABLE IF EXISTS "shared_space_album_audit" CASCADE;
@@ -183,6 +185,7 @@ DROP FUNCTION IF EXISTS shared_space_album_delete_audit() CASCADE;
 DROP FUNCTION IF EXISTS shared_space_member_delete_album_audit() CASCADE;
 DROP FUNCTION IF EXISTS shared_space_delete_album_audit() CASCADE;
 DROP FUNCTION IF EXISTS shared_space_album_user_delete_after_audit() CASCADE;
+DROP FUNCTION IF EXISTS shared_space_album_hidden_delete_audit() CASCADE;
 DROP FUNCTION IF EXISTS album_soft_delete_shared_space_album() CASCADE;
 DROP FUNCTION IF EXISTS album_space_asset_delete_audit() CASCADE;
 
@@ -248,6 +251,9 @@ DELETE FROM "migration_overrides"
    'function_shared_space_member_delete_album_audit',
    'function_shared_space_delete_album_audit',
    'function_shared_space_album_user_delete_after_audit',
+   'function_shared_space_album_hidden_delete_audit',
+   'trigger_shared_space_album_hidden_delete_audit',
+   'trigger_shared_space_album_hidden_updatedAt',
    'function_album_soft_delete_shared_space_album',
    'function_album_space_asset_delete_audit',
    'index_asset_face_personId_idx',
@@ -650,6 +656,7 @@ DELETE FROM "kysely_migrations"
   '1790000000000-FixFaceRepairScanInFlightIndex',
   '1791000000000-RepointFaceReviewToPersonGroup',
   '1792123120451-AddSharedLinkSpaceId',
+  '1793000000000-AddSharedSpaceAlbumHidden',
   '1793000000000-ClearPreOptionMFaceRepairScans',
 
    -- Pre-rename names for two migrations that were renumbered off timestamp collisions
@@ -747,6 +754,7 @@ BEGIN
        'shared_space_audit', 'shared_space_asset', 'shared_space_member',
        'shared_space_album', 'shared_space_album_audit',
        'shared_space_album_user', 'shared_space_album_user_audit',
+       'shared_space_album_hidden', 'shared_space_album_hidden_audit',
        'shared_space_album_asset_audit',
        'album_space_asset_audit',
        'face_identity_face', 'face_identity',

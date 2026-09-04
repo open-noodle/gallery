@@ -142,6 +142,37 @@ const SharedSpaceAlbumLinkUpdateSchema = z
   })
   .meta({ id: 'SharedSpaceAlbumLinkUpdateDto' });
 
+// #1041: the per-member "hide this album from MY timeline" preference — distinct from
+// SharedSpaceAlbumLinkUpdateSchema above, which is the shared, editor-only flag governing the
+// space's own Photos tab. See specs/2026-08-31-space-hide-from-timeline-design.md §2.
+const SharedSpaceAlbumMemberTimelineSchema = z
+  .object({
+    showInTimeline: z.boolean().describe("Show this album's assets in your own personal timeline"),
+  })
+  .meta({ id: 'SharedSpaceAlbumMemberTimelineDto' });
+
+// #1041 slice 12: the caller's own preview count, for the confirm dialogs above. Always the
+// caller's own number — never a cross-member count, which would be both expensive and meaningless
+// since each member's other memberships differ. See specs/2026-08-31-space-hide-from-timeline-design.md §8.1.
+const SharedSpaceTimelineHidePreviewSchema = z
+  .object({
+    hiddenAssetCount: z.number().int().min(0).describe("Photos that would leave the caller's own timeline"),
+    // #1041 follow-up: the "another visible path wins" rule (§3) makes hiddenAssetCount arbitrarily
+    // small when a photo also reaches the caller by a path they did not hide — a 58,977-photo space
+    // reported "removes 3 photos" in real use, which reads as broken. This is the rest of the
+    // explanation. BOTH preview endpoints compute it, and the rescuing path differs by endpoint:
+    // for the space preview it is another SPACE the caller still shows; for the album preview it is
+    // another way into the SAME space (a direct add, or a linked external library — the shape the
+    // #1041 reporter hit). Still optional so an older client keeps working.
+    retainedAssetCount: z
+      .number()
+      .int()
+      .min(0)
+      .optional()
+      .describe("Photos in this scope that stay on the caller's timeline via a path they did not hide"),
+  })
+  .meta({ id: 'SharedSpaceTimelineHidePreviewDto' });
+
 const SharedSpaceAlbumParamSchema = z.object({
   id: z.uuidv4(),
   albumId: z.uuidv4(),
@@ -177,6 +208,9 @@ const SharedSpaceLinkedAlbumSchema = AlbumResponseSchema.omit({ albumUsers: true
     showInTimeline: z.boolean().describe('Include this album in the space timeline'),
     addedById: z.string().nullable().describe('User who linked the album into the space'),
     linkedAt: z.string().meta({ format: 'date-time' }).describe('Link creation timestamp'),
+    hiddenFromMyTimeline: z
+      .boolean()
+      .describe('Whether the caller has hidden this album from their own timeline (§2 personal switch)'),
   })
   .meta({ id: 'SharedSpaceLinkedAlbumDto' });
 
@@ -238,6 +272,8 @@ export class SharedSpaceMemberMetadataContributionDto extends createZodDto(
 ) {}
 export class SharedSpaceLibraryLinkDto extends createZodDto(SharedSpaceLibraryLinkSchema) {}
 export class SharedSpaceAlbumLinkUpdateDto extends createZodDto(SharedSpaceAlbumLinkUpdateSchema) {}
+export class SharedSpaceAlbumMemberTimelineDto extends createZodDto(SharedSpaceAlbumMemberTimelineSchema) {}
+export class SharedSpaceTimelineHidePreviewDto extends createZodDto(SharedSpaceTimelineHidePreviewSchema) {}
 export class SharedSpaceAlbumParamDto extends createZodDto(SharedSpaceAlbumParamSchema) {}
 export class SharedSpaceMemberParamDto extends createZodDto(SharedSpaceMemberParamSchema) {}
 export class SharedSpacePersonParamDto extends createZodDto(SharedSpacePersonParamSchema) {}

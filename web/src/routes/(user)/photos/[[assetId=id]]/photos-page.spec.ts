@@ -7,10 +7,12 @@ import { goto } from '$app/navigation';
 import { sdkMock } from '$lib/__mocks__/sdk.mock';
 import TestWrapper from '$lib/components/TestWrapper.svelte';
 import type { FilterState } from '$lib/components/filter-panel/filter-panel';
+import { eventManager } from '$lib/managers/event-manager.svelte';
 import { lang } from '$lib/stores/preferences.store';
 import { buildPhotosTimelineOptions } from '$lib/utils/photos-filter-options';
 import { storeTypedSearchNames } from '$lib/utils/typed-search/typed-search-name-cache';
 import { reactivePageMock as mockPage } from '@test-data/mocks/reactive-page.mock.svelte';
+import { resetTimelineMountSeq } from '../../albums/[albumId=id]/[[photos=photos]]/[[assetId=id]]/mock-timeline-mount';
 import PhotosPage from './+page.svelte';
 
 const {
@@ -1346,5 +1348,68 @@ describe('Photos page search URL state', () => {
       await waitFor(() => expect(sdkMock.getAlbumInfo).toHaveBeenCalled());
       expect(screen.getByTestId('active-filters-bar-stub')).toHaveAttribute('data-album-label', ALBUM_ID);
     });
+  });
+});
+
+// #1041: adding photos to a space the caller has hidden from their own timeline changes what the
+// server returns, but the mounted TimelineManager has already cached its buckets — the assets used
+// to sit there until the page remounted. The page now keys the Timeline on a reload token.
+//
+// `timeline-mount-id` comes from a counter in the Timeline stub that increments once per component
+// INSTANTIATION, so these assert a real remount (fresh manager, buckets re-fetched) rather than a
+// re-render, which no other stub output distinguishes.
+describe('Photos page — SpaceAddAssets timeline reload (#1041)', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mockPage.reset('https://gallery.test/photos', { routeId: '/(user)/photos/[[assetId=id]]' });
+    lang.set('en');
+    mockAssetMultiSelectManager.selectionActive = false;
+    mockAssetMultiSelectManager.assets = [];
+    mockMemoryManager.memories = [];
+    mockAuthManager.preferences.memories.enabled = false;
+    mockRegisterSearchablePageFilters.mockReturnValue(vi.fn());
+    sessionStorage.clear();
+    resetTimelineMountSeq();
+  });
+
+  it('remounts the timeline when assets are added to a space hidden from my timeline', async () => {
+    renderPage();
+    const before = screen.getByTestId('timeline-mount-id').textContent;
+
+    eventManager.emit('SpaceAddAssets', {
+      assetIds: ['asset-1'],
+      spaceId: 'space-1',
+      hiddenFromMyTimeline: true,
+    });
+    await tick();
+
+    expect(screen.getByTestId('timeline-mount-id').textContent).not.toBe(before);
+  });
+
+  // The guard that stops the test above from passing for the wrong reason: if the page remounted on
+  // EVERY SpaceAddAssets, the assertion above would still hold while the common path silently paid
+  // a full timeline reload.
+  it('leaves the timeline mounted when the space is still shown', async () => {
+    renderPage();
+    const before = screen.getByTestId('timeline-mount-id').textContent;
+
+    eventManager.emit('SpaceAddAssets', {
+      assetIds: ['asset-1'],
+      spaceId: 'space-1',
+      hiddenFromMyTimeline: false,
+    });
+    await tick();
+
+    expect(screen.getByTestId('timeline-mount-id').textContent).toBe(before);
+  });
+
+  it('leaves the timeline mounted when the emitter says nothing about hiding', async () => {
+    renderPage();
+    const before = screen.getByTestId('timeline-mount-id').textContent;
+
+    eventManager.emit('SpaceAddAssets', { assetIds: ['asset-1'], spaceId: 'space-1' });
+    await tick();
+
+    expect(screen.getByTestId('timeline-mount-id').textContent).toBe(before);
   });
 });
