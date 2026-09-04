@@ -3,11 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
+import 'package:immich_mobile/presentation/widgets/common/polaroid_hero.widget.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter.provider.dart';
 import 'package:immich_mobile/providers/photos_filter/photos_filter_search.provider.dart';
 import 'package:immich_mobile/providers/sync_status.provider.dart';
 import 'package:immich_mobile/routing/router.dart';
-import 'package:immich_mobile/presentation/widgets/common/polaroid_hero.widget.dart';
 import 'package:immich_mobile/widgets/common/immich_loading_indicator.dart';
 
 /// Shown on the main Photos timeline when it resolves to zero assets.

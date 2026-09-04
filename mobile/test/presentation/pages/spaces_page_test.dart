@@ -412,7 +412,9 @@ void main() {
     };
 
     for (final entry in floating.entries) {
-      if (entry.value.evaluate().isEmpty) continue;
+      if (entry.value.evaluate().isEmpty) {
+        continue;
+      }
       final rect = tester.getRect(entry.value);
       for (final nav in navRects.entries) {
         expect(
