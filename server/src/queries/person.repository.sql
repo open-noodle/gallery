@@ -104,7 +104,6 @@ group by
 having
   (
     "person"."name" != $3
-    or "person"."type" = 'pet'
     or count("asset_face"."assetId") >= COALESCE(
       (
         SELECT
@@ -594,13 +593,28 @@ WITH
         $3 = ''
         OR "person"."type" = $4
       )
+      AND (
+        $5 <> 'pet'
+        OR EXISTS (
+          SELECT
+            1
+          FROM
+            "asset_face" "pet_face"
+            INNER JOIN "pet_search" ON "pet_search"."faceId" = "pet_face"."id"
+          WHERE
+            "pet_face"."personId" = "person"."id"
+        )
+      )
     GROUP BY
       "person"."id",
       "person"."type"
     HAVING
       NULLIF(BTRIM("person"."name"), '') IS NOT NULL
-      OR "person"."type" = 'pet'
-      OR COUNT("asset_face"."assetId") >= $5
+      OR (
+        $6 = 'pet'
+        AND "person"."type" = 'pet'
+      )
+      OR COUNT("asset_face"."assetId") >= $7
   )
 SELECT
   COUNT(*)::int AS "total",

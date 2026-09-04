@@ -597,12 +597,12 @@ export class PersonRepository {
       .having((eb) =>
         eb.or([
           eb('person.name', '!=', ''),
-          // Pets are exempt from the human minimumFaces threshold. Pet clustering already applied
-          // its own `petRecognition.minFaces` (shipped default 1, chosen so a pet photographed once
-          // still becomes its own individual); re-applying a threshold tuned for noisy human face
-          // clusters on top would hide exactly those pets. Grouping is by person.id (the PK), so
-          // person.type is functionally dependent and legal here.
-          eb('person.type', '=', sql.lit('pet')),
+          // Under the Pets view only, waive the human minimumFaces threshold. Pet clustering already
+          // applied its own `petRecognition.minFaces` (shipped default 1, chosen so a pet
+          // photographed once still becomes its own individual), and the Pets view is where you go
+          // to name those. The unfiltered view keeps the threshold, so it behaves exactly as before.
+          // Grouping is by person.id (the PK), so person.type is functionally dependent here.
+          ...(options?.type === 'pet' ? [eb('person.type', '=', sql.lit('pet'))] : []),
           eb(
             (innerEb) => innerEb.fn.count('asset_face.assetId'),
             '>=',
@@ -645,6 +645,19 @@ export class PersonRepository {
       )
       .$if(!options?.withHidden, (qb) => qb.where('person.isHidden', '=', false))
       .$if(!!options?.type, (qb) => qb.where('person.type', '=', options!.type!))
+      // "Pets" means the individuals pet recognition identified, not the per-species buckets the
+      // detector alone produces. A bucket has no pet_search row on any of its faces.
+      .$if(options?.type === 'pet', (qb) =>
+        qb.where((eb) =>
+          eb.exists(
+            eb
+              .selectFrom('asset_face as pet_face')
+              .innerJoin('pet_search', 'pet_search.faceId', 'pet_face.id')
+              .select(sql`1`.as('one'))
+              .whereRef('pet_face.personId', '=', 'person.id'),
+          ),
+        ),
+      )
       .offset(pagination.skip ?? 0)
       .limit(pagination.take + 1)
       .execute();
@@ -1029,9 +1042,17 @@ export class PersonRepository {
           AND "asset_face"."deletedAt" IS NULL
           AND "asset_face"."isVisible" = true
           AND (${typeFilter} = '' OR "person"."type" = ${typeFilter})
+          AND (
+            ${typeFilter} <> 'pet'
+            OR EXISTS (
+              SELECT 1 FROM "asset_face" "pet_face"
+              INNER JOIN "pet_search" ON "pet_search"."faceId" = "pet_face"."id"
+              WHERE "pet_face"."personId" = "person"."id"
+            )
+          )
         GROUP BY "person"."id", "person"."type"
         HAVING NULLIF(BTRIM("person"."name"), '') IS NOT NULL
-          OR "person"."type" = 'pet'
+          OR (${typeFilter} = 'pet' AND "person"."type" = 'pet')
           OR COUNT("asset_face"."assetId") >= ${minimumFaceCount}
       )
       SELECT

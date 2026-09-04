@@ -1069,7 +1069,6 @@ export class FaceIdentityRepository {
         FROM identity_visibility
         INNER JOIN identity_counts ON identity_counts."identityId" = identity_visibility."identityId"
         WHERE identity_visibility."hasNamedProfile" = true
-          OR identity_visibility."hasPetProfile"
           OR identity_counts."visibleAssetCount" >= ${minimumFaceCount}
       )
       SELECT
@@ -1181,7 +1180,6 @@ export class FaceIdentityRepository {
         FROM identity_visibility
         INNER JOIN identity_counts ON identity_counts."identityId" = identity_visibility."identityId"
         WHERE identity_visibility."hasNamedProfile" = true
-          OR identity_visibility."hasPetProfile"
           OR identity_counts."visibleAssetCount" >= ${minimumFaceCount}
       ),
       face_classification AS (
@@ -1760,7 +1758,7 @@ export class FaceIdentityRepository {
         FROM identity_visibility
         INNER JOIN all_identity_counts ON all_identity_counts."identityId" = identity_visibility."identityId"
         WHERE identity_visibility."hasNamedProfile" = true
-          OR identity_visibility."hasPetProfile"
+          OR (${typeFilter} = 'pet' AND identity_visibility."hasPetProfile")
           OR all_identity_counts."visibleAssetCount" >= ${input.minimumFaceCount}
       )`
       : sql``;
@@ -1790,6 +1788,11 @@ export class FaceIdentityRepository {
             ${accessibleTimelineAssetPredicate({ userId: input.userId, hasTimelineSpaces })}
           )
       ),
+      embedded_pet_identities AS (
+        SELECT DISTINCT face_identity_face."identityId"
+        FROM face_identity_face
+        INNER JOIN pet_search ON pet_search."faceId" = face_identity_face."assetFaceId"
+      ),
       accessible_profiles AS (
         SELECT
           person."identityId",
@@ -1807,6 +1810,10 @@ export class FaceIdentityRepository {
             SELECT 1 FROM accessible_faces WHERE accessible_faces."identityId" = person."identityId"
           )
           AND (${typeFilter} = '' OR person.type = ${typeFilter})
+          AND (
+            ${typeFilter} <> 'pet'
+            OR person."identityId" IN (SELECT "identityId" FROM embedded_pet_identities)
+          )
         UNION ALL
         SELECT
           shared_space_person."identityId",
@@ -1836,6 +1843,10 @@ export class FaceIdentityRepository {
             SELECT 1 FROM accessible_faces WHERE accessible_faces."identityId" = shared_space_person."identityId"
           )
           AND (${typeFilter} = '' OR shared_space_person.type = ${typeFilter})
+          AND (
+            ${typeFilter} <> 'pet'
+            OR shared_space_person."identityId" IN (SELECT "identityId" FROM embedded_pet_identities)
+          )
       ),
       eligible_profiles AS (
         SELECT *
@@ -1900,7 +1911,7 @@ export class FaceIdentityRepository {
         INNER JOIN identity_favorites ON identity_favorites."identityId" = identity_counts."identityId"
         INNER JOIN identity_types ON identity_types."identityId" = identity_counts."identityId"
         WHERE NULLIF(BTRIM(best_profiles.name), '') IS NOT NULL
-          OR identity_types."isPet"
+          OR (${typeFilter} = 'pet' AND identity_types."isPet")
           OR identity_counts."visibleAssetCount" >= ${input.minimumFaceCount}
         ORDER BY
           COALESCE(identity_favorites."isFavorite", false) DESC,

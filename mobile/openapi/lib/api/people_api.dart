@@ -376,7 +376,7 @@ class PeopleApi {
   ///   Number of items per page
   ///
   /// * [String] type:
-  ///   Filter the list to human people or to pets. Omit for both.
+  ///   Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified — species buckets, which the detector produces without an embedding, are excluded, and the People-page minimumFaces threshold is waived. Omit for the unfiltered list.
   ///
   /// * [bool] withHidden:
   ///   Include hidden people
@@ -450,7 +450,7 @@ class PeopleApi {
   ///   Number of items per page
   ///
   /// * [String] type:
-  ///   Filter the list to human people or to pets. Omit for both.
+  ///   Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified — species buckets, which the detector produces without an embedding, are excluded, and the People-page minimumFaces threshold is waived. Omit for the unfiltered list.
   ///
   /// * [bool] withHidden:
   ///   Include hidden people
@@ -493,7 +493,7 @@ class PeopleApi {
   ///   Number of items per page
   ///
   /// * [String] type:
-  ///   Filter the list to human people or to pets. Omit for both.
+  ///   Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified — species buckets, which the detector produces without an embedding, are excluded, and the People-page minimumFaces threshold is waived. Omit for the unfiltered list.
   ///
   /// * [bool] withHidden:
   ///   Include hidden people
@@ -567,7 +567,7 @@ class PeopleApi {
   ///   Number of items per page
   ///
   /// * [String] type:
-  ///   Filter the list to human people or to pets. Omit for both.
+  ///   Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified — species buckets, which the detector produces without an embedding, are excluded, and the People-page minimumFaces threshold is waived. Omit for the unfiltered list.
   ///
   /// * [bool] withHidden:
   ///   Include hidden people
@@ -610,7 +610,7 @@ class PeopleApi {
   ///   Number of items per page
   ///
   /// * [String] type:
-  ///   Filter the list to human people or to pets. Omit for both.
+  ///   Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified — species buckets, which the detector produces without an embedding, are excluded, and the People-page minimumFaces threshold is waived. Omit for the unfiltered list.
   ///
   /// * [bool] withHidden:
   ///   Include hidden people
@@ -684,7 +684,7 @@ class PeopleApi {
   ///   Number of items per page
   ///
   /// * [String] type:
-  ///   Filter the list to human people or to pets. Omit for both.
+  ///   Filter the list. `person` returns human people. `pet` returns the individual pets that pet recognition identified — species buckets, which the detector produces without an embedding, are excluded, and the People-page minimumFaces threshold is waived. Omit for the unfiltered list.
   ///
   /// * [bool] withHidden:
   ///   Include hidden people

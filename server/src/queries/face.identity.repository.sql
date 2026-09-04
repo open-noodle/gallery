@@ -133,6 +133,13 @@ WITH
       AND asset.visibility = $2
       AND (asset."ownerId" = $3)
   ),
+  embedded_pet_identities AS (
+    SELECT DISTINCT
+      face_identity_face."identityId"
+    FROM
+      face_identity_face
+      INNER JOIN pet_search ON pet_search."faceId" = face_identity_face."assetFaceId"
+  ),
   accessible_profiles AS (
     SELECT
       person."identityId",
@@ -160,6 +167,15 @@ WITH
         $5 = ''
         OR person.type = $6
       )
+      AND (
+        $7 <> 'pet'
+        OR person."identityId" IN (
+          SELECT
+            "identityId"
+          FROM
+            embedded_pet_identities
+        )
+      )
     UNION ALL
     SELECT
       shared_space_person."identityId",
@@ -181,7 +197,7 @@ WITH
       shared_space_person
       INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_person."spaceId"
       LEFT JOIN shared_space_person_alias ON shared_space_person_alias."personId" = shared_space_person.id
-      AND shared_space_person_alias."userId" = $7
+      AND shared_space_person_alias."userId" = $8
     WHERE
       shared_space_person."identityId" IS NOT NULL
       AND EXISTS (
@@ -204,8 +220,17 @@ WITH
           accessible_faces."identityId" = shared_space_person."identityId"
       )
       AND (
-        $8 = ''
-        OR shared_space_person.type = $9
+        $9 = ''
+        OR shared_space_person.type = $10
+      )
+      AND (
+        $11 <> 'pet'
+        OR shared_space_person."identityId" IN (
+          SELECT
+            "identityId"
+          FROM
+            embedded_pet_identities
+        )
       )
   ),
   eligible_profiles AS (
@@ -215,12 +240,12 @@ WITH
       accessible_profiles
     WHERE
       (
-        $10::boolean
+        $12::boolean
         OR "isHidden" = false
       )
       AND (
-        $11 = ''
-        OR name ILIKE $12
+        $13 = ''
+        OR name ILIKE $14
       )
   ),
   -- Pets are exempt from the minimumFaceCount gate below: pet clustering already applied its
@@ -297,8 +322,11 @@ WITH
       INNER JOIN identity_types ON identity_types."identityId" = identity_counts."identityId"
     WHERE
       NULLIF(BTRIM(best_profiles.name), '') IS NOT NULL
-      OR identity_types."isPet"
-      OR identity_counts."visibleAssetCount" >= $13
+      OR (
+        $15 = 'pet'
+        AND identity_types."isPet"
+      )
+      OR identity_counts."visibleAssetCount" >= $16
     ORDER BY
       COALESCE(identity_favorites."isFavorite", false) DESC,
       NULLIF(BTRIM(best_profiles.name), '') IS NULL,
@@ -308,9 +336,9 @@ WITH
       END DESC NULLS LAST,
       identity_counts."identityId"
     LIMIT
-      $14
+      $17
     OFFSET
-      $15
+      $18
   )
 SELECT
   page_rows."identityId",
@@ -356,6 +384,13 @@ WITH
       AND asset.visibility = $2
       AND (asset."ownerId" = $3)
   ),
+  embedded_pet_identities AS (
+    SELECT DISTINCT
+      face_identity_face."identityId"
+    FROM
+      face_identity_face
+      INNER JOIN pet_search ON pet_search."faceId" = face_identity_face."assetFaceId"
+  ),
   accessible_profiles AS (
     SELECT
       person."identityId",
@@ -383,6 +418,15 @@ WITH
         $5 = ''
         OR person.type = $6
       )
+      AND (
+        $7 <> 'pet'
+        OR person."identityId" IN (
+          SELECT
+            "identityId"
+          FROM
+            embedded_pet_identities
+        )
+      )
     UNION ALL
     SELECT
       shared_space_person."identityId",
@@ -404,7 +448,7 @@ WITH
       shared_space_person
       INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_person."spaceId"
       LEFT JOIN shared_space_person_alias ON shared_space_person_alias."personId" = shared_space_person.id
-      AND shared_space_person_alias."userId" = $7
+      AND shared_space_person_alias."userId" = $8
     WHERE
       shared_space_person."identityId" IS NOT NULL
       AND EXISTS (
@@ -427,8 +471,17 @@ WITH
           accessible_faces."identityId" = shared_space_person."identityId"
       )
       AND (
-        $8 = ''
-        OR shared_space_person.type = $9
+        $9 = ''
+        OR shared_space_person.type = $10
+      )
+      AND (
+        $11 <> 'pet'
+        OR shared_space_person."identityId" IN (
+          SELECT
+            "identityId"
+          FROM
+            embedded_pet_identities
+        )
       )
   ),
   eligible_profiles AS (
@@ -438,12 +491,12 @@ WITH
       accessible_profiles
     WHERE
       (
-        $10::boolean
+        $12::boolean
         OR "isHidden" = false
       )
       AND (
-        $11 = ''
-        OR name ILIKE $12
+        $13 = ''
+        OR name ILIKE $14
       )
   ),
   -- Pets are exempt from the minimumFaceCount gate below: pet clustering already applied its
@@ -520,8 +573,11 @@ WITH
       INNER JOIN identity_types ON identity_types."identityId" = identity_counts."identityId"
     WHERE
       NULLIF(BTRIM(best_profiles.name), '') IS NOT NULL
-      OR identity_types."isPet"
-      OR identity_counts."visibleAssetCount" >= $13
+      OR (
+        $15 = 'pet'
+        AND identity_types."isPet"
+      )
+      OR identity_counts."visibleAssetCount" >= $16
     ORDER BY
       COALESCE(identity_favorites."isFavorite", false) DESC,
       NULLIF(BTRIM(best_profiles.name), '') IS NULL,
@@ -531,9 +587,9 @@ WITH
       END DESC NULLS LAST,
       identity_counts."identityId"
     LIMIT
-      $14
+      $17
     OFFSET
-      $15
+      $18
   )
 SELECT
   page_rows."identityId",
@@ -671,7 +727,6 @@ WITH
       INNER JOIN identity_counts ON identity_counts."identityId" = identity_visibility."identityId"
     WHERE
       identity_visibility."hasNamedProfile" = true
-      OR identity_visibility."hasPetProfile"
       OR identity_counts."visibleAssetCount" >= $7
   )
 SELECT
@@ -832,7 +887,6 @@ WITH
       INNER JOIN identity_counts ON identity_counts."identityId" = identity_visibility."identityId"
     WHERE
       identity_visibility."hasNamedProfile" = true
-      OR identity_visibility."hasPetProfile"
       OR identity_counts."visibleAssetCount" >= $7
   ),
   face_classification AS (
@@ -1049,6 +1103,13 @@ WITH
         )
       )
   ),
+  embedded_pet_identities AS (
+    SELECT DISTINCT
+      face_identity_face."identityId"
+    FROM
+      face_identity_face
+      INNER JOIN pet_search ON pet_search."faceId" = face_identity_face."assetFaceId"
+  ),
   accessible_profiles AS (
     SELECT
       person."identityId",
@@ -1076,6 +1137,15 @@ WITH
         $5 = ''
         OR person.type = $6
       )
+      AND (
+        $7 <> 'pet'
+        OR person."identityId" IN (
+          SELECT
+            "identityId"
+          FROM
+            embedded_pet_identities
+        )
+      )
     UNION ALL
     SELECT
       shared_space_person."identityId",
@@ -1097,7 +1167,7 @@ WITH
       shared_space_person
       INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_person."spaceId"
       LEFT JOIN shared_space_person_alias ON shared_space_person_alias."personId" = shared_space_person.id
-      AND shared_space_person_alias."userId" = $7
+      AND shared_space_person_alias."userId" = $8
     WHERE
       shared_space_person."identityId" IS NOT NULL
       AND EXISTS (
@@ -1120,8 +1190,17 @@ WITH
           accessible_faces."identityId" = shared_space_person."identityId"
       )
       AND (
-        $8 = ''
-        OR shared_space_person.type = $9
+        $9 = ''
+        OR shared_space_person.type = $10
+      )
+      AND (
+        $11 <> 'pet'
+        OR shared_space_person."identityId" IN (
+          SELECT
+            "identityId"
+          FROM
+            embedded_pet_identities
+        )
       )
   ),
   eligible_profiles AS (
@@ -1131,12 +1210,12 @@ WITH
       accessible_profiles
     WHERE
       (
-        $10::boolean
+        $12::boolean
         OR "isHidden" = false
       )
       AND (
-        $11 = ''
-        OR name ILIKE $12
+        $13 = ''
+        OR name ILIKE $14
       )
   ),
   -- Pets are exempt from the minimumFaceCount gate below: pet clustering already applied its
@@ -1213,8 +1292,11 @@ WITH
       INNER JOIN identity_types ON identity_types."identityId" = identity_counts."identityId"
     WHERE
       NULLIF(BTRIM(best_profiles.name), '') IS NOT NULL
-      OR identity_types."isPet"
-      OR identity_counts."visibleAssetCount" >= $13
+      OR (
+        $15 = 'pet'
+        AND identity_types."isPet"
+      )
+      OR identity_counts."visibleAssetCount" >= $16
     ORDER BY
       COALESCE(identity_favorites."isFavorite", false) DESC,
       NULLIF(BTRIM(best_profiles.name), '') IS NULL,
@@ -1224,9 +1306,9 @@ WITH
       END DESC NULLS LAST,
       identity_counts."identityId"
     LIMIT
-      $14
+      $17
     OFFSET
-      $15
+      $18
   )
 SELECT
   page_rows."identityId",
@@ -1312,6 +1394,13 @@ WITH
         )
       )
   ),
+  embedded_pet_identities AS (
+    SELECT DISTINCT
+      face_identity_face."identityId"
+    FROM
+      face_identity_face
+      INNER JOIN pet_search ON pet_search."faceId" = face_identity_face."assetFaceId"
+  ),
   accessible_profiles AS (
     SELECT
       person."identityId",
@@ -1339,6 +1428,15 @@ WITH
         $5 = ''
         OR person.type = $6
       )
+      AND (
+        $7 <> 'pet'
+        OR person."identityId" IN (
+          SELECT
+            "identityId"
+          FROM
+            embedded_pet_identities
+        )
+      )
     UNION ALL
     SELECT
       shared_space_person."identityId",
@@ -1360,7 +1458,7 @@ WITH
       shared_space_person
       INNER JOIN timeline_spaces ON timeline_spaces."spaceId" = shared_space_person."spaceId"
       LEFT JOIN shared_space_person_alias ON shared_space_person_alias."personId" = shared_space_person.id
-      AND shared_space_person_alias."userId" = $7
+      AND shared_space_person_alias."userId" = $8
     WHERE
       shared_space_person."identityId" IS NOT NULL
       AND EXISTS (
@@ -1383,8 +1481,17 @@ WITH
           accessible_faces."identityId" = shared_space_person."identityId"
       )
       AND (
-        $8 = ''
-        OR shared_space_person.type = $9
+        $9 = ''
+        OR shared_space_person.type = $10
+      )
+      AND (
+        $11 <> 'pet'
+        OR shared_space_person."identityId" IN (
+          SELECT
+            "identityId"
+          FROM
+            embedded_pet_identities
+        )
       )
   ),
   eligible_profiles AS (
@@ -1394,12 +1501,12 @@ WITH
       accessible_profiles
     WHERE
       (
-        $10::boolean
+        $12::boolean
         OR "isHidden" = false
       )
       AND (
-        $11 = ''
-        OR name ILIKE $12
+        $13 = ''
+        OR name ILIKE $14
       )
   ),
   -- Pets are exempt from the minimumFaceCount gate below: pet clustering already applied its
@@ -1476,8 +1583,11 @@ WITH
       INNER JOIN identity_types ON identity_types."identityId" = identity_counts."identityId"
     WHERE
       NULLIF(BTRIM(best_profiles.name), '') IS NOT NULL
-      OR identity_types."isPet"
-      OR identity_counts."visibleAssetCount" >= $13
+      OR (
+        $15 = 'pet'
+        AND identity_types."isPet"
+      )
+      OR identity_counts."visibleAssetCount" >= $16
     ORDER BY
       COALESCE(identity_favorites."isFavorite", false) DESC,
       NULLIF(BTRIM(best_profiles.name), '') IS NULL,
@@ -1487,9 +1597,9 @@ WITH
       END DESC NULLS LAST,
       identity_counts."identityId"
     LIMIT
-      $14
+      $17
     OFFSET
-      $15
+      $18
   ),
   all_identity_counts AS (
     SELECT
@@ -1523,8 +1633,11 @@ WITH
       INNER JOIN all_identity_counts ON all_identity_counts."identityId" = identity_visibility."identityId"
     WHERE
       identity_visibility."hasNamedProfile" = true
-      OR identity_visibility."hasPetProfile"
-      OR all_identity_counts."visibleAssetCount" >= $16
+      OR (
+        $19 = 'pet'
+        AND identity_visibility."hasPetProfile"
+      )
+      OR all_identity_counts."visibleAssetCount" >= $20
   )
 SELECT
   page_rows."identityId",
