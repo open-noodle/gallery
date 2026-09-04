@@ -25,6 +25,8 @@ import {
 export interface PersonSearchOptions {
   withHidden: boolean;
   closestFaceAssetId?: string;
+  /** People-page type filter: 'person' or 'pet'. Undefined returns both. */
+  type?: string;
 }
 
 export interface PersonNameSearchOptions {
@@ -79,6 +81,8 @@ export interface PeopleFaceStatistics {
 
 export interface PeopleFaceStatisticsOptions {
   minimumFaceCount?: number;
+  /** People-page type filter: 'person' or 'pet'. Undefined counts both. */
+  type?: string;
 }
 
 const peopleAssetVisibilities = spaceVisibleAssetVisibilities;
@@ -725,6 +729,12 @@ export class PersonRepository {
       .having((eb) =>
         eb.or([
           eb('person.name', '!=', ''),
+          // Under the Pets view only, waive the human minimumFaces threshold. Pet clustering already
+          // applied its own `petRecognition.minFaces` (shipped default 1, chosen so a pet
+          // photographed once still becomes its own individual), and the Pets view is where you go
+          // to name those. The unfiltered view keeps the threshold, so it behaves exactly as before.
+          // Grouping is by person.id (the PK), so person.type is functionally dependent here.
+          ...(options?.type === 'pet' ? [eb('person.type', '=', sql.lit('pet'))] : []),
           eb(
             (innerEb) => innerEb.fn.count('asset_face.assetId'),
             '>=',
@@ -766,6 +776,20 @@ export class PersonRepository {
           .orderBy('person.personGroupId'),
       )
       .$if(!options?.withHidden, (qb) => qb.where('person.isHidden', '=', false))
+      .$if(!!options?.type, (qb) => qb.where('person.type', '=', options!.type!))
+      // "Pets" means the individuals pet recognition identified, not the per-species buckets the
+      // detector alone produces. A bucket has no pet_search row on any of its faces.
+      .$if(options?.type === 'pet', (qb) =>
+        qb.where((eb) =>
+          eb.exists(
+            eb
+              .selectFrom('asset_face as pet_face')
+              .innerJoin('pet_search', 'pet_search.faceId', 'pet_face.id')
+              .select(sql`1`.as('one'))
+              .whereRef('pet_face.personGroupId', '=', 'person.personGroupId'),
+          ),
+        ),
+      )
       .offset(pagination.skip ?? 0)
       .limit(pagination.take + 1)
       .execute();
@@ -1176,6 +1200,7 @@ export class PersonRepository {
   @GenerateSql({ params: [DummyValue.UUID, { minimumFaceCount: 3 }] })
   async getNumberOfPeople(userId: string, options: PeopleFaceStatisticsOptions = {}) {
     const minimumFaceCount = options.minimumFaceCount ?? 1;
+    const typeFilter = options.type ?? '';
     const result = await sql<{ total: number; hidden: number }>`
       WITH "eligible_people" AS (
         SELECT
@@ -1189,9 +1214,19 @@ export class PersonRepository {
           AND "asset"."deletedAt" IS NULL
           AND "asset_face"."deletedAt" IS NULL
           AND "asset_face"."isVisible" = true
+          AND (${typeFilter} = '' OR "person"."type" = ${typeFilter})
+          AND (
+            ${typeFilter} <> 'pet'
+            OR EXISTS (
+              SELECT 1 FROM "asset_face" "pet_face"
+              INNER JOIN "pet_search" ON "pet_search"."faceId" = "pet_face"."id"
+              WHERE "pet_face"."personGroupId" = "person"."personGroupId"
+            )
+          )
         -- see getPeopleOverviewStatistics: group by the composite PRIMARY KEY, not the unique index
-        GROUP BY "person"."ownerId", "person"."personGroupId"
+        GROUP BY "person"."ownerId", "person"."personGroupId", "person"."type"
         HAVING NULLIF(BTRIM("person"."name"), '') IS NOT NULL
+          OR (${typeFilter} = 'pet' AND "person"."type" = 'pet')
           OR COUNT("asset_face"."assetId") >= ${minimumFaceCount}
       )
       SELECT
