@@ -114,10 +114,13 @@ export const SYNC_TYPES_ORDER = [
   SyncRequestType.SharedSpaceLibrariesV1,
   SyncRequestType.LibraryAssetsV1,
   SyncRequestType.LibraryAssetExifsV1,
-  // Shared-space album sync (Phase 2A). Order: album metadata + link first
-  // (so mobile can build the album list before asset rows start streaming),
-  // then membership rows (album_asset join), then asset blobs and exif.
+  // Shared-space album sync (Phase 2A). Order: album metadata + folders first (folders have no
+  // dependency on the link rows, and landing them first means the album-link rows arrive already
+  // knowing their folder, instead of rendering flat at the root for one frame and then re-nesting
+  // once the folder catches up), then link rows (so mobile can build the album list before asset
+  // rows start streaming), then membership rows (album_asset join), then asset blobs and exif.
   SyncRequestType.SharedSpaceAlbumsV1,
+  SyncRequestType.SharedSpaceAlbumFoldersV1,
   SyncRequestType.SharedSpaceAlbumLinksV1,
   // #1041: hidden rows key off (spaceId, albumId) like the link row above, so it belongs
   // immediately after the link stream — before any asset-bearing stream, same reasoning.
@@ -284,6 +287,8 @@ export class SyncService extends BaseService {
         this.syncSharedSpaceLibrariesV1(options, response, checkpointMap, session.id),
       // Shared-space album sync handlers (Phase 2A).
       [SyncRequestType.SharedSpaceAlbumsV1]: () => this.syncSharedSpaceAlbumsV1(options, response, checkpointMap),
+      [SyncRequestType.SharedSpaceAlbumFoldersV1]: () =>
+        this.syncSharedSpaceAlbumFoldersV1(options, response, checkpointMap, session.id),
       [SyncRequestType.SharedSpaceAlbumLinksV1]: () =>
         this.syncSharedSpaceAlbumLinksV1(options, response, checkpointMap, session.id),
       [SyncRequestType.SharedSpaceAlbumHiddensV1]: () =>
@@ -339,6 +344,7 @@ export class SyncService extends BaseService {
     await this.syncRepository.sharedSpaceAlbum.cleanupAuditTable(pruneThreshold);
     await this.syncRepository.sharedSpaceAlbumLink.cleanupAuditTable(pruneThreshold);
     await this.syncRepository.sharedSpaceAlbumHidden.cleanupAuditTable(pruneThreshold);
+    await this.syncRepository.sharedSpaceAlbumFolder.cleanupAuditTable(pruneThreshold);
     await this.syncRepository.sharedSpaceAlbumToAsset.cleanupAuditTable(pruneThreshold);
   }
 
@@ -1226,6 +1232,74 @@ export class SyncService extends BaseService {
     }
 
     const upserts = this.syncRepository.sharedSpaceAlbumHidden.getUpserts({
+      ...options,
+      ack: checkpointMap[upsertType],
+    });
+    for await (const { updateId, ...data } of upserts) {
+      send(response, { type: upsertType, ids: [updateId], data });
+    }
+  }
+
+  // shared_space_album_folder rows — clone of syncSharedSpaceAlbumLinksV1. Deletes first (from
+  // shared_space_album_folder_audit, scoped to accessibleSpaces), then per-space backfill, then
+  // upserts for any new/renamed/reparented folders.
+  //
+  // getDeletes also selects spaceId (needed to gate the audit query), but the wire DTO
+  // (SyncSharedSpaceAlbumFolderDeleteV1) carries only folderId — a folder id is globally unique,
+  // so the client does not need the space to resolve which local row to drop.
+  private async syncSharedSpaceAlbumFoldersV1(
+    options: SyncQueryOptions,
+    response: Writable,
+    checkpointMap: CheckpointMap,
+    sessionId: string,
+  ) {
+    const deleteType = SyncEntityType.SharedSpaceAlbumFolderDeleteV1;
+    const deletes = this.syncRepository.sharedSpaceAlbumFolder.getDeletes({
+      ...options,
+      ack: checkpointMap[deleteType],
+    });
+    for await (const { id, folderId } of deletes) {
+      send(response, { type: deleteType, ids: [id], data: { folderId } });
+    }
+
+    const backfillType = SyncEntityType.SharedSpaceAlbumFolderBackfillV1;
+    const backfillCheckpoint = checkpointMap[backfillType];
+    const spaces = await this.syncRepository.sharedSpace.getCreatedAfter({
+      ...options,
+      afterCreateId: backfillCheckpoint?.updateId,
+    });
+    const upsertType = SyncEntityType.SharedSpaceAlbumFolderV1;
+    const upsertCheckpoint = checkpointMap[upsertType];
+    if (upsertCheckpoint) {
+      const endId = upsertCheckpoint.updateId;
+
+      for (const space of spaces) {
+        const createId = space.createId;
+        if (isEntityBackfillComplete(createId, backfillCheckpoint)) {
+          continue;
+        }
+
+        const startId = getStartId(createId, backfillCheckpoint);
+        const backfill = this.syncRepository.sharedSpaceAlbumFolder.getBackfill(
+          { ...options, afterUpdateId: startId, beforeUpdateId: endId },
+          space.id,
+        );
+
+        for await (const { updateId, ...data } of backfill) {
+          send(response, { type: backfillType, ids: [createId, updateId], data });
+        }
+
+        sendEntityBackfillCompleteAck(response, backfillType, createId);
+      }
+    } else if (spaces.length > 0) {
+      await this.upsertBackfillCheckpoint({
+        type: backfillType,
+        sessionId,
+        createId: spaces.at(-1)!.createId,
+      });
+    }
+
+    const upserts = this.syncRepository.sharedSpaceAlbumFolder.getUpserts({
       ...options,
       ack: checkpointMap[upsertType],
     });
