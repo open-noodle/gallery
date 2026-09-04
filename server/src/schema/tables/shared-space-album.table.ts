@@ -12,6 +12,7 @@ import {
 import { CreateIdColumn, UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators';
 import { shared_space_album_after_insert_user, shared_space_album_delete_audit } from 'src/schema/functions';
 import { AlbumTable } from 'src/schema/tables/album.table';
+import { SharedSpaceAlbumFolderTable } from 'src/schema/tables/shared-space-album-folder.table';
 import { SharedSpaceTable } from 'src/schema/tables/shared-space.table';
 import { UserTable } from 'src/schema/tables/user.table';
 
@@ -47,6 +48,15 @@ export class SharedSpaceAlbumTable {
   // Whether this album's photos appear in the aggregated space timeline.
   @Column({ type: 'boolean', default: true })
   showInTimeline!: Generated<boolean>;
+
+  // Visual placement inside the space. NULL = space root. Lives on the JOIN table, not on
+  // `album`, so personal albums structurally cannot be nested and one album linked into two
+  // spaces has an independent placement in each.
+  //
+  // SET NULL rather than CASCADE: deleting a folder must never unlink an album. The service
+  // promotes children before deleting, so this is a backstop for direct SQL deletes.
+  @ForeignKeyColumn(() => SharedSpaceAlbumFolderTable, { nullable: true, onDelete: 'SET NULL' })
+  folderId!: string | null;
 
   @CreateDateColumn()
   createdAt!: Generated<Timestamp>;

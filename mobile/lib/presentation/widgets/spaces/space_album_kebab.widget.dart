@@ -9,8 +9,10 @@ import 'package:immich_mobile/generated/translations.g.dart';
 ///   - Show in timeline / Hide from timeline  (Key: space-album-kebab-toggle)
 ///   - Unlink from space  (Key: space-album-kebab-unlink)
 ///
-/// The [onAddPhotos], [onToggleTimeline], [onUnlink] callbacks are B6 stubs —
-/// they are no-ops in B4.
+/// The [onAddPhotos], [onToggleTimeline], [onUnlink] callbacks are supplied by
+/// the caller — [SpaceAlbumDetailPage] wires all three to real mutations through
+/// [SpaceAlbumActions]. This widget only decides whether the menu is shown and
+/// which items it contains.
 class SpaceAlbumKebab extends StatelessWidget {
   const SpaceAlbumKebab({
     super.key,
