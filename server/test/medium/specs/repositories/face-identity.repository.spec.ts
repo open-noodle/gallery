@@ -58,6 +58,36 @@ const seedCharacterisationIdentity = async (
   return { person, identity };
 };
 
+// Seeds an owned person of a given type with `assets` timeline photos, for the People-page type
+// filter cases below.
+const seedTypedIdentity = async (
+  ctx: ReturnType<typeof setup>['ctx'],
+  sut: FaceIdentityRepository,
+  input: { userId: string; type?: string; species?: string; name?: string; assets: number; embedded?: boolean },
+) => {
+  const { person } = await ctx.newPerson({
+    ownerId: input.userId,
+    name: input.name ?? '',
+    ...(input.type && { type: input.type }),
+    ...(input.species && { species: input.species }),
+  });
+  const identity = await sut.ensurePersonIdentity(person.personGroupId);
+  for (let index = 0; index < input.assets; index++) {
+    const { asset } = await ctx.newAsset({ ownerId: input.userId, visibility: AssetVisibility.Timeline });
+    const { assetFace } = await ctx.newAssetFace({ assetId: asset.id, personGroupId: person.personGroupId });
+    await sut.linkFace({ assetFaceId: assetFace.id, identityId: identity.id, source: 'owner-person' });
+    // A pet_search row marks a pet as an individual the re-ID model identified; a species bucket
+    // never has one.
+    if (input.embedded) {
+      await ctx.database
+        .insertInto('pet_search')
+        .values({ faceId: assetFace.id, embedding: newEmbedding(), species: input.species ?? null })
+        .execute();
+    }
+  }
+  return { person, identity };
+};
+
 const newSpacePerson = async (ctx: ReturnType<typeof setup>['ctx'], spaceId: string) => {
   return ctx.database.insertInto('shared_space_person').values({ spaceId }).returningAll().executeTakeFirstOrThrow();
 };
@@ -5657,5 +5687,200 @@ describe(FaceIdentityRepository.name, () => {
         `person:${personWithoutIdentity.personGroupId}`,
       ]);
     });
+  });
+});
+
+// getAccessiblePeople is the arm the web /people page actually calls (it always sends
+// withSharedSpaces=true). The type filter and the pets minimumFaces exemption must hold here too,
+// or the filter silently does nothing on the real page.
+describe('FaceIdentityRepository getAccessiblePeople type filter', () => {
+  it('returns only pets when type is pet', async () => {
+    const { sut, ctx } = setup();
+    const { user } = await ctx.newUser();
+    const { person: human } = await seedTypedIdentity(ctx, sut, { userId: user.id, name: 'Alice', assets: 3 });
+    const { person: pet } = await seedTypedIdentity(ctx, sut, {
+      userId: user.id,
+      type: 'pet',
+      species: 'dog',
+      name: 'Rex',
+      assets: 3,
+      embedded: true,
+    });
+
+    const result = await sut.getAccessiblePeople(user.id, { withHidden: false, page: 1, size: 50, type: 'pet' });
+
+    const ids = result.people.map(({ id }) => id);
+    expect(ids).toContain(pet.personGroupId);
+    expect(ids).not.toContain(human.personGroupId);
+  });
+
+  it('returns only humans when type is person', async () => {
+    const { sut, ctx } = setup();
+    const { user } = await ctx.newUser();
+    const { person: human } = await seedTypedIdentity(ctx, sut, { userId: user.id, name: 'Bob', assets: 3 });
+    const { person: pet } = await seedTypedIdentity(ctx, sut, {
+      userId: user.id,
+      type: 'pet',
+      species: 'cat',
+      name: 'Mochi',
+      assets: 3,
+      embedded: true,
+    });
+
+    const result = await sut.getAccessiblePeople(user.id, { withHidden: false, page: 1, size: 50, type: 'person' });
+
+    const ids = result.people.map(({ id }) => id);
+    expect(ids).toContain(human.personGroupId);
+    expect(ids).not.toContain(pet.personGroupId);
+  });
+
+  it('surfaces a single-face individual under type=pet, despite the minimumFaceCount gate', async () => {
+    const { sut, ctx } = setup();
+    const { user } = await ctx.newUser();
+    const { person: pet } = await seedTypedIdentity(ctx, sut, {
+      userId: user.id,
+      type: 'pet',
+      species: 'dog',
+      assets: 1,
+      embedded: true,
+    });
+
+    const result = await sut.getAccessiblePeople(user.id, {
+      withHidden: false,
+      page: 1,
+      size: 50,
+      minimumFaceCount: 3,
+      type: 'pet',
+    });
+
+    expect(result.people.map(({ id }) => id)).toContain(pet.personGroupId);
+  });
+
+  // The header count is derived from the same query. If it kept the old gate, the page would read
+  // "73 people" above a grid of 260 — the count and the grid must agree on the pets exemption.
+  it('counts a single-face individual in the header total under type=pet', async () => {
+    const { sut, ctx } = setup();
+    const { user } = await ctx.newUser();
+    await seedTypedIdentity(ctx, sut, { userId: user.id, type: 'pet', species: 'dog', assets: 1, embedded: true });
+
+    const result = await sut.getAccessiblePeople(user.id, {
+      withHidden: false,
+      page: 1,
+      size: 50,
+      minimumFaceCount: 3,
+      type: 'pet',
+    });
+
+    expect(result.total).toBe(result.people.length);
+    expect(result.total).toBe(1);
+  });
+
+  // The overview statistics feed the UNFILTERED header, which keeps the minimumFaces gate — so a
+  // single-photo pet stays out of it, exactly as before this feature. Pinned so the "All view is
+  // unchanged" promise cannot regress.
+  it('keeps the minimumFaces gate in the overview statistics', async () => {
+    const { sut, ctx } = setup();
+    const { user } = await ctx.newUser();
+    await seedTypedIdentity(ctx, sut, { userId: user.id, type: 'pet', species: 'dog', assets: 1, embedded: true });
+
+    const stats = await sut.getAccessiblePeopleStatistics(user.id, { minimumFaceCount: 3 });
+
+    expect(stats.total).toBe(0);
+  });
+
+  // Same for the face statistics: unfiltered, so the gate stands and the single-photo pet's face is
+  // not counted as an assigned visible face.
+  it('keeps the minimumFaces gate in the face statistics', async () => {
+    const { sut, ctx } = setup();
+    const { user } = await ctx.newUser();
+    await seedTypedIdentity(ctx, sut, { userId: user.id, type: 'pet', species: 'dog', assets: 1, embedded: true });
+
+    const stats = await sut.getAccessiblePeopleFaceStatistics(user.id, { minimumFaceCount: 3 });
+
+    expect(stats.assignedVisibleFaceCount).toBe(0);
+  });
+
+  // The header count must move with the filter: filtering to Pets and reading "2 people" above a
+  // grid of one pet is worse than no count at all.
+  it('reports a total scoped to the type filter', async () => {
+    const { sut, ctx } = setup();
+    const { user } = await ctx.newUser();
+    await seedTypedIdentity(ctx, sut, { userId: user.id, name: 'Alice', assets: 3 });
+    await seedTypedIdentity(ctx, sut, {
+      userId: user.id,
+      type: 'pet',
+      species: 'dog',
+      name: 'Rex',
+      assets: 3,
+      embedded: true,
+    });
+
+    const all = await sut.getAccessiblePeople(user.id, { withHidden: false, page: 1, size: 50 });
+    const pets = await sut.getAccessiblePeople(user.id, { withHidden: false, page: 1, size: 50, type: 'pet' });
+
+    expect(all.total).toBe(2);
+    expect(pets.total).toBe(1);
+    expect(pets.people).toHaveLength(1);
+  });
+
+  it('excludes species buckets from type=pet', async () => {
+    const { sut, ctx } = setup();
+    const { user } = await ctx.newUser();
+    const { person: bucket } = await seedTypedIdentity(ctx, sut, {
+      userId: user.id,
+      type: 'pet',
+      species: 'bird',
+      name: 'bird',
+      assets: 5,
+    });
+    const { person: individual } = await seedTypedIdentity(ctx, sut, {
+      userId: user.id,
+      type: 'pet',
+      species: 'dog',
+      assets: 2,
+      embedded: true,
+    });
+
+    const result = await sut.getAccessiblePeople(user.id, { withHidden: false, page: 1, size: 50, type: 'pet' });
+
+    const ids = result.people.map(({ id }) => id);
+    expect(ids).toContain(individual.personGroupId);
+    expect(ids).not.toContain(bucket.personGroupId);
+  });
+
+  it('keeps the minimumFaceCount gate on the unfiltered view', async () => {
+    const { sut, ctx } = setup();
+    const { user } = await ctx.newUser();
+    const { person: individual } = await seedTypedIdentity(ctx, sut, {
+      userId: user.id,
+      type: 'pet',
+      species: 'cat',
+      assets: 1,
+      embedded: true,
+    });
+
+    const unfiltered = await sut.getAccessiblePeople(user.id, {
+      withHidden: false,
+      page: 1,
+      size: 50,
+      minimumFaceCount: 3,
+    });
+
+    expect(unfiltered.people.map(({ id }) => id)).not.toContain(individual.personGroupId);
+  });
+
+  it('still hides an unnamed human with a single face', async () => {
+    const { sut, ctx } = setup();
+    const { user } = await ctx.newUser();
+    const { person: human } = await seedTypedIdentity(ctx, sut, { userId: user.id, assets: 1 });
+
+    const result = await sut.getAccessiblePeople(user.id, {
+      withHidden: false,
+      page: 1,
+      size: 50,
+      minimumFaceCount: 3,
+    });
+
+    expect(result.people.map(({ id }) => id)).not.toContain(human.personGroupId);
   });
 });

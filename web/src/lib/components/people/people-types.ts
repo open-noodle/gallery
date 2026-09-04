@@ -13,7 +13,10 @@ export type ManagedPerson = {
   canEditPersonalProfile?: boolean;
 };
 
-export type VisibilityPerson = Pick<ManagedPerson, 'id' | 'displayName' | 'thumbnailUrl' | 'isHidden'>;
+export type VisibilityPerson = Pick<
+  ManagedPerson,
+  'id' | 'displayName' | 'thumbnailUrl' | 'isHidden' | 'type' | 'species'
+>;
 
 export type VisibilityChange = {
   id: string;
